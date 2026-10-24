@@ -6364,3 +6364,19 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 4. **The backlog** of existing analytic gaps is cleared by dedicated rounds, not one issue at a time.
 
 **Consequences.** Items touching the parser grow (an estimated 30–50%), so a round holds fewer of them, but the known-gap list stops growing. The fix-round and decisions skills and docs/22 §10 carry the rule.
+
+## ADR-W-158 — A known bug is never the reference and never a pass: `[2-D]` cannot cite an open bug, and a play-sheet case never expects a known-wrong outcome (#2499)
+
+**Status:** accepted · 2026-10-24 · process (workspace) · amends [ADR-W-117](#adr-w-117) (the `[2-D]` tag) and [ADR-W-092](#adr-w-092) (pre-play)
+
+**Operator:** 2026-10-24, playing round #2501 T30 — *"the refusal is wrong and is a P1. I'm surprised you passed it in your test - worth checking why."* Offered the two rules below; ruling: *"yes - rules"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — [docs/22 §2b](22-workflow.md), the playsheet skill.
+
+**Context.** #2477's plan turned «מעגל O · AB = 6 · AB קוטר של המעגל» from a false second circle into a false refusal, and tagged the change `[2-D]` because its twin «AB קוטר במעגל» is refused at HEAD. That refusal was an open bug, #2499. The play sheet then wrote T30 with `expectRefusal` set to the false sentence, so pre-play went green on the bug. The heads-up named the bug, but the case was still a pass.
+
+**Decision.**
+1. **`[2-D]` cannot cite a known bug.** Before tagging a line `[2-D]`, the plan checks whether the measured 2-D behaviour is itself an open issue (search the queue for the sentence and its twin). If it is, the line is not `[2-D]`. It is `[proposed]` (the operator decides whether trading one wrong outcome for another is worth landing), or the plan fixes the bug in the same item. Moving a student from one wrong outcome to a different wrong outcome is never progress by default.
+2. **A play-sheet case never passes on a known-wrong outcome.** A case whose correct outcome is not delivered is written with the *correct* expectation, so it runs red. It is listed in the heads-up under "approved but not delivered", naming its issue, and is never an `expectRefusal` / `expect` of the bug's output. A red pre-play case still blocks the item, per ADR-W-092, unless the item's own plan says the outcome is out of scope and the heads-up says so.
+
+**Consequences.** Some items stop landing until their twin bug is fixed or the operator accepts the trade. The sheet stops showing "pass" on behaviour the session knows to be false.

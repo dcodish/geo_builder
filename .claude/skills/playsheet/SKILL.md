@@ -84,6 +84,8 @@ A case is a claim about the product, so it is measured before it goes on the she
 - **Write the spec** `scripts/playsheets/<name>.json` (tracked):
   `{ "name", "title", "cases": [{ "id": "T1", "title", "class": "play|look|verified", "product": "2d|3d|complex|analytic", "base": "http://localhost:5173", "path"?, "lines": [...], "lookFor", "before", "expect"?: [...], "expectAbsent"?: [...], "expectRefusal"?, "asks"?: [...], "cycles"?: N, "after"?: [{ "toggle": row } | { "type": "…" }], "llm"?: { "<utterance>": ["canonical line", …] } }] }`.
   `expectRefusal` flips the case: it passes only when a refusal containing that text appears.
+  **Never set `expect` / `expectRefusal` to a known bug's output** ([ADR-W-158](../../../docs/06w-decisions-workspace.md#adr-w-158), round #2501 T30):
+  write the CORRECT outcome, let the case run red, and list it in the Heads-up as approved-but-not-delivered with its issue.
 - **The model lane is never live** (CLAUDE.md rule 2, ADR-W-127). The driver's browser answers every `/api/parse`
   itself: keyless by default (the deterministic refusal stands). For a case that exercises the AI lane, be the
   oracle and put the canonical lines the model should return in `llm`, keyed by the utterance the client

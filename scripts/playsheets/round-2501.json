@@ -1,489 +1,488 @@
 {
- "name": "round-2501",
- "title": "Round #2501 — the P1s found in play",
- "cases": [
-  {
-   "id": "T1",
-   "title": "A later line no longer deletes the earlier one (your T5) (#2480)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "ריבוע חוסם את מעגל O",
-    "ריבוע חסום במעגל O"
-   ],
-   "lookFor": "Start: press «נקה הכל». Three rows, each with its own text; line 3 accepted; one circle, one square around it and one square inside it",
-   "before": "after line 2 «מעגל O» vanished and line 2 showed twice; line 3 refused «מעגל O לא הוגדר»",
-   "expect": [
-    "ריבוע חוסם את מעגל O",
-    "ריבוע חסום במעגל O"
-   ],
-   "expectAbsent": [
-    "מעגל O לא הוגדר"
-   ]
-  },
-  {
-   "id": "T2",
-   "title": "A square around a circle keeps the circle's stated radius (#2480)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O ברדיוס 3",
-    "ריבוע חוסם את מעגל O"
-   ],
-   "lookFor": "Start: press «נקה הכל». Both rows kept; the circle keeps radius 3; the square has side 6, every side touching",
-   "before": "«מעגל O ברדיוס 3» replaced by line 2, and the radius 3 silently lost (r drawn as 2.5)",
-   "expect": [
-    "מעגל O ברדיוס 3",
-    "ריבוע חוסם את מעגל O"
-   ]
-  },
-  {
-   "id": "T3",
-   "title": "Two squares around one circle (#2480)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "ריבוע ABCD חוסם את מעגל O",
-    "ריבוע EFGH חוסם את מעגל O"
-   ],
-   "lookFor": "Start: press «נקה הכל». Three rows; two different squares, both tangent to the circle on every side",
-   "before": "line 3 took over line 2's row, and ABCD lost its tangency",
-   "expect": [
-    "ריבוע ABCD חוסם את מעגל O",
-    "ריבוע EFGH חוסם את מעגל O"
-   ]
-  },
-  {
-   "id": "T4",
-   "title": "A free point's row survives a later intersection line (#2480)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "נקודה A",
-    "M נקודת החיתוך של AB ו-CD"
-   ],
-   "lookFor": "Start: press «נקה הכל». Two rows, «נקודה A» and the M line, each with its own text",
-   "before": "the «נקודה A» row was rewritten into the M line",
-   "expect": [
-    "נקודה A",
-    "M נקודת החיתוך של AB ו-CD"
-   ]
-  },
-  {
-   "id": "T5",
-   "title": "REFUSAL: a quarter circle keeps its right angle (your T35) (#2483)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "רבע מעגל AOB",
-    "קשת AB = 40"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 2 refused; the quarter stays 90° around O. Measured sentence in full: «לא ניתן: «קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.9 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
-   "before": "a 40° wedge, all green",
-   "expectRefusal": "«קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°.",
-   "_probe": "verified-by-probe ~1.9 s"
-  },
-  {
-   "id": "T6",
-   "title": "REFUSAL: an arc whose end is the centre (#2483, #2345)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "רבע מעגל AOB",
-    "קשת BO=40"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 2 refused; the quarter is unchanged. Measured sentence in full: «הנתון «קשת BO=40» מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אין מה לשרטט מהשורה הזאת: אף קשת אחרת בשרטוט אינה יכולה לקבל את הערך הזה.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 2.2 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
-   "before": "the generic «משהו השתבש בבניית השורה הזאת…»",
-   "expectRefusal": "מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אין מה לשרטט מהשורה הזאת: אף קשת אחרת בשרטוט אינה יכולה לקבל את הערך הזה.",
-   "_probe": "verified-by-probe ~2.2 s"
-  },
-  {
-   "id": "T7",
-   "title": "REFUSAL with a next step: an arc from the centre on a plain circle (#2483)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "A על המעגל",
-    "B על המעגל",
-    "קשת OB = 40",
-    "קשת AB = 40"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 4 refused, measured sentence in full: «הנתון «קשת OB = 40» מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אם התכוונתם לקשת בין שתי נקודות שעליו, כתבו למשל «קשת AB = 40».» Line 5 (the suggested line) builds, as row «∠AOB = 40» with the note «נקלט. בפעם הבאה אפשר לכתוב כך: ∠AOB = 40 — זו הצורה שהכלי מבין תמיד.»",
-   "before": "the generic floor sentence",
-   "expectRefusal": "אם התכוונתם לקשת בין שתי נקודות שעליו, כתבו למשל «קשת AB = 40»."
-  },
-  {
-   "id": "T8",
-   "title": "REFUSAL: a half circle stays a half circle (#2483)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "חצי מעגל OAB",
-    "∠AOB = 100"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 2 refused; A, O, B stay on one line. Measured sentence in full: «לא ניתן: «∠AOB = 100» סותר את «חצי מעגל OAB» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 100°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.6 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
-   "before": "the half bent to 100°, green",
-   "expectRefusal": "«∠AOB = 100» סותר את «חצי מעגל OAB» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 100°.",
-   "_probe": "verified-by-probe ~1.6 s"
-  },
-  {
-   "id": "T9",
-   "title": "A point on the half circle stays on the drawn half (#2483)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "חצי מעגל OAB",
-    "C על חצי המעגל",
-    "AC = 6"
-   ],
-   "lookFor": "Start: press «נקה הכל». Builds, three rows; C on the drawn half, and the diameter O–B still straight through A",
-   "before": "A moved off the diameter, green"
-  },
-  {
-   "id": "T10",
-   "title": "ASK: an arc between two points that two circles share (#2483)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "מעגל P",
-    "A על מעגל O",
-    "B על מעגל O",
-    "A על מעגל P",
-    "B על מעגל P",
-    "קשת AB = 40"
-   ],
-   "lookFor": "Start: press «נקה הכל». The last line asks which circle, naming O and P; nothing new drawn. Measured sentence in full: «יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O».»",
-   "before": "silently drew the 40° on circle O",
-   "expectRefusal": "יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O»."
-  },
-  {
-   "id": "T11",
-   "title": "A centre-ended segment whose far end is on another circle keeps its crossing within the segment (#2483 batch, beyond the request)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל שמרכזו O",
-    "מעגל שמרכזו P",
-    "נקודה A על מעגל P",
-    "AO חותך את המעגל O בנקודה C"
-   ],
-   "lookFor": "Start: press «נקה הכל». C lies between A and O, on the segment AO",
-   "before": "read as a radius line, the crossing allowed outside the segment"
-  },
-  {
-   "id": "T12",
-   "title": "A chord with one end on another circle avoids the right end (#2483 batch, beyond the request)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל שמרכזו O",
-    "מעגל שמרכזו P",
-    "נקודה A על מעגל P",
-    "נקודה B על מעגל O",
-    "AB חותך את המעגל O בנקודה C"
-   ],
-   "lookFor": "Start: press «נקה הכל». C is the crossing of AB with circle O other than B (B is the end already on circle O)",
-   "before": "the wrong end was avoided"
-  },
-  {
-   "id": "T13",
-   "title": "A quarter circle written AOB is drawn around O (#2486)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "רבע מעגל AOB"
-   ],
-   "lookFor": "Start: press «נקה הכל». The quarter's corner is at O, with OA ⟂ OB",
-   "before": "drawn around A, ends at O and B"
-  },
-  {
-   "id": "T14",
-   "title": "A half circle written AOB is drawn around O (#2486)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "חצי מעגל AOB"
-   ],
-   "lookFor": "Start: press «נקה הכל». O is the midpoint of the diameter AB",
-   "before": "centred at A, diameter OB"
-  },
-  {
-   "id": "T15",
-   "title": "A sector is unchanged (#2486)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "גזרה AOB"
-   ],
-   "lookFor": "Start: press «נקה הכל». Centred at O, as before",
-   "before": "unchanged"
-  },
-  {
-   "id": "T16",
-   "title": "REFUSAL: an arc value that would bend the quarter (#2486)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "רבע מעגל AOB",
-    "קשת AB = 40"
-   ],
-   "lookFor": "Start: press «נקה הכל». Refused; the quarter stays 90° about O. (Same lines and sentence as T5, checked here as #2486's own case.) Measured sentence in full: «לא ניתן: «קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.9 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
-   "before": "refused with the \"the arc's end is the centre\" sentence (centre A)",
-   "expectRefusal": "הסיבה: ∠AOB = 40°.",
-   "expectAbsent": [
-    "הוא מרכז המעגל ולא נקודה עליו"
-   ],
-   "_probe": "verified-by-probe ~1.9 s"
-  },
-  {
-   "id": "T17",
-   "title": "Analytic draws the quarter AOB around O (#2486)",
-   "class": "play",
-   "product": "analytic",
-   "base": "http://localhost:5173",
-   "path": "/analytic.html",
-   "lines": [
-    "רבע מעגל AOB"
-   ],
-   "lookFor": "Start: press «נקה הכל» (analytic builder). The quarter is centred at O",
-   "before": "the quarter around A"
-  },
-  {
-   "id": "T18",
-   "title": "Analytic draws the sector OAB around O (#2486)",
-   "class": "play",
-   "product": "analytic",
-   "base": "http://localhost:5173",
-   "path": "/analytic.html",
-   "lines": [
-    "גזרה OAB"
-   ],
-   "lookFor": "Start: press «נקה הכל» (still the analytic builder). The sector is centred at O",
-   "before": "«גזרה OAB» around A"
-  },
-  {
-   "id": "T19",
-   "title": "A saved figure re-opens with the new centre (#2486)",
-   "class": "verified",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "רבע מעגל AOB"
-   ],
-   "lookFor": "Not driven (the driver cannot load a save; the line only opens the page). Load an old «רבע מעגל AOB» save: it opens centred at O, with step 1 marked updated; OAB and sector saves load byte-identical. Locked by src/store/__tests__/load-refresh-2486.test.ts",
-   "before": "n/a"
-  },
-  {
-   "id": "T20",
-   "title": "One point on each of two circles that share a centre (#2464)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "שני מעגלים בעלי מרכז משותף O",
-    "A על המעגל החיצוני ו-B על המעגל הפנימי"
-   ],
-   "lookFor": "Start: press «נקה הכל». A on the big circle, B on the small one, green",
-   "before": "both A and B on the outer circle, green"
-  },
-  {
-   "id": "T21",
-   "title": "A tangent to the outer circle beside a third circle draws only the tangent (#2464)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "שני מעגלים בעלי מרכז משותף O",
-    "רדיוס מעגל חיצוני הוא 10",
-    "רדיוס מעגל פנימי 9",
-    "מעגל P",
-    "משיק למעגל החיצוני בנקודה A"
-   ],
-   "lookFor": "Start: press «נקה הכל». One tangent line at A on the outer circle; P does not move; no O–P tangency in the givens",
-   "before": "O and P also made tangent at A, green"
-  },
-  {
-   "id": "T22",
-   "title": "Name the inner circle's radius r (#2464)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "שני מעגלים בעלי מרכז משותף O",
-    "רדיוס המעגל הפנימי הוא r"
-   ],
-   "lookFor": "Start: press «נקה הכל». r binds to the inner circle, green (with the existing note «האות r נקראה כסמל מידה (רדיוס) — אותיות קטנות משמשות למידות, ושמות נקודות נכתבים באות גדולה.») (The driver counts that ⚠-channel note as a refusal; a probe on main cd9c938f confirmed the row commits with ✓ and both rows stay.)",
-   "before": "sent to the AI",
-   "expect": [
-    "רדיוס המעגל הפנימי הוא r"
-   ],
-   "_probe": "verified-by-probe (⚠-channel note on a committed row)"
-  },
-  {
-   "id": "T23",
-   "title": "REFUSAL: «r = 3» beside the sized pair lists both circles by role (#2464)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "שני מעגלים בעלי מרכז משותף O",
-    "רדיוס מעגל חיצוני הוא 10",
-    "רדיוס מעגל פנימי 9",
-    "r = 3"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 4 refused, with no «O-2» and no «(O, O)». Measured sentence in full: ««r = 3»: בסרטוט יש כמה מעגלים שרדיוסם נתון (המעגל החיצוני, המעגל הפנימי), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס המעגל הפנימי הוא r».»",
-   "before": "«(O, O)» and «רדיוס מעגל O הוא r»",
-   "expectRefusal": "בסרטוט יש כמה מעגלים שרדיוסם נתון (המעגל החיצוני, המעגל הפנימי), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס המעגל הפנימי הוא r».",
-   "expectAbsent": [
-    "O-2",
-    "(O, O)"
-   ]
-  },
-  {
-   "id": "T24",
-   "title": "A chord of the outer circle tangent to the inner one now builds (#2464)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "שני מעגלים בעלי מרכז משותף O",
-    "מיתר AB במעגל החיצוני משיק למעגל הפנימי"
-   ],
-   "lookFor": "Start: press «נקה הכל». A and B on the outer circle, AB touching the inner circle",
-   "before": "refused «המשפט סותר את עצמו»",
-   "expectAbsent": [
-    "המשפט סותר את עצמו"
-   ]
-  },
-  {
-   "id": "T25",
-   "title": "English: two points on two circles (#2464)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "two concentric circles with centre O",
-    "A on the outer circle and B on the inner circle"
-   ],
-   "lookFor": "Start: press «נקה הכל». Each point on its own circle (A outer, B inner), with the existing one-given-per-line note «ציירנו את שני הנתונים שכתבתם בשורה אחת: (1) A on the outer circle (2) B on the inner circle. כדאי להקליד נתון אחד בכל שורה — כך הכלי יכול לבנות ולאמת כל נתון בנפרד, וקל יותר לתקן שלב אחד.» (The driver counts that ⚠-channel note as a refusal; a probe on main cd9c938f and the screenshot confirm the line commits with ✓: A on the outer circle, B on the inner.)",
-   "before": "refused with the one-given-per-line message",
-   "_probe": "verified-by-probe (⚠-channel note on a committed row)"
-  },
-  {
-   "id": "T26",
-   "title": "A diameter of \"the circle\" goes on the circle you drew (#2477)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "AB הוא קוטר של המעגל"
-   ],
-   "lookFor": "Start: press «נקה הכל». One circle only; AB through O, A and B on circle O",
-   "before": "a second circle P drawn on AB, green"
-  },
-  {
-   "id": "T27",
-   "title": "The same in English (#2477)",
-   "class": "look",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "circle O",
-    "AB is a diameter of the circle"
-   ],
-   "lookFor": "Start: press «נקה הכל». One circle; AB a diameter of O",
-   "before": "a second circle P"
-  },
-  {
-   "id": "T28",
-   "title": "ASK: beside two circles it asks which one (#2477)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "מעגל P",
-    "AB הוא קוטר של המעגל"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 3 asks which circle; still exactly two circles. Measured sentence in full: «יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O».»",
-   "before": "a third circle M, green",
-   "expectRefusal": "יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O»."
-  },
-  {
-   "id": "T29",
-   "title": "Control: with no circle drawn, the line still creates one (#2477)",
-   "class": "verified",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "AB הוא קוטר של המעגל"
-   ],
-   "lookFor": "Start: press «נקה הכל». One circle on AB, centred at AB's midpoint",
-   "before": "unchanged"
-  },
-  {
-   "id": "T30",
-   "title": "REFUSAL (riskiest): a diameter of \"the circle\" after a stated length (#2477)",
-   "class": "play",
-   "product": "2d",
-   "base": "http://localhost:5173",
-   "path": "/",
-   "lines": [
-    "מעגל O",
-    "AB = 6",
-    "AB קוטר של המעגל"
-   ],
-   "lookFor": "Start: press «נקה הכל». Line 3 refused, no second circle; the same message the control «AB קוטר במעגל» gets (quoting its own line). The refusal itself is #2499. Measured sentence in full: «לא ניתן: «AB קוטר של המעגל» סותר את «AB = 6» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 6. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (control measured: «לא ניתן: «AB קוטר במעגל» סותר את «AB = 6» — …הסיבה: |AB| = 6. …», otherwise word for word)",
-   "before": "a second circle P on AB, green",
-   "expectRefusal": "«AB קוטר של המעגל» סותר את «AB = 6» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 6."
-  }
- ]
+    "name": "round-2501",
+    "title": "Round #2501 — the P1s found in play",
+    "cases": [
+        {
+            "id": "T1",
+            "title": "A later line no longer deletes the earlier one (your T5) (#2480)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "ריבוע חוסם את מעגל O",
+                "ריבוע חסום במעגל O"
+            ],
+            "lookFor": "Start: press «נקה הכל». Three rows, each with its own text; line 3 accepted; one circle, one square around it and one square inside it",
+            "before": "after line 2 «מעגל O» vanished and line 2 showed twice; line 3 refused «מעגל O לא הוגדר»",
+            "expect": [
+                "ריבוע חוסם את מעגל O",
+                "ריבוע חסום במעגל O"
+            ],
+            "expectAbsent": [
+                "מעגל O לא הוגדר"
+            ]
+        },
+        {
+            "id": "T2",
+            "title": "A square around a circle keeps the circle's stated radius (#2480)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O ברדיוס 3",
+                "ריבוע חוסם את מעגל O"
+            ],
+            "lookFor": "Start: press «נקה הכל». Both rows kept; the circle keeps radius 3; the square has side 6, every side touching",
+            "before": "«מעגל O ברדיוס 3» replaced by line 2, and the radius 3 silently lost (r drawn as 2.5)",
+            "expect": [
+                "מעגל O ברדיוס 3",
+                "ריבוע חוסם את מעגל O"
+            ]
+        },
+        {
+            "id": "T3",
+            "title": "Two squares around one circle (#2480)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "ריבוע ABCD חוסם את מעגל O",
+                "ריבוע EFGH חוסם את מעגל O"
+            ],
+            "lookFor": "Start: press «נקה הכל». Three rows; two different squares, both tangent to the circle on every side",
+            "before": "line 3 took over line 2's row, and ABCD lost its tangency",
+            "expect": [
+                "ריבוע ABCD חוסם את מעגל O",
+                "ריבוע EFGH חוסם את מעגל O"
+            ]
+        },
+        {
+            "id": "T4",
+            "title": "A free point's row survives a later intersection line (#2480)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "נקודה A",
+                "M נקודת החיתוך של AB ו-CD"
+            ],
+            "lookFor": "Start: press «נקה הכל». Two rows, «נקודה A» and the M line, each with its own text",
+            "before": "the «נקודה A» row was rewritten into the M line",
+            "expect": [
+                "נקודה A",
+                "M נקודת החיתוך של AB ו-CD"
+            ]
+        },
+        {
+            "id": "T5",
+            "title": "REFUSAL: a quarter circle keeps its right angle (your T35) (#2483)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "רבע מעגל AOB",
+                "קשת AB = 40"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 2 refused; the quarter stays 90° around O. Measured sentence in full: «לא ניתן: «קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.9 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
+            "before": "a 40° wedge, all green",
+            "expectRefusal": "«קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°.",
+            "_probe": "verified-by-probe ~1.9 s"
+        },
+        {
+            "id": "T6",
+            "title": "REFUSAL: an arc whose end is the centre (#2483, #2345)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "רבע מעגל AOB",
+                "קשת BO=40"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 2 refused; the quarter is unchanged. Measured sentence in full: «הנתון «קשת BO=40» מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אין מה לשרטט מהשורה הזאת: אף קשת אחרת בשרטוט אינה יכולה לקבל את הערך הזה.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 2.2 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
+            "before": "the generic «משהו השתבש בבניית השורה הזאת…»",
+            "expectRefusal": "מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אין מה לשרטט מהשורה הזאת: אף קשת אחרת בשרטוט אינה יכולה לקבל את הערך הזה.",
+            "_probe": "verified-by-probe ~2.2 s"
+        },
+        {
+            "id": "T7",
+            "title": "REFUSAL with a next step: an arc from the centre on a plain circle (#2483)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "A על המעגל",
+                "B על המעגל",
+                "קשת OB = 40",
+                "קשת AB = 40"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 4 refused, measured sentence in full: «הנתון «קשת OB = 40» מתאר קשת שאחד מקצותיה הוא O, אבל O הוא מרכז המעגל ולא נקודה עליו — קשת מחברת שתי נקודות שעל המעגל. אם התכוונתם לקשת בין שתי נקודות שעליו, כתבו למשל «קשת AB = 40».» Line 5 (the suggested line) builds, as row «∠AOB = 40» with the note «נקלט. בפעם הבאה אפשר לכתוב כך: ∠AOB = 40 — זו הצורה שהכלי מבין תמיד.»",
+            "before": "the generic floor sentence",
+            "expectRefusal": "אם התכוונתם לקשת בין שתי נקודות שעליו, כתבו למשל «קשת AB = 40»."
+        },
+        {
+            "id": "T8",
+            "title": "REFUSAL: a half circle stays a half circle (#2483)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "חצי מעגל OAB",
+                "∠AOB = 100"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 2 refused; A, O, B stay on one line. Measured sentence in full: «לא ניתן: «∠AOB = 100» סותר את «חצי מעגל OAB» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 100°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.6 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
+            "before": "the half bent to 100°, green",
+            "expectRefusal": "«∠AOB = 100» סותר את «חצי מעגל OAB» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 100°.",
+            "_probe": "verified-by-probe ~1.6 s"
+        },
+        {
+            "id": "T9",
+            "title": "A point on the half circle stays on the drawn half (#2483)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "חצי מעגל OAB",
+                "C על חצי המעגל",
+                "AC = 6"
+            ],
+            "lookFor": "Start: press «נקה הכל». Builds, three rows; C on the drawn half, and the diameter O–B still straight through A",
+            "before": "A moved off the diameter, green"
+        },
+        {
+            "id": "T10",
+            "title": "ASK: an arc between two points that two circles share (#2483)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "מעגל P",
+                "A על מעגל O",
+                "B על מעגל O",
+                "A על מעגל P",
+                "B על מעגל P",
+                "קשת AB = 40"
+            ],
+            "lookFor": "Start: press «נקה הכל». The last line asks which circle, naming O and P; nothing new drawn. Measured sentence in full: «יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O».»",
+            "before": "silently drew the 40° on circle O",
+            "expectRefusal": "יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O»."
+        },
+        {
+            "id": "T11",
+            "title": "A centre-ended segment whose far end is on another circle keeps its crossing within the segment (#2483 batch, beyond the request)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל שמרכזו O",
+                "מעגל שמרכזו P",
+                "נקודה A על מעגל P",
+                "AO חותך את המעגל O בנקודה C"
+            ],
+            "lookFor": "Start: press «נקה הכל». C lies between A and O, on the segment AO",
+            "before": "read as a radius line, the crossing allowed outside the segment"
+        },
+        {
+            "id": "T12",
+            "title": "A chord with one end on another circle avoids the right end (#2483 batch, beyond the request)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל שמרכזו O",
+                "מעגל שמרכזו P",
+                "נקודה A על מעגל P",
+                "נקודה B על מעגל O",
+                "AB חותך את המעגל O בנקודה C"
+            ],
+            "lookFor": "Start: press «נקה הכל». C is the crossing of AB with circle O other than B (B is the end already on circle O)",
+            "before": "the wrong end was avoided"
+        },
+        {
+            "id": "T13",
+            "title": "A quarter circle written AOB is drawn around O (#2486)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "רבע מעגל AOB"
+            ],
+            "lookFor": "Start: press «נקה הכל». The quarter's corner is at O, with OA ⟂ OB",
+            "before": "drawn around A, ends at O and B"
+        },
+        {
+            "id": "T14",
+            "title": "A half circle written AOB is drawn around O (#2486)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "חצי מעגל AOB"
+            ],
+            "lookFor": "Start: press «נקה הכל». O is the midpoint of the diameter AB",
+            "before": "centred at A, diameter OB"
+        },
+        {
+            "id": "T15",
+            "title": "A sector is unchanged (#2486)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "גזרה AOB"
+            ],
+            "lookFor": "Start: press «נקה הכל». Centred at O, as before",
+            "before": "unchanged"
+        },
+        {
+            "id": "T16",
+            "title": "REFUSAL: an arc value that would bend the quarter (#2486)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "רבע מעגל AOB",
+                "קשת AB = 40"
+            ],
+            "lookFor": "Start: press «נקה הכל». Refused; the quarter stays 90° about O. (Same lines and sentence as T5, checked here as #2486's own case.) Measured sentence in full: «לא ניתן: «קשת AB = 40» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: ∠AOB = 40°. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Pre-played by a timed probe on main cd9c938f: the refusal lands about 1.9 s after Enter, after «חושב…»; the driver reads too early, so its screenshot shows «חושב…» and it reports no refusal. Probe measured exactly the sentence above.)",
+            "before": "refused with the \"the arc's end is the centre\" sentence (centre A)",
+            "expectRefusal": "הסיבה: ∠AOB = 40°.",
+            "expectAbsent": [
+                "הוא מרכז המעגל ולא נקודה עליו"
+            ],
+            "_probe": "verified-by-probe ~1.9 s"
+        },
+        {
+            "id": "T17",
+            "title": "Analytic draws the quarter AOB around O (#2486)",
+            "class": "play",
+            "product": "analytic",
+            "base": "http://localhost:5173",
+            "path": "/analytic.html",
+            "lines": [
+                "רבע מעגל AOB"
+            ],
+            "lookFor": "Start: press «נקה הכל» (analytic builder). The quarter is centred at O",
+            "before": "the quarter around A"
+        },
+        {
+            "id": "T18",
+            "title": "Analytic draws the sector OAB around O (#2486)",
+            "class": "play",
+            "product": "analytic",
+            "base": "http://localhost:5173",
+            "path": "/analytic.html",
+            "lines": [
+                "גזרה OAB"
+            ],
+            "lookFor": "Start: press «נקה הכל» (still the analytic builder). The sector is centred at O",
+            "before": "«גזרה OAB» around A"
+        },
+        {
+            "id": "T19",
+            "title": "A saved figure re-opens with the new centre (#2486)",
+            "class": "verified",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "רבע מעגל AOB"
+            ],
+            "lookFor": "Not driven (the driver cannot load a save; the line only opens the page). Load an old «רבע מעגל AOB» save: it opens centred at O, with step 1 marked updated; OAB and sector saves load byte-identical. Locked by src/store/__tests__/load-refresh-2486.test.ts",
+            "before": "n/a"
+        },
+        {
+            "id": "T20",
+            "title": "One point on each of two circles that share a centre (#2464)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "שני מעגלים בעלי מרכז משותף O",
+                "A על המעגל החיצוני ו-B על המעגל הפנימי"
+            ],
+            "lookFor": "Start: press «נקה הכל». A on the big circle, B on the small one, green",
+            "before": "both A and B on the outer circle, green"
+        },
+        {
+            "id": "T21",
+            "title": "A tangent to the outer circle beside a third circle draws only the tangent (#2464)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "שני מעגלים בעלי מרכז משותף O",
+                "רדיוס מעגל חיצוני הוא 10",
+                "רדיוס מעגל פנימי 9",
+                "מעגל P",
+                "משיק למעגל החיצוני בנקודה A"
+            ],
+            "lookFor": "Start: press «נקה הכל». One tangent line at A on the outer circle; P does not move; no O–P tangency in the givens",
+            "before": "O and P also made tangent at A, green"
+        },
+        {
+            "id": "T22",
+            "title": "Name the inner circle's radius r (#2464)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "שני מעגלים בעלי מרכז משותף O",
+                "רדיוס המעגל הפנימי הוא r"
+            ],
+            "lookFor": "Start: press «נקה הכל». r binds to the inner circle, green (with the existing note «האות r נקראה כסמל מידה (רדיוס) — אותיות קטנות משמשות למידות, ושמות נקודות נכתבים באות גדולה.») (The driver counts that ⚠-channel note as a refusal; a probe on main cd9c938f confirmed the row commits with ✓ and both rows stay.)",
+            "before": "sent to the AI",
+            "expect": [
+                "רדיוס המעגל הפנימי הוא r"
+            ],
+            "_probe": "verified-by-probe (⚠-channel note on a committed row)"
+        },
+        {
+            "id": "T23",
+            "title": "REFUSAL: «r = 3» beside the sized pair lists both circles by role (#2464)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "שני מעגלים בעלי מרכז משותף O",
+                "רדיוס מעגל חיצוני הוא 10",
+                "רדיוס מעגל פנימי 9",
+                "r = 3"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 4 refused, with no «O-2» and no «(O, O)». Measured sentence in full: ««r = 3»: בסרטוט יש כמה מעגלים שרדיוסם נתון (המעגל החיצוני, המעגל הפנימי), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס המעגל הפנימי הוא r».»",
+            "before": "«(O, O)» and «רדיוס מעגל O הוא r»",
+            "expectRefusal": "בסרטוט יש כמה מעגלים שרדיוסם נתון (המעגל החיצוני, המעגל הפנימי), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס המעגל הפנימי הוא r».",
+            "expectAbsent": [
+                "O-2",
+                "(O, O)"
+            ]
+        },
+        {
+            "id": "T24",
+            "title": "A chord of the outer circle tangent to the inner one now builds (#2464)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "שני מעגלים בעלי מרכז משותף O",
+                "מיתר AB במעגל החיצוני משיק למעגל הפנימי"
+            ],
+            "lookFor": "Start: press «נקה הכל». A and B on the outer circle, AB touching the inner circle",
+            "before": "refused «המשפט סותר את עצמו»",
+            "expectAbsent": [
+                "המשפט סותר את עצמו"
+            ]
+        },
+        {
+            "id": "T25",
+            "title": "English: two points on two circles (#2464)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "two concentric circles with centre O",
+                "A on the outer circle and B on the inner circle"
+            ],
+            "lookFor": "Start: press «נקה הכל». Each point on its own circle (A outer, B inner), with the existing one-given-per-line note «ציירנו את שני הנתונים שכתבתם בשורה אחת: (1) A on the outer circle (2) B on the inner circle. כדאי להקליד נתון אחד בכל שורה — כך הכלי יכול לבנות ולאמת כל נתון בנפרד, וקל יותר לתקן שלב אחד.» (The driver counts that ⚠-channel note as a refusal; a probe on main cd9c938f and the screenshot confirm the line commits with ✓: A on the outer circle, B on the inner.)",
+            "before": "refused with the one-given-per-line message",
+            "_probe": "verified-by-probe (⚠-channel note on a committed row)"
+        },
+        {
+            "id": "T26",
+            "title": "A diameter of \"the circle\" goes on the circle you drew (#2477)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "AB הוא קוטר של המעגל"
+            ],
+            "lookFor": "Start: press «נקה הכל». One circle only; AB through O, A and B on circle O",
+            "before": "a second circle P drawn on AB, green"
+        },
+        {
+            "id": "T27",
+            "title": "The same in English (#2477)",
+            "class": "look",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "circle O",
+                "AB is a diameter of the circle"
+            ],
+            "lookFor": "Start: press «נקה הכל». One circle; AB a diameter of O",
+            "before": "a second circle P"
+        },
+        {
+            "id": "T28",
+            "title": "ASK: beside two circles it asks which one (#2477)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "מעגל P",
+                "AB הוא קוטר של המעגל"
+            ],
+            "lookFor": "Start: press «נקה הכל». Line 3 asks which circle; still exactly two circles. Measured sentence in full: «יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O».»",
+            "before": "a third circle M, green",
+            "expectRefusal": "יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O»."
+        },
+        {
+            "id": "T29",
+            "title": "Control: with no circle drawn, the line still creates one (#2477)",
+            "class": "verified",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "AB הוא קוטר של המעגל"
+            ],
+            "lookFor": "Start: press «נקה הכל». One circle on AB, centred at AB's midpoint",
+            "before": "unchanged"
+        },
+        {
+            "id": "T30",
+            "title": "A diameter of \"the circle\" after a stated length builds (#2477; correct outcome owed by #2499)",
+            "class": "play",
+            "product": "2d",
+            "base": "http://localhost:5173",
+            "path": "/",
+            "lines": [
+                "מעגל O",
+                "AB = 6",
+                "AB קוטר של המעגל"
+            ],
+            "lookFor": "Start: press «נקה הכל». AB is a diameter of circle O, radius 3, green, no second circle. KNOWN RED until #2499 (P1): today the line is falsely refused as contradicting «AB = 6» (ADR-W-158: a case never passes on a known-wrong outcome).",
+            "before": "a second circle P on AB, green"
+        }
+    ]
 }
