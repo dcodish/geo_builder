@@ -618,6 +618,13 @@ thin candidate on its own residuals (the gauge frozen where its path froze it). 
 re-solved ring is collapsed, or when the re-solve misses the floor while the ring thins to ≤ `LIMIT_THINNING` (0.9) of
 its openness: a limit (tangent) root, approached sublinearly, such as «|BA| = |BC| · ∠ACB = 90°». A genuine thin ring
 re-solves exact where it stands. The re-solve replaces the old "exact AND collapsed" release one for one.
+**The release has two triggers and two verdicts** (#2503, [ADR-3D-378](06b-decisions-3d.md#adr-3d-378)). Besides a thin declared ring
+or solid, `pairSliver` asks the same re-solve of a candidate whose driving relations' operand pairs (`pinOperandPairs3`, a
+`Record` over every `ScalarPin` kind, each pair tagged `arm` when it carries a direction) come within `SLIVER_BAND` of the
+figure's extent — two vertices of a quadrilateral meeting leave the ring open. The verdict is `limitRoot` on that pair, or an
+**emptied angle**: after the re-solve an `arm` pair sits at or below the 1e-4 collapse line. With no ring collapsed and no
+solid flat, the pool is marked `limit` (not `collapse`), `isCollapse` reads both, and the store's zero-solution path refuses
+the line `givens-contradict`, naming the statements.
 
 **A declared solid forced flat is refused the same way** (#1860, [ADR-3D-358](06b-decisions-3d.md#adr-3d-358)).
 `settleFlatRings` judges every solid, not only the flat kinds: `closedFigure(r)` adds `solidSliver(r)` — a non-flat

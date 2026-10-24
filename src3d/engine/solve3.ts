@@ -19,7 +19,7 @@
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
-import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind, type SolidObj } from './types';
+import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -236,8 +236,11 @@ export interface InventedCollapse3 {
   /** #1860 (ADR-3D-358): set when the figure collapsed is a declared SOLID (its kind; `ring` is its vertex ids). */
   solid?: SolidKind;
 }
-/** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse. */
-export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3 };
+/** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse.
+ *  #2503 (ADR-3D-378): `limit` marks an empty pool whose every candidate was a LIMIT ROOT on a driving relation's own
+ *  operand pair (two named points met, or an angle's arm lost its length) with no ring or solid collapsed: the store
+ *  refuses it as the statements' contradiction (`givens-contradict`), never as a flat polygon. */
+export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3; readonly limit?: true };
 
 /**
  * Solve the pivot: find gauge (+ dims) such that every pin lands on its target.
@@ -297,6 +300,53 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   volume3: true, // #1447: an absolute size (scales as s³)
   area3: true, // #1447: an absolute size (scales as s²)
 };
+
+/**
+ * #2503 ([ADR-3D-378](../../docs/06b-decisions-3d.md#adr-3d-378)) — THE POINT PAIRS A DRIVING RELATION MEASURES BETWEEN,
+ * each tagged `arm` when it carries a DIRECTION (an angle's arm, either side of a ⟂ / ∥ / cos / segment angle / line–plane
+ * angle) rather than only a length. Two named points of a pair meeting is where such a relation can hold only by its own
+ * operand collapsing (the 2-D twin is `collapsibleTermPairs`, ADR-724 / ADR-764). A `Record` over the union, the
+ * `PIN_FIXES_SCALE` idiom: a new pin kind cannot be added without deciding its pairs. Named vectors resolve through
+ * `c.vectors`; a kind with no point operands (a volume, an area, a concyclic ring) returns none.
+ */
+type PinPair3 = { a: Id; b: Id; arm: boolean };
+const atomPair3 = (c: Construction3, at: VecAtom | undefined): [Id, Id] | null => {
+  if (!at) return null;
+  if (at.kind === 'pair') return [at.from, at.to];
+  const v = c.vectors.get(at.name);
+  return v ? [v.from, v.to] : null;
+};
+const exprPairs3 = (c: Construction3, e: VecExpr): [Id, Id][] => e.map((t) => atomPair3(c, t.atom)).filter((p): p is [Id, Id] => p !== null);
+const operandPair3 = (o: Operand3): [Id, Id] | null => (o.kind === 'segment' ? [o.a, o.b] : null);
+const tag3 = (pairs: ([Id, Id] | null)[], arm: boolean): PinPair3[] =>
+  pairs.filter((p): p is [Id, Id] => p !== null && p[0] !== p[1]).map(([a, b]) => ({ a, b, arm }));
+const PIN_OPERAND_PAIRS: { [K in ScalarPin['kind']]: (c: Construction3, p: Extract<ScalarPin, { kind: K }>) => PinPair3[] } = {
+  'length-rel': (_c, p) => tag3([[p.a1, p.b1], [p.a2, p.b2]], false),
+  'vec-eq': (c, p) => tag3([...exprPairs3(c, p.lhs), ...exprPairs3(c, p.rhs)], false),
+  length: (_c, p) => tag3([[p.a, p.b]], false),
+  volume3: () => [],
+  area3: () => [],
+  vangle: (_c, p) => tag3([[p.vertex, p.p], [p.vertex, p.q]], true),
+  'seg-angle': (_c, p) => tag3([[p.a1, p.b1], [p.a2, p.b2]], true),
+  dot: (c, p) => tag3([atomPair3(c, { kind: 'named', name: p.v1 }), atomPair3(c, { kind: 'named', name: p.v2 })], false),
+  'seg-perp-plane': (_c, p) => tag3([[p.a, p.b]], true),
+  'seg-par-plane': (_c, p) => tag3([[p.a, p.b]], true),
+  'cos-angle': (c, p) => tag3([atomPair3(c, p.u), atomPair3(c, p.v)], true),
+  'dot-eq': (c, p) => tag3([atomPair3(c, p.a), atomPair3(c, p.b), atomPair3(c, p.c), atomPair3(c, p.d)], false),
+  'cos-eq': (c, p) => tag3([atomPair3(c, p.a), atomPair3(c, p.b), atomPair3(c, p.c), atomPair3(c, p.d)], true),
+  'bisector-dir': (_c, p) => tag3([[p.apex, p.a], [p.apex, p.b], [p.apex, p.tip]], true),
+  'line-plane-angle': (_c, p) => tag3([[p.a, p.b]], true),
+  concyclic: () => [],
+  mutual: (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
+  'plane-rel': (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
+  distance: (_c, p) => tag3([p.a.kind === 'point' && p.b.kind === 'point' ? [p.a.id, p.b.id] : null], false),
+  'mag-rel': (c, p) => tag3([...exprPairs3(c, p.e1), ...exprPairs3(c, p.e2)], false),
+  'mag-val': (c, p) => tag3(exprPairs3(c, p.e), false),
+};
+/** #2503 (ADR-3D-378): every operand pair of one driving relation (see {@link PIN_OPERAND_PAIRS}). */
+export function pinOperandPairs3(c: Construction3, pin: ScalarPin): PinPair3[] {
+  return (PIN_OPERAND_PAIRS[pin.kind] as (c: Construction3, p: ScalarPin) => PinPair3[])(c, pin);
+}
 
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
@@ -1775,8 +1825,48 @@ export function solvePivot(
     return out;
   };
   const hasFlatKind = c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind));
-  /** Not an admissible configuration: a declared ring collapsed (or a released sliver), or a declared solid flat. */
-  const closedFigure = (r: PivotResult): boolean => (hasFlatKind && (collapsedRing(r) || anchorSliver(r))) || solidSliver(r) !== null;
+  /**
+   * #2503 ([ADR-3D-378](../../docs/06b-decisions-3d.md#adr-3d-378), the 3-D twin of 2-D's ADR-764) — THE TRIGGER READS
+   * THE DRIVING RELATIONS' OPERAND PAIRS. ADR-3D-372 asked the tightened re-solve only of a THIN declared ring or solid,
+   * and two vertices of a quadrilateral meeting leave the ring open («מרובע ABCD · |AB| = |BC| · AC ⟂ BC» drew C on A,
+   * green). Here the candidate is asked when an operand pair of ANY enforced relation (every `scalarPins` entry, not only
+   * the step's: in the other order the collapsing pair belongs to the earlier ⟂) is inside `SLIVER_BAND` of the figure's
+   * extent. Two verdicts: ADR-3D-372's `limitRoot` on that pair, unchanged; or an EMPTIED ANGLE — after the re-solve a
+   * direction-carrying pair sits at or below the 1e-4 collapse line, so the stated angle holds only because its arm has
+   * no length (2-D's ADR-123 caveat). A length-only pair meeting exactly is not refused: FR-EN-20's coincidences stay.
+   */
+  const operandPairs = c.scalarPins.flatMap((p) => pinOperandPairs3(c, p));
+  const pairOpenness = (pos: Positions3, pairs: PinPair3[]): number => {
+    if (pairs.length === 0) return Infinity;
+    const all = [...pos.values()];
+    let ext = 0;
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) ext = Math.max(ext, norm3(sub3(all[j], all[i])));
+    if (!(ext > 1e-12)) return Infinity;
+    let m = Infinity;
+    for (const { a, b } of pairs) {
+      const p = pos.get(a), q = pos.get(b);
+      if (p && q) m = Math.min(m, norm3(sub3(q, p)) / ext);
+    }
+    return m;
+  };
+  const pairMemo = new WeakMap<PivotResult, boolean>();
+  const pairSliver = (r: PivotResult): boolean => {
+    if (coupled || r.x.length !== fullLen || operandPairs.length === 0) return false;
+    const memo = pairMemo.get(r);
+    if (memo !== undefined) return memo;
+    const before = pairOpenness(solidPosAt(r.dims, r.riderTs), operandPairs);
+    let out = false;
+    if (before < SLIVER_BAND) {
+      const { x, err } = tightResolve(r);
+      const released = solidPosAt(x.slice(7, 7 + nDims), ridersOf(x));
+      out = limitRoot(err, before, pairOpenness(released, operandPairs)) || pairOpenness(released, operandPairs.filter((p) => p.arm)) <= 1e-4;
+    }
+    pairMemo.set(r, out);
+    return out;
+  };
+  /** Not an admissible configuration: a declared ring collapsed (or a released sliver), a declared solid flat, or a
+   *  driving relation held only where its own operands met (#2503). */
+  const closedFigure = (r: PivotResult): boolean => (hasFlatKind && (collapsedRing(r) || anchorSliver(r))) || solidSliver(r) !== null || pairSliver(r);
   /** The marked empty pool for a declared solid the givens force flat (the store refuses it, naming the statements). */
   const flatSolidPool = (solid: SolidObj): PivotPool =>
     Object.assign([] as PivotResult[], { collapse: { ring: [...solid.ids], riderKeys: riders.map((r) => r.id), forced: true, solid: solid.kind } });
@@ -1803,6 +1893,9 @@ export function solvePivot(
     // #1860: a declared solid the givens force flat is refused as that solid (the store names the statements)
     const flatSolid = solidSliver(rs[0]);
     if (flatSolid && !(hasFlatKind && (collapsedRing(rs[0]) || anchorSliver(rs[0])))) return flatSolidPool(flatSolid);
+    // #2503 (ADR-3D-378): no ring collapsed and no solid is flat — the relation's own operands met. No polygon to name, so
+    // the refusal is the statements' contradiction (the store's zero-solution path), never «… שטוח»
+    if (!(hasFlatKind && (collapsedRing(rs[0]) || anchorSliver(rs[0])))) return Object.assign([] as PivotResult[], { limit: true as const });
     // the attribution's reduced re-solve reads the rider rows; with none (or a V8-c layout) the
     // non-incidence givens are all there is, so they forced it
     const forced = nRider === 0 || coupled !== undefined || collapseIsStated();
@@ -1810,7 +1903,7 @@ export function solvePivot(
     const ring = (collapsedRingOf(rs[0]) ?? thinnestRingOf(rs[0])).ids;
     return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id), forced } });
   };
-  const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined;
+  const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined || pool.limit === true;
 
   if (invariantOnly) {
     // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
