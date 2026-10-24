@@ -24,6 +24,8 @@ import { decideDeterministic2D } from '@/app/decideDeterministic';
 import { otherUtteranceForError } from '@/app/errorSubject';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { factsOf } from '@/__tests__/scenario-pipeline';
+import { renderNote } from '../renderNote';
+import { circleRefs } from '@/engine';
 import { stripFormatControls } from '../../../shell/bidi';
 
 const he: Translate = (k, o) => i18n.t(k, { ...o, lng: 'he' }) as string;
@@ -51,7 +53,7 @@ async function submit(lines: string[], t: Translate = he): Promise<Out[]> {
     const said = note?.explain
       ? stripFormatControls(humanizeError(note.explain, t, line, otherUtteranceForError(st.facts, note.explain)))
       : note?.key
-        ? stripFormatControls(t(note.key, note.params))
+        ? stripFormatControls(renderNote(note as never, { t: t as never, explain: (raw) => raw, circles: circleRefs(f.construction) })) // #2464: as the app renders it
         : null;
     out.push({ kind: v.kind, commands: v.kind === 'commit' ? v.commands : null, said });
   }
@@ -165,7 +167,7 @@ describe('#2242 — two circles drawn: a size about «המעגל» asks which, a
   it('English asks the same question', async () => {
     const out = await submit(['circle O', 'circle P', 'the area of the circle is 9π'], en);
     expect(out[2].kind).toBe('refuse');
-    expect(out[2].said).toBe(stripFormatControls(en('input.ambiguousCircleRef', { circles: 'O, P', first: 'O' })));
+    expect(out[2].said).toBe(stripFormatControls(en('input.ambiguousCircleRef', { circles: 'O, P', first: 'circle O' })));
   });
 
   it('the taught remedy builds: the named «שטח המעגל O הוא 9π» sizes O', async () => {

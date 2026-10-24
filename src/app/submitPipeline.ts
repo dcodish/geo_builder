@@ -39,7 +39,7 @@ import { laneContext } from './laneContext';
 import { droppedPropertyWords } from '@/parser/propertyWords';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { figureContext } from '@/parser/llmShared';
-import { circleMembers, isGeoPoint } from '@/engine';
+import { circleMembers, circleRefs, isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
 import { dryRunOutcome, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
@@ -191,6 +191,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       said: utterance,
       explain: (raw) => deps.explainError(raw, utterance, otherUtteranceForError(store().facts, raw)),
       vocab: studentVocabulary(deps.view().construction, [...store().facts.filter((f) => f.enabled).map((f) => f.utterance), utterance]),
+      circles: circleRefs(deps.view().construction), // #2305 M3 (ADR-760): a question's circles named by the seam
     });
 
   const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());

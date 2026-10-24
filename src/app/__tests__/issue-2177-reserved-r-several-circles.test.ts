@@ -108,7 +108,7 @@ describe('#2177 — the reserved r on a figure with several circles is refused, 
     const fig = replay(facts, 0);
     expect(fig.status[facts[0].id]).toBe('ok');
     expect(fig.status[facts[1].id]).toBe('ok');
-    expect(String(fig.status[facts[2].id])).toBe('reserved radius ambiguous: r names no one circle of O, P (stated sizes)');
+    expect(String(fig.status[facts[2].id])).toBe('reserved radius ambiguous: r names no one circle of circle-O, circle-P (stated sizes)');
     expect(radii(fig)).toEqual({ 'circle-O': 3, 'circle-P': 5 });
   });
 });
@@ -160,9 +160,9 @@ describe('#2177 — reservedAmbiguity (the predicate)', () => {
   const none = new Map();
   it('two sized circles: the valued letter, either spelling', () => {
     const c = cmds(['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5', 'r = 4']);
-    expect(reservedAmbiguity(c, 2, none)).toBe('reserved radius ambiguous: r names no one circle of O, P (stated sizes)');
+    expect(reservedAmbiguity(c, 2, none)).toBe('reserved radius ambiguous: r names no one circle of circle-O, circle-P (stated sizes)');
     const C = [...c.slice(0, 2), { type: 'set-var', name: 'R', value: 4 } as never];
-    expect(reservedAmbiguity(C, 2, none)).toBe('reserved radius ambiguous: R names no one circle of O, P (stated sizes)');
+    expect(reservedAmbiguity(C, 2, none)).toBe('reserved radius ambiguous: R names no one circle of circle-O, circle-P (stated sizes)');
   });
   it('one circle, no letter, or an explicit binding of the spelling: null', () => {
     expect(reservedAmbiguity(cmds(['מעגל O ברדיוס 3', 'r = 4']), 1, none)).toBeNull();

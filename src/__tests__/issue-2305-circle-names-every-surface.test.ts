@@ -14,7 +14,9 @@
  * (`{{circle}}`, `{{circleThe}}`, `{{circleTo}}`, `{{circlePair}}`) must be
  * rendered here, so a new template that names a circle is caught. The two parser clarifications that LIST circles
  * (`input.ambiguousCircleRef`, `errors.reservedRadiusAmbiguous*`) are not in this item: their taught example names a
- * spelling the grammar does not read beside a pair (the #2305 escalation of 2026-10-23).
+ * spelling the grammar does not read beside a pair (the #2305 escalation of 2026-10-23). ADR-760 (#2464) made the grammar
+ * read it and reworded both; they are locked, with their taught sentences round-tripped, in
+ * `src/app/__tests__/issue-2464-concentric-roles-per-span.test.ts`.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import he from '@/i18n/locales/he.json';

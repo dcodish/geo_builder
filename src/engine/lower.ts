@@ -550,7 +550,9 @@ export function reservedAmbiguity(cmds: readonly AnyCommand[], i: number, radius
   const sizedIds = [...circles.keys()].filter((id) => sized.has(id));
   if (sizedIds.length === 0) return null;
   const named = sizedIds.length >= 2 ? sizedIds : [...circles.keys()];
-  return engineErrorDebugText({ code: 'reserved-radius-ambiguous', letter, circles: named.map((id) => circles.get(id)!), sized: sizedIds.length >= 2 });
+  // #2305 M2 (ADR-760): the circles travel as IDS, so the display names one of a concentric pair by its role (the two
+  // share a centre letter); `sanitizeIds` gives every other circle its letter, as before.
+  return engineErrorDebugText({ code: 'reserved-radius-ambiguous', letter, circles: named, sized: sizedIds.length >= 2 });
 }
 
 /**

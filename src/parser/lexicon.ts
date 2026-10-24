@@ -131,11 +131,19 @@ export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from '../../shell/indexedNa
  * The ROLE of one circle of a concentric pair, as the student names it: the Hebrew adjective FOLLOWS the
  * circle noun («המעגל החיצוני/הפנימי/הגדול/הקטן»), the English one PRECEDES it ("the outer/inner/larger/smaller
  * circle"). ADJACENCY to the circle noun is required — a bare «חיצוני» also appears in «נקודה חיצונית» (an
- * external POINT). One spelling, read by the parser's concentric post-pass (`circleQualifier`) and by every
- * per-span reader that names a pair's circle inside a sentence (the radius ratio, #2459). Capture 1 is the adjective.
+ * external POINT). One spelling, read where each role word stands: the parse-boundary alias `resolvePairRoles` (#2464, ADR-760)
+ * rewrites every role reference to its circle's letter form before any rule runs. Capture 1 is the adjective.
  */
 export const CIRCLE_ROLE_HE = String.raw`מעגל(?:ים)?\s+ה?(חיצוני|פנימי|גדול|קטן)`;
 export const CIRCLE_ROLE_EN = String.raw`\b(outer|external|inner|internal|larg(?:er|est)?|small(?:er|est)?|big(?:ger|gest)?)\s+circles?\b`;
+/**
+ * #2464 ([ADR-760](../../docs/06-decisions.md#adr-760)) — a role as a REFERENCE to ONE circle, with what is glued to it:
+ * the Hebrew particle cluster and article («במעגל החיצוני», «למעגל הפנימי», «שבמעגל הגדול», «מעגל פנימי») and the
+ * English article. Singular only — the plural «מעגלים …» / "circles" names no one circle. Composed from the role
+ * atoms above (no new spelling). HE captures: 1 the particles, 2 the adjective; EN capture 1 the adjective.
+ */
+export const CIRCLE_ROLE_REF_HE = String.raw`(?<![א-ת])([ושכ]?[לבמ]?)ה?(?!מעגלים)${CIRCLE_ROLE_HE}(?![א-ת])`;
+export const CIRCLE_ROLE_REF_EN = String.raw`(?:\bthe\s+)?(?!\S+\s+circles\b)${CIRCLE_ROLE_EN}`;
 /** The role a {@link CIRCLE_ROLE_HE} / {@link CIRCLE_ROLE_EN} adjective names. */
 export const circleRole = (adj: string): 'outer' | 'inner' =>
   /^(?:פנימי|קטן|inner|internal|small)/i.test(adj) ? 'inner' : 'outer';

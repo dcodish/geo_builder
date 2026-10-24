@@ -314,6 +314,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
+  '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1531,6 +1532,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2459 (ADR-754): the same ratio between the circles of a concentric pair, named by their roles ──
   { id: 'radius-ratio-role-2459', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל פנימי 1.5', 'רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל הפנימי'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D drew the outer radius as 2 (the factor), green, before ADR-754' },
   { id: 'radius-ratio-role-smaller-2459', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני 3', 'רדיוס המעגל הפנימי קטן פי 2 מרדיוס המעגל החיצוני'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D refused it (read as the inner radius 2) before ADR-754' },
+  // ── #2464 / #2470 (ADR-760): each role word names its own circle, and never adds a relation ──
+  { id: 'concentric-two-roles-2464', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'A על המעגל החיצוני ו-B על המעגל הפנימי'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2460' }], note: '2-D put both points on the outer circle, green, before ADR-760' },
+  { id: 'concentric-role-tangent-2470', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9', 'מעגל P', 'משיק למעגל החיצוני בנקודה A'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2460' }], note: '2-D also made O and P tangent at A, green, before ADR-760' },
   // ── #2066 (ADR-643): a side of the triangle is never its bisector — 2-D refuses with a sentence ──
   { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
   // #2115 (ADR-AG-299): the same predicate on a quadrilateral, and the vertex-less verb that builds over a non-side

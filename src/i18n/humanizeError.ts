@@ -30,7 +30,7 @@ import { formatMeasure } from '@/format';
 import { hasEngineToken, labelsIn, numbersIn, type StudentVocabulary } from '../../shell/studentText';
 import { PARAM_KINDS, parseEngineError, type EngineError, type ParamKind } from '@/engine/errors';
 import type { CircleRef } from '@/engine';
-import { circleTokenResolver, wordCircleSlots, type CircleRefs } from './circleText';
+import { circleList, circleTokenResolver, wordCircleSlots, type CircleRefs } from './circleText';
 
 /**
  * #2305 ([ADR-755](../../docs/06-decisions.md#adr-755)): a circle's TEXT TOKEN (its id, or the letters {@link sanitizeIds}
@@ -222,12 +222,20 @@ export interface Wording {
    * one of a concentric pair reads «המעגל הפנימי». Only a DECLARED slot resolves: a point letter is never renamed.
    */
   circleParams?: readonly string[];
+  /**
+   * #2305 M2 ([ADR-760](../../docs/06-decisions.md#adr-760)) — the params that LIST circles (comma-joined tokens): each
+   * token is worded by `circleList` (a role by its role, any other circle by its letter). A list slot is a circle slot for
+   * the provenance check, like {@link circleParams}.
+   */
+  circleListParams?: readonly string[];
 }
 
 /** The wording table — one entry per sentence family the student can read. Exported for the coverage gate (#983). */
 export const WORDINGS = {
   // lower.ts reservedAmbiguity (#2177, ADR-733): names the circles and the one next step, never a pick.
-  reservedRadius: { key: 'errors.reservedRadiusAmbiguous', keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'], saysSubject: true, nextStep: true },
+  // #2305 M2 (ADR-760): the circles are listed, and the next step taught, by the circle-naming seam — one of a concentric
+  // pair by its role («רדיוס המעגל הפנימי הוא r», a sentence the parser reads since ADR-760).
+  reservedRadius: { key: 'errors.reservedRadiusAmbiguous', keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'], saysSubject: true, nextStep: true, circleParams: ['next'], circleListParams: ['circles'] },
   // metricFeasibility.ts (#420, ADR-417): TWO wordings — the curriculum's triangle sentence («סכום שתי צלעות תמיד גדול
   // מהצלע השלישית», operator 2026-07-29) for one intermediate point, the straight-segment principle for a longer cycle.
   metric: { key: 'errors.metricImpossible', keys: ['errors.metricImpossibleTriangle', 'errors.metricImpossiblePath'] },
@@ -529,7 +537,12 @@ function render(worded: Worded, t: Translate, said: string | undefined, other: s
         }
       : undefined;
   // #2305 (ADR-755): the declared circle slots, worded through circleText (a role, or today's letter).
-  const translated = translatedRaw && w.circleParams ? wordCircleSlots(translatedRaw, w.circleParams, (k) => circles(translatedRaw[k]), t) : translatedRaw;
+  const slotted = translatedRaw && w.circleParams ? wordCircleSlots(translatedRaw, w.circleParams, (k) => circles(translatedRaw[k]), t) : translatedRaw;
+  // #2305 M2 (ADR-760): a list slot, each token worded (the tokens are read off the untranslated list)
+  const translated =
+    slotted && translatedRaw && w.circleListParams
+      ? { ...slotted, ...Object.fromEntries(w.circleListParams.filter((k) => translatedRaw[k] !== undefined).map((k) => [k, circleList(translatedRaw[k].split(', ').map((tok) => ({ ref: circles(tok), letter: tok })), t)])) }
+      : slotted;
   const key = worded.key;
   // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
   // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an
@@ -609,7 +622,7 @@ function provenance(e: EngineError, worded: Worded, vocab: StudentVocabulary, t:
     switch (kinds[f]) {
       case 'id':
       case 'ids':
-        if (values.some((x) => !idOk(x, !!w.circleParams?.includes(f)))) failed.push({ field: f, check: 'a' });
+        if (values.some((x) => !idOk(x, !!w.circleParams?.includes(f) || !!w.circleListParams?.includes(f)))) failed.push({ field: f, check: 'a' });
         break;
       case 'composite':
         if (!sentences) break;

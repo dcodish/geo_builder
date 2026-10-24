@@ -141,6 +141,19 @@ export type DecideNote =
     }
   | { readonly explain: string };
 
+/**
+ * #2305 M3 ([ADR-760](../../docs/06-decisions.md#adr-760)) — the circles a clarifying question lists, from the parser's
+ * centre TOKENS: each token stands for every circle centred there (a concentric pair is ONE token to the parser), each
+ * carried with the letter today's text prints, for `renderNote` to word through the circle-naming seam.
+ */
+export function candidateCircles(construction: Pick<Construction, 'objects'>, tokens: readonly string[]): { id: Id; letter: string }[] {
+  const tok = (c: string) => (c.startsWith('@ctr-') ? c.slice(5) : c);
+  return tokens.flatMap((letter) => {
+    const ids = construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') && tok(o.center) === letter ? [o.id] : []));
+    return (ids.length ? ids : [`circle-${letter}`]).map((id) => ({ id, letter }));
+  });
+}
+
 /** A log event the caller emits, in order — `kind`, `utterance` and `locale` are the caller's to add. */
 export type DecideLog = Readonly<Record<string, unknown>>;
 
@@ -671,8 +684,15 @@ export async function decideFromParse(
   // #546 (ADR-443): a circle-construct statement whose ANONYMOUS circle reference could not be bound —
   // ≥2 circles and even the membership tie-break says nothing — WHICH circle is the student's to say
   // (ADR-052). Ask, naming the candidates; never a silent pick and never a paid LLM call that would guess.
+  // #2305 M3 (ADR-760): the candidates travel as CIRCLES (id + the letter today's text prints), so the display names each
+  // circle of a concentric pair by its role — the parser's centre token stands for every circle centred there.
   if (!r.ok && r.reason === 'ambiguous-circle-ref') {
-    return refuse('clarify', { source: 'parser', result: `ambiguous-circle-ref:${r.centers.join(',')}` }, { key: 'input.ambiguousCircleRef', params: { circles: r.centers.join(', '), first: r.centers[0] ?? 'O' } });
+    const items = candidateCircles(viewNow().construction, r.centers);
+    return refuse(
+      'clarify',
+      { source: 'parser', result: `ambiguous-circle-ref:${r.centers.join(',')}` },
+      { key: 'input.ambiguousCircleRef', params: { circles: { circleList: items }, first: { circle: items[0] ?? { id: 'circle-O', letter: 'O' } } } },
+    );
   }
   // #519 (ADR-477): a SHAPE-consuming construct on a figure with 2+ candidate shapes — WHICH shape is
   // the student's to say (ADR-052). The owning rules already declined; before this the decline went to

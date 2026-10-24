@@ -10,10 +10,13 @@
  *    anonymous `~…`/`@…`/`#…` token, a hidden object, a label nobody typed) renders the floor sentence instead.
  *
  * A param that is not an object reference (the student's own sentence, a word, a number, a translated `{ t: key }`)
- * is rendered as before.
+ * is rendered as before. A CIRCLE param (#2305 M3, ADR-760) — `{ circle: {id, letter} }` or `{ circleList: [...] }` — is
+ * worded through the circle-naming seam with the figure's `circles` (one of a concentric pair by its role); without
+ * them, by today's letter.
  */
 import type { DecideNote } from './decideDeterministic';
 import { labelsIn, type StudentVocabulary } from '../../shell/studentText';
+import { circleList, circleText, type CircleRefs } from '@/i18n/circleText';
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -33,11 +36,15 @@ export function noteParamText(v: string, vocab?: StudentVocabulary): string | nu
   return LABEL_RUN.test(name) && labelsIn(name).every((l) => known.has(l)) ? name : null;
 }
 
-export function renderNote(n: DecideNote, ctx: { t: T; explain: (raw: string) => string; vocab?: StudentVocabulary; said?: string }): string {
+type CircleParam = { id: string; letter: string };
+export function renderNote(n: DecideNote, ctx: { t: T; explain: (raw: string) => string; vocab?: StudentVocabulary; said?: string; circles?: CircleRefs }): string {
   if ('explain' in n) return ctx.explain(n.explain);
   const params: Record<string, unknown> = {};
+  const item = (c: CircleParam) => ({ ref: ctx.circles?.get(c.id), letter: c.letter });
   for (const [k, v] of Object.entries(n.params ?? {})) {
     if (v && typeof v === 'object' && 't' in v) params[k] = ctx.t((v as { t: string }).t);
+    else if (v && typeof v === 'object' && 'circle' in v) params[k] = circleText(item((v as { circle: CircleParam }).circle).ref, (v as { circle: CircleParam }).circle.letter, ctx.t).circle;
+    else if (v && typeof v === 'object' && 'circleList' in v) params[k] = circleList((v as { circleList: CircleParam[] }).circleList.map(item), ctx.t);
     else if (typeof v === 'string') {
       // the student's own sentence is never judged
       const text = v === ctx.said?.trim() ? v : noteParamText(v, ctx.vocab);
