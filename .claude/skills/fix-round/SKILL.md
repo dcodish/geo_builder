@@ -176,7 +176,10 @@ Each item, inside its stream:
    registry, no special-casing the reported input. A plan that says "not measured past the above" is
    a hypothesis, however confidently it is phrased — treat its mechanism as something to verify
    first, not as a specification.
-4. **Per-item gates, no exceptions:** ADR entry in the product's log; per-fix unit test; the
+4. **Per-item gates, no exceptions:** a 2-D plane-geometry input change carries its **analytic port
+   in the same item**, and its 3-D port when the plan judged it simple ([ADR-W-157](../../../docs/06w-decisions-workspace.md#adr-w-157)):
+   parity row agreeing, an analytic (and 3-D) case on the play sheet; a known-gap row only for a
+   prerequisite the plan names. ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; **`npm run test:fast` green** (every product, ~2 min) plus

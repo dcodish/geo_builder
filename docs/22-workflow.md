@@ -407,6 +407,8 @@ All four builders are deployed. `products.json` is the only record of deploy sta
 
 **A plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.**
 
+- **Same item, not later** ([ADR-W-157](06w-decisions-workspace.md#adr-w-157), operator 2026-10-24): a 2-D change ports to **analytic in the same work item**, with an analytic case on its play sheet. A known-gap row is allowed only when analytic lacks a prerequisite the port depends on, and the plan names it. **3-D by judgement:** the plan says whether the 3-D port is in or out and why. It is in when the construct exists in 3-D, no `EXCEPTIONS` family covers it, and the port is a small reading or wording change; it is out when it needs new 3-D geometry or a mechanism 3-D lacks. Existing analytic gaps are cleared by dedicated rounds.
+
 - **2-D's verdict is the reference** (operator ruling on #1649, 2026-10-02: *"analytics and 2d should have same user experience"*). A plane sentence that 2-D builds, refuses or asks about gets the same answer in the analytic builder, and in 3-D for the core plane families (polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, area).
 - **The rows live once:** `shell/__tests__/fixtures/geo-input-parity.ts`. Each tree's thin lock (`src/`, `src-analytic/`, `src3d/` → `__tests__/geo-input-parity.test.ts`) runs them through its real submit decision.
 - **Adding or changing a sentence form in one builder** means one of:

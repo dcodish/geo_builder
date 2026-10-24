@@ -6346,3 +6346,21 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Measured compliance (2026-10-24).** 2-D rebuilt its rows from a fact list and folded later commands into earlier facts: the defect ADR-757 fixes, now enforced by the fold (`foldCommand`'s `committed` bound) and locked by a class test plus a corpus invariant over every scenario and fixture. 3-D (`store3.ts`: one `Fact3` appended per line), analytic (`recordLine` appends the typed line) and complex (`lines: [...lines, line]`) are structurally immune — a row IS the typed line — and need no code.
 
 **Behaviour change for a student:** none beyond ADR-757's (2-D). This records the rule a future builder, store or fold must keep.
+
+## ADR-W-157 — A 2-D plane-geometry input fix ports to analytic in the same work item; 3-D by the session's judgement (#2460)
+
+**Status:** accepted · 2026-10-24 · process (workspace) · amends [ADR-W-108](#adr-w-108) (docs/22 §10's "lands … or adds a known-gap row") and [ADR-W-117](#adr-w-117) §8 (the 3-D question)
+
+**Operator:** 2026-10-24, playing round #2501 T20 (a 2-D fix, ADR-760, that analytic still did not read) — *"why do we build for 2d and not for analytics in the same run? wouldnt it be better?"*. Offered: port in the same item by default, known gap only when analytic lacks a prerequisite. Ruling: *"yes - and we need you to have some judgement as to the 3d tool. we dont need a full 2d case for the 3d tool but there will be cases where the issue is so simple that we should let 3d support it."*
+
+**Requirements:** none (internal): what each builder promises is unchanged; this changes when the promise is kept. · **Design:** none (internal) — [docs/22 §10](22-workflow.md).
+
+**Context.** The analytic builder reads plane geometry with its own copy of the grammar (product trees never import each other), so a 2-D fix reaches it only by a port. docs/22 §10 allowed either the port or a known-gap row, and plans took the known gap: at this ruling there were 96 analytic known-gap rows over 37 issues, nearly all open, about half P3. Each row is a sentence a student can type in 2-D and not in analytic.
+
+**Decision.**
+1. **Analytic, by default in the same item.** A fix or feature that changes how 2-D reads, builds, refuses or words a plane-geometry sentence ports to analytic **in the same work item**, under the same gates: the parity row moves to (or lands in) the agreeing rows, the item's play sheet carries an analytic case beside the 2-D one, and the ADR names the analytic entry (06c). A known-gap row is allowed only when analytic **lacks a prerequisite** the port depends on (it does not draw that object, or the 2-D mechanism sits on a layer analytic does not have). The plan names that prerequisite, and its owning issue says what would unblock it.
+2. **3-D, by the session's judgement.** 3-D does not mirror 2-D wholesale. A plan states, per item, whether the 3-D port is in or out and why. **In** when it is simple: the construct already exists in 3-D, no `EXCEPTIONS` family covers it, and the port is a small reading or wording change through 3-D's existing chokepoint. **Out** (a known-gap row or the existing exception) when it needs new 3-D geometry, a new family, or a mechanism 3-D does not have. A 3-D port taken under this ruling carries a 3-D case on the play sheet and is tagged `[ruled]` (this ADR) in `What the student will see`, since it restores 2-D's ruled behaviour.
+3. **Complex** is unchanged: not plane geometry; ask.
+4. **The backlog** of existing analytic gaps is cleared by dedicated rounds, not one issue at a time.
+
+**Consequences.** Items touching the parser grow (an estimated 30–50%), so a round holds fewer of them, but the known-gap list stops growing. The fix-round and decisions skills and docs/22 §10 carry the rule.

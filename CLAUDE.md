@@ -150,7 +150,7 @@ and needs his dated ruling.
 - **Found work: a bug's priority is yours** (announce a P1); a found feature is `needs-operator` with a
   proposed priority. A `[proposed]` outcome still waits for him (ADR-W-117 Am. 1).
 - **Cross-tool warnings.** When he asks a non-2-D tool for behaviour that differs from 2-D, say so before
-  building. A 2-D change reaches analytic automatically; ask whether it applies to 3-D and complex.
+  building. A 2-D change ports to analytic in the same item, to 3-D if simple (ADR-W-157).
 
 ## Workflow — the standard operating route
 
