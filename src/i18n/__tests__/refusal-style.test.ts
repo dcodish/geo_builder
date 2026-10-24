@@ -74,7 +74,15 @@ function noteRows(): Row[] {
 }
 
 function explainRows(): Row[] {
-  return CASES.map(({ raw }) => ({ label: `explain ${raw.slice(0, 72)}`, key: 'explainError', he: explainError(raw, T) }));
+  // two raws that differ only past the label's 72 characters (the reserved-r pair since its circles became ids, #2464
+  // ADR-760) get a running suffix, so a label stays one row
+  const seen = new Map<string, number>();
+  return CASES.map(({ raw }) => {
+    const base = `explain ${raw.slice(0, 72)}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return { label: n > 1 ? `${base} #${n}` : base, key: 'explainError', he: explainError(raw, T) };
+  });
 }
 
 lockRefusalStyle('2d', () => [...explainRows(), ...noteRows()]);

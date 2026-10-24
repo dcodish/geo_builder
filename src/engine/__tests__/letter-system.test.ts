@@ -102,7 +102,7 @@ describe('letterSystem — inconsistent rows are refused with the statement they
   it('the reserved r names no circle when two have a stated radius: its value is refused, naming both (#2177, ADR-733)', () => {
     const P: AnyCommand = { type: 'circle', id: 'circle-P', center: 'P', radius: 5 };
     const refused = buildSymTab([CIRCLE3, P, val('r', 4)]).refused;
-    expect([...refused.entries()]).toEqual([[2, { status: 'reserved radius ambiguous: r names no one circle of O, P (stated sizes)', at: 2 }]]);
+    expect([...refused.entries()]).toEqual([[2, { status: 'reserved radius ambiguous: r names no one circle of circle-O, circle-P (stated sizes)', at: 2 }]]);
   });
 
   it('a value for a letter nothing binds waits (#926) — it contradicts nothing yet', () => {

@@ -17,6 +17,7 @@ import { circleResolver, explainError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
 import { offArcNoticeText, violationText } from '@/i18n/violationText';
 import { decideDeterministic2D } from '@/app/decideDeterministic';
+import { renderNote } from '@/app/renderNote';
 import { replay, useGeoStore } from '@/store/geoStore';
 
 const FIGS: Record<string, string[]> = {
@@ -93,7 +94,8 @@ describe('#2305 golden (c) — a circle that is not one of a pair keeps every se
             note?: { explain: string } | { key: string; params?: Record<string, unknown> };
           };
           const n = v.note;
-          rec[tag] = v.kind + ':' + (!n ? '' : 'explain' in n ? explainError(n.explain, t, line, undefined, circleResolver(refs)) : t(n.key, n.params));
+          // a key note is rendered as the app renders it (#2464, ADR-760: its circle params are worded by the seam)
+          rec[tag] = v.kind + ':' + (!n ? '' : 'explain' in n ? explainError(n.explain, t, line, undefined, circleResolver(refs)) : renderNote(n as never, { t: t as never, explain: (raw) => explainError(raw, t, line), circles: refs }));
         }
         expect(rec).toEqual((golden as Record<string, Record<string, string>>)[`${loc}:${name}`]);
       });

@@ -5717,6 +5717,59 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+
+  ...(
+    [
+      ['concentric-roles-per-reference-2464', 'A על המעגל החיצוני ו-B על המעגל הפנימי', { A: 'circle-O', B: 'circle-O-2' }],
+      ['concentric-roles-per-reference-2464-reversed', 'A על המעגל הפנימי ו-B על המעגל החיצוני', { A: 'circle-O-2', B: 'circle-O' }],
+    ] as const
+  ).map(
+    ([id, line, want]): Scenario => ({
+      id,
+      title: `«שני מעגלים בעלי מרכז משותף O» · «${line}» — each point on the circle its own role word names (#2464, ADR-760)`,
+      guards:
+        "#2464 (P1). Measured at 1944d866: «A על המעגל החיצוני ו-B על המעגל הפנימי» committed both points on the outer circle (|OA| = |OB| = 5), green; the reverse put both on the inner one. Root cause: ADR-244's post-pass read ONE role per sentence (the first role word) and rewrote every circle reference of the line to it. Fix (ADR-760): `resolvePairRoles` resolves each role span where it stands, at the parse boundary — the pair gets two parse-local tokens and every role span becomes its own circle's letter form before any rule runs. The class test is src/app/__tests__/issue-2464-concentric-roles-per-span.test.ts.",
+      steps: ['שני מעגלים בעלי מרכז משותף O', line],
+      check(fig) {
+        allStepsOk(fig);
+        expect(fig.violations).toEqual([]);
+        const members = ctxOf(factsOf(['שני מעגלים בעלי מרכז משותף O', line])).circleMembers ?? [];
+        for (const [p, c] of Object.entries(want)) {
+          expect(members.find((e) => e.id === c)?.points, `${p} is a member of ${c}`).toContain(p);
+          expect(Math.abs(dist(at(fig, 'O'), at(fig, p)) - fig.circles.get(c)!.r), `|O${p}| is the radius of ${c}`).toBeLessThan(1e-6);
+        }
+      },
+    }),
+  ),
+  ...(
+    [
+      ['concentric-role-tangent-no-invented-tangency-2470', 'מעגל P'],
+      ['concentric-role-tangent-no-invented-tangency-2470-sized-p', 'מעגל P ברדיוס 3'],
+    ] as const
+  ).map(
+    ([id, pLine]): Scenario => {
+      const prefix = ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9', pLine];
+      const line = 'משיק למעגל החיצוני בנקודה A';
+      return {
+        id,
+        title: `«…» · «${pLine}» · «${line}» — the tangent at A only; O and P are not made tangent (#2470, ADR-760)`,
+        guards:
+          "#2470 (P1). Measured at 1944d866: the last line ALSO committed `circles-tangent circle-O/circle-P at A`, green — a relation nobody stated. Root cause: the role adjective «חיצוני» stayed in the sentence, and `commonTangent` read it as an external common tangent's kind and bound \"the two circles\" (O, P). Fix (ADR-760): the role span is rewritten to its circle's letter form at the parse boundary, so no role adjective is left for another rule to read; the commit gate's tangent-kind member blanks role references the same way. Stability: P's centre and radius do not move.",
+        steps: [...prefix, line],
+        check(fig) {
+          allStepsOk(fig);
+          const v = gateVerdict(factsOf(prefix), line);
+          expect(v.kind === 'commit' && v.commands, JSON.stringify(v)).toEqual([{ type: 'tangent', id: 'tan-A', circle: 'circle-O', at: 'A', visible: true }]);
+          const before = replay(factsOf(prefix), 0);
+          const after = replay(factsOf([...prefix, line]), 0);
+          const [b, a] = [before.circles.get('circle-P')!, after.circles.get('circle-P')!];
+          expect(dist(a.center, b.center), 'P keeps its centre').toBeLessThan(1e-9);
+          expect(Math.abs(a.r - b.r), 'P keeps its radius').toBeLessThan(1e-9);
+          expect(Math.abs(dist(at(fig, 'O'), at(fig, 'A')) - fig.circles.get('circle-O')!.r), 'A on the outer circle').toBeLessThan(1e-6);
+        },
+      };
+    },
+  ),
 ];
 
 /**

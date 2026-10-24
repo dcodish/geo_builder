@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_HE, CIRCLE_ROLE_EN, circleRole } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -34,6 +34,7 @@ import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
+import { resolvePairRoles } from './pairRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
@@ -242,8 +243,11 @@ export interface ParseContext {
   circleMembers?: { id?: string; center: string; points: string[] }[];
   /** CONCENTRIC pairs in the figure (ADR-244): the shared centre letter + the bound outer/inner circle
    *  ids — lets "המעגל החיצוני/הפנימי" / "the outer/inner circle" resolve to the right circle, and makes
-   *  an UNQUALIFIED reference to that centre a clarification request instead of a silent guess. */
-  concentric?: { center: string; outer: string; inner: string }[];
+   *  an UNQUALIFIED reference to that centre a clarification request instead of a silent guess.
+   *  `resolved` (#2464, [ADR-760](docs/06-decisions.md#adr-760)) is PARSE-LOCAL, never set by `buildParseCtx`: the
+   *  pair inside `resolvePairRoles`'s aliased parse, whose circles already answer to their own tokens — the ADR-244
+   *  post-pass leaves its references alone. */
+  concentric?: { center: string; outer: string; inner: string; resolved?: true }[];
   /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
    *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
   neighbors?: Record<string, string[]>;
@@ -5786,22 +5790,13 @@ const sizeStatementLeftover = (s: string): boolean =>
  * bare «רדיוס O» is not read here.
  */
 const RADIUS_REF = new RegExp(String.raw`(?:רדיוס(?:\s+של)?\s+ה?מעגל\s+|\bradius\s+of\s+(?:the\s+)?circle\s+)(${LABEL})(?![A-Za-z\d])`, 'gi');
-/** #2459 ([ADR-754](../../docs/06-decisions.md#adr-754)) — a radius reference by the circle's ROLE in a concentric
- *  pair: «רדיוס (של)? (ה)מעגל החיצוני/הפנימי/הגדול/הקטן», "the radius of the outer/inner circle" (the ADR-244 roles,
- *  the lexicon's one spelling). */
-const RADIUS_ROLE_REF = new RegExp(String.raw`רדיוס(?:\s+של)?\s+ה?${CIRCLE_ROLE_HE}|\bradius\s+of\s+the\s+${CIRCLE_ROLE_EN}`, 'gi');
-
-/** The circle a ROLE names in the pair — the one role→id mapping, shared by the ADR-244 post-pass
- *  (`withConcentricResolution`) and the per-span reader `radiusReferences` (#2459). */
-const pairCircle = (pair: { outer: string; inner: string }, role: 'outer' | 'inner'): string => (role === 'outer' ? pair.outer : pair.inner);
-
-/** One radius reference, RESOLVED per span (#2459, ADR-754): a circle id; `ambiguous` — a letter that is a concentric
- *  pair's shared centre (ADR-244's ask); or `unresolved` — a role with no single pair to name a circle of. */
-type RadiusRef = { at: number; end: number } & ({ circle: string } | { ambiguous: string } | { unresolved: true });
+/** One radius reference, RESOLVED per span (#2459, ADR-754): a circle id, or `ambiguous` — a letter that is a
+ *  concentric pair's shared centre (ADR-244's ask). */
+type RadiusRef = { at: number; end: number } & ({ circle: string } | { ambiguous: string });
 /**
- * Every radius reference in the sentence, each resolved where it stands. The ADR-244 post-pass holds ONE role per
- * utterance, so a sentence that names BOTH circles of a pair by role («רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל
- * הפנימי») cannot be resolved there: a relation between two circles is resolved per span, by its reader (#2459).
+ * Every radius reference in the sentence, each resolved where it stands. A pair's circle named by its ROLE
+ * («רדיוס המעגל הפנימי») arrives here already in its letter form: `resolvePairRoles` (#2464, ADR-760) rewrote it at
+ * the parse boundary, which superseded ADR-754's role branch here.
  * A letter that is not a drawn circle's centre resolves to its would-be id; the caller checks it is drawn.
  */
 const radiusReferences = (s: string, ctx: ParseContext): RadiusRef[] => {
@@ -5811,12 +5806,7 @@ const radiusReferences = (s: string, ctx: ParseContext): RadiusRef[] => {
     const span = { at: m.index!, end: m.index! + m[0].length };
     return pairs.some((p) => up(p.center) === label) ? { ...span, ambiguous: label } : { ...span, circle: circleId(label) };
   });
-  const role = [...s.matchAll(RADIUS_ROLE_REF)].map((m): RadiusRef => {
-    const span = { at: m.index!, end: m.index! + m[0].length };
-    const adj = m[1] ?? m[2];
-    return pairs.length === 1 ? { ...span, circle: pairCircle(pairs[0], circleRole(adj)) } : { ...span, unresolved: true };
-  });
-  return [...letter, ...role].sort((a, b) => a.at - b.at);
+  return letter.sort((a, b) => a.at - b.at);
 };
 
 /**
@@ -5870,7 +5860,7 @@ const radiusRatio: Rule = (s, ctx) => {
   }
   if (!onlyRatioWords(rest)) return 'stop';
   // #2459 (ADR-754): each reference was resolved where it stands — a pair's shared centre letter is ASKED about
-  // (ADR-244's ask, never a silent pick of the outer), a role with no single pair names no circle (escalate).
+  // (ADR-244's ask, never a silent pick of the outer).
   const amb = refs.find((r): r is RadiusRef & { ambiguous: string } => 'ambiguous' in r);
   if (amb) return { clarify: 'ambiguous-circle', center: amb.ambiguous };
   const known = new Set((ctx.circles ?? []).map((c) => circleId(up(c))));
@@ -13120,27 +13110,13 @@ export function impliedPointBinding(
 }
 
 /**
- * The concentric-pair QUALIFIER named in the utterance ([ADR-244](../../docs/06-decisions.md#adr-244)):
- * the Hebrew adjective FOLLOWS the circle noun ("המעגל החיצוני/הפנימי/הגדול/הקטן"), the English
- * adjective PRECEDES it ("the outer/inner/larger/smaller circle"). ADJACENCY to the circle word is
- * required — a bare "חיצוני" also appears in "נקודה חיצונית" (an external POINT) and must never read
- * as a circle qualifier.
- */
-const circleQualifier = (s: string): 'outer' | 'inner' | null => {
-  const he = s.match(new RegExp(CIRCLE_ROLE_HE));
-  if (he) return circleRole(he[1]);
-  const en = s.match(new RegExp(CIRCLE_ROLE_EN, 'i'));
-  if (en) return circleRole(en[1]);
-  return null;
-};
-
-/**
  * CONCENTRIC-pair reference resolution post-pass ([ADR-244](../../docs/06-decisions.md#adr-244)) — the
- * chokepoint, in the ADR-119 pattern, so EVERY circle-consuming rule gains outer/inner resolution at
- * once instead of each rule learning the qualifier. Rules mint `circle-<centre>` — the OUTER of a pair,
- * by the creation binding — so only a rewrite is ever needed: an INNER qualifier in the utterance
- * redirects the refs to the pair's inner id; an OUTER qualifier confirms them. With NO qualifier,
- * STATED membership disambiguates (a command whose named points are already members of exactly one of
+ * chokepoint, in the ADR-119 pattern, for a reference to the pair's shared CENTRE (a letter, or an unqualified
+ * «המעגל»). Rules mint `circle-<centre>` — the OUTER of a pair, by the creation binding. A ROLE word
+ * («המעגל הפנימי») never reaches here: `resolvePairRoles` resolved it where it stands, before any rule ran
+ * (#2464, [ADR-760](../../docs/06-decisions.md#adr-760), which retired the one-qualifier-per-sentence branch that
+ * put every reference of a line on the circle its FIRST role word named), and its aliased pair is marked
+ * `resolved`. Here STATED membership disambiguates (a command whose named points are already members of exactly one of
  * the pair — "קשת BC" with B,C on the inner circle); otherwise the reference is genuinely ambiguous →
  * a clarification, never a silent pick and never an LLM guess. A `circle` CREATION with `ifAbsent`
  * (the macro's own output / an implicit-circle prepend) is not a reference; a bare re-creation of a
@@ -13148,10 +13124,9 @@ const circleQualifier = (s: string): 'outer' | 'inner' | null => {
  */
 function withConcentricResolution(
   commands: AnyCommand[],
-  s: string,
   ctx: ParseContext,
 ): AnyCommand[] | { clarify: 'ambiguous-circle'; center: string } {
-  const pairs = ctx.concentric ?? [];
+  const pairs = (ctx.concentric ?? []).filter((p) => !p.resolved);
   if (!pairs.length) return commands;
   const pairByOuter = new Map(pairs.map((p) => [p.outer, p]));
   const CIRCLE_REF_KEYS = ['circle', 'circle1', 'circle2'];
@@ -13168,31 +13143,29 @@ function withConcentricResolution(
     return keys.map((key) => ({ cmd, key }));
   });
   if (!refs.length) return commands;
-  const qual = circleQualifier(s);
   const membersOf = (cid: string) =>
     new Set((ctx.circleMembers ?? []).filter((e) => e.id === cid).flatMap((e) => e.points.map((p) => p.toUpperCase())));
   const targets = new Map<AnyCommand, Map<string, string>>();
   for (const { cmd, key } of refs) {
     const pair = pairByOuter.get((cmd as unknown as Record<string, string>)[key])!;
-    let target: string | null = qual ? pairCircle(pair, qual) : null;
-    if (!target) {
-      // No qualifier — stated membership picks: every point the command names that is ALREADY a member
-      // of one of the pair must side with the SAME circle.
-      const labels = Object.entries(cmd).flatMap(([k, v]) =>
-        k === 'type' || CIRCLE_REF_KEYS.includes(k)
-          ? []
-          : typeof v === 'string' && /^[A-Z]\d*$/.test(v)
-            ? [v]
-            : Array.isArray(v)
-              ? v.filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))
-              : [],
-      );
-      const o = membersOf(pair.outer);
-      const i = membersOf(pair.inner);
-      const known = labels.filter((l) => o.has(l) || i.has(l));
-      if (known.length && known.every((l) => o.has(l) && !i.has(l))) target = pair.outer;
-      else if (known.length && known.every((l) => i.has(l) && !o.has(l))) target = pair.inner;
-    }
+    // Stated membership picks: every point the command names that is ALREADY a member
+    // of one of the pair must side with the SAME circle.
+    const labels = Object.entries(cmd).flatMap(([k, v]) =>
+      k === 'type' || CIRCLE_REF_KEYS.includes(k)
+        ? []
+        : typeof v === 'string' && /^[A-Z]\d*$/.test(v)
+          ? [v]
+          : Array.isArray(v)
+            ? v.filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))
+            : [],
+    );
+    const o = membersOf(pair.outer);
+    const i = membersOf(pair.inner);
+    const known = labels.filter((l) => o.has(l) || i.has(l));
+    const target =
+      known.length && known.every((l) => o.has(l) && !i.has(l)) ? pair.outer
+      : known.length && known.every((l) => i.has(l) && !o.has(l)) ? pair.inner
+      : null;
     if (!target) return { clarify: 'ambiguous-circle', center: pair.center };
     const forCmd = targets.get(cmd) ?? new Map<string, string>();
     forCmd.set(key, target);
@@ -14510,6 +14483,12 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // «tan∢A1 = 2» names the aliased angle.
   const trig = trigGiven(s, ctx);
   if (trig) return withReservedGuard(trig, ctx);
+  // #2464 / #2470 / #2305 (ADR-760): a concentric pair's circle named by its ROLE («המעגל החיצוני/הפנימי», "the outer
+  // circle") is resolved where each role word stands — the sibling REWRITE at this chokepoint: every role span becomes
+  // the letter form of its own circle's parse-local token, so every rule reads it as it reads «מעגל O», and no role
+  // adjective is left for another rule to read as its own word («חיצוני» as a common tangent's kind).
+  const roles = resolvePairRoles(s, ctx, parseResolved);
+  if (roles) return withReservedGuard(roles, ctx);
   // «המעגל הגדול/הקטן» between two INDEPENDENT circles (issue #102, operator ruling): the size
   // qualifier both REFERS and ASSERTS — resolve the reference to a concrete circle (recorded roles
   // first, else assign by the drawn sizes) and, on a first ASSIGNING use, append the R>r-like
@@ -15170,7 +15149,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       const claimed = withRoleClaims(withCarrierSegments(res), s, ctx);
       if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
       if (!Array.isArray(claimed)) return refusalOf(claimed);
-      const resolved = withConcentricResolution(withImplicitCircles(withArcEndpoints(withOnCircleMembership(claimed, s, ctx), ctx), ctx), s, ctx);
+      const resolved = withConcentricResolution(withImplicitCircles(withArcEndpoints(withOnCircleMembership(claimed, s, ctx), ctx), ctx), ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withRadiusSymbolBinding(resolved, s, ctx), ctx), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
@@ -15973,8 +15952,12 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   // The tangent-KIND member (#212): a kind adjective on a SINGULAR tangent noun in a two-circle
   // context must land in a common-tangent / drawn-tangent lowering (the LLM's guess repositioned the
   // stated disjoint circles into mutual tangency, all rows green).
+  // #2470 (ADR-760): a circle's ROLE («למעגל החיצוני», "the inner circle") is a reference, never a tangent's kind —
+  // the lexicon's one role-reference spelling is blanked before the kind words are read (the gate's twin of the parse
+  // boundary, which rewrites the same spans before any rule reads them).
+  const kindText = s.replace(new RegExp(CIRCLE_ROLE_REF_HE, 'g'), ' ').replace(new RegExp(CIRCLE_ROLE_REF_EN, 'gi'), ' ');
   if (
-    /חיצוני|מבחוץ|פנימי|מבפנים|אלכסוני|external|internal/i.test(s) &&
+    /חיצוני|מבחוץ|פנימי|מבפנים|אלכסוני|external|internal/i.test(kindText) &&
     /(?<![א-ת])ה?משיק(?!ים)(?![א-ת])|tangent(?!s)/i.test(s) &&
     // #140: the satisfied set is DERIVED from the type name, not enumerated. It listed
     // `common-tangent` + `tangent` and missed `circles-tangent` — the mutual-position lowering, which
@@ -16020,8 +16003,10 @@ function verbEvidence(g: (typeof VERB_GATES)[number], commands: AnyCommand[]): A
       const foot = feet.get(c.id)!;
       // strict: the foot's source must be THIS circle's centre (token or its ADR-342 anonymous form) —
       // an altitude foot that happens to ride a circle is not tangency evidence.
+      // #2464 (ADR-760): a concentric pair's inner circle (`circle-O-2`) is centred there too — the id shape
+      // `evidenceAboutCircle` and the label accountant already read; the inner circle's tangency was false-blocked.
       const tok = typeof foot.from === 'string' ? foot.from.replace(/^@ctr-/, '') : '';
-      if (c.circle === `circle-${tok}`) ev.push(foot, c);
+      if (tok && (c.circle === `circle-${tok}` || c.circle.startsWith(`circle-${tok}-`))) ev.push(foot, c);
     }
   }
   // CLOSURE: a command that references an evidence object's id participates in the verb's encoding —

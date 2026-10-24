@@ -61,6 +61,21 @@ export function circleText(ref: CircleRef | undefined, letter: string, t: Circle
   };
 }
 
+/**
+ * #2305 M2/M3 ([ADR-760](../../docs/06-decisions.md#adr-760)) — a LIST of circles, as a question names its candidates:
+ * a role by its role phrase, every other circle by its letter (today's text: «O, P»). With a concentric pair the list
+ * reads «המעגל החיצוני, המעגל הפנימי, P». Two items that word the same (one letter for both circles of a pair when no
+ * role reference resolves) fold to one, as today's centre list did.
+ */
+export function circleList(items: readonly CircleItem[], t: CircleT): string {
+  const out: string[] = [];
+  for (const it of items) {
+    const w = isRole(it.ref) ? t(`circleName.${it.ref.role}`, RAW) : it.letter;
+    if (!out.includes(w)) out.push(w);
+  }
+  return out.join(', ');
+}
+
 /** Two circles as one subject: «המעגלים O ו-P» when both keep a letter (today's text), else «המעגל החיצוני והמעגל הפנימי». */
 export function circlePair(a: CircleItem, b: CircleItem, t: CircleT): string {
   if (!isRole(a.ref) && !isRole(b.ref)) return t('circleName.pairLetters', { a: a.letter, b: b.letter, ...RAW });

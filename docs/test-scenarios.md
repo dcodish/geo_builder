@@ -2154,3 +2154,11 @@ over all four (ADR-041).
 ### `square-in-circle-after-square-around-2454` — «מעגל O» · «ריבוע ABCD חוסם את מעגל O» · «מרובע EFGH חסום במעגל O» · «EFGH ריבוע»: every line builds (#2454, absorbed by #2480, ADR-757)
 
 **Guards against:** the fourth line refused «E, F, G, H is no longer available» because line 2 had rewritten «מעגל O» into a circle placed ahead of the letters it depends on. **Asserts** four rows through the store's own commit, the figure green, EFGH a square with its corners on circle O, and ABCD's sides tangent to it.
+
+### `concentric-roles-per-reference-2464` and `concentric-roles-per-reference-2464-reversed` — «שני מעגלים בעלי מרכז משותף O» · «A על המעגל החיצוני ו-B על המעגל הפנימי»: each point on the circle its own role word names (#2464, ADR-760)
+
+**Guards against:** a concentric pair's role read once per sentence — both points committed on the circle the FIRST role word named, green (|OA| = |OB| = 5 at 1944d866). **Asserts** both steps build green with no violation; A is a member of `circle-O` and B of `circle-O-2` (and the reverse in the twin), each at that circle's radius from O. The class matrix (six constructs × three spellings × both roles × the pair alone, sized, and beside a third circle; two-role lines; the chord-tangent family; the questions and refusals; #2305's M2/M3 wording) is `src/app/__tests__/issue-2464-concentric-roles-per-span.test.ts`; the mechanism's unit lock is `src/parser/__tests__/pair-roles-alias.test.ts`.
+
+### `concentric-role-tangent-no-invented-tangency-2470` and `concentric-role-tangent-no-invented-tangency-2470-sized-p` — the sized pair, «מעגל P», «משיק למעגל החיצוני בנקודה A»: the tangent at A only (#2470, ADR-760)
+
+**Guards against:** a role adjective left in the sentence being read as another rule's word — «חיצוני» as an external common tangent's kind — so O and P were made tangent at A, green, a relation nobody stated. **Asserts** the line commits exactly `tangent {circle-O, at A}`, P keeps its centre and radius, A is on the outer circle, and the figure is green; the twin states P's radius 3.
