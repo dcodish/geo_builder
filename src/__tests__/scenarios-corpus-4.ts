@@ -5945,7 +5945,74 @@ export const SCENARIOS_4: Scenario[] = [
       for (const seed of [0, 1, 2]) expect(angle(at(replay(facts, seed), 'O'), at(replay(facts, seed), 'C'), at(replay(facts, seed), 'D')), `∠OCD = 90 @${seed}`).toBeCloseTo(90, 4);
     },
   },
+  {
+    id: 'impossible-isosceles-quad-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = BC» · «AC ⊥ BC» is refused as the statement\'s contradiction, never drawn with C on A (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = BC']);
+      const v = gateVerdict(pre, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'the statement\'s over-constraint').toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(detail, 'never a flat polygon: D is not on the line').not.toMatch(COLLAPSED_VS);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, 'AC ⊥ BC', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said, 'FR-EN-8\'s contradiction sentence, naming both statements').toContain('«AC ⊥ BC» סותר את «AB = BC»');
+      // the prior figure is a real isosceles AB = BC, C not on A
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(dist(A, B) - dist(B, C))).toBeLessThan(1e-6 * dist(A, B));
+      expect(dist(A, C) / dist(A, B), 'C is not on A').toBeGreaterThan(0.1);
+      // typed past the gate (a loaded file), the fold refuses it too, as a contradiction — never pending
+      const folded = replay(factsOf(['מרובע ABCD', 'AB = BC', 'AC ⊥ BC']));
+      expect(folded.lastError).toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
+    },
+  },
+  {
+    id: 'impossible-isosceles-quad-angle-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = BC» · «∠ACB = 90» is refused at once, never committed as waiting for more givens (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = BC']);
+      const v = gateVerdict(pre, '∠ACB = 90');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail).toMatch(/^over-constrained: ∠ACB = 90° cannot hold/);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, '∠ACB = 90', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said).toContain('«∠ACB = 90» סותר את «AB = BC»');
+      const folded = replay(factsOf(['מרובע ABCD', 'AB = BC', '∠ACB = 90']));
+      expect(folded.lastError, 'a contradiction, refused').toMatch(/^over-constrained: ∠ACB = 90° cannot hold/);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
+    },
+  },
+  {
+    id: 'impossible-isosceles-quad-numeric-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = 5» · «BC = 5» · «AC ⊥ BC» is refused naming «AC ⊥ BC», never a straight corner at D (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = 5', 'BC = 5'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = 5', 'BC = 5']);
+      const v = gateVerdict(pre, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'names the student\'s statement').toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(detail, 'never a vertex the student did not constrain').not.toMatch(/A, B, C, D/);
+      expect(dist(at(fig, 'A'), at(fig, 'C')) / dist(at(fig, 'A'), at(fig, 'B')), 'C is not on A').toBeGreaterThan(0.1);
+    },
+  },
 ];
+
+/** #2443: the shared record of what the three ADR-764 scenarios guard (a hoisted function — the array reads it at load). */
+function guards2443(): string {
+  return "#2443 (P1), the operator's exact lines («מרובע ABCD» · «AB = BC» · «AC ⊥ BC»). AC ⊥ BC makes AB the hypotenuse of triangle ABC, so AB = BC holds only where C meets A. Measured at 045a8546 through decideDeterministic2D: every line committed and the quadrilateral was drawn green with C 1.3e-3 – 1.9e-3 of the extent from A (seeds 0–7); the angle form «∠ACB = 90» was parked as pending; the numeric twin committed at five seeds. ADR-746 had closed the class for a DECLARED triangle only. ADR-764: the tightened re-solve's trigger also reads the collapsible term pairs of every enforced constraint (a quadrilateral's two vertices meeting leave the ring fat), a primary refused on a term pair keeps its own verdict over a rescue stage's straight corner, and the no-room prover reads the base angles of every stated equal pair over any three points. The refusal is FR-EN-8's over-constraint («X» סותר את «Y»), marked degenerate, never a flat-polygon sentence (D is not on the line). The class matrix (spellings, orders, English, the other leg, a diagonal, a pentagon, loose points, the ratio form, 24 seeds, the controls and FR-EN-20's coincidences) is src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts.";
+}
 
 /** #2477: the shared record of what the three ADR-761 scenarios guard (a hoisted function — the array reads it at load). */
 function guards2477(): string {

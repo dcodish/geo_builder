@@ -175,6 +175,10 @@ export function polygonDefects(c: Construction, positions: Map<Id, Vec>, flatTol
  * operator's needle at 6e-3, the two-right-angles needle at 1.5e-3. The band contains legitimate figures
  * ON PURPOSE — they are told apart by re-solving, not by their shape — and it is the trigger, so an
  * ordinary figure pays nothing.
+ *
+ * #2443 ([ADR-764](../../docs/06-decisions.md#adr-764)): the same band also gates a TERM PAIR — two points a stated
+ * relation measures between (`collapsibleTermPairs`) closer than this fraction of the figure's extent. Two vertices
+ * of a quadrilateral meeting leave the ring fat, and loose points have no ring; one ruler, one band.
  */
 export const THIN_POLYGON_RATIO = 5e-2;
 /**

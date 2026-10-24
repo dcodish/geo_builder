@@ -178,6 +178,9 @@ export interface AngleSumImpossibility {
   kind: 'excess' | 'no-room' | 'limit-collapse';
   /** #2344: the base angles read off a stated equal pair (only on a `limit-collapse`) */
   inferred?: { vertex: Id; ray1: Id; ray2: Id; value: number }[];
+  /** #2443 (ADR-764): a `limit-collapse` over three points no declared triangle covers (`polygon` is then the triple
+   *  V, P, Q, not a declared ring) — refused as the statement's over-constraint, since there is no polygon to call flat */
+  undeclared?: true;
 }
 
 /**
@@ -280,6 +283,24 @@ export function angleSumImpossibility(
     const forced = sum + inferred.reduce((s, a) => s + a.value, 0);
     if (angles.length + inferred.length < n && Math.abs(forced - bound) <= NO_ROOM_TOL)
       return { polygon: [...o.vertices], angles, sum: forced, bound, kind: 'limit-collapse', inferred };
+  }
+  // #2443 (ADR-764): the base-angle theorem holds for ANY three distinct points, drawn as a triangle or not. A stated
+  // |VP| = |VQ| with a stated 90° at P (between V and Q) forces 90° at Q too, and the apex V has no room: the givens
+  // hold only where P meets Q. Read for the triples no declared triangle covers (those were judged above), and only
+  // at exactly 90°, the bound — one-way sound like every reading here.
+  apexes ??= equalApexPairs(lengths);
+  const declared = (v: Id, p: Id, q: Id): boolean =>
+    objects.some((o) => o.kind === 'polygon' && o.vertices.length === 3 && [v, p, q].every((x) => o.vertices.includes(x)));
+  for (const { v, p, q } of apexes) {
+    if (declared(v, p, q)) continue;
+    for (const [from, to] of [[p, q], [q, p]] as const) {
+      const w = wedges.find((x) => x.v === from && ((x.p === v && x.q === to) || (x.p === to && x.q === v)) && Math.abs(x.deg - 90) <= NO_ROOM_TOL);
+      if (!w) continue;
+      return {
+        polygon: [v, p, q], angles: [{ vertex: from, ray1: w.p, ray2: w.q, value: w.deg }], sum: 180, bound: 180,
+        kind: 'limit-collapse', inferred: [{ vertex: to, ray1: v, ray2: from, value: w.deg }], undeclared: true,
+      };
+    }
   }
   return null;
 }

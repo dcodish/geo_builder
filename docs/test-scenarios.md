@@ -2203,3 +2203,15 @@ over all four (ADR-041).
 
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
+
+### `impossible-isosceles-quad-refused-2443` — «מרובע ABCD» · «AB = BC» · «AC ⊥ BC» is refused as the statement's contradiction, never drawn with C on A (#2443 P1, ADR-764)
+
+**Guards against:** a green quadrilateral for givens that hold only where C meets A: a right angle at C makes AB the hypotenuse of triangle ABC, so AB = BC cannot hold. ADR-746 refused it only when ABC was a declared triangle; in a quadrilateral D keeps the ring fat, so the thin-polygon trigger never asked the tightened re-solve. **Asserts** the operator's third line is refused by the engine before commit with FR-EN-8's over-constraint (`over-constrained: AC ⟂ BC cannot hold`, «AC ⊥ BC» סותר את «AB = BC»), never a flat-polygon sentence (D is not on the line); the prior isosceles figure stays with C off A; folded as a fact it is a contradiction, never pending. The class matrix is `src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts`.
+
+### `impossible-isosceles-quad-angle-refused-2443` — «מרובע ABCD» · «AB = BC» · «∠ACB = 90» is refused at once, never committed as waiting for more givens (#2443 P1, ADR-764)
+
+**Guards against:** the angle spelling parked as pending: the no-room prover read the base angle an equal pair forces only inside a declared triangle. **Asserts** the line is refused before commit, «∠ACB = 90» סותר את «AB = BC», and the folded fact is a contradiction, never pending.
+
+### `impossible-isosceles-quad-numeric-refused-2443` — «מרובע ABCD» · «AB = 5» · «BC = 5» · «AC ⊥ BC» is refused naming «AC ⊥ BC», never a straight corner at D (#2443 P1, ADR-764)
+
+**Guards against:** the numeric twin committing green at some seeds, and a refusal that names a straight corner at D (a rescue stage's collateral defect) instead of the student's statement. **Asserts** the refusal is `over-constrained: AC ⟂ BC cannot hold`, never mentions the ring A, B, C, D, and the prior figure keeps C off A.
