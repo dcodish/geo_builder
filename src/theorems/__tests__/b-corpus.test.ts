@@ -101,8 +101,10 @@ const CORPUS: BQuestion[] = [
       'D on circle M',
       'C on circle M',
     ],
-    expect: [55, 56, 43, 46, 48, 50, 82],
-    gaps: [98, 84, 91],
+    // #2483 (ADR-758): the stated memberships («D on circle M», «C on circle M») and the through-point B are members
+    // now, so the centre-with-chords row #98 fires — it holds (M is the given circumcentre of BDC).
+    expect: [55, 56, 43, 46, 48, 50, 82, 98],
+    gaps: [84, 91],
     never: [69],
   },
   {
@@ -179,8 +181,10 @@ const CORPUS: BQuestion[] = [
       'circle through A E M',
       'D on the circle',
     ],
-    expect: [91, 2, 1, 10, 15, 16, 17, 62],
-    gaps: [102],
+    // #2483 (ADR-758): «D on the circle» is a member now, so A, E, M, D are four concyclic points and #102 fires —
+    // it holds (AEMD is the booklet's cyclic quadrilateral).
+    expect: [91, 2, 1, 10, 15, 16, 17, 62, 102],
+    gaps: [],
     never: [69],
   },
   {

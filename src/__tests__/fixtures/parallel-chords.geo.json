@@ -64,17 +64,6 @@
       "enabled": true
     },
     {
-      "id": "g1.5",
-      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
-      "group": "g1",
-      "cmd": {
-        "type": "point-on-circle",
-        "id": "A",
-        "circle": "circle-O"
-      },
-      "enabled": true
-    },
-    {
       "id": "g1.6",
       "utterance": "CD ו AF מיתרים המקבילים זה לזה",
       "group": "g1",

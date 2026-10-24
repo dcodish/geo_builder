@@ -9510,7 +9510,12 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   const [a, b] = pr;
   // avoid the endpoint already on the target circle (default to `a` — the avoid branch drops all
   // placed roots regardless, so the new crossing is found either way); draw from the off-circle end.
-  const onCircle = circleContaining(ctx, [a], center) ? a : circleContaining(ctx, [b], center) ? b : a;
+  // #2501 (ADR-758 Am. 1): "on the TARGET circle" is `membersOfCenter(center)`, never `circleContaining` — that
+  // helper only PREFERS `center` and falls back to ANY circle, so an end on another (even a hidden helper) circle
+  // read as on this one: the tangent construction's centre O rides its hidden Thales circle, and «AO חותך את
+  // המעגל בנקודה C» avoided the centre instead of A.
+  const onTarget = (p: string): boolean => membersOfCenter(ctx, center).has(up(p));
+  const onCircle = onTarget(a) ? a : onTarget(b) ? b : a;
   const other = onCircle === a ? b : a;
   const lineId = `chord-${a}${b}`;
   // A BARE pair means the SEGMENT (ADR-077 / ADR-268, the line∩circle member — issue #30): the stated
@@ -9527,7 +9532,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   // reads as the infinite line (no within crossing).
   const wordInfinite = /\bline\b|\bray\b|הישר|הקו|קרן|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s);
   const aCentre = a === up(center), bCentre = b === up(center);
-  const centreRadius = (aCentre && !!circleContaining(ctx, [b], center)) || (bCentre && !!circleContaining(ctx, [a], center));
+  const centreRadius = (aCentre && onTarget(b)) || (bCentre && onTarget(a));
   const centreSelect = (aCentre || bCentre) && !centreRadius; // centre endpoint, other not on the circle → within selection
   const infinite = wordInfinite || centreRadius;
   return [
