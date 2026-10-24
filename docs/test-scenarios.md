@@ -2162,3 +2162,15 @@ over all four (ADR-041).
 ### `concentric-role-tangent-no-invented-tangency-2470` and `concentric-role-tangent-no-invented-tangency-2470-sized-p` — the sized pair, «מעגל P», «משיק למעגל החיצוני בנקודה A»: the tangent at A only (#2470, ADR-760)
 
 **Guards against:** a role adjective left in the sentence being read as another rule's word — «חיצוני» as an external common tangent's kind — so O and P were made tangent at A, green, a relation nobody stated. **Asserts** the line commits exactly `tangent {circle-O, at A}`, P keeps its centre and radius, A is on the outer circle, and the figure is green; the twin states P's radius 3.
+
+### `issue-2477-diameter-of-the-drawn-circle` — a diameter stated about «המעגל» is a diameter of the drawn circle (#2477, ADR-761)
+
+**Guards against:** «מעגל O · AB הוא קוטר של המעגל» drawing a SECOND circle P on AB beside O, green (`circleOnDiameter` read the definite «של המעגל» as a define marker). **Asserts** the operator's two lines build green with no violations, exactly one circle, A and B on circle O and O the midpoint of AB, at seeds 0–2. The class matrix (every copula/possessive spelling in both locales, an unnamed circle, a circumcircle, ends already on O, the compounds, the two-circle ask and tie-break, the controls that still create) is `src/app/__tests__/issue-2477-definite-diameter.test.ts`; the one-circle build is the fixture `issue-2477-diameter-of-the-circle.geo.json`.
+
+### `issue-2477-diameter-of-the-circle-en` — the English twin: "AB is a diameter of the circle" (#2477, ADR-761)
+
+**Guards against:** "circle O" · "AB is a diameter of the circle" drawing a second circle on AB. **Asserts** the same as `issue-2477-diameter-of-the-drawn-circle`: one circle, AB a diameter of O at seeds 0–2, green.
+
+### `issue-2477-diameter-of-the-circle-two-circles-asks` — beside two circles, a diameter of «המעגל» asks which (#2477, ADR-761)
+
+**Guards against:** «מעגל O · מעגל P · AB הוא קוטר של המעגל» drawing a THIRD circle M, green. **Asserts** the third step is refused by the parser with `ambiguous-circle-ref` (centres O, P — the existing «יש כמה מעגלים בסרטוט…» question) and the figure keeps exactly two circles.

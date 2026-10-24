@@ -600,7 +600,7 @@ letters after the noun). It is an ambiguity question (`isAmbiguityQuestion`), so
 the model sees it; `ambiguousDefiniteShapeNote` (`app/decideDeterministic.ts`) renders it for the submit and ✎ edit
 seams (`input.ambiguousDefiniteShape`, the plural from `input.shapePlural` by arity).
 
-### A through- or size-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548), [ADR-690](06-decisions.md#adr-690))
+### A through-, size- or diameter-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548), [ADR-690](06-decisions.md#adr-690), [ADR-761](06-decisions.md#adr-761))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
 question through `definiteCircleReference`: a reference when its named centre's circle exists, or when it says
@@ -616,6 +616,14 @@ noun with a size and no through clause (`lowerSizeReference`: «המעגל שש�
 is `set-radius`, a radius letter is `radius-symbol` (its twin «רדיוס המעגל R»'s command), the same residue guard
 applies, and a reference it cannot read whole defers — never a definition. A named centre keeps its own path
 (ADR-683's restatement).
+
+**So does the diameter definition rule** (ADR-761). `circleOnDiameter` (ADR-090's Thales-circle opener) asks the
+predicate BEFORE its phrasing test, and a non-null answer makes it return null, so `diameter` binds the drawn circle,
+asks, or applies `resolveCenter`'s membership tie-break; only "is this a reference?" is read, never the predicate's
+own resolution. Its create guards run first: a named circle, «המעגל החדש» (`explicitNew`), an endpoint that is the
+centre (#152), ends on two different circles (#221), and a defining clause (`DEFINING_CLAUSE`: «שקוטרו», «שבו»,
+"circle with", "whose"), which stays a definition. With the reference answered, the definite alternatives of `DEFINE`
+fire only on a figure with no circle.
 
 **The membership seats the circle, not the point** ([ADR-576](06-decisions.md#adr-576)): before apply branch (c2)
 converts an existing free vertex to an `on-circle` rider, `reseatFreeCircle` moves the circle's unstated seat
