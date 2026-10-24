@@ -144,13 +144,20 @@ describe('#2477 — several circles: the line asks which, or binds the one its e
   });
 });
 
-describe('#2477 — the definite twin of a refused line is refused the same way (never a second circle)', () => {
+// #2499 (ADR-766, 2026-10-24): both twins were refused here with a false «סותר» (the earlier «AB = 6» was never
+// re-homed to the free radius). They now both BUILD r = 3 — the equal-outcome claim stands, strengthened to the figure.
+describe('#2477 — the definite twin answers exactly as the locative one: both build r = 3 (never a second circle)', () => {
   it('«מעגל O · AB = 6 · AB קוטר של המעגל» answers exactly as «… AB קוטר במעגל» does', async () => {
     const definite = await submit(['מעגל O', 'AB = 6', 'AB קוטר של המעגל']);
     expect(circleCount()).toBe(1);
+    expect(definite[2].kind).toBe('commit');
+    allGreen();
+    isDiameterOf('A', 'B', 'circle-O');
+    expect(replay(useGeoStore.getState().facts, 0).circles.get('circle-O')!.r).toBeCloseTo(3, 6);
     const twin = await submit(['מעגל O', 'AB = 6', 'AB קוטר במעגל']);
     expect(definite[2].kind).toBe(twin[2].kind);
     expect(definite[2].key).toBe(twin[2].key);
+    expect(replay(useGeoStore.getState().facts, 0).circles.get('circle-O')!.r).toBeCloseTo(3, 6);
   });
 });
 

@@ -736,6 +736,54 @@ export function obligationsOf(c: Construction): Map<string, Constraint> {
   return m;
 }
 
+/**
+ * The EARLIER givens a step BROKE by rewriting their objects (#2499, [ADR-766](../../docs/06-decisions.md#adr-766);
+ * LADDER stage 2e). Both halves are required:
+ *  - VIOLATED — in the failed primary solve's attribution (ADR-398) and an obligation the prior figure
+ *    carried (`obligationsOf(prev)`, ADR-402). A still-satisfied given is never listed: recruiting for it
+ *    would let stage 3B commit its widest marking and break least ownership (ADR-281).
+ *  - REWRITTEN — the given names, or is carried by, an object present in both `prev` and `next` whose
+ *    definition this step changed apart from its `solve` (the test `settleOnFrozenPrior` uses). That is
+ *    what makes its carrier assignment stale; a stated value's own conflict rewrites nothing it touches,
+ *    so a genuine contradiction pays no extra recruiter work (M2 law iii: the solver state decides only
+ *    what re-homing follows, never what a given is).
+ */
+function brokenEarlierGivens(prev: Construction, next: Construction, primary: EvalResult, already: Constraint[]): Constraint[] {
+  if (primary.ok || !primary.violated?.length) return [];
+  const before = obligationsOf(prev);
+  const skip = new Set(already.map(constraintKey));
+  const candidates = primary.violated.filter((k) => before.has(constraintKey(k)) && !skip.has(constraintKey(k)));
+  if (!candidates.length) return [];
+  const strip = (o: GeoObject) => JSON.stringify({ ...o, solve: undefined });
+  const prevById = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const rewritten = new Set<Id>();
+  for (const o of next.objects) {
+    const po = prevById.get(o.id);
+    if (po && po !== o && strip(po) !== strip(o)) rewritten.add(o.id);
+  }
+  if (!rewritten.size) return [];
+  const carriersOf = (k: Constraint): Id[] => {
+    const key = constraintKey(k);
+    return next.objects
+      .filter((o) => {
+        const sv = (o as { solve?: SolveDirective }).solve;
+        return !!sv && (constraintKey(sv.constraint) === key || (sv.also ?? []).some((a) => constraintKey(a) === key));
+      })
+      .map((o) => o.id);
+  };
+  const out: Constraint[] = [];
+  const seen = new Set<string>();
+  for (const k of candidates) {
+    const key = constraintKey(k);
+    if (seen.has(key)) continue;
+    if (constraintRefs(k).some((id) => rewritten.has(id)) || carriersOf(k).some((id) => rewritten.has(id))) {
+      seen.add(key);
+      out.push(k);
+    }
+  }
+  return out;
+}
+
 function runFailureLadder(
   prev: Construction,
   next: Construction,
@@ -806,6 +854,14 @@ function runFailureLadder(
   }
   const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
   if (orphans.length) trace.push(`${prefix}:orphans`);
+  // EARLIER-GIVEN RE-HOME (#2499, [ADR-766](../../docs/06-decisions.md#adr-766)) — M2 law (i) for EVERY
+  // obligation, not only `coincide`: a membership statement is often lowered as STRUCTURE (A rewritten to
+  // `on-circle`, to the antipode `line-circle`), adding no new constraint, while an EARLIER given about the
+  // rewritten point («AB = 6», «OA = 4») keeps a carrier that can no longer move it. Such a given joins the
+  // recruit list so the same machinery that re-homes a new given finds it a free DOF (the circle's radius) —
+  // satisfiability no longer depends on entry order.
+  const broken = brokenEarlierGivens(prev, next, primary, [...newCons, ...orphans]);
+  if (broken.length) trace.push(`${prefix}:rehome`);
   // STAGE-0 (ADR-276, issue #37): before recruiting, try the new statement's own carriers over the
   // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
   // compromise basin of) the whole already-valid coupled system.
@@ -816,7 +872,7 @@ function runFailureLadder(
       if (a) return a;
     }
   }
-  const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
+  const recruited = recruitFreeDofs(next, [...newCons, ...orphans, ...broken], trace);
   if (recruited) {
     const r2 = evaluate(recruited);
     sawTangent(r2);

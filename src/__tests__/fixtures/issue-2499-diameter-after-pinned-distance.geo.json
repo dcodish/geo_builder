@@ -1,0 +1,79 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-24T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "_UpuMv7gmlVEsAMMVnkrQ",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "WQ9rXys3IpwybP0zDd6as",
+      "utterance": "AB = 6",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "LpLaOG1rD4BvMcbOn3A1e",
+      "utterance": "AB = 6",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 6
+      },
+      "enabled": true
+    },
+    {
+      "id": "P1UWhzCQ8z-rlP9HygnCj",
+      "utterance": "AB קוטר של המעגל",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "vEKzGrlodkICpDOJxUGko",
+      "utterance": "AB קוטר של המעגל",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ZMkffBlnVBSeJkcfLkF78",
+      "utterance": "AB קוטר של המעגל",
+      "group": "g3",
+      "cmd": {
+        "type": "set-collinear",
+        "a": "A",
+        "b": "O",
+        "c": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

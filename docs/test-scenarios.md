@@ -2105,7 +2105,7 @@ over all four (ADR-041).
 
 ### `common-tangent-external-through-touch-refused-2407` — «T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)
 
-**Guards against:** the at-touch reading (ADR-740) taken for a stated kind the touch tangent is not, which would draw an "external" tangent that is internal. **Asserts** the external line is refused by the engine before commit, naming `T, A, B collinear cannot hold` (as at 3cae7f25), and the touch tangent's own kind («פנימי») commits.
+**Guards against:** the at-touch reading (ADR-740) taken for a stated kind the touch tangent is not, which would draw an "external" tangent that is internal. **Asserts** the external line is refused by the engine before commit, naming `MA ⟂ AB cannot hold` (re-based 2026-10-24 by #2499 / ADR-766: the collinear reason at 3cae7f25 came from a false refusal one sub-step earlier, which now builds), and the touch tangent's own kind («פנימי») commits.
 
 ### `impossible-right-isosceles-refused-2344` — «משולש ABC» · «AB = BC» · «AC ⊥ BC» is refused as a collapsed triangle, never drawn as a green sliver (#2344 P1, ADR-746)
 
@@ -2203,3 +2203,6 @@ over all four (ADR-041).
 
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
+### `diameter-after-pinned-distance-2499` — «מעגל O · AB = 6 · AB קוטר של המעגל» builds radius 3, as the other order does (#2499, ADR-766)
+
+**Guards against:** a membership lowered as structure (the diameter makes A the antipode of B) leaving the earlier «AB = 6» with a carrier that cannot move it, refused with a false «סותר את «AB = 6»» while the other order built (the operator's T30, round #2501). **Asserts** the operator's three lines build with no violations, one circle of radius 3, |OA| = |OB| = 3, |AB| = 6 and O the midpoint of AB at seeds 0–2 — and the same for the twin «AB קוטר במעגל» and for the reverse order. The class matrix (table A in both orders, the contradictions that stay refused, the ladder token `main:rehome`) is `src/engine/__tests__/issue-2499-earlier-given-rehomed.test.ts`; the figure is the fixture `issue-2499-diameter-after-pinned-distance.geo.json`.

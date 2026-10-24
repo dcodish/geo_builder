@@ -1789,6 +1789,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diameter-of-the-circle-2477', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D drew a second circle P on AB beside O, green, before ADR-761; analytic already drew AB on O' },
   { id: 'diameter-of-the-circle-two-asks-2477', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר של המעגל'], expect: 'asks', exception: 'X8', note: '2-D drew a third circle M, green, before ADR-761; analytic already asked' },
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
+  // ── #2499 (ADR-766): a membership after a distance that already pins its point sizes the free radius, in either order ──
+  { id: 'diameter-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'AB = 6', 'AB קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «AB = 6»» before ADR-766 (the other order built r = 3); analytic already drew r = 3' },
+  { id: 'point-on-circle-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'OA = 4', 'נקודה A על המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «OA = 4»» before ADR-766; analytic already drew r = 4' },
+  { id: 'quarter-after-radius-distance-2499', family: 'chords-arcs', steps: ['OA = 4', 'רבע מעגל OAB'], expect: 'builds', exception: 'X8', note: '2-D drew the quarter around B with a re-read hint before ADR-766; analytic already drew it around O, r = 4' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

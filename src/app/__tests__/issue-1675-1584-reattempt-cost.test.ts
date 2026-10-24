@@ -99,17 +99,24 @@ describe('#1675 — the operator\'s refusals cost one failed solve, not six (exe
 describe('#1584 — the refusals the round measured, bounded', () => {
   // #2486 (ADR-759): the measured quarter is centred at C with ends A and B; under the middle-letter reading that
   // quarter is spelt «ACB» (the operator's «CAB» is now centred at A). Same lowering, same refusal, same work.
-  it('«רבע מעגל ACB» (the measured centre-C quarter): ≤ 3.2M executed (was 8.72M), the same refusal', async () => {
+  it('«רבע מעגל ACB» (the measured centre-C quarter): ≤ 7.2M executed (was 8.72M), refused against «BC=10»', async () => {
     clearReplayCaches();
     const cold = await measure(RIGHT_15_10, 'רבע מעגל ACB');
     const warm = await measure(RIGHT_15_10, 'רבע מעגל ACB');
     expect(cold.accepted).toBe(false);
-    expect(cold.note).toMatch(/AC\| = 15 cannot hold \[vs #3\]/);
+    // #2499 (ADR-766): the quarter's first sub-step («A על המעגל», A carrying |AC| = 15) used to be refused FALSELY —
+    // A alone fits a circle of radius 15 — and that sub-step supplied the reason «|AC| = 15». With the earlier given
+    // re-homed to the free radius it builds, and the line is refused where it really fails: B on the same circle
+    // against «BC=10» (the same partner, #3), reason the quarter's own |CB| = R.
+    expect(cold.note).toMatch(/cannot hold \[vs #3\]/);
     expect(warm.note).toBe(cold.note);
     // The plan aimed at ~2.5M; the re-attempt cap cannot sit below the most expensive SUCCESSFUL re-attempt the
     // calibration sweep measured (511k), so two cut re-attempts at 750k each remain (ADR-583, measured 3.03M).
     // ADR-717 (#2118) adds one failure-path multi-start for the driven shape scalar: 3,032,084 → 3,116,119.
-    expect(cold.executed).toBeLessThanOrEqual(3_200_000);
+    // ADR-766 (#2499): each reading now reaches the sub-step that genuinely fails, whose ordinary failure ladder runs
+    // there (measured 3,116,119 → 6,820,794; the other order «רבע מעגל ACB · AC=15 · BC=10» already paid 4.74M).
+    // The re-attempt multiplier this lock bounds is unchanged: the warm run is equal or cheaper.
+    expect(cold.executed).toBeLessThanOrEqual(7_200_000);
   }, 240_000);
 
   /**
