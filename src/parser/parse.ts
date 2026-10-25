@@ -985,11 +985,14 @@ const existingPolygon = (ctx: ParseContext, n: number): Id[] | null => {
  * `from` is where the shape's phrase starts when it is not the sentence's first noun (a polygon-in-polygon's container,
  * «ריבוע חסום בתוך המשולש»); the article is read there, and the example names the shape there.
  */
-const definiteShapeVertices = (s: string, ctx: ParseContext, n: number, from = 0): Id[] | Clarify | null => {
+const definiteShapeVertices = (s: string, ctx: ParseContext, n: number, from = 0, exclude: readonly Id[] = []): Id[] | Clarify | null => {
   const span = shapeNounSpan(s.slice(from), NGON_ARITY);
   if (span?.article !== 'definite' || span.arity !== n) return null;
   const noun = { end: from + span.end };
-  const matches = (ctx.polygons ?? []).filter((v) => v.length === n).map((v) => v.map(up));
+  // `exclude` (#2257, ADR-767): a ring the sentence already names in another role — a polygon-in-polygon's container
+  // is never its own inner shape
+  const excluded = exclude.length ? [...exclude].map(up).sort().join() : null;
+  const matches = (ctx.polygons ?? []).filter((v) => v.length === n).map((v) => v.map(up)).filter((v) => [...v].sort().join() !== excluded);
   if (matches.length === 0) return null;
   if (matches.length === 1) return matches[0];
   const shapes = matches.map((v) => v.join(''));
@@ -6937,6 +6940,9 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   // removed, so a same-family container (rhombus in a rhombus) doesn't confuse the inner-shape detection.
   let inner = s.replace(cm[0], ' ');
   if (cont.consumed) inner = inner.replace(new RegExp(SHAPE_ADJ_WORDS[cont.consumed], 'i'), ' ');
+  // #2257 (ADR-767): the container's label RUN is claimed as a run first («במרובע ABCD»), as `removeClaimed` claims it —
+  // the per-letter strip below cannot match inside «ABCD», and the inner noun then read the container's name as its own
+  inner = inner.replace(new RegExp(String.raw`\b${contIds.join('')}\b`), ' ');
   for (const id of contIds) inner = inner.replace(new RegExp(String.raw`\b${id}\b`, 'g'), ' ');
   const innerPhrase = readShapePhrase(inner);
   // a polygon inscription we can't make determinate — or an inner shape carrying an adjective it cannot
@@ -6948,9 +6954,16 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   const taken = [...(ctx.points ?? []), ...contIds];
   const wm = new RegExp(SHAPE_NOUN_WORDS[innerPhrase.noun], 'i').exec(inner);
   const afterShape = wm ? inner.slice(wm.index + wm[0].length) : inner;
-  // #2205 (ADR-685): NOT resolved for a definite inner noun — its named twin («הריבוע ABCD חסום במשולש EFG») does not
-  // build on a drawn square, so neither the binding nor the question would teach a sentence that commits (#2257).
-  const ids = labelRun(afterShape, 4) ?? autoVertexLabels(4, taken);
+  // #2257 (ADR-767, reversing the #2205 deferral by the operator's 2026-10-19 ruling «Q1 - A»): a DEFINITE unnamed inner
+  // noun («הריבוע חסום במשולש EFG», "the square is inscribed in …") is the figure's drawn shape of that arity — ADR-685's
+  // resolution, the container excluded: one → its vertices (the inscription then moves THAT shape onto the sides),
+  // two or more → the question, whose named example builds; none → a new shape, as before. The inner phrase is read
+  // where it stands: before the verb, or after it when the container leads («במשולש EFG חסום הריבוע»).
+  const named = labelRun(afterShape, 4);
+  const innerFrom = cm.index > verb.index ? 0 : verb.index + verb[0].length;
+  const innerDef = named ? null : definiteShapeVertices(s, ctx, 4, innerFrom, contIds);
+  if (isClarify(innerDef)) return innerDef;
+  const ids = named ?? innerDef ?? autoVertexLabels(4, taken);
 
   const cmds: AnyCommand[] = [];
   const allExist = contIds.every((c) => (ctx.points ?? []).includes(c));

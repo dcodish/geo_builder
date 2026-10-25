@@ -5946,6 +5946,84 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'inscribe-existing-square-no-second-2257',
+    title: '«ריבוע ABCD» · «משולש EFG» · «הריבוע חסום במשולש EFG» moves THAT square into the triangle — no second square (#2257, ADR-767)',
+    guards:
+      "#2257 (P1), the operator's ruling of 2026-10-19 (Q1 = A, *\"Q1 - A\"*): with a square drawn, «הריבוע חסום במשולש EFG» inscribes THAT square — its vertices move onto the triangle's sides, no second square is drawn. At 045a8546 the line committed `inscribe` of a NEW square HIJK, drawn green beside ABCD. ADR-767: the definite inner noun resolves to the drawn square (ADR-685) and the inscription lowers over its vertices (side memberships + the noun's shape), started from the canonical inscription (the seat). Asserts one 4-gon (ABCD), no new letter, A–D each on a side of EFG, ABCD still a square, the triangle where it was, and «הציגו תצורה אחרת» keeping all of it. The class matrix is src/__tests__/issue-2257-inscribe-existing-inner.test.ts.",
+    steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const quads = fig.construction.objects.filter((o) => o.kind === 'polygon' && o.vertices.length === 4);
+      expect(quads.map((o) => (o.kind === 'polygon' ? o.vertices.join('') : '')), 'only the drawn square').toEqual(['ABCD']);
+      expect(fig.positions.has('H'), 'no new letter').toBe(false);
+      const onSide = (f: ReturnType<typeof replay>, p: string) => {
+        const [E, F, G] = ['E', 'F', 'G'].map((k) => at(f, k));
+        const P = at(f, p);
+        const off = (a: Vec, b: Vec) => {
+          const L = dist(a, b) ** 2;
+          const t = Math.max(0, Math.min(1, ((P.x - a.x) * (b.x - a.x) + (P.y - a.y) * (b.y - a.y)) / L));
+          return dist(P, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+        };
+        return Math.min(off(E, F), off(F, G), off(G, E));
+      };
+      const square = (f: ReturnType<typeof replay>, what: string) => {
+        for (const p of ['A', 'B', 'C', 'D']) expect(onSide(f, p), `${what}: ${p} on a side of EFG`).toBeLessThan(1e-6);
+        expect(dist(at(f, 'A'), at(f, 'B')), `${what}: AB = BC`).toBeCloseTo(dist(at(f, 'B'), at(f, 'C')), 6);
+        expect(angle(at(f, 'A'), at(f, 'B'), at(f, 'C')), `${what}: ∠ABC = 90`).toBeCloseTo(90, 5);
+      };
+      square(fig, 'default');
+      const prior = replay(factsOf(['ריבוע ABCD', 'משולש EFG']));
+      const shown = replay(factsOf(['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG']));
+      for (const k of ['E', 'F', 'G']) expect(dist(at(shown, k), at(prior, k)), `${k} stays where it was`).toBeLessThan(1e-6);
+      const facts = factsOf(['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG']);
+      const next = searchAnotherView(facts, 0, undefined, Number.POSITIVE_INFINITY);
+      expect(next, '«הציגו תצורה אחרת» finds another view').not.toBeNull();
+      square(replay(next!.facts, next!.seed), 'another view');
+    },
+  },
+  {
+    id: 'inscribe-two-squares-asks-2257',
+    title: 'with two squares drawn, «הריבוע חסום במשולש EFG» asks which, and its example «הריבוע ABCD חסום במשולש EFG» builds (#2257, ADR-767)',
+    guards:
+      "#2257, the 2026-10-19 ruling's row 2: *\"Row 2 (two squares drawn) follows ADR-685: «הריבוע…» is refused with the ambiguity question, and that question's named example now builds\"*. At 045a8546 the line drew a third square LMNO. docs/17 §9 (a taught remedy is a grammar claim): the example the question names is submitted as typed (the last step) and builds. Asserts the question names ABCD and HIJK, nothing is added, and the example puts A–D on EFG's sides.",
+    steps: ['ריבוע ABCD', 'ריבוע HIJK', 'משולש EFG', 'הריבוע ABCD חסום במשולש EFG'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const prefix = factsOf(['ריבוע ABCD', 'ריבוע HIJK', 'משולש EFG']);
+      const r = parse('הריבוע חסום במשולש EFG', ctxOf(prefix));
+      expect(r.ok, 'the definite line is a question, not commands').toBe(false);
+      expect(JSON.stringify(r)).toContain('ambiguous-definite-shape');
+      expect(JSON.stringify(r)).toContain('הריבוע ABCD חסום במשולש EFG');
+      expect(gateVerdict(prefix, 'הריבוע ABCD חסום במשולש EFG').kind).toBe('commit');
+      const [E, F, G] = ['E', 'F', 'G'].map((k) => at(fig, k));
+      const area = (a: Vec, b: Vec, c: Vec) => Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y));
+      for (const p of ['A', 'B', 'C', 'D']) {
+        const P = at(fig, p);
+        const onSomeLine = Math.min(area(E, F, P) / dist(E, F), area(F, G, P) / dist(F, G), area(G, E, P) / dist(G, E));
+        expect(onSomeLine, `${p} on a side line of EFG`).toBeLessThan(1e-6);
+      }
+    },
+  },
+  {
+    id: 'inscribe-existing-square-refused-named-2257',
+    title: '«ריבוע ABCD · AB = 10 · משולש EFG · EF = 2 · FG = 2 · EG = 2 · הריבוע ABCD חסום במשולש EFG» is refused naming «AB = 10», never «would be flat» (#2257, ADR-767)',
+    guards:
+      "#2257's honest floor (queue note 2026-10-23, «search first, refuse last»): a drawn square too big for a triangle whose size is stated cannot be inscribed, so the line is refused — through the ladder's existing over-constraint text, which names the statement it contradicts, and never ADR-602's flat-shape text, which would tell the student his square becomes a line (the named line's refusal at 045a8546 on an UNsized figure). Asserts the refusal is the over-constraint, and the figure keeps every earlier row.",
+    steps: ['ריבוע ABCD', 'AB = 10', 'משולש EFG', 'EF = 2', 'FG = 2', 'EG = 2'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['ריבוע ABCD', 'AB = 10', 'משולש EFG', 'EF = 2', 'FG = 2', 'EG = 2']);
+      const v = gateVerdict(facts, 'הריבוע ABCD חסום במשולש EFG');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(JSON.stringify(v)).toContain('over-constrained');
+      expect(JSON.stringify(v)).not.toMatch(/collapsed: polygon/);
+      expect(JSON.stringify(v)).not.toContain('flat');
+      expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(10, 5);
+    },
+  },
+  {
     id: 'second-triangle-around-circle-2512',
     title: '«מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O» — the second triangle is its own triangle, never drawn on the first (#2512, ADR-762)',
     guards:

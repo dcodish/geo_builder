@@ -2204,6 +2204,18 @@ over all four (ADR-041).
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
 
+### `inscribe-existing-square-no-second-2257` — «ריבוע ABCD» · «משולש EFG» · «הריבוע חסום במשולש EFG» moves THAT square into the triangle (#2257, ADR-767)
+
+**Guards against:** a definite inner noun minting a second square beside the drawn one (the operator's 2026-10-19 ruling, Q1 = A). **Asserts** one 4-gon (ABCD), no new letter, A–D each on a side of EFG, ABCD still a square, the triangle unmoved, and «הציגו תצורה אחרת» keeping all of it.
+
+### `inscribe-two-squares-asks-2257` — two squares drawn: «הריבוע חסום במשולש EFG» asks which, and the example builds (#2257, ADR-767)
+
+**Guards against:** a third square drawn beside two, and a taught example that does not build (docs/17 §9). **Asserts** the question names ABCD and HIJK and offers «הריבוע ABCD חסום במשולש EFG», which commits through the gate and puts A–D on EFG's side lines.
+
+### `inscribe-existing-square-refused-named-2257` — a square too big for a sized triangle is refused naming «AB = 10» (#2257, ADR-767)
+
+**Guards against:** a seat failure reaching the student as ADR-602's flat-shape text. **Asserts** «הריבוע ABCD חסום במשולש EFG» after «AB = 10» and an equilateral EFG of side 2 is refused as over-constrained, never «collapsed … flat», and the earlier rows stand.
+
 ### `second-triangle-around-circle-2512` — «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O»: the second triangle is its own triangle (#2512, ADR-762)
 
 **Guards against:** the triangle dual keyed by the circle alone, which drew D, E, F exactly on A, B, C, green, at every seed and every «הציגו תצורה אחרת» (the operator's report). **Asserts** one circle of the stated radius 3 (its unmoved centre is the class test's stability row), every side of each triangle tangent to O, no vertex of DEF on a vertex of ABC, and no recorded coincidence. The class matrix (every spelling, both orders, three triangles, regular and plain n-gons, a point or diameter first, presses, stability, the lone-ring pins) is `src/__tests__/issue-2512-second-ring-on-circle.test.ts`.

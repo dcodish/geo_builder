@@ -2398,11 +2398,30 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
     const B = prevPos?.get(cmd.b);
     const L = A && B ? (B.x - A.x) ** 2 + (B.y - A.y) ** 2 : 0;
     const proj = P && A && B && L > 1e-12 ? ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / L : 0.5;
-    const t = Math.min(0.88, Math.max(0.12, proj)); // within the span, clear of the endpoints
+    // within the span, clear of the endpoints — unless P already STANDS on the segment's interior (#2257, ADR-767: an
+    // inscription's seat put it there), where the statement already holds and moving P would make the figure jump
+    const onSpan = P && A && B && L > 1e-12 && proj > 0 && proj < 1 && Math.abs((P.x - A.x) * (B.y - A.y) - (P.y - A.y) * (B.x - A.x)) / L < 1e-7;
+    const t = onSpan ? proj : Math.min(0.88, Math.max(0.12, proj));
     const objects = prev.objects.map((o) =>
       o.id === cmd.id ? ({ kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t, free: true, ...(solve ? { solve } : {}) } as GeoObject) : o,
     );
     return { objects, constraints: [...prev.constraints] };
+  }
+  // #2257 (ADR-767): a statement that a DERIVED point lies on a segment is about that point — the ADR-028 rule
+  // `reinterpretAsConstraint` applies to every other placement («use the existing point»): its carrier is the point's
+  // own free 1-DOF ancestor (a drawn square's corner C rides through its base riders), never whichever endpoint of the
+  // segment the generic driver reaches first — that moved the CONTAINER a drawn square was being inscribed in.
+  const derived = !['free-point', 'on-segment', 'on-segment-solved', 'on-circle', 'on-line'].includes(existing.kind);
+  // the point's OWN shape scalar first (a rectangle's corner rides its height, a rhombus's its angle — the
+  // `driveOrCheck` (2.5) rule for a statement naming it), else its nearest free 1-DOF ancestor
+  const ownScalar = isShapeCarrier(existing) && (existing as { solve?: unknown }).solve === undefined ? cmd.id : null;
+  const own = !cmd.extension && derived ? ownScalar ?? freeCarrierAncestor(prev.objects, cmd.id) : null;
+  if (own && !wouldInvertDependency(prev.objects, own, [cmd.a, cmd.b]) && !ancestors(prev.objects, cmd.a, 'param').includes(own) && !ancestors(prev.objects, cmd.b, 'param').includes(own)) {
+    const col: Constraint = { type: 'collinear', a: cmd.id, b: cmd.a, c: cmd.b };
+    const objects = prev.objects.map((o) => (o.id === own ? ({ ...o, solve: { constraint: col, branch: 0 } } as GeoObject) : o));
+    const constraints = [...prev.constraints, col];
+    addCollinearOrder(objects, constraints, [cmd.a, cmd.id, cmd.b]);
+    return { objects, constraints };
   }
   // #260 (ADR-512): the positions ride along so the meeting re-seat can judge where the crossing lies.
   const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b }, prevPos);

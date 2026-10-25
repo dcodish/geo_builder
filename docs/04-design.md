@@ -412,6 +412,31 @@ frame (the standalone's refusal). The free kinds (general, equilateral, isoscele
 relations (`shapeCmds` / the kite `shape-variant`) and order: they already hold on every branch, and the typed
 lowering would cost the trapezoid displayable seeds and change the isosceles's variant reading.
 
+### A polygon inscribed in a polygon over a DRAWN inner shape moves that shape (#2257, [ADR-767](06-decisions.md#adr-767))
+
+The `inscribe` command (ADR-262) names its inner ids; who owns them decides the lowering, read against the figure in
+force at the moment the fact applies (`boundCmdsOf`, src/replay/core.ts — the same seam as ADR-657's cyclic kite):
+
+- **New inner vertices** keep `expandInscribe`'s expansion exactly: riders on the sides, the `polygon`, the shape's
+  constraints.
+- **Every rider vertex already a point of the figure** (`innerDrawn`): the riders (each lowered by the existing M1
+  paths — a free vertex becomes a rider, ADR-384; a DERIVED corner is constrained onto the side and carried by its own
+  shape scalar, else its nearest free 1-DOF ancestor, never by an endpoint of the side) and then the noun as its own
+  shape command over the drawn vertices (apply's one lowering: a restatement, ADR-711; a refinement of a general ring,
+  ADR-656; constraints over loose points, ADR-375). No `polygon` is re-declared. Only the placements walked the way the
+  drawn ring already turns (`drawnTurn` → `expandInscribe`'s `turn`) are offered, since a drawn shape cannot be turned
+  over.
+- **The seat** (`seatInscribedShape`, LADDER stage 5 *F-seat*): the inscription solved fresh on the same figure with
+  scratch ids gives a start; the drawn shape's unpinned free vertices are placed at the matching fresh vertices and
+  each inner shape scalar takes a few secant steps toward its own. The fact is tried from the seat first, then from
+  the figure's own start (`tryApplyFactSeated`, one attempt for the re-attempt memo and cap); the figure's own failure
+  is the verdict when neither builds. A point already standing on a segment's interior keeps its parameter when it
+  becomes a rider (`reinterpretAsCollinear`), so a seated vertex is not pulled to the 0.12–0.88 default band.
+
+The parser's half (`inscribedInPolygon`): a definite unnamed inner noun resolves through ADR-685's
+`definiteShapeVertices`, the container's ring excluded; the container's label run is stripped as a run before the
+inner noun reads its own name.
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the
