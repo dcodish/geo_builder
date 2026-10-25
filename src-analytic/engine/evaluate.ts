@@ -2472,6 +2472,53 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     const sorted = [...pts].sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
     o.vertices.forEach((v, i) => seeded.set(v, sorted[i]));
   }
+  /*
+   * …and a SECOND ring around one circle starts ON THE DUAL (#2512, [ADR-AG-333](../../docs/06c-decisions-analytic.md#adr-ag-333)).
+   * A triangle or quadrilateral stated around a drawn circle is n free vertices held by bounded `tangent-line` rows
+   * (#1503). Alone it solves from the sampled vertices; beside another ring around the same circle the joint descent
+   * fell into a basin it could not leave, refused «polygon-collapsed» / «unsatisfiable» at every seed, and which
+   * letter sets failed depended on where the sampler put their names (ABC + DEF failed, ABC + PQR built). So a ring
+   * whose circle already has a ring around it starts at an EXACT solution, 2-D's construction (ADR-115, ADR-762): touch
+   * angles, uneven so no shape is asserted, turned by the touches already on the circle × the golden angle so it does
+   * not start on the earlier ring, and varied per configuration; each vertex at the meet of its two sides' tangents.
+   * A lone ring keeps its own start, so its drawing is unchanged. A start, never a verdict: the judge has the last word.
+   */
+  {
+    const touches = new Map<Id, number>(); // centre → touch points the rings stated so far put on its circle
+    const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+    for (const o of c.objects) {
+      if (o.kind !== 'polygon' || (o.vertices.length !== 3 && o.vertices.length !== 4)) continue;
+      const v = o.vertices;
+      const n = v.length;
+      const sides = v.map((a, i) => {
+        const b = v[(i + 1) % n];
+        return c.constraints.find(
+          (k): k is Extract<Constraint, { t: 'tangent-line' }> =>
+            k.t === 'tangent-line' && k.line.kind === 'points' && k.line.bounded === true && ((k.line.a === a && k.line.b === b) || (k.line.a === b && k.line.b === a)),
+        );
+      });
+      const first = sides[0];
+      if (!first || sides.some((k) => !k || k.centre !== first.centre)) continue;
+      const earlier = touches.get(first.centre) ?? 0;
+      touches.set(first.centre, earlier + n);
+      if (earlier === 0 || !v.every((id) => seeded.has(id))) continue;
+      const centre = seeded.get(first.centre) ?? pointAtId(c, env, first.centre);
+      const r = evalExpr(first.r, env);
+      if (!centre || !(r > 1e-9)) continue;
+      // Side i (v[i]v[i+1]) touches at angle th[i]; every gap stays under a half turn, so the ring encloses the circle.
+      const base = n === 3 ? [0.4, 2.3, 4.4] : [0.3, 1.75, 3.5, 4.9];
+      const salt = (i: number) => 104729 + 7 * i + v.join('').split('').reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 100003, 0);
+      const turn = earlier * GOLDEN + (seed === 0 ? 0 : 2 * Math.PI * jitter(seed, salt(n)));
+      const th = base.map((b, i) => b + turn + (seed === 0 ? 0 : 0.6 * (jitter(seed, salt(i)) - 0.5)));
+      v.forEach((id, i) => {
+        const a0 = th[(i - 1 + n) % n] - ((i === 0) ? 2 * Math.PI : 0);
+        const a1 = th[i];
+        const mid = (a0 + a1) / 2;
+        const d = r / Math.cos((a1 - a0) / 2);
+        seeded.set(id, { x: centre.x + d * Math.cos(mid), y: centre.y + d * Math.sin(mid) });
+      });
+    }
+  }
   {
     const posOf = (id: Id): Pt | null => seeded.get(id) ?? pointAtId(c, env, id);
     const frac =(((seed * 0.6180339887) % 1) + 1) % 1;

@@ -24,7 +24,7 @@
       "group": "g1",
       "cmd": {
         "type": "point-on-circle",
-        "id": "@t-O-0",
+        "id": "@t-O-ABC-0",
         "circle": "circle-O",
         "free": true,
         "theta": 0.4
@@ -37,7 +37,7 @@
       "group": "g1",
       "cmd": {
         "type": "point-on-circle",
-        "id": "@t-O-1",
+        "id": "@t-O-ABC-1",
         "circle": "circle-O",
         "free": true,
         "theta": 2.494395102393195
@@ -50,7 +50,7 @@
       "group": "g1",
       "cmd": {
         "type": "point-on-circle",
-        "id": "@t-O-2",
+        "id": "@t-O-ABC-2",
         "circle": "circle-O",
         "free": true,
         "theta": 4.588790204786391
@@ -63,9 +63,9 @@
       "group": "g1",
       "cmd": {
         "type": "tangent",
-        "id": "tan-@t-O-0",
+        "id": "tan-@t-O-ABC-0",
         "circle": "circle-O",
-        "at": "@t-O-0"
+        "at": "@t-O-ABC-0"
       },
       "enabled": true
     },
@@ -75,9 +75,9 @@
       "group": "g1",
       "cmd": {
         "type": "tangent",
-        "id": "tan-@t-O-1",
+        "id": "tan-@t-O-ABC-1",
         "circle": "circle-O",
-        "at": "@t-O-1"
+        "at": "@t-O-ABC-1"
       },
       "enabled": true
     },
@@ -87,9 +87,9 @@
       "group": "g1",
       "cmd": {
         "type": "tangent",
-        "id": "tan-@t-O-2",
+        "id": "tan-@t-O-ABC-2",
         "circle": "circle-O",
-        "at": "@t-O-2"
+        "at": "@t-O-ABC-2"
       },
       "enabled": true
     },
@@ -100,8 +100,8 @@
       "cmd": {
         "type": "line-intersection",
         "id": "A",
-        "line1": "tan-@t-O-0",
-        "line2": "tan-@t-O-1"
+        "line1": "tan-@t-O-ABC-0",
+        "line2": "tan-@t-O-ABC-1"
       },
       "enabled": true
     },
@@ -112,8 +112,8 @@
       "cmd": {
         "type": "line-intersection",
         "id": "B",
-        "line1": "tan-@t-O-1",
-        "line2": "tan-@t-O-2"
+        "line1": "tan-@t-O-ABC-1",
+        "line2": "tan-@t-O-ABC-2"
       },
       "enabled": true
     },
@@ -124,8 +124,8 @@
       "cmd": {
         "type": "line-intersection",
         "id": "C",
-        "line1": "tan-@t-O-2",
-        "line2": "tan-@t-O-0"
+        "line1": "tan-@t-O-ABC-2",
+        "line2": "tan-@t-O-ABC-0"
       },
       "enabled": true
     },

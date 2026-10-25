@@ -5,7 +5,8 @@
  *
  * Every step is taken against its REAL prefix context (the figure the steps before it built), with the commands
  * the real parse→fact path committed for it — the plan's measurement, as a lock. #1904 (ADR-604) runs its role-word
- * member over the same steps, and #2198 (ADR-677/678) its number member and the seed-blind number accountant. A step this flags is a working
+ * member over the same steps, #2198 (ADR-677/678) its number member and the seed-blind number accountant, and #2532
+ * (ADR-765) its incidence-phrase member. A step this flags is a working
  * line the new member would refuse: that is a red test, never a row to silence. Exercised floor: the net must
  * have checked at least 1400 committed steps (measured at pickup: 1465), so it cannot pass by checking nothing.
  */
@@ -20,6 +21,7 @@ import type { AnyCommand } from '@/engine';
 import { loweringKey, unreadParts } from '../unreadParts';
 import { unreadRoles } from '../unreadRoles';
 import { unreadNumbers } from '../unreadNumbers';
+import { unreadThrough } from '../unreadThrough';
 
 const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
 
@@ -53,6 +55,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     let checked = 0;
     let withRole = 0;
     let withNumber = 0;
+    let withThrough = 0;
     const flagged: string[] = [];
     for (const c of cases) {
       for (const g of groups(c.facts)) {
@@ -68,6 +71,10 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         if (/גוב|גבה|תיכו|חוצ|altitude|height|median|bisect/i.test(g.utterance)) withRole++;
         const role = unreadRoles(g.utterance, g.cmds, ctx);
         if (role) flagged.push(`[${c.name}] «${g.utterance}» → role ${role.items.join(', ')}`);
+        // #2532 (ADR-765): the incidence-phrase member, over the same steps
+        if (/עוב(?:ר|רת|רים|רות)\s|דרך|במרכז|through/i.test(g.utterance)) withThrough++;
+        const through = unreadThrough(g.utterance, g.cmds, ctx);
+        if (through) flagged.push(`[${c.name}] «${g.utterance}» → through ${through.items.join(', ')}`);
         // #2198 (ADR-677 / ADR-678): a seed never pays for a stated number, and every stated number is read
         if (statedNumberOccurrences(g.utterance).occurrences.length === 0) continue;
         withNumber++;
@@ -77,7 +84,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         if (nums.length) flagged.push(`[${c.name}] «${g.utterance}» → number unread ${nums.join(', ')}`);
       }
     }
-    console.info(`#1888 corpus net: ${checked} committed steps checked (${withRole} with a role word, ${withNumber} with a stated number), ${flagged.length} flagged`);
+    console.info(`#1888 corpus net: ${checked} committed steps checked (${withRole} with a role word, ${withNumber} with a stated number, ${withThrough} with a through-phrase), ${flagged.length} flagged`);
     expect(flagged).toEqual([]);
     expect(checked, 'the net exercised the corpus').toBeGreaterThanOrEqual(1400);
     // measured at pickup: 1485 steps, 38 holding a cevian role word
@@ -85,5 +92,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     // #2198: measured at pickup (ef78f15c) 218 of 1718 steps state a number by the gate's own scanner (counts and
     // name indices blanked; the plan's 261 counted every digit run)
     expect(withNumber, 'the number member met real stated numbers').toBeGreaterThanOrEqual(200);
+    // #2532: measured at pickup (045a8546) 17 of 2056 committed steps hold a through-phrase opener
+    expect(withThrough, 'the incidence-phrase member met real through-phrases').toBeGreaterThanOrEqual(15);
   }, 600_000);
 });

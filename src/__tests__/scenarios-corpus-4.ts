@@ -6023,7 +6023,116 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(10, 5);
     },
   },
+  {
+    id: 'second-triangle-around-circle-2512',
+    title: '«מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O» — the second triangle is its own triangle, never drawn on the first (#2512, ADR-762)',
+    guards:
+      "#2512 (P1): measured at 045a8546 through decideDeterministic2D, DEF was drawn exactly on ABC (D = A, E = B, F = C), green, at every seed and every «הציגו תצורה אחרת». ADR-115's triangle dual keyed its touch points by the circle alone (`@t-O-0..2`), so the second triangle re-used the first one's touch points; the engine recorded the pairs as a FORCED coincidence, which `pointsDistinct` admits. Fix (ADR-762): one tangential-ring emitter (`tangentialRingAround`) for the triangle and the quadrilateral, touch points keyed by circle AND ring and started turned by the circle's rider count. Asserts one circle of the stated radius 3, every side of each triangle tangent to O (that each touch lies within its side, in every view, is #2538's lock), no vertex of DEF on a vertex of ABC, and no recorded coincidence. The class matrix (spellings, orders, three triangles, regular rings, presses) is src/__tests__/issue-2512-second-ring-on-circle.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one circle').toBe(1);
+      const c = fig.circles.get('circle-O')!;
+      expect(c.r, 'the stated radius holds').toBeCloseTo(3, 9); // the centre's stability is the class test's (seed 0)
+      for (const tri of [['A', 'B', 'C'], ['D', 'E', 'F']]) {
+        const P = tri.map((k) => at(fig, k));
+        P.forEach((p, i) => {
+          const q = P[(i + 1) % 3];
+          const L = dist(p, q);
+          const t = ((c.center.x - p.x) * (q.x - p.x) + (c.center.y - p.y) * (q.y - p.y)) / (L * L);
+          const foot = { x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) };
+          expect(dist(foot, c.center), `${tri[i]}${tri[(i + 1) % 3]} is tangent to O`).toBeCloseTo(3, 6);
+        });
+      }
+      for (const a of ['D', 'E', 'F']) for (const b of ['A', 'B', 'C']) expect(dist(at(fig, a), at(fig, b)), `${a} is not on ${b}`).toBeGreaterThan(1e-3);
+      expect(fig.coincidences ?? [], 'no coincidence recorded').toEqual([]);
+    },
+  },
+  {
+    id: 'impossible-isosceles-quad-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = BC» · «AC ⊥ BC» is refused as the statement\'s contradiction, never drawn with C on A (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = BC']);
+      const v = gateVerdict(pre, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'the statement\'s over-constraint').toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(detail, 'never a flat polygon: D is not on the line').not.toMatch(COLLAPSED_VS);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, 'AC ⊥ BC', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said, 'FR-EN-8\'s contradiction sentence, naming both statements').toContain('«AC ⊥ BC» סותר את «AB = BC»');
+      // the prior figure is a real isosceles AB = BC, C not on A
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(dist(A, B) - dist(B, C))).toBeLessThan(1e-6 * dist(A, B));
+      expect(dist(A, C) / dist(A, B), 'C is not on A').toBeGreaterThan(0.1);
+      // typed past the gate (a loaded file), the fold refuses it too, as a contradiction — never pending
+      const folded = replay(factsOf(['מרובע ABCD', 'AB = BC', 'AC ⊥ BC']));
+      expect(folded.lastError).toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
+    },
+  },
+  {
+    id: 'impossible-isosceles-quad-angle-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = BC» · «∠ACB = 90» is refused at once, never committed as waiting for more givens (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = BC']);
+      const v = gateVerdict(pre, '∠ACB = 90');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail).toMatch(/^over-constrained: ∠ACB = 90° cannot hold/);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, '∠ACB = 90', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said).toContain('«∠ACB = 90» סותר את «AB = BC»');
+      const folded = replay(factsOf(['מרובע ABCD', 'AB = BC', '∠ACB = 90']));
+      expect(folded.lastError, 'a contradiction, refused').toMatch(/^over-constrained: ∠ACB = 90° cannot hold/);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
+    },
+  },
+  {
+    id: 'impossible-isosceles-quad-numeric-refused-2443',
+    title: '#2443 P1: «מרובע ABCD» · «AB = 5» · «BC = 5» · «AC ⊥ BC» is refused naming «AC ⊥ BC», never a straight corner at D (ADR-764)',
+    guards: guards2443(),
+    steps: ['מרובע ABCD', 'AB = 5', 'BC = 5'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['מרובע ABCD', 'AB = 5', 'BC = 5']);
+      const v = gateVerdict(pre, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'names the student\'s statement').toMatch(/^over-constrained: AC ⟂ BC cannot hold/);
+      expect(detail, 'never a vertex the student did not constrain').not.toMatch(/A, B, C, D/);
+      expect(dist(at(fig, 'A'), at(fig, 'C')) / dist(at(fig, 'A'), at(fig, 'B')), 'C is not on A').toBeGreaterThan(0.1);
+    },
+  },
+  {
+    id: 'chord-through-centre-two-lines-2532',
+    title: '#2532 (ADR-765): a chord through the centre, typed one given per line — «מעגל O» · «AB מיתר» · «O על AB» builds with O on AB at every seed',
+    guards:
+      "#2532 (P1): «מעגל O» · «AB מיתר העובר דרך מרכז המעגל» committed the chord alone, green, the centre up to 3.7 units off AB (seeds 0–3 at 045a8546). Root cause: no carrier rule reads a through-clause, and every gate missed it — the accountants count «מרכז»/«המעגל» as vocabulary, #1888's label probe sees a clause only through a fresh letter, #1904's word probe covers cevian nouns only. Fix (ADR-765): an incidence-phrase member of the read-extent battery (deletion of the phrase, and of its verb opener) refuses the line whole with the one-input-per-line message, «(1) AB מיתר  (2) העובר דרך מרכז המעגל» (FR-IN-4g, ADR-603). This scenario locks the honest two-line form the student can type today. The refusals (decision verdicts at the submit seam, every measured spelling, the ✎ seam) are src/app/__tests__/issue-2532-unread-through.test.ts.",
+    steps: ['מעגל O', 'AB מיתר', 'O על AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל O', 'AB מיתר', 'O על AB']);
+      for (const seed of [0, 1, 2, 3]) {
+        const f = replay(facts, seed);
+        const [A, B, O] = ['A', 'B', 'O'].map((k) => at(f, k));
+        const off = Math.abs((B.x - A.x) * (O.y - A.y) - (B.y - A.y) * (O.x - A.x)) / dist(A, B);
+        expect(off, `dist(O, AB) @${seed}`).toBeLessThan(1e-6);
+      }
+    },
+  },
 ];
+
+/** #2443: the shared record of what the three ADR-764 scenarios guard (a hoisted function — the array reads it at load). */
+function guards2443(): string {
+  return "#2443 (P1), the operator's exact lines («מרובע ABCD» · «AB = BC» · «AC ⊥ BC»). AC ⊥ BC makes AB the hypotenuse of triangle ABC, so AB = BC holds only where C meets A. Measured at 045a8546 through decideDeterministic2D: every line committed and the quadrilateral was drawn green with C 1.3e-3 – 1.9e-3 of the extent from A (seeds 0–7); the angle form «∠ACB = 90» was parked as pending; the numeric twin committed at five seeds. ADR-746 had closed the class for a DECLARED triangle only. ADR-764: the tightened re-solve's trigger also reads the collapsible term pairs of every enforced constraint (a quadrilateral's two vertices meeting leave the ring fat), a primary refused on a term pair keeps its own verdict over a rescue stage's straight corner, and the no-room prover reads the base angles of every stated equal pair over any three points. The refusal is FR-EN-8's over-constraint («X» סותר את «Y»), marked degenerate, never a flat-polygon sentence (D is not on the line). The class matrix (spellings, orders, English, the other leg, a diagonal, a pentagon, loose points, the ratio form, 24 seeds, the controls and FR-EN-20's coincidences) is src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts.";
+}
 
 /** #2477: the shared record of what the three ADR-761 scenarios guard (a hoisted function — the array reads it at load). */
 function guards2477(): string {

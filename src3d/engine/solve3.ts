@@ -19,7 +19,7 @@
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
-import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind, type SolidObj } from './types';
+import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -236,8 +236,11 @@ export interface InventedCollapse3 {
   /** #1860 (ADR-3D-358): set when the figure collapsed is a declared SOLID (its kind; `ring` is its vertex ids). */
   solid?: SolidKind;
 }
-/** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse. */
-export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3 };
+/** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse.
+ *  #2503 (ADR-3D-378): `limit` marks an empty pool whose every candidate was a LIMIT ROOT on a driving relation's own
+ *  operand pair (two named points met, or an angle's arm lost its length) with no ring or solid collapsed: the store
+ *  refuses it as the statements' contradiction (`givens-contradict`), never as a flat polygon. */
+export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3; readonly limit?: true };
 
 /**
  * Solve the pivot: find gauge (+ dims) such that every pin lands on its target.
@@ -297,6 +300,53 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   volume3: true, // #1447: an absolute size (scales as s³)
   area3: true, // #1447: an absolute size (scales as s²)
 };
+
+/**
+ * #2503 ([ADR-3D-378](../../docs/06b-decisions-3d.md#adr-3d-378)) — THE POINT PAIRS A DRIVING RELATION MEASURES BETWEEN,
+ * each tagged `arm` when it carries a DIRECTION (an angle's arm, either side of a ⟂ / ∥ / cos / segment angle / line–plane
+ * angle) rather than only a length. Two named points of a pair meeting is where such a relation can hold only by its own
+ * operand collapsing (the 2-D twin is `collapsibleTermPairs`, ADR-724 / ADR-764). A `Record` over the union, the
+ * `PIN_FIXES_SCALE` idiom: a new pin kind cannot be added without deciding its pairs. Named vectors resolve through
+ * `c.vectors`; a kind with no point operands (a volume, an area, a concyclic ring) returns none.
+ */
+type PinPair3 = { a: Id; b: Id; arm: boolean };
+const atomPair3 = (c: Construction3, at: VecAtom | undefined): [Id, Id] | null => {
+  if (!at) return null;
+  if (at.kind === 'pair') return [at.from, at.to];
+  const v = c.vectors.get(at.name);
+  return v ? [v.from, v.to] : null;
+};
+const exprPairs3 = (c: Construction3, e: VecExpr): [Id, Id][] => e.map((t) => atomPair3(c, t.atom)).filter((p): p is [Id, Id] => p !== null);
+const operandPair3 = (o: Operand3): [Id, Id] | null => (o.kind === 'segment' ? [o.a, o.b] : null);
+const tag3 = (pairs: ([Id, Id] | null)[], arm: boolean): PinPair3[] =>
+  pairs.filter((p): p is [Id, Id] => p !== null && p[0] !== p[1]).map(([a, b]) => ({ a, b, arm }));
+const PIN_OPERAND_PAIRS: { [K in ScalarPin['kind']]: (c: Construction3, p: Extract<ScalarPin, { kind: K }>) => PinPair3[] } = {
+  'length-rel': (_c, p) => tag3([[p.a1, p.b1], [p.a2, p.b2]], false),
+  'vec-eq': (c, p) => tag3([...exprPairs3(c, p.lhs), ...exprPairs3(c, p.rhs)], false),
+  length: (_c, p) => tag3([[p.a, p.b]], false),
+  volume3: () => [],
+  area3: () => [],
+  vangle: (_c, p) => tag3([[p.vertex, p.p], [p.vertex, p.q]], true),
+  'seg-angle': (_c, p) => tag3([[p.a1, p.b1], [p.a2, p.b2]], true),
+  dot: (c, p) => tag3([atomPair3(c, { kind: 'named', name: p.v1 }), atomPair3(c, { kind: 'named', name: p.v2 })], false),
+  'seg-perp-plane': (_c, p) => tag3([[p.a, p.b]], true),
+  'seg-par-plane': (_c, p) => tag3([[p.a, p.b]], true),
+  'cos-angle': (c, p) => tag3([atomPair3(c, p.u), atomPair3(c, p.v)], true),
+  'dot-eq': (c, p) => tag3([atomPair3(c, p.a), atomPair3(c, p.b), atomPair3(c, p.c), atomPair3(c, p.d)], false),
+  'cos-eq': (c, p) => tag3([atomPair3(c, p.a), atomPair3(c, p.b), atomPair3(c, p.c), atomPair3(c, p.d)], true),
+  'bisector-dir': (_c, p) => tag3([[p.apex, p.a], [p.apex, p.b], [p.apex, p.tip]], true),
+  'line-plane-angle': (_c, p) => tag3([[p.a, p.b]], true),
+  concyclic: () => [],
+  mutual: (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
+  'plane-rel': (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
+  distance: (_c, p) => tag3([p.a.kind === 'point' && p.b.kind === 'point' ? [p.a.id, p.b.id] : null], false),
+  'mag-rel': (c, p) => tag3([...exprPairs3(c, p.e1), ...exprPairs3(c, p.e2)], false),
+  'mag-val': (c, p) => tag3(exprPairs3(c, p.e), false),
+};
+/** #2503 (ADR-3D-378): every operand pair of one driving relation (see {@link PIN_OPERAND_PAIRS}). */
+export function pinOperandPairs3(c: Construction3, pin: ScalarPin): PinPair3[] {
+  return (PIN_OPERAND_PAIRS[pin.kind] as (c: Construction3, p: ScalarPin) => PinPair3[])(c, pin);
+}
 
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
@@ -439,13 +489,27 @@ function quatMul(a: number[], b: number[]): number[] {
  * world rotation R(ω) about the origin, then translated by s·τ (s = the figure's scale), as a new gauge
  * vector. Differentiating in (τ, ω) instead of the raw (t, w) keeps the rank probe away from the axis-angle
  * map's singularity at |w| = 2π, where two raw columns vanish and a rigid figure read two false freedoms.
+ * #2378 (ADR-3D-379): an optional seventh chart coordinate z[6] is the log-scale step σ (the figure's size,
+ * scaled about its gauge origin), so the probe measures the size with the same columns.
  */
 export function rigidChart(x: readonly number[], z: readonly number[]): number[] {
   const s = Math.exp(x[6]);
   const om = v3(z[3], z[4], z[5]);
   const t0 = rotate(v3(x[0], x[1], x[2]), om);
   const w = axisAngleOf(quatMul(quatOf(om), quatOf(v3(x[3], x[4], x[5]))));
-  return [t0.x + s * z[0], t0.y + s * z[1], t0.z + s * z[2], w.x, w.y, w.z, ...x.slice(6)];
+  return [t0.x + s * z[0], t0.y + s * z[1], t0.z + s * z[2], w.x, w.y, w.z, x[6] + (z[6] ?? 0), ...x.slice(7)];
+}
+
+/**
+ * #2378 (ADR-3D-379) — the same chart about the figure's GAUGE ORIGIN (its canonical first vertex) instead of
+ * the world origin: (τ, ω, σ) turn and resize the placed figure about the point the gauge puts its first vertex
+ * at, then translate it by s·τ. The drawing's walks (`freedom: 'turn' | 'size'`) move in this chart, so a turn
+ * or a resize never drags along a translation the givens leave free, and a vertex pinned there stays exact.
+ */
+export function originChart(x: readonly number[], z: readonly number[]): number[] {
+  const s = Math.exp(x[6]);
+  const w = axisAngleOf(quatMul(quatOf(v3(z[3], z[4], z[5])), quatOf(v3(x[3], x[4], x[5]))));
+  return [x[0] + s * z[0], x[1] + s * z[1], x[2] + s * z[2], w.x, w.y, w.z, x[6] + (z[6] ?? 0), ...x.slice(7)];
 }
 
 /**
@@ -457,11 +521,29 @@ export function rigidChart(x: readonly number[], z: readonly number[]): number[]
  * units of the figure's scale and a world rotation about the origin — so a step along it is dimensionless
  * at any figure size. A structural read of the constraint system, never a
  * sampling outcome: the cube with «A(0,0,0)» · «AB=(2,0,0)» has dim 1 (the turn about AB).
+ *
+ * #2378 / #2504 (ADR-3D-379): the probe has a SEVENTH column, the log-scale σ (the figure's size), and
+ * reports three more numbers, all ranks of the same columns:
+ *  - `counted`: the rank of the 7-column null space's projection onto (ω, σ), i.e. the leftover freedoms
+ *    that change a measurable quantity (a turn, a size). A pure translation of the whole figure projects to
+ *    zero and is excluded (the operator's e23 ruling on #2505). Computed exactly as
+ *    `(7 − rank J) − (3 − rank J_τ)`: the null space minus its translation-only part, which is `null J_τ`.
+ *    The freedom cue adds it (`leftoverPlacement3`).
+ *  - `rotation`: an orthonormal basis of the leftover TURN (the ω-projection of the rigid null space, size
+ *    held): the directions the drawing's turn walk samples (`freedom: 'turn'`). Empty when no turn is left.
+ *  - `scaleFree`: σ is in the null space (rank J₇ = rank J₆): the size is free at this placement, so #518's
+ *    park may move it (ADR-3D-133's gate, now the probe's verdict instead of "the scale never left 0").
+ * `dim` and `generators` keep their ADR-3D-375 meaning (rigid only), so the read-back image is unchanged.
  */
 export interface PlacementFreedom3 {
   dim: number;
   generators: number[][];
+  counted: number;
+  rotation: number[][];
+  scaleFree: boolean;
 }
+/** A placement with no leftover freedom at all (no probe ran, or nothing is free). */
+export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false };
 
 /** #2368 — the eigenvectors of a small symmetric matrix by cyclic Jacobi, sorted by ascending eigenvalue. */
 export function symmetricEigen(a0: readonly (readonly number[])[]): { values: number[]; vectors: number[][] } {
@@ -537,8 +619,15 @@ export function solvePivot(
      * slide generalised from "the translation's projection" to "the projection on a seeded combination of
      * the leftover generators" (the number seeds the combination); returns the walked exact solution, or
      * `[]` when nothing is free or the walk snaps back.
+     * #2378 (ADR-3D-379) — `'turn'`: the DRAWING's walk. The placement turns along a seeded unit direction of
+     * its measured leftover turn ({@link PlacementFreedom3}`.rotation`) by a seeded angle over the full turn
+     * (−π, π] (`flip` negates it): hard-pin the turn's projection, release on the primary residuals, keep only
+     * when exact, non-degenerate and still at the pinned angle. `[]` when no turn is left or the walk fails.
+     * #2504 (ADR-3D-379) — `'size'`: the drawing's size park, #518's park gated by the probe (`scaleFree`):
+     * the size moves to the seed's target, the placement chart follows. `[]` when the size is not free, is
+     * already at the target, or the park is not exact.
      */
-    freedom?: 'measure' | number;
+    freedom?: 'measure' | 'turn' | 'size' | number;
   },
 ): PivotPool {
   const pointPins = c.pins;
@@ -769,20 +858,34 @@ export function solvePivot(
       // central differences in the rigid chart (τ, ω): dimensionless, and regular at every placement
       const colAt = (at: number): number[] => {
         const h = 1e-4;
-        const zp = [0, 0, 0, 0, 0, 0];
+        const zp = [0, 0, 0, 0, 0, 0, 0];
         zp[at] = h;
-        const zm = [0, 0, 0, 0, 0, 0];
+        const zm = [0, 0, 0, 0, 0, 0, 0];
         zm[at] = -h;
         const rp = f(rigidChart(x, zp));
         const rm = f(rigidChart(x, zm));
         return rp.map((v, i) => (v - rm[i]) / (2 * h));
       };
-      const cols = [0, 1, 2, 3, 4, 5].map(colAt);
+      const cols7 = [0, 1, 2, 3, 4, 5, 6].map(colAt);
+      const cols = cols7.slice(0, 6);
       const rank = cols[0].length === 0 ? 0 : numericRank(cols);
       const dim = 6 - rank;
-      if (dim === 0) return (memo = { dim: 0, generators: [] });
+      // #2378 (ADR-3D-379): the translation-only part of the null space is null(J_τ); the size column is the 7th
+      const rankT = cols[0].length === 0 ? 0 : numericRank(cols.slice(0, 3));
+      const rank7 = cols[0].length === 0 ? 0 : numericRank(cols7);
+      const counted = Math.max(0, 7 - rank7 - (3 - rankT));
+      const scaleFree = rank7 === rank;
+      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree });
       const jtj = cols.map((ci) => cols.map((cj) => ci.reduce((a, v, r) => a + v * cj[r], 0)));
-      return (memo = { dim, generators: symmetricEigen(jtj).vectors.slice(0, dim) });
+      const generators = symmetricEigen(jtj).vectors.slice(0, dim);
+      // the leftover TURN: the ω-parts of the rigid null space span it (a translation generator has none)
+      const rotRank = Math.max(0, dim - (3 - rankT));
+      let rotation: number[][] = [];
+      if (rotRank > 0) {
+        const gram = [3, 4, 5].map((i) => [3, 4, 5].map((j) => generators.reduce((a, g) => a + g[i] * g[j], 0)));
+        rotation = symmetricEigen(gram).vectors.slice(3 - rotRank);
+      }
+      return (memo = { dim, generators, counted, rotation, scaleFree });
     };
   };
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
@@ -1775,8 +1878,48 @@ export function solvePivot(
     return out;
   };
   const hasFlatKind = c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind));
-  /** Not an admissible configuration: a declared ring collapsed (or a released sliver), or a declared solid flat. */
-  const closedFigure = (r: PivotResult): boolean => (hasFlatKind && (collapsedRing(r) || anchorSliver(r))) || solidSliver(r) !== null;
+  /**
+   * #2503 ([ADR-3D-378](../../docs/06b-decisions-3d.md#adr-3d-378), the 3-D twin of 2-D's ADR-764) — THE TRIGGER READS
+   * THE DRIVING RELATIONS' OPERAND PAIRS. ADR-3D-372 asked the tightened re-solve only of a THIN declared ring or solid,
+   * and two vertices of a quadrilateral meeting leave the ring open («מרובע ABCD · |AB| = |BC| · AC ⟂ BC» drew C on A,
+   * green). Here the candidate is asked when an operand pair of ANY enforced relation (every `scalarPins` entry, not only
+   * the step's: in the other order the collapsing pair belongs to the earlier ⟂) is inside `SLIVER_BAND` of the figure's
+   * extent. Two verdicts: ADR-3D-372's `limitRoot` on that pair, unchanged; or an EMPTIED ANGLE — after the re-solve a
+   * direction-carrying pair sits at or below the 1e-4 collapse line, so the stated angle holds only because its arm has
+   * no length (2-D's ADR-123 caveat). A length-only pair meeting exactly is not refused: FR-EN-20's coincidences stay.
+   */
+  const operandPairs = c.scalarPins.flatMap((p) => pinOperandPairs3(c, p));
+  const pairOpenness = (pos: Positions3, pairs: PinPair3[]): number => {
+    if (pairs.length === 0) return Infinity;
+    const all = [...pos.values()];
+    let ext = 0;
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) ext = Math.max(ext, norm3(sub3(all[j], all[i])));
+    if (!(ext > 1e-12)) return Infinity;
+    let m = Infinity;
+    for (const { a, b } of pairs) {
+      const p = pos.get(a), q = pos.get(b);
+      if (p && q) m = Math.min(m, norm3(sub3(q, p)) / ext);
+    }
+    return m;
+  };
+  const pairMemo = new WeakMap<PivotResult, boolean>();
+  const pairSliver = (r: PivotResult): boolean => {
+    if (coupled || r.x.length !== fullLen || operandPairs.length === 0) return false;
+    const memo = pairMemo.get(r);
+    if (memo !== undefined) return memo;
+    const before = pairOpenness(solidPosAt(r.dims, r.riderTs), operandPairs);
+    let out = false;
+    if (before < SLIVER_BAND) {
+      const { x, err } = tightResolve(r);
+      const released = solidPosAt(x.slice(7, 7 + nDims), ridersOf(x));
+      out = limitRoot(err, before, pairOpenness(released, operandPairs)) || pairOpenness(released, operandPairs.filter((p) => p.arm)) <= 1e-4;
+    }
+    pairMemo.set(r, out);
+    return out;
+  };
+  /** Not an admissible configuration: a declared ring collapsed (or a released sliver), a declared solid flat, or a
+   *  driving relation held only where its own operands met (#2503). */
+  const closedFigure = (r: PivotResult): boolean => (hasFlatKind && (collapsedRing(r) || anchorSliver(r))) || solidSliver(r) !== null || pairSliver(r);
   /** The marked empty pool for a declared solid the givens force flat (the store refuses it, naming the statements). */
   const flatSolidPool = (solid: SolidObj): PivotPool =>
     Object.assign([] as PivotResult[], { collapse: { ring: [...solid.ids], riderKeys: riders.map((r) => r.id), forced: true, solid: solid.kind } });
@@ -1803,6 +1946,9 @@ export function solvePivot(
     // #1860: a declared solid the givens force flat is refused as that solid (the store names the statements)
     const flatSolid = solidSliver(rs[0]);
     if (flatSolid && !(hasFlatKind && (collapsedRing(rs[0]) || anchorSliver(rs[0])))) return flatSolidPool(flatSolid);
+    // #2503 (ADR-3D-378): no ring collapsed and no solid is flat — the relation's own operands met. No polygon to name, so
+    // the refusal is the statements' contradiction (the store's zero-solution path), never «… שטוח»
+    if (!(hasFlatKind && (collapsedRing(rs[0]) || anchorSliver(rs[0])))) return Object.assign([] as PivotResult[], { limit: true as const });
     // the attribution's reduced re-solve reads the rider rows; with none (or a V8-c layout) the
     // non-incidence givens are all there is, so they forced it
     const forced = nRider === 0 || coupled !== undefined || collapseIsStated();
@@ -1810,7 +1956,7 @@ export function solvePivot(
     const ring = (collapsedRingOf(rs[0]) ?? thinnestRingOf(rs[0])).ids;
     return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id), forced } });
   };
-  const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined;
+  const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined || pool.limit === true;
 
   if (invariantOnly) {
     // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
@@ -1931,8 +2077,9 @@ export function solvePivot(
   // full-suite failures). A genuinely determining given overrides the 1e-4 pull, exactly as it
   // overrides dims0 and the symbol anchors.
   const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
-  // deterministic multi-start: several initial rotations, seed-rotated so "show
-  // another configuration" explores different manifold points when under-determined
+  // deterministic multi-start: one fixed set of eight initial rotations, REORDERED by the seed (never rotated
+  // by it), so an under-determined placement lands in the same handful of basins at every seed. It is not a
+  // sample: a leftover turn or size is sampled after the solve, by the resolver's stage 6 (#2378, ADR-3D-379).
   const starts: number[][] = [];
   const angles = [0, 1.1, 2.3, 4.1, 0.6, 3.1, 5.2, 1.9];
   const axes = [
@@ -2038,6 +2185,61 @@ export function solvePivot(
       };
     };
     if (probe.freedom === 'measure') return [resultAt(probe.x)];
+    // #2378 (ADR-3D-379): a DRAWN walk must be as exact as the solution it moved — ACCEPT alone admits a
+    // residual of ~1e-5 per row, which a stated coordinate's own check then refuses. Polish the release, then
+    // demand the base's own exactness (10× slack, floored where the base is machine-exact).
+    const drawnAccept = Math.min(ACCEPT, Math.max(1e-20, 10 * pErr(probe.x)));
+    const polish = (f: (z: number[]) => number[], z0: number[]): number[] => {
+      let r = leastSquares(f, z0);
+      for (let k = 0; k < 3 && r.err > 1e-24; k++) {
+        const r2 = leastSquares(f, r.x);
+        if (r2.err >= r.err * 0.99) break;
+        r = r2;
+      }
+      return r.x;
+    };
+    if (probe.freedom === 'size') {
+      // #2504 (ADR-3D-379): #518's park (ADR-3D-133), gated by the probe's verdict instead of "the scale never
+      // left its start". That symptom gate froze the size at edge 1 wherever LM nudged an undriven scale by
+      // 1e-10 – 5e-9, and the paths that never call `parkScale` (a placement settled with no solve, Stage A's
+      // placement-only solve) never sampled it at all. Here the size moves to the seed's target `logScale0`
+      // about the gauge origin, only the placement chart follows (dims and symbols held), and the result is
+      // kept only when exact: a size the givens drive cannot pass, so a determined figure never resizes.
+      if (!placementFreedomAt(probe.x, mirror)().scaleFree) return [];
+      const dS = logScale0 - probe.x[6];
+      if (Math.abs(dS) < 1e-9) return [];
+      const atS = (z: number[]): number[] => originChart(probe.x, z);
+      const fZS = (z: number[]) => fP(atS(z));
+      const fPinS = (z: number[]) => [...fZS(z), 1e3 * (z[6] - dS)];
+      const zS = polish(fPinS, [0, 0, 0, 0, 0, 0, dS]);
+      const xS = atS(zS);
+      if (degenerate(xS) || pErr(xS) >= drawnAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
+      return [resultAt(xS)];
+    }
+    if (probe.freedom === 'turn') {
+      // #2378 (ADR-3D-379): the operator's 2026-10-23 ruling, "each press turns the cube about AB to a new
+      // angle". A turn by θ about the seeded axis u of the leftover turn, in {@link originChart}: only the
+      // placement moves (translation follows, so a turn about an axis off the first vertex keeps its pins); the
+      // size, the dims and the symbols are held.
+      const rot = placementFreedomAt(probe.x, mirror)().rotation;
+      if (rot.length === 0) return [];
+      const hT = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + (k + 131) * 78.233)) * 43758.5453) % 1;
+      const coefT = rot.map((_, i) => hT(i) - 0.5);
+      const u = [0, 1, 2].map((j) => rot.reduce((a, b, i) => a + coefT[i] * b[j], 0));
+      const un = Math.hypot(...u);
+      if (!(un > 1e-9)) return [];
+      for (let j = 0; j < 3; j++) u[j] /= un;
+      const theta = Math.PI * (2 * hT(7) - 1) * (probe.flip ? -1 : 1);
+      const atT = (z: number[]): number[] => originChart(probe.x, z);
+      const projT = (z: number[]): number => z[3] * u[0] + z[4] * u[1] + z[5] * u[2];
+      const fZT = (z: number[]) => fP(atT(z));
+      const fPinT = (z: number[]) => [...fZT(z), 1e3 * (projT(z) - theta)];
+      const rpT = leastSquares(fPinT, [0, 0, 0, theta * u[0], theta * u[1], theta * u[2]], 40);
+      const zT = polish(fZT, rpT.x);
+      const xT = atT(zT);
+      if (degenerate(xT) || pErr(xT) >= drawnAccept || Math.abs(projT(zT) - theta) > 1e-3) return [];
+      return [resultAt(xT)];
+    }
     const fr = placementFreedomAt(probe.x, mirror)();
     if (fr.dim === 0) return [];
     const k0 = probe.freedom;

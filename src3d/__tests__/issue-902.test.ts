@@ -88,14 +88,15 @@ describe('#902 — the class: every lane that can own a letter takes the value',
     [BOX, 'נסמן: AB = u', 'u = (k-1,k,3)', 'k = 2'].forEach(submit);
     expectAllOk();
     const ab = sub3(at('B'), at('A'));
-    expect([ab.x, ab.y, ab.z].map((v) => +v.toFixed(6))).toEqual([1, 2, 3]);
+    expect([ab.x, ab.y, ab.z].map((v) => +v.toFixed(6) + 0)).toEqual([1, 2, 3]);
   });
 
   it('a PAIR injection’s symbol: «BD = (k,2k,0)» then «k = 1» → BD = (1, 2, 0)', () => {
     [BOX, 'BD = (k,2k,0)', 'k = 1'].forEach(submit);
     expectAllOk();
     const bd = sub3(at('D'), at('B'));
-    expect([bd.x, bd.y, bd.z].map((v) => +v.toFixed(6))).toEqual([1, 2, 0]);
+    // `+ 0` folds a float -0 to 0 (ADR-3D-379 turns the box about BD, so z can land a hair below 0; the panel's fmtNum does the same).
+    expect([bd.x, bd.y, bd.z].map((v) => +v.toFixed(6) + 0)).toEqual([1, 2, 0]);
   });
 
   it('an EQUATION’s letter (#815 family): a consistent value is honoured, a contradicting one is refused BY NAME', () => {
@@ -107,7 +108,7 @@ describe('#902 — the class: every lane that can own a letter takes the value',
     expectAllOk();
     expect(derived().resolved.pivot?.pinSymbols?.k).toBe(2);
     const dir = derived().resolved.lines.get('AC')!.dir;
-    expect([dir.x, dir.y, dir.z].map((v) => +v.toFixed(6))).toEqual([3, 0, -1]);
+    expect([dir.x, dir.y, dir.z].map((v) => +v.toFixed(6) + 0)).toEqual([3, 0, -1]);
     // k = 5 contradicts the prism (AA'·AB = 24 ≠ 0): refused, naming THIS statement, keep-prior
     const n = state().facts.length;
     submit('k = 5');

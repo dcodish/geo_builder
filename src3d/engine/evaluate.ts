@@ -40,7 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
+import { applyGauge, NO_PLACEMENT_FREEDOM3, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
@@ -1117,7 +1117,12 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // MARGINAL rank over the block-enrolled free-point coordinates) from `freeT`, clamped on its
     // own. On «וקטור AB» · «אורך AB = 5» the length consumes one of the six; an over-pinned solid's
     // deficit can no longer eat an unrelated rider's genuine freedom (the #820 lock's line).
-    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param;
+    // #2378 / #2504 (ADR-3D-379): the gauge the pins did NOT absorb. The allowance above lets the first seven pin
+    // components absorb the gauge and never adds back what they left: with A and AB pinned, six of the seven are
+    // absorbed and the seventh (the turn about AB) vanished from the count, so the cue read «✓» on a cube that
+    // still turns. The leftover is MEASURED (the probe's `counted`: a turn or a size, never a pure slide), the
+    // same measurement the drawing samples, so the count and the sampling share one source (ADR-3D-124).
+    return Math.max(0, dims + placement - Math.max(0, pinCount - (7 - placement)) - consumed) + Math.max(0, freeT - blockConsumed) + param + leftoverPlacement3(c, resolved);
   }
   // #370: a floating figure beside an absolute object — its placement is sampled, and counted.
   return dims + (placementSampled3(c) ? 6 : 0) + freeT + param;
@@ -1410,6 +1415,35 @@ export function gaugePlacedIds3(c: Construction3): Id[] {
 /** Does `resolve3` SAMPLE the placement (rather than freeze it at the canonical gauge)? */
 export function placementSampled3(c: Construction3): boolean {
   return c.solids.length > 0 && hasAbsoluteFrameObject(c) && translationGaugeFree3(c);
+}
+
+/**
+ * #2378 (ADR-3D-379) — is the figure's ROTATION anchored to the absolute frame? Every absolute-frame object
+ * anchors it ({@link hasAbsoluteFrameObject}), and so does a stated VECTOR or pair value («AB=(2,0,0)»): it
+ * fixes a direction in space, so a turn about it is a real freedom, not a gauge (the operator's e24 ruling
+ * on #2505, 2026-10-24: "the vector fixes AB's direction, and the cube turns about it"). A pin whose every
+ * component is a placeholder letter states no direction.
+ */
+export function rotationAnchored3(c: Construction3): boolean {
+  if (hasAbsoluteFrameObject(c)) return true;
+  return [...c.vectorPins, ...c.pairPins].some((p) => p.x !== null || p.y !== null || p.z !== null);
+}
+
+/**
+ * #2378 / #2504 (ADR-3D-379) — the figure's MEASURED leftover placement freedom, which the cue counts and the
+ * drawing samples: the probe's `counted` (ADR-3D-375's rank probe with the size column), i.e. a turn about a
+ * pinned point or axis and a free size, a pure translation excluded (the e23 ruling on #2505). Zero for a
+ * figure whose rotation nothing anchors (FR-SP-4: its placement is a gauge), and for one whose placement is
+ * already sampled and counted (`placementSampled3`, ADR-3D-247).
+ */
+export function leftoverPlacement3(c: Construction3, resolved: Resolved3): number {
+  if (!leftoverPlacementApplies3(c)) return 0;
+  return resolved.pivot?.placementFreedom?.().counted ?? 0;
+}
+
+/** The figures {@link leftoverPlacement3} reads: a solid, rotation anchored, placement not already sampled. */
+function leftoverPlacementApplies3(c: Construction3): boolean {
+  return c.solids.length > 0 && rotationAnchored3(c) && !placementSampled3(c);
 }
 
 /**
@@ -1884,6 +1918,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // #801: the memberships a pin-symbol carrier owns — drivable only INSIDE the pivot (operands.ts)
   const symDrives = symMemberDrives(c);
   const warm: { x?: number[]; mirror?: boolean } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
+  let turnWalked = false; // #2378 (ADR-3D-379): stage 6 turned the placement along its measured leftover turn
   // #1550: the entry gate and every solve trigger below read ONE family list (see `pivotFamilies3`)
   const families = pivotFamilies3(c).filter((f) => f.present);
   const laneRows = (lane: PivotLane3): PivotFamily3[] => families.filter((f) => f.lane === lane);
@@ -2317,14 +2352,98 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         evaluateSolidsAndPoints(c, seed, p2, planesAt, linesAt, dims, true, override, undefined, undefined, riderTs, undefined, perSolidDims);
         return p2;
       };
-      const xAt = [...warm.x];
-      const mirrorAt = warm.mirror ?? false;
+      let xAt = [...warm.x];
+      let mirrorAt = warm.mirror ?? false;
       let measured: PlacementFreedom3 | null = null;
       const placementFreedom = (): PlacementFreedom3 =>
         (measured ??=
           solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, freedom: 'measure' })[0]
-            ?.placementFreedom?.() ?? { dim: 0, generators: [] });
+            ?.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3);
       pivot = { ...pivot, placementFreedom };
+      // #2378 (ADR-3D-379) — THE DRAWING TURNS. The operator's 2026-10-23 ruling (#2378, card d04 A): "Each
+      // press turns the cube about AB to a new angle. The first drawing may no longer sit square on the floor."
+      // An anchored figure's leftover turn (the ADR-3D-101 freeze: never sampled, the multi-start's eight starts
+      // are a fixed set) is walked by a seeded angle over the full turn, at every seed, on the plain resolve; the
+      // read-back image below then starts from the drawn placement. Transactional like stage 5, and recorded
+      // through `solveStage`, so the image replays it. A leftover translation is not walked here (stage 5 owns
+      // the slide; a pure slide is not a freedom, the e23 ruling on #2505).
+      // #2504 (ADR-3D-379): the SIZE first (the operator's d03b ruling: "Every anchored cube whose size no given
+      // fixes changes size on the button"), so the turn's exactness test then runs at the drawn size. One park,
+      // on the path every figure takes; the solver's own #518 park still runs where it always did.
+      if (leftoverPlacementApplies3(c) && placementFreedom().scaleFree) {
+        const posBefore = new Map(pos);
+        const paramBefore = paramOut;
+        const pivotBefore = pivot;
+        const parked = solveStage(() =>
+          solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, freedom: 'size' }),
+        );
+        if (parked.length > 0) {
+          applySolutions(parked);
+          pinParam();
+          resolveLatePlanes();
+          const paramBroke =
+            paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+          if (paramBroke || !signsHold()) {
+            pos.clear();
+            for (const [id, q] of posBefore) pos.set(id, q);
+            paramOut = paramBefore;
+            pivot = pivotBefore;
+            resolveLatePlanes();
+            resolveSymObjects();
+          } else if (warm.x) {
+            xAt = [...warm.x];
+            mirrorAt = warm.mirror ?? false;
+            measured = null;
+            pivot = {
+              ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
+              ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
+              ...(pivotBefore.pointRoots ? { pointRoots: pivotBefore.pointRoots } : {}),
+            };
+          }
+        }
+      }
+      if (leftoverPlacementApplies3(c) && placementFreedom().rotation.length > 0) {
+        const posBefore = new Map(pos);
+        const paramBefore = paramOut;
+        const pivotBefore = pivot;
+        const restore = (): void => {
+          pos.clear();
+          for (const [id, q] of posBefore) pos.set(id, q);
+          paramOut = paramBefore;
+          pivot = pivotBefore;
+          resolveLatePlanes();
+          resolveSymObjects();
+        };
+        const attempt = (flip: boolean): boolean => {
+          const turned = solveStage(() =>
+            solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, flip, freedom: 'turn' }),
+          );
+          if (turned.length === 0) return false;
+          applySolutions(turned);
+          pinParam();
+          resolveLatePlanes();
+          const paramBroke =
+            paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+          return !paramBroke && signsHold();
+        };
+        if (!attempt(false)) {
+          restore();
+          if (!attempt(true)) restore();
+        }
+        if (pivot !== pivotBefore && warm.x) {
+          // a re-placement of the CHOSEN configuration, not a new pool (stage 5's rule): the pool's counts and its
+          // admissible roots stay the base's, and the freedom is re-measured at the turned placement
+          turnWalked = true;
+          xAt = [...warm.x];
+          mirrorAt = warm.mirror ?? false;
+          measured = null;
+          pivot = {
+            ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen, placementFreedom,
+            ...(pivotBefore.symRoots ? { symRoots: pivotBefore.symRoots } : {}),
+            ...(pivotBefore.pointRoots ? { pointRoots: pivotBefore.pointRoots } : {}),
+          };
+        }
+      }
       if (opts.placementImage && placementFreedom().dim > 0) {
         // transactional, exactly as stage 5: an image that breaks a sign given or the parameter is no image
         const posBefore = new Map(pos);
@@ -2465,7 +2584,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // of a wrong statement on the strength of an arbitrary choice — ADR-3D-138's class exactly.
   const placementSampledParts = {
     translation: translationFree && c.solids.length > 0 && hasAbsoluteFrameObject(c),
-    rotation: rotationFree && c.solids.length > 0 && hasAbsoluteFrameObject(c),
+    // #2378 (ADR-3D-379): a leftover turn stage 6 walked is sampled too, so a frame claim softens on it
+    rotation: (rotationFree && c.solids.length > 0 && hasAbsoluteFrameObject(c)) || turnWalked,
   };
   const placementSampled = placementSampledParts.translation || placementSampledParts.rotation;
   if ((translationFree || rotationFree || spinAxis) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {

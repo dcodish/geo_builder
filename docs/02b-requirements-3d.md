@@ -97,7 +97,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   An unanchored figure is normalised onto the floor, so «הציגו תצורה אחרת» changes only its shape (operator:
   *"Keep it flat on the floor"*). **A number drawn on the canvas must be seed-invariant knowledge** — the
   shared statement is [FR-DP-3](02w-requirements-workspace.md).
-  - Sources: ADR-3D-272, #1861.
+  An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
+  still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
+  תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
+  AB to a new angle. The first drawing may no longer sit square on the floor."*; 2026-10-24, #2504 d03b).
+  - Sources: ADR-3D-272, #1861, ADR-3D-379.
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:
@@ -551,7 +555,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   ∠ACB = 90°», or «AC ⊥ BC» / «CA ⊥ CB», in either order, or «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°»: the right angle
   at C makes BA the hypotenuse, so the lengths agree only when C = A). The completing line is refused with the same words,
   never drawn as a sliver (#2292, ADR-3D-372, ADR-W-146); a thin but real triangle («|AB| = 2 · |BC| = 1 · AC ⊥ BC»)
-  builds. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
+  builds. **The same givens are refused when the points that would meet are NOT a declared ring** — two vertices of a
+  quadrilateral or a pentagon («מרובע ABCD · |AB| = |BC| · AC ⟂ BC» would put C on A), or a triangle declared over existing
+  points — and so is a stated angle that holds only because its arm has no length («ריבוע ABCD · E על AB · |DE| = |DA| ·
+  DE ⊥ AE», E on A): the completing line is refused as the statements' contradiction («הנתונים סותרים זה את זה — אין גוף
+  שמקיים את «AC ⟂ BC» יחד עם «|AB| = |BC|»»), never with a flat-polygon sentence (#2503, ADR-3D-378). A length-only
+  coincidence (FR-EN-20: «D על BC · |BD| = |BC|» puts D on C) still builds. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
   SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
@@ -580,8 +589,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   on the canvas are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated
   relation consumes is **measured on the resolved figure, never inferred from a count** — a relation the
   construction already satisfies (a parallelogram's second parallel pair, a kite's mirrored sides)
-  consumes nothing.
-  - Sources: ADR-3D-247, ADR-3D-248.
+  consumes nothing. An anchored figure's **leftover turn or size**, measured on the resolved figure, is
+  counted too («קובייה …» · «A(0,0,0)» reads «דרגות חופש: 4»: three for turning, one for size); a pure
+  slide of the whole figure is not (operator 2026-10-24, #2505 e23, #2504 d03a).
+  - Sources: ADR-3D-247, ADR-3D-248, ADR-3D-379.
 - **FR-RD-10 (Must)** — **A stated right angle against a PLANE is the knee.** «π1 ניצב ל-π2», «המישור
   ABC ניצב למישור ABB'», «הזווית בין המישורים π1 ו-π2 היא 90» — and the line × plane spellings at 90°
   («הזווית בין AA' למישור ABC היא 90», «הזווית בין הישר ℓ1 למישור π1 היא 90») — draw the textbook knee:

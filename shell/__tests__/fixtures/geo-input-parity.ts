@@ -292,6 +292,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
 
+  '#2547': 'open', // #2532 (ADR-765): analytic hands a through-clause chord to the model where 2-D refuses — the interim question; #2541 reads it in both
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
@@ -316,6 +317,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2509': 'open', // #2257 (ADR-767): analytic reads no unnamed polygon-in-polygon inscription («הריבוע חסום במשולש EFG»); 2-D moves the drawn square
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
+  '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -832,6 +834,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'impossible-right-isosceles-2292-angle', family: 'angles', steps: ['משולש ABC', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
   { id: 'impossible-right-isosceles-2292-other-leg', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AB ⊥ AC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
   { id: 'thin-right-triangle-2292-control', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = 2', 'BC = 1', 'AC ⊥ BC'], expect: 'builds', note: 'a real right triangle — the control' },
+  // #2443 (ADR-764) / #2503 (ADR-3D-378): the same impossible givens with NO declared triangle — two vertices of a quadrilateral, or loose points, would meet
+  { id: 'impossible-isosceles-quad-2443-perp', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', note: 'AB = BC holds only where C meets A; D keeps the quadrilateral wide, so no ring is flat' },
+  { id: 'impossible-isosceles-quad-2443-angle', family: 'angles', steps: ['מרובע ABCD', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused' },
+  { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', knownGap: [{ product: 'analytic', issue: '#2506' }], note: 'three loose points: no polygon at all' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)
@@ -1066,6 +1072,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circle-by-area-1622', family: 'circles', steps: ['מעגל O ששטחו 9π'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-radius-unnamed-1622', family: 'circles', steps: ['מעגל שרדיוסו 5'], expect: 'builds', exception: 'X8' },
   { id: 'radius-letters-order-1622', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r'], expect: 'builds', exception: 'X8' },
+  // ── #2521 (ADR-AG-332): a stated radius binds the circle's radius letter — a relation over the letter reads the value ──
+  { id: 'radius-letters-order-then-value-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r', 'רדיוס מעגל P הוא 9'], expect: 'builds', exception: 'X8', note: 'analytic drew O (3.46) smaller than P (9), green, before ADR-AG-332; the drawing is locked in src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts' },
+  { id: 'radius-letters-value-then-order-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 9', 'R > r'], expect: 'builds', exception: 'X8', note: 'analytic refused «R > r» as naming a point r before ADR-AG-332' },
+  { id: 'radius-letter-value-then-ratio-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 3', 'R = 2r'], expect: 'builds', exception: 'X8', note: 'analytic answered not-handled before ADR-AG-332' },
+  { id: 'radius-letter-value-then-bound-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 9', 'r < 5'], expect: 'refused', exception: 'X8', note: 'analytic built it green (P drawn at 9, «r < 5» narrowing a ghost) before ADR-AG-332' },
   { id: 'common-tangent-internal-1622', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB משיק משותף פנימי לשני המעגלים'], expect: 'builds', exception: 'X8' },
   { id: 'centre-of-given-circle-1622', family: 'circles', steps: ['נתון מעגל', 'מרכז המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'radius-of-created-circle-1622', family: 'circles', steps: ['A על המעגל', 'רדיוס המעגל הוא 5'], expect: 'builds', exception: 'X8' },
@@ -1792,7 +1803,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2257 (ADR-767): an inscription whose inner shape is already drawn moves THAT shape into the container ──
   { id: 'inscribe-existing-square-named-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע ABCD חסום במשולש EFG'], expect: 'builds', exception: 'X8', note: '2-D refused «would be flat» before ADR-767; analytic already put A–D on the sides' },
   { id: 'inscribe-existing-square-definite-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2509' }], note: '2-D drew a second square HIJK, green, before ADR-767; analytic does not read the unnamed inscription (not-handled)' },
+  // ── #2532 (ADR-765): an incidence clause the reading never read refuses the line whole (FR-IN-4g); analytic hands it to the model (02c R124) ──
+  { id: 'chord-through-centre-2532-01', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר העובר דרך מרכז המעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2547' }], note: '2-D drew an ordinary chord with O off AB, green, before ADR-765; analytic answers not-handled (the model, R124) — the interim question is #2547, the read is #2541' },
+  { id: 'chord-through-centre-2532-03', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר', 'O על AB'], expect: 'builds', exception: 'X8', note: 'the honest two-line form of chord-through-centre-2532-01: O on AB at every seed in both builders (the English spellings are locked in src/app/__tests__/issue-2532-unread-through.test.ts: X8 is matched in Hebrew)' },
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
+  // ── #2512 (ADR-762 / ADR-AG-333): a second triangle around one circle is its own triangle ──
+  { id: 'second-ring-around-circle-2512', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'], expect: 'builds', exception: 'X8', note: '2-D drew DEF exactly on ABC, green, before ADR-762; analytic refused it «polygon-collapsed» before ADR-AG-333' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

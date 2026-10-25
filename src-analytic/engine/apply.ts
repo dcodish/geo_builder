@@ -1436,16 +1436,12 @@ function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: 
     // The circle's own bare symbols, wherever they still stand, become the stated parts.
     for (const part of ['a', 'b', 'r'] as const) {
       if (spoken[part]) continue;
-      const sym = own(part);
-      const value = stated[part];
-      next = {
-        ...next,
-        objects: next.objects.map((o) => (o.id === host.id ? o : substituteSym(o, sym, value))),
-        constraints: substituteSym(next.constraints, sym, value),
-        selectors: substituteSym(next.selectors, sym, value),
-      };
-      carried = { a: substituteSym(carried.a, sym, value), b: substituteSym(carried.b, sym, value), r: substituteSym(carried.r, sym, value) };
+      // The host already carries the stated equation, which names none of the tool's symbols.
+      const bound = bindSymbol(next, own(part), stated[part], src, { admit: false });
+      if (!bound.ok) return bound;
+      next = bound.next;
     }
+    carried = readBound(next, carried);
   }
   const carriedFacts: Fact[] = [];
   if (spoken.r) {
@@ -1542,13 +1538,13 @@ function relateCircles(
   const uy: Expr = { kind: 'div', a: mul(num(2), m), b: den };
   params.push({ t: 'param', sym: own('m'), domain: UNBOUNDED, src });
   let next: Construction = c;
+  // The tool's own symbol replaced by the relation's construction — through the one binding seam (#2521).
+  let failed: ApplyError | null = null;
   const substitute = (name: string, value: Expr) => {
-    next = {
-      ...next,
-      objects: substituteSym(next.objects, name, value),
-      constraints: substituteSym(next.constraints, name, value),
-      params: next.params.filter((p) => p.sym !== name),
-    };
+    if (failed) return;
+    const bound = bindSymbol(next, name, value, src, { admit: false });
+    if (bound.ok) next = bound.next;
+    else failed = bound.error;
   };
   const extra: Fact[] = [];
   if (isCreatedCircle(b) && pb.a && pb.b) {
@@ -1562,6 +1558,7 @@ function relateCircles(
       extra.push({ t: 'constraint', k: { t: 'coord', id: pa.centre, x: sub(pb.a, mul(distance, ux)), y: sub(pb.b, mul(distance, uy)) }, src });
     } else return { ok: true, next: c };
   } else return { ok: true, next: c };
+  if (failed) return { ok: false, error: failed };
   const out = applyAll(next, [...params, ...extra]);
   return out.ok ? { ok: true, next: out.next } : out;
 }
@@ -2404,7 +2401,13 @@ function resolveLineRefs(c: Construction, f: Fact): Fact {
 }
 
 export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
-  const f = resolveLineRefs(c, f0);
+  /*
+   * A BOUND LETTER READS ITS VALUE (#2521, ADR-AG-332), in every fact and both orders: «רדיוס מעגל P הוא 9» · «R > r»
+   * is «R > 9»; «R = 2r» is «R = 18»; a domain stated for the bound letter itself is a claim about its value.
+   */
+  const boundValue = f0.t === 'param' ? c.bound?.[f0.sym] : undefined;
+  if (f0.t === 'param' && boundValue !== undefined) return judgeBoundParam(c, f0, boundValue);
+  const f = resolveLineRefs(c, readBound(c, f0));
   const out = applyStatement(c, f);
   if (!out.ok || out.effect === 'known') return out;
   // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
@@ -4345,20 +4348,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
            * naming the statement, where it used to be substituted and the circle silently vanished.
            */
           const sym = r.name;
-          const admitted = admitStated(c, c.params.find((p) => p.sym === sym)?.domain, f.value, f.src);
-          if (!admitted.ok) return admitted;
-          const base = admitted.next;
           /**
            * EVERYWHERE the symbol stands, not only on the circle (am. 1): a tangency stated with the
            * circle («נתון מעגל O משיק לציר ה-x») carries `r_O` in its own constraint, and replacing the
            * radius on the object alone left that constraint solving a different, still-free radius —
-           * the circle drawn at r = 5 while the tangency held for some other r.
+           * the circle drawn at r = 5 while the tangency held for some other r. And a relation over the LETTER («R > r»,
+           * before or after) reads the value too: the binding seam (#2521, ADR-AG-332).
            */
-          const objects = substituteSym(base.objects, sym, f.value);
-          const constraints = substituteSym(base.constraints, sym, f.value);
-          const restText = JSON.stringify({ objects, constraints });
-          const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
-          return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
+          const bound = bindSymbol(c, sym, f.value, f.src);
+          return bound.ok ? { ok: true, next: bound.next, effect: 'narrowed' } : bound;
         }
         // A radius already carried by the object: a RESTATEMENT, judged at the probes. A different one is refused in 2-D's
         // ruled sentence naming the line that sized the circle (#2119, ADR-684 — operator ruling 2026-10-15, every builder).
@@ -4372,15 +4370,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
          * exactly as a centred circle's `r_O` is (above) — «A על המעגל» · «רדיוס המעגל הוא 5», «מעגל בקוטר 10» (2-D
          * sets the radius of its unnamed circle; ADR-AG-219).
          */
-        const sym = toolSymbol(host.id, 'r');
-        const admitted = admitStated(c, c.params.find((p) => p.sym === sym)?.domain, f.value, f.src);
-        if (!admitted.ok) return admitted;
-        const base = admitted.next;
-        const objects = substituteSym(base.objects, sym, f.value);
-        const constraints = substituteSym(base.constraints, sym, f.value);
-        const restText = JSON.stringify({ objects, constraints });
-        const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
-        return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
+        const bound = bindSymbol(c, toolSymbol(host.id, 'r'), f.value, f.src);
+        return bound.ok ? { ok: true, next: bound.next, effect: 'narrowed' } : bound;
       }
       if (host.kind === 'curve') {
         // An equation circle's radius is determined by its equation — the sentence is a claim.
@@ -5018,11 +5009,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         collapsed[named] = f.sel;
         return { ok: true, effect: 'narrowed', next: { ...c, selectors: collapsed } };
       }
-      return {
-        ok: true,
-        effect: 'created',
-        next: { ...c, selectors: [...c.selectors, f.sel] },
-      };
+      // An order between parameters left with no free symbol, or with one, is read once, here and by the binding
+      // seam alike (#2521, ADR-AG-332): judged now, or lowered to that symbol's domain beside the selector.
+      const added: Construction = { ...c, selectors: [...c.selectors, f.sel] };
+      const read = normalizeParamOrder(added, f.sel, f.src);
+      return read.ok ? { ok: true, effect: 'created', next: read.next } : read;
     }
 
     case 'derived':
@@ -5334,18 +5325,185 @@ function sameReference(prior: GeoObject, f: Fact): boolean {
   return prior.kind === 'segment' || prior.kind === 'polygon';
 }
 
-/** Replace every `{ kind: 'sym', name: sym }` inside `x` with `value` — a structural substitution. */
+/**
+ * Replace every `{ kind: 'sym', name: sym }` inside `x` with `value` — a structural substitution. IDENTITY-PRESERVING
+ * (#2521): a part the symbol does not occur in is returned as the same reference, so the fold's attribution
+ * (`constraintFact` / `selectorFact`, compared by identity) keeps every untouched constraint and selector on the line
+ * that stated it. Private to the binding seam: called only by `bindSymbol` and `readBound` (a guard test holds it).
+ */
 function substituteSym<T>(x: T, sym: string, value: Expr): T {
   const walk = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map(walk);
+    if (Array.isArray(v)) {
+      let changed = false;
+      const out = v.map((w) => {
+        const n = walk(w);
+        if (n !== w) changed = true;
+        return n;
+      });
+      return changed ? out : v;
+    }
     if (v && typeof v === 'object') {
       const o = v as Record<string, unknown>;
       if (o.kind === 'sym' && o.name === sym && Object.keys(o).length === 2) return value;
-      return Object.fromEntries(Object.entries(o).map(([k, w]) => [k, walk(w)]));
+      let changed = false;
+      const entries = Object.entries(o).map(([k, w]) => {
+        const n = walk(w);
+        if (n !== w) changed = true;
+        return [k, n] as const;
+      });
+      return changed ? Object.fromEntries(entries) : v;
     }
     return v;
   };
   return walk(x) as T;
+}
+
+/** Every symbol a `{ kind: 'sym' }` node names anywhere inside `x` — the structural scan (never a text search). */
+function symbolNodes(x: unknown, out: Set<string> = new Set()): Set<string> {
+  if (Array.isArray(x)) for (const w of x) symbolNodes(w, out);
+  else if (x && typeof x === 'object') {
+    const o = x as Record<string, unknown>;
+    if (o.kind === 'sym' && typeof o.name === 'string' && Object.keys(o).length === 2) out.add(o.name);
+    else for (const w of Object.values(o)) symbolNodes(w, out);
+  }
+  return out;
+}
+
+/** The construction's fields that are not expressions over the figure's symbols — never substituted into. */
+const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound']);
+
+/**
+ * THE ONE PLACE A STATED VALUE REPLACES A FREE SYMBOL (#2521, ADR-AG-332).
+ *
+ * «מעגל P שרדיוסו r» · «R > r» · «רדיוס מעגל P הוא 9»: the radius was free and the student just gave it, so `r`
+ * BECOMES 9 — and a letter is one parameter (ADR-AG-307), so it becomes 9 everywhere, not only on the circle. The
+ * substitution used to cover the objects and constraints alone and forget the letter afterwards: «R > r» went on
+ * judging an orphaned `r` the canvas no longer showed (P drawn at 9, O at 3.46, green), a later «r < 5» narrowed a
+ * ghost, and the parameter was retired by a TEXT search that a letter called `r` (the field name of a circle's radius)
+ * always matched, so the ghost stayed in the DOF count.
+ *
+ * In order:
+ * - **a. domain** — `admitStated` (`out-of-domain`), unless `admit: false`: the tool replacing its own symbol by its
+ *   construction (`relateCircles`, `describeDrawnCircle`) states no value the student must be told about;
+ * - **b. everywhere** — one structural walk over every expression-bearing field of the construction (all but
+ *   `NOT_SUBSTITUTED`), so a field added later cannot be missed; the values already bound are substituted too;
+ * - **c. retirement** — the parameter leaves the register when no `{kind:'sym'}` node of it remains (`symbolNodes`);
+ * - **d. the record** — `bound[sym] = value`, which `readBound` substitutes into every later fact;
+ * - **e. the orders it touched** — each `sign / params` selector the substitution changed is read again
+ *   (`normalizeParamOrder`): one left with no symbol is judged now, one left with one symbol becomes that symbol's
+ *   domain.
+ */
+function bindSymbol(
+  c: Construction,
+  sym: string,
+  value: Expr,
+  src: string,
+  opts: { admit: boolean } = { admit: true },
+): { ok: true; next: Construction } | { ok: false; error: ApplyError } {
+  let base = c;
+  if (opts.admit) {
+    const admitted = admitStated(c, c.params.find((p) => p.sym === sym)?.domain, value, src);
+    if (!admitted.ok) return admitted;
+    base = admitted.next;
+  }
+  const next: Record<string, unknown> = { ...base };
+  for (const key of Object.keys(base) as Array<keyof Construction>) {
+    if (!NOT_SUBSTITUTED.has(key)) next[key] = substituteSym(base[key], sym, value);
+  }
+  let out = next as unknown as Construction;
+  const bound: Record<string, Expr> = {};
+  for (const [s, v] of Object.entries(base.bound ?? {})) bound[s] = substituteSym(v, sym, value);
+  bound[sym] = value;
+  const stillRead = symbolNodes(Object.entries(out).filter(([k]) => !NOT_SUBSTITUTED.has(k as keyof Construction)).map(([, v]) => v));
+  out = { ...out, bound, params: stillRead.has(sym) ? out.params : out.params.filter((p) => p.sym !== sym) };
+  for (let i = 0; i < out.selectors.length; i++) {
+    if (out.selectors[i] === base.selectors[i]) continue;
+    const r = normalizeParamOrder(out, out.selectors[i], src);
+    if (!r.ok) return r;
+    out = r.next;
+  }
+  return { ok: true, next: out };
+}
+
+/**
+ * `x` as the figure's BINDINGS read it (#2521, ADR-AG-332): every symbol a stated value bound (`Construction.bound`)
+ * replaced by that value. Idempotent, and the identity when nothing is bound. Applied to every fact at the top of
+ * `applyFact`, so a sentence naming a bound letter — before or after the value, in any family — reads the value.
+ */
+function readBound<T>(c: Construction, x: T): T {
+  const bound = c.bound;
+  if (!bound) return x;
+  let out = x;
+  for (const [sym, value] of Object.entries(bound)) out = substituteSym(out, sym, value);
+  return out;
+}
+
+/** `e` as `α·s + β` over its one symbol `s`, read at four numeric probes (no CAS), or null when it is not linear. */
+function linearIn(e: Expr, s: string): { a: number; b: number } | null {
+  const at = (t: number) => evalExpr(e, { [s]: t });
+  const b = at(0);
+  const a = at(1) - b;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  for (const t of [2, -3, 0.5, 7.25]) {
+    const v = at(t);
+    const want = a * t + b;
+    if (!Number.isFinite(v) || Math.abs(v - want) > 1e-9 * Math.max(1, Math.abs(want), Math.abs(a), Math.abs(b))) return null;
+  }
+  return { a, b };
+}
+
+/**
+ * ONE READING OF AN ORDER BETWEEN PARAMETERS (#2521, ADR-AG-332) — «R > r» as a `sign / params` selector, read by the
+ * `selector` case when it is stated and by `bindSymbol` when a binding rewrites it:
+ *
+ * - **no free symbol left** (5 − 9 > 0): judged now — kept when it holds (dropping it would shift the positional
+ *   `selectorLine`), refused `unsatisfiable`, naming the statement, when it cannot;
+ * - **one symbol, linear** (R − 9 > 0): kept, and ALSO lowered to that symbol's domain through the ONE domain merge
+ *   (the `param` fact «R > 9» parses to), so the sampler draws inside it rather than finding it by a walk; an empty
+ *   merge cannot hold and is refused `unsatisfiable`;
+ * - **otherwise**: unchanged — a region of the parameter space, judged after the solve (ADR-AG-005 D7 kind 2).
+ */
+function normalizeParamOrder(
+  c: Construction,
+  sel: Selector,
+  src: string,
+): { ok: true; next: Construction } | { ok: false; error: ApplyError } {
+  if (sel.kind !== 'sign' || sel.q.k !== 'params') return { ok: true, next: c };
+  const e = sel.q.e;
+  const refuse = { ok: false as const, error: { code: 'unsatisfiable' as const, detail: src } };
+  const holds = (v: number) => (sel.positive ? v > 0 : v < 0);
+  const syms = symbolsOf(e).filter((s) => !RESERVED_SYMBOLS.has(s));
+  if (syms.length === 0) {
+    const v = evalExpr(e, {});
+    return Number.isFinite(v) && holds(v) ? { ok: true, next: c } : refuse;
+  }
+  if (syms.length !== 1) return { ok: true, next: c };
+  const lin = linearIn(e, syms[0]);
+  if (!lin) return { ok: true, next: c };
+  if (lin.a === 0) return holds(lin.b) ? { ok: true, next: c } : refuse;
+  const k = -lin.b / lin.a;
+  const greater = lin.a > 0 === sel.positive;
+  const domain: Domain = greater ? { min: k, minOpen: true } : { max: k, maxOpen: true };
+  const r = applyFact(c, { t: 'param', sym: syms[0], domain, src });
+  if (!r.ok) return r;
+  const merged = r.next.params.find((p) => p.sym === syms[0])?.domain;
+  return merged && emptyDomain(merged) ? refuse : { ok: true, next: r.next };
+}
+
+/**
+ * A DOMAIN STATED FOR A BOUND LETTER (#2521, ADR-AG-332) — «r < 5» after «רדיוס מעגל P הוא 9». The letter is no longer
+ * free, so the sentence is a CLAIM about its value, never a narrowing of a ghost: a constant is judged exactly (`known`
+ * when it holds, `unsatisfiable` naming the statement when not); a letter bound to another lone letter carries the
+ * domain over to it (the `param` merge); any other expression cannot carry a domain without a CAS, and is refused by
+ * name (`out-of-scope`) rather than dropped.
+ */
+function judgeBoundParam(c: Construction, f: Extract<Fact, { t: 'param' }>, value: Expr): ApplyOutcome {
+  const syms = symbolsOf(value).filter((s) => !RESERVED_SYMBOLS.has(s));
+  if (syms.length === 0) {
+    return inDomain(f.domain, evalExpr(value, {})) ? { ok: true, effect: 'known', next: c } : { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+  }
+  if (value.kind === 'sym') return applyFact(c, { ...f, sym: value.name });
+  return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
 }
 
 /** Two lines as homogeneous triples: the same line when the triples are proportional. */
