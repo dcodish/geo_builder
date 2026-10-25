@@ -6,8 +6,9 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-24",
+  "updatedAt": "2026-10-25",
   "slow": [
+    "src-analytic/__tests__/geo-input-parity.test.ts",
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
@@ -31,6 +32,7 @@
     "src/__tests__/issue-1600-choice-registry.test.ts",
     "src/__tests__/issue-1605-charged-memo-hits.test.ts",
     "src/__tests__/issue-1770-capped-reattempt-pool.test.ts",
+    "src/__tests__/issue-2257-inscribe-existing-inner.test.ts",
     "src/__tests__/issue-2344-impossible-right-isosceles.test.ts",
     "src/__tests__/issue-2405-all-common-tangents.test.ts",
     "src/__tests__/issue-2430-common-tangent-later-pin.test.ts",
@@ -101,7 +103,6 @@
     "src3d/__tests__/issue-2292-limit-collapse.test.ts",
     "src3d/__tests__/issue-2503-limit-collapse-pair.test.ts",
     "src3d/__tests__/issue-814.test.ts",
-    "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",
     "src3d/__tests__/issue-820-rider-drive.test.ts",
     "src3d/__tests__/issue-827.test.ts",
