@@ -5,12 +5,18 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 085ecb4d-0bb1-4faa-bf28-623344445d75
-  modified: 2026-10-26T08:50:09.179Z
+  modified: 2026-10-26T08:58:25.331Z
 ---
 
-**Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** The full map is the private
-artifact https://claude.ai/artifact/4FEgb4ef1f1UAd6h4wae3Y ("Geo Builder Roadmap Map"). Read it with the
-Artifact tool (`action: "read"`) before continuing.
+**Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** Two private artifacts:
+- **The overview he works from:** https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew ("Geo Builder Roadmap"). It has
+  the year strip, a five-week board of 11 workstreams, this week's focus and what waits on him. Each workstream
+  opens its issues. He asked for this after finding the long map "lots of text, hard to follow". Keep it one screen.
+- **The detailed reference:** https://claude.ai/artifact/4FEgb4ef1f1UAd6h4wae3Y ("Geo Builder Roadmap Map"), with the
+  full directions inventory per product.
+
+Read both with the Artifact tool (`action: "read"`) before continuing. **He wants the roadmap discussed and agreed
+before any relabelling.**
 
 **Agreed with the operator:**
 - The competition is general AI. The edge is the givens list, not the picture. This is recorded in the
