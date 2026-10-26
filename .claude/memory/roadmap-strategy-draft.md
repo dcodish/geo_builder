@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 085ecb4d-0bb1-4faa-bf28-623344445d75
-  modified: 2026-10-26T08:35:57.438Z
+  modified: 2026-10-26T08:50:09.179Z
 ---
 
 **Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** The full map is the private
@@ -31,6 +31,11 @@ Artifact tool (`action: "read"`) before continuing.
 - **No fixed fix-round split.** A round follows the current work. *"even P1s don't always have to go in first priority"*.
   This conflicts with CLAUDE.md's "P1 — drop everything", so it needs his wording in an ADR before it changes.
   The proposal on the artifact is to add "how standard is the case" to priority.
+
+**Priority scheme ruled 2026-10-26, filed as #2556 (not built yet):** P1 = a wrong answer that a real person hit
+(his own sessions count). A wrong answer found internally = P2 with a `wrong-answer` mark. Priority follows the
+product's phase (a complex P2 is not important now). Proposed labels: `wrong-answer` and `reported`, plus a "Later"
+bucket and re-ranking whenever a phase changes.
 
 **Still needs his answer:** the process proposals (milestones, rounds that follow the work, the intake gate, phase
 review, the P1 rewording). These need a workspace ADR and his approval. Also, book the locus design conversation.
