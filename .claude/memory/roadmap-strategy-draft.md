@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 085ecb4d-0bb1-4faa-bf28-623344445d75
-  modified: 2026-10-26T06:14:22.937Z
+  modified: 2026-10-26T08:35:57.438Z
 ---
 
 **Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** The full map is the private
@@ -23,11 +23,17 @@ Artifact tool (`action: "read"`) before continuing.
   artifact's section 5 holds that inventory per product.
 - He wants to think more deeply about **locus discoverability** (#1177 and its family).
 
-**Still needs his answer:**
-- What "ready for a unit" means (recommended: exercises gate + corpus meter).
-- When conics come.
-- The fix-round split (proposed 60/25/15).
-- The process proposals: milestones, weighted rounds, intake gate, phase review. These need a workspace ADR and his approval.
+**Answered 2026-10-26:**
+- **Ready for a unit = "ready enough".** The unit's bagrut questions build easily and correctly, and so do the book examples
+  he tests. Not 100% coverage. 2-D today is the reference: standard cases work, and a rare bug doesn't block readiness.
+- **Conics and the sphere (round solids, #1569) move to next school year.** They are outside this year's curriculum.
+  This year's order: analytic locus → 3-D vectors → complex.
+- **No fixed fix-round split.** A round follows the current work. *"even P1s don't always have to go in first priority"*.
+  This conflicts with CLAUDE.md's "P1 — drop everything", so it needs his wording in an ADR before it changes.
+  The proposal on the artifact is to add "how standard is the case" to priority.
+
+**Still needs his answer:** the process proposals (milestones, rounds that follow the work, the intake gate, phase
+review, the P1 rewording). These need a workspace ADR and his approval. Also, book the locus design conversation.
 
 **Why:** the operator found the work "sporadic: no roadmap, no priorities, no phases".
 
