@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 085ecb4d-0bb1-4faa-bf28-623344445d75
-  modified: 2026-10-26T08:58:25.331Z
+  modified: 2026-10-26T09:53:17.668Z
 ---
 
 **Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** Two private artifacts:
@@ -15,7 +15,17 @@ metadata:
 - **The detailed reference:** https://claude.ai/artifact/4FEgb4ef1f1UAd6h4wae3Y ("Geo Builder Roadmap Map"), with the
   full directions inventory per product.
 
-Read both with the Artifact tool (`action: "read"`) before continuing. **He wants the roadmap discussed and agreed
+Read both with the Artifact tool (`action: "read"`) before continuing.
+
+**The overview is driven by its own database** (load the ArtifactData tool; url = the overview). Documents:
+- `plan/current`: the weeks and the workstreams with their issue numbers. Add a newly filed issue to a workstream here; no republish needed.
+- `state/issues`: the live state of each plan issue.
+- `snapshots/<date>`: counts by workstream, by phase and by tool × priority. One document per refresh, and **the
+  first one is the baseline**: never overwrite it.
+- `decisions/<id>`: the decisions that gate the plan, each with its status: open, answered (he clicked a choice on the
+  page), or recorded. **On every session start, list `decisions`. For each `answered` one, transcribe the ruling to its
+  GitHub issue (quote his note) and set its status to `recorded`.**
+- `tools/snapshot`: the refresh script's source and the how-to. Refresh after each fix round, and whenever he asks. **He wants the roadmap discussed and agreed
 before any relabelling.**
 
 **Agreed with the operator:**
