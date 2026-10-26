@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 085ecb4d-0bb1-4faa-bf28-623344445d75
-  modified: 2026-10-26T09:53:17.668Z
+  modified: 2026-10-26T11:59:09.791Z
 ---
 
 **Status 2026-10-26: draft, nothing in the queue or workflow changed yet.** Two private artifacts:
@@ -25,7 +25,22 @@ Read both with the Artifact tool (`action: "read"`) before continuing.
 - `decisions/<id>`: the decisions that gate the plan, each with its status: open, answered (he clicked a choice on the
   page), or recorded. **On every session start, list `decisions`. For each `answered` one, transcribe the ruling to its
   GitHub issue (quote his note) and set its status to `recorded`.**
-- `tools/snapshot`: the refresh script's source and the how-to. Refresh after each fix round, and whenever he asks. **He wants the roadmap discussed and agreed
+- `tools/snapshot`: the refresh script's source and the how-to. Refresh after each fix round, and whenever he asks.
+
+**Saving from the page:** when the page is opened in the Claude Code desktop **side panel**, writes to its database do not
+land (seen 2026-10-26: all ten selections were lost). The page now warns after 8 s and has a "Copy my answers" button.
+Saving from claude.ai in a browser is untested. Decisions are numbered D1–D10 by `rank`.
+
+**The ten plan decisions D1–D10 were ruled on 2026-10-26** (given in chat). They are transcribed to #1177, #1186,
+#2556, #2499, #2538, #2552, #2554 and #2547, and `needs-operator` was removed from #2499, #2538, #2552 and #2547. Four
+choices differ from the recommendation:
+- **D1 B:** the canvas-label design session runs first, in week 1; the locus chip waits for it.
+- **D6 A:** ship #2499 now; one slower refusal is a scoped exception to the no-slowdown rule.
+- **D7 B:** #2538 uses one general rule (about 4 s on one quadrilateral line accepted).
+- **D8 B:** only the exam's two «המעגל הראשון» sentences.
+
+**Next:** he asked to connect GitHub to claude.ai, so the page can read issue state live through the `mcp`
+capability. Once the connector exists, check its tools and make one read-only call before wiring it. **He wants the roadmap discussed and agreed
 before any relabelling.**
 
 **Agreed with the operator:**
