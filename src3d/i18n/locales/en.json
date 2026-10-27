@@ -344,7 +344,7 @@
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as «plane {{ids}} is perpendicular to line {{line}}».",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
-    "vectorNamedBare": "\"{{from}}{{to}} = {{name}}\" is read as a vector: {{name}} is the name of the vector {{from}}{{to}}. If you meant a length, write \"|{{from}}{{to}}| = {{name}}\" instead.",
+    "vectorNamedBare": "«{{sentence}}» is read as a vector: {{name}} is the name of the vector {{pair}}. If you meant a length, write «{{taught}}» instead.",
     "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",
     "stated": {
       "shape": "{{a}} is a {{shape}}",

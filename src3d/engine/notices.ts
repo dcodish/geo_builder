@@ -78,6 +78,16 @@ export interface NarrowedRing3 {
   readonly note: RingNote;
 }
 
+/**
+ * #2092 (ADR-3D-381): the slots of the bare-naming note — the sentence as the reading took it, the pair, and the
+ * TAUGHT length spelling. One composition, read by the page and by the lock that submits the taught line, so the
+ * message and the accepted spelling cannot drift apart (docs/17 §9).
+ */
+export function bareNamingSlots(n: { name: string; from: Id; to: Id }): { sentence: string; name: string; pair: string; taught: string } {
+  const pair = `${n.from}${n.to}`;
+  return { sentence: `${pair} = ${n.name}`, name: n.name, pair, taught: `|${pair}| = ${n.name}` };
+}
+
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
   | {

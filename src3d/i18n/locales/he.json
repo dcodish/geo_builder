@@ -344,7 +344,7 @@
     "lineCalledPlane": "שימו לב: {{line}} הוא ישר, לא מישור. הנתון נבנה כ«מישור {{ids}} אנך לישר {{line}}».",
     "lineRelNoun": "שימו לב: {{line}} הוא ישר, לא מישור — היחס נבנה מול הישר {{line}}.",
     "lineAutoNamed": "השם {{requested}} כבר תפוס בציור, ולכן ישר החיתוך נקרא {{assigned}}.",
-    "vectorNamedBare": "\"{{from}}{{to}} = {{name}}\" נקרא כווקטור: {{name}} הוא שם הווקטור {{from}}{{to}}. אם התכוונתם לאורך, כתבו במקום זה \"|{{from}}{{to}}| = {{name}}\".",
+    "vectorNamedBare": "«{{sentence}}» נקרא כווקטור: {{name}} הוא שם הווקטור {{pair}}. אם התכוונתם לאורך, כתבו במקום זה «{{taught}}».",
     "alreadyKnown": "{{statement}} — נכון ואומת ✓, אך {{why}}, כך שהנתון אינו מוסיף מידע חדש.",
     "stated": {
       "shape": "{{a}} {{shape}}",

@@ -30,6 +30,7 @@ import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
+import { bareNamingSlots } from './engine/notices';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
@@ -835,7 +836,7 @@ export default function App3() {
                   : n.kind === 'line-auto-named'
                     ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
                   : n.kind === 'vector-named-bare' // #2092 (ADR-3D-381): the reading a bare «AB = k» got, and the length spelling
-                    ? t('notice.vectorNamedBare', { name: n.name, from: n.from, to: n.to })
+                    ? t('notice.vectorNamedBare', bareNamingSlots(n))
                     : n.kind === 'already-known'
                       ? /* #853 (ADR-3D-209): ONE template for «true, and already known» — the
                            statement in the student's own wording, then why it follows. The four

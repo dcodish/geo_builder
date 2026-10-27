@@ -14,7 +14,7 @@ import i18n3d from '../i18n';
 import { derive3, useGeo3 } from '../store/store3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
-import type { BuildNotice3 } from '../engine/notices';
+import { bareNamingSlots, type BuildNotice3 } from '../engine/notices';
 
 const BOX = "תיבה ABCDA'B'C'D'";
 const st = () => useGeo3.getState();
@@ -34,7 +34,7 @@ function build(lines: string[]) {
 const bareNotes = (n: readonly BuildNotice3[]) => n.filter((x) => x.kind === 'vector-named-bare');
 /** The rendered note, bidi isolates stripped (i18n wraps each interpolated value in one). */
 const noteText = (n: Extract<BuildNotice3, { kind: 'vector-named-bare' }>, lng: 'he' | 'en') =>
-  (i18n3d.t('notice.vectorNamedBare', { name: n.name, from: n.from, to: n.to, lng }) as string).replace(/[⁦-⁩]/g, '');
+  (i18n3d.t('notice.vectorNamedBare', { ...bareNamingSlots(n), lng }) as string).replace(/[⁦-⁩]/g, '');
 const len = (d: ReturnType<typeof derive3>, a: string, b: string) => {
   const p = d.positions.get(a)!;
   const q = d.positions.get(b)!;
@@ -55,8 +55,8 @@ describe('#2092 — a bare «AB = k» keeps the vector reading and says so', () 
     expect(d.construction.vectors.get('k')).toMatchObject({ from: 'A', to: 'B' });
     const notes = bareNotes(d.notices);
     expect(notes).toEqual([{ kind: 'vector-named-bare', name: 'k', from: 'A', to: 'B' }]);
-    expect(noteText(notes[0] as never, 'he')).toBe('"AB = k" נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה "|AB| = k".');
-    expect(noteText(notes[0] as never, 'en')).toBe('"AB = k" is read as a vector: k is the name of the vector AB. If you meant a length, write "|AB| = k" instead.');
+    expect(noteText(notes[0] as never, 'he')).toBe('«AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה «|AB| = k».');
+    expect(noteText(notes[0] as never, 'en')).toBe('«AB = k» is read as a vector: k is the name of the vector AB. If you meant a length, write «|AB| = k» instead.');
   });
 
   it('every letter, the u, v, w convention included («AB = u»)', () => {
@@ -115,7 +115,7 @@ describe('#2092 — the taught remedy is accepted on the next Enter', () => {
   /** The spelling the note teaches, read out of the note itself (docs/17 §9: one source). */
   const taught = (d: ReturnType<typeof derive3>) => {
     const n = bareNotes(d.notices)[0] as Extract<BuildNotice3, { kind: 'vector-named-bare' }>;
-    return /"(\|[^"]+)"/.exec(noteText(n, 'he'))![1];
+    return /«(\|[^»]+)»/.exec(noteText(n, 'he'))![1];
   };
 
   it('typing the taught line after «AB = k» records the length too', () => {

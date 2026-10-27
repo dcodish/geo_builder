@@ -430,8 +430,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - Sources: ADR-3D-344; #2054, #2061, #2023 (operator rulings 2026-10-13, 2026-10-14).
 - **FR-VC-2f (Must)** — **A bare «AB = k» names a vector and SAYS so; a length given as a letter is written
   «|AB| = k».** Without «נסמן», «AB = k» (any lowercase letter, «AB = u» included, on any host) keeps the vector
-  reading — AB is named k — and the figure shows the note «"AB = k" נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם
-  לאורך, כתבו במקום זה "|AB| = k".» for as long as the line stands. «נסמן: AB = k» says "denote" and shows nothing.
+  reading — AB is named k — and the figure shows the note ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם
+  לאורך, כתבו במקום זה «|AB| = k».» for as long as the line stands. «נסמן: AB = k» says "denote" and shows nothing.
   «|AB| = k» («|AB|=k», «|AB| = 2k») is a stated length named by a letter: AB wears «k» («2k») on the canvas and its
   length stays free ([ADR-052](06-decisions.md#adr-052)) until a value lands on the letter («k = 3» → |AB| = 3, the
   label reads «3»; with «2k», 6). The same letter on two segments relates them («|AB| = k» · «|AD| = k» → equal;
