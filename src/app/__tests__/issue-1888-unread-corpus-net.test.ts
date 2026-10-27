@@ -101,5 +101,8 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     expect(withNumber, 'the number member met real stated numbers').toBeGreaterThanOrEqual(200);
     // #2532: measured at pickup (045a8546) 17 of 2056 committed steps hold a through-phrase opener
     expect(withThrough, 'the incidence-phrase member met real through-phrases').toBeGreaterThanOrEqual(15);
+    // #2545: measured at pickup (d9494206 + the fix) 1 of 2093 committed steps names a circle by its relation in argument
+    // position — the member is exercised on the corpus, and the class lines live in issue-2545-ring-circle-reference.test.ts
+    expect(withRingRole, 'the relation member met a real relation-named circle').toBeGreaterThanOrEqual(1);
   }, 600_000);
 });

@@ -25,7 +25,7 @@
  */
 import { augmentParseCtx, parse } from '@/parser';
 import type { ParseContext } from '@/parser';
-import { plainCircle, replaceSpans, resolveRingSpan, ringOf, ringRoleSpans, letteredCircle, type RingSpan } from '@/parser/ringRoles';
+import { declarationLine as declaration, namedRing, plainCircle, replaceSpans, resolveRingSpan, ringOf, ringRoleSpans, letteredCircle, type RingSpan } from '@/parser/ringRoles';
 import type { AnyCommand } from '@/engine';
 import { loweringKey } from './unreadParts';
 
@@ -47,28 +47,6 @@ export function unreadRingRole(utterance: string, commands: readonly AnyCommand[
     return r.ok && r.commands.length > 0 && loweringKey(r.commands) === lowering;
   });
   return unread.length ? { unread, items: unread.map((sp) => sp.text.trim()) } : null;
-}
-
-const NOUN_HE: Record<number, string> = { 3: 'משולש', 4: 'מרובע' };
-const NOUN_EN: Record<number, string> = { 3: 'triangle', 4: 'quadrilateral' };
-
-/** The line that declares the described circle on `ring`, in the student's language. */
-function declaration(sp: RingSpan, letter: string, ring: readonly string[]): string | null {
-  const he = NOUN_HE[ring.length];
-  const en = NOUN_EN[ring.length];
-  if (!he || !en) return null;
-  const r = ring.join('');
-  if (sp.lang === 'he') return sp.relation === 'circum' ? `מעגל ${letter} חוסם את ${he} ${r}` : `מעגל ${letter} חסום ב${he} ${r}`;
-  return sp.relation === 'circum' ? `circle ${letter} circumscribes ${en} ${r}` : `circle ${letter} is inscribed in ${en} ${r}`;
-}
-
-/** The span naming the ring explicitly — the example a which-polygon question teaches. */
-function namedRing(sp: RingSpan, ring: readonly string[]): string {
-  const r = ring.join('');
-  const he = NOUN_HE[ring.length] ?? 'מצולע';
-  const en = NOUN_EN[ring.length] ?? 'polygon';
-  if (sp.lang === 'he') return `${plainCircle(sp)} ${sp.relation === 'circum' ? 'החוסם את' : 'החסום ב'}${sp.relation === 'circum' ? ' ' : ''}${he} ${r}`;
-  return `${sp.pre} the circle ${sp.relation === 'circum' ? 'circumscribing' : 'inscribed in'} ${en} ${r}`;
 }
 
 /** A centre letter nothing on the figure or in the line uses. */
