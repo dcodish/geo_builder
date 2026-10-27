@@ -674,6 +674,11 @@ export function describeConstraint(con: Constraint): string {
       if (con.radii) return `radius(${con.radii.c1}) = ${con.k} · radius(${con.radii.c2})`;
       return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'length-radius':
+      // #2499 (ADR-766): k = 1 is a circle MEMBERSHIP — |centre·P| equals the radius measured through the witness
+      // member — so it is described as that equality of two named lengths (`|CB| = |CA|`), never as an `R` the
+      // student never wrote (ADR-W-130's provenance check sends `1·R` to the floor). A hidden witness still fails
+      // provenance there, exactly as before.
+      if (con.k === 1 && !con.add && con.witness !== con.b) return `|${con.a}${con.b}| = |${con.center}${con.witness}|`;
       return `|${con.a}${con.b}| = ${con.k}·R${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'angle-ratio':
       return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
