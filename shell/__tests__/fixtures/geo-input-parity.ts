@@ -292,6 +292,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
 
+  '#2560': 'open', // #2545 (ADR-768 / ADR-AG-335): 2-D refuses a relation-named circle the figure lacks; analytic hands it to the model (R124) — creating it is the open question
   '#2547': 'open', // #2532 (ADR-765): analytic hands a through-clause chord to the model where 2-D refuses — the interim question; #2541 reads it in both
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
@@ -1809,6 +1810,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
   // ── #2512 (ADR-762 / ADR-AG-333): a second triangle around one circle is its own triangle ──
   { id: 'second-ring-around-circle-2512', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'], expect: 'builds', exception: 'X8', note: '2-D drew DEF exactly on ABC, green, before ADR-762; analytic refused it «polygon-collapsed» before ADR-AG-333' },
+  // ── #2545 (ADR-768 / ADR-AG-335): a circle named by its relation to a polygon binds the described circle, or the line is refused ──
+  { id: 'ring-circle-ref-2545-01', family: 'chords-arcs', steps: ['משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D drew a free circle missing A, B, C, green, before ADR-768; analytic answers not-handled (the model, R124) — whether the circle is created is #2560' },
+  { id: 'ring-circle-ref-2545-02', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O חוסם את משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'builds', exception: 'X8', note: 'D, E on the circumcircle in both builders; analytic answered not-handled before ADR-AG-335' },
+  { id: 'ring-circle-ref-2545-03', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל I חסום במשולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D put D, E on the INCIRCLE, green, before ADR-768; analytic answers not-handled (the model)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -13786,3 +13786,16 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts` (the report and seven spellings, the other direction and circle, value-first rows, the ratio rows in both orders, the ghost-symbol refusals, the contradiction in both orders, the ghost DOF for five letters, controls, stability, the M2 single-seam guard); fixture `issue-2521-radius-letter-binds.analytic.json`; parity rows `radius-letters-order-then-value-2521`, `radius-letters-value-then-order-2521`, `radius-letter-value-then-ratio-2521`, `radius-letter-value-then-bound-2521` (X8).
 
 **Behaviour change for a student:** after «R > r», stating circle P's radius as 9 draws circle O larger than 9 (it was drawn smaller, green); the radius may be stated before «R > r» (it was refused); «רדיוס מעגל P הוא 3» then «R = 2r» draws O at 6 (it was not understood); «r < 5» after P's radius 9 is refused (it was accepted); «R > r» · «רדיוס O הוא 5» · «רדיוס P הוא 9» refuses the last line with the existing «הערך במשפט … אינו אפשרי כאן» message (it was accepted green — 2-D accepts it with an amber warning; #2527 asks which is right).
+
+## ADR-AG-335 — The bare «המעגל החוסם / החסום» reads the figure's one polygon's described circle when it is drawn (#2545, the ADR-W-157 port of ADR-768)
+
+**Status:** accepted · 2026-10-27 · bug port (2-D's [ADR-768](06-decisions.md#adr-768)), fix round #2561, stream B · branch `fix/2545-ring-role-reader` · **extends** [ADR-AG-203](#adr-ag-203) (the described-circle fold, now without a typed ring). LADDER stage: none (the frame's fold and M1).
+**Requirements:** [02c](02c-requirements-analytic.md) R139 amendment · **Design:** [04c](04c-design-analytic.md) § "A circle named by its ring" (the letterless name)
+
+**Measured before** (d9494206, `decideSubmit` → `derive`): every bare row (R1, R2, R5, R6, K1–K4b, K7–K11c, K12, E1–E7) was `not-handled`, handed to the model; the lettered rows recorded correctly (ADR-AG-203 / ADR-AG-210); and the controls 2-D binds — «מעגל O חוסם את משולש ABC» · «DE מיתר במעגל החוסם», «משולש ABC חסום במעגל» · «…החוסם [את המשולש]», the incircle «…החסום» — were `not-handled` too.
+
+**Decision.** The frame folds an argument-position relation with no ring typed to the letterless name «⊙◌» / «○◌» (+ the noun's size: «⊙◌3»), `names.ts` `letterlessCircleName`, read by every circle-name slot (`DESCRIBED_CIRCLE_ALT`). M1's `describedCircle` reads it as the figure's one polygon (of that size) and binds its described circle only when that circle is the figure's ONE circle — 2-D's rule. `statingNamedCircle` never creates it, and `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict the line had before, field for field: creating the circle, or choosing between two, is #2560.
+
+**Measured after:** C1, C2, C2b, C8 record with D, E on the described circle at 24 seeds; every other row of the plan's matrix is byte-identical to d9494206 (the bare-absent rows keep `not-handled`; the lettered rows record as before). Parity: `ring-circle-ref-2545-02` builds in both builders; `-01` / `-03` are analytic known gaps on #2560 (2-D refuses, analytic hands to the model).
+
+**Lock.** `src-analytic/__tests__/issue-2545-ring-circle-ref.test.ts`.

@@ -445,6 +445,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
 - Sources: ADR-AG-203, #1659, #1665, #1663.
 
+**R139 amendment — the same circle with no ring typed** (2-D's FR-EN-3d, ADR-W-157). «DE מיתר במעגל החוסם», «P על המעגל החסום במשולש», "DE is a chord of the circumcircle" name the figure's one polygon's described circle, and record on it when it is drawn and is the figure's one circle. Otherwise the line keeps its hand-off to the model (R124), where 2-D refuses it: whether the circle is created is #2560.
+- after «משולש ABC» · «מעגל O חוסם את משולש ABC»: «DE מיתר במעגל החוסם» → D, E on circle O
+- Sources: ADR-AG-335, #2545.
+
 **R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn. Every circle the tool drew («נתון מעגל», «שני מעגלים», a touch's) takes a later «משוואת המעגל (O) היא …», keeping what was already stated about it (ADR-AG-322).
 - after «A(3,4)» on x²+y²=25: «AB קוטר במעגל» → B at (−3,−4)
 - Sources: ADR-AG-204, #1669, #1670.
