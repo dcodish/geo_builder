@@ -3720,6 +3720,12 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   // «הישר l משיק למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה» — the same common tangent, its line named l (#2392).
   const namedTangent = namedCommonTangent(g, line);
   if (namedTangent) return namedTangent;
+  // «משיק משותף חיצוני לשני המעגלים» · «הישר l משיק משותף חיצוני …» — the same tangent, its touches the tool's (#2553).
+  const unnamedTangent = unnamedCommonTangent(g, line);
+  if (unnamedTangent) return unnamedTangent;
+  // «P נקודת ההשקה של l2 עם מעגל O_1» — the touch point of a tangent the figure has, named (#2553).
+  const touchName = namedTouchPoint(g, line);
+  if (touchName) return touchName;
   // «כל המשיקים המשותפים לשני המעגלים», «המשיק העובר בנקודה המשותפת לשני המעגלים» — the set and the touch tangent (#2390).
   const tangentSet = commonTangentSet(g, line);
   if (tangentSet) return tangentSet;
@@ -6734,10 +6740,10 @@ const THROUGH_FREE_EN = new RegExp(
  * line-first tangency of `parseCircleAt` («הישר l1 משיק למעגל M»), which would refuse the line it does not yet have.
  */
 const NAMED_TANGENT_HE = new RegExp(
-  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק\\s+(ל.+?)\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})(?:\\s*,?\\s+בהתאמה)?$`,
+  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק(?:\\s+משותף)?(?:\\s+(חיצוני|פנימי|אלכסוני))?(?:\\s+משותף)?\\s+(ל.+?)\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})(?:\\s*,?\\s+בהתאמה)?$`,
 );
 const NAMED_TANGENT_EN = new RegExp(
-  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+(?:a\\s+)?tangent\\s+((?:to|of)\\s+.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})(?:\\s*,?\\s+respectively)?$`,
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+(?:(?:a|an|the)\\s+)?(?:(external|exterior|internal|interior|transverse)\\s+)?(?:common\\s+)?tangent\\s+((?:to|of)\\s+.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})(?:\\s*,?\\s+respectively)?$`,
   'i',
 );
 const NAMED_TANGENT_SPLIT_HE = new RegExp(
@@ -6756,11 +6762,65 @@ function namedCommonTangent(g: string, line: string): RuleOutcome {
   }
   const m = NAMED_TANGENT_HE.exec(g) ?? NAMED_TANGENT_EN.exec(g);
   if (!m) return null;
-  const [, name, target, p, q] = m;
+  const [, name, kindWord, target, p, q] = m;
   const slots = twoCircleSlots(target);
   if (!slots) return null;
   if (p === q) return refuse('repeated-vertex', line);
-  return aboutCircles(slots, commonTangentFacts(p, q, SLOT1, SLOT2, undefined, line, name), line);
+  // «הישר l משיק משותף חיצוני למעגלים … בהתאמה» — the stated kind rides the same tangent (#2553, ADR-AG-337).
+  const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
+  return aboutCircles(slots, commonTangentFacts(p, q, SLOT1, SLOT2, kind, line, name), line);
+}
+
+/**
+ * «משיק (משותף) חיצוני (משותף) לשני המעגלים» · «המשיק המשותף למעגלים O ו-P» · «הישר l משיק משותף חיצוני לשני המעגלים» ·
+ * "an external common tangent to the two circles" · "the line l is an external common tangent of the two circles" — A
+ * COMMON TANGENT THE SENTENCE DOES NOT LETTER (#2553, ADR-AG-337; 2-D's label-less «משיק משותף [חיצוני]», measured at
+ * d9494206). The same `common-tangent` as «AB משיק משותף …» (ADR-AG-313's lowering, no new geometry): its touches are the
+ * tool's letters, 2-D's `autoVertexLabels` (`TOOL_LETTERS.vertex` — A, B, the next free letters, line-scoped so a
+ * second such sentence is a second tangent, C, D, as in 2-D), and its line is named by the sentence («הישר l») or by its
+ * touches. «משותף» or a kind word is required, as in 2-D: «הישר l משיק לשני המעגלים» keeps its reading.
+ */
+const UNNAMED_TANGENT_HE = new RegExp(
+  `^(?:ה?ישר\\s+(${FREE_LINE_NAME})\\s+(?:הוא\\s+)?)?ה?משיק(\\s+ה?משותף)?(?:\\s+ה?(חיצוני|פנימי|אלכסוני))?(\\s+ה?משותף)?\\s+(ל.+)$`,
+);
+const UNNAMED_TANGENT_EN = new RegExp(
+  `^(?:(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+)?(?:(?:a|an|the)\\s+)?(?:(external|exterior|internal|interior|transverse)\\s+)?(common\\s+)?tangent\\s+((?:to|of)\\s+.+)$`,
+  'i',
+);
+function unnamedCommonTangent(g: string, line: string): RuleOutcome {
+  const he = UNNAMED_TANGENT_HE.exec(g);
+  const en = he ? null : UNNAMED_TANGENT_EN.exec(g);
+  if (!he && !en) return null;
+  const [name, common, kindWord, target] = he ? [he[1], he[2] ?? he[4], he[3], he[5]] : [en![1], en![3], en![2], en![4]];
+  if (!common && !kindWord) return null;
+  const slots = twoCircleSlots(target);
+  if (!slots) return null;
+  const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
+  const [a, b] = [toolPoint('vertex', 'common-tangent-1'), toolPoint('vertex', 'common-tangent-2')];
+  return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line, name), line);
+}
+
+/**
+ * «P נקודת ההשקה של l2 עם מעגל O_1» · «P היא נקודת ההשקה של הישר l2 עם המעגל» · «נקודת ההשקה של l2 ומעגל O_1 היא P» ·
+ * "P is the point of tangency of l2 with circle O_1" — THE TOUCH POINT OF A LINE AND A CIRCLE, NAMED (#2553, ADR-AG-337;
+ * the exam's ד, after «כל המשיקים המשותפים»). The inverse of «הישר l2 משיק למעגל O_1 בנקודה P», and read as exactly that
+ * sentence: P on the circle, on the line, the radius ⟂ the line there — so on a line the figure already draws tangent,
+ * P is its touch point, and the rule that owns the tangency owns every refusal (a line the figure lacks, a name clash).
+ */
+const TOUCH_NOUN_HE = 'נקודת\\s+(?:ה)?(?:השקה|מגע)';
+const TOUCH_OF_HE = `של\\s+(?:ה?ישר\\s+)?(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:עם\\s+|ו-?)ה?מעגל(?:\\s+(${NAME}))?`;
+const TOUCH_NAME_HE = new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:היא|הינה)\\s+)?${TOUCH_NOUN_HE}\\s+${TOUCH_OF_HE}$`);
+const TOUCH_NAME_HE_LAST = new RegExp(`^${TOUCH_NOUN_HE}\\s+${TOUCH_OF_HE}\\s+(?:היא\\s+(?:ה?נקודה\\s+)?)?(${NAME})$`);
+const TOUCH_NAME_EN = new RegExp(
+  `^(?:(?:the\\s+)?point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:point\\s+of\\s+(?:tangency|contact)|(?:touch(?:ing)?|tangency|contact)\\s+point)\\s+of\\s+(?:(?:the\\s+)?line\\s+)?(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:with|and)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?$`,
+  'i',
+);
+function namedTouchPoint(g: string, line: string): RuleOutcome {
+  const last = TOUCH_NAME_HE_LAST.exec(g);
+  const m = last ? [last[3], last[1], last[2]] : (TOUCH_NAME_HE.exec(g) ?? TOUCH_NAME_EN.exec(g))?.slice(1, 4);
+  if (!m) return null;
+  const [p, l, o] = m;
+  return viaCanonical(line, null, () => [`הישר ${l} משיק למעגל${o ? ` ${o}` : ''} בנקודה ${p}`]);
 }
 
 /**

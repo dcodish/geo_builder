@@ -895,6 +895,16 @@ sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
 
 *Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
 
+**The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
+`unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,
+and lowers to the same `commonTangentFacts` as «AB משיק משותף …» (ADR-AG-313) with the touches as `toolPoint('vertex', …)`
+placeholders (line-scoped, so a second sentence mints C, D). «משותף» or a kind word is required. `NAMED_TANGENT_HE/EN` take
+an optional kind. The definition clause «ש(שני) המעגלים נמצאים באותו צד / מצדדים שונים שלו» is folded into the kind word by
+`foldTangentSide` at `orthography` (`frameAnalytic.ts`, copied from 2-D's `src/parser/tangentSide.ts`, which `normalizeUtterance` calls). `namedTouchPoint` reads
+«X נקודת ההשקה של <line> עם (ה)מעגל <ref>» through `viaCanonical` as «הישר <line> משיק למעגל <ref> בנקודה X».
+
+*Identifiers:* `unnamedCommonTangent` · `UNNAMED_TANGENT_HE` · `UNNAMED_TANGENT_EN` · `namedTouchPoint` · `TOUCH_NAME_HE` · `TOUCH_NAME_HE_LAST` · `TOUCH_NAME_EN` · `foldTangentSide`
+
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
 Every spelling lowers to the canonical crossing of two tangent nouns (`readTangentNoun`, `tangentsMeet`,
