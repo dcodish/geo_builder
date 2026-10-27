@@ -461,6 +461,8 @@ export function pointAt(figure: Figure, x: number, y: number): string | null {
 export function centresOf(figure: Figure, letter: string): Namable[] {
   const out: Namable[] = [];
   const circles = figure.curves.filter((cu) => cu.stated && cu.curve.kind === 'circle');
+  /** The contextual sentence, which binds to the figure's ONE circle (`centre-of`) — one spelling for every lone-circle branch below. */
+  const contextual = `${letter} מרכז המעגל`;
   for (const cu of figure.curves) {
     if (!cu.stated) continue;
     const circle = cu.curve as { kind: string; cx?: number; cy?: number };
@@ -481,7 +483,7 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
       continue;
     }
     if (!numeralKey(cu.id) && circles.length === 1 && cu.id.startsWith('circle-thru-')) {
-      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל`, centreOf: cu.id });
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: contextual, centreOf: cu.id });
       continue;
     }
     /**
@@ -507,7 +509,7 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
      * restrict it to. Placed after the ring forms, so a circle that already had a sentence keeps it.
      */
     if (!numeralKey(cu.id) && circles.length === 1) {
-      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל`, centreOf: cu.id });
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: contextual, centreOf: cu.id });
       continue;
     }
 
