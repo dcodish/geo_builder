@@ -14,12 +14,17 @@ import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { fmtAnalytic } from '../format';
+import { SOLVE_RESOLUTION } from '../engine/solve';
 import summerB from './fixtures/exam-2024sB-locus-1138.analytic.json';
 import winter from './fixtures/exam-2024w-locus-1138.analytic.json';
 import winterParam from './fixtures/exam-2024w-locus-param-1138.analytic.json';
 
 type P = { x: number; y: number };
-const EPS = 1e-6;
+/**
+ * A CLOSED bound holds ON its value at the figure's resolution (#2230's band, ADR-AG-291): SOLVE_RESOLUTION × the figure's
+ * span, which is at most 4 here. The trace's refined ends may sit inside that band, never past it.
+ */
+const BAND = 4 * SOLVE_RESOLUTION;
 
 /** Submit `seq` line by line through the real decision; every line must record. */
 function built(seq: readonly string[]): string[] {
@@ -59,14 +64,14 @@ describe('#1138 lock 3 — a sweep range on a free point bounds the trace, never
       expect(d.faults).toEqual([]);
       expect(d.figure.carrierDof).toBe(1);
       const ys = [0, 1, 2, 3, 4, 5].map((s) => derive(lines, s).figure.points.find((p) => p.id === 'A')!.y);
-      for (const y of ys) expect(Math.abs(y)).toBeLessThanOrEqual(1.5 + EPS);
+      for (const y of ys) expect(Math.abs(y)).toBeLessThanOrEqual(1.5 + BAND);
       expect(new Set(ys.map((y) => y.toFixed(6))).size).toBeGreaterThan(1);
       const a = locus(lines, 'A');
       expect(a.value).toBe('circle · x² + y² = 2²');
       const pts = drawn(a);
       expect(pts.length).toBeGreaterThan(10);
       for (const p of pts) {
-        expect(Math.abs(p.y)).toBeLessThanOrEqual(1.5 + 1e-3);
+        expect(Math.abs(p.y)).toBeLessThanOrEqual(1.5 + BAND);
         expect(Math.abs(Math.hypot(p.x, p.y) - 2)).toBeLessThan(1e-6);
       }
       expect(pts.some((p) => p.x > 1)).toBe(true);
@@ -140,8 +145,14 @@ describe('#1138 — the carrier sentence «A נקודה (כלשהי) על …» 
     expect(derive(seg, 0).figure.carrierDof).toBe(1);
     expect(locus(built(['P היא נקודה על הישר y = x']), 'P').value).toBe('line · x - y = 0');
   });
-  it('a tail that is not a range declines the whole line rather than being absorbed', () => {
-    expect(lastVerdict(['A נקודה כלשהי על המעגל x^2 + y^2 = 4 כך ש-AB = 3']).kind).toBe('refused');
+  it('a tail that is not a range is left to the condition frame: «… כך ש-AB = 3» keeps both halves', () => {
+    const lines = built(['A נקודה כלשהי על המעגל x^2 + y^2 = 4 כך ש-AB = 3']);
+    const d = derive(lines, 0);
+    expect(d.faults).toEqual([]);
+    const a = d.figure.points.find((p) => p.id === 'A')!;
+    const b = d.figure.points.find((p) => p.id === 'B')!;
+    expect(Math.hypot(a.x, a.y)).toBeCloseTo(2, 6);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(3, 6);
   });
 });
 

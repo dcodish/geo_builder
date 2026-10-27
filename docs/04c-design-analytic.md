@@ -1584,7 +1584,7 @@ holds `points` and `pieces`, and only the pieces are drawn.
 D7's kinds 2 and 3 are one lowering on a point coordinate: `compareSymbolic` reads `atom op value`, `value op atom`
 and the window, and each end is a `coord-compare` selector (`closed` for ≤ / ≥). No DOF is consumed; the judged walk
 above clips the trace. `parseCarrierPoint` lowers «A נקודה (כלשהי) על …» through the incidence, with an optional
-range tail that must read as selectors only.
+range tail read here only when it is selectors (any other tail is the condition frame's).
 
 *Identifiers:* `coordSide` · `closed`
 

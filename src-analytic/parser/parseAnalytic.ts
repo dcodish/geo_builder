@@ -9073,8 +9073,8 @@ function parseDistinct(line: string): RuleOutcome {
  * that A is a point — which the incidence already makes it — so the sentence is the incidence «A על …» and is lowered
  * through it (2-D reads «P נקודה על הצלע AB» and «P נקודה כלשהי על המעגל» as its point-on sentence, measured at
  * `d9494206`). «המעגל» alone is the incidence's own contextual operand (#1429): it resolves when the figure has exactly one
- * circle. The tail is a RANGE on the point (D7's kind 3) and must read as selectors only — anything else declines the
- * whole line rather than being absorbed into it.
+ * circle. A tail that is a RANGE on the point (D7's kind 3) is read here; any other tail declines this rule and is left to
+ * the condition frame («… כך ש-AB = 3» keeps both halves).
  */
 const CARRIER_POINT_HE = new RegExp(
   `^${HE_GIVEN}(${NAME})\\s+(?:(?:היא|הינה|הוא|הינו)\\s+)?נקודה(?:\\s+כלשהי)?\\s+((?:נמצאת\\s+)?על\\s+.+?)(?:\\s+כך\\s+ש-?\\s*(.+))?$`,

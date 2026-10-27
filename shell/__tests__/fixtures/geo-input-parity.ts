@@ -309,6 +309,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
   '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
+  '#2570': 'open', // #1138 (ADR-AG-340): 3-D does not read «P נקודה על הצלע AB» (the predicate noun before an incidence)
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
@@ -1769,7 +1770,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#2415' }, { product: '3d', issue: '#2420' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
   { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2420' }], note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
   // ── #1138 (ADR-AG-340): «P נקודה (כלשהי) על …» is the incidence — 2-D reads both, analytic did not ──
-  { id: 'point-noun-on-side-1138', family: 'points-incidence', steps: ['משולש ABC', 'P נקודה על הצלע AB'], expect: 'builds' },
+  { id: 'point-noun-on-side-1138', family: 'points-incidence', steps: ['משולש ABC', 'P נקודה על הצלע AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2570' }] },
   { id: 'point-noun-any-on-circle-1138', family: 'circles', steps: ['מעגל O', 'P נקודה כלשהי על המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'two-tangents-meet-2391', family: 'tangents', steps: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C', 'שני המשיקים נחתכים בנקודה D'], expect: 'builds', exception: 'X8' },
   { id: 'centres-distance-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'המרחק בין מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
