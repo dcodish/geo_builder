@@ -7778,9 +7778,14 @@ const tangentialRingAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): 
     ...t.map((ti): AnyCommand => ({ type: 'tangent', id: `tan-${ti}`, circle: circ, at: ti })),
     ...v.map((vi, i): AnyCommand => ({ type: 'line-intersection', id: vi, line1: `tan-${t[i]}`, line2: `tan-${t[(i + 1) % n]}` })),
   );
-  if (n === 3) return [...cmds, { type: 'triangle', ids: [v[0], v[1], v[2]] }];
-  if (variant.length) return [...cmds, ...variant];
-  return [...cmds, { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(declaredAs !== 'quadrilateral' ? { declaredAs } : {}) }, ...relations];
+  // #2538 ([ADR-763](docs/06-decisions.md#adr-763)): «חוסם» is the INCIRCLE — every side touches the circle WITHIN the
+  // side, the one encoding of "tangent to a side" (`tangentLine`'s `set-line [a, F, b]`, ADR-077). Side v[i]v[i+1] lies
+  // on tan(t[i+1]), so the touch is collinear by construction and only its ORDER is stated (`structural`). Without it the
+  // touch angles could leave the incircle configuration and the circle was drawn OUTSIDE the ring, green.
+  const within = v.map((vi, i): AnyCommand => ({ type: 'set-line', points: [vi, t[(i + 1) % n], v[(i + 1) % n]], structural: true }));
+  if (n === 3) return [...cmds, { type: 'triangle', ids: [v[0], v[1], v[2]] }, ...within];
+  if (variant.length) return [...cmds, ...variant, ...within];
+  return [...cmds, { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(declaredAs !== 'quadrilateral' ? { declaredAs } : {}) }, ...relations, ...within];
 };
 /** The golden angle — successive rings around one circle start on well-spread touch angles. */
 const GOLDEN_TURN = Math.PI * (3 - Math.sqrt(5));
@@ -7824,6 +7829,10 @@ const incircleConstruction = (v: Id[], I: Id, autoCenter: boolean, foot: (e: num
       cmds.push({ type: 'point-on-circle', id: f, circle: circleId(I) }); // a non-auto edge → force tangency (flex to tangential)
     }
   }
+  // #2538 ([ADR-763](../../docs/06-decisions.md#adr-763)): every touch lies WITHIN its side, the one encoding of "tangent to
+  // a side". A foot is on the side's LINE by construction, so only the order is stated (`structural`); without it a forced
+  // foot slid off its side as the solver flattened a corner, and the circle touched only the side's extension, green.
+  for (let e = 0; e < n; e++) cmds.push({ type: 'set-line', points: [v[e], foot(e), v[(e + 1) % n]], structural: true } as AnyCommand);
   return cmds.map((c) => ({ ...c, ...extra }) as AnyCommand);
 };
 

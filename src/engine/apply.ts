@@ -3151,7 +3151,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         const created = ensureCollinearRiders(objects, pts);
         addObj(objects, segment(pts[0], pts[pts.length - 1]));
         const anchors = pts.filter((p) => !created.has(p));
-        for (let i = 2; i < anchors.length; i++) addCollinear(objects, constraints, anchors[i], anchors[0], anchors[1]);
+        // #2538 (WIP, escalated): a STRUCTURAL line is collinear by construction; only the order is stated.
+        if (!cmd.structural) for (let i = 2; i < anchors.length; i++) addCollinear(objects, constraints, anchors[i], anchors[0], anchors[1]);
         if (pts.length >= 3) {
           addCollinearOrder(objects, constraints, pts);
           // #402: a JUST-CREATED rider satisfies the stated order BY CONSTRUCTION (its default t
