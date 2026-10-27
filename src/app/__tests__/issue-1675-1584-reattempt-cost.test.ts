@@ -107,8 +107,9 @@ describe('#1584 — the refusals the round measured, bounded', () => {
     // #2499 (ADR-766): the quarter's first sub-step («A על המעגל», A carrying |AC| = 15) used to be refused FALSELY —
     // A alone fits a circle of radius 15 — and that sub-step supplied the reason «|AC| = 15». With the earlier given
     // re-homed to the free radius it builds, and the line is refused where it really fails: B on the same circle
-    // against «BC=10» (the same partner, #3), reason the quarter's own |CB| = R.
-    expect(cold.note).toMatch(/cannot hold \[vs #3\]/);
+    // against «BC=10» (the same partner, #3), reason the quarter's own membership |CB| = |CA| — described as the
+    // equality of two named lengths, never as an unstated `1·R` that ADR-W-130's provenance check sends to the floor.
+    expect(cold.note).toMatch(/\|CB\| = \|CA\| cannot hold \[vs #3\]/);
     expect(warm.note).toBe(cold.note);
     // The plan aimed at ~2.5M; the re-attempt cap cannot sit below the most expensive SUCCESSFUL re-attempt the
     // calibration sweep measured (511k), so two cut re-attempts at 750k each remain (ADR-583, measured 3.03M).
@@ -116,6 +117,8 @@ describe('#1584 — the refusals the round measured, bounded', () => {
     // ADR-766 (#2499): each reading now reaches the sub-step that genuinely fails, whose ordinary failure ladder runs
     // there (measured 3,116,119 → 6,820,794; the other order «רבע מעגל ACB · AC=15 · BC=10» already paid 4.74M).
     // The re-attempt multiplier this lock bounds is unchanged: the warm run is equal or cheaper.
+    // The bound 3.2M → 7.2M is the operator's ruling D6 = A (2026-10-26, on #2499): "accept the cost and ship now",
+    // an explicit exception to the #1874 no-slowdown ruling (2026-10-08), scoped to this fix and this lock ONLY.
     expect(cold.executed).toBeLessThanOrEqual(7_200_000);
   }, 240_000);
 

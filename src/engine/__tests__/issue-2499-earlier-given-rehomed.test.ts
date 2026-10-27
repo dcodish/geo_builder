@@ -23,6 +23,13 @@ import { replay, useGeoStore } from '@/store/geoStore';
 import { applyStep, emptyConstruction } from '../step';
 import { freeDofs } from '../sample';
 import type { Command, Construction } from '../types';
+import { describeConstraint } from '../solve';
+import i18n from '@/i18n';
+import { humanizeError, type Translate } from '@/i18n/humanizeError';
+import { otherUtteranceForError } from '@/app/errorSubject';
+import { stripFormatControls } from '../../../shell/bidi';
+
+const he: Translate = (k, o) => i18n.t(k, { ...o, lng: 'he' }) as string;
 
 beforeEach(() => {
   useGeoStore.getState().clear();
@@ -279,4 +286,33 @@ describe('#2499 — the ladder: the broken earlier given is re-homed at 2e, only
     expect(r.ok).toBe(false);
     expect(r.ladder ?? []).not.toContain('main:rehome');
   });
+});
+
+describe('#2499 — the refusal that now reaches its real failing sub-step names an honest reason', () => {
+  it('describeConstraint: a k = 1 membership |centre·P| = R reads as the equality of two named lengths', () => {
+    const membership = { type: 'length-radius', a: 'C', b: 'B', circle: 'circle-C', center: 'C', witness: 'A', k: 1 } as const;
+    expect(describeConstraint(membership)).toBe('|CB| = |CA|');
+    // A stated «AB = R» (a is not the centre) keeps its own k·R wording — only the membership shape is re-described.
+    expect(describeConstraint({ ...membership, a: 'A', b: 'B', witness: 'W' })).toBe('|AB| = 1·R');
+    expect(describeConstraint({ ...membership, k: 2 })).toBe('|CB| = 2·R');
+  });
+
+  it('#1584\'s quarter «ABC משולש ישר זוית · AC=15 · BC=10 · רבע מעגל ACB» is refused against «BC=10», reason |CB| = |CA|', async () => {
+    useGeoStore.getState().clear();
+    let said: string | null = null;
+    for (const line of ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל ACB']) {
+      const st = useGeoStore.getState();
+      const f = replay(st.facts, st.seed);
+      const v = await decideDeterministic2D({ facts: st.facts, seed: st.seed, view: { construction: f.construction, positions: f.positions } }, line, 'he');
+      if (v.kind === 'commit') {
+        const group = `g${st.facts.length}`;
+        for (const c of v.commands) useGeoStore.getState().execute(c, line, group);
+      }
+      const raw = v.kind === 'refuse' && v.note && 'explain' in v.note ? v.note.explain : null;
+      said = raw ? stripFormatControls(humanizeError(raw, he, line, otherUtteranceForError(st.facts, raw))) : null;
+    }
+    expect(said).toContain('«רבע מעגל ACB» סותר את «BC=10»');
+    expect(said).toContain('הסיבה: |CB| = |CA|');
+    expect(said).not.toContain('משהו השתבש');
+  }, 120_000);
 });
