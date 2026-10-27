@@ -19860,3 +19860,17 @@ This is ADR-603's own class, *"a stated part the winning reading never looks at 
 **Locks.** `src/app/__tests__/created-notice-1467.test.ts` (20: the shared §5c rows; twelve blank sentences commit green with their notice; «AB = 2 AD» at four seeds, moving; «AD:DB = 1:2»; «משולש ABC» · «AB = 2 AX» names only X; declarations and subjects silent; identity and the pure-reading gate; «מעגל O שרדיוסו R»; the text); fixtures `create-on-mention-{ratio,double,typo}-1467.geo.json`. **⚠ Locks rewritten:** `issue-1720-cevian-triangle` (two: the cevians now commit), `issue-960-submit-gate-driver` (T6 «DE = x» commits), `catalog-fresh-figure` (28 allowlisted rows healed; 6 remain: «α < β», and two that name a circle the figure lacks — #2048). `shell/__tests__/created-notice-meta.test.ts` (the meta-lock).
 
 **Not in this ADR.** Circles named by a missing letter («G חיתוך מעגל O ומעגל P» still gets the split tip) and the cevian host drawing beyond its points are #2048; a row whose points a deletion removed stays red (#1411, #1467-d).
+
+## ADR-770 — A length given in a letter, a fraction or a root creates its endpoints: «OR=r» puts R on the circle (#2489 T34)
+
+**Status:** accepted · 2026-10-27 · feature (2-D) · fix round #2561, stream I · branch `feat/2489-mention-lines-planes` · the 2-D half of [ADR-W-163](06w-decisions-workspace.md#adr-w-163) · a member of [ADR-769](#adr-769)'s class, delivered by its mechanism with no code of its own
+
+**Operator:** T34 (2026-10-24) «מעגל O ברדיוס r» · «OR=r»: *"This should be accepted with dof. Only location for R is on the circle so a point that lins exists."*; #2048 ruling A.
+
+**Requirements:** [02](02-requirements.md) FR-EN-8 (ADR-769's clause covers it) · **Design:** none (internal) — ADR-769's `withImpliedPoints` reads a store-level measure by its own operands · **LADDER stage:** before stage 0 (ADR-769's pass)
+
+**Measured before** (`d9494206`): «OR=r», «RO=r», «OR=2r» and the English sentence after «מעגל O ברדיוס r» refused «|OR| = 1·R references an unknown point»; blank «AB = 35/2» / «AB = 12√2» likewise; blank «AB = k» / «AB = 3x» committed a label with nothing drawn.
+
+**Decision.** `measure-length` and its kin are read by their own `a`/`b` (their lowering needs the whole list's symbol table), so R is created as a bare point and the existing `length-radius` lowering puts it on circle O, the radius following R; «r = 5» then pins |OR| = 5. The radius symbol is never an operand («מעגל O שרדיוסו R» creates no point R).
+
+**Locks.** `src/app/__tests__/issue-2489-symbolic-length-points.test.ts` (11: four spellings with |OR| = r at seeds 0–3 and the notice naming R only; «r = 5»; «OR=2r»; four blank symbolic lengths); fixture `circle-radius-point-2489.geo.json`.

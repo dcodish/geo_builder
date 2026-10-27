@@ -7,7 +7,6 @@ import { exprPointIds, exprVectorNames } from './vecExpr';
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
-import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
@@ -695,19 +694,6 @@ function releaseParamToPivot(c: Construction3): Construction3 | null {
   for (const [name, def] of next.planes) {
     if ([def.cx, def.cy, def.cz, def.d].some((e) => e.p !== 0)) next.planes.set(name, { ...def, sym });
   }
-  return next;
-}
-
-/** #552 (the on-planes ruling-1 mirror): a relation or membership naming an UNDECLARED line CREATES
- *  it as a free line — bounded to the CONVENTION token (canonical `ℓ<digits?>`), which cannot collide
- *  with a point (uppercase), a plane (π…) or a vector (`[a-w]`), so no bare-symbol ambiguity exists.
- *  A non-convention name («k») still means "declare it first" — its kind is only ever stated by the
- *  noun, and a mistyped name must refuse, not conjure. Returns `c` untouched when nothing is created. */
-function withFreeLines(c: Construction3, names: string[]): Construction3 {
-  const create = [...new Set(names)].filter((n) => FREE_LINE_TOKEN.test(n) && !c.lines.has(n) && !c.pointLines.has(n));
-  if (create.length === 0) return c;
-  const next = clone(c);
-  for (const n of create) next.lines.set(n, { kind: 'free' });
   return next;
 }
 
@@ -2429,7 +2415,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, cmd.ids);
       if (missing) return { ok: false, error: missing };
       if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
-      const c2 = withFreeLines(c, [cmd.line]); // #552: «l ⊥ BCK» on an undeclared convention line creates it
+      const c2 = c; // #2489 (ADR-3D-383): a missing line is created by the fold's mint pass, as «ישר k» declares it
       if (!c2.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
       const next = clone(c2);
       // #383 (ADR-3D-109): the stated relation's point-run CARRIER is drawn (the ADR-3D-015 /
@@ -2449,7 +2435,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'line-rel': {
       // #552: BOTH sides may be undeclared convention lines («l1 ∥ l2» cold) — the subject and a
       // line-kind operand each auto-create; a later free line reads the earlier one's resolution.
-      const c2 = withFreeLines(c, [cmd.line, ...(cmd.op.kind === 'line' ? [cmd.op.name] : [])]);
+      const c2 = c; // #2489 (ADR-3D-383): a missing line on either side is created by the fold's mint pass
       const err = lineRelRefsError(c2, cmd.op, cmd.line);
       if (err) return { ok: false, error: err };
       const next = clone(c2);
@@ -2861,7 +2847,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'line-perp-plane': {
-      const c2 = withFreeLines(c, [cmd.line]); // #552: «l ⊥ π» on an undeclared convention line creates it
+      const c2 = c; // #2489 (ADR-3D-383): a missing line is created by the fold's mint pass
       if (!c2.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
       if (!c2.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       const next = clone(c2);
@@ -2886,10 +2872,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-line': {
-      // #552 (the on-planes shape exactly): a membership naming an undeclared convention line creates it
-      const c0 = withFreeLines(c, [cmd.line]);
-      if (!c0.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
-      c = c0;
+      // #2489 (ADR-3D-383): a membership naming a missing line — the fold's mint pass creates it, as «ישר k» does
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
       if (!c.points.has(cmd.id)) {
         // M1 dual (ADR-3D-031, the on-planes shape): a NEW id stated onto a named line is
         // CREATED as a free rider (1 sampled DOF); the store's status pass still checks

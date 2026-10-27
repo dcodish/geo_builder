@@ -36,7 +36,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
-import { declaresOnly3, mintableId3, mintEligible3 } from '../engine/mintable';
+import { declaresOnly3, lineSlotNames3, mintableId3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -524,6 +524,8 @@ function deriveCore3(
   seed: number,
   narrow: boolean,
   premint?: Readonly<Record<string, readonly string[]>>,
+  /** #2489 (ADR-3D-383): the LINES the pass decided to create, by row — placed with the points before the refold. */
+  prelines?: Readonly<Record<string, readonly string[]>>,
   postMint?: Readonly<Record<string, FactStatus3>>,
 ): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
@@ -539,6 +541,10 @@ function deriveCore3(
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
   let c: Construction3 = premint ? mintFree(emptyConstruction3(), Object.values(premint).flat()) : emptyConstruction3();
+  for (const name of Object.values(prelines ?? {}).flat()) {
+    const made = applyCommand3(c, { type: 'free-line', name });
+    if (made.ok) c = made.next;
+  }
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
   const pinOwnerIds = new Set<string>();
@@ -768,6 +774,8 @@ function deriveCore3(
   const failedAfterMint: Record<string, FactStatus3> = {};
   /** Every point the pass created, by the row it was created for — what the in-order refold places first. */
   const mintedBy: Record<string, string[]> = premint ? Object.fromEntries(Object.entries(premint).map(([k, v]) => [k, [...v]])) : {};
+  /** #2489: every line the pass created, by row (never in the notice). */
+  const linesBy: Record<string, string[]> = prelines ? Object.fromEntries(Object.entries(prelines).map(([k, v]) => [k, [...v]])) : {};
   const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
     let probe = base;
     const exp = expandFact(base, f);
@@ -780,19 +788,41 @@ function deriveCore3(
     }
     return null;
   };
-  const missingOf = (st: FactStatus3 | null, base: Construction3): string | null =>
-    st !== null && typeof st === 'object' && (st.code === 'unknown-point' || st.code === 'two-unknowns') && mintableId3((st as { id: string }).id, base) ? (st as { id: string }).id : null;
+  /** What the latest attempt says is missing and the pass may create: a point, or (#2489) a line named in a line slot. */
+  type Missing3 = { kind: 'point' | 'line'; id: string };
+  const missingOf = (st: FactStatus3 | null, base: Construction3, f: Fact3): Missing3 | null => {
+    if (st === null || typeof st !== 'object') return null;
+    const id = (st as { id?: unknown }).id;
+    if (typeof id !== 'string') return null;
+    if ((st.code === 'unknown-point' || st.code === 'two-unknowns') && mintableId3(id, base)) return { kind: 'point', id };
+    if (st.code === 'unknown-line' && !base.lines.has(id) && !base.pointLines.has(id) && lineSlotNames3(f.cmds).has(id)) return { kind: 'line', id };
+    return null;
+  };
   for (let guard = 0; guard < facts.length && !premint; guard++) {
     let minted = false;
     for (const f of facts) {
       if (typeof status[f.id] === 'string' || !mintEligible3(f.cmds)) continue;
       let st: FactStatus3 | null = dryRunOn(c, f); // the latest attempt: an earlier mint may have supplied a letter
-      if (missingOf(st, c) === null) continue;
+      if (missingOf(st, c, f) === null) continue;
       let probe = c;
       const ids: string[] = [];
-      for (let id = missingOf(st, probe); id !== null && ids.length < 24; id = missingOf(st, probe)) {
-        ids.push(id);
-        probe = mintFree(probe, [id]);
+      const lineIds: string[] = [];
+      for (let m = missingOf(st, probe, f), n = 0; m !== null && n < 24; m = missingOf(st, probe, f), n++) {
+        if (m.kind === 'point') {
+          ids.push(m.id);
+          probe = mintFree(probe, [m.id]);
+          st = dryRunOn(probe, f);
+          continue;
+        }
+        // #2489 (ADR-3D-383): a line is created as its declaration «ישר k» creates it — every clash rule of the
+        // declaration (a vector, a plane, a through-line named the same) is inherited, and its refusal is the line's
+        const made = applyCommand3(probe, { type: 'free-line', name: m.id });
+        if (!made.ok) {
+          st = made.error;
+          break;
+        }
+        probe = made.next;
+        lineIds.push(m.id);
         st = dryRunOn(probe, f);
       }
       if (st !== null) {
@@ -802,7 +832,10 @@ function deriveCore3(
       }
       c = probe;
       status[f.id] = restatedAgainst(f, applyFact(f));
-      if (status[f.id] === 'ok') mintedBy[f.id] = ids;
+      if (status[f.id] === 'ok') {
+        mintedBy[f.id] = ids;
+        if (lineIds.length) linesBy[f.id] = lineIds;
+      }
       minted = true;
       break;
     }
@@ -826,14 +859,16 @@ function deriveCore3(
    */
   if (!premint && Object.keys(mintedBy).length > 0) {
     let keep: Record<string, string[]> = mintedBy;
+    let keepLines: Record<string, string[]> = linesBy;
     const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
     for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
-      const again = deriveCore3(factsIn, seed, narrow, keep, reasons);
+      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons);
       const failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok');
       if (failed.length === 0) return again;
       for (const id of failed) reasons[id] = again.status[id]; // the post-mint reason, read in list order
       keep = Object.fromEntries(Object.entries(keep).filter(([id]) => !failed.includes(id)));
-      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, reasons);
+      keepLines = Object.fromEntries(Object.entries(keepLines).filter(([id]) => !failed.includes(id)));
+      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, {}, reasons);
     }
   }
   // a row whose created points were dropped reports why it failed WITH them, never «unknown point» (atomicity)

@@ -3325,6 +3325,8 @@ dihedral driving to 60° with the altitude foot on BC and ⟂ to it.
 
 ### ADR-3D-141 — the FREE-standing named LINE: «ישר k» / bare «l1», pinned by stated relations (#552)
 
+**⚠ Partly superseded by [ADR-3D-383](#adr-3d-383) (2026-10-27):** the creation half — "a non-convention name must be declared first" — is withdrawn; a line named in any line slot is created as «ישר k» declares it (#2489, operator 2026-10-24).
+
 The #487 free plane, line edition, and deliberately the same architecture at every layer. A student can
 now declare a line before anything about it is known — and a relation can conjure one — with its 4 DOFs
 (direction 2 + anchor 2) sampled per seed until givens pin them (ADR-052: an unstated direction or
@@ -13591,3 +13593,25 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Known residual.** Claims over all-free points that the drive cannot pin stay refused, now with their true code: «שטח המשולש ABC = 4.5», «AB∥ACD» read `point-not-determined` (#1467 §7's successor class). «PQ = 2AB» names Q only: P is the point the relation defines.
 
 **Perf (docs/17 §7).** One submit on a blank page: «AB = 3» 1.29 s, of which the mint pass is negligible — «קטע AB» · «AB = 3», which needs no mint, takes 1.11 s; the cost is the all-free solve. «המרחק בין D למישור ABC הוא 6» on a blank page takes 2.9 s (1.1 s after «משולש ABC») — a finding, filed on #1467's PR.
+
+## ADR-3D-383 — A line named with its noun before it exists is created like «ישר k», in every relation that names a line (#2489 T45)
+
+**Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/2489-mention-lines-planes` (stacked on #1467's) · the 3-D half of [ADR-W-163](06w-decisions-workspace.md#adr-w-163) · **amends** [ADR-3D-141](#adr-3d-141) (the name-shape bound on creation is withdrawn) and [ADR-3D-382](#adr-3d-382) (line slots join the mint pass)
+
+**Operator:** T45 (2026-10-24) «קובייה ABCD» · «הישר k מאונך למישור ABC»: *"the tool needs to create the line if its referenced with dof"*; card e20 = A (2026-10-24): no notice for a created line.
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-26 (new) · **Design:** [04b](04b-design-3d.md) § "The mint pass" (the line row) · **LADDER stage:** the fold's mint pass (ADR-3D-382)
+
+**Measured before** (the #1467 tip): «הישר k מאונך למישור ABC», its English, «הישר k מקביל ל-AB», «A על הישר k», «הזווית בין הישר k למישור ABC היא 30», «הישר k מקביל לישר m», and «הישר k|ℓ חותך את המישור ABC בנקודה M», «המרחק בין A לישר k|ℓ הוא 3» refused `unknown-line` — the last two even for the convention ℓ, because `withFreeLines` was wired into four command kinds by hand.
+
+**Class (docs/17 §1).** *A statement that names a line by its noun refuses `unknown-line` instead of creating it, unless the name has the convention shape and the command kind is on a hand-kept list of four.*
+
+**Decision.**
+1. **The mint pass mints a line** when the latest dry run reports `unknown-line` for a name in one of the line's LINE SLOTS (`lineSlotNames3`: a `line` field or a `{kind: 'line'}` operand — reached only through the noun or the ℓ token, so the kind is the student's). The mint applies `{type: 'free-line', name}`: a name the declaration refuses («נסמן: AB = u» · «הישר u …») reports the declaration's own refusal. A circle reported through the same code («A נמצאת על המעגל») is never in a line slot.
+2. **`withFreeLines` and its four call sites are deleted**; the convention-name behaviour comes through the pass unchanged (`free-line.test.ts` green, one lock rewritten).
+3. **No notice** for a created line; `created` records points only.
+4. **DOF** is the declared line's: ⟂ plane 2, ∥ segment 2, membership 2, angle 3, crossing 4, two new lines 6.
+
+**Deviation from the plan (measured).** «המרחק בין A לישר k הוא 3» does not build: it creates k and is then refused `line-not-determined` — exactly what it answers after «ישר k» today (the plan's B.1 had no declared-line cell for it). A distance claim that pins a free line is a capability of its own, filed as #2564 (`needs-operator`); the refusal is the declaration's verdict, never «define it first».
+
+**Locks.** `src3d/__tests__/free-line-create-2489.test.ts` (17: nine relations × the declared DOF, two lines, the relation at five seeds and moving, no notice, mint-last, the clash, the distance verdict, the circle guard, the bare vector); `free-line.test.ts`'s "a typo must not conjure a line", `plane-line-perp.test.ts`'s «ACD אנך לישר q» and two `refusal-batch1-1995` rows (the taught «ישר k» / «line k» is no longer reached for a line named with its noun) rewritten; fixture `free-line-created-2489.geo3.json`.

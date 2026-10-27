@@ -310,7 +310,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Behaviour | 2-D | 3-D | Analytic | Complex | Status |
 | --- | --- | --- | --- | --- | --- |
 | A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
-| A line that refers to a point the figure lacks («M אמצע AB», «AB = 2 AD» on a blank page) | created free; the notice «נוצרה נקודה חדשה X — …» with ✕ removing the line | same | same | created silently, no notice | **Gap** — complex #2562 (`later`); ruled 2026-09-27 (#1467, ADR-W-162); one notice, `shell/frame/CreatedNotice.tsx` + suite keys |
+| A line that refers to a point the figure lacks («M אמצע AB», «AB = 2 AD» on a blank page) | created free; the notice «נוצרה נקודה חדשה X — …» with ✕ removing the line | same; a named line too («הישר k …»), with no notice (ADR-W-163) | same | created silently, no notice | **Gap** — complex #2562 (`later`); ruled 2026-09-27 (#1467, ADR-W-162); one notice, `shell/frame/CreatedNotice.tsx` + suite keys |
 | An AI answer that drops a shape or role word the student typed («שווה צלעת» answered «משולש ABC») | refused, the word named (dropped-given) | same | records today | n/a (no AI fallback) | **Ruled** — 2026-10-08 (#1906, ADR-W-144, FR-SU-21); analytic's half is #1906's third item; one reader, `shell/llm/honestyCore.ts` `propertyWords` |
 | Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |
 | Givens list: mute, edit, delete | shared list | same | same | same | **Same** |

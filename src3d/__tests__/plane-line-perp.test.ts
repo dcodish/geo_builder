@@ -99,11 +99,14 @@ describe('#375 — a point-run plane ⟂ a named line', () => {
     expect(derive3(state().facts, 0).construction.lines.get('ℓ7')?.kind).toBe('free');
   });
 
-  it('…while an unknown NON-convention name still refuses, not silently dropped (#375’s honest half)', () => {
+  // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with dof"): a line named with its noun is
+  // created as «ישר q» declares it — and is never silently dropped: the relation holds on it.
+  it('…and an unknown NON-convention name typed with its noun is created, never dropped', () => {
     useGeo3.getState().clear();
     submit('פירמידה משולשת ABCD');
     submit('ACD אנך לישר q');
-    expect(state().lastError).not.toBeNull();
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, 0).construction.lines.get('q')).toEqual({ kind: 'free' });
   });
 
   it('the DRIVEN figure still lands in general position — the relation fixes facing, not place', () => {

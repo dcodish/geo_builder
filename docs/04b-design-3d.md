@@ -460,7 +460,9 @@ dry run (`dryRunOn`) reports `unknown-point` / `two-unknowns` on a `mintableId3`
 anything was minted, `deriveCore3` folds AGAIN with those points placed first (`premint`), so every row applies in list
 order; a row that fails there is dropped from `premint` and reports its reason (`postMint`).
 `mintEligible3` (`engine/mintable.ts`) excludes a statement about a solid's own element (`solidElement3`: a diagonal,
-the solid's height, a height to a named base face, a tetrahedron's altitude; #978). The bare-segment apply branch declares
+the solid's height, a height to a named base face, a tetrahedron's altitude; #978). **Lines** ([ADR-3D-383](06b-decisions-3d.md#adr-3d-383),
+#2489): an `unknown-line` for a name in `lineSlotNames3` is minted by applying `free-line` (its refusal is the line's), and
+is placed by `premint` like a point; lines are never in `created` (no notice). `withFreeLines` is gone. The bare-segment apply branch declares
 both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` → `App3`'s `CreatedNotice`; ✕ is `remove`.
 
 ## Solving the figure and judging claims

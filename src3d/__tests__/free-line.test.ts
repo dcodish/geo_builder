@@ -283,10 +283,14 @@ describe('#552 — the noun-declared arbitrary name works end to end', () => {
     expect(parse3('B על k').ok, 'no noun, no convention — no kind signal').toBe(false);
   });
 
-  it('an UNDECLARED non-convention name refuses — a typo must not conjure a line', () => {
+  // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with
+  // dof"), after #1467 replaced the typo guard with the created-points notice: the name typed with its noun is a LINE, so
+  // it is created exactly as «ישר k» declares it (#552's "a non-convention name must be declared first" is withdrawn).
+  it('an UNDECLARED non-convention name typed with its noun is created as «ישר k» would create it', () => {
     build(['קובייה ABCD', 'הישר k מאונך למישור ABC']);
-    expect(state().facts, 'refused, kept prior').toHaveLength(1);
-    expect(state().lastError).toEqual({ code: 'unknown-line', id: 'k' });
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastError).toBeNull();
+    expect(derived().construction.lines.get('k')).toEqual({ kind: 'free' });
   });
 });
 

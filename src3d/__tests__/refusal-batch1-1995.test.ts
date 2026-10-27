@@ -87,11 +87,10 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit(taught(s)!)).toBeNull();
   });
 
-  it('unknown line: the taught «ישר k» is taken, and then the line itself', () => {
+  // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with dof"): the "define it first" sentence is no
+  // longer reached for a line named with its noun — k is created.
+  it('unknown line: the line is taken, k created free', () => {
     setUp(['קובייה ABCD']);
-    const s = submit('הישר k מאונך למישור ABC')!;
-    expect(s).toBe('הישר «k» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «ישר k» — ואז כתבו את השורה שוב.');
-    expect(submit(taught(s)!)).toBeNull();
     expect(submit('הישר k מאונך למישור ABC')).toBeNull();
   });
 
@@ -162,9 +161,8 @@ describe('#1995 batch 1 — 3-D: the English twins take the same shape, and teac
     const p = submit("הישר AC' מאונך למישור π3", 'en')!;
     expect(p).toBe('Plane «π3» is not defined yet. Define it first — for example «plane π3» — then type the line again.');
     expect(submit(taught(p)!)).toBeNull();
-    const l = submit('הישר k מאונך למישור ABC', 'en')!;
-    expect(l).toBe('Line «k» is not defined yet. Define it first — for example «line k» — then type the line again.');
-    expect(submit(taught(l)!)).toBeNull();
+    // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with dof"): the line half is taken directly.
+    expect(submit('הישר k מאונך למישור ABC', 'en')).toBeNull();
   });
 
   it('symbolic new point', () => {
