@@ -1006,6 +1006,20 @@ curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
 
+### Among the solutions, the one nearest the start ([ADR-AG-339](06c-decisions-analytic.md#adr-ag-339))
+
+A converged solve returns one member of its solution set, and which one was the descent's accident. So after the solve
+(either stage), `evaluateUncached` walks the free VERTICES to the member nearest the **seeded start**:
+`nearestSolution(x, xRef, residuals)` (`solve.ts`) steps inside the null space of the Jacobian at the current point
+(`jacobianRank`'s basis, the one rank chokepoint), polishes back with `solveLM`, and keeps a step only when the
+polish converges and is strictly nearer. Parameters are held where the solve left them (`carrierSystem(…, { params:
+'fixed' })`), so a parameter a given pinned, or that ADR-AG-197 resampled inside its feasible side, is never pulled back
+toward its sample. The result is kept only if `admissibleAt` (selectors, rings) holds whenever it held before. The
+reference is the seeded start, which the sampler varies per seed, so the free point still moves on every «הציגו תצורה
+אחרת». The prior figure is not the reference (derive carries no prefix history). An isolated solution costs one
+Jacobian and moves nothing. Not projected: `solveLM`'s direct callers (the locus tracer's predictor–corrector, the
+repair re-solves in `evaluate.ts`, the thin-ring tight re-solve), which must follow their own start.
+
 ### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
 
 "What line does this name denote" lives in `engine/lines.ts`, reached by the surfaces via `app/lines.ts` and by the

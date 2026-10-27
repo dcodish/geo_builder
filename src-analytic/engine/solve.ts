@@ -1590,6 +1590,63 @@ export function solvePreferring(
   return fallback ?? best ?? { values: starts[0] ? [...starts[0]] : [], ok: residuals(starts[0] ?? []).length === 0, worst: 0 };
 }
 
+/**
+ * THE MEMBER OF THE SOLUTION SET NEAREST WHERE THE FIGURE STARTED (#1182, [ADR-AG-339](../../docs/06c-decisions-analytic.md#adr-ag-339)).
+ *
+ * An under-determined least-squares solve returns whichever member of its solution set the descent happens to reach:
+ * along a free direction the cost is flat, so the point is a function of the residual ROWS and of the path, not of the
+ * set. Measured on «A(0,0) · B(6,8) · נקודה M · MA = MB»: seeded at (−3.7, −4.3), right beside the figure, the descent
+ * stopped at (−13.8, 16.6), and the student's two points filled 39 % of the view. A row that adds nothing to the set
+ * (the isosceles base angles after «AB = AC») changes the path and so moves the drawn member (#1264 ①).
+ *
+ * This answers both with the set's own definition of "the answer": from a converged `x`, walk to the point of
+ * `{residuals = 0}` nearest `xRef`. Each step moves only inside the null space of the Jacobian at the current point
+ * (`jacobianRank`'s basis), so to first order it changes no residual, then `solveLM` polishes back onto the set. A step is
+ * kept only when the polish CONVERGES and the result is strictly nearer `xRef`; a step that does not is halved, and a walk
+ * that cannot improve stops. So it can never trade a residual for proximity: every point it returns met the same
+ * tolerance `x` did.
+ *
+ * `null` means "keep `x`": an isolated solution (no free direction, the determined figure's one Jacobian and nothing
+ * more), a set already nearest at `x`, or no converged improvement. The caller judges validity (selectors, rings).
+ */
+export function nearestSolution(x: number[], xRef: readonly number[], residuals: (v: number[]) => number[], maxSteps = 8): number[] | null {
+  const n = x.length;
+  if (n === 0 || xRef.length !== n) return null;
+  const r0 = residuals(x);
+  if (!Array.isArray(r0) || r0.length === 0) return null;
+  const scale = Math.max(1, ...xRef.map((v) => Math.abs(v)));
+  const dist = (v: readonly number[]) => Math.hypot(...v.map((vi, i) => vi - xRef[i]));
+  let cur = x;
+  let dCur = dist(cur);
+  let moved = false;
+  for (let step = 0; step < maxSteps; step += 1) {
+    const { nullBasis } = jacobianRank(cur, residuals);
+    if (nullBasis.length === 0) break;
+    const d = new Array(n).fill(0);
+    for (const b of nullBasis) {
+      let c = 0;
+      for (let i = 0; i < n; i += 1) c += b[i] * (xRef[i] - cur[i]);
+      for (let i = 0; i < n; i += 1) d[i] += c * b[i];
+    }
+    if (!(Math.hypot(...d) > 1e-9 * scale)) break;
+    let improved = false;
+    for (let t = 1; t >= 0.125; t /= 2) {
+      const r = solveLM(cur.map((v, i) => v + t * d[i]), residuals, 40);
+      if (!r.ok) continue;
+      const dr = dist(r.values);
+      if (dr < dCur) {
+        improved = dCur - dr > 1e-9 * scale;
+        cur = r.values;
+        dCur = dr;
+        moved = true;
+        break;
+      }
+    }
+    if (!improved) break;
+  }
+  return moved ? cur : null;
+}
+
 /** Gaussian elimination with partial pivoting. `null` when the system is singular to working
  *  precision — which the caller answers by damping harder rather than by inventing a step. */
 function gaussian(A: number[][], n: number): number[] | null {

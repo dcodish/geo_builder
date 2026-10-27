@@ -784,6 +784,9 @@ a sentence the tool parsed.
 - **"Unstated" means the drawable configurations still differ** (#2233, ADR-AG-290): the note also goes when the givens settle the choice without naming it — signs («x_A > 0»), an axis side, coordinates, or the geometry forcing the rest — matching the data panel; the axes note teaches only a vertex whose axis still differs. Until the configurations are all read, the note stays as it was. Not yet for the trapezoid's assumed pair (#2284).
 - Sources: ADR-481; ADR-AG-267; ADR-AG-290.
 
+**R197 — a point the givens leave free is drawn as close to the stated figure as the givens allow, and a fact that adds nothing moves nothing**. *(Operator, 2026-09-18 on #1182: "seeds should always try to find a close point and work backwards if no choice"; ruled 2026-09-20: "change the solve".)* On «A(0,0) · B(6,8) · נקודה M · MA = MB», A and B fill at least half the view at every configuration (they shrank to one dot at the first). Where the givens force a point far out, it is drawn far out and the view follows; nothing is clamped. Nearness never pins: «הציגו תצורה אחרת» still moves a free point (R14, ADR-052). A stated fact the figure already satisfies («זווית ABC = זווית ACB» after «AB = AC») leaves every point where it was.
+- Sources: ADR-AG-339.
+
 **R15 — The tool never has to work out that an ambiguity is harmless.** No special case for "this one happens not to matter".
 
 **R16 — `isKnowledge` must vary the DISCRETE choices too, not only the continuous parameters.** Judged over **one configuration pool** of 24 drawable configurations; an unconfirmed value shows «בודק…», never a provisional number (operator ruling B′).

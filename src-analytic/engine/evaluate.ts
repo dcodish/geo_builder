@@ -22,7 +22,7 @@ import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLin
 import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, nearestSolution, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt } from './discreteAxes';
@@ -2807,6 +2807,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    */
   const stageOne = carrierSystem(c, env, { params: 'fixed' });
   let converged = false;
+  /** Did the solve that produced `free` CONVERGE (#1182)? Only a converged answer is a member of the solution set. */
+  let solvedOk = false;
 
   /**
    * THE SELECTORS STEER WHICH CONVERGED START IS TAKEN (#1463) — the #1071 / #1268 lesson for the
@@ -2986,6 +2988,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       if (stageOneRejected) stageOneFallback = { ...first, values: solved.toVec(firstEffort, env) };
       if ((first.ok && !stageOneRejected) || solved.syms.length === 0) {
         converged = true;
+        solvedOk = first.ok;
         free = firstEffort;
         solvedVec = solved.toVec(free, env);
       }
@@ -3188,6 +3191,35 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       free = solved.asMap(res.values);
       env = solved.envAt(res.values);
       solvedVec = res.values;
+      solvedOk = state.accepted && res.ok;
+    }
+  }
+
+  /**
+   * AMONG THE SOLUTIONS THE GIVENS ALLOW, THE ONE NEAREST WHERE THE FIGURE STARTED (#1182, ADR-AG-339).
+   *
+   * A converged answer is one member of its solution set, and which one was the descent's accident: «MA = MB» left M
+   * anywhere on the bisector, and seed 0 stopped it two figure-spans out. The operator's ruling (2026-09-20, "change the
+   * solve"): among the solutions the constraints allow, prefer the one nearest the figure the student is looking at.
+   * The reference is the SEEDED start — sampled per seed, so «הציגו תצורה אחרת» still moves a free point (ADR-052) —
+   * and the walk moves only the free VERTICES, every parameter held where the solve left it: a parameter stage two
+   * moved was moved by a given or resampled inside its feasible side (ADR-AG-197), and pulling it back toward its
+   * infeasible sample would undo exactly that.
+   *
+   * Kept only when the configuration stays as valid as it was (`admissibleAt`: the selectors and the rings), so a
+   * projection can change which valid drawing is shown and never turn a valid one invalid. A determined figure pays
+   * one Jacobian and moves nothing.
+   */
+  if (solvedOk && ids.length > 0) {
+    const fixed = sys.syms.length === 0 || env === sampledEnv ? stageOne : carrierSystem(c, env, { params: 'fixed' });
+    const x = fixed.toVec(free);
+    const near = nearestSolution(x, fixed.toVec(seeded), fixed.residualsAt);
+    if (near) {
+      const valid = (v: number[]) => admissibleAt(c, fixed.positionsAt(v), env);
+      if (valid(near) || !valid(x)) {
+        free = fixed.asMap(near);
+        solvedVec = sys.toVec(free, env);
+      }
     }
   }
 
