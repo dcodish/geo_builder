@@ -158,8 +158,8 @@ Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-dec
 
 **Every operator report or request is FILED as a GitHub issue first** (`gh issue create` on
 `dcodish/geo_builder`, even when fixed in the same session). Labels: type `bug`/`feature`/`debt` + priority
-`P1` (prod honesty/correctness — drop everything) / `P2` (real input fails visibly — schedule by log-triage
-demand) / `P3` (polish/debt — batch) + product `2d`/`3d`/`analytic`/`complex`/`server`/`workspace`; `needs-operator` when blocked
+`P1`/`P2`/`P3`/`later` by who hit it and the plan, + marks `wrong-answer`/`reported`
+([docs/22 §2](docs/22-workflow.md); P1 = a wrong answer a person hit) + product `2d`/`3d`/`analytic`/`complex`/`server`/`workspace`; `needs-operator` when blocked
 on a decision; `icebox` for a closed, parked issue (never one that shows something false); `auto-ok`
 marks a fix plan approved for the autonomous `/fix-round` loop. A session applies `auto-ok` only as
 transcription of the operator's explicit approval, or to a plan whose every `What the student will see`

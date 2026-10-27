@@ -55,8 +55,13 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   fix shape; the cap below never forbids a correct bundle.
 - **Cap: up to 20 work items** per round — one number, no band (a bundle counts as ONE item) —
   [ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028). **Fewer is always fine**: the cap is not a
-  quota, and a round with two eligible items runs rather than waits to fill up. Priority order
-  P2 → P3 within eligibility; value density (per the /status-update rubric) breaks ties.
+  quota, and a round with two eligible items runs rather than waits to fill up. **Composition
+  order follows the teaching plan** ([docs/22 §2](../../../docs/22-workflow.md), ADR-W-160): (1) P2
+  items in the roadmap plan's workstreams — read `plan/current` from the overview page's database
+  (the roadmap-refresh skill names the page and the tool), current week's workstreams first;
+  (2) the other P2s, `wrong-answer` first, then by phase Now (analytic) → Next (3-D) → 2-D → workspace/server;
+  (3) P3s riding along on the same themes. **Never compose a `later` issue**, even if armed: name it
+  under Skipped. Value density (per the /status-update rubric) breaks ties within a step.
   **Price the sitting before composing big:** ~30 min/item measured, so a full 20 is an 8–11 hour
   run — that is the unattended overnight shape ([ADR-W-054](../../../docs/06w-decisions-workspace.md));
   an attended round composes to what the operator can play in one go.
@@ -389,8 +394,8 @@ Pick anything without `auto-ok` · write a fix plan for an unplanned issue · me
 · deploy · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
 question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
 an escalation · exceed the announced composition mid-round (found new work → file an issue, never armed by the round:
-a bug with the priority the round judges, a P1 announced at once; a feature `needs-operator` with a proposed
-priority — ADR-W-117 Am. 1) · take a default on an open question · ship a `[proposed]` outcome ·
+a bug with the priority the round judges by docs/22 §2 — a round's own find is never `reported`, so a
+`wrong-answer` it finds is P2, not P1; a feature `needs-operator` with a proposed priority — ADR-W-117 Am. 1) · take a default on an open question · ship a `[proposed]` outcome ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items

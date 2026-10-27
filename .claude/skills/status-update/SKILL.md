@@ -38,7 +38,9 @@ not N):
 gh issue list --state open --limit 200 --json number,body
 ```
 
-Classify each issue from its labels: priority `P1`/`P2`/`P3` (an unlabeled priority is a triage bug —
+Classify each issue from its labels: priority `P1`/`P2`/`P3`/`later` per [docs/22 §2](../../../docs/22-workflow.md)
+(ADR-W-160: who hit it and where it sits in the teaching plan), the marks `wrong-answer` (show ⚠ on the
+row) and `reported` (show 👤), (an unlabeled priority is a triage bug —
 report it in a "mislabeled" line rather than guessing), type `bug`/`feature`/`debt`, product
 `2d`/`3d`/`server`/`workspace`, and the attention labels: `needs-operator` (blocked on a decision),
 `auto-ok` (plan approved for `/fix-round`), `in-round` (a fix round executing NOW — or, with no
@@ -74,19 +76,23 @@ section is information, not clutter):
 ```markdown
 # Issue queue — YYYY-MM-DD
 
-Open: N (P1: n / P2: n / P3: n) · bugs n · features n · debt n
+Open: N (P1: n / P2: n / P3: n / later: n) · bugs n · features n · debt n · ⚠ wrong answers n · 👤 reported n
 Attention: needs-operator n · plans awaiting auto-ok n · PRs awaiting play n · rounds in flight n · rounds awaiting play n
 Prod: <current prod tag> · undeployed on main: <none | short list>
 Icebox: N parked (closed, reopened when a student hits one or the operator asks)
 
-## P1 — drop everything
+## P1 — drop everything (a wrong answer a real person hit)
 | # | Product | Type | Title (shortened) | Value | Complexity/Risk |
 
-## P2 — real input fails visibly
-(one table like the above, rows sorted: 2d, then 3d, analytic, complex, then server/workspace)
+## P2 — the work queue
+(one table like the above; rows sorted: roadmap-plan items first, then ⚠ wrong answers, then by phase:
+analytic (Now), 3d (Next), 2d, then server/workspace)
 
-## P3 — polish / debt, batched
+## P3 — batched
 (same table shape)
+
+## Later — not ranked until its phase opens
+(one line per product/topic with its count — complex, conics, sphere — no table; an ⚠ row is listed by number)
 
 ## Waiting on you
 (the full attention surface, in four sub-lists — every row one sentence, readable without opening
@@ -145,6 +151,8 @@ reason the report exists as a habit. Its four sub-lists:
 
 **The recommendation** is a concrete next-round composition, not a restatement of the tables:
 - Every open P1 goes first, always, each with one line on why it can't wait.
+- Then the **roadmap plan's** P2 items, current week first (docs/22 §2) — an unarmed plan item is named as
+  "needs a fix plan" so the operator sees what holds the plan back. Never recommend a `later` issue.
 - Then a **mix** of P2 and P3 — the operator explicitly wants both, not a pure-P2 diet. Aim for
   P2s that form a coherent theme (same module or mechanism — shared context makes a batch cheaper
   than its parts) plus quick P3 wins riding along, landing inside the fix-round cap of **up to 20 items**
