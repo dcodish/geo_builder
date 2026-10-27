@@ -6380,3 +6380,22 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 2. **A play-sheet case never passes on a known-wrong outcome.** A case whose correct outcome is not delivered is written with the *correct* expectation, so it runs red. It is listed in the heads-up under "approved but not delivered", naming its issue, and is never an `expectRefusal` / `expect` of the bug's output. A red pre-play case still blocks the item, per ADR-W-092, unless the item's own plan says the outcome is out of scope and the heads-up says so.
 
 **Consequences.** Some items stop landing until their twin bug is fixed or the operator accepts the trade. The sheet stops showing "pass" on behaviour the session knows to be false.
+
+## ADR-W-160 — Priority follows who hit it and where it sits in the teaching plan; `wrong-answer` and `reported` record severity (#2556)
+
+**Status:** accepted · 2026-10-27 · process (workspace) · amends [ADR-265](06-decisions.md#adr-265) (the P1/P2/P3 rubric, docs/22 §2)
+
+**Operator:** 2026-10-26, strategy session: *"there are so many items on priority 2 and priority 3, it doesn't really help us prioritize."* *"drop everything would be for cases where we have a user who actually tried to do something and ran into a P1 issue."* *"if I hit an issue, it means that any … other person would have hit it."* *"a P2 on the complex tool is not really that important because complex tool is a lower priority in general."* Scheme approved as roadmap decision D5 = A (2026-10-26, transcribed on #2556): the two labels and the Later bucket; a wrong answer a session finds in 2-D is P2 with the mark. 2026-10-27: *"we need that now so we can start working the new way"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §2, `scripts/priority-rerank.mjs`, the fix-round, status-update and log-triage skills.
+
+**Context.** The rubric graded severity only. On 2026-10-26 the queue held 170 P2 and 312 P3, and all three P1s had been found by sessions, not by a person. The fix round composed P2 → P3 with no regard for the teaching calendar (analytic now, 3-D vectors next, 2-D maintenance, complex and conics later).
+
+**Decision.**
+1. **Two marks record severity:** `wrong-answer` (a wrong figure shown as correct, a dropped or misread given, lost work; a false refusal is not one) and `reported` (a real person hit it: the operator in class or playing, a teacher, a prod-log student).
+2. **Priority:** P1 = `wrong-answer` + `reported`, or prod down. P2 = the roadmap plan's workstreams, any `wrong-answer` outside Later, a `reported` visible failure in the Now/Next product. P3 = 2-D maintenance, internal finds, polish, debt. `later` = a phase not started (complex, conics, the sphere); never composed into a round. Debt and workspace/server keep their own rule.
+3. **The fix round composes in plan order:** the roadmap's P2 items, then other P2s (`wrong-answer` first, then Now → Next → 2-D → workspace), then P3s on the same themes.
+4. **Re-rank when a phase changes**, with `scripts/priority-rerank.mjs`. It reads the marks from labels; without a label it proposes `reported` from the issue's opening ("Operator report…" vs "Found while…") and flags `wrong-answer` candidates for a person to judge. **The operator reviews the summary of changes before any label changes.**
+5. **The one-time re-rank of 2026-10-27** applies the same way: the summary page first, labels only on his approval.
+
+**Consequences.** P2 becomes a list worth working through (97 proposed, down from 170); P1 is rare and always a person's report. Internally found wrong answers stay visible through their mark. An item in a Later phase waits, unranked, until its phase opens.
