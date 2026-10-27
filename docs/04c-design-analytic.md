@@ -792,6 +792,8 @@ Spellings lower in the parser (the frame's `centreClauses`, `sharedSubjectClause
 resolved through `circleByName`, `centreRuleOf` / `centreIdOf`, with regions as `sign` selectors
 (`evaluate.ts circleQuantity`). `separatedFrom` tries `chordStarts` for the other root.
 
+`centresOf` offers a centre only with a sentence the grammar reads back: the equation, the numeral, the ring form, or — for the figure's ONLY circle with neither numeral nor equation, of any kind — the contextual «P מרכז המעגל» (a lone `circle-thru` takes it first, every other kind after the ring forms, so no existing offer changes; [ADR-AG-338](06c-decisions-analytic.md#adr-ag-338), #2554). A sentence-drawn pair (`circle-pair<k>-1/2`) has no such sentence (D8 = B on #2552) and is the class guard's one declared exception.
+
 *Identifiers:* `M(x,y)` · `ONE_OF_HE` · `incidenceOn(…).t === 'kind'` · `THRU_HE` · `tangent-circles` · `freeAngleOf` · `selectorFact` · `c.selectors` · `derive.nameCanonicalCentres` · `centresOf` · `pointAt` · `deflatedStarts` · `collapsedPairs` · `on-line` · `selectorsHoldAt`
 
 ### Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)

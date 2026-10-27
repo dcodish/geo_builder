@@ -406,6 +406,10 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מרכז המעגל M נמצא על ציר ה-y», «הנקודה B נמצאת מחוץ למעגל»
 - Sources: ADR-AG-193, #1619, #1598.
 
+**R130 amendment — the + at the figure's only circle names its centre, however the circle was stated (#2554, ADR-AG-338)**. A free circle, a circle on a diameter and a quadrilateral's incircle offer their centre like a circle through three points: the click opens the letter popover and records «O מרכז המעגל». The centres of a pair the tool drew («שני מעגלים») offer nothing and are named by typing «O_1 מרכז מעגל» in order (operator ruling D8 = B on #2552, 2026-10-26).
+- «מעגל ברדיוס 5» → click the + → «O מרכז המעגל»
+- Sources: ADR-AG-338, #2554, #1598.
+
 **R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»** Every shape noun can be inscribed (a cyclic parallelogram is drawn as a rectangle); the converse touches every side; «חד זוויות» holds in every configuration. **Except a noun no circle passes around (a right trapezoid):** in one sentence (R135), or as a ring already declared and then inscribed — and the reverse, inscribed and then declared — it is refused, naming both statements, in every inscription spelling.
 - «מרובע ABCD חסום במעגל שמרכזו M»
 - «במשולש AOB חסום מעגל שמרכזו C» → C where the bisectors meet

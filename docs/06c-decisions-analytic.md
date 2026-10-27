@@ -13825,3 +13825,27 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2553-unnamed-common-tangent.test.ts` (the three saved fixtures, nine external and three internal spellings at six seeds with the side checked from the figure, the repeat, the letters beside the student's, the line-named form and its «בהתאמה» twin, five touch-noun spellings at six seeds, two refusals, controls, the fold's own reach); `src/__tests__/issue-2553-tangent-side.test.ts` (2-D: six definition spellings, the side checked from the drawn figure); fixtures `exam-2553-q6-external-tangent`, `exam-2553-q6-same-side`, `exam-2553-q6-touch-points` (`.analytic.json`); parity rows `unnamed-common-tangent-2553`, `unnamed-common-tangent-named-circles-2553`, `tangent-same-side-2553`, `tangent-opposite-sides-2553` (X8), `line-named-common-tangent-2553`, `touch-point-noun-2553` (X4, analytic only).
 
 **Behaviour change for a student:** in analytic, «משיק חיצוני משותף לשני המעגלים», «משיק משותף חיצוני למעגלים O_1 ו-O_2» and «הישר l משיק משותף חיצוני לשני המעגלים» draw the tangent (A, B, or named l) instead of going to the AI; in both builders «משיק משותף ששני המעגלים נמצאים באותו צד שלו» draws the external tangent; in analytic «P נקודת ההשקה של l2 עם מעגל O_1» names that touch point.
+
+## ADR-AG-338 — The + at the figure's only circle names its centre, however the circle was stated (#2554)
+
+**Status:** accepted · 2026-10-27 · bug (P2), fix round #2561 (stream E) · branch `fix/2554-lone-circle-centre-offer` · plan items 1 and 3 only; item 2 (a pair's centres) stays unbuilt. LADDER stage: none (the canvas offer list).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R130 amendment "the + at the figure's only circle names its centre" · **Design:** [04c](04c-design-analytic.md) § "The circle the figure has" (the `centresOf` paragraph).
+
+**Rulings.** [asked] #1598, the operator, 2026-10-02: *"press on the center of a circle to create a letter"*. D8 = B on #2552 (2026-10-26): «המעגל הראשון / השני» is read only in the exam's two sentences, so no sentence names one circle of a pair. [ADR-AG-048](#adr-ag-048) (two surfaces, one grammar), [ADR-AG-054](#adr-ag-054) (a ring whose click fails is worse than no ring).
+
+**Measured at pickup** (main d9494206, `derive` → `offersOf`, every catalog entry with its `needs`): a + with no offer and no letter at the centre for `circle-new` («מעגל», «נתון מעגל», «מעגל ברדיוס 5», «מעגל בקוטר 10», «משיק למעגל», …), `circle-diam` («נתון מעגל שקוטרו BD», «BD קוטר במעגל», «קוטר»), the quadrilateral incircle `circle-in-ABCD`, and every sentence-drawn pair `circle-pair1-1/2`. Typing «O מרכז המעגל» named each lone centre.
+
+**Root cause.** `centresOf` (`src-analytic/engine/crossings.ts`) offered the contextual «X מרכז המעגל» only when the lone circle's id began `circle-thru-`. The sentence itself binds to the figure's one circle whatever its kind (`centre-of` → `centreRuleOf`), so the gate was narrower than the grammar, and every other lone circle drew a + it could not act on.
+
+**Decision.** After the equation, the lone-`circle-thru` contextual and the ring forms, `centresOf` offers «X מרכז המעגל» for any lone stated circle with no numeral and no equation. The new branch sits after the existing ones, so every circle that had an offer keeps the same sentence. Pairs keep offering nothing (D8 = B); their centres are named by typing «O_1 מרכז מעגל» in order.
+
+**Class guard (item 3).** `issue-2554-lone-circle-centre.test.ts` walks every catalog entry (with its `needs`) and asserts that each stated circle with a centre either has a letter there or offers its +, and that every offer's sentence records through `decideSubmit` and names a point AT that centre. One declared exception: `circle-pair<k>-1/2`, citing D8 = B. One known-gap row, found by the guard and filed as #2566 (P2): «נתון מעגל שמשוואתו (x-13)^2+y^2=R^2» offers its equation sentence, which the typed path refuses (`conflicting-restatement`). The row asserts the gap is still open, so it must be removed when #2566 lands.
+
+**Measured after:** «מעגל ברדיוס 5», «מעגל», «מעגל בקוטר 10», a diameter's circle and a quadrilateral's incircle each offer one centre; the popover's letter records «O מרכז המעגל», O sits at the centre, and one undo removes it. «שני מעגלים» and «שני מעגלים זרים» offer nothing.
+
+**2-D and 3-D.** Not ported: the change is inside analytic's centre offer list (`centresOf`, #1598); no input sentence changes, so no parity row moves.
+
+**Locks.** `src-analytic/__tests__/issue-2554-lone-circle-centre.test.ts` (the five lone kinds through the real popover ops, store and `decideSubmit`; the pair rows; the catalog-wide class guard).
+
+**Behaviour change for a student:** in analytic, clicking the + at the centre of the figure's only circle now opens the letter popover for a free circle, a circle on a diameter and a quadrilateral's incircle (it did nothing). A pair's centres still do nothing.
