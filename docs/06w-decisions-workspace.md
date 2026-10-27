@@ -6396,5 +6396,6 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 2. The `roadmap-refresh` skill writes it to the page and transcribes any decision answered on the page to its issue.
 3. The fix-round skill (Step 5b) and the status-update skill (Step 4) run it as their last step. It also runs on request.
 4. If a GitHub connector is added to claude.ai later, the page may read GitHub live instead; the plan and decisions stay in its database.
+5. **A daily cloud routine** ("Roadmap refresh — daily", 04:00 UTC) runs steps 1–3 of the skill — read the plan, compute, write `state/issues` and today's snapshot — so the page is current even when no session runs and the operator's PC is off. It never transcribes decisions, edits the plan or touches GitHub; those stay with a session. Cloud sessions refuse GitHub GraphQL (HTTP 403, probe 2026-10-27), so the script reads only through REST (`gh api`); the output was diffed byte-identical against the GraphQL version. Ruling (2026-10-27): *"go ahead with 1-3 and daily run is correct"*.
 
-**Consequences.** Between sessions the page can be up to one working day behind the queue; it shows the date of its snapshot. A refresh costs about a minute of `gh` calls.
+**Consequences.** The page is at most a day behind the queue; it shows the date of its snapshot. A refresh costs about a minute of `gh` calls, and the routine one short cloud run a day.

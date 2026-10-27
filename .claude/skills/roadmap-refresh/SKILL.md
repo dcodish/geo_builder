@@ -7,7 +7,7 @@ description: Refresh the operator's roadmap overview page (a claude.ai artifact 
 
 The roadmap overview is https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew. It reads only its own
 database; it cannot reach GitHub, and the operator's claude.ai account has no GitHub connector
-(checked 2026-10-27). So the page is exactly as current as the last session that ran this skill
+(checked 2026-10-27). So the page is exactly as current as the last session or daily cloud run that refreshed it
 ([ADR-W-159](../../../docs/06w-decisions-workspace.md#adr-w-159), #2557). The fix-round and
 status-update skills run it as their last step; it also runs alone.
 
@@ -45,6 +45,15 @@ or delete it.** A second refresh on the same day replaces that day's snapshot (p
    the report, never delete it.
 6. **Report one line** in the calling skill's output: *"Roadmap page refreshed: N open (baseline
    485), week W, workstreams done X/Y"*, plus any decision transcribed.
+
+## The daily cloud run
+
+A scheduled routine, "Roadmap refresh — daily" (04:00 UTC), runs steps 1–3 in Anthropic's cloud
+(ADR-W-159 §5), so nothing on the operator's PCs needs to be on. It does not transcribe decisions or
+edit the plan: answered decisions wait for the next session's step 4. Debug it with `RemoteTrigger`
+`list_runs` / `get_run_log`. The script must keep to `gh api` (REST): cloud sessions refuse GraphQL,
+which `gh issue list/view/comment` use, and the `repositories/{id}/...` links that `--paginate`
+follows, so it pages by number.
 
 ## Known limits
 

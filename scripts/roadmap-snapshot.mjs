@@ -22,9 +22,15 @@ const today = new Date().toISOString().slice(0, 10);
 const weekOf = (d) => { const i = plan.weeks.filter((w) => w.from <= d).length; return d > plan.end ? 6 : i; };
 
 // Every open issue (for phase counts) plus each plan issue's own state (closed ones too).
-// The REST issues list includes pull requests; they are dropped, as `gh issue list` did.
-const open = gh(['--paginate', `repos/${repo}/issues?state=open&per_page=100`, '--jq', '.[] | select(.pull_request | not) | {number, title, labels}'])
-  .split('\n').filter(Boolean).map(JSON.parse).map((i) => ({ number: i.number, title: i.title, labels: labelsOf(i) }));
+// The REST issues list includes pull requests; they are dropped, as `gh issue list` did. Pages are
+// requested by number, never with `--paginate`: its next-page links use `repositories/{id}/...`
+// paths, which the cloud proxy refuses (HTTP 403, dry run 2026-10-27).
+const open = [];
+for (let page = 1; ; page++) {
+  const rows = JSON.parse(gh([`repos/${repo}/issues?state=open&per_page=100&page=${page}`]));
+  for (const i of rows) if (!i.pull_request) open.push({ number: i.number, title: i.title, labels: labelsOf(i) });
+  if (rows.length < 100) break;
+}
 const ids = [...new Set(plan.workstreams.flatMap((w) => w.issues))];
 const issues = {};
 for (const n of ids) {
