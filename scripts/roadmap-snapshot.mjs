@@ -6,6 +6,7 @@
  * file, runs this script, and writes the two outputs back.
  *
  * Usage: node scripts/roadmap-snapshot.mjs <plan.json> <out-dir>   (needs `gh` authenticated)
+ * Reads GitHub through the REST API only (`gh api`): cloud routines refuse GraphQL, which `gh issue list/view` use.
  * Writes <out-dir>/issues.json (db doc state/issues) and <out-dir>/snapshot.json (db doc snapshots/<date>).
  */
 import { execFileSync } from 'node:child_process';
@@ -14,18 +15,21 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const [planPath, outDir] = process.argv.slice(2);
 const plan = JSON.parse(readFileSync(planPath, 'utf8'));
 const repo = 'dcodish/geo_builder';
-const gh = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
+const gh = (args) => execFileSync('gh', ['api', ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+const labelsOf = (i) => i.labels.map((l) => ({ name: l.name }));
 
 const today = new Date().toISOString().slice(0, 10);
 const weekOf = (d) => { const i = plan.weeks.filter((w) => w.from <= d).length; return d > plan.end ? 6 : i; };
 
 // Every open issue (for phase counts) plus each plan issue's own state (closed ones too).
-const open = gh(['issue', 'list', '--repo', repo, '--state', 'open', '--limit', '2000', '--json', 'number,title,labels']);
+// The REST issues list includes pull requests; they are dropped, as `gh issue list` did.
+const open = gh(['--paginate', `repos/${repo}/issues?state=open&per_page=100`, '--jq', '.[] | select(.pull_request | not) | {number, title, labels}'])
+  .split('\n').filter(Boolean).map(JSON.parse).map((i) => ({ number: i.number, title: i.title, labels: labelsOf(i) }));
 const ids = [...new Set(plan.workstreams.flatMap((w) => w.issues))];
 const issues = {};
 for (const n of ids) {
-  const i = gh(['issue', 'view', String(n), '--repo', repo, '--json', 'number,title,state,labels,closedAt']);
-  issues[n] = { t: i.title, s: i.state, l: i.labels.map((l) => l.name), closedAt: i.closedAt || null };
+  const i = JSON.parse(gh([`repos/${repo}/issues/${n}`]));
+  issues[n] = { t: i.title, s: i.state.toUpperCase(), l: i.labels.map((l) => l.name), closedAt: i.closed_at || null };
 }
 
 const kind = (l) => (l.includes('bug') ? 'bug' : l.includes('feature') ? 'feature' : l.includes('debt') ? 'debt' : 'other');
