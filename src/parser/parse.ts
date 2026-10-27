@@ -25,6 +25,7 @@ import { restoreStatedSequences as restoreStatedSequencesShared } from '../../sh
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldTangentSide } from './tangentSide';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
@@ -14394,7 +14395,8 @@ export function normalizeUtterance(raw: string): string {
   // sibling lanes already had. Both run on the fully-orthographic text, so every value-bearing rule
   // downstream sees one shape.
   // #1691 (ADR-AG-239): «F ו- G», «F ו -G», «F ו - G» are «F ו-G» — the shared fold every builder's boundary calls.
-  const lengths = normalizeVerboseLength(stripValueUnits(foldConjunctionSpacing(orth)));
+  // #2553 (ADR-AG-337): «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is «… חיצוני לשני המעגלים» — one fold (copied to analytic).
+  const lengths = normalizeVerboseLength(stripValueUnits(foldTangentSide(foldConjunctionSpacing(orth))));
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
   // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read
