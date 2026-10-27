@@ -35,9 +35,8 @@ describe('V7 T1 — vector-defined points', () => {
 
   it('unknown INSIDE the expression: AD = 2/3u + 1/3v defines C when v = AC (2021-חורף form)', () => {
     ['A(0,2,-1)', 'B(-3,2,2)', 'D(-2,3,1)'].forEach(submit);
-    submit('נסמן: AB = u, AC = v'); // C does not exist yet — v's head is the unknown
-    expect(state().lastError).toEqual({ code: 'unknown-point', id: 'C' }); // naming needs existing points — correct refusal
-    // the exam's flow instead DEFINES C through the relation with a PAIR atom:
+    // ⚠ #1467 (ADR-3D-382, #2048 S2(a)): «נסמן: AB = u, AC = v» with no C now CREATES C free — locked in
+    // issue-840.test.ts. The exam's flow DEFINES C through the relation with a PAIR atom:
     submit('AD = 2/3AB + 1/3AC');
     expect(state().lastError).toBeNull();
     const pos = derived().positions;
@@ -92,9 +91,12 @@ describe('V7 T1 — vector-defined points', () => {
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 
-  it('two unknown points refuse honestly', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; the operator's T49, 2026-10-24, «קובייה ABCD» · «PQ = 2AB»: "same comment" —
+  // create what is needed, with its DOF): Q is created free and P is the point the relation defines.
+  it('two unknown points: Q is created free, and P is defined by the relation', () => {
     submit('קובייה ABCD');
     submit('PQ = 2AB');
-    expect(state().lastError).toEqual({ code: 'two-unknowns', id: 'Q' });
+    expect(state().lastError).toBeNull();
+    expect(state().lastCreated?.ids).toEqual(['Q']);
   });
 });

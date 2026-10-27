@@ -133,12 +133,12 @@ describe('#1093 — what it refuses, and by name', () => {
     expect(through).toBeDefined();
   });
 
-  it('but the DIRECTION operand is a reference, not a naming — it introduces nothing', () => {
-    // The asymmetry is deliberate: relations do not introduce their operands, and a direction is
-    // what a relation's operand is. Naming what a construction is ABOUT differs from naming what it
-    // is measured against.
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice", and 2-D now creates every referenced point too, ADR-769): 
+  // the DIRECTION operand is still a reference, not a naming, so its points are CREATED (and announced), never declared.
+  it('the DIRECTION operand is a reference: its missing points are created by reference', () => {
     const d = derive(['נתונה הנקודה P(1,1)', 'דרך P עובר ישר מקביל ל CD'], 0);
-    expect(d.figure.points.map((p) => p.id)).not.toContain('C');
+    expect(d.faults).toEqual([]);
+    expect(d.created).toEqual([{ index: 1, ids: ['C', 'D'] }]);
   });
 
   it('a direction that is not a direction is an OWNED refusal (ADR-AG-017)', () => {

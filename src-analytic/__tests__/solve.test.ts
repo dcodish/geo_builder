@@ -111,10 +111,11 @@ describe('a shape noun DECLARES; a reference still may not invent', () => {
     expect(d.figure.segments).toHaveLength(3);
   });
 
-  it('but «AD גובה לצלע BC» with no B still refuses, naming the point', () => {
-    // #1028's rule holds for every form 2-D does not mint for (#1670, ADR-AG-210 — «M אמצע AB» now mints, as in 2-D).
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice", and 2-D now creates every referenced point too, ADR-769): 
+  it('«AD גובה לצלע BC» with no B creates B and C', () => {
     const d = derive(['AD גובה לצלע BC']);
-    expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
+    expect(d.faults).toEqual([]);
+    expect(d.created[0]?.ids).toEqual(['B', 'C']);
   });
 
   it('an unplaced vertex MOVES between configurations — it is free, not defaulted (ADR-052)', () => {

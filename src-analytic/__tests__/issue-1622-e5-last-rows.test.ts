@@ -254,9 +254,11 @@ describe('#1622 E5 — «נסמן את שטח ABCD ב-S» on an empty canvas int
     expect(d.figure.segments.filter((s) => s.id.startsWith('poly-')).length).toBe(4);
   });
 
-  it('only the LABEL introduces its region: an area VALUE about points that do not exist stays refused, as in 2-D', () => {
-    expect(kinds(['שטח ABCD = 20'])).toEqual(['refused:unknown-reference']);
-    expect(kinds(['שטח ABC = שטח ABD'])).toEqual(['refused:unknown-reference']);
-    expect(kinds(['משולש ABC', 'S_{XYZ} / S_{ABC} = 2'])[1]).toBe('refused:unknown-reference');
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"; 2-D creates them too, ADR-769): 
+  // an area VALUE about points that do not exist creates them too (the LABEL alone still draws its ring).
+  it('an area VALUE about points that do not exist creates them, as in 2-D', () => {
+    expect(kinds(['שטח ABCD = 20'])).toEqual(['record']);
+    expect(kinds(['שטח ABC = שטח ABD'])).toEqual(['record']);
+    expect(kinds(['משולש ABC', 'S_{XYZ} / S_{ABC} = 2'])[1]).toBe('record');
   });
 });

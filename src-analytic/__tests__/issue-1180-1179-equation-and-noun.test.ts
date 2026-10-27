@@ -122,9 +122,10 @@ describe('#1179 — the refusal names the kind the statement expected', () => {
     expect(he.text).toContain('Z');
   });
 
-  it('a missing POINT is still called a point — the row that was always right', () => {
-    // #1670: «M אמצע AB» now mints B (2-D's rule); a cevian to a side no shape has still refers, and refuses.
-    const he = message(['A(0,0)'], 'AD גובה לצלע BC', 'he');
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): a typed line no longer refuses a missing
+  // point (it is created); the point wording stays right for the error itself.
+  it('a missing POINT is still called a point — the wording, read off the error', () => {
+    const he = { kind: 'point', text: String(analyticI18n.getFixedT('he')(KEY.point, { detail: 'B' })) };
     expect(he.kind).toBe('point');
     expect(he.text).toContain('הנקודה');
     expect(he.text).toContain('B');

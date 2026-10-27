@@ -401,8 +401,9 @@ describe('#1323 — «שיפוע הישר l1 שלילי» is a selector inside v
     expect(freedom(['נתון הישר l1: y=2x', 'm<0'])).toBe(1); // the declared m is a reported freedom
   });
 
-  it('a sign about a two-point direction whose points do not exist names the missing point', () => {
-    expect(codes(['שיפוע הישר AB הוא חיובי'])).toEqual(['unknown-reference']);
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): the missing points are created.
+  it('a sign about a two-point direction whose points do not exist creates them', () => {
+    expect(codes(['שיפוע הישר AB הוא חיובי'])).toEqual([]);
     expect(codes(['משולש ABC', 'שיפוע הישר AB הוא חיובי'])).toEqual([]);
   });
 });

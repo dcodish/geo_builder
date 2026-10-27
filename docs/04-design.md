@@ -1117,6 +1117,17 @@ mention is a sentence-opening «ב+מעגל [O]», so the circle is the scene, n
 
 ## The submit gate and `decideDeterministic`
 
+### Points a statement names and the figure lacks ([ADR-769](06-decisions.md#adr-769), #1467)
+
+The outermost `parse` runs `withImpliedPoints(commands, ctx.points)` whenever the context carries `points` (a figure) (`src/parser/impliedPoints.ts`): the batch is
+`lower`ed and applied structurally onto a skeleton of the figure's points, and every `[A-Z]d*` id the result's
+`objectParents` / `constraintRefs` (plus a store-level measure's own operands) reference and it does not hold gets
+«נקודה X»'s `free-point {x: 3, y: 2, free, ifAbsent}` prepended — identity when nothing is missing. Placement is
+`free-point`'s general-position probe. On commit, `commitLine` (`submitPipeline.ts`, both the deterministic and the
+LLM path) asks `createdByReference(before, after, statements, utterance)` (`src/app/createdPoints.ts`): the typed
+labels a carrier (`segment`, bare `free-point`) brought in, never a point a command defines, nothing for a
+declaration-only line. `App.tsx` shows `CreatedNotice` while that group is the last row; ✕ is `removeGroup`.
+
 ### The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
 
 Everything up to the model call — store operations, the pre-parse guards, the parse and its #186/#539 auto-binds,

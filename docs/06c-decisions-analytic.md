@@ -999,6 +999,8 @@ and that limit is stated rather than papered over.
 
 ## ADR-AG-015 — B2/B3 BUILT: free vertices, the joint solve, and entry order stops mattering (#1016 #1017 #1033 #1034 #1047)
 
+**Status:** accepted · **⚠ Partly superseded by [ADR-AG-342](#adr-ag-342) (2026-10-27):** decision 1's "a reference still may not invent" no longer holds for points — every line that refers to a missing point creates it (#1467).
+
 **Requirements:** [02c](02c-requirements-analytic.md) R19 (entry-order independence), R5 (tier 3,
 ratified by [ADR-AG-009](#adr-ag-009)), P4/R22 (the DOF cue as the determinacy signal), §8 F16/F17.
 **Design:** [04c](04c-design-analytic.md) "The model" — the constraint layer and the solve.
@@ -9574,7 +9576,7 @@ Also measured: the S4 cevian foot was a FREE point plus constraints, so adding �
 
 ## ADR-AG-210 — A radius names an unnamed centre, a reference states the circle it names, and a bare relation mints its new letters — by 2-D's rule (#1670, #1686)
 
-**Status:** accepted · 2026-10-02.
+**Status:** accepted · 2026-10-02 · **⚠ Partly superseded by [ADR-AG-342](#adr-ag-342) (2026-10-27):** decision 4's form gate (`mintedByReference`) is gone — every point reference mints (#1467).
 - Operator rulings on #1670 (2026-10-02): rows 1–2 follow 2-D; *"an unlablled circle should not be O automatically. and yes - accept new letter with same logic the 2d tool has"*.
 - Operator ruling on #1686 (2026-10-02), on «BO = 5» beside an unnamed circle: *"create a segment BO where B is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the center … thats why we create a random point O until user assigns its location"*.
 - Lifts [#1028](https://github.com/dcodish/geo_builder/issues/1028)'s refusal for the forms 2-D mints for.
@@ -13786,3 +13788,24 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts` (the report and seven spellings, the other direction and circle, value-first rows, the ratio rows in both orders, the ghost-symbol refusals, the contradiction in both orders, the ghost DOF for five letters, controls, stability, the M2 single-seam guard); fixture `issue-2521-radius-letter-binds.analytic.json`; parity rows `radius-letters-order-then-value-2521`, `radius-letters-value-then-order-2521`, `radius-letter-value-then-ratio-2521`, `radius-letter-value-then-bound-2521` (X8).
 
 **Behaviour change for a student:** after «R > r», stating circle P's radius as 9 draws circle O larger than 9 (it was drawn smaller, green); the radius may be stated before «R > r» (it was refused); «רדיוס מעגל P הוא 3» then «R = 2r» draws O at 6 (it was not understood); «r < 5» after P's radius 9 is refused (it was accepted); «R > r» · «רדיוס O הוא 5» · «רדיוס P הוא 9» refuses the last line with the existing «הערך במשפט … אינו אפשרי כאן» message (it was accepted green — 2-D accepts it with an amber warning; #2527 asks which is right).
+
+## ADR-AG-342 — Every line that refers to a point the figure lacks creates it, as 2-D does, and the notice names it (#1467)
+
+**Status:** accepted · 2026-10-27 · feature (analytic) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · the analytic half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-AG-210](#adr-ag-210) decision 4 (the mint is no longer gated by `mintedByReference`, the forms 2-D minted for in 2026-10: 2-D now creates every referenced point, [ADR-769](06-decisions.md#adr-769)) · **supersedes** [ADR-AG-015](#adr-ag-015) decision 1 for points
+
+**Operator:** ruling 2026-09-27 on #1467, *"Create everywhere + notice"*; #2048 card d5-2048-tools (2026-10-13), *"every builder that has these objects creates them the same way"*.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R143 (amended) · **Design:** [04c](04c-design-analytic.md) § "New letters and circles a reference names" · **LADDER stage:** the fold, `foldPass`'s last-resort mint (after the deferral fixpoint, unchanged position)
+
+**Measured before** (`d9494206`, `decideSubmit`): «M אמצע AB», «AB = 5», «P על הישר AB», «A(0,0)» · «B(4,0)» · «M אמצע AX» recorded silently; «AB = 2 AD», «AD תיכון לצלע BC», «שיפוע הישר AB שלילי» refused `unknown-reference` (point).
+
+**Decision.**
+1. **Every line whose only failures are references to missing points** has them minted `free` and re-applied, a round at a time (a fact naming a further missing letter mints that one too), until the line lands; a line that still fails keeps nothing. The reader is the fold's own `unknown-reference`; `mintedByReference`, `isMintCompanion`, `orderMints` and `plainLengthSide` are deleted.
+2. **Unchanged:** mint-last (after the fixpoint, so «M אמצע AB» above «A(0,0)» binds), the area label's ring, circle references (`refKindOf === 'circle'` stays refused; #2048 S3), and a radius capital («R > r» stays refused).
+3. **The notice:** `FoldResult.created` → `Derivation.created` (line index → ids), kept apart from `minted` (a name the TOOL gave). `decideSubmit`'s `record` carries `created`; `App.tsx` shows `CreatedNotice` while that line is the last row; ✕ is `removeLine`.
+
+**Locks.** `src-analytic/__tests__/created-notice-1467.test.ts` (12: the shared §5c rows; six blank sentences with their notice; «AB = 2 AD» at three seeds; mint-last; «R > r»; a missing circle; the text).
+
+**⚠ Locks rewritten** (each cites #1467; they asserted ADR-AG-015's "a reference may not invent" for points, or ADR-AG-210's 2-D form gate): `derived`, `solve`, `parser` («AB = 2CD»), `issue-1242-fold-deferral` (atomicity now asked of «AB קוטר במעגל I», which no creation fixes; the forward-reference gate), `issue-1670-follow-2d` (its four 2-D refusals now build), `issue-1651-1652`, `line-at`, `issue-1620-perpendiculars`, `issue-1620-bisectors-cevians`, `issue-1622-e4-chords-arcs` (an arc's missing ends are created ON its circle), `issue-1622-e5-last-rows` (an area value), `issue-1317-family`, `issue-2395-distinct-given` (the point half; the circle half kept), `issue-2431-line-name-resolves`, `issue-1464-1324-1462-kite-exercise` (two), `issue-2392-named-common-tangent`, `fact-ops-1548` (three: muting a point leaves its dependent on a free point, #1467 §8b), `issue-1150-1145-refs` and `issue-1180-1179-equation-and-noun` and `issue-1750-unknown-ref-near-miss` (a typed line no longer reaches the missing-POINT refusal; the circle half and the wording stay locked), `issue-1272-claim-gate` (two), `issue-1340-forward-derived-point`.
+
+**Known difference from 2-D (wording only).** «AD תיכון לצלע BC» names B, C here and A, B, C in 2-D: analytic's cevian draws AD as a declaring segment (ADR-AG-015), so A is introduced, not minted. The LLM lane's lines record without the notice.

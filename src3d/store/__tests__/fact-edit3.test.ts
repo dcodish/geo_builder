@@ -39,14 +39,15 @@ describe('replaceFact — in place, re-parsed, gated', () => {
     expect(st().lastError).toEqual({ code: 'not-understood' });
   });
 
-  it('an edit that breaks the FIGURE is refused keep-prior', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): an edit naming missing points creates them;
+  // an edit whose own row still fails is refused keep-prior, with its true reason.
+  it('an edit naming missing points commits; an edit that breaks the FIGURE is refused keep-prior', () => {
     st().submit('קובייה ABCD');
     st().submit("M אמצע BB'");
     const mid = st().facts[1];
-    // Q is undefined — the edited fact's own status goes bad, so the edit refuses
-    expect(st().replaceFact(mid.id, 'M אמצע QW')).toBe(false);
-    expect(st().facts[1].utterance).toBe("M אמצע BB'");
-    expect(st().lastError).toEqual({ code: 'unknown-point', id: 'Q' });
+    expect(st().replaceFact(mid.id, 'M אמצע QW')).toBe(true);
+    expect(st().replaceFact(st().facts[1].id, 'M אמצע AA')).toBe(false);
+    expect(st().facts[1].utterance).toBe('M אמצע QW');
   });
 
   it('an edit that orphans a DEPENDENT commits — the dependent flags on its own row (the toggle contract)', () => {
@@ -57,7 +58,8 @@ describe('replaceFact — in place, re-parsed, gated', () => {
     expect(st().replaceFact(cube.id, 'טטראדר KLMN')).toBe(true);
     const d = derived();
     expect(d.status[cube.id]).toBe('ok');
-    expect(d.status[mid.id]).toEqual({ code: 'unknown-point', id: 'B' }); // flagged, not deleted
+    // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): the dependent builds on free B, B' (the list without the cube)
+    expect(d.status[mid.id]).toBe('ok');
     // reversible exactly like a toggle: restore the cube and the dependent heals
     expect(st().replaceFact(cube.id, 'קובייה ABCD')).toBe(true);
     expect(derive3(st().facts, st().seed).status[mid.id]).toBe('ok');

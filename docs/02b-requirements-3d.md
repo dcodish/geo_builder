@@ -383,8 +383,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
   that moves on «הציגו תצורה אחרת», never a fixed default), and the student can name what they drew
-  in the next line («נסמן: AB = u»). Once a figure exists, a pair with two unknown endpoints is refused by
-  name. **Not yet:** a vector given only by components, which needs the design in #1188.
+  in the next line («נסמן: AB = u»). Once a figure exists, a pair with unknown endpoints creates them
+  too, and the created-points notice names them (FR-SP-25; this replaced the by-name refusal, #1467). **Not yet:** a vector given only by components, which needs the design in #1188.
   - Sources: ADR-052, ADR-3D-253; #1184, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
@@ -636,6 +636,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 
 ## Coverage
 
+- **FR-SP-25 (Must)** — **A line that refers to a point the figure lacks creates it.** «M אמצע AB», «AB = 3»,
+  «∠BAC = 90», «המרחק בין D למישור ABC הוא 6» on an empty canvas, cube · «E אמצע XC», «קובייה ABCD» · «PQ = 2AB»,
+  and points inside a vector line («נסמן: AB = u, AC = v» with no C) build: each missing point is FREE (3 DOF,
+  resampled, ADR-052), created only after every line has had its chance to declare it (so «M אמצע SA» typed above
+  «פירמידה SABCD» binds), and named by the shared notice «נוצרה נקודה חדשה X — אם זו טעות הקלדה, לחצו ✕ לביטול
+  השורה» whose ✕ removes the line. A line that still fails creates nothing and says its real reason; a line that
+  only declares («קטע QZ», a solid) announces nothing; «אלכסון AB» with no solid stays refused (#978).
+  - Sources: ADR-3D-382, ADR-W-162; #1467, #2048.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

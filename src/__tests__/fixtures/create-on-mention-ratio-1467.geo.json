@@ -1,0 +1,66 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-27T12:00:00.000Z",
+  "name": "create-on-mention-ratio-1467",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "AD:DB = 1:2",
+      "group": "g0",
+      "cmd": {
+        "type": "free-point",
+        "id": "A",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "AD:DB = 1:2",
+      "group": "g0",
+      "cmd": {
+        "type": "free-point",
+        "id": "D",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "AD:DB = 1:2",
+      "group": "g0",
+      "cmd": {
+        "type": "free-point",
+        "id": "B",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "AD:DB = 1:2",
+      "group": "g0",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "D",
+        "c": "D",
+        "d": "B",
+        "k": 0.5
+      },
+      "enabled": true
+    }
+  ]
+}

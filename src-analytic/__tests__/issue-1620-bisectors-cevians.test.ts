@@ -279,7 +279,7 @@ describe('honest refusals', () => {
   });
 
   it.each([
-    ['a bisector of an angle the figure does not have', ['משולש ABC', 'AD חוצה זווית XAC'], 'unknown-reference'],
+    // ⚠ #1467 (ADR-AG-342): «AD חוצה זווית XAC» on a triangle now CREATES X (2-D does too, ADR-769) — no longer a refusal
     ['a segment that does not start at the angle\'s vertex', ['משולש ABC', 'XD חוצה זווית BAC'], 'bisector-wrong-apex'],
     ['the apex stated twice, disagreeing', ['משולש ABC', 'CE חוצה זווית A במשולש ABC'], 'bisector-wrong-apex'],
     ['a lone vertex that is not the segment\'s', ['משולש ABC', 'AD חוצה זווית C'], 'bisector-wrong-apex'],

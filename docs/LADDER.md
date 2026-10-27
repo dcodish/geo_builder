@@ -6,6 +6,8 @@ _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages tra
 
 > **Before stage 0 — the submit decision's honesty battery** (`honestyGateReport`, both 2-D commit seams). Not a ladder stage: it decides whether a parse may reach the ladder at all. Its read-extent members ([ADR-603](06-decisions.md#adr-603), #1888; [ADR-604](06-decisions.md#adr-604), #1904; [ADR-765](06-decisions.md#adr-765), #2532) refuse a line whose reading did not read a part of it, a role word, or an incidence clause («…העובר דרך מרכז המעגל»).
 
+> **Before stage 0 — the parse seam's created points** ([ADR-769](06-decisions.md#adr-769), #1467): the outermost `parse` prepends `free-point {free, ifAbsent}` for every point the batch references and the figure lacks (`withImpliedPoints`). 3-D and analytic create in their folds instead, after the deferral fixpoint (ADR-3D-382, ADR-AG-342).
+
 ## Stage 0 — pre-gates (`applyStep`, before anything mutates)
 
 | # | Gate | Trace token | Refusal |

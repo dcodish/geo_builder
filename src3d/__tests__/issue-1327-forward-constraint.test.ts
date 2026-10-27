@@ -34,10 +34,10 @@ describe('#1327 — «∠SAB = 70» above the pyramid that declares A and B', ()
     expect(vangles(['∠SAB = 70', PYR])).toEqual([70]);
   });
 
-  it('a constraint naming a point NO line declares stays red, naming it — nothing is invented to satisfy it', () => {
-    const [first, second] = statuses(['∠SXB = 70', PYR]);
-    expect(first).toEqual({ code: 'unknown-point', id: 'X' });
-    expect(second).toBe('ok');
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a point no line declares is created,
+  // LAST — S and B still bind to the pyramid below; only X is new.
+  it('a constraint naming a point NO line declares creates it, last (S and B bind to the pyramid)', () => {
+    expect(statuses(['∠SXB = 70', PYR])).toEqual(['ok', 'ok']);
   });
 
   it('#926’s symbol retry is unchanged — «α = 70» before and after its definition', () => {

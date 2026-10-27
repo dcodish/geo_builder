@@ -57,8 +57,8 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
 
   it('«שיעור ה-x של A הוא שלילי» is UNDERSTOOD since #1462 — x_A < 0, refused only for the point it names', () => {
     // The #1323 shape one quantity over: the sign of a coordinate is a comparison with 0 (ADR-AG-161). With
-    // no A the honest answer is the missing point, and the seam does not fire for a sentence the tool read.
-    expect(codeOf('שיעור ה-x של A הוא שלילי')).toBe('unknown-reference');
+    // no A, A is created (#1467, ADR-AG-342), and the seam does not fire for a sentence the tool read.
+    expect(verdictOf('שיעור ה-x של A הוא שלילי').kind).toBe('record');
     expect(reachesFallback(verdictOf('שיעור ה-x של A הוא שלילי'))).toBe(false);
   });
 
@@ -67,7 +67,7 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
     // no A and B the honest answer is the missing points, not "not understood" — and the seam does
     // not fire for a sentence the tool read.
     expect(parseLine('שיפוע הישר AB הוא חיובי').ok).toBe(true);
-    expect(codeOf('שיפוע הישר AB הוא חיובי')).toBe('unknown-reference');
+    expect(verdictOf('שיפוע הישר AB הוא חיובי').kind).toBe('record'); // #1467: A and B are created
     expect(decideSubmit('שיפוע הישר AB הוא חיובי', ['משולש ABC'], 0).kind).toBe('record');
   });
 

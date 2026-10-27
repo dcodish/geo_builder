@@ -110,9 +110,11 @@ describe('#601 — the sibling arms, re-asserted', () => {
     expect(st.lastError === null || (st.lastError as { code?: string }).code !== 'unknown-point').toBe(true);
   });
 
-  it('a kite whose DERIVING points are missing refuses by name rather than inventing them', () => {
-    // The corner is derived from three points; if one of them is absent this is not a completion at all.
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a kite's missing corners are created by the
+  // fold's mint pass, as a declaration (no notice).
+  it('a kite whose corners are missing creates them, and announces nothing (a declaration)', () => {
     const { st } = build(['משולש ABC', 'דלתון ABXD']);
-    expect(st.lastError).not.toBeNull();
+    expect(st.lastError).toBeNull();
+    expect(st.lastCreated).toBeNull();
   });
 });

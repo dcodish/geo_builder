@@ -404,7 +404,7 @@ function canStartFigure(c: Construction3): boolean {
 }
 
 /** Mint the missing endpoints as `free3` (ADR-052 — an unstated position is a free DOF, never a fixed default). */
-function mintFree(c: Construction3, ids: Id[]): Construction3 {
+export function mintFree(c: Construction3, ids: Id[]): Construction3 {
   const next = clone(c);
   for (const id of ids) if (!next.points.has(id)) next.points.set(id, { kind: 'free3' });
   return next;
@@ -1772,7 +1772,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        */
       const fresh = [cmd.a, cmd.b].filter((id) => !c.points.has(id));
       /**
-       * THE BOTH-FRESH REFUSAL STAYS HERE, and #1184 measured why (see `canStartFigure`).
+       * ⚠ #1467 (ADR-3D-382, operator ruling 2026-09-27 "Create everywhere + notice"): the both-fresh refusal below is
+       * WITHDRAWN. «קטע QZ» on an empty canvas DECLARES Q and Z, as «משולש XYZ» declares its corners; the typo guard
+       * it was is replaced by the created-points notice (which a declaration never shows). «אלכסון AB» is not bare
+       * drawing: it keeps its refusal with no solid (#978) — the `diagonal` guard below and `mintEligible3`.
+       *
+       * (History) THE BOTH-FRESH REFUSAL STAYS HERE, and #1184 measured why (see `canStartFigure`).
        *
        * The empty-canvas relaxation that lets «וקטור AB» start a figure is applied to the ARROW lane
        * only. Widening it here as well was built and measured, and it moves two locks that encode
@@ -1784,7 +1789,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        * So a bare segment on an empty canvas is a separate question with its own answer to find,
        * filed rather than decided here.
        */
-      if (cmd.bare && fresh.length > 0 && fresh.length < 2) {
+      // a diagonal keeps ADR-3D-191's one-known-end mint («אלכסון AE» on a cube); with no known end it has no solid to be of
+      if (cmd.bare && fresh.length > 0 && (fresh.length < 2 || !cmd.diagonal)) {
         const next = mintFree(c, fresh);
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };

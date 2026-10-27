@@ -40,8 +40,9 @@ import { droppedPropertyWords } from '@/parser/propertyWords';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { figureContext } from '@/parser/llmShared';
 import { circleMembers, circleRefs, isGeoPoint } from '@/engine';
-import type { Construction, Id, Vec } from '@/engine';
-import { dryRunOutcome, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
+import type { AnyCommand, Construction, Id, Vec } from '@/engine';
+import { createdByReference } from './createdPoints';
+import { dryRunOutcome, groupKey, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
@@ -64,6 +65,17 @@ export interface SubmitUi {
    */
   setText?(text: string): void;
   setBusy(busy: boolean): void;
+  /**
+   * #1467 (ADR-769, ADR-W-162): the «נוצרה נקודה חדשה …» notice — the points the committed line created by reference,
+   * and the row (its group key) whose removal is the notice's ✕. Null clears it. Optional: a headless driver omits it.
+   */
+  setCreatedNotice?(notice: CreatedNotice2D | null): void;
+}
+
+/** #1467 — what the created-points notice holds in 2-D: the labels, and the row the ✕ removes. */
+export interface CreatedNotice2D {
+  names: Id[];
+  groupKey: string;
 }
 
 export interface SubmitDeps {
@@ -103,10 +115,27 @@ export interface SubmitDeps {
  * escalation commits nothing here, naming included. The pipeline calls this, and so do the locks that replay a
  * sequence through `decideDeterministic2D` — four of them used to re-apply the binds by hand.
  */
-export function commitVerdict(verdict: Verdict2D, utterance: string): void {
+export function commitVerdict(verdict: Verdict2D, utterance: string): CreatedNotice2D | null {
   const st = useGeoStore.getState();
-  if (verdict.kind === 'commit') st.executeMany([...nameByUseCommands(verdict.binds), ...verdict.commands], utterance);
-  else if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
+  if (verdict.kind === 'commit') return commitLine([...nameByUseCommands(verdict.binds), ...verdict.commands], verdict.commands, utterance);
+  if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
+  return null;
+}
+
+/**
+ * #1467 (ADR-769) — commit one line's batch and say which points it created by reference. Both commit paths (the
+ * deterministic verdict above and the LLM's decomposition) come through here, so the notice cannot be wired to one.
+ * `statements` is the line's own commands, without its naming by use.
+ */
+function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utterance: string): CreatedNotice2D | null {
+  const st = useGeoStore.getState();
+  const before = replay(st.facts, st.seed).construction;
+  st.executeMany(batch, utterance);
+  const now = useGeoStore.getState();
+  const last = now.facts[now.facts.length - 1];
+  if (!last || now.facts.length === st.facts.length) return null;
+  const names = createdByReference(before, replay(now.facts, now.seed).construction, statements, utterance);
+  return names.length ? { names, groupKey: groupKey(last) } : null;
 }
 
 /**
@@ -167,6 +196,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   ui.setInputNote('');
   ui.setLlmDropped([]);
   ui.setRenameNote('');
+  ui.setCreatedNotice?.(null); // #1467: the notice speaks for the last line only
   const store = () => useGeoStore.getState();
   const parseCtxNow = () => {
     const v = deps.view();
@@ -262,7 +292,11 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       return; // keep the text so the student can edit it
     case 'commit':
       // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
-      commitVerdict(verdict, utterance);
+      {
+        // evaluated FIRST: an optional call (`ui.setCreatedNotice?.(…)`) skips its arguments when the UI has no notice
+        const created = commitVerdict(verdict, utterance);
+        ui.setCreatedNotice?.(created);
+      }
       for (const e of verdict.logs) log(e);
       if (verdict.note) ui.setInputNote(noteText(verdict.note));
       ui.clearText();
@@ -507,7 +541,8 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   // (a Hebrew input must never surface as an English row). All built commands share one group, exactly
   // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
   // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
-  store().executeMany([...bindCmds, ...llmCmds], utterance); // one batch → one step row AND one undo entry (E4)
+  const created = commitLine([...bindCmds, ...llmCmds], llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
+  ui.setCreatedNotice?.(created);
   // `commands` carries the LLM's committed canonical commands into the PROD analytics event too (issue
   // #84) — a `source:llm, result:ok` submit is otherwise opaque and a reported session can't reconstruct.
   // `restored` (#536): stated point-runs whose LLM respelling the sequence gate corrected («ABD→ADB») —
