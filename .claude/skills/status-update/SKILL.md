@@ -163,6 +163,12 @@ reason the report exists as a habit. Its four sub-lists:
   enthusiasm, or old prose approvals in issue bodies arm nothing. An operator edit ("also add #N")
   is part of the approval; transcribe it as given.
 
+## Step 4 — refresh the roadmap page
+
+Run the **`roadmap-refresh`** skill after the report, using the same live queue
+([ADR-W-159](../../../docs/06w-decisions-workspace.md#adr-w-159)), and add its one line to the report. It
+also transcribes any decision the operator answered on the page since the last refresh.
+
 ## Grounding rules
 
 - Never grade from the title alone; titles compress, bodies carry the diagnosis.
