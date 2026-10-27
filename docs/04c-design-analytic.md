@@ -905,6 +905,16 @@ an optional kind. The definition clause «ש(שני) המעגלים נמצאים
 
 *Identifiers:* `unnamedCommonTangent` · `UNNAMED_TANGENT_HE` · `UNNAMED_TANGENT_EN` · `namedTouchPoint` · `TOUCH_NAME_HE` · `TOUCH_NAME_HE_LAST` · `TOUCH_NAME_EN` · `foldTangentSide`
 
+**The exam's pair sentences ([ADR-AG-336](06c-decisions-analytic.md#adr-ag-336), #2552).** «שני מעגלים שרדיוס כל
+אחד מהם r» is the `שני מעגלים` rule's pair with both slots `{ k: 'new', r }` (`radiusOfSize`'s value slot). «מרכז המעגל
+הראשון / השני הוא X(a,b)» (`pairCentreAt`) lowers to `centre-of { id: X, ordinal: 1 | 2, create }` and the point
+sentence «X(a,b)»; M1 names the unnamed `circle-pair<k>-<ordinal>` member's centre by `namingByOrder`, answers `known`
+for a member already centred on X and `already-named` for one centred on another letter, and with no pair reads the
+fact as without the ordinal. `segmentsOf` and the `UNWRAP` table take «ו» before «מרכז» as a sentence opener, so the
+exam's joined sentence is cut and read as the two.
+
+*Identifiers:* `pairCentreAt` · `PAIR_CENTRE_HE` · `PAIR_CENTRE_EN` · `centre-of.ordinal` · `segmentsOf` · `UNWRAP`
+
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
 Every spelling lowers to the canonical crossing of two tangent nouns (`readTangentNoun`, `tangentsMeet`,

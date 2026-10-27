@@ -217,7 +217,8 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/^\((.*)\)$/, '$1'],
   // The conjunction that continues the previous sentence — «והנקודה C …», «וידוע כי …», «וכי DO/DE = 2/3».
   [/^וכי\s+/, ''],
-  [/^ו(?=ה[א-ת]|ידוע|נתו|עוד\s)/, ''],
+  // «ומרכז המעגל השני הוא …» (#2552, ADR-AG-336) — the sentence opener `segmentsOf` cuts before, unwrapped as the others.
+  [/^ו(?=ה[א-ת]|ידוע|נתו|עוד\s|מרכז\s)/, ''],
   // The given-prefixes, in every form the corpus prints — «נתון», «נתון:», «נתון כי», «נתון גם», «נתון בנוסף:»,
   // «עוד נתון:», «ידוע כי», «ידוע גם ש-». The four inflections are written out: «נתון» ends in FINAL nun.
   // The glued relative «ש-» («נתון שהישר …») is never the first letter of a CARDINAL: «נתונים שני מעגלים» is "two circles
@@ -1068,7 +1069,8 @@ export function segmentsOf(line: string): Segment[] {
     if (ch === '(') depth += 1;
     else if (ch === ')') depth = Math.max(0, depth - 1);
     else if (depth === 0 && (ch === ',' || ch === ';')) cut(i, ch + ' ', 1);
-    else if (depth === 0 && ch === ' ' && /^ ו(?:ה[א-ת]|ידוע|נתו|כי\s)/.test(line.slice(i))) cut(i, ' ', 1);
+    // «… ומרכז המעגל השני הוא O2(9, 10)» (#2552, ADR-AG-336): «מרכז» opens a sentence too — the exam joins its two centres so.
+    else if (depth === 0 && ch === ' ' && /^ ו(?:ה[א-ת]|ידוע|נתו|כי\s|מרכז\s)/.test(line.slice(i))) cut(i, ' ', 1);
     else if (depth === 0 && ch === ' ') {
       // «A משמאל ל-O ו-C מימין ל-O» (#1706 follow-up, ADR-AG-222): «ו-» before a point's name may join two sentences.
       // The joint is kept as the separator, so a reading that merges the pieces gets the line back unchanged.
