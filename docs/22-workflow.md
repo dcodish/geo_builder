@@ -30,7 +30,7 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 
 **The title leads with his words.** Its first clause is the sentence the operator typed, in Hebrew «guillemets»; the class name goes after the dash. He finds his reports by scanning titles for his own words, and re-reports one he cannot see (#1323).
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **What each type means** (#1763). The type is decided by what the STUDENT experiences, not by the size of the change:
 - **`bug`** — the product does something wrong for a student: a wrong figure, a dropped or misread given, a false refusal, a crash, a misleading message. Route: a fix on `main` (§3).
@@ -45,19 +45,47 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 
 ## 2. Priority rubric
 
-- **P1 — production correctness / honesty.** A figure that renders wrong while looking right, a silently dropped given, a crash, data loss, prod down. **Drop everything**; fix before any other work; hotfix may land directly on `main` (gates still apply); deploy promptly.
-- **P2 — a real input fails visibly.** An honest refusal/escalation on something students genuinely type, a common phrasing gap, a verifier-amber that should be green. Scheduled by **measured demand** (log-triage counts beat intuition — see the `/log-triage` skill).
-- **P3 — polish / perf / internal debt.** Batched; picked up when the P1/P2 queue is quiet.
+Priority answers *what do we work on next*. It follows **who hit the issue** and **where it sits in
+the teaching plan** ([ADR-W-160](06w-decisions-workspace.md#adr-w-160), #2556; operator ruling
+2026-10-26: *"a P2 on the complex tool is not really that important because complex tool is a lower
+priority in general"*). Severity is recorded separately, by two marks:
 
-Honesty violations outrank capability gaps: a wrong figure teaches a student something false; a refusal only inconveniences them.
+- **`wrong-answer`** — a wrong figure shown as correct, a silently dropped or misread given, or lost
+  work. Whoever found it. A false refusal, a false red row or a bad message is a visible failure, not a
+  wrong answer.
+- **`reported`** — a real person hit it: the operator in class or while playing book, exam or play-sheet
+  examples (*"if I hit an issue, it means that any … other person would have hit it"*), a teacher, or a
+  student in the prod logs. An issue a session found carries no `reported`, however it was later ruled on.
 
-**Grade by the class, never by the reach.** A figure drawn green for givens that cannot hold is P1 however unlikely the input. "It takes a mistake to reach" describes the honesty class, since a student's mistyped contradiction is exactly when the tool must refuse (#1328). Reachability may lower a P2 or P3, never a P1.
+**The phases** come from the roadmap (the overview page,
+https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew): **Now** = analytic (lines, circles, locus) ·
+**Next** = 3-D (vectors) · **Maintenance** = 2-D, bugs only · **Later** = complex, conics (ellipse,
+parabola, hyperbola) and the sphere/round solids · workspace and server sit outside the phases.
+
+- **P1 — drop everything.** A `wrong-answer` that is also `reported`, or production down. Fix before any
+  other work; a hotfix may land directly on `main` (gates still apply); deploy promptly.
+- **P2 — the work queue.** Any issue in the roadmap plan's workstreams (the current and next unit's
+  "ready enough"); any `wrong-answer` outside a Later phase, including 2-D (D5, 2026-10-26); a
+  `reported` visible failure in a Now or Next product. Internally found wrong answers sort first.
+- **P3 — batched.** Maintenance (2-D) items that are not wrong answers, unusual cases a session found,
+  polish, perf and debt.
+- **`later` — not ranked.** A product or topic whose phase has not started. It carries the `later` label
+  instead of P1/P2/P3 and is never composed into a fix round. **When a phase opens, its items are
+  re-ranked** (`scripts/priority-rerank.mjs`; the operator reviews the summary before labels change).
+
+Debt keeps its own rule: **P3 by default, P2 when it blocks scheduled work** (§1). Workspace and server
+items are ranked by that rule and by the P1 definition, not by phase.
+
+**Grade the mark by the class, never by the reach.** A figure drawn green for givens that cannot hold
+is `wrong-answer` however unlikely the input; "it takes a mistake to reach" describes the honesty class,
+since a student's mistyped contradiction is exactly when the tool must refuse (#1328). What the mark
+does to the priority is the rubric above: a session-found wrong answer is P2, a person-hit one is P1.
 
 ## 2b. Triage-first: a reported issue is QUEUED, never auto-fixed (operator directive, 2026-07-10 — ADR-265 Am. 1)
 
 The operator raises issues **while testing**, often several per pass. If the reporting session starts fixing immediately, the operator is forced to feed one issue at a time and parallel fixes overwrite each other in the shared tree. So the reporting session's job is **triage, not repair**:
 
-1. **File the issue** (§1) with type + priority + app labels.
+1. **File the issue** (§1) with type + priority + app labels, and **`reported`**: the operator hit it. Add **`wrong-answer`** if it is one, which makes it P1 (§2).
 2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
 3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit, and **not itself an open bug**: search the queue first, [ADR-W-158](06w-decisions-workspace.md#adr-w-158)) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
@@ -291,7 +319,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 
 ## 6. One-time GitHub setup (done at adoption)
 
-Labels: `P1` (red) `P2` (orange) `P3` (yellow) · `bug` `feature` `debt` · `2d` `3d` `server` · `needs-operator`. The app-label set **grows with the workspace** — each new product (§9) gets its own label at creation (planned: `analytic`, `complex`); `server` doubles as the label for shared-infra / CI / workspace items. CI runs per-product lanes on every push and PR (`.github/workflows/ci.yml`, ADR-266). Branch protection on `main` is optional (solo repo; CI is the real gate) — revisit if collaborators join.
+Labels: `P1` (red) `P2` (orange) `P3` (yellow) `later` (grey) · `wrong-answer` `reported` (2026-10-27, ADR-W-160) · `bug` `feature` `debt` · `2d` `3d` `server` · `needs-operator`. The app-label set **grows with the workspace** — each new product (§9) gets its own label at creation (planned: `analytic`, `complex`); `server` doubles as the label for shared-infra / CI / workspace items. CI runs per-product lanes on every push and PR (`.github/workflows/ci.yml`, ADR-266). Branch protection on `main` is optional (solo repo; CI is the real gate) — revisit if collaborators join.
 
 ## 7. Concurrency rules (one shared tree, two machines)
 
