@@ -845,7 +845,9 @@ M1's `circleByName` decodes a described name with `describedCircle`: `⊙` = the
 A diameter works on any circle (`diameter-of` → both ends `on-curve` plus a radius `relation`); `openCurveText` prints
 `—` for a `θ_` symbol (`readsToolSymbol`).
 
-*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
+**No ring typed ([ADR-AG-335](06c-decisions-analytic.md#adr-ag-335), #2545):** the frame folds an argument-position «במעגל החוסם [את המשולש]» / "of the circumcircle" to the letterless name «⊙◌» / «○◌» (+ the noun's size, `letterlessCircleName`); `describedCircle` reads it as the figure's one polygon's circle, bound only when it is the figure's one circle, and `statingNamedCircle` never creates it. `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict it gave before.
+
+*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `RING_OF_FIGURE` · `letterlessCircleName` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
 
 ### Circles a sentence draws; two circles named by order ([ADR-AG-219](06c-decisions-analytic.md#adr-ag-219), #1622 E3, #1693)
 

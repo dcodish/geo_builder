@@ -112,6 +112,46 @@ function autosInterchangeable(construction: Construction): boolean {
   return canon(false) === canon(true);
 }
 
+/**
+ * #2545 ([ADR-768](../../docs/06-decisions.md#adr-768)) — every polygon with a circle tangent to EVERY side BY
+ * CONSTRUCTION, the referent of «המעגל החסום [במשולש ABC]» / "the incircle". A side is tangent when the construction
+ * makes it so, never when the drawing happens to agree (docs/17 §3b, a semantic field):
+ *  - the incircle family (ADR-115's `incircle`, #1660's touch list — `incircleConstruction`): a FOOT from the centre
+ *    onto the side, the circle passing through one of those feet (its radius is the distance to a side);
+ *  - a ring built around the circle (ADR-757's dual): both ends of the side are crossings of tangent lines OF THIS
+ *    circle that share one of them (the side lies on it).
+ */
+export function inscribedCircles(construction: Construction): { circle: Id; center: Id; ring: Id[] }[] {
+  const objs = construction.objects;
+  const members = circleMembers(construction);
+  const tangentOf = new Map<Id, Id>(); // tangent line id → its circle
+  for (const o of objs) if (o.kind === 'line' && o.spec.via === 'tangent') tangentOf.set(o.id, o.spec.circle);
+  const crossingLines = new Map<Id, Id[]>(); // a crossing point → its two lines
+  for (const o of objs) if (o.kind === 'line-intersection') crossingLines.set(o.id, [o.line1, o.line2]);
+  const out: { circle: Id; center: Id; ring: Id[] }[] = [];
+  for (const poly of objs) {
+    if (poly.kind !== 'polygon') continue;
+    const v = poly.vertices;
+    for (const c of objs) {
+      if (c.kind !== 'circle' || c.center.startsWith('~')) continue;
+      const onIt = new Set(members.find((m) => m.id === c.id)?.points ?? []);
+      const feet = objs.filter((o) => o.kind === 'foot' && o.from === c.center);
+      const footOn = (a: Id, b: Id) => feet.find((f) => f.kind === 'foot' && ((f.a === a && f.b === b) || (f.a === b && f.b === a)));
+      const onTangent = (a: Id, b: Id) => (crossingLines.get(a) ?? []).some((l) => tangentOf.get(l) === c.id && (crossingLines.get(b) ?? []).includes(l));
+      let throughFoot = false;
+      const every = v.every((a, i) => {
+        const b = v[(i + 1) % v.length];
+        const f = footOn(a, b);
+        if (f && (onIt.has(f.id) || (c.radius.via === 'through' && c.radius.point === f.id))) throughFoot = true;
+        return !!f || onTangent(a, b);
+      });
+      const byFeet = v.every((a, i) => !!footOn(a, v[(i + 1) % v.length]));
+      if (every && (!byFeet || throughFoot)) out.push({ circle: c.id, center: c.center, ring: [...v] });
+    }
+  }
+  return out;
+}
+
 export function buildParseCtx(construction: Construction, positions: Map<Id, Vec>): ParseContext {
   return {
     // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
@@ -197,6 +237,8 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
     // #805 play (ADR-465 Am. 2): existing altitude feet — repeated auto-named altitudes reuse them
     feet: construction.objects.flatMap((o) => (o.kind === 'foot' ? [{ id: o.id, from: o.from, a: o.a, b: o.b }] : [])),
+    // #2545 (ADR-768): each ring's circle tangent to every side by construction — «המעגל החסום» resolves on it
+    inscribedCircles: inscribedCircles(construction),
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     // #554 (ADR-503): the DRAWN tangent-at-point lines («משיק למעגל O בנקודה B»), so the definite plural «המשיקים
     // נחתכים בנקודה E» on a LATER line can resolve which two lines cross — the incremental twin of the

@@ -36,6 +36,7 @@ import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
 import { resolvePairRoles } from './pairRoles';
+import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
@@ -371,6 +372,12 @@ export interface ParseContext {
    *  its foot (identical re-lowering → the #613 restate-dedupe reads the repeat as the same
    *  statement) and lets the leg-role pick rotate to the leg not yet carrying one. */
   feet?: { id: string; from: string; a: string; b: string }[];
+  /** #2545 ([ADR-768](../../docs/06-decisions.md#adr-768)) — SEMANTIC: each polygon with a circle tangent to EVERY side
+   *  by construction — the incircle family's feet from the centre onto each side (ADR-115, #1660's touch list), or a ring
+   *  whose sides lie on the circle's tangent lines (ADR-757's dual). Read off the objects, never the drawing: the referent
+   *  of «המעגל החסום [במשולש ABC]» / "the incircle" (`ringRoles.ts`). `center` is the real centre id (an unnamed
+   *  circle's is anonymous, '@ctr-O', ADR-342). */
+  inscribedCircles?: { circle: string; center: string; ring: string[] }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -558,21 +565,6 @@ const incenterLabel = (s: string): string | null => {
  * figure has exactly ONE circle — that circle's centre (implicit "the circle"). With
  * 0 or 2+ unnamed circles it stays null (ambiguous → the rule defers/escalates).
  */
-/**
- * #82/#81/#83 ([ADR-291](docs/06-decisions.md#adr-291)): "המעגל החוסם את [המשולש|המרובע] ABC[D]" /
- * "the circle circumscribing …" as a circle REFERENCE — resolved to the EXISTING circle through the
- * named points (M1: resolution before creation; the ADR-119 circle-reference chokepoint, so EVERY
- * circle-consuming rule gains the phrasing at once). Null when no such circle exists yet — the
- * creation rules (`circumcircle`/`circumcircleMeetsSegment`) keep owning that case.
- */
-const CIRCUM_REF_SRC = String.raw`(?:ה?מעגל\s+ה?חוסם\s+(?:את\s+)?(?:ה?משולש\s+|ה?מרובע\s+)?|(?:the\s+)?circle\s+circumscribing\s+(?:the\s+)?(?:triangle\s+|quad(?:rilateral)?\s+)?)((?:[A-Za-z]\d*\s*){3,4})`;
-const circumscribingRef = (s: string, ctx: ParseContext): string | null => {
-  const m = s.match(new RegExp(CIRCUM_REF_SRC, 'i'));
-  if (!m) return null;
-  const run = (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
-  if (run.length < 3) return null;
-  return circleContaining(ctx, run);
-};
 
 /**
  * «המעגל הימני/השמאלי» / "the right/left circle" (#188 / ADR-349) — a DIRECTIONAL reference to one of
@@ -598,7 +590,6 @@ const directionalCircleRef = (s: string, ctx: ParseContext): string | null => {
 
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
   circleCenter(s) ??
-  circumscribingRef(s, ctx) ??
   directionalCircleRef(s, ctx) ??
   // #546 (ADR-443): the anonymous tail — exactly one circle binds as always (ADR-029), and beside
   // SEVERAL the utterance's own member points may determine the circle (the membership tie-break).
@@ -618,7 +609,6 @@ const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
  */
 const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
   circleCenter(s) ??
-  circumscribingRef(s, ctx) ??
   directionalCircleRef(s, ctx) ??
   // #546 (ADR-443): the same anonymous tail as `resolveCenter`, behind this helper's mention gate.
   (mentionsCircle(s) ? (ctx.circles?.length === 1 ? ctx.circles[0] : anonymousCircleOf(s, ctx)) : null);
@@ -769,8 +759,7 @@ const leadingNamedPoint = (s: string): string | null => {
 
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string =>
-  s
-    .replace(new RegExp(CIRCUM_REF_SRC, 'gi'), ' ') // the ADR-291 circumscribing REFERENCE, labels and all
+  dropRingRefs(s) // #2545 (ADR-768): a circle named by its relation to a ring, the ring's labels and all (ADR-291's strip)
     .replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
 
 /**
@@ -5552,7 +5541,7 @@ const definiteCircleReference = (s: string, ctx: ParseContext, named: string | n
     return N && circles.some((c) => up(c) === N) ? { center: N } : null;
   }
   if (!DEFINITE_CIRCLE.test(s)) return null;
-  const hit = circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? existingCircleRef(s, ctx);
+  const hit = directionalCircleRef(s, ctx) ?? existingCircleRef(s, ctx);
   if (hit) return { center: hit };
   return { clarify: 'ambiguous-circle-ref', centers: circles.map((c) => (c.startsWith('@ctr-') ? c.slice(5) : c)) };
 };
@@ -5576,9 +5565,8 @@ const lowerThroughReference = (
   const ref = definiteCircleReference(s, ctx, named);
   if (!ref) return null;
   if (r.symbolic) return null; // a radius SYMBOL on a reference is a naming statement — not this path's
-  const rest = s
+  const rest = dropRingRefs(s)
     .replace(thr.text, ' ')
-    .replace(new RegExp(CIRCUM_REF_SRC, 'i'), ' ')
     .replace(/ה?מעגל\s+ה?(?:ימני|שמאלי)|\bthe\s+(?:right|left)(?:-hand)?\s+circle\b/gi, ' ')
     .replace(/circles?|[ושבל]?ה?מעגל\w*/gi, ' ')
     .replace(named ? new RegExp(String.raw`(?<![A-Za-z\d])${named}(?![A-Za-z\d])`, 'g') : /,^/, ' ')
@@ -5615,8 +5603,7 @@ const lowerSizeReference = (s: string, ctx: ParseContext, r: ReturnType<typeof p
   if (!r.numeric && !(r.symbolic && r.sym)) return null;
   const ref = definiteCircleReference(s, ctx, null);
   if (!ref) return null;
-  const rest = s
-    .replace(new RegExp(CIRCUM_REF_SRC, 'i'), ' ')
+  const rest = dropRingRefs(s)
     .replace(/ה?מעגל\s+ה?(?:ימני|שמאלי)|\bthe\s+(?:right|left)(?:-hand)?\s+circle\b/gi, ' ')
     .replace(/circles?|[ושבל]?ה?מעגל\w*/gi, ' ')
     .replace(/[ושב]{0,2}(?:רדיוס|היק[פף]|שטח|קוטר)[והם]?|radius|circumference|perimeter|diameter|area|π|√|ס["״']?מ|מ["״']?מ|שווה(?:\s+ל-?)?/gi, ' ')
@@ -13365,7 +13352,7 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
   let circle: { center: string; prepend: AnyCommand[] } | null | undefined;
   const circleFor = (): { center: string; prepend: AnyCommand[] } | null => {
     if (circle !== undefined) return circle;
-    const pointed = circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx);
+    const pointed = directionalCircleRef(s, ctx);
     const r = pointed ? { center: pointed, prepend: [] } : resolveOrIntroduceCircle(s, ctx, { presupposes: true });
     // The winning rule created the circle itself (one, in this very utterance) — that is the referent,
     // never a second, introduced one beside it.
@@ -14571,6 +14558,13 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // circle") is resolved where each role word stands — the sibling REWRITE at this chokepoint: every role span becomes
   // the letter form of its own circle's parse-local token, so every rule reads it as it reads «מעגל O», and no role
   // adjective is left for another rule to read as its own word («חיצוני» as a common tangent's kind).
+  // #2545 (ADR-768): a circle named by its RELATION to a polygon («במעגל החוסם [את המשולש ABC]», «על המעגל החסום», "of
+  // the circumcircle") is resolved where the relation stands — the sibling REWRITE at this chokepoint: each span whose
+  // described circle exists becomes that circle's letter form, so every circle rule binds it as it binds «מעגל O». A span
+  // with no described circle is left as typed, for the honesty battery's `unreadRingRole` (never another circle).
+  const ring = resolveRingRoles(s, ctx, parseResolved);
+  if (ring && 'aliased' in ring) return withReservedGuard(ring.aliased, ctx);
+  if (ring) s = ring.s;
   const roles = resolvePairRoles(s, ctx, parseResolved);
   if (roles) return withReservedGuard(roles, ctx);
   // «המעגל הגדול/הקטן» between two INDEPENDENT circles (issue #102, operator ruling): the size

@@ -22,7 +22,7 @@
  * line that is STORED is always the one the student typed.
  */
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
-import { NUMERAL_ALT, isNumeralName } from '../engine/names';
+import { NUMERAL_ALT, isNumeralName, letterlessCircleName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
@@ -375,6 +375,26 @@ const CENTRED_REF_EN = new RegExp(
   `\\b((?:on|to|of|inside|outside)\\s+(?:the\\s+)?circle)\\s+(?:with|whose)\\s+cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(${NAME})(?![A-Za-z0-9₀-₉'])`,
   'gi',
 );
+/**
+ * #2545 ([ADR-AG-335](../../docs/06c-decisions-analytic.md#adr-ag-335)) — THE SAME REFERENCE WITH NO RING TYPED, the ADR-W-157
+ * port of 2-D's ADR-768: «DE מיתר במעגל החוסם», «P על המעגל החסום במשולש», "DE is a chord of the circumcircle". Only in
+ * ARGUMENT position (behind an operand particle or preposition), never a subject. Folded to the letterless name
+ * (`letterlessCircleName`), which M1 resolves to the figure's one polygon's described circle when it is the figure's one
+ * circle — otherwise `submit.ts` keeps the line's hand-off to the model, as before.
+ */
+const LETTERLESS_HE = new RegExp(
+  `(?<![א-ת])((?:ו?ש?[בלמ])|(?:ו?ש?(?:על|של|אל)\\s+))(ה?)מעגל\\s+ה(חוס(?:ם|מת)|חסו(?:ם|מה))(?:\\s+(?:את\\s+)?(?:ב)?ה?(${SHAPE_HE}))?(?![א-ת])(?!\\s*(?:את\\s+)?[A-Z]{2})`,
+  'g',
+);
+const LETTERLESS_EN = new RegExp(
+  `(?<![A-Za-z])(of|on|in|to|onto|into|with|from|at|inside)\\s+the\\s+(circumscribed\\s+circle|inscribed\\s+circle|circumcircle|incircle|circle\\s+circumscribing|circle\\s+inscribed\\s+in)(?:\\s+(?:(?:of|in|around|about)\\s+)?(?:the\\s+)?(${SHAPE_EN}))?(?![A-Za-z])(?!\\s+[A-Z]{2})`,
+  'gi',
+);
+const ringArity = (noun: string | undefined): number => {
+  if (!noun) return 0;
+  const key = shapeKey(noun);
+  return key ? SHAPES[key].arity : 0;
+};
 const WHOLE_DESCRIPTION = /^(?:ה?מעגל|(?:the\s+|a\s+)?circle)\s+[⊙○][A-Z0-9₀-₉]+$/i;
 export function describedCircles(line: string): string {
   let out = line
@@ -382,6 +402,10 @@ export function describedCircles(line: string): string {
     .replace(CENTRED_REF_EN, (_m, ref: string, centre: string) => `${ref} ${centre}`);
   for (const [re, mark] of DESCRIBED_HE) out = out.replace(re, (_m, run: string) => `מעגל ${mark}${run}`);
   for (const [re, mark] of DESCRIBED_EN) out = out.replace(re, (_m, run: string) => `circle ${mark}${run}`);
+  out = out.replace(LETTERLESS_HE, (_m, pre: string, art: string, rel: string, noun?: string) =>
+    `${pre}${art}מעגל ${letterlessCircleName(/^חוס/.test(rel) ? 'circum' : 'in', ringArity(noun))}`);
+  out = out.replace(LETTERLESS_EN, (_m, prep: string, rel: string, noun?: string) =>
+    `${prep} circle ${letterlessCircleName(/circum/i.test(rel) ? 'circum' : 'in', ringArity(noun))}`);
   return out === line || WHOLE_DESCRIPTION.test(out) ? line : out;
 }
 
