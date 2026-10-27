@@ -2206,3 +2206,36 @@ over all four (ADR-041).
 ### `diameter-after-pinned-distance-2499` — «מעגל O · AB = 6 · AB קוטר של המעגל» builds radius 3, as the other order does (#2499, ADR-766)
 
 **Guards against:** a membership lowered as structure (the diameter makes A the antipode of B) leaving the earlier «AB = 6» with a carrier that cannot move it, refused with a false «סותר את «AB = 6»» while the other order built (the operator's T30, round #2501). **Asserts** the operator's three lines build with no violations, one circle of radius 3, |OA| = |OB| = 3, |AB| = 6 and O the midpoint of AB at seeds 0–2 — and the same for the twin «AB קוטר במעגל» and for the reverse order. The class matrix (table A in both orders, the contradictions that stay refused, the ladder token `main:rehome`) is `src/engine/__tests__/issue-2499-earlier-given-rehomed.test.ts`; the figure is the fixture `issue-2499-diameter-after-pinned-distance.geo.json`.
+
+### `inscribe-existing-square-no-second-2257` — «ריבוע ABCD» · «משולש EFG» · «הריבוע חסום במשולש EFG» moves THAT square into the triangle (#2257, ADR-767)
+
+**Guards against:** a definite inner noun minting a second square beside the drawn one (the operator's 2026-10-19 ruling, Q1 = A). **Asserts** one 4-gon (ABCD), no new letter, A–D each on a side of EFG, ABCD still a square, the triangle unmoved, and «הציגו תצורה אחרת» keeping all of it.
+
+### `inscribe-two-squares-asks-2257` — two squares drawn: «הריבוע חסום במשולש EFG» asks which, and the example builds (#2257, ADR-767)
+
+**Guards against:** a third square drawn beside two, and a taught example that does not build (docs/17 §9). **Asserts** the question names ABCD and HIJK and offers «הריבוע ABCD חסום במשולש EFG», which commits through the gate and puts A–D on EFG's side lines.
+
+### `inscribe-existing-square-refused-named-2257` — a square too big for a sized triangle is refused naming «AB = 10» (#2257, ADR-767)
+
+**Guards against:** a seat failure reaching the student as ADR-602's flat-shape text. **Asserts** «הריבוע ABCD חסום במשולש EFG» after «AB = 10» and an equilateral EFG of side 2 is refused as over-constrained, never «collapsed … flat», and the earlier rows stand.
+
+### `second-triangle-around-circle-2512` — «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O»: the second triangle is its own triangle (#2512, ADR-762)
+
+**Guards against:** the triangle dual keyed by the circle alone, which drew D, E, F exactly on A, B, C, green, at every seed and every «הציגו תצורה אחרת» (the operator's report). **Asserts** one circle of the stated radius 3 (its unmoved centre is the class test's stability row), every side of each triangle tangent to O, no vertex of DEF on a vertex of ABC, and no recorded coincidence. The class matrix (every spelling, both orders, three triangles, regular and plain n-gons, a point or diameter first, presses, stability, the lone-ring pins) is `src/__tests__/issue-2512-second-ring-on-circle.test.ts`.
+
+### `impossible-isosceles-quad-refused-2443` — «מרובע ABCD» · «AB = BC» · «AC ⊥ BC» is refused as the statement's contradiction, never drawn with C on A (#2443 P1, ADR-764)
+
+**Guards against:** a green quadrilateral for givens that hold only where C meets A: a right angle at C makes AB the hypotenuse of triangle ABC, so AB = BC cannot hold. ADR-746 refused it only when ABC was a declared triangle; in a quadrilateral D keeps the ring fat, so the thin-polygon trigger never asked the tightened re-solve. **Asserts** the operator's third line is refused by the engine before commit with FR-EN-8's over-constraint (`over-constrained: AC ⟂ BC cannot hold`, «AC ⊥ BC» סותר את «AB = BC»), never a flat-polygon sentence (D is not on the line); the prior isosceles figure stays with C off A; folded as a fact it is a contradiction, never pending. The class matrix is `src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts`.
+
+### `impossible-isosceles-quad-angle-refused-2443` — «מרובע ABCD» · «AB = BC» · «∠ACB = 90» is refused at once, never committed as waiting for more givens (#2443 P1, ADR-764)
+
+**Guards against:** the angle spelling parked as pending: the no-room prover read the base angle an equal pair forces only inside a declared triangle. **Asserts** the line is refused before commit, «∠ACB = 90» סותר את «AB = BC», and the folded fact is a contradiction, never pending.
+
+### `impossible-isosceles-quad-numeric-refused-2443` — «מרובע ABCD» · «AB = 5» · «BC = 5» · «AC ⊥ BC» is refused naming «AC ⊥ BC», never a straight corner at D (#2443 P1, ADR-764)
+
+**Guards against:** the numeric twin committing green at some seeds, and a refusal that names a straight corner at D (a rescue stage's collateral defect) instead of the student's statement. **Asserts** the refusal is `over-constrained: AC ⟂ BC cannot hold`, never mentions the ring A, B, C, D, and the prior figure keeps C off A.
+
+### `chord-through-centre-two-lines-2532` — a chord through the centre, one given per line: «מעגל O» · «AB מיתר» · «O על AB» (#2532, ADR-765)
+
+**Guards against:** the honest two-line form breaking now that the one-line «AB מיתר העובר דרך מרכז המעגל» is refused (it committed the chord alone, green, with O off AB). **Asserts** every step is green and dist(O, AB) < 1e-6 at seeds 0–3. The refusals (every measured spelling, both locales, the ✎ seam) are locked in `src/app/__tests__/issue-2532-unread-through.test.ts`.
+

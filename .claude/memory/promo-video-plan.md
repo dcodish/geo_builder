@@ -5,11 +5,15 @@ metadata:
   node_type: memory
   type: project
   originSessionId: f7ed5a70-075c-4fed-8411-2f6e5f5c2b79
-  modified: 2026-09-27T18:05:01.154Z
+  modified: 2026-10-26T06:01:20.900Z
 ---
 
 **Status: parked 2026-09-27 by the operator — "we will return to it but it's not priority now".** Nothing
 built yet. Resume from the open questions at the bottom.
+
+**Messaging source (2026-10-26):** the video's claims come from the Positioning section of
+`docs/01-vision.md` (#2555): the competition is general AI; the value is the givens list, not the picture;
+ten key benefits, each with a demo moment.
 
 **Brief (operator's answers):** audience = teachers (use it themselves or promote it to their classes) ·
 channels = Instagram + WhatsApp groups · language = Hebrew · voice-over yes · no music.

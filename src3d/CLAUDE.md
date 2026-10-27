@@ -31,7 +31,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
 
 | Module | What it is |
 | --- | --- |
-| `engine/` | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, `solve3.ts` (the pivot: numeric similarity + dims least-squares, LM with central-difference Jacobian, seed-rotated multi-start), `relationTable.ts` (the disposition map), `operands.ts` (the operand-thunk resolver), `arcs`/`baseShapes`/`defaultView`/`notices` |
+| `engine/` | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, `solve3.ts` (the pivot: numeric similarity + dims least-squares, LM with central-difference Jacobian, seed-reordered multi-start), `relationTable.ts` (the disposition map), `operands.ts` (the operand-thunk resolver), `arcs`/`baseShapes`/`defaultView`/`notices` |
 | `parser/` | `parse3.ts` — **context-free** rules; resolution happens at apply, so there is no `ParseContext` here (deliberately, and it is the better architecture — see docs/17 §3b). `catalog3.ts` is the coverage map with a guard test asserting every entry parses in He **and** En. `llmShared3.ts` holds the 3-D prompt |
 | `render/` | Orthographic-orbit SVG: `scene3.ts` (pure) + `Figure3.tsx`. Textbook dashed hidden edges via numeric outward normals. `notation.ts` formats vector notation |
 | `store/` | Zustand + zundo, derive-on-demand, keep-prior-on-error. Save/load `.geo3.json` (replay inputs only) |
@@ -62,7 +62,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
   exception: computed coordinates while the data panel is open (ADR-3D-014 Am. 3, ADR-W-118 B7). A number
   drawn must also be seed-invariant knowledge — one drawing's values are not a given. Agreement only sees
   what the resolver varies: the read-back samples the placement's MEASURED leftover rigid freedom
-  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)).
+  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)); an anchored figure's leftover turn and size are also counted by the cue and drawn sampled ([ADR-3D-379](../docs/06b-decisions-3d.md#adr-3d-379)).
 - **Under-determination is welcome.** An unstated dimension stays a free, resampled DOF while the pinned
   parts stand still.
 

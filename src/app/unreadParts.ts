@@ -26,7 +26,7 @@ import { augmentParseCtx, normalizeUtterance, parse, rightAngledAtVertex } from 
 import type { ParseContext } from '@/parser';
 import { endsWithSceneNoun, referencedContextLabels } from '@/parser/labelAccounting';
 import type { AnyCommand } from '@/engine';
-import { cutAtReading, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
+import { cutAtReading, locate, readLabelRuns, type Located, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
 import { clausesOf } from './independence';
 
 /** A lowering as the probe compares it: the commands without their `consumed` bookkeeping. */
@@ -39,7 +39,7 @@ export const loweringKey = (cmds: readonly AnyCommand[]): string =>
   );
 
 /** 2-D's reader in a context: the lowering key of a successful parse, null otherwise. */
-const readerIn = (ctx: ParseContext): Reader<string> => ({
+export const readerIn = (ctx: ParseContext): Reader<string> => ({
   read: (text) => {
     const r = parse(text, ctx);
     return r.ok && r.commands.length > 0 ? loweringKey(r.commands) : null;
@@ -118,8 +118,18 @@ export function unreadParts(utterance: string, commands: readonly AnyCommand[], 
     },
   });
   if (occ.unread.length === 0) return null;
+  const { clauses, readerFor } = clauseReaders(utterance, ctx);
+  const cut = cutAtReading(utterance, clauses, occ, readerFor);
+  return { unread: occ.unread, cut, items: cut ? cut.lost : occ.unread.map((o) => o.text) };
+}
+
+/**
+ * The line's clauses (`clausesOf`, the one splitter), located, each with the reader a one-per-line student would have
+ * there: the figure plus the clauses before it (ADR-598's reading). Shared by every read-extent member that cuts parts
+ * (#1888's labels, #2532's incidence phrases), so their parts are cut the same way.
+ */
+export function clauseReaders(utterance: string, ctx: ParseContext): { clauses: Located[]; readerFor: (i: number) => Reader<string> } {
   const clauses = locate(utterance, clausesOf(utterance));
-  // each clause alone, in the figure plus the clauses before it (ADR-598's reading of a one-per-line student)
   const ctxs: ParseContext[] = [];
   let cur = ctx;
   for (const c of clauses) {
@@ -127,6 +137,5 @@ export function unreadParts(utterance: string, commands: readonly AnyCommand[], 
     const r = parse(c.text, cur);
     if (r.ok && r.commands.length) cur = augmentParseCtx(cur, r.commands);
   }
-  const cut = cutAtReading(utterance, clauses, occ, (i) => readerIn(ctxs[i]));
-  return { unread: occ.unread, cut, items: cut ? cut.lost : occ.unread.map((o) => o.text) };
+  return { clauses, readerFor: (i) => readerIn(ctxs[i]) };
 }

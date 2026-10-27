@@ -9,3 +9,4 @@ Working rules live in CLAUDE.md, docs/17, docs/22, docs/RUNBOOK.md and the skill
 - [Jev experiment](jev-experiment.md) — the parked "did you mean" model: where the harness and key live, and what the operator pre-approved
 - [Promo video plan](promo-video-plan.md) — the operator's parked teacher-video project: format, storyboard, open questions
 - [Browser probes hit the live LLM](browser-probes-hit-live-llm.md) — launch every Playwright probe through scripts/lib/browser-harness.mjs
+- [Roadmap draft](roadmap-strategy-draft.md) — the roadmap pages; what is open

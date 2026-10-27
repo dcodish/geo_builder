@@ -28,6 +28,69 @@ The same describe-it-and-see-it capability serves a second purpose: a teacher or
 - **Secondary — content / textbook authors:** producing clean, correctly-proportioned geometry diagrams to include in books and printed materials. For this audience the value is describing a figure quickly and **exporting it as an image**.
 - Not programmers. The interface is Hebrew, right-to-left, and must be usable with no training.
 
+## Positioning — why this tool, when any AI can draw the picture
+
+Recorded with the operator, 2026-10-26 (#2555). Applies to all four builders. Keep this section as the
+source for any demo, video or pitch.
+
+**The competition is general AI.** A teacher or student can paste a question into ChatGPT, Claude or
+Gemini and get a picture. Producing *an image* is no longer the value. The value is what happens
+**between** the givens and the picture: building it one given at a time, and seeing the figure change as
+givens are added or removed.
+
+**The core idea.** What the tool works on is **the problem's list of givens**, not the picture. The list
+is ordered and editable, and the figure follows it. No other tool in the landscape has that object.
+
+### The landscape
+
+| | Input | What you get | Strong at | Where Geo Builder differs |
+| --- | --- | --- | --- | --- |
+| **AI chatbots** | Paste the question | A static picture, plus the solution | No effort; any topic | Their pictures look plausible but are often geometrically wrong; a new fact means a new picture; they hand over the answer |
+| **GeoGebra** | Construct by hand with tools and commands | A live, draggable figure, 2-D and 3-D | Power, generality, community | You must know *how* to construct the figure, which is part of the problem; building takes time |
+| **Desmos** | Equations | Live graphs, 2-D and 3-D | Analytic geometry, polish | You must already have the equations. Turning "the altitude from A" into one is the student's exercise |
+| **Geo Builder** | The problem's givens, in free Hebrew or English text, one at a time | A live figure, correct by construction, that changes with every given | See below | — |
+
+**One sentence:** Geo Builder turns a problem's givens into a live figure, built one given at a time, so
+the class sees what each given does. AI gives you a picture of the answer; GeoGebra and Desmos make you
+construct the figure yourself.
+
+### Key benefits
+
+Each benefit comes with the moment that shows it, for a demo or video.
+
+1. **Plain language, rich vocabulary.** Free Hebrew or English text in the wording of bagrut questions,
+   across four vocabularies: plane geometry, solid geometry, analytic geometry, complex numbers. No
+   command syntax and no construction skill. *Show:* type a bagrut question's givens line by line as they
+   appear on the page.
+2. **The figure builds one given at a time.** Each given visibly changes the figure, and existing points
+   never jump. *Show:* «ריבוע ABCD» → «נקודה G על AD» → «זווית GBA = 37», and G slides along AD until the
+   angle holds.
+3. **Switch a given off and on, edit it, delete it.** The figure loosens and you can see what that given
+   was holding in place. *Show:* turn off the angle given, and G is free again.
+4. **What the question did not say is visible.** «הציגו תצורה אחרת» shows another drawing the givens
+   allow. An AI shows one picture and implies it is the only one. *Show:* a triangle that the question
+   never said was acute flips to obtuse.
+5. **Correct by construction, and checked.** Every figure is computed from the givens and checked
+   against them: a stated 37° is 37°. *Show:* the givens list with every given verified, beside an AI
+   picture with a wrong proportion.
+6. **Every stated value is on the figure.** Lengths, angles and right-angle marks are labelled the way
+   exam figures are.
+7. **It does not solve the problem.** The figure helps the student think without giving the answer away.
+   For a teacher this is a feature, not a gap.
+8. **Live and spatial in 3-D.** Rotate and pan a solid to see it from any side. *Show:* a cube with a
+   midpoint, turned around.
+9. **From the givens straight to the figure, with no solving first.** In analytic geometry, "the altitude
+   from A" or "a circle through three points" is drawn without the student computing any equation.
+10. **Classroom and authoring ready.** Hebrew, right-to-left, in the browser, no installation, free;
+    export the figure as an image for a worksheet or exam.
+
+### What is not defensible
+
+AI that writes a **live** GeoGebra or Desmos file from a pasted question is coming. When it works,
+"language in, live figure out" stops being unique. What stays ours is the givens-list experience (add,
+remove, alternatives, what each given constrains), guaranteed correctness, and the fit to the curriculum
+and the classroom. Effort goes there, not into competing on drawing breadth.
+
 ## The core interaction (the heart of the product)
 
 The user enters information **incrementally**, and the figure builds up and adapts as constraints accumulate:

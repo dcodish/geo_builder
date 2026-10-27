@@ -119,12 +119,18 @@ function assignKey(place: Placement[]): string {
 
 /** All DISTINCT inscribe placements (the cyclable variants), most-canonical first. */
 export function inscribePlacements(ids: Id[], container: Id[]): Placement[][] {
+  return directedPlacements(ids, container).map((d) => d.place);
+}
+
+/** The placements with the walk DIRECTION each was laid in: +1 walks the container's own vertex order, so the inner
+ *  ring turns the way the container turns; −1 walks it backwards, so the inner ring turns the other way. */
+function directedPlacements(ids: Id[], container: Id[]): { place: Placement[]; dir: 1 | -1 }[] {
   const idx = new Map(container.map((c, i) => [c, i]));
   const hasShared = ids.some((l) => idx.has(l));
   const dirs: (1 | -1)[] = [1, -1];
   const rotations = hasShared ? [0] : container.map((_, i) => i);
   const seen = new Set<string>();
-  const out: Placement[][] = [];
+  const out: { place: Placement[]; dir: 1 | -1 }[] = [];
   for (const dir of dirs) {
     for (const rot of rotations) {
       const p = assignFor(ids, container, dir, rot);
@@ -132,7 +138,7 @@ export function inscribePlacements(ids: Id[], container: Id[]): Placement[][] {
       const key = assignKey(p);
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push(p);
+      out.push({ place: p, dir });
     }
   }
   return out;
@@ -202,9 +208,45 @@ export function shapeConstraints(shape: InscribeShape | 'trapezoid', ids: Id[], 
 export function expandInscribe(
   cmd: InscribeCmd,
   explicitOnSegs: { id: Id; a: Id; b: Id }[] = [],
+  drawn?: ReadonlySet<Id>,
+  turn?: 1 | -1,
 ): Command[] {
-  const variants = inscribePlacements(cmd.ids, cmd.container);
+  // #2257 (ADR-767): `turn` — the drawn inner ring already turns one way (+1 the container's way, −1 the other), so
+  // only the placements walked in that direction can hold it; the cyclable variants are those. Absent: every placement.
+  const directed = directedPlacements(cmd.ids, cmd.container);
+  const kept = turn === undefined ? directed : directed.filter((d) => d.dir === turn);
+  const variants = (kept.length ? kept : directed).map((d) => d.place);
   if (variants.length === 0) return []; // no valid placement (e.g. an impossible container) — nothing to add
+  const place = variants[inscribeVariantIndex(cmd, explicitOnSegs, variants)];
+  const riders: Command[] = [];
+  place.forEach((p, i) => {
+    if (p.at === 'side') riders.push({ type: 'point-on-segment', id: cmd.ids[i], a: p.a, b: p.b });
+  });
+  // #2257 ([ADR-767](../../docs/06-decisions.md#adr-767)) — THE INNER SHAPE IS ALREADY DRAWN: the inscription is a
+  // statement ABOUT it, never a re-creation (M1, the polygon-container twin of ADR-753's circle). Each drawn vertex
+  // takes its side membership through the existing M1 paths (a free carrier becomes a rider on the side, ADR-384; any
+  // other vertex is constrained onto it), and the noun is stated over the drawn vertices as its own shape command —
+  // apply's one lowering of a shape over existing points: a restatement of the ring it already is (ADR-711), a
+  // refinement of a general ring (ADR-656), or the shape's constraints over loose points (ADR-375). No `polygon` is
+  // re-declared over a drawn ring, so the «already defined» re-creation is gone.
+  if (drawn && innerDrawn(cmd, drawn)) return [...riders, { type: cmd.shape, ids: [...cmd.ids] } as Command];
+  // Riders create the non-shared vertices → the `polygon` DRAWS the inscribed shape's boundary and creates its
+  // polygon object (so it renders, is detected as a shape, and its sides are reportable segments) → then the
+  // shape's defining constraints flex the vertices into shape.
+  const draw: Command = { type: 'polygon', ids: [...cmd.ids] };
+  return [...riders, draw, ...shapeConstraints(cmd.shape, cmd.ids)];
+}
+
+/** #2257 (ADR-767): every inner vertex that rides a container side is already a point of the figure (`drawn`) — the
+ *  inscription is then about the drawn shape. A vertex shared with the container is the container's own (ADR-262). */
+export function innerDrawn(cmd: Pick<InscribeCmd, 'ids' | 'container'>, drawn: ReadonlySet<Id>): boolean {
+  const riders = cmd.ids.filter((id) => !cmd.container.includes(id));
+  return riders.length > 0 && riders.every((id) => drawn.has(id));
+}
+
+/** The placement `expandInscribe` takes: an explicit on-segment given on a shape vertex pins the matching variant
+ *  (M4), else `cmd.variant` selects. */
+function inscribeVariantIndex(cmd: InscribeCmd, explicitOnSegs: { id: Id; a: Id; b: Id }[], variants: Placement[][]): number {
   const norm = (v: number) => ((v % variants.length) + variants.length) % variants.length;
   let chosen = norm(cmd.variant);
   // An explicit on-segment given on a shape vertex pins the matching variant.
@@ -221,16 +263,7 @@ export function expandInscribe(
       break;
     }
   }
-  const place = variants[chosen];
-  const riders: Command[] = [];
-  place.forEach((p, i) => {
-    if (p.at === 'side') riders.push({ type: 'point-on-segment', id: cmd.ids[i], a: p.a, b: p.b });
-  });
-  // Riders create the non-shared vertices → the `polygon` DRAWS the inscribed shape's boundary and creates its
-  // polygon object (so it renders, is detected as a shape, and its sides are reportable segments) → then the
-  // shape's defining constraints flex the vertices into shape.
-  const draw: Command = { type: 'polygon', ids: [...cmd.ids] };
-  return [...riders, draw, ...shapeConstraints(cmd.shape, cmd.ids)];
+  return chosen;
 }
 
 /**

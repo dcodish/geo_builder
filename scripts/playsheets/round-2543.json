@@ -1,0 +1,910 @@
+{
+ "name": "round-2543",
+ "title": "Round #2543 — overnight P1 session",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "A second triangle around the same circle is its own triangle (#2512)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O",
+    "משולש DEF חוסם את מעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». Two different triangles, both tangent to O on every side; D, E, F are not on A, B, C",
+   "before": "DEF drawn exactly on top of ABC, green",
+   "expect": [
+    "משולש ABC חוסם את מעגל O",
+    "משולש DEF חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "They stay apart on «הציגו תצורה אחרת» (#2512, riskiest)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O",
+    "משולש DEF חוסם את מעגל O"
+   ],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל». Type the lines, then press «הציגו תצורה אחרת» 3 times: the two triangles are apart in every view. (Some views may still show the circle OUTSIDE a triangle: that is #2538, escalated, not this fix.)",
+   "before": "on top of each other in every view",
+   "expect": [
+    "משולש DEF חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "Three triangles around one circle (#2512)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O",
+    "משולש DEF חוסם את מעגל O",
+    "משולש GHK חוסם את מעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». Three distinct triangles, all tangent to O",
+   "before": "all three drawn on one",
+   "expect": [
+    "משולש GHK חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "Two regular pentagons in one circle (#2512)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מחומש משוכלל ABCDE חסום במעגל O",
+    "מחומש משוכלל FGHKL חסום במעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». Two different regular pentagons, both with every vertex on O",
+   "before": "the second pentagon drawn on the first",
+   "expect": [
+    "מחומש משוכלל FGHKL חסום במעגל O"
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "A regular pentagon avoids a point already on the circle (#2512)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "נקודה P על מעגל O",
+    "מחומש משוכלל ABCDE חסום במעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». A is not on P",
+   "before": "A drawn on P",
+   "expect": [
+    "מחומש משוכלל ABCDE חסום במעגל O"
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "A lone triangle around a circle is unchanged (#2512, regression guard)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». The same first drawing as prod (positions pinned in the class test)",
+   "before": "unchanged",
+   "expect": [
+    "משולש ABC חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "Analytic: a second triangle around the circle builds (#2512)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "משולש ABC חוסם את מעגל O",
+    "משולש DEF חוסם את מעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). Line 3 accepted; two different triangles, both tangent to O",
+   "before": "line 3 refused (polygon-collapsed)",
+   "expect": [
+    "משולש DEF חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T8",
+   "title": "Analytic: two squares around one circle (#2512)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "ריבוע ABCD חוסם את מעגל O",
+    "ריבוע EFGH חוסם את מעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). Both squares drawn, both tangent to O",
+   "before": "line 3 refused (unsatisfiable)",
+   "expect": [
+    "ריבוע EFGH חוסם את מעגל O"
+   ]
+  },
+  {
+   "id": "T9",
+   "title": "REFUSAL: 2-D refuses the impossible quadrilateral (#2443)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = BC",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». Line 3 refused «לא ניתן: «AC ⊥ BC» סותר את «AB = BC» — אי אפשר לקיים את שניהם יחד…»; the isosceles figure stays, with C away from A",
+   "before": "a green quadrilateral with C on A",
+   "expectRefusal": "«AC ⊥ BC» סותר את «AB = BC»"
+  },
+  {
+   "id": "T10",
+   "title": "REFUSAL: 2-D refuses the angle form at once (#2443)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = BC",
+    "∠ACB = 90"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused «∠ACB = 90» סותר את «AB = BC»; no «waiting for more givens»",
+   "before": "accepted as pending",
+   "expectRefusal": "סותר את «AB = BC»"
+  },
+  {
+   "id": "T11",
+   "title": "REFUSAL: 2-D numeric twin names «AC ⊥ BC» (#2443)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = 5",
+    "BC = 5",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The refusal names «AC ⊥ BC», never a straight corner at D",
+   "before": "green at most configurations",
+   "expectRefusal": "«AC ⊥ BC»"
+  },
+  {
+   "id": "T12",
+   "title": "A real thin quadrilateral is still accepted, as before (#2443 guard)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = 10",
+    "BC = 9.9999",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». All four rows commit (✓); after about 4.4 s the status shows the existing notice «לא נמצאה תצורה שמקיימת את כל הדרישות יחד — הציור המוצג עשוי להיות מנוון (למשל נקודות שמתלכדות). בדקו את הנתון האחרון שהוזן.». Verified by a timed probe: identical on the new main (4394 ms) and on yesterday's code (4458 ms). The notice itself is pre-existing (the same seed-dependent defect as #2544), not this round.",
+   "before": "unchanged (same rows, same notice, same timing)",
+   "expect": [
+    "BC = 9.9999"
+   ]
+  },
+  {
+   "id": "T13",
+   "title": "REFUSAL: three loose points (#2443)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "נקודה A",
+    "נקודה B",
+    "נקודה C",
+    "AB = BC",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused",
+   "before": "green with C on A",
+   "expectRefusal": "«AC ⊥ BC»"
+  },
+  {
+   "id": "T14",
+   "title": "REFUSAL: analytic still refuses the quadrilateral (regression guard)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מרובע ABCD",
+    "AB = BC",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). Refused. (Analytic's loose-point twin is still green: #2506, not this round)",
+   "before": "unchanged",
+   "expectRefusal": "AC ⊥ BC"
+  },
+  {
+   "id": "T15",
+   "title": "REFUSAL: 3-D refuses the impossible quadrilateral (#2503)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AB| = |BC|",
+    "AC ⟂ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). Line 3 refused «הנתונים סותרים זה את זה — אין גוף שמקיים את «AC ⟂ BC» יחד עם «|AB| = |BC|»»; the figure stays",
+   "before": "green with C on A",
+   "expectRefusal": "הנתונים סותרים זה את זה"
+  },
+  {
+   "id": "T16",
+   "title": "REFUSAL: 3-D refuses the angle form (#2503)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AB| = |BC|",
+    "∠ACB = 90"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). Refused with the same sentence",
+   "before": "green",
+   "expectRefusal": "הנתונים סותרים זה את זה"
+  },
+  {
+   "id": "T17",
+   "title": "3-D: a real thin quadrilateral still builds (#2503, riskiest)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AB| = 10",
+    "|BC| = 9.9999",
+    "AC ⟂ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). Builds; every row ok",
+   "before": "unchanged",
+   "expectAbsent": [
+    "הנתונים סותרים"
+   ]
+  },
+  {
+   "id": "T18",
+   "title": "REFUSAL: 3-D refuses the emptied angle (#2503)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "E על AB",
+    "|DE| = |DA|",
+    "DE ⟂ AE"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). The last line refused, naming «DE ⟂ AE»",
+   "before": "green with E on A",
+   "expectRefusal": "הנתונים סותרים זה את זה"
+  },
+  {
+   "id": "T19",
+   "title": "REFUSAL: 3-D numeric twin, refused quickly (#2503)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AB| = 5",
+    "|BC| = 5",
+    "AC ⟂ BC"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). Refused in about 2 s",
+   "before": "about 10 s, then a red row",
+   "expectRefusal": "הנתונים סותרים זה את זה"
+  },
+  {
+   "id": "T20",
+   "title": "REFUSAL: «AB מיתר העובר דרך מרכז המעגל», the report (#2532)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB מיתר העובר דרך מרכז המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». Nothing drawn for line 2; the one-given-per-line message lists «(1) AB מיתר  (2) העובר דרך מרכז המעגל»",
+   "before": "an ordinary chord, green, with O off AB",
+   "expectRefusal": "העובר דרך מרכז המעגל"
+  },
+  {
+   "id": "T21",
+   "title": "REFUSAL, riskiest: «AB קוטר העובר דרך מרכז המעגל» (#2532)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB קוטר העובר דרך מרכז המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused «(1) AB קוטר  (2) העובר דרך מרכז המעגל»",
+   "before": "a correct diameter, green",
+   "expectRefusal": "AB קוטר"
+  },
+  {
+   "id": "T22",
+   "title": "REFUSAL: «… במעגל העובר דרך מרכזו» (#2532)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB מיתר במעגל העובר דרך מרכזו"
+   ],
+   "lookFor": "Start: press «נקה הכל». «(1) AB מיתר במעגל  (2) העובר דרך מרכזו»",
+   "before": "an ordinary chord, green",
+   "expectRefusal": "העובר דרך מרכזו"
+  },
+  {
+   "id": "T23",
+   "title": "REFUSAL: a segment through the centre (#2532)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB קטע העובר דרך מרכז המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». «(1) AB קטע  (2) העובר דרך מרכז המעגל» — never «(1) AB» alone",
+   "before": "a segment, green",
+   "expectRefusal": "AB קטע"
+  },
+  {
+   "id": "T24",
+   "title": "REFUSAL: an altitude through the centre (#2532)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O",
+    "AD גובה העובר דרך מרכז המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». «(1) AD גובה  (2) העובר דרך מרכז המעגל»",
+   "before": "an altitude, green, ignoring O",
+   "expectRefusal": "AD גובה"
+  },
+  {
+   "id": "T25",
+   "title": "The honest two-line form builds (#2532)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB מיתר",
+    "O על AB"
+   ],
+   "cycles": 1,
+   "lookFor": "Start: press «נקה הכל». Green; AB passes through O, and still does after one press of «הציגו תצורה אחרת» (the configuration search shows «חושב… (n/24)» for a few seconds)",
+   "before": "unchanged",
+   "expect": [
+    "O על AB"
+   ]
+  },
+  {
+   "id": "T26",
+   "title": "A through-clause that IS read still builds (#2532 guard)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים משיקים מבפנים בנקודה T",
+    "המשיק העובר בנקודה המשותפת לשני המעגלים"
+   ],
+   "lookFor": "Start: press «נקה הכל». The tangent at T, green",
+   "before": "unchanged",
+   "expectAbsent": [
+    "בכל שורה נתון אחד"
+   ]
+  },
+  {
+   "id": "T27",
+   "title": "REFUSAL: an edit that adds the clause is refused inline (#2532)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB מיתר"
+   ],
+   "lookFor": "Start: press «נקה הכל». Then click ✎ on the «AB מיתר» row and change it to «AB מיתר העובר דרך מרכז המעגל»: the edit is refused inline, naming «העובר דרך מרכז המעגל». (The driver cannot edit a row; this step is covered by the ✎ rows of the unit test and needs your hands.)",
+   "before": "the edit committed green",
+   "expect": [
+    "AB מיתר"
+   ]
+  },
+  {
+   "id": "T28",
+   "title": "Analytic: O drawn larger than P after «R > r» (#2521, the report)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שרדיוסו R",
+    "מעגל P שרדיוסו r",
+    "R > r",
+    "רדיוס מעגל P הוא 9"
+   ],
+   "cycles": 2,
+   "lookFor": "Start: press «נקה הכל» (analytic builder). P at radius 9 and O visibly larger, green; «הציגו תצורה אחרת» keeps O larger than 9",
+   "before": "O (3.46) smaller than P (9), green",
+   "expect": [
+    "רדיוס מעגל P הוא 9"
+   ]
+  },
+  {
+   "id": "T29",
+   "title": "Analytic: the radius stated before «R > r» (#2521)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שרדיוסו R",
+    "מעגל P שרדיוסו r",
+    "רדיוס מעגל P הוא 9",
+    "R > r"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). All four lines accepted; O larger than 9",
+   "before": "«R > r» refused «הנקודה r עדיין לא הוגדרה»",
+   "expect": [
+    "R > r"
+   ],
+   "expectAbsent": [
+    "הנקודה r עדיין לא הוגדרה"
+   ]
+  },
+  {
+   "id": "T30",
+   "title": "Analytic: a ratio after the radius (#2521)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שרדיוסו R",
+    "מעגל P שרדיוסו r",
+    "רדיוס מעגל P הוא 3",
+    "R = 2r"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). O at radius 6",
+   "before": "the last line not understood",
+   "expect": [
+    "R = 2r"
+   ]
+  },
+  {
+   "id": "T31",
+   "title": "REFUSAL: analytic, a bound against the stated radius (#2521)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שרדיוסו R",
+    "מעגל P שרדיוסו r",
+    "רדיוס מעגל P הוא 9",
+    "r < 5"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). The last line refused «לא נמצאה תצורה שבה מתקיים: «r < 5»»; P stays at 9",
+   "before": "accepted green",
+   "expectRefusal": "לא נמצאה תצורה שבה מתקיים: «r < 5»"
+  },
+  {
+   "id": "T32",
+   "title": "REFUSAL: analytic, a contradiction (#2521)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O שרדיוסו R",
+    "מעגל P שרדיוסו r",
+    "R > r",
+    "רדיוס מעגל O הוא 5",
+    "רדיוס מעגל P הוא 9"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). The last line refused «הערך במשפט «רדיוס מעגל P הוא 9» אינו אפשרי כאן — הוא חייב להיות …» (a range 0 to 5); O = 5 and P < 5",
+   "before": "accepted green with P larger than O",
+   "expectRefusal": "הערך במשפט «רדיוס מעגל P הוא 9» אינו אפשרי כאן"
+  },
+  {
+   "id": "T33",
+   "title": "Analytic: no phantom freedom (#2521)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O(0,0)",
+    "מעגל O שרדיוסו r",
+    "רדיוס מעגל O הוא 3"
+   ],
+   "lookFor": "Start: press «נקה הכל» (analytic builder). Reported fully determined; no free-degree cue",
+   "before": "one free degree reported",
+   "expect": [
+    "רדיוס מעגל O הוא 3"
+   ]
+  },
+  {
+   "id": "T34",
+   "title": "3-D: the cube that can turn no longer claims ✓ (#2378)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "מישור ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). «דרגות חופש: 1»",
+   "before": "«✓ הציור נקבע במלואו על ידי הנתונים»",
+   "expect": [
+    "דרגות חופש: 1"
+   ],
+   "expectAbsent": [
+    "הציור נקבע במלואו"
+   ]
+  },
+  {
+   "id": "T35",
+   "title": "3-D: each press turns the cube about AB (#2378)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "מישור ABCD"
+   ],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). Press «הציגו תצורה אחרת» 3 times: the cube swings about the AB edge to a new angle each time while A and B stay put. The first drawing may be tilted",
+   "before": "flat on the floor, or the same few positions"
+  },
+  {
+   "id": "T36",
+   "title": "3-D: a free size is counted (#2378)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל» (3-D builder). «דרגות חופש: 4»",
+   "before": "✓ fully determined",
+   "expect": [
+    "דרגות חופש: 4"
+   ]
+  },
+  {
+   "id": "T37",
+   "title": "3-D: a cube set square by two planes resizes (#2378)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "מישור ABCD מקביל למישור xy",
+    "מישור ABB'A' מקביל למישור xz"
+   ],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). «דרגות חופש: 1»; on 3 presses the cube changes size but stays square to the axes",
+   "before": "✓, and the edge stayed 1 at some presses",
+   "expect": [
+    "דרגות חופש: 1"
+   ]
+  },
+  {
+   "id": "T38",
+   "title": "3-D: a stated sign survives the turn (#2378, riskiest)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "מישור ABCD",
+    "שיעור ה-z של D חיובי"
+   ],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). On every press D stays above the floor (z > 0) and the cube still turns",
+   "before": "the cube never turned"
+  },
+  {
+   "id": "T39",
+   "title": "3-D: a cube fixed only by a vector turns about it (#2378)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB=(2,0,0)"
+   ],
+   "cycles": 2,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). «דרגות חופש: 1»; presses turn the cube about AB",
+   "before": "✓, no turn",
+   "expect": [
+    "דרגות חופש: 1"
+   ]
+  },
+  {
+   "id": "T40",
+   "title": "3-D: a determined cube still reads ✓ (#2378 guard)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "AD=(0,2,0)"
+   ],
+   "cycles": 2,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). ✓, and presses do not move the cube",
+   "before": "unchanged",
+   "expect": [
+    "הציור נקבע במלואו"
+   ]
+  },
+  {
+   "id": "T41",
+   "title": "3-D: the bare cube is unchanged (#2378 guard)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'"
+   ],
+   "cycles": 2,
+   "lookFor": "Start: press «נקה הכל» (3-D builder). ✓, flat on the floor at edge 1 on every press",
+   "before": "unchanged",
+   "expect": [
+    "הציור נקבע במלואו"
+   ]
+  },
+  {
+   "id": "T42",
+   "title": "PR #2550: «הריבוע חסום במשולש EFG» moves the drawn square in (#2257)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "משולש EFG",
+    "הריבוע חסום במשולש EFG"
+   ],
+   "cycles": 2,
+   "lookFor": "Start: press «נקה הכל» (PR server). A–D on EFG's sides, no second square, the triangle unmoved; after «הציגו תצורה אחרת» the square is still inscribed (Pre-played by a timed probe that waits for «חושב…» to clear: settled in 548 ms with every row ✓; its settled screenshot is T42-probe.png. The driver's own shot can show «חושב…».)",
+   "before": "a second square HIJK, green",
+   "expect": [
+    "הריבוע חסום במשולש EFG"
+   ],
+   "expectAbsent": [
+    "HIJK"
+   ]
+  },
+  {
+   "id": "T43",
+   "title": "PR #2550: the named form builds (#2257)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "משולש EFG",
+    "הריבוע ABCD חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). The same figure as T42",
+   "before": "refused «would be flat»",
+   "expect": [
+    "הריבוע ABCD חסום במשולש EFG"
+   ]
+  },
+  {
+   "id": "T44",
+   "title": "PR #2550: a square with a stated size — the triangle grows (#2257, riskiest)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB = 3",
+    "משולש EFG",
+    "הריבוע חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). The triangle grows around the square; AB stays 3 (Pre-played by a timed probe that waits for «חושב…» to clear: settled in 780 ms with every row ✓; its settled screenshot is T44-probe.png. The driver's own shot can show «חושב…».)",
+   "before": "a second square",
+   "expect": [
+    "הריבוע חסום במשולש EFG"
+   ]
+  },
+  {
+   "id": "T45",
+   "title": "PR #2550: a drawn «מרובע» becomes the square (#2257, riskiest)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "משולש EFG",
+    "הריבוע חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). ABCD becomes a square inside EFG; no new square (Pre-played by a timed probe that waits for «חושב…» to clear: settled in 315 ms with every row ✓; its settled screenshot is T45-probe.png. The driver's own shot can show «חושב…».)",
+   "before": "a new square HIJK",
+   "expect": [
+    "הריבוע חסום במשולש EFG"
+   ]
+  },
+  {
+   "id": "T46",
+   "title": "PR #2550: two squares drawn — it asks which (#2257)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע HIJK",
+    "משולש EFG",
+    "הריבוע חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). Line 4 is answered with the question, in full: ««הריבוע חסום במשולש EFG» — בשרטוט יש כמה מרובעים (ABCD, HIJK), ולא ברור לאיזה מהם הכוונה. כתבו את שמו, למשל «הריבוע ABCD חסום במשולש EFG».». Then type the suggested sentence «הריבוע ABCD חסום במשולש EFG»: it builds (four rows, ABCD inside EFG)",
+   "before": "a third square LMNO",
+   "expectRefusal": "ולא ברור לאיזה מהם הכוונה",
+   "after": [
+    {
+     "type": "הריבוע ABCD חסום במשולש EFG"
+    }
+   ]
+  },
+  {
+   "id": "T47",
+   "title": "PR #2550: a square inside a drawn quadrilateral (#2257)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "הריבוע חסום במרובע ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). A new square EFGH inside ABCD",
+   "before": "refused «'poly-ABCD' is already defined»",
+   "expect": [
+    "הריבוע חסום במרובע ABCD"
+   ],
+   "expectAbsent": [
+    "already defined"
+   ]
+  },
+  {
+   "id": "T48",
+   "title": "REFUSAL, PR #2550: a size that cannot fit — and it takes ~25 s (#2257, needs a ruling)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB = 10",
+    "משולש EFG",
+    "EF = 2",
+    "FG = 2",
+    "EG = 2",
+    "הריבוע ABCD חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). The last line is refused after about 19 s, in full: «לא ניתן: «הריבוע ABCD חסום במשולש EFG» סותר את «AB = 10» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 10. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.». Timed probe: 19.4 s on this PR against 11.4 s on yesterday's code. That cost is the ruling you need to give. (The driver reads before the refusal lands, so its screenshot shows «חושב…»; the probe measured the sentence above)",
+   "before": "refused in 11.4 s with «… סותר נתון קודם …» (no partner named)",
+   "expectAbsent": [
+    "שטוח"
+   ]
+  },
+  {
+   "id": "T49",
+   "title": "PR #2550: the indefinite form still draws a new square (guard)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "משולש EFG",
+    "ריבוע חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). A new square HIJK inside EFG; ABCD untouched",
+   "before": "unchanged",
+   "expect": [
+    "ריבוע חסום במשולש EFG"
+   ]
+  },
+  {
+   "id": "T50",
+   "title": "PR #2550: a drawn rectangle moves in (#2257)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "משולש EFG",
+    "המלבן חסום במשולש EFG"
+   ],
+   "lookFor": "Start: press «נקה הכל» (PR server). The rectangle moves inside the triangle; no second rectangle (Pre-played by a timed probe that waits for «חושב…» to clear: settled in 945 ms with every row ✓; its settled screenshot is T50-probe.png. The driver's own shot can show «חושב…».)",
+   "before": "a second rectangle",
+   "expect": [
+    "המלבן חסום במשולש EFG"
+   ]
+  }
+ ]
+}

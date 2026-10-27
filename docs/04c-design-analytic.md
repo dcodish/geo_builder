@@ -204,13 +204,20 @@ branch (last).
 
 *Identifiers:* `A·B` · `|PQ|` · `AB + BC = 10`
 
-### Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1)
+### Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1, [ADR-AG-332](06c-decisions-analytic.md#adr-ag-332))
 
 `readRoleRef` (`parser/parseAnalytic.ts`) reads a role once: the given is `<role> <copula>? <value>` (`roleSplits`),
 the ask is the phrase after `normaliseAsk` (`app/ask.ts`) strips openers. M1 resolves `radius-of`, `focus-of`,
 `directrix-eq`, `perimeter-of`; a missing or ambiguous host refuses with `host: {kind, found, need?}`
-(`app/hostKey.ts`, `errHost.*`, `askHost.*`). A stated value replacing a domained symbol (`r_O`) passes `admitStated`
-(`out-of-domain`) and `substituteSym`; the directrix prints through `roleLineText`/`directrixText`; `ringsNamed`
+(`app/hostKey.ts`, `errHost.*`, `askHost.*`). A stated value replacing a free symbol (`r_O`, a student's radius letter
+`r`, a tool symbol) goes through ONE seam, `bindSymbol` (ADR-AG-332): `admitStated` (`out-of-domain`), then one
+structural substitution over every expression-bearing field of the construction (all but `params` / `seedNames` /
+`bound`), retirement of the parameter when no `{kind:'sym'}` node of it remains (a structural scan, never a text
+search), the record `Construction.bound[sym] = value`, and `normalizeParamOrder` on each `sign / params` selector it
+rewrote (no symbol left: judged now, `unsatisfiable` when false; one linear symbol: also lowered to that symbol's domain
+through the `param` merge). `applyFact` reads `bound` at its entry (`readBound`), so a later fact naming a bound letter
+reads the value, and a `param` fact on a bound letter is judged against it (`judgeBoundParam`). `substituteSym` is
+private to those two functions (a guard test holds it); the directrix prints through `roleLineText`/`directrixText`; `ringsNamed`
 resolves a noun-only perimeter.
 
 *Identifiers:* `engine/apply.ts`
@@ -712,6 +719,13 @@ does; `constraintCurveRefs` lists it, `constraintRefs` only the point sides — 
 With an equation side, concentric is judged structurally at M1 (`centresAlwaysCoincide` over the probe environments); `readCircleSubject`,
 `TANGENT_BRANCH` and `peelMods` read the sentence; `touch-point {a, b}` names the touch; `inDomain(d, v, floor)` with
 `openBoundFloor` keeps a forced-zero radius off the bound.
+
+**A second ring around one circle starts on the dual** ([ADR-AG-333](06c-decisions-analytic.md#adr-ag-333), #2512). In
+`evaluateUncached`'s seeding, a triangle or quadrilateral every side of which is a bounded `tangent-line` to one centre,
+stated after another such ring around that centre, seeds its free vertices at 2-D's construction: uneven touch angles
+turned by the touches already on the circle × the golden angle (varied per configuration past 0), each vertex at the meet
+of its two sides' tangents — an exact solution, so the joint descent does not depend on where the letters were sampled.
+A lone ring keeps its sampled start. A start, never a verdict.
 
 *Identifiers:* `line-l1` · `bounded: true` · `bound` · `tangent-circles {a, b, branch?}` · `parseCircleAt` · `one` · `pair` · `K ± r_K·û` · `r > 0` · `floor = 0`
 *ADRs:* ADR-AG-167.

@@ -1042,6 +1042,17 @@ export interface Construction {
    * vertex starts.
    */
   seedNames?: Readonly<Record<Id, string>>;
+  /**
+   * WHAT A STATED VALUE GAVE A SYMBOL (#2521, ADR-AG-332) — `symbol → the expression that replaced it`, absent or
+   * empty for every figure no stated value bound a symbol in.
+   *
+   * «מעגל P שרדיוסו r» · «רדיוס מעגל P הוא 9» binds `r` to 9: the value is substituted everywhere the symbol stood
+   * (`apply.ts` `bindSymbol`, the one seam) and recorded here, so a LATER sentence naming `r` («R > r», «r < 5»,
+   * «R = 2r») reads 9 instead of minting a fresh free symbol the canvas never shows. Rebuilt by the fold — pure over the
+   * lines, like the rest of the construction; never saved. The tool's own symbols (`toolSymbol`, `radiusSymbol`) are
+   * recorded too: harmless, since no sentence can name them.
+   */
+  bound?: Readonly<Record<string, Expr>>;
 }
 
 /**

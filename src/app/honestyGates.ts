@@ -46,6 +46,7 @@ import type { ParseContext } from '@/parser';
 import { unreadNumbers } from './unreadNumbers';
 import { unreadParts, type UnreadReport } from './unreadParts';
 import { unreadRoles, type RoleReport } from './unreadRoles';
+import { unreadThrough, type ThroughReport } from './unreadThrough';
 
 /**
  * Every gate that is a pure function of `(utterance, commands)`. Exported as a MAP, not as a sequence
@@ -55,7 +56,7 @@ import { unreadRoles, type RoleReport } from './unreadRoles';
  * though only the LLM path consults them today.
  *
  * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`, and #1888's
- * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers`, which re-read the line in the seam's own parse context)
+ * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers` / #2532's `unreadThrough`, which re-read the line in the seam's own parse context)
  * are deliberately out — they need the figure, which is not this map's input shape. The read-extent members are
  * netted over the corpus by `issue-1888-unread-corpus-net.test.ts`.
  */
@@ -101,7 +102,9 @@ export interface GateReport {
   unread: UnreadReport | null;
   /** #1904 (ADR-604): the cevian role words no reading depends on — the word sibling of `unread` */
   unreadRole: RoleReport | null;
-  /** true when every gate that predates the read-extent members (#1888, #1904) is clean: only a lost part or role fired */
+  /** #2532 (ADR-765): the incidence phrases («העובר דרך מרכז המעגל») no reading depends on — the phrase sibling */
+  unreadThrough: ThroughReport | null;
+  /** true when every gate that predates the read-extent members (#1888, #1904, #2532) is clean: only a lost part, role or phrase fired */
   onlyReadExtent: boolean;
   /**
    * Everything left unread, as the STUDENT'S OWN tokens — never a gate name and never internal state
@@ -199,6 +202,10 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   // THE WORD SIBLING (#1904, ADR-604): a cevian role word («גובה», «תיכון», «חוצה זווית») the reading does not depend
   // on — deleting it leaves the lowering unchanged — was dropped, however well the family-presence gates account it.
   const unreadRole = unreadRoles(utterance, commands, ctx);
+  // THE PHRASE SIBLING (#2532, ADR-765): an incidence clause («העובר דרך מרכז המעגל», «במעגל O העובר דרך O», "through the
+  // centre") the reading does not depend on — deleting it, or its verb opener, leaves the lowering unchanged — was dropped,
+  // however well its words («מרכז», «המעגל») are accounted as vocabulary and however its letter is a co-reference.
+  const through = unreadThrough(utterance, commands, ctx);
   // LETTERS READ OUT OF PROSE (#2195, ADR-738): a label the lowering references that the student never typed as a
   // capital, the figure does not have and the line does not define — its letter sits only inside an English word
   // («the triangle is right-angled» → ∠TRI). Ruled: English words are never read as point labels.
@@ -216,7 +223,8 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     !droppedCmp &&
     droppedConstruct.length === 0 &&
     unread === null &&
-    unreadRole === null;
+    unreadRole === null &&
+    through === null;
   const onlyReadExtent =
     !clean &&
     latinProse.length === 0 &&
@@ -242,6 +250,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     latinProse,
     unread?.items ?? [],
     unreadRole?.items ?? [],
+    through?.items ?? [],
   );
 
   return {
@@ -258,6 +267,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     latinProse,
     unread,
     unreadRole,
+    unreadThrough: through,
     onlyReadExtent,
     items,
   };

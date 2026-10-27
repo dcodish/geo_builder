@@ -389,7 +389,7 @@ folded at the utterance boundary (`normalizeInscriptionSlip`: «חסומה» →
 `ringOnCircle` (parse.ts) is the one emitter of the n-gon-on-a-circle scaffold (ADR-610): the circle (or an
 `existing` one), one `point-on-circle` per vertex, the ring. With `regular` it also emits
 `regularRingSides(ids)` — the n−1 consecutive `set-equal`s |AB| = |BC|, …, |(n−1)th side| = |nth side|. The pinned
-θ (90 + 360·i/n) are only the SEED that places NEW vertices; over existing ids a `point-on-circle` lowers to
+θ (90 + 360·i/n, turned by `ridersOn(ctx, circle)` × the golden angle on an EXISTING circle — #2512, [ADR-762](06-decisions.md#adr-762); 0 on a circle the line mints) are only the SEED that places NEW vertices; over existing ids a `point-on-circle` lowers to
 membership (M1) and the θ say nothing, so the equalities are the statement the solver holds and the givens
 verifier checks. Concyclic + equal consecutive chords + the simple-ring floor of a declared `polygon` (ADR-616)
 is exactly the convex regular n-gon; the pentagram (equal chords, crossed) fails the floor and is never shown.
@@ -411,6 +411,31 @@ typed shape comes BEFORE the circumcircle and `set-concyclic`, so a contradictin
 frame (the standalone's refusal). The free kinds (general, equilateral, isosceles, kite, trapezoid) keep their own
 relations (`shapeCmds` / the kite `shape-variant`) and order: they already hold on every branch, and the typed
 lowering would cost the trapezoid displayable seeds and change the isosceles's variant reading.
+
+### A polygon inscribed in a polygon over a DRAWN inner shape moves that shape (#2257, [ADR-767](06-decisions.md#adr-767))
+
+The `inscribe` command (ADR-262) names its inner ids; who owns them decides the lowering, read against the figure in
+force at the moment the fact applies (`boundCmdsOf`, src/replay/core.ts — the same seam as ADR-657's cyclic kite):
+
+- **New inner vertices** keep `expandInscribe`'s expansion exactly: riders on the sides, the `polygon`, the shape's
+  constraints.
+- **Every rider vertex already a point of the figure** (`innerDrawn`): the riders (each lowered by the existing M1
+  paths — a free vertex becomes a rider, ADR-384; a DERIVED corner is constrained onto the side and carried by its own
+  shape scalar, else its nearest free 1-DOF ancestor, never by an endpoint of the side) and then the noun as its own
+  shape command over the drawn vertices (apply's one lowering: a restatement, ADR-711; a refinement of a general ring,
+  ADR-656; constraints over loose points, ADR-375). No `polygon` is re-declared. Only the placements walked the way the
+  drawn ring already turns (`drawnTurn` → `expandInscribe`'s `turn`) are offered, since a drawn shape cannot be turned
+  over.
+- **The seat** (`seatInscribedShape`, LADDER stage 5 *F-seat*): the inscription solved fresh on the same figure with
+  scratch ids gives a start; the drawn shape's unpinned free vertices are placed at the matching fresh vertices and
+  each inner shape scalar takes a few secant steps toward its own. The fact is tried from the seat first, then from
+  the figure's own start (`tryApplyFactSeated`, one attempt for the re-attempt memo and cap); the figure's own failure
+  is the verdict when neither builds. A point already standing on a segment's interior keeps its parameter when it
+  becomes a rider (`reinterpretAsCollinear`), so a seated vertex is not pulled to the 0.12–0.88 default band.
+
+The parser's half (`inscribedInPolygon`): a definite unnamed inner noun resolves through ADR-685's
+`definiteShapeVertices`, the container's ring excluded; the container's label run is stripped as a run before the
+inner noun reads its own name.
 
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
@@ -658,7 +683,7 @@ the sentence's labels.
 
 ### A polygon around an existing circle is built on it: the dual ([ADR-115](06-decisions.md#adr-115), [ADR-757](06-decisions.md#adr-757))
 
-When the circle an `incircle` sentence names is already in the figure and the ring is new, nothing defines the circle: the ring is the DUAL. A triangle (ADR-115) takes three free touch points; a quadrilateral (`tangentialQuadAround`, #2480) four, the student's vertices at consecutive tangent meets (`v[i] = tan(t[i]) ∩ tan(t[i+1])`). The phrase is carried as derived relations between the touch points — antipodal for parallel sides (`line-through` the centre, its second crossing), a quarter turn for perpendicular ones (`perpendicular-line` through the centre), mirrored for an isosceles trapezoid's legs — with no solve; a kite keeps its `shape-variant` over four free touch angles. The ring is declared as stated (`declaredAs`), a stated right angle or equal pair also travels as its own relation (the mark and the givens list), and the touch points are keyed by circle and ring (`@t-O-ABCD-i`), turned by the circle's rider count. A ring whose vertices already exist keeps the generic construction.
+When the circle an `incircle` sentence names is already in the figure and the ring is new, nothing defines the circle: the ring is the DUAL, emitted by ONE function, `tangentialRingAround` (#2512, [ADR-762](06-decisions.md#adr-762): the triangle had a private copy keyed by the circle alone, so a second triangle re-used the first one's touch points). A triangle (ADR-115) takes three free touch points; a quadrilateral (#2480) four, the student's vertices at consecutive tangent meets (`v[i] = tan(t[i]) ∩ tan(t[i+1])`). The phrase is carried as derived relations between the touch points — antipodal for parallel sides (`line-through` the centre, its second crossing), a quarter turn for perpendicular ones (`perpendicular-line` through the centre), mirrored for an isosceles trapezoid's legs — with no solve; a kite keeps its `shape-variant` over four free touch angles. The ring is declared as stated (`declaredAs`), a stated right angle or equal pair also travels as its own relation (the mark and the givens list), and the touch points are keyed by circle and ring (`@t-O-ABC-i`, `@t-O-ABCD-i`), turned by the circle's rider count (`ridersOn`, the one reader, shared with the n ≥ 5 scaffold). A ring whose vertices already exist keeps the generic construction.
 
 ### A touch list is one sentence: the ring's incircle, else the shared seam ([ADR-631](06-decisions.md#adr-631))
 
@@ -1226,6 +1251,28 @@ together is a co-reference. At submit, when only the read-extent members fired (
 `lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
+#### An incidence clause the reading never read ([ADR-765](06-decisions.md#adr-765))
+
+The phrase sibling, `unreadThrough` (`src/app/unreadThrough.ts`, in the battery): a fourth token kind of ADR-603's
+class, the LABEL-FREE incidence phrase («AB מיתר העובר דרך מרכז המעגל», «…במעגל O העובר דרך O», "through the
+centre"), which no other member sees — its words are circle vocabulary to the accountants, it has no fresh letter for
+the label probe, and a letter it does name is a co-reference. The openers are lexicon atoms (`THROUGH_OPEN_HE/_EN`,
+`THROUGH_VERB_HE/_EN`). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
+to the clause end), and the verb opener alone (never a bare «דרך» / "through", a fronted locative a rule may tolerate).
+The occurrence is unread when EITHER leaves the lowering unchanged — the whole phrase alone misses a phrase whose words
+a rule reads for another reason (a secant's «המעגל»), the verb alone misses a tangent. The verb-only finding is the weaker one: it stands only when the
+lowering references no point label the line never typed, because a reading that resolved a role-named point
+(«המשיק העובר בנקודה המשותפת…» → the tangent at T) read the phrase, and the verb was a connective. An unread occurrence is
+reported as its whole phrase, clipped to its clause. **The phrase cut** (`cutAtReading`, an `Occurrence` with
+`phrase: true`): the phrase is one unit, placed in a clause by overlap (its clitic «ו» may sit between two clauses);
+labels inside it do not count as read; the head is everything before it (trailing comma dropped), and must read as the
+span does with the phrase deleted — «(1) AB קטע  (2) העובר דרך מרכז המעגל», never «(1) AB  (2) קטע…». At submit, after
+the label refusal (a line both members see keeps the label member's parts) and only where nothing older fired,
+`lostPartNote` refuses with `input.scope.split-statements` (`scope:split-statements:unread-through`); a line with no
+cut (the secant, whose circle is read from inside the phrase) takes the weak path. The ✎ seam names the phrase
+through `GateReport.items`. Cost: two parses per opener occurrence, plus the label probe and the cut, only on lines
+holding an opener.
 
 #### A number the reading never read ([ADR-677](06-decisions.md#adr-677), [ADR-678](06-decisions.md#adr-678))
 

@@ -53,7 +53,9 @@ describe('#4 — the drawn free vertices are committed at accept (ADR-585)', () 
     const cold = work.done - w;
     expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
     expect(fig.violations).toEqual([]);
-    expect(cold, `cold work ${cold}`).toBeLessThan(200_000); // 484,883 before, 122,909 after
+    // #2443 (ADR-764): 218,340 since the tolerance-artefact trigger reads term pairs — E lands 1.4e-4 of the extent from C
+    // (an FR-EN-20 convergence), so five accepts each pay one tightened re-solve, which passes. Still well under the pre-fix cost.
+    expect(cold, `cold work ${cold}`).toBeLessThan(250_000); // 484,883 before, 122,909 after ADR-585, 218,340 after ADR-764
     w = work.done;
     replay(FACTS.map((f) => ({ ...f })), 0); // content-equal copy: the fold memo serves it
     expect(work.done - w).toBe(0);

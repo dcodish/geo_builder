@@ -470,12 +470,42 @@ const COLLAPSED_POLYGON_RATIO = DEGENERATE_EXTENT_RATIO;
  */
 function toleranceArtefactPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
   const known = artefactSeen.get(positions);
-  if (known && known.c === c) return known.defect !== null;
+  if (known && known.c === c) return known.failed;
   const thin = degeneratePolygons(c, positions, THIN_POLYGON_RATIO); // the trigger: an ordinary figure pays nothing
+  // #2443 (ADR-764): the trigger's second term — two named points a stated relation measures between, met inside the
+  // same band. Two vertices of a quadrilateral meeting leave the ring fat, and loose points have no ring at all.
+  const pair = !thin.length && collapsingTermPair(c, positions);
   // #2344 (ADR-746): the re-solve tightens the length family too, at a factor sized for a tangent root's quadratic residual
-  const defect = thin.length && !evaluateTightened(c, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR).ok ? { id: thin[0].id, vertices: [...thin[0].vertices], kind: 'flat' as const } : null;
-  artefactSeen.set(positions, { c, defect });
-  return defect !== null;
+  const failed = (thin.length > 0 || pair) && !evaluateTightened(c, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR).ok;
+  // A declared thin ring is ADR-602's flat polygon; a term pair names no polygon, so the refusal is the over-constraint.
+  const defect = failed && thin.length ? { id: thin[0].id, vertices: [...thin[0].vertices], kind: 'flat' as const } : null;
+  artefactSeen.set(positions, { c, defect, failed });
+  return failed;
+}
+/**
+ * #2443 ([ADR-764](../../docs/06-decisions.md#adr-764)) — does some ENFORCED constraint (the listed ones and the solve
+ * directives' embedded ones) have a collapsible term pair ({@link collapsibleTermPairs}, the one ruler of "this
+ * relation's own term collapsed") closer than {@link THIN_POLYGON_RATIO} × the figure's extent? Every enforced
+ * constraint, not only the step's: with the givens in the other order the collapsing pair belongs to the EARLIER one.
+ * A pair a `coincide` merged is one point by statement, never a collapse (the vacuity gate's own exclusion).
+ */
+function collapsingTermPair(c: Construction, positions: Map<Id, Vec>): boolean {
+  let ext = 1;
+  for (const v of positions.values()) ext = Math.max(ext, Math.abs(v.x), Math.abs(v.y));
+  const band = THIN_POLYGON_RATIO * ext;
+  const merged = new Set(c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')));
+  for (const con of [...c.constraints, ...drivenConstraintsOf(c)])
+    for (const [a, b] of collapsibleTermPairs(con)) {
+      if (a === b || merged.has([a, b].sort().join('|'))) continue;
+      const p = positions.get(a), q = positions.get(b);
+      if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < band) return true;
+    }
+  return false;
+}
+/** #2443 (ADR-764): the tolerance-artefact gate refused this solve on a term pair alone — no declared polygon is thin. */
+function termPairArtefact(c: Construction, positions: Map<Id, Vec>): boolean {
+  const known = artefactSeen.get(positions);
+  return !!known && known.c === c && known.failed && known.defect === null;
 }
 /**
  * #2344 ([ADR-746](../../docs/06-decisions.md#adr-746)) — the polygon the tolerance-artefact gate refused, keyed by the
@@ -483,7 +513,7 @@ function toleranceArtefactPolygon(c: Construction, positions: Map<Id, Vec>): boo
  * reports it as ADR-602's flat polygon (the 2-D twin of 3-D's and analytic's `polygon-collapsed`), not as an
  * over-constraint. Read back, never recomputed: the re-solve runs once per judged solve.
  */
-const artefactSeen = new WeakMap<Map<Id, Vec>, { c: Construction; defect: PolygonDefect | null }>();
+const artefactSeen = new WeakMap<Map<Id, Vec>, { c: Construction; defect: PolygonDefect | null; failed: boolean }>();
 function toleranceArtefactDefect(c: Construction, positions: Map<Id, Vec>): PolygonDefect | undefined {
   const known = artefactSeen.get(positions);
   return known && known.c === c ? known.defect ?? undefined : undefined;
@@ -939,7 +969,11 @@ function runFailureLadder(
   // declared shape, and ADR-602's refusal names it; the «כבר מוגדרת» wording is for a step whose degenerate solution is
   // only ever the one point («ריבוע ABCD» · «B אמצע CD»). «מלבן ABCD» · «B אמצע CD» keeps its flat refusal.
   const primaryDefect = primary.ok ? gateDefects(next, primary.positions)[0] ?? toleranceArtefactDefect(next, primary.positions) : undefined;
-  const flatPoly = [primaryDefect, collapsedSeen].find((d) => d && d.kind !== 'point') ?? primaryDefect ?? collapsedSeen;
+  // #2443 (ADR-764): a primary the tolerance-artefact gate refused on a term pair alone carries its own verdict — the
+  // statement's over-constraint. A rescue stage's collateral defect (a straight corner at a vertex the student never
+  // constrained) must not outrank it.
+  const primaryByPair = primary.ok && !primaryDefect && termPairArtefact(next, primary.positions);
+  const flatPoly = primaryByPair ? undefined : [primaryDefect, collapsedSeen].find((d) => d && d.kind !== 'point') ?? primaryDefect ?? collapsedSeen;
   const flatErr = flatPoly ? polygonDefectError(flatPoly, blameCons) : null;
   // #1328 (ADR-537): when the PRIMARY solve succeeded and the step-accept gate refused it — a vacuous
   // satisfaction (#7), a collapsed polygon (#408), a tolerance artefact (#1328) — a solution EXISTS and is
@@ -1353,7 +1387,11 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const angleErr = angleSumImpossibility(probed.objects, probed.constraints, [...probed.constraints, ...drivenConstraintsOf(probed)]);
   if (angleErr?.kind === 'limit-collapse') {
     const added = addedConstraints(prev, probed);
-    const error = collapsedPolygonError(angleErr.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
+    // #2443 (ADR-764): three points no declared triangle covers have no polygon to call flat — the statement's
+    // over-constraint, named «X» סותר את «Y» by the fold's drop-one search (FR-EN-8)
+    const error = angleErr.undeclared
+      ? engineErrorDebugText(added.length ? { code: 'over-constrained', what: describeConstraint(describeNewStatement(added)) } : { code: 'over-constrained-unnamed' })
+      : collapsedPolygonError(angleErr.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
     return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'], degenerate: true };
   }
   if (angleErr) {
@@ -2416,11 +2454,30 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
     const B = prevPos?.get(cmd.b);
     const L = A && B ? (B.x - A.x) ** 2 + (B.y - A.y) ** 2 : 0;
     const proj = P && A && B && L > 1e-12 ? ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / L : 0.5;
-    const t = Math.min(0.88, Math.max(0.12, proj)); // within the span, clear of the endpoints
+    // within the span, clear of the endpoints — unless P already STANDS on the segment's interior (#2257, ADR-767: an
+    // inscription's seat put it there), where the statement already holds and moving P would make the figure jump
+    const onSpan = P && A && B && L > 1e-12 && proj > 0 && proj < 1 && Math.abs((P.x - A.x) * (B.y - A.y) - (P.y - A.y) * (B.x - A.x)) / L < 1e-7;
+    const t = onSpan ? proj : Math.min(0.88, Math.max(0.12, proj));
     const objects = prev.objects.map((o) =>
       o.id === cmd.id ? ({ kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t, free: true, ...(solve ? { solve } : {}) } as GeoObject) : o,
     );
     return { objects, constraints: [...prev.constraints] };
+  }
+  // #2257 (ADR-767): a statement that a DERIVED point lies on a segment is about that point — the ADR-028 rule
+  // `reinterpretAsConstraint` applies to every other placement («use the existing point»): its carrier is the point's
+  // own free 1-DOF ancestor (a drawn square's corner C rides through its base riders), never whichever endpoint of the
+  // segment the generic driver reaches first — that moved the CONTAINER a drawn square was being inscribed in.
+  const derived = !['free-point', 'on-segment', 'on-segment-solved', 'on-circle', 'on-line'].includes(existing.kind);
+  // the point's OWN shape scalar first (a rectangle's corner rides its height, a rhombus's its angle — the
+  // `driveOrCheck` (2.5) rule for a statement naming it), else its nearest free 1-DOF ancestor
+  const ownScalar = isShapeCarrier(existing) && (existing as { solve?: unknown }).solve === undefined ? cmd.id : null;
+  const own = !cmd.extension && derived ? ownScalar ?? freeCarrierAncestor(prev.objects, cmd.id) : null;
+  if (own && !wouldInvertDependency(prev.objects, own, [cmd.a, cmd.b]) && !ancestors(prev.objects, cmd.a, 'param').includes(own) && !ancestors(prev.objects, cmd.b, 'param').includes(own)) {
+    const col: Constraint = { type: 'collinear', a: cmd.id, b: cmd.a, c: cmd.b };
+    const objects = prev.objects.map((o) => (o.id === own ? ({ ...o, solve: { constraint: col, branch: 0 } } as GeoObject) : o));
+    const constraints = [...prev.constraints, col];
+    addCollinearOrder(objects, constraints, [cmd.a, cmd.id, cmd.b]);
+    return { objects, constraints };
   }
   // #260 (ADR-512): the positions ride along so the meeting re-seat can judge where the crossing lies.
   const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b }, prevPos);

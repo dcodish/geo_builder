@@ -422,6 +422,10 @@ circumscribes triangle ABC" as «… חסום במעגל (O)»; "triangle ABC ci
 circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשולש ABC» (the circle the subject) as «מעגל חוסם את המשולש ABC»;
 «מעגל ש-ABC חוסם» / «מעגל שהמשולש ABC חוסם» (the ring the subject) as the incircle. n ≥ 5 waits for #1969.
 - «מעגל שחוסם את המשולש ABC», «מעגל ש-ABC חוסם», "the circle O circumscribes triangle ABC"
+
+**R131 amendment — a second ring around one circle (#2512, ADR-AG-333, ADR-W-157)**. A triangle or quadrilateral stated around a circle that already has a ring around it builds as 2-D builds it: tangent to every side within the side, its own figure, at every configuration, whatever its letters.
+- «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O»; two squares around O
+- Sources: ADR-AG-333, #2512.
 - Sources: ADR-AG-275, #1975, ADR-W-108.
 
 **R132 — a tangent at a named point, the tangent as an object, tangency to any circle, and chords**. *(Operator, #1616 ruling 4: "Chord: yes.")* The touch is perpendicular to the radius at every configuration; «המשיק» refers to the drawn tangent.
@@ -651,7 +655,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «sin∢ABC = 0.5» → «30° או 150°», cycled
 - Sources: ADR-AG-227, #1719.
 
-**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is refused (R193). A point R together with the radius R is refused in either order, naming both and the earlier line.
+**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is refused (R193). A point R together with the radius R is refused in either order, naming both and the earlier line. A stated radius of a circle whose radius is a letter gives that letter the value: every relation over the letter, stated before or after, reads it; a relation the value breaks is refused naming the line ([ADR-AG-332](06c-decisions-analytic.md#adr-ag-332), #2521).
 - «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1», «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» → r = 3, R = 6 in Q2
 - «(x−13)²+y²=R²», «ורדיוסו R», «רדיוס המעגל O הוא R»
 - «R(1,2)» · «נתון מעגל N שרדיוסו R» → refused, naming «R(1,2)»
