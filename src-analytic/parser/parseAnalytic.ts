@@ -1352,7 +1352,7 @@ const BOUNDED_NOUN = new RegExp(
 );
 
 /** A CONTEXTUAL operand — «המעגל», «הפרבולה» with no name: which curve is M1's question (#1429). */
-type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef };
+type KindOperand = { t: 'kind'; kind: 'circle' | 'parabola' | 'ellipse' | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef };
 
 /**
  * A LINE-OBJECT operand (#1715, ADR-AG-224) — «חוצה זוית B», «הגובה מ-A», «התיכון מ-A», «האנך מ-A ל-BC», «האנך
@@ -1420,6 +1420,14 @@ function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | 
   // «האנך», «האנך שהורידו מנקודה B לציר ה-x» — the perpendicular the figure drew (#1620, ADR-AG-207).
   const perp = perpendicularRef(trim(operand));
   if (perp) return perp === 'bad' ? null : perp;
+  /*
+   * «הישר המקביל» · «האנך האמצעי» — the auxiliary line by its ROLE (#1138, ADR-AG-341): the one line the figure built
+   * through a point parallel to something, the one perpendicular bisector. A reference, never a construction — M1
+   * resolves it, and none or several is refused naming the candidates. Named in full («האנך האמצעי ל-EK») it is the
+   * line-object operand below, which builds it.
+   */
+  const role = roleLineRef(trim(operand));
+  if (role) return role;
   // A line-object named in full — a bisector, a cevian from its apex, a perpendicular bisector — is BUILT by the operand
   // (#1715), as a tangent at a named point is above. AFTER «האנך»: ADR-AG-207 rules that phrase a REFERENCE to the
   // perpendicular the figure drew, however fully it is described.
@@ -1623,7 +1631,7 @@ function parseIntersectionPlain(
       k.t === 'object'
         ? k.facts.map((f) => ({ ...f, src: line }))
         : k.t === 'kind'
-          ? [{ t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line }]
+          ? [{ t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.line ? { line: k.line } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line }]
           : [{ t: 'constraint', k, src: line }];
     return made([
       { t: 'declare', id, src: line },
@@ -4525,7 +4533,6 @@ function parseCircleThru(line: string): RuleOutcome {
  * «x_B > y_D» compares two different things and is left to the rules below, which refuse it honestly.
  */
 const COORD_ATOM = `(?:([xy])\\s*_\\s*\\{?\\s*(${NAME})\\s*\\}?|(${NAME})\\s*_\\s*\\{?\\s*([xy])\\s*\\}?|([xy])(${NAME}))`;
-const COMPARE_SYM = new RegExp(`^${HE_GIVEN}${COORD_ATOM}\\s*(>|<)\\s*(.+)$`);
 /** One side of a symbolic comparison as `{axis, id}`, from `COORD_ATOM`'s three alternatives. */
 function atomOf(m: RegExpExecArray | RegExpMatchArray, at: number): { axis: 'x' | 'y'; id: Id } | null {
   if (m[at]) return { axis: m[at] as 'x' | 'y', id: m[at + 1] };
@@ -4570,9 +4577,71 @@ function compareValue(src: string): Expr | null {
   return valueExpr(s);
 }
 
-function compareFacts(id: Id, axis: 'x' | 'y', greater: boolean, rhs: CoordCompareRhs, line: string): ParseResult {
+function compareFacts(id: Id, axis: 'x' | 'y', greater: boolean, rhs: CoordCompareRhs, line: string, closed = false): ParseResult {
   if ('point' in rhs && rhs.point === id) return { ok: false, code: 'repeated-vertex', detail: line };
-  return made([{ t: 'selector', sel: { kind: 'coord-compare', id, axis, greater, rhs }, src: line }]);
+  return made([{ t: 'selector', sel: { kind: 'coord-compare', id, axis, greater, rhs, ...(closed ? { closed: true as const } : {}) }, src: line }]);
+}
+
+/** «שיעור ה-y של A» standing alone — a SIDE of a symbolic comparison or range (#1138), the noun form of `y_A`. */
+const HE_COORD_ONLY = new RegExp(`^${HE_COORD}$`);
+
+/** One side of a symbolic comparison as a coordinate atom — `y_A`, `A_y`, `yA` or «שיעור ה-y של A» — else `null`. */
+function coordSide(src: string): { axis: 'x' | 'y'; id: Id } | null {
+  const t = trim(src);
+  const sym = COORD_ATOM_ONLY.exec(t);
+  if (sym) return atomOf(sym, 1);
+  const he = HE_COORD_ONLY.exec(t);
+  return he ? { axis: (he[1] ?? he[2]) as 'x' | 'y', id: he[3] } : null;
+}
+
+/**
+ * A COORDINATE AGAINST ITS BOUNDS, SYMBOLICALLY — «x_B > 1», «y_A ≤ 1.5», «1 < x_B», «-1.5 ≤ y_A ≤ 1.5»,
+ * «-1.5 ≤ שיעור ה-y של A ≤ 1.5» (#1462; the non-strict operators and the RANGE, #1138, ADR-AG-340).
+ *
+ * ADR-AG-005 D7 names a third inequality kind, the SWEEP RANGE on a free point, whose consumer is the locus lane. On a
+ * point coordinate the second and third kinds are ONE meaning — "this coordinate lies in this set" — differing only in
+ * what else is free, so they are one lowering: each end is a `coord-compare` selector (D7 kind 2), `closed` when the
+ * student wrote ≤ / ≥. A selector consumes no freedom, so a range never determines its point; validity bounds the
+ * configurations and the trace is clipped to it (ADR-AG-245). Routing the two by whether the point happens to be free
+ * would be one sentence with two meanings by hidden state (docs/17 §2.3).
+ */
+function compareSymbolic(line: string): RuleOutcome {
+  const body = line.replace(new RegExp(`^${HE_GIVEN}`), '');
+  const parts = body.split(ORDER_OP);
+  if (parts.length === 3) {
+    const [l, op, r] = parts;
+    const lhs = coordSide(l);
+    const rhs = coordSide(r);
+    if (lhs && rhs) {
+      // Two different axes are two different quantities: not this construct.
+      if (rhs.axis !== lhs.axis) return null;
+      return compareFacts(lhs.id, lhs.axis, greaterOp(op), { point: rhs.id }, line, closedOp(op));
+    }
+    if (lhs) {
+      const v = compareValue(r);
+      return v ? compareFacts(lhs.id, lhs.axis, greaterOp(op), { value: v }, line, closedOp(op)) : null;
+    }
+    if (rhs) {
+      // «1 < x_B» — the value on the left: the coordinate is on the operator's other side.
+      const v = compareValue(l);
+      return v ? compareFacts(rhs.id, rhs.axis, !greaterOp(op), { value: v }, line, closedOp(op)) : null;
+    }
+    return null;
+  }
+  if (parts.length === 5) {
+    const [a, o1, mid, o2, b] = parts;
+    const at = coordSide(mid);
+    if (!at || greaterOp(o1) !== greaterOp(o2)) return null; // «1 < x_B > 3» states no range
+    const lo = compareValue(a);
+    const hi = compareValue(b);
+    if (!lo || !hi) return null;
+    const first = compareFacts(at.id, at.axis, !greaterOp(o1), { value: lo }, line, closedOp(o1));
+    const second = compareFacts(at.id, at.axis, greaterOp(o2), { value: hi }, line, closedOp(o2));
+    if (!first.ok) return first;
+    if (!second.ok) return second;
+    return made([...first.facts, ...second.facts]);
+  }
+  return null;
 }
 type CoordCompareRhs = Extract<Selector, { kind: 'coord-compare' }>['rhs'];
 
@@ -4671,22 +4740,8 @@ function parseCompare(line: string): RuleOutcome {
     const { axis, greater } = positionMeaning(against[2]);
     return made([{ t: 'selector', sel: { kind: 'line-compare', id, line: u, axis, greater }, src: line }, ...claims.out]);
   }
-  const sym = COMPARE_SYM.exec(line);
-  if (sym) {
-    const lhs = atomOf(sym, 1);
-    const op = sym[7];
-    const rest = trim(sym[8]);
-    if (!lhs) return null;
-    const other = COORD_ATOM_ONLY.exec(rest);
-    if (other) {
-      const r = atomOf(other, 1);
-      // Two different axes are two different quantities: not this construct.
-      if (!r || r.axis !== lhs.axis) return null;
-      return compareFacts(lhs.id, lhs.axis, op === '>', { point: r.id }, line);
-    }
-    const v = compareValue(rest);
-    return v ? compareFacts(lhs.id, lhs.axis, op === '>', { value: v }, line) : null;
-  }
+  const symbolic = compareSymbolic(line);
+  if (symbolic) return symbolic;
 
   const he = COMPARE_HE.exec(line);
   if (he) {
@@ -6681,11 +6736,13 @@ const RELATION_SYM = new RegExp(`^${HE_GIVEN}(.+?)\\s*(${REL_PARALLEL_SYM}|${REL
  * this tree's recurring trap is a Hebrew gate that admits one spelling and silently drops the rest
  * (five times by #1081's count, and #1088 made it six).
  */
+/** A line's own name — `l4`, `ℓ`, a numeral (#1319); never a two-point run. */
+const FREE_LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL})`;
 const THROUGH_HE = new RegExp(
-  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)\\s+(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
 );
 const THROUGH_EN = new RegExp(
-  `^(?:a\\s+|the\\s+)?line\\s+(?:passes\\s+)?through\\s+(?:point\\s+)?(${NAME})\\s+(?:and\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+)$`,
+  `^(?:a\\s+|the\\s+)?line(?:\\s+([ℓl][0-9]?))?\\s+(?:passes\\s+)?through\\s+(?:point\\s+)?(${NAME})\\s+(?:and\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+)$`,
   'i',
 );
 /**
@@ -6694,7 +6751,7 @@ const THROUGH_EN = new RegExp(
  * ADR-AG-207). The relation word may carry its own article or clitic («והמקביל»).
  */
 const THROUGH_LINE_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}ה?(?:ישר|קו)\\s+(?:(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})\\s+(?:ו?(?:הוא|היא)\\s+)?(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  `^${HE_GIVEN}ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})\\s+(?:ו?(?:הוא|היא)\\s+)?(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
 );
 /**
  * …AND WHERE IT CUTS A SIDE — «… מקביל לציר ה-y וחותך את הצלע AB בנקודה F», «… the y-axis and cuts side AB at F»
@@ -6718,7 +6775,6 @@ const THROUGH_CUT_EN = new RegExp(`^(.+?)\\s*,?\\s+(?:and\\s+|which\\s+)?(?:cuts
  * statement about two points rather than a construction through one. The English form takes the name
  * before «through» («line l4 through M»), as the language puts it.
  */
-const FREE_LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL})`;
 const THROUGH_FREE_HE = new RegExp(
   `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?$`,
 );
@@ -6898,9 +6954,24 @@ function parseThroughLine(line: string): RuleOutcome {
       },
     ]);
   }
-  const m = THROUGH_HE.exec(line) ?? THROUGH_LINE_FIRST_HE.exec(line) ?? THROUGH_EN.exec(line);
+  /*
+   * The line's own NAME (#1138, ADR-AG-341) — «דרך E עובר ישר l1 מקביל לציר ה-x», «ישר l1 דרך E מקביל …», "line l1
+   * through E parallel to …": the exam names the auxiliary lines it later crosses. Named, the name IS the identity, like
+   * every named line (the free-direction member above); anonymous, content-derived (ADR-AG-023).
+   */
+  const first = THROUGH_HE.exec(line);
+  const lineFirst = first ? null : THROUGH_LINE_FIRST_HE.exec(line);
+  const enT = first || lineFirst ? null : THROUGH_EN.exec(line);
+  const m = first
+    ? [first[1], first[2], first[3], first[4]]
+    : lineFirst
+      ? [lineFirst[2], lineFirst[1], lineFirst[3], lineFirst[4]]
+      : enT
+        ? [enT[2], enT[1], enT[3], enT[4]]
+        : null;
   if (!m) return null;
-  const [, through, word, tail] = m;
+  const [through, token, word, tail] = m;
+  const lineName = token ? lineNameOf(token, enT ? 'en' : 'he') : undefined;
   const cut = THROUGH_CUT_HE.exec(tail) ?? THROUGH_CUT_EN.exec(tail);
   const dirSrc = cut ? cut[1] : tail;
   const claims: ClaimSink = { out: [], src: line };
@@ -6915,7 +6986,8 @@ function parseThroughLine(line: string): RuleOutcome {
    * the same discipline the anonymous curves follow, keyed on what actually identifies this line:
    * the point, the direction and which of the two readings it is.
    */
-  const id = `curve-${anonIndex(`through:${through}:${perp ? 'perp' : 'par'}:${describeDirId(dir)}`)}`;
+  const id = token ? lineIdOf(token) : `curve-${anonIndex(`through:${through}:${perp ? 'perp' : 'par'}:${describeDirId(dir)}`)}`;
+  const named = lineName ? { name: lineName } : {};
   /**
    * The ANCHOR is introduced if it does not exist, with DOF — the operator's 2026-09-15 ruling for
    * «הישר AB» (#1066), applied here because it is the same act: «דרך P» NAMES P and asserts a line
@@ -6929,7 +7001,7 @@ function parseThroughLine(line: string): RuleOutcome {
   if (!cut) {
     return made([
       { t: 'declare', id: through, src: line },
-      { t: 'line-at', id, through, dir, perp, src: line },
+      { t: 'line-at', id, through, dir, perp, ...named, src: line },
       ...claims.out,
     ]);
   }
@@ -6948,7 +7020,7 @@ function parseThroughLine(line: string): RuleOutcome {
   if (!crossing || !crossing.ok) return crossing;
   return made([
     { t: 'declare', id: through, src: line },
-    { t: 'line-at', id, through, dir, perp, drawn: false, src: line },
+    { t: 'line-at', id, through, dir, perp, drawn: false, ...named, src: line },
     ...crossing.facts,
     { t: 'segment', id: segmentId(through, at), a: through, b: at, ref: true, src: line },
     ...claims.out,
@@ -7071,20 +7143,26 @@ function cutIsOwnLine(cutText: string | undefined, ontoText: string): boolean {
  * midpoint (a tool letter unless the student named it, the one mint) and the line through it perpendicular to AB.
  */
 /** «… חותך אותו בנקודה M» / "… meets it at M" names the midpoint (ADR-AG-211) — the form a renamed tool letter is written into. */
-const PERP_BISECTOR_HE = new RegExp(`^ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+?)(?:\\s+(?:חותך|פוגש)\\s+אותו\\s+ב(?:ה)?נקודה\\s+(${NAME}))?$`);
-const PERP_BISECTOR_EN = new RegExp(`^(?:[Tt]he\\s+)?[Pp]erpendicular\\s+bisector\\s+(?:of|to)\\s+(.+?)(?:\\s+meets\\s+it\\s+at\\s+(${NAME}))?$`);
+const PERP_BISECTOR_HE = new RegExp(`^(?:(?:ה?ישר\\s+)?(${FREE_LINE_NAME})\\s+(?:(?:הוא|היא)\\s+)?)?ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+?)(?:\\s+(?:חותך|פוגש)\\s+אותו\\s+ב(?:ה)?נקודה\\s+(${NAME}))?$`);
+const PERP_BISECTOR_EN = new RegExp(`^(?:(?:[Tt]he\\s+)?(?:[Ll]ine\\s+)?([ℓl][0-9]?)\\s+(?:is\\s+)?)?(?:[Tt]he\\s+)?[Pp]erpendicular\\s+bisector\\s+(?:of|to)\\s+(.+?)(?:\\s+meets\\s+it\\s+at\\s+(${NAME}))?$`);
 
 function parsePerpendicular(line: string): RuleOutcome {
   const bisector = PERP_BISECTOR_HE.exec(line) ?? PERP_BISECTOR_EN.exec(line);
   if (bisector) {
     const claims: ClaimSink = { out: [], src: line };
-    const piece = direction(trim(bisector[1]), claims);
+    const piece = direction(trim(bisector[2]), claims);
     if (!piece || piece.k !== 'points') return refuse('bad-operand', line);
     const [a, b] = [piece.a, piece.b].sort();
-    const mid = bisector[2] ?? toolPoint('midpoint', `mid:${a},${b}`);
+    const mid = bisector[3] ?? toolPoint('midpoint', `mid:${a},${b}`);
+    /*
+     * «l2 אנך אמצעי ל-EK», «הישר l2 הוא האנך האמצעי לקטע EK», "l2 is the perpendicular bisector of EK" — the line's own
+     * NAME (#1138, ADR-AG-341), its identity as for every named line; anonymous, content-derived as before.
+     */
+    const token = bisector[1];
+    const id = token ? lineIdOf(token) : `curve-${anonIndex(`perp-bisector:${a}${b}`)}`;
     return made([
       { t: 'derived', id: mid, rule: { t: 'midpoint', a: piece.a, b: piece.b }, src: line },
-      { t: 'line-at', id: `curve-${anonIndex(`perp-bisector:${a}${b}`)}`, through: mid, dir: piece, perp: true, src: line },
+      { t: 'line-at', id, through: mid, dir: piece, perp: true, ...(token ? { name: lineNameOf(token, /[א-ת]/.test(line) ? 'he' : 'en') } : {}), src: line },
       ...claims.out,
     ]);
   }
@@ -7110,6 +7188,19 @@ function parsePerpendicular(line: string): RuleOutcome {
     if (!b.ok) return b;
     return made([...a.facts, ...b.facts]);
   }
+  return null;
+}
+
+const ROLE_PARALLEL = /^(?:ה?(?:ישר|קו)\s+ה?מקביל|(?:the\s+)?parallel(?:\s+line)?)$/i;
+const ROLE_PERP_BISECTOR = /^(?:ה?אנך\s+ה?אמצעי|(?:the\s+)?perpendicular\s+bisector)$/i;
+const ROLE_PARALLEL_NAMED = new RegExp(`^ה?(?:ישר|קו)\\s+(${FREE_LINE_NAME})\\s+ה?מקביל$`);
+/** «הישר המקביל» / «האנך האמצעי» with nothing after it — the role reference M1 resolves (`on-kind`, #1138). */
+function roleLineRef(text: string): KindOperand | null {
+  // «הישר l1 המקביל» — the role with the line's own name: that line (the remedy the ambiguity refusal teaches).
+  const named = ROLE_PARALLEL_NAMED.exec(text);
+  if (named) return { t: 'kind', kind: 'parallel', line: named[1] };
+  if (ROLE_PARALLEL.test(text)) return { t: 'kind', kind: 'parallel' };
+  if (ROLE_PERP_BISECTOR.test(text)) return { t: 'kind', kind: 'perp-bisector' };
   return null;
 }
 
@@ -7620,7 +7711,7 @@ function parseConstraint(raw: string): RuleOutcome {
     if (k && k.t === 'kind') {
       return made([
         { t: 'declare', id, src: line },
-        { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line },
+        { t: 'on-kind', id, kind: k.kind, ...(k.circle ? { circle: k.circle } : {}), ...(k.line ? { line: k.line } : {}), ...(k.foot ? { foot: k.foot } : {}), src: line },
       ]);
     }
     // «E על חוצה זוית B» — a point on a line-object the sentence builds (#1715): the operand's own lowering.
@@ -8974,6 +9065,32 @@ function parseDistinct(line: string): RuleOutcome {
   return made([{ t: 'distinct-of', names: [a, b], ...(nouns[0] ? { noun: nouns[0] } : {}), src: line }]);
 }
 
+/**
+ * A POINT INTRODUCED AS "A POINT ON …" — «A נקודה כלשהי על המעגל x^2 + y^2 = 4», «A נקודה על המעגל», «P היא נקודה על
+ * הצלע AB», with an optional range tail «… כך ש-−1.5 ≤ y_A ≤ 1.5» (#1138, ADR-AG-340).
+ *
+ * The exam introduces the swept point of a locus this way. The predicate noun «נקודה» (with «כלשהי», "any") says only
+ * that A is a point — which the incidence already makes it — so the sentence is the incidence «A על …» and is lowered
+ * through it (2-D reads «P נקודה על הצלע AB» and «P נקודה כלשהי על המעגל» as its point-on sentence, measured at
+ * `d9494206`). «המעגל» alone is the incidence's own contextual operand (#1429): it resolves when the figure has exactly one
+ * circle. The tail is a RANGE on the point (D7's kind 3) and must read as selectors only — anything else declines the
+ * whole line rather than being absorbed into it.
+ */
+const CARRIER_POINT_HE = new RegExp(
+  `^${HE_GIVEN}(${NAME})\\s+(?:(?:היא|הינה|הוא|הינו)\\s+)?נקודה(?:\\s+כלשהי)?\\s+((?:נמצאת\\s+)?על\\s+.+?)(?:\\s+כך\\s+ש-?\\s*(.+))?$`,
+);
+function parseCarrierPoint(line: string): RuleOutcome {
+  const m = CARRIER_POINT_HE.exec(line);
+  if (!m) return null;
+  const [, id, on, tail] = m;
+  const incidence = viaSentences(line, [`${id} ${on}`]);
+  if (!incidence || !incidence.ok || !tail) return incidence;
+  const range = parseClause(trim(tail));
+  if (!range.ok) return range.code === 'not-handled' ? null : { ...range, detail: line };
+  if (!range.facts.every((f) => f.t === 'selector')) return null;
+  return made([...incidence.facts, ...range.facts.map((f) => ({ ...f, src: line }))]);
+}
+
 function parseClauseRules(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -8983,6 +9100,10 @@ function parseClauseRules(raw: string): ParseResult {
 
   const pin = parseParamValue(line);
   if (pin) return pin;
+
+  // «A נקודה (כלשהי) על …» (#1138) — the predicate noun before an incidence, read as the incidence itself.
+  const carrier = parseCarrierPoint(line);
+  if (carrier) return carrier;
 
   // A stated distinctness (#2395) — after the parameter domains («a ≠ 0» is a domain), before the comparisons.
   const distinct = parseDistinct(line);

@@ -1098,10 +1098,10 @@ a sentence the tool parsed.
 - clicking a point → its coordinates and its distance to each named line, drawn as a perpendicular
 - Sources: ADR-AG-066, ADR-AG-067.
 
-**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated.** The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1).
+**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated.** The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). The locus question is **one question however the exam words it** — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» answer the same row (ADR-AG-341). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
 - «נקודה P» · «PA מאונך ל-PB» · «המקום הגיאומטרי של P» → trace, kind, equation
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
-- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817.
+- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138.
 
 ---
 

@@ -293,7 +293,25 @@ const LOCUS_OF =
  * נקודה בשם כל הנקודות M …»). The condition's joiners are enumerated.
  */
 const SET_FORMER =
-  /^(?:(?:כל\s+)?ה?נקודות\s+|(?:all\s+)?(?:the\s+)?points\s+)([A-Z][0-9₀-₉]?)(?:\s+(?:ה?מקיימות|ה?מקיימים|ש-?|such\s+that|satisfying|that\s+satisfy)\s*(.+))?$/;
+  /^(?:ש(?:עליו|בו)\s+(?:נמצאות|נמצאים|מונחות|מונחים)\s+)?(?:(?:כל\s+)?ה?נקודות\s+|(?:all\s+)?(?:the\s+)?points\s+)([A-Z][0-9₀-₉]?)(?:\s+(?:ה?מקיימות|ה?מקיימים|ש-?|such\s+that|satisfying|that\s+satisfy)\s*(.+))?$/;
+
+/**
+ * THE EXAM'S LOCUS QUESTIONS, HOWEVER THEY ARE WORDED (#1138, ADR-AG-341) — ADR-AG-141 made the locus question one
+ * question however it opens; these are its other two openings, each rewritten to the plain locus phrase before it is read,
+ * so they can never answer differently from it. ENUMERATED, never `.*` (the #1301 anti-widening rule).
+ *
+ * - «הביעו באמצעות a את <the locus question>»: the same question. The answer is the locus row: the equation when the
+ *   configurations agree on it, and with a parameter that moves its coefficients the kind with the existing reason
+ *   (ADR-AG-072 §4–5) — the symbolic half is #1186. Read only before a LOCUS question; other questions keep their own
+ *   grammar.
+ * - «הראו כי <the locus phrase> הוא / נמצא על <kind> (ומצאו את משוואתו)»: the same row. The kind the sentence states is
+ *   not checked: the tool answers, it does not verify (ADR-AG-072 §6).
+ *
+ * The relative-clause closing «… שעליו נמצאות כל הנקודות M» is `SET_FORMER`'s optional lead.
+ */
+const EXPRESS_IN = /^(?:הביעו|הביעי|הבע|בטאו|בטא|בטאי)\s+(?:באמצעות|בעזרת)\s+[a-z]\s+את\s+(.+)$/;
+const SHOW_THAT_LOCUS =
+  /^(?:הראו|הראה|הראי|הוכיחו|הוכח|הוכיחי)\s+(?:כי|ש-?)\s*(.+?)\s*,?\s+(?:(?:הוא|היא)\s+|(?:נמצא|נמצאות|נמצאים)\s+על\s+)(?:ה?ישר|ה?מעגל|ה?פרבולה|ה?אליפסה)(?:\s*,?\s+ו-?(?:מצאו|מצא|מצאי)\s+את\s+משוואת(?:ו|ה))?$/;
 
 /** A question about the locus AS A CURVE — «שיפוע המקום הגיאומטרי של M» (#2389 → #2393): the locus is an answer, not an object. */
 const LOCUS_PHRASE = /^(?:ה?מקום\s+ה?גי?אומטרי|(?:[Tt]he\s+)?locus)(?:\s+(?:של|of)\s+.+)?$/;
@@ -432,6 +450,10 @@ function askOne(
    * the point and its property with sentences the tool already has, and the locus falls out of the
    * DOF. This phrase is a QUESTION, which is why it lives here.
    */
+  const shown = SHOW_THAT_LOCUS.exec(text);
+  if (shown && LOCUS_OF.test(shown[1])) text = shown[1];
+  const expressed = EXPRESS_IN.exec(text);
+  if (expressed && LOCUS_OF.test(expressed[1])) text = expressed[1];
   const loc = LOCUS_OF.exec(text);
   if (loc) {
     let name = loc[1].trim();

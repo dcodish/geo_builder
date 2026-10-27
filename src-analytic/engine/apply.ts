@@ -379,7 +379,22 @@ export interface ApplyError {
 function callable(o: GeoObject): string {
   if (o.kind === 'curve' && o.id.startsWith('curve-')) return o.label.eqSrc ?? '';
   if (o.kind === 'circle-thru' && o.name) return o.name;
+  // A line built through a point (#1138): its name, or nothing a student could type for an unnamed one.
+  if (o.kind === 'line-at') return o.name ?? (o.id.startsWith('curve-') ? '' : statedName(o.id));
   return statedName(o.id);
+}
+
+/** A line built through a point PARALLEL to a stated direction (#1138): «דרך E עובר ישר מקביל לציר ה-x». */
+function isParallelLine(o: GeoObject): boolean {
+  return o.kind === 'line-at' && !o.perp && o.dir.k !== 'free';
+}
+
+/** A PERPENDICULAR BISECTOR (#1138): a perpendicular line-at through the midpoint of the pair it is perpendicular to. */
+function isPerpBisector(c: Construction, o: GeoObject): boolean {
+  if (o.kind !== 'line-at' || !o.perp || o.dir.k !== 'points') return false;
+  const { a, b } = o.dir;
+  const mid = objectById(c, o.through);
+  return !!mid && mid.kind === 'derived' && mid.rule.t === 'midpoint' && ((mid.rule.a === a && mid.rule.b === b) || (mid.rule.a === b && mid.rule.b === a));
 }
 
 /**
@@ -3320,6 +3335,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         }
         return { ok: true, effect: 'known', next: c };
       }
+      /*
+       * THE SAME CONSTRUCTION, NAMED OR NOT, IS ONE LINE (#1138, ADR-AG-341). A line through a point with a stated
+       * direction is identified by what builds it (ADR-AG-023), and a name is the second identity a named line has: so
+       * «האנך האמצעי לקטע EK» then «l2 הוא האנך האמצעי ל-EK» NAMES the line already drawn (the id is never rewritten;
+       * every slot reads the name, ADR-AG-317), and the unnamed restatement of a named one is already known. Two
+       * different names keep their two objects, as before. A free direction is never the same construction twice.
+       */
+      if (f.dir.k !== 'free') {
+        const key = JSON.stringify(f.dir);
+        const twin = c.objects.find(
+          (o): o is Extract<GeoObject, { kind: 'line-at' }> =>
+            o.kind === 'line-at' && o.through === f.through && o.perp === f.perp && JSON.stringify(o.dir) === key && o.drawn !== false,
+        );
+        if (twin && !f.name) return { ok: true, effect: 'known', next: c };
+        if (twin && !twin.name && f.name && f.drawn !== false) {
+          return { ok: true, effect: 'narrowed', next: { ...c, objects: c.objects.map((o) => (o === twin ? { ...twin, name: f.name } : o)) } };
+        }
+      }
       return {
         ok: true,
         effect: 'created',
@@ -3689,6 +3722,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const foot = feet[0];
         if (foot.rule.t !== 'foot') return { ok: false, error: noHost(f.src, 'perpendicular', 0) };
         return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: foot.rule.from, b: foot.id }, src: f.src });
+      }
+      /*
+       * «הישר המקביל», «האנך האמצעי» — the one auxiliary line of that ROLE (#1138, ADR-AG-341). Read off the construction:
+       * a parallel is a `line-at` that is not perpendicular and copies a stated direction; a perpendicular bisector is a
+       * perpendicular `line-at` through the midpoint of the very pair it is perpendicular to.
+       */
+      if (f.kind === 'parallel' || f.kind === 'perp-bisector') {
+        // A NAME narrows it («הישר l1 המקביל»): the one parallel line of that name.
+        const lines = c.objects.filter(
+          (o) =>
+            o.kind === 'line-at' &&
+            o.drawn !== false &&
+            (f.kind === 'parallel' ? isParallelLine(o) : isPerpBisector(c, o)) &&
+            (f.line === undefined || o.name === f.line || o.id === lineIdOf(f.line)),
+        );
+        // Several bisectors are refused by count: the taught remedy names a line, and «הישר <name>» is the sentence that reads.
+        if (lines.length !== 1) return { ok: false, error: noHost(f.src, 'line', f.kind === 'parallel' ? lines : lines.length) };
+        return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: lines[0].id }, src: f.src });
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
       const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));

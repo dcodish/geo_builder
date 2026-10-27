@@ -590,7 +590,13 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef })
+  /*
+   * `kind: 'parallel'` / `'perp-bisector'` (#1138, ADR-AG-341) — «הישר המקביל», «האנך האמצעי»: the one line the figure
+   * built through a point parallel to something (a `line-at`, not perpendicular, with a stated direction), the one
+   * perpendicular bisector (a perpendicular `line-at` through the midpoint of the pair it is perpendicular to). A
+   * reference, never a construction: none or several is refused naming the candidates.
+   */
   /*
    * `kind: 'perpendicular'` (#1620, ADR-AG-207) — «E על האנך», «המשיק והאנך נחתכים בנקודה D»: the one perpendicular
    * the figure DREW (a `foot` derived point and the line from its point to it). `foot` narrows it by its description
@@ -1184,8 +1190,12 @@ export type Selector =
    * `axis-side` («B על החלק החיובי של ציר x», «ברביע») is this comparison against 0, and is judged and
    * seeded through the same function (`compareOf`, `evaluate.ts`) — one mechanism with two spellings in
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
+   *
+   * `closed` (#1138, ADR-AG-340) — the student wrote ≤ / ≥: a coordinate ON its bound holds. A RANGE on a free point
+   * («-1.5 ≤ y_A ≤ 1.5», D7's kind 3) is two of these: the same selector family, so it bounds the configurations and
+   * clips the trace (ADR-AG-245) and never consumes a degree of freedom.
    */
-  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr }; closed?: true }
   /**
    * «M מעל הישר KL» · «M מתחת לישר KL» · «M מימין לישר l» · «M משמאל לישר l» — A POINT'S SIDE OF A STRAIGHT LINE
    * (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher than the y of the other

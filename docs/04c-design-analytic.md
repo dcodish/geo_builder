@@ -1579,6 +1579,25 @@ holds `points` and `pieces`, and only the pieces are drawn.
 
 *Identifiers:* `starts`
 
+#### A sweep range is two selectors ([ADR-AG-340](06c-decisions-analytic.md#adr-ag-340), #1138)
+
+D7's kinds 2 and 3 are one lowering on a point coordinate: `compareSymbolic` reads `atom op value`, `value op atom`
+and the window, and each end is a `coord-compare` selector (`closed` for ≤ / ≥). No DOF is consumed; the judged walk
+above clips the trace. `parseCarrierPoint` lowers «A נקודה (כלשהי) על …» through the incidence, with an optional
+range tail that must read as selectors only.
+
+*Identifiers:* `coordSide` · `closed`
+
+#### The exam's own questions, and its named lines ([ADR-AG-341](06c-decisions-analytic.md#adr-ag-341), #1138)
+
+The ask lane rewrites «… שעליו נמצאות כל הנקודות X», «הביעו באמצעות a את …» and «הראו כי … הוא <kind> …» to the
+locus phrase before reading it (`EXPRESS_IN`, `SHOW_THAT_LOCUS`, `SET_FORMER`). A line through a point and a
+perpendicular bisector take an optional line name (the name is the id, `lineIdOf`); «הישר המקביל» / «האנך האמצעי»
+are `on-kind` references M1 resolves to the one such `line-at` (`isParallelLine`, `isPerpBisector`), refusing none
+or several.
+
+*Identifiers:* `roleLineRef` · `perp-bisector`
+
 #### It rides the ask lane, and widens one field
 
 The ask lane carries it; `Answer.mark` / `drawnMarks` also carry a polyline, drawn only when the figure is open.

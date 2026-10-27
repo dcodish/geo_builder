@@ -1768,6 +1768,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
   { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#2415' }, { product: '3d', issue: '#2420' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
   { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2420' }], note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
+  // ── #1138 (ADR-AG-340): «P נקודה (כלשהי) על …» is the incidence — 2-D reads both, analytic did not ──
+  { id: 'point-noun-on-side-1138', family: 'points-incidence', steps: ['משולש ABC', 'P נקודה על הצלע AB'], expect: 'builds' },
+  { id: 'point-noun-any-on-circle-1138', family: 'circles', steps: ['מעגל O', 'P נקודה כלשהי על המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'two-tangents-meet-2391', family: 'tangents', steps: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C', 'שני המשיקים נחתכים בנקודה D'], expect: 'builds', exception: 'X8' },
   { id: 'centres-distance-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'המרחק בין מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
   { id: 'centres-segment-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'אורכו של הקטע המחבר את מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
