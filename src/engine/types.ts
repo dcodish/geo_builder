@@ -424,6 +424,15 @@ const POINT_KIND_FLAGS: Record<GeoPointKind, true> = {
 
 const POINT_KINDS: ReadonlySet<string> = new Set(Object.keys(POINT_KIND_FLAGS));
 
+/** Ids that are NOT part of the student-facing figure, so they must never appear in a detected relation,
+ *  split, angle, or shape — the detection universe is "what the student sees" (FR-RV-6). Two families:
+ *  `~`-prefixed HIDDEN scaffolding (the Thales auxiliary midpoint `~tanmid-…`, touch witnesses — never
+ *  rendered at all), and `@`-prefixed ANONYMOUS PROMOTABLE points ([ADR-297](docs/06-decisions.md#adr-297)
+ *  / #32 — a decomposition's touch/tangency point the student didn't name; drawn as a clickable dot but
+ *  unnamed, so not yet a relation subject until promoted to a letter). One predicate, used wherever the
+ *  detection universe is built ([ADR-295](docs/06-decisions.md#adr-295)). */
+export const isScaffoldId = (id: Id): boolean => id.startsWith('~') || id.startsWith('@');
+
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
   return POINT_KINDS.has(o.kind);
 }

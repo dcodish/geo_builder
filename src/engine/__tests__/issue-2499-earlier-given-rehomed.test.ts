@@ -295,6 +295,9 @@ describe('#2499 — the refusal that now reaches its real failing sub-step names
     // A stated «AB = R» (a is not the centre) keeps its own k·R wording — only the membership shape is re-described.
     expect(describeConstraint({ ...membership, a: 'A', b: 'B', witness: 'W' })).toBe('|AB| = 1·R');
     expect(describeConstraint({ ...membership, k: 2 })).toBe('|CB| = 2·R');
+    // A hidden witness (a free radius «מעגל O ברדיוס r» witnesses through `~radw-…`) is never named: it keeps the
+    // `1·R` form the explainer renders as the radius letter (#2132's «(R)»), not `|O⟨…⟩|` (round #2561 batch).
+    expect(describeConstraint({ ...membership, a: 'O', b: 'R', center: 'O', witness: '~radw-circle-O' })).toBe('|OR| = 1·R');
   });
 
   it('#1584\'s quarter «ABC משולש ישר זוית · AC=15 · BC=10 · רבע מעגל ACB» is refused against «BC=10», reason |CB| = |CA|', async () => {
