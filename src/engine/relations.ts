@@ -18,14 +18,15 @@
  */
 
 import type { Construction, GeoObject, Id, LineSpec, Vec } from './types';
-import { isGeoPoint } from './types';
+import { isGeoPoint, isScaffoldId } from './types';
 import { evaluate } from './evaluate';
 import { applySeed, freeDofCount, scalePinned } from './sample';
 import { pointNeighbors } from './step';
 import { dist, sub, len } from './geometry';
 
-// `isScaffoldId` lives in types.ts (solve.ts reads it too, and cannot import this module without a cycle).
-export { isScaffoldId } from './types';
+// `isScaffoldId` lives in types.ts (solve.ts reads it too, and cannot import this module without a cycle). It is
+// imported for this module's own use AND re-exported: a bare re-export binds no local name (round #2561).
+export { isScaffoldId };
 
 /**
  * GEOMETRIC segment splitting — every point that lies ON a drawn carrier, connected to the carrier's other
