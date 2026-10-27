@@ -834,6 +834,8 @@ export default function App3() {
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'line-auto-named'
                     ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
+                  : n.kind === 'vector-named-bare' // #2092 (ADR-3D-381): the reading a bare «AB = k» got, and the length spelling
+                    ? t('notice.vectorNamedBare', { name: n.name, from: n.from, to: n.to })
                     : n.kind === 'already-known'
                       ? /* #853 (ADR-3D-209): ONE template for «true, and already known» — the
                            statement in the student's own wording, then why it follows. The four

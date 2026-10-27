@@ -428,6 +428,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   FR-VC-2d's relabel (ADR-3D-052's equality rule stands). A 3-D «AB=a» is a vector (X7), so the length half of
   the ruling has no 3-D sentence.
   - Sources: ADR-3D-344; #2054, #2061, #2023 (operator rulings 2026-10-13, 2026-10-14).
+- **FR-VC-2f (Must)** — **A bare «AB = k» names a vector and SAYS so; a length given as a letter is written
+  «|AB| = k».** Without «נסמן», «AB = k» (any lowercase letter, «AB = u» included, on any host) keeps the vector
+  reading — AB is named k — and the figure shows the note «"AB = k" נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם
+  לאורך, כתבו במקום זה "|AB| = k".» for as long as the line stands. «נסמן: AB = k» says "denote" and shows nothing.
+  «|AB| = k» («|AB|=k», «|AB| = 2k») is a stated length named by a letter: AB wears «k» («2k») on the canvas and its
+  length stays free ([ADR-052](06-decisions.md#adr-052)) until a value lands on the letter («k = 3» → |AB| = 3, the
+  label reads «3»; with «2k», 6). The same letter on two segments relates them («|AB| = k» · «|AD| = k» → equal;
+  «|AA'| = 2k» → twice). The taught line builds right after «AB = k», and as the ✎ edit of that row. A letter the
+  figure already gives another meaning (a coordinate symbol, a parameter, an angle name) is out of scope and is not
+  read; «אורך AB הוא k» is not read, as in 2-D.
+  - Sources: ADR-3D-381; #2092 (operator ruling 2026-10-14, card d14b-2092-k).
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything beyond that is refused and escalated to the operator, not approximated.
   - Sources: operator authority, D3 above; [docs/20 §10](archive/20-space-vectors-tool.md).

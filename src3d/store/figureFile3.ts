@@ -105,6 +105,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'angle-bound3': true,
   'angle-eq': true,
   'angle-mark': true,
+  'length-mark': true, // #2092 (ADR-3D-381): «|AB| = k» — a stated length letter, saved like its angle twin
   'angle-pair-eq': true,
   'bisector-point': true,
   'bisector-ray': true, // #343: «OD חוצה זווית AOC» — a stated construction, same round-trip argument

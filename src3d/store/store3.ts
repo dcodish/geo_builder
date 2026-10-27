@@ -50,7 +50,7 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolOwnersOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -1794,6 +1794,14 @@ function readStatement3(
       const flat = flatHeightReading3(derive3(st.facts, st.seed).construction, sentinel);
       if (flat.flat && (!flat.reading || parsed.commands.length !== 1 || !isBareAltitude3(utterance)))
         return { ok: false, error: { code: 'not-understood' } };
+    }
+    // #2092 (ADR-3D-381): «|AB| = k» reads k as a LENGTH letter only while the figure gives k no other meaning. A letter
+    // already a parameter, a coordinate's symbol, an angle's name or a vector ratio («C(k,1,0)» first) is out of the
+    // ruled scope and keeps the verdict it had before the length letter existed — not read.
+    const marks = parsed.commands.filter((k) => k.type === 'length-mark');
+    if (marks.length > 0) {
+      const c = derive3(st.facts, st.seed).construction;
+      if (marks.some((k) => symbolOwnersOf(c, k.label).some((o) => o.kind !== 'length'))) return { ok: false, error: { code: 'not-understood' } };
     }
     return { ok: true, commands: parsed.commands, unread: parsed.unread ?? [], ...(readAs ? { readAs } : {}) };
   }

@@ -409,6 +409,11 @@ const SEEDED: SeededCorpus = {
   // from the equation's own point. Both rows, both surfaces and the class are asserted in plane-two-forms-2367.test.ts;
   // this is the build + drift net.
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
+
+  // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued
+  // (before: «|AB| = k» was not understood). The equality, the value, the labels and the bare-naming note are asserted
+  // in vector-or-length-2092.test.ts; this is the build + drift net.
+  'length-letter-2092.geo3.json': ["תיבה ABCDA'B'C'D'", '|AB| = k', '|AD| = k', 'k = 3'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

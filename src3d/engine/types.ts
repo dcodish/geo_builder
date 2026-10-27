@@ -453,6 +453,9 @@ export interface NameVectorCommand {
   name: string;
   from: Id;
   to: Id;
+  /** #2092 (ADR-3D-381): the name came from a BARE «AB = k» (no «נסמן»), the line read one of two ways —
+   *  the vector reading is kept and `buildNotices3` says so, pointing at «|AB| = k» for a length. */
+  bare?: true;
 }
 
 /** An auxiliary drawn segment (idempotent; a solid edge is never duplicated). */
@@ -489,6 +492,21 @@ export interface AngleMark3Command {
   label?: string;
   /** #977: the symbol's COEFFICIENT — «∠ABC = 2α» carries 2. A value later given to the letter is
    *  multiplied by it, so the same letter can name two angles in a stated ratio. Absent ⇒ 1. */
+  coef?: number;
+}
+
+/**
+ * #2092 ([ADR-3D-381](../../docs/06b-decisions-3d.md#adr-3d-381)) — a stated LENGTH given as a LETTER: «|AB| = k»,
+ * «|AB| = 2k». The length twin of {@link AngleMark3Command}: the segment wears the letter, the length stays a free
+ * DOF until a value lands on the letter (ADR-052), and the same letter on two segments relates them
+ * (|XY| = (coef₂/coef₁)·|ZW|). Resolved at apply — the parser cannot know which letters the figure owns.
+ */
+export interface LengthMark3Command {
+  type: 'length-mark';
+  a: Id;
+  b: Id;
+  label: string;
+  /** «|AB| = 2k» carries 2. A value later given to the letter is multiplied by it. Absent ⇒ 1. */
   coef?: number;
 }
 
@@ -629,6 +647,9 @@ export interface SymAffine {
  */
 export const angleMarkText = (mk: { label?: string; coef?: number }): string =>
   mk.label ? `${mk.coef ?? ''}${mk.label}` : '';
+
+/** #2092 (ADR-3D-381): what a length letter SAYS on the canvas — «k», «2k» — composed in one place, as {@link angleMarkText}. */
+export const lengthMarkText = (mk: { label: string; coef?: number }): string => `${mk.coef !== undefined && mk.coef !== 1 ? mk.coef : ''}${mk.label}`;
 
 export const MAX_SYM_DEGREE = 3;
 
@@ -1067,6 +1088,7 @@ export type Command3 =
   | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand
   | AngleMark3Command
+  | LengthMark3Command
   | PointOnSegment3Command
   | MidpointAutoCommand
   | VertexAngleCommand
@@ -1336,7 +1358,7 @@ export interface Construction3 {
   /** Insertion-ordered: a point's parents always precede it (enforced at apply). */
   points: Map<Id, PointDef>;
   /** Declared vector names → their ordered pair. */
-  vectors: Map<string, { from: Id; to: Id }>;
+  vectors: Map<string, { from: Id; to: Id; bare?: true }>;
   /** #72: UNNAMED ink arrows (`חץ A'C`) — rendered like a named vector, no label, never a basis member. */
   arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
@@ -1345,6 +1367,9 @@ export interface Construction3 {
   /** #977: `coef` is the symbol's multiplier — «∠ABC = 2α» stores 2, so a value later given to the
    *  letter drives this angle to `coef × value`. Absent ⇒ 1. */
   angleMarks: { vertex: Id; p: Id; q: Id; label?: string; coef?: number }[];
+  /** #2092 (ADR-3D-381): LENGTH LETTERS — «|AB| = k» puts `k` on segment AB (`coef` 2 for «|AB| = 2k»). The length
+   *  twin of `angleMarks`: no DOF of its own; a shared letter relates the segments, a value pins them. */
+  lengthMarks: { a: Id; b: Id; label: string; coef?: number }[];
   /** #319 — LABELED line↔plane angle measures («זוית בין SB ומישור ABC היא α»): pedagogical naming,
    *  never a driver; the panel prints `label = X°` when the angle is seed-stable (angles are
    *  scale-free, so no scale gate — the ADR-3D-054 taxonomy). */
@@ -1567,6 +1592,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   arrows: [],
   segments: [],
   angleMarks: [],
+  lengthMarks: [],
   linePlaneMarks: [],
   relMarks: [],
   requirements: [],
@@ -1638,6 +1664,7 @@ export function figureSymbolsOf(c: Construction3): string[] {
   for (const b of c.partialNames) out.add(b.sym);
   for (const b of c.riderNames) out.add(b.sym);
   for (const m of c.angleMarks) if (m.label) out.add(m.label);
+  for (const m of c.lengthMarks) out.add(m.label); // #2092
   return [...out];
 }
 
@@ -1725,6 +1752,8 @@ export type SymbolOwner =
   | { kind: 'pin-sym' }
   | { kind: 'param' }
   | { kind: 'angle'; marks: Construction3['angleMarks'] }
+  /** #2092 (ADR-3D-381): the letter names a LENGTH («|AB| = k») */
+  | { kind: 'length'; marks: Construction3['lengthMarks'] }
   | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' }
   | { kind: 'rider'; id: Id; fromB: boolean };
 
@@ -1737,6 +1766,8 @@ export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   if (c.param === sym) out.push({ kind: 'param' });
   const marks = c.angleMarks.filter((m) => m.label === sym);
   if (marks.length > 0) out.push({ kind: 'angle', marks });
+  const lengths = c.lengthMarks.filter((m) => m.label === sym);
+  if (lengths.length > 0) out.push({ kind: 'length', marks: lengths });
   for (const b of c.partialNames) if (b.sym === sym) out.push({ kind: 'component', target: b.target, axis: b.axis });
   for (const b of c.riderNames) if (b.sym === sym) out.push({ kind: 'rider', id: b.id, fromB: b.fromB }); // #921
   return out;

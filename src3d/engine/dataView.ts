@@ -1422,6 +1422,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
               const v = componentValue(c, o.target, o.axis, at);
               if (v !== undefined) return v;
             }
+            if (o.kind === 'length') {
+              // #2092 (ADR-3D-381): the letter's value read off the drawn segment, its coefficient divided out
+              const m = o.marks[0];
+              const A = at(m.a);
+              const B = at(m.b);
+              if (!A || !B) continue;
+              return norm3(sub3(B, A)) / (m.coef ?? 1);
+            }
             if (o.kind === 'angle') {
               const m = o.marks[0];
               const V = at(m.vertex);

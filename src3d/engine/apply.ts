@@ -151,6 +151,7 @@ function clone(c: Construction3): Construction3 {
     quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids], ...(q.adj ? { adj: q.adj } : {}), ...(q.kind ? { kind: q.kind } : {}) })),
     redundantShapes: c.redundantShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
     angleMarks: [...c.angleMarks],
+    lengthMarks: [...c.lengthMarks],
     planes: new Map(c.planes),
     lines: new Map(c.lines),
     param: c.param,
@@ -1721,8 +1722,31 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, [cmd.from, cmd.to]);
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
-      next.vectors.set(cmd.name, { from: cmd.from, to: cmd.to });
+      next.vectors.set(cmd.name, { from: cmd.from, to: cmd.to, ...(cmd.bare ? { bare: true as const } : {}) });
       return { ok: true, next };
+    }
+
+    case 'length-mark': {
+      /*
+       * #2092 ([ADR-3D-381](../../docs/06b-decisions-3d.md#adr-3d-381)) — «|AB| = k»: a LENGTH named by a letter, the
+       * length twin of `angle-mark`. The segment wears the letter and its length stays a FREE DOF (ADR-052) until a
+       * value lands on the letter (`symbol-value`, through `symbolOwnersOf`). The same letter on another segment is
+       * a stated relation |XY| = (coef/coef₀)·|ZW|, lowered to the ordinary `length-rel` so M1 drives or verifies it.
+       * A vector name is another namespace («AB = k» · «|AB| = k» both hold), as an angle letter already is.
+       */
+      const missing = missingPoint(c, [cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
+      const coef = cmd.coef ?? 1;
+      const onSeg = (m: { a: Id; b: Id }) => samePair([m.a, m.b], cmd.a, cmd.b);
+      // the same statement again adds nothing
+      if (c.lengthMarks.some((m) => onSeg(m) && m.label === cmd.label && (m.coef ?? 1) === coef)) return { ok: true, next: c };
+      const prior = c.lengthMarks.find((m) => m.label === cmd.label);
+      const next = clone(c);
+      if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
+      next.lengthMarks.push({ a: cmd.a, b: cmd.b, label: cmd.label, ...(cmd.coef !== undefined && cmd.coef !== 1 ? { coef: cmd.coef } : {}) });
+      if (!prior) return { ok: true, next };
+      return applyCommand3(next, { type: 'length-rel', a1: cmd.a, b1: cmd.b, rhs: { pair: [prior.a, prior.b] }, c: coef / (prior.coef ?? 1) });
     }
 
     case 'segment3': {
@@ -2948,7 +2972,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         c.points.has(cmd.from) &&
         c.points.has(cmd.to)
       ) {
-        return applyCommand3(c, { type: 'name-vector', name: cmd.terms[0].atom.name, from: cmd.from, to: cmd.to });
+        // #2092 (ADR-3D-381): the line is read one of two ways, so the naming is marked BARE and the figure says so
+        // (`vector-named-bare`), pointing at «|AB| = k» for the length reading (operator ruling 2026-10-14)
+        return applyCommand3(c, { type: 'name-vector', name: cmd.terms[0].atom.name, from: cmd.from, to: cmd.to, bare: true });
       }
       // named vectors must exist
       for (const t of cmd.terms) {
@@ -3203,7 +3229,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       for (const owner of owners) {
         if (!r.ok) return r;
-        if (owner.kind === 'angle') {
+        if (owner.kind === 'length') {
+          // #2092 (ADR-3D-381): the letter names a LENGTH («|AB| = k» then «k = 3») — the ordinary length given, scaled by
+          // the mark's coefficient («|AB| = 2k» with «k = 3» is 6), so it drives a free dim and verifies a determined one.
+          for (const mk of owner.marks) {
+            if (!r.ok) return r;
+            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'length-eq', a: mk.a, b: mk.b, value: (mk.coef ?? 1) * cmd.value } });
+          }
+        } else if (owner.kind === 'angle') {
           // ADR-3D-052 (#272) — the letter names an ANGLE («∠SAB = α» then «α = 70»). Resolved HERE, where
           // the figure is known (parse3 is context-free), and delegated to the ordinary angle claim so the
           // value DRIVES a free-dim solid and VERIFIES a determined one (M1) like any other stated angle.

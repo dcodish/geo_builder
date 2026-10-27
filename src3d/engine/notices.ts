@@ -121,6 +121,16 @@ export type BuildNotice3 =
       line: string;
     }
   | {
+      /** #2092 (ADR-3D-381): a BARE «AB = k» (no «נסמן») was read as NAMING the vector AB «k». The line has two
+       *  readings, so the kept one is said aloud, with the spelling of the other («|AB| = k», a length) — the
+       *  operator's ruling of 2026-10-14 (card d14b-2092-k, "A, with teaching"). Every bare naming, whatever the
+       *  letter: u, v, w are "just convention". Derived from the vector's own flag, so it survives undo and load. */
+      kind: 'vector-named-bare';
+      name: string;
+      from: Id;
+      to: Id;
+    }
+  | {
       /** #333 (ADR-3D-153): the student named an intersection line `ℓ` while `ℓ` was already another
        *  line, so it was auto-indexed. Operator ruling 2026-07-25: auto-index and SAY SO, rather than
        *  refuse with a bare `already-defined` the student cannot act on. Derived from the line's
@@ -389,6 +399,8 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   for (const r of c.lineRels) {
     if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
   }
+  // #2092 (ADR-3D-381): a vector named by a bare «AB = k» — the reading the line got, said aloud
+  for (const [name, v] of c.vectors) if (v.bare) out.push({ kind: 'vector-named-bare', name, from: v.from, to: v.to });
   // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
   for (const [name, def] of c.lines) {
     if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
