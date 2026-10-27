@@ -19819,6 +19819,7 @@ This is ADR-603's own class, *"a stated part the winning reading never looks at 
 **Sibling audit (ADR-W-157).**
 - **Analytic:** no drop. Every class line is `not-handled` (handed to the model), which is its ruled behaviour (02c R124: *"a rest that says something … is still the model's"*). The exception is «AB מיתר במעגל O העובר דרך O», which is refused `split-statements`. Analytic already reads the main-verb forms (ADR-AG-193).
   - **Port: out, as a known-gap row.** The prerequisite is an operator ruling that changes R124 for this rest: #2547 (filed, `needs-operator`). #2541 already rules its end state, a read in both builders. No 06c entry.
+  - **Amended 2026-10-27 (#2547): ported.** The operator ruled R124 changed for this rest (D10 = A, 2026-10-26), and analytic now refuses the class with 2-D's parts ([ADR-AG-334](06c-decisions-analytic.md#adr-ag-334)). The opener atoms moved to `shell/incidencePhrase.ts`, re-exported by `src/parser/lexicon.ts` ([ADR-W-161](06w-decisions-workspace.md#adr-w-161)); this member is unchanged.
 - **3-D:** every member is `not-understood` (handed on), and circle geometry is exception X8. Nothing to port.
 
 **Locks.**

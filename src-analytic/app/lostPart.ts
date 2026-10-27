@@ -23,6 +23,12 @@
  *    #1947 ([ADR-AG-301](../../docs/06c-decisions-analytic.md#adr-ag-301)): a rest that says something AFTER its lost
  *    part — «ב-B ו-AB = 4» — is cut at its conjunctions; the first piece must be the lost part (the same test), and
  *    every further piece a given that records on its own after the prefix. Its parts are then all listed.
+ * 3. **A declined line whose rest is an incidence clause on a segment** ({@link declinedThrough}; #2547,
+ *    [ADR-AG-334](../../docs/06c-decisions-analytic.md#adr-ag-334)). «AB מיתר העובר דרך מרכז המעגל»: arm 2 leaves it,
+ *    because its rest says something («מרכז», «מעגל»). 2-D refuses it whole (ADR-765), and the operator ruled analytic
+ *    the same (2026-10-26). The head before the first incidence opener (`shell/incidencePhrase.ts`) must record and
+ *    read as a segment, and the phrase's point must carry no fresh letter (named by its role, or by a letter the head
+ *    carries). A fresh letter («… דרך C») is left to the model, as 2-D leaves it.
  *
  * The right-angle syntax is TAUGHT instead of listed: when the read part is a triangle whose right angle the
  * reading left open (a `choice` of perpendiculars at its vertices) and the lost part names one of its vertices.
@@ -32,7 +38,8 @@ import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { VOCABULARY_ANALYTIC } from '../parser/scopeAnalytic';
-import { parseLine } from '../parser/parseAnalytic';
+import { parseLine, POINT_NOUN_EN_ATOM, POINT_NOUN_HE_ATOM } from '../parser/parseAnalytic';
+import { firstIncidenceOpener, incidencePhraseAtStart } from '../../shell/incidencePhrase';
 import type { Fact } from '../engine/types';
 
 /** A lowering as the probe compares it: the facts without their `src` (a framed line quotes the line as typed). */
@@ -162,4 +169,61 @@ export function declinedPart(line: string, records: (piece: string, before: read
     return withTeach([prefix, lost, ...more], parsed.facts);
   }
   return null;
+}
+
+/** A point noun right before a label — «הנקודה C», "the point C": the label's optional subject noun, not a role. */
+const NOUN_BEFORE_LABEL = new RegExp(String.raw`(?<!\p{L})(?:${POINT_NOUN_HE_ATOM}|${POINT_NOUN_EN_ATOM})\s*$`, 'iu');
+
+/**
+ * Does the incidence phrase's point carry NO FRESH LETTER (ADR-765's class sentence, asked in analytic)? Either it is
+ * named by its ROLE — with its labels (and a point noun right before one) removed, words of the tool's vocabulary
+ * remain («מרכז המעגל», «מרכזו», «אמצע AB», "the centre", a bare «הנקודה») — or every label it has is one the head
+ * already carries (a co-reference).
+ */
+function pointCarriesNoFreshLetter(point: string, carried: ReadonlySet<string>): boolean {
+  const runs = labelRuns(point);
+  const labels = runs.flatMap((r) => r.parts);
+  if (labels.length > 0 && labels.every((l) => carried.has(l))) return true;
+  let words = '';
+  let from = 0;
+  for (const r of runs) {
+    words += point.slice(from, r.at).replace(NOUN_BEFORE_LABEL, '') + ' ';
+    from = r.end;
+  }
+  words += point.slice(from);
+  return hasConstructionSignal(words, VOCABULARY_ANALYTIC);
+}
+
+/**
+ * ARM 3 — #2547 ([ADR-AG-334](../../docs/06c-decisions-analytic.md#adr-ag-334)): A THROUGH-CLAUSE ON A SEGMENT, refused
+ * whole as 2-D refuses it (ADR-765). Operator, 2026-10-26 (D10 = A): *"refuse now, like 2-D … instead of passing it to the
+ * AI"*. A DECLINED line whose head — the text before its first incidence opener (`shell/incidencePhrase.ts`, the one
+ * spelling every builder reads), a trailing comma dropped as 2-D's cut drops it — records and READS AS a segment (a
+ * `segment` or `cevian-of` fact: a chord, segment, diameter, tangent, altitude, median), and whose rest is ONE incidence
+ * phrase whose point carries no fresh letter. «AB מיתר העובר דרך מרכז המעגל» → «(1) AB מיתר  (2) העובר דרך מרכז המעגל».
+ *
+ * The segment test is a property of the READING, never of the spelling: «ישר AB …» (a line) and «מעגל העובר דרך A»
+ * (2-D builds it) never qualify. A fresh letter («… דרך C») leaves the line to the model, as 2-D escalates it. A rest
+ * that continues with givens joined by «ו-» / "and" that each record after the head («… ו-AB = 4») lists them as further
+ * parts (ADR-AG-301's cut); otherwise the whole rest is the one phrase, to its clause end. Runs after {@link declinedPart},
+ * so a co-reference that arm already refuses («AB מיתר במעגל O העובר דרך O») keeps its parts.
+ */
+export function declinedThrough(line: string, records: (piece: string, before: readonly string[]) => boolean): LostPart | null {
+  const at = firstIncidenceOpener(line);
+  if (at < 0) return null;
+  const head = line.slice(0, at).replace(/[,\s]+$/, '');
+  const rest = line.slice(at).trim();
+  const parsed = parseLine(head);
+  if (!parsed.ok || !parsed.facts.some((f) => f.t === 'segment' || f.t === 'cevian-of')) return null;
+  const [first, ...more] = conjunctionPieces(rest);
+  const phrase = incidencePhraseAtStart(first);
+  if (!phrase || !incidencePhraseAtStart(rest)) return null;
+  if (!pointCarriesNoFreshLetter(phrase.point, carriedLabels(parsed.facts))) return null;
+  if (!records(head, [])) return null;
+  const held = [head];
+  for (const piece of more) {
+    if (!records(piece, held)) return { parts: [head, rest] };
+    held.push(piece);
+  }
+  return { parts: more.length ? [head, first, ...more] : [head, rest] };
 }

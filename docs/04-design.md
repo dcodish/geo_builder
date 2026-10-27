@@ -1258,7 +1258,7 @@ The phrase sibling, `unreadThrough` (`src/app/unreadThrough.ts`, in the battery)
 class, the LABEL-FREE incidence phrase («AB מיתר העובר דרך מרכז המעגל», «…במעגל O העובר דרך O», "through the
 centre"), which no other member sees — its words are circle vocabulary to the accountants, it has no fresh letter for
 the label probe, and a letter it does name is a co-reference. The openers are lexicon atoms (`THROUGH_OPEN_HE/_EN`,
-`THROUGH_VERB_HE/_EN`). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
+`THROUGH_VERB_HE/_EN`), homed in `shell/incidencePhrase.ts` and re-exported by `src/parser/lexicon.ts`: one spelling of "through" that analytic's arm 3 of the lost part reads too ([ADR-W-161](06w-decisions-workspace.md#adr-w-161)). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
 to the clause end), and the verb opener alone (never a bare «דרך» / "through", a fronted locative a rule may tolerate).
 The occurrence is unread when EITHER leaves the lowering unchanged — the whole phrase alone misses a phrase whose words
 a rule reads for another reason (a secant's «המעגל»), the verb alone misses a tangent. The verb-only finding is the weaker one: it stands only when the
