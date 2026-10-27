@@ -499,6 +499,17 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
       out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence, centreOf: cu.id });
       continue;
     }
+    /**
+     * THE FIGURE'S ONLY CIRCLE, HOWEVER IT WAS STATED (#2554, ADR-AG-338). The contextual «P מרכז המעגל» binds
+     * to the one circle (`centre-of`'s own resolution), so it names ANY lone circle with no numeral and no
+     * equation of its own — a free «מעגל ברדיוס 5» (`circle-new`), a diameter's circle (`circle-diam`), a
+     * quadrilateral's incircle — not only a `circle-thru`, which is what the id-prefix gate above used to
+     * restrict it to. Placed after the ring forms, so a circle that already had a sentence keeps it.
+     */
+    if (!numeralKey(cu.id) && circles.length === 1) {
+      out.push({ id: `centre-${cu.id}`, x: circle.cx, y: circle.cy, sentence: `${letter} מרכז המעגל`, centreOf: cu.id });
+      continue;
+    }
 
     /**
      * The student's own letter comes from the ID, not from `label.name`.
@@ -529,7 +540,7 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
  *
  * The click and the typed path are ONE decision: this is {@link centresOf} asked with the chosen letter,
  * never a second composer, so the form (`… מרכז המעגל I` for a numeral circle, `… מרכז המעגל x^2+y^2=16`
- * for an equation circle, the contextual `… מרכז המעגל` for the figure's only computed circle) is the
+ * for an equation circle, the contextual `… מרכז המעגל` for the figure's only circle of any other kind, #2554) is the
  * one the grammar reads back (ADR-AG-048). Null when that circle offers no centre (already named, or no
  * sentence can name it).
  */
