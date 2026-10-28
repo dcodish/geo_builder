@@ -1,0 +1,233 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-28T12:00:00.000Z",
+  "name": "equilateral-around-circle-incircle-2538",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@t-O-ABC-0",
+        "circle": "circle-O",
+        "free": true,
+        "theta": 0.4
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@t-O-ABC-1",
+        "circle": "circle-O",
+        "free": true,
+        "theta": 2.494395102393195
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@t-O-ABC-2",
+        "circle": "circle-O",
+        "free": true,
+        "theta": 4.588790204786391
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-@t-O-ABC-0",
+        "circle": "circle-O",
+        "at": "@t-O-ABC-0"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.5",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-@t-O-ABC-1",
+        "circle": "circle-O",
+        "at": "@t-O-ABC-1"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.6",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-@t-O-ABC-2",
+        "circle": "circle-O",
+        "at": "@t-O-ABC-2"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.7",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "A",
+        "line1": "tan-@t-O-ABC-0",
+        "line2": "tan-@t-O-ABC-1"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.8",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "B",
+        "line1": "tan-@t-O-ABC-1",
+        "line2": "tan-@t-O-ABC-2"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.9",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "C",
+        "line1": "tan-@t-O-ABC-2",
+        "line2": "tan-@t-O-ABC-0"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.10",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.11",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@t-O-ABC-1",
+          "B"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.12",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "B",
+          "@t-O-ABC-2",
+          "C"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.13",
+      "utterance": "משולש ABC חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "C",
+          "@t-O-ABC-0",
+          "A"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.14",
+      "utterance": "ABC משולש שווה צלעות",
+      "group": "g2",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.15",
+      "utterance": "ABC משולש שווה צלעות",
+      "group": "g2",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.16",
+      "utterance": "ABC משולש שווה צלעות",
+      "group": "g2",
+      "cmd": {
+        "type": "set-equal",
+        "a": "B",
+        "b": "C",
+        "c": "C",
+        "d": "A"
+      },
+      "enabled": true
+    }
+  ]
+}

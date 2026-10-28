@@ -6155,7 +6155,73 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'ring-around-circle-is-incircle-2538',
+    title: '«מעגל O» · «משולש ABC חוסם את מעגל O» · «ABC משולש שווה צלעות» — the circle is inside the triangle, touching every side within the side, in the first view and on «הציגו תצורה אחרת» (#2538, ADR-763)',
+    guards: guards2538(),
+    steps: ['מעגל O', 'משולש ABC חוסם את מעגל O', 'ABC משולש שווה צלעות'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O', 'ABC משולש שווה צלעות']);
+      const before = replay(factsOf(['מעגל O', 'משולש ABC חוסם את מעגל O'])).circles.get('circle-O')!;
+      let cur = { facts, seed: 0 };
+      for (let k = 0; k < 4; k++) {
+        const f = replay(cur.facts, cur.seed);
+        expect(ringEnclosesCircle(f, ['A', 'B', 'C']), `view ${k} (seed ${cur.seed}): O inside ABC, every touch within its side`).toBe(true);
+        const [A, B, C] = ['A', 'B', 'C'].map((p) => at(f, p));
+        expect(dist(A, B)).toBeCloseTo(dist(B, C), 6);
+        expect(dist(B, C)).toBeCloseTo(dist(C, A), 6);
+        if (k === 0) {
+          const c = f.circles.get('circle-O')!;
+          expect(c.center.x, 'line 3 never moves O').toBeCloseTo(before.center.x, 9);
+          expect(c.center.y).toBeCloseTo(before.center.y, 9);
+          expect(c.r).toBeCloseTo(before.r, 9);
+        }
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, 60_000);
+        if (!next) break;
+        cur = next;
+      }
+    },
+  },
+  {
+    id: 'incircle-given-only-an-excircle-meets-2538',
+    title: '«מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «AB = 4» — a side only an excircle could have is never drawn green and never drawn with the circle outside (#2538, ADR-763; #2572 makes it a refusal)',
+    guards: `${guards2538()} This scenario locks what must never happen (ADR-W-158): «AB = 4» around a radius-3 circle (every side of a triangle around it is longer than 6) committed GREEN with O as an excircle at main 422cda84. The interim answer, waiting for givens (operator ruling "2538 - A", 2026-10-28), is deliberately not asserted; #2572 tightens this to a refusal.`,
+    steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'AB = 4']);
+      for (const seed of [0, 1]) {
+        const f = replay(facts, seed);
+        const last = facts[facts.length - 1];
+        expect(f.status[last.id], `seed ${seed}: «AB = 4» is never green`).not.toBe('ok');
+        expect(ringEnclosesCircle(f, ['A', 'B', 'C']), `seed ${seed}: never drawn with the circle outside`).toBe(true);
+      }
+    },
+  },
 ];
+
+/** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
+function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {
+  const c = f.circles.get('circle-O');
+  if (!c) return false;
+  const V = ids.map((k) => at(f, k));
+  const side = V.map((p, i) => {
+    const q = V[(i + 1) % V.length];
+    return Math.sign((q.x - p.x) * (c.center.y - p.y) - (q.y - p.y) * (c.center.x - p.x));
+  });
+  if (!side.every((s) => s === side[0] && s !== 0)) return false;
+  return V.every((p, i) => {
+    const q = V[(i + 1) % V.length];
+    const t = ((c.center.x - p.x) * (q.x - p.x) + (c.center.y - p.y) * (q.y - p.y)) / dist(p, q) ** 2;
+    return t > 0 && t < 1;
+  });
+}
+
+/** #2538: the shared record of what the two ADR-763 scenarios guard (a hoisted function — the array reads it at load). */
+function guards2538(): string {
+  return "#2538 (P1, prod honesty): measured at main 422cda84 through decideDeterministic2D, the equilateral triangle around an existing circle was green at every seed but drew the circle OUTSIDE it (an excircle) at 15 of 24 seeds and on 6 of 9 «הציגו תצורה אחרת» views; the same with a right angle, «AB = AC», an angle, another figure inscribed first, a point on O first, a second triangle, a new circle in a quadrilateral with «AB = AD», and «AB = 8» around a radius-3 circle (wrong in the first view). Root cause: every emitter of a ring around a circle (`tangentialRingAround`, `incircleConstruction`) stated each side's LINE tangent, never that the touch lies WITHIN the side, so no layer could tell the incircle from an excircle. Fix (ADR-763): each side states the order [v, touch, w] (`set-line … structural`, the order only), the one encoding of «tangent to a side» the tangent rule already uses. The class matrix (spellings, relations, rings, seeds 0–23, presses) is src/__tests__/issue-2538-ring-around-circle-inscribed.test.ts.";
+}
 
 /** #2443: the shared record of what the three ADR-764 scenarios guard (a hoisted function — the array reads it at load). */
 function guards2443(): string {
