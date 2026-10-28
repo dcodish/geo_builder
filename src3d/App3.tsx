@@ -30,6 +30,7 @@ import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
+import { vectorNames3 } from './engine/vecExpr';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
@@ -810,7 +811,7 @@ export default function App3() {
              * second row. The direction stays on `textDir3` for BOTH box and preview (#868,
              * and #1314 owns the question that leaves).
              */
-            preview={(s) => inputPreviewNode3(s, new Set(derived.construction.vectors.keys()))}
+            preview={(s) => inputPreviewNode3(s, new Set(vectorNames3(derived.construction)))}
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}
           />
@@ -923,7 +924,7 @@ export default function App3() {
                 : {}),
               // #934 (ADR-3D-228) → #1401 (ADR-W-088): the row's DIRECTION is the shared chrome's now,
               // derived with `textDir3` from this text — this callback used to set `dir` itself.
-              text: factRowText3(f, new Set(derived.construction.vectors.keys())),
+              text: factRowText3(f, new Set(vectorNames3(derived.construction))),
               lead:
                 f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
                   <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
@@ -936,7 +937,7 @@ export default function App3() {
                 <span className="block min-w-0 truncate text-sm">
                   {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
                       inside a `rows={facts.map(...)}` ternary is one no test can reach. */}
-                  <FactRowText3 f={f} vecNames={new Set(derived.construction.vectors.keys())} />
+                  <FactRowText3 f={f} vecNames={new Set(vectorNames3(derived.construction))} />
                 </span>
               ),
               trail: (planeChips.get(f.id) ?? []).length > 0 || dihedralChips.has(f.id) ? (
@@ -1158,12 +1159,12 @@ export default function App3() {
                         <span key={v.label}>
                           {v.decomp && (
                             <div>
-                              <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                              <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(vectorNames3(derived.construction))} />
                             </div>
                           )}
                           {v.coords && (
                             <div>
-                              <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
+                              <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(vectorNames3(derived.construction))} />
                             </div>
                           )}
                           {v.mag && (
@@ -1234,7 +1235,7 @@ export default function App3() {
                       <span key={r.text + i} dir={textDir3(r.text)} className="flex items-center justify-between gap-2">
                         <span>
                           {/* #1543 (ADR-3D-301): the echo is arrowed only when the QUESTION was read as a vector */}
-                          {askEchoNode3(r.text, r.echo, new Set(derived.construction.vectors.keys()))}
+                          {askEchoNode3(r.text, r.echo, new Set(vectorNames3(derived.construction)))}
                           {r.answer !== null ? (
                             <span className="font-medium">
                               {/* #823: an answer may have several ROWS — a plane gives its standard and
@@ -1244,7 +1245,7 @@ export default function App3() {
                               {(r.rows ?? [r.answer]).map((row, k) => (
                                 <span key={k} className={k > 0 ? 'block' : undefined}>
                                   {k === 0 ? ' = ' : null}
-                                  <VecMath text={row} vecNames={new Set(derived.construction.vectors.keys())} />
+                                  <VecMath text={row} vecNames={new Set(vectorNames3(derived.construction))} />
                                 </span>
                               ))}
                               {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}

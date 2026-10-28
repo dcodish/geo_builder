@@ -116,6 +116,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'dot-eq-chain': true,
   'dot-given': true,
   'draw-arrow': true,
+  'declare-vector': true, // #1188 (ADR-3D-386): «וקטור u» — a free vector is a stated object; a saved figure reloads with it
   'height-to-face': true,
   'line-common-perp': true,
   'line-plane-angle': true,

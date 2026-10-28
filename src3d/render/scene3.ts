@@ -12,6 +12,7 @@
  */
 
 import { openCrossings3 } from '../engine/crossings3';
+import { layoutFreeVectors3 } from './freeVectorLayout';
 import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
@@ -68,6 +69,9 @@ export interface SceneVector3 {
   labelY: number;
   /** Screen-space direction of the vector, degrees (for the arrowhead's rotation at `to`). */
   angleDeg: number;
+  /** #1188 (ADR-3D-386): a FREE vector — drawn floating in the tray, in the free-vector palette at this index
+   *  (declaration order). Absent for an anchored vector or an ink arrow, which keep the vector colour. */
+  free?: number;
 }
 
 /** A coordinate axis (Lane A — drawn when the figure carries algebraic objects). */
@@ -1157,6 +1161,10 @@ export function buildScene3(
     }
   }
 
+  // #1188 (ADR-3D-386): the floating free vectors' world tails and heads — display only, chosen beside the figure
+  // before the fit so the fit includes them
+  const freePlaced = layoutFreeVectors3(c, resolved);
+
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
   const projOf = (p: Vec3): { x: number; y: number } => {
     const q = project3(p, frame);
@@ -1177,6 +1185,7 @@ export function buildScene3(
     ...wWitnesses.flatMap((wt) => [wt.a, wt.b]), // #397: the witness stays in frame
     // #1476: the construction's foot and legs stay in frame (a fallback leg is sized after the fit)
     ...wConstr.flatMap((w) => [w.foot, ...(w.legLen !== null ? [add3(w.foot, scale3(w.armQ, w.legLen))] : [])]),
+    ...freePlaced.flatMap((fp) => [fp.tail, fp.head]), // #1188: a floating vector is never clipped
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
@@ -1357,6 +1366,36 @@ export function buildScene3(
       labelX: mx + px * 17,
       labelY: my + py * 17,
       angleDeg: (Math.atan2(dy, dx) * 180) / Math.PI,
+    });
+  }
+  // #1188 (ADR-3D-386): FREE vectors float in the tray — no points, so no tail dot and no endpoint letters; the
+  // label sits beside the midpoint on the side away from the viewport centre, exactly as a named vector's does.
+  for (const fp of freePlaced) {
+    const a = w2s(fp.tail);
+    const b = w2s(fp.head);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue; // seen end-on: nothing to draw at this camera angle
+    let px = -dy / len;
+    let py = dx / len;
+    const mx = a.x + dx / 2;
+    const my = a.y + dy / 2;
+    if ((viewport.width / 2 - mx) * px + (viewport.height / 2 - my) * py > 0) {
+      px = -px;
+      py = -py;
+    }
+    vectors.push({
+      name: fp.name,
+      x1: a.x,
+      y1: a.y,
+      x2: b.x,
+      y2: b.y,
+      hidden: false,
+      labelX: mx + px * 17,
+      labelY: my + py * 17,
+      angleDeg: (Math.atan2(dy, dx) * 180) / Math.PI,
+      free: fp.index,
     });
   }
 

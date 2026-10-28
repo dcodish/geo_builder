@@ -1,0 +1,99 @@
+{
+  "name": "feat-1188-step1",
+  "title": "#1188 step 1 — a vector with no position, drawn floating (3-D)",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "«וקטור u» on an empty canvas draws a floating arrow that moves with «הציגו תצורה אחרת»",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["וקטור u"],
+      "cycles": 2,
+      "lookFor": "A single coloured (pink) arrow named u, underlined, with NO dot at its start and no point letters; each press of «הציגו תצורה אחרת» shows it with a different direction and length.",
+      "before": "Refused: «לא הבנתי את הבקשה…» — nothing drawn."
+    },
+    {
+      "id": "T2",
+      "title": "Two declared vectors and a stated tuple: two arrows in two hues, the panel lists both",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["וקטור u", "וקטור v", "u = (1,2,3)"],
+      "lookFor": "Two floating arrows, u and v, in two different colours (neither the teal of an anchored vector). Open the data panel: the stated rows read «v = (?, ?, ?)» and «u = (1, 2, 3)», and the measures show u = (1, 2, 3) with |u|.",
+      "before": "All three lines refused (the first two «לא הבנתי», the third «הווקטור «u» לא הוגדר»)."
+    },
+    {
+      "id": "T3",
+      "title": "A free vector floats BESIDE a cube, never at a vertex",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["קובייה ABCDA'B'C'D'", "u = (1,1,1)"],
+      "lookFor": "The cube unchanged, and to its right a floating pink arrow u pointing up-and-away, not touching the cube and not starting at any lettered point.",
+      "before": "«u = (1,1,1)» refused «הווקטור «u» לא הוגדר»."
+    },
+    {
+      "id": "T4",
+      "title": "The textbook given «נתון: v = (10,-5,0)» builds on an empty canvas",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["נתון: v = (10,-5,0)"],
+      "lookFor": "Green row; one floating arrow v.",
+      "before": "Refused «הווקטור «v» לא הוגדר»."
+    },
+    {
+      "id": "T5",
+      "title": "REFUSAL — a magnitude on a free vector is the tool's limit, quoting the line",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["וקטור u", "|u| = 5"],
+      "expectRefusal": "מגבלה של הכלי",
+      "lookFor": "The second line is refused with «הכלי עדיין לא יודע לקבוע גודל … לווקטור החופשי u, ולכן «|u| = 5» לא נוסף — זו מגבלה של הכלי.»; the arrow u stays.",
+      "before": "Both refused; the second said «הווקטור «u» לא הוגדר» about the u just typed."
+    },
+    {
+      "id": "T6",
+      "title": "REFUSAL — a sum of free vectors is the tool's limit (until step 2), quoting the line",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["וקטור u", "וקטור v", "w = u + v"],
+      "expectRefusal": "מגבלה של הכלי",
+      "lookFor": "u and v drawn; «w = u + v» refused with «הכלי עדיין לא יודע לחשב ביטוי שבו מופיע הווקטור החופשי u, ולכן «w = u + v» לא נוסף — זו מגבלה של הכלי.» — never «בדקו את החישוב».",
+      "before": "All refused; the third said «הווקטור «w» לא הוגדר»."
+    },
+    {
+      "id": "T7",
+      "title": "REFUSAL — one name, one meaning: a named edge vector cannot be re-declared free",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["נסמן: AB = u", "וקטור u"],
+      "expectRefusal": "כבר מוגדר",
+      "lookFor": "The arrow AB named u stays green; «וקטור u» is refused «u» כבר מוגדר בציור…, and the FIRST row stays green.",
+      "before": "«וקטור u» refused «לא הבנתי את הבקשה»."
+    },
+    {
+      "id": "T8",
+      "title": "Ask «|u|» about a stated free vector",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5291",
+      "path": "/3d.html",
+      "lines": ["u = (3,0,4)"],
+      "asks": ["|u|"],
+      "lookFor": "In the data panel's ask lane, «|u| = 5».",
+      "before": "«u = (3,0,4)» refused, so nothing to ask about."
+    }
+  ]
+}

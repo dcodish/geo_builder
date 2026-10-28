@@ -22,7 +22,7 @@ import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
-import type { Construction3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
+import type { Construction3, FreeVec3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
 type VecDef = Construction3['vecDefs'][number];
@@ -883,6 +883,15 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // declared vectors first (coords + stated magnitude), then auxiliary segments (decomp + coords)
   for (const [name, d] of vecNames) addEntry(name, d.from, d.to, true);
+  // #1188 (ADR-3D-386): a FREE vector's value is its own components — absolute, so no frame or scale gate applies.
+  // It prints only when it is the SAME in every sampled configuration: a stated tuple does, a sampled one never.
+  for (const name of c.freeVectors.keys()) {
+    const vals = resolved.map((r) => r.freeVectors.get(name));
+    const v0 = vals[0];
+    if (!v0 || !vals.every((v) => v && sameVec(v, v0))) continue;
+    const m = norm3(v0);
+    entries.push({ label: name, decomp: null, coords: coordStr(v0), mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+  }
   for (const [a, b] of c.segments) addEntry(`${a}${b}`, a, b, false);
 
   // derived magnitude equalities among the declared vectors: |u| = |v| = |w| — equal in
@@ -1419,7 +1428,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
             }
             if (o.kind === 'component') {
               // #814's own resolver, so the panel and the sign gate cannot disagree about the value.
-              const v = componentValue(c, o.target, o.axis, at);
+              const v = componentValue(c, o.target, o.axis, at, r.freeVectors); // #1188: a free vector's component
               if (v !== undefined) return v;
             }
             if (o.kind === 'angle') {
@@ -1490,6 +1499,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 export function statedVectorRows(
   c: {
     vectors: Map<string, { from: string; to: string }>;
+    /** #1188 (ADR-3D-386): free vectors — a stated tuple prints as typed, a never-stated one as `u = (?, ?, ?)` */
+    freeVectors?: ReadonlyMap<string, FreeVec3>;
     claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
     pairPins?: readonly StatedPin[];
     vectorPins?: readonly StatedPin[];
@@ -1498,6 +1509,9 @@ export function statedVectorRows(
 ): string[] {
   const rows: string[] = [];
   for (const [name, { from, to }] of c.vectors) rows.push(`${name} = ${pairArrow(from, to)}`);
+  // #1188: a free vector nothing has been stated about is still a given — that u EXISTS — and its components are
+  // open, in the panel's `?` idiom (the params rows' `t = ?`)
+  for (const [name, fv] of c.freeVectors ?? []) if (!fv.stated) rows.push(`${name} = (${fv.comps.map((x) => (x === null ? '?' : cleanMag(x))).join(', ')})`);
   /**
    * #2077 (ADR-3D-368): every COMPONENT GIVEN the student typed as a tuple, by pair or by name:
    * «AB = (k-1,k,3)» prints «AB⃗ = (k-1, k, 3)». Operator, 2026-10-13: *"AB = (k-1,k,3) - shouldnt the data
@@ -1508,6 +1522,7 @@ export function statedVectorRows(
   const tuples = [
     ...(c.pairPins ?? []).map((p) => ({ head: pairArrow(p.a ?? '?', p.b ?? '?'), p })),
     ...(c.vectorPins ?? []).map((p) => ({ head: p.name ?? '?', p })),
+    ...[...(c.freeVectors ?? [])].map(([name, fv]) => ({ head: name, p: { name, x: fv.comps[0], y: fv.comps[1], z: fv.comps[2], stated: fv.stated } as StatedPin })),
   ]
     .filter((t) => t.p.stated)
     .sort((a, b) => a.p.stated!.ord - b.p.stated!.ord);

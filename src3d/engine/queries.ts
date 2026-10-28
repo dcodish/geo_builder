@@ -22,6 +22,7 @@ import { revolutionMeasure } from './claims';
 import { angleAskOperands, componentAskOf, foldPrimes3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
+import { namedVector3 } from './vecExpr';
 import { foldGlyphs } from '../../shell/glyphFold';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
 
@@ -160,13 +161,15 @@ const Q_SEG = String.raw`(?:ה?(?:קטע|צלע|מקצוע)\s+|(?:the\s+)?(?:seg
 /** Resolve a token string to an operand against the figure: a declared vector, or a two-point pair. */
 function atomOf(c: Construction3, s: string): Atom | null {
   const t = s.trim();
-  if (/^[a-z]$/.test(t) && c.vectors.has(t)) return { named: t };
+  if (/^[a-z]$/.test(t) && namedVector3(c, t)) return { named: t }; // #1188: anchored or FREE
   const m = t.match(new RegExp(`^(${PT})\\s*(${PT})$`));
   return m ? { pair: [m[1], m[2]] } : null;
 }
 
-/** The direction vector an atom spans at these positions (named vector's from→to, or the pair). */
-function atomVec(c: Construction3, a: Atom, pos: Positions3): Vec3 | null {
+/** The direction vector an atom spans at these positions (named vector's from→to, or the pair). #1188: a FREE
+ *  vector has no endpoints — its value is the configuration's `freeVectors` entry (absent ⇒ unresolvable). */
+function atomVec(c: Construction3, a: Atom, pos: Positions3, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+  if ('named' in a && c.freeVectors.has(a.named)) return free?.get(a.named) ?? null;
   const [from, to] = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? [d.from, d.to] : [undefined, undefined]; })() : a.pair;
   if (!from || !to) return null;
   const p = pos.get(from);
@@ -405,7 +408,7 @@ function solidVolume(c: Construction3, ids: Id[], pos: Positions3): number | nul
 }
 
 /** The raw numeric value of a query at one configuration; null when a referenced object is unplaced. */
-function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCtx): number | null {
+function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCtx, free?: ReadonlyMap<string, Vec3>): number | null {
   const angleBetween = (u: Vec3, v: Vec3): number | null => {
     const n = norm3(u) * norm3(v);
     return n < 1e-12 ? null : (Math.acos(Math.max(-1, Math.min(1, dot3(u, v) / n))) * 180) / Math.PI;
@@ -426,12 +429,12 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
       return ga && gb ? distanceBetween(ga, gb) : null;
     }
     case 'dot': {
-      const u = atomVec(c, q.a, pos);
-      const v = atomVec(c, q.b, pos);
+      const u = atomVec(c, q.a, pos, free);
+      const v = atomVec(c, q.b, pos, free);
       return u && v ? dot3(u, v) : null;
     }
     case 'length': {
-      const u = atomVec(c, q.a, pos);
+      const u = atomVec(c, q.a, pos, free);
       return u ? norm3(u) : null;
     }
     case 'angle-vertex': {
@@ -439,8 +442,8 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
       return p && qq && r ? angleBetween(sub3(p, qq), sub3(r, qq)) : null;
     }
     case 'angle-vec': {
-      const u = atomVec(c, q.a, pos);
-      const v = atomVec(c, q.b, pos);
+      const u = atomVec(c, q.a, pos, free);
+      const v = atomVec(c, q.b, pos, free);
       return u && v ? angleBetween(u, v) : null;
     }
     case 'line-plane':
@@ -652,6 +655,16 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     // the generic path, and #1450's fix there is only the NOTE (a symbol is never 'points').
   }
 
+  // #1188 (ADR-3D-386): a FREE vector asked by name — «u» — is its components, when they are the same in every
+  // sampled configuration (stated), and honestly undetermined otherwise (sampled: one drawing is not a given).
+  if (q.kind === 'vector' && 'named' in q.a && c.freeVectors.has(q.a.named)) {
+    const name = q.a.named;
+    const vals = knowledgeSamples3(c, seeds, RB).map((r) => r.freeVectors.get(name));
+    const v0 = vals[0];
+    const stable = !!v0 && vals.every((v) => v && norm3(sub3(v, v0)) <= 1e-9 * Math.max(1, norm3(v0)));
+    return stable ? { text, answer: coordStr(v0!) } : { text, answer: null, note: 'undetermined' };
+  }
+
   if (q.kind === 'vector') {
     const posArr = knowledgeSamples3(c, seeds, RB).map((r) => r.positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
@@ -781,7 +794,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     return v === null ? { text, answer: null, note: 'undetermined' } : { text, answer: piMultiple(v) };
   }
 
-  const vals = knowledgeSamples3(c, seeds, RB).map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }));
+  const vals = knowledgeSamples3(c, seeds, RB).map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }, r.freeVectors));
   if (vals.some((v) => v === null || !Number.isFinite(v)))
     // #1450: a SYMBOL that cannot be measured is 'undetermined' — 'unavailable' is worded about
     // points («הנקודות האלו אינן בציור»), which is how asking «k» blamed letters that were fine.
@@ -792,14 +805,17 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   if (val0 === null) {
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
     const pin = pinFreeMeasures(c);
-    if (pin && stableNums(knowledgeSamples3(pin.c, seeds, RB).map((r) => evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes }))) !== null) {
+    if (pin && stableNums(knowledgeSamples3(pin.c, seeds, RB).map((r) => evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes }, r.freeVectors))) !== null) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }
     return { text, answer: null, note: 'undetermined' };
   }
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
-  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
+  // #1188: a FREE vector's components are absolute — a quantity read off free vectors alone needs no pinned scale
+  const atoms: Atom[] = q.kind === 'dot' || q.kind === 'angle-vec' ? [q.a, q.b] : q.kind === 'length' ? [q.a] : [];
+  const freeOnly = atoms.length > 0 && atoms.every((a) => 'named' in a && c.freeVectors.has(a.named));
+  const scaleFree = freeOnly || q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
   if (!scaleFree && !scaleKnown3(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
   const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
   return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };

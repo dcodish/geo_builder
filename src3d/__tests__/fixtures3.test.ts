@@ -420,6 +420,10 @@ const SEEDED: SeededCorpus = {
   // #2367 (ADR-3D-376) — the operator's T45 sequence: a plane whose equation shows gets its parametric form too,
   // from the equation's own point. Both rows, both surfaces and the class are asserted in plane-two-forms-2367.test.ts;
   // this is the build + drift net.
+  // #1188 step 1 (ADR-3D-386) — the free vector: declared by name, and by its components (before: «וקטור u» not-understood,
+  // «u = (1,2,3)» refused unknown-vector). Seeds, panel, ask, drawing and refusals are asserted in
+  // issue-1188-free-vector.test.ts; this is the build + drift net.
+  'free-vector-declare-1188.geo3.json': ['וקטור u', 'וקטור v', 'u = (1,2,3)'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 };
 
@@ -481,7 +485,8 @@ describe('fixtures3 — the regression net', () => {
         for (const f of r.facts) {
           expect(d.status[f.id], f.utterance).toBe(f.enabled ? 'ok' : 'disabled');
         }
-        expect(d.positions.size).toBeGreaterThan(0);
+        // #1188: a figure of FREE vectors draws without a single point — it is still a figure
+        expect(d.positions.size + d.resolved.freeVectors.size).toBeGreaterThan(0);
       });
 
       it('no parser drift: every stored utterance still lowers to the stored commands', () => {
