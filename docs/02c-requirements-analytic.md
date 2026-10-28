@@ -284,7 +284,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «AB קוטר» · «OB רדיוס» → O is the centre
 - «BD⊥AC», «M אמצע AB», «AB = 5» with new letters → free points, as in 2-D
 - **⚠ Amended by ADR-AG-342 (#1467, 2026-10-27):** EVERY sentence that refers to points the figure lacks creates them, as 2-D now does («AB = 2 AD», «AD תיכון לצלע BC», «שיפוע הישר AB שלילי»), and the shared notice «נוצרו נקודות חדשות … — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» names them; ✕ removes the line. A missing circle is still refused (#2048).
-- Sources: ADR-AG-210, ADR-AG-342, #1670, #1686, #1467.
+- **Amended by ADR-AG-344 (#2552 D9, 2026-10-28):** the one circle a sentence creates WITH a notice is R198's D9 circle, «נוצר מעגל חדש שמרכזו P — …», with the same ✕.
+- Sources: ADR-AG-210, ADR-AG-342, ADR-AG-344, #1670, #1686, #1467.
 
 ### Lines and crossings
 
@@ -498,7 +499,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «נתונים שני מעגלים שרדיוס כל אחד מהם 5» (also without «נתונים», any number, a radical or a radius letter; English "two circles each of radius 5") draws the pair «שני מעגלים» draws, both circles of that radius
 - «מרכז המעגל הראשון הוא O_1(-3,1)» and «מרכז המעגל השני הוא O_2(9,10)» (any order; «O1», «O_1», «O₁», the minus «−»; English "the centre of the first circle is …") name circle 1's or 2's centre of the drawn pair and place it there; the exam's joined «מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)» reads as the two. Typed again it is already known; a second letter for a centre already named is refused «כבר יש שם לנקודה הזו: …»; with no pair drawn the circle is created on that centre
 - not read (D8 = B), still handed to the AI: «שני מעגלים שרדיוסם 5», «שני מעגלים ברדיוס 5», «מרכז מעגל O_1(-3,1)», «O_1 מרכז המעגל הראשון», «רדיוס המעגל האחד הוא 5», «מעגל O_1 שמרכזו (-3,1) ורדיוסו 5»
-- Sources: ADR-AG-336, #2552, ADR-AG-322.
+- **D9** *(operator rulings D9 = A, 2026-10-26, and the wording, 2026-10-28)*: «P מרכז מעגל» (indefinite «מעגל», no «ה»), typed when every circle on the figure already has a centre letter and none is P, draws a NEW circle centred at P (a free radius; a letter already in the figure becomes its centre), and under the line «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה»; ✕ removes the line. That notice alone, even when P is a new letter. While a centre is unnamed «P מרכז מעגל» names it, as before; the definite «P מרכז המעגל» never creates (beside a lettered pair it asks which circle; beside one lettered circle «כבר יש שם לנקודה הזו: …»); on an empty figure it draws the circle without a notice, as before
+- Sources: ADR-AG-336, ADR-AG-344, #2552, ADR-AG-322.
 
 **R181 — every common tangent of two circles in one sentence, each named; the tangent at the touching circles' common point**. *(Operator ruling 2026-10-20 on #2390: "we should name them so the user can refer to them later"; #2379.)*
 - «כל המשיקים המשותפים לשני המעגלים» (also «המשיקים המשותפים …», «… למעגלים M ו-N», English) draws every common tangent by how the circles sit: 4 apart, 3 externally tangent, 2 crossing, 1 internally tangent. Each is a full line with its equation row. Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0

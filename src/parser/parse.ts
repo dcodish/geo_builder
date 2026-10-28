@@ -722,7 +722,7 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupp
     // (`withAnonymousAutoCentres`) remaps every exact use of the letter, so a letter the sentence also names
     // as a point (a fresh «O» typed in the same line) would be swallowed into the hidden centre.
     const said = (s.match(/[A-Z]\d*/g) ?? []);
-    const c = freeLabel([...(ctx.points ?? []), ...said], ['O', 'P', 'Q', 'K']);
+    const c = freeLabel(ctx, [...said], ['O', 'P', 'Q', 'K']);
     return {
       center: c,
       prepend: [{ type: 'circle', id: circleId(c), center: c, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, autoCenter: true }],
@@ -822,9 +822,17 @@ function runOf(t: string, n: number, tok: string): Id[] | null {
   return null;
 }
 
-/** First label from `prefer` (else any A–Z) not already in `used` — for an auto-named auxiliary point. */
-function freeLabel(used: string[], prefer: string[] = []): Id {
-  const taken = new Set(used.map((u) => u.toUpperCase()));
+/**
+ * THE minting chokepoint for an auto-named auxiliary point ([ADR-772](docs/06-decisions.md#adr-772), #1690): the
+ * first label from `prefer` (else any A–Z) that is neither an EXISTING point of the figure (`ctx.points`) nor in
+ * `used` (the sentence's own letters, a sibling just minted, a caller's extra exclusions such as circle tokens).
+ * The figure's points are excluded HERE, never by each caller: three construction rules (the median's two
+ * stated-triangle/stated-side forms and the singular perpendicular bisector) forgot to pass them, so a tool-made
+ * midpoint took the id `M` over an existing M — moving a triangle's vertex onto the midpoint, or refusing a second
+ * median as «M coincides with its constructed target». A caller cannot opt out.
+ */
+function freeLabel(ctx: ParseContext, used: string[], prefer: string[] = []): Id {
+  const taken = new Set([...(ctx.points ?? []), ...used].map((u) => u.toUpperCase()));
   const pool = [...prefer, ...'MNPQRSTUVWXYZKLGHIJ'.split('')];
   return (pool.find((c) => !taken.has(c.toUpperCase())) ?? 'M').toUpperCase();
 }
@@ -908,7 +916,7 @@ function withAnonymousAutoCentres(commands: AnyCommand[], ctx: ParseContext = NO
     if ((c.type === 'circle' || c.type === 'circle-through') && c.autoCenter && !c.center.startsWith('@') && !c.center.startsWith('~')) {
       let tok = c.center;
       if (taken.has(up(tok)) && !(c as { ifAbsent?: boolean }).ifAbsent) {
-        tok = freeLabel([...taken, ...commands.flatMap((k) => commandLetters(k))], ['O', 'P', 'Q', 'K']);
+        tok = freeLabel(ctx, [...taken, ...commands.flatMap((k) => commandLetters(k))], ['O', 'P', 'Q', 'K']);
         retoken.set(c.center, tok);
       }
       taken.add(up(tok));
@@ -1639,8 +1647,8 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
     nmM && isUpperLabel(nmM[1]) && isUpperLabel(nmM[2]) && up(nmM[1]) !== up(nmM[2]) && !verts.includes(up(nmM[1])) && !verts.includes(up(nmM[2]))
       ? [up(nmM[1]), up(nmM[2])]
       : null;
-  const m1 = named ? named[0] : freeLabel([...verts, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
-  const m2 = named ? named[1] : freeLabel([...verts, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+  const m1 = named ? named[0] : freeLabel(ctx, [...verts], ['M', 'N', 'P', 'Q']);
+  const m2 = named ? named[1] : freeLabel(ctx, [...verts, m1], ['N', 'P', 'Q', 'S']);
   return [
     ...(build ? [build] : []),
     { type: 'midpoint', id: m1, a: legs[0][0], b: legs[0][1] },
@@ -1708,8 +1716,8 @@ const midsegment: Rule = (s, ctx) => {
   if (namedM && up(namedM[1]) !== up(namedM[2]) && !tri.includes(up(namedM[1])) && !tri.includes(up(namedM[2]))) {
     [m1, m2] = [up(namedM[1]), up(namedM[2])];
   } else {
-    m1 = freeLabel([...tri, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
-    m2 = freeLabel([...tri, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+    m1 = freeLabel(ctx, [...tri], ['M', 'N', 'P', 'Q']);
+    m2 = freeLabel(ctx, [...tri, m1], ['N', 'P', 'Q', 'S']);
   }
   const have = new Set(ctx.points ?? []);
   const out: AnyCommand[] = [];
@@ -1839,7 +1847,7 @@ const specialPointMeet: Rule = (s, ctx) => {
       out.push(...r.commands);
     }
     const at = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})\b`, 'i'));
-    const X = at ? up(at[1]) : leadingNamedPoint(s) ?? freeLabel([a, b, c, d, ...(ctx.points ?? [])], ['G', 'H', 'I', 'K']);
+    const X = at ? up(at[1]) : leadingNamedPoint(s) ?? freeLabel(ctx, [a, b, c, d], ['G', 'H', 'I', 'K']);
     return [...out, { type: 'line-line-intersection', id: X, a, b, c, d }];
   }
   // Result label: "… בנקודה X" / "… at X" (after the meet), or "הנקודה X היא …"/"X מפגש …"/"X is the
@@ -1934,7 +1942,7 @@ const specialPointMeet: Rule = (s, ctx) => {
     bisector: ['I', 'O', 'M', 'K'],
     perpbis: ['O', 'M', 'K', 'P'],
   };
-  const X = named ?? freeLabel([...poly, ...(ctx.points ?? [])], PREFERRED[fam.key] ?? []);
+  const X = named ?? freeLabel(ctx, [...poly], PREFERRED[fam.key] ?? []);
   const [A, B, C, D] = poly; // D undefined for a triangle
   // Only the CENTRE point is drawn — every construction line/point (diagonals, medians, altitudes, ⊥-bisectors
   // and their feet/midpoints) is SCAFFOLDING (operator, 2026-07-14): a `~`-prefixed helper point is not
@@ -2547,7 +2555,7 @@ const midpoint: Rule = (s, ctx) => {
     if (toks.length !== 2) return null;
     const leftover = rest.replace(/\b(?:[A-Z]\d*)+\b/g, ' ').replace(REQUEST_WORDS, ' ').trim();
     if (leftover) return null;
-    id = freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['M', 'N', 'K', 'L']);
+    id = freeLabel(ctx, [...(ctx.circles ?? [])], ['M', 'N', 'K', 'L']);
   }
   // "B is the midpoint of segment AC" implies the segment AC. If an endpoint is NEW, draw the segment first
   // (idempotent; it also CREATES the endpoints, which `midpoint` needs — else "unresolved dependencies"
@@ -5477,7 +5485,7 @@ const concentricCircles: Rule = (s, ctx) => {
   // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
   const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
   const named = m ? m[1] : circleCenter(s);
-  const center = named ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
+  const center = named ?? freeLabel(ctx, [...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const outer = circleId(center);
   const inner = `${outer}-2`;
   const auto = named ? {} : { autoCenter: true as const };
@@ -5738,7 +5746,7 @@ const circle: Rule = (s, ctx) => {
     if (leftover) return null;
   }
   // An UNNAMED centre is auto-assigned and HIDDEN unless used (FR-RN-8); a named centre is shown.
-  const center = named ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
+  const center = named ?? freeLabel(ctx, [...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const auto = !named;
   if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM), ...(auto ? { autoCenter: true } : {}) }];
   // No NUMERIC size was stated ⇒ the radius is a free DOF seeded at the default, not a fixed value
@@ -6559,7 +6567,7 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
     ];
   }
   const existing = boundInscribeCircle(s, ctx, ids, named, r) ?? undefined;
-  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  const center = named ?? freeLabel(ctx, [...ids, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   // «בר-חסימה» / "cyclic" / "inscribable" keeps the circle HIDDEN — the vertices are concyclic and the circle
   // is not drawn — exactly as it does for a triangle or a quad at HEAD. «חסום» / "inscribed" draws it.
   return [
@@ -6771,7 +6779,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
         ];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
-  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  const center = named ?? freeLabel(ctx, [...ids, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
   // Inscribing in an EXISTING circle ("מרובע EBAD חסום במעגל O" where O is already drawn, or the
   // DEFINITE «חסום במעגל» beside the figure's one circle): do NOT re-create it — that re-emits
@@ -7054,7 +7062,7 @@ const regularPolygon: Rule = (s, ctx) => {
   // n ≥ 5: vertices on a HIDDEN circle at equal spacing; free radius unless a numeric one is given.
   // #1891 (ADR-610): the lowering is THE shared scaffold emitter — `inscribedPolygon`'s n-gon branch emits
   // the same scaffold with the circle DRAWN, and a second copy of it is how the two readings drifted apart.
-  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  const center = named ?? freeLabel(ctx, [...ids, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   // #2265 (ADR-739): a ring that already RIDES one circle («מחומש ABCDE חסום במעגל» · «המחומש משוכלל») is made
   // regular ON that circle — the ADR-156 reuse the inscribed reading already asks. Minting a second hidden circle
   // there left its auto-centre undetermined («@ctr-P is still free») once the sides had to hold. A stated radius
@@ -7134,7 +7142,7 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
   const bulgeIn = /בתוך|מבפנים|\binside\b/i.test(s);
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
-    const center = freeLabel([...used, ...(ctx.circles ?? [])], CENTRES);
+    const center = freeLabel(ctx, [...used, ...(ctx.circles ?? [])], CENTRES);
     used.add(center);
     const circ = circleId(center);
     const ref = bulgeOut || bulgeIn ? poly.find((v) => v !== a && v !== b) : undefined;
@@ -7263,7 +7271,7 @@ const semicircle: Rule = (s, ctx) => {
     if (Object.keys(semicircleBulge(s, ctx, a, b)).length) return 'stop';
     const center =
       (namedC && up(namedC) !== a && up(namedC) !== b && up(namedC) !== on ? up(namedC) : null) ??
-      freeLabel([a, b, on, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
+      freeLabel(ctx, [a, b, on, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
     const circ = circleId(center);
     const arc: AnyCommand = { type: 'arc', id: `arc-${b}${a}`, center, from: b, to: a, spanDeg: 180, bulgeRef: on, bulgeToward: true };
     if (exists(a) && exists(b) && !r.numeric && !exists(center)) {
@@ -7332,7 +7340,7 @@ const semicircle: Rule = (s, ctx) => {
     // #1204/#2486: the 3-run names it outright (the one arc-run reader), and that reading wins.
     (runRoles ? up(runRoles.centre) : null) ??
     (namedC && up(namedC) !== up(a) && up(namedC) !== up(b) ? up(namedC) : null) ??
-    freeLabel([up(a), up(b), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
+    freeLabel(ctx, [up(a), up(b), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
   const circ = circleId(center);
   // BOTH endpoints EXIST and no numeric radius contradicts: the semicircle is CLOSED-FORM — centre =
   // the midpoint of the stated diameter, radius through an endpoint. Zero solve, so the prior figure
@@ -7419,7 +7427,7 @@ const quarterCircle: Rule = (s, ctx) => {
   // ctx.circles joins the exclusion (#213): anonymous ADR-342 centres live only there.
   const center =
     namedRoles?.centre ??
-    (namedC ? up(namedC) : freeLabel([...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']));
+    (namedC ? up(namedC) : freeLabel(ctx, [...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']));
   const fresh = autoVertexLabels(2, [...taken, center]);
   // Alphabet exhausted (26 points taken) → the legacy A,B defaults rather than a crash; not a real figure.
   const [a, b] = namedRoles ? namedRoles.ends : (endsRun ?? (fresh.length === 2 ? fresh : ['A', 'B']));
@@ -7491,7 +7499,7 @@ const sector: Rule = (s, ctx) => {
     [center, a, b] = [roles.centre, roles.ends[0], roles.ends[1]];
   } else {
     // ctx.circles joins the exclusion (#213): anonymous ADR-342 centres live only there.
-    center = namedC ? up(namedC) : freeLabel([...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
+    center = namedC ? up(namedC) : freeLabel(ctx, [...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M', 'N', 'S']);
     const fresh = autoVertexLabels(2, [...taken, center]);
     [a, b] = endsRun ?? (fresh.length === 2 ? (fresh as [string, string]) : ['A', 'B']);
   }
@@ -7649,7 +7657,7 @@ const incircle: Rule = (s, ctx) => {
     if (incLabel && !ids.includes(up(incLabel))) return up(incLabel);
     return null;
   })();
-  const I = namedInc ?? freeLabel([...ids, ...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'I']); // a circle centre defaults to O (never an existing circle's token — ADR-342)
+  const I = namedInc ?? freeLabel(ctx, [...ids, ...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'I']); // a circle centre defaults to O (never an existing circle's token — ADR-342)
 
   // The polygon's defining command (carries its constraints: trapezoid AB∥CD, rhombus equal sides, …), so the
   // shape stays the named shape while the tangential flex below adjusts it to admit an incircle.
@@ -7904,11 +7912,11 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // The circle's centre: the named one ("circle O"), else a fresh auto-name — the corner circle is a
   // NEW object, so "AB ו-AD משיקים למעגל" (no name) is built deterministically rather than escalating
   // (the centre is dodged against the figure's labels, like the incircle's incenter).
-  const center = named ?? freeLabel([vertex, arm1, arm2, ...(namedTips ?? []), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M']);
+  const center = named ?? freeLabel(ctx, [vertex, arm1, arm2, ...(namedTips ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M']);
   // optional named tangency points: "at E and K" / "בנקודות E ו-K"
   const taken = [vertex, arm1, arm2, center, ...(ctx.points ?? [])];
-  const E = namedTips ? namedTips[0] : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
-  const K = namedTips ? namedTips[1] : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
+  const E = namedTips ? namedTips[0] : freeLabel(ctx, taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
+  const K = namedTips ? namedTips[1] : freeLabel(ctx, [...taken, E], ['K', 'M', 'N']); // tangency on side 2
   const bisId = `bis-${arm1}${vertex}${arm2}`;
   // #785 (ADR-462): this lowering encodes tangency STRUCTURALLY — the centre rides the corner's bisector
   // and the radius IS the perpendicular distance to each side, so no `tangent` command is emitted and
@@ -8010,7 +8018,7 @@ const touchListCircle: Rule = (s, ctx) => {
     // incircle's foot is a joint solve 2-D does not run — the sentence declines, unchanged (ADR-631).
     if (tips?.some(given)) return null;
     if (!INCIRCLE_ARITIES.has(ring.length)) return { clarify: 'incircle-not-drawn', sides: ring.length };
-    const I = named ?? freeLabel([...(ctx.points ?? []), ...circles, ...vertices, ...(tips ?? [])], ['O', 'P', 'Q', 'I']);
+    const I = named ?? freeLabel(ctx, [...circles, ...vertices, ...(tips ?? [])], ['O', 'P', 'Q', 'I']);
     const n = ring.length;
     const foot = (e: number): Id => tipOf(ring[e], ring[(e + 1) % n]) ?? anonId('f', `${ring[e]}${ring[(e + 1) % n]}`);
     return [...drawSides, ...incircleConstruction(ring, I, !named, foot, enc)];
@@ -8236,7 +8244,7 @@ const circleOnDiameter: Rule = (s, ctx) => {
   const givenDiameter = referencedCircleMissing && (endpointsExist || labelsBeforeKeyword || unnamedCircle);
   if (!DEFINE.test(s) && !givenDiameter) return null;
   if (!/circle|מעגל/i.test(s) && !givenDiameter) return null; // need a circle word, unless it's a clear given diameter ("AB קוטר")
-  const centre = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...circles], ['O', 'P', 'M', 'Q', 'K']);
+  const centre = named ?? freeLabel(ctx, [...ids, ...circles], ['O', 'P', 'M', 'Q', 'K']);
   const auto = !named;
   return [
     { type: 'segment', a: ids[0], b: ids[1] }, // the diameter AB (idempotent; creates A,B if they're new — `midpoint` needs them)
@@ -8260,9 +8268,9 @@ const inscribedAngleOnDiameter: Rule = (s, ctx) => {
   const center = resolveCenter(s, ctx); // an EXISTING circle (named, or the single one) — required
   if (!center) return null;
   const taken = ctx.points ?? [];
-  const A = freeLabel(taken, ['A', 'B', 'C', 'D']);
-  const B = freeLabel([...taken, A], ['B', 'C', 'D', 'E']);
-  const C = freeLabel([...taken, A, B], ['C', 'D', 'E', 'F']);
+  const A = freeLabel(ctx, taken, ['A', 'B', 'C', 'D']);
+  const B = freeLabel(ctx, [...taken, A], ['B', 'C', 'D', 'E']);
+  const C = freeLabel(ctx, [...taken, A, B], ['C', 'D', 'E', 'F']);
   return [
     { type: 'diameter', id1: A, id2: B, circle: circleId(center) }, // A on circle, B = antipode (the diameter)
     { type: 'point-on-circle', id: C, circle: circleId(center) }, // the inscribed apex
@@ -8379,7 +8387,7 @@ const diameterFromPoint: Rule = (s, ctx) => {
   );
   const labels = [...rest.matchAll(/\b[A-Za-z]\d*\b/g)].map((mm) => up(mm[0]));
   if (labels.some((l) => l !== F)) return null;
-  const far = freeLabel([F, up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);
+  const far = freeLabel(ctx, [F, up(center), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);
   const exists = (ctx.points ?? []).some((q) => up(q) === F);
   return [
     // a NEW F is created on the circle by the `diameter` command itself; an existing one is lowered (ADR-663's helper)
@@ -8997,7 +9005,7 @@ const resolveCirclePair = (
   if (circs.length === 2) return { kind: 'existing', centres: [circs[0], circs[1]] };
   if (!plural) return null; // implied-only resolution binds an existing pair, never creates one
   if (circs.length === 1)
-    return { kind: 'complete', centres: [circs[0], freeLabel([circs[0], ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] };
+    return { kind: 'complete', centres: [circs[0], freeLabel(ctx, [circs[0], ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] };
   if (circs.length === 0) return 'introduce';
   return null; // 3+ circles — ambiguous which pair; defer, never invent
 };
@@ -9073,7 +9081,7 @@ const containedNewInExisting = (
     // container («מעגל מוכל בתוך מעגל O»). The 0/1-circle cases above stay determined and build.
     return { clarify: 'ambiguous-container', centers: circs };
   }
-  const inner = freeLabel([outer, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+  const inner = freeLabel(ctx, [outer, ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   const cmds: AnyCommand[] = [];
   if (outerNew)
     cmds.push({ type: 'circle', id: circleId(outer), center: outer, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(outerNamed ? {} : { autoCenter: true }) });
@@ -9109,7 +9117,7 @@ const twoCirclesPosition: Rule = (s, ctx) => {
   if (pair === null) return null;
   const isNamed = pair !== 'introduce' && pair.kind === 'named';
   const [c1, c2] =
-    pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
+    pair === 'introduce' ? ['O', freeLabel(ctx, ['O', ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (up(c1) === up(c2)) return null;
   // #2263 (ADR-702): one radius for a CONTAINED pair — which circle has it? Refused, one given per line.
   // #2200 (ADR-712): a CONTAINED pair stated equal in size is refused from the words, before anything is read.
@@ -9158,7 +9166,7 @@ const twoCirclesBare: Rule = (s, ctx) => {
   // configuration set comes from what was stated); «שני מעגלים» alone keeps all three.
   const admits: CirclePositionCase[] | null = EQUAL_SIZE.test(s) ? ['meet', 'disjoint'] : null;
   const c1 = 'O';
-  const c2 = freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+  const c2 = freeLabel(ctx, [c1, ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   return withEqualRadii(s, [
     { type: 'circle', id: circleId(c1), center: c1, radius: RADIUS_DEFAULT, freeRadius: true, autoCenter: true, ifAbsent: true },
     { type: 'circle', id: circleId(c2), center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, autoCenter: true, ifAbsent: true },
@@ -9180,7 +9188,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
     if (labels.length === 4) {
       const pairIds = definiteTwoCircles(s, ctx);
       const cc1 = namedCentres[0] ?? 'O';
-      const cc2 = namedCentres[1] ?? freeLabel([cc1, ...labels, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+      const cc2 = namedCentres[1] ?? freeLabel(ctx, [cc1, ...labels, ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
       const sid1 = pairIds?.[0] ?? circleId(cc1);
       const sid2 = pairIds?.[1] ?? circleId(cc2);
       const creates: AnyCommand[] = pairIds
@@ -9222,7 +9230,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   const named = resolved !== 'introduce' && resolved.kind === 'named' ? resolved.centres.map(up) : [];
   const [c1, c2] =
     resolved === 'introduce'
-      ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])]
+      ? ['O', freeLabel(ctx, ['O', ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])]
       : (resolved.centres.map(up) as [string, string]);
   // The two intersection points: the pair after "at"/"בנקודות", or a bare "X and Y" that ISN'T the
   // named centres — else AUTO-name them A,B (the student drew "two intersecting circles" without naming the
@@ -9731,7 +9739,7 @@ const circlesTangent: Rule = (s, ctx) => {
   if (pair === null) return null; // single/half-named circle ⇒ the tangent-line rule; unbindable definite ⇒ escalate
   const isNamed = pair !== 'introduce' && pair.kind === 'named';
   const [c1, c2] =
-    pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
+    pair === 'introduce' ? ['O', freeLabel(ctx, ['O', ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (c1 === c2) return null;
   const internal = internalWords.test(s);
   // #761, operator ruling 2026-08-19 («we should not support 2 equal circles tangents from inside —
@@ -9765,7 +9773,7 @@ const circlesTangent: Rule = (s, ctx) => {
   const id1 = circleId(c1), id2 = circleId(c2);
   // #2209 (ADR-703): a pair already stated tangent keeps its record's operand order and, with no «בנקודה», its touch.
   const onRecord = onStatedTangency(ctx, id1, id2);
-  const at = atM ? up(atM[1]) : (onRecord.at ?? freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']));
+  const at = atM ? up(atM[1]) : (onRecord.at ?? freeLabel(ctx, [c1, c2], ['M', 'T', 'N', 'K']));
   const have = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
   const cmds: AnyCommand[] = [];
   // Each circle is a FREE-radius circle (ADR-052: unstated radius is a DOF), distinct seeds so it doesn't
@@ -9951,9 +9959,9 @@ function allCommonTangents(phrase: string, t: CommonTangentSet): AnyCommand[] | 
   const position = ctx.statedPairPositions?.[pairKey];
   if (position === undefined) {
     const used = [...(ctx.points ?? []), ...(ctx.circles ?? []), c1, c2];
-    const e = freeLabel(used, ['E', 'F', 'G', 'H']);
-    const f = freeLabel([...used, e], ['F', 'G', 'H', 'K']);
-    const touch = freeLabel(used, ['T', 'K', 'S']);
+    const e = freeLabel(ctx, used, ['E', 'F', 'G', 'H']);
+    const f = freeLabel(ctx, [...used, e], ['F', 'G', 'H', 'K']);
+    const touch = freeLabel(ctx, used, ['T', 'K', 'S']);
     const he = /[א-ת]/.test(phrase);
     const options = he
       ? ['המעגלים זרים', `המעגלים נחתכים בנקודות ${e} ו-${f}`, `המעגלים משיקים בנקודה ${touch}`]
@@ -10047,7 +10055,7 @@ const commonTangent: Rule = (s, ctx) => {
   const introduce = noCircles && (resolved === 'introduce' || (resolved === null && /מעגלים|\bcircles\b/i.test(s)));
   if (!introduce && (resolved === null || resolved === 'introduce')) return null; // no two distinct circles to be common to → LLM
   const centres: [string, string] = introduce
-    ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])]
+    ? ['O', freeLabel(ctx, ['O', ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])]
     : (resolved as { kind: 'named' | 'existing'; centres: [string, string] }).centres;
   if (centres[0] === centres[1]) return null;
   const have = new Set(ctx.points ?? []);
@@ -10465,8 +10473,8 @@ const tangentsFromExternal: Rule = (s, ctx) => {
     B = up(abM[2]);
   } else {
     const taken0 = [E, up(center), ...(ctx.points ?? [])];
-    A = freeLabel(taken0, ['T', 'S', 'U', 'V', 'W', 'G', 'H']);
-    B = freeLabel([...taken0, A], ['S', 'U', 'V', 'W', 'G', 'H', 'T']);
+    A = freeLabel(ctx, taken0, ['T', 'S', 'U', 'V', 'W', 'G', 'H']);
+    B = freeLabel(ctx, [...taken0, A], ['S', 'U', 'V', 'W', 'G', 'H', 'T']);
   }
   const out: AnyCommand[] = [...resolved.prepend];
   // The external apex, if new. Seeded CLOSE to the default circle (~1.2× its radius, like a textbook
@@ -10557,7 +10565,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   // the unclosed on-circle-endpoint + NEW-off-circle-endpoint member of the ADR-081/082 family).
   if (members.has(apex)) return null;
   const newLabel = labels.find((l) => l !== apex && !have.has(l));
-  const touch = newLabel ?? (atPoint && !have.has(atPoint) ? atPoint : freeLabel([...have, ...labels, center], ['T', 'S', 'D', 'F']));
+  const touch = newLabel ?? (atPoint && !have.has(atPoint) ? atPoint : freeLabel(ctx, [...have, ...labels, center], ['T', 'S', 'D', 'F']));
   const circ = circleId(center);
   const mid = `~tanmid-${center}${apex}`; // hidden centre of the Thales circle on O-apex (scaffolding; "~" → not drawn)
   const aux = `tanaux-${center}${apex}`;
@@ -10935,7 +10943,7 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
       { type: 'line-circle-intersection', id: D, line: lineId, circle: circleId(existing), avoid: shared, order: [shared, D, other] },
     ];
   }
-  const center = freeLabel([a, b, c, p, q, D, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+  const center = freeLabel(ctx, [a, b, c, p, q, D, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   const circId = circleId(center);
   return [
     // Created HIDDEN (issue #86): the cut sentence uses the circle only to place D — the same scaffolding
@@ -10983,7 +10991,7 @@ const circumcircle: Rule = (s, ctx) => {
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
   const four = labelRun(rest, 4);
   if (four && four.every((id) => (ctx.points ?? []).includes(id))) {
-    const center = freeLabel([...four, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+    const center = freeLabel(ctx, [...four, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
     return [
       { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2], autoCenter: true }, // #2362 (ADR-748): minted
       { type: 'set-concyclic', points: four },
@@ -10992,7 +11000,7 @@ const circumcircle: Rule = (s, ctx) => {
   const ids = labelRun(rest, 3);
   if (!ids) return null;
   // Avoid clashing with an existing centre (a second circle gets a fresh label, not a reused 'O').
-  const center = freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+  const center = freeLabel(ctx, [...ids, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2], autoCenter: true }]; // #2362 (ADR-748): minted
 };
 
@@ -11400,7 +11408,7 @@ const median: Rule = (s, ctx) => {
       .filter((p) => p.length === 3 && p.includes(side[0]) && p.includes(side[1]));
     const apexes = [...new Set(tris.map((t) => t.find((x) => x !== side[0] && x !== side[1])!))];
     if (apexes.length !== 1) return null;
-    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel([apexes[0], ...side, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']); // reuse → identical re-lowering → #613 dedupe (Am. 2)
+    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel(ctx, [apexes[0], ...side], ['M', 'N', 'P', 'Q']); // reuse → identical re-lowering → #613 dedupe (Am. 2)
     return [
       { type: 'midpoint', id: foot, a: side[0], b: side[1] },
       { type: 'segment', a: apexes[0], b: foot },
@@ -11410,7 +11418,7 @@ const median: Rule = (s, ctx) => {
   // An explicit opposite side ("...to side AB") with a from-apex fully determines the median —
   // the foot is that side's midpoint (no triangle to name/re-emit; the figure already has the points).
   if (side && side[0] !== apex && side[1] !== apex) {
-    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel([apex, ...side], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
+    const foot = existingMidpointOf(ctx, side[0], side[1]) ?? freeLabel(ctx, [apex, ...side], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
     return [
       { type: 'midpoint', id: foot, a: side[0], b: side[1] },
       { type: 'segment', a: apex, b: foot },
@@ -11426,7 +11434,7 @@ const median: Rule = (s, ctx) => {
     if ('shapes' in res) return { clarify: 'ambiguous-cevian', role: 'median', apex, shapes: res.shapes, side: res.side };
     const edges = res.edges;
     if (edges.length !== 1) return null;
-    const mid = existingMidpointOf(ctx, edges[0][0], edges[0][1]) ?? freeLabel([apex, ...edges[0], ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
+    const mid = existingMidpointOf(ctx, edges[0][0], edges[0][1]) ?? freeLabel(ctx, [apex, ...edges[0]], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
     return [
       { type: 'midpoint', id: mid, a: edges[0][0], b: edges[0][1] },
       { type: 'segment', a: apex, b: mid },
@@ -11434,7 +11442,7 @@ const median: Rule = (s, ctx) => {
   }
   const others = tri.filter((x) => x !== apex);
   if (others.length !== 2) return null;
-  const mid = existingMidpointOf(ctx, others[0], others[1]) ?? freeLabel(tri, ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
+  const mid = existingMidpointOf(ctx, others[0], others[1]) ?? freeLabel(ctx, tri, ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
   return [
     // the stated triangle is introduced by `cevianTriangle` (#1720), the one step
     { type: 'midpoint', id: mid, a: others[0], b: others[1] },
@@ -11752,7 +11760,7 @@ const altitude: Rule = (s, ctx) => {
     const apexes = [...new Set(tris.map((t) => t.find((x) => x !== sd[0] && x !== sd[1])!))];
     if (apexes.length !== 1) return null;
     const apx = apexes[0];
-    const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+    const foot2 = existingFootOf(ctx, apx, sd[0], sd[1]) ?? freeLabel(ctx, [apx, ...sd], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
     // #1233 — the apex is derived from the polygon here, so this cannot currently be degenerate; asked
     // anyway, because "cannot currently be" is what the median's gate said about the altitude.
     const roleFault = cevianFault(apx, foot2, sd, 'altitude');
@@ -11846,7 +11854,7 @@ const altitude: Rule = (s, ctx) => {
   }
   // Auto-name the foot avoiding EVERY existing figure point, not just the apex/base — otherwise a second
   // altitude re-picks 'F' and silently REDEFINES the first altitude's foot (a §6-honesty collision).
-  const f = namedFoot ?? existingFootOf(ctx, apex, p, q) ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
+  const f = namedFoot ?? existingFootOf(ctx, apex, p, q) ?? freeLabel(ctx, [apex, p, q], ['F', 'G', 'H', 'P']); // reuse (Am. 2)
   // #1233 — the altitude had NO counterpart to the median's apex gate, so «BD גובה לצלע AB» built a
   // zero-length altitude and reported success. Asked HERE, at the single emit point, so every way the
   // apex and the side are resolved above is covered by one check.
@@ -11948,7 +11956,7 @@ const perpBisector: Rule = (s, ctx) => {
     if (pairs.length < 2) return null; // a plural naming <2 segments is unclear — escalate, don't guess
     const taken: Id[] = [...pairs.flat(), ...(ctx.points ?? [])];
     return pairs.flatMap(([pa, pb]) => {
-      const mid = freeLabel(taken, ['M', 'N', 'P', 'Q', 'K', 'L']);
+      const mid = freeLabel(ctx, taken, ['M', 'N', 'P', 'Q', 'K', 'L']);
       taken.push(mid);
       return [
         { type: 'midpoint', id: mid, a: pa, b: pb },
@@ -11991,7 +11999,9 @@ const perpBisector: Rule = (s, ctx) => {
     ];
   }
   // Otherwise CONSTRUCT: the midpoint of AB + the drawn ⟂ line there; a leading name → markers on it.
-  const mid = freeLabel([a, b, ...names], ['M', 'N', 'P', 'Q']);
+  // The segment's EXISTING midpoint is the bisector's foot (ADR-772, the median's ADR-465 Am. 2 reuse): a restated
+  // bisector re-lowers to the identical commands (#613 dedupe), and a student's «M אמצע AB» is never twinned.
+  const mid = existingMidpointOf(ctx, a, b) ?? freeLabel(ctx, [a, b, ...names], ['M', 'N', 'P', 'Q']);
   const lineId = `perp-${mid}-${a}${b}`;
   return [
     { type: 'midpoint', id: mid, a, b },
@@ -12225,7 +12235,7 @@ const bisectsSegment: Rule = (s, ctx) => {
   const existingMid = Object.entries(ctx.midpointOf ?? {}).find(
     ([, [x, y]]) => (x === o1 && y === o2) || (x === o2 && y === o1),
   )?.[0];
-  const M = named ? up(named[1]) : existingMid ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? []), s1, s2, o1, o2], ['M', 'N', 'K', 'L']);
+  const M = named ? up(named[1]) : existingMid ?? freeLabel(ctx, [...(ctx.circles ?? []), s1, s2, o1, o2], ['M', 'N', 'K', 'L']);
   const have = new Set(ctx.points ?? []);
   const nb = ctx.neighbors ?? {};
   const drawn = (x: Id, y: Id) => (nb[x] ?? []).includes(y);
@@ -12551,7 +12561,7 @@ const bareTangent: Rule = (s, ctx) => {
     .replace(FILLER, ' ')
     .trim();
   if (leftover) return null;
-  const T = freeLabel([up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['T', 'S', 'K', 'N']);
+  const T = freeLabel(ctx, [up(center), ...(ctx.circles ?? [])], ['T', 'S', 'K', 'N']);
   return [
     ...resolved.prepend,
     { type: 'point-on-circle', id: T, circle: circleId(center), free: true }, // the touch — a free on-circle DOF
@@ -12574,8 +12584,8 @@ const bareDiameter: Rule = (s, ctx) => {
     .trim();
   if (leftover) return null;
   const taken = [up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])];
-  const A = freeLabel(taken, ['A', 'B', 'C', 'D', 'E', 'F']);
-  const B = freeLabel([...taken, A], ['B', 'C', 'D', 'E', 'F', 'G']);
+  const A = freeLabel(ctx, taken, ['A', 'B', 'C', 'D', 'E', 'F']);
+  const B = freeLabel(ctx, [...taken, A], ['B', 'C', 'D', 'E', 'F', 'G']);
   return [...resolved.prepend, { type: 'diameter', id1: A, id2: B, circle: circleId(center) }];
 };
 
@@ -12611,8 +12621,8 @@ const unnamedSecant: Rule = (s, ctx) => {
     .trim();
   if (leftover) return null;
   const taken = [up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])];
-  const C = namedM ? up(namedM[1]) : freeLabel(taken, ['C', 'D', 'E', 'F']);
-  let D = namedM ? up(namedM[2]) : freeLabel([...taken, C], ['D', 'E', 'F', 'G']);
+  const C = namedM ? up(namedM[1]) : freeLabel(ctx, taken, ['C', 'D', 'E', 'F']);
+  let D = namedM ? up(namedM[2]) : freeLabel(ctx, [...taken, C], ['D', 'E', 'F', 'G']);
   // Alphabet exhausted → both freeLabel fallbacks collapse to 'M'; diverge the second (the
   // quarterCircle legacy-default precedent — not a real figure, but never a silent escalation).
   if (!namedM && D === C) D = C === 'M' ? 'N' : 'M';

@@ -1,0 +1,61 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-28T12:00:00.000Z",
+  "name": "bisector-beside-vertex-m-1690",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש MPQ",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "M",
+          "P",
+          "Q"
+        ]
+      },
+      "enabled": true,
+      "group": "g0"
+    },
+    {
+      "id": "g1.0",
+      "utterance": "קטע EK",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "K"
+      },
+      "enabled": true,
+      "group": "g1"
+    },
+    {
+      "id": "g2.0",
+      "utterance": "אנך אמצעי ל-EK",
+      "group": "g2",
+      "cmd": {
+        "type": "midpoint",
+        "id": "N",
+        "a": "E",
+        "b": "K"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "utterance": "אנך אמצעי ל-EK",
+      "group": "g2",
+      "cmd": {
+        "type": "perpendicular-line",
+        "id": "perp-N-EK",
+        "through": "N",
+        "a": "E",
+        "b": "K",
+        "visible": true
+      },
+      "enabled": true
+    }
+  ]
+}

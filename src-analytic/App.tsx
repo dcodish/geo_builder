@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import registry from '../products.json';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
-import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
+import { CREATED_NOTICE_KEYS, createdNoticeTextOf } from '../shell/session/createdPoints';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
 import { DataPanel } from '../shell/frame/DataPanel';
@@ -186,8 +186,11 @@ export function App() {
   const canUndo = useStore(useAnalyticStore.temporal, (t) => t.pastStates.length > 0);
   const canRedo = useStore(useAnalyticStore.temporal, (t) => t.futureStates.length > 0);
   const [draft, setDraft] = useState('');
-  /** #1467 (ADR-AG-342, ADR-W-162): the points the last recorded line created by reference, and that line (index + text). */
-  const [createdNotice, setCreatedNotice] = useState<{ index: number; line: string; names: string[] } | null>(null);
+  /**
+   * #1467 (ADR-AG-342, ADR-W-162): the points the last recorded line created by reference, and that line (index + text).
+   * #2552 D9 (ADR-AG-344): or the new circle it stated, by its centre (`circle`).
+   */
+  const [createdNotice, setCreatedNotice] = useState<{ index: number; line: string; names: string[]; circle?: string } | null>(null);
   /** #1251 — the LLM fallback is in flight. Owns only the spinner; the decision lives in app/fallback.ts. */
   const [thinking, setThinking] = useState(false);
 
@@ -904,9 +907,14 @@ export function App() {
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
         // transient surfaces, so a notice set before it would be erased by the very line that earned it.
         commitRecord(verdict, recordLine, t);
-        if (verdict.created?.length) {
+        if (verdict.created?.length || verdict.createdCircle) {
           const now = useAnalyticStore.getState().lines;
-          setCreatedNotice({ index: now.length - 1, line: now[now.length - 1], names: verdict.created });
+          setCreatedNotice({
+            index: now.length - 1,
+            line: now[now.length - 1],
+            names: verdict.created ?? [],
+            ...(verdict.createdCircle ? { circle: verdict.createdCircle } : {}),
+          });
         }
         return sentenceOutcome(verdict);
       /**
@@ -1379,7 +1387,7 @@ export function App() {
               {createdNotice && lines.length - 1 === createdNotice.index && lines[createdNotice.index] === createdNotice.line && (
                 <div style={{ marginTop: 8 }}>
                   <CreatedNotice
-                    text={t(createdNoticeText(createdNotice.names).key, createdNoticeText(createdNotice.names).params)}
+                    text={t(createdNoticeTextOf(createdNotice).key, createdNoticeTextOf(createdNotice).params)}
                     undoLabel={t(CREATED_NOTICE_KEYS.undo)}
                     onUndo={() => {
                       removeLine(createdNotice.index);

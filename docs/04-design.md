@@ -1125,6 +1125,16 @@ mention is a sentence-opening «ב+מעגל [O]», so the circle is the scene, n
 `lineLineIntersection` reads with the En `FILLER` stripped. A locative that names its circle is accounted context
 (rule 5 of `labelAccounting.ts`) only when the figure already holds what it says.
 
+### The tool's letter for a point the student did not name (#1690, [ADR-772](06-decisions.md#adr-772))
+
+`freeLabel(ctx, used, prefer)` (`parse.ts`) is the one place a rule mints a letter for a helper point (a median's or
+bisector's midpoint, a foot, a centre, a touch point, an unlettered vertex). It excludes every point of the figure
+(`ctx.points`) itself, so no rule can forget to; `used` adds only what the figure does not yet hold: the sentence's
+own letters, a sibling minted in the same line, circle tokens. A rule whose helper the figure may already have reuses
+it first (`existingMidpointOf` / `existingFootOf`, ADR-465 Am. 2): the median, the altitude and the singular
+perpendicular bisector. A restated construction then re-lowers to identical commands and the #613 dedupe reads it as
+«כבר נאמר».
+
 ## The submit gate and `decideDeterministic`
 
 ### Points a statement names and the figure lacks ([ADR-769](06-decisions.md#adr-769), #1467)

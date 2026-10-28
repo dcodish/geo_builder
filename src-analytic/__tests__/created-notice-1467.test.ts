@@ -15,13 +15,15 @@ import { createdNoticeFaults } from '../../shell/__tests__/fixtures/created-noti
 import type { CreatedPointsAdapter } from '../../shell/session/createdPoints';
 
 let lines: string[] = [];
-let notice: { index: number; names: string[] } | null = null;
+let notice: { index: number; names: string[]; circle?: string } | null = null;
 const submit = (l: string) => {
   const v = decideSubmit(l, lines, 0);
   notice = null;
   if (v.kind === 'record') {
     lines = [...lines, v.line];
     if (v.created?.length) notice = { index: lines.length - 1, names: v.created };
+    // #2552 D9 (ADR-AG-344): App.tsx's other arm — the circle a line stated, by its centre
+    if (v.createdCircle) notice = { index: lines.length - 1, names: [], circle: v.createdCircle };
   }
   return v;
 };
@@ -34,7 +36,7 @@ const adapter: CreatedPointsAdapter = {
     notice = null;
   },
   submit: (l) => void submit(l),
-  lastCreated: () => (notice && notice.index === lines.length - 1 ? { names: notice.names } : null),
+  lastCreated: () => (notice && notice.index === lines.length - 1 ? { names: notice.names, ...(notice.circle ? { circle: notice.circle } : {}) } : null),
   undoLastLine: () => {
     if (notice) lines = lines.filter((_, i) => i !== notice!.index);
     notice = null;
@@ -52,6 +54,8 @@ describe('#1467 — analytic honours the shared created-notice contract', () => 
       typoLine: 'M אמצע AX',
       typoName: 'X',
       declarationLine: 'משולש ABC',
+      // #2552 D9: every circle's centre lettered, then «P מרכז מעגל» states a new circle on P
+      circle: { setup: ['מעגל שמרכזו O(0,0) ורדיוסו 3'], line: 'P מרכז מעגל', centre: 'P' },
     })).toEqual([]);
   });
 });

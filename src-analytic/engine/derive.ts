@@ -151,6 +151,11 @@ export interface Derivation {
    */
   created: Array<{ index: number; ids: string[] }>;
   /**
+   * #2552 D9 (ADR-AG-344) — THE NEW CIRCLE A LINE STATED by its centre («X מרכז מעגל» with every centre lettered), one
+   * entry per such line (never a faulted one). The submit path reads the new line's entry for «נוצר מעגל חדש שמרכזו X …».
+   */
+  createdCircles: Array<{ index: number; centre: string }>;
+  /**
    * WHAT A LINE THAT LANDED SHOULD TELL THE STUDENT (#1350, ADR-AG-183) — one entry per line whose
    * statement was accepted with a notice (`applyFact`'s `ApplyNotice`), never on a faulted line. The
    * submit path reads the new line's entry and carries it into the commit that records the line.
@@ -206,7 +211,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
   // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
@@ -1051,6 +1056,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   factCreated.forEach((ids, i) => {
     if (ids?.length && outcomes[owner[i]] !== 'faulted') created.push({ index: owner[i], ids: [...ids] });
   });
+  const createdCircles: Derivation['createdCircles'] = [];
+  factCircles.forEach((centre, i) => {
+    if (centre && outcomes[owner[i]] !== 'faulted' && !createdCircles.some((k) => k.index === owner[i])) createdCircles.push({ index: owner[i], centre });
+  });
 
   // One notice per line, and none on a line that faulted — a refusal already says everything (#1350).
   const notices: Derivation['notices'] = [];
@@ -1089,7 +1098,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, created, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, created, createdCircles, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -1279,6 +1288,7 @@ export const EMPTY_DERIVATION: Derivation = {
   outcomes: [],
   minted: [],
   created: [],
+  createdCircles: [],
   notices: [],
   constraintLine: [],
   selectorLine: [],

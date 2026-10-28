@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-28T11:05:41.844Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "הישר AC' מאונך למישור π3",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "perp",
+          "a": {
+            "kind": "segment",
+            "a": "A",
+            "b": "C'"
+          },
+          "b": {
+            "kind": "plane-named",
+            "name": "π3"
+          }
+        }
+      ]
+    }
+  ]
+}
