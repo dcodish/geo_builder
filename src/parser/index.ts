@@ -4,7 +4,7 @@ export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCirc
   droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
   statedLabelTokens, distributedClauses, typedLabels, circleWithOtherCentre, doubleCentreNaming, lowercaseLabelFold, latinProseLabels, liftTeachable, definedLabels, lowercaseMeasureLetters, latinAngleLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES, augmentParseCtx, cevianPairReadings } from './parse';
 export type { ParseResult, ParseContext, CevianPairSegment } from './parse';
-export { buildParseCtx } from './context';
+export { buildParseCtx, inscribedCircles } from './context';
 export { incidenceList } from './incidenceList';
 export { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, classifyOutOfScope, foreignGiven, rightAngledAtVertex, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
 export type { ScopeCategory, ScopeMatch, RightAngledAtVertex } from './scope';

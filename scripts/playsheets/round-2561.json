@@ -1,0 +1,792 @@
+{
+ "name": "round-2561",
+ "title": "Round #2561 — week 1 of the roadmap",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "A diameter stated after its length builds (#2499, your P1)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB = 6",
+    "AB קוטר של המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». A circle of radius 3 with AB as its diameter; every row green",
+   "before": "refused with a false «… סותר את «AB = 6»»",
+   "expect": [
+    "AB קוטר של המעגל"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "A point put on the circle after its distance builds (#2499)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "OA = 4",
+    "נקודה A על המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». The circle takes radius 4 and A sits on it, green",
+   "before": "a false «סותר»",
+   "expect": [
+    "נקודה A על המעגל"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "A quarter circle keeps the centre you wrote (#2499)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "OA = 4",
+    "רבע מעגל OAB"
+   ],
+   "lookFor": "Start: press «נקה הכל». The quarter is centred at O (the middle letter is the centre), radius 4, with no hint",
+   "before": "centred at B, with a «רבע מעגל ABO» hint",
+   "expect": [
+    "רבע מעגל OAB"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "REFUSAL: a real size conflict is still refused (#2499)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 2",
+    "AB = 6",
+    "AB קוטר במעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused with «… סותר …»; nothing new is drawn — verified by a timed probe on main (33f5604a): refused in 1.7 s, «… סותר את «AB = 6» … הסיבה: |AB| = 6 …» (the driver reads before the refusal lands)",
+   "before": "unchanged"
+  },
+  {
+   "id": "T5",
+   "title": "REFUSAL, new wording: the impossible quarter now names its reason (#2499)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ABC משולש ישר זוית",
+    "AC=15",
+    "BC=10",
+    "רבע מעגל ACB"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused, and the full sentence reads «לא ניתן: «רבע מעגל ACB» סותר את «BC=10» — … הסיבה: |CB| = |CA| …». It may take a few seconds (the slowdown you accepted for this fix) — verified by a timed probe on main (33f5604a): refused in 8.6 s, the full sentence «לא ניתן: «רבע מעגל ACB» סותר את «BC=10» — אי אפשר לקיים את שניהם יחד. הסיבה: |CB| = |CA|. אפשר לנסות סדר אחר…»",
+   "before": "refused with the reason «|AC| = 15»"
+  },
+  {
+   "id": "T6",
+   "title": "REFUSAL: a chord of a circumscribed circle that isn't drawn yet (#2545)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "DE מיתר במעגל החוסם"
+   ],
+   "lookFor": "Start: press «נקה הכל». The second line is refused, and the full sentence ends «…נסו להקליד אותם בשני שלבים: (1) מעגל O חוסם את משולש ABC  (2) DE מיתר במעגל O». Nothing new is drawn",
+   "before": "a free circle with D and E on it that misses A, B and C, all green",
+   "expectRefusal": "מעגל O חוסם את משולש ABC"
+  },
+  {
+   "id": "T7",
+   "title": "The two lines the refusal teaches build it (#2545)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O חוסם את משולש ABC",
+    "DE מיתר במעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». A, B, C, D, E all on circle O; every row green",
+   "before": "unchanged",
+   "expect": [
+    "DE מיתר במעגל O"
+   ]
+  },
+  {
+   "id": "T8",
+   "title": "«החוסם» binds the drawn circumcircle (#2545)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O חוסם את משולש ABC",
+    "DE מיתר במעגל החוסם"
+   ],
+   "lookFor": "Start: press «נקה הכל». D and E on circle O; no second circle",
+   "before": "unchanged (it was right by coincidence)",
+   "expect": [
+    "DE מיתר במעגל החוסם"
+   ]
+  },
+  {
+   "id": "T9",
+   "title": "REFUSAL: «החוסם» is not put on the incircle (#2545)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל I חסום במשולש ABC",
+    "DE מיתר במעגל החוסם"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused with the same two-line sentence «(1) מעגל O חוסם את משולש ABC  (2) DE מיתר במעגל O»",
+   "before": "D and E drawn on the INCIRCLE, green",
+   "expectRefusal": "מעגל O חוסם את משולש ABC"
+  },
+  {
+   "id": "T10",
+   "title": "Analytic reads «במעגל החוסם» when the circle is drawn (#2545)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל O חוסם את משולש ABC",
+    "DE מיתר במעגל החוסם"
+   ],
+   "lookFor": "Switch to analytic (/analytic.html), press «נקה הכל». The last line is recorded, with D and E on the circle",
+   "before": "not understood (handed to the AI)",
+   "expect": [
+    "DE מיתר במעגל החוסם"
+   ]
+  },
+  {
+   "id": "T11",
+   "title": "The exam's external common tangent is drawn (#2553)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O_1(-3,1)",
+    "O_2(9,10)",
+    "מעגל O_1 שרדיוסו 5",
+    "מעגל O_2 שרדיוסו 5",
+    "משיק חיצוני משותף לשני המעגלים",
+    "הישר AB חותך את ציר ה-y מתחת לציר ה-x"
+   ],
+   "lookFor": "Analytic, «נקה הכל». The tangent AB with A(0,−3) on O₁ and B(12,6) on O₂",
+   "before": "the tangent line went to the AI",
+   "expect": [
+    "משיק חיצוני משותף לשני המעגלים"
+   ]
+  },
+  {
+   "id": "T12",
+   "title": "The exam's wording for «external» works (#2553)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O_1(-3,1)",
+    "O_2(9,10)",
+    "מעגל O_1 שרדיוסו 5",
+    "מעגל O_2 שרדיוסו 5",
+    "משיק משותף ששני המעגלים נמצאים באותו צד שלו"
+   ],
+   "lookFor": "Analytic, «נקה הכל». An external tangent, with both centres on one side of it",
+   "before": "went to the AI",
+   "expect": [
+    "משיק משותף ששני המעגלים נמצאים באותו צד שלו"
+   ]
+  },
+  {
+   "id": "T13",
+   "title": "The same wording in 2-D (#2553)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "משיק משותף ששני המעגלים נמצאים באותו צד שלו"
+   ],
+   "lookFor": "Switch to 2-D (/), «נקה הכל». Tangent AB, both circles on the same side of it",
+   "before": "went to the AI",
+   "expect": [
+    "משיק משותף ששני המעגלים נמצאים באותו צד שלו"
+   ]
+  },
+  {
+   "id": "T14",
+   "title": "Beyond your request: «from different sides» means the internal tangent (#2553)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "משיק משותף ששני המעגלים נמצאים מצדדים שונים שלו"
+   ],
+   "lookFor": "2-D, «נקה הכל». An internal tangent: the circles on opposite sides of it. The stream added this spelling and «בצדדים שונים» / «משני צדדיו» beside the exam's: keep or drop?",
+   "before": "went to the AI",
+   "expect": [
+    "משיק משותף ששני המעגלים נמצאים מצדדים שונים שלו"
+   ]
+  },
+  {
+   "id": "T15",
+   "title": "Name a touch point of a common tangent (#2553)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O_1(-3,1)",
+    "O_2(9,10)",
+    "מעגל O_1 שרדיוסו 5",
+    "מעגל O_2 שרדיוסו 5",
+    "כל המשיקים המשותפים לשני המעגלים",
+    "P נקודת ההשקה של l2 עם מעגל O_1"
+   ],
+   "lookFor": "Analytic, «נקה הכל». P appears at (0,−3)",
+   "before": "went to the AI",
+   "expect": [
+    "נקודת ההשקה של l2"
+   ]
+  },
+  {
+   "id": "T16",
+   "title": "REFUSAL: a touch point that already has a letter (#2553)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "O_1(-3,1)",
+    "O_2(9,10)",
+    "מעגל O_1 שרדיוסו 5",
+    "מעגל O_2 שרדיוסו 5",
+    "משיק חיצוני משותף לשני המעגלים",
+    "P נקודת ההשקה של AB עם מעגל O_1"
+   ],
+   "lookFor": "Analytic, «נקה הכל». The last line is refused with «לא ניתן למקם את P: הישר משיק … בנקודה אחת בלבד»; nothing drawn",
+   "before": "went to the AI",
+   "expectRefusal": "לא ניתן למקם את P"
+  },
+  {
+   "id": "T17",
+   "title": "Click a free circle's centre to name it (#2554)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל ברדיוס 5"
+   ],
+   "lookFor": "Analytic, «נקה הכל». Click the + at the circle's centre: the letter popover opens; choose O. The row «O מרכז המעגל» is added and O sits at the centre",
+   "before": "the + did nothing",
+   "expect": [
+    "מעגל ברדיוס 5"
+   ]
+  },
+  {
+   "id": "T18",
+   "title": "Click the centre of a circle on a diameter (#2554)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "B(7,7)",
+    "D(1,1)",
+    "נתון מעגל שקוטרו BD"
+   ],
+   "lookFor": "Analytic, «נקה הכל». Click the + at (4,4): the popover opens; the letter lands at the midpoint of BD",
+   "before": "the + did nothing",
+   "expect": [
+    "נתון מעגל שקוטרו BD"
+   ]
+  },
+  {
+   "id": "T19",
+   "title": "Click the centre of a square's incircle (#2554)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(4,4)",
+    "D(0,4)",
+    "מעגל חסום במרובע ABCD"
+   ],
+   "lookFor": "Analytic, «נקה הכל». Click the + at (2,2): the popover opens and the letter names it",
+   "before": "the + did nothing",
+   "expect": [
+    "מעגל חסום במרובע ABCD"
+   ]
+  },
+  {
+   "id": "T20",
+   "title": "A pair's centres stay unclickable, as ruled (#2554, D8)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "שני מעגלים"
+   ],
+   "lookFor": "Analytic, «נקה הכל». Clicking either + does nothing. Then type «O_1 מרכז מעגל»: it names the first centre",
+   "before": "unchanged",
+   "expect": [
+    "שני מעגלים"
+   ],
+   "after": [
+    {
+     "type": "O_1 מרכז מעגל"
+    }
+   ]
+  },
+  {
+   "id": "T21",
+   "title": "The exam's two-circle sentences, as printed (PR #2571, #2552)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)"
+   ],
+   "lookFor": "PR server :5174, analytic, «נקה הכל». Two radius-5 circles centred at (−3,1) and (9,10)",
+   "before": "both lines went to the AI",
+   "expect": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5"
+   ]
+  },
+  {
+   "id": "T22",
+   "title": "REFUSAL: a second name for a centre (PR #2571)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O_1(-3,1)",
+    "מרכז המעגל הראשון הוא P(1,1)"
+   ],
+   "lookFor": ":5174, analytic, «נקה הכל». The last line is refused «כבר יש שם לנקודה הזו: O₁…»",
+   "before": "went to the AI",
+   "expectRefusal": "כבר יש שם לנקודה הזו"
+  },
+  {
+   "id": "T23",
+   "title": "REFUSAL: the chord through the centre gets 2-D's message (PR #2575, #2547)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "AB מיתר העובר דרך מרכז המעגל"
+   ],
+   "lookFor": "PR server :5175, analytic, «נקה הכל». The full sentence: «בכל שורה נתון אחד … (1) AB מיתר  (2) העובר דרך מרכז המעגל», with no AI spinner",
+   "before": "went to the AI",
+   "expectRefusal": "העובר דרך מרכז המעגל"
+  },
+  {
+   "id": "T24",
+   "title": "REFUSAL: a true diameter clause is refused too (PR #2575, riskiest)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "AB קוטר העובר דרך מרכז המעגל"
+   ],
+   "lookFor": ":5175, analytic, «נקה הכל». The same message with «(1) AB קוטר  (2) העובר דרך מרכז המעגל»",
+   "before": "the AI, which may have drawn a correct diameter",
+   "expectRefusal": "AB קוטר"
+  },
+  {
+   "id": "T25",
+   "title": "REFUSAL: your ruled edge line, «דרך ראשית הצירים» (PR #2575)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "AB מיתר העובר דרך ראשית הצירים"
+   ],
+   "lookFor": ":5175, analytic, «נקה הכל». Refused with the one-given-per-line message (you ruled «refuse them too» today)",
+   "before": "went to the AI",
+   "expectRefusal": "בכל שורה נתון אחד"
+  },
+  {
+   "id": "T26",
+   "title": "The honest two-line form builds (PR #2575)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "AB מיתר",
+    "O על AB"
+   ],
+   "lookFor": ":5175, analytic, «נקה הכל». A chord through the centre, green; still holds after «הציגו תצורה אחרת»",
+   "before": "unchanged",
+   "cycles": 2,
+   "expect": [
+    "O על AB"
+   ]
+  },
+  {
+   "id": "T27",
+   "title": "The locus is drawn only inside a stated range (PR #2574, #1138)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "נקודה A",
+    "A על המעגל x^2 + y^2 = 4",
+    "-1.5 ≤ y_A ≤ 1.5"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של A"
+   ],
+   "lookFor": "PR server :5176, analytic, «נקה הכל». The answer «מעגל · x² + y² = 2²»; two arcs (left and right), nothing above y = 1.5 or below −1.5",
+   "before": "the range line was not understood",
+   "expect": [
+    "≤ 1.5"
+   ]
+  },
+  {
+   "id": "T28",
+   "title": "The exam's own range sentence (PR #2574)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל II שמשוואתו x^2+y^2=4",
+    "A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של A"
+   ],
+   "lookFor": ":5176, analytic, «נקה הכל». The same two arcs",
+   "before": "the second line was not understood",
+   "expect": [
+    "A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5"
+   ]
+  },
+  {
+   "id": "T29",
+   "title": "REFUSAL: a range that leaves nothing (PR #2574)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "נקודה A",
+    "A על המעגל x^2 + y^2 = 4",
+    "5 ≤ y_A ≤ 6"
+   ],
+   "lookFor": ":5176, analytic, «נקה הכל». The last line is refused, naming «5 ≤ y_A ≤ 6»; the figure unchanged",
+   "before": "not understood",
+   "expectRefusal": "5 ≤ y_A ≤ 6"
+  },
+  {
+   "id": "T30",
+   "title": "Summer B 2024 with named lines, asked in the exam's words (PR #2574)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "M(1,2)",
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "דרך E עובר ישר l1 מקביל לציר ה-x",
+    "l2 אנך אמצעי ל-EK",
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "asks": [
+    "הראו כי המקום הגיאומטרי של כל הנקודות G הוא פרבולה ומצאו את משוואתו"
+   ],
+   "lookFor": ":5176, analytic, «נקה הכל». The answer «פרבולה · y² = 4x» and the parabola drawn",
+   "before": "the l1/l2 lines were refused and the question was unreadable",
+   "expect": [
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ]
+  },
+  {
+   "id": "T31",
+   "title": "REFUSAL: «הישר המקביל» when two parallels exist (PR #2574)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "דרך E עובר ישר l1 מקביל לציר ה-x",
+    "דרך K עובר ישר l3 מקביל לציר ה-y",
+    "אנך אמצעי ל-EK",
+    "G נקודת החיתוך של הישר המקביל עם האנך האמצעי"
+   ],
+   "lookFor": ":5176, analytic, «נקה הכל». Refused, naming «הישר l1, הישר l3» and suggesting «… הישר l1 המקביל …»; typing the suggestion builds G",
+   "before": "bad-operand",
+   "expectRefusal": "l3"
+  },
+  {
+   "id": "T32",
+   "title": "Not asked for: a line typed unnamed and then named becomes one line (PR #2574)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5176",
+   "path": "/analytic.html",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "אנך אמצעי ל-EK",
+    "l2 אנך אמצעי ל-EK"
+   ],
+   "lookFor": ":5176, analytic, «נקה הכל». ONE perpendicular bisector, now named l2 (before, a second line was drawn on top of it). Is that what you want?",
+   "before": "two coincident lines",
+   "expect": [
+    "l2 אנך אמצעי ל-EK"
+   ]
+  },
+  {
+   "id": "T33",
+   "title": "A ratio on a blank page creates its points (PR #2573, #1467)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "PR server :5177, 2-D, «נקה הכל». A, D and B are drawn; the notice «נוצרו נקודות חדשות A, D, B — …» with a ✕",
+   "before": "refused «…references an unknown point»",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T34",
+   "title": "The ✕ on the notice undoes a typo (PR #2573)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 2 AX"
+   ],
+   "lookFor": ":5177, 2-D, «נקה הכל». The notice names only X; pressing ✕ removes the line and X",
+   "before": "refused",
+   "expect": [
+    "AB = 2 AX"
+   ]
+  },
+  {
+   "id": "T35",
+   "title": "3-D creates a missing point (PR #2573)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "E אמצע XC"
+   ],
+   "lookFor": ":5177, 3-D (/3d.html), «נקה הכל». It builds; the notice names X; «הציגו תצורה אחרת» moves X",
+   "before": "refused unknown-point X",
+   "cycles": 1,
+   "expect": [
+    "E אמצע XC"
+   ]
+  },
+  {
+   "id": "T36",
+   "title": "REFUSAL: a diagonal still needs a solid (PR #2573)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "lines": [
+    "אלכסון AB"
+   ],
+   "lookFor": ":5177, 3-D, «נקה הכל». Still refused; nothing drawn",
+   "before": "refused (unchanged)",
+   "expectRefusal": "לא"
+  },
+  {
+   "id": "T37",
+   "title": "Analytic: later lines still place the created points (PR #2573)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5177",
+   "path": "/analytic.html",
+   "lines": [
+    "M אמצע AB",
+    "A(0,0)",
+    "B(4,0)"
+   ],
+   "lookFor": ":5177, analytic, «נקה הכל». M at (2,0); after line 1 the notice names A, B and goes away once the later lines come",
+   "before": "line 1 recorded silently",
+   "expect": [
+    "B(4,0)"
+   ]
+  },
+  {
+   "id": "T38",
+   "title": "Not asked for: deleting the line that defined a point no longer turns its users red (PR #2573)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "E אמצע BC",
+    "F אמצע AE"
+   ],
+   "lookFor": ":5177, 3-D, «נקה הכל». Then delete the row «E אמצע BC»: F's row stays green and E becomes a free point, silently (the planned notice for this was NOT built). Is that OK, or should it say so?",
+   "before": "F's row turned red",
+   "expect": [
+    "F אמצע AE"
+   ]
+  },
+  {
+   "id": "T39",
+   "title": "3-D creates a named line (PR #2577, #2489)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר k מאונך למישור ABC"
+   ],
+   "lookFor": "PR server :5178, 3-D, «נקה הכל». k is drawn perpendicular to ABC, with no notice (as you ruled)",
+   "before": "refused unknown-line k",
+   "expect": [
+    "הישר k מאונך למישור ABC"
+   ]
+  },
+  {
+   "id": "T40",
+   "title": "Writing «AB = k» says it names a vector (PR #2576, #2092)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5179",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AB = k"
+   ],
+   "lookFor": "PR server :5179, 3-D, «נקה הכל». The blue note, in full: ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה «|AB| = k».». Note: every bare naming like «AB = u» now shows it",
+   "before": "recorded with no message",
+   "expect": [
+    "AB = k"
+   ]
+  },
+  {
+   "id": "T41",
+   "title": "The taught length line builds (PR #2576)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5179",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AB = k",
+    "|AB| = k"
+   ],
+   "lookFor": ":5179, 3-D, «נקה הכל». The third line is accepted and AB is labelled k",
+   "before": "«|AB| = k» not understood",
+   "expect": [
+    "|AB| = k"
+   ]
+  },
+  {
+   "id": "T42",
+   "title": "One letter on two edges, then a value (PR #2576)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5179",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "|AB| = k",
+    "|AD| = k",
+    "k = 3"
+   ],
+   "lookFor": ":5179, 3-D, «נקה הכל». AB and AD labelled k and equal; after «k = 3» both labels read 3",
+   "before": "not understood",
+   "expect": [
+    "k = 3"
+   ]
+  },
+  {
+   "id": "T43",
+   "title": "«נסמן» shows no note (PR #2576)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5179",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "נסמן: AB = k"
+   ],
+   "lookFor": ":5179, 3-D, «נקה הכל». No blue note",
+   "before": "unchanged",
+   "expect": [
+    "נסמן"
+   ]
+  },
+  {
+   "id": "T44",
+   "title": "REFUSAL: a letter already used as a coordinate (PR #2576)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5179",
+   "path": "/3d.html",
+   "lines": [
+    "C(k,1,0)",
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "|AB| = k"
+   ],
+   "lookFor": ":5179, 3-D, «נקה הכל». The last line is not understood; nothing drawn for it",
+   "before": "unchanged",
+   "expectRefusal": "לא"
+  }
+ ]
+}

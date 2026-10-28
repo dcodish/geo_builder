@@ -56,6 +56,7 @@ import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { clauseCoverageVerdict, compoundNotHonoured, joinedSubject, splitStatements } from './clauseCoverage';
 import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
+import { lostRingNote } from './unreadRingRole';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
@@ -1072,8 +1073,19 @@ export async function decideFromParse(
       if (lostThrough) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-through', commands: r.commands }, lostThrough);
       }
+      // #2545 (ADR-768): a circle named by its RELATION to a polygon the reading never read («DE מיתר במעגל החוסם» bound a
+      // free circle, or the incircle) — ADR-603's class, a fifth token kind — refuses the whole line with the same
+      // one-input-per-line message, naming the two lines that build it (each proved to read on this figure); beside several
+      // polygons it asks which (ADR-685's question). Only where nothing older fired (W21), like its siblings.
+      const lostRing = gates.unreadRingRole && !aiPath ? lostRingNote(utterance, gates.unreadRingRole, pctx) : null;
+      if (lostRing?.kind === 'split') {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-ring', commands: r.commands }, lostRing.note);
+      }
+      if (lostRing?.kind === 'ambiguous') {
+        return refuse('clarify', { source: 'parser', result: `ambiguous-definite-shape:${lostRing.shapes.join(',')}` }, ambiguousDefiniteShapeNote(lostRing, utterance));
+      }
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...gates.latinProse.map((x) => `latin-prose:${x}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`), ...(gates.unreadThrough?.items ?? []).map((x) => `unread-through:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
+      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...gates.latinProse.map((x) => `latin-prose:${x}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`), ...(gates.unreadThrough?.items ?? []).map((x) => `unread-through:${x}`), ...(gates.unreadRingRole?.items ?? []).map((x) => `unread-ring:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
       // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
       // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
       // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.

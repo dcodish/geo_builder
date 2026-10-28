@@ -6400,6 +6400,18 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 
 **Consequences.** P2 becomes a list worth working through (97 proposed, down from 170); P1 is rare and always a person's report. Internally found wrong answers stay visible through their mark. An item in a Later phase waits, unranked, until its phase opens.
 
+## ADR-W-161 — The incidence-phrase atoms move to `shell/incidencePhrase.ts`: one spelling of "through" for every builder (#2547)
+
+**Status:** accepted · 2026-10-27 · shared chrome (workspace) · fix round #2561, stream D · branch `feat/2547-through-clause-refusal` · **amends** [ADR-765](06-decisions.md#adr-765) (the atoms' home only; 2-D's member is unchanged)
+
+**Requirements:** none (internal) · **Design:** [04](04-design.md) § "An incidence clause the reading never read" (the atoms' shell home) · [04c](04c-design-analytic.md) § "A line that loses a part" (arm 3 reads them)
+
+**Context.** ADR-765 spelled the through-clause openers (`THROUGH_OPEN_HE/_EN`, `THROUGH_VERB_HE/_EN`, `THROUGH_OPEN`, `THROUGH_VERB`) in 2-D's `src/parser/lexicon.ts`. Analytic's arm 3 of the lost part ([ADR-AG-334](06c-decisions-analytic.md#adr-ag-334)) needs the same openers, and `BOUNDARIES.json` lets `src-analytic` import `shell/` only. A second copy in analytic would be the third-copy drift docs/22 §9 forbids in advance.
+
+**Decision.** The six atoms move verbatim to `shell/incidencePhrase.ts`, with the Latin-letter guards as private constants, and `src/parser/lexicon.ts` re-exports them (the precedent of `shell/indexedName` and `shell/vulgarFractions`). The module adds two generic helpers: `incidencePhraseAtStart(text)` (one opener at the start, within one clause) and `firstIncidenceOpener(text)` (where the first opener after a head starts). It holds no product knowledge: whether a phrase is *read* stays each builder's own question, asked of its own reader (2-D's deletion in `unreadThrough`, analytic's declined-line arm).
+
+**Consequences.** 2-D's `unreadThrough` and analytic's `declinedThrough` read one spelling; a new opener spelling lands in both. No import edge changes (`shell` is already importable by both), and `server/__tests__/isolation.test.ts` stays green. The inline-Hebrew ratchet ([ADR-W-153](#adr-w-153)) gains `shell/incidencePhrase.ts: 4`: the four Hebrew literals are grammar atoms that left `src/parser/` (exempt), as `shell/conjunction.ts`'s are, not sentences.
+
 ## ADR-W-162 — A line that refers to a point the figure lacks creates it in every builder, and one shared notice says so, with a ✕ that removes the line (#1467)
 
 **Status:** accepted · 2026-10-27 · feature (all tools) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · **supersedes** #840's 3-D typo guard (2026-08-31) and [ADR-AG-015](06c-decisions-analytic.md#adr-ag-015) decision 1 for points · per builder: [ADR-769](06-decisions.md#adr-769) (2-D), [ADR-3D-382](06b-decisions-3d.md#adr-3d-382), [ADR-AG-342](06c-decisions-analytic.md#adr-ag-342); complex is a known gap (#2562, ADR-W-160)

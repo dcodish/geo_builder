@@ -33,6 +33,7 @@ import {
   droppedWordRelations,
   looksCompound,
   lowercaseLabelFold,
+  inscribedCircles,
 } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { laneContext } from './laneContext';
@@ -449,6 +450,9 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       points: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
       polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
       circles: llmFig.objects.flatMap((o) => (o.kind === 'circle' ? [o.id] : [])),
+      // #2545 (ADR-768): which circle a relation word («המעגל החוסם») describes — the answer must bind that one
+      circleMembers: circleMembers(llmFig),
+      inscribedCircles: inscribedCircles(llmFig),
     },
     { skip: lostVerbs.includes('חוצה/bisect') ? ['angle-bisector', 'bisect'] : [] },
   );

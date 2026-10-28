@@ -4,6 +4,7 @@
  "server/shareStore.ts": 5,
  "shell/conjunction.ts": 5,
  "shell/glyphFold.ts": 1,
+ "shell/incidencePhrase.ts": 4,
  "shell/math.tsx": 1,
  "shell/proofTarget.ts": 11,
  "shell/radianAngle.ts": 6,
