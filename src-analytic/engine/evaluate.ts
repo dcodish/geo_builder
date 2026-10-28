@@ -2824,7 +2824,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * solution found, the fallback is today's figure and the post-hoc judge still has the last word.
    */
   const ownFree = new Set(ids);
-  const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
+  /** The free vertices lead the vector (`carrierSystem`); the parameters after them stay on the plain step (#1182). */
+  const anchorAt = (system: CarrierSystem): number => 2 * system.ids.length;
+  const selectorsHoldAt =(system: CarrierSystem, x: number[]): boolean =>
     c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
@@ -2967,16 +2969,20 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       // A figure with no parameters keeps the multi-start as it always was.
       const budget = solved.syms.length > 0 ? 40 : 120;
       const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
-      const first = solvePreferring(
-        vertexStarts.map((m) => stageOne.toVec(m)),
-        stageOne.residualsAt,
-        budget,
-        () => true,
-        (x) => selectorsHoldAt(stageOne, x),
-        // With parameters, stage one is only a question (see below) and stage two — where a parameter can
-        // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
-        (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
-      );
+      const near = solveLM(stageOne.toVec(starts[0]), stageOne.residualsAt, budget, anchorAt(stageOne));
+      const retry = near.ok ? vertexStarts : vertexStarts.slice(1);
+      const first = (near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env)) || retry.length === 0
+        ? near
+        : solvePreferring(
+            retry.map((m) => stageOne.toVec(m)),
+            stageOne.residualsAt,
+            budget,
+            () => true,
+            (x) => selectorsHoldAt(stageOne, x),
+            // With parameters, stage one is only a question (see below) and stage two — where a parameter can
+            // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
+            (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
+          );
       firstEffort = stageOne.asMap(first.values);
       // A converged stage one the selectors reject is not the answer while a parameter could still move
       // (#1463): at the seed's radius only the COLLAPSED kite fits the circle, and the configuration the
