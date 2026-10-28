@@ -3340,13 +3340,16 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         // "not at this value" — never a point drawn at NaN and never a fallback position.
         const p = evalRule(o.rule, at, curveAtOf(c, env, at));
         if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
-          points.push({ id: o.id, x: p.x, y: p.y });
           placed.set(o.id, p);
+          // A HELPER (#2583, ADR-AG-345) is placed for what is built through it and is no point of the figure: no dot,
+          // no letter, no scaffolding, no crossing it could hold. Only `placed` (what the later objects read) has it.
+          if (o.helper) break;
+          points.push({ id: o.id, x: p.x, y: p.y });
           // The scaffolding is recorded only where the point itself exists, so a figure never shows
           // a construction for something that is not there.
           const built = constructionOf(o.rule, at, p);
           if (built) construction.push({ id: o.id, ...built });
-        } else vacant.push({ id: o.id, reason: 'vacant' });
+        } else if (!o.helper) vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
       /**

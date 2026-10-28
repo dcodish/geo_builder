@@ -507,6 +507,12 @@ export type Fact =
    */
   | (FactBase & { t: 'name-line'; a: Id; b: Id; name: string })
   /**
+   * «נסמן את האנך האמצעי ל-EK ב-l2» · «נסמן את הישר העובר דרך E המקביל לציר ה-x ב-l1» — A LINE NAMED BY ITS DESCRIPTION
+   * (#2584, ADR-AG-346). `operand` is the clause the description parses to (it builds the line, or restates the one the
+   * figure has); `line` is the id of its `line-at`. M1 gives the figure's line that is that construction the name.
+   */
+  | (FactBase & { t: 'name-line-object'; operand: Fact[]; line: Id; name: string })
+  /**
    * «כל המשיקים המשותפים לשני המעגלים» — EVERY COMMON TANGENT OF THE PAIR (#2390, ADR-AG-314), written over the
    * circle-slot sentinels inside `circles-about`. M1 reads how the pair sits (`pairPositionOf`) and draws the families
    * that position has, each a `common-tangent` object named by `names` (the student's) or the next free l1, l2, ….
@@ -802,6 +808,9 @@ export const factsWithin = (f: Fact): Fact[] =>
       : // #1737 (ADR-AG-265): the trapezoid a height sentence introduces by its letters.
         f.t === 'height-of' && f.declare
         ? [f, ...f.declare.flatMap(factsWithin)]
+        : // #2584 (ADR-AG-346): a line named by its description builds (or restates) the line it names.
+          f.t === 'name-line-object'
+          ? [f, ...f.operand.flatMap(factsWithin)]
         : // #2391 (ADR-AG-315): a tangent-through applies the tangent AT its point, or the from-point construction.
           f.t === 'tangent-through'
           ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
@@ -844,7 +853,11 @@ export type GeoObject =
    * solver-free: given its parents there is exactly one answer, in closed form. This is the kind
    * that makes the object→object dependency relation non-empty for the first time.
    */
-  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding }
+  /**
+   * `helper` (#2583, ADR-AG-345) — a point the tool needs and nobody drew (a perpendicular bisector's midpoint): placed
+   * for what is built through it, never drawn, lettered or listed. Its id is `toolLetters.helperId`, the one source.
+   */
+  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true }
   /**
    * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
    *

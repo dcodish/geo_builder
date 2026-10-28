@@ -82,7 +82,11 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'shape-not-found': [{ shape: 'טרפז' }],
   'ambiguous-side': [{}],
   'polygon-not-supported': [{}],
-  'already-named': [{ holder: 'P' }],
+  'already-named': [{ holder: 'P' }, { holder: 'l1', holderKind: 'line' }],
+  'line-exists': [
+    { detail: 'l2 אנך אמצעי ל-EK', declared: 'אנך אמצעי ל-EK', lineName: 'l2', offer: 'נסמן את האנך האמצעי ל-EK ב-l2' },
+    { detail: 'l2 אנך אמצעי ל-EK', declared: 'אנך אמצעי ל-EK', lineName: 'l2' },
+  ], // #2584 (ADR-AG-346)
   'alias-taken': [{ holder: 'P' }],
   'rename-bad-name': [{}],
   'rename-same': [{}],

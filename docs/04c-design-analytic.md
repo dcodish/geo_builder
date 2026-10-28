@@ -552,7 +552,14 @@ foot is derived (`toolFootFacts`, `engine/cevian.ts`), named after the fact thro
 `cevianNamingCandidates`; `TO_HYP_*` emit `cevian-of { hypotenuse }`, resolved from the STATED right angle
 (`sameConstraint`, `rightAngleAt(v, …)`) or asked (`ambiguous-hypotenuse`, `ambiguous-no-right-angle`).
 
-*Identifiers:* `P₁` · `@fresh:<role>|<key>` · `mid:B,C` · `foot(A|BC)` · `median:A` · `toolPoint` · `derived midpoint(u, v)` · `derived foot(apex → uv)` · `cevian-of { toolFoot }` · `cevian-of { side }`
+**A helper point** ([ADR-AG-345](06c-decisions-analytic.md#adr-ag-345), #2583). A role in `HELPER_ROLES` (`bisector-mid`, the
+perpendicular bisector's midpoint: no end of the drawn line) resolves to `helperId(key)` (`~mid:E,K`), never a letter,
+and is not minted. M1 marks the derived object `helper`; `evaluate` places it (`placed`) but leaves it out of
+`figure.points`, so nothing downstream draws, labels, crosses or lists it. The first LETTERED derivation of the same
+point (`sameDerivation`) renames it at M1's one-position-one-name check (`replaceId`), and `resolveToolLetters` re-points
+the helper's later placeholders to that letter.
+
+*Identifiers:* `P₁` · `@fresh:<role>|<key>` · `mid:B,C` · `HELPER_ROLES` · `helperId` · `~mid:E,K` · `foot(A|BC)` · `median:A` · `toolPoint` · `derived midpoint(u, v)` · `derived foot(apex → uv)` · `cevian-of { toolFoot }` · `cevian-of { side }`
 
 ### New letters and circles a reference names ([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), #1670, #1686)
 
@@ -1624,7 +1631,16 @@ perpendicular bisector take an optional line name (the name is the id, `lineIdOf
 are `on-kind` references M1 resolves to the one such `line-at` (`isParallelLine`, `isPerpBisector`), refusing none
 or several.
 
-*Identifiers:* `roleLineRef` · `perp-bisector`
+**A line stated again** ([ADR-AG-346](06c-decisions-analytic.md#adr-ag-346), #2584): both twin arms of `applyStatement` (the
+equation twin, `identicalCurve`; the construction twin, `lineAtTwin`) ask one verdict, `restatedLine`: known · rename
+(over the tool's l-number, or a carrier) · `already-named` (`holderKind: 'line'`) · `line-exists` (a new name for a drawn,
+unnamed line). `line-exists` reaches the submit path with the twin's id; `derive` adds the row that drew it
+(`declared`), and `parser/lineOffer.ts` writes «נסמן את <description> ב-<name>» from the `line-at`, kept only when
+`decideSubmit` would record it; `sentenceOutcome` pre-fills it. `name-line-object` (`parseNameLineObject`) is that
+sentence: its operand is any clause the grammar reads as one `line-at`; M1 builds or restates it and names it as
+`name-line` does.
+
+*Identifiers:* `roleLineRef` · `perp-bisector` · `restatedLine` · `lineAtTwin` · `line-exists` · `name-line-object` · `lineOfferCandidate`
 
 #### It rides the ask lane, and widens one field
 

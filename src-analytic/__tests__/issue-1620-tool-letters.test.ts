@@ -47,14 +47,16 @@ const cosAt = (a: P, f: P, u: P, v: P) => {
 
 describe('one role → letter table: the letter, and the next free one when it is taken', () => {
   it.each([
-    // a midpoint — a median's foot, a perpendicular bisector's: M, then N, then P (2-D's M, N, P, Q)
+    // a midpoint — a median's foot: M, then N, then P (2-D's M, N, P, Q)
     ['median', ['משולש ABC', 'תיכון מ-A במשולש ABC'], ['M']],
     ['median, M taken', ['משולש ABC', 'נקודה M', 'תיכון מ-A במשולש ABC'], ['N']],
     ['median, M and N taken', ['משולש ABC', 'נקודה M', 'נקודה N', 'תיכון מ-A במשולש ABC'], ['P']],
     ['two medians', ['משולש ABC', 'תיכון מ-A במשולש ABC', 'תיכון מ-B במשולש ABC'], ['M', 'N']],
     ['median to a side', ['משולש ABC', 'תיכון לצלע BC'], ['M']],
-    ['perpendicular bisector', ['משולש ABC', 'אנך אמצעי ל-AB'], ['M']],
-    ['perpendicular bisector, M taken', ['משולש ABC', 'נקודה M', 'אנך אמצעי ל-AB'], ['N']],
+    // ⚠ REWRITTEN by #2583 (ADR-AG-345; operator ruling 2026-10-27 «B»): a perpendicular bisector's midpoint is a helper —
+    // no letter, no mint — until a line letters it (`issue-2583-2584-restated-lines.test.ts`).
+    ['perpendicular bisector', ['משולש ABC', 'אנך אמצעי ל-AB'], []],
+    ['perpendicular bisector, M taken', ['משולש ABC', 'נקודה M', 'אנך אמצעי ל-AB'], []],
     // a midsegment's two ends: 2-D's M, N — and N, P when M is taken (its second end prefers N, P, Q, S)
     ['midsegment', ['קטע האמצעים לצלע BC במשולש ABC'], ['M', 'N']],
     ['midsegment, M taken', ['נקודה M', 'קטע האמצעים לצלע BC במשולש ABC'], ['N', 'P']],
@@ -133,8 +135,8 @@ describe('the tool’s letter is the student’s to rename — the sentence is r
     [['משולש ABC', 'תיכון מ-A במשולש ABC'], 'M', 'תיכון מ-A במשולש ABC פוגש את הצלע בנקודה K'],
     [['משולש ABC', 'גובה מנקודה A'], 'H', 'גובה מנקודה A פוגש את הצלע בנקודה K'],
     [['משולש ישר-זווית ABC', 'זווית C ישרה', 'תיכון ליתר'], 'M', 'תיכון ליתר פוגש את הצלע בנקודה K'],
-    // S2 reported `rename-not-typed` for this one: the perpendicular bisector names its midpoint «… חותך אותו בנקודה K»
-    [['משולש ABC', 'אנך אמצעי ל-AB'], 'M', 'אנך אמצעי ל-AB חותך אותו בנקודה K'],
+    // ⚠ #2583 (ADR-AG-345): the perpendicular bisector's row is gone — its midpoint has no tool letter to rename. Its
+    // named form «… חותך אותו בנקודה K» still letters it (locked in `issue-2583-2584-restated-lines.test.ts`).
     [['B(1,14)', 'האנך מהנקודה B לציר ה-x'], 'H', 'האנך מהנקודה B לציר ה-x חותך אותו בנקודה K'],
   ] as const)('%j — %s → K', (lines, from, expected) => {
     const r = decideRename(from, 'K', session([...lines]));

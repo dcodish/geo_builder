@@ -22,6 +22,7 @@ import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTange
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
+import { isHelperId } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
@@ -196,6 +197,12 @@ export type ApplyErrorCode =
    * student takes, never a silent substitution.
    */
   | 'already-named'
+  /**
+   * A LINE THE FIGURE ALREADY DRAWS, RESTATED UNDER A NEW NAME (#2584, ADR-AG-346; operator ruling 2026-10-27, T32: *"it
+   * should refuse to draw second line and say that already exists and offer to rename the line"*). `twin` is the drawn
+   * line, `lineName` the name the student typed; the submit path names the row that drew it and offers the naming sentence.
+   */
+  | 'line-exists'
   /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
   | 'alias-taken'
   /**
@@ -372,6 +379,40 @@ export interface ApplyError {
   /** For `bisector-is-side` (#2115): the angle's vertex, and the host polygon's kind (`triangle`, `square`, `n4`, `n5`…). */
   vertex?: Id;
   polygonKind?: string;
+  /** For `already-named` (#2584, ADR-AG-346): the holder is a LINE's name, so the message calls it a line. */
+  holderKind?: 'line';
+  /** For `line-exists` (#2584, ADR-AG-346): the drawn line, and the name the restatement gave it. */
+  twin?: Id;
+  lineName?: string;
+}
+
+/**
+ * THE ONE VERDICT ON A LINE STATED AGAIN (#2584, ADR-AG-346). A sentence that builds a line the figure already holds — by
+ * the same equation (`identicalCurve`) or the same construction (a `line-at` through the same point along the same
+ * direction) — is judged by what it ADDS, never by its spelling, so both arms of `applyStatement` ask here:
+ *
+ * - no new name, or the line's own ⇒ `known` (2-D's «זה כבר קיים באיור»);
+ * - a name over the TOOL's l-number ⇒ `rename` (#2425 Q3, ruled 2026-10-20, re-ruled 2026-10-27: *"it should rename
+ *   the line but not create another line"*);
+ * - a second name for a line the student named ⇒ `already-named`, naming the holder (#1164: *"it should refuse"*);
+ * - a name for a DRAWN line that has none ⇒ `line-exists`: refused, with the naming sentence offered (T32, 2026-10-27);
+ * - a name for a CARRIER (undrawn) ⇒ `rename`: the #1149 promotion, the line is drawn under the name.
+ */
+export type RestatedLine = 'known' | 'rename' | 'already-named' | 'line-exists';
+export function restatedLine(held: string | undefined, tool: boolean, drawn: boolean, incoming: string | undefined): RestatedLine {
+  if (!incoming || incoming === held) return 'known';
+  if (held) return tool ? 'rename' : 'already-named';
+  return drawn ? 'line-exists' : 'rename';
+}
+
+/** The figure's drawn `line-at` that IS this construction — the same point, the same direction, the same turn. */
+function lineAtTwin(c: Construction, f: { through: Id; dir: Direction; perp: boolean }): Extract<GeoObject, { kind: 'line-at' }> | undefined {
+  if (f.dir.k === 'free') return undefined; // a free direction is never the same construction twice
+  const key = JSON.stringify(f.dir);
+  return c.objects.find(
+    (o): o is Extract<GeoObject, { kind: 'line-at' }> =>
+      o.kind === 'line-at' && o.through === f.through && o.perp === f.perp && JSON.stringify(o.dir) === key && o.drawn !== false,
+  );
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -2757,8 +2798,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (twin) {
         const incoming = f.label.name;
         const held = twin.label.name;
+        const isLine = curveKindOf(twin) === 'line';
+        // One verdict for every line spelling (#2584, ADR-AG-346); a circle or a conic keeps the naming it always had.
+        const verdict = restatedLine(held || undefined, !!twin.label.auto, isLine && twin.stated, incoming || undefined);
+        if (verdict === 'line-exists') {
+          return { ok: false, error: { code: 'line-exists', detail: f.src, twin: twin.id, lineName: incoming } };
+        }
         // The TOOL's l-number yields to the student's own name for the same line (#2425 Q3, ADR-AG-319).
-        if (incoming && held && incoming !== held && twin.label.auto) {
+        if (verdict === 'rename' && held) {
           const { auto: _tool, ...own } = twin.label;
           const label = { ...own, ...f.label, name: incoming };
           return {
@@ -2767,8 +2814,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             next: { ...c, objects: c.objects.map((o) => (o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o)) },
           };
         }
-        if (incoming && held && incoming !== held) {
-          return { ok: false, error: { code: 'already-named', detail: f.src, holder: held } };
+        if (verdict === 'already-named') {
+          return { ok: false, error: { code: 'already-named', detail: f.src, holder: held, ...(isLine ? { holderKind: 'line' as const } : {}) } };
         }
         /**
          * The #1149 promotion rule, reached by the other door: a line first minted as a CARRIER and
@@ -3348,22 +3395,19 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return { ok: true, effect: 'known', next: c };
       }
       /*
-       * THE SAME CONSTRUCTION, NAMED OR NOT, IS ONE LINE (#1138, ADR-AG-341). A line through a point with a stated
-       * direction is identified by what builds it (ADR-AG-023), and a name is the second identity a named line has: so
-       * «האנך האמצעי לקטע EK» then «l2 הוא האנך האמצעי ל-EK» NAMES the line already drawn (the id is never rewritten;
-       * every slot reads the name, ADR-AG-317), and the unnamed restatement of a named one is already known. Two
-       * different names keep their two objects, as before. A free direction is never the same construction twice.
+       * THE SAME CONSTRUCTION, NAMED OR NOT, IS ONE LINE (#1138, ADR-AG-341; its rename-in-place withdrawn by #2584,
+       * ADR-AG-346). A line through a point with a stated direction is identified by what builds it (ADR-AG-023). Stated
+       * again, it is `restatedLine`'s verdict, the equation arm's: the unnamed restatement is known; «l2 הוא האנך
+       * האמצעי ל-EK» after the unnamed «האנך האמצעי לקטע EK» is refused `line-exists` (the submit path offers «נסמן את
+       * האנך האמצעי ל-EK ב-l2»); a second name is `already-named`. Never a second, coincident line.
        */
-      if (f.dir.k !== 'free') {
-        const key = JSON.stringify(f.dir);
-        const twin = c.objects.find(
-          (o): o is Extract<GeoObject, { kind: 'line-at' }> =>
-            o.kind === 'line-at' && o.through === f.through && o.perp === f.perp && JSON.stringify(o.dir) === key && o.drawn !== false,
-        );
-        if (twin && !f.name) return { ok: true, effect: 'known', next: c };
-        if (twin && !twin.name && f.name && f.drawn !== false) {
-          return { ok: true, effect: 'narrowed', next: { ...c, objects: c.objects.map((o) => (o === twin ? { ...twin, name: f.name } : o)) } };
-        }
+      const twin = lineAtTwin(c, f);
+      if (twin && !f.name) return { ok: true, effect: 'known', next: c };
+      if (twin && f.drawn !== false) {
+        const verdict = restatedLine(twin.name, false, true, f.name);
+        if (verdict === 'known') return { ok: true, effect: 'known', next: c };
+        if (verdict === 'already-named') return { ok: false, error: { code: 'already-named', detail: f.src, holder: twin.name, holderKind: 'line' } };
+        return { ok: false, error: { code: 'line-exists', detail: f.src, twin: twin.id, lineName: f.name } };
       }
       return {
         ok: true,
@@ -4352,6 +4396,37 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     /**
+     * «נסמן את האנך האמצעי ל-EK ב-l2» — A LINE NAMED BY ITS DESCRIPTION (#2584, ADR-AG-346), the sentence the `line-exists`
+     * refusal offers. The description builds the line, or restates the one the figure draws (its `line-at` arm: known);
+     * the figure's line that IS that construction then takes the name exactly as `name-line` gives one: its id becomes
+     * the name's, and every reference follows it. Naming gives a name only to what has none (#1109): a line the student
+     * named is `already-named`, a name another object holds is the clash.
+     */
+    case 'name-line-object': {
+      const built = applyAll(c, f.operand.map((g) => ({ ...g, src: f.src }) as Fact));
+      if (!built.ok) return built;
+      const lineAt = f.operand.find((g): g is Extract<Fact, { t: 'line-at' }> => g.t === 'line-at');
+      const target = objectById(built.next, f.line) ?? (lineAt ? lineAtTwin(built.next, lineAt) : undefined);
+      if (!target || target.kind !== 'line-at') return { ok: false, error: { code: 'not-handled', detail: f.src } };
+      const id = lineIdOf(f.name);
+      if (target.name === f.name) return built.effect === 'known' ? { ok: true, effect: 'known', next: c } : built;
+      if (target.name) return { ok: false, error: { code: 'already-named', detail: f.src, holder: target.name, holderKind: 'line' } };
+      const holder = curveByName(built.next, f.name) ?? objectById(built.next, id);
+      if (holder && holder !== target) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(holder) } };
+      const n = built.next;
+      return {
+        ok: true,
+        effect: built.effect === 'created' ? 'created' : 'narrowed',
+        next: {
+          ...n,
+          objects: n.objects.map((o) => (o === target ? { ...target, id, name: f.name } : replaceId(o, target.id, id))),
+          constraints: n.constraints.map((k) => replaceId(k, target.id, id)),
+          selectors: n.selectors.map((s) => replaceId(s, target.id, id)),
+        },
+      };
+    }
+
+    /**
      * «המשיק למעגל בנקודה A» — the tangent line as an OBJECT (#1619 B3, ADR-AG-195). The circle is
      * resolved by the `tangent-of` chain; A lies on it, and the line through A is perpendicular to the
      * radius there — a `line-at` on the radius direction turned a quarter, 0 DOF, closed form.
@@ -5332,6 +5407,25 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const holder = c.objects.find(
           (o) => o.kind === 'derived' && !o.follows && o.id !== f.id && sameDerivation(o.rule, f.rule),
         );
+        /*
+         * A HELPER IS NAMED BY THE FIRST LETTER THAT DERIVES IT (#2583, ADR-AG-345; operator ruling 2026-10-27, «B»). A
+         * perpendicular bisector's midpoint has no name, so «P אמצע EK» after the line is not a second name: P becomes
+         * that point — drawn, lettered — and what was built through it follows (`replaceId`, the `name-line` rename).
+         * #1109's principle: naming gives a name only to what has none.
+         */
+        if (holder && holder.kind === 'derived' && holder.helper && !isHelperId(f.id)) {
+          const named: GeoObject = { kind: 'derived', id: f.id, rule: holder.rule };
+          return {
+            ok: true,
+            effect: 'narrowed',
+            next: {
+              ...c,
+              objects: c.objects.map((o) => (o === holder ? named : replaceId(o, holder.id, f.id))),
+              constraints: c.constraints.map((k) => replaceId(k, holder.id, f.id)),
+              selectors: c.selectors.map((s) => replaceId(s, holder.id, f.id)),
+            },
+          };
+        }
         if (holder) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(holder.id) } };
         }
@@ -5339,7 +5433,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 
       const made: GeoObject =
         f.t === 'derived'
-          ? { kind: 'derived', id: f.id, rule: f.rule, ...(f.follows ? { follows: f.follows } : {}) }
+          ? { kind: 'derived', id: f.id, rule: f.rule, ...(f.follows ? { follows: f.follows } : {}), ...(isHelperId(f.id) ? { helper: true as const } : {}) }
           : f.t === 'segment'
             ? { kind: 'segment', id: f.id, a: f.a, b: f.b, ...(f.follows ? { follows: f.follows } : {}) }
             : { kind: 'polygon', id: f.id, vertices: f.vertices, noun: f.noun, ...circleFlags };

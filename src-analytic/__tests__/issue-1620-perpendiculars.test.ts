@@ -141,10 +141,12 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
     expect(derive(['משולש ABC', 'האנך מ-X ל-BC'], 0).created).toEqual([{ index: 1, ids: ['X'] }]);
   });
 
-  it('the perpendicular bisector: the midpoint (a tool letter, or the student’s), and the line through it ⟂ AB', () => {
+  // ⚠ REWRITTEN by #2583 (ADR-AG-345; operator ruling 2026-10-27 «B»): the unnamed midpoint is a helper, never drawn.
+  it('the perpendicular bisector: the line through the midpoint of AB ⟂ AB; the midpoint is drawn only when the student names it', () => {
     const d = clean(derive(['משולש ABC', 'אנך אמצעי ל-AB'], 1));
-    const [a, b, m] = ['A', 'B', 'M'].map((id) => pt(d, id));
-    expect(m.x).toBeCloseTo((a.x + b.x) / 2, 9);
+    const [a, b] = ['A', 'B'].map((id) => pt(d, id));
+    expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C']);
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const line = d.figure.curves.find((c) => c.curve.kind === 'line' && c.stated);
     expect(line).toBeDefined();
     if (line && line.curve.kind === 'line') {

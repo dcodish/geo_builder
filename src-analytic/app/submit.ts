@@ -32,6 +32,7 @@ import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
+import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
 
 /** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
@@ -444,11 +445,26 @@ function decideOnce(
     const reused = subjectIdsOf(parsed).find(
       (id) => !restatedCentres.has(id) && current.construction.objects.some((o) => o.id === id),
     );
+    /*
+     * #2584 (ADR-AG-346; operator ruling 2026-10-27, T32) — A DRAWN LINE RESTATED UNDER A NEW NAME is refused naming the row
+     * that drew it, and the box is pre-filled with the sentence that names it (`parser/lineOffer.ts`). Offered only when this
+     * same decision would record it, so the next Enter never meets a refusal (ADR-W-030's promise).
+     */
+    if (fault.code === 'line-exists') {
+      const name = fault.lineName ?? '';
+      const candidate = fault.twin ? lineOfferCandidate(current.construction, fault.twin, name, /[א-ת]/.test(line) ? 'he' : 'en') : null;
+      const offer = candidate && decideSubmit(candidate, lines, seed, current).kind === 'record' ? candidate : undefined;
+      return {
+        kind: 'refused',
+        error: { key: 'line-exists', detail: fault.detail, lineName: name, ...(fault.declared ? { declared: fault.declared } : {}), ...(offer ? { offer } : {}) },
+      };
+    }
     const definedBy = reused ? definingLineOf(lines, reused) : null;
     return {
       kind: 'refused',
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
+        ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),
@@ -653,6 +669,7 @@ export function decideToggle(
       kind: 'refused',
       error: {
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
+        ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),
@@ -730,6 +747,9 @@ export function sentenceOutcome(verdict: SubmitVerdict): SentenceOutcome {
       return 'consumed';
     case 'teach':
       return { prefill: verdict.canonical };
+    // #2584 (ADR-AG-346): a restated line's refusal puts the naming sentence in the box, as a lesson does
+    case 'refused':
+      return verdict.error.key === 'line-exists' && verdict.error.offer ? { prefill: verdict.error.offer } : 'kept';
     default:
       return 'kept';
   }

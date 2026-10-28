@@ -6947,6 +6947,30 @@ function parseNameLine(line: string): RuleOutcome {
 }
 
 /**
+ * «נסמן את האנך האמצעי ל-EK ב-l2» · «נסמן ב-l1 את הישר העובר דרך E המקביל לציר ה-x» · "denote the perpendicular bisector
+ * of EK by l2" — A LINE NAMED BY ITS DESCRIPTION (#2584, ADR-AG-346; #1126's grammar half, ruled 2026-09-17: a line can be
+ * named). The operand is any clause the grammar reads as ONE constructed line (a \`line-at\`): what builds it is the line's
+ * identity, so M1 names the figure's line that is that construction. The sentence the \`line-exists\` refusal offers.
+ */
+const NAME_VERB_HE = '(?:(?:נסמן|נסמנה|מסמנים|לסמן)\\s+)?';
+const NAME_OBJECT_HE = new RegExp(`^${NAME_VERB_HE}את\\s+(.+?)\\s+ב-?\\s*(${FREE_LINE_NAME})$`);
+const NAME_OBJECT_HE_FIRST = new RegExp(`^${NAME_VERB_HE}ב-?\\s*(${FREE_LINE_NAME})\\s+את\\s+(.+)$`);
+const NAME_OBJECT_EN = new RegExp(`^(?:(?:let\\s+us\\s+)?(?:denote|call|label|name)\\s+)?(.+?)\\s+(?:by|as)\\s+(${FREE_LINE_NAME})$`, 'i');
+function parseNameLineObject(line: string): RuleOutcome {
+  const first = NAME_OBJECT_HE_FIRST.exec(line);
+  const m = first ? [first[2], first[1]] : (NAME_OBJECT_HE.exec(line) ?? NAME_OBJECT_EN.exec(line))?.slice(1, 3);
+  if (!m) return null;
+  const [operand, name] = m;
+  const r = parseClause(trim(operand));
+  if (!r.ok) return null;
+  const lines = r.facts.filter((f) => f.t === 'line-at');
+  // Exactly one constructed line, and nothing the description asserts beyond building it (a point it declares, a helper).
+  if (lines.length !== 1 || lines[0].t !== 'line-at' || lines[0].name !== undefined) return null;
+  if (!r.facts.every((f) => f.t === 'line-at' || f.t === 'derived' || f.t === 'declare')) return null;
+  return made([{ t: 'name-line-object', operand: r.facts.map((f) => ({ ...f, src: line })), line: lines[0].id, name, src: line }]);
+}
+
+/**
  * «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» — WHERE A LINE CROSSES AN AXIS, NO POINT MADE (#2392, ADR-AG-313; the
  * exam's Q3 ג). Also «מתחת ל…», the x-axis «מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y» with no
  * letter, and English. Read only with no letter: «… בנקודה B» is the lettered crossing, which mints B, unchanged. A side
@@ -7250,7 +7274,8 @@ function cutIsOwnLine(cutText: string | undefined, ontoText: string): boolean {
 
 /**
  * «אנך אמצעי ל-AB» · «האנך האמצעי לצלע AB» · «the perpendicular bisector of AB» — 2-D's lowering, copied: the
- * midpoint (a tool letter unless the student named it, the one mint) and the line through it perpendicular to AB.
+ * midpoint and the line through it perpendicular to AB. The midpoint is the student's letter when he named it, else a
+ * HELPER (#2583, ADR-AG-345, operator ruling 2026-10-27 «B»): the line is drawn, its midpoint is not and has no letter.
  */
 /** «… חותך אותו בנקודה M» / "… meets it at M" names the midpoint (ADR-AG-211) — the form a renamed tool letter is written into. */
 const PERP_BISECTOR_HE = new RegExp(`^(?:(?:ה?ישר\\s+)?(${FREE_LINE_NAME})\\s+(?:(?:הוא|היא)\\s+)?)?ה?אנך\\s+ה?אמצעי\\s+(?:ל-?\\s*|של\\s+)(.+?)(?:\\s+(?:חותך|פוגש)\\s+אותו\\s+ב(?:ה)?נקודה\\s+(${NAME}))?$`);
@@ -7263,7 +7288,7 @@ function parsePerpendicular(line: string): RuleOutcome {
     const piece = direction(trim(bisector[2]), claims);
     if (!piece || piece.k !== 'points') return refuse('bad-operand', line);
     const [a, b] = [piece.a, piece.b].sort();
-    const mid = bisector[3] ?? toolPoint('midpoint', `mid:${a},${b}`);
+    const mid = bisector[3] ?? toolPoint('bisector-mid', `mid:${a},${b}`);
     /*
      * «l2 אנך אמצעי ל-EK», «הישר l2 הוא האנך האמצעי לקטע EK», "l2 is the perpendicular bisector of EK" — the line's own
      * NAME (#1138, ADR-AG-341), its identity as for every named line; anonymous, content-derived as before.
@@ -9479,7 +9504,7 @@ function parseClauseRules(raw: string): ParseResult {
    * gets the last word, rather than having its refusal overwritten by `not-handled` downstream.
    */
   // «נסמן את הישר PQ ב-l», and where a line crosses an axis with no point named (#2392, ADR-AG-313).
-  const lineNamed = parseNameLine(line) ?? parseAxisCut(line);
+  const lineNamed = parseNameLine(line) ?? parseNameLineObject(line) ?? parseAxisCut(line);
   if (lineNamed) return lineNamed;
 
   const matched =

@@ -272,7 +272,10 @@ export function errorText(error: InputError, t: Translate): string {
     'shape-not-found': 'errShapeNotFound',
     'ambiguous-side': 'errAmbiguousSide',
     'polygon-not-supported': 'errPolygonNotSupported',
-    'already-named': 'errAlreadyNamed',
+    // #2584 (ADR-AG-346): a line's holder is called a line (#1164: the refusal names the holder)
+    'already-named': error.key === 'already-named' && error.holderKind === 'line' ? 'errAlreadyNamedLine' : 'errAlreadyNamed',
+    // #2584 (ADR-AG-346, T32): the line already drawn, its row, and the naming sentence the box now holds
+    'line-exists': error.key === 'line-exists' && error.offer ? 'errLineExists' : 'errLineExistsAlone',
     'alias-taken': 'errAliasTaken',
     // #2054 / #2061 (ADR-AG-277) — 2-D's sentences (ADR-661): the second name, and the same letter's other coefficient
     'name-taken': error.key === 'name-taken' && error.nameKind === 'length'
@@ -376,6 +379,7 @@ export function errorText(error: InputError, t: Translate): string {
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',
     letter: error.key === 'capital-magnitude' ? error.letter : '',
+    lineName: error.key === 'line-exists' ? error.lineName : '',
     corrected: error.key === 'capital-magnitude' ? error.corrected : '',
     role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',

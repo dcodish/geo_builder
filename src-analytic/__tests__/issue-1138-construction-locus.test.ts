@@ -223,9 +223,15 @@ describe("#1138 lock 6 — קיץ ב' 2024: the named auxiliary lines, and the l
     expect(locus(lines, 'G').value).toBe('parabola · y² = 4x');
   });
 
-  it('a line drawn unnamed and then named is ONE line, which takes the name; the unnamed restatement is known', () => {
+  // ⚠ REWRITTEN by #2584 (ADR-AG-346; operator ruling 2026-10-27, T32): ADR-AG-341 decision 4's rename-in-place is
+  // withdrawn — the named restatement is refused `line-exists`, and the naming sentence it offers records.
+  it('a line drawn unnamed and then named is refused, its offer names the ONE line; the unnamed restatement is known', () => {
     const ctx = ['K(1,0)', 'נקודה E', 'E על הישר x = -1'];
-    const lines = built([...ctx, 'האנך האמצעי לקטע EK', 'l2 הוא האנך האמצעי ל-EK', 'דרך E עובר ישר מקביל לציר ה-x', 'G נקודת החיתוך של הישר l2 עם הישר המקביל']);
+    expect(lastVerdict([...ctx, 'האנך האמצעי לקטע EK', 'l2 הוא האנך האמצעי ל-EK'])).toMatchObject({
+      kind: 'refused',
+      error: { key: 'line-exists', lineName: 'l2', offer: 'נסמן את האנך האמצעי ל-EK ב-l2' },
+    });
+    const lines = built([...ctx, 'האנך האמצעי לקטע EK', 'נסמן את האנך האמצעי ל-EK ב-l2', 'דרך E עובר ישר מקביל לציר ה-x', 'G נקודת החיתוך של הישר l2 עם הישר המקביל']);
     const lineAts = derive(lines, 0).construction.objects.filter((o) => o.kind === 'line-at');
     expect(lineAts).toHaveLength(2);
     expect(lineAts.filter((o) => o.kind === 'line-at' && o.name === 'l2')).toHaveLength(1);
