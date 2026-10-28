@@ -56,7 +56,7 @@ A case is a claim about the product, so it is measured before it goes on the she
 - **`scripts/play-servers.ps1 -Sheet <name>`** does it all from `scripts/playsheets/<name>.servers.json`
   (`{ "main": 5173, "prs": [{ "port": 5174, "branch": "feat/…", "pr": N }] }`). It pulls a clean `main`,
   makes a worktree per PR under `C:\projects\geo-pr\<port>` with its own `npm install`, starts each server
-  in its own window and waits for every port. `-Cleanup` stops the PR servers and removes their worktrees.
+  hidden (no window on the operator's desktop; output in `logs\play-<port>.log`) and waits for every port. `-Cleanup` stops the PR servers and removes their worktrees.
 - **By hand**, launch detached from PowerShell:
   `Start-Process -FilePath node -ArgumentList "node_modules\vite\bin\vite.js --port N --strictPort" -WorkingDirectory <tree> -WindowStyle Hidden`.
   Never from a background Bash (it dies at the tool timeout), never through `npx` (it exits at once under

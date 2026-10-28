@@ -40,6 +40,7 @@ import {
 } from './parse';
 import { FILLER, KEYWORD_STEMS } from './spanAccounting';
 import { SHAPE_NOUN_WORDS } from './shapePhrase';
+import { describedCircle, ringOf, ringRoleSpans, type RingSpan } from './ringRoles';
 
 type QuadNounKind = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'trapezoid' | 'kite';
 /** What a property word names. */
@@ -158,7 +159,7 @@ function evenRing(commands: AnyCommand[]): boolean {
 }
 
 /** Does the answer carry property `p`, as the student's line (spelt right: `line`) states it? */
-function carries(p: PropertyWord2, commands: AnyCommand[], line: string, occ: { start: number; text: string }, ctx: ParseContext): boolean {
+function carries(p: PropertyWord2, commands: AnyCommand[], line: string, occ: { start: number; text: string }, ctx: ParseContext, typed: string = line): boolean {
   const has = (types: ReadonlySet<string>) => commands.some((c) => types.has(c.type));
   switch (p.kind) {
     case 'adj':
@@ -187,7 +188,12 @@ function carries(p: PropertyWord2, commands: AnyCommand[], line: string, occ: { 
       // a direction is a CIRCLE's: a polygon inscribed in a polygon is the `inscribe` command's own
       if (!/מעגל|circle/i.test(line) || commands.some((c) => c.type === 'inscribe')) return true;
       // a definite reference to a circle already drawn («המעגל החוסם», "the circumscribed circle")
-      if ((ctx.circles?.length ?? 0) > 0 && (/^ה/.test(occ.text) || /(?:^|\s)המעגל\s*$|\bthe\s+(?:circle\s+)?$/i.test(line.slice(0, occ.start)))) return true;
+      const definite = /^ה/.test(occ.text) || /(?:^|\s)המעגל\s*$|\bthe\s+(?:circle\s+)?$/i.test(line.slice(0, occ.start));
+      // #2545 (ADR-768): …in ARGUMENT position («DE מיתר במעגל החוסם») it names the DESCRIBED circle, so the answer must
+      // bind that circle — not merely some circle (an answer on an unrelated circle, or on the incircle, dropped the word)
+      const span = definite ? ringRoleSpans(typed).find((sp) => occ.start >= sp.at && occ.start < sp.end) : undefined;
+      if (span) return bindsDescribed(span, commands, ctx);
+      if ((ctx.circles?.length ?? 0) > 0 && definite) return true;
       const dir = statedCircleDirection(normalizeUtterance(line));
       if (dir === 'in') return commands.some((c) => c.type === 'bisector' || c.type === 'tangent');
       return commands.some(
@@ -198,6 +204,31 @@ function carries(p: PropertyWord2, commands: AnyCommand[], line: string, occ: { 
       ) || hasDiameter(commands);
     }
   }
+}
+
+/**
+ * #2545 (ADR-768): does the answer bind the circle a relation span describes — the drawn one (`describedCircle`, the
+ * parse-boundary reader's own predicate, over the figure the answer is added to), or one the answer itself builds as
+ * that ring's circumcircle / incircle? Every circle the answer places something on must be it.
+ */
+function bindsDescribed(span: RingSpan, commands: AnyCommand[], ctx: ParseContext): boolean {
+  const ring = ringOf(span, ctx);
+  if (!('ring' in ring)) return false;
+  const want = describedCircle(span.relation, ring.ring, ctx)?.id;
+  const inRing = (x: unknown) => typeof x === 'string' && ring.ring.includes(x);
+  const cmds = commands as unknown as Record<string, unknown>[];
+  const bisectorsAtRing = new Set(cmds.filter((c) => c.type === 'bisector' && inRing(c.vertex)).map((c) => c.id));
+  const incentres = new Set(cmds.filter((c) => c.type === 'line-intersection' && bisectorsAtRing.has(c.line1) && bisectorsAtRing.has(c.line2)).map((c) => c.id));
+  const made = new Set(
+    cmds.flatMap((c) =>
+      span.relation === 'circum'
+        ? c.type === 'circumcircle' && [c.a, c.b, c.c].every(inRing) ? [c.id] : []
+        : (c.type === 'circle-through' || c.type === 'circle') && incentres.has(c.center) ? [c.id] : [],
+    ),
+  );
+  const refs = cmds.flatMap((c) => Object.entries(c).flatMap(([k, v]) => (k !== 'id' && typeof v === 'string' && v.startsWith('circle-') ? [v] : [])));
+  if (refs.length === 0) return made.size > 0;
+  return refs.every((id) => id === want || made.has(id));
 }
 
 const SHAPE_CLASS = new Set<PropertyWord2['kind']>(['adj', 'noun', 'ring', 'regular']);
@@ -232,7 +263,7 @@ export function droppedPropertyWords(
         if (SHAPE_CLASS.has(p.kind) && shapeExempt) return true;
         if (ROLE_CLASS.has(p.kind) && roleReference) return true;
         const line = withSpan(utterance, o.start, o.end, canonical);
-        return carries(p, commands, line, o, ctx);
+        return carries(p, commands, line, o, ctx, utterance);
       }),
     );
     if (!ok) out.push(o.text);

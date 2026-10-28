@@ -47,6 +47,7 @@ import { unreadNumbers } from './unreadNumbers';
 import { unreadParts, type UnreadReport } from './unreadParts';
 import { unreadRoles, type RoleReport } from './unreadRoles';
 import { unreadThrough, type ThroughReport } from './unreadThrough';
+import { unreadRingRole, type RingReport } from './unreadRingRole';
 
 /**
  * Every gate that is a pure function of `(utterance, commands)`. Exported as a MAP, not as a sequence
@@ -56,7 +57,7 @@ import { unreadThrough, type ThroughReport } from './unreadThrough';
  * though only the LLM path consults them today.
  *
  * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`, and #1888's
- * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers` / #2532's `unreadThrough`, which re-read the line in the seam's own parse context)
+ * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers` / #2532's `unreadThrough` / #2545's `unreadRingRole`, which re-read the line in the seam's own parse context)
  * are deliberately out — they need the figure, which is not this map's input shape. The read-extent members are
  * netted over the corpus by `issue-1888-unread-corpus-net.test.ts`.
  */
@@ -104,7 +105,9 @@ export interface GateReport {
   unreadRole: RoleReport | null;
   /** #2532 (ADR-765): the incidence phrases («העובר דרך מרכז המעגל») no reading depends on — the phrase sibling */
   unreadThrough: ThroughReport | null;
-  /** true when every gate that predates the read-extent members (#1888, #1904, #2532) is clean: only a lost part, role or phrase fired */
+  /** #2545 (ADR-768): the circles named by their relation to a polygon («במעגל החוסם») no reading depends on — the relation sibling */
+  unreadRingRole: RingReport | null;
+  /** true when every gate that predates the read-extent members (#1888, #1904, #2532, #2545) is clean: only a lost part, role, phrase or relation fired */
   onlyReadExtent: boolean;
   /**
    * Everything left unread, as the STUDENT'S OWN tokens — never a gate name and never internal state
@@ -206,6 +209,10 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   // centre") the reading does not depend on — deleting it, or its verb opener, leaves the lowering unchanged — was dropped,
   // however well its words («מרכז», «המעגל») are accounted as vocabulary and however its letter is a co-reference.
   const through = unreadThrough(utterance, commands, ctx);
+  // THE RELATION SIBLING (#2545, ADR-768): a circle named by its relation to a polygon («DE מיתר במעגל החוסם», "the
+  // circumcircle") whose described circle the parse-boundary reader did not resolve, and whose deletion leaves the
+  // lowering unchanged — the line bound another circle (a free one, or the figure's one circle of another role).
+  const ringRole = unreadRingRole(utterance, commands, ctx);
   // LETTERS READ OUT OF PROSE (#2195, ADR-738): a label the lowering references that the student never typed as a
   // capital, the figure does not have and the line does not define — its letter sits only inside an English word
   // («the triangle is right-angled» → ∠TRI). Ruled: English words are never read as point labels.
@@ -224,7 +231,8 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedConstruct.length === 0 &&
     unread === null &&
     unreadRole === null &&
-    through === null;
+    through === null &&
+    ringRole === null;
   const onlyReadExtent =
     !clean &&
     latinProse.length === 0 &&
@@ -251,6 +259,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     unread?.items ?? [],
     unreadRole?.items ?? [],
     through?.items ?? [],
+    ringRole?.items ?? [],
   );
 
   return {
@@ -268,6 +277,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     unread,
     unreadRole,
     unreadThrough: through,
+    unreadRingRole: ringRole,
     onlyReadExtent,
     items,
   };

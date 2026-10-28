@@ -792,6 +792,8 @@ Spellings lower in the parser (the frame's `centreClauses`, `sharedSubjectClause
 resolved through `circleByName`, `centreRuleOf` / `centreIdOf`, with regions as `sign` selectors
 (`evaluate.ts circleQuantity`). `separatedFrom` tries `chordStarts` for the other root.
 
+`centresOf` offers a centre only with a sentence the grammar reads back: the equation, the numeral, the ring form, or — for the figure's ONLY circle with neither numeral nor equation, of any kind — the contextual «P מרכז המעגל» (a lone `circle-thru` takes it first, every other kind after the ring forms, so no existing offer changes; [ADR-AG-338](06c-decisions-analytic.md#adr-ag-338), #2554). A sentence-drawn pair (`circle-pair<k>-1/2`) has no such sentence (D8 = B on #2552) and is the class guard's one declared exception.
+
 *Identifiers:* `M(x,y)` · `ONE_OF_HE` · `incidenceOn(…).t === 'kind'` · `THRU_HE` · `tangent-circles` · `freeAngleOf` · `selectorFact` · `c.selectors` · `derive.nameCanonicalCentres` · `centresOf` · `pointAt` · `deflatedStarts` · `collapsedPairs` · `on-line` · `selectorsHoldAt`
 
 ### Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)
@@ -845,7 +847,9 @@ M1's `circleByName` decodes a described name with `describedCircle`: `⊙` = the
 A diameter works on any circle (`diameter-of` → both ends `on-curve` plus a radius `relation`); `openCurveText` prints
 `—` for a `θ_` symbol (`readsToolSymbol`).
 
-*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
+**No ring typed ([ADR-AG-335](06c-decisions-analytic.md#adr-ag-335), #2545):** the frame folds an argument-position «במעגל החוסם [את המשולש]» / "of the circumcircle" to the letterless name «⊙◌» / «○◌» (+ the noun's size, `letterlessCircleName`); `describedCircle` reads it as the figure's one polygon's circle, bound only when it is the figure's one circle, and `statingNamedCircle` never creates it. `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict it gave before.
+
+*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `RING_OF_FIGURE` · `letterlessCircleName` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
 
 ### Circles a sentence draws; two circles named by order ([ADR-AG-219](06c-decisions-analytic.md#adr-ag-219), #1622 E3, #1693)
 

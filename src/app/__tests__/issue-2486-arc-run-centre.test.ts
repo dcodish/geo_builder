@@ -6,9 +6,9 @@
  * The CLASS lock, through the real decide path (`decideDeterministic2D`): {quarter, half, sector} × the measured runs ×
  * {Hebrew, English, the run before the noun, «עיגול», a stated radius} × {fresh; «נקודה A · נקודה B»; «נקודה A ·
  * נקודה O · נקודה B»}. The committed arc's centre is `arcRunRoles(run).centre` — the ONE reader the parser rules and
- * the re-reader share — and the step teaches nothing (the student's own reading built). Excluded by design: a figure
- * whose stated reading fails on #2499 (a pinned distance between the centre and an end, entered first), where the
- * #1012 re-reader then legitimately tries another centre; no row below states such a distance.
+ * the re-reader share — and the step teaches nothing (the student's own reading built). The former exclusion (a
+ * figure whose stated reading failed on #2499 — a pinned distance between the centre and an end, entered first) is
+ * WITHDRAWN (ADR-766, 2026-10-24): that reading now builds, and the rows at the end lock it.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -97,4 +97,20 @@ describe('#2486 — one reader: the committed centre is arcRunRoles(run).centre'
     expect(['A', 'B', 'C']).not.toContain(arc.center); // the centre is the hypotenuse's midpoint, never a vertex
     expect(arc.bulgeRef).toBeDefined();
   }, 60_000);
+});
+
+// #2499 (ADR-766): a distance between the centre and an end, stated FIRST, no longer refuses the stated reading — the
+// free radius flexes to it — so the #1012 re-reader is never consulted and the arc keeps the centre the student wrote.
+describe('#2499 — «OA = 4» first: the stated centre still builds, nothing re-read', () => {
+  for (const noun of NOUNS)
+    for (const run of ['OAB', 'AOB'])
+      it(`«OA = 4» · «${noun.he} ${run}» / "${noun.en} ${run}"`, async () => {
+        const want = arcRunRoles(run.split('') as [string, string, string]).centre;
+        for (const [line, locale] of [[`${noun.he} ${run}`, 'he'], [`${noun.en} ${run}`, 'en']] as const) {
+          const v = await decide(['OA = 4'], line, locale);
+          expect(v.kind, `${line}: ${JSON.stringify(v).slice(0, 300)}`).toBe('commit');
+          expect(centreOf(v), line).toBe(want);
+          expect((v as { note?: { key: string } }).note?.key, `${line}: nothing taught`).not.toBe('input.canonicalHint');
+        }
+      }, 60_000);
 });

@@ -246,6 +246,16 @@ Seams recorded against the layout:
   whose engine error now carries circle ids), and a decide note's `{ circleList }` / `{ circle }` params, which
   `renderNote` words with the figure's `circleRefs` (`candidateCircles` expands the parser's centre token to every
   circle centred there).
+- **A circle by its relation to a polygon, per span (ADR-768, #2545).** `src/parser/ringRoles.ts` `resolveRingRoles`,
+  called in `parseEntry` before the pair roles (the rewrite chokepoint). A span is the lexicon's `RING_ROLE_REF_HE/EN`
+  in ARGUMENT position (behind an operand particle / preposition) plus an optional ring tail (`RING_NOUN_*`, a label
+  run). The ring: the run, else the figure's one polygon of the noun's size, else the figure's one polygon. The circle:
+  circumscribed = the one `circleMembers` entry holding every vertex; inscribed = the semantic field
+  `inscribedCircles` (`context.ts`: feet from the centre onto every side with the circle through one, or every side on
+  the circle's tangent lines). A ring found without letters resolves only when that circle is the figure's one circle.
+  Resolved, the span becomes «מעגל <token>» / "circle <token>"; an anonymous token the line also types as a label is
+  read over a context with a fresh parse-local token, mapped back. `dropRingRefs` (the ADR-291 strip, both relations)
+  keeps a ring's labels out of `dropCircleRef`. Retired: ADR-291's `circumscribingRef` and `CIRCUM_REF_SRC`.
 - **A pair's circle by its role, per span (ADR-760, #2464).** `src/parser/pairRoles.ts` `resolvePairRoles`, called in
   `parseEntry` beside #102's size qualifier and #192's ordinal (the rewrite chokepoint): when the figure has exactly
   one concentric pair and the line a role span (the lexicon's `CIRCLE_ROLE_REF_HE/EN`), the pair gets two fresh
@@ -1251,6 +1261,18 @@ together is a co-reference. At submit, when only the read-extent members fired (
 `lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
+#### A circle's relation to a polygon that the reading never read ([ADR-768](06-decisions.md#adr-768))
+
+The relation sibling, `unreadRingRole` (`src/app/unreadRingRole.ts`, in the battery): a fifth token kind of ADR-603's
+class. Each relation span in argument position (`ringRoles.ts` `ringRoleSpans`) is read when the parse-boundary reader
+resolved it (`resolveRingSpan`); otherwise it is replaced by the plain circle noun with its particles and the line
+re-read — unchanged lowering = unread. At submit, after the through-clause refusal and only where nothing older fired,
+`lostRingNote` refuses with `input.scope.split-statements` (`scope:split-statements:unread-ring`), the two lines — the
+declaration «מעגל O חוסם את משולש ABC» / «מעגל O חסום במשולש ABC» (a letter nothing uses) and the line with the span as
+«מעגל O» — each proved to read in turn; several polygons and a bare relation ask `input.ambiguousDefiniteShape`; no
+polygon, or a ring with no declaration (a pentagon), takes the weak path. The ✎ seam names the span through
+`GateReport.items`. Cost: one deletion parse per unresolved span, only on lines holding one.
 
 #### An incidence clause the reading never read ([ADR-765](06-decisions.md#adr-765))
 

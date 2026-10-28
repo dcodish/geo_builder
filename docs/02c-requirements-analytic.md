@@ -406,6 +406,10 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מרכז המעגל M נמצא על ציר ה-y», «הנקודה B נמצאת מחוץ למעגל»
 - Sources: ADR-AG-193, #1619, #1598.
 
+**R130 amendment — the + at the figure's only circle names its centre, however the circle was stated (#2554, ADR-AG-338)**. A free circle, a circle on a diameter and a quadrilateral's incircle offer their centre like a circle through three points: the click opens the letter popover and records «O מרכז המעגל». The centres of a pair the tool drew («שני מעגלים») offer nothing and are named by typing «O_1 מרכז מעגל» in order (operator ruling D8 = B on #2552, 2026-10-26).
+- «מעגל ברדיוס 5» → click the + → «O מרכז המעגל»
+- Sources: ADR-AG-338, #2554, #1598.
+
 **R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»** Every shape noun can be inscribed (a cyclic parallelogram is drawn as a rectangle); the converse touches every side; «חד זוויות» holds in every configuration. **Except a noun no circle passes around (a right trapezoid):** in one sentence (R135), or as a ring already declared and then inscribed — and the reverse, inscribed and then declared — it is refused, naming both statements, in every inscription spelling.
 - «מרובע ABCD חסום במעגל שמרכזו M»
 - «במשולש AOB חסום מעגל שמרכזו C» → C where the bisectors meet
@@ -444,6 +448,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R139 — every circle can be named in a sentence, a diameter works on every circle, and the data panel never shows the tool's own symbols**. A computed circle by its role or centre; an open equation shows «—», never an internal symbol.
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
 - Sources: ADR-AG-203, #1659, #1665, #1663.
+
+**R139 amendment — the same circle with no ring typed** (2-D's FR-EN-3d, ADR-W-157). «DE מיתר במעגל החוסם», «P על המעגל החסום במשולש», "DE is a chord of the circumcircle" name the figure's one polygon's described circle, and record on it when it is drawn and is the figure's one circle. Otherwise the line keeps its hand-off to the model (R124), where 2-D refuses it: whether the circle is created is #2560.
+- after «משולש ABC» · «מעגל O חוסם את משולש ABC»: «DE מיתר במעגל החוסם» → D, E on circle O
+- Sources: ADR-AG-335, #2545.
 
 **R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn. Every circle the tool drew («נתון מעגל», «שני מעגלים», a touch's) takes a later «משוואת המעגל (O) היא …», keeping what was already stated about it (ADR-AG-322).
 - after «A(3,4)» on x²+y²=25: «AB קוטר במעגל» → B at (−3,−4)

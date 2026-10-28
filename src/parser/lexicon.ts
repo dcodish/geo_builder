@@ -148,6 +148,32 @@ export const CIRCLE_ROLE_REF_EN = String.raw`(?:\bthe\s+)?(?!\S+\s+circles\b)${C
 export const circleRole = (adj: string): 'outer' | 'inner' =>
   /^(?:פנימי|קטן|inner|internal|small)/i.test(adj) ? 'inner' : 'outer';
 
+// ── A circle by its relation to a polygon (#2545, ADR-768) ─────────────────────────────────────────
+/**
+ * The two RING relations of a circle, as the adjective after the circle noun. ADR-650's voice trap, side by side:
+ * «חוסם» (active: the circle ENCLOSES the polygon) is the CIRCUMSCRIBED circle, «חסום» (passive: it is enclosed IN
+ * the polygon) the INSCRIBED one. Capture-free stems; {@link ringRelation} classes a matched word.
+ */
+export const RING_CIRCUM_HE = String.raw`חוס(?:ם|מת)`;
+export const RING_INSCR_HE = String.raw`חסו(?:ם|מה)`;
+/**
+ * A circle named by its relation to a polygon in ARGUMENT position — behind an operand particle («במעגל החוסם»,
+ * «למעגל החסום», «על המעגל החוסם», «שבמעגל …»), never the sentence's subject («המעגל החוסם את … חותך …», «מעגל O
+ * חוסם את …» are declarations, owned by their rules). Captures: 1 the particles (kept on a rewrite), 2 the relation.
+ * The ring that may follow («את המשולש ABC», «במשולש») is read by `ringRoles.ts` from {@link RING_NOUN_HE}.
+ */
+export const RING_ROLE_REF_HE = String.raw`(?<![א-ת])((?:ו?ש?[בלמ])|(?:ו?ש?(?:על|של|אל)\s+))ה?מעגל\s+ה(${RING_CIRCUM_HE}|${RING_INSCR_HE})(?![א-ת])`;
+/**
+ * The English twin, behind a preposition: "of the circumscribed circle", "on the incircle", "in the circle
+ * circumscribing …", "to the circle inscribed in …". Captures: 1 the preposition, 2 the whole relation phrase.
+ */
+export const RING_ROLE_REF_EN = String.raw`(?<![A-Za-z])(of|on|in|to|onto|into|with|from|at|inside)\s+the\s+((?:circumscribed|inscribed)\s+circle|circumcircle|incircle|circle\s+(?:circumscribing|inscribed\s+in|circumscribed\s+(?:about|around)))(?![A-Za-z])`;
+/** The polygon nouns a ring tail may carry («את המשולש», "of triangle"): the noun, then its vertex count (0 = any). */
+export const RING_NOUN_HE = String.raw`משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|מחומש|משושה|מצולע`;
+export const RING_NOUN_EN = String.raw`triangle|quadrilateral|quad|square|rectangle|rhombus|trapezoid|trapezium|kite|parallelogram|pentagon|hexagon|polygon`;
+/** The relation a {@link RING_ROLE_REF_HE} / {@link RING_ROLE_REF_EN} match names. */
+export const ringRelation = (word: string): 'circum' | 'inscribed' => (/חוס|circum/i.test(word) ? 'circum' : 'inscribed');
+
 // ── Keywords (bilingual, morphology handled ONCE)────────────────────────────────────────────────
 /** Hebrew kaf in both positional forms — the ADR-3D-035 recorded trap (`מאונ[ךכ]` — a final-ך-only
  *  gate silently rejects the plural `מאונכים`, where kaf is medial). */

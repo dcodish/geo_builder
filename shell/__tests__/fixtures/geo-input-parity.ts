@@ -292,6 +292,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
 
+  '#2560': 'open', // #2545 (ADR-768 / ADR-AG-335): 2-D refuses a relation-named circle the figure lacks; analytic hands it to the model (R124) — creating it is the open question
   '#2547': 'open', // #2532 (ADR-765): analytic hands a through-clause chord to the model where 2-D refuses — the interim question; #2541 reads it in both
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
@@ -1808,8 +1809,16 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'chord-through-centre-2532-01', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר העובר דרך מרכז המעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2547' }], note: '2-D drew an ordinary chord with O off AB, green, before ADR-765; analytic answers not-handled (the model, R124) — the interim question is #2547, the read is #2541' },
   { id: 'chord-through-centre-2532-03', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר', 'O על AB'], expect: 'builds', exception: 'X8', note: 'the honest two-line form of chord-through-centre-2532-01: O on AB at every seed in both builders (the English spellings are locked in src/app/__tests__/issue-2532-unread-through.test.ts: X8 is matched in Hebrew)' },
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
+  // ── #2499 (ADR-766): a membership after a distance that already pins its point sizes the free radius, in either order ──
+  { id: 'diameter-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'AB = 6', 'AB קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «AB = 6»» before ADR-766 (the other order built r = 3); analytic already drew r = 3' },
+  { id: 'point-on-circle-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'OA = 4', 'נקודה A על המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «OA = 4»» before ADR-766; analytic already drew r = 4' },
+  { id: 'quarter-after-radius-distance-2499', family: 'chords-arcs', steps: ['OA = 4', 'רבע מעגל OAB'], expect: 'builds', exception: 'X8', note: '2-D drew the quarter around B with a re-read hint before ADR-766; analytic already drew it around O, r = 4' },
   // ── #2512 (ADR-762 / ADR-AG-333): a second triangle around one circle is its own triangle ──
   { id: 'second-ring-around-circle-2512', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'], expect: 'builds', exception: 'X8', note: '2-D drew DEF exactly on ABC, green, before ADR-762; analytic refused it «polygon-collapsed» before ADR-AG-333' },
+  // ── #2545 (ADR-768 / ADR-AG-335): a circle named by its relation to a polygon binds the described circle, or the line is refused ──
+  { id: 'ring-circle-ref-2545-01', family: 'chords-arcs', steps: ['משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D drew a free circle missing A, B, C, green, before ADR-768; analytic answers not-handled (the model, R124) — whether the circle is created is #2560' },
+  { id: 'ring-circle-ref-2545-02', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O חוסם את משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'builds', exception: 'X8', note: 'D, E on the circumcircle in both builders; analytic answered not-handled before ADR-AG-335' },
+  { id: 'ring-circle-ref-2545-03', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל I חסום במשולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D put D, E on the INCIRCLE, green, before ADR-768; analytic answers not-handled (the model)' },
   // ── #2553 (ADR-AG-337): the common tangent the sentence does not letter, its kind written as its definition, its touch point named ──
   { id: 'unnamed-common-tangent-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק חיצוני משותף לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'both letter the touches A, B; analytic handed it to the model before ADR-AG-337' },
   { id: 'unnamed-common-tangent-named-circles-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק משותף חיצוני למעגלים O ו-P'], expect: 'builds', exception: 'X8', note: 'analytic handed it to the model before ADR-AG-337' },

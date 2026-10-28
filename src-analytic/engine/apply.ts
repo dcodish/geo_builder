@@ -942,6 +942,17 @@ export function onCurveByConstruction(c: Construction, curve: GeoObject, p: Id):
  */
 function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undefined {
   const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  /*
+   * #2545 (ADR-AG-335): the LETTERLESS reference («DE מיתר במעגל החוסם») — the ring is the figure's one polygon (of the
+   * typed noun's size), and the described circle binds only when it is the figure's ONE circle: which circle a bare
+   * relation names beside another is the operator's question (#2560), as in 2-D (ADR-768).
+   */
+  if (d.pts.length === 0) {
+    const rings = c.objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && (!d.arity || o.vertices.length === d.arity));
+    if (rings.length !== 1 || circles.length !== 1) return undefined;
+    const hit = describedCircle(c, { role: d.role, pts: [...rings[0].vertices] });
+    return hit === circles[0] ? hit : undefined;
+  }
   if (d.role === 'circum') return circles.find((o) => d.pts.every((p) => onCurveByConstruction(c, o, p)));
   const ring = ringId(d.pts);
   const sides = d.pts.map((p, i) => [p, d.pts[(i + 1) % d.pts.length]] as const);
@@ -1182,6 +1193,8 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
    * «המעגל החוסם את המשולש ABC» states (`circle-thru` through the three; the incircle for «החסום ב»). Its ring must exist.
    */
   const described = readDescribedCircle(name);
+  // #2545 (ADR-AG-335): a letterless reference names no ring to build on — creating it is #2560's question
+  if (described && described.pts.length === 0) return null;
   if (described) {
     const creation: Fact | null =
       described.role === 'circum'

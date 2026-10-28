@@ -13787,6 +13787,19 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 
 **Behaviour change for a student:** after «R > r», stating circle P's radius as 9 draws circle O larger than 9 (it was drawn smaller, green); the radius may be stated before «R > r» (it was refused); «רדיוס מעגל P הוא 3» then «R = 2r» draws O at 6 (it was not understood); «r < 5» after P's radius 9 is refused (it was accepted); «R > r» · «רדיוס O הוא 5» · «רדיוס P הוא 9» refuses the last line with the existing «הערך במשפט … אינו אפשרי כאן» message (it was accepted green — 2-D accepts it with an amber warning; #2527 asks which is right).
 
+## ADR-AG-335 — The bare «המעגל החוסם / החסום» reads the figure's one polygon's described circle when it is drawn (#2545, the ADR-W-157 port of ADR-768)
+
+**Status:** accepted · 2026-10-27 · bug port (2-D's [ADR-768](06-decisions.md#adr-768)), fix round #2561, stream B · branch `fix/2545-ring-role-reader` · **extends** [ADR-AG-203](#adr-ag-203) (the described-circle fold, now without a typed ring). LADDER stage: none (the frame's fold and M1).
+**Requirements:** [02c](02c-requirements-analytic.md) R139 amendment · **Design:** [04c](04c-design-analytic.md) § "A circle named by its ring" (the letterless name)
+
+**Measured before** (d9494206, `decideSubmit` → `derive`): every bare row (R1, R2, R5, R6, K1–K4b, K7–K11c, K12, E1–E7) was `not-handled`, handed to the model; the lettered rows recorded correctly (ADR-AG-203 / ADR-AG-210); and the controls 2-D binds — «מעגל O חוסם את משולש ABC» · «DE מיתר במעגל החוסם», «משולש ABC חסום במעגל» · «…החוסם [את המשולש]», the incircle «…החסום» — were `not-handled` too.
+
+**Decision.** The frame folds an argument-position relation with no ring typed to the letterless name «⊙◌» / «○◌» (+ the noun's size: «⊙◌3»), `names.ts` `letterlessCircleName`, read by every circle-name slot (`DESCRIBED_CIRCLE_ALT`). M1's `describedCircle` reads it as the figure's one polygon (of that size) and binds its described circle only when that circle is the figure's ONE circle — 2-D's rule. `statingNamedCircle` never creates it, and `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict the line had before, field for field: creating the circle, or choosing between two, is #2560.
+
+**Measured after:** C1, C2, C2b, C8 record with D, E on the described circle at 24 seeds; every other row of the plan's matrix is byte-identical to d9494206 (the bare-absent rows keep `not-handled`; the lettered rows record as before). Parity: `ring-circle-ref-2545-02` builds in both builders; `-01` / `-03` are analytic known gaps on #2560 (2-D refuses, analytic hands to the model).
+
+**Lock.** `src-analytic/__tests__/issue-2545-ring-circle-ref.test.ts`.
+
 ## ADR-AG-337 — A common tangent the sentence does not letter, its kind written as its definition, and its touch point named after (#2553)
 
 **Status:** accepted · 2026-10-27 · bug P2 (`reported`, analytic; a missing 2-D port), fix round #2561 (stream C) · branch `fix/2553-external-common-tangent` · LADDER stage: none (parser lowerings onto ADR-AG-313's `common-tangent`; no solver change)
@@ -13812,6 +13825,30 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2553-unnamed-common-tangent.test.ts` (the three saved fixtures, nine external and three internal spellings at six seeds with the side checked from the figure, the repeat, the letters beside the student's, the line-named form and its «בהתאמה» twin, five touch-noun spellings at six seeds, two refusals, controls, the fold's own reach); `src/__tests__/issue-2553-tangent-side.test.ts` (2-D: six definition spellings, the side checked from the drawn figure); fixtures `exam-2553-q6-external-tangent`, `exam-2553-q6-same-side`, `exam-2553-q6-touch-points` (`.analytic.json`); parity rows `unnamed-common-tangent-2553`, `unnamed-common-tangent-named-circles-2553`, `tangent-same-side-2553`, `tangent-opposite-sides-2553` (X8), `line-named-common-tangent-2553`, `touch-point-noun-2553` (X4, analytic only).
 
 **Behaviour change for a student:** in analytic, «משיק חיצוני משותף לשני המעגלים», «משיק משותף חיצוני למעגלים O_1 ו-O_2» and «הישר l משיק משותף חיצוני לשני המעגלים» draw the tangent (A, B, or named l) instead of going to the AI; in both builders «משיק משותף ששני המעגלים נמצאים באותו צד שלו» draws the external tangent; in analytic «P נקודת ההשקה של l2 עם מעגל O_1» names that touch point.
+
+## ADR-AG-338 — The + at the figure's only circle names its centre, however the circle was stated (#2554)
+
+**Status:** accepted · 2026-10-27 · bug (P2), fix round #2561 (stream E) · branch `fix/2554-lone-circle-centre-offer` · plan items 1 and 3 only; item 2 (a pair's centres) stays unbuilt. LADDER stage: none (the canvas offer list).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R130 amendment "the + at the figure's only circle names its centre" · **Design:** [04c](04c-design-analytic.md) § "The circle the figure has" (the `centresOf` paragraph).
+
+**Rulings.** [asked] #1598, the operator, 2026-10-02: *"press on the center of a circle to create a letter"*. D8 = B on #2552 (2026-10-26): «המעגל הראשון / השני» is read only in the exam's two sentences, so no sentence names one circle of a pair. [ADR-AG-048](#adr-ag-048) (two surfaces, one grammar), [ADR-AG-054](#adr-ag-054) (a ring whose click fails is worse than no ring).
+
+**Measured at pickup** (main d9494206, `derive` → `offersOf`, every catalog entry with its `needs`): a + with no offer and no letter at the centre for `circle-new` («מעגל», «נתון מעגל», «מעגל ברדיוס 5», «מעגל בקוטר 10», «משיק למעגל», …), `circle-diam` («נתון מעגל שקוטרו BD», «BD קוטר במעגל», «קוטר»), the quadrilateral incircle `circle-in-ABCD`, and every sentence-drawn pair `circle-pair1-1/2`. Typing «O מרכז המעגל» named each lone centre.
+
+**Root cause.** `centresOf` (`src-analytic/engine/crossings.ts`) offered the contextual «X מרכז המעגל» only when the lone circle's id began `circle-thru-`. The sentence itself binds to the figure's one circle whatever its kind (`centre-of` → `centreRuleOf`), so the gate was narrower than the grammar, and every other lone circle drew a + it could not act on.
+
+**Decision.** After the equation, the lone-`circle-thru` contextual and the ring forms, `centresOf` offers «X מרכז המעגל» for any lone stated circle with no numeral and no equation. The new branch sits after the existing ones, so every circle that had an offer keeps the same sentence. Pairs keep offering nothing (D8 = B); their centres are named by typing «O_1 מרכז מעגל» in order.
+
+**Class guard (item 3).** `issue-2554-lone-circle-centre.test.ts` walks every catalog entry (with its `needs`) and asserts that each stated circle with a centre either has a letter there or offers its +, and that every offer's sentence records through `decideSubmit` and names a point AT that centre. One declared exception: `circle-pair<k>-1/2`, citing D8 = B. One known-gap row, found by the guard and filed as #2566 (P2): «נתון מעגל שמשוואתו (x-13)^2+y^2=R^2» offers its equation sentence, which the typed path refuses (`conflicting-restatement`). The row asserts the gap is still open, so it must be removed when #2566 lands.
+
+**Measured after:** «מעגל ברדיוס 5», «מעגל», «מעגל בקוטר 10», a diameter's circle and a quadrilateral's incircle each offer one centre; the popover's letter records «O מרכז המעגל», O sits at the centre, and one undo removes it. «שני מעגלים» and «שני מעגלים זרים» offer nothing.
+
+**2-D and 3-D.** Not ported: the change is inside analytic's centre offer list (`centresOf`, #1598); no input sentence changes, so no parity row moves.
+
+**Locks.** `src-analytic/__tests__/issue-2554-lone-circle-centre.test.ts` (the five lone kinds through the real popover ops, store and `decideSubmit`; the pair rows; the catalog-wide class guard).
+
+**Behaviour change for a student:** in analytic, clicking the + at the centre of the figure's only circle now opens the letter popover for a free circle, a circle on a diameter and a quadrilateral's incircle (it did nothing). A pair's centres still do nothing.
 
 ## ADR-AG-336 — The exam's two pair sentences: «שני מעגלים שרדיוס כל אחד מהם r», and «מרכז המעגל הראשון / השני הוא X(a,b)» (#2552)
 
