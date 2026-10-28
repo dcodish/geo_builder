@@ -1338,7 +1338,14 @@ export const EMPTY_CONSTRUCTION: Construction = {
 };
 
 export const pointsOf = (c: Construction): PointObject[] => c.objects.filter(isPoint);
-export const positionalOf = (c: Construction) => c.objects.filter(isPositional);
+/**
+ * THE FIGURE'S POINTS, as every student surface lists them (the data panel, the rename's letters) — every positional
+ * object except a HELPER (#2583, ADR-AG-345): a perpendicular bisector's unnamed midpoint is placed for its line and is
+ * no point of the figure, so it is never listed, exactly as `evaluate` leaves it out of `figure.points`. M1's references
+ * read `isPositional` (the line through it must find it); a surface reads this.
+ */
+export const positionalOf = (c: Construction) =>
+  c.objects.filter((o): o is Extract<GeoObject, { kind: 'point' | 'derived' | 'free' }> => isPositional(o) && !(o.kind === 'derived' && o.helper));
 export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isCurve);
 export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
   c.objects.find((o) => o.id === id);

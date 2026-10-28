@@ -555,7 +555,8 @@ foot is derived (`toolFootFacts`, `engine/cevian.ts`), named after the fact thro
 **A helper point** ([ADR-AG-345](06c-decisions-analytic.md#adr-ag-345), #2583). A role in `HELPER_ROLES` (`bisector-mid`, the
 perpendicular bisector's midpoint: no end of the drawn line) resolves to `helperId(key)` (`~mid:E,K`), never a letter,
 and is not minted. M1 marks the derived object `helper`; `evaluate` places it (`placed`) but leaves it out of
-`figure.points`, so nothing downstream draws, labels, crosses or lists it. The first LETTERED derivation of the same
+`figure.points`, and `positionalOf` (the enumerator every student list reads: the panel, the rename) leaves it out of
+the construction's points, so nothing downstream draws, labels, crosses or lists it; M1 reads `isPositional`. The first LETTERED derivation of the same
 point (`sameDerivation`) renames it at M1's one-position-one-name check (`replaceId`), and `resolveToolLetters` re-points
 the helper's later placeholders to that letter.
 
