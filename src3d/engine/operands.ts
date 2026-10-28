@@ -913,8 +913,11 @@ export function componentValue(
   target: ComponentTarget,
   axis: 'x' | 'y' | 'z',
   at: (id: Id) => Vec3 | undefined,
+  /** #1188 (ADR-3D-386): the configuration's FREE-vector values — a free vector has no endpoints to read */
+  freeVectors?: ReadonlyMap<string, Vec3>,
 ): number | undefined {
   if (target.kind === 'point') return at(target.id)?.[axis];
+  if (target.kind === 'vector' && c.freeVectors.has(target.name)) return freeVectors?.get(target.name)?.[axis];
   const seg = target.kind === 'pair' ? { from: target.a, to: target.b } : c.vectors.get(target.name);
   if (!seg) return undefined;
   const from = at(seg.from);
@@ -922,10 +925,18 @@ export function componentValue(
   return from && to ? to[axis] - from[axis] : undefined;
 }
 
+/**
+ * #1188 (ADR-3D-386) — the component signs a PLACEMENT must honour: every one except a sign on a FREE vector's
+ * component, which no placement can move — the free-vector pass samples that component inside its stated sign.
+ * Read by every positional sign reader (the pivot's filter and conditions), so the pivot never sees a free vector.
+ */
+export const positionalComponentSigns3 = (c: Construction3): Construction3['componentSigns'] =>
+  c.componentSigns.filter((g) => !(g.target.kind === 'vector' && c.freeVectors.has(g.target.name)));
+
 /** #814 — do the stated component signs hold under a given placement? Shared by the pivot's solution
  *  filter and the drive's rollback check, so one statement cannot be enforced in one and not the other. */
 export const componentSignsHold = (c: Construction3, at: (id: Id) => Vec3 | undefined): boolean =>
-  c.componentSigns.every((g) => {
+  positionalComponentSigns3(c).every((g) => {
     const v = componentValue(c, g.target, g.axis, at);
     return v === undefined ? false : g.positive ? v > 1e-9 : v < -1e-9;
   });

@@ -825,6 +825,17 @@ function deriveCore3(
         lineIds.push(m.id);
         st = dryRunOn(probe, f);
       }
+      // #1188 (ADR-3D-386): a NAME CLASH found here is order-dependent — this dry run reads the whole fold, so a LATER
+      // row («וקטור u») may own the name this earlier row («נסמן: AB = u») introduces. Only the in-order refold below
+      // may judge it: the row keeps its created points as a candidate and the refold decides (and drops them if the
+      // clash is real in list order). Every other post-mint reason is the row's own and is final here, as before.
+      if (st !== null && typeof st === 'object' && st.code === 'already-defined' && (ids.length > 0 || lineIds.length > 0)) {
+        mintedBy[f.id] = ids;
+        if (lineIds.length) linesBy[f.id] = lineIds;
+        failedAfterMint[f.id] = restatedAgainst(f, st);
+        status[f.id] = failedAfterMint[f.id];
+        continue;
+      }
       if (st !== null) {
         status[f.id] = restatedAgainst(f, st); // the post-mint reason; nothing minted is kept
         failedAfterMint[f.id] = status[f.id];
@@ -1460,7 +1471,7 @@ function deriveCore3(
             ? resolved.param.value
             : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
                resolved.ratioSymbols?.[cmd.sym] ??
-               (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id)) : undefined));
+               (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id), resolved.freeVectors) : undefined)); // #1188: a free vector's component
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
           break;
@@ -1571,7 +1582,8 @@ function deriveCore3(
           status[f.id] = { code: 'no-solution', id: cmd.id };
           break;
         }
-      } else if (cmd.type === 'inject-vector' || (cmd.type === 'point3' && c.pins.some((p) => p.id === cmd.id))) {
+      } else if ((cmd.type === 'inject-vector' && c.vectors.has(cmd.name)) || (cmd.type === 'point3' && c.pins.some((p) => p.id === cmd.id))) {
+        // #1188: a tuple on a FREE vector never touches the pivot (ADR-3D-386), so a pivot failure is never its fault
         // an injection with NO satisfying placement — the pivot found nothing (honest refusal)
         if (resolved.pivot && resolved.pivot.solutions === 0) {
           status[f.id] = { code: 'injection-unsatisfiable' };
@@ -1656,6 +1668,18 @@ function deriveCore3(
     const other = facts.find((g) => g.id !== f.id && g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => declares(k, ring, against)));
     status[f.id] = { ...st, sentence: f.utterance, ...(other ? { other: other.utterance } : {}) };
   }
+  // #1188 (ADR-3D-386): the free-vector refusals name the student's line, never internal state. A component restated
+  // with another number is the existing conflict sentence, naming this line and the earlier tuples on that vector
+  // (apply knows vectors, not lines — the #2061 precedent above).
+  facts.forEach((f, i) => {
+    const st = status[f.id];
+    if (typeof st !== 'object') return;
+    if (st.code === 'free-vector-metric' || st.code === 'free-vector-combination') status[f.id] = { ...st, sentence: f.utterance };
+    else if (st.code === 'free-vector-conflict') {
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => k.type === 'inject-vector' && k.name === st.id));
+      status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: by.map((g) => g.utterance) };
+    }
+  });
 
   // #850: the notice lane's numeric gate needs sampled configurations. `resolved` is the one this
   // derive already computed — no extra solve on the hot path; the branch guard inside reads the

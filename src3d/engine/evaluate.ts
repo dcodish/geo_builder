@@ -486,6 +486,52 @@ export interface Resolved3 {
    *  failing is a contradiction among the givens, never an unfixed placement — even while the unstated
    *  translation is still sampled. Same derivation as `placementSampled` (its disjunction). */
   placementSampledParts: { translation: boolean; rotation: boolean };
+  /** #1188 (ADR-3D-386) — every FREE vector's value at this configuration: its stated components verbatim, its
+   *  unstated ones sampled (`resolveFreeVectors3`). Values, never positions — nothing positional reads this. */
+  freeVectors: ReadonlyMap<string, Vec3>;
+}
+
+/** #1188 (ADR-3D-386): the range an unstated free-vector component is sampled in, ±FREE_VEC_RANGE. */
+export const FREE_VEC_RANGE = 1.2;
+/** #1188: the NORM FLOOR — a free vector is never drawn shorter than this fraction of the range (never a dot). */
+export const FREE_VEC_FLOOR = 0.3;
+const FREE_VEC_REDRAWS = 8;
+
+/**
+ * #1188 (ADR-3D-386) — THE FREE-VECTOR PASS: each free vector's value at `seed`.
+ *
+ * A pure post-pivot stage of `resolve3` that reads NOTHING positional (no point, no plane, no pivot output), so every
+ * figure without a free vector resolves bit-identically. A stated component is kept verbatim; an unstated one is a
+ * free DOF (ADR-052), sampled from the STRUCTURAL key `fvec-<name>-<axis>` — adding a fact never reshuffles an
+ * earlier vector's sample — inside the half-range a stated sign («a חיובי» on a named component) allows. The norm
+ * floor: a draw shorter than `FREE_VEC_FLOOR × FREE_VEC_RANGE` re-draws its sampled components from the next key
+ * (`fvec-<name>-<axis>#k`), so the floating arrow is never a dot; a vector the student STATED short stays as stated.
+ */
+export function resolveFreeVectors3(c: Construction3, seed: number): Map<string, Vec3> {
+  const out = new Map<string, Vec3>();
+  const axes = ['x', 'y', 'z'] as const;
+  for (const [name, fv] of c.freeVectors) {
+    const sign = (ax: 'x' | 'y' | 'z'): number | undefined => {
+      const g = c.componentSigns.find((s) => s.target.kind === 'vector' && s.target.name === name && s.axis === ax);
+      return g ? (g.positive ? 1 : -1) : undefined;
+    };
+    const draw = (k: number): Vec3 => {
+      const [x, y, z] = axes.map((ax, i) => {
+        const stated = fv.comps[i];
+        if (stated !== null) return stated;
+        const key = `fvec-${name}-${ax}${k === 0 ? '' : `#${k}`}`;
+        const sg = sign(ax);
+        return sg === undefined ? sample(seed, key, -FREE_VEC_RANGE, FREE_VEC_RANGE) : sg * sample(seed, key, 0.15, 1) * FREE_VEC_RANGE;
+      });
+      return v3(x, y, z);
+    };
+    let v = draw(0);
+    if (fv.comps.some((x) => x === null)) {
+      for (let k = 1; k <= FREE_VEC_REDRAWS && norm3(v) < FREE_VEC_FLOOR * FREE_VEC_RANGE; k++) v = draw(k);
+    }
+    out.set(name, v);
+  }
+  return out;
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -1032,6 +1078,13 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
  * corner's construction already satisfies (a quad-shape's one-unknown arm) consumes nothing.
  */
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
+  // #1188 (ADR-3D-386): a free vector's unstated components are sampled DOF (the pass's own source: `comps` null)
+  let freeVecDof = 0;
+  for (const fv of c.freeVectors.values()) freeVecDof += fv.comps.filter((x) => x === null).length;
+  return freeVecDof + figureFreeDofCount3(c, resolved);
+}
+
+function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
   let dims = 0;
   c.solids.forEach((_solid, i) => {
     dims += solidDimsAt(c, i, 0).length; // #1855: a further solid's own similarity is free too
@@ -2947,6 +3000,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     ratioSymbols: Object.fromEntries(ratioSymbols),
     coordDetermined,
     seed,
+    freeVectors: resolveFreeVectors3(c, seed), // #1188 (ADR-3D-386): the post-pivot free-vector pass
   };
 }
 

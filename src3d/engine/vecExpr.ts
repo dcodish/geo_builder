@@ -9,7 +9,7 @@
  */
 
 import { cross3, dot3, sub3, v3, type Vec3 } from './vec3';
-import type { Construction3, Id, Positions3, VecAtom, VecExpr } from './types';
+import type { Construction3, FreeVec3, Id, Positions3, VecAtom, VecExpr } from './types';
 
 /** The world vector an atom denotes at these positions, or null if unresolvable. */
 export function atomVec(atom: VecAtom, c: Construction3, pos: Positions3): Vec3 | null {
@@ -62,4 +62,52 @@ export function exprPointIds(expr: VecExpr): Id[] {
 /** All declared-vector names an expression references. */
 export function exprVectorNames(expr: VecExpr): string[] {
   return expr.flatMap((t) => (t.atom.kind === 'named' ? [t.atom.name] : []));
+}
+
+/**
+ * #1188 (ADR-3D-386) — WHAT IS THE VECTOR NAMED `name`? Asked here, and only here, by every VALUE reader.
+ *
+ * A name lives in one of two sibling stores: `c.vectors` (anchored — a point pair, «נסמן: AB = u») or
+ * `c.freeVectors` (free — components and no position, «וקטור u»). Position readers (the renderer's shafts, the
+ * pivot's pair residuals, right-angle marks, segment carriers) keep reading `c.vectors`, because a free vector has
+ * no position for them to read; a reader that wants the VALUE asks here, so a free vector cannot fall through a
+ * `c.vectors.has` check into "unknown". The direct reads that remain are counted by the ratchet in
+ * `issue-1188-free-vector.test.ts`, which may only go down.
+ */
+export function namedVector3(
+  c: Pick<Construction3, 'vectors' | 'freeVectors'>,
+  name: string,
+): { kind: 'anchored'; from: Id; to: Id } | { kind: 'free'; def: FreeVec3 } | undefined {
+  const pair = c.vectors.get(name);
+  if (pair) return { kind: 'anchored', from: pair.from, to: pair.to };
+  const def = c.freeVectors.get(name);
+  return def ? { kind: 'free', def } : undefined;
+}
+
+/** #1188: is `name` a FREE vector (no position)? */
+export const isFreeVector3 = (c: Pick<Construction3, 'freeVectors'>, name: string): boolean => c.freeVectors.has(name);
+
+/** #1188: every declared vector name — anchored first, then free, each in declaration order. */
+export const vectorNames3 = (c: Pick<Construction3, 'vectors' | 'freeVectors'>): string[] => [...c.vectors.keys(), ...c.freeVectors.keys()];
+
+/**
+ * #1188 (ADR-3D-386) — the VALUE an atom denotes in one configuration: a pair's or an anchored name's tail→head,
+ * or a free vector's components at this seed (`Resolved3.freeVectors`). Undefined when unresolvable.
+ */
+export function vectorValue3(
+  c: Pick<Construction3, 'vectors' | 'freeVectors'>,
+  at: { positions: Positions3; freeVectors: ReadonlyMap<string, Vec3> },
+  atom: VecAtom,
+): Vec3 | undefined {
+  if (atom.kind === 'named') {
+    const nv = namedVector3(c, atom.name);
+    if (!nv) return undefined;
+    if (nv.kind === 'free') return at.freeVectors.get(atom.name);
+    const a = at.positions.get(nv.from);
+    const b = at.positions.get(nv.to);
+    return a && b ? sub3(b, a) : undefined;
+  }
+  const a = at.positions.get(atom.from);
+  const b = at.positions.get(atom.to);
+  return a && b ? sub3(b, a) : undefined;
 }

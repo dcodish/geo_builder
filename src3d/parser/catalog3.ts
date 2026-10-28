@@ -379,4 +379,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // Appended LAST so every earlier entry keeps its index (the #1394 parity golden is keyed by it).
   { category: 'points', he: 'שיעור ה-x של B הוא 3', en: 'the x-coordinate of B is 3' },
   { category: 'points', he: 'x_B = 3', en: 'x_B = 3' },
+  // #1188 (ADR-3D-386): a FREE vector — no position, drawn floating («נתון: v = (…)» above declares one too). Appended
+  // at the END so every earlier entry keeps its index (the #1394 golden keys catalog rows by index)
+  { category: 'vectors', he: 'וקטור u', en: 'vector u' },
+  { category: 'vectors', he: 'הווקטורים u, v ו-w', en: 'vectors u, v and w' },
 ];

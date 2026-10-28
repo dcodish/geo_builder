@@ -20,7 +20,7 @@ import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
-import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
+import { componentValue, distanceBetween, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
@@ -2142,7 +2142,7 @@ export function solvePivot(
   // #820: a rider lane keeps the full pool for the same reason an open pin symbol does (#797) — two
   // admissible `t` are two configurations, and a pool that carries one of them hides the other from
   // every honesty gate downstream.
-  const collectAll = c.signGivens.length > 0 || c.componentSigns.length > 0 || nPinSym > 0 || nRider > 0;
+  const collectAll = c.signGivens.length > 0 || positionalComponentSigns3(c).length > 0 || nPinSym > 0 || nRider > 0;
   // #818: the stated SIGNS, as conditions over a candidate — a coordinate sign given on a point and a
   // sign on a named free component (#814) are one kind here, exactly as `applySolutions`' filter treats
   // them. A `partial` point is absolute and sign-honoured at sample time (ADR-3D-094): not a condition.
@@ -2150,7 +2150,7 @@ export function solvePivot(
     ...c.signGivens
       .filter((g) => c.points.get(g.id)?.kind !== 'partial')
       .map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => at(g.id)?.[g.axis] })),
-    ...c.componentSigns.map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
+    ...positionalComponentSigns3(c).map((g) => ({ positive: g.positive, value: (at: (id: Id) => Vec3 | undefined) => componentValue(c, g.target, g.axis, at) })),
   ];
   /** A candidate's FINAL positions (gauge applied to gauge points; absolute points verbatim). */
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {

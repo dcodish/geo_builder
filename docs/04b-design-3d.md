@@ -464,6 +464,54 @@ the solid's height, a height to a named base face, a tetrahedron's altitude; #97
 #2489): an `unknown-line` for a name in `lineSlotNames3` is minted by applying `free-line` (its refusal is the line's), and
 is placed by `premint` like a point; lines are never in `created` (no notice). `withFreeLines` is gone. The bare-segment apply branch declares
 both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` → `App3`'s `CreatedNotice`; ✕ is `remove`.
+**A name clash found by the pass is not final** ([ADR-3D-387](06b-decisions-3d.md#adr-3d-387), #1188): the dry run reads
+the WHOLE fold, so a later row may already own the name an earlier row introduces («נסמן: AB = u» · «וקטור u» on a
+blank page). A post-mint `already-defined` therefore keeps the row's created points as a `premint` candidate and lets
+the in-order refold judge; a clash that is real in list order is dropped by the refold exactly as any failing row is.
+
+### Free vectors ([ADR-3D-386](06b-decisions-3d.md#adr-3d-386), #1188)
+
+A **free vector** has components and no position. It lives in a sibling store, `Construction3.freeVectors`
+(`name → FreeVec3 { comps, stated? }`), never in `vectors` (anchored: a point pair), and never in `points`,
+`segments`, `arrows` or `positions`. A name lives in exactly one store; `declare-vector`, `inject-vector`,
+`name-vector` and `free-line` refuse `already-defined` across them (`vectorNameTaken3` also asks lines, planes and
+`symbolOwnersOf`). **The accessor:** `namedVector3(c, n)` (anchored | free | undefined) and `vectorValue3(c, at, atom)`
+in `vecExpr.ts` are how a VALUE reader asks; position readers keep reading `c.vectors`, because a free vector has
+nothing for them to read. The remaining direct `c.vectors.has/get` reads are counted by a ratchet
+(`issue-1188-free-vector.test.ts`) that may only go down.
+
+- **Apply.** `declare-vector` (parsed from a vector-MARKED bare name list, or the plural noun «וקטורים») is idempotent
+  on a free name. `inject-vector` on a name that is not anchored is the M1 duality (`injectFreeVector3`): an unknown
+  name is declared with the tuple; a free one has each component SET (was free) or VERIFIED (equal: redundant;
+  different: `free-vector-conflict`, which `derive3` reports as `givens-contradict` naming both lines). A bare letter
+  names a free component through #814's `partialNames`; an affine component is a linear relation (step 2). On an
+  anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names,
+  use)`: every command that names a vector states its use — `'metric'` (magnitude, angle, ⟂, ∥, dot: refused
+  `free-vector-metric` on a free name until step 4) or `'combination'` (a vector equation, a vec-rel, a span point:
+  `free-vector-combination` until step 2). A free name is checked before an unknown one, so «w = u + v» is the honest
+  "not yet", never `unknown-vector` about w.
+- **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
+  reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
+  unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a
+  stated component sign allows), and a draw under `FREE_VEC_FLOOR × FREE_VEC_RANGE` re-draws its sampled components
+  from `…#k` (the norm floor: never a dot). A sign on a free component is honoured here, so the pivot's sign readers
+  ask `positionalComponentSigns3` and never see it. `freeDofCount3` adds the unstated components.
+- **Need-basis (Q5).** `point-in-span` counts `c.vectors` only — a floating p beside the cube's u, v, w must not turn a
+  buildable span point into `need-basis`.
+- **Panel and ask.** `statedVectorRows` prints a stated tuple as typed and a never-stated free vector as
+  `u = (?, ?, ?)`; the measures rows carry `u = (1, 2, 3)`, `|u|`, `u²` only when the value agrees across
+  `knowledgeSamples3`. A free vector's value is absolute, so no frame or scale gate applies to it. The ask lane's
+  `atomOf` admits a free name; «u» answers its components when seed-invariant, and a quantity read off free vectors
+  alone (`|u|`, `u·v`, `∠(u,v)`) skips the scale gate.
+- **Render** (display, never geometry: the angle-mark ADR-3D-043 / draw-arrow ADR-3D-039 precedents).
+  `render/freeVectorLayout.ts` places each free vector's world tail, every build, from the figure as drawn: the
+  TRAY, declaration order, one band per vector stacked up world z (the screen's vertical at every yaw), set past
+  the figure's +x bounding box by a gap scaled to the longest vector; on an empty canvas centred on the origin.
+  `buildScene3` adds the tails and heads to the fit and emits a `SceneVector3` with `free: index`; `Figure3` inks it
+  from `FREE_VECTOR_COLORS` (distinct from `VECTOR_COLOR` and the plane patches). No point exists, so no dot and no
+  letter is drawn.
+- **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
+  free vectors from the lines that stated them.
 
 ## Solving the figure and judging claims
 
