@@ -30,7 +30,7 @@ import { RING_OF_FIGURE } from '../engine/names';
 import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
-import { declinedPart, unreadPart, type LostPart } from './lostPart';
+import { declinedPart, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import type { SentenceOutcome } from '../../shell/sentences';
 
@@ -346,12 +346,15 @@ function decideOnce(
      * read; a rest of labels it already carries, with no word that says anything, is the part that was not.
      */
     if (parsed.code === 'not-handled') {
-      const lost = declinedPart(line, (piece, before) => {
+      const records = (piece: string, before: readonly string[]): boolean => {
         // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
         const held = before.length ? [...lines, ...before] : lines;
         const k = decideOnce(piece, held, seed, before.length ? derive(held, seed) : current).kind;
         return k === 'record' || k === 'already-known' || k === 'already-follows';
-      });
+      };
+      // #2547 (ADR-AG-334) — arm 3, after arm 2 so a co-reference it refuses keeps its parts: a through-clause on a
+      // segment whose point carries no fresh letter («AB מיתר העובר דרך מרכז המעגל») is refused whole, as 2-D refuses it.
+      const lost = declinedPart(line, records) ?? declinedThrough(line, records);
       if (lost) return lostPartRefusal(line, lost);
     }
     // #1175 — a refusal that carries WHO is already there must not lose them on the way to the UI.

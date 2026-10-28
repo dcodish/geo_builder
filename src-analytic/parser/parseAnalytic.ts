@@ -294,13 +294,20 @@ const claimable = (tail: string): boolean => {
 const HE_GIVEN = '(?:נתו(?:ן|נה|נים|נות)\\s+)?';
 /** «הנקודה» / «נקודה» / «הנקודות» / «נקודות», optional — the subject noun. */
 /**
+ * The point NOUNS themselves, bare (no boundary, no trailing space): «הנקודה» / «נקודות» / «קדקוד», and the English
+ * "(the) point(s)". Exported for the lost part's arm 3 (#2547, ADR-AG-334): «דרך הנקודה C» names C, so a noun right
+ * before a label is the label's optional subject noun, never a role. `HE_POINT` composes the Hebrew half.
+ */
+export const POINT_NOUN_HE_ATOM = '(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד))';
+export const POINT_NOUN_EN_ATOM = '(?:(?:the\\s+)?points?)';
+/**
  * The optional subject noun before a point's name.
  *
  * `קדקוד` is the EXAM's own word for a vertex (#1127), and it belongs here rather than inline at
  * any call site: this tree's stated rule is that a noun gate re-spelled inline drifts, and it has paid
  * for that three times. One alternation, and every construct that admits a point gains the spelling.
  */
-const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד)\\s+)?';
+const HE_POINT = `(?:${POINT_NOUN_HE_ATOM}\\s+)?`;
 /** «הישר» / «ישר». */
 /**
  * The line NOUNS — «הישר AC», and «האלכסון AC», which is the same object (#1070).

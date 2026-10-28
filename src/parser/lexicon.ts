@@ -316,14 +316,18 @@ export const CEVIAN_NOUNS_EN = String.raw`altitude|height|median|bisect\w*`;
  * The VERB forms are the narrower atom: a bare «דרך» / "through" is also a fronted locative a rule may tolerate
  * («דרך הנקודה C העבירו משיק»), so only the verb opener is ever deleted alone. The `_HE` / `_EN` atoms are bare
  * alternations; `THROUGH_OPEN` / `THROUGH_VERB` carry the boundaries.
+ *
+ * #2547 ([ADR-W-161](../../docs/06w-decisions-workspace.md#adr-w-161)): the atoms live in `shell/incidencePhrase.ts`,
+ * one spelling of "through" for every builder (analytic's arm 3 of the lost part reads them too); re-exported here.
  */
-export const THROUGH_VERB_HE = String.raw`[ושה]{0,2}עוב(?:ר|רת|רים|רות)\s+(?:דרך|ב-?(?=\S))`;
-export const THROUGH_OPEN_HE = String.raw`${THROUGH_VERB_HE}|דרך|במרכז`;
-export const THROUGH_VERB_EN = String.raw`(?:(?:that|which)\s+)?(?:pass(?:es|ing)?|go(?:es|ing)?|runs?|running)\s+through`;
-export const THROUGH_OPEN_EN = String.raw`(?:(?:that|which)\s+)?(?:(?:pass(?:es|ing)?|go(?:es|ing)?|runs?|running)\s+)?through`;
-/** The openers with their boundaries, both locales: no Hebrew letter before a Hebrew opener, no Latin letter around an English one. */
-export const THROUGH_OPEN = String.raw`(?:(?<![א-ת])(?:${THROUGH_OPEN_HE})|${EN_START}(?:${THROUGH_OPEN_EN})${EN_END})`;
-export const THROUGH_VERB = String.raw`(?:(?<![א-ת])(?:${THROUGH_VERB_HE})|${EN_START}(?:${THROUGH_VERB_EN})${EN_END})`;
+export {
+  THROUGH_VERB_HE,
+  THROUGH_OPEN_HE,
+  THROUGH_VERB_EN,
+  THROUGH_OPEN_EN,
+  THROUGH_OPEN,
+  THROUGH_VERB,
+} from '../../shell/incidencePhrase';
 
 /** The Hebrew copula between a subject and its predicate noun — «AM הוא חוצה זווית», «ABC היא …» (#1685/#1999,
  *  [ADR-666](../../docs/06-decisions.md#adr-666)). One atom: `frame.ts` and the cevian subject read it. Bare alternation. */
