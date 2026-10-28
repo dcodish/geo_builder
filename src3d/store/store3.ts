@@ -51,7 +51,7 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolOwnersOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -677,7 +677,16 @@ function deriveCore3(
    * there — the first enabled fact before it whose commands mark that angle with that letter and coefficient. The
    * engine stays free of utterances; the coefficient conflict is reported in 3-D's existing conflict sentence.
    */
+  /** #2581 (ADR-3D-385): `letter|meaning` → the utterance of the first green fact after which the letter had it. */
+  const meaningOrigin = new Map<string, string>();
   const restatedAgainst = (f: Fact3, st: FactStatus3): FactStatus3 => {
+    // #2581 / #2580 (ADR-3D-385): a letter refused a second meaning names the LINE that gave it its first — the first
+    // enabled, green fact after which the letter had that meaning (read off the fold's own record, so every spelling
+    // of the first meaning — a bare naming, «נסמן», a coordinate, an equation — is found the same way)
+    if (st !== 'ok' && typeof st === 'object' && st.code === 'letter-meaning-taken') {
+      const by = meaningOrigin.get(`${st.letter}|${st.had}`);
+      return by !== undefined && by !== f.utterance ? { ...st, line: by } : st;
+    }
     if (st === 'ok' || typeof st !== 'object' || (st.code !== 'angle-name-taken' && st.code !== 'angle-coef-conflict')) return st;
     const w = st.was;
     const marks = (g: Fact3) =>
@@ -692,6 +701,9 @@ function deriveCore3(
       continue;
     }
     status[f.id] = restatedAgainst(f, applyFact(f));
+    if (status[f.id] === 'ok') {
+      for (const [sym, ms] of letterMeanings3(c)) for (const m of ms) if (!meaningOrigin.has(`${sym}|${m.kind}`)) meaningOrigin.set(`${sym}|${m.kind}`, f.utterance);
+    }
   }
   // #926 (ADR-3D-220, ADR-W-044): a statement addressed to a LETTER — «α = 70», «p חיובי» — whose
   // definition sits LATER in the list is retried once the fold is complete. The list reaches that shape
@@ -1934,14 +1946,6 @@ function readStatement3(
       const flat = flatHeightReading3(derive3(st.facts, st.seed).construction, sentinel);
       if (flat.flat && (!flat.reading || parsed.commands.length !== 1 || !isBareAltitude3(utterance)))
         return { ok: false, error: { code: 'not-understood' } };
-    }
-    // #2092 (ADR-3D-381): «|AB| = k» reads k as a LENGTH letter only while the figure gives k no other meaning. A letter
-    // already a parameter, a coordinate's symbol, an angle's name or a vector ratio («C(k,1,0)» first) is out of the
-    // ruled scope and keeps the verdict it had before the length letter existed — not read.
-    const marks = parsed.commands.filter((k) => k.type === 'length-mark');
-    if (marks.length > 0) {
-      const c = derive3(st.facts, st.seed).construction;
-      if (marks.some((k) => symbolOwnersOf(c, k.label).some((o) => o.kind !== 'length'))) return { ok: false, error: { code: 'not-understood' } };
     }
     return { ok: true, commands: parsed.commands, unread: parsed.unread ?? [], ...(readAs ? { readAs } : {}) };
   }

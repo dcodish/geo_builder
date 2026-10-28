@@ -120,6 +120,15 @@
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
     "angleNameTaken": "Angle {{angle}} already has a name: {{symbol}} (in the line «{{line}}»). An angle has one name — keep using {{symbol}}.",
     "angleNameTakenAlone": "Angle {{angle}} already has a name: {{symbol}}. An angle has one name — keep using {{symbol}}.",
+    "letterTaken": {
+      "inLine": "In the line «{{line}}», ",
+      "vector_length": "{{lead}}{{letter}} was already set as the name of the vector {{of}}, so it cannot also be a length. Write the length with a different letter, for example «|{{want}}| = {{alt}}».",
+      "length_vector": "{{lead}}{{letter}} was already set as the length of the segment {{of}}, so it cannot also name a vector. Pick a different letter for the vector, for example «denote: {{want}} = {{alt}}».",
+      "vector_param": "{{lead}}{{letter}} was already set as the name of the vector {{of}}, so it cannot also be a parameter. Write the parameter with a different letter, for example {{alt}}.",
+      "param_vector": "{{lead}}{{letter}} was already set as a parameter, so it cannot also name a vector. Pick a different letter for the vector, for example «denote: {{want}} = {{alt}}».",
+      "angle_length": "{{lead}}{{letter}} was already set as the name of the angle {{of}}, so it cannot also be a length. Write the length with a different letter, for example «|{{want}}| = {{alt}}».",
+      "length_angle": "{{lead}}{{letter}} was already set as the length of the segment {{of}}, so it cannot also name an angle. Write the angle with a different letter, for example «∠{{want}} = {{alt}}»."
+    },
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",
     "givensContradictAlone": "The givens contradict each other — no figure satisfies «{{stated}}» together with the rest of the givens",
     "ringNotFlat": "A {{kind}} is a flat shape, and the vertices {{vertices}} do not lie in one plane — so «{{stated}}» cannot hold together with {{others}}.",
@@ -344,7 +353,7 @@
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as «plane {{ids}} is perpendicular to line {{line}}».",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
-    "vectorNamedBare": "«{{sentence}}» is read as a vector: {{name}} is the name of the vector {{pair}}. If you meant a length, write «{{taught}}» instead.",
+    "vectorNamedBare": "«{{sentence}}» is read as a vector: {{name}} is the name of the vector {{pair}}. If you meant a length, write «{{taught}}».",
     "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",
     "stated": {
       "shape": "{{a}} is a {{shape}}",

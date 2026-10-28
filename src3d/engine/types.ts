@@ -73,6 +73,15 @@ export interface SymTerm {
 
 export type Claim3 =
   | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number; given?: true } // |a1b1| = c·|a2b2|
+  /**
+   * #2580 / #2582 ([ADR-3D-384](../../docs/06b-decisions-3d.md#adr-3d-384)) — THE LENGTH-LETTER TIE: |ab| = coef·sym,
+   * where `sym` is a length letter («|AB| = k», «|AB| = 2k») that the figure ALSO owns as a number (a coordinate
+   * parameter, an equation's parameter, a vector-definition ratio, a named component, a rider's parameter, a pivot
+   * symbol). Recorded once per (mark, letter) by the outermost apply, whichever of the two lines came first, so the
+   * order, the ✎ edit and file load give one figure. Each number lane DRIVES it where it can (the parameter
+   * root-find, the vec-def symbol solve, the pivot); this claim is the verifier's arbiter in every lane (M1).
+   */
+  | { type: 'length-letter'; a: Id; b: Id; coef: number; sym: string }
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
@@ -190,6 +199,9 @@ export type ScalarPin =
    */
   | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  /** #2580 (ADR-3D-384): |ab| = coef·(the letter's number), where the PIVOT owns that number — a pin symbol, a named
+   *  free component or a rider's parameter. The residual twin of the `length-letter` claim (which stays the arbiter). */
+  | { kind: 'letter-tie'; a: Id; b: Id; coef: number; q: PivotLetter3 }
   // #1447 — a VOLUME/AREA with free dims DRIVES like a length (operator ruling 2026-09-27: a later
   // magnitude may move free shape dims; #754 restricts only the FIRST). The claim stays the arbiter.
   | { kind: 'volume3'; noun: SolidNoun; ids: Id[]; value: number } // נפח הפירמידה ABCD = 12, driving
@@ -1464,6 +1476,8 @@ export interface Construction3 {
     | { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; sym: string }
     | { rel: 'length-rel'; a: Id; b: Id; pair2: [Id, Id]; c: number; sym: string } // |ab| = c·|pair2| pins the symbol
     | { rel: 'value'; value: number; sym: string } // k = ½ — direct assignment, on ANY symbol the figure carries
+    // #2580 (ADR-3D-384): |ab| = coef·k — a length letter tied to the vec-def ratio («AN = k·AC» · «|AB| = k»)
+    | { rel: 'length-sym'; a: Id; b: Id; coef: number; sym: string }
     // ADR-3D-056 (#286): a ⊥/∥ between two SEGMENTS where one endpoint is this symbol-defined point.
     // «EO⊥AS» with E = A+t·AS pins t to the foot of the perpendicular — one root-find, not a dims drive
     // (the ⊥ was being pushed onto the free solid dims, so it held only at lucky seeds). seg(a,b) is the
@@ -1805,11 +1819,64 @@ export type Requirement3 =
   // so a right corner is not a special case the drawing must avoid.
   | { kind: 'quad-general'; base: QuadBase; ids: [Id, Id, Id, Id]; right?: true };
 
+/** #2580 (ADR-3D-384): a number the PIVOT owns, as the tie's residual reads it — a pin symbol's slot, a named free
+ *  component's coordinate, or a rider's parameter read off its host segment (`fromB`: measured from the far end). */
+export type PivotLetter3 =
+  | { kind: 'sym'; sym: string }
+  | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' }
+  | { kind: 'rider'; id: Id; fromB: boolean };
+
+/**
+ * #2581 / #2580 ([ADR-3D-385](../../docs/06b-decisions-3d.md#adr-3d-385)) — WHAT A LETTER MEANS in a figure, by kind.
+ * A NUMBER letter may appear in several statements (each is an equation on one number), but a vector is not a
+ * number, and an angle is not a length, so three pairs are one letter with two meanings and are refused in either
+ * order (operator rulings 2026-10-27 and 2026-10-28): vector × length, vector × parameter, angle × length.
+ * `param` is every coordinate or equation parameter — the figure parameter, a named component, a pivot symbol.
+ * Each meaning carries the object it names, for the sentence.
+ */
+export type LetterMeaning3 = 'vector' | 'length' | 'angle' | 'param';
+export interface LetterMeaningOf3 {
+  kind: LetterMeaning3;
+  /** the object as the sentence names it: the vector's pair «AB», the segment «AB», the angle «BAD'»; none for a parameter */
+  of?: string;
+}
+export const LETTER_MEANING_CLASHES: readonly (readonly [LetterMeaning3, LetterMeaning3])[] = [
+  ['vector', 'length'],
+  ['vector', 'param'],
+  ['angle', 'length'],
+];
+export function letterMeanings3(c: Construction3): Map<string, LetterMeaningOf3[]> {
+  const out = new Map<string, LetterMeaningOf3[]>();
+  const add = (sym: string, m: LetterMeaningOf3) => {
+    const list = out.get(sym) ?? [];
+    if (!list.some((x) => x.kind === m.kind)) list.push(m);
+    out.set(sym, list);
+  };
+  for (const [name, v] of c.vectors) add(name, { kind: 'vector', of: `${v.from}${v.to}` });
+  for (const m of c.lengthMarks) add(m.label, { kind: 'length', of: `${m.a}${m.b}` });
+  for (const m of c.angleMarks) if (m.label) add(m.label, { kind: 'angle', of: `${m.p}${m.vertex}${m.q}` });
+  if (c.param) add(c.param, { kind: 'param' });
+  for (const b of c.partialNames) add(b.sym, { kind: 'param' });
+  for (const s of pinSymsOf(c)) add(s, { kind: 'param' });
+  return out;
+}
+/** #2581 (ADR-3D-385): the first lowercase letter the figure gives no meaning — the example a refusal or note offers,
+ *  so following it never meets the refusal again (never a fixed «a»). */
+export function unusedLetter3(c: Construction3): string {
+  const used = new Set<string>([...figureSymbolsOf(c), ...c.vectors.keys(), ...letterMeanings3(c).keys()]);
+  for (const l of 'abcdefghjmnpqrstuvwxyz') if (!used.has(l)) return l;
+  return 'a';
+}
+
 /** The angle mark a restatement is refused against (#2054/#2061): which angle, and the letter and coefficient it wears. */
 export interface AngleMarkRef3 { vertex: Id; p: Id; q: Id; label: string; coef: number }
 
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
+  /** #2581 / #2580 (ADR-3D-385): this line gives `letter` a second meaning (`now`, on `want`) that cannot share a letter
+   *  with the one it already has (`had`, on `of`). `alt` is a letter the figure does not use; `line` is the statement
+   *  that gave the first meaning (filled by `derive3`). */
+  | { code: 'letter-meaning-taken'; letter: string; had: LetterMeaning3; of?: string; now: LetterMeaning3; want?: string; alt: string; line?: string }
   /** #2054 (ADR-3D-344): a second letter for an angle that already wears one — `angle` as the refused line spells it,
    *  `symbol` the letter it wears (with its coefficient), `line` the statement that put it there (filled by `derive3`). */
   | { code: 'angle-name-taken'; angle: string; symbol: string; line?: string; was: AngleMarkRef3 }

@@ -224,6 +224,16 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return err.line
         ? t('err.angleNameTaken', { angle: err.angle, symbol: err.symbol, line: err.line })
         : t('err.angleNameTakenAlone', { angle: err.angle, symbol: err.symbol });
+    // #2581 / #2580 (ADR-3D-385): one letter, two meanings that cannot share it — the earlier meaning, the line that gave
+    // it (filled by derive3), and a letter the figure does not use (operator rulings 2026-10-27 / 2026-10-28)
+    case 'letter-meaning-taken':
+      return t(`err.letterTaken.${err.had}_${err.now}`, {
+        lead: err.line ? t('err.letterTaken.inLine', { line: err.line }) : '',
+        letter: err.letter,
+        of: err.of ?? '',
+        want: err.want ?? '',
+        alt: err.alt,
+      });
     case 'angle-coef-conflict': // reported as `givens-contradict` by derive3; never reaches the student raw
       return t('err.givensContradictAlone', { stated: `∠${err.was.p}${err.was.vertex}${err.was.q}` });
     case 'givens-contradict':

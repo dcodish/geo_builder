@@ -18,6 +18,15 @@ const others = ['∠ABC = 40°'];
 const ERRORS3: Record<Code3, Payload[]> = {
   'already-defined': [{ id: 'circle-ABCD' }, { id: 'P' }],
   'angle-name-taken': [{ angle: 'ABC', symbol: 'k', line: '∠ABC = 40°', was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 1 } }, { angle: 'ABC', symbol: 'k', was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 1 } }],
+  // #2581 / #2580 (ADR-3D-385): every clash pair, with and without the line that gave the first meaning
+  'letter-meaning-taken': [
+    { letter: 'k', had: 'vector', of: 'AB', now: 'length', want: 'AD', alt: 'a', line: 'AB = k' },
+    { letter: 'k', had: 'length', of: 'AB', now: 'vector', want: 'AD', alt: 'a', line: '|AB| = k' },
+    { letter: 'k', had: 'vector', of: 'AB', now: 'param', alt: 'a', line: 'AB = k' },
+    { letter: 'k', had: 'param', now: 'vector', want: 'AB', alt: 'a', line: 'C(k,1,0)' },
+    { letter: 'k', had: 'angle', of: 'BAC', now: 'length', want: 'AB', alt: 'a', line: '∠BAC = k' },
+    { letter: 'k', had: 'length', of: 'AB', now: 'angle', want: 'BAC', alt: 'a' },
+  ],
   'angle-coef-conflict': [{ was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 2 } }],
   'shape-disjoint': [{ stated: 'trapezoid', actual: 'parallelogram' }],
   'inscribed-contradicts-noun': [

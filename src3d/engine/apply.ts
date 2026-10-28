@@ -13,7 +13,7 @@ import { resolveSolidSubject } from './solidSubject';
 import { baseKind3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
-import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom } from './types';
@@ -745,6 +745,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'polygon-open': // #1849
       return missingPoint(c, claim.ids);
     case 'length-eq':
+    case 'length-letter': // #2580
       return missingPoint(c, [claim.a, claim.b]);
     case 'area-eq':
       return missingPoint(c, claim.ids);
@@ -1327,11 +1328,81 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
   let r: ApplyResult3;
   try {
     r = applyCommand3Inner(c, cmd);
+    // #2580 / #2581 (ADR-3D-384, ADR-3D-385): what the line did to the figure's LETTERS is judged once, here, on the
+    // outermost call — so it holds in either order, on the ✎ edit and on load, never at one submit seam (#2582)
+    if (r.ok && APPLY_DEPTH === 1) r = settleLetters3(c, r.next);
   } finally {
     APPLY_DEPTH -= 1;
   }
   if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
   return r;
+}
+
+/** #2580 (ADR-3D-384): the owner kinds that name a NUMBER a length letter can equal. */
+const NUMBER_OWNERS = new Set<SymbolOwner['kind']>(['param', 'vec-def', 'component', 'rider', 'pin-sym']);
+
+/**
+ * #2580 / #2581 / #2582 ([ADR-3D-384](../../docs/06b-decisions-3d.md#adr-3d-384),
+ * [ADR-3D-385](../../docs/06b-decisions-3d.md#adr-3d-385)) — A LETTER HAS ONE MEANING; A NUMBER LETTER, MANY EQUATIONS.
+ *
+ * 1. A letter given a second meaning that cannot share it with its first — vector × length, vector × parameter,
+ *    angle × length ({@link LETTER_MEANING_CLASHES}) — is refused, whichever came first: the earlier meaning is the
+ *    one in `before`. The sentence names the letter, what it already is, and a letter the figure does not use.
+ * 2. A length letter whose letter the figure also owns as a NUMBER is the equation |ab| = coef·sym: one
+ *    `length-letter` claim per (mark, letter), recorded by whichever line completes the pair. Derived from the
+ *    construction (`lengthMarks` × `symbolOwnersOf`), never from which line was typed first.
+ */
+function settleLetters3(before: Construction3, next: Construction3): ApplyResult3 {
+  const was = letterMeanings3(before);
+  for (const [sym, ms] of letterMeanings3(next)) {
+    for (const [x, y] of LETTER_MEANING_CLASHES) {
+      const mx = ms.find((m) => m.kind === x);
+      const my = ms.find((m) => m.kind === y);
+      if (!mx || !my) continue;
+      const prev = was.get(sym) ?? [];
+      const hadX = prev.some((m) => m.kind === x);
+      const hadY = prev.some((m) => m.kind === y);
+      if (hadX && hadY) continue; // not this line's doing
+      const [had, now] = hadY && !hadX ? [my, mx] : [mx, my];
+      return { ok: false, error: { code: 'letter-meaning-taken', letter: sym, had: had.kind, ...(had.of ? { of: had.of } : {}), now: now.kind, ...(now.of ? { want: now.of } : {}), alt: unusedLetter3(next) } };
+    }
+  }
+  let r: ApplyResult3 = { ok: true, next };
+  for (const mk of next.lengthMarks) {
+    if (!symbolOwnersOf(r.next, mk.label).some((o) => NUMBER_OWNERS.has(o.kind))) continue;
+    const coef = mk.coef ?? 1;
+    const tied = r.next.claims.some((cl) => cl.type === 'length-letter' && cl.sym === mk.label && cl.coef === coef && samePair([cl.a, cl.b], mk.a, mk.b));
+    if (tied) continue;
+    r = applyCommand3(r.next, { type: 'claim', claim: { type: 'length-letter', a: mk.a, b: mk.b, coef, sym: mk.label } });
+    if (!r.ok) return r;
+  }
+  return r;
+}
+
+/**
+ * #2580 (ADR-3D-384) — the tie |ab| = coef·sym, lowered into the lane that owns the number (M1: the claim is recorded in
+ * every case and stays the arbiter):
+ *  - the figure PARAMETER, both ends typed points — derived by the parameter root-find from the claim (`paramPinProbes`);
+ *  - the figure parameter, an end placed by the figure — the post-pivot parameter lane (`paramGivens`, ADR-3D-032);
+ *  - a vec-def RATIO with no pin of its own — the ratio's symbol pin (`length-sym`);
+ *  - a pin symbol, a named component, a rider's parameter — a pivot residual (`letter-tie`).
+ */
+function lowerLengthLetter3(c: Construction3, cl: Extract<Claim3, { type: 'length-letter' }>): Construction3 {
+  const next = clone(c);
+  next.claims.push(cl);
+  const typed = (id: Id) => {
+    const k = c.points.get(id)?.kind;
+    return k === 'coord' || k === 'coord-sym';
+  };
+  for (const o of symbolOwnersOf(c, cl.sym)) {
+    if (o.kind === 'param' && !(typed(cl.a) && typed(cl.b))) next.paramGivens.push(cl);
+    else if (o.kind === 'vec-def' && !next.symbolPins.some((p) => p.sym === cl.sym))
+      next.symbolPins.push({ rel: 'length-sym', a: cl.a, b: cl.b, coef: cl.coef, sym: cl.sym });
+    else if (o.kind === 'pin-sym') next.scalarPins.push({ kind: 'letter-tie', a: cl.a, b: cl.b, coef: cl.coef, q: { kind: 'sym', sym: cl.sym } });
+    else if (o.kind === 'component') next.scalarPins.push({ kind: 'letter-tie', a: cl.a, b: cl.b, coef: cl.coef, q: { kind: 'component', target: o.target, axis: o.axis } });
+    else if (o.kind === 'rider') next.scalarPins.push({ kind: 'letter-tie', a: cl.a, b: cl.b, coef: cl.coef, q: { kind: 'rider', id: o.id, fromB: o.fromB } });
+  }
+  return next;
 }
 
 function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
@@ -1718,7 +1789,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        * length twin of `angle-mark`. The segment wears the letter and its length stays a FREE DOF (ADR-052) until a
        * value lands on the letter (`symbol-value`, through `symbolOwnersOf`). The same letter on another segment is
        * a stated relation |XY| = (coef/coef₀)·|ZW|, lowered to the ordinary `length-rel` so M1 drives or verifies it.
-       * A vector name is another namespace («AB = k» · «|AB| = k» both hold), as an angle letter already is.
+       * A letter the figure owns as a NUMBER is tied to the length (|XY| = coef·k, ADR-3D-384); a vector or an angle letter
+       * is refused (ADR-3D-385). Both are judged once, order-free, by settleLetters3 on the outermost call.
        */
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
@@ -2073,6 +2145,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'claim': {
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
+      if (cmd.claim.type === 'length-letter') return { ok: true, next: lowerLengthLetter3(c, cmd.claim) };
       const next = clone(c);
       // ADR-3D-032: a given referencing a coord-sym point PINS the figure parameter —
       // it must NOT enter the pivot (M rides a provisional sampled k there); it is

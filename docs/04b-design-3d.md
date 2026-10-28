@@ -233,7 +233,14 @@ ratio («SN = k·SC»), a pivot pin symbol (`pinSymsOf`), the algebraic lane's p
 labelled angle, a named free component (`partialNames`, #814, ADR-3D-175), or a named rider parameter
 (`riderNames`, #921), or a **length letter** (`lengthMarks`, «|AB| = k», #2092, ADR-3D-381 — the length twin of the
 angle mark: `label` the binding letter, `coef` the multiplier; a shared letter lowers to `length-rel`, a value to the
-ordinary `length-eq` claim). A statement addressed to a letter («p = 3», «p חיובי») reaches EVERY owner. `figureSymbolsOf`, the
+ordinary `length-eq` claim). A statement addressed to a letter («p = 3», «p חיובי») reaches EVERY owner.
+**One meaning per letter; a number letter, many equations** (#2580/#2581, ADR-3D-384/385). `settleLetters3` (`apply.ts`) runs on
+the outermost apply after every command. It refuses a clash in `LETTER_MEANING_CLASHES` over `letterMeanings3` (vector ×
+length, vector × parameter, angle × length; `letter-meaning-taken`, the first meaning's line filled by `derive3`), and ties
+every length mark whose letter has a NUMBER owner by recording one `length-letter` claim (|ab| = coef·sym), whichever line
+came first. `lowerLengthLetter3` hands the tie to the owner's lane: the parameter root-find (`lengthLetterProbes`, both ends
+typed) or the post-pivot `paramGivens`; the vec-def symbol pin `length-sym`; the pivot residual `letter-tie` for a pin
+symbol, a named component or a rider (`pivotLetterValue3`). The claim is the arbiter in every lane (`letterNumbersAt3`). `figureSymbolsOf`, the
 **display** registry for the panel and the ask lane, is **derived from the address one** (ADR-3D-230); only
 the pricing differs per owner kind, and an undetermined letter reads `?` in every lane.
 
