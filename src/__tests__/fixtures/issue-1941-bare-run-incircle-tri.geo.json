@@ -122,6 +122,51 @@
         "b": "A"
       },
       "enabled": true
+    },
+    {
+      "id": "g1.w0",
+      "utterance": "מעגל חסום ב-ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@f-AB",
+          "B"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w1",
+      "utterance": "מעגל חסום ב-ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "B",
+          "@f-BC",
+          "C"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w2",
+      "utterance": "מעגל חסום ב-ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "C",
+          "@f-CA",
+          "A"
+        ],
+        "structural": true
+      },
+      "enabled": true
     }
   ]
 }

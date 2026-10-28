@@ -144,6 +144,51 @@
       "enabled": true
     },
     {
+      "id": "g1.w0",
+      "utterance": "משולש חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@t-O-ABC-1",
+          "B"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w1",
+      "utterance": "משולש חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "B",
+          "@t-O-ABC-2",
+          "C"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w2",
+      "utterance": "משולש חוסם את מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "C",
+          "@t-O-ABC-0",
+          "A"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
       "id": "g2.11",
       "utterance": "משולש חסום במעגל O",
       "group": "g2",

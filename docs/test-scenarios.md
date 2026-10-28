@@ -2239,3 +2239,11 @@ over all four (ADR-041).
 
 **Guards against:** the honest two-line form breaking now that the one-line «AB מיתר העובר דרך מרכז המעגל» is refused (it committed the chord alone, green, with O off AB). **Asserts** every step is green and dist(O, AB) < 1e-6 at seeds 0–3. The refusals (every measured spelling, both locales, the ✎ seam) are locked in `src/app/__tests__/issue-2532-unread-through.test.ts`.
 
+
+### `ring-around-circle-is-incircle-2538` — «מעגל O» · «משולש ABC חוסם את מעגל O» · «ABC משולש שווה צלעות»: the circle is inside the triangle (#2538, ADR-763)
+
+**Guards against:** the excircle drawn green (the circle outside the triangle) at 15 of 24 seeds and on 6 of 9 «הציגו תצורה אחרת» views, because a ring around a circle stated only its side LINES tangent. **Asserts** every step green; at the commit view and on the presses the centre is inside ABC and every touch foot lies strictly within its side; the triangle is equilateral; line 3 never moves O. The class matrix is `src/__tests__/issue-2538-ring-around-circle-inscribed.test.ts`.
+
+### `incircle-given-only-an-excircle-meets-2538` — «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «AB = 4»: never green, never drawn outside (#2538, ADR-763)
+
+**Guards against:** «AB = 4», which only an excircle can meet, committed green with O outside the triangle. **Asserts** (ADR-W-158: what must never happen) the line is not green and the circle is drawn inside at seeds 0 and 1. The interim answer (waiting for givens, operator ruling 2026-10-28) is deliberately not asserted; #2572 tightens it to a refusal.
