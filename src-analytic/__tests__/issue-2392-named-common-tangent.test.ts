@@ -151,10 +151,10 @@ describe('#2392 — «נסמן את הישר PQ ב-l»', () => {
     expect(answer(d, 'משוואת הישר l')).toBe('3x - 2y + 1 = 0');
   });
 
-  it('a pair the figure lacks is refused «unknown-reference»', () => {
+  // ⚠ #1467 (ADR-AG-342; ruling 2026-09-27 "Create everywhere + notice"): a missing point of the pair is created.
+  it('a pair the figure lacks has its missing point created', () => {
     const r = record(['A(1,2)', 'נסמן את הישר AB ב-l']);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.key).toBe('unknown-reference');
+    expect(r.ok).toBe(true);
   });
 
   it('a name another line already has is refused', () => {

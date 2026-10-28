@@ -87,8 +87,10 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
     submit('AS = w'); // naming — w was unknown
     expectAllOk();
     submit('|EN| = |w|'); // w resolves: it was really named
-    // (E,N don't exist here — expect the honest unknown-point refusal, proving w resolved first)
-    expect(state().lastError).toEqual({ code: 'unknown-point', id: 'E' });
+    // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): E and N are created free.
+    // An unknown w would still refuse `unknown-vector`, so the build proves w resolved first.
+    expect(state().lastError).toBeNull();
+    expect(state().lastCreated?.ids).toEqual(['E', 'N']);
     submit('AS = w'); // now w is KNOWN — the same statement is a (true) claim, not a re-name
     expectAllOk();
     submit('AB = w'); // a FALSE vector claim (AB⃗ ≠ AS⃗) — refused

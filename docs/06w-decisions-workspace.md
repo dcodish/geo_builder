@@ -6399,3 +6399,58 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 5. **The one-time re-rank of 2026-10-27** applies the same way: the summary page first, labels only on his approval.
 
 **Consequences.** P2 becomes a list worth working through (97 proposed, down from 170); P1 is rare and always a person's report. Internally found wrong answers stay visible through their mark. An item in a Later phase waits, unranked, until its phase opens.
+
+## ADR-W-161 — The incidence-phrase atoms move to `shell/incidencePhrase.ts`: one spelling of "through" for every builder (#2547)
+
+**Status:** accepted · 2026-10-27 · shared chrome (workspace) · fix round #2561, stream D · branch `feat/2547-through-clause-refusal` · **amends** [ADR-765](06-decisions.md#adr-765) (the atoms' home only; 2-D's member is unchanged)
+
+**Requirements:** none (internal) · **Design:** [04](04-design.md) § "An incidence clause the reading never read" (the atoms' shell home) · [04c](04c-design-analytic.md) § "A line that loses a part" (arm 3 reads them)
+
+**Context.** ADR-765 spelled the through-clause openers (`THROUGH_OPEN_HE/_EN`, `THROUGH_VERB_HE/_EN`, `THROUGH_OPEN`, `THROUGH_VERB`) in 2-D's `src/parser/lexicon.ts`. Analytic's arm 3 of the lost part ([ADR-AG-334](06c-decisions-analytic.md#adr-ag-334)) needs the same openers, and `BOUNDARIES.json` lets `src-analytic` import `shell/` only. A second copy in analytic would be the third-copy drift docs/22 §9 forbids in advance.
+
+**Decision.** The six atoms move verbatim to `shell/incidencePhrase.ts`, with the Latin-letter guards as private constants, and `src/parser/lexicon.ts` re-exports them (the precedent of `shell/indexedName` and `shell/vulgarFractions`). The module adds two generic helpers: `incidencePhraseAtStart(text)` (one opener at the start, within one clause) and `firstIncidenceOpener(text)` (where the first opener after a head starts). It holds no product knowledge: whether a phrase is *read* stays each builder's own question, asked of its own reader (2-D's deletion in `unreadThrough`, analytic's declined-line arm).
+
+**Consequences.** 2-D's `unreadThrough` and analytic's `declinedThrough` read one spelling; a new opener spelling lands in both. No import edge changes (`shell` is already importable by both), and `server/__tests__/isolation.test.ts` stays green. The inline-Hebrew ratchet ([ADR-W-153](#adr-w-153)) gains `shell/incidencePhrase.ts: 4`: the four Hebrew literals are grammar atoms that left `src/parser/` (exempt), as `shell/conjunction.ts`'s are, not sentences.
+
+## ADR-W-162 — A line that refers to a point the figure lacks creates it in every builder, and one shared notice says so, with a ✕ that removes the line (#1467)
+
+**Status:** accepted · 2026-10-27 · feature (all tools) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · **supersedes** #840's 3-D typo guard (2026-08-31) and [ADR-AG-015](06c-decisions-analytic.md#adr-ag-015) decision 1 for points · per builder: [ADR-769](06-decisions.md#adr-769) (2-D), [ADR-3D-382](06b-decisions-3d.md#adr-3d-382), [ADR-AG-342](06c-decisions-analytic.md#adr-ag-342); complex is a known gap (#2562, ADR-W-160)
+
+**Operator:** ruling of 2026-09-27 on #1467 (/decisions pass), *"Create everywhere + notice"*, follow-up (the typo guard) *"Notice with one-click undo"*; #2048 ruling A (2026-10-13), *"A referenced point that does not exist is created, with #1467's notice"*, and card d5-2048-tools, *"every builder that has these objects creates them the same way"*; play verdicts T36/T37/T41/T49 of 2026-10-24 on round #2466's sheet.
+
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder table row "A line that refers to a point the figure lacks" · **Design:** [04w](04w-design-shell.md) § "The created-points notice"
+
+**Context — measured at `d9494206`** (2-D `decideDeterministic2D` → `replay`; 3-D `useGeo3.submit`; analytic `decideSubmit`; the model mocked). One sentence, four policies, none of which told the student:
+- 2-D created a referenced point only when the winning rule happened to emit a `segment` carrier («M אמצע AB»); «AB = 2 AD», «AD:DB = 1:2», «שטח המשולש ABC הוא 13» refused «… references an unknown point».
+- 3-D refused `unknown-point` everywhere except a bare «קטע» with one known end.
+- Analytic created silently for the forms 2-D created for (ADR-AG-210) and refused the rest.
+- Complex created silently.
+
+**Decision.**
+1. **The rule, in every builder that has points:** a line that refers to a point the figure does not have creates it as a free point (ADR-052: no position assumed, resampled by «הציגו תצורה אחרת»), exactly as that builder's bare point declaration would, and the line then means what it means when the point exists. Nothing else is created. Circles, lines, planes, solids and vectors as objects are #2048, #2489 and #2484.
+2. **Which operands are missing is each builder's own reference-resolution answer**, never a list of command kinds: 2-D reads the engine's `objectParents` / `constraintRefs` over the structurally applied batch; 3-D and analytic read the `unknown-point` / `unknown-reference` their fold already reports. In 3-D and analytic the creation is the fold's LAST resort, after the deferral fixpoint, so a point any line declares binds and «M אמצע AB» typed above «A(0,0)» never mints. A line that still fails after creating keeps nothing it created.
+3. **The notice** is one suite sentence in every builder — `suite.notice.createdPoint` «נוצרה נקודה חדשה {{names}} — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», `suite.notice.createdPoints` «נוצרו נקודות חדשות {{names}} — …» — rendered by `shell/frame/CreatedNotice.tsx`. Its ✕ removes the line (so the points go too: every builder derives positions from its list). It names only points created by REFERENCE: a line that declares its points («משולש ABC», «קטע AB», «נקודה C», coordinates, a solid) announces nothing, and a line's own subject (M of «M אמצע AB») is never named. It is shown while its line is the last row, so the next line, a ✕, an undo or an edit retires it.
+4. **The notice is the typo guard.** «M אמצע AQ'» after a cube creates Q' and the notice names it; this replaces #840's refusal, as #840's own revisit condition foresaw.
+5. **§5c lock:** `shell/session/createdPoints.ts` declares `CreatedPointsAdapter`; `shell/__tests__/fixtures/created-notice-rows.ts` holds the five rows (reference names exactly the referenced labels; ✕ removes the line and its points; a typo names only itself; a declaration announces nothing; the next line retires it); `created-notice-meta.test.ts` runs them against four broken adapters. Each builder's `created-notice-1467.test.ts` hands its real submit path.
+
+**Known gap.** Complex keeps creating silently; its notice is #2562 (`later`, ADR-W-160): it needs its own created-by-reference reader, not a trivial port.
+
+**Consequences.** The four builders answer «M אמצע AB» on a blank page the same way. The refusals that taught "define the point first" for a missing point are no longer reached for points named by letters.
+
+**Amendment 1 — 2026-10-28, the locks that held the old refusal (merge of PR #2573, round #2561).** The PR's gates were `test:fast`, so the slow-tier locks that asserted the missing-point refusal met the rule only at the merged main's full suite (9 files red). Each was re-measured and moved to the rule, with no product change: the shared parity rows `area-value-unknown-1622`, `bare-scaled-length-1670`, `bare-ratio-1670`, `cevian-no-shape-1670` and `area-ratio-no-region-1621` now build in 2-D and analytic alike; 3-D's #1679 gap is gone on five rows the mint pass now builds; analytic's #2129 gap is gone on the two arc rows (A and B are placed on circle O, as 2-D does), which closes #2129. Analytic's #1621 region test, #2545's catalog sweep row («המעגל החוסם את משולש ABC חותך את CE בנקודה D» on a blank page: A, B, C, E are created and the line builds its circle by definition) and the #2201 leak lock's four missing-point sequences (now: they commit, with no refusal note) follow the rule. The leak sweep's non-vacuity floor counted those refusals and is recalibrated to the measured 8. Parity goldens re-recorded once, every drift attributed by diffing full records before (`33f5604a`) and after: 2-D 5 scenarios, all a created point; 3-D 453 sequences, all a missing-point refusal that now builds or reaches the line's own, more specific check (e.g. #1904's one-line-per-role teaching, which needs its taught lines to record).
+
+**Requirements:** none beyond the entry above · **Design:** none (internal)
+
+## ADR-W-163 — A line named before it exists is created like its declaration; no notice for a created line (#2489)
+
+**Status:** accepted · 2026-10-27 · feature (2-D + 3-D) · fix round #2561, stream I · branch `feat/2489-mention-lines-planes` (stacked on #1467's) · extends [ADR-W-162](#adr-w-162) beyond points · per builder: [ADR-770](06-decisions.md#adr-770) (2-D), [ADR-3D-383](06b-decisions-3d.md#adr-3d-383)
+
+**Operator:** round #2466 verdicts of 2026-10-24 — T45 *"the tool needs to create the line if its referenced with dof"*, T34 *"This should be accepted with dof. Only location for R is on the circle so a point that lins exists."*; ruling 2026-10-24, card e20 = A: *"No notice for lines or for a point with letter coordinates. The new row is the signal, as you chose for planes."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder row "A line that refers to a point the figure lacks" (a named line joins it, without the notice) · **Design:** none (internal) beyond the builders' own entries
+
+**Decision.**
+1. **A line (3-D's named free line) that a statement names in a line slot and the figure lacks is created by the same mint pass as a point**, by applying its declaration («ישר k», `free-line`), so every clash rule of the declaration is inherited. Mint-last and atomicity are ADR-W-162's.
+2. **No notice for a created line** (card e20 = A). The new row is the signal.
+3. **2-D:** a symbolic length («OR=r», «AB = k», «AB = 35/2») names its endpoints like any statement; ADR-769's pass creates them, with the point notice.
+4. **Not here:** planes (#2484, next round, the same pass); a new point with letter coordinates («N(k,p,3)», T46) is its own 3-D item, #2563.

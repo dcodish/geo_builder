@@ -105,7 +105,8 @@ describe('#1464 — the circle through three points, in every spelling the exam 
   });
 
   it('refusals name the sentence: an unknown point, a repeated one, three pinned collinear points', () => {
-    expect(derive(['A(0,0)', 'B(1,1)', 'מעגל ABQ'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
+    // ⚠ #1467 (ADR-AG-342; ruling 2026-09-27 "Create everywhere + notice"): an unknown point is created, not refused.
+    expect(derive(['A(0,0)', 'B(1,1)', 'מעגל ABQ'], 0).created).toEqual([{ index: 2, ids: ['Q'] }]);
     expect(derive(['A(0,0)', 'B(1,1)', 'מעגל שעובר בנקודות A, B, A'], 0).faults.map((f) => f.code)).toEqual(['repeated-vertex']);
     const col = derive(['A(0,0)', 'B(1,1)', 'C(2,2)', 'מעגל ABC'], 0);
     expect(col.faults.map((f) => [f.index, f.code])).toEqual([[3, 'does-not-exist']]);
@@ -216,7 +217,8 @@ describe('#1462 — a coordinate compared chooses the configuration', () => {
     expect(pair).toHaveLength(1);
     expect(pair[0].code).toBe('unsatisfiable');
     expect([7, 8]).toContain(pair[0].index);
-    expect(derive([...KITE, 'x_B > x_Q'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
+    // ⚠ #1467 (ADR-AG-342; ruling 2026-09-27 "Create everywhere + notice"): Q is created, not refused.
+    expect(derive([...KITE, 'x_B > x_Q'], 0).faults).toEqual([]);
     expect(derive(['A(0,0)', 'x_A > x_A'], 0).faults.map((f) => f.code)).toEqual(['repeated-vertex']);
     // Two different axes are two different quantities — not read as a comparison.
     expect(parseLine('x_A > y_B').ok).toBe(false);

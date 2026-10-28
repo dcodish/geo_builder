@@ -49,10 +49,11 @@ describe('#840 — an unstated endpoint is a FREE point, not a refusal', () => {
     expect(new Set(zs.map((z) => z.toFixed(3))).size).toBeGreaterThan(1);
   });
 
-  it('a TYPO is still caught — both endpoints unknown names the undeclared label', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): the notice replaced this typo guard, and a
+  // declaration («קטע QZ») creates its ends without one.
+  it('both endpoints unknown: «קטע QZ» declares Q and Z', () => {
     const r = build([...CUBE, 'קטע QZ']);
-    expect(r.errs).toHaveLength(1);
-    expect(r.errs[0]).toContain('unknown-point');
+    expect(r.errs).toHaveLength(0);
   });
 
   it('a BOUND endpoint keeps its owner — B stays the cube’s vertex', () => {
@@ -64,11 +65,12 @@ describe('#840 — an unstated endpoint is a FREE point, not a refusal', () => {
    * `segment3` as a CARRIER, and minting there would let a NAMING introduce its own subject. Only the
    * drawing register — where the student's whole sentence IS the segment — may create a point.
    */
-  it('a segment emitted as a CARRIER never mints — naming needs existing points', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): #2048 ruling A ("whatever is missing is
+  // created") reaches points inside a vector line too; C is a free point and the notice names it.
+  it('a naming whose head is missing creates it free (#1467, #2048 S2(a))', () => {
     const r = build(['A(0,2,-1)', 'B(-3,2,2)', 'D(-2,3,1)', 'נסמן: AB = u, AC = v']);
-    expect(r.errs).toHaveLength(1);
-    expect(r.errs[0]).toContain('unknown-point');
-    expect(r.kindOf('C')).toBeUndefined(); // the naming did not conjure its own head
+    expect(r.errs).toHaveLength(0);
+    expect(r.kindOf('C')).toBe('free3');
   });
 });
 

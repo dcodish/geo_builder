@@ -59,7 +59,6 @@ import {
   type ArcDef,
   type GeoObject,
   type Id,
-  type OrderSide,
   type PointObject,
   type PolygonObject,
 } from './types';
@@ -957,6 +956,17 @@ export function onCurveByConstruction(c: Construction, curve: GeoObject, p: Id):
  */
 function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undefined {
   const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  /*
+   * #2545 (ADR-AG-335): the LETTERLESS reference («DE מיתר במעגל החוסם») — the ring is the figure's one polygon (of the
+   * typed noun's size), and the described circle binds only when it is the figure's ONE circle: which circle a bare
+   * relation names beside another is the operator's question (#2560), as in 2-D (ADR-768).
+   */
+  if (d.pts.length === 0) {
+    const rings = c.objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && (!d.arity || o.vertices.length === d.arity));
+    if (rings.length !== 1 || circles.length !== 1) return undefined;
+    const hit = describedCircle(c, { role: d.role, pts: [...rings[0].vertices] });
+    return hit === circles[0] ? hit : undefined;
+  }
   if (d.role === 'circum') return circles.find((o) => d.pts.every((p) => onCurveByConstruction(c, o, p)));
   const ring = ringId(d.pts);
   const sides = d.pts.map((p, i) => [p, d.pts[(i + 1) % d.pts.length]] as const);
@@ -1197,6 +1207,8 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
    * «המעגל החוסם את המשולש ABC» states (`circle-thru` through the three; the incircle for «החסום ב»). Its ring must exist.
    */
   const described = readDescribedCircle(name);
+  // #2545 (ADR-AG-335): a letterless reference names no ring to build on — creating it is #2560's question
+  if (described && described.pts.length === 0) return null;
   if (described) {
     const creation: Fact | null =
       described.role === 'circum'
@@ -3937,6 +3949,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const create = (): ApplyOutcome =>
         f.create ? applyAll(c, f.create) : { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       let host: GeoObject | undefined;
+      /*
+       * «מרכז המעגל הראשון / השני הוא X(a,b)» (#2552, ADR-AG-336) — circle 1 or 2 of the pair the figure drew, in the
+       * order the pair sentence introduced them. The member whose centre is still unnamed is named X (`namingByOrder`, as
+       * «X מרכז מעגל» names by order); two drawn pairs with that member unnamed ask which. A member whose centre is X
+       * already is known; one lettered otherwise is the existing «already named» refusal. No drawn pair: the sentence
+       * reads as it does without the ordinal.
+       */
+      if (f.ordinal !== undefined) {
+        const members = c.objects.filter((o) => curveKindOf(o) === 'circle' && new RegExp(`^circle-pair\\d+-${f.ordinal}$`).test(o.id));
+        if (members.some((o) => centreIdOf(c, o) === f.id)) return { ok: true, effect: 'known', next: c };
+        const open = members.filter((o) => centreRuleOf(o) !== null && centreIdOf(c, o) === null);
+        if (open.length > 1) return { ok: false, error: noHost(f.src, 'circle', open) };
+        if (open.length === 1 && !objectById(c, f.id)) return namingByOrder(c, open[0], f.id, f);
+        const named = members.length === 1 ? centreIdOf(c, members[0]) : null;
+        if (open.length === 0 && named !== null) return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(named) } };
+      }
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
@@ -5766,6 +5794,11 @@ export interface FoldResult {
   selectorFact: number[];
   /** Per-fact NOTICE, positionally (#1350) — what a statement that landed should tell the student. */
   notices: Array<ApplyNotice | null>;
+  /**
+   * #1467 (ADR-AG-342): per fact, the points the fold's mint pass CREATED for its line by reference — set on the
+   * line's first landed fact, null elsewhere. What the «נוצרה נקודה חדשה …» notice names.
+   */
+  created: Array<Id[] | null>;
 }
 
 /**
@@ -5822,6 +5855,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
           r.errors[i] = e;
           r.effects[i] = null;
           r.notices[i] = null;
+          r.created[i] = null;
         }
       });
       return r;
@@ -5918,7 +5952,16 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     }
   };
   fixpoint();
+  const created: Array<Id[] | null> = facts.map(() => null);
   /*
+   * ⚠ WIDENED by #1467 ([ADR-AG-342](../../docs/06c-decisions-analytic.md#adr-ag-342); operator ruling 2026-09-27,
+   * "Create everywhere + notice", and #2048's card d5 "every builder that has these objects creates them the same way"):
+   * EVERY line whose only failures are references to points it lacks has them created — not only the forms 2-D
+   * minted for in 2026-10 (`mintedByReference`, now 2-D's history: 2-D creates every referenced point too, ADR-769).
+   * Which points are missing is the fold's own answer — each still-failing fact's `unknown-reference` — minted one
+   * round at a time until the line lands; a line that still fails keeps nothing (the line is the unit, ADR-AG-133).
+   * A radius or measure capital is never a point here: the fact that names it reports it as a symbol, not a point.
+   *
    * THE LAST RESORT: A BARE RELATION INTRODUCES ITS NEW LETTERS (#1670, ADR-AG-210; operator 2026-10-02 — "accept new
    * letter with same logic the 2d tool has"). Only once nothing else can define them — the in-order pass and the deferral
    * fixpoint have run, so a letter a later line defines («M אמצע AB» typed above «A(0,0)») is still defined there and
@@ -5940,11 +5983,18 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
       // and is either a minting form or the piece/selector the sentence draws beside it. «AD גובה לצלע BC» names a
       // SIDE — its `perpendicular` half is no minting form, so B and C stay refused, as in 2-D.
       const failing = facts.map((f, j) => ({ f, j })).filter(({ j }) => include(j) && errors[j] && lineOf(j) === line);
-      const allRefs = failing.every(({ j }) => errors[j]!.code === 'unknown-reference' && refKindOf(errors[j]!.detail) === 'point');
-      const missing = [...new Set(failing.flatMap(({ f }) => mintedByReference(f)))].filter((id) => !objectById(c, id));
-      const formed = failing.every(({ f }) => mintedByReference(f).length > 0 || isMintCompanion(f));
-      if (!allRefs || !formed || missing.length === 0 || !failing.every(({ j }) => missing.includes(errors[j]!.detail))) continue;
-      let next: Construction = { ...c, objects: [...c.objects, ...missing.map((id): GeoObject => ({ kind: 'free', id }))] };
+      const missingRef = (e: ApplyError | null | undefined): Id | null =>
+        e && e.code === 'unknown-reference' && refKindOf(e.detail) === 'point' && isPointLabel(e.detail) ? e.detail : null;
+      if (!failing.every(({ j }) => missingRef(errors[j]) !== null && !objectById(c, errors[j]!.detail))) continue;
+      const missing: Id[] = [];
+      let next: Construction = c;
+      const mintMore = (ids: readonly (Id | null)[]): boolean => {
+        const fresh = [...new Set(ids.filter((x): x is Id => x !== null && !objectById(next, x)))];
+        missing.push(...fresh);
+        next = { ...next, objects: [...next.objects, ...fresh.map((id): GeoObject => ({ kind: 'free', id }))] };
+        return fresh.length > 0;
+      };
+      mintMore(failing.map(({ j }) => errors[j]!.detail));
       // An area LABEL names its region (#1622 E5, ADR-AG-221): the ring is drawn with its new letters, as a noun draws
       // its own — the polygon the area is OF, so its points stay a simple ring the area can be read on.
       let ringsDrawn = true;
@@ -5959,21 +6009,37 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         next = out.next;
       }
       if (!ringsDrawn) continue;
-      const landed: Array<{ j: number; out: Extract<ApplyOutcome, { ok: true }> }> = [];
-      for (const { f, j } of failing) {
-        const out = applyFact(next, f);
-        if (!out.ok) break;
-        landed.push({ j, out });
-        next = out.next;
+      // the line, applied on the minted figure; a fact naming a FURTHER missing letter («AD תיכון לצלע BC»: C after B)
+      // mints that one too and the line is tried again, bounded by the letters a line can name
+      const minted0 = next;
+      let landed: Array<{ j: number; out: Extract<ApplyOutcome, { ok: true }> }> = [];
+      for (let round = 0; round < 24; round++) {
+        landed = [];
+        let at = next;
+        let refused: ApplyError | null = null;
+        for (const { f, j } of failing) {
+          const out = applyFact(at, f);
+          if (!out.ok) {
+            refused = out.error;
+            break;
+          }
+          landed.push({ j, out });
+          at = out.next;
+        }
+        if (!refused || !mintMore([missingRef(refused)])) break;
       }
-      if (landed.length !== failing.length) continue;
+      if (landed.length !== failing.length) {
+        next = minted0;
+        continue;
+      }
       for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine);
+      created[landed[0].j] = missing;
       minted = true;
     }
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices, touchByOnLine };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, touchByOnLine };
 }
 
 /**
@@ -6000,60 +6066,6 @@ function reDecidedBy(r: FoldResult & { touchByOnLine?: boolean[] }, from: Map<nu
 }
 
 /**
- * What a sentence that mints may carry beside its minting fact (#1670): its named pieces, a selector, a declaration, and a
- * length given about the same letters — «C מחלקת את AB ביחס 3:2» places C ON AB (that mints, as in 2-D) and its ratio
- * rides along, where «AB:BC = 2:3» alone has no minting fact and stays refused, as in 2-D.
- */
-const MINT_COMPANIONS: ReadonlySet<Fact['t']> = new Set<Fact['t']>(['segment', 'line-2pt', 'selector', 'declare']);
-const isMintCompanion = (f: Fact): boolean => MINT_COMPANIONS.has(f.t) || (f.t === 'constraint' && f.k.t === 'length-eq');
-
-/** A length side 2-D mints for: a number, or segments ADDED with no coefficient («AB», «AB + BC», «5») — not «2CD», «AB:BC». */
-function plainLengthSide(e: Expr): boolean {
-  if (!symbolsOf(e).some(isTermPlaceholder)) return true;
-  if (e.kind === 'sym') return true;
-  return e.kind === 'add' && plainLengthSide(e.a) && plainLengthSide(e.b);
-}
-
-/**
- * THE FORMS WHOSE NEW LETTERS ARE MINTED (#1670, ADR-AG-210) — measured on 2-D's `decideDeterministic2D`, which mints a
- * letter wherever its lowering DRAWS a segment through it: «BD⊥AC», «AB∥CD» and every spelling of the two (the pair
- * operands of `relation`); «AB = CD», «AB = 5», «AB + BC = 10» (plain lengths); «זווית ABC = 30» (the arms);
- * «M אמצע AB» (the parents); «E על AB», «AB חותך את CD בנקודה E» (the carrier pair); «AB משיק למעגל C» (the tangent
- * pair). 2-D REFUSES «AB = 2CD», «AB:BC = 2:3», «C מחלקת את AB ביחס 3:2», the angle bisector and a cevian to a side no
- * shape has («AD גובה לצלע BC» — its `perpendicular` half is no minting form), so they keep #1028's refusal here.
- * The ids a fact would mint; `[]` for every other fact. Which LINE mints is decided in `foldPass`, over all its facts.
- */
-function mintedByReference(f: Fact): Id[] {
-  if (f.t === 'derived') return f.rule.t === 'midpoint' ? [f.rule.a, f.rule.b] : [];
-  // An ORDER (#1621 D3, ADR-AG-216) mints as its equality twin does: 2-D draws «AB < BC»'s two segments, «AB ≤ 10»'s
-  // one, and «זווית ABC קהה»'s two arms, minting their letters — the plain lengths and the angles, never «2AB < CD».
-  if (f.t === 'selector') return f.sel.kind === 'sign' && f.sel.q.k === 'order' ? orderMints(f.sel.q.left, f.sel.q.right) : [];
-  if (f.t === 'tangent-of') return (f.lines ?? []).flatMap((l) => (l.kind === 'points' ? [l.a, l.b] : []));
-  if (f.t !== 'constraint') return [];
-  const k = f.k;
-  switch (k.t) {
-    case 'relation':
-      return k.u.k === 'points' && k.v.k === 'points' ? [k.u.a, k.u.b, k.v.a, k.v.b] : [];
-    case 'length-eq': {
-      const ring = areaLabelRing(f);
-      if (ring) return ring;
-      const pairs = [...k.left.terms, ...k.right.terms];
-      const plain = pairs.every((t) => t.kind === undefined || t.kind === 'length') && plainLengthSide(k.left.expr) && plainLengthSide(k.right.expr);
-      return plain ? lengthRefs(k.left).concat(lengthRefs(k.right)) : [];
-    }
-    case 'angle':
-      return [k.at.v, k.at.a, k.at.b];
-    // «זוית AEB שווה לזווית BEC» — two angles' arms, as 2-D draws them (#1622, ADR-AG-218).
-    case 'angle-ratio':
-      return [k.left, k.right].flatMap((r) => (isAngleRef(r) ? [r.v, r.a, r.b] : []));
-    case 'on-line-2pt':
-      return [k.a, k.b];
-    default:
-      return [];
-  }
-}
-
-/**
  * THE RING AN AREA LABEL NAMES (#1622 E5, ADR-AG-221) — «נסמן את שטח ABCD ב-S», i.e. «שטח ABCD = S»: one area on one
  * side and a lone symbol on the other. 2-D commits that label on an empty canvas (its `measure-area` on a variable,
  * binding when the shape comes) and introduces nothing. Analytic holds no statement about points it does not have, so
@@ -6072,19 +6084,8 @@ function areaLabelRing(f: Fact): Id[] | null {
 }
 const polygonIdOf = (ring: readonly Id[]): Id => `poly-${ring.join('')}`;
 
-/** The letters an order's two sides mint (`mintedByReference`): each side a value, a plain length, or an angle — else none. */
-function orderMints(...sides: OrderSide[]): Id[] {
-  const ids: Id[] = [];
-  for (const o of sides) {
-    if (o.t === 'angle') ids.push(o.at.v, o.at.a, o.at.b);
-    else if (o.t === 'length') {
-      const plain = o.le.terms.every((t) => t.kind === undefined || t.kind === 'length') && plainLengthSide(o.le.expr);
-      if (!plain) return [];
-      ids.push(...lengthRefs(o.le));
-    }
-  }
-  return ids;
-}
+/** #1467: a point LETTER as the parser canonicalises it — what the mint pass may create (never a curve or a symbol). */
+const isPointLabel = (id: Id): boolean => /^[A-Z]d*'*$/.test(id);
 
 /**
  * A domain in comparable form — see the `narrowed` vs `known` decision in `applyFact`.

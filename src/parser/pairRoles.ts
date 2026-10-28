@@ -98,6 +98,9 @@ export const PAIR_ALIAS_FIELDS: { [K in keyof Required<ParseContext>]: 'untouche
   roleSides: 'untouched',
   openRightTriangles: 'untouched',
   feet: 'untouched',
+  // #2545 (ADR-768): an incircle is one circle object — re-keyed like `circleSizes`
+  inscribedCircles: (v, a) =>
+    v.map((e) => (e.circle === a.outer ? { ...e, circle: tokId(a.tO), center: a.tO } : e.circle === a.inner ? { ...e, circle: tokId(a.tI), center: a.tI } : e)),
 };
 
 /** The aliased context: every circle-bearing field re-keyed so each circle of the pair answers to its own token. */

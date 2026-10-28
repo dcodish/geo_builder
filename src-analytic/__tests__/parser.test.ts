@@ -574,10 +574,11 @@ describe('#1074 — the segment NOUN is optional', () => {
     expect(r.scene.points).toHaveLength(2);
   });
 
-  it('leaves «AB = 2CD» refusing — naming is not referring', () => {
-    // #1028 is not softened by this. The distinction is which of the two the sentence does. (#1670, ADR-AG-210: the
-    // forms 2-D mints for — «M אמצע AB», «AB = 5» — now mint their new letters; a scaled length is not one of them.)
-    expect(derive(['AB = 2CD'], 0).faults.map((f) => f.code)).toEqual(['unknown-reference']);
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"; 2-D creates them too, ADR-769): 
+  // «AB = 2CD» REFERS to its points, so they are created by reference (and announced), never declared.
+  it('«AB = 2CD» refers: its points are created by reference', () => {
+    expect(derive(['AB = 2CD'], 0).faults).toEqual([]);
+    expect(derive(['AB = 2CD'], 0).created[0]?.ids.length).toBe(4);
   });
 
   it('keeps «AB = 5» a LENGTH — and, since #1652, the length also draws the pair it names', () => {

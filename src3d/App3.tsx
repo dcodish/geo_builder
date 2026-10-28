@@ -54,6 +54,8 @@ import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { Banner } from '../shell/frame/Banner';
+import { CreatedNotice } from '../shell/frame/CreatedNotice';
+import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
@@ -124,6 +126,7 @@ export default function App3() {
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>(''); // #742: top-row copy feedback
   const lastError = useGeo3((s) => s.lastError);
   const lastNotice = useGeo3((s) => s.lastNotice); // #613 — the statement succeeded and added nothing
+  const lastCreated = useGeo3((s) => s.lastCreated); // #1467 (ADR-3D-382): the points the last line created by reference
   const submit = useGeo3((s) => s.submit);
   const dispatchVerdict = useGeo3((s) => s.dispatchVerdict);
   const toggle = useGeo3((s) => s.toggle);
@@ -857,6 +860,17 @@ export default function App3() {
                 ))}
               </ul>
             </Banner>
+          )}
+          {/* #1467 (ADR-W-162): shown while its line is still the last row — any later row, ✕, undo or edit retires it */}
+          {lastCreated && !lastError && !busy && facts[facts.length - 1]?.id === lastCreated.factId && (
+            <CreatedNotice
+              text={t(createdNoticeText(lastCreated.ids).key, createdNoticeText(lastCreated.ids).params)}
+              undoLabel={t(CREATED_NOTICE_KEYS.undo)}
+              onUndo={() => {
+                logDebug3({ kind: 'action', action: 'delete', detail: lastCreated.factId });
+                remove(lastCreated.factId);
+              }}
+            />
           )}
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">

@@ -25,11 +25,10 @@ describe('#960 — the operator’s two dead play cases, as the gate sees them',
     expect(v.kind).toBe('commit');
   });
 
-  it('T6: «DE = x» before D and E exist is REFUSED pre-commit, not deferred', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-769; ruling 2026-09-27 "Create everywhere + notice"): D and E are created free.
+  it('T6: «DE = x» before D and E exist commits, creating them', () => {
     const v = verdictAfter(['משולש ABC', 'AB = 3x'], 'DE = x');
-    expect(v.kind).toBe('refused');
-    expect(v).toMatchObject({ reason: 'error' });
-    expect((v as { detail?: string }).detail ?? '', 'and it says why').toMatch(/unknown point/i);
+    expect(v.kind).toBe('commit');
   });
 });
 

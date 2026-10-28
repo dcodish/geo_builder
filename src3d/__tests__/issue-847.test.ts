@@ -53,12 +53,13 @@ describe('#847 — a non-ok row carries no plane chip', () => {
     // #1550 inverts #847's "never": the containment is the FIRST row to name ABCD, so it owns the chip
     expect(chips(), 'the first mention of the plane carries its chip').toEqual([['BE מוכל במישור ABCD', 'ABCD']]);
 
-    const eRow = st().facts.find((f) => f.utterance.includes('אמצע'))!;
-    st().remove(eRow.id);
+    // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): deleting E's row no longer turns the
+    // containment amber (E is created free), so the row is MUTED — a row that is not ok still owns nothing.
+    const containment = st().facts.find((f) => f.utterance.includes('מוכל'))!;
+    st().toggle(containment.id);
 
     const d = derive3(st().facts, st().seed);
-    const containment = st().facts.find((f) => f.utterance.includes('מוכל'))!;
-    expect(d.status[containment.id], 'the containment is refused once E is gone').not.toBe('ok');
+    expect(d.status[containment.id], 'the containment is not ok while muted').not.toBe('ok');
     expect(chips(), 'and still owns nothing').toEqual([]);
   });
 

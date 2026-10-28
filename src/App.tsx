@@ -62,6 +62,8 @@ import { forgetSession, offeredSession, restoreSession, startSessionPersist } fr
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { Banner } from '../shell/frame/Banner';
+import { CreatedNotice } from '../shell/frame/CreatedNotice';
+import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
 // #1189 (ADR-W-079): a figure travels as a LINK — the teacher copies one, the student taps it.
 import { openSharedFigure, shareLinkFor } from '@/store/shareLink';
 // #1373: the fragment is SUBSCRIBED to, not read once — a link pasted into a tab already on this
@@ -82,7 +84,7 @@ import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { auditLoadedFigure, liveAuditFindings } from '@/store/loadAudit';
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
-import { runSubmit } from '@/app/submitPipeline';
+import { runSubmit, type CreatedNotice2D } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
 import { narrowingText } from '@/app/narrowingText';
 import { figureStatus, figureStatusParams } from '@/app/figureStatus';
@@ -206,6 +208,8 @@ export default function App() {
   const shapesRef = useRef<HTMLDivElement>(null); // the detected-shapes section — scrolled into view when it appears / a card opens
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
+  // #1467 (ADR-769, ADR-W-162): the points the last committed line created by reference, and the row its ✕ removes
+  const [createdNotice, setCreatedNotice] = useState<CreatedNotice2D | null>(null);
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
   const [fileNote, setFileNote] = useState(''); // transient: why a figure file couldn't be loaded (FR-HS-10)
   // Persistent ADR-242 load-audit findings (issue #24). Unlike `fileNote` (a one-shot string), the audit note
@@ -774,6 +778,7 @@ export default function App() {
         clearText: () => setText(''),
         setText,
         setBusy,
+        setCreatedNotice,
       },
       view: () => ({ construction, positions }),
       isBusy: () => busyRef.current,
@@ -1509,6 +1514,18 @@ export default function App() {
 
             </InputArea>
           </div>
+
+          {/* #1467: shown while its line is still the last row — any later row, ✕, undo or edit of the list retires it */}
+          {createdNotice && facts.length > 0 && groupKey(facts[facts.length - 1]) === createdNotice.groupKey && (
+            <CreatedNotice
+              text={t(createdNoticeText(createdNotice.names).key, createdNoticeText(createdNotice.names).params)}
+              undoLabel={t(CREATED_NOTICE_KEYS.undo)}
+              onUndo={() => {
+                useGeoStore.getState().removeGroup(createdNotice.groupKey);
+                setCreatedNotice(null);
+              }}
+            />
+          )}
 
           {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError, utteranceForError(facts, status, lastError), otherUtteranceForError(facts, lastError))}</div>}
 

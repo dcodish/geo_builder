@@ -83,15 +83,19 @@ describe('#1184 — a vector on an EMPTY canvas', () => {
  * designed to work: an empty canvas has nothing to have mistyped against, but the moment ANY figure
  * exists the guard is as it was.
  */
-describe('#1184 — the typo guard is untouched once a figure exists', () => {
-  it('«קטע QZ» after a point is still refused, naming Q', () => {
+/**
+ * ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice", which replaced the typo
+ * guard with the created-points notice): missing endpoints are created once a figure exists too.
+ */
+describe('#1184 — missing endpoints are created once a figure exists too (#1467)', () => {
+  it('«קטע QZ» after a point declares Q and Z', () => {
     const r = build(['נקודה P(0,0,0)', 'קטע QZ']);
-    expect(r.err).toMatchObject({ code: 'unknown-point', id: 'Q' });
+    expect(r.err).toBeNull();
   });
 
-  it('«חץ QZ» after a point is refused too — the relaxation is the EMPTY canvas, not the arrow', () => {
+  it('«חץ QZ» after a point creates Q and Z', () => {
     const r = build(['נקודה P(0,0,0)', 'חץ QZ']);
-    expect(r.err).toMatchObject({ code: 'unknown-point', id: 'Q' });
+    expect(r.err).toBeNull();
   });
 
   /**
@@ -101,9 +105,11 @@ describe('#1184 — the typo guard is untouched once a figure exists', () => {
    * no solid exists for it to be a diagonal of). Those lanes feed rules that ask *which points already
    * exist*; an arrow feeds none. Asserted so the scope is a decision on the record, not an omission.
    */
-  it('«קטע AB» on an empty canvas is still refused — the widening is the ARROW lane only', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a bare segment declares its ends; #601 and #978's
+  // concerns are held by their own locks (the kite is created by the mint pass; «אלכסון AB» stays refused).
+  it('«קטע AB» on an empty canvas declares A and B', () => {
     const r = build(['קטע AB']);
-    expect(r.err).toMatchObject({ code: 'unknown-point' });
+    expect(r.err).toBeNull();
   });
 });
 

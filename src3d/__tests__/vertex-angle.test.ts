@@ -74,10 +74,13 @@ describe('ADR-3D-049 — apply resolves the arms from the figure', () => {
     expect(state().facts.length).toBe(before);
   });
 
-  it('an unknown vertex refuses unknown-point', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): X is created, and the line is then refused
+  // for its true reason (a lone new vertex has no arms to read) — keeping nothing it created.
+  it('an unknown vertex is refused for its real reason, and nothing is created', () => {
     submit('משולש AOB');
     submit('זוית X ישרה');
-    expect(state().lastError).toMatchObject({ code: 'unknown-point', id: 'X' });
+    expect(state().lastError).toMatchObject({ code: 'ambiguous-angle', id: 'X' });
+    expect(state().facts).toHaveLength(1);
   });
 
   it('a determined figure VERIFIES: the cube base corner via two drawn segments', () => {

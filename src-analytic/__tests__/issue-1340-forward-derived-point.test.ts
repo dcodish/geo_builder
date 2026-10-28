@@ -67,14 +67,13 @@ describe('#1340 — the fold retries a creating fact exactly as it retries a con
     expect(crossing.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D', 'P']);
   });
 
-  it('a reference whose operand NO line declares stays red, naming the reference — nothing is invented', () => {
-    // #1670 (ADR-AG-210): «M אמצע AX» now MINTS X after the fixpoint, as 2-D does; a form 2-D does not mint for
-    // (a scaled length) is retried by the same fixpoint and still names the missing point.
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): a point NO line declares is created, LAST —
+  // A and B still bind to the coordinates below; only X is new.
+  it('a reference whose operand NO line declares creates it, after the fixpoint binds the rest', () => {
     const d = derive(['AX = 2AB', 'A(0,0)', 'B(4,0)'], 0);
-    expect(d.faults).toHaveLength(1);
-    expect(d.faults[0]).toMatchObject({ index: 0, code: 'unknown-reference', detail: 'X' });
-    expect(d.outcomes[0]).toBe('faulted');
-    expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B']);
+    expect(d.faults).toEqual([]);
+    expect(d.created).toEqual([{ index: 0, ids: ['X'] }]);
+    expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'X']);
   });
 
   it('a chain settles: a point derived from a point that is itself derived later in the list', () => {

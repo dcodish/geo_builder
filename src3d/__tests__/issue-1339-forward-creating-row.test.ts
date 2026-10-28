@@ -69,11 +69,10 @@ describe('#1339 — the creating row is retried exactly as a constraint row is',
     for (let seed = 0; seed < 6; seed++) expect(offMidpoint(fold(['M אמצע SA', PYR], seed), 'M', 'S', 'A'), `seed ${seed}`).toBeLessThan(1e-9);
   });
 
-  it('a row whose point NO line declares stays red, naming it — nothing is invented to satisfy it', () => {
-    const [first, second] = statuses(['M אמצע XA', PYR]);
-    expect(first).toEqual({ code: 'unknown-point', id: 'X' });
-    expect(second).toBe('ok');
-    expect(fold(['M אמצע XA', PYR]).construction.points.has('M')).toBe(false);
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a point no line declares is created, last.
+  it('a row whose point NO line declares creates it, last; A binds to the pyramid', () => {
+    expect(statuses(['M אמצע XA', PYR])).toEqual(['ok', 'ok']);
+    expect(fold(['M אמצע XA', PYR]).construction.points.has('M')).toBe(true);
   });
 
   it('a chain settles: midpoint → a length on the midpoint → the solid, in both orders of the first two', () => {

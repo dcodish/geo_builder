@@ -121,7 +121,6 @@ beforeEach(() => {
 describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
   const CASES: { issue: string; lines: string[]; after: string }[] = [
     { issue: '#2151', lines: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], after: FLOOR.he },
-    { issue: '#2132', lines: ['מעגל O ברדיוס r', 'OR=r'], after: `הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה. ${HINT_HE}` },
     // #2345 (ADR-758) under #2486 (ADR-759): «רבע מעגל AOB» is centred at O (the middle letter), so AB is a real arc of
     // the quarter — «קשת AB = 40» contradicts its 90° and is refused as over-constrained (#2483), «קשת AB = 90» is
     // already true. Never the floor, never ∠AAB. Read from the locale table (one source).
@@ -131,7 +130,6 @@ describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
     // The arc-end-is-centre sentence itself, its letters re-based to the middle-letter centre (#2486): O is the centre.
     { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AO = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AO = 40', end: 'O' })) },
     { issue: '#2345', lines: ['רבע מעגל BAO', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
-    { issue: '#2048', lines: ['AD:DB = 1:2'], after: `הנתון «AD:DB = 1:2» מתייחס לנקודה שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה. ${HINT_HE}` },
   ];
   for (const c of CASES) {
     it(`${c.issue} ${c.lines.join(' · ')} → ${c.after === FLOOR.he ? 'the floor' : 'the named refusal'}`, async () => {
@@ -142,15 +140,23 @@ describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
     }, 60_000);
   }
 
-  it('[2-D] unchanged: a fragment of the student’s own letters and numbers keeps its bracket («AB = 2 AD»)', async () => {
-    const { notes } = await play(['AB = 2 AD']);
-    expect(notes.map((n) => plain(n.text))).toContain(`הנתון «AB = 2 AD» מתייחס לנקודה שעדיין לא הוגדרה (|AB| = 2·|AD|). הגדירו אותה תחילה. ${HINT_HE}`);
-  }, 60_000);
-
-  it('the English catalog line «S_{ABC}/S_{DEF} = 3/4» names its missing points too', async () => {
-    const { notes } = await play(['S_{ABC}/S_{DEF} = 3/4'], 'en');
-    expect(notes.map((n) => plain(n.text)).some((x) => x.includes("refers to a point that hasn't been defined yet (A, B, C, D, E, F)"))).toBe(true);
-  }, 60_000);
+  // #2132's «OR=r», #2048's «AD:DB = 1:2», «AB = 2 AD» and the English «S_{ABC}/S_{DEF} = 3/4» rendered the missing-point
+  // refusal. ADR-W-162 (#1467) creates those points instead (its notice is shell/frame/CreatedNotice, locked by
+  // created-notice-meta), so each now commits with no refusal note, and whatever note it shows is clean.
+  const CREATED: { issue: string; lines: string[]; locale: 'he' | 'en' }[] = [
+    { issue: '#2132', lines: ['מעגל O ברדיוס r', 'OR=r'], locale: 'he' },
+    { issue: '#2048', lines: ['AD:DB = 1:2'], locale: 'he' },
+    { issue: '[2-D]', lines: ['AB = 2 AD'], locale: 'he' },
+    { issue: '[en catalog]', lines: ['S_{ABC}/S_{DEF} = 3/4'], locale: 'en' },
+  ];
+  for (const c of CREATED) {
+    it(`${c.issue} ${c.lines.join(' · ')} → commits, its points created (ADR-W-162)`, async () => {
+      const { notes } = await play(c.lines, c.locale);
+      expect([...new Set(st().facts.map((x) => x.utterance))]).toEqual(c.lines); // a line may commit as several facts
+      expect(notes.filter((n) => n.said === c.lines[c.lines.length - 1]).map((n) => plain(n.text))).toEqual([]);
+      for (const n of notes) expect(violations(n.text, n.vocab, c.locale, n.said), plain(n.text)).toEqual([]);
+    }, 60_000);
+  }
 });
 
 describe('#2201 3b — (2) the class: every catalog row × he/en on a fresh figure', () => {
@@ -176,8 +182,9 @@ describe('#2201 3b — (2) the class: every catalog row × he/en on a fresh figu
       }
     }
     expect(bad, bad.join('\n')).toEqual([]);
-    // non-vacuous: the sweep rendered messages, and messages that are not the floor
-    expect(rendered).toBeGreaterThan(20);
+    // non-vacuous: the sweep rendered messages, and messages that are not the floor. Measured 8 after ADR-W-162 (#1467):
+    // the catalog rows that refused «references an unknown point» on a fresh figure now create their points instead.
+    expect(rendered).toBeGreaterThan(5);
     expect(nonFloor).toBeGreaterThan(0);
   }, 900_000);
 });

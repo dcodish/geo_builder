@@ -294,13 +294,20 @@ const claimable = (tail: string): boolean => {
 const HE_GIVEN = '(?:נתו(?:ן|נה|נים|נות)\\s+)?';
 /** «הנקודה» / «נקודה» / «הנקודות» / «נקודות», optional — the subject noun. */
 /**
+ * The point NOUNS themselves, bare (no boundary, no trailing space): «הנקודה» / «נקודות» / «קדקוד», and the English
+ * "(the) point(s)". Exported for the lost part's arm 3 (#2547, ADR-AG-334): «דרך הנקודה C» names C, so a noun right
+ * before a label is the label's optional subject noun, never a role. `HE_POINT` composes the Hebrew half.
+ */
+export const POINT_NOUN_HE_ATOM = '(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד))';
+export const POINT_NOUN_EN_ATOM = '(?:(?:the\\s+)?points?)';
+/**
  * The optional subject noun before a point's name.
  *
  * `קדקוד` is the EXAM's own word for a vertex (#1127), and it belongs here rather than inline at
  * any call site: this tree's stated rule is that a noun gate re-spelled inline drifts, and it has paid
  * for that three times. One alternation, and every construct that admits a point gains the spelling.
  */
-const HE_POINT = '(?:ה?(?:נקוד(?:ה|ות)|קו?דקוד)\\s+)?';
+const HE_POINT = `(?:${POINT_NOUN_HE_ATOM}\\s+)?`;
 /** «הישר» / «ישר». */
 /**
  * The line NOUNS — «הישר AC», and «האלכסון AC», which is the same object (#1070).
@@ -3553,6 +3560,10 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   // nothing when the circle stands: the centre is shown, unnamed, until a sentence names it (#1673, ADR-AG-210).
   if (/^(?:ה?נקודת\s+)?מרכז\s+ה?מעגל$|^(?:the\s+)?cent(?:re|er)\s+of\s+the\s+circle$/i.test(g)) return aboutCircles([{ k: 'the' }], [], line);
 
+  // «מרכז המעגל הראשון הוא O_1(-3,1)» — circle 1 or 2 of a drawn pair, its centre named and placed (#2552).
+  const pairCentre = pairCentreAt(g, line);
+  if (pairCentre) return pairCentre;
+
   // «שני מעגלים …» — two circles the sentence draws, a PAIR (interchangeable until a statement tells them apart).
   const two = /^שני\s+מעגלים(?:\s+(.+))?$/.exec(g) ?? /^(?:the\s+)?two\s+(?:(disjoint|intersecting|nested|concentric)\s+)?circles(?:\s+(.+))?$/i.exec(g);
   if (two) {
@@ -3561,6 +3572,21 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     const rest = trim((he ? two[1] : two[2]) ?? '');
     const pair: CircleSlot[] = [{ k: 'new' }, { k: 'new' }];
     if (!rest && !adjective) return aboutCircles(pair, [], line);
+    /*
+     * «(נתונים) שני מעגלים שרדיוס כל אחד מהם 5» · "two circles, each of radius 5" — THE PAIR WITH ONE RADIUS FOR BOTH
+     * (#2552, ADR-AG-336; the exam's «שאלה 6» opening sentence). The same two circles, each sized as «מעגל ברדיוס 5» sizes
+     * its one: the value is `radiusOfSize`'s slot (a number, a radical, a radius letter). Only this sentence (operator
+     * ruling D8 = B, 2026-10-26): «שני מעגלים שרדיוסם 5» and «… ברדיוס 5» keep going to the AI.
+     */
+    const each =
+      (he ? new RegExp(`^ש(?:ה)?רדיוס\\s+(?:של\\s+)?כל\\s+אחד\\s+מהם\\s+(?:(?:${COPULA_WORDS})\\s*|=\\s*)?(\\S+)$`).exec(rest) : null) ??
+      (!he && !adjective ? /^,?\s*each\s+(?:of\s+|with\s+)?(?:a\s+)?radius\s+(?:of\s+)?=?\s*(\S+)$/i.exec(rest) : null);
+    if (each) {
+      const r = radiusOfSize('radius', each[1]);
+      // A value no reader takes declines, as «מעגל ברדיוס …» does — so a capital is taught (#2427, ADR-AG-325), never misread.
+      if (!r) return null;
+      return aboutCircles([{ k: 'new', r }, { k: 'new', r }], [], line);
+    }
     if ((he && /^זרים$/.test(rest)) || (adjective === 'disjoint' && !rest)) {
       return aboutCircles(pair, [{ t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'apart' }, positive: true }, src: line }], line);
     }
@@ -3728,6 +3754,12 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   // «הישר l משיק למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה» — the same common tangent, its line named l (#2392).
   const namedTangent = namedCommonTangent(g, line);
   if (namedTangent) return namedTangent;
+  // «משיק משותף חיצוני לשני המעגלים» · «הישר l משיק משותף חיצוני …» — the same tangent, its touches the tool's (#2553).
+  const unnamedTangent = unnamedCommonTangent(g, line);
+  if (unnamedTangent) return unnamedTangent;
+  // «P נקודת ההשקה של l2 עם מעגל O_1» — the touch point of a tangent the figure has, named (#2553).
+  const touchName = namedTouchPoint(g, line);
+  if (touchName) return touchName;
   // «כל המשיקים המשותפים לשני המעגלים», «המשיק העובר בנקודה המשותפת לשני המעגלים» — the set and the touch tangent (#2390).
   const tangentSet = commonTangentSet(g, line);
   if (tangentSet) return tangentSet;
@@ -6790,10 +6822,10 @@ const THROUGH_FREE_EN = new RegExp(
  * line-first tangency of `parseCircleAt` («הישר l1 משיק למעגל M»), which would refuse the line it does not yet have.
  */
 const NAMED_TANGENT_HE = new RegExp(
-  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק\\s+(ל.+?)\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})(?:\\s*,?\\s+בהתאמה)?$`,
+  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק(?:\\s+משותף)?(?:\\s+(חיצוני|פנימי|אלכסוני))?(?:\\s+משותף)?\\s+(ל.+?)\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})(?:\\s*,?\\s+בהתאמה)?$`,
 );
 const NAMED_TANGENT_EN = new RegExp(
-  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+(?:a\\s+)?tangent\\s+((?:to|of)\\s+.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})(?:\\s*,?\\s+respectively)?$`,
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+(?:(?:a|an|the)\\s+)?(?:(external|exterior|internal|interior|transverse)\\s+)?(?:common\\s+)?tangent\\s+((?:to|of)\\s+.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})(?:\\s*,?\\s+respectively)?$`,
   'i',
 );
 const NAMED_TANGENT_SPLIT_HE = new RegExp(
@@ -6812,11 +6844,89 @@ function namedCommonTangent(g: string, line: string): RuleOutcome {
   }
   const m = NAMED_TANGENT_HE.exec(g) ?? NAMED_TANGENT_EN.exec(g);
   if (!m) return null;
-  const [, name, target, p, q] = m;
+  const [, name, kindWord, target, p, q] = m;
   const slots = twoCircleSlots(target);
   if (!slots) return null;
   if (p === q) return refuse('repeated-vertex', line);
-  return aboutCircles(slots, commonTangentFacts(p, q, SLOT1, SLOT2, undefined, line, name), line);
+  // «הישר l משיק משותף חיצוני למעגלים … בהתאמה» — the stated kind rides the same tangent (#2553, ADR-AG-337).
+  const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
+  return aboutCircles(slots, commonTangentFacts(p, q, SLOT1, SLOT2, kind, line, name), line);
+}
+
+/**
+ * «משיק (משותף) חיצוני (משותף) לשני המעגלים» · «המשיק המשותף למעגלים O ו-P» · «הישר l משיק משותף חיצוני לשני המעגלים» ·
+ * "an external common tangent to the two circles" · "the line l is an external common tangent of the two circles" — A
+ * COMMON TANGENT THE SENTENCE DOES NOT LETTER (#2553, ADR-AG-337; 2-D's label-less «משיק משותף [חיצוני]», measured at
+ * d9494206). The same `common-tangent` as «AB משיק משותף …» (ADR-AG-313's lowering, no new geometry): its touches are the
+ * tool's letters, 2-D's `autoVertexLabels` (`TOOL_LETTERS.vertex` — A, B, the next free letters, line-scoped so a
+ * second such sentence is a second tangent, C, D, as in 2-D), and its line is named by the sentence («הישר l») or by its
+ * touches. «משותף» or a kind word is required, as in 2-D: «הישר l משיק לשני המעגלים» keeps its reading.
+ */
+const UNNAMED_TANGENT_HE = new RegExp(
+  `^(?:ה?ישר\\s+(${FREE_LINE_NAME})\\s+(?:הוא\\s+)?)?ה?משיק(\\s+ה?משותף)?(?:\\s+ה?(חיצוני|פנימי|אלכסוני))?(\\s+ה?משותף)?\\s+(ל.+)$`,
+);
+const UNNAMED_TANGENT_EN = new RegExp(
+  `^(?:(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+)?(?:(?:a|an|the)\\s+)?(?:(external|exterior|internal|interior|transverse)\\s+)?(common\\s+)?tangent\\s+((?:to|of)\\s+.+)$`,
+  'i',
+);
+function unnamedCommonTangent(g: string, line: string): RuleOutcome {
+  const he = UNNAMED_TANGENT_HE.exec(g);
+  const en = he ? null : UNNAMED_TANGENT_EN.exec(g);
+  if (!he && !en) return null;
+  const [name, common, kindWord, target] = he ? [he[1], he[2] ?? he[4], he[3], he[5]] : [en![1], en![3], en![2], en![4]];
+  if (!common && !kindWord) return null;
+  const slots = twoCircleSlots(target);
+  if (!slots) return null;
+  const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
+  const [a, b] = [toolPoint('vertex', 'common-tangent-1'), toolPoint('vertex', 'common-tangent-2')];
+  return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line, name), line);
+}
+
+/**
+ * «מרכז המעגל הראשון הוא O_1(-3,1)» · «מרכז המעגל השני הוא O_2(9,10)» · "the centre of the first circle is O_1(-3,1)" —
+ * ONE CIRCLE OF THE DRAWN PAIR, ITS CENTRE NAMED AND PLACED (#2552, ADR-AG-336; the exam's «שאלה 6» second sentence).
+ * «הראשון / השני» is read ONLY here (operator ruling D8 = B, 2026-10-26: the exam's two sentences, not a general
+ * reference), extending ADR-AG-322's single-sentence «המעגל האחד / האחר» reader: the `centre-of` fact carries the
+ * ordinal, M1 names that member's centre by order, and the point sentence «X(a,b)» then places it — the two lines
+ * «X מרכז מעגל» · «X(a,b)» in one. With no pair drawn, the circle is created on X, as «X מרכז המעגל» creates it.
+ */
+const PAIR_CENTRE_HE = new RegExp(`^מרכז(?:ו)?\\s+(?:של\\s+)?ה?מעגל\\s+ה(ראשון|שני)\\s+(?:(?:הוא|היא|הינו)\\s+)?(?:ב?(?:ה?נקודה\\s+)?)?(${NAME})\\s*(\\([^()]*\\))$`);
+const PAIR_CENTRE_EN = new RegExp(`^the\\s+cent(?:re|er)\\s+of\\s+the\\s+(first|second)\\s+circle\\s+is\\s+(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})\\s*(\\([^()]*\\))$`, 'i');
+function pairCentreAt(g: string, line: string): RuleOutcome {
+  const m = PAIR_CENTRE_HE.exec(g) ?? PAIR_CENTRE_EN.exec(g);
+  if (!m) return null;
+  const [, word, id, coords] = m;
+  const ordinal: 1 | 2 = /^(?:ראשון|first)$/i.test(word) ? 1 : 2;
+  const placed = parseClause(`${id}${coords}`);
+  if (!placed.ok) return null;
+  const create = parseClause(`נתון מעגל שמרכזו ${id}`);
+  return made([
+    { t: 'centre-of', id, ordinal, ...(create.ok ? { create: create.facts.map((f) => ({ ...f, src: line })) } : {}), src: line },
+    ...placed.facts.map((f) => ({ ...f, src: line })),
+  ]);
+}
+
+/**
+ * «P נקודת ההשקה של l2 עם מעגל O_1» · «P היא נקודת ההשקה של הישר l2 עם המעגל» · «נקודת ההשקה של l2 ומעגל O_1 היא P» ·
+ * "P is the point of tangency of l2 with circle O_1" — THE TOUCH POINT OF A LINE AND A CIRCLE, NAMED (#2553, ADR-AG-337;
+ * the exam's ד, after «כל המשיקים המשותפים»). The inverse of «הישר l2 משיק למעגל O_1 בנקודה P», and read as exactly that
+ * sentence: P on the circle, on the line, the radius ⟂ the line there — so on a line the figure already draws tangent,
+ * P is its touch point, and the rule that owns the tangency owns every refusal (a line the figure lacks, a name clash).
+ */
+const TOUCH_NOUN_HE = 'נקודת\\s+(?:ה)?(?:השקה|מגע)';
+const TOUCH_OF_HE = `של\\s+(?:ה?ישר\\s+)?(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:עם\\s+|ו-?)ה?מעגל(?:\\s+(${NAME}))?`;
+const TOUCH_NAME_HE = new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})\\s+(?:(?:היא|הינה)\\s+)?${TOUCH_NOUN_HE}\\s+${TOUCH_OF_HE}$`);
+const TOUCH_NAME_HE_LAST = new RegExp(`^${TOUCH_NOUN_HE}\\s+${TOUCH_OF_HE}\\s+(?:היא\\s+(?:ה?נקודה\\s+)?)?(${NAME})$`);
+const TOUCH_NAME_EN = new RegExp(
+  `^(?:(?:the\\s+)?point\\s+)?(${NAME})\\s+is\\s+the\\s+(?:point\\s+of\\s+(?:tangency|contact)|(?:touch(?:ing)?|tangency|contact)\\s+point)\\s+of\\s+(?:(?:the\\s+)?line\\s+)?(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:with|and)\\s+(?:the\\s+)?circle(?:\\s+(${NAME}))?$`,
+  'i',
+);
+function namedTouchPoint(g: string, line: string): RuleOutcome {
+  const last = TOUCH_NAME_HE_LAST.exec(g);
+  const m = last ? [last[3], last[1], last[2]] : (TOUCH_NAME_HE.exec(g) ?? TOUCH_NAME_EN.exec(g))?.slice(1, 4);
+  if (!m) return null;
+  const [p, l, o] = m;
+  return viaCanonical(line, null, () => [`הישר ${l} משיק למעגל${o ? ` ${o}` : ''} בנקודה ${p}`]);
 }
 
 /**

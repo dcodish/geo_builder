@@ -158,10 +158,12 @@ describe('arc measures — an arc is its central angle (2-D ADR-116)', () => {
     }
   });
 
-  it('REFUSAL — an arc whose ends the figure does not have is refused naming the end (2-D refuses it too)', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"; 2-D creates them too, ADR-769): 
+  // an arc whose ends the figure does not have creates them — ON the circle, since the arc puts them there.
+  it('an arc whose ends the figure does not have creates them, on its circle', () => {
     const v = decideSubmit('קשת AB = 40 במעגל O', ['מעגל O'], 0);
-    expect(v.kind).toBe('refused');
-    if (v.kind === 'refused') expect(v.error.key).toBe('unknown-reference');
+    expect(v.kind).toBe('record');
+    if (v.kind === 'record') expect(v.created).toEqual(['A', 'B']);
   });
 
   it('He and En lower to the same arc fact', () => {

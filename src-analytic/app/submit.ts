@@ -25,13 +25,20 @@ import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { holdsInEveryConfiguration } from '../engine/evaluate';
-import type { ApplyNotice } from '../engine/apply';
+import { circleByName, type ApplyNotice } from '../engine/apply';
+import { RING_OF_FIGURE } from '../engine/names';
 import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
-import { declinedPart, unreadPart, type LostPart } from './lostPart';
+import { declinedPart, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import type { SentenceOutcome } from '../../shell/sentences';
+
+/** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
+const typedAt = (line: string, id: string): number => {
+  const at = line.split('').findIndex((_, i) => line.startsWith(id, i) && !/[0-9']/.test(line[i + id.length] ?? ''));
+  return at < 0 ? Infinity : at;
+};
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
@@ -52,7 +59,7 @@ export type SubmitVerdict =
    * caller shows it IN THE SAME COMMIT that records the line (`recordLine(line, notice)`): a notice set
    * before the record would be cleared by it.
    */
-  | { kind: 'record'; line: string; notice?: RecordNotice }
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[] }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -345,18 +352,30 @@ function decideOnce(
      * read; a rest of labels it already carries, with no word that says anything, is the part that was not.
      */
     if (parsed.code === 'not-handled') {
-      const lost = declinedPart(line, (piece, before) => {
+      const records = (piece: string, before: readonly string[]): boolean => {
         // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
         const held = before.length ? [...lines, ...before] : lines;
         const k = decideOnce(piece, held, seed, before.length ? derive(held, seed) : current).kind;
         return k === 'record' || k === 'already-known' || k === 'already-follows';
-      });
+      };
+      // #2547 (ADR-AG-334) — arm 3, after arm 2 so a co-reference it refuses keeps its parts: a through-clause on a
+      // segment whose point carries no fresh letter («AB מיתר העובר דרך מרכז המעגל») is refused whole, as 2-D refuses it.
+      const lost = declinedPart(line, records) ?? declinedThrough(line, records);
       if (lost) return lostPartRefusal(line, lost);
     }
     // #1175 — a refusal that carries WHO is already there must not lose them on the way to the UI.
     // Spread rather than listed field-by-field, so the next code that carries context arrives intact.
     return { kind: 'refused', error: { ...parsed, ok: undefined, key: parsed.code } as unknown as InputError };
   }
+
+  /**
+   * #2545 (ADR-AG-335) — A LETTERLESS DESCRIBED CIRCLE THE FIGURE DOES NOT HAVE. «DE מיתר במעגל החוסם» reads only when
+   * the figure's one polygon has that circle and it is the figure's one circle; otherwise the line keeps the hand-off it
+   * had before the reading existed (02c R124) — creating the circle, or choosing between two, is #2560's question.
+   */
+  const letterless = [...JSON.stringify(parsed.facts).matchAll(new RegExp(`"([⊙○]${RING_OF_FIGURE}[0-9]?)"`, 'g'))].map((m) => m[1]);
+  // the verdict an unread line gets above, field for field
+  if (letterless.some((name) => !circleByName(current.construction, name))) return { kind: 'refused', error: { code: 'not-handled', detail: line, key: 'not-handled' } as unknown as InputError };
 
   /**
    * #1888 / #1889 (ADR-AG-251) — A PART THE READING NEVER READ. «C מחלקת את AB ביחס 3:2 ב-B» parsed to the ratio alone:
@@ -383,9 +402,15 @@ function decideOnce(
   if (capitalParam) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capitalParam } };
   /** A `record` verdict carries the new line's notice, if the fold raised one (#1350). */
   const raised = trial.notices.find((n) => n.index === lines.length);
-  const recorded: SubmitVerdict = raised
-    ? { kind: 'record', line, notice: { code: raised.code, detail: raised.detail, holder: raised.holder } }
-    : { kind: 'record', line };
+  /** #1467 (ADR-AG-342): the letters this line's references created — what the «נוצרה נקודה חדשה …» notice names. */
+  // in the order the student typed them, as 2-D names them
+  const made = trial.created.find((c) => c.index === lines.length)?.ids.slice().sort((x, y) => typedAt(line, x) - typedAt(line, y));
+  const recorded: SubmitVerdict = {
+    kind: 'record',
+    line,
+    ...(raised ? { notice: { code: raised.code, detail: raised.detail, holder: raised.holder } } : {}),
+    ...(made?.length ? { created: made } : {}),
+  };
   /**
    * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed
    * line passes)? Its own, first. But a solver that cannot meet the whole set blames whichever

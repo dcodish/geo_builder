@@ -98,10 +98,13 @@ describe('#774 — «מרובע ABCE»: the quad stays a QUAD — flat by defini
     expect(def).toEqual({ kind: 'on-plane', plane: 'ABC' });
   });
 
-  it('a run whose fresh labels cannot be minted refuses naming an UNDECLARED label', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): the fold's mint pass creates the corners
+  // a run cannot mint itself; a declaration announces nothing.
+  it('a run with two unknown corners creates them, and announces nothing (a declaration)', () => {
     submit(PYRAMID);
-    submit('מרובע ABXY'); // two unknown corners of a flat quad — no owner yet
-    expect(err()).toEqual({ code: 'unknown-point', id: 'X' });
+    submit('מרובע ABXY');
+    expect(err()).toBeNull();
+    expect(useGeo3.getState().lastCreated).toBeNull();
   });
 
   it('the operator sequence (#807 play): «מרובע ABCE» AFTER «משולש SEC» draws the missing AE side', () => {
