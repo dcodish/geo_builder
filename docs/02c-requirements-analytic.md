@@ -632,7 +632,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R88 — a RATIO between two lengths is a given the student can state**. The bare colon relates existing points; the keyworded divider mints the point. An n-way chain is refused by name.
 - «AC:CB = 3:2»
 - «C מחלקת את AB ביחס 3:2» → C minted on AB
-- Sources: #1124.
+- **⚠ Amended by ADR-AG-348 (#2579, 2026-10-28):** as in 2-D, the bare colon draws both named segments and, when they share a point nothing places yet («AD:DB = 1:2», a new D or a bare «נקודה D»), places that point on the outer segment between its ends and draws that segment too; a point the figure already places (a polygon's vertex, a point on another object) keeps the plain proportion.
+- Sources: #1124, ADR-AG-348, #2579.
 
 **R106 — a given that DETERMINES a parameter is honoured**. *(Operator: "one design pass over the solver … so a student can build the whole 572 figure".)* **An unpinned parameter is never moved by the solve**; an unused declared symbol is marked «(לא בשימוש בשרטוט)».
 - «N על הישר l3» on `(k+1)x+2y−12+5k=0` → `k = 2`, in the panel

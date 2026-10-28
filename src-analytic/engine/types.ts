@@ -257,6 +257,15 @@ export type Fact =
    */
   | (FactBase & { t: 'declare'; id: Id })
   /**
+   * «AD:DB = 1:2» — THE SHARED POINT OF A COLON RATIO, SEATED between the outer ends (#2579,
+   * [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348); the 2-D twin is ADR-773). The sentence places D on AB,
+   * between A and B, when nothing in the figure places D yet: a new letter, or a bare declared point that is no polygon's
+   * vertex, no circle's defining point and no constraint's subject. A point the figure already places (a vertex of
+   * «משולש ABD», a point «על BC») keeps the plain proportion: seating it would re-define it. The parser is pure over one
+   * line, so which of the two holds is decided at M1, here, where the figure is known.
+   */
+  | (FactBase & { t: 'seat-between'; id: Id; a: Id; b: Id })
+  /**
    * «זווית B ישרה» — a right angle named by its VERTEX ALONE (#1049).
    *
    * It cannot be lowered in the parser, because `B` names an angle only once the figure says which

@@ -256,7 +256,7 @@ describe('#2459 — controls, unchanged', () => {
   it('«AB גדול פי 2» still asks for the comparand; «AB גדול פי 2 מ-AC» is still the ratio', async () => {
     const v = await decide(['משולש ABC'], 'AB גדול פי 2');
     expect(v).toMatchObject({ kind: 'refuse', note: { key: 'input.incompleteComparative' } });
-    expect(committed(await decide(['משולש ABC'], 'AB גדול פי 2 מ-AC'))?.[0]).toMatchObject({ type: 'set-ratio', k: 2 });
+    expect(committed(await decide(['משולש ABC'], 'AB גדול פי 2 מ-AC'))?.find((c) => c.type === 'set-ratio')).toMatchObject({ type: 'set-ratio', k: 2 });
   });
 });
 

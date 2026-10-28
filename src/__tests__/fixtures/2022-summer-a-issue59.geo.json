@@ -273,6 +273,29 @@
     {
       "id": "5hxLsQ3HA96O-lzW5w8TM",
       "utterance": "AC=0.5DC",
+      "group": "5hxLsQ3HA96O-lzW5w8TM",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5hxLsQ3HA96O-lzW5w8TM~1",
+      "utterance": "AC=0.5DC",
+      "group": "5hxLsQ3HA96O-lzW5w8TM",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5hxLsQ3HA96O-lzW5w8TM~2",
+      "utterance": "AC=0.5DC",
+      "group": "5hxLsQ3HA96O-lzW5w8TM",
       "cmd": {
         "type": "set-ratio",
         "a": "A",

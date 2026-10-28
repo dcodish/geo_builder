@@ -71,6 +71,28 @@
       "utterance": "BE = 1/4 BC, DF = 1/4 AD",
       "group": "Gy2aviUzb80jfkHISOXdC",
       "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "T0efFtvqMaufdoqQYxTrv~1",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "T0efFtvqMaufdoqQYxTrv~2",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
         "type": "set-ratio",
         "a": "B",
         "b": "E",
@@ -81,7 +103,29 @@
       "enabled": true
     },
     {
-      "id": "KV6TumsHiO1ShVWAFU_zb",
+      "id": "T0efFtvqMaufdoqQYxTrv~3",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "T0efFtvqMaufdoqQYxTrv~4",
+      "utterance": "BE = 1/4 BC, DF = 1/4 AD",
+      "group": "Gy2aviUzb80jfkHISOXdC",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "T0efFtvqMaufdoqQYxTrv~5",
       "utterance": "BE = 1/4 BC, DF = 1/4 AD",
       "group": "Gy2aviUzb80jfkHISOXdC",
       "cmd": {

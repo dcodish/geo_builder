@@ -59,7 +59,8 @@ describe('corner tangent with NAMED tangent points, arm endpoints untouched (ADR
 });
 
 describe('segment ratio with a √ value — Q3', () => {
-  const ratio = (u: string) => cmds(u)[0] as Extract<AnyCommand, { type: 'set-ratio' }>;
+  // #2579 (ADR-773): the ratio draws both named segments first, so the relation is read by its type, not its slot
+  const ratio = (u: string) => cmds(u).find((c) => c.type === 'set-ratio') as Extract<AnyCommand, { type: 'set-ratio' }>;
 
   it('"EB/AE=√2/2" ⇒ k = √2/2 ≈ 0.707 (not a "AE=√2" fragment)', () => {
     const r = ratio('EB/AE=√2/2');

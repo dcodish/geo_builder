@@ -136,8 +136,12 @@ describe('#1467 — a statement naming a point the figure lacks creates it (the 
     const ctx = { points: ['A', 'B', 'D'] };
     const r = parse('AB = 2 AD', ctx);
     expect(r.ok && r.commands.some((c) => c.type === 'free-point')).toBe(false);
+    // #2579 (ADR-773): a proportion now draws the segments it names, and those carriers create A, B and D, so the pass adds
+    // nothing; a measure («AB = k») still has its endpoints created by the pass
     const blank = parse('AB = 2 AD', { points: [] });
-    expect(blank.ok && blank.commands.filter((c) => c.type === 'free-point').map((c) => (c as { id: string }).id)).toEqual(['A', 'B', 'D']);
+    expect(blank.ok && blank.commands.map((c) => c.type)).toEqual(['segment', 'segment', 'set-ratio']);
+    const measure = parse('AB = k', { points: [] });
+    expect(measure.ok && measure.commands.filter((c) => c.type === 'free-point').map((c) => (c as { id: string }).id)).toEqual(['A', 'B']);
   });
 
   it('a radius symbol is never created as a point («מעגל O שרדיוסו R»)', async () => {

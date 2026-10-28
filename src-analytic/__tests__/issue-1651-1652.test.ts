@@ -285,7 +285,7 @@ describe('#1652 — a length given draws the pair it names; a distance draws not
   it.each([
     ['AB = 2CD', ['seg-AB', 'seg-CD']],
     ['AB + BC = 10', ['seg-AB', 'seg-BC']],
-    ['AC:CB = 3:2', ['seg-AC', 'seg-BC']],
+    ['AC:CB = 3:2', ['seg-AB', 'seg-AC', 'seg-BC']], // #2579 (ADR-AG-348): and the outer segment AB its shared point C sits on
     ['אורך הקטע AB הוא 3', ['seg-AB']],
   ])('«%s» draws every pair it names', (line, expected) => {
     const lines = ['נקודה A', 'נקודה B', 'נקודה C', 'נקודה D', line];

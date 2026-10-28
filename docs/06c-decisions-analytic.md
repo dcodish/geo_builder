@@ -13930,3 +13930,22 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **⚠ Locks rewritten** (each cites #1467; they asserted ADR-AG-015's "a reference may not invent" for points, or ADR-AG-210's 2-D form gate): `derived`, `solve`, `parser` («AB = 2CD»), `issue-1242-fold-deferral` (atomicity now asked of «AB קוטר במעגל I», which no creation fixes; the forward-reference gate), `issue-1670-follow-2d` (its four 2-D refusals now build), `issue-1651-1652`, `line-at`, `issue-1620-perpendiculars`, `issue-1620-bisectors-cevians`, `issue-1622-e4-chords-arcs` (an arc's missing ends are created ON its circle), `issue-1622-e5-last-rows` (an area value), `issue-1317-family`, `issue-2395-distinct-given` (the point half; the circle half kept), `issue-2431-line-name-resolves`, `issue-1464-1324-1462-kite-exercise` (two), `issue-2392-named-common-tangent`, `fact-ops-1548` (three: muting a point leaves its dependent on a free point, #1467 §8b), `issue-1150-1145-refs` and `issue-1180-1179-equation-and-noun` and `issue-1750-unknown-ref-near-miss` (a typed line no longer reaches the missing-POINT refusal; the circle half and the wording stay locked), `issue-1272-claim-gate` (two), `issue-1340-forward-derived-point`.
 
 **Known difference from 2-D (wording only).** «AD תיכון לצלע BC» names B, C here and A, B, C in 2-D: analytic's cevian draws AD as a declaring segment (ADR-AG-015), so A is introduced, not minted. The LLM lane's lines record without the notice.
+
+## ADR-AG-348 — «AD:DB = 1:2» places D on AB, between A and B, and draws AB, as 2-D does (#2579)
+
+**Status:** accepted · 2026-10-28 · feature (analytic) · fix round #2585, stream H · branch `feat/2579-ratio-draws-segments` · the analytic port of [ADR-773](06-decisions.md#adr-773) (ADR-W-157) · amends #1124's R88 ("the bare colon relates existing points")
+
+**Operator:** ruling 2026-10-27 on #2579: Q2 «yes» (draw AB too), Q3 «yes» (place D on AB, between A and B); Q1 «always» was already analytic's behaviour (#1652 draws both pairs).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R88 (amended) · **Design:** [04c](04c-design-analytic.md) § "Measures as givens: the ratio of two measures and the area notation" · **LADDER stage:** M1 (`applyFact`), the fact's own arm
+
+**Measured before** (`422cda84`, `decideSubmit` → `derive`): «AD:DB = 1:2» drew AD and DB but not AB, and D floated off the line (AD:DB held with A, D, B bent), blank and over «נקודה A/B/D».
+
+**Decision.**
+1. **`parseRatioColon`** keeps its relation (`ratioFact`, the one «AC = 1.5CB» lowers to) and its two pieces; when the pairs share exactly one point (`sharedPointHost`, the 2-D helper's twin), it also emits the outer segment's piece and a new fact `seat-between { id, a, b }`.
+2. **`seat-between` is decided at M1**, because the parser is pure over one line and only the figure knows whether D is already placed: `unplacedPoint(c, id)` — a `free` object that is no polygon's vertex, no circle's centre or defining point (`circleDefPoints`), and no constraint's subject (every constraint that places a point names it as its `id`: a coordinate, a midpoint, a membership) — applies `on-line-2pt` and the `between` selector, exactly the divider's placement (`ratioDividerFacts`); otherwise the fact is `known` and the proportion stands alone. The analytic reading of 2-D's `freePoints`.
+3. **The identity lock** (#1124) now asserts the RELATION: «AC:CB = 3:2» and «AC = 1.5CB» still state one `length-eq`; the colon adds the seat and the outer segment.
+
+**Sibling audit.** 2-D is ADR-773 (same predicate, ADR-565's `freePoints`). 3-D: #2596. The «/» and «=» spellings are not seated, as in 2-D (#2597).
+
+**Locks.** `src-analytic/__tests__/issue-2579-colon-seats-point.test.ts` (9: four entry contexts with D between and AD:DB = 1:2 at seeds 0–3; the notice A, D, B and the three segments; A(0,0) · B(6,0) → D(2,0); «משולש ABD» stays a triangle; «D על BC» stays on BC; no shared point). **⚠ Locks rewritten:** `issue-1124-ratio-family` (the identity case reads the relation), `issue-1651-1652` («AC:CB = 3:2» now also draws AB).

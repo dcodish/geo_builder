@@ -1,0 +1,83 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-28T12:00:00.000Z",
+  "name": "ratio-places-shared-point-2579",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "utterance": "AD:DB = 1:2",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AD:DB = 1:2",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "AD:DB = 1:2",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "AD:DB = 1:2",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "AD:DB = 1:2",
+      "group": "g1",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "D",
+        "c": "D",
+        "d": "B",
+        "k": 0.5
+      },
+      "enabled": true
+    }
+  ]
+}
