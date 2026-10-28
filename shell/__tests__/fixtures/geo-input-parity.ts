@@ -880,6 +880,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trapezoid-midsegment-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EF קטע אמצעים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'trapezoid-bases-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EL מקביל לבסיסים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'second-unnamed-median-1690', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון מ-A במשולש ABC', 'תיכון מ-B במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#1690 (ADR-772): the second median takes the midpoint N; 2-D refused it «M coincides with its constructed target»' },
   { id: 'cevian-plural-respectively', family: 'cevians-centres', steps: ['משולש OBC', 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '471 corpus 7/4, as S1 teaches its imperative' },
   { id: 'cevian-plural-respectively-medians', family: 'cevians-centres', steps: ['משולש ABC', 'AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the medians twin (#1685, ADR-629)' },
   { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '471 corpus 22/5; 2-D reads it since #1685/#1999 (ADR-666)' },
@@ -1834,6 +1835,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'pair-each-radius-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2216' }], note: 'analytic draws two radius-5 circles since ADR-AG-336; 2-D hands it to the model (#2216 item 2)' },
   { id: 'pair-first-centre-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O_1(-3,1)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'a coordinate centre: analytic’s; not-handled before ADR-AG-336' },
   { id: 'pair-centres-joined-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the exam’s joined sentence, cut before «ומרכז»; not-handled before ADR-AG-336' },
+  // ── #2552 D9 (ADR-AG-344): «X מרכז מעגל» with every centre lettered states a new circle (operator ruling D9 = A) ──
+  // Beside ONE lettered circle 2-D renames the centre instead (#2586). Both are `builds` in this vocabulary, so that half
+  // cannot be a known-gap row (it would read as agreeing); its lock is analytic's own (issue-2552-d9-new-circle.test.ts).
+  { id: 'centre-of-a-circle-new-2552', family: 'circles', steps: ['מעגל O', 'מעגל Q', 'P מרכז מעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a third circle on P; analytic refused it ambiguous-shape before ADR-AG-344' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

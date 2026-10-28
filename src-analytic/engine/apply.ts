@@ -791,7 +791,11 @@ export type ApplyOutcome =
    * fold told it of (`onLine`) puts the touch point on it — not one of its letters, not the figure, not the pair's
    * position. The fold then records that line's own statement as `narrowed`, never `known`: it re-decided the tangent.
    */
-  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true }
+  /*
+   * `createdCircle` (#2552 D9, ADR-AG-344): the fact stated a NEW circle on this centre letter («X מרכז מעגל» with every
+   * circle's centre lettered). The fold carries it per fact; the submit path turns it into the created-circle notice.
+   */
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true; createdCircle?: Id }
   | { ok: false; error: ApplyError };
 
 /**
@@ -4041,6 +4045,18 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       } else {
         const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
         if (circles.length === 0) return create();
+        /*
+         * «X מרכז מעגל» — A circle (#2552 D9, ADR-AG-344; operator ruling D9 = A, 2026-10-26). Once every circle on the
+         * figure has a centre letter, and none of them is X, no circle is left for the sentence to name: it states a new
+         * circle centred at X: the sentence's own creation («נתון מעגל שמרכזו X», the lowering an empty figure takes, whose
+         * circle-on-a-centre is `stateCircleOn`'s, as #1670's `statingNamedCircle` states it), and says so (`createdCircle`
+         * → «נוצר מעגל חדש שמרכזו X …»). While a centre is unnamed it names that one, exactly as «המעגל» does; the definite
+         * form never creates.
+         */
+        if (f.indefinite && circles.every((o) => centreIdOf(c, o) !== null) && !circles.some((o) => centreIdOf(c, o) === f.id)) {
+          const stated = create();
+          return stated.ok ? { ...stated, effect: 'created', createdCircle: f.id } : stated;
+        }
         if (circles.length > 1) {
           // «O מרכז המעגל» beside two fresh interchangeable circles names one, by order (#1688 ruling, ADR-AG-219).
           const pick = objectById(c, f.id) ? null : circleToName(c);
@@ -5893,6 +5909,8 @@ export interface FoldResult {
    * line's first landed fact, null elsewhere. What the «נוצרה נקודה חדשה …» notice names.
    */
   created: Array<Id[] | null>;
+  /** #2552 D9 (ADR-AG-344): per fact, the centre letter of the NEW circle it stated (`createdCircle`), null elsewhere. */
+  createdCircles: Array<Id | null>;
 }
 
 /**
@@ -5950,6 +5968,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
           r.effects[i] = null;
           r.notices[i] = null;
           r.created[i] = null;
+          r.createdCircles[i] = null;
         }
       });
       return r;
@@ -5963,6 +5982,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   const errors: Array<ApplyError | null> = facts.map(() => null);
   const effects: Array<LineEffect | null> = facts.map(() => null);
   const notices: Array<ApplyNotice | null> = facts.map(() => null);
+  const createdCircles: Array<Id | null> = facts.map(() => null);
   /**
    * Which FACT put each constraint in the construction (#1079).
    *
@@ -5981,7 +6001,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
   const touchByOnLine: boolean[] = facts.map(() => false);
-  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true) => {
+  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
     touchByOnLine[i] = byOnLine === true;
     const before = c.constraints;
     const beforeSel = c.selectors;
@@ -6003,6 +6023,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     errors[i] = null;
     effects[i] = effect;
     notices[i] = notice ?? null;
+    createdCircles[i] = circle ?? null;
   };
   /*
    * #2169 (ADR-W-131): the lines whose shape noun the ring's nouns already imply (`restates`) — the rest of that line's
@@ -6019,7 +6040,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     }
     const out = applyFact(c, f);
     if (out.ok) {
-      commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
+      commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
       if (out.restates) restated.add(lineOfFact(i));
     } else errors[i] = out.error;
   });
@@ -6035,7 +6056,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         if (failedOn.get(i) === c) return;
         const out = applyFact(c, f);
         if (out.ok) {
-          commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
+          commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
           progressed = true;
         } else {
           errors[i] = out.error;
@@ -6126,14 +6147,14 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         next = minted0;
         continue;
       }
-      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine);
+      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine, out.createdCircle);
       created[landed[0].j] = missing;
       minted = true;
     }
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, touchByOnLine };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, touchByOnLine };
 }
 
 /**

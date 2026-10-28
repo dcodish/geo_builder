@@ -17,8 +17,9 @@
  *    member must lie on the plane, so a member pins the offset and every member-chord constrains the
  *    normal. Three non-collinear members determine the plane; extras are verified downstream by the
  *    store's `memberHolds3` pass (`not-on-plane` on the offending fact — nothing here needs to refuse).
- *  - a stated ∥/⟂ RELATION whose other operand resolves (a point-run plane, an equation plane, an
- *    earlier free plane). The relation lands in the claims list (the S3 disposition map is claim-gated
+ *  - a stated ∥/⟂/angle/⊂ RELATION whose other operand resolves — a plane (point-run, equation, coordinate, an earlier
+ *    free plane) or, since #2484 (ADR-3D-388), a DIRECTION (a segment, a vector, a determined line, an axis), read
+ *    through the free line's own operand seam (`operandDirection3` / `operandNormal3`). The relation lands in the claims list (the S3 disposition map is claim-gated
  *    for plane×plane) — resolving the free plane TO the stated relation is what makes the claim verify
  *    green: the M1 duality, where the same sentence drives a free object and verifies a determined one.
  *  - #508: a stated DISTANCE from a known point, which pins the OFFSET (`d = −n·p ± value`, the sign a
@@ -35,8 +36,10 @@
 import { sample } from './rng';
 import { add3, centroid3, cross3, dist3, dot3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 import type { Construction3, Id, PlaneDef } from './types';
+import { operandDirection3, operandNormal3 } from './operands';
 
-/** The token shape a NAMED plane takes (`π`, `π1`, `π12`) — the only shape on-planes may auto-create. */
+/** The token shape a NAMED plane takes (`π`, `π1`, `π12`) — the only shape the fold's mint pass creates (#2484,
+ *  `mintablePlane3`; any relation naming a missing one, ADR-3D-388). */
 export const FREE_PLANE_TOKEN = /^π\d*$/;
 
 /** The placeholder entry (`z = 0`); its numbers are never read as knowledge — `free` gates that. */
@@ -126,6 +129,8 @@ export function resolveFreePlane(
   pos: Map<Id, Vec3>,
   resolvedNormals: Map<string, Vec3>,
   lineDirs: Map<string, Vec3>,
+  /** #2484: the anchors of the lines in `lineDirs` — a CONTAINED line puts its anchor on the plane. */
+  lineAnchors?: Map<string, Vec3>,
 ): FreePlaneResolution {
   // ---- gather the pins ------------------------------------------------------------------
   // members: existing points STATED on the plane (side statements are inequalities, not pins)
@@ -137,24 +142,62 @@ export function resolveFreePlane(
     if (p && def && !(def.kind === 'on-plane' && def.plane === name)) members.push(p);
   }
 
-  // relations: ∥ fixes the normal outright; ⟂ contributes one direction-constraint
-  let parallelTo: Vec3 | null = null;
+  // relations, read through the shared operand seam (#2484, ADR-3D-388) for EVERY operand kind, the free line's rule:
+  //  - against a PLANE (normal m): ∥ fixes the normal outright, ⟂ is one direction-constraint (n ⊥ m); a plane×plane
+  //    angle stays on its own #1439 lane (with no equation it is refused `plane-not-determined`, honestly);
+  //  - against a DIRECTION d (a segment, a vector, a determined line, an axis): ⟂ fixes the normal outright (n ∥ d),
+  //    ∥ is one direction-constraint (n ⊥ d), an angle β puts the normal on the #534 cone about d, and «AB מוכל
+  //    במישור π» is ∥ plus the segment's ends as MEMBERS (they pin the offset).
+  // The plane read only plane operands until #2484, so «AC' ⟂ π3» on a declared free plane pinned nothing, the
+  // orientation stayed sampled, and the honest claim was refused `plane-not-determined`.
+  // (declared through `as`: the closures below assign them, which control-flow narrowing does not see)
+  let parallelTo = null as Vec3 | null;
   const dirConstraints: Vec3[] = [];
+  let coneAxis = null as Vec3 | null;
+  let coneHalfAngle = 0;
+  /** «ℓ ∠ π = β» / «AB ∠ π = β» — the normal is (90° − β) from the direction; ⟂ and ∥ are the cone's two ends. */
+  const angleTo = (du: Vec3, deg: number): void => {
+    const beta = Math.max(0, Math.min(90, deg)); // a line↔plane angle is undirected, ≤ 90°
+    if (beta >= 90 - 1e-9) parallelTo = du; // the ⟂ endpoint, exactly
+    else if (beta <= 1e-9) dirConstraints.push(du); // the ∥ endpoint, exactly
+    else {
+      coneAxis = du;
+      coneHalfAngle = ((90 - beta) * Math.PI) / 180;
+    }
+  };
+  /** A point the plane must CONTAIN (a contained segment's end, a contained line's anchor) — a member, unless it is a
+   *  rider of this very plane (defined BY it). */
+  const memberAt = (id: Id): void => {
+    const p = pos.get(id);
+    const def = c.points.get(id);
+    if (p && def && !(def.kind === 'on-plane' && def.plane === name)) members.push(p);
+  };
   for (const cl of c.claims) {
     if (cl.type !== 'plane-rel') continue;
-    if (cl.rel !== 'parallel' && cl.rel !== 'perp') continue;
     const other =
       cl.a.kind === 'plane-named' && cl.a.name === name ? cl.b : cl.b.kind === 'plane-named' && cl.b.name === name ? cl.a : null;
     if (!other) continue;
-    const otherN =
-      other.kind === 'plane-named'
-        ? resolvedNormals.get(other.name)
-        : other.kind === 'plane-run'
-          ? runNormal(other.ids, pos)
-          : undefined;
-    if (!otherN || norm3(otherN) < 1e-9) continue;
-    if (cl.rel === 'parallel') parallelTo = normalize3(otherN);
-    else dirConstraints.push(normalize3(otherN));
+    const otherN = operandNormal3(other, pos, (n) => resolvedNormals.get(n));
+    if (otherN) {
+      if (norm3(otherN) < 1e-9) continue;
+      if (cl.rel === 'parallel') parallelTo = normalize3(otherN);
+      else if (cl.rel === 'perp') dirConstraints.push(normalize3(otherN));
+      continue;
+    }
+    const d = operandDirection3(c, other, pos, lineDirs);
+    if (!d || norm3(d) < 1e-9) continue;
+    const du = normalize3(d);
+    if (cl.rel === 'perp') parallelTo = du;
+    else if (cl.rel === 'parallel') dirConstraints.push(du);
+    else if (cl.rel === 'angle' && cl.deg !== undefined) angleTo(du, cl.deg);
+    else if (cl.rel === 'contained') {
+      dirConstraints.push(du);
+      if (other.kind === 'segment') [other.a, other.b].forEach(memberAt);
+      else if (other.kind === 'line') {
+        const at = lineAnchors?.get(other.name);
+        if (at) members.push(at);
+      }
+    }
   }
 
   // «ℓ ⊥ π» pins the normal outright (n ∥ dir); «ℓ ∥ π» constrains it (n ⊥ dir). These arrive as
@@ -172,22 +215,18 @@ export function resolveFreePlane(
   // everything between: «זווית בין ישר ℓ למישור π = 45» left the orientation sampled and was refused,
   // a satisfiable given the engine had every means to honour. With |n̂| = 1, sin β = |n̂·û|, so the
   // angle between n̂ and û is (90° − β): a cone whose SPIN is one genuinely free DOF, sampled.
-  let coneAxis: Vec3 | null = null;
-  let coneHalfAngle = 0;
   for (const r of c.lineRels) {
     if (r.op.kind !== 'plane-named' || r.op.name !== name) continue;
     const dir = lineDirs.get(r.line);
     if (!dir || norm3(dir) < 1e-9) continue;
     if (r.rel === 'perp') parallelTo = normalize3(dir);
     else if (r.rel === 'parallel') dirConstraints.push(normalize3(dir));
-    else if (r.rel === 'angle' && r.deg !== undefined) {
-      const beta = Math.max(0, Math.min(90, r.deg)); // a line↔plane angle is undirected, ≤ 90°
-      if (beta >= 90 - 1e-9) parallelTo = normalize3(dir); // the ⟂ endpoint, exactly
-      else if (beta <= 1e-9) dirConstraints.push(normalize3(dir)); // the ∥ endpoint, exactly
-      else {
-        coneAxis = normalize3(dir);
-        coneHalfAngle = ((90 - beta) * Math.PI) / 180;
-      }
+    else if (r.rel === 'angle' && r.deg !== undefined) angleTo(normalize3(dir), r.deg);
+    else if (r.rel === 'contained') {
+      // #2484: «הישר ℓ מוכל במישור π» — the line's direction lies in the plane and its anchor is ON it
+      dirConstraints.push(normalize3(dir));
+      const at = lineAnchors?.get(r.line);
+      if (at) members.push(at);
     }
   }
 
@@ -355,12 +394,4 @@ export function resolveFreePlane(
   }
 
   return { n, d, dof: nSampled + dSampled };
-}
-
-/** The normal of a point-run operand (`plane ABC`) from current positions; null when degenerate. */
-function runNormal(ids: Id[], pos: Map<Id, Vec3>): Vec3 | undefined {
-  const ps = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
-  if (ps.length < 3) return undefined;
-  const nrm = cross3(sub3(ps[1], ps[0]), sub3(ps[2], ps[0]));
-  return norm3(nrm) > 1e-9 ? nrm : undefined;
 }

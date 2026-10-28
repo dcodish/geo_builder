@@ -575,6 +575,16 @@ names is minted too) until the line lands, or the line keeps nothing ([ADR-AG-34
 the shared `CreatedNotice` in `App.tsx`, shown while that line is last; ✕ is `removeLine`. The triangle form states its
 triangle first (`clauseFacts`).
 
+**A new circle by its centre ([ADR-AG-344](06c-decisions-analytic.md#adr-ag-344), #2552 D9).** `centreOfCircle` keeps
+the article: «X מרכז מעגל» (no «ה») lowers to `centre-of { indefinite: true, create }`. In M1's no-equation arm, an
+`indefinite` fact on a figure whose every circle has a centre letter (`centreIdOf`), none of them X, applies its
+`create` («נתון מעגל שמרכזו X»: `declare` + `circle-at-X`, `stateCircleOn`) and returns `createdCircle: X`. It travels
+`FoldResult.createdCircles` (per fact) → `Derivation.createdCircles` (by line) → `record.createdCircle`, which replaces
+`record.created` on that line; `App.tsx` renders it through `createdNoticeTextOf` (`suite.notice.createdCircle`,
+ADR-W-164).
+
+*Identifiers:* `centre-of.indefinite` · `createdCircle` · `createdCircles` · `record.createdCircle` · `createdNoticeTextOf`
+
 *Identifiers:* `circle-at-<letter>` · `create` · `chordFacts` · `on-kind { circle }` · `tangent-line-at`
 
 ### A role sentence introduces its ends ([ADR-AG-204](06c-decisions-analytic.md#adr-ag-204), #1669)

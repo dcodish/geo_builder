@@ -1197,18 +1197,18 @@ const CENTRE_EN = new RegExp(
  * circle and no second lowering of it exists.
  */
 const CENTRE_CTX_HE = new RegExp(
-  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:של\\s+)?ה?מעגל(?:\\s+(?:${HE_EQ_OF}${HE_IS}\\s*:?\\s*)?(.+))?$`,
+  `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:של\\s+)?(ה?)מעגל(?:\\s+(?:${HE_EQ_OF}${HE_IS}\\s*:?\\s*)?(.+))?$`,
 );
 /** «המעגל האחד / האחר / הראשון / השני» — one circle of a pair (#2397, ADR-AG-322), before the equation it is described by. */
 const PAIR_ORDINAL = /^ה?(?:אחד|אחר|ראשון|שני)\s+(?=\S)/;
 const CENTRE_CTX_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+the\\s+circle(?:\\s+(?:whose\\s+equation\\s+is\\s+)?(.+))?$`,
+  `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+(the)\\s+circle(?:\\s+(?:whose\\s+equation\\s+is\\s+)?(.+))?$`,
 );
 
 function centreOfCircle(line: string): RuleOutcome {
   const m = CENTRE_CTX_HE.exec(line) ?? CENTRE_CTX_EN.exec(line);
   if (!m) return null;
-  const [, id, tail] = m;
+  const [, id, the, tail] = m;
   // Only a creation that NAMES this centre is the statement — «מעגל I שמשוואתו …» reads I as the circle's
   // numeral, and would create a circle with no centre named at all.
   const created = (sentence: string): Fact[] | undefined => {
@@ -1218,7 +1218,9 @@ function centreOfCircle(line: string): RuleOutcome {
   };
   if (tail === undefined) {
     const create = created(`נתון מעגל שמרכזו ${id}`);
-    return made([{ t: 'centre-of', id, ...(create ? { create } : {}), src: line }]);
+    // «X מרכז מעגל», «מעגל» without «ה» (#2552 D9, ADR-AG-344): A circle, not THE circle. M1 reads it as the circle to
+    // name while a centre is left unnamed, and as a NEW circle on X once none is.
+    return made([{ t: 'centre-of', id, ...(create ? { create } : {}), ...(the ? {} : { indefinite: true as const }), src: line }]);
   }
   // A circle NAMED by its ring (#1663, ADR-AG-203) — «X מרכז המעגל החוסם את המשולש ABC», folded by the frame to
   // «… המעגל ⊙ABC». Which circle that is, and what its centre lowers to, is M1's (`centre-of`, `circleByName`);

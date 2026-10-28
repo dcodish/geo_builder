@@ -39,9 +39,10 @@ choices differ from the recommendation:
 - **D7 B:** #2538 uses one general rule (about 4 s on one quadrilateral line accepted).
 - **D8 B:** only the exam's two «המעגל הראשון» sentences.
 
-**Next:** he asked to connect GitHub to claude.ai, so the page can read issue state live through the `mcp`
-capability. Once the connector exists, check its tools and make one read-only call before wiring it. **He wants the roadmap discussed and agreed
-before any relabelling.**
+**Keeping it current (2026-10-27, #2557, ADR-W-159):** claude.ai has no GitHub connector on his account
+(checked after a restart), so he approved the routine: the `roadmap-refresh` skill, run by every fix round and
+status update. If a connector appears later, the page can read GitHub live through the `mcp` capability. **He
+wants the roadmap discussed and agreed before any relabelling.**
 
 **Agreed with the operator:**
 - The competition is general AI. The edge is the givens list, not the picture. This is recorded in the

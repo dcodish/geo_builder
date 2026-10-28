@@ -13,6 +13,7 @@
  *   Minting would draw a free segment certified as that element (`solidElement3`).
  */
 import type { Command3, Construction3 } from './types';
+import { FREE_PLANE_TOKEN } from './freePlane';
 
 /** A 3-D point label as the parser canonicalises it: an uppercase letter, glued digits, primes. */
 const POINT_LABEL3 = /^[A-Z]\d*'*$/;
@@ -50,6 +51,42 @@ export function lineSlotNames3(cmds: readonly Command3[]): Set<string> {
   walk(cmds);
   return out;
 }
+
+/**
+ * #2484 ([ADR-3D-388](../../docs/06b-decisions-3d.md#adr-3d-388); operator ruling 2026-10-24, e10 = A: *"Any relation
+ * naming a missing plane creates it. Like ⟂: π3 is created free and the relation places it. Lines already work this
+ * way."*) — THE PLANE SLOTS of a line's commands: every name the parser put where a NAMED PLANE goes (a `{kind:
+ * 'plane-named', name}` operand, a `plane` / `p1` / `p2` name field). The line-slot walk's twin: a structural read of
+ * the commands, never a list of command kinds.
+ */
+export function planeSlotNames3(cmds: readonly Command3[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'plane-named' && typeof o.name === 'string') out.add(o.name);
+    for (const [k, x] of Object.entries(o)) {
+      if ((k === 'plane' || k === 'p1' || k === 'p2') && typeof x === 'string') out.add(x);
+      else if (typeof x === 'object') walk(x);
+    }
+  };
+  walk(cmds);
+  return out;
+}
+
+/**
+ * May the mint pass create the plane `name` for a line made of `cmds` on `c`? A π-token (`π`, `π3` — the named-plane
+ * convention, ADR-3D-124) in one of the line's plane slots that names nothing in the figure. A missing point-run name
+ * («ABC») is mistyped letters and stays the point lane's (its letters are minted, never a plane).
+ */
+export const mintablePlane3 = (name: string, c: Construction3, cmds: readonly Command3[]): boolean =>
+  FREE_PLANE_TOKEN.test(name) &&
+  !c.planes.has(name) &&
+  !c.pointPlanes.has(name) &&
+  !c.relPlanes.has(name) &&
+  !c.lines.has(name) &&
+  planeSlotNames3(cmds).has(name);
 
 /**
  * A command that states something IS AN ELEMENT OF A SOLID (#1467 plan §3.2, "solid-relative statements keep their

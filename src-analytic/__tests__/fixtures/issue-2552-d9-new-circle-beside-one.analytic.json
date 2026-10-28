@@ -1,0 +1,10 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "מעגל שמרכזו O(0,0) ורדיוסו 3",
+    "P מרכז מעגל"
+  ],
+  "seed": 0,
+  "name": "#2552 D9 — beside one lettered circle, «P מרכז מעגל» draws a second circle centred at P"
+}

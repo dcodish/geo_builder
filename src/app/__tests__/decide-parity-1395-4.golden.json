@@ -303,6 +303,7 @@
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:arc-endpoints-2037.geo.json": "9e0c1471e4805cef",
  "fixture:arc-on-minted-circle-name-2362.geo.json": "c28afd7c2dd8bc19",
+ "fixture:bisector-beside-vertex-m-1690.geo.json": "63df212f99c6154b",
  "fixture:catalog-tangent-drawn-2209.geo.json": "d4ab46aee9ee80e1",
  "fixture:catalog-tangent-drawn-at-2209.geo.json": "d4ab46aee9ee80e1",
  "fixture:chord-of-circumcircle-2545.geo.json": "7db2d76b247a773a",
@@ -452,5 +453,6 @@
  "fixture:two-circles-disjoint-radius-both-2216.geo.json": "6f5aeacdafa8bbc1",
  "fixture:two-circles-radius-both-2216.geo.json": "dd401377d37b1d81",
  "fixture:two-circles-tangent-radius-both-2216.geo.json": "27906e1fc90599a5",
- "fixture:two-points-on-two-circles-2185.geo.json": "f787af0dd5b0045e"
+ "fixture:two-points-on-two-circles-2185.geo.json": "f787af0dd5b0045e",
+ "fixture:two-unnamed-medians-1690.geo.json": "24fb3addc6f5aa3a"
 }

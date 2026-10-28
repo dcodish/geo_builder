@@ -6381,6 +6381,25 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 
 **Consequences.** Some items stop landing until their twin bug is fixed or the operator accepts the trade. The sheet stops showing "pass" on behaviour the session knows to be false.
 
+## ADR-W-159 — The roadmap page is refreshed from GitHub by every fix round and status update (#2557)
+
+**Status:** accepted · 2026-10-27 · process (workspace)
+
+**Operator:** 2026-10-26, on the roadmap overview (a claude.ai artifact): *"Does this live as a artifact here, or do we create some other way for the dashboard to stay current?"* He chose a GitHub connector (*"lets connect to github - this sounds like the most robust option"*); his claude.ai account has none (checked twice, the second time after a restart, 2026-10-27). Offered instead: every fix round and status update refreshes the page, with a daily scheduled run on top if it can write the page. Ruling: *"yes"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — the `roadmap-refresh` skill, `scripts/roadmap-snapshot.mjs`.
+
+**Context.** The overview page (https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew) shows the five-week plan, progress per workstream, the open queue by tool and priority, and the plan decisions. It reads its own database and cannot call GitHub. Its data was written once, by hand, on 2026-10-26.
+
+**Decision.**
+1. `scripts/roadmap-snapshot.mjs` computes the page's data from `gh`: each plan issue's state, and one dated snapshot of counts. The first snapshot (2026-10-26) is the baseline and is never overwritten.
+2. The `roadmap-refresh` skill writes it to the page and transcribes any decision answered on the page to its issue.
+3. The fix-round skill (Step 5b) and the status-update skill (Step 4) run it as their last step. It also runs on request.
+4. If a GitHub connector is added to claude.ai later, the page may read GitHub live instead; the plan and decisions stay in its database.
+5. **A daily cloud routine** ("Roadmap refresh — daily", 04:00 UTC) runs steps 1–3 of the skill — read the plan, compute, write `state/issues` and today's snapshot — so the page is current even when no session runs and the operator's PC is off. It never transcribes decisions, edits the plan or touches GitHub; those stay with a session. Cloud sessions refuse GitHub GraphQL (HTTP 403, probe 2026-10-27), so the script reads only through REST (`gh api`); the output was diffed byte-identical against the GraphQL version. Ruling (2026-10-27): *"go ahead with 1-3 and daily run is correct"*.
+
+**Consequences.** The page is at most a day behind the queue; it shows the date of its snapshot. A refresh costs about a minute of `gh` calls, and the routine one short cloud run a day.
+
 ## ADR-W-160 — Priority follows who hit it and where it sits in the teaching plan; `wrong-answer` and `reported` record severity (#2556)
 
 **Status:** accepted · 2026-10-27 · process (workspace) · amends [ADR-265](06-decisions.md#adr-265) (the P1/P2/P3 rubric, docs/22 §2)
@@ -6454,3 +6473,18 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 2. **No notice for a created line** (card e20 = A). The new row is the signal.
 3. **2-D:** a symbolic length («OR=r», «AB = k», «AB = 35/2») names its endpoints like any statement; ADR-769's pass creates them, with the point notice.
 4. **Not here:** planes (#2484, next round, the same pass); a new point with letter coordinates («N(k,p,3)», T46) is its own 3-D item, #2563.
+
+## ADR-W-164 — The created notice names a new circle by its centre: one more suite key and one more §5c row (#2552 D9)
+
+**Status:** accepted · 2026-10-28 · feature (shell; analytic is the one builder that shows it) · fix round #2585 (stream C) · branch `feat/2552-d9-new-circle` · extends [ADR-W-162](#adr-w-162) · per builder: [ADR-AG-344](06c-decisions-analytic.md#adr-ag-344)
+
+**Operator:** ruling 2026-10-28 on #2552 D9 ("2252 - A"): «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», *"It says what was drawn and how to undo it, word for word like the point notice."*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R198 (the D9 bullet; no other builder creates a circle by its centre today, #2586) · **Design:** [04w](04w-design-shell.md) § "The created-points notice"
+
+**Decision.**
+1. **The key** `suite.notice.createdCircle` sits beside `createdPoint` / `createdPoints` in `shell/locales/he.json` + `en.json`: «נוצר מעגל חדש שמרכזו {{centre}} — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» verbatim; English in the point notice's shape, "New circle centred at {{centre}} was created — if this is a typo, press ✕ to undo the line." `CREATED_NOTICE_KEYS.circle` names it.
+2. **The contract:** `CreatedNotice` gains an optional `circle` (the centre's label; `names` is then empty) and `createdNoticeTextOf(notice)` picks the circle's key or the points' (`createdNoticeText`, unchanged for the builders that show only points). One notice per line: a circle line does not also name its new centre as a point.
+3. **The §5c row:** `created-notice-rows.ts` gains a sixth row, run when a builder hands `CreatedNoticeSentences.circle` (setup, line, centre): the circle line records, the notice names the circle and no points, and ✕ removes the line and the centre. The meta-lock adds a `circle-as-point` broken adapter, which the row catches.
+
+**Consequences.** The ✕ and the banner are the points' own, so the circle notice cannot drift from them. A builder that later creates circles by reference hands the row its sentences.

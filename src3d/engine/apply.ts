@@ -6,7 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
-import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
+import { freePlaneDef } from './freePlane';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
@@ -2723,21 +2723,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-planes': {
-      // #487 ruling 1 (ADR-3D-124): a membership naming an UNDECLARED plane CREATES it as a free plane —
-      // the operator chose the forgiving incremental flow over refuse-with-guidance, accepting that a
-      // typo'd name conjures a plane. Bounded by ruling 2 at the grammar: every on-planes rule requires
-      // the plane NOUN («על המישור π2»), so no bare-symbol path can create anything. Only a NAMED-plane
-      // token (π-style) qualifies — a missing point-run name (ABC) still means mistyped labels, refused.
-      const autoCreate =
-        cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane) && FREE_PLANE_TOKEN.test(cmd.plane);
-      if (!autoCreate && cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane))
+      // #487 ruling 1 (ADR-3D-124) — a membership naming an UNDECLARED π-plane creates it free — is now the fold's
+      // mint pass (#2484, ADR-3D-388): every relation that names a missing π-plane creates it there, last, so a plane
+      // any line declares binds first. This case only refuses the missing name; the pass reads that refusal.
+      if (cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane))
         return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       if (!c.points.has(cmd.id)) {
         // M1 dual (the 2-D ADR-236 shape): a NEW id stated onto — or above/below — a NAMED
         // plane is CREATED as a free point riding it (2 DOF; 3 with a stated side)
         if (cmd.plane === 'any') return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
         const next = clone(c);
-        if (autoCreate) next.planes.set(cmd.plane, freePlaneDef(cmd.plane));
         next.points.set(
           cmd.id,
           cmd.side
@@ -2750,7 +2745,6 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // given is an inequality — sampled + verified, never driven — so it opens no door)
       if (!cmd.side && cmd.plane !== 'any') c = adoptParamForCarrier(c, { kind: 'plane', name: cmd.plane });
       const next = clone(c);
-      if (autoCreate) next.planes.set(cmd.plane, freePlaneDef(cmd.plane));
       next.memberships.push(cmd);
       return { ok: true, next };
     }
