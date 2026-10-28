@@ -1,0 +1,156 @@
+{
+ "name": "prod-2026-10-29",
+ "title": "Prod smoke after prod/2026-10-29",
+ "cases": [
+  {
+   "id": "T1",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "title": "A perpendicular bisector beside triangle MPQ leaves the triangle alone (#1690)",
+   "class": "look",
+   "lines": [
+    "משולש MPQ",
+    "קטע EK",
+    "אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». Triangle MPQ unchanged; the bisector of EK goes through a new point N at its midpoint",
+   "before": "vertex M jumps onto EK's midpoint, silently, distorting the triangle",
+   "expect": [
+    "אנך אמצעי ל-EK"
+   ]
+  },
+  {
+   "id": "T8",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "title": "«P מרכז מעגל» draws a third circle after the exam pair",
+   "class": "play",
+   "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O_1(-3,1)",
+    "מרכז המעגל השני הוא O_2(9,10)",
+    "P מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». A third circle centred at a new point P; the radius-5 circles unmoved. Under the line exactly «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», and no «נוצרה נקודה חדשה»",
+   "before": "refused, asking which circle",
+   "expect": [
+    "P מרכז מעגל"
+   ]
+  },
+  {
+   "id": "T14",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "title": "A perpendicular to a plane not yet defined creates it",
+   "class": "play",
+   "cycles": 2,
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' מאונך למישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 ⟂ AC′ and a π3 row appears. «הציגו תצורה אחרת» slides π3 along AC′",
+   "before": "refused «המישור «π3» עדיין לא הוגדר…»",
+   "expect": [
+    "הישר AC' מאונך למישור π3"
+   ]
+  },
+  {
+   "id": "T33",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "title": "A free vector on an empty page",
+   "class": "look",
+   "cycles": 2,
+   "lines": [
+    "וקטור u"
+   ],
+   "lookFor": "Start: press «נקה הכל». One arrow named u (underlined), no start dot, no point letters; it changes direction and length on each «הציגו תצורה אחרת»",
+   "before": "«לא הבנתי את הבקשה…»",
+   "expect": [
+    "וקטור u"
+   ]
+  },
+  {
+   "id": "T41",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "title": "Your T44: «|AB| = k» after «C(k,1,0)» builds",
+   "class": "play",
+   "lines": [
+    "C(k,1,0)",
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "|AB| = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». All green; C at (√3,1,0); AB labelled k; the panel says «k = √3»",
+   "before": "the last line not understood",
+   "expect": [
+    "|AB| = k"
+   ]
+  },
+  {
+   "id": "T52",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "title": "Your T30: the bisector draws only its line",
+   "class": "play",
+   "lines": [
+    "M(1,2)",
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "דרך E עובר ישר l1 מקביל לציר ה-x",
+    "l2 אנך אמצעי ל-EK",
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Line l2 drawn with no point N and no «הכלי קרא לנקודה N». The points are M, K, E, G",
+   "before": "a lettered N with a row note",
+   "expectAbsent": [
+    "~mid",
+    "הכלי קרא לנקודה N"
+   ],
+   "expect": [
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ]
+  },
+  {
+   "id": "T60",
+   "title": "A box edge letter is unknown until the size is fixed (#2594)",
+   "class": "play",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "|AB| = k"
+   ],
+   "expectAbsent": [
+    "k = 1"
+   ],
+   "lookFor": "panel k = ?",
+   "before": "k = 1"
+  },
+  {
+   "id": "T61",
+   "title": "A typed coordinate still fixes k (#2594 control)",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "C(k,1,0)",
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "|AB| = k"
+   ],
+   "lookFor": "k = √3",
+   "before": "unchanged"
+  }
+ ]
+}
