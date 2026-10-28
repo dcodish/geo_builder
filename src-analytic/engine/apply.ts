@@ -942,6 +942,17 @@ export function onCurveByConstruction(c: Construction, curve: GeoObject, p: Id):
  */
 function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undefined {
   const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+  /*
+   * #2545 (ADR-AG-335): the LETTERLESS reference («DE מיתר במעגל החוסם») — the ring is the figure's one polygon (of the
+   * typed noun's size), and the described circle binds only when it is the figure's ONE circle: which circle a bare
+   * relation names beside another is the operator's question (#2560), as in 2-D (ADR-768).
+   */
+  if (d.pts.length === 0) {
+    const rings = c.objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && (!d.arity || o.vertices.length === d.arity));
+    if (rings.length !== 1 || circles.length !== 1) return undefined;
+    const hit = describedCircle(c, { role: d.role, pts: [...rings[0].vertices] });
+    return hit === circles[0] ? hit : undefined;
+  }
   if (d.role === 'circum') return circles.find((o) => d.pts.every((p) => onCurveByConstruction(c, o, p)));
   const ring = ringId(d.pts);
   const sides = d.pts.map((p, i) => [p, d.pts[(i + 1) % d.pts.length]] as const);
@@ -1182,6 +1193,8 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
    * «המעגל החוסם את המשולש ABC» states (`circle-thru` through the three; the incircle for «החסום ב»). Its ring must exist.
    */
   const described = readDescribedCircle(name);
+  // #2545 (ADR-AG-335): a letterless reference names no ring to build on — creating it is #2560's question
+  if (described && described.pts.length === 0) return null;
   if (described) {
     const creation: Fact | null =
       described.role === 'circum'
@@ -3886,6 +3899,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const create = (): ApplyOutcome =>
         f.create ? applyAll(c, f.create) : { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       let host: GeoObject | undefined;
+      /*
+       * «מרכז המעגל הראשון / השני הוא X(a,b)» (#2552, ADR-AG-336) — circle 1 or 2 of the pair the figure drew, in the
+       * order the pair sentence introduced them. The member whose centre is still unnamed is named X (`namingByOrder`, as
+       * «X מרכז מעגל» names by order); two drawn pairs with that member unnamed ask which. A member whose centre is X
+       * already is known; one lettered otherwise is the existing «already named» refusal. No drawn pair: the sentence
+       * reads as it does without the ordinal.
+       */
+      if (f.ordinal !== undefined) {
+        const members = c.objects.filter((o) => curveKindOf(o) === 'circle' && new RegExp(`^circle-pair\\d+-${f.ordinal}$`).test(o.id));
+        if (members.some((o) => centreIdOf(c, o) === f.id)) return { ok: true, effect: 'known', next: c };
+        const open = members.filter((o) => centreRuleOf(o) !== null && centreIdOf(c, o) === null);
+        if (open.length > 1) return { ok: false, error: noHost(f.src, 'circle', open) };
+        if (open.length === 1 && !objectById(c, f.id)) return namingByOrder(c, open[0], f.id, f);
+        const named = members.length === 1 ? centreIdOf(c, members[0]) : null;
+        if (open.length === 0 && named !== null) return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(named) } };
+      }
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };

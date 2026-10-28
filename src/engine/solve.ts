@@ -25,6 +25,7 @@ import {
   ORDER_LEN_MIN_FRAC,
   boundAim,
   isOrderConstraint,
+  isScaffoldId,
 } from './types';
 import { add, angleDeg, circumcenter, dist, scale, solveParam, sub, unit } from './geometry';
 import { operandArea, operandBoundary, operandText } from './roundMeasure';
@@ -674,6 +675,13 @@ export function describeConstraint(con: Constraint): string {
       if (con.radii) return `radius(${con.radii.c1}) = ${con.k} · radius(${con.radii.c2})`;
       return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'length-radius':
+      // #2499 (ADR-766): |centre·P| = 1·R is a circle MEMBERSHIP (apply's point-on-circle lowering) — the radius
+      // measured through the witness member — so it is described as that equality of two named lengths
+      // (`|CB| = |CA|`), never as an `R` the student never wrote (ADR-W-130's provenance check sends `1·R` to the
+      // floor). Only the membership shape: a stated «AB = R» (a ≠ centre) keeps its own `k·R` wording. A hidden
+      // witness (`~radw-…`, a scaffold id) keeps the `1·R` form, which the explainer renders as the radius letter
+      // (#2132's «(R)»), never as `|O⟨…⟩|` (round #2561 batch, student-text-leak-lock).
+      if (con.k === 1 && !con.add && con.a === con.center && con.witness !== con.b && !isScaffoldId(con.witness)) return `|${con.a}${con.b}| = |${con.center}${con.witness}|`;
       return `|${con.a}${con.b}| = ${con.k}·R${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'angle-ratio':
       return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;

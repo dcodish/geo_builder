@@ -793,6 +793,8 @@ Spellings lower in the parser (the frame's `centreClauses`, `sharedSubjectClause
 resolved through `circleByName`, `centreRuleOf` / `centreIdOf`, with regions as `sign` selectors
 (`evaluate.ts circleQuantity`). `separatedFrom` tries `chordStarts` for the other root.
 
+`centresOf` offers a centre only with a sentence the grammar reads back: the equation, the numeral, the ring form, or — for the figure's ONLY circle with neither numeral nor equation, of any kind — the contextual «P מרכז המעגל» (a lone `circle-thru` takes it first, every other kind after the ring forms, so no existing offer changes; [ADR-AG-338](06c-decisions-analytic.md#adr-ag-338), #2554). A sentence-drawn pair (`circle-pair<k>-1/2`) has no such sentence (D8 = B on #2552) and is the class guard's one declared exception.
+
 *Identifiers:* `M(x,y)` · `ONE_OF_HE` · `incidenceOn(…).t === 'kind'` · `THRU_HE` · `tangent-circles` · `freeAngleOf` · `selectorFact` · `c.selectors` · `derive.nameCanonicalCentres` · `centresOf` · `pointAt` · `deflatedStarts` · `collapsedPairs` · `on-line` · `selectorsHoldAt`
 
 ### Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)
@@ -846,7 +848,9 @@ M1's `circleByName` decodes a described name with `describedCircle`: `⊙` = the
 A diameter works on any circle (`diameter-of` → both ends `on-curve` plus a radius `relation`); `openCurveText` prints
 `—` for a `θ_` symbol (`readsToolSymbol`).
 
-*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
+**No ring typed ([ADR-AG-335](06c-decisions-analytic.md#adr-ag-335), #2545):** the frame folds an argument-position «במעגל החוסם [את המשולש]» / "of the circumcircle" to the letterless name «⊙◌» / «○◌» (+ the noun's size, `letterlessCircleName`); `describedCircle` reads it as the figure's one polygon's circle, bound only when it is the figure's one circle, and `statingNamedCircle` never creates it. `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict it gave before.
+
+*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `RING_OF_FIGURE` · `letterlessCircleName` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
 
 ### Circles a sentence draws; two circles named by order ([ADR-AG-219](06c-decisions-analytic.md#adr-ag-219), #1622 E3, #1693)
 
@@ -895,6 +899,26 @@ numeral taken in any notation by `nameReading`). The ask lane resolves the touch
 sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
 
 *Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
+
+**The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
+`unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,
+and lowers to the same `commonTangentFacts` as «AB משיק משותף …» (ADR-AG-313) with the touches as `toolPoint('vertex', …)`
+placeholders (line-scoped, so a second sentence mints C, D). «משותף» or a kind word is required. `NAMED_TANGENT_HE/EN` take
+an optional kind. The definition clause «ש(שני) המעגלים נמצאים באותו צד / מצדדים שונים שלו» is folded into the kind word by
+`foldTangentSide` at `orthography` (`frameAnalytic.ts`, copied from 2-D's `src/parser/tangentSide.ts`, which `normalizeUtterance` calls). `namedTouchPoint` reads
+«X נקודת ההשקה של <line> עם (ה)מעגל <ref>» through `viaCanonical` as «הישר <line> משיק למעגל <ref> בנקודה X».
+
+*Identifiers:* `unnamedCommonTangent` · `UNNAMED_TANGENT_HE` · `UNNAMED_TANGENT_EN` · `namedTouchPoint` · `TOUCH_NAME_HE` · `TOUCH_NAME_HE_LAST` · `TOUCH_NAME_EN` · `foldTangentSide`
+
+**The exam's pair sentences ([ADR-AG-336](06c-decisions-analytic.md#adr-ag-336), #2552).** «שני מעגלים שרדיוס כל
+אחד מהם r» is the `שני מעגלים` rule's pair with both slots `{ k: 'new', r }` (`radiusOfSize`'s value slot). «מרכז המעגל
+הראשון / השני הוא X(a,b)» (`pairCentreAt`) lowers to `centre-of { id: X, ordinal: 1 | 2, create }` and the point
+sentence «X(a,b)»; M1 names the unnamed `circle-pair<k>-<ordinal>` member's centre by `namingByOrder`, answers `known`
+for a member already centred on X and `already-named` for one centred on another letter, and with no pair reads the
+fact as without the ordinal. `segmentsOf` and the `UNWRAP` table take «ו» before «מרכז» as a sentence opener, so the
+exam's joined sentence is cut and read as the two.
+
+*Identifiers:* `pairCentreAt` · `PAIR_CENTRE_HE` · `PAIR_CENTRE_EN` · `centre-of.ordinal` · `segmentsOf` · `UNWRAP`
 
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 

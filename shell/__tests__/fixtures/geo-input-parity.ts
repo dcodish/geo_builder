@@ -292,6 +292,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
 
+  '#2560': 'open', // #2545 (ADR-768 / ADR-AG-335): 2-D refuses a relation-named circle the figure lacks; analytic hands it to the model (R124) — creating it is the open question
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
@@ -317,6 +318,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
+  '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1808,8 +1810,27 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'chord-through-centre-2547-03', family: 'chords-arcs', steps: ['מעגל O', 'AB קוטר העובר דרך מרכז המעגל'], expect: 'refused', exception: 'X8', note: 'true but unread: refused in both (ADR-765, ADR-603 decision 7 "refuse it too"); analytic handed it to the model before ADR-AG-334 (#2547)' },
   { id: 'chord-through-centre-2532-03', family: 'chords-arcs', steps: ['מעגל O', 'AB מיתר', 'O על AB'], expect: 'builds', exception: 'X8', note: 'the honest two-line form of chord-through-centre-2532-01: O on AB at every seed in both builders (the English spellings are locked in src/app/__tests__/issue-2532-unread-through.test.ts: X8 is matched in Hebrew)' },
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
+  // ── #2499 (ADR-766): a membership after a distance that already pins its point sizes the free radius, in either order ──
+  { id: 'diameter-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'AB = 6', 'AB קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «AB = 6»» before ADR-766 (the other order built r = 3); analytic already drew r = 3' },
+  { id: 'point-on-circle-after-distance-2499', family: 'chords-arcs', steps: ['מעגל O', 'OA = 4', 'נקודה A על המעגל'], expect: 'builds', exception: 'X8', note: '2-D refused «… סותר את «OA = 4»» before ADR-766; analytic already drew r = 4' },
+  { id: 'quarter-after-radius-distance-2499', family: 'chords-arcs', steps: ['OA = 4', 'רבע מעגל OAB'], expect: 'builds', exception: 'X8', note: '2-D drew the quarter around B with a re-read hint before ADR-766; analytic already drew it around O, r = 4' },
   // ── #2512 (ADR-762 / ADR-AG-333): a second triangle around one circle is its own triangle ──
   { id: 'second-ring-around-circle-2512', family: 'inscribed', steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'], expect: 'builds', exception: 'X8', note: '2-D drew DEF exactly on ABC, green, before ADR-762; analytic refused it «polygon-collapsed» before ADR-AG-333' },
+  // ── #2545 (ADR-768 / ADR-AG-335): a circle named by its relation to a polygon binds the described circle, or the line is refused ──
+  { id: 'ring-circle-ref-2545-01', family: 'chords-arcs', steps: ['משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D drew a free circle missing A, B, C, green, before ADR-768; analytic answers not-handled (the model, R124) — whether the circle is created is #2560' },
+  { id: 'ring-circle-ref-2545-02', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O חוסם את משולש ABC', 'DE מיתר במעגל החוסם'], expect: 'builds', exception: 'X8', note: 'D, E on the circumcircle in both builders; analytic answered not-handled before ADR-AG-335' },
+  { id: 'ring-circle-ref-2545-03', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל I חסום במשולש ABC', 'DE מיתר במעגל החוסם'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2560' }], note: '2-D put D, E on the INCIRCLE, green, before ADR-768; analytic answers not-handled (the model)' },
+  // ── #2553 (ADR-AG-337): the common tangent the sentence does not letter, its kind written as its definition, its touch point named ──
+  { id: 'unnamed-common-tangent-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק חיצוני משותף לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'both letter the touches A, B; analytic handed it to the model before ADR-AG-337' },
+  { id: 'unnamed-common-tangent-named-circles-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק משותף חיצוני למעגלים O ו-P'], expect: 'builds', exception: 'X8', note: 'analytic handed it to the model before ADR-AG-337' },
+  { id: 'tangent-same-side-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק משותף ששני המעגלים נמצאים באותו צד שלו'], expect: 'builds', exception: 'X8', note: 'the exam’s definition of «חיצוני» (foldTangentSide, one copy per builder); both builders handed it to the model before ADR-AG-337' },
+  { id: 'tangent-opposite-sides-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק משותף ששני המעגלים נמצאים מצדדים שונים שלו'], expect: 'builds', exception: 'X8', note: '«פנימי» by its definition; both handed it to the model before ADR-AG-337' },
+  { id: 'line-named-common-tangent-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק משותף חיצוני לשני המעגלים'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic handed it to the model before ADR-AG-337' },
+  { id: 'touch-point-noun-2553', family: 'tangents', steps: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3', 'כל המשיקים המשותפים לשני המעגלים', 'A נקודת ההשקה של l1 עם מעגל O'], contextFor: { '2d': ['מעגל O', 'מעגל P'] }, expect: 'builds', exception: 'X4', only: ['analytic'], note: 'the inverse of «הישר l1 משיק למעגל O בנקודה A»; 2-D names no line (X4) and letters every touch it draws; analytic handed it to the model before ADR-AG-337' },
+  // ── #2552 (ADR-AG-336): the exam’s two pair sentences (operator ruling D8 = B: these two only) ──
+  { id: 'pair-each-radius-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2216' }], note: 'analytic draws two radius-5 circles since ADR-AG-336; 2-D hands it to the model (#2216 item 2)' },
+  { id: 'pair-first-centre-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O_1(-3,1)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'a coordinate centre: analytic’s; not-handled before ADR-AG-336' },
+  { id: 'pair-centres-joined-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the exam’s joined sentence, cut before «ומרכז»; not-handled before ADR-AG-336' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

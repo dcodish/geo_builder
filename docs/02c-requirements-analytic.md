@@ -406,6 +406,10 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מרכז המעגל M נמצא על ציר ה-y», «הנקודה B נמצאת מחוץ למעגל»
 - Sources: ADR-AG-193, #1619, #1598.
 
+**R130 amendment — the + at the figure's only circle names its centre, however the circle was stated (#2554, ADR-AG-338)**. A free circle, a circle on a diameter and a quadrilateral's incircle offer their centre like a circle through three points: the click opens the letter popover and records «O מרכז המעגל». The centres of a pair the tool drew («שני מעגלים») offer nothing and are named by typing «O_1 מרכז מעגל» in order (operator ruling D8 = B on #2552, 2026-10-26).
+- «מעגל ברדיוס 5» → click the + → «O מרכז המעגל»
+- Sources: ADR-AG-338, #2554, #1598.
+
 **R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»** Every shape noun can be inscribed (a cyclic parallelogram is drawn as a rectangle); the converse touches every side; «חד זוויות» holds in every configuration. **Except a noun no circle passes around (a right trapezoid):** in one sentence (R135), or as a ring already declared and then inscribed — and the reverse, inscribed and then declared — it is refused, naming both statements, in every inscription spelling.
 - «מרובע ABCD חסום במעגל שמרכזו M»
 - «במשולש AOB חסום מעגל שמרכזו C» → C where the bisectors meet
@@ -445,6 +449,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
 - Sources: ADR-AG-203, #1659, #1665, #1663.
 
+**R139 amendment — the same circle with no ring typed** (2-D's FR-EN-3d, ADR-W-157). «DE מיתר במעגל החוסם», «P על המעגל החסום במשולש», "DE is a chord of the circumcircle" name the figure's one polygon's described circle, and record on it when it is drawn and is the figure's one circle. Otherwise the line keeps its hand-off to the model (R124), where 2-D refuses it: whether the circle is created is #2560.
+- after «משולש ABC» · «מעגל O חוסם את משולש ABC»: «DE מיתר במעגל החוסם» → D, E on circle O
+- Sources: ADR-AG-335, #2545.
+
 **R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn. Every circle the tool drew («נתון מעגל», «שני מעגלים», a touch's) takes a later «משוואת המעגל (O) היא …», keeping what was already stated about it (ADR-AG-322).
 - after «A(3,4)» on x²+y²=25: «AB קוטר במעגל» → B at (−3,−4)
 - Sources: ADR-AG-204, #1669, #1670.
@@ -476,6 +484,20 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «נסמן את הישר PQ ב-l» (also «נסמן ב-l את הישר PQ», "denote the line PQ by l") names the line through P and Q; on a segment only, the line is drawn under that name; a name already taken, or a line already named, is refused
 - «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» keeps the configurations whose crossing is there and adds no point; likewise «מתחת ל…», «… ציר ה-x … מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y / x», English. A side no configuration has is refused «לא נמצאה תצורה…»; a line parallel to that axis meets it nowhere; «… בנקודה B» still names the crossing B
 - Sources: ADR-AG-313, #2392, #2390, #2379.
+
+**R197 — a common tangent the sentence does not letter is drawn, its kind may be written as its definition, and a touch point can be named after the tangent**. *(Operator, 2026-10-25, on the exam «שאלה 6, משיק משותף לשני מעגלים שווים»: "didnt deal with the משיק חיצוני"; the unlettered form as 2-D reads it.)*
+- «משיק חיצוני משותף לשני המעגלים» (also «משיק משותף חיצוני …», «המשיק המשותף …», «משיק פנימי / אלכסוני …», «משיק חיצוני לשני המעגלים», «… למעגלים O_1 ו-O_2», English "an external common tangent of the two circles") draws that common tangent as «AB משיק משותף …» does, its touches lettered by the tool A, B (the next free letters, as in 2-D); a second such sentence draws another tangent, C, D. With no kind it is any of the four
+- «הישר l משיק משותף חיצוני לשני המעגלים» (English "the line l is an external common tangent of the two circles") draws it named l; «הישר l משיק משותף חיצוני למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה» carries the kind on R182's sentence
+- «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is the external tangent and «… מצדדים שונים שלו» (also «בצדדים שונים», «משני צדדיו») the internal one, as in 2-D; also with letters («PQ משיק משותף …») and named circles («… שהמעגלים O ו-P נמצאים …»)
+- «P נקודת ההשקה של l2 עם מעגל O_1» (also «P היא נקודת ההשקה של הישר l2 עם המעגל O_1», «נקודת המגע של l2 ומעגל O_1», «נקודת ההשקה … היא P», English) is «הישר l2 משיק למעגל O_1 בנקודה P»: after «כל המשיקים המשותפים …» it names that touch point. A line the figure lacks is refused naming it; a touch the tool already lettered is refused with the tangency's own message, not given a second letter
+- «הישר l משיק לשני המעגלים» (no «משותף», no kind) is not this sentence and goes to the AI, as before
+- Sources: ADR-AG-337, #2553, ADR-AG-313.
+
+**R198 — the exam's two pair sentences: one radius for both circles, and circle 1's or 2's centre by its coordinates**. *(Operator, 2026-10-25, on «שאלה 6»: "I had an issue creating this diagram. It wouldnt accept O_1 / O_2"; scope per his ruling D8 = B, 2026-10-26: "only the exam's exact two sentences".)*
+- «נתונים שני מעגלים שרדיוס כל אחד מהם 5» (also without «נתונים», any number, a radical or a radius letter; English "two circles each of radius 5") draws the pair «שני מעגלים» draws, both circles of that radius
+- «מרכז המעגל הראשון הוא O_1(-3,1)» and «מרכז המעגל השני הוא O_2(9,10)» (any order; «O1», «O_1», «O₁», the minus «−»; English "the centre of the first circle is …") name circle 1's or 2's centre of the drawn pair and place it there; the exam's joined «מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)» reads as the two. Typed again it is already known; a second letter for a centre already named is refused «כבר יש שם לנקודה הזו: …»; with no pair drawn the circle is created on that centre
+- not read (D8 = B), still handed to the AI: «שני מעגלים שרדיוסם 5», «שני מעגלים ברדיוס 5», «מרכז מעגל O_1(-3,1)», «O_1 מרכז המעגל הראשון», «רדיוס המעגל האחד הוא 5», «מעגל O_1 שמרכזו (-3,1) ורדיוסו 5»
+- Sources: ADR-AG-336, #2552, ADR-AG-322.
 
 **R181 — every common tangent of two circles in one sentence, each named; the tangent at the touching circles' common point**. *(Operator ruling 2026-10-20 on #2390: "we should name them so the user can refer to them later"; #2379.)*
 - «כל המשיקים המשותפים לשני המעגלים» (also «המשיקים המשותפים …», «… למעגלים M ו-N», English) draws every common tangent by how the circles sit: 4 apart, 3 externally tangent, 2 crossing, 1 internally tangent. Each is a full line with its equation row. Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0

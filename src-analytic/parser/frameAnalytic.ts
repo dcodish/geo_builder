@@ -22,7 +22,7 @@
  * line that is STORED is always the one the student typed.
  */
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
-import { NUMERAL_ALT, isNumeralName } from '../engine/names';
+import { NUMERAL_ALT, isNumeralName, letterlessCircleName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
@@ -98,7 +98,9 @@ export function orthography(raw: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     // «AB ו- BC», «ו -BC», «ו - BC» are «ו-BC» — the shared fold every builder's boundary calls (#1691, ADR-AG-239).
-    .replace(/^.*$/, (t) => wordDegrees(foldConjunctionSpacing(t)).trim());
+    .replace(/^.*$/, (t) => wordDegrees(foldConjunctionSpacing(t)).trim())
+    // «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is «משיק משותף חיצוני לשני המעגלים» — 2-D's fold, copied (#2553, ADR-AG-337).
+    .replace(/^.*$/, (t) => foldTangentSide(t));
 }
 
 /*
@@ -215,7 +217,8 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/^\((.*)\)$/, '$1'],
   // The conjunction that continues the previous sentence — «והנקודה C …», «וידוע כי …», «וכי DO/DE = 2/3».
   [/^וכי\s+/, ''],
-  [/^ו(?=ה[א-ת]|ידוע|נתו|עוד\s)/, ''],
+  // «ומרכז המעגל השני הוא …» (#2552, ADR-AG-336) — the sentence opener `segmentsOf` cuts before, unwrapped as the others.
+  [/^ו(?=ה[א-ת]|ידוע|נתו|עוד\s|מרכז\s)/, ''],
   // The given-prefixes, in every form the corpus prints — «נתון», «נתון:», «נתון כי», «נתון גם», «נתון בנוסף:»,
   // «עוד נתון:», «ידוע כי», «ידוע גם ש-». The four inflections are written out: «נתון» ends in FINAL nun.
   // The glued relative «ש-» («נתון שהישר …») is never the first letter of a CARDINAL: «נתונים שני מעגלים» is "two circles
@@ -375,6 +378,26 @@ const CENTRED_REF_EN = new RegExp(
   `\\b((?:on|to|of|inside|outside)\\s+(?:the\\s+)?circle)\\s+(?:with|whose)\\s+cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(${NAME})(?![A-Za-z0-9₀-₉'])`,
   'gi',
 );
+/**
+ * #2545 ([ADR-AG-335](../../docs/06c-decisions-analytic.md#adr-ag-335)) — THE SAME REFERENCE WITH NO RING TYPED, the ADR-W-157
+ * port of 2-D's ADR-768: «DE מיתר במעגל החוסם», «P על המעגל החסום במשולש», "DE is a chord of the circumcircle". Only in
+ * ARGUMENT position (behind an operand particle or preposition), never a subject. Folded to the letterless name
+ * (`letterlessCircleName`), which M1 resolves to the figure's one polygon's described circle when it is the figure's one
+ * circle — otherwise `submit.ts` keeps the line's hand-off to the model, as before.
+ */
+const LETTERLESS_HE = new RegExp(
+  `(?<![א-ת])((?:ו?ש?[בלמ])|(?:ו?ש?(?:על|של|אל)\\s+))(ה?)מעגל\\s+ה(חוס(?:ם|מת)|חסו(?:ם|מה))(?:\\s+(?:את\\s+)?(?:ב)?ה?(${SHAPE_HE}))?(?![א-ת])(?!\\s*(?:את\\s+)?[A-Z]{2})`,
+  'g',
+);
+const LETTERLESS_EN = new RegExp(
+  `(?<![A-Za-z])(of|on|in|to|onto|into|with|from|at|inside)\\s+the\\s+(circumscribed\\s+circle|inscribed\\s+circle|circumcircle|incircle|circle\\s+circumscribing|circle\\s+inscribed\\s+in)(?:\\s+(?:(?:of|in|around|about)\\s+)?(?:the\\s+)?(${SHAPE_EN}))?(?![A-Za-z])(?!\\s+[A-Z]{2})`,
+  'gi',
+);
+const ringArity = (noun: string | undefined): number => {
+  if (!noun) return 0;
+  const key = shapeKey(noun);
+  return key ? SHAPES[key].arity : 0;
+};
 const WHOLE_DESCRIPTION = /^(?:ה?מעגל|(?:the\s+|a\s+)?circle)\s+[⊙○][A-Z0-9₀-₉]+$/i;
 export function describedCircles(line: string): string {
   let out = line
@@ -382,6 +405,10 @@ export function describedCircles(line: string): string {
     .replace(CENTRED_REF_EN, (_m, ref: string, centre: string) => `${ref} ${centre}`);
   for (const [re, mark] of DESCRIBED_HE) out = out.replace(re, (_m, run: string) => `מעגל ${mark}${run}`);
   for (const [re, mark] of DESCRIBED_EN) out = out.replace(re, (_m, run: string) => `circle ${mark}${run}`);
+  out = out.replace(LETTERLESS_HE, (_m, pre: string, art: string, rel: string, noun?: string) =>
+    `${pre}${art}מעגל ${letterlessCircleName(/^חוס/.test(rel) ? 'circum' : 'in', ringArity(noun))}`);
+  out = out.replace(LETTERLESS_EN, (_m, prep: string, rel: string, noun?: string) =>
+    `${prep} circle ${letterlessCircleName(/circum/i.test(rel) ? 'circum' : 'in', ringArity(noun))}`);
   return out === line || WHOLE_DESCRIPTION.test(out) ? line : out;
 }
 
@@ -1066,7 +1093,8 @@ export function segmentsOf(line: string): Segment[] {
     if (ch === '(') depth += 1;
     else if (ch === ')') depth = Math.max(0, depth - 1);
     else if (depth === 0 && (ch === ',' || ch === ';')) cut(i, ch + ' ', 1);
-    else if (depth === 0 && ch === ' ' && /^ ו(?:ה[א-ת]|ידוע|נתו|כי\s)/.test(line.slice(i))) cut(i, ' ', 1);
+    // «… ומרכז המעגל השני הוא O2(9, 10)» (#2552, ADR-AG-336): «מרכז» opens a sentence too — the exam joins its two centres so.
+    else if (depth === 0 && ch === ' ' && /^ ו(?:ה[א-ת]|ידוע|נתו|כי\s|מרכז\s)/.test(line.slice(i))) cut(i, ' ', 1);
     else if (depth === 0 && ch === ' ') {
       // «A משמאל ל-O ו-C מימין ל-O» (#1706 follow-up, ADR-AG-222): «ו-» before a point's name may join two sentences.
       // The joint is kept as the separator, so a reading that merges the pieces gets the line back unchanged.
@@ -1107,4 +1135,35 @@ export function partitions(segments: readonly Segment[], max = 6): string[][] {
     out.push(groups);
   }
   return out.sort((a, b) => a.length - b.length);
+}
+
+/**
+ * #2553 (ADR-AG-337) — A COMMON TANGENT'S KIND WRITTEN AS ITS DEFINITION: «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is
+ * «משיק משותף חיצוני לשני המעגלים», «… מצדדים שונים שלו» «… פנימי …». COPIED from 2-D's `src/parser/tangentSide.ts` (never
+ * imported, BOUNDARIES.json; a vocabulary layer shared across products is undecided), called by `orthography`; the parity
+ * rows `tangent-same-side-2553` / `tangent-opposite-sides-2553` hold the two copies to one verdict. Only the tangent noun's
+ * own relative clause is folded, and the circles it names become the readers' target.
+ */
+const TANGENT_SAME_SIDE = '(?:נמצאים\\s+|מונחים\\s+)?(?:ב|מ)אותו\\s+(?:ה)?צד\\s+(?:שלו|של\\s+ה?משיק)';
+const TANGENT_OPPOSITE_SIDES =
+  '(?:נמצאים\\s+|מונחים\\s+)?(?:(?:ב|מ)צדדים\\s+(?:ה)?שונים\\s+(?:שלו|של\\s+ה?משיק)|(?:ב|מ)שני\\s+(?:ה)?צדדים\\s+(?:שלו|של\\s+ה?משיק)|(?:ב|מ)שני\\s+צדדיו)';
+/** «משיק (משותף)?» then «ש(שני )?ה?מעגלים (X ו-Y)?» — the tangent noun and the circles its clause names. */
+const TANGENT_HEAD = '((?:^|\\s)ה?משיק(?:\\s+ה?משותף)?)\\s+ש(?:(שני\\s+ה?מעגלים)|(ה?מעגלים(?:\\s+[A-Z][0-9₀-₉]?\\s*ו-?\\s*[A-Z][0-9₀-₉]?)?))\\s+';
+const TANGENT_EXTERNAL = new RegExp(`${TANGENT_HEAD}${TANGENT_SAME_SIDE}(?=$|[\\s,.;])`, 'g');
+const TANGENT_INTERNAL = new RegExp(`${TANGENT_HEAD}${TANGENT_OPPOSITE_SIDES}(?=$|[\\s,.;])`, 'g');
+/** English: "(a) common tangent with both circles on the same side of it" / "… on opposite sides of it". */
+const TANGENT_EN_HEAD = '\\b((?:an?|the)\\s+)?common\\s+tangent\\s+(?:with|such\\s+that|so\\s+that|where)\\s+(?:both|the\\s+two)\\s+circles\\s+(?:are\\s+|lie\\s+)?';
+const TANGENT_EN_EXTERNAL = new RegExp(`${TANGENT_EN_HEAD}on\\s+the\\s+same\\s+side\\s+of\\s+it\\b`, 'gi');
+const TANGENT_EN_INTERNAL = new RegExp(`${TANGENT_EN_HEAD}on\\s+(?:opposite|different)\\s+sides\\s+of\\s+it\\b`, 'gi');
+
+/** The circles of the clause as the rules' own target: «לשני המעגלים», «למעגלים O ו-P». */
+const tangentTarget = (two: string | undefined, named: string | undefined): string =>
+  two || !named || !/[A-Z]/.test(named) ? 'לשני המעגלים' : `ל${named.replace(/^ה/, '').replace(/\s+/g, ' ')}`;
+
+export function foldTangentSide(s: string): string {
+  return s
+    .replace(TANGENT_EXTERNAL, (_m, head: string, two?: string, named?: string) => `${head} חיצוני ${tangentTarget(two, named)}`)
+    .replace(TANGENT_INTERNAL, (_m, head: string, two?: string, named?: string) => `${head} פנימי ${tangentTarget(two, named)}`)
+    .replace(TANGENT_EN_EXTERNAL, (_m, det?: string) => `${det ? 'an ' : ''}external common tangent to the two circles`)
+    .replace(TANGENT_EN_INTERNAL, (_m, det?: string) => `${det ? 'an ' : ''}internal common tangent to the two circles`);
 }

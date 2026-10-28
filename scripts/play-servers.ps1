@@ -5,7 +5,8 @@
 .DESCRIPTION
   Reads scripts/playsheets/<Sheet>.servers.json - { "main": 5173, "prs": [ { "port": 5174, "branch": "feat/..." }, ... ] } -
   pulls main, makes (or refreshes) a detached worktree per PR branch under C:\projects\geo-pr\<port>, runs `npm install`
-  inside each (never a linked node_modules - docs/22 sec.7), opens one window per server, and waits until every port answers.
+  inside each (never a linked node_modules - docs/22 sec.7), starts each server HIDDEN (no window on the desktop; its
+  output goes to logs\play-<port>.log), and waits until every port answers.
   Works the same on either PC: everything it needs comes from GitHub.
 
 .EXAMPLE
@@ -29,11 +30,9 @@ if ($Cleanup) {
   foreach ($pr in $cfg.prs) {
     $c = Get-NetTCPConnection -LocalPort $pr.port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($c) {
-      # the server's window (its parent) holds the worktree as its working directory - close both
-      $parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)").ParentProcessId
+      # the server runs hidden with no window of its own, so only its node process is stopped (its launching shell has
+      # long exited, and a reused parent id must never take an unrelated process down)
       Stop-Process -Id $c.OwningProcess -Force -Confirm:$false
-      $pp = Get-Process -Id $parent -ErrorAction SilentlyContinue
-      if ($pp -and $pp.ProcessName -eq 'powershell') { Stop-Process -Id $parent -Force -Confirm:$false }
       "stopped server on $($pr.port)"
     }
     $w = Wt $pr.port
@@ -73,15 +72,21 @@ foreach ($pr in $cfg.prs) {
   Push-Location $w; npm install --no-audit --no-fund; Pop-Location
 }
 
-# 3. one window per server (a port already in use is reported, not taken over).
+# 3. one hidden server per port (a port already in use is reported, not taken over). The operator never sees a window
+#    (2026-10-27: "they open and clutter my desktop"); each server's output goes to logs\play-<port>.log instead.
 $servers = @(@{ port = $cfg.main; dir = $repo; label = 'main' }) + @($cfg.prs | ForEach-Object { @{ port = $_.port; dir = (Wt $_.port); label = $_.branch } })
+$logs = Join-Path $repo 'logs'
+New-Item -ItemType Directory -Force $logs | Out-Null
 foreach ($s in $servers) {
   if (Get-NetTCPConnection -LocalPort $s.port -State Listen -ErrorAction SilentlyContinue) {
-    Write-Warning "Port $($s.port) is already in use - left as is ($($s.label)). Close that server and re-run to replace it."
+    Write-Warning "Port $($s.port) is already in use - left as is ($($s.label)). Stop that server and re-run to replace it."
     continue
   }
-  $cmd = "`$host.UI.RawUI.WindowTitle = 'play $($s.port) - $($s.label)'; node node_modules/vite/bin/vite.js --port $($s.port) --strictPort"
-  Start-Process powershell -ArgumentList '-NoExit', '-Command', $cmd -WorkingDirectory $s.dir
+  # A hidden shell does the redirect itself: Start-Process's own -Redirect* switches make the server inherit this
+  # script's output handles, so a caller reading the script's output never sees it finish (2026-10-27).
+  $log = Join-Path $logs "play-$($s.port).log"
+  $cmd = "node node_modules\vite\bin\vite.js --port $($s.port) --strictPort *> '$log'"
+  Start-Process powershell -WindowStyle Hidden -WorkingDirectory $s.dir -ArgumentList '-NoProfile', '-Command', $cmd
 }
 
 # 4. wait until each answers (vite binds IPv6 localhost - poll `localhost`, not 127.0.0.1).
@@ -90,6 +95,6 @@ foreach ($s in $servers) {
   for ($i = 0; $i -lt 60 -and -not $ok; $i++) {
     try { $ok = (Invoke-WebRequest -UseBasicParsing "http://localhost:$($s.port)/" -TimeoutSec 3).StatusCode -eq 200 } catch { Start-Sleep -Seconds 2 }
   }
-  "{0}  {1}  {2}" -f $(if ($ok) { 'UP  ' } else { 'DOWN' }), "http://localhost:$($s.port)/", $s.label
+  "{0}  {1}  {2}" -f $(if ($ok) { 'UP  ' } else { "DOWN (see logs\play-$($s.port).log)" }), "http://localhost:$($s.port)/", $s.label
 }
 "Play sheet: scripts/playsheets/$Sheet.json  |  stop and remove the PR servers with -Cleanup"
