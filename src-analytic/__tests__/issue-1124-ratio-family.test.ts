@@ -30,6 +30,11 @@ const shape = (line: string) => {
   const r = parseLine(line);
   return r.ok ? JSON.stringify(r.facts, (k, v) => (k === 'src' ? undefined : v)) : null;
 };
+/** The RELATION a line states (its `length-eq` facts), `src` stripped. */
+const relation = (line: string) => {
+  const r = parseLine(line);
+  return r.ok ? JSON.stringify(r.facts.filter((f) => f.t === 'constraint' && f.k.t === 'length-eq'), (k, v) => (k === 'src' ? undefined : v)) : null;
+};
 
 describe('#1124 — every spelling puts the point in the same place', () => {
   const CASES: Array<[string, string[]]> = [
@@ -74,7 +79,11 @@ describe('#1124 — it is a REWRITE, not a second mechanism', () => {
      * [ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053) names — and this case is what proves
      * it, because a reproduction can only ever agree with itself.
      */
-    expect(shape('AC:CB = 3:2')).toBe(shape('AC = 1.5CB'));
+    // #2579 (ADR-AG-348): the colon form ALSO draws AB and seats its shared point C between A and B (the operator's
+    // ruling 2026-10-27), so the whole fact list differs by those two; the RELATION is still the one «AC = 1.5CB» states.
+    expect(relation('AC:CB = 3:2')).toBe(relation('AC = 1.5CB'));
+    expect(JSON.parse(relation('AC = 1.5CB')!)).toHaveLength(1);
+    expect(shape('AC:CB = 3:2')).not.toBe(shape('AC = 1.5CB'));
   });
 
   it('and the two really do draw the same figure', () => {

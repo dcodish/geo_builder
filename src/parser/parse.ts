@@ -859,9 +859,15 @@ const centrePt = (ctx: ParseContext, letter: string): Id => ctx.centrePoint?.[le
  * centre); a named centre — or a letter the student separately owns as a point — needs/gets nothing.
  * Positional/definitional statements («P על המשך BA») must NOT call this — the letter stays fresh there.
  */
-/** #1673 (ADR-565): may `x` become an unnamed circle's centre by being named so? A fresh letter, or a free point. */
-const nameableAsCentre = (ctx: ParseContext, x: string): boolean =>
+/**
+ * #1673 (ADR-565), #2579 ([ADR-773](docs/06-decisions.md#adr-773)): does nothing in the figure place `x` yet? A fresh
+ * letter, or a bare free point (`freePoints`: no shape's vertex, no circle's defining point). SEMANTIC: read off the
+ * construction, never off coordinates. A sentence may then PLACE it: the naming of a centre, a colon ratio's shared point.
+ */
+const unplacedPoint = (ctx: ParseContext, x: string): boolean =>
   !(ctx.points ?? []).map(up).includes(up(x)) || (ctx.freePoints ?? []).map(up).includes(up(x));
+/** #1673 (ADR-565): may `x` become an unnamed circle's centre by being named so? A point nothing places yet. */
+const nameableAsCentre = unplacedPoint;
 
 /**
  * #1673 (ADR-565): a RADIUS sentence whose centre end is the student's own letter for an UNNAMED circle («OB רדיוס»,
@@ -3636,6 +3642,26 @@ function affineTailOf(g: Record<string, string | undefined>, p: string): { konst
   if (den === 0) return null;
   return { konst: (sign * parseFloat(g[`${p}c`]!)) / den, text: `${sign > 0 ? '+' : '−'} ${g[`${p}c`]}${g[`${p}cd`] !== undefined ? `/${g[`${p}cd`]}` : ''}` };
 }
+/**
+ * #2579 ([ADR-773](docs/06-decisions.md#adr-773)) — THE SEGMENTS A LENGTH STATEMENT NAMES, drawn. Every 2-D rule that
+ * lowers a stated length relation composes this: «AB = 5» (`distanceConstraint`), «AB = CD» (`equalSegments`), the
+ * products and the proportions («AB = 2 AD», «AD/DB = 1/2», «AD:DB = 1:2», «AB פי 2 מ-AD»). The symbolic and radical
+ * measures («AB = 3x», «AB = √2», `measure-length`) are ruled to draw too and wait for #2590: with a carrier, a pinned
+ * radius leaves «OR=r» undriven when the drawing satisfies it by coincidence. One `segment` per distinct named pair, in the order named; a `segment` is idempotent by its
+ * deterministic id, so a pair the figure already draws is not drawn twice. The segments come BEFORE the relation, so
+ * they are the line's carriers and the created-points notice names the points they bring in (ADR-769).
+ */
+function lengthCarriers(...pairs: readonly (readonly [Id, Id])[]): AnyCommand[] {
+  const out: AnyCommand[] = [];
+  const seen = new Set<string>();
+  for (const [a, b] of pairs) {
+    const key = [a, b].sort().join('|');
+    if (a === b || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ type: 'segment', a, b });
+  }
+  return out;
+}
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
     new RegExp(
@@ -3648,7 +3674,8 @@ const ratioConstraint: Rule = (s) => {
     const m = mV?.value ?? 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
     const n = nV?.value ?? 1;
     const d = qV?.value ?? 1; // trailing divisor ("CD/2", "CD/√2")
-    return [{ type: 'set-ratio', a: up(g.la!), b: up(g.lb!), c: up(g.lc!), d: up(g.ld!), k: n / (m * d) }];
+    const [a, b, c, dd] = [up(g.la!), up(g.lb!), up(g.lc!), up(g.ld!)];
+    return [...lengthCarriers([a, b], [c, dd]), { type: 'set-ratio', a, b, c, d: dd, k: n / (m * d) }];
   }
   // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" / "AC פי √(3) מ-CO" — |AB| is k× |AD|. The RHS "מ" may be glued
   // to a segment-noun ("מהקטע CO" / "מהצלע CD" / "מאורך CO") — the verbose relational form (issue #105) — so
@@ -3667,7 +3694,10 @@ const ratioConstraint: Rule = (s) => {
     const smaller = new RegExp(String.raw`(?<![א-ת])(?:${RATIO_SMALLER})(?![א-ת])`, 'i').test(hg.hmid ?? '');
     if (k !== null && k.value > 0) {
       const ids = { a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!) };
-      return [smaller ? { type: 'set-ratio', ...ids, k: 1 / k.value, consumed: { numbers: [k.value] } } : { type: 'set-ratio', ...ids, k: k.value }];
+      return [
+        ...lengthCarriers([ids.a, ids.b], [ids.c, ids.d]),
+        smaller ? { type: 'set-ratio', ...ids, k: 1 / k.value, consumed: { numbers: [k.value] } } : { type: 'set-ratio', ...ids, k: k.value },
+      ];
     }
   }
   return null;
@@ -3720,7 +3750,8 @@ const segmentRatio: Rule = (s) => {
   if (!m) return null;
   const v = numexprVal(m.groups!, 'v');
   if (!v) return null;
-  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: v.value }];
+  const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  return [...lengthCarriers([a, b], [c, d]), { type: 'set-ratio', a, b, c, d, k: v.value }];
 };
 
 /**
@@ -4167,36 +4198,50 @@ const lengthProduct: Rule = (s) => {
   if (lhs.length !== rhs.length) return null; // unequal degree pins scale — refused honestly, never built wrong
   const k = Ln.k / Rn.k;
   if (!Number.isFinite(k) || k <= 0) return null;
-  const draws: AnyCommand[] = [];
-  const seen = new Set<string>();
-  for (const [a, b] of [...lhs, ...rhs]) {
-    const key = [a, b].sort().join('|');
-    if (a === b || seen.has(key)) continue;
-    seen.add(key);
-    draws.push({ type: 'segment', a, b });
-  }
-  return [...draws, { type: 'set-length-product', k, lhs: lhs.flat(), rhs: rhs.flat() }];
+  return [...lengthCarriers(...lhs, ...rhs), { type: 'set-length-product', k, lhs: lhs.flat(), rhs: rhs.flat() }];
 };
 
 /**
  * "DF:FC = 1:2" — a bare ratio between two named segments, colon-form, with NO `ratio`/`divides`
  * keyword (`dividesInRatio` owns the keyworded phrasings). |DF|:|FC| = p:q ⇒ |DF| = (p/q)·|FC|,
  * emitted as a `set-ratio` CONSTRAINT (like `segmentRatio`, the `/`-form sibling) that drives the
- * shared/free point so the proportion holds — it references existing endpoints, it does not create
- * them. Anchored on the full `seg:seg = p:q` shape (both sides an `x:y`), so it never claims a lone
+ * shared/free point so the proportion holds. It draws both named segments (#2579, ADR-773, operator ruling 2026-10-27
+ * Q1 «always»). When the two segments SHARE one point («AD:DB», D) and nothing in the figure places that point yet
+ * (`unplacedPoint`: a new letter or a bare free point), the sentence places it on the outer segment, between its ends,
+ * and draws that segment too (Q3, Q2): `segment AB` · `point-on-segment D` (no `t`: the ratio drives it) — the
+ * «D על AB» · «AD:DB = 1:2» lowering in one line. A shared point the figure already places (a polygon's vertex, a point
+ * on another object) keeps the plain proportion: placing it would re-define it. Anchored on the full `seg:seg = p:q` shape (both sides an `x:y`), so it never claims a lone
  * segment, an equality, or a `p:q` that lacks two named LHS segments. Without this the utterance fell
  * through every rule and escalated to the LLM, which returned "DF = FC/2" — then silently mis-read as
  * a plain equality (the divisor dropped). Now deterministic and offline. (`RATPQ` defined just below.)
  */
-const segmentRatioColon: Rule = (s) => {
+const segmentRatioColon: Rule = (s, ctx) => {
   const m = s.match(
     new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*:\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATPQ}`),
   );
   if (!m) return null;
   const p = parseFloat(m[5]), q = parseFloat(m[6]);
   if (p <= 0 || q <= 0) return null;
-  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: p / q }];
+  const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  const ratio: AnyCommand = { type: 'set-ratio', a, b, c, d, k: p / q };
+  const host = sharedPointHost([a, b], [c, d]);
+  if (host && unplacedPoint(ctx, host.point)) {
+    // the segments first (their carriers bring in A, D, B, so the notice names all three), then the placement
+    return [...lengthCarriers([host.from, host.to], [a, b], [c, d]), { type: 'point-on-segment', id: host.point, a: host.from, b: host.to }, ratio];
+  }
+  return [...lengthCarriers([a, b], [c, d]), ratio];
 };
+
+/** #2579 (ADR-773): two segments sharing exactly one point («AD», «DB» → D) and the outer segment their other ends make (AB). */
+function sharedPointHost([a, b]: readonly [Id, Id], [c, d]: readonly [Id, Id]): { point: Id; from: Id; to: Id } | null {
+  if (a === b || c === d) return null;
+  const shared = [a, b].filter((x) => x === c || x === d);
+  if (shared.length !== 1) return null;
+  const point = shared[0]!;
+  const from = a === point ? b : a;
+  const to = c === point ? d : c;
+  return from === to ? null : { point, from, to };
+}
 
 /**
  * A point DIVIDING a segment in a stated ratio — "G divides DC in ratio 1:2" / "G מחלק[ת] את DC ביחס 1:2"
@@ -4279,11 +4324,7 @@ const equalSegments: Rule = (s) => {
   const m = s.match(new RegExp(String.raw`${CARRIER_PRE}\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${CARRIER_PRE}\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'));
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
-  return [
-    { type: 'segment', a, b },
-    { type: 'segment', a: c, b: d },
-    { type: 'set-equal', a, b, c, d },
-  ];
+  return [...lengthCarriers([a, b], [c, d]), { type: 'set-equal', a, b, c, d }];
 };
 
 /**
@@ -4298,10 +4339,7 @@ const distanceConstraint: Rule = (s) => {
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\s*$`));
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
-  return [
-    { type: 'segment', a, b },
-    { type: 'set-distance', a, b, value: parseFloat(m[3]) },
-  ];
+  return [...lengthCarriers([a, b]), { type: 'set-distance', a, b, value: parseFloat(m[3]) }];
 };
 
 // ── Symbolic measures (ADR-031): a named unknown shared across statements. ──

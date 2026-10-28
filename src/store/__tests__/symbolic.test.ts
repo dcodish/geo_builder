@@ -218,7 +218,8 @@ describe('affine measures "CE = k + 2" (coef·var ± constant)', () => {
 describe('segment-length ratio "AE/ED = 2/3"', () => {
   it('parses to a set-ratio (|AE| = ⅔·|ED|), not a half-parsed "ED=2"', () => {
     const r = parse('AE/ED = 2/3');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'set-ratio', a: 'A', b: 'E', c: 'E', d: 'D', k: 2 / 3 });
+    // #2579 (ADR-773): the two named segments are drawn first
+    expect(r.ok && r.commands).toEqual([{ type: 'segment', a: 'A', b: 'E' }, { type: 'segment', a: 'E', b: 'D' }, { type: 'set-ratio', a: 'A', b: 'E', c: 'E', d: 'D', k: 2 / 3 }]);
   });
 
   it('places a sliding point at the right spot (E on AD, AE/ED = 2/3 ⇒ t = 0.4)', () => {
@@ -241,7 +242,7 @@ describe('π constant', () => {
 
   it('an uppercase segment "PI" stays a ratio, not π (AB = 2PI ≠ AB = 2π)', () => {
     const r = parse('AB = 2PI');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'set-ratio', a: 'A', b: 'B', c: 'P', d: 'I', k: 2 });
+    expect(r.ok && r.commands.find((c) => c.type === 'set-ratio')).toEqual({ type: 'set-ratio', a: 'A', b: 'B', c: 'P', d: 'I', k: 2 });
   });
 });
 

@@ -24,17 +24,25 @@
       "utterance": "AB = 2 AX",
       "group": "g1",
       "cmd": {
-        "type": "free-point",
-        "id": "X",
-        "x": 3,
-        "y": 2,
-        "free": true,
-        "ifAbsent": true
+        "type": "segment",
+        "a": "A",
+        "b": "B"
       },
       "enabled": true
     },
     {
-      "id": "g1.1",
+      "id": "g1.0~1",
+      "utterance": "AB = 2 AX",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "X"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0~2",
       "utterance": "AB = 2 AX",
       "group": "g1",
       "cmd": {

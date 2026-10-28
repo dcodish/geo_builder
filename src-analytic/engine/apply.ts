@@ -2412,6 +2412,23 @@ function resolveLineRefs(c: Construction, f: Fact): Fact {
   return own === undefined ? out : ({ ...out, id: own } as Fact);
 }
 
+/**
+ * #2579 ([ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)) — DOES NOTHING IN THE FIGURE PLACE `id` YET? A
+ * bare declared point (`free`) that is no polygon's vertex, no circle's centre or defining point, and the subject of no
+ * constraint (a coordinate, a midpoint, a membership: every constraint that places a point names it as its `id`). The
+ * analytic reading of 2-D's `freePoints` (ADR-565). Read off the construction's statements, never off a drawing.
+ */
+function unplacedPoint(c: Construction, id: Id): boolean {
+  const o = objectById(c, id);
+  if (!o || o.kind !== 'free') return false;
+  for (const p of c.objects) {
+    if (p.kind === 'polygon' && p.vertices.includes(id)) return false;
+    if (p.kind === 'circle-at' && p.centre === id) return false;
+    if (p.kind === 'circle-thru' && circleDefPoints(p.def).includes(id)) return false;
+  }
+  return !c.constraints.some((k) => 'id' in k && k.id === id);
+}
+
 export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
   /*
    * A BOUND LETTER READS ITS VALUE (#2521, ADR-AG-332), in every fact and both orders: «רדיוס מעגל P הוא 9» · «R > r»
@@ -4869,6 +4886,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 
     case 'role-of':
       return applyRoleOf(c, f);
+
+    /** #2579 (ADR-AG-348): a colon ratio's shared point, seated on the outer segment when nothing places it yet. */
+    case 'seat-between': {
+      if (!objectById(c, f.id)) return { ok: false, error: unknownRef(c, f.id) };
+      if (!unplacedPoint(c, f.id)) return { ok: true, effect: 'known', next: c };
+      const on = applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: f.a, b: f.b }, src: f.src });
+      if (!on.ok) return on;
+      return applyFact(on.next, { t: 'selector', sel: { kind: 'between', id: f.id, a: f.a, b: f.b }, src: f.src });
+    }
 
     /** Introduce a named but unplaced point; harmless and absorbed if it already exists. */
     case 'declare': {

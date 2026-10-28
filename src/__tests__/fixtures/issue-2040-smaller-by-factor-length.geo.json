@@ -25,6 +25,28 @@
       "utterance": "AB קטן פי 2 מ-AC",
       "group": "g1",
       "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "eNdoFnH5qH2ZanSNJIXOM~1",
+      "utterance": "AB קטן פי 2 מ-AC",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "eNdoFnH5qH2ZanSNJIXOM~2",
+      "utterance": "AB קטן פי 2 מ-AC",
+      "group": "g1",
+      "cmd": {
         "type": "set-ratio",
         "a": "A",
         "b": "B",

@@ -8016,8 +8016,25 @@ function parseRatioColon(line: string): Fact[] | null {
   const q = Number(m[6]);
   if (!(p > 0) || !(q > 0)) return null;
   const fact = ratioFact([m[1], m[2]], [m[3], m[4]], p, q, line);
+  if (!fact) return null;
   // «AC:CB = 3:2» names both pairs, so both are drawn (#1652) — the length rule's own reading of a named pair.
-  return fact ? [fact, ...lengthPieces([`${m[1]}${m[2]}`, `${m[3]}${m[4]}`], line)] : null;
+  const pieces = lengthPieces([`${m[1]}${m[2]}`, `${m[3]}${m[4]}`], line);
+  // #2579 (ADR-AG-348, the ADR-773 port): the two segments SHARE a point («AD», «DB» → D) — the sentence places it on the
+  // outer segment AB, between A and B, and draws AB, when nothing places it yet (decided at M1: `seat-between`).
+  const host = sharedPointHost([m[1], m[2]], [m[3], m[4]]);
+  if (!host) return [fact, ...pieces];
+  return [...lengthPieces([`${host.from}${host.to}`], line), ...pieces, { t: 'seat-between', id: host.point, a: host.from, b: host.to, src: line }, fact];
+}
+
+/** #2579 (ADR-AG-348): two segments sharing exactly one point («AD», «DB» → D) and the outer segment their other ends make. */
+function sharedPointHost([a, b]: readonly [string, string], [c, d]: readonly [string, string]): { point: string; from: string; to: string } | null {
+  if (a === b || c === d) return null;
+  const shared = [a, b].filter((x) => x === c || x === d);
+  if (shared.length !== 1) return null;
+  const point = shared[0]!;
+  const from = a === point ? b : a;
+  const to = c === point ? d : c;
+  return from === to ? null : { point, from, to };
 }
 
 /** The placement shared by the divider and prose spellings: `C` sits on `AB`, between its ends. */

@@ -964,6 +964,8 @@ uses is `not-handled` at M1 ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307))
 Every form lowers to `length-eq`: `areaNotation` rewrites `S_{ABC}`, and `ratioAsEquation` rewrites the prose ratio.
 A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The divider spelling «היחס בין AC ל-CB הוא 3:2» is `parseDividesInRatio`'s and is read earlier.
 
+The bare colon (`parseRatioColon`) draws both pairs; when they share one point (`sharedPointHost`) it also draws the outer segment and emits `seat-between { id, a, b }` ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), #2579). M1 (`applyFact`) decides it, because the parser is pure over one line: `unplacedPoint` (a `free` object that is no polygon's vertex, no circle's centre or defining point and no constraint's `id`) → `on-line-2pt` + the `between` selector, as the divider; otherwise `known`, the proportion alone.
+
 *Identifiers:* `S_ABC` · `parser/frameAnalytic.ts` · `d_{AB}` · `asEquation` · `AREA_TOKEN`
 
 ### Arcs, sectors and the diameter from a point ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), #1622 E4)

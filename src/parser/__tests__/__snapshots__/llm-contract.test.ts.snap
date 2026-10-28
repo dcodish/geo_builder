@@ -36,9 +36,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "AB = 2 AD": {
     "en": [
+      "segment",
+      "segment",
       "set-ratio",
     ],
     "he": [
+      "segment",
+      "segment",
       "set-ratio",
     ],
   },
@@ -262,9 +266,17 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "AD:DB = 1:2": {
     "en": [
+      "segment",
+      "segment",
+      "segment",
+      "point-on-segment",
       "set-ratio",
     ],
     "he": [
+      "segment",
+      "segment",
+      "segment",
+      "point-on-segment",
       "set-ratio",
     ],
   },

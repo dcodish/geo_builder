@@ -814,6 +814,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── the step-1 audit's seed (#1649 §D), re-measured on c6a412aa — rows not already a catalog row above ──
   { id: 'on-side', family: 'points-incidence', steps: ['מלבן ABCD', 'E על הצלע DC'], expect: 'builds' },
   { id: 'ratio', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD:DB = 1:2'], expect: 'builds' },
+  // #2579 (ADR-773, ADR-AG-348): the colon ratio over a new or bare shared point places it between the outer ends and draws
+  // the outer segment in 2-D and analytic; over a vertex it stays the plain proportion. 3-D draws the two pairs only (#2596).
+  { id: 'colon-ratio-seats-2579', family: 'midpoint-ratio', steps: ['נקודה A', 'נקודה B', 'נקודה D', 'AD:DB = 1:2'], expect: 'builds', exception: 'X9' },
+  { id: 'colon-ratio-vertex-2579', family: 'midpoint-ratio', steps: ['משולש ABD', 'AD:DB = 1:2'], expect: 'builds' },
   // #1815 (ADR-3D-309, 2-D ADR-413) — a rider's incidence that holds only on a FLAT triangle is refused, not drawn flat
   { id: 'rider-midpoint-collapse-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'M על AB', 'M אמצע BC'], expect: 'refused', note: 'M on AB and the midpoint of BC only when ABC is flat' },
   { id: 'rider-midpoint-collapse-mirror-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'D אמצע AC'], expect: 'refused' },

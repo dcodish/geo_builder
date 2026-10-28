@@ -1138,6 +1138,13 @@ LLM path) asks `createdByReference(before, after, statements, utterance)` (`src/
 labels a carrier (`segment`, bare `free-point`) brought in, never a point a command defines, nothing for a
 declaration-only line. `App.tsx` shows `CreatedNotice` while that group is the last row; ✕ is `removeGroup`.
 
+**The segments a length statement names** ([ADR-773](06-decisions.md#adr-773), #2579): every 2-D length-relation rule composes
+`lengthCarriers(...pairs)` (`src/parser/parse.ts`), one `segment` per distinct named pair BEFORE the relation, so a
+proportion's points arrive through carriers and `withImpliedPoints` is identity for it. `segmentRatioColon` with a
+shared point (`sharedPointHost`) that `unplacedPoint(ctx, x)` (a fresh letter or a `freePoints` member, ADR-565) admits
+also emits the outer `segment` and `point-on-segment` (no `t`) before its `set-ratio`, so the ratio drives an
+`on-segment-solved` slider. The measure rules (`measure-length`) have no carrier yet (#2590).
+
 ### The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
 
 Everything up to the model call — store operations, the pre-parse guards, the parse and its #186/#539 auto-binds,
