@@ -1830,6 +1830,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'pair-each-radius-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2216' }], note: 'analytic draws two radius-5 circles since ADR-AG-336; 2-D hands it to the model (#2216 item 2)' },
   { id: 'pair-first-centre-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O_1(-3,1)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'a coordinate centre: analytic’s; not-handled before ADR-AG-336' },
   { id: 'pair-centres-joined-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the exam’s joined sentence, cut before «ומרכז»; not-handled before ADR-AG-336' },
+  // ── #2552 D9 (ADR-AG-344): «X מרכז מעגל» with every centre lettered states a new circle (operator ruling D9 = A) ──
+  // Beside ONE lettered circle 2-D renames the centre instead (#2586). Both are `builds` in this vocabulary, so that half
+  // cannot be a known-gap row (it would read as agreeing); its lock is analytic's own (issue-2552-d9-new-circle.test.ts).
+  { id: 'centre-of-a-circle-new-2552', family: 'circles', steps: ['מעגל O', 'מעגל Q', 'P מרכז מעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a third circle on P; analytic refused it ambiguous-shape before ADR-AG-344' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

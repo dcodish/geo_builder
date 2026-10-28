@@ -20,6 +20,11 @@ export interface CreatedNoticeSentences {
   typoName: string;
   /** A line that DECLARES its points: it announces nothing. */
   declarationLine: string;
+  /**
+   * #2552 D9 (ADR-W-164): a builder that creates a CIRCLE by its centre — lines that letter every circle's centre, then
+   * a line stating a new circle on `circleCentre` (a new letter). Omitted by a builder that creates no circle.
+   */
+  circle?: { setup: readonly string[]; line: string; centre: string };
 }
 
 /** One row: a name and a check that throws (an `expect`) when the adapter breaks the contract. */
@@ -69,6 +74,24 @@ export const CREATED_NOTICE_ROWS: readonly CreatedNoticeRow[] = [
       await a.submit(s.declarationLine);
       expect(a.lineCount()).toBe(1);
       expect(a.lastCreated()).toBeNull();
+    },
+  },
+  {
+    name: 'a line that creates a circle announces the circle alone, and its ✕ removes the line',
+    async run(a, s) {
+      if (!s.circle) return;
+      a.reset();
+      for (const l of s.circle.setup) await a.submit(l);
+      const before = a.lineCount();
+      expect(a.pointNames(), 'the centre is new').not.toContain(s.circle.centre);
+      await a.submit(s.circle.line);
+      expect(a.lineCount(), 'the circle line recorded').toBe(before + 1);
+      expect(a.pointNames()).toContain(s.circle.centre);
+      expect(a.lastCreated()?.circle).toBe(s.circle.centre);
+      sameNames(a.lastCreated()?.names, []);
+      a.undoLastLine();
+      expect(a.lineCount()).toBe(before);
+      expect(a.pointNames()).not.toContain(s.circle.centre);
     },
   },
   {

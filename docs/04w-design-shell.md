@@ -451,6 +451,11 @@ meta-lock runs them against four broken adapters. Each builder decides WHICH poi
 shows the notice while that line is the last row (2-D `createdByReference` + `commitLine`; 3-D `Derived3.created` +
 `lastCreated`; analytic `Derivation.created` + `record.created`). Complex: #2562.
 
+A line that created a CIRCLE by its centre ([ADR-W-164](06w-decisions-workspace.md#adr-w-164), #2552 D9) shows
+`suite.notice.createdCircle` («נוצר מעגל חדש שמרכזו {{centre}} — …») instead: `CreatedNotice.circle` carries the centre,
+`createdNoticeTextOf(notice)` picks the key, and the ✕ is the same. The rows' sixth (circle) row runs for a builder that
+hands `CreatedNoticeSentences.circle`; today only analytic (`record.createdCircle`).
+
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 
 `ManualScreen` shows a capped SAMPLE per section. Two rules make a cap honest:
