@@ -1,0 +1,1023 @@
+{
+ "name": "round-2585",
+ "title": "Fix round #2585",
+ "cases": [
+  {
+   "id": "T1",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "A perpendicular bisector beside triangle MPQ leaves the triangle alone (#1690)",
+   "class": "look",
+   "lines": [
+    "משולש MPQ",
+    "קטע EK",
+    "אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». Triangle MPQ unchanged; the bisector of EK goes through a new point N at its midpoint",
+   "before": "vertex M jumps onto EK's midpoint, silently, distorting the triangle",
+   "expect": [
+    "אנך אמצעי ל-EK"
+   ]
+  },
+  {
+   "id": "T2",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "The same in English (#1690)",
+   "class": "verified",
+   "lines": [
+    "משולש MPQ",
+    "קטע EK",
+    "perpendicular bisector of EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». As the case above: midpoint N, the triangle unchanged",
+   "before": "M moves",
+   "expect": [
+    "perpendicular bisector of EK"
+   ]
+  },
+  {
+   "id": "T3",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "Two unnamed medians both draw (#1690)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "תיכון מ-A במשולש ABC",
+    "תיכון מ-B במשולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The median from A to M (midpoint of BC) and from B to N (midpoint of AC); no refusal",
+   "before": "the third line is refused «M coincides with its constructed target»",
+   "expect": [
+    "תיכון מ-B במשולש ABC"
+   ]
+  },
+  {
+   "id": "T4",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "A median leaves an existing point M where it is (#1690)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "נקודה M",
+    "תיכון מ-A במשולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». M stays put; the median goes from A to a new N at BC's midpoint",
+   "before": "M is moved onto BC's midpoint",
+   "expect": [
+    "תיכון מ-A במשולש ABC"
+   ]
+  },
+  {
+   "id": "T5",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "A bisector leaves an existing point M where it is (#1690)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "נקודה M",
+    "אנך אמצעי ל-AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». M stays put; the bisector of AB goes through N",
+   "before": "M is moved to AB's midpoint",
+   "expect": [
+    "אנך אמצעי ל-AB"
+   ]
+  },
+  {
+   "id": "T6",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "The bisector goes through the midpoint you already named (#1690, not asked for)",
+   "class": "play",
+   "lines": [
+    "קטע AB",
+    "K אמצע AB",
+    "אנך אמצעי ל-AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». The bisector passes through K; only A, B and K on the figure",
+   "before": "a second point M drawn on top of K",
+   "expect": [
+    "אנך אמצעי ל-AB"
+   ]
+  },
+  {
+   "id": "T7",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "title": "A restated bisector is already drawn (#1690, regression guard)",
+   "class": "verified",
+   "lines": [
+    "משולש MPQ",
+    "קטע EK",
+    "אנך אמצעי ל-EK",
+    "אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line answers that it is already drawn and adds no row or point",
+   "before": "unchanged for «קטע AB»; here the 3rd line used to move M"
+  },
+  {
+   "id": "T8",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "«P מרכז מעגל» draws a third circle after the exam pair",
+   "class": "play",
+   "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O_1(-3,1)",
+    "מרכז המעגל השני הוא O_2(9,10)",
+    "P מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». A third circle centred at a new point P; the radius-5 circles unmoved. Under the line exactly «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», and no «נוצרה נקודה חדשה»",
+   "before": "refused, asking which circle",
+   "expect": [
+    "P מרכז מעגל"
+   ]
+  },
+  {
+   "id": "T9",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "The ✕ on that notice removes the line",
+   "class": "play",
+   "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O_1(-3,1)",
+    "מרכז המעגל השני הוא O_2(9,10)",
+    "P מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the ✕ on the notice: the «P מרכז מעגל» line, P and its circle are gone; the two radius-5 circles stay",
+   "before": "no notice"
+  },
+  {
+   "id": "T10",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "A second circle beside one lettered circle",
+   "class": "look",
+   "lines": [
+    "מעגל שמרכזו O(0,0) ורדיוסו 3",
+    "P מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». A second circle centred at P, with the same notice naming P",
+   "before": "refused «כבר יש שם לנקודה הזו: O»",
+   "expect": [
+    "P מרכז מעגל"
+   ]
+  },
+  {
+   "id": "T11",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "REFUSAL: the definite «מרכז המעגל» is unchanged",
+   "class": "verified",
+   "lines": [
+    "מעגל שמרכזו O(0,0) ורדיוסו 3",
+    "P מרכז המעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». Still refused «כבר יש שם לנקודה הזו: O», nothing drawn",
+   "before": "unchanged (regression guard)",
+   "expectRefusal": "כבר יש שם לנקודה הזו"
+  },
+  {
+   "id": "T12",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "The pair's centres are still named in turn (control)",
+   "class": "verified",
+   "lines": [
+    "שני מעגלים",
+    "O_1 מרכז מעגל",
+    "O_2 מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». The two centres lettered O₁ and O₂, no third circle, no circle notice",
+   "before": "unchanged",
+   "expect": [
+    "O_2 מרכז מעגל"
+   ]
+  },
+  {
+   "id": "T13",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "title": "An empty page is unchanged (control)",
+   "class": "verified",
+   "lines": [
+    "P מרכז מעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». One circle centred at P, no notice",
+   "before": "unchanged",
+   "expect": [
+    "P מרכז מעגל"
+   ]
+  },
+  {
+   "id": "T14",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A perpendicular to a plane not yet defined creates it",
+   "class": "play",
+   "cycles": 2,
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' מאונך למישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 ⟂ AC′ and a π3 row appears. «הציגו תצורה אחרת» slides π3 along AC′",
+   "before": "refused «המישור «π3» עדיין לא הוגדר…»",
+   "expect": [
+    "הישר AC' מאונך למישור π3"
+   ]
+  },
+  {
+   "id": "T15",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A perpendicular on a declared free plane turns it",
+   "class": "look",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מישור π3",
+    "הישר AC' מאונך למישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 turns to face AC′",
+   "before": "refused «למישור π3 אין עדיין משוואה או כיוון…»",
+   "expect": [
+    "הישר AC' מאונך למישור π3"
+   ]
+  },
+  {
+   "id": "T16",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "Parallel to a segment",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מישור π3",
+    "הישר AB מקביל למישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 ∥ AB",
+   "before": "refused, the plane has no direction",
+   "expect": [
+    "הישר AB מקביל למישור π3"
+   ]
+  },
+  {
+   "id": "T17",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A line lying in a new plane",
+   "class": "look",
+   "cycles": 2,
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AB מוכל במישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». π3 passes through A and B and turns about AB on «הציגו תצורה אחרת»",
+   "before": "refused, π3 not defined",
+   "expect": [
+    "הישר AB מוכל במישור π3"
+   ]
+  },
+  {
+   "id": "T18",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A line–plane angle",
+   "class": "verified",
+   "cycles": 2,
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הזווית בין הישר AC' למישור π3 היא 30"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; the angle is 30° in every configuration",
+   "before": "refused, π3 not defined",
+   "expect": [
+    "הזווית בין הישר AC' למישור π3 היא 30"
+   ]
+  },
+  {
+   "id": "T19",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A vector perpendicular to a new plane",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "נסמן: AB = u",
+    "u ⟂ π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 ⟂ AB",
+   "before": "refused, π3 not defined",
+   "expect": [
+    "u ⟂ π3"
+   ]
+  },
+  {
+   "id": "T20",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A new plane parallel to the base",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "π3 ∥ ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 ∥ the base",
+   "before": "refused, π3 not defined",
+   "expect": [
+    "π3 ∥ ABC"
+   ]
+  },
+  {
+   "id": "T21",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A line crossing a new plane at M",
+   "class": "look",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' חותך את המישור π3 בנקודה M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; M drawn on AC′",
+   "before": "refused, π3 not defined",
+   "expect": [
+    "הישר AC' חותך את המישור π3 בנקודה M"
+   ]
+  },
+  {
+   "id": "T22",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "REFUSAL: an angle between two planes when one is new",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הזווית בין המישור π3 למישור ABC היא 30"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, the plane has no equation or direction yet; no π3 row is left",
+   "before": "refused «המישור «π3» עדיין לא הוגדר…»",
+   "expectRefusal": "אין עדיין משוואה"
+  },
+  {
+   "id": "T23",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A construction line also creates its planes (not asked for)",
+   "class": "play",
+   "lines": [
+    "פירמידה SABC",
+    "ℓ ישר החיתוך בין המישורים π1 ו-π2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds: π1 and π2 created free, ℓ as their crossing. Your 24 Oct ruling said «any relation»; this line is a construction. Is that what you want?",
+   "before": "refused, π1 not defined",
+   "expect": [
+    "ℓ ישר החיתוך בין המישורים π1 ו-π2"
+   ]
+  },
+  {
+   "id": "T24",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "title": "A point on a new plane still creates it (regression guard)",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A על המישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; π3 created, as before",
+   "before": "unchanged",
+   "expect": [
+    "A על המישור π3"
+   ]
+  },
+  {
+   "id": "T25",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "On a blank page «AD:DB = 1:2» draws AB, AD, DB with D between",
+   "class": "look",
+   "lines": [
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Three segments; D on AB a third of the way from A; the notice names A, D, B",
+   "before": "points only, no segments, D off the line",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T26",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "Bare points: D moves onto AB",
+   "class": "verified",
+   "lines": [
+    "נקודה A",
+    "נקודה B",
+    "נקודה D",
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». D on AB between A and B; AB, AD, DB drawn",
+   "before": "no segments, D free",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T27",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "On a triangle, D lands on side AB",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». D on side AB with AD:DB = 1:2; the triangle does not move",
+   "before": "D floated off AB",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T28",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "«AB = 2 AD» draws both segments",
+   "class": "verified",
+   "lines": [
+    "AB = 2 AD"
+   ],
+   "lookFor": "Start: press «נקה הכל». AB and AD drawn; D stays free (not on AB)",
+   "before": "no segments",
+   "expect": [
+    "AB = 2 AD"
+   ]
+  },
+  {
+   "id": "T29",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "The slash form draws its segments but does not place D",
+   "class": "play",
+   "lines": [
+    "AD/DB = 1/2"
+   ],
+   "lookFor": "Start: press «נקה הכל». AD and DB drawn; D not on AB. Your ruling named only the colon form; #2597 asks whether this one should place D too",
+   "before": "no segments",
+   "expect": [
+    "AD/DB = 1/2"
+   ]
+  },
+  {
+   "id": "T30",
+   "base": "http://localhost:5176",
+   "product": "2d",
+   "path": "/",
+   "title": "A triangle's vertex is not flattened onto AB (regression guard)",
+   "class": "verified",
+   "lines": [
+    "משולש ABD",
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Still a real triangle, with DB = 2·AD",
+   "before": "unchanged",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T31",
+   "base": "http://localhost:5176",
+   "product": "analytic",
+   "path": "/analytic.html",
+   "title": "Analytic: on a blank page AB, AD, DB drawn with D between",
+   "class": "look",
+   "lines": [
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Three segments; D on AB; the notice names A, D, B",
+   "before": "AD and DB only, D off the line",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T32",
+   "base": "http://localhost:5176",
+   "product": "analytic",
+   "path": "/analytic.html",
+   "title": "Analytic: coordinates fix D",
+   "class": "verified",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». D at (2,0)",
+   "before": "D off the x-axis",
+   "expect": [
+    "AD:DB = 1:2"
+   ]
+  },
+  {
+   "id": "T33",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "A free vector on an empty page",
+   "class": "look",
+   "cycles": 2,
+   "lines": [
+    "וקטור u"
+   ],
+   "lookFor": "Start: press «נקה הכל». One arrow named u (underlined), no start dot, no point letters; it changes direction and length on each «הציגו תצורה אחרת»",
+   "before": "«לא הבנתי את הבקשה…»",
+   "expect": [
+    "וקטור u"
+   ]
+  },
+  {
+   "id": "T34",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "Two free vectors and a stated one",
+   "class": "play",
+   "lines": [
+    "וקטור u",
+    "וקטור v",
+    "u = (1,2,3)"
+   ],
+   "lookFor": "Start: press «נקה הכל». Two arrows in two hues. The panel reads «v = (?, ?, ?)» and «u = (1, 2, 3)», and |u| = √14",
+   "before": "all three lines refused",
+   "expect": [
+    "u = (1,2,3)"
+   ]
+  },
+  {
+   "id": "T35",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "A free vector beside a cube",
+   "class": "look",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "u = (1,1,1)"
+   ],
+   "lookFor": "Start: press «נקה הכל». The cube unchanged and an arrow u to its right, touching no vertex",
+   "before": "refused «הווקטור «u» לא הוגדר»",
+   "expect": [
+    "u = (1,1,1)"
+   ]
+  },
+  {
+   "id": "T36",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "The textbook given builds",
+   "class": "verified",
+   "lines": [
+    "נתון: v = (10,-5,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». A green row and one floating arrow v",
+   "before": "refused, v not defined",
+   "expect": [
+    "נתון: v = (10,-5,0)"
+   ]
+  },
+  {
+   "id": "T37",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "REFUSAL: a length on a free vector (new sentence)",
+   "class": "play",
+   "lines": [
+    "וקטור u",
+    "|u| = 5"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «הכלי עדיין לא יודע לקבוע גודל, זווית, ניצבות, הקבלה או מכפלה סקלרית לווקטור החופשי u, ולכן «|u| = 5» לא נוסף — זו מגבלה של הכלי.» The arrow u stays",
+   "before": "both lines refused",
+   "expectRefusal": "הכלי עדיין לא יודע לקבוע גודל"
+  },
+  {
+   "id": "T38",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "REFUSAL: a sum of free vectors (new sentence)",
+   "class": "play",
+   "lines": [
+    "וקטור u",
+    "וקטור v",
+    "w = u + v"
+   ],
+   "lookFor": "Start: press «נקה הכל». u and v drawn; refused, word for word: «הכלי עדיין לא יודע לחשב ביטוי שבו מופיע הווקטור החופשי u, ולכן «w = u + v» לא נוסף — זו מגבלה של הכלי.»",
+   "before": "all refused; the third said w is not defined",
+   "expectRefusal": "הכלי עדיין לא יודע לחשב"
+  },
+  {
+   "id": "T39",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "REFUSAL: one name, one meaning",
+   "class": "play",
+   "lines": [
+    "נסמן: AB = u",
+    "וקטור u"
+   ],
+   "lookFor": "Start: press «נקה הכל». The arrow AB = u and its row stay green; «וקטור u» is refused: u is already defined",
+   "before": "«וקטור u» not understood",
+   "expectRefusal": "כבר מוגדר"
+  },
+  {
+   "id": "T40",
+   "product": "3d",
+   "base": "http://localhost:5177",
+   "path": "/3d.html",
+   "title": "Ask the length of a stated free vector",
+   "class": "play",
+   "lines": [
+    "u = (3,0,4)"
+   ],
+   "asks": [
+    "|u|"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type «|u|» in the panel's ask box: «|u| = 5»",
+   "before": "the line was refused, nothing to ask",
+   "expect": [
+    "u = (3,0,4)"
+   ]
+  },
+  {
+   "id": "T41",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "Your T44: «|AB| = k» after «C(k,1,0)» builds",
+   "class": "play",
+   "lines": [
+    "C(k,1,0)",
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "|AB| = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». All green; C at (√3,1,0); AB labelled k; the panel says «k = √3»",
+   "before": "the last line not understood",
+   "expect": [
+    "|AB| = k"
+   ]
+  },
+  {
+   "id": "T42",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "The other order gives the same figure",
+   "class": "look",
+   "lines": [
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "|AB| = k",
+    "C(k,1,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». Same as the case above: k = √3, C at (√3,1,0)",
+   "before": "on the PR, k stayed free",
+   "expect": [
+    "C(k,1,0)"
+   ]
+  },
+  {
+   "id": "T43",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a length that cannot equal k",
+   "class": "play",
+   "lines": [
+    "C(k,1,0)",
+    "A(0,0,0)",
+    "|AC| = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused with the existing contradiction message",
+   "before": "not understood"
+  },
+  {
+   "id": "T44",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a vector letter, then a length",
+   "class": "play",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AB = k",
+    "|AB| = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «AB = k» k כבר נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».»",
+   "before": "on the PR, accepted",
+   "expectRefusal": "כבר נקבע כשם הווקטור"
+  },
+  {
+   "id": "T45",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a length letter, then a vector",
+   "class": "play",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "|AB| = k",
+    "AD = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «|AB| = k» k כבר נקבע כאורך הקטע AB, ולכן הוא לא יכול להיות גם שם של וקטור. בחרו לווקטור אות אחרת, למשל «נסמן: AD = a».»",
+   "before": "on the PR, accepted",
+   "expectRefusal": "כבר נקבע כאורך הקטע"
+  },
+  {
+   "id": "T46",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a parameter, then a vector",
+   "class": "play",
+   "lines": [
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "C(k,1,0)",
+    "AB = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «C(k,1,0)» k כבר נקבע כפרמטר, ולכן הוא לא יכול להיות גם שם של וקטור. בחרו לווקטור אות אחרת, למשל «נסמן: AB = a».»",
+   "before": "accepted",
+   "expectRefusal": "כבר נקבע כפרמטר"
+  },
+  {
+   "id": "T47",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a vector, then a parameter",
+   "class": "play",
+   "lines": [
+    "A(0,0,0)",
+    "B(1,1,1)",
+    "AB = k",
+    "C(k,1,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «AB = k» k כבר נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם פרמטר. כתבו את הפרמטר באות אחרת, למשל a.»",
+   "before": "accepted",
+   "expectRefusal": "לא יכול להיות גם פרמטר"
+  },
+  {
+   "id": "T48",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: an angle letter, then a length",
+   "class": "play",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "∠BAD' = k",
+    "|AB| = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «∠BAD' = k» k כבר נקבע כשם הזווית BAD', ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».»",
+   "before": "on the PR, not understood",
+   "expectRefusal": "כבר נקבע כשם הזווית"
+  },
+  {
+   "id": "T49",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "REFUSAL: a length letter, then an angle",
+   "class": "play",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "|AB| = k",
+    "∠BAD' = k"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «בשורה «|AB| = k» k כבר נקבע כאורך הקטע AB, ולכן הוא לא יכול להיות גם שם של זווית. כתבו את הזווית באות אחרת, למשל «∠BAD' = a».»",
+   "before": "on the PR, accepted",
+   "expectRefusal": "לא יכול להיות גם שם של זווית"
+  },
+  {
+   "id": "T50",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "The note after «AB = k» teaches a different letter",
+   "class": "play",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AB = k",
+    "|AB| = a"
+   ],
+   "lookFor": "Start: press «נקה הכל». After «AB = k» the note ends «אם התכוונתם לאורך, כתבו «|AB| = a».»; then «|AB| = a» builds",
+   "before": "on the PR, the note taught «|AB| = k»",
+   "expect": [
+    "|AB| = a"
+   ]
+  },
+  {
+   "id": "T51",
+   "product": "3d",
+   "base": "http://localhost:5178",
+   "path": "/3d.html",
+   "title": "A coordinate letter ties a cube's edge",
+   "class": "look",
+   "cycles": 2,
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "C(p,1,0)",
+    "|AB| = p"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds; |AB| equals C's x coordinate, and «הציגו תצורה אחרת» changes the cube's size",
+   "before": "not understood",
+   "expect": [
+    "|AB| = p"
+   ]
+  },
+  {
+   "id": "T52",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "Your T30: the bisector draws only its line",
+   "class": "play",
+   "lines": [
+    "M(1,2)",
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "דרך E עובר ישר l1 מקביל לציר ה-x",
+    "l2 אנך אמצעי ל-EK",
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "lookFor": "Start: press «נקה הכל». Line l2 drawn with no point N and no «הכלי קרא לנקודה N». The points are M, K, E, G",
+   "before": "a lettered N with a row note",
+   "expect": [
+    "G נקודת החיתוך של הישר l1 עם הישר l2"
+   ]
+  },
+  {
+   "id": "T53",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "Naming the midpoint afterwards shows it",
+   "class": "look",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "אנך אמצעי ל-EK",
+    "P אמצע EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». Line 4 draws only the line; line 5 records and shows P on it",
+   "before": "line 4 drew M; line 5 refused «כבר יש שם לנקודה הזו: M»",
+   "expect": [
+    "P אמצע EK"
+   ]
+  },
+  {
+   "id": "T54",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "Your T32 REFUSAL: a new name for a line already drawn",
+   "class": "play",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "אנך אמצעי ל-EK",
+    "l2 אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «הישר הזה כבר קיים באיור: «אנך אמצעי ל-EK». כדי לקרוא לו l2, לחצו Enter — המשפט כבר בתיבה.» No row added; the input holds «נסמן את האנך האמצעי ל-EK ב-l2»",
+   "before": "on the PR, renamed in place silently",
+   "expectRefusal": "הישר הזה כבר קיים באיור"
+  },
+  {
+   "id": "T55",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "Pressing Enter on that offer names the line",
+   "class": "play",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "אנך אמצעי ל-EK",
+    "l2 אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». After the refusal above, press Enter, then type «דרך E עובר ישר l1 מקביל לציר ה-x» and «G נקודת החיתוך של הישר l1 עם הישר l2»: the bisector is l2, and G is drawn",
+   "before": "the naming sentence was not understood"
+  },
+  {
+   "id": "T56",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "REFUSAL: a second name for a named line",
+   "class": "play",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "l1 אנך אמצעי ל-EK",
+    "l2 אנך אמצעי ל-EK"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «לישר הזה כבר יש שם: l1. כדי לשנות את השם, מחקו את השורה של l1 וכתבו אותה מחדש.» No second line",
+   "before": "on the PR, a second coincident line",
+   "expectRefusal": "לישר הזה כבר יש שם"
+  },
+  {
+   "id": "T57",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "REFUSAL: a second name for an equation line («לישר», not «לנקודה»)",
+   "class": "play",
+   "lines": [
+    "נתון ישר l1: y=2x+1",
+    "נתון ישר l2: y=2x+1"
+   ],
+   "lookFor": "Start: press «נקה הכל». The same «לישר הזה כבר יש שם: l1 …» sentence. The word changed from «לנקודה», which you did not ask for",
+   "before": "«כבר יש שם לנקודה הזו: l1 …»",
+   "expectRefusal": "לישר הזה כבר יש שם"
+  },
+  {
+   "id": "T58",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "An equation line still takes a name (regression guard)",
+   "class": "verified",
+   "lines": [
+    "נתון ישר y=2x+1",
+    "נתון ישר l2: y=2x+1"
+   ],
+   "lookFor": "Start: press «נקה הכל». Both lines record; one line, named l2",
+   "before": "unchanged",
+   "expect": [
+    "נתון ישר l2: y=2x+1"
+   ]
+  },
+  {
+   "id": "T59",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "title": "REFUSAL: the parallel through a point, restated with a name (not asked for)",
+   "class": "play",
+   "lines": [
+    "K(1,0)",
+    "נקודה E",
+    "E על הישר x = -1",
+    "דרך E עובר ישר מקביל לציר ה-x",
+    "דרך E עובר ישר l1 מקביל לציר ה-x"
+   ],
+   "lookFor": "Start: press «נקה הכל». Refused, word for word: «הישר הזה כבר קיים באיור: «דרך E עובר ישר מקביל לציר ה-x». כדי לקרוא לו l1, לחצו Enter — המשפט כבר בתיבה.» The input holds the naming sentence; Enter records it",
+   "before": "on the PR, renamed in place silently",
+   "expectRefusal": "הישר הזה כבר קיים באיור"
+  }
+ ]
+}
