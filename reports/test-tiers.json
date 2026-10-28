@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-27",
+  "updatedAt": "2026-10-28",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
@@ -102,12 +102,10 @@
     "src3d/__tests__/issue-1918-trapezoid-identity.test.ts",
     "src3d/__tests__/issue-2292-limit-collapse.test.ts",
     "src3d/__tests__/issue-2503-limit-collapse-pair.test.ts",
-    "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-816.test.ts",
     "src3d/__tests__/issue-820-rider-drive.test.ts",
     "src3d/__tests__/issue-827.test.ts",
     "src3d/__tests__/issue-863-sample-hoist.test.ts",
-    "src3d/__tests__/issue-902.test.ts",
     "src3d/__tests__/issue-936-degenerate.test.ts",
     "src3d/__tests__/member-drive.test.ts",
     "src3d/__tests__/narrowing-note-1996.test.ts",
