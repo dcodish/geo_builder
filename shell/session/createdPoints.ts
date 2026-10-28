@@ -14,21 +14,40 @@
  * nothing, and a line's own subject (M in «M אמצע AB») is never named.
  */
 
-/** The suite keys of the notice. `one` / `many` interpolate `{{names}}`; `undo` is the ✕ button's accessible name. */
+/**
+ * The suite keys of the notice. `one` / `many` interpolate `{{names}}`; `circle` interpolates `{{centre}}`; `undo` is
+ * the ✕ button's accessible name.
+ */
 export const CREATED_NOTICE_KEYS = {
   one: 'suite.notice.createdPoint',
   many: 'suite.notice.createdPoints',
+  /**
+   * #2552 D9 ([ADR-W-164](../../docs/06w-decisions-workspace.md#adr-w-164), operator ruling 2026-10-28 "2252 - A"): a line
+   * that created a NEW CIRCLE by its centre — «נוצר מעגל חדש שמרכזו X — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», the
+   * same sentence shape and the same ✕ as the points'. It names the centre, so a new centre letter is not announced
+   * again: a notice is either the points' or the circle's, never both.
+   */
+  circle: 'suite.notice.createdCircle',
   undo: 'suite.notice.createdUndo',
 } as const;
 
-/** What a builder's notice shows: the created labels, in the order the line named them. */
+/**
+ * What a builder's notice shows: the created labels, in the order the line named them — or, when the line created a
+ * circle (`circle`, its centre's label), that circle; `names` is then empty.
+ */
 export interface CreatedNotice {
   readonly names: readonly string[];
+  readonly circle?: string;
 }
 
-/** The key and interpolation for a notice — singular for one point, plural otherwise. */
+/** The key and interpolation for a points notice — singular for one point, plural otherwise. */
 export function createdNoticeText(names: readonly string[]): { key: string; params: { names: string } } {
   return { key: names.length === 1 ? CREATED_NOTICE_KEYS.one : CREATED_NOTICE_KEYS.many, params: { names: names.join(', ') } };
+}
+
+/** The key and interpolation for any notice: the circle's when it names one, else the points' (`createdNoticeText`). */
+export function createdNoticeTextOf(n: CreatedNotice): { key: string; params: Record<string, string> } {
+  return n.circle !== undefined ? { key: CREATED_NOTICE_KEYS.circle, params: { centre: n.circle } } : createdNoticeText(n.names);
 }
 
 /**

@@ -635,7 +635,12 @@ export type Fact =
    * figure drew, in the order the pair sentence introduced them (`circle-pair<k>-1` / `-2`). Read only in that sentence
    * (operator ruling D8 = B); with no such pair the fact reads as it does without the ordinal.
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true; ordinal?: 1 | 2 })
+  /**
+   * `indefinite` (#2552 D9, ADR-AG-344): the sentence said «מעגל», not «המעגל» («X מרכז מעגל»). While some circle's centre
+   * has no letter it reads as the definite form does; once every circle's centre is lettered (and none is X), it states a
+   * NEW circle centred at X, and the line says so with the created-circle notice.
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true; ordinal?: 1 | 2; indefinite?: true })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and

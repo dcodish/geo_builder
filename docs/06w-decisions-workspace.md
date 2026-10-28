@@ -6454,3 +6454,18 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 2. **No notice for a created line** (card e20 = A). The new row is the signal.
 3. **2-D:** a symbolic length («OR=r», «AB = k», «AB = 35/2») names its endpoints like any statement; ADR-769's pass creates them, with the point notice.
 4. **Not here:** planes (#2484, next round, the same pass); a new point with letter coordinates («N(k,p,3)», T46) is its own 3-D item, #2563.
+
+## ADR-W-164 — The created notice names a new circle by its centre: one more suite key and one more §5c row (#2552 D9)
+
+**Status:** accepted · 2026-10-28 · feature (shell; analytic is the one builder that shows it) · fix round #2585 (stream C) · branch `feat/2552-d9-new-circle` · extends [ADR-W-162](#adr-w-162) · per builder: [ADR-AG-344](06c-decisions-analytic.md#adr-ag-344)
+
+**Operator:** ruling 2026-10-28 on #2552 D9 ("2252 - A"): «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», *"It says what was drawn and how to undo it, word for word like the point notice."*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R198 (the D9 bullet; no other builder creates a circle by its centre today, #2586) · **Design:** [04w](04w-design-shell.md) § "The created-points notice"
+
+**Decision.**
+1. **The key** `suite.notice.createdCircle` sits beside `createdPoint` / `createdPoints` in `shell/locales/he.json` + `en.json`: «נוצר מעגל חדש שמרכזו {{centre}} — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» verbatim; English in the point notice's shape, "New circle centred at {{centre}} was created — if this is a typo, press ✕ to undo the line." `CREATED_NOTICE_KEYS.circle` names it.
+2. **The contract:** `CreatedNotice` gains an optional `circle` (the centre's label; `names` is then empty) and `createdNoticeTextOf(notice)` picks the circle's key or the points' (`createdNoticeText`, unchanged for the builders that show only points). One notice per line: a circle line does not also name its new centre as a point.
+3. **The §5c row:** `created-notice-rows.ts` gains a sixth row, run when a builder hands `CreatedNoticeSentences.circle` (setup, line, centre): the circle line records, the notice names the circle and no points, and ✕ removes the line and the centre. The meta-lock adds a `circle-as-point` broken adapter, which the row catches.
+
+**Consequences.** The ✕ and the banner are the points' own, so the circle notice cannot drift from them. A builder that later creates circles by reference hands the row its sentences.
