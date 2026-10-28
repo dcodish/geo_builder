@@ -630,7 +630,12 @@ export type Fact =
    * of a pair the figure drew. With no curve of that equation, M1 names the centre on the drawn circle by order and gives
    * it the equation; with no drawn circles it creates the circle, as without the ordinal.
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true })
+  /**
+   * `ordinal` (#2552, ADR-AG-336): «מרכז המעגל הראשון / השני הוא X(a,b)» — the FIRST or SECOND circle of the pair the
+   * figure drew, in the order the pair sentence introduced them (`circle-pair<k>-1` / `-2`). Read only in that sentence
+   * (operator ruling D8 = B); with no such pair the fact reads as it does without the ordinal.
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true; ordinal?: 1 | 2 })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and

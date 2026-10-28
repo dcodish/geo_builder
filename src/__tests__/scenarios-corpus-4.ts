@@ -5480,7 +5480,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'common-tangent-external-through-touch-refused-2407',
     title: '«T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)',
     guards:
-      "#2407 (P1), operator ruling 2026-10-20 on #2385: *\"it draws the wrong line and says its impossible\"*. ADR-740 makes a common tangent whose own letters pass through the circles' touch point the tangent AT the touch («T על AB» · «AB משיק משותף למעגלים M ו-N», «… פנימי …», «TB …»). The tangent at the touch of externally tangent circles is an INTERNAL common tangent (Am. 8), so a stated «חיצוני» names no line through T: the at-touch reading is not taken and the two-touch reading's honest refusal stands, exactly as at 3cae7f25 (`over-constrained: T, A, B collinear cannot hold`). The figure keeps the circles, T and segment AB, with no tangent drawn. The class test is src/__tests__/issue-2407-common-tangent-at-touch.test.ts.",
+      "#2407 (P1), operator ruling 2026-10-20 on #2385: *\"it draws the wrong line and says its impossible\"*. ADR-740 makes a common tangent whose own letters pass through the circles' touch point the tangent AT the touch («T על AB» · «AB משיק משותף למעגלים M ו-N», «… פנימי …», «TB …»). The tangent at the touch of externally tangent circles is an INTERNAL common tangent (Am. 8), so a stated «חיצוני» names no line through T: the at-touch reading is not taken and the two-touch reading's honest refusal stands, exactly as at 3cae7f25 (`over-constrained: T, A, B collinear cannot hold`). The figure keeps the circles, T and segment AB, with no tangent drawn. The class test is src/__tests__/issue-2407-common-tangent-at-touch.test.ts. Re-based 2026-10-24 by #2499 (ADR-766): the collinear reason came from a FALSE refusal one sub-step earlier (the external tangent's «A על מעגל M» with T on AB, which is satisfiable: B slides). With the earlier given re-homed that sub-step builds, and the line is refused where it really fails, at the external tangent's implicit ⟂ («MA ⟂ AB cannot hold»); the refusal, its kind and the internal-tangent control are unchanged.",
     steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB'],
     check(fig) {
       allStepsOk(fig);
@@ -5488,7 +5488,7 @@ export const SCENARIOS_4: Scenario[] = [
       const v = gateVerdict(facts, 'AB משיק משותף חיצוני למעגלים M ו-N');
       expect(v.kind, JSON.stringify(v)).toBe('refused');
       expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
-      expect(v.kind === 'refused' && v.detail, 'names the collinearity the external tangent cannot keep').toContain('T, A, B collinear cannot hold');
+      expect(v.kind === 'refused' && v.detail, 'names the perpendicular the external tangent cannot keep (#2499 re-base)').toContain('MA ⟂ AB cannot hold');
       expect(gateVerdict(facts, 'AB משיק משותף פנימי למעגלים M ו-N').kind, 'the touch tangent\'s own kind builds').toBe('commit');
     },
   },
@@ -5943,6 +5943,34 @@ export const SCENARIOS_4: Scenario[] = [
       expect(readings?.[0]?.utterance, 'and teaches the middle-letter spelling these steps typed').toBe('רבע מעגל DCO');
       const facts = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על CB', 'רבע מעגל DCO']);
       for (const seed of [0, 1, 2]) expect(angle(at(replay(facts, seed), 'O'), at(replay(facts, seed), 'C'), at(replay(facts, seed), 'D')), `∠OCD = 90 @${seed}`).toBeCloseTo(90, 4);
+    },
+  },
+  {
+    id: 'diameter-after-pinned-distance-2499',
+    title: '#2499 P1: «מעגל O · AB = 6 · AB קוטר של המעגל» builds a circle of radius 3 with AB its diameter — the same figure as the other order, never a false «סותר» (ADR-766)',
+    guards:
+      "#2499 (P1), the operator's exact lines from playing round #2501 (T30, 2026-10-24): *\"the refusal is wrong … there is no problem meeting the criteria and entering the data in the other order gives the right result\"*. Measured at 045a8546: the third line was refused «… סותר את «AB = 6»» while «מעגל O · AB קוטר של המעגל · AB = 6» built r = 3. Root cause (ADR-766): the diameter is lowered as structure (A → the antipode of B), adding no new constraint, so the earlier «AB = 6», whose carrier (B's θ) can no longer move it, was in no recruit list and the free radius was never offered to it. LADDER 2e now re-homes every violated earlier given that names or is carried by an object the step rewrote. The class matrix (table A, both orders, contradictions, ladder tokens) is src/engine/__tests__/issue-2499-earlier-given-rehomed.test.ts; the fixture is issue-2499-diameter-after-pinned-distance.geo.json.",
+    steps: ['מעגל O', 'AB = 6', 'AB קוטר של המעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations ?? [], 'no violations').toEqual([]);
+      const isDiameter = (facts: Fact[], label: string) => {
+        for (const seed of [0, 1, 2]) {
+          const f = replay(facts, seed);
+          expect(f.lastError, `${label} @${seed}`).toBeNull();
+          expect([...f.circles.keys()], `${label}: one circle @${seed}`).toEqual(['circle-O']);
+          expect(f.circles.get('circle-O')!.r, `${label}: r = 3 @${seed}`).toBeCloseTo(3, 6);
+          const A = at(f, 'A'), B = at(f, 'B'), O = at(f, 'O');
+          expect(dist(O, A), `${label}: |OA| @${seed}`).toBeCloseTo(3, 6);
+          expect(dist(O, B), `${label}: |OB| @${seed}`).toBeCloseTo(3, 6);
+          expect(dist(A, B), `${label}: |AB| @${seed}`).toBeCloseTo(6, 6);
+          expect((A.x + B.x) / 2, `${label}: O is AB's midpoint @${seed}`).toBeCloseTo(O.x, 6);
+          expect((A.y + B.y) / 2, `${label}: O is AB's midpoint @${seed}`).toBeCloseTo(O.y, 6);
+        }
+      };
+      isDiameter(factsOf(['מעגל O', 'AB = 6', 'AB קוטר של המעגל']), 'the operator');
+      isDiameter(factsOf(['מעגל O', 'AB = 6', 'AB קוטר במעגל']), 'the twin');
+      isDiameter(factsOf(['מעגל O', 'AB קוטר של המעגל', 'AB = 6']), 'the other order');
     },
   },
   {

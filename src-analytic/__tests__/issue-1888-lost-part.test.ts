@@ -17,7 +17,11 @@ import { errorText } from '../app/errorText';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
-import { loweringKey } from '../app/lostPart';
+import { declinedThrough, loweringKey } from '../app/lostPart';
+import { THROUGH_OPEN } from '../../shell/incidencePhrase';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { analyticCorpus } from './analyticCorpus';
 import { analyticI18n } from '../i18n';
 
 type T = (k: string, o?: Record<string, unknown>) => string;
@@ -205,5 +209,47 @@ describe('class locks over the catalog', () => {
       }
     }
     expect(dropped).toEqual([]);
+  }, 300_000);
+
+  /**
+   * #2547 (ADR-AG-334) — THE FALSE-FLAG NET for arm 3. Over the analytic corpus (`analyticCorpus()`: the suite's
+   * string-array literals + the catalog), the exam corpus (`corpus471.json`), the saved `*.analytic.json` fixtures and
+   * the catalog's English twins (with their needs), every DECLINED line that holds an incidence
+   * opener is one the class does not hold (measured at d9494206: each goes to the model, and none is a through-clause on
+   * a segment whose point is role-named), so arm 3 must refuse none of them. The floor keeps the net from passing by
+   * checking nothing. Only a sequence holding an opener is replayed (the arm runs on nothing else), so the full harvest
+   * costs seconds, not the 210 s a full replay takes.
+   */
+  it('arm 3 refuses no declined corpus, fixture or catalog line that holds an opener', () => {
+    const dir = path.resolve(__dirname, 'fixtures');
+    const seqs: string[][] = (JSON.parse(readFileSync(path.join(dir, 'corpus471.json'), 'utf8')) as { lines: string[] }[]).map((q) => q.lines);
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.analytic.json'))) seqs.push(JSON.parse(readFileSync(path.join(dir, f), 'utf8')).lines);
+    for (const { e, held } of runnable) for (const ex of [e.he, e.en]) if (ex) seqs.push([...held, ex]);
+    seqs.push(...analyticCorpus());
+    const opener = new RegExp(THROUGH_OPEN, 'i');
+    const flagged: string[] = [];
+    let withOpener = 0;
+    for (const seq of seqs) {
+      if (!seq.some((l) => opener.test(l))) continue;
+      const lines: string[] = [];
+      for (const line of seq) {
+        const v = decideSubmit(line, lines, 0);
+        if (v.kind === 'record') {
+          lines.push(v.line);
+          continue;
+        }
+        const p = parseLine(line);
+        if (p.ok || p.code !== 'not-handled' || !opener.test(line)) continue;
+        withOpener++;
+        const records = (piece: string, before: readonly string[]) => {
+          const k = decideSubmit(piece, [...lines, ...before], 0).kind;
+          return k === 'record' || k === 'already-known' || k === 'already-follows';
+        };
+        const lost = declinedThrough(line, records);
+        if (lost) flagged.push(`${lines.join(' · ')} ⟶ «${line}» ⟶ ${lost.parts.join(' | ')}`);
+      }
+    }
+    expect(flagged).toEqual([]);
+    expect(withOpener, `declined lines holding an opener: ${withOpener}`).toBeGreaterThanOrEqual(10);
   }, 300_000);
 });
