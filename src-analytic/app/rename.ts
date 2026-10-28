@@ -62,6 +62,7 @@ import { canonicalConstraint, type Constraint } from '../engine/solve';
 import type { Fact } from '../engine/types';
 import type { AskedQuestion, InputError } from '../store/useAnalyticStore';
 import type { Construction, Id } from '../engine/types';
+import { positionalOf } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
@@ -232,9 +233,8 @@ export function rewriteLine(line: string, from: string, to: string): { line: str
   return r && { line: r.line, count: r.counts[from] ?? 0 };
 }
 
-/** Every point id the construction holds — stated, derived or free. */
-const pointIdsOf = (c: Construction): Id[] =>
-  c.objects.filter((o) => o.kind === 'point' || o.kind === 'derived' || o.kind === 'free').map((o) => o.id);
+/** Every point id the figure shows — stated, derived or free; never a helper (#2583, `positionalOf`). */
+const pointIdsOf = (c: Construction): Id[] => positionalOf(c).map((o) => o.id);
 
 /**
  * THE SEED-NAME MAP UNDER A LETTER CHANGE (#1631 sub-decision b) — a TRANSPOSITION of `a` and `b`.

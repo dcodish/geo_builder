@@ -484,8 +484,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - a common tangent is drawn as a full line with its equation row; while the givens leave two candidate lines, the row lists both («3x − 4y + 14 = 0 או 3x − 4y − 86 = 0»)
 - «הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה» (also «למעגלים …», «לשני המעגלים …», without «בהתאמה», «הישר l משיק למעגל N1 בנקודה P ולמעגל N2 בנקודה Q», English) draws the common tangent named l, touching N1 at P and N2 at Q; when l is already a line, the touches are on it
 - «נסמן את הישר PQ ב-l» (also «נסמן ב-l את הישר PQ», "denote the line PQ by l") names the line through P and Q; on a segment only, the line is drawn under that name; a name already taken, or a line already named, is refused
+- a CONSTRUCTED line is named by its description: «נסמן את האנך האמצעי ל-EK ב-l2», «נסמן ב-l2 את האנך האמצעי ל-EK», «נסמן את הישר העובר דרך E המקביל לציר ה-x ב-l1», "denote the perpendicular bisector of EK by l2"; on a figure without that line it is drawn under the name ([ADR-AG-346](06c-decisions-analytic.md#adr-ag-346))
+- **a line stated again gets one verdict in every spelling** (operator, T32, 2026-10-27: *"it should refuse to draw second line and say that already exists and offer to rename the line"*): «l2 אנך אמצעי ל-EK» (or «הישר l2 הוא האנך האמצעי לקטע EK», «דרך E עובר ישר l1 מקביל לציר ה-x», English) after the same line drawn unnamed is refused «הישר הזה כבר קיים באיור: «<the row that drew it>». כדי לקרוא לו l2, לחצו Enter — המשפט כבר בתיבה.», and the input holds «נסמן את האנך האמצעי ל-EK ב-l2», which records; no row is added and no second line drawn. A second name for a named line is refused naming the holder as a line («לישר הזה כבר יש שם: l1 …»), in every spelling. «נתון ישר l2: y=2x+1» after «נתון ישר y=2x+1» renames the tool's l1, one line (#2425 Q3, re-ruled 2026-10-27: *"it should rename the line but not create another line"*)
 - «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» keeps the configurations whose crossing is there and adds no point; likewise «מתחת ל…», «… ציר ה-x … מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y / x», English. A side no configuration has is refused «לא נמצאה תצורה…»; a line parallel to that axis meets it nowhere; «… בנקודה B» still names the crossing B
-- Sources: ADR-AG-313, #2392, #2390, #2379.
+- Sources: ADR-AG-313, #2392, #2390, #2379, ADR-AG-346, #2584.
 
 **R197 — a common tangent the sentence does not letter is drawn, its kind may be written as its definition, and a touch point can be named after the tangent**. *(Operator, 2026-10-25, on the exam «שאלה 6, משיק משותף לשני מעגלים שווים»: "didnt deal with the משיק חיצוני"; the unlettered form as 2-D reads it.)*
 - «משיק חיצוני משותף לשני המעגלים» (also «משיק משותף חיצוני …», «המשיק המשותף …», «משיק פנימי / אלכסוני …», «משיק חיצוני לשני המעגלים», «… למעגלים O_1 ו-O_2», English "an external common tangent of the two circles") draws that common tangent as «AB משיק משותף …» does, its touches lettered by the tool A, B (the next free letters, as in 2-D); a second such sentence draws another tangent, C, D. With no kind it is any of the four
@@ -573,7 +575,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - Sources: ADR-AG-253, #1945, #1907, ADR-W-118, ADR-263, ADR-169.
 
 **R103c — the tool's letters are 2-D's, and «תיכון ליתר» never assumes the right angle**. **M** for a midpoint, **H** for a foot (F is the focus letter here); with only «משולש ישר-זווית ABC», «תיכון ליתר» ASKS which side is the hypotenuse.
-- Sources: ADR-AG-211, #1620, #1222, #1281, #1689.
+- **A perpendicular bisector draws only its line** (operator ruling 2026-10-27, «B»): «אנך אמצעי ל-EK» and «l2 אנך אמצעי ל-EK» show no midpoint dot, no letter and no «הכלי קרא לנקודה …». «P אמצע EK» typed after the line shows its midpoint, lettered P (before it, the line runs through P); a sentence that refers to the midpoint («אמצע EK») letters it M, announced on that row. A foot, a median's foot and a midsegment's ends keep their letters. Analytic only: 2-D still draws M.
+- Sources: ADR-AG-211, #1620, #1222, #1281, #1689, ADR-AG-345, #2583.
 
 **R137 — a piece named by its role is understood wherever a side is, and the role is honoured; a length given draws the pairs it names**. *(Operator: "when i write הישר BC מקביל לציר ה-x — accepted. when i write המיתר BC מקביל לציר ה-x — its rejected".)*
 - «המיתר BC מקביל לציר ה-x», «אורך השוק BC הוא 6»
@@ -1123,10 +1126,10 @@ a sentence the tool parsed.
 - clicking a point → its coordinates and its distance to each named line, drawn as a perpendicular
 - Sources: ADR-AG-066, ADR-AG-067.
 
-**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated.** The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1).
+**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated.** The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). The locus question is **one question however the exam words it** — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» answer the same row (ADR-AG-341). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
 - «נקודה P» · «PA מאונך ל-PB» · «המקום הגיאומטרי של P» → trace, kind, equation
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
-- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817.
+- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138.
 
 ---
 

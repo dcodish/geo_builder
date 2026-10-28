@@ -220,7 +220,12 @@ export type InputError =
    * «P מרכז המעגל I» then «O מרכז המעגל I» used to mint a second point on top of the first.
    * The refusal names the holder so the student sees the collision, not a scolding about their letter.
    */
-  | { key: 'already-named'; detail: string; holder?: string }
+  | { key: 'already-named'; detail: string; holder?: string; holderKind?: 'line' }
+  /**
+   * #2584 (ADR-AG-346) — a line the figure already draws, restated under a new name: `declared` is the row that drew it,
+   * `lineName` the name typed, `offer` the naming sentence the input is pre-filled with (absent when none would record).
+   */
+  | { key: 'line-exists'; detail: string; declared?: string; lineName: string; offer?: string }
   /** «נסמן זוית MAC כ-A1» where A1 already names another angle, or a point (#1622 E5, ADR-AG-221) — `holder` is the label. */
   | { key: 'alias-taken'; detail: string; holder?: string }
   /** #2054 (ADR-AG-277) — a second letter for an angle or a segment: the first letter, the target as written, the earlier line. */

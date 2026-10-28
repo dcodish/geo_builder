@@ -1423,6 +1423,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #2392 (ADR-AG-313): the common tangent named by its line (the exam's Q3 ג), the name given after, and the axis side.
   { category: 'circles', family: 'F5', he: 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה', en: 'the line l is tangent to circles O and P at A and B respectively', needs: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3'] },
   { category: 'relations', family: 'F17', he: 'נסמן את הישר AB ב-l', en: 'denote the line AB by l', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
+  // #2584 (ADR-AG-346): a constructed line named by its description — the sentence a restated line's refusal offers.
+  { category: 'relations', family: 'F17', he: 'נסמן את האנך האמצעי ל-AB ב-l2', en: 'denote the perpendicular bisector of AB by l2', needs: ['A(1,2)', 'B(3,5)', 'אנך אמצעי ל-AB'] },
   { category: 'relations', family: 'F17', he: 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x', en: 'line AB crosses the y-axis above the x-axis', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
   { category: 'circles', family: 'F5', he: 'מנקודה A יוצאים שני משיקים לשני המעגלים', en: 'from point A two tangents to the two circles' },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל O ומשיק למעגל P', en: 'AB is a chord of circle O and tangent to circle P', needs: ['מעגל O', 'מעגל P'] },

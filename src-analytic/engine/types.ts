@@ -507,6 +507,12 @@ export type Fact =
    */
   | (FactBase & { t: 'name-line'; a: Id; b: Id; name: string })
   /**
+   * «נסמן את האנך האמצעי ל-EK ב-l2» · «נסמן את הישר העובר דרך E המקביל לציר ה-x ב-l1» — A LINE NAMED BY ITS DESCRIPTION
+   * (#2584, ADR-AG-346). `operand` is the clause the description parses to (it builds the line, or restates the one the
+   * figure has); `line` is the id of its `line-at`. M1 gives the figure's line that is that construction the name.
+   */
+  | (FactBase & { t: 'name-line-object'; operand: Fact[]; line: Id; name: string })
+  /**
    * «כל המשיקים המשותפים לשני המעגלים» — EVERY COMMON TANGENT OF THE PAIR (#2390, ADR-AG-314), written over the
    * circle-slot sentinels inside `circles-about`. M1 reads how the pair sits (`pairPositionOf`) and draws the families
    * that position has, each a `common-tangent` object named by `names` (the student's) or the next free l1, l2, ….
@@ -590,7 +596,13 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular'; circle?: string; foot?: PerpRef })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef })
+  /*
+   * `kind: 'parallel'` / `'perp-bisector'` (#1138, ADR-AG-341) — «הישר המקביל», «האנך האמצעי»: the one line the figure
+   * built through a point parallel to something (a `line-at`, not perpendicular, with a stated direction), the one
+   * perpendicular bisector (a perpendicular `line-at` through the midpoint of the pair it is perpendicular to). A
+   * reference, never a construction: none or several is refused naming the candidates.
+   */
   /*
    * `kind: 'perpendicular'` (#1620, ADR-AG-207) — «E על האנך», «המשיק והאנך נחתכים בנקודה D»: the one perpendicular
    * the figure DREW (a `foot` derived point and the line from its point to it). `foot` narrows it by its description
@@ -801,6 +813,9 @@ export const factsWithin = (f: Fact): Fact[] =>
       : // #1737 (ADR-AG-265): the trapezoid a height sentence introduces by its letters.
         f.t === 'height-of' && f.declare
         ? [f, ...f.declare.flatMap(factsWithin)]
+        : // #2584 (ADR-AG-346): a line named by its description builds (or restates) the line it names.
+          f.t === 'name-line-object'
+          ? [f, ...f.operand.flatMap(factsWithin)]
         : // #2391 (ADR-AG-315): a tangent-through applies the tangent AT its point, or the from-point construction.
           f.t === 'tangent-through'
           ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
@@ -843,7 +858,11 @@ export type GeoObject =
    * solver-free: given its parents there is exactly one answer, in closed form. This is the kind
    * that makes the object→object dependency relation non-empty for the first time.
    */
-  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding }
+  /**
+   * `helper` (#2583, ADR-AG-345) — a point the tool needs and nobody drew (a perpendicular bisector's midpoint): placed
+   * for what is built through it, never drawn, lettered or listed. Its id is `toolLetters.helperId`, the one source.
+   */
+  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true }
   /**
    * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
    *
@@ -1194,8 +1213,12 @@ export type Selector =
    * `axis-side` («B על החלק החיובי של ציר x», «ברביע») is this comparison against 0, and is judged and
    * seeded through the same function (`compareOf`, `evaluate.ts`) — one mechanism with two spellings in
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
+   *
+   * `closed` (#1138, ADR-AG-340) — the student wrote ≤ / ≥: a coordinate ON its bound holds. A RANGE on a free point
+   * («-1.5 ≤ y_A ≤ 1.5», D7's kind 3) is two of these: the same selector family, so it bounds the configurations and
+   * clips the trace (ADR-AG-245) and never consumes a degree of freedom.
    */
-  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr }; closed?: true }
   /**
    * «M מעל הישר KL» · «M מתחת לישר KL» · «M מימין לישר l» · «M משמאל לישר l» — A POINT'S SIDE OF A STRAIGHT LINE
    * (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher than the y of the other
@@ -1320,7 +1343,14 @@ export const EMPTY_CONSTRUCTION: Construction = {
 };
 
 export const pointsOf = (c: Construction): PointObject[] => c.objects.filter(isPoint);
-export const positionalOf = (c: Construction) => c.objects.filter(isPositional);
+/**
+ * THE FIGURE'S POINTS, as every student surface lists them (the data panel, the rename's letters) — every positional
+ * object except a HELPER (#2583, ADR-AG-345): a perpendicular bisector's unnamed midpoint is placed for its line and is
+ * no point of the figure, so it is never listed, exactly as `evaluate` leaves it out of `figure.points`. M1's references
+ * read `isPositional` (the line through it must find it); a surface reads this.
+ */
+export const positionalOf = (c: Construction) =>
+  c.objects.filter((o): o is Extract<GeoObject, { kind: 'point' | 'derived' | 'free' }> => isPositional(o) && !(o.kind === 'derived' && o.helper));
 export const curvesOf = (c: Construction): CurveObject[] => c.objects.filter(isCurve);
 export const objectById = (c: Construction, id: Id): GeoObject | undefined =>
   c.objects.find((o) => o.id === id);

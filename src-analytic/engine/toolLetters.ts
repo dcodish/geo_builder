@@ -23,14 +23,19 @@
  * ruling (#1281: the reserved `P₁`, `derive.resolveMints`) — it is not a construct with a role.
  */
 import { sameDerivation } from './sameDerivation';
-import { ROLE_SIDE_SENTINELS, type Fact, type Id } from './types';
+import { factsWithin, ROLE_SIDE_SENTINELS, type Fact, type Id } from './types';
 
-export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'end' | 'diameter-end' | 'crossing' | 'secant' | 'touch' | 'common' | 'vertex';
+export type ToolPointRole = 'midpoint' | 'bisector-mid' | 'midpoint-2' | 'foot' | 'end' | 'diameter-end' | 'crossing' | 'secant' | 'touch' | 'common' | 'vertex';
 
 /** The ONE role → letters table. The first free letter wins; then 2-D's pool; then the first letter subscripted. */
 export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
-  /** A midpoint the sentence did not name — a median's foot, a perpendicular bisector's, a midsegment's first end. */
+  /** A midpoint the sentence did not name — a median's foot, a midsegment's first end, a bare «אמצע AB». */
   midpoint: 'MNPQ',
+  /**
+   * A perpendicular bisector's midpoint (#2583, ADR-AG-345): a HELPER role (`HELPER_ROLES`), never lettered while only the
+   * line refers to it. Its letters are the midpoint's, used if the figure ever needs a fallback.
+   */
+  'bisector-mid': 'MNPQ',
   /** A midsegment's second end (2-D's `m2`), so the pair reads M, N. */
   'midpoint-2': 'NPQS',
   /** The foot of a perpendicular or an altitude: 2-D's F, G, H, P with F → H (#1167). */
@@ -61,6 +66,19 @@ export const TOOL_LETTERS: Readonly<Record<ToolPointRole, string>> = {
   touch: 'TS',
   common: 'BCDEGH',
 };
+/**
+ * THE ROLES WHOSE POINT IS NOT PART OF WHAT IS DRAWN (#2583, ADR-AG-345; operator ruling 2026-10-27, «B», amending #1620).
+ * A foot, a median's foot and a midsegment's ends END the piece the sentence draws, so they are drawn and lettered. A
+ * perpendicular bisector is a whole line, and its midpoint is no end of it: it is a HELPER, a derived point with no
+ * letter, no dot and no `minted` row, which the line runs through. It takes a letter when a later line derives the same
+ * point lettered — the student's «P אמצע EK», or a sentence that refers to it («אמצע EK», the tool's letter): M1
+ * renames the helper to that letter (`apply.ts`, ONE POSITION, ONE NAME), and every later placeholder of it reads it.
+ */
+export const HELPER_ROLES: ReadonlySet<ToolPointRole> = new Set(['bisector-mid']);
+/** The helper's id: content-derived from what the point IS, so it is stable, and no student can type it. */
+export const helperId = (key: string): Id => `~${key}`;
+export const isHelperId = (id: Id): boolean => id.startsWith('~');
+
 /** 2-D's `freeLabel` pool, minus nothing: it holds no F. */
 const POOL = 'MNPQRSTUVWXYZKLGHIJ';
 
@@ -86,6 +104,8 @@ export function resolveToolLetters(
   const names = new Map<string, string>();
   const minted: Array<{ index: number; id: string }> = [];
   const out: Fact[] = [];
+  /** A helper's placeholder, by the helper's id — so a later lettered derivation of it re-points that placeholder. */
+  const helperPh = new Map<Id, string>();
   facts.forEach((f0, i) => {
     // A segment's id is its SORTED ends, and a placeholder may sort first inside it — it is re-keyed from its ends
     // below, so its id is never where a placeholder is discovered.
@@ -99,11 +119,19 @@ export function resolveToolLetters(
     for (const ph of new Set(text.match(PLACEHOLDER) ?? [])) {
       if (names.has(nameKey(ph))) continue;
       const role = ph.slice(TOOL_PREFIX.length).split('|')[0] as ToolPointRole;
-      // The same point already derived the same way keeps ITS name (#1153: one position, one name).
+      const helper = HELPER_ROLES.has(role);
+      // The same point already derived the same way keeps ITS name (#1153: one position, one name). A lettered role never
+      // takes a helper's id: it is a point the sentence draws, so it is lettered, and M1 renames the helper to it.
       const own =
         f0.t === 'derived' && f0.id === ph
-          ? out.find((g) => g.t === 'derived' && sameDerivation(g.rule, f0.rule) && !g.id.includes(TOOL_PREFIX))
+          ? out.find((g) => g.t === 'derived' && sameDerivation(g.rule, f0.rule) && !g.id.includes(TOOL_PREFIX) && (helper || !isHelperId(g.id)))
           : undefined;
+      if (!own && helper) {
+        const id = helperId(ph.slice(TOOL_PREFIX.length).split('|').slice(1).join('|'));
+        names.set(nameKey(ph), id);
+        helperPh.set(id, nameKey(ph));
+        continue;
+      }
       let name = own ? (own as { id: Id }).id : [...(TOOL_LETTERS[role] ?? ''), ...POOL].find((x) => !used.has(x));
       if (!name) {
         const base = (TOOL_LETTERS[role] ?? 'P')[0];
@@ -120,6 +148,16 @@ export function resolveToolLetters(
     if (f.t === 'segment') f = { ...f, id: f0.t === 'segment' && !f0.id.includes(TOOL_PREFIX) ? f0.id : segId(f.a, f.b) };
     // A ring the TOOL lettered is re-keyed from its resolved vertices, as a segment is (#1622).
     if (f.t === 'polygon') f = { ...f, id: f0.t === 'polygon' && !f0.id.includes(TOOL_PREFIX) ? f0.id : polyId(f.vertices) };
+    // A LETTERED derivation of a helper's point names it (#2583): every later placeholder of the helper reads the letter.
+    if (f.t === 'derived' && !isHelperId(f.id)) {
+      const rule = f.rule;
+      const named = f.id;
+      const held = out.flatMap(factsWithin).find((g) => g.t === 'derived' && isHelperId(g.id) && helperPh.has(g.id) && sameDerivation(g.rule, rule));
+      if (held && held.t === 'derived') {
+        names.set(helperPh.get(held.id)!, named);
+        helperPh.delete(held.id);
+      }
+    }
     for (const m of text.match(/"[A-Z][0-9₀-₉]?"/g) ?? []) used.add(m.slice(1, -1));
     out.push(f);
   });

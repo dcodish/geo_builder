@@ -214,6 +214,10 @@ const he = {
   errNumeralNotation:
     '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
+  // #2584 (ADR-AG-346) — the same refusal for a line (#1164), and a drawn line restated under a new name (T32, 2026-10-27)
+  errAlreadyNamedLine: 'לישר הזה כבר יש שם: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
+  errLineExists: 'הישר הזה כבר קיים באיור: «{{declared}}». כדי לקרוא לו {{lineName}}, לחצו Enter — המשפט כבר בתיבה.',
+  errLineExistsAlone: 'הישר הזה כבר קיים באיור: «{{declared}}». כדי לקרוא לו {{lineName}}, מחקו את השורה הזו וכתבו אותה מחדש עם השם.',
   errAliasTaken: 'השם {{holder}} כבר תפוס בציור — שם אחד מסמן דבר אחד, נקודה או זווית. בחרו שם אחר, למשל אות עם ספרה אחרת.',
   // #1154 — the rename's refusals, each naming what the student wrote
   errRenameBadName: '«{{detail}}» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
@@ -808,6 +812,9 @@ const en: typeof he = {
   errNumeralNotation:
     '«{{numNoun}} {{holder}}» and «{{numNoun}} {{detail}}» are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write «{{numNoun}} {{holder}}», as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
+  errAlreadyNamedLine: 'that line already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
+  errLineExists: 'This line is already in the figure: «{{declared}}». To call it {{lineName}}, press Enter — the sentence is already in the box.',
+  errLineExistsAlone: 'This line is already in the figure: «{{declared}}». To call it {{lineName}}, delete that line and write it again with the name.',
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',

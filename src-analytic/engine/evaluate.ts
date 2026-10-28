@@ -1632,8 +1632,10 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       const lhs = cmp.axis === 'x' ? p.x : p.y;
       const rhs = rhsOf(cmp, (id) => at.get(id) ?? null, env);
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
-      // Strict, at the figure's resolution (#2230): a coordinate ON its bound is on neither side.
-      return sideOfBound(lhs, rhs, spanOf(at)) === (cmp.greater ? 1 : -1);
+      // Strict, at the figure's resolution (#2230): a coordinate ON its bound is on neither side — and a CLOSED one
+      // (≤ / ≥, #1138) holds there.
+      const side = sideOfBound(lhs, rhs, spanOf(at));
+      return side === (cmp.greater ? 1 : -1) || (cmp.closed === true && side === 0);
     }
     /** ON THE BISECTOR'S OWN RAY (#1284, ADR-AG-209) — the angle's side of the perpendicular at its vertex. */
     if (s.kind === 'angle-side') {
@@ -3338,13 +3340,16 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         // "not at this value" — never a point drawn at NaN and never a fallback position.
         const p = evalRule(o.rule, at, curveAtOf(c, env, at));
         if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
-          points.push({ id: o.id, x: p.x, y: p.y });
           placed.set(o.id, p);
+          // A HELPER (#2583, ADR-AG-345) is placed for what is built through it and is no point of the figure: no dot,
+          // no letter, no scaffolding, no crossing it could hold. Only `placed` (what the later objects read) has it.
+          if (o.helper) break;
+          points.push({ id: o.id, x: p.x, y: p.y });
           // The scaffolding is recorded only where the point itself exists, so a figure never shows
           // a construction for something that is not there.
           const built = constructionOf(o.rule, at, p);
           if (built) construction.push({ id: o.id, ...built });
-        } else vacant.push({ id: o.id, reason: 'vacant' });
+        } else if (!o.helper) vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
       /**
