@@ -59,7 +59,12 @@ export type SubmitVerdict =
    * caller shows it IN THE SAME COMMIT that records the line (`recordLine(line, notice)`): a notice set
    * before the record would be cleared by it.
    */
-  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[] }
+  /**
+   * `created` (#1467, ADR-AG-342): the points the line's references created. `createdCircle` (#2552 D9, ADR-AG-344): the
+   * centre letter of the NEW circle the line stated («X מרכז מעגל» with every centre lettered). A line carries at most
+   * one of the two: the circle notice already names its centre, so a new X is not announced twice.
+   */
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -405,11 +410,13 @@ function decideOnce(
   /** #1467 (ADR-AG-342): the letters this line's references created — what the «נוצרה נקודה חדשה …» notice names. */
   // in the order the student typed them, as 2-D names them
   const made = trial.created.find((c) => c.index === lines.length)?.ids.slice().sort((x, y) => typedAt(line, x) - typedAt(line, y));
+  /** #2552 D9 (ADR-AG-344): the new circle this line stated, by its centre — its notice replaces the points' one. */
+  const circle = trial.createdCircles.find((c) => c.index === lines.length)?.centre;
   const recorded: SubmitVerdict = {
     kind: 'record',
     line,
     ...(raised ? { notice: { code: raised.code, detail: raised.detail, holder: raised.holder } } : {}),
-    ...(made?.length ? { created: made } : {}),
+    ...(circle ? { createdCircle: circle } : made?.length ? { created: made } : {}),
   };
   /**
    * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed

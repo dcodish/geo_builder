@@ -17,7 +17,7 @@
 
 import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
-import { cross3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
+import { centroid3, cross3, dist3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -941,3 +941,65 @@ export const componentSignsHold = (c: Construction3, at: (id: Id) => Vec3 | unde
     return v === undefined ? false : g.positive ? v > 1e-9 : v < -1e-9;
   });
 
+
+/**
+ * #2484 ([ADR-3D-388](../../docs/06b-decisions-3d.md#adr-3d-388)) — THE FREE-OBJECT OPERAND SEAM. What a free object
+ * (a free line, `resolveFreeLine`; a free plane, `resolveFreePlane`) reads from the operand a relation names, at the
+ * current positions: its DIRECTION when it runs along something, its NORMAL when it is a plane. One reader for both
+ * free objects, so a relation pins a free plane for exactly the operand kinds it pins a free line — the free plane had
+ * read plane operands only, so «AC' ⟂ π3» pinned nothing and the honest claim was refused `plane-not-determined`.
+ */
+
+/** The normal of a point-run plane from its FIRST three placed points; undefined when degenerate or unplaced. */
+export const idsRunNormal3 = (ids: readonly Id[], pos: ReadonlyMap<Id, Vec3>): Vec3 | undefined => {
+  const ps = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
+  if (ps.length < 3) return undefined;
+  const nrm = cross3(sub3(ps[1], ps[0]), sub3(ps[2], ps[0]));
+  return norm3(nrm) > 1e-9 ? nrm : undefined;
+};
+
+/** A point on a point-run plane (the centroid of its placed points); undefined when fewer than three are placed. */
+export const idsRunPoint3 = (ids: readonly Id[], pos: ReadonlyMap<Id, Vec3>): Vec3 | undefined => {
+  const ps = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
+  if (ps.length < 3) return undefined;
+  return centroid3(ps);
+};
+
+export const AXIS_DIR3: Readonly<Record<'x' | 'y' | 'z', Vec3>> = { x: v3(1, 0, 0), y: v3(0, 1, 0), z: v3(0, 0, 1) };
+export const COORD_NORMAL3: Readonly<Record<'xy' | 'yz' | 'xz', Vec3>> = { xy: v3(0, 0, 1), yz: v3(1, 0, 0), xz: v3(0, 1, 0) };
+
+/** The direction ALONG a directional operand (segment, line, vector, axis), unnormalized; undefined otherwise or
+ *  when it does not resolve at these positions. `lineDirs` holds the lines the caller may read. */
+export function operandDirection3(
+  c: Construction3,
+  op: Operand3,
+  pos: ReadonlyMap<Id, Vec3>,
+  lineDirs: ReadonlyMap<string, Vec3>,
+): Vec3 | undefined {
+  const chord = (from: Id, to: Id): Vec3 | undefined => {
+    const a = pos.get(from);
+    const b = pos.get(to);
+    return a && b && dist3(a, b) > 1e-9 ? sub3(b, a) : undefined;
+  };
+  if (op.kind === 'segment') return chord(op.a, op.b);
+  if (op.kind === 'line') return lineDirs.get(op.name);
+  if (op.kind === 'vector') {
+    const vd = c.vectors.get(op.name);
+    return vd ? chord(vd.from, vd.to) : undefined;
+  }
+  if (op.kind === 'axis') return AXIS_DIR3[op.axis];
+  return undefined;
+}
+
+/** The normal of a planar operand (named, point-run, coordinate), unnormalized; undefined otherwise or when it does
+ *  not resolve. `planeNormal` answers for the named planes the caller may read. */
+export function operandNormal3(
+  op: Operand3,
+  pos: ReadonlyMap<Id, Vec3>,
+  planeNormal: (name: string) => Vec3 | undefined,
+): Vec3 | undefined {
+  if (op.kind === 'plane-named') return planeNormal(op.name);
+  if (op.kind === 'plane-run') return idsRunNormal3(op.ids, pos);
+  if (op.kind === 'plane-coord') return COORD_NORMAL3[op.axes];
+  return undefined;
+}

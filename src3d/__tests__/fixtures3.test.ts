@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2484 (ADR-3D-388) — the operator's two sequences (2026-10-24): a relation naming a missing π-plane creates it free, and a
+  // segment ⟂ a free plane pins it. The class is asserted in free-plane-relations-2484.test.ts; this is the build + drift net.
+  'free-plane-perp-2484-undeclared.geo3.json': ["קובייה ABCDA'B'C'D'", "הישר AC' מאונך למישור π3"],
+  'free-plane-perp-2484-declared.geo3.json': ["קובייה ABCDA'B'C'D'", 'מישור π3', "הישר AC' מאונך למישור π3"],
   // #2489 (ADR-3D-383) — the operator's T45 (2026-10-24): a line named with its noun before it exists is created free by #1467's mint
   // pass, as «ישר k» declares it. The class is asserted in free-line-create-2489.test.ts; this is the build + drift net.
   'free-line-created-2489.geo3.json': ['קובייה ABCD', 'הישר k מאונך למישור ABC'],

@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "נתונים שני מעגלים שרדיוס כל אחד מהם 5",
+    "מרכז המעגל הראשון הוא O_1(-3,1)",
+    "מרכז המעגל השני הוא O_2(9,10)",
+    "P מרכז מעגל"
+  ],
+  "seed": 0,
+  "name": "#2552 D9 — the exam pair, then «P מרכז מעגל» draws a third circle centred at P"
+}

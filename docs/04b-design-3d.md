@@ -462,7 +462,10 @@ order; a row that fails there is dropped from `premint` and reports its reason (
 `mintEligible3` (`engine/mintable.ts`) excludes a statement about a solid's own element (`solidElement3`: a diagonal,
 the solid's height, a height to a named base face, a tetrahedron's altitude; #978). **Lines** ([ADR-3D-383](06b-decisions-3d.md#adr-3d-383),
 #2489): an `unknown-line` for a name in `lineSlotNames3` is minted by applying `free-line` (its refusal is the line's), and
-is placed by `premint` like a point; lines are never in `created` (no notice). `withFreeLines` is gone. The bare-segment apply branch declares
+is placed by `premint` like a point; lines are never in `created` (no notice). `withFreeLines` is gone. **Planes** ([ADR-3D-388](06b-decisions-3d.md#adr-3d-388),
+#2484): an `unknown-plane` for a π-token in `planeSlotNames3` (a `plane-named` operand, a `plane` / `p1` / `p2` name) that
+names nothing (`mintablePlane3`) is minted by applying `free-plane`, placed by `preplanes`, never in `created`; the
+`on-planes` case no longer creates inline, so a membership creates through the pass too. The bare-segment apply branch declares
 both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` → `App3`'s `CreatedNotice`; ✕ is `remove`.
 **A name clash found by the pass is not final** ([ADR-3D-387](06b-decisions-3d.md#adr-3d-387), #1188): the dry run reads
 the WHOLE fold, so a later row may already own the name an earlier row introduces («נסמן: AB = u» · «וקטור u» on a
@@ -512,6 +515,17 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   letter is drawn.
 - **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
   free vectors from the lines that stated them.
+
+### Free objects: one operand seam ([ADR-3D-388](06b-decisions-3d.md#adr-3d-388), #2484)
+
+A free line (`resolveFreeLine`) and a free plane (`resolveFreePlane`) read the operand a relation names through the same
+two functions in `operands.ts`: `operandDirection3` (segment, vector, determined line, axis) and `operandNormal3` (named,
+point-run, coordinate plane). For a free plane, every `plane-rel` claim naming it is read that way. Against a normal m:
+∥ → n ∥ m, ⟂ → n ⊥ m. Against a direction d: ⟂ → n ∥ d, ∥ → n ⊥ d, an angle β → the #534 cone about d, ⊂ → n ⊥ d plus
+the segment's ends as members. A contained `lineRels` line adds its anchor (`lineAnchors`) as a member. A plane × plane
+angle stays on its #1439 lane. The DOF is still counted by the code that pins. The placement funnel's predicates
+(`freePlaneFigurePinned3`, `freePlaneOffsetPinned3`) are unchanged: `reresolveFreeObjects3` re-resolves the plane after
+the funnel, and the relations hold at every seed. Outright pins combine last-writer-wins (#2487 owns the ordered fit).
 
 ## Solving the figure and judging claims
 

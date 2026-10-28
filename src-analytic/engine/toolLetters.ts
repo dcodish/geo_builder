@@ -13,8 +13,8 @@
  * The letters, measured through `decideDeterministic2D` (2-D's `freeLabel`, `src/parser/parse.ts`): a foot prefers
  * F, G, H, P (a free point F already in the figure → G; F, G, H → P); a midsegment's midpoints prefer M, N, P, Q and
  * N, P, Q, S; then 2-D's pool `MNPQRSTUVWXYZKLGHIJ`. Analytic's foot reads F → H, so H, G, P (F is never offered).
- * 2-D's median and perpendicular-bisector midpoints always write M, even over a point M the figure has — a 2-D
- * collision (#1690); here the midpoint takes the next free letter like every other role.
+ * 2-D's median and perpendicular-bisector midpoints once always wrote M, even over a point M the figure had; since
+ * #1690 (ADR-772) they take the next free letter there too, as every role does here.
  *
  * Resolved in LIST ORDER against the letters the EARLIER facts use, so a later line never re-letters an earlier
  * point (stability) and a later line that names the tool's letter refers to it (#1153: naming it a second time is
