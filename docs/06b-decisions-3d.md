@@ -3325,6 +3325,8 @@ dihedral driving to 60° with the altitude foot on BC and ⟂ to it.
 
 ### ADR-3D-141 — the FREE-standing named LINE: «ישר k» / bare «l1», pinned by stated relations (#552)
 
+**⚠ Partly superseded by [ADR-3D-383](#adr-3d-383) (2026-10-27):** the creation half — "a non-convention name must be declared first" — is withdrawn; a line named in any line slot is created as «ישר k» declares it (#2489, operator 2026-10-24).
+
 The #487 free plane, line edition, and deliberately the same architecture at every layer. A student can
 now declare a line before anything about it is known — and a relation can conjure one — with its 4 DOFs
 (direction 2 + anchor 2) sampled per seed until givens pin them (ADR-052: an unstated direction or
@@ -6144,7 +6146,7 @@ calls for.
 
 ## ADR-3D-191 — AN UNSTATED ENDPOINT IS FREE, AND CONTAINMENT TAKES A DEGREE OF FREEDOM (#840, #839)
 
-**Status:** Accepted (2026-08-31) · **Ladder:** stage 1 (apply) + stage 5 (placement) · **Operator report:** playing `prod/2026-08-31`
+**Status:** Accepted (2026-08-31) · **⚠ Partly superseded by [ADR-3D-382](#adr-3d-382) (2026-10-27):** the both-fresh «קטע QZ» refusal (the typo guard) is withdrawn; a line referring to a missing point creates it, with the notice (#1467) · **Ladder:** stage 1 (apply) + stage 5 (placement) · **Operator report:** playing `prod/2026-08-31`
 
 > *"when i delete the E middle of it doesnt do anything (is yellow). In this case, I think that BE should
 > be drawn with a degree of freedom and having it part of ABCD should even limit the degree of freedom
@@ -13589,3 +13591,52 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Golden drift expected** (`decide-submit3-parity-1394`, the batch's to judge): any golden row whose session names a vector bare («AB = u») now carries the `vector-named-bare` notice if notices are recorded; any «|AB| = <letter>» row flips from not-understood to recorded.
 
 **Behaviour change for a student:** in 3-D, «AB = k» (and «AB = u») still names the vector and now shows ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה «|AB| = k».». «|AB| = k» now builds: AB is labelled k, its length is free, a second «|AD| = k» makes them equal and «k = 3» sets them to 3. Before: no note, and «|AB| = k» was not understood.
+
+## ADR-3D-382 — A line that refers to a point the figure lacks creates it, last, in the fold: the mint pass (#1467)
+
+**Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · the 3-D half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-3D-191](#adr-3d-191) (the both-fresh «קטע» refusal is withdrawn: a bare segment declares its ends) · **supersedes** #840's 2026-08-31 typo guard and the "nothing is invented" clauses of [ADR-3D-257](#adr-3d-257) / [ADR-3D-259](#adr-3d-259) for points · folds in #2048 S2(a) (points inside a vector line are created too, so `v7-t1`'s "kept" refusal is rewritten here, not locked and rewritten later)
+
+**Operator:** ruling 2026-09-27 on #1467, *"Create everywhere + notice"*, *"Notice with one-click undo"*; T41 (2026-10-24) cube · «E אמצע XC»: *"we can create a point X so the claim satisfies. point x just has 3 dofs at this declaration until user narrows it."*; T49 «קובייה ABCD» · «PQ = 2AB»: *"same comment"*; #2048 ruling A.
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 (new) · **Design:** [04b](04b-design-3d.md) § "The mint pass" · **LADDER stage:** the fold, after the post-pass deferral fixpoint and the stale-message refresh (ADR-3D-259 / #1413), before the solve
+
+**Measured before** (`d9494206`, `useGeo3.submit`): «M אמצע AB», «M אמצע BB'», «K על AA' כך ש-AK = 2KA'», «AB = 3», «∠BAC = 90», «המרחק בין D למישור ABC הוא 6», «קטע QZ», «נסמן: AB = u», cube · «M אמצע AQ'», cube · «E אמצע XC», and «A(0,2,-1)» · «B(-3,2,2)» · «נסמן: AB = u, AC = v» refused `unknown-point`; «קובייה ABCD» · «PQ = 2AB» refused `two-unknowns`.
+
+**Decision.**
+1. **The mint pass** (`deriveCore3`): for each still-red row, in list order, whose LATEST dry run (an earlier mint may have supplied a letter) reports `unknown-point` or `two-unknowns` with a mintable id, mint that id `free3` (the existing `mintFree`) and dry-run again, until the row applies; then apply it for real and re-run the deferral fixpoint for its dependents. Which ids are missing is the engine's own answer at its ~60 `missingPoint` sites — no command-kind list.
+2. **Then the figure is folded AGAIN in list order** with the decided points placed from the start (`premint`). Applying a minted row last changed what the solve did with the rows after it — measured: «פירמידה ABCDS שבסיסה ריבוע» · «AS = w» · «|EN| = |w|» · «AB = w» recorded the false vector claim and blamed «|EN| = |w|» with a flat pyramid, where the declared-first figure («קטע EN» first) refuses «AB = w» `claim-refuted`. A row that fails in the in-order fold has its points dropped and the fold runs again (bounded by the rows that minted); it reports the reason it failed WITH them (`postMint`).
+3. **Mint-last:** a point any line declares binds through the fixpoint first. «M אמצע SA» typed above «פירמידה SABCD» binds (M on the pyramid's SA); «M אמצע AB» · «A(1,2,3)» binds A and mints only B.
+4. **Atomic:** a row that still fails after minting keeps nothing it minted, and its status is the post-mint reason («המרחק בין D למישור ABC הוא 6» over three collinear points reads `point-not-determined`, never «unknown point»).
+5. **Eligibility** (`src3d/engine/mintable.ts`, the docs/17 §3 row "mint eligibility"): an id is mintable when it is a point label the figure lacks (the degenerate-shape returns that report an EXISTING id are never minted). A line that states something IS AN ELEMENT OF A SOLID is not eligible (`solidElement3`, the plan's §3.2): a diagonal («אלכסון AB» with no solid stays refused, #978), the solid's height («XY גובה הפירמידה»), a height to a named base face («גובה מנקודה D לבסיס ABZ»), a tetrahedron's altitude. A relation TO a face («SQ מקביל לבסיס») is not one: Q is created, held in the plane through S ∥ the base.
+6. **The notice:** `Derived3.created[factId]` holds the minted ids; `submit`'s `record` sets `lastCreated`, and `App3` shows `CreatedNotice` while that fact is the last row; ✕ is `remove(factId)`. A declaration-only line («קטע AB» · «דלתון ABCD»'s other corners) may still need the pass, but announces nothing (`declaresOnly3`).
+7. **«קטע QZ» on an empty canvas** declares Q and Z at apply (the ADR-3D-191 branch, now `fresh.length > 0`; a diagonal keeps the one-known-end mint only, so «אלכסון AE» on a cube still draws).
+
+**Locks.** `src3d/__tests__/created-notice-1467.test.ts` (18: the shared §5c rows; seven blank sentences with their notice; T41; T49 at three seeds; «AB = 3» at five seeds, moving; a vector line; «קטע QZ» silent; mint-last both ways; atomic with the true reason; «אלכסון AB» refused; ✕; the text); fixtures `create-on-mention-{cube-x,pq,midpoint}-1467.geo3.json`.
+
+**⚠ Locks rewritten** (each cites #1467; they asserted the superseded "nothing is invented" / typo-guard behaviour): `auto-midpoint` (unknown endpoints are created), `exam-2026-2` («|EN| = |w|» creates E, N), `issue-1184-vector-starts-a-figure` (three: «קטע QZ» / «חץ QZ» after a point, «קטע AB» blank), `issue-1327-forward-constraint`, `issue-1339-forward-creating-row`, `issue-1413-stale-error` (the edit sequence builds; atomicity asked of a line failing after the mint), `issue-601` (the kite's corners), `issue-774` («מרובע ABXY»), `issue-840` (two), `v7-t1` (two), `vertex-angle` («זוית X ישרה» refused for its true reason), `issue-1550` (a muted row owns no chip), `height-from-apex` («SQ מקביל לבסיס» creates Q), `refusal-batch1-1995` (two: «define it first» and «one new point only» are no longer reached for these sentences — round #2466's batch-1 sentences superseded, as the 2026-10-24 note on #1467 asked). `issue-1499-perp-from-in-plane-point` («XY⊥ABC» creates X, Y), `issue-1692-triage-replay3` («AB ⊥ AC» now `point-not-determined`; «קטע BC» after a clear builds), `issue-847` (a muted row owns no chip), `issue-926`, `fact-edit3` (two), `store3` — the last three are #1467 §8b: deleting, muting or editing away a point's definition no longer reports `dependents-broken`; the dependent builds on a free point, the list without that row. **Not delivered from §8b:** the notice on that delete path (its ✕ = undo); the dependent row is green and silent. **Kept:** `issue-978-diagonal-verifier` (green with zero edits), `issue-1944-perp-to-base-flat` («מ-D מורידים אנך לבסיס» still refuses naming D).
+
+**Known residual.** Claims over all-free points that the drive cannot pin stay refused, now with their true code: «שטח המשולש ABC = 4.5», «AB∥ACD» read `point-not-determined` (#1467 §7's successor class). «PQ = 2AB» names Q only: P is the point the relation defines.
+
+**Perf (docs/17 §7).** One submit on a blank page: «AB = 3» 1.29 s, of which the mint pass is negligible — «קטע AB» · «AB = 3», which needs no mint, takes 1.11 s; the cost is the all-free solve. «המרחק בין D למישור ABC הוא 6» on a blank page takes 2.9 s (1.1 s after «משולש ABC») — a finding, filed on #1467's PR.
+
+## ADR-3D-383 — A line named with its noun before it exists is created like «ישר k», in every relation that names a line (#2489 T45)
+
+**Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/2489-mention-lines-planes` (stacked on #1467's) · the 3-D half of [ADR-W-163](06w-decisions-workspace.md#adr-w-163) · **amends** [ADR-3D-141](#adr-3d-141) (the name-shape bound on creation is withdrawn) and [ADR-3D-382](#adr-3d-382) (line slots join the mint pass)
+
+**Operator:** T45 (2026-10-24) «קובייה ABCD» · «הישר k מאונך למישור ABC»: *"the tool needs to create the line if its referenced with dof"*; card e20 = A (2026-10-24): no notice for a created line.
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-26 (new) · **Design:** [04b](04b-design-3d.md) § "The mint pass" (the line row) · **LADDER stage:** the fold's mint pass (ADR-3D-382)
+
+**Measured before** (the #1467 tip): «הישר k מאונך למישור ABC», its English, «הישר k מקביל ל-AB», «A על הישר k», «הזווית בין הישר k למישור ABC היא 30», «הישר k מקביל לישר m», and «הישר k|ℓ חותך את המישור ABC בנקודה M», «המרחק בין A לישר k|ℓ הוא 3» refused `unknown-line` — the last two even for the convention ℓ, because `withFreeLines` was wired into four command kinds by hand.
+
+**Class (docs/17 §1).** *A statement that names a line by its noun refuses `unknown-line` instead of creating it, unless the name has the convention shape and the command kind is on a hand-kept list of four.*
+
+**Decision.**
+1. **The mint pass mints a line** when the latest dry run reports `unknown-line` for a name in one of the line's LINE SLOTS (`lineSlotNames3`: a `line` field or a `{kind: 'line'}` operand — reached only through the noun or the ℓ token, so the kind is the student's). The mint applies `{type: 'free-line', name}`: a name the declaration refuses («נסמן: AB = u» · «הישר u …») reports the declaration's own refusal. A circle reported through the same code («A נמצאת על המעגל») is never in a line slot.
+2. **`withFreeLines` and its four call sites are deleted**; the convention-name behaviour comes through the pass unchanged (`free-line.test.ts` green, one lock rewritten).
+3. **No notice** for a created line; `created` records points only.
+4. **DOF** is the declared line's: ⟂ plane 2, ∥ segment 2, membership 2, angle 3, crossing 4, two new lines 6.
+
+**Deviation from the plan (measured).** «המרחק בין A לישר k הוא 3» does not build: it creates k and is then refused `line-not-determined` — exactly what it answers after «ישר k» today (the plan's B.1 had no declared-line cell for it). A distance claim that pins a free line is a capability of its own, filed as #2564 (`needs-operator`); the refusal is the declaration's verdict, never «define it first».
+
+**Locks.** `src3d/__tests__/free-line-create-2489.test.ts` (17: nine relations × the declared DOF, two lines, the relation at five seeds and moving, no notice, mint-last, the clash, the distance verdict, the circle guard, the bare vector); `free-line.test.ts`'s "a typo must not conjure a line", `plane-line-perp.test.ts`'s «ACD אנך לישר q» and two `refusal-batch1-1995` rows (the taught «ישר k» / «line k» is no longer reached for a line named with its noun) rewritten; fixture `free-line-created-2489.geo3.json`.

@@ -348,10 +348,11 @@ opposite (2-D's parity test on `(r, dir)`); any other noun's vertex order is sem
 
 - **Arm 1, a parsed line.** `unreadPart` runs the shared probe (`shell/readExtent.ts` `readLabelRuns`) with `parseLine` as the reader and the facts without `src` as the lowering. The frame is context-free, so one reader serves every clause; the whole line is the one clause `cutAtReading` cuts. A tail gives `split-statements`; an unread run with read labels after it gives `not-handled` (the model, as in 2-D). Asked before the fold: it is a question about the reading.
 - **Arm 2, a declined line.** `declinedPart`: the LONGEST word-boundary prefix that the same decision would record (or answer as already known). Its rest must carry at least one label, only labels the prefix's facts carry, and nothing else with a construction signal (`hasConstructionSignal` over `VOCABULARY_ANALYTIC`, no digit). No word list is added. When the rest fails that test whole, it is cut at its conjunctions (`conjunctionPieces`: «ו-» after `shell/conjunction`'s `foldConjunctionSpacing`, and "and"; [ADR-AG-301](06c-decisions-analytic.md#adr-ag-301), #1947): the first piece must pass the same test and every further piece must record after the prefix and the pieces before it (the caller's `records(piece, before)`, which derives that figure). Then the parts are `[prefix, lost, ...further]`; any further piece that does not record keeps the old answer.
+- **Arm 3, the incidence phrase** ([ADR-AG-334](06c-decisions-analytic.md#adr-ag-334), #2547). `declinedThrough`, asked at the same `not-handled` seam AFTER `declinedPart` (so a co-reference arm 2 refuses keeps its parts). The head is the text before the line's first incidence opener (`shell/incidencePhrase.ts`'s `firstIncidenceOpener`, the atoms 2-D's `unreadThrough` reads; [ADR-W-161](06w-decisions-workspace.md#adr-w-161)), a trailing comma dropped as 2-D's cut drops it (the comma rule lives here, never in arm 2's shared walk). The head must record and READ AS a segment: its `parseLine` facts hold a `segment` or `cevian-of` fact (chord, segment, diameter, tangent, altitude, median; a line «ישר AB» and «מעגל העובר דרך A» never qualify). The rest must be one incidence phrase within one clause (`incidencePhraseAtStart`: no `,` `;` `.`). The X-test is ADR-765's "no fresh letter": the phrase's point (in the first conjunction piece) has every label carried by the head, or, with its labels and a point noun right before one removed (`POINT_NOUN_HE_ATOM` / `POINT_NOUN_EN_ATOM`, the subject noun `HE_POINT` composes), still has a construction signal over `VOCABULARY_ANALYTIC`. Parts: `[head, phrase, ...further]` when the rest's further «ו-» / "and" pieces each record after the head (ADR-AG-301's cut), else `[head, rest]`.
 - **The taught form.** `rightAngleTeach`: the read part is a triangle whose right angle the reading left open (a three-way `choice` of perpendiculars) and the lost part is one of its vertices, whatever follows it. The refusal carries `teach: { triangle, angle }`, the angle named with the vertex in the middle.
 - **Text.** `errSplitStatements` and `errRightAngleVertex` (`i18n/index.ts`) carry 2-D's text byte for byte (ADR-W-118 B1; `shell/__tests__/one-fact-per-line-parity-1962.test.ts` reads analytic's key off disk). `errorText` fills `{{more}}` with the parts after the taught pair, numbered from (3) in 2-D's `numbered` format.
 
-*Identifiers:* `split-statements` · `unreadPart` · `declinedPart` · `lostPartOf`
+*Identifiers:* `split-statements` · `unreadPart` · `declinedPart` · `declinedThrough` · `lostPartOf`
 
 ### What a sentence draws, and whose extent it is ([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), #1639, #1640, #1636, #1641, #1643)
 
@@ -559,8 +560,11 @@ foot is derived (`toolFootFacts`, `engine/cevian.ts`), named after the fact thro
 (`onCircleAlready`, `centreRuleOf`, `nameCentreAs`). A named circle the chain (`circleByName`) cannot find is stated by
 `statingNamedCircle` (`declare`, `param radiusSymbol(M)` > 0, `circle-at-M`); an `on-kind` circle with no circle
 creates one (`touchedCircleFacts`). **New letters, last**: after the fixpoints, `foldPass` adds `free` points for a
-line whose failures are all point references in minting forms (`mintedByReference`) or companions (`segment`,
-`line-2pt`, `selector`, `declare`); a `perpendicular` is not one, and the triangle form states its
+line whose failures are all `unknown-reference`s to point letters, a round at a time (a further missing letter a fact
+names is minted too) until the line lands, or the line keeps nothing ([ADR-AG-342](06c-decisions-analytic.md#adr-ag-342),
+#1467: every reference, as 2-D; the 2026-10 `mintedByReference` form gate is gone). The ids land in
+`FoldResult.created` on the line's first fact, `Derivation.created` by line, and `decideSubmit`'s `record.created` —
+the shared `CreatedNotice` in `App.tsx`, shown while that line is last; ✕ is `removeLine`. The triangle form states its
 triangle first (`clauseFacts`).
 
 *Identifiers:* `circle-at-<letter>` · `create` · `chordFacts` · `on-kind { circle }` · `tangent-line-at`
@@ -792,6 +796,8 @@ Spellings lower in the parser (the frame's `centreClauses`, `sharedSubjectClause
 resolved through `circleByName`, `centreRuleOf` / `centreIdOf`, with regions as `sign` selectors
 (`evaluate.ts circleQuantity`). `separatedFrom` tries `chordStarts` for the other root.
 
+`centresOf` offers a centre only with a sentence the grammar reads back: the equation, the numeral, the ring form, or — for the figure's ONLY circle with neither numeral nor equation, of any kind — the contextual «P מרכז המעגל» (a lone `circle-thru` takes it first, every other kind after the ring forms, so no existing offer changes; [ADR-AG-338](06c-decisions-analytic.md#adr-ag-338), #2554). A sentence-drawn pair (`circle-pair<k>-1/2`) has no such sentence (D8 = B on #2552) and is the class guard's one declared exception.
+
 *Identifiers:* `M(x,y)` · `ONE_OF_HE` · `incidenceOn(…).t === 'kind'` · `THRU_HE` · `tangent-circles` · `freeAngleOf` · `selectorFact` · `c.selectors` · `derive.nameCanonicalCentres` · `centresOf` · `pointAt` · `deflatedStarts` · `collapsedPairs` · `on-line` · `selectorsHoldAt`
 
 ### Inscribed and circumscribed: the sentence is the sentences it is made of ([ADR-AG-194](06c-decisions-analytic.md#adr-ag-194), #1619 B2, #1554)
@@ -845,7 +851,9 @@ M1's `circleByName` decodes a described name with `describedCircle`: `⊙` = the
 A diameter works on any circle (`diameter-of` → both ends `on-curve` plus a radius `relation`); `openCurveText` prints
 `—` for a `θ_` symbol (`readsToolSymbol`).
 
-*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
+**No ring typed ([ADR-AG-335](06c-decisions-analytic.md#adr-ag-335), #2545):** the frame folds an argument-position «במעגל החוסם [את המשולש]» / "of the circumcircle" to the letterless name «⊙◌» / «○◌» (+ the noun's size, `letterlessCircleName`); `describedCircle` reads it as the figure's one polygon's circle, bound only when it is the figure's one circle, and `statingNamedCircle` never creates it. `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict it gave before.
+
+*Identifiers:* `readDescribedCircle` · `DESCRIBED_CIRCLE_ALT` · `RING_OF_FIGURE` · `letterlessCircleName` · `centreOfCircle` · `centre-of { circle }` · `relation parallel (points a b) (radius host a)` · `openCurveText(construction, id)` · `readsToolSymbol` · `isDirectionSymbol`
 
 ### Circles a sentence draws; two circles named by order ([ADR-AG-219](06c-decisions-analytic.md#adr-ag-219), #1622 E3, #1693)
 
@@ -894,6 +902,26 @@ numeral taken in any notation by `nameReading`). The ask lane resolves the touch
 sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
 
 *Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
+
+**The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
+`unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,
+and lowers to the same `commonTangentFacts` as «AB משיק משותף …» (ADR-AG-313) with the touches as `toolPoint('vertex', …)`
+placeholders (line-scoped, so a second sentence mints C, D). «משותף» or a kind word is required. `NAMED_TANGENT_HE/EN` take
+an optional kind. The definition clause «ש(שני) המעגלים נמצאים באותו צד / מצדדים שונים שלו» is folded into the kind word by
+`foldTangentSide` at `orthography` (`frameAnalytic.ts`, copied from 2-D's `src/parser/tangentSide.ts`, which `normalizeUtterance` calls). `namedTouchPoint` reads
+«X נקודת ההשקה של <line> עם (ה)מעגל <ref>» through `viaCanonical` as «הישר <line> משיק למעגל <ref> בנקודה X».
+
+*Identifiers:* `unnamedCommonTangent` · `UNNAMED_TANGENT_HE` · `UNNAMED_TANGENT_EN` · `namedTouchPoint` · `TOUCH_NAME_HE` · `TOUCH_NAME_HE_LAST` · `TOUCH_NAME_EN` · `foldTangentSide`
+
+**The exam's pair sentences ([ADR-AG-336](06c-decisions-analytic.md#adr-ag-336), #2552).** «שני מעגלים שרדיוס כל
+אחד מהם r» is the `שני מעגלים` rule's pair with both slots `{ k: 'new', r }` (`radiusOfSize`'s value slot). «מרכז המעגל
+הראשון / השני הוא X(a,b)» (`pairCentreAt`) lowers to `centre-of { id: X, ordinal: 1 | 2, create }` and the point
+sentence «X(a,b)»; M1 names the unnamed `circle-pair<k>-<ordinal>` member's centre by `namingByOrder`, answers `known`
+for a member already centred on X and `already-named` for one centred on another letter, and with no pair reads the
+fact as without the ordinal. `segmentsOf` and the `UNWRAP` table take «ו» before «מרכז» as a sentence opener, so the
+exam's joined sentence is cut and read as the two.
+
+*Identifiers:* `pairCentreAt` · `PAIR_CENTRE_HE` · `PAIR_CENTRE_EN` · `centre-of.ordinal` · `segmentsOf` · `UNWRAP`
 
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 

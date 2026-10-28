@@ -212,9 +212,10 @@ describe('#1550 Q2 — the plane chip lives on the FIRST row that mentions the p
 
   it('a row that is not ok owns nothing — the next ok mention takes the chip (#847 kept)', () => {
     build(["קובייה ABCDA'B'C'D'", 'E אמצע AC', 'BE מוכל במישור ABCD', 'מישור ABCD']);
-    useGeo3.getState().remove(st().facts[1].id); // BE's row goes amber: E no longer exists
+    // ⚠ #1467 (ADR-3D-382): deleting the E row no longer turns BE's row amber — E is created free — so the row is muted
+    useGeo3.getState().toggle(st().facts[2].id);
     const d = derive3(st().facts, st().seed);
-    expect(d.status[st().facts[1].id]).not.toBe('ok');
+    expect(d.status[st().facts[2].id]).not.toBe('ok');
     expect(chipRows()).toEqual([['מישור ABCD', 'ABCD']]);
   });
 

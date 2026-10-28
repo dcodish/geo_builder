@@ -178,9 +178,16 @@ describe('#579 (ADR-3D-146) — the NAMED new foot: «SO גובה הפירמיד
     expect(st.lastError, 'two unknown letters must refuse').not.toBeNull();
   });
 
-  it('refusal preserved: ∥ with a new letter does not invent a point', () => {
-    const { st } = build(['פירמידה ABCDS שבסיסה ריבוע', 'SQ מקביל לבסיס']);
-    expect(st.lastError, 'a whole plane of points satisfies ∥ — no unique Q').not.toBeNull();
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a new letter in a
+  // relation TO the base is an ordinary referenced point — Q is created free, held in the plane through S ∥ the base.
+  it('∥ with a new letter creates the point free, and the relation holds', () => {
+    for (const seed of [0, 1, 2]) {
+      const { st, pos } = build(['פירמידה ABCDS שבסיסה ריבוע', 'SQ מקביל לבסיס'], seed);
+      expect(st.lastError).toBeNull();
+      const [A, B, C, S, Q] = ['A', 'B', 'C', 'S', 'Q'].map((id) => pos.get(id)!);
+      const n = cross3(sub3(B, A), sub3(C, A));
+      expect(Math.abs(dot3(n, sub3(Q, S))) / (norm3(n) * norm3(sub3(Q, S)))).toBeLessThan(1e-6);
+    }
   });
 
   it('both-exist keeps its existing routing — nothing minted, nothing re-created', () => {

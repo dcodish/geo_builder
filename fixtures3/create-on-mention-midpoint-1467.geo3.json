@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-27T15:35:55.777Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "M אמצע AB",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "M",
+          "a": "A",
+          "b": "B",
+          "t": 0.5
+        }
+      ]
+    }
+  ]
+}

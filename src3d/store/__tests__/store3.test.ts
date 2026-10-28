@@ -50,15 +50,16 @@ describe('store3', () => {
     expect(useGeo3.getState().lastError).toEqual({ code: 'not-understood' });
   });
 
-  it('toggle off auto-drops dependents (flagged, reversible)', () => {
+  it('toggle off: a dependent builds on free points (reversible)', () => {
     useGeo3.getState().submit('קובייה ABCD');
     useGeo3.getState().submit("M אמצע BB'");
     const [cube, mid] = useGeo3.getState().facts;
     useGeo3.getState().toggle(cube.id);
     let d = derived();
     expect(d.status[cube.id]).toBe('disabled');
-    expect(d.status[mid.id]).toEqual({ code: 'unknown-point', id: 'B' });
-    expect(d.positions.size).toBe(0);
+    // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): M builds on free B, B'.
+    expect(d.status[mid.id]).toBe('ok');
+    expect([...d.positions.keys()].sort()).toEqual(['B', "B'", 'M']);
     useGeo3.getState().toggle(cube.id); // reversible
     d = derived();
     expect(d.status[mid.id]).toBe('ok');

@@ -86,28 +86,19 @@ describe('#1720 — a triangle-form cevian introduces its triangle, for every ro
   });
 });
 
-describe('#1720 — an operand the figure lacks is refused naming the sentence', () => {
-  it.each([
-    ['AD תיכון לצלע BC', 'B, C'],
-  ])('«%s» on an empty canvas names the missing letters %s, quoting the sentence', async (line, points) => {
-    const r = await decide([], line);
-    expect(r.key).toBe('input.missingOperands');
-    expect(r.params).toMatchObject({ points });
-    expect(r.text).toContain(line);
-    expect(r.text).not.toMatch(/unresolved|dependencies|bis-|~|line-/);
-    expect(llmParseMock).not.toHaveBeenCalled();
-  });
-
-  it('no refusal of this path carries an internal id, in either locale', async () => {
-    for (const line of ['AD תיכון לצלע BC', 'AD חוצה זווית BAC']) {
-      for (const lng of ['he', 'en'] as const) {
-        useGeoStore.getState().clear();
-        const r = await decide([], line, lng);
-        expect(['input.missingOperands', 'input.unresolvedSentence'], `${line} (${lng})`).toContain(r.key);
-        expect(r.text).toContain(line);
-        expect(r.text).not.toMatch(/unresolved|dependencies|bis-|~|line-|@/);
-      }
+/**
+ * ⚠ REWRITTEN by #1467 (ADR-769; operator ruling 2026-09-27 "Create everywhere + notice"; #2048 ruling A: "a cevian with
+ * no host triangle creates the vertices it names"): the operands the figure lacks are created, so these lines commit.
+ * `input.missingOperands` stays the fallback for an operand nothing can create (#1411's deleted-line rows).
+ */
+describe('#1720 — an operand the figure lacks is created (#1467)', () => {
+  it.each(['AD תיכון לצלע BC', 'AD חוצה זווית BAC'])('«%s» on an empty canvas commits in both locales, and no model is asked', async (line) => {
+    for (const lng of ['he', 'en'] as const) {
+      useGeoStore.getState().clear();
+      const { v } = await decide([], line, lng);
+      expect(v.kind, `${line} (${lng})`).toBe('commit');
     }
+    expect(llmParseMock).not.toHaveBeenCalled();
   });
 
   it('missingOperandLetters: what the batch relies on and nothing defines', () => {

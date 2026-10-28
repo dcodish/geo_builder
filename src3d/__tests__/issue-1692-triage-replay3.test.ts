@@ -44,7 +44,8 @@ const SWEEP: ReadonlyArray<{ why: string; session: string; now: Now; detail: str
   { why: 'a line that records with nothing positioned yet is BUILT (the App records it)', session: 'המישור π1: z = 1', now: 'built', detail: 'plane3' },
   { why: '#353: the lowercase nudge', session: 'פירמידה sabcd', now: 'guided', detail: 'scope:lowercase-labels' },
   { why: 'ADR-3D-040: the guidance register', session: 'פירמידה', now: 'guided', detail: 'scope:bare-solid' },
-  { why: 'a reasoned refusal is not a gap', session: 'AB ⊥ AC', now: 'refused', detail: 'unknown-point' },
+  // #1467 (ADR-3D-382): A, B, C are created; a ⟂ claim over free points the drive cannot pin is refused with its true code
+  { why: 'a reasoned refusal is not a gap', session: 'AB ⊥ AC', now: 'refused', detail: 'point-not-determined' },
   { why: 'a genuine gap STAYS a live gap', session: 'משולש ABC ⏎ AB מתעופף מעל הקשת', now: 'not-handled', detail: 'not-understood' },
 ];
 
@@ -81,10 +82,9 @@ describe('#1692 — the 3-D replay reads each line the way the App does', () => 
       act('redo'),
       sub('קטע AB'), // the redo brought the triangle back
       act('clear'),
-      sub('קטע BC'), // …and the clear took it away
+      sub('קטע BC'), // …and the clear took it away — so «קטע BC» declares B and C afresh (#1467)
     ]);
-    expect(nows(out)).toBe('built skip skip built skip refused');
-    expect(out[5].detail).toBe('unknown-point');
+    expect(nows(out)).toBe('built skip skip built skip built');
     expect(out.every((o) => !o.degraded)).toBe(true);
   });
 });

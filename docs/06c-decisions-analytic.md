@@ -999,6 +999,8 @@ and that limit is stated rather than papered over.
 
 ## ADR-AG-015 — B2/B3 BUILT: free vertices, the joint solve, and entry order stops mattering (#1016 #1017 #1033 #1034 #1047)
 
+**Status:** accepted · **⚠ Partly superseded by [ADR-AG-342](#adr-ag-342) (2026-10-27):** decision 1's "a reference still may not invent" no longer holds for points — every line that refers to a missing point creates it (#1467).
+
 **Requirements:** [02c](02c-requirements-analytic.md) R19 (entry-order independence), R5 (tier 3,
 ratified by [ADR-AG-009](#adr-ag-009)), P4/R22 (the DOF cue as the determinacy signal), §8 F16/F17.
 **Design:** [04c](04c-design-analytic.md) "The model" — the constraint layer and the solve.
@@ -9574,7 +9576,7 @@ Also measured: the S4 cevian foot was a FREE point plus constraints, so adding �
 
 ## ADR-AG-210 — A radius names an unnamed centre, a reference states the circle it names, and a bare relation mints its new letters — by 2-D's rule (#1670, #1686)
 
-**Status:** accepted · 2026-10-02.
+**Status:** accepted · 2026-10-02 · **⚠ Partly superseded by [ADR-AG-342](#adr-ag-342) (2026-10-27):** decision 4's form gate (`mintedByReference`) is gone — every point reference mints (#1467).
 - Operator rulings on #1670 (2026-10-02): rows 1–2 follow 2-D; *"an unlablled circle should not be O automatically. and yes - accept new letter with same logic the 2d tool has"*.
 - Operator ruling on #1686 (2026-10-02), on «BO = 5» beside an unnamed circle: *"create a segment BO where B is where we know it is and O is free. if the user wants it to be the center, he can write next sentance that O is the center … thats why we create a random point O until user assigns its location"*.
 - Lifts [#1028](https://github.com/dcodish/geo_builder/issues/1028)'s refusal for the forms 2-D mints for.
@@ -13786,3 +13788,145 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts` (the report and seven spellings, the other direction and circle, value-first rows, the ratio rows in both orders, the ghost-symbol refusals, the contradiction in both orders, the ghost DOF for five letters, controls, stability, the M2 single-seam guard); fixture `issue-2521-radius-letter-binds.analytic.json`; parity rows `radius-letters-order-then-value-2521`, `radius-letters-value-then-order-2521`, `radius-letter-value-then-ratio-2521`, `radius-letter-value-then-bound-2521` (X8).
 
 **Behaviour change for a student:** after «R > r», stating circle P's radius as 9 draws circle O larger than 9 (it was drawn smaller, green); the radius may be stated before «R > r» (it was refused); «רדיוס מעגל P הוא 3» then «R = 2r» draws O at 6 (it was not understood); «r < 5» after P's radius 9 is refused (it was accepted); «R > r» · «רדיוס O הוא 5» · «רדיוס P הוא 9» refuses the last line with the existing «הערך במשפט … אינו אפשרי כאן» message (it was accepted green — 2-D accepts it with an amber warning; #2527 asks which is right).
+
+## ADR-AG-335 — The bare «המעגל החוסם / החסום» reads the figure's one polygon's described circle when it is drawn (#2545, the ADR-W-157 port of ADR-768)
+
+**Status:** accepted · 2026-10-27 · bug port (2-D's [ADR-768](06-decisions.md#adr-768)), fix round #2561, stream B · branch `fix/2545-ring-role-reader` · **extends** [ADR-AG-203](#adr-ag-203) (the described-circle fold, now without a typed ring). LADDER stage: none (the frame's fold and M1).
+**Requirements:** [02c](02c-requirements-analytic.md) R139 amendment · **Design:** [04c](04c-design-analytic.md) § "A circle named by its ring" (the letterless name)
+
+**Measured before** (d9494206, `decideSubmit` → `derive`): every bare row (R1, R2, R5, R6, K1–K4b, K7–K11c, K12, E1–E7) was `not-handled`, handed to the model; the lettered rows recorded correctly (ADR-AG-203 / ADR-AG-210); and the controls 2-D binds — «מעגל O חוסם את משולש ABC» · «DE מיתר במעגל החוסם», «משולש ABC חסום במעגל» · «…החוסם [את המשולש]», the incircle «…החסום» — were `not-handled` too.
+
+**Decision.** The frame folds an argument-position relation with no ring typed to the letterless name «⊙◌» / «○◌» (+ the noun's size: «⊙◌3»), `names.ts` `letterlessCircleName`, read by every circle-name slot (`DESCRIBED_CIRCLE_ALT`). M1's `describedCircle` reads it as the figure's one polygon (of that size) and binds its described circle only when that circle is the figure's ONE circle — 2-D's rule. `statingNamedCircle` never creates it, and `submit.ts` answers a letterless name the figure cannot bind with the not-handled verdict the line had before, field for field: creating the circle, or choosing between two, is #2560.
+
+**Measured after:** C1, C2, C2b, C8 record with D, E on the described circle at 24 seeds; every other row of the plan's matrix is byte-identical to d9494206 (the bare-absent rows keep `not-handled`; the lettered rows record as before). Parity: `ring-circle-ref-2545-02` builds in both builders; `-01` / `-03` are analytic known gaps on #2560 (2-D refuses, analytic hands to the model).
+
+**Lock.** `src-analytic/__tests__/issue-2545-ring-circle-ref.test.ts`.
+
+## ADR-AG-337 — A common tangent the sentence does not letter, its kind written as its definition, and its touch point named after (#2553)
+
+**Status:** accepted · 2026-10-27 · bug P2 (`reported`, analytic; a missing 2-D port), fix round #2561 (stream C) · branch `fix/2553-external-common-tangent` · LADDER stage: none (parser lowerings onto ADR-AG-313's `common-tangent`; no solver change)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R197 (new: the unlettered and line-named common tangent, the kind as its definition, the touch point named) · [02](02-requirements.md) FR-EN-3 (one added sentence: 2-D reads the kind as its definition) · **Design:** [04c](04c-design-analytic.md) § "Common tangents" (the paragraph on `unnamedCommonTangent`, `foldTangentSide`, `namedTouchPoint`)
+
+**The report.** Operator, 2026-10-25 (prod analytic, the exam «שאלה 6, משיק משותף לשני מעגלים שווים», parts ב–ד): *"didnt deal with the משיק חיצוני"*. After O₁(−3,1), O₂(9,10), both radius 5: «משיק חיצוני משותף לשני המעגלים», «… ל O_1 ול- O_2», «… למעגלים O_1 ול- O_2» went to the model (`llm:unfaithful`); «P נקודת ההשקה של l2 עם מעגל O_1» three times (`llm:rejected`).
+
+**Re-measured at pickup** (origin/main `d9494206`; analytic `decideSubmit` → `derive`, 2-D `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked): as the issue's table. Analytic: «משיק חיצוני משותף לשני המעגלים», «משיק משותף חיצוני למעגלים O_1 ו-O_2», «הישר l משיק משותף חיצוני לשני המעגלים», «משיק משותף ששני המעגלים נמצאים באותו צד שלו» not-handled; «PQ משיק משותף חיצוני …» builds. 2-D: the first two commit, touches A, B (a second one: C, D); the definition clause escalates; «P נקודת ההשקה של l2 עם מעגל O» escalates. 2-D reads none of the per-circle «ל O ול- P» forms either, so they are not part of this port.
+
+**The class.** *A common-tangent sentence that does not letter its touches — or names its line instead, or writes its kind as its definition — was not lowered to the common tangent the builder already draws; and the touch point of a drawn tangent could not be named by its noun.* Not a new construct: ADR-AG-313's `common-tangent` is the one lowering for all of it.
+
+**Decision.**
+1. **`unnamedCommonTangent`** (`parseAnalytic.ts`, read after `namedCommonTangent`): «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l (הוא)?», and English. «משותף» or a kind word is required, 2-D's trigger, so «הישר l משיק לשני המעגלים» keeps its reading. The touches are `toolPoint('vertex', …)` placeholders — 2-D's `autoVertexLabels` (A, B, the next free letters), line-scoped, so a second such sentence is a second tangent, C, D, as in 2-D (measured: the two externals at every seed). The circles go through the existing `twoCircleSlots`.
+2. **`NAMED_TANGENT_HE/EN`** take the optional kind («הישר l משיק משותף חיצוני למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה»), passed to `commonTangentFacts` as the `AB` form passes it.
+3. **The kind as its definition is ONE fold per builder, `foldTangentSide`**, at the parser boundary: 2-D's `src/parser/tangentSide.ts`, called by `normalizeUtterance`, COPIED into analytic's `frameAnalytic.ts`, called by `orthography`. Copied, not shared through `shell/` as `foldConjunctionSpacing` is (ADR-AG-239): a vocabulary layer shared across products is undecided (BOUNDARIES.json `lexicon`), and the shell inline-Hebrew ratchet (ADR-W-153) bars new Hebrew literals there. The parity rows hold the copies to one verdict. It folds only the tangent noun's own relative clause, «משיק (משותף)? ש(שני )?(ה)מעגלים (X ו-Y)? (נמצאים)? באותו צד שלו» → «… חיצוני לשני המעגלים / למעגלים X ו-Y», and «מצדדים שונים / בצדדים שונים / משני צדדיו שלו» → «פנימי»; English "common tangent with both circles on the same side of it / on opposite sides of it". A per-rule spelling would leave the next common-tangent rule to miss it.
+4. **`namedTouchPoint`**: «X נקודת ההשקה / המגע של (הישר)? <line> עם (ה)מעגל <ref>» (also «X היא …», «… ומעגל …», «נקודת ההשקה … היא X», English) is read through `viaCanonical` as «הישר <line> משיק למעגל <ref> בנקודה X» — its inverse, already read — so that sentence's rule owns every outcome: a line the figure lacks is refused `unknown-reference`; on a drawn tangent X is its touch point; a touch the tool already lettered is refused with that sentence's own message («… אין נקודת חיתוך נוספת …»), never given a second letter.
+
+**Rejected.** Widening `twoCircleSlots` to «ל O_1 ול- O_2» (2-D reads no per-circle form; a separate change). A per-reader `ששני המעגלים …` alternation (the class would reappear in the next reader). A rename of an already-lettered touch by the noun (a student-visible behaviour nobody asked for: `[proposed]`).
+
+**2-D and 3-D (ADR-W-157).** 2-D gains item 3 (the fold); its unlettered tangent was the reference. Item 4 is not ported to 2-D: its sentence names a line by a letter («l2»), exception X4 (2-D names no line and letters every touch it draws), so the parity row is X4, analytic-only, with 2-D required not to build it. 3-D: X8, not expected.
+
+**Locks.** `src-analytic/__tests__/issue-2553-unnamed-common-tangent.test.ts` (the three saved fixtures, nine external and three internal spellings at six seeds with the side checked from the figure, the repeat, the letters beside the student's, the line-named form and its «בהתאמה» twin, five touch-noun spellings at six seeds, two refusals, controls, the fold's own reach); `src/__tests__/issue-2553-tangent-side.test.ts` (2-D: six definition spellings, the side checked from the drawn figure); fixtures `exam-2553-q6-external-tangent`, `exam-2553-q6-same-side`, `exam-2553-q6-touch-points` (`.analytic.json`); parity rows `unnamed-common-tangent-2553`, `unnamed-common-tangent-named-circles-2553`, `tangent-same-side-2553`, `tangent-opposite-sides-2553` (X8), `line-named-common-tangent-2553`, `touch-point-noun-2553` (X4, analytic only).
+
+**Behaviour change for a student:** in analytic, «משיק חיצוני משותף לשני המעגלים», «משיק משותף חיצוני למעגלים O_1 ו-O_2» and «הישר l משיק משותף חיצוני לשני המעגלים» draw the tangent (A, B, or named l) instead of going to the AI; in both builders «משיק משותף ששני המעגלים נמצאים באותו צד שלו» draws the external tangent; in analytic «P נקודת ההשקה של l2 עם מעגל O_1» names that touch point.
+
+## ADR-AG-338 — The + at the figure's only circle names its centre, however the circle was stated (#2554)
+
+**Status:** accepted · 2026-10-27 · bug (P2), fix round #2561 (stream E) · branch `fix/2554-lone-circle-centre-offer` · plan items 1 and 3 only; item 2 (a pair's centres) stays unbuilt. LADDER stage: none (the canvas offer list).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R130 amendment "the + at the figure's only circle names its centre" · **Design:** [04c](04c-design-analytic.md) § "The circle the figure has" (the `centresOf` paragraph).
+
+**Rulings.** [asked] #1598, the operator, 2026-10-02: *"press on the center of a circle to create a letter"*. D8 = B on #2552 (2026-10-26): «המעגל הראשון / השני» is read only in the exam's two sentences, so no sentence names one circle of a pair. [ADR-AG-048](#adr-ag-048) (two surfaces, one grammar), [ADR-AG-054](#adr-ag-054) (a ring whose click fails is worse than no ring).
+
+**Measured at pickup** (main d9494206, `derive` → `offersOf`, every catalog entry with its `needs`): a + with no offer and no letter at the centre for `circle-new` («מעגל», «נתון מעגל», «מעגל ברדיוס 5», «מעגל בקוטר 10», «משיק למעגל», …), `circle-diam` («נתון מעגל שקוטרו BD», «BD קוטר במעגל», «קוטר»), the quadrilateral incircle `circle-in-ABCD`, and every sentence-drawn pair `circle-pair1-1/2`. Typing «O מרכז המעגל» named each lone centre.
+
+**Root cause.** `centresOf` (`src-analytic/engine/crossings.ts`) offered the contextual «X מרכז המעגל» only when the lone circle's id began `circle-thru-`. The sentence itself binds to the figure's one circle whatever its kind (`centre-of` → `centreRuleOf`), so the gate was narrower than the grammar, and every other lone circle drew a + it could not act on.
+
+**Decision.** After the equation, the lone-`circle-thru` contextual and the ring forms, `centresOf` offers «X מרכז המעגל» for any lone stated circle with no numeral and no equation. The new branch sits after the existing ones, so every circle that had an offer keeps the same sentence. Pairs keep offering nothing (D8 = B); their centres are named by typing «O_1 מרכז מעגל» in order.
+
+**Class guard (item 3).** `issue-2554-lone-circle-centre.test.ts` walks every catalog entry (with its `needs`) and asserts that each stated circle with a centre either has a letter there or offers its +, and that every offer's sentence records through `decideSubmit` and names a point AT that centre. One declared exception: `circle-pair<k>-1/2`, citing D8 = B. One known-gap row, found by the guard and filed as #2566 (P2): «נתון מעגל שמשוואתו (x-13)^2+y^2=R^2» offers its equation sentence, which the typed path refuses (`conflicting-restatement`). The row asserts the gap is still open, so it must be removed when #2566 lands.
+
+**Measured after:** «מעגל ברדיוס 5», «מעגל», «מעגל בקוטר 10», a diameter's circle and a quadrilateral's incircle each offer one centre; the popover's letter records «O מרכז המעגל», O sits at the centre, and one undo removes it. «שני מעגלים» and «שני מעגלים זרים» offer nothing.
+
+**2-D and 3-D.** Not ported: the change is inside analytic's centre offer list (`centresOf`, #1598); no input sentence changes, so no parity row moves.
+
+**Locks.** `src-analytic/__tests__/issue-2554-lone-circle-centre.test.ts` (the five lone kinds through the real popover ops, store and `decideSubmit`; the pair rows; the catalog-wide class guard).
+
+**Behaviour change for a student:** in analytic, clicking the + at the centre of the figure's only circle now opens the letter popover for a free circle, a circle on a diameter and a quadrilateral's incircle (it did nothing). A pair's centres still do nothing.
+
+## ADR-AG-336 — The exam's two pair sentences: «שני מעגלים שרדיוס כל אחד מהם r», and «מרכז המעגל הראשון / השני הוא X(a,b)» (#2552)
+
+**Status:** accepted (items 1, 2 and 5 of the revised plan; item 3, D9, escalated — see below) · 2026-10-27 · feature (P2, analytic) · fix round #2561 (stream C) · branch `feat/2552-pair-circle-sentences`, stacked on `fix/2553-external-common-tangent` ([ADR-AG-337](#adr-ag-337)) · LADDER stage: none (a parser reading and an M1 choice of the circle named by order; no solver change)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R198 (new: the two sentences, the joined form, what stays with the AI) · **Design:** [04c](04c-design-analytic.md) § "Common tangents" (the paragraph on the pair sentences: `pairCentreAt`, `centre-of.ordinal`, the «ומרכז» opener) · **Builds on** [ADR-AG-322](#adr-ag-322) (the single-sentence «המעגל האחד / האחר» reader), [ADR-AG-219](#adr-ag-219) (naming a pair's centre by order)
+
+**The request.** Operator, 2026-10-25 (prod analytic, «שאלה 6, משיק משותף לשני מעגלים שווים»): *"I had an issue creating this diagram. It wouldnt accept O_1 / O_2 in many cases (but sometimes did)"*. The exam: «נתונים שני מעגלים שרדיוס כל אחד מהם 5. מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10).» **Ruling D8 = B (2026-10-26):** *"only the exam's exact two sentences"*; «המעגל הראשון / השני» is not made general. **Ruling D9 = A:** «P מרכז מעגל» with every centre lettered creates a new circle at P, with the creation notice and ✕, *"in line with the 2026-10-13 ruling on #2048"*.
+
+**Re-measured at pickup** (the #2553 tip `7ebbf865` over origin/main `d9494206`, `decideSubmit` → `derive`, no model): as the issue's table. «נתונים שני מעגלים שרדיוס כל אחד מהם 5», «מרכז המעגל הראשון הוא O_1(-3,1)» (after «שני מעגלים») and the joined sentence: not-handled. «שני מעגלים» · «O_1 מרכז מעגל» · «O_1(-3,1)» builds. After both centres are lettered, «P מרכז מעגל» asks which circle (ambiguous-shape); after one lettered circle it is refused `already-named`.
+
+**Decision.**
+1. **One radius for the pair:** the `שני מעגלים` rule reads «ש(ה)רדיוס (של) כל אחד מהם r» (English "each of radius r") as its pair with both slots `{ k: 'new', r }`, the value through `radiusOfSize` (a number, a radical, a radius letter). No other spelling (D8).
+2. **Circle 1's or 2's centre:** `pairCentreAt` reads «מרכז (של)? (ה)מעגל ה(ראשון|שני) (הוא)? X(a,b)» (English "the centre of the first/second circle is X(a,b)") as `centre-of { id: X, ordinal, create }` followed by the point sentence «X(a,b)» — the two lines «X מרכז מעגל» · «X(a,b)» in one, so it lowers through the existing naming and placing, no second copy. M1 (`centre-of`): the unnamed member `circle-pair<k>-<ordinal>` is named by `namingByOrder`; a member already centred on X is `known`; one centred on another letter is `already-named` (the existing message); two drawn pairs with that member open ask which; no pair: the fact reads as without the ordinal (the circle is created on X). The ordinal is read only in this sentence (D8), extending ADR-AG-322's reader.
+3. **The joined form:** `segmentsOf` cuts, and `UNWRAP` strips, a «ו» before «מרכז» as it already does before «ה…», «ידוע», «נתו»: the line-splitter's sentence-opener vocabulary, not a reading of this line. «מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)» is then the two sentences.
+
+**Escalated: D9 (plan item 3).** The plan says to reuse "the #2048 create-on-mention path and its notice". Measured: #2048 and #1467 are both open, and analytic has no creation notice (no locale key, no submit verdict carries one; 2-D has none either — only complex labels a point «נוצר מעצם האזכור»). Analytic's only create-on-mention path for a circle is `statingNamedCircle` (#1670), which creates silently. Building D9 now means either a new circle with no notice (short of the ruling) or a new student-facing notice whose wording nobody has ruled — both student-visible and untagged (rule 7). It waits for the operator on #2552; today's answers stand (`ambiguous-shape` beside a lettered pair, `already-named` beside one lettered circle), so nothing false is drawn meanwhile.
+
+**2-D and 3-D (ADR-W-157).** The pair radius sentence is 2-D's #2216 item 2: parity row `pair-each-radius-2552` carries a 2-D known gap on #2216. The centre sentences give coordinates (exception X1, analytic only). 3-D: X8, not expected.
+
+**Locks.** `src-analytic/__tests__/issue-2552-pair-circle-sentences.test.ts` (the two saved fixtures at four seeds, four radius values, «נתונים»-less and English, both orders at four seeds, the subscript and minus spellings, English, the restatement, the `already-named` refusal, no pair drawn, controls, the six D8 near-variants still not-handled); fixtures `exam-2552-q6-pair-joined`, `exam-2552-q6-pair-split` (`.analytic.json`; the latter continues into #2553's external tangent, A(0,−3), B(12,6)); parity rows `pair-each-radius-2552` (X8, 2-D gap #2216), `pair-first-centre-2552`, `pair-centres-joined-2552` (X1, analytic only).
+
+**Behaviour change for a student:** in analytic, «נתונים שני מעגלים שרדיוס כל אחד מהם 5» draws two circles of radius 5, and «מרכז המעגל הראשון הוא O_1(-3,1)» / «… השני הוא O_2(9,10)», or the exam's joined sentence, place their centres, instead of going to the AI. Nothing else changes.
+
+## ADR-AG-334 — A through-clause on a segment refuses the line whole, as 2-D refuses it (ADR-765): arm 3 of the lost part (#2547)
+
+**Status:** accepted · 2026-10-27 · feature (P2, analytic) · fix round #2561, stream D · branch `feat/2547-through-clause-refusal` · ports [ADR-765](06-decisions.md#adr-765) to analytic and **amends** [ADR-AG-251](#adr-ag-251) (a third arm) under [ADR-W-120](06w-decisions-workspace.md#adr-w-120) / [ADR-W-157](06w-decisions-workspace.md#adr-w-157); the atoms' shared home is [ADR-W-161](06w-decisions-workspace.md#adr-w-161). LADDER stage: before stage 0, the submit decision (analytic's lost-part seam); no engine or solver change.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R124 (the lost-part bullet: an incidence clause on a segment whose point is named by its role, or by a letter the readable part already names, is refused whole with its parts) · **Design:** [04c](04c-design-analytic.md) § "A line that loses a part" ("Arm 3, the incidence phrase")
+
+**Rulings.** Operator, 2026-10-26, D10 = A ([#2547](https://github.com/dcodish/geo_builder/issues/2547#issuecomment-6415431621)): *"refuse now, like 2-D … instead of passing it to the AI. The two builders then give the same verdict."* 2026-10-27, of «… דרך נקודת החיתוך», «… דרך מרכז המשולש» with no triangle, and «… דרך ראשית הצירים» (2-D hands the first two to the AI and calls the third analytic): *"Refuse them too"*. Reading the clause is #2541; when it lands, these refusals become reads.
+
+**Measured before** (`main` d9494206, `decideSubmit` / `reachesFallback`, the model never reached). «מעגל O» · «AB מיתר העובר דרך מרכז המעגל» was `not-handled` and went to the model, where 2-D refuses it `input.scope.split-statements` «(1) AB מיתר  (2) העובר דרך מרכז המעגל». So did every spelling of ADR-765's class that analytic's head reads (the 35 refusal rows of the lock: «שעובר», «המיתר AB», «מיתר AB», «מרכז מעגל O», «העובר במרכז», «במרכז המעגל», «המרכז», «מרכזו», «ועובר», «, העובר», the empty canvas, an unnamed circle, two circles, a tangent, an altitude, a median, «המעגל החוסם», «אמצע AB/BC», the diameter, «… ו-AB = 4», «… ומאונך ל-OC», «מרכז המשולש», a bare «הנקודה», «מרכז הכובד», five English spellings, and the three asked rows). «AB מיתר במעגל O העובר דרך O» was already refused by arm 2 with 2-D's parts.
+
+**Class (ADR-765's sentence, asked at analytic's door).** *A declined line whose readable head declares a segment (chord, segment, tangent, altitude, median, diameter), and whose rest is one incidence phrase whose point carries no fresh letter (named by its role, or by a letter the head carries), went to the model where 2-D refuses it whole.*
+
+**Root cause.** Arm 2 (`declinedPart`) accepts a rest only when it is labels the prefix carries plus words with no construction signal; «העובר דרך מרכז המעגל» says something («מרכז», «מעגל»), so arm 2 returned null and the line left through `decideOnce`'s `not-handled` return (02c R124's *"a rest that says something … is still the model's"*). 2-D's member cannot be called: it imports 2-D's parser, and it is a DELETION over a reading — analytic's frame declines these lines, so there is no reading to delete from. The question is copied, the reader is each builder's own (ADR-W-120's rule for the label member).
+
+**Decision.** Arm 3, `declinedThrough(line, records)` (`src-analytic/app/lostPart.ts`), asked at the same seam AFTER arm 2:
+1. **Head.** The text before the line's first incidence opener (`firstIncidenceOpener`, `shell/incidencePhrase.ts`), a trailing comma dropped as 2-D's cut drops it. The comma rule lives in this arm, not in arm 2's shared walk.
+2. **The head reads as a segment** — a property of the reading: its `parseLine` facts hold `segment` or `cevian-of`, and it records (`record` / `already-known` / `already-follows`). «ישר AB …» (`line-2pt`) and «מעגל העובר דרך A» never qualify.
+3. **The rest is one incidence phrase** within one clause (`incidencePhraseAtStart`: no `,` `;` `.`, so «…, AB = 4» stays with the model).
+4. **The point carries no fresh letter:** in the first «ו-»/"and" piece, every label is carried by the head, or, with its labels and a point noun right before one removed (`POINT_NOUN_HE_ATOM` / `POINT_NOUN_EN_ATOM`, exported from the parser's subject-noun atom, so «הנקודה C» ≡ «C» and a bare «הנקודה» stays a role), it still has a construction signal over `VOCABULARY_ANALYTIC`. No noun list is added.
+5. **Parts.** When every further conjunction piece records after the head (ADR-AG-301's cut), the parts are `[head, phrase, …further]` («… (3) AB = 4», as 2-D); otherwise `[head, rest]` («(2) העובר דרך מרכז המעגל ומאונך ל-OC», as 2-D). The caller refuses with `lostPartRefusal`: the existing `errSplitStatements`, 2-D's text byte for byte. No locale change.
+
+**Rejected.** Reading the clause (#2541's scope). A noun list separating «מרכז המעגל» from «נקודת החיתוך» (the operator ruled both refused). The prototype's longest-prefix walk for the head (it gives the same heads on every measured row; the opener cut states the comma rule directly).
+
+**Residuals (unchanged, none draws anything false; each still goes to the model where 2-D refuses).** «AB מיתר העובר דרך O» / «… דרך הנקודה O» / "… passing through O" (2-D's label member, ADR-603; filed as F1); «AB קטע …» (analytic does not read «AB קטע»; F2); «… דרך הראשית» («ראשית» alone is no analytic vocabulary); «…, AB = 4» (a comma before a further given).
+
+**Measured after.** Every refusal row gives 2-D's parts string for string, `reachesFallback` false; the 16 model-bound controls (secant, fresh letters, X3/X4 that 2-D builds, the four line spellings, L/L2/LE, S1, X8, X11, English origin) still go to the model; the six analytic reads (the main verb, «AB/CD עובר …» after a chord, «O על AB», «AB קוטר», «AB קוטר במעגל O») still record; «מעגל O» · «AB מיתר» · «O על AB» puts O on AB at seeds 0–7. **False flags: 0.** The net (`issue-1888-lost-part.test.ts`, class locks) replays every sequence holding an opener in `analyticCorpus()`, `corpus471.json`, the saved fixtures and the catalog's English twins, and asks arm 3 of each declined line holding one: it refuses none, over an exercised floor of ≥ 10 such lines (6.6 s). The plan's out-of-tree sweep over 3,971 sequences agreed (12 opener lines reaching the model, 0 flagged).
+
+**Perf** (docs/17 §7, 30-run means after warm-up): the reported line's `decideSubmit` is 4.8 ms, of which arm 3 is 1.6 ms (one `parseLine` and one `records` of the head); a fresh-letter line («AB מיתר העובר דרך C») spends 0.2 ms in the arm (it stops at the X-test, before `records`); a declined line with no opener spends nothing measurable (one regex scan). «AB מיתר» (a committing line) never reaches the arm: 1.4 ms either way.
+
+**Fails before.** At d9494206 every one of the lock's 35 refusal rows, and its rendered-text case, is `not-handled` → the model (the plan's `proto.out.txt`, same base).
+
+**Locks.** `src-analytic/__tests__/issue-2547-through-clause.test.ts`; the false-flag net in `issue-1888-lost-part.test.ts` (class locks); parity rows `chord-through-centre-2532-01` (its analytic known gap dropped), `chord-through-centre-2547-02` (the pronoun «מרכזו») and `chord-through-centre-2547-03` (the true-but-unread diameter), all X8, `'#2547'` removed from `GAP_ISSUES`.
+
+**Behaviour change for a student:** in analytic, «AB מיתר העובר דרך מרכז המעגל» (and its spellings, in both languages) is no longer handed to the AI: it is refused with 2-D's one-given-per-line message and the two parts. «AB קוטר העובר דרך מרכז המעגל», which the AI may have drawn as a correct diameter, is refused too. «… דרך נקודת החיתוך», «… דרך מרכז המשולש» and «… דרך ראשית הצירים» are refused as well (operator, 2026-10-27).
+
+## ADR-AG-342 — Every line that refers to a point the figure lacks creates it, as 2-D does, and the notice names it (#1467)
+
+**Status:** accepted · 2026-10-27 · feature (analytic) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · the analytic half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-AG-210](#adr-ag-210) decision 4 (the mint is no longer gated by `mintedByReference`, the forms 2-D minted for in 2026-10: 2-D now creates every referenced point, [ADR-769](06-decisions.md#adr-769)) · **supersedes** [ADR-AG-015](#adr-ag-015) decision 1 for points
+
+**Operator:** ruling 2026-09-27 on #1467, *"Create everywhere + notice"*; #2048 card d5-2048-tools (2026-10-13), *"every builder that has these objects creates them the same way"*.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R143 (amended) · **Design:** [04c](04c-design-analytic.md) § "New letters and circles a reference names" · **LADDER stage:** the fold, `foldPass`'s last-resort mint (after the deferral fixpoint, unchanged position)
+
+**Measured before** (`d9494206`, `decideSubmit`): «M אמצע AB», «AB = 5», «P על הישר AB», «A(0,0)» · «B(4,0)» · «M אמצע AX» recorded silently; «AB = 2 AD», «AD תיכון לצלע BC», «שיפוע הישר AB שלילי» refused `unknown-reference` (point).
+
+**Decision.**
+1. **Every line whose only failures are references to missing points** has them minted `free` and re-applied, a round at a time (a fact naming a further missing letter mints that one too), until the line lands; a line that still fails keeps nothing. The reader is the fold's own `unknown-reference`; `mintedByReference`, `isMintCompanion`, `orderMints` and `plainLengthSide` are deleted.
+2. **Unchanged:** mint-last (after the fixpoint, so «M אמצע AB» above «A(0,0)» binds), the area label's ring, circle references (`refKindOf === 'circle'` stays refused; #2048 S3), and a radius capital («R > r» stays refused).
+3. **The notice:** `FoldResult.created` → `Derivation.created` (line index → ids), kept apart from `minted` (a name the TOOL gave). `decideSubmit`'s `record` carries `created`; `App.tsx` shows `CreatedNotice` while that line is the last row; ✕ is `removeLine`.
+
+**Locks.** `src-analytic/__tests__/created-notice-1467.test.ts` (12: the shared §5c rows; six blank sentences with their notice; «AB = 2 AD» at three seeds; mint-last; «R > r»; a missing circle; the text).
+
+**⚠ Locks rewritten** (each cites #1467; they asserted ADR-AG-015's "a reference may not invent" for points, or ADR-AG-210's 2-D form gate): `derived`, `solve`, `parser` («AB = 2CD»), `issue-1242-fold-deferral` (atomicity now asked of «AB קוטר במעגל I», which no creation fixes; the forward-reference gate), `issue-1670-follow-2d` (its four 2-D refusals now build), `issue-1651-1652`, `line-at`, `issue-1620-perpendiculars`, `issue-1620-bisectors-cevians`, `issue-1622-e4-chords-arcs` (an arc's missing ends are created ON its circle), `issue-1622-e5-last-rows` (an area value), `issue-1317-family`, `issue-2395-distinct-given` (the point half; the circle half kept), `issue-2431-line-name-resolves`, `issue-1464-1324-1462-kite-exercise` (two), `issue-2392-named-common-tangent`, `fact-ops-1548` (three: muting a point leaves its dependent on a free point, #1467 §8b), `issue-1150-1145-refs` and `issue-1180-1179-equation-and-noun` and `issue-1750-unknown-ref-near-miss` (a typed line no longer reaches the missing-POINT refusal; the circle half and the wording stay locked), `issue-1272-claim-gate` (two), `issue-1340-forward-derived-point`.
+
+**Known difference from 2-D (wording only).** «AD תיכון לצלע BC» names B, C here and A, B, C in 2-D: analytic's cevian draws AD as a declaring segment (ADR-AG-015), so A is introduced, not minted. The LLM lane's lines record without the notice.

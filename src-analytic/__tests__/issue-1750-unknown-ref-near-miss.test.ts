@@ -89,9 +89,10 @@ describe('#1750 — controls: no near miss, no suggestion; the message is unchan
     expect(plain(errorText(error, he))).toBe('הישר 7 עדיין לא הוגדר. הגדירו אותו קודם, ואז אפשר להתייחס אליו.');
   });
 
-  it('a point the figure lacks: «B»', () => {
-    const { error } = refusal(['A1(-1,2)'], 'שיעור ה-x של B הוא שלילי');
-    expect(error).toEqual({ key: 'unknown-reference', detail: 'B', expected: 'point' });
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): a point the figure lacks is created, so no
+  // refusal (and no near miss) arises for it.
+  it('a point the figure lacks: «B» is created, not refused', () => {
+    expect(submit(['A1(-1,2)'], 'שיעור ה-x של B הוא שלילי').verdict.kind).toBe('record');
   });
 
   it('NOT DRIVABLE: the near miss exists but the sentence in its name would be refused too — no suggestion', () => {

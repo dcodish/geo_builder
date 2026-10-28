@@ -177,15 +177,12 @@ describe('the honest refusals', () => {
     }
   });
 
-  it('a region whose vertices do not exist is refused by name, never drawn', () => {
+  // ADR-W-162 (#1467) superseded the refusal: a line naming points the figure lacks creates them, with the notice.
+  it('a region whose vertices do not exist creates them, and the notice names exactly those (ADR-W-162)', () => {
     for (const s of ['S_{XYZ} / S_{ABC} = 2', 'היחס בין שטח המשולש XYZ לשטח המשולש ABC הוא 1:2']) {
-      const { verdicts } = submitted(['משולש ABC', s]);
-      const v = verdicts[1];
-      expect(v.kind, s).toBe('refused');
-      if (v.kind === 'refused') {
-        expect(v.error.key).toBe('unknown-reference');
-        expect(v.error.detail).toBe('X');
-      }
+      const { held, verdicts } = submitted(['משולש ABC', s]);
+      expect(verdicts[1].kind, s).toBe('record');
+      expect(derive(held, 0).created, s).toEqual([{ index: 1, ids: ['X', 'Y', 'Z'] }]);
     }
   });
 });

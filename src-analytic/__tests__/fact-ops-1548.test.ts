@@ -48,7 +48,8 @@ describe('#1548 — muting a row takes it out of the figure and keeps it in the 
     expect(toggle(1).kind).toBe('apply');
     expect(store().lines).toEqual(DEPENDENT); // the row stays
     expect(store().disabled).toEqual([1]);
-    expect(ids()).toEqual(['A']);
+    // ⚠ #1467 (ADR-AG-342): the dependent no longer faults — it creates the muted point free (the list without that row).
+    expect(figureOf().figure.points.map((p) => [p.id, p.x, p.y])).toEqual(derive(['A(0,0)', 'CD גובה לצלע AB'], store().seed).figure.points.map((p) => [p.id, p.x, p.y]));
 
     expect(toggle(1).kind).toBe('apply');
     expect(store().disabled).toEqual([]);
@@ -63,13 +64,15 @@ describe('#1548 — muting a row takes it out of the figure and keeps it in the 
     expect(muted.figure.points.map((p) => [p.id, p.x, p.y])).toEqual(derive(['A(0,0)', 'M אמצע AB'], store().seed).figure.points.map((p) => [p.id, p.x, p.y]));
   });
 
-  it('a line that depended on the muted one faults on ITS OWN row — the honest counterfactual', () => {
+  // ⚠ #1467 (ADR-AG-342): the dependent no longer faults — it creates the muted point free (the list without that row).
+  it('a line that depended on the muted one builds on a FREE point — the honest counterfactual', () => {
     DEPENDENT.forEach((l) => store().recordLine(l));
     toggle(1);
     const d = figureOf();
     const rows = rowOf(store().lines.length, store().disabled);
-    // the derivation indexes the ACTIVE lines; the row map puts the fault on «CD גובה לצלע AB», row 2
-    expect(d.faults.map((f) => [rows[f.index], f.code])).toEqual([[2, 'unknown-reference']]);
+    expect(d.faults).toEqual([]);
+    // the derivation indexes the ACTIVE lines; the row map puts the creation on «CD גובה לצלע AB», row 2
+    expect(d.created.map((c) => [rows[c.index], c.ids])).toEqual([[2, ['B']]]);
   });
 
   it('un-muting faces the typed-line gate: a line that now contradicts the figure stays muted, and the refusal names IT', () => {
@@ -155,10 +158,8 @@ describe('#1548 — a muted row saves muted and loads muted', () => {
     const out = loadAnalyticSession(saved as unknown as Record<string, unknown>, '');
     expect(store().lines).toEqual(DEPENDENT);
     expect(store().disabled).toEqual([1]);
-    expect(ids()).toEqual(['A']);
-    // the cevian's missing side end is reported on the cevian's own sentence
-    expect(out.failed).toBe(1);
-    expect(store().loadAudit?.failed).toEqual([{ line: 'CD גובה לצלע AB', reason: 'unknown-reference' }]);
+    // ⚠ #1467 (ADR-AG-342): the dependent no longer faults — it creates the muted point free (the list without that row).
+    expect(out.failed).toBe(0);
   });
 
   it('a muted line that no longer READS is named by the audit (the drift net covers muted rows too)', () => {

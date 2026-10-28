@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-27T12:00:00.000Z",
+  "name": "chord-of-circumcircle-2545",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "utterance": "מעגל O חוסם את משולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "autoCenter": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.0",
+      "utterance": "DE מיתר במעגל O",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "utterance": "DE מיתר במעגל O",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "DE מיתר במעגל O",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

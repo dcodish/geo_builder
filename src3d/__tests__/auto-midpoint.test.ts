@@ -52,9 +52,11 @@ describe('ADR-3D-048 — un-named אמצע (auto-labeled midpoint)', () => {
     expect(parse3("M אמצע BB'")).toMatchObject({ ok: true, commands: [{ type: 'point-on-segment3', id: 'M', a: 'B', b: "B'", t: 0.5 }] });
   });
 
-  it('unknown endpoints refuse honestly', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"): a missing endpoint is created free.
+  it('unknown endpoints are created free, and the notice names them', () => {
     submit('קובייה ABCD');
     submit('אמצע XY');
-    expect(state().lastError).toMatchObject({ code: 'unknown-point' });
+    expect(state().lastError).toBeNull();
+    expect(state().lastCreated?.ids).toEqual(['X', 'Y']);
   });
 });

@@ -29,6 +29,14 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2489 (ADR-3D-383) — the operator's T45 (2026-10-24): a line named with its noun before it exists is created free by #1467's mint
+  // pass, as «ישר k» declares it. The class is asserted in free-line-create-2489.test.ts; this is the build + drift net.
+  'free-line-created-2489.geo3.json': ['קובייה ABCD', 'הישר k מאונך למישור ABC'],
+  // #1467 (ADR-3D-382) — the operator's T41 and T49 (2026-10-24) and the ruling's own sentence: a line naming a point the
+  // figure lacks creates it free, last. The notice and the class are asserted in created-notice-1467.test.ts; this is the build + drift net.
+  'create-on-mention-cube-x-1467.geo3.json': ["קובייה ABCDA'B'C'D'", 'E אמצע XC'],
+  'create-on-mention-pq-1467.geo3.json': ['קובייה ABCD', 'PQ = 2AB'],
+  'create-on-mention-midpoint-1467.geo3.json': ['M אמצע AB'],
   // #2378 (ADR-3D-379) — the operator's exact four lines: a cube free to turn about AB. The cue («דרגות חופש: 1») and
   // the sampled turn are asserted in issue-2378-leftover-turn-sampled.test.ts; this is the build + drift net.
   'cube-turn-about-ab-2378.geo3.json': ["קובייה ABCDA'B'C'D'", 'A(0,0,0)', 'AB=(2,0,0)', 'מישור ABCD'],

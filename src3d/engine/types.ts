@@ -935,8 +935,8 @@ export interface FreePlaneCommand {
  * (the #487 shape, line edition). Convention names (`l`, `l1` → canonical `ℓ`, `ℓ1`) may stand bare —
  * the ℓ-prefix is what marks them as lines, exactly as the π-prefix marks planes (#487 Am. 1); any
  * other single-letter name REQUIRES the noun («ישר k»), which is what states the kind — the parser
- * stays context-free. A relation naming an undeclared CONVENTION line auto-creates it through this
- * same duality (the on-planes ruling-1 shape); a non-convention name must be declared first.
+ * stays context-free. A relation naming a line the figure lacks — any name in a line slot, since #2489
+ * (ADR-3D-383) — creates it through this very command, applied by the fold's mint pass.
  */
 export interface FreeLineCommand {
   type: 'free-line';

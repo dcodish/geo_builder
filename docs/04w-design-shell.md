@@ -440,6 +440,17 @@ The model is never called. **The meta-lock** runs the same checks against an ora
 
 ## The frame's surfaces
 
+### The created-points notice ([ADR-W-162](06w-decisions-workspace.md#adr-w-162), #1467)
+
+`shell/frame/CreatedNotice.tsx` is a string-free `Banner kind="notice"` whose dismiss is the undo: ✕ (accessible
+name the caller's `suite.notice.createdUndo`, via `Banner`'s `dismissAriaLabel`) removes the line. The text is the
+suite key `createdNoticeText(names)` picks — `suite.notice.createdPoint` for one name, `createdPoints` otherwise —
+in `shell/session/createdPoints.ts`, which also declares the §5c `CreatedPointsAdapter` (reset · submit · lastCreated
+· undoLastLine · pointNames · lineCount). The rows live in `shell/__tests__/fixtures/created-notice-rows.ts`; the
+meta-lock runs them against four broken adapters. Each builder decides WHICH points a line created by reference and
+shows the notice while that line is the last row (2-D `createdByReference` + `commitLine`; 3-D `Derived3.created` +
+`lastCreated`; analytic `Derivation.created` + `record.created`). Complex: #2562.
+
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 
 `ManualScreen` shows a capped SAMPLE per section. Two rules make a cap honest:

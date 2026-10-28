@@ -22,6 +22,8 @@ import { loweringKey, unreadParts } from '../unreadParts';
 import { unreadRoles } from '../unreadRoles';
 import { unreadNumbers } from '../unreadNumbers';
 import { unreadThrough } from '../unreadThrough';
+import { unreadRingRole } from '../unreadRingRole';
+import { hasRingSpan } from '@/parser/ringRoles';
 
 const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
 
@@ -56,6 +58,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     let withRole = 0;
     let withNumber = 0;
     let withThrough = 0;
+    let withRingRole = 0;
     const flagged: string[] = [];
     for (const c of cases) {
       for (const g of groups(c.facts)) {
@@ -75,6 +78,10 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         if (/עוב(?:ר|רת|רים|רות)\s|דרך|במרכז|through/i.test(g.utterance)) withThrough++;
         const through = unreadThrough(g.utterance, g.cmds, ctx);
         if (through) flagged.push(`[${c.name}] «${g.utterance}» → through ${through.items.join(', ')}`);
+        // #2545 (ADR-768): the relation member, over the same steps
+        if (hasRingSpan(g.utterance)) withRingRole++;
+        const ring = unreadRingRole(g.utterance, g.cmds, ctx);
+        if (ring) flagged.push(`[${c.name}] «${g.utterance}» → ring ${ring.items.join(', ')}`);
         // #2198 (ADR-677 / ADR-678): a seed never pays for a stated number, and every stated number is read
         if (statedNumberOccurrences(g.utterance).occurrences.length === 0) continue;
         withNumber++;
@@ -84,7 +91,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         if (nums.length) flagged.push(`[${c.name}] «${g.utterance}» → number unread ${nums.join(', ')}`);
       }
     }
-    console.info(`#1888 corpus net: ${checked} committed steps checked (${withRole} with a role word, ${withNumber} with a stated number, ${withThrough} with a through-phrase), ${flagged.length} flagged`);
+    console.info(`#1888 corpus net: ${checked} committed steps checked (${withRole} with a role word, ${withNumber} with a stated number, ${withThrough} with a through-phrase, ${withRingRole} with a relation-named circle), ${flagged.length} flagged`);
     expect(flagged).toEqual([]);
     expect(checked, 'the net exercised the corpus').toBeGreaterThanOrEqual(1400);
     // measured at pickup: 1485 steps, 38 holding a cevian role word
@@ -94,5 +101,8 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     expect(withNumber, 'the number member met real stated numbers').toBeGreaterThanOrEqual(200);
     // #2532: measured at pickup (045a8546) 17 of 2056 committed steps hold a through-phrase opener
     expect(withThrough, 'the incidence-phrase member met real through-phrases').toBeGreaterThanOrEqual(15);
+    // #2545: measured at pickup (d9494206 + the fix) 1 of 2093 committed steps names a circle by its relation in argument
+    // position — the member is exercised on the corpus, and the class lines live in issue-2545-ring-circle-reference.test.ts
+    expect(withRingRole, 'the relation member met a real relation-named circle').toBeGreaterThanOrEqual(1);
   }, 600_000);
 });

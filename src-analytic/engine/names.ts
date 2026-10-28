@@ -108,18 +108,29 @@ export function numeralCurveId(kind: NumeralKind, numeral: string): Id {
  * points, «○ABC» inscribed in the ring. Not a letter the student could have typed for a point, so it can never
  * collide with a centre letter or a numeral.
  */
-export type DescribedCircle = { role: 'circum' | 'in'; pts: Id[] };
+export type DescribedCircle = { role: 'circum' | 'in'; pts: Id[]; arity?: number };
 const DESCRIBED_MARK = { circum: '⊙', in: '○' } as const;
 const POINT_TOKEN = '[A-Z][0-9₀-₉]?';
+/**
+ * #2545 ([ADR-AG-335](../../docs/06c-decisions-analytic.md#adr-ag-335)) — the LETTERLESS described circle, «המעגל החוסם
+ * [את המשולש]» / "the circumcircle": no ring is typed, so the ring is the figure's ONE polygon (of the noun's size when
+ * one is typed). Spelled «⊙◌» / «○◌», then the size («⊙◌3» — a triangle's), resolved at M1 against what the figure
+ * holds (`circleByName`); never a mark a student types, so it cannot collide with a name.
+ */
+export const RING_OF_FIGURE = '◌';
 /** The regex atom for a described-circle name, for the parser's circle-name slots. */
-export const DESCRIBED_CIRCLE_ALT = `[⊙○](?:${POINT_TOKEN}){3,4}`;
-const DESCRIBED_RE = new RegExp(`^([⊙○])((?:${POINT_TOKEN}){3,4})$`);
+export const DESCRIBED_CIRCLE_ALT = `[⊙○](?:(?:${POINT_TOKEN}){3,4}|${RING_OF_FIGURE}[0-9]?)`;
+const DESCRIBED_RE = new RegExp(`^([⊙○])(?:((?:${POINT_TOKEN}){3,4})|${RING_OF_FIGURE}([0-9]?))$`);
+/** The letterless name: the relation, and the ring's size (0 = any polygon). */
+export const letterlessCircleName = (role: DescribedCircle['role'], arity: number): string => `${DESCRIBED_MARK[role]}${RING_OF_FIGURE}${arity || ''}`;
 export const describedCircleName = (role: DescribedCircle['role'], pts: readonly Id[]): string =>
   `${DESCRIBED_MARK[role]}${pts.join('')}`;
 export function readDescribedCircle(name: string): DescribedCircle | null {
   const m = DESCRIBED_RE.exec(name);
   if (!m) return null;
-  return { role: m[1] === '⊙' ? 'circum' : 'in', pts: m[2].match(new RegExp(POINT_TOKEN, 'g')) ?? [] };
+  const role = m[1] === '⊙' ? 'circum' : 'in';
+  if (m[2] === undefined) return { role, pts: [], arity: m[3] ? Number(m[3]) : 0 };
+  return { role, pts: m[2].match(new RegExp(POINT_TOKEN, 'g')) ?? [] };
 }
 
 /**

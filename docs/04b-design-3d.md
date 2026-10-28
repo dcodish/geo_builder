@@ -453,6 +453,20 @@ A **carrier** («נסמן: AB = u») never introduces its own subject (`v7-t1`);
 applied to the arrow lane only: `segment3 {bare}` feeds shape-completion and role rules that ask which
 points exist (#601, #978). `canStartFigure` is the named predicate the next register asks.
 
+### The mint pass ([ADR-3D-382](06b-decisions-3d.md#adr-3d-382), #1467)
+
+`deriveCore3`, after the post-pass fixpoint and the stale-message refresh: each still-red row (list order) whose latest
+dry run (`dryRunOn`) reports `unknown-point` / `two-unknowns` on a `mintableId3` id has that id minted `free3`
+(`mintFree`) and is dry-run again until it applies — then applied, recorded in `created[factId]` (unless
+`declaresOnly3`), and the fixpoint re-runs. A row still failing keeps nothing and takes the post-mint status. When
+anything was minted, `deriveCore3` folds AGAIN with those points placed first (`premint`), so every row applies in list
+order; a row that fails there is dropped from `premint` and reports its reason (`postMint`).
+`mintEligible3` (`engine/mintable.ts`) excludes a statement about a solid's own element (`solidElement3`: a diagonal,
+the solid's height, a height to a named base face, a tetrahedron's altitude; #978). **Lines** ([ADR-3D-383](06b-decisions-3d.md#adr-3d-383),
+#2489): an `unknown-line` for a name in `lineSlotNames3` is minted by applying `free-line` (its refusal is the line's), and
+is placed by `premint` like a point; lines are never in `created` (no notice). `withFreeLines` is gone. The bare-segment apply branch declares
+both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` → `App3`'s `CreatedNotice`; ✕ is `remove`.
+
 ## Solving the figure and judging claims
 
 ### The solver — a coordinate-injection pivot, not a general CAS

@@ -134,9 +134,10 @@ describe('#2431 — a line that does not exist is refused, never recorded and dr
     const e = refusalOf([...NARROWED.he, 'ישר דרך A מקביל לישר l7']);
     expect(e).toMatchObject({ key: 'unknown-reference', detail: 'l7' });
   });
-  it('«ישר דרך A מקביל ל-CD» with no C → unknown-reference naming C', () => {
-    const e = refusalOf([...NARROWED.he, 'ישר דרך A מקביל ל-CD']);
-    expect(e).toMatchObject({ key: 'unknown-reference', detail: 'C' });
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"; 2-D creates them too, ADR-769): 
+  // a missing POINT is created; a missing named LINE (l7, below) still refuses.
+  it('«ישר דרך A מקביל ל-CD» with no C creates C and D', () => {
+    expect(refusalOf([...NARROWED.he, 'ישר דרך A מקביל ל-CD'])).toBeNull();
   });
   it('«הישר AB מקביל לישר l7» stays unknown-reference l7', () => {
     const e = refusalOf([...NARROWED.he, 'הישר AB מקביל לישר l7']);

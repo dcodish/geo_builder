@@ -137,7 +137,8 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
     expect(parseLine('האנך מ-A לצלע AB')).toMatchObject({ ok: false, code: 'degenerate-role' });
     expect(parseLine('D רגל האנך מ-D לציר ה-x')).toMatchObject({ ok: false, code: 'degenerate-role' });
     expect(parseLine('האנך מ-A לפיל')).toMatchObject({ ok: false, code: 'bad-operand' });
-    expect(derive(['משולש ABC', 'האנך מ-X ל-BC'], 0).faults[0]).toMatchObject({ index: 1, code: 'unknown-reference' });
+    // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"; 2-D creates them too, ADR-769): an unknown point is created.
+    expect(derive(['משולש ABC', 'האנך מ-X ל-BC'], 0).created).toEqual([{ index: 1, ids: ['X'] }]);
   });
 
   it('the perpendicular bisector: the midpoint (a tool letter, or the student’s), and the line through it ⟂ AB', () => {
