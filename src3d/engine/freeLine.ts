@@ -37,6 +37,7 @@
 import { sample } from './rng';
 import { add3, centroid3, cross3, dist3, dot3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 import type { Construction3, Id, Operand3 } from './types';
+import { COORD_NORMAL3, idsRunNormal3, idsRunPoint3, operandDirection3, operandNormal3 } from './operands';
 
 /** The CONVENTION shape a named line takes after canonicalisation (`ℓ`, `ℓ1`, `ℓ12`) — the only
  *  shape relations may auto-create (typed `l1` arrives here canonical, the #69 discipline). */
@@ -75,22 +76,11 @@ const orient = (n: Vec3): Vec3 => {
   return lead < 0 ? scale3(n, -1) : n;
 };
 
-/** The normal of a point-run operand (`BCK`) from current positions; undefined when degenerate. */
-const runNormal = (ids: Id[], pos: Map<Id, Vec3>): Vec3 | undefined => {
-  const ps = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
-  if (ps.length < 3) return undefined;
-  const nrm = cross3(sub3(ps[1], ps[0]), sub3(ps[2], ps[0]));
-  return norm3(nrm) > 1e-9 ? nrm : undefined;
-};
-
-/** A point ON the point-run operand's plane (for seating the anchor at a visible crossing). */
-const runPoint = (ids: Id[], pos: Map<Id, Vec3>): Vec3 | undefined => {
-  const ps = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
-  return ps.length >= 3 ? centroid3(ps) : undefined;
-};
-
-const AXIS_DIR: Record<'x' | 'y' | 'z', Vec3> = { x: v3(1, 0, 0), y: v3(0, 1, 0), z: v3(0, 0, 1) };
-const COORD_NORMAL: Record<'xy' | 'yz' | 'xz', Vec3> = { xy: v3(0, 0, 1), yz: v3(1, 0, 0), xz: v3(0, 1, 0) };
+// #2484 (ADR-3D-388): the operand readers (`operandDirection3` / `operandNormal3`) and the run helpers are the shared
+// free-object seam in `operands.ts` — the free plane reads every operand through the same two functions.
+const runNormal = idsRunNormal3;
+const runPoint = idsRunPoint3;
+const COORD_NORMAL = COORD_NORMAL3;
 
 /**
  * Resolve one free line for this seed. `planes` carries every plane resolved so far (equation
@@ -118,30 +108,9 @@ export function resolveFreeLine(
     if (p && def && !(def.kind === 'on-line' && def.line === name)) members.push(p);
   }
 
-  // the direction of an operand the line is related to, when it resolves (undefined otherwise)
-  const opDir = (op: Operand3): Vec3 | undefined => {
-    if (op.kind === 'segment') {
-      const a = pos.get(op.a);
-      const b = pos.get(op.b);
-      return a && b && dist3(a, b) > 1e-9 ? sub3(b, a) : undefined;
-    }
-    if (op.kind === 'line') return lineDirs.get(op.name);
-    if (op.kind === 'vector') {
-      const vd = c.vectors.get(op.name);
-      const a = vd && pos.get(vd.from);
-      const b = vd && pos.get(vd.to);
-      return a && b && dist3(a, b) > 1e-9 ? sub3(b, a) : undefined;
-    }
-    if (op.kind === 'axis') return AXIS_DIR[op.axis];
-    return undefined;
-  };
-  // the normal of a plane-kind operand, when it resolves
-  const opNormal = (op: Operand3): Vec3 | undefined => {
-    if (op.kind === 'plane-named') return planes.get(op.name)?.n;
-    if (op.kind === 'plane-run') return runNormal(op.ids, pos);
-    if (op.kind === 'plane-coord') return COORD_NORMAL[op.axes];
-    return undefined;
-  };
+  // the direction / normal of an operand the line is related to, when it resolves (the shared seam, #2484)
+  const opDir = (op: Operand3): Vec3 | undefined => operandDirection3(c, op, pos, lineDirs);
+  const opNormal = (op: Operand3): Vec3 | undefined => operandNormal3(op, pos, (n) => planes.get(n)?.n);
 
   let parallelTo: Vec3 | null = null; // pins the direction outright
   const dirConstraints: Vec3[] = []; // each: dir ⊥ this vector

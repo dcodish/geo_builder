@@ -66,7 +66,7 @@ const CELLS: Record<string, CellStatus> = {
   'perp|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'mixed atoms, ADR-3D-035' },
   'perp|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'u ⊥ v' },
   'perp|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-plane-rel / perp-plane claim' },
-  'perp|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'perp|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386). On a FREE plane the operand pins the plane (`resolveFreePlane`, ADR-3D-388)' },
   'perp|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: '#375 / ADR-3D-100' },
   'perp|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'linePerpPlane pins m (2024-Q2); S2 records the numeric claim + the flipped מישור-first order' },
   'perp|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels pivot residual (ADR-3D-103)' },
@@ -76,7 +76,7 @@ const CELLS: Record<string, CellStatus> = {
   'perp|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'perp|plane-named|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: '#1439 (ADR-3D-263) / #1472 (ADR-3D-286): paramPinningRels — pins the parameter iff a normal carries it and it does not hold for every value, else a verified claim' },
   'perp|vector|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
-  'perp|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'perp|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386). On a FREE plane the operand pins the plane (`resolveFreePlane`, ADR-3D-388)' },
 
   // ---- parallel -----------------------------------------------------------------------
   'parallel|segment|segment': {
@@ -87,7 +87,7 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4: a direction relation — a free vector qualifies (ADR-3D-104)' },
   'parallel|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4 (ADR-3D-104)' },
   'parallel|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-par-plane' },
-  'parallel|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'parallel|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386). On a FREE plane the operand pins the plane (`resolveFreePlane`, ADR-3D-388)' },
   'parallel|line|line':{ status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dirs pin m (the 2010-Q3 family); numeric verifies' },
   'parallel|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'parallel|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
