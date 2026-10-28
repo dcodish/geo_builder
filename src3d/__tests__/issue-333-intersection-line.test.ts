@@ -188,9 +188,15 @@ describe('#333 — the line is real geometry, not just a parse', () => {
     expect(def?.kind).toBe('plane-plane');
   });
 
-  it('an unknown π operand still refuses honestly', () => {
+  // ⚠ REWRITTEN by #2484 (ADR-3D-388; operator ruling 2026-10-24, e10 = A: "Any relation naming a missing plane creates
+  // it"): π1 and π2 are created free by the mint pass, as «מישור π1» · «מישור π2» declare them, and ℓ is their crossing.
+  it('undeclared π operands are created free, and the line is their crossing', () => {
     submit('פירמידה SABC');
     submit('ℓ ישר החיתוך בין המישורים π1 ו-π2');
-    expect(state().lastError, 'π1/π2 were never declared').not.toBe(null);
+    expect(state().lastError).toBe(null);
+    const d = derive3(state().facts, 0);
+    expect(d.construction.planes.get('π1')?.free).toBe(true);
+    expect(d.construction.planes.get('π2')?.free).toBe(true);
+    expect(d.construction.lines.get('ℓ')?.kind).toBe('plane-plane');
   });
 });

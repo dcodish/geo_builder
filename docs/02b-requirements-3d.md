@@ -488,6 +488,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   answers its coordinates when they are knowledge (**«w = (0, 0, 12)»**) and otherwise «לא נקבע על ידי הנתונים»,
   never its own name; a pair keeps its decomposition («AS = w = (0, 0, 12)»).
   - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072.
+- **FR-EQ-5 (Must)** — **A named plane is placed by whatever is stated about it.** A π-plane may be declared free
+  («מישור π3»), or it comes into being, free, from any statement that names it. «קובייה ABCDA'B'C'D'» · «הישר AC' מאונך
+  למישור π3» builds with no declaration. So do ∥ / ⊂ a segment or a line, ⟂ / ∥ a vector or a plane, an angle to a
+  segment, a distance, a membership, a crossing «הישר AC' חותך את המישור π3 בנקודה M», and the symbol and English
+  spellings. Whatever is stated pins the plane: «AC' ⟂ π3» turns it to face AC′, «AB מוכל במישור π3» puts A and B on it.
+  What is not stated stays free and moves on «הציגו תצורה אחרת» (ADR-052). After «AC' ⟂ π3», π3 slides along AC′, and
+  the DOF cue counts that. A plane declared on any line of the list is used first. A line that still fails creates
+  nothing and gives its real reason. No notice: the new row in the list is the signal.
+  - Sources: ADR-3D-124, ADR-3D-206, [ADR-3D-388](06b-decisions-3d.md#adr-3d-388); #487, #2484.
 
 ## Claims — the student's answer, never a driver
 

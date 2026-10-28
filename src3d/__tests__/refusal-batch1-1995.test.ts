@@ -79,12 +79,11 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit("P על הקטע AA' כך ש-RP = αu + βv")).toBeNull();
   });
 
-  it('unknown plane: the taught «מישור π3» is taken (read out of the sentence)', () => {
+  // ⚠ REWRITTEN by #2484 (ADR-3D-388; operator ruling 2026-10-24, e10 = A: "Any relation naming a missing plane creates
+  // it"): the "define it first" sentence is no longer reached for a π-plane — π3 is created free, and the ⟂ places it.
+  it('unknown plane: the line is taken, π3 created free', () => {
     setUp([CUBE]);
-    const s = submit("הישר AC' מאונך למישור π3")!;
-    expect(s).toBe('המישור «π3» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מישור π3» — ואז כתבו את השורה שוב.');
-    expect(taught(s)).toBe('מישור π3');
-    expect(submit(taught(s)!)).toBeNull();
+    expect(submit("הישר AC' מאונך למישור π3")).toBeNull();
   });
 
   // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with dof"): the "define it first" sentence is no
@@ -158,9 +157,8 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
 describe('#1995 batch 1 — 3-D: the English twins take the same shape, and teach spellings that are read', () => {
   it('unknown plane / line: the taught «plane π3» and «line k» are taken', () => {
     setUp([CUBE]);
-    const p = submit("הישר AC' מאונך למישור π3", 'en')!;
-    expect(p).toBe('Plane «π3» is not defined yet. Define it first — for example «plane π3» — then type the line again.');
-    expect(submit(taught(p)!)).toBeNull();
+    // ⚠ REWRITTEN by #2484 (ADR-3D-388, ruling 2026-10-24 e10 = A): the plane half is taken directly, π3 created free.
+    expect(submit("הישר AC' מאונך למישור π3", 'en')).toBeNull();
     // ⚠ REWRITTEN by #2489 (ADR-3D-383; operator 2026-10-24, T45: "the tool needs to create the line if its referenced with dof"): the line half is taken directly.
     expect(submit('הישר k מאונך למישור ABC', 'en')).toBeNull();
   });

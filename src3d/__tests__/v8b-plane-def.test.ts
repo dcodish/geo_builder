@@ -82,12 +82,15 @@ describe('V8-b — build (2009-ב geometry: pyramid SABC by coordinates)', () =>
     expect(dot(sub(D, F), SC)).toBeCloseTo(0, 6);
   });
 
-  it('a plane-cut on an unknown plane is refused honestly', () => {
+  // ⚠ REWRITTEN by #2484 (ADR-3D-388; operator ruling 2026-10-24, e10 = A: "Any relation naming a missing plane creates
+  // it"): the crossing on a π never defined creates π free; the crossing pins nothing, so π stays fully sampled.
+  it('a plane-cut on an undeclared π creates π free, and the crossing builds', () => {
     submit('S(0,0,0)');
     submit('A(2,1,3)');
     submit('E חיתוך המישור π עם SA'); // π never defined
-    expect(state().facts).toHaveLength(2);
-    expect(state().lastError).toEqual({ code: 'unknown-plane', id: 'π' });
+    expect(state().lastError).toBeNull();
+    expect(state().facts).toHaveLength(3);
+    expect(derive3(state().facts, 0).construction.planes.get('π')?.free).toBe(true);
   });
 });
 

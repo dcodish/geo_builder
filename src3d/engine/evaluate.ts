@@ -3693,13 +3693,17 @@ function resolveFreePlanes3(
   // #552: a FREE line's direction is NOT a pin for a free plane — when both are free the plane
   // LEADS and the line follows (`resolveFreeLines3` runs after this), which is what keeps the
   // mutual read from oscillating: exactly one of the pair ever reads the other.
+  const lineAnchors = new Map<string, Vec3>(); // #2484: a CONTAINED line puts its anchor on the plane
   for (const [lname, ln] of lines) {
-    if (!isFreeLine3(c, lname)) lineDirs.set(lname, ln.dir);
+    if (!isFreeLine3(c, lname)) {
+      lineDirs.set(lname, ln.dir);
+      lineAnchors.set(lname, ln.anchor);
+    }
   }
   let moved = false;
   for (const [pname, pdef] of c.planes) {
     if (!pdef.free) continue;
-    const r = resolveFreePlane(c, pname, seed, pos, resolvedNormals, lineDirs);
+    const r = resolveFreePlane(c, pname, seed, pos, resolvedNormals, lineDirs, lineAnchors);
     const prev = planes.get(pname);
     if (!prev || dist3(prev.n, r.n) > 1e-9 || Math.abs(prev.d - r.d) > 1e-9) moved = true;
     planes.set(pname, { n: r.n, d: r.d });
