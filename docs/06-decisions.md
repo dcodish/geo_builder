@@ -19953,3 +19953,23 @@ The controls that bound correctly (C1, C2, C8, Y9, Y10) did so only because the 
 **Decision.** `measure-length` and its kin are read by their own `a`/`b` (their lowering needs the whole list's symbol table), so R is created as a bare point and the existing `length-radius` lowering puts it on circle O, the radius following R; «r = 5» then pins |OR| = 5. The radius symbol is never an operand («מעגל O שרדיוסו R» creates no point R).
 
 **Locks.** `src/app/__tests__/issue-2489-symbolic-length-points.test.ts` (11: four spellings with |OR| = r at seeds 0–3 and the notice naming R only; «r = 5»; «OR=2r»; four blank symbolic lengths); fixture `circle-radius-point-2489.geo.json`.
+
+## ADR-772 — A construction's tool-made point never takes the letter of a point the figure has: «אנך אמצעי ל-EK» beside a triangle MPQ names its midpoint N (#1690)
+
+**Status:** accepted · 2026-10-28 · bug (P2, 2-D, wrong-answer) · fix round #2585, stream I · branch `fix/1690-construction-midpoint-ids`
+
+**Operator:** ruling 2026-10-02 on #1620: *"M for a midpoint, F for a foot, the next free letter if taken"*; "ok 1690" (2026-10-27) on the bisector arm.
+
+**Requirements:** [02](02-requirements.md) FR-IN-11 (the auto-chosen label excludes every existing label, for every construction; an existing midpoint is reused) · **Design:** [04](04-design.md) "The tool's letter for a point the student did not name" · **LADDER stage:** none (parser lowering, before stage 0)
+
+**Measured before** (`main` 422cda84, through `decideDeterministic2D` → `commitVerdict` → `replay`, the model mocked to throw): «משולש MPQ» · «קטע EK» · «אנך אמצעי ל-EK» committed `midpoint M of EK`, silently and green, and the triangle's vertex M moved onto the midpoint of EK. «נקודה M» followed by «תיכון מ-A במשולש ABC» or «אנך אמצעי ל-AB» wrote `midpoint M` over the point. A second unnamed median («תיכון מ-B במשולש ABC» after «תיכון מ-A במשולש ABC») was refused «M coincides with its constructed target». Analytic already gave M, then N (ADR-AG-211).
+
+**Class.** *A rule that mints a letter for a helper point the student did not name takes a letter the figure already uses.* `freeLabel(used, prefer)` excluded only what each caller passed. 58 of its 61 callers passed `ctx.points`; three did not: the median's stated-triangle form, its stated-side form, and the singular perpendicular bisector. Applying `midpoint M` over an existing M redefines the point (that is how «M אמצע AB» names an existing point), so the overwrite went through the engine unremarked.
+
+**Decision.**
+1. **The chokepoint excludes the figure itself.** `freeLabel(ctx, used, prefer)`: `ctx.points` is excluded inside it. `used` now only adds what the figure does not hold yet (the sentence's own letters, a sibling minted on the same line, circle tokens). No caller can leave the figure out. All 61 call sites were rewritten mechanically and the now-redundant `...(ctx.points ?? [])` spreads were dropped. Only the three sites above change behaviour.
+2. **The singular perpendicular bisector reuses the segment's existing midpoint** (`existingMidpointOf`, the median's and altitude's ADR-465 Am. 2 reuse). Before, a restated bisector deduped only because its letter was always M. Once M is excluded, a restatement would mint a twin, and so would a bisector after «M אמצע AB». With the reuse, a restatement lowers to identical commands («כבר נאמר»), and a midpoint the student already named is the bisector's foot, never a second point on the same spot. Analytic does the same (measured: «K אמצע AB» · «אנך אמצעי ל-AB» keeps K alone).
+
+**Not in this ADR.** Whether 2-D's bisector midpoint is drawn or lettered before it is named: that is analytic's #2583 ruling, and 2-D is unchanged. The plural bisector («האנכים האמצעיים של AB ו-CD») already excluded the figure's points; a restatement of it still twins its midpoints (#2588). «תיכון מ-A לצלע BC» is refused at submit by the one-statement scope (#2587), so the stated-side form is locked at the lowering.
+
+**Locks.** `src/app/__tests__/issue-1690-construction-midpoint-ids.test.ts`, through the submit door: the bisector beside MPQ in Hebrew and English, with M, P and Q unmoved; two medians as M and N; a free point M kept against the median and the bisector; the bisector reusing K; a restated bisector reading as already drawn; the stated-side lowering. Fixtures `bisector-beside-vertex-m-1690.geo.json` and `two-unnamed-medians-1690.geo.json`. Parity row `second-unnamed-median-1690`.

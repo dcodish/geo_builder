@@ -1,0 +1,70 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-28T12:00:00.000Z",
+  "name": "two-unnamed-medians-1690",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true,
+      "group": "g0"
+    },
+    {
+      "id": "g1.0",
+      "utterance": "תיכון מ-A במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "midpoint",
+        "id": "M",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "תיכון מ-A במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "M"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.0",
+      "utterance": "תיכון מ-B במשולש ABC",
+      "group": "g2",
+      "cmd": {
+        "type": "midpoint",
+        "id": "N",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "utterance": "תיכון מ-B במשולש ABC",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "N"
+      },
+      "enabled": true
+    }
+  ]
+}
