@@ -263,7 +263,8 @@ describe('the ✎ edit seam refuses the same line inline, naming the relation', 
 });
 
 /** The catalog sweep: every example holding a relation word keeps its verdict on an empty canvas in both locales — measured
- *  byte-identical (verdict and commands) at d9494206 and at this fix; the cut line keeps its own (pre-existing) refusal. */
+ *  byte-identical (verdict and commands) at d9494206 and at this fix. The cut line's own refusal was the missing-point one,
+ *  which ADR-W-162 (#1467) replaced: A, B, C and E are now created and the line builds its own circle by definition. */
 const CATALOG_VERDICTS: [string, string, string][] = [
   ["he","מעוין BDEF חסום במשולש ABC","commit"],
   ["he","מלבן DEFG חסום במשולש ABC","commit"],
@@ -272,7 +273,7 @@ const CATALOG_VERDICTS: [string, string, string][] = [
   ["he","משולש ישר-זווית ABC חסום במעגל","commit"],
   ["he","מעגל חוסם את ABC","commit"],
   ["he","מעגל חוסם את המחומש ABCDE","commit"],
-  ["he","המעגל החוסם את משולש ABC חותך את CE בנקודה D","refuse"],
+  ["he","המעגל החוסם את משולש ABC חותך את CE בנקודה D","commit"],
   ["he","מעגל חסום במשולש ABC","commit"],
   ["he","משולש DEF חוסם את המעגל","commit"],
   ["he","מעגל חסום בטרפז ABCD","commit"],
