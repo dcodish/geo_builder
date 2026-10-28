@@ -168,6 +168,17 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
+    // #1188 (ADR-3D-386): the free-vector «not yet» refusals — the tool's limit, named with the student's line
+    case 'free-vector-metric':
+      return err.sentence ? t('err.freeVectorMetric', { sentence: err.sentence, id: err.id }) : t('err.freeVectorMetricAlone', { id: err.id });
+    case 'free-vector-combination':
+      return err.sentence
+        ? t('err.freeVectorCombination', { sentence: err.sentence, id: err.id })
+        : t('err.freeVectorCombinationAlone', { id: err.id });
+    // reported as `givens-contradict` by derive3 and never reaches the student raw; the fallback is the taken-name sentence,
+    // whose remedy (edit the row that stated it) is the right one for a component already stated
+    case 'free-vector-conflict':
+      return t('err.alreadyDefined', { id: err.id });
     case 'unknown-plane':
       // #1455: `base` is the engine's sentinel for «הבסיס» — never a name the student gave a plane
       return err.id === 'base' ? t('err.baseNeedsOneSolid') : t('err.unknownPlane', { id: err.id });

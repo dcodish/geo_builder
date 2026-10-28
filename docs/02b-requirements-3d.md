@@ -384,8 +384,23 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
   that moves on «הציגו תצורה אחרת», never a fixed default), and the student can name what they drew
   in the next line («נסמן: AB = u»). Once a figure exists, a pair with unknown endpoints creates them
-  too, and the created-points notice names them (FR-SP-25; this replaced the by-name refusal, #1467). **Not yet:** a vector given only by components, which needs the design in #1188.
+  too, and the created-points notice names them (FR-SP-25; this replaced the by-name refusal, #1467). A vector given
+  only by name or by components, with no points at all, is FR-VC-1d.
   - Sources: ADR-052, ADR-3D-253; #1184, #1188.
+- **FR-VC-1d (Must)** — **A vector may be declared with no position**: by name («וקטור u», «הווקטורים u, v ו-w»,
+  "vector u") or by its components («u = (1,2,3)», «נתון: v = (10,-5,0)»). It is drawn **floating, visibly
+  unanchored** (operator, 2026-09-20): an arrow beside the figure (centred on an empty canvas) in a hue of its own,
+  with no tail dot and no endpoint letters, its name underlined at the midpoint. Its unstated components are free
+  and move with «הציגו תצורה אחרת»; a stated one never moves. The data panel lists it as stated («u = (1, 2, 3)»,
+  or «u = (?, ?, ?)» when nothing is stated) and prints its components and |u| only when they are the same in every
+  configuration; the ask lane answers «u» and «|u|» on the same terms. A name means one thing: a free vector's name
+  cannot also name an anchored vector («נסמן: AB = u»), a line or a plane, in either order; a component restated
+  with another number is refused naming both lines. A free vector is never part of the named basis (`need-basis`
+  counts the anchored vectors only). **Not yet** (refused honestly as the tool's limit, naming the statement — never
+  «בדקו את החישוב» and never "u is not declared"): a combination that contains a free vector («w = u + v», «p = 2u»,
+  an affine component), #1188 step 2; the head-to-tail drawing of a stated sum, step 3; a magnitude, angle, ⟂, ∥ or
+  dot product on a free vector («|u| = 5», «u ⟂ v»), step 4.
+  - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a

@@ -78,6 +78,14 @@ export const orbitStep = (width: number): number => (2 * Math.PI) / Math.max(400
 /** Named vectors draw in their own colour (ADR-3D-003 Am.) so tail/head read instantly. */
 const VECTOR_COLOR = '#0d9488';
 
+/**
+ * #1188 (ADR-3D-386) — the FREE-vector palette: one hue per free vector, in declaration order, every one distinct from
+ * `VECTOR_COLOR` (an anchored vector keeps its teal) and from the plane patches, so a floating arrow never reads as
+ * an anchored one and u, v and w are told apart beside each other. Exported for the lock.
+ */
+export const FREE_VECTOR_COLORS = ['#db2777', '#ea580c', '#4f46e5', '#65a30d', '#c026d3', '#475569'] as const;
+export const freeVectorColor3 = (index: number): string => FREE_VECTOR_COLORS[index % FREE_VECTOR_COLORS.length];
+
 /** Bidi-isolate a MATH string (coordinates, equations) so the RTL document can't visually
  *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
 const ltr = (s: string) => `⁦${s}⁩`;
@@ -427,15 +435,18 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             strokeLinecap="round"
           />
         ))}
-        {scene.vectors.map((v, vi) => (
-          <g key={v.name || `arrow-${vi}`} data-testid={`vec-${v.name || `arrow-${vi}`}`}>
+        {scene.vectors.map((v, vi) => {
+          // #1188: a FREE vector floats in its own hue (no tail dot, no endpoint letters — it has no points)
+          const ink = v.free !== undefined ? freeVectorColor3(v.free) : VECTOR_COLOR;
+          return (
+          <g key={v.name || `arrow-${vi}`} data-testid={`vec-${v.name || `arrow-${vi}`}`} data-free={v.free !== undefined ? 'true' : undefined}>
             {/* the vector itself, in its own colour: tail→head overlay, ARROWHEAD AT THE HEAD (`to`) */}
             <line
               x1={v.x1}
               y1={v.y1}
               x2={v.x2}
               y2={v.y2}
-              stroke={VECTOR_COLOR}
+              stroke={ink}
               strokeWidth={2}
               strokeDasharray={v.hidden ? '7 5' : undefined}
               strokeLinecap="round"
@@ -443,7 +454,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             <path
               d="M 0 0 L -9 -4.5 L -9 4.5 Z"
               transform={`translate(${v.x2} ${v.y2}) rotate(${v.angleDeg})`}
-              fill={VECTOR_COLOR}
+              fill={ink}
             />
             {/* #849 (ADR-3D-195): the name in textbook vector notation — the UNDERLINE ONLY. Every
                 label here is a DECLARED name (`c.vectors`), never a point pair, and the arrow means
@@ -460,7 +471,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                   fontSize={15}
                   fontStyle="italic"
                   fontFamily="ui-sans-serif, system-ui, sans-serif"
-                  fill={VECTOR_COLOR}
+                  fill={ink}
                   stroke="#ffffff"
                   strokeWidth={3.5}
                   paintOrder="stroke"
@@ -469,11 +480,12 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 >
                   {v.name}
                 </text>
-                <line x1={-6} y1={9} x2={6} y2={9} stroke={VECTOR_COLOR} strokeWidth={1.2} />
+                <line x1={-6} y1={9} x2={6} y2={9} stroke={ink} strokeWidth={1.2} />
               </g>
             )}
           </g>
-        ))}
+          );
+        })}
         {/* #483 — the OFFER: a hollow dot where a determined line∩plane crossing has no name yet.
             Hollow and in the plane palette so it reads as "available", never as an existing point;
             drawn before the real points so a named point always wins the pixels. The generous

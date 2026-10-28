@@ -50,7 +50,9 @@ export function studentFacingViolations(values: readonly string[], vocab: Studen
   const names = new Set(vocab.names);
   const out: string[] = [];
   for (const v of values) {
-    for (const m of v.matchAll(ID_SHAPED)) out.push(`id-shaped «${m[0]}» in «${v}»`);
+    // #1188 (ADR-3D-386): an id-SHAPED run the student TYPED is their own algebra («u = (k-1, 2, k)» quoted back), not an
+    // engine id — the same typed-text exemption the Latin-word rule below has always had
+    for (const m of v.matchAll(ID_SHAPED)) if (!typed.includes(m[0].toLowerCase())) out.push(`id-shaped «${m[0]}» in «${v}»`);
     for (const m of v.matchAll(LATIN_WORD)) if (!typed.includes(m[0])) out.push(`untyped word «${m[0]}» in «${v}»`);
     for (const run of v.matchAll(LABEL_RUN)) {
       for (const l of run[0].matchAll(LABEL)) {

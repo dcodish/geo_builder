@@ -682,6 +682,17 @@ export interface StatedComps {
   ord: number;
 }
 
+/**
+ * #1188 (ADR-3D-386) — ONE FREE VECTOR: components and no position. A component is a stated number or `null`
+ * (unstated: a free DOF, sampled per seed by `resolveFreeVectors3` and moved by «הציגו תצורה אחרת», ADR-052).
+ * Step 2 of #1188 widens a component to an affine `SymComp` and adds a `def` (a vector defined by a combination);
+ * until then both are refused at apply (`free-vector-combination`). `stated` is the tuple as typed, for the panel.
+ */
+export interface FreeVec3 {
+  comps: [number | null, number | null, number | null];
+  stated?: StatedComps;
+}
+
 /** The distinct symbols an affine component names, in first-written order. */
 export const symsOfAffine = (e: SymAffine): string[] => {
   const out: string[] = [];
@@ -1192,6 +1203,8 @@ export type Command3 =
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
   | { type: 'draw-arrow'; from: Id; to: Id } // #72: `חץ A'C` — an UNNAMED ink arrow (draws the segment too)
+  // #1188 (ADR-3D-386): «וקטור u» / «הווקטורים u ו-v» — declares FREE vectors (no position, every component free)
+  | { type: 'declare-vector'; names: string[] }
   // #72 / #448: `אנך יורד מ-M לבסיס`, `גובה הפירמידה מנקודה D`, `גובה מנקודה D לבסיס ABC` — the ⟂ from a
   // point onto a base plane; the foot is auto-minted at apply (parse3 is context-free). `face` is the
   // STATED base when the student named one — without it apply resolves the figure's single solid, and
@@ -1371,6 +1384,14 @@ export interface Construction3 {
   points: Map<Id, PointDef>;
   /** Declared vector names → their ordered pair. */
   vectors: Map<string, { from: Id; to: Id; bare?: true }>;
+  /**
+   * #1188 (ADR-3D-386) — FREE VECTORS: a vector with NO position («וקטור u», «u = (1,2,3)»), the sibling store of
+   * `vectors`. A name lives in exactly one of the two (apply refuses `already-defined` across them). Insertion-ordered.
+   * Never read by position code: a free vector is a VALUE, so it is never in `points`, `segments`, `arrows` or
+   * `positions`, never a basis member (`need-basis` counts `vectors` alone) and never a pivot unknown. Its value
+   * per configuration is `Resolved3.freeVectors`; ask "what is the vector named n" through `namedVector3`.
+   */
+  freeVectors: Map<string, FreeVec3>;
   /** #72: UNNAMED ink arrows (`חץ A'C`) — rendered like a named vector, no label, never a basis member. */
   arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
@@ -1603,6 +1624,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   solids: [],
   points: new Map(),
   vectors: new Map(),
+  freeVectors: new Map(),
   arrows: [],
   segments: [],
   angleMarks: [],
@@ -1915,6 +1937,15 @@ export type EngineError3 =
   | { code: 'ambiguous-vector-length'; a1: Id; b1: Id; a2: Id; b2: Id; c: number }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
+  /** #1188 (ADR-3D-386): a MAGNITUDE / angle / ⟂ / ∥ / dot given on a FREE vector — not built until #1188 step 4.
+   *  `sentence` is the refused line (filled by the store). Never `claim-refuted`, never `unknown-vector`. */
+  | { code: 'free-vector-metric'; id: string; sentence?: string }
+  /** #1188 (ADR-3D-386): a free vector inside a COMBINATION («w = u + v», «AE = u + p») or with an affine component
+   *  («u = (k-1, 2, k)») — not built until #1188 step 2. `sentence` is the refused line (filled by the store). */
+  | { code: 'free-vector-combination'; id: string; sentence?: string }
+  /** #1188 (ADR-3D-386): engine-internal — a component restated with a DIFFERENT number. `derive3` reports it as
+   *  `givens-contradict` naming this line and the line that stated the component first (the #2061 precedent). */
+  | { code: 'free-vector-conflict'; id: string }
   | { code: 'unknown-plane'; id: string }
   // #859: the pair does not match the DIAGONAL the sentence claimed — an edge offered to «אלכסון», or a
   // face diagonal offered to «אלכסון ראשי». Named rather than silently drawn: the refusal names the

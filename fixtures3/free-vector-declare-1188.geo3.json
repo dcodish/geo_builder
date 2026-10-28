@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-28T11:16:57.098Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור u",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "u"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור v",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "v"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "u = (1,2,3)",
+      "cmds": [
+        {
+          "type": "inject-vector",
+          "name": "u",
+          "x": 1,
+          "y": 2,
+          "z": 3,
+          "srcs": [
+            "1",
+            "2",
+            "3"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2172,6 +2172,24 @@ export function isBareAltitude3(utterance: string): boolean {
   return !!h && h.altitude && !h.ofSolid && h.value === undefined;
 }
 
+/**
+ * #1188 (ADR-3D-386) — «וקטור u», «הווקטור u», «vector u», and the plural «הווקטורים u, v ו-w» / "vectors u, v and w":
+ * DECLARE free vectors — vectors with no position. A vector name is one lowercase letter `[a-w]` (the vector lane's
+ * own name token; x, y, z are axes). The singular WORD is stripped by `normalize3` and survives as the vector
+ * marking, so a bare marked name (or a name list) is the declaration; an UNMARKED bare «u» is never one (it stays the
+ * ask lane's). The Hebrew plural noun is not stripped, so it is read here. The «ו-» spacing is already folded by
+ * `shell/conjunction` at the seam (ADR-AG-239).
+ */
+const VEC_NAME_LIST_SEP = /\s*,\s*(?:ו-?\s*|and\s+)?|\s+(?:ו-?\s*|and\s+)/i;
+const declareVector: Rule = (s) => {
+  const plural = s.match(/^ה?ו?וקטורים\s+(.+)$/) ?? s.match(/^(?:the\s+)?vectors\s+(.+)$/i);
+  const body = plural ? plural[1] : VEC_MARKED ? s.replace(/^the\s+/i, '') : null;
+  if (body === null) return null;
+  const names = body.trim().split(VEC_NAME_LIST_SEP);
+  if (names.length === 0 || !names.every((n) => /^[a-w]$/.test(n))) return null;
+  return [{ type: 'declare-vector', names: [...new Set(names)] }];
+};
+
 /** #72: `חץ A'C` / `arrow A'C` — draw the pair as an UNNAMED ink arrow (the named-basis lane
  *  stays `נסמן: AB = u`; an unnamed arrow never joins the basis). The vector WORD (`וקטור AB`)
  *  is normalize3-stripped decoration and deliberately keeps its established segment reading. */
@@ -5233,6 +5251,7 @@ export const RULES: Rule[] = [
   medianFoot, // `CD תיכון במשולש ABC`
   altitudeFoot, // V8-g: `גובה ... לצלע AB הוא CD` — before heightOfSolid (which owns 3-D heights)
   heightOfSolid,
+  declareVector, // #1188: «וקטור u» / «הווקטורים u ו-v» — free vectors (an exact name list: it can claim nothing else)
   drawArrow, // #72: an unnamed ink arrow — before bareSegment (the noun must not read as a label)
   perpToBase, // #72: the base-directed ⟂ from a point (auto-minted foot)
   polygonCircle3, // #442: a circle inscribed in / circumscribed about a polygon — BEFORE the polygon rules

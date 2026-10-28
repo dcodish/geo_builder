@@ -60,7 +60,7 @@ export interface NFact3 {
 const DEFINITION_CMDS = new Set<string>([
   'solid', 'quad-shape', 'rect-complete', 'segment3', 'point-on-segment3', 'midpoint-auto', 'name-vector',
   'angle-mark', 'length-mark', 'centroid3', 'diag-intersection', 'seg-crossing3', 'quad-diagonals', 'point-in-span', 'param-decl',
-  'param-sign', 'plane3', 'free-plane', 'free-line', 'line3', 'circle3', 'plane-through', 'line-through', 'draw-arrow',
+  'param-sign', 'plane3', 'free-plane', 'free-line', 'line3', 'circle3', 'plane-through', 'line-through', 'draw-arrow', 'declare-vector',
   'revolution', 'plane-plane-line', 'line-plane-point', 'foot-on-plane', 'foot-on-line', 'line-projection',
   'line-common-perp', 'bisector-ray',
 ]);

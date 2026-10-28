@@ -2423,5 +2423,25 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
     "text": "x_B = 3",
     "winner": "componentGiven",
   },
+  {
+    "lang": "en",
+    "text": "vector u",
+    "winner": "declareVector",
+  },
+  {
+    "lang": "he",
+    "text": "וקטור u",
+    "winner": "declareVector",
+  },
+  {
+    "lang": "en",
+    "text": "vectors u, v and w",
+    "winner": "declareVector",
+  },
+  {
+    "lang": "he",
+    "text": "הווקטורים u, v ו-w",
+    "winner": "declareVector",
+  },
 ]
 `;
