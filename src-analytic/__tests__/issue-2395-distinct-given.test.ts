@@ -173,8 +173,10 @@ describe('#2395 — refusals, each its own case', () => {
     expect(parseLine('N1 ≠ N1')).toMatchObject({ ok: false, code: 'repeated-vertex' });
   });
 
-  it('a name the figure has not got is `unknown-reference`, naming it', () => {
-    expect(refusalOf(['נקודה P', 'P ≠ Q'])).toMatchObject({ key: 'unknown-reference', detail: 'Q', expected: 'point' });
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): a missing POINT is created; a missing
+  // CIRCLE still refuses by name (#2048 S3).
+  it('a circle the figure has not got is `unknown-reference`, naming it; a missing point is created', () => {
+    expect(refusalOf(['נקודה P', 'P ≠ Q'])).toBeNull();
     expect(refusalOf(['נתון מעגל שמרכזו N1 ורדיוסו 10', 'המעגלים N1 ו-N2 שונים'])).toMatchObject({
       key: 'unknown-reference',
       detail: 'N2',

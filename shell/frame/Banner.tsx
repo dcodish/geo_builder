@@ -17,9 +17,11 @@ interface BannerProps {
   /** Present = dismissable; the label is the caller's translated text. */
   onDismiss?: () => void;
   dismissLabel?: string;
+  /** The dismiss button's accessible name when its visible label is a glyph (✕) — the caller's translated text. */
+  dismissAriaLabel?: string;
 }
 
-export function Banner({ kind, children, onDismiss, dismissLabel }: BannerProps) {
+export function Banner({ kind, children, onDismiss, dismissLabel, dismissAriaLabel }: BannerProps) {
   const pal =
     kind === 'error'
       ? { fg: color.danger, bg: color.dangerSoft, border: color.dangerBorder }
@@ -28,7 +30,7 @@ export function Banner({ kind, children, onDismiss, dismissLabel }: BannerProps)
     <div role={kind === 'error' ? 'alert' : 'status'} style={{ ...box, color: pal.fg, background: pal.bg, borderColor: pal.border }}>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} style={{ ...dismissBtn, color: pal.fg }}>
+        <button type="button" onClick={onDismiss} aria-label={dismissAriaLabel} style={{ ...dismissBtn, color: pal.fg }}>
           {dismissLabel ?? '×'}
         </button>
       )}

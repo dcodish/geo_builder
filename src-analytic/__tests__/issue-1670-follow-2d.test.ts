@@ -346,15 +346,16 @@ describe('#1670 row 4 — a bare relation mints its new letters where 2-D does',
     expect(typed(['BD⊥AC', 'D אמצע AB']).kinds).toEqual(['record', 'record']);
   });
 
-  // measured on 2-D: each is refused — no letter is minted, #1028's refusal holds
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice", and 2-D now creates every referenced point too, ADR-769): 
+  // the four forms 2-D refused in 2026-10 now build in both builders, their new letters minted free.
   it.each([
-    ['AB = 2CD', 'A'],
-    ['AB:BC = 2:3', 'A'],
-    ['AD גובה לצלע BC', 'B'],
-    ['AD תיכון לצלע BC', 'B'],
-  ])('REFUSAL — «%s» on an empty canvas mints nothing and names %s', (line, missing) => {
+    ['AB = 2CD', ['A', 'B', 'C', 'D']],
+    ['AB:BC = 2:3', ['A', 'B', 'C']],
+    ['AD גובה לצלע BC', ['B', 'C']],
+    ['AD תיכון לצלע BC', ['B', 'C']],
+  ])('«%s» on an empty canvas records, creating %j', (line, ids) => {
     const { last } = typed([line]);
-    expect(last.kind === 'refused' && last.error.key).toBe('unknown-reference');
-    expect(last.kind === 'refused' && last.error.detail).toBe(missing);
+    expect(last.kind).toBe('record');
+    expect(last.kind === 'record' && last.created).toEqual(ids);
   });
 });

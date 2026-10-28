@@ -91,9 +91,10 @@ describe('#1145 — the refusal names what the STUDENT wrote', () => {
 
   /** A missing POINT was already named correctly, and must stay that way — `statedName` is the
    *  identity on an id with no prefix, which is what makes a uniform call safe. */
-  it('a missing point still names its letter', () => {
-    // #1670: «M אמצע AB» now mints B (2-D's rule); a cevian to a side no shape has still refers, and refuses.
-    expect(refusal(['A(0,0)'], 'AD גובה לצלע BC')?.detail).toBe('B');
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice"): a missing point is created, so a typed
+  // line no longer reaches this refusal; a missing CIRCLE still does, and still names the student's letter.
+  it('a missing circle still names its letter', () => {
+    expect(refusal(['A(0,0)'], 'B על המעגל I')?.detail).toBe('I');
   });
 
   it('statedName strips only the prefixes it minted', () => {

@@ -35,7 +35,8 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
+import { declaresOnly3, mintableId3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -81,6 +82,9 @@ export interface Derived3 {
    *  ring the fold picked. The fact list keeps the reference; every reader that asks "what did this line state?" of
    *  the figure reads these. */
   resolvedCmds: Readonly<Record<string, readonly Command3[]>>;
+  /** #1467 (ADR-3D-382): by fact id, the points that line CREATED by reference — the fold's mint pass, last resort
+   *  after the deferral fixpoint. What the «נוצרה נקודה חדשה …» notice names. Absent for a line that created none. */
+  created: Readonly<Record<string, readonly string[]>>;
 }
 
 export type StoreError3 =
@@ -515,7 +519,13 @@ function withShapeSentence3<E extends { code: string }>(e: E, utterance: string)
  * search folds SUBSETS of the list through this same function with `narrow: false` — the same fold, never a
  * second reader, and no recursion. A subset fold is not a "press", so it never counts in {@link deriveStats3}.
  */
-function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 {
+function deriveCore3(
+  factsIn: Fact3[],
+  seed: number,
+  narrow: boolean,
+  premint?: Readonly<Record<string, readonly string[]>>,
+  postMint?: Readonly<Record<string, FactStatus3>>,
+): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
   /** #2235 (ADR-3D-351): the commands each fact holding a `shape-ref3` applied as, against the figure before it */
@@ -526,7 +536,9 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
     const r = expandShapeRefs3(at, f.cmds);
     return r.ok ? r : { ok: false, error: withShapeSentence3(r.error, f.utterance) };
   };
-  let c: Construction3 = emptyConstruction3();
+  // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
+  // LIST ORDER over them (see the mint pass) — empty on the first fold
+  let c: Construction3 = premint ? mintFree(emptyConstruction3(), Object.values(premint).flat()) : emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
   const pinOwnerIds = new Set<string>();
@@ -740,6 +752,96 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
     const latest = retryError(f);
     if (latest !== null) status[f.id] = restatedAgainst(f, latest);
   }
+  /**
+   * #1467 ([ADR-3D-382](../../docs/06b-decisions-3d.md#adr-3d-382), ADR-W-162; operator ruling 2026-09-27, "Create
+   * everywhere + notice") — THE MINT PASS: a line that refers to a point nothing in the list declares creates it as a
+   * free point (`free3`, 3 sampled DOFs, ADR-052), and the fold runs again for the rows that leaned on it.
+   *
+   * LAST RESORT, after the deferral fixpoint above: a point ANY line declares is bound by that line (ADR-3D-259), so
+   * «M אמצע SA» typed above «פירמידה SABCD» binds and mints nothing, and every figure that built before builds the
+   * same. Which ids are missing is the engine's own answer — the `unknown-point` / `two-unknowns` a dry run reports,
+   * minted one at a time until the line applies — never a list of command kinds kept here. A line that still fails
+   * after minting KEEPS NOTHING it minted (#1413's atomicity), and its status is the post-mint reason: «unknown point»
+   * would no longer be true. Eligibility (`mintEligible3`) excludes only the solid-relative noun «אלכסון», whose
+   * refusal on a canvas with no solid is the #978 lock.
+   */
+  const failedAfterMint: Record<string, FactStatus3> = {};
+  /** Every point the pass created, by the row it was created for — what the in-order refold places first. */
+  const mintedBy: Record<string, string[]> = premint ? Object.fromEntries(Object.entries(premint).map(([k, v]) => [k, [...v]])) : {};
+  const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
+    let probe = base;
+    const exp = expandFact(base, f);
+    if (!exp.ok) return exp.error;
+    for (const cmd of exp.cmds) {
+      if (droppedSoft(cmd)) continue;
+      const r = applyCommand3(probe, seated(cmd));
+      if (!r.ok) return r.error;
+      probe = r.next;
+    }
+    return null;
+  };
+  const missingOf = (st: FactStatus3 | null, base: Construction3): string | null =>
+    st !== null && typeof st === 'object' && (st.code === 'unknown-point' || st.code === 'two-unknowns') && mintableId3((st as { id: string }).id, base) ? (st as { id: string }).id : null;
+  for (let guard = 0; guard < facts.length && !premint; guard++) {
+    let minted = false;
+    for (const f of facts) {
+      if (typeof status[f.id] === 'string' || !mintEligible3(f.cmds)) continue;
+      let st: FactStatus3 | null = dryRunOn(c, f); // the latest attempt: an earlier mint may have supplied a letter
+      if (missingOf(st, c) === null) continue;
+      let probe = c;
+      const ids: string[] = [];
+      for (let id = missingOf(st, probe); id !== null && ids.length < 24; id = missingOf(st, probe)) {
+        ids.push(id);
+        probe = mintFree(probe, [id]);
+        st = dryRunOn(probe, f);
+      }
+      if (st !== null) {
+        status[f.id] = restatedAgainst(f, st); // the post-mint reason; nothing minted is kept
+        failedAfterMint[f.id] = status[f.id];
+        continue;
+      }
+      c = probe;
+      status[f.id] = restatedAgainst(f, applyFact(f));
+      if (status[f.id] === 'ok') mintedBy[f.id] = ids;
+      minted = true;
+      break;
+    }
+    if (!minted) break;
+    for (let pass = 0; pass < facts.length; pass++) {
+      let progressed = false;
+      for (const f of facts) {
+        if (typeof status[f.id] === 'string' || retryError(f) !== null) continue;
+        status[f.id] = restatedAgainst(f, applyFact(f));
+        progressed = true;
+      }
+      if (!progressed) break;
+    }
+  }
+  /**
+   * The pass decided WHICH points to create; the figure is folded again with them in place from the start, so every
+   * row applies in list order. Applying the minted row LAST changed what the solve did with the rows after it: «AB =
+   * w» typed after «|EN| = |w|» drove the pyramid flat and blamed the earlier row, where the declared-first figure
+   * («קטע EN» · «|EN| = |w|» · «AB = w») refuses the false claim. A row that fails in the in-order fold keeps nothing
+   * it created: its points are dropped and the fold runs again (bounded by the rows that minted).
+   */
+  if (!premint && Object.keys(mintedBy).length > 0) {
+    let keep: Record<string, string[]> = mintedBy;
+    const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
+    for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
+      const again = deriveCore3(factsIn, seed, narrow, keep, reasons);
+      const failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok');
+      if (failed.length === 0) return again;
+      for (const id of failed) reasons[id] = again.status[id]; // the post-mint reason, read in list order
+      keep = Object.fromEntries(Object.entries(keep).filter(([id]) => !failed.includes(id)));
+      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, reasons);
+    }
+  }
+  // a row whose created points were dropped reports why it failed WITH them, never «unknown point» (atomicity)
+  if (postMint) for (const [id, st] of Object.entries(postMint)) if (typeof status[id] !== 'string') status[id] = st;
+  /** What the notice names: the points created by REFERENCE — a row that only declares («קטע AB» · «דלתון ABCD») is silent. */
+  const created: Record<string, string[]> = Object.fromEntries(
+    Object.entries(mintedBy).filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? [])),
+  );
   // #2235 (ADR-3D-351): from here on every reader asks what each line stated ABOUT THE FIGURE — a shape reference is
   // read as the ring it was applied to (the blame, crossing, collapse and narrowing passes below never see a placeholder)
   if (Object.keys(resolvedCmds).length > 0) facts = facts.map((f) => (resolvedCmds[f.id] ? { ...f, cmds: resolvedCmds[f.id] } : f));
@@ -1526,7 +1628,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds, created };
 }
 
 export interface Geo3State {
@@ -1543,6 +1645,9 @@ export interface Geo3State {
    * silently, so that case sets no notice.
    */
   lastNotice: { code: 'already-stated' } | { code: 'vertex-angle-read-as'; angles: string } | null;
+  /** #1467 (ADR-3D-382): the points the last recorded line created by reference, and that line's fact id — what the
+   *  «נוצרה נקודה חדשה …» notice names; its ✕ removes the fact. Null after any other verdict. */
+  lastCreated: { factId: string; ids: readonly string[] } | null;
   submit: (utterance: string) => void;
   /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
    *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
@@ -2072,6 +2177,7 @@ export const useGeo3 = create<Geo3State>()(
       figureName: '',
       lastError: null,
       lastNotice: null,
+      lastCreated: null,
 
       submit: (utterance) => {
         // #1394: DECIDED, then dispatched — every branch lives in `decideSubmit3`, pure over the state.
@@ -2079,6 +2185,7 @@ export const useGeo3 = create<Geo3State>()(
       },
 
       dispatchVerdict: (v) => {
+        if (v.kind !== 'record') set({ lastCreated: null }); // #1467: the notice speaks for the last line only
         switch (v.kind) {
           case 'rename':
             get().rename(v.from, v.to);
@@ -2097,15 +2204,19 @@ export const useGeo3 = create<Geo3State>()(
             // line re-ticks is 2-D's silent re-enable (FR-EN-9, `foldCommand`), never "already on the figure".
             set({ facts: v.facts, lastError: null, lastNotice: v.twin.enabled ? { code: 'already-stated' } : null });
             return;
-          case 'record':
+          case 'record': {
+            const added = v.facts[v.facts.length - 1];
+            const ids = added ? derive3(v.facts, v.seed).created[added.id] : undefined;
             set({
               facts: v.facts,
               seed: v.seed,
               lastError: null,
+              lastCreated: added && ids?.length ? { factId: added.id, ids } : null,
               // #1942: a lone vertex read as its polygon's angle is said aloud, never a silent pick (2-D's note)
               lastNotice: v.readAs?.length ? { code: 'vertex-angle-read-as', angles: v.readAs.map((a) => `∠${a}`).join(', ') } : null,
             });
             return;
+          }
         }
       },
 

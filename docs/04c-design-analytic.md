@@ -560,8 +560,11 @@ foot is derived (`toolFootFacts`, `engine/cevian.ts`), named after the fact thro
 (`onCircleAlready`, `centreRuleOf`, `nameCentreAs`). A named circle the chain (`circleByName`) cannot find is stated by
 `statingNamedCircle` (`declare`, `param radiusSymbol(M)` > 0, `circle-at-M`); an `on-kind` circle with no circle
 creates one (`touchedCircleFacts`). **New letters, last**: after the fixpoints, `foldPass` adds `free` points for a
-line whose failures are all point references in minting forms (`mintedByReference`) or companions (`segment`,
-`line-2pt`, `selector`, `declare`); a `perpendicular` is not one, and the triangle form states its
+line whose failures are all `unknown-reference`s to point letters, a round at a time (a further missing letter a fact
+names is minted too) until the line lands, or the line keeps nothing ([ADR-AG-342](06c-decisions-analytic.md#adr-ag-342),
+#1467: every reference, as 2-D; the 2026-10 `mintedByReference` form gate is gone). The ids land in
+`FoldResult.created` on the line's first fact, `Derivation.created` by line, and `decideSubmit`'s `record.created` —
+the shared `CreatedNotice` in `App.tsx`, shown while that line is last; ✕ is `removeLine`. The triangle form states its
 triangle first (`clauseFacts`).
 
 *Identifiers:* `circle-at-<letter>` · `create` · `chordFacts` · `on-kind { circle }` · `tangent-line-at`

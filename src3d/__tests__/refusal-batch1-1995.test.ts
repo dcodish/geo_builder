@@ -60,10 +60,10 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit('החלף בין A ל-B')).toBeNull();
   });
 
-  it('unknown point: define it first — and once it is, the line is taken', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; the operator's T41, 2026-10-24: "we can create a point X so the claim satisfies"):
+  // the "define it first" sentence is no longer reached for a point named by its letter — X is created, free.
+  it('unknown point: the line is taken, and X is created', () => {
     setUp([CUBE]);
-    expect(submit('E אמצע XC')).toBe('הנקודה «X» עדיין לא הוגדרה. הגדירו אותה תחילה, ואז כתבו את השורה שוב.');
-    expect(submit('נקודה X(0,0,5)')).toBeNull();
     expect(submit('E אמצע XC')).toBeNull();
   });
 
@@ -113,10 +113,9 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit('נפח הפירמידה SABCD = 11')).toBeNull();
   });
 
-  it('two unknowns: define the second point first, then the relation is taken', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; the operator's T49, 2026-10-24: "same comment"): Q is created and P is defined.
+  it('two unknowns: the relation is taken, Q created free', () => {
     setUp(['קובייה ABCD']);
-    expect(submit('PQ = 2AB')).toBe('בקשר וקטורי מותרת נקודה חדשה אחת בלבד, ו-«Q» היא נקודה חדשה שנייה. הגדירו תחילה את «Q», ואז כתבו את הקשר שוב.');
-    expect(submit('Q(0,0,0)')).toBeNull();
     expect(submit('PQ = 2AB')).toBeNull();
   });
 

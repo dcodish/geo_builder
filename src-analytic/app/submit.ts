@@ -34,6 +34,12 @@ import { declinedPart, declinedThrough, unreadPart, type LostPart } from './lost
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import type { SentenceOutcome } from '../../shell/sentences';
 
+/** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
+const typedAt = (line: string, id: string): number => {
+  const at = line.split('').findIndex((_, i) => line.startsWith(id, i) && !/[0-9']/.test(line[i + id.length] ?? ''));
+  return at < 0 ? Infinity : at;
+};
+
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
 
@@ -53,7 +59,7 @@ export type SubmitVerdict =
    * caller shows it IN THE SAME COMMIT that records the line (`recordLine(line, notice)`): a notice set
    * before the record would be cleared by it.
    */
-  | { kind: 'record'; line: string; notice?: RecordNotice }
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[] }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -396,9 +402,15 @@ function decideOnce(
   if (capitalParam) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capitalParam } };
   /** A `record` verdict carries the new line's notice, if the fold raised one (#1350). */
   const raised = trial.notices.find((n) => n.index === lines.length);
-  const recorded: SubmitVerdict = raised
-    ? { kind: 'record', line, notice: { code: raised.code, detail: raised.detail, holder: raised.holder } }
-    : { kind: 'record', line };
+  /** #1467 (ADR-AG-342): the letters this line's references created — what the «נוצרה נקודה חדשה …» notice names. */
+  // in the order the student typed them, as 2-D names them
+  const made = trial.created.find((c) => c.index === lines.length)?.ids.slice().sort((x, y) => typedAt(line, x) - typedAt(line, y));
+  const recorded: SubmitVerdict = {
+    kind: 'record',
+    line,
+    ...(raised ? { notice: { code: raised.code, detail: raised.detail, holder: raised.holder } } : {}),
+    ...(made?.length ? { created: made } : {}),
+  };
   /**
    * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed
    * line passes)? Its own, first. But a solver that cannot meet the whole set blames whichever

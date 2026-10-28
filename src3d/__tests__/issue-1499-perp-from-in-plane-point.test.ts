@@ -117,8 +117,9 @@ describe('#1499 — what must NOT change', () => {
     expect(off(s)).toBeGreaterThan(1e-3);
   });
 
-  it('a ⟂-to-plane with BOTH endpoints unknown stays an honest refusal', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): the missing endpoints are created.
+  it('a ⟂-to-plane with BOTH endpoints unknown creates them, and the relation is recorded', () => {
     const r = submitAll(['ABC משולש', 'XY⊥ABC']);
-    expect(r.err?.code).toBeTruthy();
+    expect(r.err).toBeNull();
   });
 });

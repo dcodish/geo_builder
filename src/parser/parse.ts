@@ -34,6 +34,7 @@ import { arcRunRoles } from '../../shell/arcRun';
 import { foreignGiven, rightAngledAtVertex } from './scope';
 import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
+import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
 import { resolvePairRoles } from './pairRoles';
@@ -14511,6 +14512,10 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   try {
     let r = parseEntry(raw, ctx);
     if (!r.ok) return r;
+    // #1467 (ADR-769): a point the statement names and the figure lacks is created by its bare declaration — once, here.
+    // Only against a FIGURE: a context that does not say which points exist (`points` absent — a pure reading, a probe)
+    // has nothing to be missing from.
+    if (ctx.points) r = { ...r, commands: withImpliedPoints(r.commands, ctx.points) };
     const named = new Set(r.commands.flatMap(commandLetters));
     const indefiniteShape = indefiniteBindSink.find((ids) => ids.every((v) => named.has(v)));
     if (indefiniteShape) r = { ...r, indefiniteShape };

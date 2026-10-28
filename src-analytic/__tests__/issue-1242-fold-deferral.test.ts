@@ -103,8 +103,10 @@ describe('#1242 — deferral: a constraint typed before the objects it names is 
 });
 
 describe('#1242 — atomicity: a line that cannot be finished leaves NO residue', () => {
-  it('a cevian naming points no line ever declares is faulted in full — no D, no segment AD, nothing drawn', () => {
-    const d = derive(['AD גובה לצלע BC'], 0);
+  // ⚠ #1467 (ADR-AG-342): «AD גובה לצלע BC» now CREATES its missing points, so atomicity is asked of a line that
+  // fails for a reason no creation fixes — a diameter in a numeral circle the figure does not have (four facts).
+  it('a line that cannot be finished is faulted in full — nothing of it is drawn', () => {
+    const d = derive(['AB קוטר במעגל I'], 0);
     expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
     expect(d.outcomes).toEqual(['faulted']);
     expect(d.construction.objects, 'nothing of the line survives').toEqual([]);
@@ -113,23 +115,23 @@ describe('#1242 — atomicity: a line that cannot be finished leaves NO residue'
     expect(d.figure.segments).toEqual([]);
   });
 
-  it('a later line that leaned on the faulted line’s fragment is faulted too — the poisoning runs to a fixpoint', () => {
-    // «EF גובה לצלע AD» would have been satisfied by the residue (A and D declared, never placed); with the
-    // residue gone it names points that do not exist, and says so. (#1670: not «M אמצע AD» — a bare midpoint now
-    // mints its parents, as 2-D does; a cevian to a side never does.)
-    const d = derive(['AD גובה לצלע BC', 'EF גובה לצלע AD'], 0);
-    expect(d.outcomes).toEqual(['faulted', 'faulted']);
-    expect(d.construction.objects).toEqual([]);
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342): the later line no longer faults with the first — it never sees the faulted line's
+  // residue, and creates its own points (A and B are minted for it, not borrowed from the refused diameter).
+  it('a later line never leans on a faulted line’s fragment: it creates its own points', () => {
+    const d = derive(['AB קוטר במעגל I', 'EF גובה לצלע AB'], 0);
+    expect(d.outcomes[0]).toBe('faulted');
+    expect(d.outcomes[1]).not.toBe('faulted');
+    expect(d.created).toEqual([{ index: 1, ids: ['A', 'B'] }]);
   });
 
   it('the fault is reported ONCE per line, not once per fact of the line', () => {
-    const d = derive(['AD גובה לצלע BC'], 0);
+    const d = derive(['AB קוטר במעגל I'], 0);
     expect(d.faults).toHaveLength(1);
     expect(d.faults[0].index).toBe(0);
   });
 
   it('the fold alone: every fact of a faulted line carries the line’s error, positionally', () => {
-    const r = parseLine('AD גובה לצלע BC');
+    const r = parseLine('AB קוטר במעגל I');
     if (!r.ok) throw new Error('did not parse');
     const facts: Fact[] = r.facts;
     const out = fold(facts, facts.map(() => 0));
@@ -152,10 +154,11 @@ describe('#1242 — what stays exactly as it was', () => {
     expect(d.faults).toEqual([]);
   });
 
-  it('the submit gate: a forward reference typed on a canvas that lacks the point is still refused (ADR-AG-015 — a reference may not invent)', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; supersedes ADR-AG-015 decision 1 for points): the reference creates them.
+  it('the submit gate: a reference typed on a canvas that lacks the point creates it', () => {
     const v = decideSubmit('AD גובה לצלע BC', [], 0);
-    expect(v.kind).toBe('refused');
-    if (v.kind === 'refused') expect(v.error.key).toBe('unknown-reference');
+    expect(v.kind).toBe('record');
+    if (v.kind === 'record') expect(v.created).toEqual(['B', 'C']);
   });
 
   it('the submit gate: the same line on the triangle records, and the reversed list — reached by editing — derives clean', () => {

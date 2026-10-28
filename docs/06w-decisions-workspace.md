@@ -6411,3 +6411,28 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Decision.** The six atoms move verbatim to `shell/incidencePhrase.ts`, with the Latin-letter guards as private constants, and `src/parser/lexicon.ts` re-exports them (the precedent of `shell/indexedName` and `shell/vulgarFractions`). The module adds two generic helpers: `incidencePhraseAtStart(text)` (one opener at the start, within one clause) and `firstIncidenceOpener(text)` (where the first opener after a head starts). It holds no product knowledge: whether a phrase is *read* stays each builder's own question, asked of its own reader (2-D's deletion in `unreadThrough`, analytic's declined-line arm).
 
 **Consequences.** 2-D's `unreadThrough` and analytic's `declinedThrough` read one spelling; a new opener spelling lands in both. No import edge changes (`shell` is already importable by both), and `server/__tests__/isolation.test.ts` stays green. The inline-Hebrew ratchet ([ADR-W-153](#adr-w-153)) gains `shell/incidencePhrase.ts: 4`: the four Hebrew literals are grammar atoms that left `src/parser/` (exempt), as `shell/conjunction.ts`'s are, not sentences.
+
+## ADR-W-162 — A line that refers to a point the figure lacks creates it in every builder, and one shared notice says so, with a ✕ that removes the line (#1467)
+
+**Status:** accepted · 2026-10-27 · feature (all tools) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · **supersedes** #840's 3-D typo guard (2026-08-31) and [ADR-AG-015](06c-decisions-analytic.md#adr-ag-015) decision 1 for points · per builder: [ADR-769](06-decisions.md#adr-769) (2-D), [ADR-3D-382](06b-decisions-3d.md#adr-3d-382), [ADR-AG-342](06c-decisions-analytic.md#adr-ag-342); complex is a known gap (#2562, ADR-W-160)
+
+**Operator:** ruling of 2026-09-27 on #1467 (/decisions pass), *"Create everywhere + notice"*, follow-up (the typo guard) *"Notice with one-click undo"*; #2048 ruling A (2026-10-13), *"A referenced point that does not exist is created, with #1467's notice"*, and card d5-2048-tools, *"every builder that has these objects creates them the same way"*; play verdicts T36/T37/T41/T49 of 2026-10-24 on round #2466's sheet.
+
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder table row "A line that refers to a point the figure lacks" · **Design:** [04w](04w-design-shell.md) § "The created-points notice"
+
+**Context — measured at `d9494206`** (2-D `decideDeterministic2D` → `replay`; 3-D `useGeo3.submit`; analytic `decideSubmit`; the model mocked). One sentence, four policies, none of which told the student:
+- 2-D created a referenced point only when the winning rule happened to emit a `segment` carrier («M אמצע AB»); «AB = 2 AD», «AD:DB = 1:2», «שטח המשולש ABC הוא 13» refused «… references an unknown point».
+- 3-D refused `unknown-point` everywhere except a bare «קטע» with one known end.
+- Analytic created silently for the forms 2-D created for (ADR-AG-210) and refused the rest.
+- Complex created silently.
+
+**Decision.**
+1. **The rule, in every builder that has points:** a line that refers to a point the figure does not have creates it as a free point (ADR-052: no position assumed, resampled by «הציגו תצורה אחרת»), exactly as that builder's bare point declaration would, and the line then means what it means when the point exists. Nothing else is created. Circles, lines, planes, solids and vectors as objects are #2048, #2489 and #2484.
+2. **Which operands are missing is each builder's own reference-resolution answer**, never a list of command kinds: 2-D reads the engine's `objectParents` / `constraintRefs` over the structurally applied batch; 3-D and analytic read the `unknown-point` / `unknown-reference` their fold already reports. In 3-D and analytic the creation is the fold's LAST resort, after the deferral fixpoint, so a point any line declares binds and «M אמצע AB» typed above «A(0,0)» never mints. A line that still fails after creating keeps nothing it created.
+3. **The notice** is one suite sentence in every builder — `suite.notice.createdPoint` «נוצרה נקודה חדשה {{names}} — אם זו טעות הקלדה, לחצו ✕ לביטול השורה», `suite.notice.createdPoints` «נוצרו נקודות חדשות {{names}} — …» — rendered by `shell/frame/CreatedNotice.tsx`. Its ✕ removes the line (so the points go too: every builder derives positions from its list). It names only points created by REFERENCE: a line that declares its points («משולש ABC», «קטע AB», «נקודה C», coordinates, a solid) announces nothing, and a line's own subject (M of «M אמצע AB») is never named. It is shown while its line is the last row, so the next line, a ✕, an undo or an edit retires it.
+4. **The notice is the typo guard.** «M אמצע AQ'» after a cube creates Q' and the notice names it; this replaces #840's refusal, as #840's own revisit condition foresaw.
+5. **§5c lock:** `shell/session/createdPoints.ts` declares `CreatedPointsAdapter`; `shell/__tests__/fixtures/created-notice-rows.ts` holds the five rows (reference names exactly the referenced labels; ✕ removes the line and its points; a typo names only itself; a declaration announces nothing; the next line retires it); `created-notice-meta.test.ts` runs them against four broken adapters. Each builder's `created-notice-1467.test.ts` hands its real submit path.
+
+**Known gap.** Complex keeps creating silently; its notice is #2562 (`later`, ADR-W-160): it needs its own created-by-reference reader, not a trivial port.
+
+**Consequences.** The four builders answer «M אמצע AB» on a blank page the same way. The refusals that taught "define the point first" for a missing point are no longer reached for points named by letters.

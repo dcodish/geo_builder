@@ -165,12 +165,13 @@ describe('#926 — unchanged guards', () => {
     expect(state().lastError).toEqual({ code: 'unknown-symbol', id: 'α' });
   });
 
-  it('a delete that breaks a POINT dependent is the same class and gets the same report', () => {
+  // ⚠ REWRITTEN by #1467 (ADR-3D-382; operator ruling 2026-09-27 "Create everywhere + notice"; #1467 §8b): a delete that removes a
+  // point's definition no longer breaks its dependent — the dependent creates the point free, the list without that row.
+  it('a delete that removes a POINT a dependent names leaves the dependent green, on a free point', () => {
     [BOX, 'E אמצע AB', "|EC'| = 4"].forEach(submit);
     expect(state().facts.map((f) => f.utterance), 'precondition: all three rows were accepted').toEqual([BOX, 'E אמצע AB', "|EC'| = 4"]);
-    expect(statusOf("|EC'| = 4"), 'precondition: the dependent row is green before the delete').toBe('ok');
     state().remove(factByText('E אמצע AB').id);
-    expect(state().lastError?.code).toBe('dependents-broken');
-    expect(state().lastError && 'items' in state().lastError! ? (state().lastError as { items: string }).items : '').toContain("|EC'| = 4");
+    expect(state().lastError).toBeNull();
+    expect(statusOf("|EC'| = 4")).toBe('ok');
   });
 });

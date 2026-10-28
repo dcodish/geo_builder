@@ -1,0 +1,51 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-27T12:00:00.000Z",
+  "name": "create-on-mention-typo-1467",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "utterance": "AB = 2 AX",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "X",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AB = 2 AX",
+      "group": "g1",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "B",
+        "c": "A",
+        "d": "X",
+        "k": 2
+      },
+      "enabled": true
+    }
+  ]
+}

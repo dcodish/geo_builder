@@ -305,9 +305,9 @@ describe('#1652 — a length given draws the pair it names; a distance draws not
     expect(last(['A(0,0)', 'B(3,4)', 'AB = 6'])).toBe('refused:unsatisfiable');
   });
 
-  it('a scaled length over points that do not exist still refuses — the drawn piece never introduces them', () => {
-    // #1670 (ADR-AG-210): a PLAIN length («OC = 15») now mints its new letters, as 2-D does; a scaled one does not, in
-    // either builder — so the drawn piece is still never what introduces a point.
-    expect(last(['OC = 2OD'])).toBe('refused:unknown-reference');
+  // ⚠ REWRITTEN by #1467 (ADR-AG-342; operator ruling 2026-09-27 "Create everywhere + notice", and 2-D now creates every referenced point too, ADR-769): 
+  // a scaled length mints its letters too; the mint pass introduces them, never the drawn piece.
+  it('a scaled length over points that do not exist creates them (the mint pass, not the drawn piece)', () => {
+    expect(last(['OC = 2OD'])).toBe('record');
   });
 });

@@ -282,8 +282,9 @@ From the «lines and points» corpus (§8), numbered onward.
 
 **R143 — a sentence that names points or a circle the figure does not have yet builds as it does in the 2-D tool**. *(Operator: "accept new letter with same logic the 2d tool has".)* An unlettered centre is never «O» until named.
 - «AB קוטר» · «OB רדיוס» → O is the centre
-- «BD⊥AC», «M אמצע AB», «AB = 5» with new letters → free points, as in 2-D; «AB = 2CD», «AD גובה לצלע BC» still refused, as in 2-D
-- Sources: ADR-AG-210, #1670, #1686.
+- «BD⊥AC», «M אמצע AB», «AB = 5» with new letters → free points, as in 2-D
+- **⚠ Amended by ADR-AG-342 (#1467, 2026-10-27):** EVERY sentence that refers to points the figure lacks creates them, as 2-D now does («AB = 2 AD», «AD תיכון לצלע BC», «שיפוע הישר AB שלילי»), and the shared notice «נוצרו נקודות חדשות … — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» names them; ✕ removes the line. A missing circle is still refused (#2048).
+- Sources: ADR-AG-210, ADR-AG-342, #1670, #1686, #1467.
 
 ### Lines and crossings
 

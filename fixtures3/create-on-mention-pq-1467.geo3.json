@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-27T15:35:55.775Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "PQ = 2AB",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "P",
+          "to": "Q",
+          "terms": [
+            {
+              "coeff": {
+                "k": 2,
+                "p": 0
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "A",
+                "to": "B"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
