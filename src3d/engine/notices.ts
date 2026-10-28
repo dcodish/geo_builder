@@ -22,7 +22,7 @@ import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, pl
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
 import type { Resolved3 } from './evaluate';
-import type { Construction3, Id, Operand3, Positions3, SolidKind } from './types';
+import { unusedLetter3, type Construction3, type Id, type Operand3, type Positions3, type SolidKind } from './types';
 
 /**
  * #1918 (ADR-3D-313) — the FIGURE-MISMATCH channel: what the drawing on screen shows that a stated noun says
@@ -78,6 +78,18 @@ export interface NarrowedRing3 {
   readonly note: RingNote;
 }
 
+/**
+ * #2092 (ADR-3D-381): the slots of the bare-naming note — the sentence as the reading took it, the pair, and the
+ * TAUGHT length spelling. One composition, read by the page and by the lock that submits the taught line, so the
+ * message and the accepted spelling cannot drift apart (docs/17 §9).
+ */
+export function bareNamingSlots(n: { name: string; from: Id; to: Id; alt: string }): { sentence: string; name: string; pair: string; taught: string } {
+  const pair = `${n.from}${n.to}`;
+  // #2581 (ADR-3D-385, operator ruling 2026-10-27: "it should suggest a new letter"): the taught length uses a letter
+  // the figure does not use, so following the note never meets the vector-letter refusal
+  return { sentence: `${pair} = ${n.name}`, name: n.name, pair, taught: `|${pair}| = ${n.alt}` };
+}
+
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
   | {
@@ -119,6 +131,18 @@ export type BuildNotice3 =
        *  is built against the line, and the wording is corrected. */
       kind: 'line-rel-noun';
       line: string;
+    }
+  | {
+      /** #2092 (ADR-3D-381): a BARE «AB = k» (no «נסמן») was read as NAMING the vector AB «k». The line has two
+       *  readings, so the kept one is said aloud, with the spelling of the other («|AB| = k», a length) — the
+       *  operator's ruling of 2026-10-14 (card d14b-2092-k, "A, with teaching"). Every bare naming, whatever the
+       *  letter: u, v, w are "just convention". Derived from the vector's own flag, so it survives undo and load. */
+      kind: 'vector-named-bare';
+      name: string;
+      from: Id;
+      to: Id;
+      /** #2581 (ADR-3D-385): the letter the taught length uses — one the figure does not use */
+      alt: string;
     }
   | {
       /** #333 (ADR-3D-153): the student named an intersection line `ℓ` while `ℓ` was already another
@@ -389,6 +413,8 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   for (const r of c.lineRels) {
     if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
   }
+  // #2092 (ADR-3D-381): a vector named by a bare «AB = k» — the reading the line got, said aloud
+  for (const [name, v] of c.vectors) if (v.bare) out.push({ kind: 'vector-named-bare', name, from: v.from, to: v.to, alt: unusedLetter3(c) });
   // #333 (ADR-3D-153): an intersection line that did not get the name the student wrote
   for (const [name, def] of c.lines) {
     if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {

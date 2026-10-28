@@ -299,6 +299,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   'mag-val': true, // #393/#335: |expr| = value is an absolute size, like `length`/`distance`
   volume3: true, // #1447: an absolute size (scales as s³)
   area3: true, // #1447: an absolute size (scales as s²)
+  'letter-tie': true, // #2580 (ADR-3D-384): a length equal to a NUMBER (a coordinate, a symbol, a ratio) is an absolute size
 };
 
 /**
@@ -342,7 +343,34 @@ const PIN_OPERAND_PAIRS: { [K in ScalarPin['kind']]: (c: Construction3, p: Extra
   distance: (_c, p) => tag3([p.a.kind === 'point' && p.b.kind === 'point' ? [p.a.id, p.b.id] : null], false),
   'mag-rel': (c, p) => tag3([...exprPairs3(c, p.e1), ...exprPairs3(c, p.e2)], false),
   'mag-val': (c, p) => tag3(exprPairs3(c, p.e), false),
+  'letter-tie': (_c, p) => tag3([[p.a, p.b]], false),
 };
+/**
+ * #2580 (ADR-3D-384) — the NUMBER a pivot-owned letter names, read off positions (and the pivot's symbol slots): one
+ * reader for the pivot's `letter-tie` residual and the `length-letter` verifier, so the drive targets what the arbiter
+ * checks. `undefined` when a point it reads is not placed.
+ */
+export function pivotLetterValue3(
+  c: Construction3,
+  q: import('./types').PivotLetter3,
+  at: (id: Id) => Vec3 | undefined | null,
+  symAt: (sym: string) => number | null | undefined,
+): number | undefined {
+  if (q.kind === 'sym') return symAt(q.sym) ?? undefined;
+  if (q.kind === 'component') return componentValue(c, q.target, q.axis, (id) => at(id) ?? undefined);
+  const def = c.points.get(q.id);
+  if (def?.kind !== 'on-segment') return undefined;
+  const a = at(def.a);
+  const b = at(def.b);
+  const e = at(q.id);
+  if (!a || !b || !e) return undefined;
+  const ab = sub3(b, a);
+  const len2 = dot3(ab, ab);
+  if (!(len2 > 1e-12)) return undefined;
+  const t = dot3(sub3(e, a), ab) / len2;
+  return q.fromB ? 1 - t : t;
+}
+
 /** #2503 (ADR-3D-378): every operand pair of one driving relation (see {@link PIN_OPERAND_PAIRS}). */
 export function pinOperandPairs3(c: Construction3, pin: ScalarPin): PinPair3[] {
   return (PIN_OPERAND_PAIRS[pin.kind] as (c: Construction3, p: ScalarPin) => PinPair3[])(c, pin);
@@ -1089,6 +1117,13 @@ export function solvePivot(
         const a = at(pin.a);
         const b = at(pin.b);
         out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);
+      } else if (pin.kind === 'letter-tie') {
+        // #2580 (ADR-3D-384): |ab| − coef·(the number the letter also names), the number read at the trial unknowns:
+        // a pin symbol's slot, a named component's coordinate, a rider's parameter off its host — signed, so it crosses
+        const a = at(pin.a);
+        const b = at(pin.b);
+        const v = pivotLetterValue3(c, pin.q, at, (sym) => symAt(x, sym));
+        out.push(a && b && v !== undefined ? norm3(sub3(b, a)) - pin.coef * v : 10);
       } else if (pin.kind === 'vangle') {
         const vtx = at(pin.vertex);
         const p = at(pin.p);

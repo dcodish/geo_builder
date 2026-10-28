@@ -873,7 +873,34 @@ const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
 function paramPinProbes(c: Construction3): ParamPinProbe[] {
   if (!c.param) return [];
   const rels = paramPinningRels(c).map((pin) => relPinProbe(c, pin)).filter((p) => !holdsForEveryValue(p));
-  return [...rels, ...paramLinePerps(c).map((g) => perpPinProbe(c, g))];
+  return [...rels, ...paramLinePerps(c).map((g) => perpPinProbe(c, g)), ...lengthLetterProbes(c)];
+}
+
+/**
+ * #2580 (ADR-3D-384) — «|AB| = k» where k is the figure parameter and both ends are TYPED points («A(0,0,0)», or
+ * «C(k,1,0)» itself): the length is a function of k alone, so the tie |AB|(k) − coef·k is one more pinning given in
+ * root-find form, derived from the recorded `length-letter` claim. An end the figure places is the post-pivot lane's
+ * (`paramGivens`, lowered at apply). «C(k,1,0) · A(0,0,0) · B(1,1,1) · |AB| = k» → k = √3; «|AC| = k» has no root.
+ */
+function lengthLetterProbes(c: Construction3): ParamPinProbe[] {
+  const out: ParamPinProbe[] = [];
+  const typedAt = (id: Id, a: number): Vec3 | null => {
+    const d = c.points.get(id);
+    if (d?.kind === 'coord') return v3(d.x, d.y, d.z);
+    if (d?.kind === 'coord-sym') return v3(linVal(d.x, a), linVal(d.y, a), linVal(d.z, a));
+    return null;
+  };
+  for (const cl of c.claims) {
+    if (cl.type !== 'length-letter' || cl.sym !== c.param || c.paramGivens.includes(cl)) continue;
+    const f = (a: number): number => {
+      const p = typedAt(cl.a, a);
+      const q = typedAt(cl.b, a);
+      return p && q ? dist3(p, q) - cl.coef * a : NaN;
+    };
+    const key = JSON.stringify([c.param, cl, c.points.get(cl.a), c.points.get(cl.b)]);
+    out.push({ scans: [f], holds: (a) => { const r = f(a); return !Number.isNaN(r) && Math.abs(r) <= PIN_TOL * Math.max(1, Math.abs(a)); }, key });
+  }
+  return out;
 }
 
 /** Does the parameter value satisfy EVERY pinning given? */
@@ -1238,6 +1265,12 @@ function symbolPinResidual(
   if (!P) return NaN;
   const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
   if (pin.rel === 'value') return kValue - pin.value;
+  if (pin.rel === 'length-sym') {
+    // #2580 (ADR-3D-384): the length letter tied to the ratio — |ab| − coef·k, signed (crosses zero)
+    const a = get(pin.a);
+    const b = get(pin.b);
+    return a && b ? norm3(sub3(b, a)) - pin.coef * kValue : NaN;
+  }
   if (pin.rel === 'length-rel') {
     const a1 = get(pin.a);
     const b1 = get(pin.b);
@@ -1299,7 +1332,7 @@ function pinDrivenSegLen(
     const pb = get(b);
     return pa && pb ? norm3(sub3(pb, pa)) : 0;
   };
-  if (pin.rel === 'length-rel') return seg(pin.a, pin.b);
+  if (pin.rel === 'length-rel' || pin.rel === 'length-sym') return seg(pin.a, pin.b);
   if (pin.rel === 'seg-perp' || pin.rel === 'seg-par')
     return pin.a === vd.unknown || pin.b === vd.unknown ? seg(pin.a, pin.b) : seg(pin.c, pin.d);
   if (pin.rel === 'parallel' || pin.rel === 'perp') return seg(pin.a, pin.b);
@@ -1660,6 +1693,19 @@ export function scaleKnown3(c: Construction3): boolean {
 }
 
 /**
+ * #2594 ([ADR-3D-389](../../docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — IS
+ * THIS LETTER'S VALUE A GAUGE MAGNITUDE? A letter that names a length («|AB| = k», a `lengthMarks` entry) IS that length
+ * over its coefficient, whatever lane also owns it (the #2580 tie sets a coordinate parameter from it). So its value is
+ * knowledge exactly when a length is: when {@link scaleKnown3} holds. Otherwise the drawn value is the frozen similarity
+ * gauge (a bare solid's first dim, |AB| = 1 at every seed — seed-stable, never stated), and printing it asserts a size
+ * the student never gave (ADR-052). The data panel's params row and the ask lane both ask HERE, so «k» can never read a
+ * value on one surface and «?» on the other (the #481 rule, ADR-3D-271).
+ */
+export function letterIsGaugeLength3(c: Construction3, sym: string): boolean {
+  return c.lengthMarks.some((m) => m.label === sym) && !scaleKnown3(c);
+}
+
+/**
  * ADR-3D-033 (M1): a side-less membership statement about a NAMED plane is a GIVEN the figure's free
  * DOFs must satisfy — drivable when the carrier is a point-run plane (it rides the figure) or a numeric
  * equation plane. `'any'` keeps its branch-SELECTION semantics (chooseParam); a side statement is an
@@ -1868,6 +1914,12 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         const p = symAt(cl.a, t);
         const q = symAt(cl.b, t);
         return p && q ? dist3(p, q) - cl.value : NaN;
+      }
+      if (cl.type === 'length-letter') {
+        // #2580 (ADR-3D-384): the tie |ab| = coef·k over the final positions, k being the very value searched for
+        const p = symAt(cl.a, t);
+        const q = symAt(cl.b, t);
+        return p && q ? dist3(p, q) - cl.coef * t : NaN;
       }
       if (cl.type === 'angle-seg-eq') {
         const p1 = symAt(cl.a1, t);

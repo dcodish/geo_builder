@@ -80,6 +80,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'טטראדר ABCD', en: 'tetrahedron ABCD' },
   { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|' },
   { category: 'vectors', he: 'אורך AS שווה לאורך AB', en: '|AS| = |AB|' },
+  // #2092 (ADR-3D-381): a length given as a LETTER — the taught spelling («AB = k» names a vector)
+  { category: 'vectors', he: '|AB| = k', en: '|AB| = k' },
   // #393/#335 (ADR-3D-107): chained + expression magnitudes
   { featured: true, category: 'vectors', he: '|u|=|v|=1', en: '|u|=|v|=1' },
   { category: 'vectors', he: '|u|=|v|=|w|', en: '|u|=|v|=|w|' },

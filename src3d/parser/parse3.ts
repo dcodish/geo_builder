@@ -1959,6 +1959,17 @@ const lengthRel: Rule = (s) => {
       { type: 'segment3', a: a1, b: b1 },
       { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num } },
     ];
+  // #2092 (ADR-3D-381): a LETTER right side on the bar form — «|AB| = k», «|AB| = 2k». The taught spelling of a
+  // length the operator ruled «AB = k» does not mean (that names a vector). Only the bars: «אורך AB הוא k» stays
+  // unread, as its 2-D twin is. The letter is resolved at apply (`length-mark`), where the figure's letters are known.
+  if (lhs[1] !== undefined) {
+    const sym = r.match(new RegExp(`^(?<coef>${MAG})?\\s*[·×*]?\\s*(?<letter>[a-z])$`));
+    if (sym?.groups) {
+      const coef = sym.groups.coef ? magValue(sym.groups.coef) : 1;
+      if (coef === null || !(coef > 0)) return null;
+      return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-mark', a: a1, b: b1, label: sym.groups.letter, ...(coef !== 1 ? { coef } : {}) }];
+    }
+  }
   // [coefficient ·]? tail — tail is |ZW|, |w|, אורך/length ZW, צלע הריבוע ABCD, or bare ZW.
   // The product commutes: the coefficient may come BEFORE (√6/4·|w|) or AFTER (|w|·√6/4).
   const tail = (re: string): { c: number; g: string[] } | null => {

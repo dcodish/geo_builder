@@ -265,7 +265,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
-  '#2092': 'open', // #2097 (ADR-719): 3-D does not read a bar-spelled length set to a letter («|AB| = k»)
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
@@ -1689,7 +1688,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
-  { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+  { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', note: '2-D escalated it before ADR-719; 3-D did not read it before ADR-3D-381 (#2092)' },
+  // #2092 (ADR-3D-381): every builder records «AB = k» — 2-D and analytic as the length k, 3-D as the vector AB named k,
+  // with the note teaching «|AB| = k» (operator ruling 2026-10-14, card d14b-2092-k)
+  { id: 'vector-name-bare-2092', family: 'lengths', steps: ['משולש ABC', 'AB = k'], expect: 'builds', note: '3-D reads a vector name and says so (ADR-3D-381)' },
+  { id: 'abs-length-letter-equal-2092', family: 'lengths', steps: ['משולש ABC', '|AB| = k', '|AC| = k'], expect: 'builds', note: '3-D did not read «|AB| = k» before ADR-3D-381 (#2092)' },
 
   // ── #2215 (ADR-723): a chord after a tangent builds in either order; a role noun spreads only over the pairs it governs ──
   { id: 'tangent-then-chord-2215', family: 'circles', steps: ['מעגל O', 'מעגל P', 'AB משיק למעגל P', 'AB מיתר במעגל O'], expect: 'builds', exception: 'X8', note: '2-D refused the chord as a conflict with the tangent before ADR-723 (the reverse order built); analytic already built it' },

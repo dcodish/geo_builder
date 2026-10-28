@@ -425,6 +425,22 @@ const SEEDED: SeededCorpus = {
   // issue-1188-free-vector.test.ts; this is the build + drift net.
   'free-vector-declare-1188.geo3.json': ['וקטור u', 'וקטור v', 'u = (1,2,3)'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
+
+  // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued
+  // (before: «|AB| = k» was not understood). The equality, the value, the labels and the bare-naming note are asserted
+  // in vector-or-length-2092.test.ts; this is the build + drift net.
+  'length-letter-2092.geo3.json': ["תיבה ABCDA'B'C'D'", '|AB| = k', '|AD| = k', 'k = 3'],
+
+  // #2580 (ADR-3D-384) — the operator's T44 lines: a length letter that is also the coordinate parameter is the
+  // equation |AB| = k, so k = √3 and C = (√3,1,0) (before: «|AB| = k» was not understood). The value, both orders, the
+  // edit and the load are asserted in vector-or-length-2092.test.ts; this is the build + drift net.
+  'param-length-letter-2580.geo3.json': ['C(k,1,0)', 'A(0,0,0)', 'B(1,1,1)', '|AB| = k'],
+
+  // #2594 (ADR-3D-389) — the operator's ruled rows: a length letter on a box whose size nothing fixes reads «k = ?»
+  // (before: «k = 1», the frozen gauge). The panel row and the ask answer are asserted in
+  // gauge-length-letter-2594.test.ts; these are the build + drift net.
+  'gauge-length-letter-2594.geo3.json': ["תיבה ABCDA'B'C'D'", '|AB| = k'],
+  'gauge-length-letter-tie-2594.geo3.json': ["תיבה ABCDA'B'C'D'", 'E(k,1,0)', '|AB| = k'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

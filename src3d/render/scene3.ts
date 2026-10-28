@@ -17,7 +17,7 @@ import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
-import { defaultPlaneDisplay3, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
+import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
@@ -1519,6 +1519,23 @@ export function buildScene3(
     const p = w2s(pa);
     const q = w2s(pb);
     measures.push({ a, b, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: fmt(value) });
+  }
+  // #2092 (ADR-3D-381): a length stated as a LETTER («|AB| = k», «|AB| = 2k») wears that letter in the same lane until
+  // a value lands on it — then the value above is what was stated and the letter yields, as 2-D's label does.
+  {
+    const stated = statedLengths(c);
+    const drawn = new Set<string>();
+    for (const mk of c.lengthMarks) {
+      const key = [mk.a, mk.b].sort().join('|');
+      if (stated.has(key) || drawn.has(key)) continue;
+      const pa = positions.get(mk.a);
+      const pb = positions.get(mk.b);
+      if (!pa || !pb) continue;
+      drawn.add(key);
+      const p = w2s(pa);
+      const q = w2s(pb);
+      measures.push({ a: mk.a, b: mk.b, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: lengthMarkText(mk) });
+    }
   }
 
   // #483 — the crossings the givens determine and nobody has named. The SET is the engine's call

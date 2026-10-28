@@ -12,7 +12,7 @@
  * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
  */
 
-import { knowledgeSamples3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
+import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
@@ -636,6 +636,9 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   // «undetermined», when the honest answer is that the givens allow exactly ±√2 — the answer the exam
   // wants. A single branch answers as a plain value; none at all (an unpinned parameter) is genuinely
   // undetermined and says so.
+  // #2594 (ADR-3D-389): a letter that names a length IS that length, so on a gauge-scaled figure it answers what «|AB|»
+  // answers — «תלוי בקנה המידה» — through the predicate the panel's params row asks (never a lane's own price).
+  if (q.kind === 'symbol' && letterIsGaugeLength3(c, q.sym)) return { text, answer: null, note: 'scale' };
   if (q.kind === 'symbol' && q.sym === c.param) {
     const branches = resolve3(c, seed).param?.branches ?? [];
     const shown = branchAnswer(q.sym, branches); // #1867: «m = -2 או m = 4» once joined by the ask row; 3+ roots → null

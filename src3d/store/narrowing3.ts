@@ -59,7 +59,7 @@ export interface NFact3 {
 /** Commands that only create or name (a point, a segment, a circle, a plane, a noun): no relation of their own. */
 const DEFINITION_CMDS = new Set<string>([
   'solid', 'quad-shape', 'rect-complete', 'segment3', 'point-on-segment3', 'midpoint-auto', 'name-vector',
-  'angle-mark', 'centroid3', 'diag-intersection', 'seg-crossing3', 'quad-diagonals', 'point-in-span', 'param-decl',
+  'angle-mark', 'length-mark', 'centroid3', 'diag-intersection', 'seg-crossing3', 'quad-diagonals', 'point-in-span', 'param-decl',
   'param-sign', 'plane3', 'free-plane', 'free-line', 'line3', 'circle3', 'plane-through', 'line-through', 'draw-arrow', 'declare-vector',
   'revolution', 'plane-plane-line', 'line-plane-point', 'foot-on-plane', 'foot-on-line', 'line-projection',
   'line-common-perp', 'bisector-ray',

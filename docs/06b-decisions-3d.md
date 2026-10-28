@@ -13567,6 +13567,33 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394` (any recorded `dof`) — the batch's to re-record.
 
+## ADR-3D-381 — A bare «AB = k» names a vector and says so; «|AB| = k» is a length named by a letter (#2092)
+
+**⚠ Amended** by [ADR-3D-384](#adr-3d-384) (decision 4, "Scope kept", withdrawn: a length letter that is also a number is tied to it) and [ADR-3D-385](#adr-3d-385) (decision 2's "another namespace" withdrawn: a vector or angle letter is refused as a length; the note teaches a free letter, «|AB| = a»).
+
+**Status:** accepted · 2026-10-27 · feature (P2, 3d) · fix round #2561, stream H · branch `feat/2092-length-letter-not-vector` (from `main`; planned to stack on #1613, which this round skipped while it waits on #1467) · implements the #2092 "Fix plan — 2026-10-14 (second ruling)" · **LADDER stage:** none (3-D parse + apply; a length letter lowers to the existing `length-rel` / `length-eq` lanes)
+**Operator:** 2026-10-14, card `d14b-2092-k`, "A, with teaching": *"we need a way to distinguish. on one hand, u, v, w are the common names for 3d vectors, but it is true that this is just convention. so the syntax should be as option A suggests but we say that if the length was the meaning they should write |AB|=k. so we educate also."* Confirmed 2026-10-23 by #2253's d03 A (the vector reading stays; #2253's "an unknown letter in a vector statement defines it" is its own item).
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2f · **Design:** [04b](04b-design-3d.md) § "The symbol registries" (the length-letter owner) and § "The stated-magnitude lane" (the letter label, the bare-naming note)
+**Siblings:** 2-D reads «AB = k» and «|AB| = k» as the length k ([ADR-719](06-decisions.md#adr-719), #2097); analytic reads «|AB| = k» as a length. 3-D's «AB = k» is a vector by the X7 ruling (#1184), so its verdict differs in kind, not in "builds".
+
+**Measured before** (`main` @ d9494206, the store's real `submit` → `derive3`; no model call): «תיבה ABCDA'B'C'D'» · «AB = k» (also «משולש ABC» · «AB = k», «AB = u») recorded `vec-rel` → `name-vector` k = AB with **no notice**; «… · AD = k» refused `claim-refuted`; «… · k = 3» refused `unknown-symbol`; «|AB| = k» **not-understood** (`parse3` `not-handled`); «|AB| = 4» records `length-eq`; «נסמן: AB = k» records the naming with no notice; «AB = k» · «∠BAD = k» both record (a vector name and a scalar letter are separate namespaces).
+
+**Two causes.** (1) *A line read one of two ways was read silently:* the bare arm of `vec-rel` (`apply.ts`) turned «AB = <new letter>» into `name-vector` and said nothing. (2) *A stated length given as a letter was not read in 3-D, while its numeric twin and its angle twin were:* `lengthRel` (`parse3.ts`) read a number, a pair or a vector magnitude on the right of «|XY| =», never a letter, and no symbol owner existed for a length.
+
+**Decision.**
+1. **The note.** The bare arm emits `name-vector` with `bare: true`; the flag rides the vector record (`Construction3.vectors`), and `buildNotices3` emits `{ kind: 'vector-named-bare', name, from, to }` for each such vector, worded `notice.vectorNamedBare` over the slots `bareNamingSlots` composes (the sentence, the pair, the taught `|AB| = k` — one source for the page and for the lock that submits it) (he: ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה «|AB| = k».»; en: the translation). Every bare naming, whatever the letter (u, v, w are "just convention"); «נסמן:» emits `name-vector` directly, unflagged, and shows nothing. Derived from the construction, so undo, the ✎ edit and load agree.
+2. **The length letter.** `lengthRel` admits, on the bar form only, a right side `[MAG coefficient][·]letter` (one lowercase Latin letter, coefficient > 0) and emits `segment3` + `{ type: 'length-mark', a, b, label, coef? }`. Apply records it in `Construction3.lengthMarks` (the length twin of `angleMarks`); the length stays a free DOF. The same letter on another segment lowers to `length-rel` |XY| = (coef/coef₀)·|ZW| against the first segment wearing it, so M1 drives or verifies it; the identical statement again adds nothing. `symbolOwnersOf` gains `{ kind: 'length', marks }` (and `figureSymbolsOf` the letter), so `symbol-value` gives each marked segment the ordinary `length-eq` claim of coef·value, and the data panel prices the letter off the drawn segment (|XY|/coef), «?» while it is free.
+3. **The canvas.** `scene3` draws a length letter in the stated-magnitude lane with `lengthMarkText` («k», «2k») until a value is stated on that pair; then the value (from `statedLengths`) is the label.
+4. **Scope kept.** A letter the figure already gives another owner (a coordinate or pin symbol, the parameter, an angle name, a vec-def ratio — «C(k,1,0)» first) keeps the verdict it had: `readStatement3` answers `not-understood` for that line. «אורך AB הוא k» stays unread (its 2-D twin escalates too). `figureFile3` saves `length-mark`; `narrowing3` lists it with the definitions.
+
+**Deviations from the plan.** (a) Branched from `main`, not stacked on #1613 (skipped this round: its audit sequences it after #1467). (b) The parity row the plan named `abs-length-letter-2092` already existed as `abs-length-var-2097` with a 3-D known gap on #2092; the gap is dropped (and `#2092` from `GAP_ISSUES`) instead of adding a duplicate row. `vector-name-bare-2092` carries no `exception` (every builder records the line, so the verdict is shared; the X7 patterns do not match «AB = k»). Added `abs-length-letter-equal-2092` («|AB| = k» · «|AC| = k»). (c) The canvas shows the value once the letter is valued; no letter/value chip is added for lengths (the #937 chip is the angle arc's), so "with letter k" is carried by the data panel's «k = 3» row. (d) The note's two quoted spans are written «…», not the plan's straight quotes: the standing quote-style ruling (#2202 d1, #2241 for English) that `shell/__tests__/quote-style.test.ts` and `src3d/__tests__/issue-802.test.ts` enforce. The words are the plan's.
+
+**Locks.** `src3d/__tests__/vector-or-length-2092.test.ts` (the note with its exact Hebrew and English on a box, a triangle, «AB=k» and «AB = u»; none after «נסמן»; «|AB| = k» / «|AB|=k» label «k» and a free length across seeds; equal letters equal at seeds 0–2; «|AA'| = 2a» twice; «|AB| = 2k» label «2k», then «k = 3» → 6 and label «6»; the fixture's lines → both edges 3; the taught remedy read out of the note and accepted on the next Enter, and as the ✎ edit of the «AB = k» row; the out-of-scope letter, «אורך AB הוא k» and the numeric control). Fixture `fixtures3/length-letter-2092.geo3.json` («תיבה ABCDA'B'C'D'» · «|AB| = k» · «|AD| = k» · «k = 3»). Catalog row «|AB| = k» (He + En).
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to judge): any golden row whose session names a vector bare («AB = u») now carries the `vector-named-bare` notice if notices are recorded; any «|AB| = <letter>» row flips from not-understood to recorded.
+
+**Behaviour change for a student:** in 3-D, «AB = k» (and «AB = u») still names the vector and now shows ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו במקום זה «|AB| = k».». «|AB| = k» now builds: AB is labelled k, its length is free, a second «|AD| = k» makes them equal and «k = 3» sets them to 3. Before: no note, and «|AB| = k» was not understood.
+
 ## ADR-3D-382 — A line that refers to a point the figure lacks creates it, last, in the fold: the mint pass (#1467)
 
 **Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · the 3-D half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-3D-191](#adr-3d-191) (the both-fresh «קטע» refusal is withdrawn: a bare segment declares its ends) · **supersedes** #840's 2026-08-31 typo guard and the "nothing is invented" clauses of [ADR-3D-257](#adr-3d-257) / [ADR-3D-259](#adr-3d-259) for points · folds in #2048 S2(a) (points inside a vector line are created too, so `v7-t1`'s "kept" refusal is rewritten here, not locked and rewritten later)
@@ -13616,6 +13643,69 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 
 **Locks.** `src3d/__tests__/free-line-create-2489.test.ts` (17: nine relations × the declared DOF, two lines, the relation at five seeds and moving, no notice, mint-last, the clash, the distance verdict, the circle guard, the bare vector); `free-line.test.ts`'s "a typo must not conjure a line", `plane-line-perp.test.ts`'s «ACD אנך לישר q» and two `refusal-batch1-1995` rows (the taught «ישר k» / «line k» is no longer reached for a line named with its noun) rewritten; fixture `free-line-created-2489.geo3.json`.
 
+## ADR-3D-384 — A length letter the figure also owns as a number is the equation |XY| = coef·k, in every order and every lane (#2580, #2582)
+
+**Status:** accepted · 2026-10-28 · feature fix on PR #2576 (3d) · fix round #2585, stream D · branch `feat/2092-length-letter-not-vector` · **amends** [ADR-3D-381](#adr-3d-381) (decision 4, "Scope kept", is withdrawn for number owners) · **LADDER stage:** Stage 1 (the parameter root-find), the vec-def symbol solve and the Stage-2 pivot each take the tie; the claim verifier is the arbiter
+**Operator:** T44 on PR #2576, 2026-10-27: *"there is no reason why |AB|=k contradicts C(k,1,0)"*; ruling 2026-10-27 on #2580 (the angle letter: *"if its an angle we refuse"*, see [ADR-3D-385](#adr-3d-385)).
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2f · **Design:** [04b](04b-design-3d.md) § "The symbol registries" (the length-letter tie)
+
+**Measured before** (PR #2576 merged with `main` @ 422cda84, the store's real `submit` → `derive3`, seeds 0–2, model mocked): «C(k,1,0) · A(0,0,0) · B(1,1,1) · |AB| = k» refused the last line `not-understood`, and so did «|AB| = 2k», «|AC| = k», the equation parameter («π: x + (m-2)y + z = 0» · «|AB| = m»), a vec-def ratio («משולש ABC · N על AC · AN = k·AC» · «|AB| = k»), a rider («SE = t·SA» · «|AB| = t») and a named component (cube · «C(p,1,0)» · «|AB| = p»). The mirror order «A · B · |AB| = k · C(k,1,0)» recorded every line with k sampled freely (C at x ≈ −0.006) while AB wore «k» (#2582).
+
+**Root cause.** ADR-3D-381 made the length letter a `symbolOwnersOf` owner that never TIED to the letter's other owners; it met them only when a value arrived («k = 3»). With nothing that could bind a length to a number the figure already owns, decision 4 forbade the sharing with a guard in `readStatement3` — a guard at one submit seam, which only sees owners that exist when «|AB| = k» is typed. The other order, a file load and the ✎ edit never passed it (#2582).
+
+**Class.** A stated length given as a letter whose letter the figure also owns as a NUMBER (the figure parameter, an equation's parameter, a vec-def ratio, a named component, a rider's parameter, a pivot symbol) is never lowered to |XY| = coef·sym in the lane that owns the number. #2582 is the same missing tie from the other entry order.
+
+**Decision.**
+1. **The seam guard is deleted**, not extended (the src3d/CLAUDE.md trap: a guard bound to one code path).
+2. **One tie, recorded order-free.** `settleLetters3` (`apply.ts`) runs on the OUTERMOST `applyCommand3` call, after every command: for each length mark whose letter has a number owner and no tie yet, it records the claim `{ type: 'length-letter', a, b, coef, sym }`. Whichever line completes the pair records it, so both orders, the ✎ edit and load give one construction, and the claim is attributed to the newer line by the store's count-delta rule (a refutation names it).
+3. **Each lane drives it** (`lowerLengthLetter3`); the claim is recorded in every case and is the arbiter (M1):
+   - the figure parameter with both ends typed points (`coord` / `coord-sym`): `paramPinProbes` derives one more pinning given, |XY|(a) − coef·a, from the claim (`lengthLetterProbes`), so `pinningGivens`, the DOF cue, the root-find and the blame list agree (#1472). «|AB| = k» → k = √3; «|AB| = 2k» → √3/2; «|AC| = k» (√(k²+1) = k) → the existing `no-roots`, on the newest line; a later «k = 3» → `no-roots` naming «k = 3» and «|AB| = k»;
+   - the figure parameter with an end the figure places: the post-pivot parameter lane (`paramGivens`, ADR-3D-032), whose residual gains the `length-letter` case;
+   - a vec-def ratio with no pin of its own: the symbol pin `{ rel: 'length-sym', a, b, coef, sym }`, solved by the vec-def symbol root-find like `length-rel`;
+   - a pivot symbol, a named component, a rider's parameter: a pivot residual `{ kind: 'letter-tie', a, b, coef, q }` (`solve3.ts`), the number read at the trial unknowns by `pivotLetterValue3` (a symbol's slot, the component off the point, the rider's t off its host). It fixes the scale (`PIN_FIXES_SCALE`: a length equal to a number is an absolute size).
+4. **The verifier** (`claims.ts`, `length-letter`) reads the letter's number once per owner (`letterNumbersAt3`: the parameter's value, the pivot's symbol, the vec-def ratio, the component, the rider's t) and requires |XY| = coef·value for each, so a lane that could not drive the tie is refuted, never drawn silently.
+5. **Unchanged:** `symbol-value` still reaches every owner; the canvas label stays the student's «k»; the data panel prices k from its own lane («k = √3»).
+
+**Sibling audit.** 2-D has no coordinate parameters or vector-ratio letters (`src/` letters are lengths and angles only), so the class is not present. Analytic already reads a coordinate letter and a length letter as ONE number, through `decideSubmit` (measured: «A(k,0) · B(0,0) · |AB| = k» records; «A(k,1) · B(0,0) · |AB| = k» is refused `unsatisfiable`, and so is the mirror «B(0,0) · |AB| = k · A(k,1)»), so 3-D now matches it; nothing filed.
+
+**Locks.** `src3d/__tests__/vector-or-length-2092.test.ts`: the operator's four lines (k = √3, C = (√3,1,0), AB labelled k, panel «k = √3», seeds 0–2); the mirror order; the saved figure loaded through `deserializeFigure3` → `derive3` in both orders; the ✎ edit «|AB| = 2k» → «|AB| = k»; «|AB| = 2k» → √3/2; «|AC| = k» → `no-roots`; «k = 3» → `no-roots` naming both lines; the equation parameter m = √3; the vec-def ratio, the named component (both orders, the cube still varies), the rider and the pivot symbol each hold the tie at seeds 0–2. Fixture `fixtures3/param-length-letter-2580.geo3.json` (the operator's four lines). The PR's "out-of-scope letter" case is removed (it is now the T44 build).
+
+**Behaviour change for a student:** in 3-D, «|AB| = k» after «C(k,1,0)» (or before it) builds and ties the length to k: with A(0,0,0) and B(1,1,1), k = √3 and C sits at (√3,1,0). The same holds when k is an equation's parameter, a vector-definition ratio («AN = k·AC»), a named component or a rider's parameter. Before (PR #2576): «|AB| = k» was not understood after the number, and accepted with k left free before it.
+
+## ADR-3D-385 — A letter has one meaning: a vector letter is not a length or a parameter, an angle letter is not a length — refused in either order, naming the line and offering a free letter (#2581, #2580)
+
+**Status:** accepted · 2026-10-28 · feature fix on PR #2576 (3d) · fix round #2585, stream D · branch `feat/2092-length-letter-not-vector` · **amends** [ADR-3D-381](#adr-3d-381) (decision 2's "a vector name is another namespace" is withdrawn for length letters; decision 1's note teaches a different letter) · **LADDER stage:** none (apply-time binding check)
+**Operator:** T41 on PR #2576: *"we should tell user to use a different letter"*; ruling 2026-10-27 on #2581: *"we refuse the other direction as well"*, the note *"should suggest a new letter"*; ruling 2026-10-27 on #2580: *"if its an angle we refuse"*; ruling 2026-10-28 on #2581: *"yes - a vector name should not be used as a parameter. this is bad practice and will not appear in exams."* Consistent with #2253 d16 (2026-10-23: «k = 3» for a vector k is refused, teaching «|k| = 3»).
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2f · **Design:** [04b](04b-design-3d.md) § "The symbol registries" (one meaning per letter)
+
+**Measured before** (PR #2576 merged with `main` @ 422cda84, store `submit` → `derive3`, model mocked): «תיבה ABCDA'B'C'D'» · «AB = k» · «|AB| = k» recorded both (k a vector AND a length); so did «|AD| = k», «נסמן: AB = u» · «|AD| = u», the mirror «|AB| = k» · «AD = k» / «נסמן: AD = k», «C(k,1,0)» · «AB = k» and its mirror, and «|AB| = k» · «∠BAD' = k». «∠BAD' = k» · «|AB| = k» answered `not-understood` (the deleted seam guard).
+
+**Root cause.** ADR-3D-381 decision 2 treated vector names as "another namespace" (the `length-mark` arm never asked `c.vectors`; `symbolOwnersOf` leaves vector names out), and nothing anywhere asked whether a letter already had a meaning of another KIND. The double meaning was the PR's own new behaviour.
+
+**Class.** A letter given a second meaning that cannot share it with the first — a vector is not a number; an angle is not a length — is accepted in whichever order the guard does not see. The check belongs where letters are bound, once, so it holds in every order, on the ✎ edit and on load.
+
+**Decision.**
+1. **The meaning registry.** `letterMeanings3` (`types.ts`) reads each letter's meanings off the construction: `vector` (`c.vectors`), `length` (`lengthMarks`), `angle` (`angleMarks`), `param` (the figure parameter, a named component, a pivot symbol — every coordinate or equation parameter). `LETTER_MEANING_CLASHES` lists the three ruled pairs: vector × length, vector × param, angle × length. A number letter may still appear in several statements (ADR-3D-384).
+2. **The check** is the first half of `settleLetters3`, on the outermost apply: a clash present after the command and absent before it refuses the command with `{ code: 'letter-meaning-taken', letter, had, of, now, want, alt }`. The earlier meaning is the one the figure had before. `alt` is `unusedLetter3`: the first lowercase letter the figure gives no meaning (never a fixed «a»).
+3. **The line.** `derive3` records, per `letter|meaning`, the first green fact after which the letter had it, and fills `line` from it (the `angle-name-taken` precedent), so every spelling of the first meaning — a bare naming, «נסמן:», a coordinate, an equation — is named the same way.
+4. **The sentences** (new keys `err.letterTaken.*`, one next step each, ADR-W-154; the lead «בשורה «…» » is omitted when no line is known):
+   - vector, then length: «בשורה «AB = k» k כבר נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».»
+   - length, then vector: «בשורה «|AB| = k» k כבר נקבע כאורך הקטע AB, ולכן הוא לא יכול להיות גם שם של וקטור. בחרו לווקטור אות אחרת, למשל «נסמן: AD = a».»
+   - parameter, then vector: «בשורה «C(k,1,0)» k כבר נקבע כפרמטר, ולכן הוא לא יכול להיות גם שם של וקטור. בחרו לווקטור אות אחרת, למשל «נסמן: AB = a».»
+   - vector, then parameter: «בשורה «AB = k» k כבר נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם פרמטר. כתבו את הפרמטר באות אחרת, למשל a.»
+   - angle, then length: «בשורה «∠BAD' = k» k כבר נקבע כשם הזווית BAD', ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».»
+   - length, then angle: «בשורה «|AB| = k» k כבר נקבע כאורך הקטע AB, ולכן הוא לא יכול להיות גם שם של זווית. כתבו את הזווית באות אחרת, למשל «∠BAD' = a».»
+   English: "In the line «AB = k», k was already set as the name of the vector AB, so it cannot also be a length. Write the length with a different letter, for example «|AB| = a»." and its five twins.
+5. **The bare-naming note** teaches the free letter: ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם לאורך, כתבו «|AB| = a».» (`bareNamingSlots` composes `taught` from the notice's `alt`), so following it never meets the refusal. The ✎ edit of the «AB = k» row into «|AB| = a» still builds.
+
+**Deviations from the plan.** (a) The check is one outer-apply pass over the construction's letter registry instead of a test in the `length-mark` arm, because the rulings made it three pairs in both orders: one derivation covers every arm that binds a letter (`name-vector`, the bare `vec-rel`, a coordinate, a component, an equation, `angle-mark`, `length-mark`). (b) "Parameter" covers every coordinate or equation parameter (the figure parameter, a named component, a pivot symbol), per the 2026-10-28 ruling's "a vector name should not be used as a parameter"; a rider's or a vec-def's ratio letter is not a coordinate and is not in the pair. (c) The vector-then-parameter sentence offers the free letter alone («למשל a»), since the refused line's own spelling with the letter replaced cannot be composed safely from the utterance.
+
+**Sibling audit.** 2-D and analytic have no vector-name registry (`src/`, `src-analytic/`: no named vectors), so the class is not present.
+
+**Locks.** `src3d/__tests__/vector-or-length-2092.test.ts`: each of the six sentences with exact He (and En for five); «|AD| = k» and «נסמן: AB = u» · «|AD| = u»; the mirror after «נסמן: AD = k»; a named component on a cube («C(p,1,0)» · «AB = p»); load in both orders through `derive3` (the fact status names the line); controls «|AB| = a» after «AB = k» and «|k| = 3»; the note with the free letter on a box, a triangle and «AB = u», and «b» when «a» is taken; the taught line read out of the note and accepted, and as the ✎ edit. `message-floor-2028.test.ts`: the six clash pairs render student text.
+
+**Behaviour change for a student:** in 3-D, one letter cannot be both a vector and a length, both a vector and a coordinate parameter, or both an angle and a length: the second line is refused in either order, with a sentence that names the line that gave the letter its first meaning and offers an unused letter. The «AB = k» note now teaches «|AB| = a» (a free letter) instead of «|AB| = k». Before (PR #2576): every such pair was accepted with the letter meaning two things, except «∠BAD' = k» · «|AB| = k», which was not understood.
+
 ## ADR-3D-386 — A vector may have no position: the free-vector store, drawn floating (#1188 step 1)
 
 **Status:** accepted · 2026-10-28 · feature (3d) · fix round #2585, stream F · branch `feat/1188-free-vector-step1` · step 1 of the #1188 design plan (2026-10-06); steps 2–6 cite this entry · unblocks #1184 arm 2
@@ -13660,6 +13750,7 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 
 **Behaviour change for a student:** only that the right line is refused — a later line can no longer turn an earlier, correct line red over a name.
 
+
 ## ADR-3D-388 — A free plane is pinned by whatever is stated about it, and a relation naming a missing π-plane creates it: one operand seam, one mint pass (#2484)
 
 **Status:** accepted · 2026-10-28 · feature (3d) · fix round #2585, stream G · branch `feat/2484-create-missing-plane` · **amends** [ADR-3D-124](#adr-3d-124) (ruling 1's membership-only creation is widened to every relation, and moves from `apply`'s `on-planes` case into the fold's mint pass) and [ADR-3D-382](#adr-3d-382) / [ADR-3D-383](#adr-3d-383) (plane slots join the mint pass)
@@ -13692,3 +13783,42 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Perf (docs/17 §7).** The operator's undeclared sequence takes 41 ms to submit. The `free-plane-487` control takes 43 ms for its five lines. The pass adds one dry run per created plane.
 
 **Found while measuring (filed, not built).** Adding a membership on a free plane re-seats the cube's placement at a fixed seed (measured identically for «מישור π3» · «A על המישור π3» before this change; #2592). Two mutually-pinned free planes («π3 ∥ π4») show 2 DOF on the cue, where the pair keeps 4 (pre-existing for two declared planes; #2593).
+
+
+## ADR-3D-389 — A letter that names a length takes the length's scale gate: on a figure whose size nothing fixes it reads «k = ?», in every lane (#2594)
+
+**Status:** accepted · 2026-10-28 · bug fix on PR #2576 (3d) · branch `feat/2092-length-letter-not-vector` · **amends** [ADR-3D-381](#adr-3d-381) (the panel's `length` owner arm) and [ADR-3D-384](#adr-3d-384) (a number owner the tie sets) · **LADDER stage:** none (display / ask knowledge gate)
+**Operator:** ruling 2026-10-28 on #2594, asked whether «תיבה ABCDA'B'C'D'» · «|AB| = k» should keep «k = 1» or show «k = ?» until something fixes the box's size: *"yes - show k=?"*.
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2f (the length letter's value) · **Design:** [04b](04b-design-3d.md) § "The symbol registries" (the scale gate)
+
+**Measured before** (PR #2576 merged with `main` @ de72dd2c, store `submit` → `derive3` → `dataView` / `answerQuery`, model mocked):
+
+| lines | panel | ask «k» | `scaleKnown3` |
+| --- | --- | --- | --- |
+| «תיבה ABCDA'B'C'D'» · «\|AB\| = k» | k = 1 | 1 (from the panel row) | false |
+| «תיבה ABCDA'B'C'D'» · «E(k,1,0)» · «\|AB\| = k» (and the mirror order) | k = 1 | 1 (the param branch) | false |
+| «קובייה ABCDA'B'C'D'» · «\|AB\| = k»; «משולש ABC» · «\|AB\| = k»; box «\|AB\| = k» · «\|AD\| = k» | k = 1 | 1 | false |
+| «משולש ABC» · «AN = k·AC» · «\|AB\| = k» | k = ? | 1 (generic path, `symbol` counted scale-free) | false |
+| «C(k,1,0)» · «A(0,0,0)» · «B(1,1,1)» · «\|AB\| = k» | k = √3 | √3 | true |
+
+|AB| = 1.0000 at all four sampled seeds in every false row: the frozen similarity gauge (ADR-3D-054).
+
+**Class (docs/17 §1).** *A value derived from a length is printed as knowledge on a figure whose scale is a gauge, because the lane that prices it reads seed-stability, and the seeds never vary the scale.* The panel already withholds every |XY| row on such a figure (`hasScale`, ADR-3D-054 / #517); a LETTER that names the length was priced by its owner's lane instead — the `length` arm (|XY|/coef off the drawn segment), the algebraic parameter's branch set (set from the length by the #2580 tie), and in the ask lane the `symbol` query counted scale-free. Three lanes, one missing gate. The hypothesis in the issue was right; it was measured, not assumed.
+
+**Decision.**
+1. **One predicate,** `letterIsGaugeLength3(c, sym)` (`evaluate.ts`, beside `scaleKnown3`): the letter has a `lengthMarks` entry and `scaleKnown3(c)` is false. It reads what the letter MEANS (a length), not which lane owns it, so a future owner kind is gated without being listed.
+2. **The panel asks it first** in the params loop, before the parameter arm and every owner arm: the row is `k = ?`, `open`, and the letter stays out of `known` (so no stated vector row substitutes the gauge value).
+3. **The ask lane asks it first** for a `symbol` query and answers the note `scale` — what «|AB|» itself answers on the same figure («תלוי בקנה המידה (קבעו גודל)»), an existing message. Before, the panel's own fall-through and the param shortcut each reached a different answer, so «k» read «?» on the panel and «1» in the ask (the #481 rule, ADR-3D-271: one decision, two surfaces).
+4. **Nothing else moves.** Where the size is fixed — typed coordinates, a stated length or value, a numeric injection — `scaleKnown3` holds and the forced value prints exactly as before. A letter that names no length is not touched.
+
+**Measured after** (same path): every false row above reads «k = ?» and the ask answers `scale`; the controls hold — T44 «k = √3» / √3; box «|AB| = k» · «|AD| = k» · «k = 3» → 3; cube «|AB| = k» · «k = 3» → 3; cube «|AB| = k» · «|AD| = 3» → 3; cube «|AB| = 2k» · «|AC'| = 6» → 1.73; box «E(k,1,0)» · «|AB| = k» · «k = 2» → 2; «קובייה ABCDA'B'C'D'» · «C(p,1,0)» · «|AB| = p» builds, «p = ?» (undetermined, unchanged); box «E(k,1,0)» · «F(0,1,0)» · «|EF| = 3» · «k חיובי» → 3 (no length mark, ungated).
+
+**Measured, not built.** With k already fixed absolutely (that last control), adding «|AB| = k» on the box is refused `no-roots` naming «|EF| = 3»: the tie cannot rescale a gauge-sized solid. So no buildable figure has a length letter that is forced while `scaleKnown3` is false — the case where this gate could withhold a real value. If that tie is ever made to pin the scale, `scaleKnown3` must learn it in the same change (the #517 rule), or the gate would read it as gauge.
+
+**Sibling audit.** Grepped every reader of a letter's value: `dataView` (the params loop — the only pricing site), `queries.ts` (the param shortcut, the panel-row read, the generic path's `scaleFree` list), `apply.ts` («k = 3» → `length-eq`, a given, not a display). All three display paths now ask the predicate. Other builders: 2-D has no frozen scale gauge — an unstated size is a sampled free DOF (ADR-052), so a length letter's value varies across samples and is not printed (`src/engine/lower.ts` lowers a letter only from a stated value); analytic coordinates are absolute (no scale gauge); complex has no length letters. Class not present elsewhere.
+
+**Locks.** `src3d/__tests__/gauge-length-letter-2594.test.ts`: the issue table and four more gauge figures (cube, triangle, shared letter, coefficient) read «k = ?» with the ask's `scale` note, at four seeds for the operator's box; seven controls keep their values; the two saved figures load to «k = ?». Fixtures `fixtures3/gauge-length-letter-2594.geo3.json` (the operator's box) and `gauge-length-letter-tie-2594.geo3.json` (the #2580 tie) — the build + parser-drift net.
+
+**Perf.** One structural `scaleKnown3` per letter row and per symbol query; no sampling added (M3).
+
+**Behaviour change for a student:** in 3-D, «|AB| = k» on a figure whose size nothing fixes shows «k = ?» (was «k = 1»), and asking «k» says it depends on the scale (was «1»). Once something fixes the size, the value shows as before.

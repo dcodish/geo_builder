@@ -231,9 +231,21 @@ it does not apply:
 `symbolOwnersOf` (`types.ts`) is the **address** registry (#902, ADR-3D-219): a letter's owners — a vec-def's
 ratio («SN = k·SC»), a pivot pin symbol (`pinSymsOf`), the algebraic lane's parameter (`c.param`), a
 labelled angle, a named free component (`partialNames`, #814, ADR-3D-175), or a named rider parameter
-(`riderNames`, #921). A statement addressed to a letter («p = 3», «p חיובי») reaches EVERY owner. `figureSymbolsOf`, the
+(`riderNames`, #921), or a **length letter** (`lengthMarks`, «|AB| = k», #2092, ADR-3D-381 — the length twin of the
+angle mark: `label` the binding letter, `coef` the multiplier; a shared letter lowers to `length-rel`, a value to the
+ordinary `length-eq` claim). A statement addressed to a letter («p = 3», «p חיובי») reaches EVERY owner.
+**One meaning per letter; a number letter, many equations** (#2580/#2581, ADR-3D-384/385). `settleLetters3` (`apply.ts`) runs on
+the outermost apply after every command. It refuses a clash in `LETTER_MEANING_CLASHES` over `letterMeanings3` (vector ×
+length, vector × parameter, angle × length; `letter-meaning-taken`, the first meaning's line filled by `derive3`), and ties
+every length mark whose letter has a NUMBER owner by recording one `length-letter` claim (|ab| = coef·sym), whichever line
+came first. `lowerLengthLetter3` hands the tie to the owner's lane: the parameter root-find (`lengthLetterProbes`, both ends
+typed) or the post-pivot `paramGivens`; the vec-def symbol pin `length-sym`; the pivot residual `letter-tie` for a pin
+symbol, a named component or a rider (`pivotLetterValue3`). The claim is the arbiter in every lane (`letterNumbersAt3`). `figureSymbolsOf`, the
 **display** registry for the panel and the ask lane, is **derived from the address one** (ADR-3D-230); only
-the pricing differs per owner kind, and an undetermined letter reads `?` in every lane.
+the pricing differs per owner kind, and an undetermined letter reads `?` in every lane. **A length letter takes the length's
+scale gate** (#2594, ADR-3D-389): `letterIsGaugeLength3` (`evaluate.ts`, beside `scaleKnown3`) — a letter with a
+`lengthMarks` entry on a figure whose scale is not knowledge — is asked before any owner arm by the panel's params loop
+(the row reads `?`) and by the ask lane (note `scale`), so no lane prices a gauge length as a value.
 
 `symbolPins` is keyed by the symbol's **name**: the relation pins drive a symbol-defined point; the `value`
 pin is read by each lane on its own terms — the vec-def lane as the point's k, the **pivot as a
@@ -994,7 +1006,13 @@ the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expr
 | **length** | **`SceneMeasure3`** | **value only** — the segment is already drawn |
 
 The lengths come from `statedLengths` (`engine/dataView.ts`), shared with the panel and keyed by the
-unordered pair; not gated by `showWitnesses` or by edge visibility.
+unordered pair; not gated by `showWitnesses` or by edge visibility. A **length letter** (`lengthMarks`, «|AB| = k»,
+ADR-3D-381) draws in the same lane with its text (`lengthMarkText`: «k», «2k») until a value is stated on the pair,
+when the value wins.
+
+**A bare vector naming is said aloud** (ADR-3D-381). `vec-rel`'s bare arm (`AB = <new letter>`, no «נסמן») lowers to
+`name-vector` with `bare: true`; the flag rides the vector record, and `buildNotices3` emits `vector-named-bare` for
+each such vector — derived from the construction like every notice, so undo, the ✎ edit and load show the right thing.
 
 ### The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)) — retired
 

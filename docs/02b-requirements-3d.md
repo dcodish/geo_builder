@@ -443,6 +443,29 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   FR-VC-2d's relabel (ADR-3D-052's equality rule stands). A 3-D «AB=a» is a vector (X7), so the length half of
   the ruling has no 3-D sentence.
   - Sources: ADR-3D-344; #2054, #2061, #2023 (operator rulings 2026-10-13, 2026-10-14).
+- **FR-VC-2f (Must)** — **A bare «AB = k» names a vector and SAYS so; a length given as a letter is written
+  «|AB| = k».** Without «נסמן», «AB = k» (any lowercase letter, «AB = u» included, on any host) keeps the vector
+  reading — AB is named k — and the figure shows the note ««AB = k» נקרא כווקטור: k הוא שם הווקטור AB. אם התכוונתם
+  לאורך, כתבו «|AB| = a».» (the taught length uses a letter the figure does not use, ADR-3D-385) for as long as the line stands. «נסמן: AB = k» says "denote" and shows nothing.
+  «|AB| = k» («|AB|=k», «|AB| = 2k») is a stated length named by a letter: AB wears «k» («2k») on the canvas and its
+  length stays free ([ADR-052](06-decisions.md#adr-052)) until a value lands on the letter («k = 3» → |AB| = 3, the
+  label reads «3»; with «2k», 6). The same letter on two segments relates them («|AB| = k» · «|AD| = k» → equal;
+  «|AA'| = 2k» → twice). The taught line builds right after «AB = k», and as the ✎ edit of that row. A length letter the
+  figure also owns as a NUMBER — a coordinate or equation parameter («C(k,1,0)», «π: x + (m-2)y + z = 0»), a
+  vector-definition ratio («AN = k·AC»), a named component, a rider's parameter — is the equation |AB| = coef·k, in
+  either order, on the ✎ edit and on load: «C(k,1,0) · A(0,0,0) · B(1,1,1) · |AB| = k» gives k = √3 and C = (√3,1,0);
+  a length that cannot equal it («|AC| = k» there) or a later «k = 3» against it is the existing contradiction on the
+  newest line (ADR-3D-384). A letter has ONE meaning of each kind that cannot share it: a vector letter is not a length
+  or a parameter, and an angle letter is not a length. The second line is refused in either order with a sentence that
+  names the line that gave the first meaning and offers a letter the figure does not use, e.g. «בשורה «AB = k» k כבר
+  נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».» (ADR-3D-385).
+  «אורך AB הוא k» is not read, as in 2-D. A length letter IS a length, so the data panel and the ask lane give its value
+  only when the figure's size is fixed by what was stated (typed coordinates, a stated length or value): «תיבה
+  ABCDA'B'C'D'» · «|AB| = k» shows «k = ?» and asking «k» answers «תלוי בקנה המידה (קבעו גודל)», as «|AB|» does —
+  also when the letter is tied to a parameter («E(k,1,0)»); «C(k,1,0) · A(0,0,0) · B(1,1,1) · |AB| = k» still shows
+  «k = √3» (ADR-3D-389).
+  - Sources: ADR-3D-381, ADR-3D-384, ADR-3D-385, ADR-3D-389; #2092 (operator ruling 2026-10-14, card d14b-2092-k); #2580, #2582
+    (T44, ruling 2026-10-27); #2581 (T41, rulings 2026-10-27 and 2026-10-28); #2594 (ruling 2026-10-28).
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything beyond that is refused and escalated to the operator, not approximated.
   - Sources: operator authority, D3 above; [docs/20 §10](archive/20-space-vectors-tool.md).

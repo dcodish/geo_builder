@@ -12,7 +12,8 @@ import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
-import type { Claim3, Construction3, RevolutionObj } from './types';
+import { symbolOwnersOf, type Claim3, type Construction3, type RevolutionObj } from './types';
+import { pivotLetterValue3 } from './solve3';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
  *  NUMERIC pivot carries the finite-difference-Jacobian floor (~1e-6 in loosely
@@ -83,6 +84,25 @@ export function lineAngleDeg(pos: ReadonlyMap<string, Vec3>, a1: string, b1: str
   return (Math.acos(Math.min(1, Math.abs(dot3(d1, d2)) / den)) * 180) / Math.PI;
 }
 
+/**
+ * #2580 (ADR-3D-384) — the NUMBER a letter names in one resolved configuration, once per number owner
+ * (`symbolOwnersOf`): the figure parameter's value, a pin symbol's solved value, a vec-def ratio's chosen value, a
+ * named component's coordinate, a rider's parameter. Length and angle owners are not numbers of this kind (an angle
+ * letter cannot share a length's name — ADR-3D-385). `undefined` = the lane left it unresolved.
+ */
+export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (number | undefined)[] {
+  const at = (id: string) => r.positions.get(id);
+  const out: (number | undefined)[] = [];
+  for (const o of symbolOwnersOf(c, sym)) {
+    if (o.kind === 'param') out.push(r.param?.value);
+    else if (o.kind === 'pin-sym') out.push(r.pivot?.pinSymbols?.[sym]);
+    else if (o.kind === 'vec-def') out.push(r.ratioSymbols[sym]);
+    else if (o.kind === 'component') out.push(pivotLetterValue3(c, { kind: 'component', target: o.target, axis: o.axis }, at, () => undefined));
+    else if (o.kind === 'rider') out.push(pivotLetterValue3(c, { kind: 'rider', id: o.id, fromB: o.fromB }, at, () => undefined));
+  }
+  return out;
+}
+
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
 
@@ -100,6 +120,16 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
   // («K = (…)») carries no flag and keeps its verify-your-answer register (ADR-3D-075).
   if ('given' in claim && claim.given && resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
   switch (claim.type) {
+    case 'length-letter': {
+      // #2580 (ADR-3D-384): |ab| = coef·(the number the letter names) — for EVERY number owner of the letter, each
+      // read where its lane put it, so a lane that could not drive the tie is refuted here, never silently drawn
+      const a = pos.get(claim.a);
+      const b = pos.get(claim.b);
+      if (!a || !b) return false;
+      const len = norm3(sub3(b, a));
+      const values = letterNumbersAt3(c, claim.sym, resolved);
+      return values.every((v) => v !== undefined && Number.isFinite(v) && Math.abs(len - claim.coef * v) <= REL_TOL * Math.max(Math.abs(len), 1));
+    }
     case 'vec-eq': {
       const l = evalExpr(claim.lhs, c, pos);
       const r = evalExpr(claim.rhs, c, pos);
