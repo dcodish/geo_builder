@@ -17,7 +17,7 @@
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
-import { knowledgeSamples3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
+import { knowledgeSamples3, letterIsGaugeLength3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
@@ -1379,6 +1379,15 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     return value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
   };
   for (const sym of figureSymbolsOf(c)) {
+    /**
+     * #2594 ([ADR-3D-389](docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — a
+     * letter that names a length takes the length's scale gate (`hasScale`, ADR-3D-054), before any owner arm, so no
+     * lane — the length arm below, or a number owner the #2580 tie set from that length — prices it around the gate.
+     */
+    if (letterIsGaugeLength3(c, sym)) {
+      params.push(paramRow(sym, null));
+      continue;
+    }
     // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
     // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
     if (sym === c.param) {

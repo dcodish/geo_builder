@@ -431,6 +431,12 @@ const SEEDED: SeededCorpus = {
   // equation |AB| = k, so k = √3 and C = (√3,1,0) (before: «|AB| = k» was not understood). The value, both orders, the
   // edit and the load are asserted in vector-or-length-2092.test.ts; this is the build + drift net.
   'param-length-letter-2580.geo3.json': ['C(k,1,0)', 'A(0,0,0)', 'B(1,1,1)', '|AB| = k'],
+
+  // #2594 (ADR-3D-389) — the operator's ruled rows: a length letter on a box whose size nothing fixes reads «k = ?»
+  // (before: «k = 1», the frozen gauge). The panel row and the ask answer are asserted in
+  // gauge-length-letter-2594.test.ts; these are the build + drift net.
+  'gauge-length-letter-2594.geo3.json': ["תיבה ABCDA'B'C'D'", '|AB| = k'],
+  'gauge-length-letter-tie-2594.geo3.json': ["תיבה ABCDA'B'C'D'", 'E(k,1,0)', '|AB| = k'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

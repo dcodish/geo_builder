@@ -444,9 +444,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or a parameter, and an angle letter is not a length. The second line is refused in either order with a sentence that
   names the line that gave the first meaning and offers a letter the figure does not use, e.g. «בשורה «AB = k» k כבר
   נקבע כשם הווקטור AB, ולכן הוא לא יכול להיות גם אורך. כתבו את האורך באות אחרת, למשל «|AB| = a».» (ADR-3D-385).
-  «אורך AB הוא k» is not read, as in 2-D.
-  - Sources: ADR-3D-381, ADR-3D-384, ADR-3D-385; #2092 (operator ruling 2026-10-14, card d14b-2092-k); #2580, #2582
-    (T44, ruling 2026-10-27); #2581 (T41, rulings 2026-10-27 and 2026-10-28).
+  «אורך AB הוא k» is not read, as in 2-D. A length letter IS a length, so the data panel and the ask lane give its value
+  only when the figure's size is fixed by what was stated (typed coordinates, a stated length or value): «תיבה
+  ABCDA'B'C'D'» · «|AB| = k» shows «k = ?» and asking «k» answers «תלוי בקנה המידה (קבעו גודל)», as «|AB|» does —
+  also when the letter is tied to a parameter («E(k,1,0)»); «C(k,1,0) · A(0,0,0) · B(1,1,1) · |AB| = k» still shows
+  «k = √3» (ADR-3D-389).
+  - Sources: ADR-3D-381, ADR-3D-384, ADR-3D-385, ADR-3D-389; #2092 (operator ruling 2026-10-14, card d14b-2092-k); #2580, #2582
+    (T44, ruling 2026-10-27); #2581 (T41, rulings 2026-10-27 and 2026-10-28); #2594 (ruling 2026-10-28).
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything beyond that is refused and escalated to the operator, not approximated.
   - Sources: operator authority, D3 above; [docs/20 §10](archive/20-space-vectors-tool.md).

@@ -242,7 +242,10 @@ came first. `lowerLengthLetter3` hands the tie to the owner's lane: the paramete
 typed) or the post-pivot `paramGivens`; the vec-def symbol pin `length-sym`; the pivot residual `letter-tie` for a pin
 symbol, a named component or a rider (`pivotLetterValue3`). The claim is the arbiter in every lane (`letterNumbersAt3`). `figureSymbolsOf`, the
 **display** registry for the panel and the ask lane, is **derived from the address one** (ADR-3D-230); only
-the pricing differs per owner kind, and an undetermined letter reads `?` in every lane.
+the pricing differs per owner kind, and an undetermined letter reads `?` in every lane. **A length letter takes the length's
+scale gate** (#2594, ADR-3D-389): `letterIsGaugeLength3` (`evaluate.ts`, beside `scaleKnown3`) — a letter with a
+`lengthMarks` entry on a figure whose scale is not knowledge — is asked before any owner arm by the panel's params loop
+(the row reads `?`) and by the ask lane (note `scale`), so no lane prices a gauge length as a value.
 
 `symbolPins` is keyed by the symbol's **name**: the relation pins drive a symbol-defined point; the `value`
 pin is read by each lane on its own terms — the vec-def lane as the point's k, the **pivot as a

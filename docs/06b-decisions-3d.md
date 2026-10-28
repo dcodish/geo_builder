@@ -13738,3 +13738,42 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Perf (docs/17 §7).** The operator's undeclared sequence takes 41 ms to submit. The `free-plane-487` control takes 43 ms for its five lines. The pass adds one dry run per created plane.
 
 **Found while measuring (filed, not built).** Adding a membership on a free plane re-seats the cube's placement at a fixed seed (measured identically for «מישור π3» · «A על המישור π3» before this change; #2592). Two mutually-pinned free planes («π3 ∥ π4») show 2 DOF on the cue, where the pair keeps 4 (pre-existing for two declared planes; #2593).
+
+
+## ADR-3D-389 — A letter that names a length takes the length's scale gate: on a figure whose size nothing fixes it reads «k = ?», in every lane (#2594)
+
+**Status:** accepted · 2026-10-28 · bug fix on PR #2576 (3d) · branch `feat/2092-length-letter-not-vector` · **amends** [ADR-3D-381](#adr-3d-381) (the panel's `length` owner arm) and [ADR-3D-384](#adr-3d-384) (a number owner the tie sets) · **LADDER stage:** none (display / ask knowledge gate)
+**Operator:** ruling 2026-10-28 on #2594, asked whether «תיבה ABCDA'B'C'D'» · «|AB| = k» should keep «k = 1» or show «k = ?» until something fixes the box's size: *"yes - show k=?"*.
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2f (the length letter's value) · **Design:** [04b](04b-design-3d.md) § "The symbol registries" (the scale gate)
+
+**Measured before** (PR #2576 merged with `main` @ de72dd2c, store `submit` → `derive3` → `dataView` / `answerQuery`, model mocked):
+
+| lines | panel | ask «k» | `scaleKnown3` |
+| --- | --- | --- | --- |
+| «תיבה ABCDA'B'C'D'» · «\|AB\| = k» | k = 1 | 1 (from the panel row) | false |
+| «תיבה ABCDA'B'C'D'» · «E(k,1,0)» · «\|AB\| = k» (and the mirror order) | k = 1 | 1 (the param branch) | false |
+| «קובייה ABCDA'B'C'D'» · «\|AB\| = k»; «משולש ABC» · «\|AB\| = k»; box «\|AB\| = k» · «\|AD\| = k» | k = 1 | 1 | false |
+| «משולש ABC» · «AN = k·AC» · «\|AB\| = k» | k = ? | 1 (generic path, `symbol` counted scale-free) | false |
+| «C(k,1,0)» · «A(0,0,0)» · «B(1,1,1)» · «\|AB\| = k» | k = √3 | √3 | true |
+
+|AB| = 1.0000 at all four sampled seeds in every false row: the frozen similarity gauge (ADR-3D-054).
+
+**Class (docs/17 §1).** *A value derived from a length is printed as knowledge on a figure whose scale is a gauge, because the lane that prices it reads seed-stability, and the seeds never vary the scale.* The panel already withholds every |XY| row on such a figure (`hasScale`, ADR-3D-054 / #517); a LETTER that names the length was priced by its owner's lane instead — the `length` arm (|XY|/coef off the drawn segment), the algebraic parameter's branch set (set from the length by the #2580 tie), and in the ask lane the `symbol` query counted scale-free. Three lanes, one missing gate. The hypothesis in the issue was right; it was measured, not assumed.
+
+**Decision.**
+1. **One predicate,** `letterIsGaugeLength3(c, sym)` (`evaluate.ts`, beside `scaleKnown3`): the letter has a `lengthMarks` entry and `scaleKnown3(c)` is false. It reads what the letter MEANS (a length), not which lane owns it, so a future owner kind is gated without being listed.
+2. **The panel asks it first** in the params loop, before the parameter arm and every owner arm: the row is `k = ?`, `open`, and the letter stays out of `known` (so no stated vector row substitutes the gauge value).
+3. **The ask lane asks it first** for a `symbol` query and answers the note `scale` — what «|AB|» itself answers on the same figure («תלוי בקנה המידה (קבעו גודל)»), an existing message. Before, the panel's own fall-through and the param shortcut each reached a different answer, so «k» read «?» on the panel and «1» in the ask (the #481 rule, ADR-3D-271: one decision, two surfaces).
+4. **Nothing else moves.** Where the size is fixed — typed coordinates, a stated length or value, a numeric injection — `scaleKnown3` holds and the forced value prints exactly as before. A letter that names no length is not touched.
+
+**Measured after** (same path): every false row above reads «k = ?» and the ask answers `scale`; the controls hold — T44 «k = √3» / √3; box «|AB| = k» · «|AD| = k» · «k = 3» → 3; cube «|AB| = k» · «k = 3» → 3; cube «|AB| = k» · «|AD| = 3» → 3; cube «|AB| = 2k» · «|AC'| = 6» → 1.73; box «E(k,1,0)» · «|AB| = k» · «k = 2» → 2; «קובייה ABCDA'B'C'D'» · «C(p,1,0)» · «|AB| = p» builds, «p = ?» (undetermined, unchanged); box «E(k,1,0)» · «F(0,1,0)» · «|EF| = 3» · «k חיובי» → 3 (no length mark, ungated).
+
+**Measured, not built.** With k already fixed absolutely (that last control), adding «|AB| = k» on the box is refused `no-roots` naming «|EF| = 3»: the tie cannot rescale a gauge-sized solid. So no buildable figure has a length letter that is forced while `scaleKnown3` is false — the case where this gate could withhold a real value. If that tie is ever made to pin the scale, `scaleKnown3` must learn it in the same change (the #517 rule), or the gate would read it as gauge.
+
+**Sibling audit.** Grepped every reader of a letter's value: `dataView` (the params loop — the only pricing site), `queries.ts` (the param shortcut, the panel-row read, the generic path's `scaleFree` list), `apply.ts` («k = 3» → `length-eq`, a given, not a display). All three display paths now ask the predicate. Other builders: 2-D has no frozen scale gauge — an unstated size is a sampled free DOF (ADR-052), so a length letter's value varies across samples and is not printed (`src/engine/lower.ts` lowers a letter only from a stated value); analytic coordinates are absolute (no scale gauge); complex has no length letters. Class not present elsewhere.
+
+**Locks.** `src3d/__tests__/gauge-length-letter-2594.test.ts`: the issue table and four more gauge figures (cube, triangle, shared letter, coefficient) read «k = ?» with the ask's `scale` note, at four seeds for the operator's box; seven controls keep their values; the two saved figures load to «k = ?». Fixtures `fixtures3/gauge-length-letter-2594.geo3.json` (the operator's box) and `gauge-length-letter-tie-2594.geo3.json` (the #2580 tie) — the build + parser-drift net.
+
+**Perf.** One structural `scaleKnown3` per letter row and per symbol query; no sampling added (M3).
+
+**Behaviour change for a student:** in 3-D, «|AB| = k» on a figure whose size nothing fixes shows «k = ?» (was «k = 1»), and asking «k» says it depends on the scale (was «1»). Once something fixes the size, the value shows as before.

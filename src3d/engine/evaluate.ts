@@ -1640,6 +1640,19 @@ export function scaleKnown3(c: Construction3): boolean {
 }
 
 /**
+ * #2594 ([ADR-3D-389](../../docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — IS
+ * THIS LETTER'S VALUE A GAUGE MAGNITUDE? A letter that names a length («|AB| = k», a `lengthMarks` entry) IS that length
+ * over its coefficient, whatever lane also owns it (the #2580 tie sets a coordinate parameter from it). So its value is
+ * knowledge exactly when a length is: when {@link scaleKnown3} holds. Otherwise the drawn value is the frozen similarity
+ * gauge (a bare solid's first dim, |AB| = 1 at every seed — seed-stable, never stated), and printing it asserts a size
+ * the student never gave (ADR-052). The data panel's params row and the ask lane both ask HERE, so «k» can never read a
+ * value on one surface and «?» on the other (the #481 rule, ADR-3D-271).
+ */
+export function letterIsGaugeLength3(c: Construction3, sym: string): boolean {
+  return c.lengthMarks.some((m) => m.label === sym) && !scaleKnown3(c);
+}
+
+/**
  * ADR-3D-033 (M1): a side-less membership statement about a NAMED plane is a GIVEN the figure's free
  * DOFs must satisfy — drivable when the carrier is a point-run plane (it rides the figure) or a numeric
  * equation plane. `'any'` keeps its branch-SELECTION semantics (chooseParam); a side statement is an

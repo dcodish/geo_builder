@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-28T21:05:10.457Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "E(k,1,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "E",
+          "x": null,
+          "y": 1,
+          "z": 0,
+          "syms": [
+            "k",
+            null,
+            null
+          ],
+          "srcs": [
+            "k",
+            "1",
+            "0"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "|AB| = k",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "length-mark",
+          "a": "A",
+          "b": "B",
+          "label": "k"
+        }
+      ]
+    }
+  ]
+}
