@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2489 (ADR-3D-383) — the operator's T45 (2026-10-24): a line named with its noun before it exists is created free by #1467's mint
+  // pass, as «ישר k» declares it. The class is asserted in free-line-create-2489.test.ts; this is the build + drift net.
+  'free-line-created-2489.geo3.json': ['קובייה ABCD', 'הישר k מאונך למישור ABC'],
   // #1467 (ADR-3D-382) — the operator's T41 and T49 (2026-10-24) and the ruling's own sentence: a line naming a point the
   // figure lacks creates it free, last. The notice and the class are asserted in created-notice-1467.test.ts; this is the build + drift net.
   'create-on-mention-cube-x-1467.geo3.json': ["קובייה ABCDA'B'C'D'", 'E אמצע XC'],

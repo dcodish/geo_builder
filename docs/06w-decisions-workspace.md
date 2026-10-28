@@ -6436,3 +6436,17 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Known gap.** Complex keeps creating silently; its notice is #2562 (`later`, ADR-W-160): it needs its own created-by-reference reader, not a trivial port.
 
 **Consequences.** The four builders answer «M אמצע AB» on a blank page the same way. The refusals that taught "define the point first" for a missing point are no longer reached for points named by letters.
+
+## ADR-W-163 — A line named before it exists is created like its declaration; no notice for a created line (#2489)
+
+**Status:** accepted · 2026-10-27 · feature (2-D + 3-D) · fix round #2561, stream I · branch `feat/2489-mention-lines-planes` (stacked on #1467's) · extends [ADR-W-162](#adr-w-162) beyond points · per builder: [ADR-770](06-decisions.md#adr-770) (2-D), [ADR-3D-383](06b-decisions-3d.md#adr-3d-383)
+
+**Operator:** round #2466 verdicts of 2026-10-24 — T45 *"the tool needs to create the line if its referenced with dof"*, T34 *"This should be accepted with dof. Only location for R is on the circle so a point that lins exists."*; ruling 2026-10-24, card e20 = A: *"No notice for lines or for a point with letter coordinates. The new row is the signal, as you chose for planes."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder row "A line that refers to a point the figure lacks" (a named line joins it, without the notice) · **Design:** none (internal) beyond the builders' own entries
+
+**Decision.**
+1. **A line (3-D's named free line) that a statement names in a line slot and the figure lacks is created by the same mint pass as a point**, by applying its declaration («ישר k», `free-line`), so every clash rule of the declaration is inherited. Mint-last and atomicity are ADR-W-162's.
+2. **No notice for a created line** (card e20 = A). The new row is the signal.
+3. **2-D:** a symbolic length («OR=r», «AB = k», «AB = 35/2») names its endpoints like any statement; ADR-769's pass creates them, with the point notice.
+4. **Not here:** planes (#2484, next round, the same pass); a new point with letter coordinates («N(k,p,3)», T46) is its own 3-D item, #2563.

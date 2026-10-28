@@ -644,6 +644,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   השורה» whose ✕ removes the line. A line that still fails creates nothing and says its real reason; a line that
   only declares («קטע QZ», a solid) announces nothing; «אלכסון AB» with no solid stays refused (#978).
   - Sources: ADR-3D-382, ADR-W-162; #1467, #2048.
+- **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
+  למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
+  that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two
+  new lines in one sentence — and in English. A line declared anywhere in the list is used first; a name the
+  declaration refuses (a vector's) is refused as the declaration refuses it. No notice: the new row is the signal.
+  - Sources: ADR-3D-383, ADR-W-163; #2489.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

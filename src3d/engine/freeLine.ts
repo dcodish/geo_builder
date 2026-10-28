@@ -2,9 +2,10 @@
  * #552 — the FREE-standing named LINE: «ישר k» / bare «l1», declared before anything about it is
  * known. The #487 free-plane module, line edition, and deliberately the same shape:
  *
- *  1. `FREE_LINE_TOKEN` — the CONVENTION name shape (canonical `ℓ`, `ℓ1`, …) that relations may
- *     auto-create, exactly as `FREE_PLANE_TOKEN` bounds what an on-planes membership may conjure.
- *     A non-convention name («ישר k») must be declared first — its kind is stated by the noun.
+ *  1. `FREE_LINE_TOKEN` — the CONVENTION name shape (canonical `ℓ`, `ℓ1`, …) that may stand BARE, with no noun
+ *     («l1 ⟂ π»): the parser's tie-break, not creation. ⚠ #2489 (ADR-3D-383): creation is no longer bounded by the
+ *     name's shape — a line named in any line slot that the figure lacks («הישר k …», a convention ℓ alike) is
+ *     created by the fold's mint pass exactly as its declaration «ישר k» creates it.
  *
  *  2. `resolveFreeLine` — the per-seed resolution: whatever the figure PINS is honoured exactly,
  *     everything beyond the pins is SAMPLED (ADR-052 — an unstated direction or position is a free

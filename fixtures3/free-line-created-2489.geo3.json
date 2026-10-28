@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-27T15:42:04.092Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "הישר k מאונך למישור ABC",
+      "cmds": [
+        {
+          "type": "plane-line-perp",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ],
+          "line": "k"
+        }
+      ]
+    }
+  ]
+}

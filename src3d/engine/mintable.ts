@@ -29,6 +29,29 @@ export const declaresOnly3 = (cmds: readonly Command3[]): boolean =>
   cmds.every((k) => k.type === 'solid' || k.type === 'quad-shape' || k.type === 'point3' || (k.type === 'segment3' && !!k.bare && !k.diagonal));
 
 /**
+ * #2489 ([ADR-3D-383](../../docs/06b-decisions-3d.md#adr-3d-383); operator, 2026-10-24, T45: *"the tool needs to create
+ * the line if its referenced with dof"*) — THE LINE SLOTS of a line's commands: every name the parser put where a
+ * LINE goes (`line`, a `{kind: 'line', name}` operand). The parser reaches those slots only through the noun «הישר» /
+ * "line" or the convention token `ℓ`, so the kind is the student's, never guessed. A name reported `unknown-line` is
+ * mintable only from such a slot — so a circle reported through that code («A נמצאת על המעגל») is never made a line.
+ */
+export function lineSlotNames3(cmds: readonly Command3[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'line' && typeof o.name === 'string') out.add(o.name);
+    for (const [k, x] of Object.entries(o)) {
+      if (k === 'line' && typeof x === 'string') out.add(x);
+      else if (typeof x === 'object') walk(x);
+    }
+  };
+  walk(cmds);
+  return out;
+}
+
+/**
  * A command that states something IS AN ELEMENT OF A SOLID (#1467 plan §3.2, "solid-relative statements keep their
  * subject"): a diagonal («אלכסון AB»), the solid's height («XY גובה הפירמידה» — a perpendicular to the solid's own
  * base, `plane: []`), a height to a named base face («גובה מנקודה D לבסיס ABZ»), a tetrahedron's altitude. Free
