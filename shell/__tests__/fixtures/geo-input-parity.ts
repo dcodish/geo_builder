@@ -319,6 +319,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
+  '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1825,6 +1826,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'tangent-opposite-sides-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'משיק משותף ששני המעגלים נמצאים מצדדים שונים שלו'], expect: 'builds', exception: 'X8', note: '«פנימי» by its definition; both handed it to the model before ADR-AG-337' },
   { id: 'line-named-common-tangent-2553', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק משותף חיצוני לשני המעגלים'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic handed it to the model before ADR-AG-337' },
   { id: 'touch-point-noun-2553', family: 'tangents', steps: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3', 'כל המשיקים המשותפים לשני המעגלים', 'A נקודת ההשקה של l1 עם מעגל O'], contextFor: { '2d': ['מעגל O', 'מעגל P'] }, expect: 'builds', exception: 'X4', only: ['analytic'], note: 'the inverse of «הישר l1 משיק למעגל O בנקודה A»; 2-D names no line (X4) and letters every touch it draws; analytic handed it to the model before ADR-AG-337' },
+  // ── #2552 (ADR-AG-336): the exam’s two pair sentences (operator ruling D8 = B: these two only) ──
+  { id: 'pair-each-radius-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2216' }], note: 'analytic draws two radius-5 circles since ADR-AG-336; 2-D hands it to the model (#2216 item 2)' },
+  { id: 'pair-first-centre-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O_1(-3,1)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'a coordinate centre: analytic’s; not-handled before ADR-AG-336' },
+  { id: 'pair-centres-joined-2552', family: 'circles', steps: ['נתונים שני מעגלים שרדיוס כל אחד מהם 5', 'מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)'], contextFor: { '2d': ['שני מעגלים'] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the exam’s joined sentence, cut before «ומרכז»; not-handled before ADR-AG-336' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -1410,6 +1410,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'AB משיק משותף חיצוני לשני המעגלים', en: 'AB is an external common tangent of the two circles' },
   { category: 'circles', family: 'F5', he: 'CD משיק משותף למעגלים O ו-P בנקודה M', en: 'CD is a common tangent to circles O and P at M' },
   // #2553 (ADR-AG-337): the common tangent the sentence does not letter (the tool's A, B), its kind as its definition, its touch named.
+  // #2552 (ADR-AG-336): the exam’s pair sentences — one radius for both, and circle 1’s / 2’s centre by coordinates.
+  { category: 'circles', family: 'F5', he: 'נתונים שני מעגלים שרדיוס כל אחד מהם 5', en: 'two circles each of radius 5' },
+  { category: 'circles', family: 'F5', he: 'מרכז המעגל הראשון הוא O(-3,1)', en: 'the centre of the first circle is O(-3,1)', needs: ['שני מעגלים'] },
   { category: 'circles', family: 'F5', he: 'משיק חיצוני משותף לשני המעגלים', en: 'an external common tangent of the two circles', needs: ['מעגל O', 'מעגל P'] },
   { category: 'circles', family: 'F5', he: 'משיק משותף ששני המעגלים נמצאים באותו צד שלו', en: 'a common tangent with both circles on the same side of it', needs: ['מעגל O', 'מעגל P'] },
   { category: 'circles', family: 'F5', he: 'הישר l משיק משותף חיצוני לשני המעגלים', en: 'the line l is an external common tangent of the two circles', needs: ['מעגל O', 'מעגל P'] },

@@ -493,6 +493,12 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «הישר l משיק לשני המעגלים» (no «משותף», no kind) is not this sentence and goes to the AI, as before
 - Sources: ADR-AG-337, #2553, ADR-AG-313.
 
+**R198 — the exam's two pair sentences: one radius for both circles, and circle 1's or 2's centre by its coordinates**. *(Operator, 2026-10-25, on «שאלה 6»: "I had an issue creating this diagram. It wouldnt accept O_1 / O_2"; scope per his ruling D8 = B, 2026-10-26: "only the exam's exact two sentences".)*
+- «נתונים שני מעגלים שרדיוס כל אחד מהם 5» (also without «נתונים», any number, a radical or a radius letter; English "two circles each of radius 5") draws the pair «שני מעגלים» draws, both circles of that radius
+- «מרכז המעגל הראשון הוא O_1(-3,1)» and «מרכז המעגל השני הוא O_2(9,10)» (any order; «O1», «O_1», «O₁», the minus «−»; English "the centre of the first circle is …") name circle 1's or 2's centre of the drawn pair and place it there; the exam's joined «מרכז המעגל הראשון הוא O1(−3, 1) ומרכז המעגל השני הוא O2(9, 10)» reads as the two. Typed again it is already known; a second letter for a centre already named is refused «כבר יש שם לנקודה הזו: …»; with no pair drawn the circle is created on that centre
+- not read (D8 = B), still handed to the AI: «שני מעגלים שרדיוסם 5», «שני מעגלים ברדיוס 5», «מרכז מעגל O_1(-3,1)», «O_1 מרכז המעגל הראשון», «רדיוס המעגל האחד הוא 5», «מעגל O_1 שמרכזו (-3,1) ורדיוסו 5»
+- Sources: ADR-AG-336, #2552, ADR-AG-322.
+
 **R181 — every common tangent of two circles in one sentence, each named; the tangent at the touching circles' common point**. *(Operator ruling 2026-10-20 on #2390: "we should name them so the user can refer to them later"; #2379.)*
 - «כל המשיקים המשותפים לשני המעגלים» (also «המשיקים המשותפים …», «… למעגלים M ו-N», English) draws every common tangent by how the circles sit: 4 apart, 3 externally tangent, 2 crossing, 1 internally tangent. Each is a full line with its equation row. Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0
 - the names are the student's («המשיקים המשותפים l1, l2 ו-l3 לשני המעגלים»), else the next free l1, l2, … external first («l1», «ישר 1» and «I» count as one name); they are on screen from the start, so a later «הישר l2 …» means that tangent and a new «הישר l1: …» is refused as a name already taken; a count of names that does not match is refused «לא נמצאה תצורה…»

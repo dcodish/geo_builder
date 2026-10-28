@@ -3545,6 +3545,10 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   // nothing when the circle stands: the centre is shown, unnamed, until a sentence names it (#1673, ADR-AG-210).
   if (/^(?:ה?נקודת\s+)?מרכז\s+ה?מעגל$|^(?:the\s+)?cent(?:re|er)\s+of\s+the\s+circle$/i.test(g)) return aboutCircles([{ k: 'the' }], [], line);
 
+  // «מרכז המעגל הראשון הוא O_1(-3,1)» — circle 1 or 2 of a drawn pair, its centre named and placed (#2552).
+  const pairCentre = pairCentreAt(g, line);
+  if (pairCentre) return pairCentre;
+
   // «שני מעגלים …» — two circles the sentence draws, a PAIR (interchangeable until a statement tells them apart).
   const two = /^שני\s+מעגלים(?:\s+(.+))?$/.exec(g) ?? /^(?:the\s+)?two\s+(?:(disjoint|intersecting|nested|concentric)\s+)?circles(?:\s+(.+))?$/i.exec(g);
   if (two) {
@@ -3553,6 +3557,21 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     const rest = trim((he ? two[1] : two[2]) ?? '');
     const pair: CircleSlot[] = [{ k: 'new' }, { k: 'new' }];
     if (!rest && !adjective) return aboutCircles(pair, [], line);
+    /*
+     * «(נתונים) שני מעגלים שרדיוס כל אחד מהם 5» · "two circles, each of radius 5" — THE PAIR WITH ONE RADIUS FOR BOTH
+     * (#2552, ADR-AG-336; the exam's «שאלה 6» opening sentence). The same two circles, each sized as «מעגל ברדיוס 5» sizes
+     * its one: the value is `radiusOfSize`'s slot (a number, a radical, a radius letter). Only this sentence (operator
+     * ruling D8 = B, 2026-10-26): «שני מעגלים שרדיוסם 5» and «… ברדיוס 5» keep going to the AI.
+     */
+    const each =
+      (he ? new RegExp(`^ש(?:ה)?רדיוס\\s+(?:של\\s+)?כל\\s+אחד\\s+מהם\\s+(?:(?:${COPULA_WORDS})\\s*|=\\s*)?(\\S+)$`).exec(rest) : null) ??
+      (!he && !adjective ? /^,?\s*each\s+(?:of\s+|with\s+)?(?:a\s+)?radius\s+(?:of\s+)?=?\s*(\S+)$/i.exec(rest) : null);
+    if (each) {
+      const r = radiusOfSize('radius', each[1]);
+      // A value no reader takes declines, as «מעגל ברדיוס …» does — so a capital is taught (#2427, ADR-AG-325), never misread.
+      if (!r) return null;
+      return aboutCircles([{ k: 'new', r }, { k: 'new', r }], [], line);
+    }
     if ((he && /^זרים$/.test(rest)) || (adjective === 'disjoint' && !rest)) {
       return aboutCircles(pair, [{ t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'apart' }, positive: true }, src: line }], line);
     }
@@ -6798,6 +6817,30 @@ function unnamedCommonTangent(g: string, line: string): RuleOutcome {
   const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
   const [a, b] = [toolPoint('vertex', 'common-tangent-1'), toolPoint('vertex', 'common-tangent-2')];
   return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line, name), line);
+}
+
+/**
+ * «מרכז המעגל הראשון הוא O_1(-3,1)» · «מרכז המעגל השני הוא O_2(9,10)» · "the centre of the first circle is O_1(-3,1)" —
+ * ONE CIRCLE OF THE DRAWN PAIR, ITS CENTRE NAMED AND PLACED (#2552, ADR-AG-336; the exam's «שאלה 6» second sentence).
+ * «הראשון / השני» is read ONLY here (operator ruling D8 = B, 2026-10-26: the exam's two sentences, not a general
+ * reference), extending ADR-AG-322's single-sentence «המעגל האחד / האחר» reader: the `centre-of` fact carries the
+ * ordinal, M1 names that member's centre by order, and the point sentence «X(a,b)» then places it — the two lines
+ * «X מרכז מעגל» · «X(a,b)» in one. With no pair drawn, the circle is created on X, as «X מרכז המעגל» creates it.
+ */
+const PAIR_CENTRE_HE = new RegExp(`^מרכז(?:ו)?\\s+(?:של\\s+)?ה?מעגל\\s+ה(ראשון|שני)\\s+(?:(?:הוא|היא|הינו)\\s+)?(?:ב?(?:ה?נקודה\\s+)?)?(${NAME})\\s*(\\([^()]*\\))$`);
+const PAIR_CENTRE_EN = new RegExp(`^the\\s+cent(?:re|er)\\s+of\\s+the\\s+(first|second)\\s+circle\\s+is\\s+(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})\\s*(\\([^()]*\\))$`, 'i');
+function pairCentreAt(g: string, line: string): RuleOutcome {
+  const m = PAIR_CENTRE_HE.exec(g) ?? PAIR_CENTRE_EN.exec(g);
+  if (!m) return null;
+  const [, word, id, coords] = m;
+  const ordinal: 1 | 2 = /^(?:ראשון|first)$/i.test(word) ? 1 : 2;
+  const placed = parseClause(`${id}${coords}`);
+  if (!placed.ok) return null;
+  const create = parseClause(`נתון מעגל שמרכזו ${id}`);
+  return made([
+    { t: 'centre-of', id, ordinal, ...(create.ok ? { create: create.facts.map((f) => ({ ...f, src: line })) } : {}), src: line },
+    ...placed.facts.map((f) => ({ ...f, src: line })),
+  ]);
 }
 
 /**

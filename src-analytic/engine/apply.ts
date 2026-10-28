@@ -3899,6 +3899,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const create = (): ApplyOutcome =>
         f.create ? applyAll(c, f.create) : { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       let host: GeoObject | undefined;
+      /*
+       * «מרכז המעגל הראשון / השני הוא X(a,b)» (#2552, ADR-AG-336) — circle 1 or 2 of the pair the figure drew, in the
+       * order the pair sentence introduced them. The member whose centre is still unnamed is named X (`namingByOrder`, as
+       * «X מרכז מעגל» names by order); two drawn pairs with that member unnamed ask which. A member whose centre is X
+       * already is known; one lettered otherwise is the existing «already named» refusal. No drawn pair: the sentence
+       * reads as it does without the ordinal.
+       */
+      if (f.ordinal !== undefined) {
+        const members = c.objects.filter((o) => curveKindOf(o) === 'circle' && new RegExp(`^circle-pair\\d+-${f.ordinal}$`).test(o.id));
+        if (members.some((o) => centreIdOf(c, o) === f.id)) return { ok: true, effect: 'known', next: c };
+        const open = members.filter((o) => centreRuleOf(o) !== null && centreIdOf(c, o) === null);
+        if (open.length > 1) return { ok: false, error: noHost(f.src, 'circle', open) };
+        if (open.length === 1 && !objectById(c, f.id)) return namingByOrder(c, open[0], f.id, f);
+        const named = members.length === 1 ? centreIdOf(c, members[0]) : null;
+        if (open.length === 0 && named !== null) return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(named) } };
+      }
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
