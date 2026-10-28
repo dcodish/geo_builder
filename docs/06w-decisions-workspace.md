@@ -6381,6 +6381,25 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 
 **Consequences.** Some items stop landing until their twin bug is fixed or the operator accepts the trade. The sheet stops showing "pass" on behaviour the session knows to be false.
 
+## ADR-W-159 — The roadmap page is refreshed from GitHub by every fix round and status update (#2557)
+
+**Status:** accepted · 2026-10-27 · process (workspace)
+
+**Operator:** 2026-10-26, on the roadmap overview (a claude.ai artifact): *"Does this live as a artifact here, or do we create some other way for the dashboard to stay current?"* He chose a GitHub connector (*"lets connect to github - this sounds like the most robust option"*); his claude.ai account has none (checked twice, the second time after a restart, 2026-10-27). Offered instead: every fix round and status update refreshes the page, with a daily scheduled run on top if it can write the page. Ruling: *"yes"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — the `roadmap-refresh` skill, `scripts/roadmap-snapshot.mjs`.
+
+**Context.** The overview page (https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew) shows the five-week plan, progress per workstream, the open queue by tool and priority, and the plan decisions. It reads its own database and cannot call GitHub. Its data was written once, by hand, on 2026-10-26.
+
+**Decision.**
+1. `scripts/roadmap-snapshot.mjs` computes the page's data from `gh`: each plan issue's state, and one dated snapshot of counts. The first snapshot (2026-10-26) is the baseline and is never overwritten.
+2. The `roadmap-refresh` skill writes it to the page and transcribes any decision answered on the page to its issue.
+3. The fix-round skill (Step 5b) and the status-update skill (Step 4) run it as their last step. It also runs on request.
+4. If a GitHub connector is added to claude.ai later, the page may read GitHub live instead; the plan and decisions stay in its database.
+5. **A daily cloud routine** ("Roadmap refresh — daily", 04:00 UTC) runs steps 1–3 of the skill — read the plan, compute, write `state/issues` and today's snapshot — so the page is current even when no session runs and the operator's PC is off. It never transcribes decisions, edits the plan or touches GitHub; those stay with a session. Cloud sessions refuse GitHub GraphQL (HTTP 403, probe 2026-10-27), so the script reads only through REST (`gh api`); the output was diffed byte-identical against the GraphQL version. Ruling (2026-10-27): *"go ahead with 1-3 and daily run is correct"*.
+
+**Consequences.** The page is at most a day behind the queue; it shows the date of its snapshot. A refresh costs about a minute of `gh` calls, and the routine one short cloud run a day.
+
 ## ADR-W-160 — Priority follows who hit it and where it sits in the teaching plan; `wrong-answer` and `reported` record severity (#2556)
 
 **Status:** accepted · 2026-10-27 · process (workspace) · amends [ADR-265](06-decisions.md#adr-265) (the P1/P2/P3 rubric, docs/22 §2)

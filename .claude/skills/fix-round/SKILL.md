@@ -361,6 +361,11 @@ list** — two versions that differ is how a case gets skipped.
 sync, so the dashboard shows a link to this page. Emit `round playsheet` when you start writing the
 sheet. The dashboard never carries the cases or the verdicts itself.
 
+**Refresh the roadmap page** with the **`roadmap-refresh`** skill once the round's issues are closed or
+labelled ([ADR-W-159](../../../docs/06w-decisions-workspace.md#adr-w-159)), and put its one-line result in
+the final message. The roadmap page is the operator's view of the plan; it is only as current as the
+last refresh.
+
 ## Step 6 — readiness gate (standing rule 5)
 
 **Build, serve and pre-play the sheet with the `/playsheet` skill**; the items below are this round's
