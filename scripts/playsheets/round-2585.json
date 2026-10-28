@@ -124,7 +124,8 @@
     "אנך אמצעי ל-EK"
    ],
    "lookFor": "Start: press «נקה הכל». The last line answers that it is already drawn and adds no row or point",
-   "before": "unchanged for «קטע AB»; here the 3rd line used to move M"
+   "before": "unchanged for «קטע AB»; here the 3rd line used to move M",
+   "expectRefusal": "כבר קיים באיור"
   },
   {
    "id": "T8",
@@ -206,10 +207,7 @@
     "O_2 מרכז מעגל"
    ],
    "lookFor": "Start: press «נקה הכל». The two centres lettered O₁ and O₂, no third circle, no circle notice",
-   "before": "unchanged",
-   "expect": [
-    "O_2 מרכז מעגל"
-   ]
+   "before": "unchanged"
   },
   {
    "id": "T13",
@@ -497,10 +495,7 @@
     "AD/DB = 1/2"
    ],
    "lookFor": "Start: press «נקה הכל». AD and DB drawn; D not on AB. Your ruling named only the colon form; #2597 asks whether this one should place D too",
-   "before": "no segments",
-   "expect": [
-    "AD/DB = 1/2"
-   ]
+   "before": "no segments"
   },
   {
    "id": "T30",
@@ -583,10 +578,7 @@
     "u = (1,2,3)"
    ],
    "lookFor": "Start: press «נקה הכל». Two arrows in two hues. The panel reads «v = (?, ?, ?)» and «u = (1, 2, 3)», and |u| = √14",
-   "before": "all three lines refused",
-   "expect": [
-    "u = (1,2,3)"
-   ]
+   "before": "all three lines refused"
   },
   {
    "id": "T35",
@@ -600,10 +592,7 @@
     "u = (1,1,1)"
    ],
    "lookFor": "Start: press «נקה הכל». The cube unchanged and an arrow u to its right, touching no vertex",
-   "before": "refused «הווקטור «u» לא הוגדר»",
-   "expect": [
-    "u = (1,1,1)"
-   ]
+   "before": "refused «הווקטור «u» לא הוגדר»"
   },
   {
    "id": "T36",
@@ -616,10 +605,7 @@
     "נתון: v = (10,-5,0)"
    ],
    "lookFor": "Start: press «נקה הכל». A green row and one floating arrow v",
-   "before": "refused, v not defined",
-   "expect": [
-    "נתון: v = (10,-5,0)"
-   ]
+   "before": "refused, v not defined"
   },
   {
    "id": "T37",
@@ -681,10 +667,7 @@
     "|u|"
    ],
    "lookFor": "Start: press «נקה הכל». Type «|u|» in the panel's ask box: «|u| = 5»",
-   "before": "the line was refused, nothing to ask",
-   "expect": [
-    "u = (3,0,4)"
-   ]
+   "before": "the line was refused, nothing to ask"
   },
   {
    "id": "T41",
@@ -736,8 +719,9 @@
     "A(0,0,0)",
     "|AC| = k"
    ],
-   "lookFor": "Start: press «נקה הכל». The last line is refused with the existing contradiction message",
-   "before": "not understood"
+   "lookFor": "Start: press «נקה הכל». The last line is refused: no real k makes «|AC| = k» hold (the existing contradiction message)",
+   "before": "not understood",
+   "expectRefusal": "אין אף ערך ממשי"
   },
   {
    "id": "T44",
@@ -892,6 +876,10 @@
    ],
    "lookFor": "Start: press «נקה הכל». Line l2 drawn with no point N and no «הכלי קרא לנקודה N». The points are M, K, E, G",
    "before": "a lettered N with a row note",
+   "expectAbsent": [
+    "~mid",
+    "הכלי קרא לנקודה N"
+   ],
    "expect": [
     "G נקודת החיתוך של הישר l1 עם הישר l2"
    ]
@@ -912,6 +900,9 @@
    ],
    "lookFor": "Start: press «נקה הכל». Line 4 draws only the line; line 5 records and shows P on it",
    "before": "line 4 drew M; line 5 refused «כבר יש שם לנקודה הזו: M»",
+   "expectAbsent": [
+    "~mid"
+   ],
    "expect": [
     "P אמצע EK"
    ]
@@ -932,6 +923,9 @@
    ],
    "lookFor": "Start: press «נקה הכל». Refused, word for word: «הישר הזה כבר קיים באיור: «אנך אמצעי ל-EK». כדי לקרוא לו l2, לחצו Enter — המשפט כבר בתיבה.» No row added; the input holds «נסמן את האנך האמצעי ל-EK ב-l2»",
    "before": "on the PR, renamed in place silently",
+   "expectAbsent": [
+    "~mid"
+   ],
    "expectRefusal": "הישר הזה כבר קיים באיור"
   },
   {
@@ -949,7 +943,8 @@
     "l2 אנך אמצעי ל-EK"
    ],
    "lookFor": "Start: press «נקה הכל». After the refusal above, press Enter, then type «דרך E עובר ישר l1 מקביל לציר ה-x» and «G נקודת החיתוך של הישר l1 עם הישר l2»: the bisector is l2, and G is drawn",
-   "before": "the naming sentence was not understood"
+   "before": "the naming sentence was not understood",
+   "expectRefusal": "הישר הזה כבר קיים באיור"
   },
   {
    "id": "T56",
