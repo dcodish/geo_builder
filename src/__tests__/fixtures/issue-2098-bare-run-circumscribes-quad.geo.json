@@ -148,6 +148,66 @@
         "b": "A"
       },
       "enabled": true
+    },
+    {
+      "id": "g1.w0",
+      "utterance": "ABCD חוסם את המעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@f-AB",
+          "B"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w1",
+      "utterance": "ABCD חוסם את המעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "B",
+          "@f-BC",
+          "C"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w2",
+      "utterance": "ABCD חוסם את המעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "C",
+          "@f-CD",
+          "D"
+        ],
+        "structural": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.w3",
+      "utterance": "ABCD חוסם את המעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "D",
+          "@f-DA",
+          "A"
+        ],
+        "structural": true
+      },
+      "enabled": true
     }
   ]
 }

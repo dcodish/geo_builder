@@ -185,7 +185,9 @@ const SHAPE: Record<string, (P: Vec[]) => [string, number][]> = {
   rightTrapezoid: ([A, B, C, D]) => [['AB∥DC', cross(A, B, D, C)], ['AD⟂AB', dot(A, D, A, B)]],
   isoTrapezoid: ([A, B, C, D]) => [['AB∥DC', cross(A, B, D, C)], ['AD=BC', d(A, D) - d(B, C)]],
   // either axis (ADR-138: «הציגו תצורה אחרת» cycles it): AC (|AB|=|AD|, |CB|=|CD|) or BD (|AB|=|BC|, |AD|=|DC|)
-  kite: ([A, B, C, D]) => [['a kite', Math.min(Math.abs(d(A, B) - d(A, D)) + Math.abs(d(C, B) - d(C, D)), Math.abs(d(A, B) - d(B, C)) + Math.abs(d(A, D) - d(D, C)))]],
+  // #2538 (ADR-763): the kite's equal pairs are SOLVED (a shape-variant over four free touch angles, jointly with each
+  // side's within-the-side order), so they hold to the solver's relative tolerance: read the mismatch per unit perimeter
+  kite: ([A, B, C, D]) => [['a kite', Math.min(Math.abs(d(A, B) - d(A, D)) + Math.abs(d(C, B) - d(C, D)), Math.abs(d(A, B) - d(B, C)) + Math.abs(d(A, D) - d(D, C))) / (d(A, B) + d(B, C) + d(C, D) + d(D, A))]],
   quad: () => [],
 };
 

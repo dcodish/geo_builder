@@ -76,6 +76,27 @@
       "enabled": true
     },
     {
+      "id": "W8SReLKTJYVdh7Ui75ZHE.w0",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "set-line", "points": ["A", "@f-AB", "B"], "structural": true },
+      "enabled": true
+    },
+    {
+      "id": "W8SReLKTJYVdh7Ui75ZHE.w1",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "set-line", "points": ["B", "@f-BC", "C"], "structural": true },
+      "enabled": true
+    },
+    {
+      "id": "W8SReLKTJYVdh7Ui75ZHE.w2",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "W8SReLKTJYVdh7Ui75ZHE",
+      "cmd": { "type": "set-line", "points": ["C", "@f-CA", "A"], "structural": true },
+      "enabled": true
+    },
+    {
       "id": "jJJOTEELQA86T_V2ePkao",
       "utterance": "משיק למעגל בנקודה B",
       "cmd": { "type": "tangent", "id": "tan-B", "circle": "circle-O", "at": "B", "visible": true },
