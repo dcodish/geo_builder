@@ -41,7 +41,7 @@ import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
-import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
+import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
@@ -649,6 +649,7 @@ function deriveCore3(
     const pinsBefore = pivotPinKey(c);
     const coordPinsBefore = c.pins.length + c.vectorPins.length;
     const paramPinsBefore = paramPinKey(c);
+    const before = c; // #1782: the scale givens this fact may demote, and the claim slots that own them
     /**
      * #1413 — A FAILING FACT IS ATOMIC: it commits NOTHING (the analytic line-atomicity, arriving
      * here). Before this, a fact that failed on its Nth command had already committed the earlier
@@ -673,7 +674,18 @@ function deriveCore3(
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
     // pin ownership (same count-delta discipline): a fact that contributed ANY pivot
     // pin must not read ok when the pivot finds no placement (honesty — no silent seed figure)
-    if (pivotPinKey(c) !== pinsBefore) pinOwnerIds.add(f.id);
+    if (pivotPinKey(c) !== pinsBefore) {
+      // #1782 (ADR-3D-393): a scale given this fact DEMOTED to a pivot pin is a pin given from here on, so the fact
+      // that stated it owns a pin too — a later contradiction names it beside the newest statement. Added first,
+      // so the insertion order (newest last) still blames this fact.
+      for (const g of before.scaleGivens) {
+        if (c.scaleGivens.includes(g)) continue;
+        const at = before.claims.indexOf(g);
+        const owner = claimOwners.find((o) => at >= o.from && at < o.to);
+        if (owner && owner.factId !== f.id) pinOwnerIds.add(owner.factId);
+      }
+      pinOwnerIds.add(f.id);
+    }
     if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
     if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
     return 'ok';
@@ -1184,7 +1196,8 @@ function deriveCore3(
           c.solids.length > 0 &&
           !(c.scaleGivens.includes(claim) && scaleGivenActive(c))
         ) {
-          const exactlyCheckable = scaleGivenActive(c) && freeDims(c) === 0;
+          // #1782 (ADR-3D-393): or the size is held by a magnitude demoted to a pin — the same statement, stated
+          const exactlyCheckable = magnitudeSizeStated3(c) && freeDims(c) === 0;
           // #1447: an AREA claim mirrored by its driving pin joins the volume's pivot lane — the
           // pin drove the free dims toward the statement, and this verification is its arbiter.
           const pivotLane = (claim.type === 'volume-poly' || claim.type === 'area-eq') && c.scaleGivens.length === 0 && scalePinned(c);

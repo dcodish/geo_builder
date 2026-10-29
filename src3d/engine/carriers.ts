@@ -95,6 +95,104 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
 }
 
 /**
+ * #1782 (ADR-3D-393) — THE POINTS A POINT IS BUILT FROM, one level: the parents its definition reads, plus
+ * every point that defines a plane or line it rides. A total switch over `PointDef['kind']`, so a kind added
+ * later is a compile error here rather than a point whose reach silently stops (src3d/CLAUDE.md: an
+ * enumeration of the drivable cases is not a rule; the walk over what a definition READS is).
+ */
+function pointParents3(c: Construction3, def: PointDef): Id[] {
+  const carrierPts = (o: unknown): Id[] => {
+    const out: Id[] = [];
+    const walk = (v: unknown, depth: number): void => {
+      if (depth > 6) return;
+      if (typeof v === 'string') {
+        if (c.points.has(v)) out.push(v);
+        else if (depth < 6 && c.pointPlanes.has(v)) walk(c.pointPlanes.get(v), depth + 1);
+        else if (depth < 6 && c.planes.has(v)) walk(c.planes.get(v), depth + 1);
+        else if (depth < 6 && c.lines.has(v)) walk(c.lines.get(v), depth + 1);
+        return;
+      }
+      if (Array.isArray(v)) return v.forEach((x) => walk(x, depth));
+      if (v && typeof v === 'object') for (const x of Object.values(v as Record<string, unknown>)) walk(x, depth);
+    };
+    walk(o, 0);
+    return out;
+  };
+  switch (def.kind) {
+    case 'solid-vertex':
+    case 'coord':
+    case 'partial':
+    case 'coord-sym':
+    case 'rev-point':
+    case 'free3':
+      return [];
+    case 'on-segment':
+    case 'bisector-seg':
+    case 'bisector-ray':
+    case 'foot-seg':
+    case 'reflect-line':
+    case 'parallelogram-point':
+    case 'scaled-offset':
+    case 'right-pyramid-apex':
+    case 'centroid':
+    case 'in-span':
+    case 'seg-cross':
+    case 'foot-face':
+      return carrierPts(def);
+    case 'on-plane':
+    case 'right-apex':
+    case 'foot-plane':
+    case 'plane-cut':
+      return carrierPts({ ...def, plane: undefined }).concat(carrierPts(def.plane));
+    case 'on-line':
+    case 'foot-line':
+      return carrierPts({ ...def, line: undefined }).concat(carrierPts(def.line));
+    case 'line-plane':
+      return carrierPts(def.line).concat(carrierPts(def.plane));
+    case 'vec-defined':
+      return carrierPts(c.vecDefs[def.def]);
+    case 'vec-pair':
+      return carrierPts([c.vecDefs[def.def1], c.vecDefs[def.def2]]);
+    default: {
+      const never: never = def;
+      return never;
+    }
+  }
+}
+
+/**
+ * #1782 (ADR-3D-393) — DOES A STATEMENT'S REACH INCLUDE A FREE CARRIER DOF the pivot can drive?
+ *
+ * True iff some point the statement names, or some point one of them is BUILT FROM (the parent walk above,
+ * transitively: a midpoint of a rider reaches the rider's `t`), carries a `drivable` parameter in the
+ * sampled-carrier table. That is the semantic fact "this statement reads something the student never
+ * stated", which the apply-boundary drive routing asked through a proxy — "the figure's solids have free
+ * dims" — so on a rigid cube every length, angle or ⟂ on a rider was judged against the SAMPLED rider and
+ * refused «בדקו את החישוב» (docs/17 §2.2). #1311 (ADR-3D-260) widened that proxy by one carrier kind
+ * (`free3`); this reads the whole table.
+ *
+ * Read only where the figure has a SOLID, the rigid-solid reach this ADR is about. A solid-free figure keeps
+ * exactly the routing it had: #1311's own clause (a statement that NAMES a `free3` point drives) stays at the
+ * claim arm, and a solid-free rider (coordinates + «D על AB · AD = 1», #1816) has no pivot to run on — the
+ * successor issue's lane, not this one.
+ */
+export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boolean {
+  if (c.solids.length === 0) return false;
+  const seen = new Set<Id>();
+  const stack = [...ids];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const def = c.points.get(id);
+    if (!def) continue;
+    if (carrierParams3(c, id, def).some((p) => p.drivable)) return true;
+    stack.push(...pointParents3(c, def));
+  }
+  return false;
+}
+
+/**
  * #1615 (ADR-3D-293) — A COORDINATE GIVEN ON A COORD-SYM POINT, read in closed form.
  *
  * Every point whose position carries parameters in the sampled-carrier table above (a segment's `t`, a line's

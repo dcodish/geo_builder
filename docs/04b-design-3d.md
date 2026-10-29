@@ -635,7 +635,17 @@ A `free3` point («וקטור AB» on an empty canvas, «קטע BE» from a know
 unstated DOF that are **pivot unknowns**: each coordinate is a #820 rider-lane entry keyed
 `freeCoordKey(id, axis)` in `riderTs`, anchored at its canonical sample. `evaluateSolidsAndPoints` places a
 driven coordinate, and the pivot runs on a solid-less figure that holds one (`hasFreePoint3`). The apply
-fork drives a scalar statement when `freeDims(c) > 0` or it names a `free3` point (`claimPointIds`);
+fork drives a scalar statement when **its reach includes a free DOF** (`statementReachesFreeDof3`, [ADR-3D-393](06b-decisions-3d.md#adr-3d-393)):
+the solids have free dims, or a point it names — or a point one of those is built from (`pointParents3`, a total
+switch over `PointDef`) — carries a `drivable` entry of the carrier table (`reachesFreeCarrier3`, `carriers.ts`). The
+carrier reach is read only on a figure with a solid; on a solid-free figure #1311's clause (a NAMED `free3` point)
+stays the claim arm's second condition. Every
+drive-or-claim site in `apply.ts` asks it (the claim arm and its magnitude demotion, `cos-angle`, `mag-rel`,
+`mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane);
+`freeDims` stays a count. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
+that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
+arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
+that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).
 `lengthClaim` lowers a marked «וקטור AB = 5» to the one-word form's arrow. A candidate the anchors left just
 above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing
 a solid (a free coordinate's anchor equilibrium sits higher than a rider's, which moves within `[0, 1]`).
