@@ -100,6 +100,29 @@ export function riderWholeT(side: 'from-a' | 'from-b', k: number): RiderT {
 }
 
 /**
+ * #1783 (ADR-3D-391) — the VECTOR reading of `p0→p1 = k·(q0→q1)` as a given about rider `id` on host `a–b`.
+ *
+ * Every letter must lie on the host line (`a`, `b` or the rider), so each is an affine function of `t`
+ * (`a ↦ 0`, `b ↦ 1`, `id ↦ t`) and the equation is one linear equation in `t`. That covers the HALVES shape
+ * (`AD = 3DB`) and the WHOLE-HOST shape (`AB = 4AD`) alike, in every orientation and for every sign of `k`,
+ * with direction respected: `AB = 4DA` puts D at `t = −¼`, off the segment, so it is `'invalid'` here, where the
+ * set-matching `riderWholeSide` (a LENGTH reading) used to accept it and build it silently as lengths.
+ *
+ * Confined to the open interval, like `riderWholeT`: «R על ab» is a given too.
+ */
+export function riderVectorT(id: Id, a: Id, b: Id, p0: Id, p1: Id, q0: Id, q1: Id, k: number): RiderT {
+  if (!Number.isFinite(k)) return 'invalid';
+  const lin = (x: Id): [number, number] | null => (x === a ? [0, 0] : x === b ? [1, 0] : x === id ? [0, 1] : null);
+  const [P0, P1, Q0, Q1] = [lin(p0), lin(p1), lin(q0), lin(q1)];
+  if (!P0 || !P1 || !Q0 || !Q1) return 'invalid';
+  const beta = P1[0] - P0[0] - k * (Q1[0] - Q0[0]);
+  const alpha = P1[1] - P0[1] - k * (Q1[1] - Q0[1]);
+  if (Math.abs(alpha) < 1e-12) return 'invalid'; // the rider cancels: nothing about it is stated
+  const t = -beta / alpha;
+  return t > 0 && t < 1 ? t : 'invalid';
+}
+
+/**
  * #820 — THE RIDER'S SAMPLED PARAMETER, IN ONE PLACE.
  *
  * A free rider (`K על SB`, no ratio stated) has no determined `t`, so one is SAMPLED per seed. That

@@ -2443,5 +2443,15 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
     "text": "הווקטורים u, v ו-w",
     "winner": "declareVector",
   },
+  {
+    "lang": "en",
+    "text": "AB + BC = 10",
+    "winner": "lengthSum",
+  },
+  {
+    "lang": "he",
+    "text": "AB + BC = 10",
+    "winner": "lengthSum",
+  },
 ]
 `;

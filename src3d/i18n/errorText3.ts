@@ -39,7 +39,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
        * mean?" leaves a student who has just been told their true given is false no way forward,
        * which is #778's *non-canonical input is TAUGHT, never silently accepted*.
        *
-       * The parser's `c = 1` refusal carries no pairs and keeps the generic wording.
+       * The `c = 1` form («AB = AC», «AB = 1AC») carries no pairs and keeps the generic wording, which already
+       * names both spellings (#1680, ADR-3D-391: one reading, asked at the apply boundary for every form).
        */
       return 'a1' in err
         ? t('err.ambiguousVectorLengthRatio', {

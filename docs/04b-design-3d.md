@@ -573,7 +573,24 @@ to the open interval — an endpoint-or-beyond coefficient is refused, never cla
 binds the name only (`riderNames`). **One chokepoint** (ADR-3D-231, #932): `riderRatioRetarget`, at
 `applyCommand3Inner`'s entry, rewrites a ratio statement into its `point-on-segment3` given, so `vec-rel`,
 `length-rel` and the `length-ratio` claim share one semantics; a letter is read in the stated orientation
-only (`1/t` is not a name).
+only (`1/t` is not a name). A **numeric `vec-rel` is directed** (ADR-3D-391, #1783): `riderVectorT` solves the
+vector equation on the host line (`a ↦ 0`, `b ↦ 1`, rider `↦ t`) for both shapes at once, so «AB = 4DA» (vector
+`t = −¼`) is not placed — the set-matching whole-host test had built it as lengths.
+
+**One reading for an unmarked segment equation** (ADR-3D-391, #1680). The parser no longer refuses a bare
+«AB = AC»: it lowers, like «AB = 1AC», to an unmarked single-pair `vec-rel`, and `segmentEquationReading`
+(`apply.ts`, at the outermost `applyCommand3` only — the engine lowers other commands to the same shape) decides:
+marked → vector; a point not yet drawn → vector (a definition); a free rider (`on-segment`, `t` absent) →
+`vector-or-ask`, i.e. the command carries `askIfRefuted` onto its `vec-eq` claim and the store turns that claim's
+refutation into `ambiguous-vector-length` (`segmentEquationAsk`, shared); one segment on both sides → vector,
+except at `k = 1`; anything else → ask. The ask carries the pairs except at `k = 1`, whose generic wording names
+both spellings.
+
+**A length sum** (ADR-3D-392, #1680) is the `length-sum` claim and `ScalarPin` (Σ cᵢ·|aᵢbᵢ| = value, the
+`lengthSum` rule, 2-D's `set-measure-sum`). It routes exactly as `length-eq`: the driving pin plus its recorded
+arbiter (`recordPinGiven`) on a figure with free dims, a scale given on a gauge-frozen solid when every coefficient
+is positive (`scaleGiven.ts` power 1), the claim lane otherwise. Its residual is signed, so it crosses zero;
+`PIN_FIXES_SCALE` marks it as fixing the scale.
 
 ### Gauge, and why the landing funnel exists
 

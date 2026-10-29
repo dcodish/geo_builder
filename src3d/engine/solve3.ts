@@ -279,6 +279,7 @@ export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3;
  */
 const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   length: true, // |DC| = 4 — an absolute size
+  'length-sum': true, // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — an absolute size, like `length`
   dot: true, // u·v = 24 scales as s², so it fixes s
   'length-rel': false, // a RATIO of lengths
   'vec-eq': false, // #1183: both sides scale together — a vector equation pins no size
@@ -325,6 +326,7 @@ const PIN_OPERAND_PAIRS: { [K in ScalarPin['kind']]: (c: Construction3, p: Extra
   'length-rel': (_c, p) => tag3([[p.a1, p.b1], [p.a2, p.b2]], false),
   'vec-eq': (c, p) => tag3([...exprPairs3(c, p.lhs), ...exprPairs3(c, p.rhs)], false),
   length: (_c, p) => tag3([[p.a, p.b]], false),
+  'length-sum': (_c, p) => tag3(p.terms.map((t) => [t.a, t.b] as [Id, Id]), false),
   volume3: () => [],
   area3: () => [],
   vangle: (_c, p) => tag3([[p.vertex, p.p], [p.vertex, p.q]], true),
@@ -1117,6 +1119,17 @@ export function solvePivot(
         const a = at(pin.a);
         const b = at(pin.b);
         out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);
+      } else if (pin.kind === 'length-sum') {
+        // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| − value — SIGNED, so it crosses zero (never a non-negative residual)
+        let sum = 0;
+        let ok = true;
+        for (const t of pin.terms) {
+          const a = at(t.a);
+          const b = at(t.b);
+          if (!a || !b) ok = false;
+          else sum += t.c * norm3(sub3(b, a));
+        }
+        out.push(ok ? sum - pin.value : 10);
       } else if (pin.kind === 'letter-tie') {
         // #2580 (ADR-3D-384): |ab| − coef·(the number the letter also names), the number read at the trial unknowns:
         // a pin symbol's slot, a named component's coordinate, a rider's parameter off its host — signed, so it crosses

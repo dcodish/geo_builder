@@ -92,14 +92,21 @@ describe('#748 — the ratio determines the rider, stated on its own line', () =
 describe('#748 — honesty: what must still refuse, and what must not move', () => {
   beforeEach(reset);
 
-  it('a ratio CONTRADICTING an already-stated one still refuses — a determined rider is claimed about, not redefined', () => {
+  /**
+   * #1680 (ADR-3D-391): a rider whose t is already STATED is placed, so an unmarked equation about it places nothing and
+   * is asked about like any other («every other unmarked segment equation keeps asking», operator 2026-10-13) — never
+   * redefined, and never refuted as arithmetic. The bar form keeps the honest claim lane: a contradiction refuses.
+   */
+  it('a ratio CONTRADICTING an already-stated one is never a redefinition — asked about, and the bar form refuses', () => {
     const { err: e } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"]);
-    expect(e).not.toBeNull();
-    expect(e).toMatchObject({ code: 'claim-refuted' });
+    expect(e).toMatchObject({ code: 'ambiguous-vector-length' });
+    const { err: bar } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "|AE| = 3|EA'|"]);
+    expect(bar).not.toBeNull(); // refused (today in the polygon-collapse register), never asked: the bars answered the question
+    expect((bar as { code: string }).code).not.toBe('ambiguous-vector-length');
   });
 
-  it('a ratio AGREEING with the stated one verifies (idempotent, no false accusation)', () => {
-    const { err: e, pos } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "AE = 2EA'"]);
+  it('a ratio AGREEING with the stated one verifies in the bar form (idempotent, no false accusation)', () => {
+    const { err: e, pos } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "|AE| = 2|EA'|"]);
     expect(e).toBeNull();
     expect(ratio(pos)).toBeCloseTo(2, 6);
   });
@@ -114,8 +121,9 @@ describe('#748 — honesty: what must still refuse, and what must not move', () 
     // The rider is not the shared middle letter, so the vector reading (t = 2, off the segment) and the
     // length reading (t = ⅔) disagree — believing either would be a guess. It REFUSES, and leaves E
     // where the seed put it rather than quietly adopting the chain value.
+    // #1783 (ADR-3D-391, the card-11 ruling of 2026-10-13): the refusal is the QUESTION now, never «בדקו את החישוב»
     const { err: e, pos } = build(['מקבילון', "E על AA'", "AE = 2*A'E"]);
-    expect(e).toMatchObject({ code: 'claim-refuted' });
+    expect(e).toMatchObject({ code: 'ambiguous-vector-length' });
     expect(ratio(pos)).not.toBeCloseTo(2, 3);
   });
 

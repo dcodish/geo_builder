@@ -35,7 +35,7 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationAsk } from '../engine/apply';
 import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
@@ -90,7 +90,6 @@ export interface Derived3 {
 export type StoreError3 =
   | EngineError3
   | { code: 'not-understood' }
-  | { code: 'ambiguous-vector-length' }
   /** #516: one letter as both the running parameter and a figure DOF — a recognized ambiguity
    *  surfaces a clarification and NEVER escalates to the LLM lane (which would guess). */
   | { code: 'param-roles-conflated'; letter: string }
@@ -1201,7 +1200,12 @@ function deriveCore3(
           status[owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
-              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
+              : (sampledCarrierVerdict(claim, c, resolved) ??
+                membershipCollapse(owner.factId, claim) ??
+                // #1680/#1783 (ADR-3D-391): an unmarked equation over a free rider whose vector reading the figure
+                // refutes is ASKED about (card-11 ruling, 2026-10-13), never called false
+                (claim.type === 'vec-eq' && claim.askIfRefuted ? segmentEquationAsk([claim.askIfRefuted.a1, claim.askIfRefuted.b1], [claim.askIfRefuted.a2, claim.askIfRefuted.b2], claim.askIfRefuted.c) : null) ??
+                { code: 'claim-refuted' });
           break;
         }
       }
@@ -1242,10 +1246,24 @@ function deriveCore3(
     return ids.join('');
   };
   const blamedPinOwner = [...pinOwnerIds].pop();
+  /** #1680/#1783 (ADR-3D-391): the line's free-rider equation, whose vector reading is tried and asked about if it fails */
+  const riderAskOf = (factId: string): EngineError3 | null => {
+    for (const o of claimOwners) {
+      if (o.factId !== factId) continue;
+      for (const cl of c.claims.slice(o.from, o.to))
+        if (cl.type === 'vec-eq' && cl.askIfRefuted)
+          return segmentEquationAsk([cl.askIfRefuted.a1, cl.askIfRefuted.b1], [cl.askIfRefuted.a2, cl.askIfRefuted.b2], cl.askIfRefuted.c);
+    }
+    return null;
+  };
   if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
     const f = facts.find((x) => x.id === blamedPinOwner)!;
     const collapse = pivotCollapse;
-    status[blamedPinOwner] = collapse
+    // the vector reading could not be placed (here: only a flat figure would hold it) — the student is asked
+    const riderAsk = riderAskOf(blamedPinOwner);
+    status[blamedPinOwner] = riderAsk
+      ? riderAsk
+      : collapse
       ? {
           code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
           sides: collapse.ring.length, ring: collapse.solid ? solidAsWritten(collapse.ring) : collapse.ring.join(''),
@@ -1994,9 +2012,7 @@ function readStatement3(
   return {
     ok: false,
     error:
-      parsed.reason === 'ambiguous-vector-length'
-        ? { code: 'ambiguous-vector-length' }
-        : parsed.reason === 'param-roles-conflated'
+      parsed.reason === 'param-roles-conflated'
           ? { code: 'param-roles-conflated', letter: parsed.letter }
           : parsed.reason === 'ambiguous-main-diagonal'
             ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(st) }

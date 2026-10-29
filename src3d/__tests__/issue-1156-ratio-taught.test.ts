@@ -121,9 +121,14 @@ describe('#1156 — what must NOT move (round #1169’s escalation tripwire)', (
     expect(err).toBeNull();
   });
 
-  it('the rider NON-chain still refuses as a claim, not as an ambiguity', () => {
+  /**
+   * #1783 (ADR-3D-391), the operator's card-11 ruling (2026-10-13): a point-on-a-segment sentence builds only where
+   * its vector reading can hold. «AE = 2·A'E» puts E at t = 2 as vectors (off AA') and at ⅔ as lengths, so it is
+   * ASKED about — #748's 'refuse rather than pick' still holds; the refusal is the question, no longer «בדקו את החישוב».
+   */
+  it('the rider NON-chain is asked about, never refuted as arithmetic', () => {
     const { err } = build(['מקבילון', "E על AA'", "AE = 2*A'E"]);
-    expect((err as { code: string } | null)?.code).toBe('claim-refuted');
+    expect(err).toEqual({ code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: "A'", b2: 'E', c: 2 });
   });
 
   /**
@@ -146,8 +151,8 @@ describe('#1156 — what must NOT move (round #1169’s escalation tripwire)', (
     expect((err as { code: string } | null)?.code).not.toBe('ambiguous-vector-length');
   });
 
-  /** A bare `c = 1` pair stays the PARSER's clarification — it never reaches the apply boundary. */
-  it('the bare c=1 form keeps the parser’s generic clarification', () => {
+  /** #1680 (ADR-3D-391): a bare `c = 1` pair is asked at the apply boundary now, still with no pairs (the generic text). */
+  it('the bare c=1 form keeps the generic clarification', () => {
     const { err } = build(['פירמידה ABCDS שבסיסה ריבוע', 'AS = AB']);
     expect(err).toEqual({ code: 'ambiguous-vector-length' });
   });

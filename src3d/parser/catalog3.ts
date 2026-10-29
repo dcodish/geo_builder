@@ -385,4 +385,6 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // at the END so every earlier entry keeps its index (the #1394 golden keys catalog rows by index)
   { category: 'vectors', he: 'וקטור u', en: 'vector u' },
   { category: 'vectors', he: 'הווקטורים u, v ו-w', en: 'vectors u, v and w' },
+  // #1680 (ADR-3D-392): a sum of segment lengths equal to a number (2-D's `set-measure-sum`). Appended LAST (the #1394 key)
+  { category: 'vectors', he: 'AB + BC = 10', en: 'AB + BC = 10' },
 ];

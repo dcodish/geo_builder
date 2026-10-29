@@ -83,7 +83,14 @@ export type Claim3 =
    */
   | { type: 'length-letter'; a: Id; b: Id; coef: number; sym: string }
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
-  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
+  | {
+      type: 'vec-eq';
+      lhs: VecExpr;
+      rhs: VecExpr;
+      /** #1680/#1783 (ADR-3D-391): an UNMARKED `XY = k·ZW` over a free rider. The vector reading is tried; where
+       *  the figure refutes it the student is ASKED (with these pairs), never told the statement is false. */
+      askIfRefuted?: { a1: Id; b1: Id; a2: Id; b2: Id; c: number };
+    } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
@@ -103,6 +110,8 @@ export type Claim3 =
    */
   | { type: 'polygon-open'; ids: Id[]; given: true }
   | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true } // AB = 3 (all points pinned ⇒ a CHECK)
+  /** #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — «AB + BC = 10», 2-D's `set-measure-sum` (length unit). Fixes the scale. */
+  | { type: 'length-sum'; terms: { a: Id; b: Id; c: number }[]; value: number; given?: true }
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   // #1546 (ADR-3D-282): a component is `null` when the statement left it UNSTATED or SYMBOLIC («B(3, n, p)»
   // checks x only) — the verifier compares the components that are present. The `A = (…)` claim spelling
@@ -199,6 +208,8 @@ export type ScalarPin =
    */
   | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  /** #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value. NOT similarity-invariant: like `length`, it fixes the scale. */
+  | { kind: 'length-sum'; terms: { a: Id; b: Id; c: number }[]; value: number }
   /** #2580 (ADR-3D-384): |ab| = coef·(the letter's number), where the PIVOT owns that number — a pin symbol, a named
    *  free component or a rider's parameter. The residual twin of the `length-letter` claim (which stays the arbiter). */
   | { kind: 'letter-tie'; a: Id; b: Id; coef: number; q: PivotLetter3 }
@@ -830,7 +841,7 @@ export interface VecRelCommand {
   symbol?: string;
   /**
    * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
-   * word), so this relation is not the two-reading sentence {@link ambiguousPairRatio} asks about.
+   * word), so this relation is not the two-reading sentence {@link segmentEquationReading} asks about.
    *
    * The parser used to consume the marking and throw it away: `markVectorContext` set `VEC_MARKED`,
    * used it to pick the vector lane over the length lane, and emitted a `vec-rel` carrying no record
@@ -841,6 +852,9 @@ export interface VecRelCommand {
    * than to the concept); it travels on the command now.
    */
   marked?: true;
+  /** #1680/#1783 (ADR-3D-391): set ONLY by the outermost apply's segment-equation reading, never by a parser.
+   *  This unmarked relation is about a free rider, so a refuted vector reading asks instead of refusing. */
+  askIfRefuted?: true;
 }
 
 /**
@@ -1935,6 +1949,8 @@ export type EngineError3 =
    * refusal would be worse than the bug it replaces.
    */
   | { code: 'ambiguous-vector-length'; a1: Id; b1: Id; a2: Id; b2: Id; c: number }
+  /** #1680 (ADR-3D-391): the coefficient-1 form («AB = AC», «AB = 1AC») carries no pairs: the generic wording. */
+  | { code: 'ambiguous-vector-length' }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
   /** #1188 (ADR-3D-386): a MAGNITUDE / angle / ⟂ / ∥ / dot given on a FREE vector — not built until #1188 step 4.

@@ -9967,6 +9967,8 @@ third). `fixtures3/` sweep unchanged. No fixture, for the reason ADR-3D-247 give
 
 ### ADR-3D-249 — «AA'=3BC» is ASKED about, never called false; and a length ratio DRIVES (#1156)
 
+**⚠ Amended by [ADR-3D-391](#adr-3d-391) (2026-10-29):** the guard's "five conditions" are replaced by one reading for every unmarked segment equation. The `k ≠ 1` condition (the parser asked about `c = 1`) and the blanket "any `on-segment` point" exemption are retired: a free rider is read as a vector where that places it and is asked about where the figure refutes it, and a midpoint or a placed rider asks like any other point.
+
 **Requirements:** [02b](02b-requirements-3d.md) — none added; this restores the honesty invariant (a true given is never refuted). **Design:** the apply boundary's public entry. **LADDER stage:** apply, at the outermost call — before any internal lowering.
 
 **Live in production, and reported by the log rather than by a person.** Session `i8gw52ej`: one student, 7 submits, 4 spellings, every one `claim-refuted`. They then cleared the canvas and rebuilt the figure without the relation.
@@ -13822,3 +13824,79 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Perf.** One structural `scaleKnown3` per letter row and per symbol query; no sampling added (M3).
 
 **Behaviour change for a student:** in 3-D, «|AB| = k» on a figure whose size nothing fixes shows «k = ?» (was «k = 1»), and asking «k» says it depends on the scale (was «1»). Once something fixes the size, the value shows as before.
+
+
+## ADR-3D-391 — One reading for an unmarked segment equation: a sentence that defines a point or places a rider is a vector, every other one asks, and a rider is never refuted as arithmetic (#1680, #1783)
+
+**Status:** accepted · 2026-10-29 · feature (3d) · fix round #2602 · branch `feat/1680-length-or-vector` · **amends** [ADR-3D-249](#adr-3d-249) (its "five conditions") · the 3-D half of the [ADR-W-108](06w-decisions-workspace.md#adr-w-108) amendment (family X12) · **LADDER stage:** the apply-boundary pre-gate (outermost `applyCommand3`); the store's claim verdict for the rider arm
+**Operator:** rulings on #1680 — 2026-10-04 (*"keep asking"*, a deliberate 3-D exception; and *"ask too"*: «AB = AC», «AB = CD», «AB = 2AD», «AB = ½CD» ask, a vector only when marked); 2026-10-13 card 12, option A (*"A new point or a point on a segment never asks"*, «AK = AD» builds like «AK = 2AD»; *"Every other unmarked segment equation keeps asking"*); 2026-10-13 card 11 («E על AA'» · «AE = AB» keeps asking: *"the 'point on a segment never asks' exemption applies only when the vector reading can hold"*). #1783's plan (2026-10-06) is built inside it, as it asked.
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-1a (an unmarked segment equation is read by what it does to the figure) · **Design:** [04b](04b-design-3d.md) § "A rider's ratio clause is read by the RIDER" (the directed `vec-rel` and the one reading)
+
+**Measured, before and after** (`origin/main` @ caf00532, store `submit`, model mocked; P = «מקבילון ABCDA'B'C'D'»):
+
+| lines | before | after |
+| --- | --- | --- |
+| «משולש ABC» · «AB = AC»; «מרובע ABCD» · «AB = CD» / «AB = 2 AD»; pyramid «AB = ½CD» | asks | asks (unchanged) |
+| pyramid «AB = 1AC» / «AB = 1·AC» | `claim-refuted` | asks (generic wording) |
+| pyramid «AB⃗ = 2AD⃗» / «וקטור AB = 2 וקטור AD» | refuted as a vector | unchanged |
+| P · «AK = AD» / «KA = AD» / «AD = AK»; P · «N אמצע CC'» · «A'K = DN» | asks | builds, K where the vector says |
+| P · «AK = 2AD»; «A'K = 4/5 DN» | builds | unchanged |
+| P · «E על AA'» · «AE = EA'» / «EA' = AE» / «A'E = EA»; pyramid «E על SA» · «SE = EA» | asks | builds, t = ½ |
+| P · «E על AA'» · «AE = AA'» | asks | builds, E on A' (both readings) |
+| P · «E על AA'» · «AE = AB» | asks | asks (card 11) |
+| P · «E על AA'» · «AE = 2AB» / «AE = 2·A'E» / «AE = 2AA'» | `claim-refuted` | asks |
+| P · «E על AA'» · «AE = ½BB'» / «AE = -A'E» | builds t = ½ | unchanged |
+| pyramid «M אמצע BC» · «SM = 2SA» | `claim-refuted` | asks |
+| pyramid «M אמצע BC» · «BM = 1MC» | builds | asks, like «BM = MC» |
+| P · «E על AA' כך ש-AE = 2EA'» · «AE = 3EA'» / «AE = 2EA'» | refuted / builds | asks (the bar form keeps refuting / verifying) |
+| «משולש ABC» · «D על AB» · «AD = 3BD» / «3BD = AD» / «AD = 0.5BD» / «BD = 3AD» | `claim-refuted` | asks, with the pairs |
+| … · «AB = 4DA» | builds t = ¼ (as lengths) | asks |
+| … · «AD = 3DB» / «DB = 3AD» / «AB = 4AD» / «AD = DB» | builds (¾, ¼, ¼) / asks | builds (¾, ¼, ¼, ½) |
+| … · «|AD| = 3|BD|» / «אורך AD = 3 אורך BD» / «AD:DB = 3:1» | builds ¾ | unchanged |
+| … · «AB⃗ = 4DA⃗» (marked) | builds t = ¼ | `claim-refuted` |
+| pyramid «E על SA» · «SE = 0.25AS» | builds t = ¼ (as lengths) | asks; «ES = 0.25AS» still builds
+
+**Class (docs/17 §1).** *A segment equation's reading — vector, ask, or refuted — depended on which of two code paths parsed it, not on what it says about the figure.* The parser asked about the plain `XY = ZW` before any rule ran; being context-free it could not see a new point or a rider, so it asked about «AK = AD» and «AE = EA'». `ambiguousPairRatio` asked about `XY = k·ZW` with three exemptions of its own: `k = 1` ("the parser already asks" — but «AB = 1AC» is not the parser's shape, so nobody asked and it was refuted), any `on-segment` point ("#748 owns it" — wider than the rider lane it names: a midpoint has `t = ½`, so «SM = 2SA» was refuted against the tool's own sample), and unknown points. Inside the rider family, `riderRatioRetarget` read the halves shape as directed and the whole-host shape as sets, so «AD = 3BD» (vector: t = 1.5) was refuted «בדקו את החישוב» while «AB = 4DA» (vector: t = −¼) built silently as lengths (#1783).
+
+**Decision.**
+1. **The parser does not refuse.** The context-free plain-pair check is deleted; a bare «AB = AC» lowers through `vecEqClaim` to the unmarked single-pair `vec-rel` «AB = 1AC» already produced. The parser's `'ambiguous-vector-length'` reason and its store mapping are removed (unreachable), and the code is an `EngineError3` in both forms.
+2. **One predicate, `segmentEquationReading`** (`apply.ts`, at the outermost `applyCommand3`, where the figure is known — the engine lowers other commands to the same shape): marked → vector (#1183); a point not yet drawn → vector, a definition (ADR-3D-010, the ruling's "defines a new point"); a **free rider** (`on-segment`, `t` absent) in either pair → `vector-or-ask` (the ruling's "places a point on a segment", narrowed by card 11); one segment on both sides → vector, except at `k = 1` («AB = BA»), the plain form's question, asked as before; anything else → ask. A midpoint or a rider whose `t` is already stated is placed, so its sentence places nothing and asks.
+3. **`vector-or-ask`.** The command carries `askIfRefuted` onto its `vec-eq` claim. `riderRatioRetarget` places the rider in closed form where it can; otherwise the claim lane drives it; and where the final figure refutes the claim, or the pivot finds no placement for it at all («D על AB» · «AD = DC», which only a flat triangle holds), the store answers `ambiguous-vector-length` with the student's pairs (`segmentEquationAsk`, shared with the apply gate) instead of `claim-refuted`. The test is the figure itself, so an off-host statement that does hold («AE = ½BB'») still builds, and one that cannot («AE = AB») asks.
+4. **A numeric `vec-rel` is directed in both rider shapes.** `riderVectorT` (`onSegmentRatio.ts`) solves `p0→p1 = k·(q0→q1)` on the host line (`a ↦ 0`, `b ↦ 1`, rider `↦ t`), open interval. It replaces the chain test and the set-matching whole-host test for a directed numeric statement; length statements and the letter coefficient keep their readings.
+5. **The payload.** At `k = 1` the ask carries no pairs, so `errorText3` shows the existing generic `err.ambiguousVectorLength`, byte-identical to the old plain-form ask; otherwise the pairs and `err.ambiguousVectorLengthRatio`. No locale edit. `decideDeterministic3` keeps the code a `clarify`, so the sentence never reaches the model.
+
+**Deviations from the plan.**
+- «E על AA'» · «AE = AA'» builds with E on A' as the plan's line says, but through the claim lane's drive, not `riderWholeT` (which refuses an endpoint by design). «AE = 2AA'» (neither reading places E; refuted before) asks: a sentence that places nothing asks, per the 2026-10-13 ruling.
+- «3BD = AD» (sides swapped) was a bare `vec-eq` claim from `vecEqClaim`'s non-pair branch; it now lowers to the same `vec-rel` as «AD = ⅓·BD», so the one reading sees it (#1783's row).
+- The #1156 lock "the rider NON-chain still refuses as a claim" («AE = 2·A'E») is re-based to "asks": it is #1783's own class (vector t = 2, lengths t = ⅔) and the card-11 ruling settles it. Both plans had listed that file as must-not-change; the two plans conflict there, and the newer ruling decides.
+- A rider whose `t` is already stated («E על AA' כך ש-AE = 2EA'») then «AE = 3EA'» / «AE = 2EA'» now asks, like the midpoint's «BM = 1MC»: the #1680 plan's predicate (its class reach names "a ratio clause's point") against #1783's note that such a rider "stays in the claim lane". Two #748 locks are re-based to the bar form, which keeps refusing a contradiction and verifying an agreement.
+- The parity family is X12, not X11 (taken by ADR-AG-325 meanwhile).
+- On an EMPTY canvas the plain form now reads as the coefficient form always did: «BE = EC» defines E (B and C are created free by the mint pass, ADR-3D-382) and builds; «AD = AC» is refused «no position for A» (`no-solution`). Both asked before. These are the #1394 golden rows `suite:["BE = EC"]` and `suite:["AD = AC"]`; the other drifted rows (`AE = 2*A'E`, the stated-t rider, the midpoint's «AM = 2MA'») are the asks above.
+
+**Sibling audit.** 2-D and analytic have no vector reading (X7): they read equal lengths, which is why X12 exists. The rider arithmetic lives in `onSegmentRatio.ts`, shared with parse3's ratio clause (unchanged: a clause is a length reading). Complex: not applicable.
+
+**Locks.** `src3d/__tests__/issue-1680-segment-equation.test.ts` (the ask rows, the marked rows, new-point definitions checked at every `claimSeeds` seed, rider placements, the «X = Y» ≡ «X = 1·Y» class test over eleven pairs); `src3d/__tests__/issue-1783-rider-ratio-asks.test.ts` (every orientation of «AD = 3BD», «AB = 4DA», the chain and length forms that still build, the marked refutations); fixtures `rider-halves-1680`, `new-point-plain-1680`; parity rows X12 + `rider-halves-1680`, `rider-chain-1783`. Re-based: `issue72-phrasing` (2), `issue-837-noun-prefix`, `issue-1156-ratio-taught` (2).
+
+**Behaviour change for a student:** in 3-D, «AK = AD» with K new and «E על AA'» · «AE = EA'» now build (they asked); «AB = 1AC», «SM = 2SA» over a midpoint, «AD = 3BD» over a rider now ask «length or vector?» (they were refuted as false); «AB = 4DA» over a rider now asks (**withdrawn:** it built silently as lengths); «AB⃗ = 4DA⃗» marked is now refuted (it built). Everything the 2026-10-04 ruling listed keeps asking.
+
+
+## ADR-3D-392 — A sum of segment lengths equal to a number is a given in 3-D: 2-D's `set-measure-sum`, length unit (#1680 arm c)
+
+**Status:** accepted · 2026-10-29 · feature (3d) · fix round #2602 · branch `feat/1680-length-or-vector` · **LADDER stage:** the dims solve (Stage 2 pivot) — a new driving `ScalarPin`; the claim verifier is the arbiter
+**Operator:** ruling 2026-10-13 on #1680, arm (c): «AB + BC = 10» in 3-D reads as a length sum, `[2-D]`.
+**Requirements:** [02b](02b-requirements-3d.md) FR-CL-2b (new) · **Design:** [04b](04b-design-3d.md) § "A rider's ratio clause is read by the RIDER" (the length-sum paragraph)
+
+**2-D reference** (the plan's measurement at dc474afc, re-checked): `משולש ABC` · `AB + BC = 10` commits `segment AB`, `segment BC`, `set-measure-sum {unit: length, coefs: [1, 1], target: 10}`; no canvas label; the sum is in the givens list. `AB + BC = 2√3`, `AB + BC = k` and `AB + AC = 2BC` escalate. In 3-D all of these were `not-understood` (to the model).
+
+**Decision.**
+1. **`lengthSum`** (`parse3.ts`, before `lengthRel`/`vecEqClaim`): ≥ 2 signed terms `[coef] PAIR`, `[coef]|PAIR|` or `אורך PAIR` on the left, a plain number (or `p/q`) on the right. A radical or letter target is not taken (2-D escalates it); pair terms on both sides are not claimed (in 3-D a vector equation, X7). Emits `segment3` per pair and the `length-sum` claim. English is the same token stream.
+2. **`length-sum` claim and `ScalarPin`** `{terms: {a, b, c}[], value}`; `PIN_FIXES_SCALE: true` (an absolute size, like `length`).
+3. **Routing exactly as `length-eq`** (`apply.ts`): on free dims, the driving pin plus its recorded arbiter (`recordPinGiven`, ADR-3D-285), demoting a scale given in force (#1447); on a gauge-frozen solid, a scale given when every coefficient is positive (`scaleGiven.ts`, power 1, magnitude Σ cᵢ·|aᵢbᵢ|); otherwise the claim lane.
+4. **Residual** (`solve3.ts`): Σ cᵢ·|aᵢbᵢ| − value, signed, so it crosses zero. **Verify** (`claims.ts`): the `length-eq` tolerance.
+5. **Display follows 2-D**: no canvas label; the given is the fact in the givens list. `narrowing3` counts it as a value claim.
+
+**Solver sweep** (docs/17 M3): the six length-sum spellings and the 1680 fixtures build at every `claimSeeds` seed in the locks; the pin is one signed row beside `length`, read only when a `length-sum` given exists, so figures without one evaluate the same residual vector as before.
+
+**Locks.** `issue-1680-segment-equation.test.ts` arm (c): six spellings build with the sum holding at every `claimSeeds` seed; «הציגו תצורה אחרת» changes the triangle and keeps the sum; «AB = 3 · BC = 4 · AB + BC = 10» refuses; «AB + BC = AC» stays a vector equation and «AB + BC = 2√3» is not taken. Fixture `length-sum-1680.geo3.json`; parity row `cat-an-042` is now plain (all three build); catalog3 gains «AB + BC = 10».
+
+**Behaviour change for a student:** in 3-D, «AB + BC = 10» (and «AB − BC = 2», «AB + BC + CA = 12», «2AB + BC = 10») after «משולש ABC» now builds a triangle with that sum, written nowhere on the canvas; before, the sentence went to the model.

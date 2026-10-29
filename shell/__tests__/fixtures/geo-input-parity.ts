@@ -65,7 +65,7 @@ export interface StepVerdict {
  */
 export type StepRunner = (steps: readonly string[]) => readonly StepVerdict[] | Promise<readonly StepVerdict[]>;
 
-export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10' | 'X11';
+export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10' | 'X11' | 'X12';
 
 export interface ExceptionFamily {
   title: string;
@@ -191,6 +191,15 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     topic: false,
     patterns: [/(?:רדיוס\S*|radius)\s+[A-QS-Z](?![A-Za-z0-9₀-₉_'])/, /[=+−-]\s*\d*[A-QS-Z](?![A-Za-z0-9₀-₉_'])\s*$/],
   },
+  X12: {
+    title: 'a bare XY = k·ZW over points already drawn asks length-or-vector in 3-D («AB = AC», «AB = 2AD»)',
+    reason:
+      'operator rulings 2026-10-04 and 2026-10-13 on #1680 (ADR-3D-391, ADR-W-108 Am.): 3-D is the builder with vectors, so an unmarked segment equation over points already drawn asks «length or vector?»; one that defines a new point, or places a free rider where the vector reading holds, builds. 2-D and analytic have no vector reading (X7) and read equal lengths. A rider coefficient whose vector reading fails («D על AB» · «AD = 3BD») asks too (#1783)',
+    products: ['2d', 'analytic'],
+    mustRefuse: ['3d'],
+    topic: false,
+    patterns: [/^[A-Z]\d*'?[A-Z]\d*'?\s*=\s*[-\d.½/·\s]*[A-Z]\d*'?[A-Z]\d*'?\s*$/],
+  },
 };
 
 /** The plane families of the audit (§A), for reading the rows. */
@@ -249,7 +258,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1531': 'open',
   '#1677': 'icebox',
   '#1679': 'icebox',
-  '#1680': 'open',
   '#1726': 'icebox',
   '#1784': 'open',
   '#1796': 'open',
@@ -618,8 +626,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-072', family: 'area-perimeter', steps: ['נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-073', family: 'area-perimeter', steps: ['משולש ABC', 'היקף המשולש ABC = 20'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-074', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds' },
-  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1680' }] },
-  { id: 'cat-2d-076', family: 'lengths', steps: ['מרובע ABCD', 'AB = 2 AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1680' }] },
+  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', exception: 'X12' },
+  { id: 'cat-2d-076', family: 'lengths', steps: ['מרובע ABCD', 'AB = 2 AD'], expect: 'builds', exception: 'X12' },
   { id: 'cat-2d-077', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'AD:DB = 1:2'], expect: 'builds' },
   { id: 'cat-2d-078', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'G מחלקת את DC ביחס 1:2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-079', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB מאונך ל-CD'], expect: 'builds' },
@@ -741,8 +749,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-an-038', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB ∥ DC'], expect: 'builds' },
   { id: 'cat-an-039', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB ⊥ BC'], expect: 'builds' },
   { id: 'cat-an-040', family: 'lengths', steps: ['משולש ABC', 'AB = 10'], expect: 'builds' },
-  { id: 'cat-an-041', family: 'lengths', steps: ['משולש ABC', 'AB = AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1680' }] },
-  { id: 'cat-an-042', family: 'lengths', steps: ['משולש ABC', 'AB + BC = 10'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1680' }] },
+  { id: 'cat-an-041', family: 'lengths', steps: ['משולש ABC', 'AB = AC'], expect: 'builds', exception: 'X12' },
+  { id: 'cat-an-042', family: 'lengths', steps: ['משולש ABC', 'AB + BC = 10'], expect: 'builds', note: '3-D reads a length sum since #1680 (ADR-3D-392)' },
   { id: 'cat-an-043', family: 'midpoint-ratio', steps: ['משולש ABC', 'AC:CB = 3:2'], expect: 'builds' },
   { id: 'cat-an-044', family: 'midpoint-ratio', steps: ['נקודה C', 'נקודה A', 'נקודה B', 'C מחלקת את AB ביחס 3:2'], expect: 'builds', exception: 'X9' },
   { id: 'cat-an-045', family: 'midpoint-ratio', steps: ['נקודה A', 'נקודה C', 'נקודה B', 'היחס בין AC ל-CB הוא 3:2'], expect: 'builds', exception: 'X9' },
@@ -814,6 +822,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── the step-1 audit's seed (#1649 §D), re-measured on c6a412aa — rows not already a catalog row above ──
   { id: 'on-side', family: 'points-incidence', steps: ['מלבן ABCD', 'E על הצלע DC'], expect: 'builds' },
   { id: 'ratio', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD:DB = 1:2'], expect: 'builds' },
+  // #1680 / #1783 (ADR-3D-391): a rider's unmarked equation. Where its vector reading places it, 3-D builds like 2-D;
+  // where it does not («AD = 3BD»: D would sit at 1.5·AB), 3-D asks, the X12 family
+  { id: 'rider-halves-1680', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD = DB'], expect: 'builds', note: 'D at the middle; 3-D asked before #1680' },
+  { id: 'rider-chain-1783', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD = 3DB'], expect: 'builds' },
+  { id: 'rider-coefficient-1783', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD = 3BD'], expect: 'builds', exception: 'X12', note: '3-D refused it «בדקו את החישוב» before #1783' },
   // #1815 (ADR-3D-309, 2-D ADR-413) — a rider's incidence that holds only on a FLAT triangle is refused, not drawn flat
   { id: 'rider-midpoint-collapse-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'M על AB', 'M אמצע BC'], expect: 'refused', note: 'M on AB and the midpoint of BC only when ABC is flat' },
   { id: 'rider-midpoint-collapse-mirror-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'D אמצע AC'], expect: 'refused' },
@@ -1853,7 +1866,7 @@ export const UNCOVERED_CATALOG: Readonly<Record<Product, readonly string[]>> = {
     'BE/ED = 1:3', // 3-D builds it on its solid; no plane context makes the row type in every builder
     'D על המעגל', // 3-D needs D to exist first; its catalog context is not a plane figure
     'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', // 2-D takes ~9 s to escalate it — too slow for a lock row
-    '∠SDB', // a bare angle: 3-D draws it, 2-D refuses it as a question with no value — ruling pending (#1680)
+    '∠SDB', // a bare angle: 3-D draws it, 2-D refuses it as a question with no value — ruled 2026-10-04, owned by #1981
   ],
 };
 
