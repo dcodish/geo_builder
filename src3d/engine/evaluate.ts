@@ -702,7 +702,46 @@ function operandDefsKey(c: Construction3, op: Operand3): unknown {
   return op;
 }
 
+/**
+ * #1528 (ADR-3D-396) — a coordinate point's stated MEMBERSHIP in root-find form. The scan is the point's
+ * distance to the carrier at the candidate value — SIGNED for a plane (n·P + d)/|n|, so a crossing is found
+ * by bisection; |(P − anchor) × dir|/|dir| for a line (touch roots). The verdict is the verifier's own
+ * predicate (`memberHolds3` / `onLineHolds3`, the store's `not-on-plane` / `not-on-line` pass), so a root
+ * is never offered that the recorded membership would then refuse.
+ */
+function memberPinProbe(c: Construction3, pin: Extract<ParamPinRel3, { member: object }>): ParamPinProbe {
+  const key = JSON.stringify([c.param, pin.member, operandDefsKey(c, pin.a), operandDefsKey(c, pin.b)]);
+  const def = c.points.get(pin.member.id);
+  const P = def?.kind === 'coord' ? v3(def.x, def.y, def.z) : null;
+  const m = pin.member;
+  if (m.type === 'on-planes') {
+    const f = (a: number): number => {
+      if (!P) return NaN;
+      const pl = planeAt(c, m.plane, a);
+      const n = norm3(pl.n);
+      return n > 1e-12 ? (dot3(pl.n, P) + pl.d) / n : NaN;
+    };
+    return { scans: [f], holds: (a) => { const r = f(a); return !Number.isNaN(r) && Math.abs(r) <= PIN_TOL && memberHolds3(P!, planeAt(c, m.plane, a)); }, key };
+  }
+  const f = (a: number): number => {
+    const ln = lineAtParam(c, m.line, a);
+    if (!P || !ln) return NaN;
+    const d = norm3(ln.dir);
+    return d > 1e-12 ? norm3(cross3(sub3(P, ln.anchor), ln.dir)) / d : NaN;
+  };
+  return {
+    scans: [f],
+    holds: (a) => {
+      const r = f(a);
+      const ln = lineAtParam(c, m.line, a);
+      return !Number.isNaN(r) && r <= PIN_TOL && ln !== null && onLineHolds3(P!, ln);
+    },
+    key,
+  };
+}
+
 function relPinProbe(c: Construction3, pin: ParamPinRel3): ParamPinProbe {
+  if (pin.member) return memberPinProbe(c, pin);
   const geoms = (a: number): [OperandGeom, OperandGeom] | null => {
     const ga = operandAtParam(c, pin.a, a);
     const gb = operandAtParam(c, pin.b, a);

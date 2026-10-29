@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-29T16:15:29.512Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "הנקודה A(1, 2, 3)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 1,
+          "y": 2,
+          "z": 3
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π: mx + z - 1 = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 1
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "mx + z - 1 = 0"
+          },
+          "param": "m"
+        }
+      ]
+    },
+    {
+      "utterance": "A על המישור π",
+      "cmds": [
+        {
+          "type": "on-planes",
+          "id": "A",
+          "plane": "π"
+        }
+      ]
+    }
+  ]
+}

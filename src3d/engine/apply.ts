@@ -716,6 +716,14 @@ function adoptParamAsPinSym(c: Construction3, exprs: (SymComp | null)[]): Constr
  *
  * No refusal exists at this door: when the lane holds a pinning given it keeps the letter and the
  * membership stays a verify/selection (`chooseParam`), exactly as before.
+ *
+ * #1528 (ADR-3D-396): `c` already holds the stated membership, so the door asks the membership ITSELF
+ * through the one predicate (`releaseParamToPivot` → `paramPinningRels`). A COORDINATE point's membership
+ * is a pin — the pivot has nothing to move for an absolute point, and the 1-DOF root-find is the only
+ * mechanism that can determine the letter — so the letter stays in the algebraic lane. A figure point
+ * (a solid vertex) is not a pin operand, so it re-homes exactly as #815 ruled. An identity membership
+ * («B(0,0,1) על π: mx + z − 1 = 0») is admitted here and dropped only by the root-find's identity guard,
+ * so it too keeps the letter, which then stays a free sampled DOF the membership verifies at.
  */
 function adoptParamForCarrier(c: Construction3, carrier: { kind: 'line' | 'plane'; name: string }): Construction3 {
   if (!c.param) return c;
@@ -2908,9 +2916,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       // #815: a stated membership against an algebraic-lane plane re-homes its letter to the pivot (a side
       // given is an inequality — sampled + verified, never driven — so it opens no door)
-      if (!cmd.side && cmd.plane !== 'any') c = adoptParamForCarrier(c, { kind: 'plane', name: cmd.plane });
-      const next = clone(c);
+      // #1528 (ADR-3D-396): recorded FIRST, so the door asks the membership itself whether it pins the letter
+      let next = clone(c);
       next.memberships.push(cmd);
+      if (!cmd.side && cmd.plane !== 'any') next = adoptParamForCarrier(next, { kind: 'plane', name: cmd.plane });
       return { ok: true, next };
     }
 
@@ -3041,17 +3050,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.points.set(cmd.id, { kind: 'on-line', line: cmd.line });
         return { ok: true, next };
       }
-      c = adoptParamForCarrier(c, { kind: 'line', name: cmd.line }); // #815: the letter re-homes through the membership door
-      const next = clone(c);
+      // #815: the letter re-homes through the membership door — #1528 (ADR-3D-396): asked with the membership
+      // recorded, so a coordinate point's membership (a pin) keeps it
+      const withMember = clone(c);
+      withMember.onLines.push(cmd);
+      const next = adoptParamForCarrier(withMember, { kind: 'line', name: cmd.line });
       // M1 (ADR-3D-031 Am., the ADR-3D-030 shape): an EXISTING point stated onto a NUMERIC
       // typed line on a SOLID-bearing figure is ALSO a GIVEN — a point on a line is a point
       // on TWO planes through it, so the statement lowers to two plane pins and the whole
       // plane-drive machinery (normal-solve exclusion, unmet check, failure-path retry,
       // Stage-A placement, degeneracy filter) absorbs it with no new solver code. The
-      // onLines record is KEPT (below) — the store's not-on-line check on final
+      // onLines record is KEPT (recorded above) — the store's not-on-line check on final
       // coordinates is the arbiter either way.
-      const lineDef = c.lines.get(cmd.line)!;
-      if (lineDef.kind === 'parametric' && c.solids.length > 0) {
+      const lineDef = next.lines.get(cmd.line)!;
+      if (lineDef.kind === 'parametric' && next.solids.length > 0) {
         const num = (e: LinExpr): number | null => (e.p === 0 ? e.k : null);
         const a = lineDef.anchor.map(num);
         const d = lineDef.dir.map(num);
@@ -3064,7 +3076,6 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           for (const n of [e1, e2]) next.planePins.push({ ids: [cmd.id], cx: n.x, cy: n.y, cz: n.z, d: -dot3(n, anchor) });
         }
       }
-      next.onLines.push(cmd);
       return { ok: true, next };
     }
 

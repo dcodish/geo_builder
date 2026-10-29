@@ -547,8 +547,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (`claim-refuted`) when it is wrong**. A claim never reshapes the figure. A statement about a part the
   tool sampled that no drive honours is refused as *not yet determined*, naming that part, never as wrong.
   A relation between objects given by equations or coordinates, where one carries the figure's parameter in
-  what the relation reads, determines the parameter instead; one that holds for every value leaves it free.
-  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286; #508, #512, #552, #1311, #1439, #1472.
+  what the relation reads, determines the parameter instead, including a coordinate point stated on the plane
+  or line («A(1, 2, 3)» · «π: mx + z − 1 = 0» · «A על המישור π» gives m = −2, shown as «m = −2»); one that
+  holds for every value leaves it free.
+  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396; #508, #512, #552, #1311, #1439, #1472, #1528.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. A role noun («אלכסון AB») is a claim too, judged again on the final figure; named

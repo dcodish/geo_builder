@@ -127,7 +127,10 @@ the map is enumerable ([docs/26](archive/26-3d-relations-plan.md)). `operands.ts
 absolute objects a relation pins the figure parameter when an operand carries it **in what the relation
 reads** (ADR-3D-286, #1472: ⟂ / ∥ / angle read directions; coincidence, containment, intersection and
 distance read positions too), and is a claim otherwise. One list, `paramPinningRels` (`claimPinsParam`,
-`operandCarriesParam`), feeds the root-find; each pin's residual is the verifier's own function on the
+`operandCarriesParam`), feeds the root-find. A coordinate point's stated membership on such a plane or line
+is the same position relation at distance 0, so the list reads `c.memberships` / `c.onLines` too, through the
+same admission rule (`memberPinsParam`, ADR-3D-396, #1528); the #815 membership door asks that list with the
+membership already recorded, so only a member the pivot can move (a figure point) hands the letter over; each pin's residual is the verifier's own function on the
 operands rebuilt at the candidate value (`operandAtParam`). A residual that vanishes at every scan sample
 is **not** a pin (the identity guard). The claim is always recorded, and a number drawn from it shows only
 when it holds (`DIRECTION_REL_TOL`).
