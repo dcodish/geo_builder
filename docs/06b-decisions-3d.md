@@ -5398,6 +5398,11 @@ FIRST — «מנסרה ישרה משולשת ABCA'B'C'», then «משוואת ה
 order (that is #801) and derives green as a loaded file (ADR-3D-174 §2's re-homing acts on the SET).
 The interactive step refused a satisfiable statement and blamed the point.
 
+   *Amended by [ADR-3D-396](#adr-3d-396) (#1528): the door now asks the membership ITSELF — it is recorded
+   first and `releaseParamToPivot` reads the one pin list — so a COORDINATE point's membership (which the pivot
+   cannot move) keeps the letter in the algebraic lane, where the root-find pins it. A figure point re-homes
+   exactly as here.*
+
 **Class.** *A letter carried only by EQUATIONS is never an unknown any drive can solve for, even when
 a stated membership is exactly the given that determines it.* The algebraic lane's letter (`c.param`)
 is root-found post-pivot over angle / ⟂ / line-relation givens, or — with none of those — simply
@@ -11447,7 +11452,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Rejected.** (i) Extending the two per-column lists with the new relation words: that is the chokepoint growing by enumeration (docs/17 §3) and it keeps "the word decides" alive. (ii) Using the verifier's normalised classifiers as the scan residual: the normalised coplanarity and anchor offset are 1 everywhere except exactly at the root, so no grid sample lands on the zero and the minima scan has nothing to descend. (iii) A per-construction identity memo (WeakMap on `c`): content keys cost little and cannot go stale if a caller mutates a construction.
 
-**Not built (named).** An absolute point's MEMBERSHIP on an equation object carrying the parameter is re-homed to the pivot by the #815 door and cannot move a coordinate point — **#1528**, a different chokepoint (the plan split it out). Rows 5–6 (a DISTANCE from such a point) are in this ADR.
+**Not built (named).** An absolute point's MEMBERSHIP on an equation object carrying the parameter is re-homed to the pivot by the #815 door and cannot move a coordinate point — **#1528**, a different chokepoint (the plan split it out). *Built by [ADR-3D-396](#adr-3d-396): the list reads memberships too.* Rows 5–6 (a DISTANCE from such a point) are in this ADR.
 
 **Sibling products (docs/17 §1).** *2-D* has no equation parameter — the class cannot occur. *Complex* has no planes or lines. *Analytic*: measured `משוואת הישר AB היא y=mx+1` · `P(1,3)` · `P על AB` → m = 2 (its n-D solver treats the symbol as an unknown, so a relation determines it) — class not present. The plan's spelling «הנקודה (1, 3) על הישר» (and «הנקודה P(1,3) נמצאת על הישר AB») is `not-handled` there: a parse-coverage gap, not this class, reported to the round.
 
@@ -13822,3 +13827,34 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Perf.** One structural `scaleKnown3` per letter row and per symbol query; no sampling added (M3).
 
 **Behaviour change for a student:** in 3-D, «|AB| = k» on a figure whose size nothing fixes shows «k = ?» (was «k = 1»), and asking «k» says it depends on the scale (was «1»). Once something fixes the size, the value shows as before.
+
+## ADR-3D-396 — An absolute point's membership pins the parameter; the #815 door re-homes only a member the pivot can move (#1528)
+
+**Status:** accepted · 2026-10-29 · fix round #2602 · plan: the #1528 "Fix plan — 2026-10-06" comment, operator-approved (auto-ok, 2026-10-06, /decisions "Arm all 26"). **Amends** [ADR-3D-178](#adr-3d-178) (the #815 door's predicate) and [ADR-3D-286](#adr-3d-286) (the one pin list gains memberships).
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-CL-1** — "a stated relation between equation objects with a parameter determines the parameter" now includes a coordinate point stated on the plane or line · **Design:** [04b](04b-design-3d.md) *Relations as a disposition map* — the operand-routing paragraph: a membership reads position and joins the one list · **LADDER stage:** none new — the existing 1-DOF parameter root-find (`pinningGivens` / `paramRoots` / `chooseParam`).
+
+**The report.** «הנקודה A(1, 2, 3)» · «המישור π: mx + z - 1 = 0» · «A על המישור π» was refused «A is not on the plane» although m = −2 satisfies it.
+
+**Re-measured at pickup (`caf00532`, `submit` → `derive3`).** Every row of the plan's table reproduced: the issue's sequence, the plane-first order, the subject-noun spelling and English were refused `not-on-plane` A with m sampled (0.736 at seed 0); the line row `not-on-line` A. One finding beyond the table: the identity row alone («B(0, 0, 1)» on the same π, true for every m) was refused `not-on-plane` B too — the door had handed the letter to a pivot that had nothing to resolve, so the plane was not even evaluated. The cube row built (the #815 door), as the plan said.
+
+**Class.** *A membership of an absolute point on an equation carrier whose coefficients hold the parameter is routed to a mechanism that cannot move either operand, so a satisfiable given is judged at a sampled parameter* (the #909 / #1472 class, membership edition). Two gaps at one seam: `paramPinningRels` read only `c.claims`, and a membership is recorded in `c.memberships` / `c.onLines` — so «distance(A, π) = 2» pinned m while «A ∈ π», the same relation at distance 0, did not; and the door's predicate ("the lane holds nothing that pins") never asked whether the member itself was such a pin.
+
+**Decision.**
+1. **The membership joins the one pin list.** `memberPinsParam` (`operands.ts`) builds a `ParamPinRel3` `{ member, a: point, b: carrier, reads: 'position' }` for an `on-planes` record (no side, not `any`) or an `on-line` record, and admits it through the SAME rule as `claimPinsParam` (`admitsPin`: both operands `isParamPinOperand` — so the point must be `coord` — and one carrying the parameter in position). A `coord-sym` point keeps the letter already; a `partial` point stays on today's path (not built: a free component plus the letter is 2 DOF).
+2. **The residual is the verifier's own predicate.** `memberPinProbe` (`evaluate.ts`) scans the point's signed normalised distance (n·P + d)/|n| for a plane (sign roots + touch) and |(P − anchor) × dir|/|dir| for a line (touch); a candidate holds only where the store's own `memberHolds3` / `onLineHolds3` holds too, so a root is never offered that the `not-on-plane` / `not-on-line` pass would refuse. ADR-3D-286's identity guard applies unchanged: «B(0,0,1) ∈ π» pins nothing and m stays a free sampled DOF.
+3. **The door asks the membership itself.** `on-planes` and `on-line` record the membership FIRST and then call `adoptParamForCarrier`, whose `releaseParamToPivot` already reads `paramPinningRels`: one predicate, two readers (ADR-3D-286 step 6). A coordinate member keeps the letter; a figure member (a solid vertex) is not a pin operand and re-homes exactly as ADR-3D-178 ruled. An identity membership is admitted by the list (the identity guard lives in the root-find), so it too keeps the letter — which is what makes the B row verify.
+4. **Blame needs no code.** `paramPinKey` / `paramPinOwners` (store3) read `pinningGivens`, so a membership no m satisfies is refused `no-roots` naming «A על המישור π» (verified in the lock).
+5. **Relation table:** `on|point|plane-named` and `on|point|line` gain `param-root`, citing this ADR.
+
+**What the student sees.** «A על המישור π» with A typed by coordinates and π written in m now builds, and the data panel's parameters row shows «m = −2» (the #1472 / ADR-3D-079 display every pinned letter already takes). Where no m works, the refusal is the root-find's existing `no-roots` message naming the membership («אין אף ערך ממשי של m שבו «A על המישור π» מתקיים…») instead of «A is not on the plane». A membership true for every m leaves m free, as #1472 rules for every relation. The same holds on a figure whose m another given already pins: in the 2024 חורף Q2 gate («ℓ ⟂ π» pins m = −5), «C(1,1,1) על הישר ℓ» is now refused with the `no-roots` message naming it together with «הישר ℓ ניצב למישור π» («…הנתונים האלה סותרים זה את זה»), where it was `not-on-line` C. The scenario lock in `scenarios3.test.ts` is updated to that message.
+
+**Rejected.** (i) A second, membership-only gate at the door (`member is absolute ⇒ keep`): two predicates for one question, and it would still leave the root-find blind to the membership. (ii) Recording the membership as a `distance-rel` claim of 0: a second record of one statement, which the verifier would then judge twice.
+
+**Sibling products (docs/17 §1, ADR-W-108).** Parameters, equations and R³ lines/planes are `EXCEPTIONS.X3/X5`; no parity row. *Analytic*, measured at `caf00532`: «הנקודה A(1, 3)» · «הישר l: y = mx + 1» · «A על הישר l» records (its n-D solver treats the letter as an unknown) — class not present. *2-D* has no equation parameter. *Complex* has no planes or lines.
+
+**Locks.** `src3d/__tests__/issue-1528-absolute-member-pins.test.ts` (19 cases: the reported rows in four spellings and both orders, the offset, anchor, direction and plane∩plane variants, a two-root line reaching both roots at seeds 0/1, the panel row «m = −2», the list entry, the identity row alone and beside A, two `no-roots` refusals naming the membership with the facts not grown, and the door both ways — the cube row still re-homes and builds). Fixtures (rule 4): `fixtures3/point-on-param-plane-1528.geo3.json` (the issue's three lines) and `fixtures3/point-on-param-line-1528.geo3.json`. Unchanged and re-run: the #815, #801, #1472 and #1439 locks and the fixtures3 net.
+
+**Measured (solver gates).** *Whole-rate, 24 seeds, over all 93 `fixtures3/` sessions* (a sequential base/after run through the suite lock): the 91 pre-existing sessions keep their whole-seed counts (90 at 24/24; `symbolic-line-equation-863` at 23/24 on both); the two new fixtures go 0 → 24/24. *Timing:* the whole sweep 328.9 → 330.0 s, every per-fixture delta within ±2 % run-to-run noise, the largest on pivot figures with no algebraic-lane parameter (`rider-length-1735` 92.6 → 93.4 s). The new pin costs one touch scan per membership, memoised with the roots. *#1394 parity golden:* measured on this branch, 0 existing hashes drift and 0 keys are gone; the new keys are this ADR's lock arrays and fixtures. It is re-recorded by the round's batch, not here.
+
+**Consequences.** `src3d/engine/operands.ts` (`ParamPinRel3` becomes a union, `admitsPin`, `memberPinsParam`, `paramPinningRels` reads memberships), `src3d/engine/evaluate.ts` (`memberPinProbe`), `src3d/engine/apply.ts` (the door asks after recording), `src3d/engine/relationTable.ts`.
