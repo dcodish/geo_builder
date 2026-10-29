@@ -2443,5 +2443,25 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
     "text": "הווקטורים u, v ו-w",
     "winner": "declareVector",
   },
+  {
+    "lang": "en",
+    "text": "w = u + v",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "w = u + v",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "w = 2u - 3v",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "w = 2u - 3v",
+    "winner": "vecEqClaim",
+  },
 ]
 `;

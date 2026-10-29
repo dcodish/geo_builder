@@ -487,6 +487,17 @@ function placementFixers3(
 const coordinateFixers3 = (c: Construction3, facts: readonly Fact3[], id: Id): Set<string> | null =>
   placementFixers3(c, facts, id, false);
 
+/** #1188 step 2 (ADR-3D-390): the vectors this command says something about — a tuple on it, a declaration of it, or
+ *  a vector equation / relation that names it (the conflict sentence's earlier lines). */
+function vectorsNamedBy3(k: Command3): string[] {
+  const named = (e: readonly { atom: { kind: string; name?: string } }[]) => e.flatMap((t) => (t.atom.kind === 'named' && t.atom.name ? [t.atom.name] : []));
+  if (k.type === 'inject-vector') return [k.name];
+  if (k.type === 'declare-vector') return [...k.names];
+  if (k.type === 'vec-rel') return named(k.terms);
+  if (k.type === 'claim' && k.claim.type === 'vec-eq') return [...named(k.claim.lhs), ...named(k.claim.rhs)];
+  return [];
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
   const hit = per?.get(seed);
@@ -1715,9 +1726,11 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-metric' || st.code === 'free-vector-combination') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-metric' || st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
-      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => k.type === 'inject-vector' && k.name === st.id));
+      // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
+      const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => vectorsNamedBy3(k).some((n) => named.includes(n))));
       status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: by.map((g) => g.utterance) };
     }
   });

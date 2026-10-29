@@ -41,6 +41,8 @@ type Query =
   // #1543: `read` records HOW the magnitude was asked — bars «|AB|» are the magnitude of the VECTOR AB;
   // the word «אורך AB» is a segment's length. Same number, different reading, and the echo shows the reading.
   | { kind: 'length'; a: Atom; read: 'vector' | 'segment' }
+  // #1188 step 2 (ADR-3D-390): a linear COMBINATION asked — «u + v», «2u − 3v», and its magnitude «|u + v|»
+  | { kind: 'combo'; terms: { k: number; a: Atom }[]; mag: boolean }
   | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
   | { kind: 'symbol'; sym: string } // a free parameter «t» from «AE=t·AS» — its solved value (scale-invariant)
   | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
@@ -115,6 +117,8 @@ function vectorAtoms(q: Query): Atom[] {
       return [q.a, q.b];
     case 'vector':
       return [q.a];
+    case 'combo':
+      return q.terms.map((t) => t.a);
     case 'length':
       return q.read === 'vector' ? [q.a] : [];
     case 'line-plane':
@@ -175,6 +179,45 @@ function atomVec(c: Construction3, a: Atom, pos: Positions3, free?: ReadonlyMap<
   const p = pos.get(from);
   const q = pos.get(to);
   return p && q ? sub3(q, p) : null;
+}
+
+/**
+ * #1188 step 2 (ADR-3D-390) — a LINEAR COMBINATION of declared vectors and point pairs, as the ask lane reads it:
+ * «u + v», «2u − 3v», «½u + AB». Null unless it is a combination proper (two terms, or one with a coefficient other
+ * than 1 — a bare «u» stays the vector question) and every operand resolves.
+ */
+const COEF = String.raw`\d+(?:\.\d+)?(?:\/\d+)?|[½⅓⅔¼¾]`;
+const UNICODE_FRAC: Record<string, number> = { '½': 0.5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 0.25, '¾': 0.75 };
+function comboOf(c: Construction3, raw: string): { k: number; a: Atom }[] | null {
+  const t = raw.replace(/[⃗→]/g, '').replace(/−/g, '-').trim();
+  const re = new RegExp(String.raw`^\s*([+-])?\s*(${COEF})?\s*\*?\s*([a-z]|${PT}\s*${PT})(?![a-zA-Z'])`);
+  const out: { k: number; a: Atom }[] = [];
+  let rest = t;
+  while (rest.length > 0) {
+    const m = rest.match(re);
+    if (!m || (out.length > 0 && !m[1])) return null;
+    const a = atomOf(c, m[3]);
+    if (!a) return null;
+    const mag = m[2] === undefined ? 1 : UNICODE_FRAC[m[2]] ?? (m[2].includes('/') ? Number(m[2].split('/')[0]) / Number(m[2].split('/')[1]) : Number(m[2]));
+    if (!Number.isFinite(mag)) return null;
+    out.push({ k: m[1] === '-' ? -mag : mag, a });
+    rest = rest.slice(m[0].length).trim();
+  }
+  if (out.length === 0 || (out.length === 1 && out[0].k === 1)) return null;
+  return out;
+}
+
+/** #1188 step 2: Σ k·atom at these positions (free vectors at this configuration), or null if any operand is unresolvable. */
+function comboVec(c: Construction3, terms: { k: number; a: Atom }[], pos: Positions3, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+  let x = 0, y = 0, z = 0;
+  for (const t of terms) {
+    const v = atomVec(c, t.a, pos, free);
+    if (!v) return null;
+    x += t.k * v.x;
+    y += t.k * v.y;
+    z += t.k * v.z;
+  }
+  return { x, y, z };
 }
 
 /** Parse a query string into a typed request (no coordinates yet), or null if unrecognised. */
@@ -262,6 +305,9 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   if (lenTok) {
     const a = atomOf(c, lenTok);
     if (a) return { kind: 'length', a, read: barM ? 'vector' : 'segment' };
+    // #1188 step 2: «|u + v|» — the magnitude of a combination
+    const terms = barM ? comboOf(c, barM[1]) : null;
+    if (terms) return { kind: 'combo', terms, mag: true };
   }
 
   // AREA: «area ABC» / «שטח ABC» / «S_{ABC}» / «SABC»
@@ -341,6 +387,9 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
 
   // VECTOR (last): a bare pair «AE» or a bare declared vector «w» — the vector itself, not its length.
   const bare = s.replace(/^(?:ה?ו?וקטור|vector)\s+/i, '').replace(/[⃗→]/g, '').trim();
+  // #1188 step 2 (ADR-3D-390): a bare COMBINATION «u + v», «2u − 3v» — the vector it denotes
+  const combo = comboOf(c, bare);
+  if (combo) return { kind: 'combo', terms: combo, mag: false };
   const va = atomOf(c, bare);
   if (va) return { kind: 'vector', a: va };
 
@@ -481,6 +530,11 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
       return solveSymbol(c, q.sym, pos);
     case 'vector':
       return null; // handled in answerQuery (a vector isn't a single scalar), never reached here
+    case 'combo': {
+      // #1188 step 2: the magnitude of a combination (the vector itself is answered in answerQuery)
+      const v = comboVec(c, q.terms, pos, free);
+      return q.mag && v ? norm3(v) : null;
+    }
   }
 }
 
@@ -668,6 +722,19 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     return stable ? { text, answer: coordStr(v0!) } : { text, answer: null, note: 'undetermined' };
   }
 
+  // #1188 step 2 (ADR-3D-390): a combination asked — its components when they are the same in every sampled
+  // configuration (and, over an anchored operand, when the scale is knowledge), honestly undetermined otherwise
+  if (q.kind === 'combo' && !q.mag) {
+    const per = knowledgeSamples3(c, seeds, RB).map((r) => comboVec(c, q.terms, r.positions, r.freeVectors));
+    if (per.some((v) => v === null)) return { text, answer: null, note: 'unavailable' };
+    const v0 = per[0]!;
+    const stable = per.every((v) => norm3(sub3(v!, v0)) <= 1e-4 * Math.max(1, norm3(v0)));
+    const freeOnly = q.terms.every((t) => 'named' in t.a && c.freeVectors.has(t.a.named));
+    if (!stable) return { text, answer: null, note: 'undetermined' };
+    if (!freeOnly && !scaleKnown3(c)) return { text, answer: null, note: 'scale' };
+    return { text, answer: coordStr(v0) };
+  }
+
   if (q.kind === 'vector') {
     const posArr = knowledgeSamples3(c, seeds, RB).map((r) => r.positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
@@ -816,7 +883,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
   // #1188: a FREE vector's components are absolute — a quantity read off free vectors alone needs no pinned scale
-  const atoms: Atom[] = q.kind === 'dot' || q.kind === 'angle-vec' ? [q.a, q.b] : q.kind === 'length' ? [q.a] : [];
+  const atoms: Atom[] = q.kind === 'dot' || q.kind === 'angle-vec' ? [q.a, q.b] : q.kind === 'length' ? [q.a] : q.kind === 'combo' ? q.terms.map((t) => t.a) : [];
   const freeOnly = atoms.length > 0 && atoms.every((a) => 'named' in a && c.freeVectors.has(a.named));
   const scaleFree = freeOnly || q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane' || q.kind === 'angle-ops';
   if (!scaleFree && !scaleKnown3(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };

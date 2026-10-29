@@ -424,6 +424,11 @@ const SEEDED: SeededCorpus = {
   // «u = (1,2,3)» refused unknown-vector). Seeds, panel, ask, drawing and refusals are asserted in
   // issue-1188-free-vector.test.ts; this is the build + drift net.
   'free-vector-declare-1188.geo3.json': ['וקטור u', 'וקטור v', 'u = (1,2,3)'],
+  // #1188 steps 2–3 (ADR-3D-390) — a sum of free vectors, and a free vector defined from an anchored one (before: both
+  // refused `free-vector-combination`). The system, the coupling and the head-to-tail picture are asserted in
+  // issue-1188-free-vector-step2.test.ts; these are the build + drift net.
+  'free-vector-sum-1188.geo3.json': ['וקטור u', 'וקטור v', 'w = u + v'],
+  'free-vector-coupling-1188.geo3.json': ["קובייה ABCDA'B'C'D'", 'נסמן: AB = u', 'וקטור p', 'p = 2u'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 
   // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued

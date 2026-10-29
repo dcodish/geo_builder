@@ -1452,6 +1452,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
               const t = dot3(sub3(e, a), ab) / len2;
               return o.fromB ? 1 - t : t;
             }
+            if (o.kind === 'free-sym') {
+              // #1188 step 2 (ADR-3D-390): a free vector's letter — the free-vector system's value at this drawing
+              const v = r.freeSyms.get(sym);
+              if (v !== undefined) return v;
+            }
             if (o.kind === 'component') {
               // #814's own resolver, so the panel and the sign gate cannot disagree about the value.
               const v = componentValue(c, o.target, o.axis, at, r.freeVectors); // #1188: a free vector's component
@@ -1546,6 +1551,7 @@ export function statedVectorRows(
     vectors: Map<string, { from: string; to: string }>;
     /** #1188 (ADR-3D-386): free vectors — a stated tuple prints as typed, a never-stated one as `u = (?, ?, ?)` */
     freeVectors?: ReadonlyMap<string, FreeVec3>;
+    freeVecEqs?: readonly { lhs: VecTermLike[]; rhs: VecTermLike[] }[];
     claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
     pairPins?: readonly StatedPin[];
     vectorPins?: readonly StatedPin[];
@@ -1556,7 +1562,8 @@ export function statedVectorRows(
   for (const [name, { from, to }] of c.vectors) rows.push(`${name} = ${pairArrow(from, to)}`);
   // #1188: a free vector nothing has been stated about is still a given — that u EXISTS — and its components are
   // open, in the panel's `?` idiom (the params rows' `t = ?`)
-  for (const [name, fv] of c.freeVectors ?? []) if (!fv.stated) rows.push(`${name} = (${fv.comps.map((x) => (x === null ? '?' : cleanMag(x))).join(', ')})`);
+  // #1188 step 2 (ADR-3D-390): a DEFINED vector is stated by its definition («w = u + v», below), never as open components
+  for (const [name, fv] of c.freeVectors ?? []) if (!fv.stated && !fv.def) rows.push(`${name} = (${fv.comps.map((x) => (x === null ? '?' : cleanMag(x))).join(', ')})`);
   /**
    * #2077 (ADR-3D-368): every COMPONENT GIVEN the student typed as a tuple, by pair or by name:
    * «AB = (k-1,k,3)» prints «AB⃗ = (k-1, k, 3)». Operator, 2026-10-13: *"AB = (k-1,k,3) - shouldnt the data
@@ -1567,7 +1574,7 @@ export function statedVectorRows(
   const tuples = [
     ...(c.pairPins ?? []).map((p) => ({ head: pairArrow(p.a ?? '?', p.b ?? '?'), p })),
     ...(c.vectorPins ?? []).map((p) => ({ head: p.name ?? '?', p })),
-    ...[...(c.freeVectors ?? [])].map(([name, fv]) => ({ head: name, p: { name, x: fv.comps[0], y: fv.comps[1], z: fv.comps[2], stated: fv.stated } as StatedPin })),
+    ...[...(c.freeVectors ?? [])].map(([name, fv]) => ({ head: name, p: { name, x: fv.symComps?.[0] ?? fv.comps[0], y: fv.symComps?.[1] ?? fv.comps[1], z: fv.symComps?.[2] ?? fv.comps[2], stated: fv.stated } as StatedPin })),
   ]
     .filter((t) => t.p.stated)
     .sort((a, b) => a.p.stated!.ord - b.p.stated!.ord);
@@ -1576,6 +1583,9 @@ export function statedVectorRows(
     if (claim.type !== 'vec-eq' || !claim.lhs || !claim.rhs) continue;
     rows.push(`${vecSide(claim.lhs)} = ${vecSide(claim.rhs)}`);
   }
+  // #1188 step 2 (ADR-3D-390): a free vector's definition and the free-vector equations, in the same notation
+  for (const [name, fv] of c.freeVectors ?? []) if (fv.def) rows.push(`${name} = ${vecSide(fv.def)}`);
+  for (const eq of c.freeVecEqs ?? []) rows.push(`${vecSide(eq.lhs)} = ${vecSide(eq.rhs)}`);
   return rows;
 }
 

@@ -385,4 +385,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // at the END so every earlier entry keeps its index (the #1394 golden keys catalog rows by index)
   { category: 'vectors', he: 'וקטור u', en: 'vector u' },
   { category: 'vectors', he: 'הווקטורים u, v ו-w', en: 'vectors u, v and w' },
+  // #1188 steps 2–3 (ADR-3D-390): a combination of free vectors DEFINES the new one, drawn head to tail. Appended LAST
+  // (the #1394 golden keys catalog rows by index)
+  { category: 'vectors', he: 'w = u + v', en: 'w = u + v' },
+  { category: 'vectors', he: 'w = 2u - 3v', en: 'w = 2u - 3v' },
 ];

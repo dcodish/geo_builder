@@ -398,10 +398,21 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   configuration; the ask lane answers «u» and «|u|» on the same terms. A name means one thing: a free vector's name
   cannot also name an anchored vector («נסמן: AB = u»), a line or a plane, in either order; a component restated
   with another number is refused naming both lines. A free vector is never part of the named basis (`need-basis`
-  counts the anchored vectors only). **Not yet** (refused honestly as the tool's limit, naming the statement — never
-  «בדקו את החישוב» and never "u is not declared"): a combination that contains a free vector («w = u + v», «p = 2u»,
-  an affine component), #1188 step 2; the head-to-tail drawing of a stated sum, step 3; a magnitude, angle, ⟂, ∥ or
-  dot product on a free vector («|u| = 5», «u ⟂ v»), step 4.
+  counts the anchored vectors only). **Combinations** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390)): a linear
+  combination DEFINES a new vector («w = u + v», «w = 2u - 3v», «u + v = w», «p = ½u»), and an equation among existing
+  vectors is a given the tool solves («u = (k,1,2)», «v = (1,1,1)», «w = (3,2,3)», «w = u + v» gives k = 2),
+  whatever order the givens come in once the vectors are declared; a component may be an expression in a letter («u = (k-1, 2, k)»), which «k = 3» then values. Stating a
+  combination moves nothing already drawn; what the givens leave free still moves with «הציגו תצורה אחרת»; givens
+  that cannot all hold are refused naming the lines. A free vector may be equated to an arrow of the figure («p = 2u»
+  on a «נסמן» u; «AB = p», which pins AB when p's components are stated) and may define a point («AE = p»). **A stated
+  combination is drawn head to tail** (operator, 2026-10-06): u, then a faded copy of v starting at u's head, and
+  w = u + v closing the triangle; every combination follows the same rule (2u − v: faded copies of 2u and −v,
+  chained), and a sum of three terms closes the polygon. The copies are drawing only — never a vector, never data.
+  The data panel lists a definition in vector notation («w = u + v»), and the ask lane answers «u + v», «2u - 3v»,
+  «|u - v|» when the value is known. **Not yet** (refused honestly as the tool's limit, naming the statement — never
+  «בדקו את החישוב» and never "u is not declared"): a statement that would make the figure and a free vector one joint
+  solve («AB = p» then «AD = p»; «AE = t·p»; a span point over a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
+  product on a free vector («|u| = 5», «u ⟂ v»), #1188 step 4.
   - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves

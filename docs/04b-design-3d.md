@@ -502,12 +502,29 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   on a free name. `inject-vector` on a name that is not anchored is the M1 duality (`injectFreeVector3`): an unknown
   name is declared with the tuple; a free one has each component SET (was free) or VERIFIED (equal: redundant;
   different: `free-vector-conflict`, which `derive3` reports as `givens-contradict` naming both lines). A bare letter
-  names a free component through #814's `partialNames`; an affine component is a linear relation (step 2). On an
+  names a free component through #814's `partialNames`; an affine component is recorded in `symComps` (step 2). On an
   anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names,
   use)`: every command that names a vector states its use — `'metric'` (magnitude, angle, ⟂, ∥, dot: refused
-  `free-vector-metric` on a free name until step 4) or `'combination'` (a vector equation, a vec-rel, a span point:
-  `free-vector-combination` until step 2). A free name is checked before an unknown one, so «w = u + v» is the honest
-  "not yet", never `unknown-vector` about w.
+  `free-vector-metric` on a free name until step 4) or `'figure'` (a span point: `free-vector-coupling`). A free name
+  is checked before an unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
+- **Combinations (step 2, [ADR-3D-390](06b-decisions-3d.md#adr-3d-390)).** `freeVecEquation3` takes every `vec-eq`
+  claim and every `vec-rel` that names a free vector or introduces a name (M1): one new name on a side → `def`; one
+  free vector nothing has been said about → OWNED (`def`, M2 law (i)); one anchored arrow = a constant → that arrow's
+  pin (`inject-pair` / `inject-vector`; `injectFreeVector3` does the same for a vector defined as one arrow); else a
+  row in `c.freeVecEqs`. No free vector and no new name → the claim lane, unchanged. **The system**
+  (`engine/freeVecSystem.ts`): each free vector's value is an affine form over the unknowns (unstated components of
+  undefined vectors, affine letters — `SymbolOwner` `free-sym`), constants, and anchored endpoint coordinates; the
+  equations are the rows, the stated components of defined vectors, and a component-naming letter that is also an
+  affine unknown. `settleFreeVectors3` (the outermost apply, beside `settleLetters3`) eliminates once by modified
+  Gram-Schmidt, carrying the constants and anchored coefficients: anchored residue → `free-vector-coupling`, numeric
+  residue → `free-vector-conflict` (`givens-contradict` naming the lines about those vectors); a free letter another
+  lane owns → `already-defined`; a figure point over a free vector that is no longer PURE → `free-vector-coupling`.
+  `solveFreeVectors3` projects the seeded sample onto the solution set (min-norm, x = s − Uᵀ(Us − β)); with no row it
+  returns the sample, so step 1's values are bit-identical. `freeDofCount3` reads unknowns − rank. A `vec-rel` that
+  DEFINES a point inlines each defined free vector by its combination and keeps an undefined pure one as a term;
+  `solveVecDef` reads it from `pureFreeVectors3(c, seed)` (the pre-pivot block of the same solve, memoised).
+  `Resolved3.freeSyms` carries each free letter's value for the panel's params row. The ask lane's `combo` query
+  evaluates Σ k·atom per knowledge sample.
 - **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
   reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
   unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a
@@ -528,6 +545,14 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   `buildScene3` adds the tails and heads to the fit and emits a `SceneVector3` with `free: index`; `Figure3` inks it
   from `FREE_VECTOR_COLORS` (distinct from `VECTOR_COLOR` and the plane patches). No point exists, so no dot and no
   letter is drawn.
+- **The head-to-tail chain (step 3, ADR-3D-390; rulings 2026-10-06).** `layoutFreeVectorScene3` reads each stated
+  combination (a `def` of ≥ 2 terms, or a `freeVecEqs` row with one single-vector side) in statement order and places
+  it as a chain from R's tail (R's own place, else x₁'s tail, else a new tray group rooted at x₁); x₁ with c₁ = 1,
+  drawn as a vector, is the first link, every other link is a `FreeVectorCopy3` of cᵢxᵢ, and R closes it. Each tray
+  group's band extent is the union of its members and copies, so a triangle never overlaps the next band; a chain
+  anchored at a figure point is drawn in world space. `buildScene3` fits the copies and emits `vectorCopies`
+  (`SceneVectorCopy3`); `Figure3` draws them dashed at reduced opacity in the source's hue, with no label. A copy is
+  display only — the angle-mark / draw-arrow precedents — in no engine structure, never knowledge, never a DOF.
 - **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
   free vectors from the lines that stated them.
 
