@@ -19,6 +19,22 @@ import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, Operand3 }
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
 import { centroid3, cross3, dist3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
+/** A stated membership's arbiter (ADR-3D-033): the point lies on the plane to within the
+ *  DRIVE's numeric floor (the LM + regulariser equilibrium, ~1e-5 of the figure scale) —
+ *  still orders of magnitude below any genuinely off-plane statement. Shared by the
+ *  stage-4 unmet trigger and the store's verify pass so no drive/verify gap can exist. */
+export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
+  Math.abs(dot3(pl.n, p) + pl.d) / Math.max(norm3(pl.n), 1e-12) <= 1e-4 * Math.max(1, norm3(p));
+
+/** #801 (ADR-3D-174) — the LINE edition of {@link memberHolds3}, extracted from the store's verify pass
+ *  so the stage-4 drive aims at exactly the bar the verifier judges by (the memberHolds3 discipline: a
+ *  drive that stops short of the verifier's tolerance produces a refusal nothing can clear). */
+//
+// #1769 (ADR-3D-395): moved here from evaluate.ts, unchanged, so the pivot's root predicate (`isRoot` in
+// solve3's `collect`) judges a candidate by the very bar the stage-4 validation and the verifier use.
+export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
+  norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
+
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
   /** A representative point ON the operand (a point itself, a segment endpoint, a line anchor…). */

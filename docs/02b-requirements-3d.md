@@ -519,13 +519,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens leave a figure parameter two values, the data panel and the ask lane both list them: a pair that
   are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —
   **«m = -2 או m = 4»** — never a set «{-2, 4}». Three or more roots list nothing: the panel reads the open
-  **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
+  **«m = ?»** and the ask lane says the value is not determined (#1861). The same holds for a letter that vector or
+  membership givens leave on several discrete values (the right prism with «AA'=(k-1,k-7,k+1)» and AC on
+  «x=(8,-1,-1)+t(k+1,0,k-3)»: **«k = -1 או k = 2»**), and «הציגו תצורה אחרת» reaches each value's drawing; a letter
+  the givens determine shows its one value. Where a sampled configuration misses one of the values, the row reads
+  «k = ?» rather than a single value (#1769). A point with exactly two
   configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking «S» answers the same coordinates,
   naming the point once: **«S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**. Every ask answer is the bare value after the
   question («B = (1, t, 2)», «k = 2»), never the label again. A declared basis vector asked by its own name
   answers its coordinates when they are knowledge (**«w = (0, 0, 12)»**) and otherwise «לא נקבע על ידי הנתונים»,
   never its own name; a pair keeps its decomposition («AS = w = (0, 0, 12)»).
-  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072.
+  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395), #1769.
 - **FR-EQ-5 (Must)** — **A named plane is placed by whatever is stated about it.** A π-plane may be declared free
   («מישור π3»), or it comes into being, free, from any statement that names it. «קובייה ABCDA'B'C'D'» · «הישר AC' מאונך
   למישור π3» builds with no declaration. So do ∥ / ⊂ a segment or a line, ⟂ / ∥ a vector or a plane, an angle to a
