@@ -2828,7 +2828,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const ownFree = new Set(ids);
   /** The free vertices lead the vector (`carrierSystem`); the parameters after them stay on the plain step (#1182). */
   const anchorAt = (system: CarrierSystem): number => 2 * system.ids.length;
-  const selectorsHoldAt =(system: CarrierSystem, x: number[]): boolean =>
+  const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
     c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
@@ -2972,11 +2972,12 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const budget = solved.syms.length > 0 ? 40 : 120;
       const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
       const near = solveLM(stageOne.toVec(starts[0]), stageOne.residualsAt, budget, anchorAt(stageOne));
-      const retry = near.ok ? vertexStarts : vertexStarts.slice(1);
-      const first = (near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env)) || retry.length === 0
+      // A start the anchored step could not bring home is still tried on the plain step (the multi-start below
+      // re-solves it first), so the anchored solve can never cost a figure the convergence it had.
+      const first = near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env)
         ? near
         : solvePreferring(
-            retry.map((m) => stageOne.toVec(m)),
+            vertexStarts.map((m) => stageOne.toVec(m)),
             stageOne.residualsAt,
             budget,
             () => true,

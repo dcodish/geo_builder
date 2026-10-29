@@ -833,6 +833,11 @@ a sentence the tool parsed.
 - «N(13,0)» · «נקודה M» → M reaches the origin's side
 - Sources: ADR-AG-324, #2426 (round #2414 T9).
 
+**R199 — a free point is drawn near the figure the student stated, and «הציגו תצורה אחרת» still moves it**. *(Operator, 2026-09-18: "seeds should always try to find a close point and work backwards if no choice"; ruled 2026-09-20 "change the solve", 2026-10-28 "1182 - A", 2026-10-29 card 2 A.)* When the givens leave a point free, it is drawn as close to the stated figure as the givens allow, so the stated points fill a usable share of the view; when the givens force it far out, it is drawn far out and the view follows (nothing is clamped). Each press of «הציגו תצורה אחרת» moves it, over about 10 clearly different places. A fact that adds nothing moves the figure by a hair at most.
+- «A(0,0)» · «B(6,8)» · «נקודה M» · «MA = MB» → A and B take at least half the view at every configuration (the opening one was 39 %); M on the line 3x + 4y = 25 in at least 10 places 1 unit apart over 24 presses
+- «מלבן ABCD» then «AB מאונך ל-BC» → no point moves more than 0.2 (it moved up to 24.9)
+- Sources: ADR-AG-347, #1182, #1264.
+
 **R191 — a letter that stands for a size is positive**. *(Operator ruling 2026-10-20 on #2419: "r for radius like any letter represending size needs to be positive".)* A circle's radius however it is written (by its centre «שרדיוסו r», a positive multiple «שרדיוסו 2r», squared in its equation «(x−a)²+y²=r²», «x²+y²=4r²», «R²»), and a length, a distance, a perimeter or an area valued by a letter or a positive multiple of one («AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «היקף המשולש ABC הוא k», «שטח המשולש ABC הוא k»): the letter's row reads «0 < r» while it is open, and only its positive values are configurations. «r > 0» typed after it is already known.
 - «x²+y²=r²» · «A(3,4)» · «A על המעגל» → «r = 5» (not «r = −5 או 5»); Q2 in the exam's own form → r = 3, R = 6, one equation per circle
 - «a < 0» then «AB = a», or «AB = a» then «a < 0» → refused, naming the later sentence, with the radius's out-of-range message

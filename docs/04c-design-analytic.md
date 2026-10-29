@@ -1052,6 +1052,21 @@ curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
 
+### The step is anchored at the start ([ADR-AG-347](06c-decisions-analytic.md#adr-ag-347))
+
+`solveLM(x0, residuals, maxIter, anchored)`: in the Newton regime (the last plain step cut the cost at least
+fourfold, λ ≤ 1e-3) the step on the leading `anchored` coordinates lands on the point of the linearised set
+`r + J (x' − x) = 0` nearest `x0`, `x' = x0 + J⁺ (J (x − x0) − r)`: the same `JᵀJ`, damped by `λ·I` (the
+Euclidean nearest point), for the right-hand side `−Jᵀ(r + J a)` with `a = x0 − x`. No extra Jacobian. On a curved
+set the pull halves down to a quarter and may raise the cost (never above the last three accepted costs, at most
+twice per solve); once the anchored and plain candidates agree to `SOLVE_RESOLUTION` the plain step finishes.
+Stage one of `evaluateUncached` solves the seeded start with `anchored = 2 · ids.length` (the free vertices;
+parameters stay plain) and keeps it only when it converged and `admissibleAt` holds; otherwise the
+`solvePreferring` multi-start runs as before. The locus tracer, the deflated and repair solves and stage two stay on
+the plain step: they follow a predictor or look for another root on purpose. So among the solutions the givens
+allow, the figure draws the one nearest the seeded start: the free point stays beside the figure, a restated row
+cannot move it, and the variety «הציגו תצורה אחרת» shows is the sampler's, projected onto the solution set.
+
 ### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
 
 "What line does this name denote" lives in `engine/lines.ts`, reached by the surfaces via `app/lines.ts` and by the

@@ -1407,13 +1407,15 @@ export function withToleranceFactor<T>(factor: number, fn: () => T): T {
  */
 export const SOLVE_RESOLUTION = 10 * Math.sqrt(SOLVE_TOL);
 
-/** The damping at or below which `solveLM` is in its Newton regime and anchors its step (#1182, ADR-AG-343): its
+/** The damping at or below which `solveLM` is in its Newton regime and anchors its step (#1182, ADR-AG-347): its
  *  starting λ, so the regime is "no attempt refused since the last accepted step". */
 const ANCHOR_LAMBDA = 1e-3;
 const ANCHOR_WINDOW = 3;
 const NEWTON_RATIO = 0.25;
 const ANCHOR_MIN_PULL = 0.25;
 const ANCHOR_RAISES = 2;
+/** The plain iterations that finish an anchored solve stopped short of the loop's tolerance (#1182). */
+const POLISH_ITER = 8;
 
 export interface SolveResult {
   /** The carrier values that satisfy the constraints, in the order they were handed in. */
@@ -1441,7 +1443,7 @@ export function solveLM(
   residuals: (x: number[]) => number[],
   maxIter = 120,
   /**
-   * How many LEADING coordinates are ANCHORED at `x0` (#1182, [ADR-AG-343](../../docs/06c-decisions-analytic.md#adr-ag-343)):
+   * How many LEADING coordinates are ANCHORED at `x0` (#1182, [ADR-AG-347](../../docs/06c-decisions-analytic.md#adr-ag-347)):
    * in the Newton regime their step lands on the point of the linearised solution set nearest `x0`, not the point
    * nearest the current iterate. `0` (the default) is the plain damped step. A figure solve anchors its free
    * vertices (`2 · ids.length`) and leaves the parameters after them on the plain step.
@@ -1460,6 +1462,7 @@ export function solveLM(
   /** Is the descent in its Newton regime — did the last plain step cut the cost at least fourfold (#1182)? */
   let newton = false;
   let raises = 0;
+  let anchoredTaken = false;
 
   const tol = SOLVE_TOL * TOLERANCE_FACTOR;
   for (let iter = 0; iter < maxIter && f > tol * tol; iter += 1) {
@@ -1481,7 +1484,7 @@ export function solveLM(
     }
 
     /**
-     * THE STEP IS ANCHORED AT THE START, in the Newton regime (#1182, ADR-AG-343).
+     * THE STEP IS ANCHORED AT THE START, in the Newton regime (#1182, ADR-AG-347).
      *
      * The plain step `(JᵀJ + λ·diag) δ = −Jᵀr` is the shortest step from the CURRENT iterate. On an under-determined
      * figure the free directions then drift with every step's curvature, and the solve stops wherever the descent
@@ -1579,11 +1582,27 @@ export function solveLM(
       if (recent.length > ANCHOR_WINDOW) recent.shift();
       x = next;
       f = fn;
+      if (anchoredStep) anchoredTaken = true;
       lambda = Math.max(lambda * 0.3, 1e-12);
       if (stalled >= 8) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
+    }
+  }
+
+  /**
+   * THE PLAIN STEP FINISHES (#1182). The anchored step's pull is halved on a curved set, so near the set its
+   * convergence can be linear, and a solve can stop inside `ok`'s tolerance but short of the plain step's precision:
+   * «B על ציר ה-x» landed 1.4e-6 off its exact 2, and an area printed «99.999999». A few plain steps from there are
+   * the tiny minimum-norm correction from a point already on the set: they restore the precision without drifting.
+   * Paid only by a solve that took an anchored step and stopped short of the loop's own tolerance.
+   */
+  if (anchoredTaken && f > tol * tol) {
+    const p = solveLM(x, residuals, POLISH_ITER);
+    if (cost(p.values) < f) {
+      x = p.values;
+      f = cost(x);
     }
   }
 

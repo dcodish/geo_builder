@@ -14042,3 +14042,64 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2552-d9-new-circle.test.ts` (13: the D9 case after the exam pair and beside one circle at three seeds, the centre on P; stability of the earlier circles; an existing letter as the centre; the ruled Hebrew text; ✕ restoring the figure; two fixtures; controls — «O_1 מרכז מעגל» · «O_2 מרכז מעגל» name the pair in turn, the definite form keeps `ambiguous-shape` / `already-named`, the empty figure records silently, «O מרכז מעגל» on circle O is not a second circle, a lone equation circle's centre is named); fixtures `issue-2552-d9-new-circle-after-pair`, `issue-2552-d9-new-circle-beside-one`; the shared created-notice rows' circle row through analytic's adapter (`created-notice-1467.test.ts`); parity row `centre-of-a-circle-new-2552`.
 
 **Behaviour change for a student:** in analytic, «P מרכז מעגל» typed when every circle already has a centre letter draws a new circle centred at P, and under the line «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה»; ✕ removes the line. Nothing else changes.
+
+## ADR-AG-347 — Among the solutions the givens allow, the solve lands on the one nearest where it started: `solveLM` anchors its Newton step (#1182)
+
+**Date:** 2026-10-29 · **Status:** accepted · bug #1182, fix round #2602, branch `fix/1182-free-point-near-figure` (the route built on `fix/1182-anchored-step` @ 5b7c9a60 in round #2585, rebased onto `caf00532`). LADDER stage: **solve** (the analytic vocabulary: inside `solveLM`, and stage one of `evaluateUncached`'s vertex solve). No parser, fold, render or catalog change. `docs/LADDER.md` is the 2-D ladder and is not edited.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R199 (a free point is drawn near the stated figure; «הציגו תצורה אחרת» still moves it). · **Design:** [04c](04c-design-analytic.md), "The step is anchored at the start".
+
+**Operator rulings.** 2026-09-18 (round #1181 T28): *"there is no point in showing such a point M which is so far away from A and B that it's impossible to see what's happening. seeds should always try to find a close point and work backwards if no choice."* 2026-09-20: *"Yes — change the solve"* (with #1264 ① joined here). 2026-10-28, "1182 - A": change the solver itself so it lands near the start at no extra cost; "we cannot slow down anything" (#1874, 2026-10-08) stands with no exception. 2026-10-29, card 2 A: *"Accept 10 as the bar and ship"*: the variety lock is ≥ 10 distinct M positions, 1 unit apart, over 24 seeds.
+
+**Re-measured at pickup** (`caf00532`, `derive`, no model; HEAD and branch interleaved in one process). «A(0,0) · B(6,8) · נקודה M · MA = MB»: seed 0 M at (−13.79, 16.59), A and B 39 % of the view, 3 of 24 seeds under half. «מלבן ABCD» + «AB מאונך ל-BC»: max move over seeds 0–5 up to 24.9. Unchanged from the 2026-10-27 measurement.
+
+**Class.** *An under-determined least-squares solve returns whichever member of its solution set the descent path happens to reach.* That point depends on the residual ROWS and the iteration path, not on the SET. Two symptoms follow: (a) legibility, because along a free direction the cost is flat and Levenberg–Marquardt from one side can stop spans away; and (b) stability, because a row that changes nothing about the set still changes `JᵀJ` and so the path.
+
+**Root cause.** `solveLM`'s damped step `(JᵀJ + λ·(1 + diag)) δ = −Jᵀr` is the shortest step from the CURRENT iterate, never from the start. So the free directions drift with each step's curvature.
+
+**Decision.**
+1. **The anchored step** (`solveLM`'s new `anchored` argument, `engine/solve.ts`). In the Newton regime (the last plain step cut the cost at least fourfold, λ at or below its starting 1e-3), the step on the leading `anchored` coordinates lands on the point of the linearised set `r + J (x' − x) = 0` nearest `x0`: `x' = x0 + J⁺ (J (x − x0) − r)`. It is computed as `x' = x + a + δ'`, with `a = x0 − x` on the anchored coordinates (0 on the rest) and `δ'` solving the same `JᵀJ` damped by `λ·I` for the right-hand side `−Jᵀ(r + J a)`. That is one more matrix–vector product and one more small elimination per iteration, with no extra Jacobian. At `x = x0` it is the plain step. `λ·I`, not `λ·(1 + diag)`: the scaled damping gives a "nearest" point that a redundant row moves (rectangle up to 27.7, measured in round #2585).
+2. **A curved set.** The jump back toward the start leaves a curved set, so the pull halves down to a quarter. It may raise the cost above the current iterate's, never above the last three accepted costs, and at most twice per solve. Once the anchored and plain candidates agree to `SOLVE_RESOLUTION` the plain step finishes, so convergence stays quadratic. With a strictly monotone step the rectangle still moved up to 4.6 (round #2585).
+3. **Free vertices only.** Stage one of the figure solve passes `anchored = 2 · ids.length` (the free vertices lead the vector, `carrierSystem`). Parameters stay on the plain step, so ADR-AG-197's resampling is not undone.
+4. **Kept only when admissible.** Stage one solves the seeded start anchored and keeps it only when it converged and `admissibleAt` (selectors and rings) holds. Otherwise today's `solvePreferring` multi-start runs unchanged, minus the start already tried when the anchored solve did not converge. So the anchored answer can change which valid configuration is drawn but cannot turn a whole figure into a refused one.
+5. **"Work backwards if no choice."** Nothing is clamped: when the givens force a point far out, the anchored step lands there (it moves only as far as the rows need), and the view follows.
+
+**Sites left on the plain step, and why.** The locus tracer's predictor–corrector solves (`locus.ts`; a trace step must follow its predictor, not snap back to a start); the deflated restarts and repair solves in `evaluate.ts` (they look for a DIFFERENT root on purpose); stage two (the joint vertex + parameter solve, reached only when the vertices alone cannot converge); `solveMultiStart` / `solvePreferring` themselves (the fallback, which is exactly today's behaviour).
+
+**Measured before / after** (`caf00532`, interleaved, 24 seeds).
+
+| gate | HEAD | after | bar |
+|---|---|---|---|
+| MA = MB: seeds with AB under 50 % of the view | 3/24 (seed 0: 39 %) | **0/24** (worst 76 %; seed 0 M = (2.69, 4.23)) | 0 |
+| MA = MB: distinct M positions, 1 unit apart | 17 (x ∈ [−13.8, 15.5]) | **10** (x ∈ [−4.0, 10.1]) | ≥ 10 (ruling 2026-10-29) |
+| locus of M over 24 seeds | one answer | one answer, `3x + 4y - 25 = 0` | one |
+| «מלבן ABCD» + «AB מאונך ל-BC», max move, seeds 0–5 | up to 24.9 | up to **0.078** | ≤ 0.2 |
+| «משולש ABC · AB = AC» + base angles, max move | up to 0.148 | up to 0.021 | (the door already answers `already-follows`, ADR-AG-330) |
+| «מרובע ABCD · מעגל M משיק לצלעות AB ו-BC», whole seeds | 24 | 24 | ≥ 8 |
+| «מרובע ABCD · הזווית בין BD ל-BA היא 30», whole seeds | 24 | 24 | ≥ 15 |
+| bare «משולש ABC», whole seeds | 24 | 24 | — |
+
+**Timing** (per line, seed 0, `decideSubmit` + a fresh `derive`, medians of 7, interleaved). Every line is within max(1.05 × HEAD, HEAD + 5 ms):
+
+| figure | HEAD total / slowest line | after |
+|---|---|---|
+| 572 PART_C | 2274 / 1674 ms | 2302 / 1699 ms |
+| MA = MB | 8.3 / 3.4 | 8.6 / 3.5 |
+| kite + circle | 110 / 45.1 | 123 / 48.6 (line 5: 7.8 → 11.7) |
+| `טרפז · טרפז ישר זווית · טרפז שווה שוקיים` | 9.4 / 4.4 | 8.9 / 4.1 |
+| quadrilateral + tangent circle | 4.0 / 2.8 | 6.6 / 5.4 |
+| isosceles + base angles | 9.9 / 6.0 | 11.7 / 8.1 |
+
+Three lines pass only on the + 5 ms floor (kite line 5, the tangent circle's line 2, the base angles' line 3): a few milliseconds slower in absolute terms, inside the ruled bound. **Worst-case multiplier (docs/17 M3):** per iteration, one extra n×n elimination and up to three extra cost evaluations; per stage one, one extra solve on the failure path only (the anchored start, then the unchanged multi-start). The corpus timing run is the batch's.
+
+**Variety (ADR-052).** The drawn M is now the point of the bisector nearest the seed's start, so its spread is the spread of the seeded starts projected onto the line: 14 places at 0.5 apart, 10 at 1 apart. HEAD's 17 came from the descent's drift, which is the defect itself. The operator accepted 10 (2026-10-29). M still moves on every «הציגו תצורה אחרת».
+
+**Considered.** Option B of 2026-09-18 (re-seed when a free point lands beyond K spans): superseded by the 2026-09-20 ruling, since it hides bad configurations instead of improving them and K is an unstated magnitude. The post-solve min-norm walk (round #2561, `fix/1182-nearest-placement` @ e889c9da): it worked, but it made the trapezoid stack 5.6× and the kite 2× slower, so it was dropped by the 2026-10-28 ruling. The prior figure as the reference (a new given moving the figure less): measured gains, but it needs `derive` to carry prefix history, so it was deferred in the 2026-10-06 plan §8.
+
+**Sibling audit.** *2-D:* «קטע AB · נקודה M · MA = MB» keeps M 0.11–0.80 spans from AB's midpoint over 12 seeds (2026-10-06 plan). Its mechanism is stage 4's nearest-root selection on a param-carrier plus `settleOnFrozenPrior`, so the verdict already matches and there is no code change and no known-gap row. Its redundant-line jump is closed by #999's `noop implied-restatement`. The 2-D component solve's own regulariser question is #1874, which this ADR does not touch. *3-D:* not measured. It is out of scope by the 2026-09-18 ruling ("`src-analytic/` only; do not port without a separate look"). *Within analytic:* every figure whose stage-one vertex solve has a positive-dimensional solution set (loci, free riders, an isosceles apex, a rectangle's free side). A discrete branch choice (two isolated roots) is a configuration axis, not a free direction, and is unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-1182-free-point-near-figure.test.ts` (14): `solveLM` anchored lands on the foot of the perpendicular from its start (four starts), `anchored = 0` is bit-identical to today, the residual is not traded; the operator's figure at seed 0 and at all 24 seeds takes at least half the view; M is on the bisector at every seed; ≥ 10 distinct M and every press moves it; the locus is one answer; the rectangle ≤ 0.2, the base angles ≤ 0.05, the #1264 sequence 0; the tangent circle ≥ 8 and the BD/BA angle ≥ 15 whole seeds. Fixture `issue-1182-free-point-near-figure.analytic.json` (the operator's sequence). The parity goldens are re-judged at the batch.
+
+**Consequences.** `engine/solve.ts` (`solveLM`'s `anchored` argument and the anchored step), `engine/evaluate.ts` (stage one's anchored solve and `admissibleAt` keep-test); docs 02c R199, 04c. #1264 ① is answered at derive level for analytic.
+
+**Behaviour change for a student:** in analytic, when the givens leave a point free, its opening position sits near the figure the student stated. «A(0,0) · B(6,8) · נקודה M · MA = MB» opens with A and B filling the view instead of a corner of it. «הציגו תצורה אחרת» still moves M on every press, over about 10 clearly different places instead of about 17.
