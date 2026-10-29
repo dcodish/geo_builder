@@ -13822,3 +13822,71 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Perf.** One structural `scaleKnown3` per letter row and per symbol query; no sampling added (M3).
 
 **Behaviour change for a student:** in 3-D, «|AB| = k» on a figure whose size nothing fixes shows «k = ?» (was «k = 1»), and asking «k» says it depends on the scale (was «1»). Once something fixes the size, the value shows as before.
+
+## ADR-3D-395 — A pin symbol's admissible roots are one set: one root predicate, one pool-closing walk, every consumer reads the record (#1769)
+
+**Status:** accepted · 2026-10-29 · bug fix (P2) · fix round #2602 · plan: the "Fix plan — 2026-10-06" comment on #1769 (armed by the operator's "Arm all 26", 2026-10-06) · **amends** [ADR-3D-168](#adr-3d-168) Am. 1 (#797's «k = ?» for discrete roots becomes the root set) · **LADDER stage:** 3-D stage 4 (the [ADR-3D-033](#adr-3d-033) membership drive) and the pivot's continuation stage
+**Operator:** ruling 2026-10-04 on #1769, *"show both, then go fast"*. The format is [ADR-3D-336](#adr-3d-336)'s (operator ruling W1, 2026-10-08), which superseded ADR-3D-303's comma that the plan quoted: «k = -1 או k = 2». The same ruling covers moving #797's lock (the 2026-10-06 housekeeping comment).
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (amended: a letter left on several values by vector or membership givens lists them) · **Design:** [04b](04b-design-3d.md) § "The solver" (*A pin symbol's admissible roots are one set*)
+
+**Measured before** (`main` @ caf00532, store `submit` → `derive3` → `dataView`, nothing mocked). The figure is the operator's prism: «מנסרה ישרה משולשת ABCA'B'C'» · «AA'=(k-1,k-7,k+1)» · «AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)». The right-prism condition is (k+1)(2k−4) = 0, so k ∈ {−1, 2}:
+
+| | before | after |
+| --- | --- | --- |
+| panel at seed 0 | «k = 2», `open: false` | «k = -1 או k = 2» |
+| pools carrying both roots, seeds 0–23 + 1013–1036 + 2027–2050 (the panel's samples) | 0 / 72 | 66 / 72 |
+| panel reads both, seeds 0–23 | 0 / 24 (one root printed at 20) | 18 / 24; the other 6 read «k = ?» |
+| not whole, same 72 samples | 4 (2030, 1019, 2042, 22) | 3 (2030, 2042, 22) |
+
+**Class (docs/17 §1).** *Search order, not the givens, decided which roots of a discrete pin symbol were admissible.* Six places each lost a root in a different way, and none of them owned the set:
+- stage 4 kept the first good candidate overall;
+- the #803 slide and the #2368 read-back image dropped the pool's record;
+- the #797 walk read a collapsed pinned solve as evidence of continuity, and it also collapsed on its way to the other root;
+- the roots found by the #816 widening and the #1735 re-seat were never walked;
+- the solver's `ACCEPT` (sum of squares 1e-10) and the verifier's `onLineHolds3` (relative 1e-7) were two definitions of "holds". A real root (k = −1, with C 5.8e-7 off ℓ at error 6.3e-11) entered the pool and was then rejected.
+
+The panel then read the one surviving root as knowledge. That is #797's class (*seed-stability is not determinedness*), one stage later.
+
+**Decision (M1 at the solver's root chokepoint).**
+1. **One root predicate.** `onLineHolds3` and `memberHolds3` move unchanged to `operands.ts` and are re-exported from `evaluate.ts` (solve3 never imports evaluate; the same move #818 made). `membersHold(mirror, x)` reads every member pin at the candidate's final positions, and reads a pin-symbol carrier at the candidate's own symbol value. `collect` admits a candidate only when it is exact, not degenerate, and passes `membersHold`. A candidate that is exact on `ACCEPT` but off the bar first gets the #1311 release, then is judged again. The #803 slide's acceptance asks the same predicate, with the same release: a slide that cannot be brought onto the bar is no slide. With no member pin the predicate is `true`, so no other solve changes.
+2. **One pool-closing walk.** The #797 walk is now `symbolWalk()`, with a per-mirror `walked` set. It runs after the cold starts, after the #816 widening, and inside the #1735 re-seat stage; the last two are failure-path only. `pinRootKey(pinSymbols, syms)`, exported from solve3, is the one root key. The walk, the round-robin interleave and stage 4 all read it, which removes three inline copies.
+3. **A collapse is no evidence, and the walk holds the shape on retry.** `explore` reports a target admissible only when the pinned solve is not degenerate. A collapsed pinned stage is retried once with the log-scale and dims held to the base solution (`SHAPE_HOLD = 1`). If the release from that held point collapses too, it is released once more through `SHAPE_HOLD_SOFT = 0.1`, then freely. This is retry-only: a target that does not collapse pays nothing. *Deviation from the plan:* the plan named `REG_SF` (1e-4) for the hold. Measured, that weight held nothing and changed no seed; a weight of 1 does.
+4. **Stage 4 keeps one validated representative per root** and applies them as the pool. `pool[seed % n]` then cycles the roots, and `symRoots` records all of them. A figure with no open pin symbol has one key and stops at its first good candidate, as before.
+5. **The record survives re-placement.** The slide and the read-back image keep the pool's `symRoots` when their own symbol values are among the roots. One rule decides this (`rootsDescribe`). The image keeps its one-entry point record, so the point rows do not change. *Beyond the plan's list, same class:* the image was a seventh site dropping the record. It was found because the panel samples it.
+6. **The panel prints the set.** `rootSetsAgree(perSeed, relTol)` (dataView) is the one test of whether the root set agrees. The algebraic lane's branch row uses it at 1e-6 and the pin-symbol row at 1e-4. When every sampled seed's pool carries the same two or more roots, the row is `${sym} = ${branchAnswer(sym, roots)}`: «k = -1 או k = 2», «±» for a symmetric pair, and nothing listed for three or more. Any disagreement between seeds reads «k = ?». The ask lane answers «k» from this same row (#1746), so the two surfaces cannot differ.
+
+**Measured after: the 24-seed sweep of every `fixtures3` file (91 files × 24 seeds, before vs after).** In 90 files the statuses, the root sets and the pool sizes are all identical. The one change is `symbolic-line-equation-863`, the operator's prism:
+- root sets go from {2} or {−1} to {−1, 2} at 22 seeds. Seed 11 is still {2}, and seed 22 keeps its pre-drive 10-value pool;
+- the whole-rate stays 23/24;
+- every seed that now draws k = −1 verifies. The new root is the one the algebra gives, (k+1)(2k−4) = 0, not an artefact.
+
+Timing: the total sweep went from 327.0 s to 331.1 s (+1.3 %). The #863 fixture went from 39.5 s to 43.8 s (+11 %, under the plan's 15 % report line). No other fixture moved by more than noise.
+
+**Not fixed, recorded.** At 6 of the 72 panel samples the pool still misses a root, and the panel then reads «k = ?», never a single value. There are two kinds:
+- (a) samples 2030, 2042 and 22 were not whole before and are not whole now. Every start of their stage-4 drive collapses, so the drive is rolled back. This is the drive failing, not the pool;
+- (b) samples 11, 1019 and 2045 carry {2}: the walk's release from near k = −1 still collapses.
+
+#863 Part B (the anchored solve) is the next item on this chokepoint, and it starts from these honest sets. The #818 sign-axis continuation still runs only on the cold-start pool. No fixture has a sign given together with a widened or re-seated root, so it is not folded in here.
+
+**Sibling audit.** The class is closed elsewhere:
+- 2-D: `drivenRoots` keeps every root of a 1-D carrier (LADDER 4.2);
+- analytic: each parameter is solved in closed form;
+- complex: all roots are enumerated (#1434);
+- 3-D's algebraic `param` lane: its branches are closed-form (#1474), and it now shares `rootSetsAgree`.
+
+No parity row: an R³ pin-symbol membership drive is not a plane-geometry sentence.
+
+**Locks.**
+- `src3d/__tests__/issue-1769-root-pool.test.ts`: the panel at seeds 0–2; both roots in the pool and every figure whole at seeds 0, 1, 2 and 10; both drawings reachable over seeds 0–3; the reversed entry order; `rootSetsAgree`.
+- `issue-797.test.ts` case 1 moves by the ruling, from «k = ?» to «k = 1 או k = 2». Its determined control still reads «k = 2».
+- The fixture `fixtures3/symbolic-line-equation-863.geo3.json` stays green.
+- Must-not-change, all run green: `issue-1440`, `-1474`, `-1591`, `-1735`, `-801`, `-803`, `-815`, `-818`, `-820`, `-863-resolve-memo`, `-863-sample-hoist`, `-902`, the #1394 `decideSubmit3` golden, and `fixtures3.test.ts`.
+
+**Perf (M3).**
+- Success path: one `membersHold` check per collected candidate in a solve with member pins, and no extra solve.
+- The walk's solve count is unchanged.
+- A shape-hold retry runs only on a collapsed target (at most 2 extra LM solves).
+- The widening and re-seat walks run on the failure path only.
+- Stage 4 validates each distinct root once.
+
+**Behaviour change for a student:** in 3-D, when two values of a letter both satisfy the givens (the prism's k = −1 and k = 2), the data panel and the ask lane now say so, «k = -1 או k = 2», instead of showing one as if it were determined. «הציגו תצורה אחרת» reaches both drawings. A letter the givens determine still shows its one value. #797's two-vector prism reads «k = 1 או k = 2» (was «k = ?»).

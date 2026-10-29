@@ -561,6 +561,19 @@ function of `(construction, seed, paramValue)`, memoized at that chokepoint (a W
 identity — `apply` clones, never mutates). Every consumer shares it through `knowledgeSamples3`;
 `resolveStats3` counts resolves and hits.
 
+**A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
+root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary
+residuals, not collapsed, and every member pin holds by the verifier's own bar (`membersHold`, which reads
+`onLineHolds3` / `memberHolds3` from `operands.ts`). A candidate exact on `ACCEPT` but outside that bar gets the #1311
+release and is judged again; the #803 slide's acceptance asks the same predicate. The #797 walk (`symbolWalk`) closes
+the pool over every source of a root: the cold starts, the #816 widening and the #1735 re-seat, each base walked once
+(`pinRootKey`, the one root key the walk, the round-robin interleave and stage 4 share). A collapsed pinned stage is
+no evidence of continuity, and is retried once with the shape held (retry-only). Stage 4 keeps one validated
+representative per root and applies them as the pool; the slide and the read-back image carry the pool's `symRoots`
+when their own symbol values are among them (`rootsDescribe`). The panel prints the set
+(`branchAnswer`) when every sampled seed's pool carries the same ≥ 2 roots (`rootSetsAgree`, shared with the
+algebraic lane's branch row); any disagreement reads «k = ?».
+
 **A symbolic coordinate lives in one of two lanes** (ADR-3D-218, #898): with a solid, a pivot **pin**
 carrying the full affine form, exponents included; with none, a `coord-sym` point stored as a degree-1
 `{k, p}`. The narrower lane **refuses what it cannot hold rather than narrowing it silently**.
