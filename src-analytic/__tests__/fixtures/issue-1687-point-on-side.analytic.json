@@ -1,0 +1,10 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "משולש ABC",
+    "D על BC"
+  ],
+  "seed": 0,
+  "name": "#1687 — «D על BC» on a free triangle puts D on the side and leaves the triangle where it was"
+}

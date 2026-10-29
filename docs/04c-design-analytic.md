@@ -1052,6 +1052,22 @@ curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
 
+### An introduced point starts where its sentence puts it ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), #1687)
+
+A seeding stage in `evaluateUncached`, after every region seeding and before `fitCreatedShapes` and the joint solve.
+`ownershipOf(c)` (memoised per construction) gives each constraint and selector to the **latest-declared free vertex
+it is placed from**: directly, or through a derived point, curve or segment (`objectDeps` and the object's own
+references, transitively). A later sentence never changes what an earlier vertex owns, so the figure as it stood is
+a prefix of the figure that follows. `fitIntroducedPoints` then walks the free vertices in declaration order and
+fits each one ALONE to what it owns (two unknowns, `solveLM`, ≤ 60 iterations), every other point held at its
+current start. Starts: the region-seeded position, a seed-varied point (0.2–0.8) inside each bounded piece or
+`between`, the quarter points of each two-point carrier unless a `beyond` names the vertex, and the hashed seed.
+Acceptance tiers: own selectors hold and not stacked on another point (2·`apartOf`), then own selectors hold, then
+converged. With none, the start is unchanged. The same ownership decides the #2426 wide box (`reachedIds`): a
+vertex is "reached" only by a given it owns, so a later point's sentence that merely names it («D על BC» names C)
+does not change where it starts. The #1168 projection and the bounded restarts read a free end through `seeded`
+(`pointAtId` alone saw only stated points). The joint solve, the selectors and `drawableAt` keep the last word.
+
 ### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
 
 "What line does this name denote" lives in `engine/lines.ts`, reached by the surfaces via `app/lines.ts` and by the

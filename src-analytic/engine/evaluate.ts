@@ -2107,6 +2107,148 @@ interface CreatedFit {
   dead: boolean;
 }
 
+/**
+ * AN INTRODUCED POINT STARTS WHERE ITS SENTENCE PUTS IT, ON THE FIGURE AS IT STOOD (#1687,
+ * [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)) — #1647's created-circle fit, generalised to every
+ * free vertex.
+ *
+ * «משולש ABC» · «D על BC»: D's letter hashes to a start nowhere near BC, and the joint descent then satisfied the
+ * incidence by moving B, C and D together — a least-squares step spreads its correction over every unknown in the
+ * row — so adding the sentence moved the triangle (24/24 seeds), and the display walk, handed a start that broke
+ * `between` or the spread, redrew the whole figure at another seed. 2-D never re-solves an earlier point for a later
+ * one: a point-on-object is evaluated after its parents.
+ *
+ * This is that rule as a START. Each constraint and selector is OWNED by the latest-declared free vertex it is placed
+ * from (directly or through a derived point, curve or segment — `objectDeps`, transitively). In declaration order,
+ * each vertex that owns a constraint is fitted ALONE to what it owns (two unknowns, `solveLM`, ≤ 60 iterations),
+ * every earlier vertex held where its own fit left it. A constraint that names only earlier vertices — «AB = 5» added
+ * later — is owned by the latest of them, so a sentence that does constrain the earlier figure still moves it.
+ *
+ * Starts, in order: the region-seeded position (#1071, #1168, #1268, ADR-AG-208, ADR-AG-217 already set it); a
+ * seed-varied point inside each piece the vertex is bounded to (0.2–0.8, so ADR-052 holds and the seed still moves
+ * it); the quarter points of each carrier through two points, only when no `beyond` selector names the vertex (a
+ * carrier start ignores the extension's region — measured, it broke every «E על המשך …»); the hashed seed.
+ * A converged fit whose own selectors hold wins; a converged fit failing one is the fallback; with none, nothing
+ * changes. A start, never a verdict: the joint solve and the judge keep the last word.
+ */
+/**
+ * WHICH FREE VERTEX OWNS EACH CONSTRAINT AND SELECTOR (#1687, ADR-AG-348): the latest-declared free vertex it is placed
+ * from — directly, or through a derived point, a curve or a segment (`objectDeps` and the object's own references,
+ * transitively). A later sentence never changes what an earlier vertex owns, which is what makes the figure as it
+ * stood a prefix of the figure that follows. Memoized per construction.
+ */
+interface Ownership {
+  constraints: ReadonlyMap<Id, Constraint[]>;
+  selectors: ReadonlyMap<Id, Selector[]>;
+}
+const ownershipCache = new WeakMap<Construction, Ownership>();
+function ownershipOf(c: Construction): Ownership {
+  const hit = ownershipCache.get(c);
+  if (hit) return hit;
+  const ids = freeIds(c);
+  const order = new Map<Id, number>();
+  c.objects.forEach((o, i) => order.set(o.id, i));
+  const free = new Set(ids);
+  const idsIn = (value: unknown, out: Set<Id>): Set<Id> => {
+    if (typeof value === 'string') {
+      if (order.has(value)) out.add(value);
+    } else if (Array.isArray(value)) for (const v of value) idsIn(v, out);
+    else if (value && typeof value === 'object') for (const v of Object.values(value as Record<string, unknown>)) idsIn(v, out);
+    return out;
+  };
+  /** Per object, the free vertices it is placed from. */
+  const deps = new Map<Id, Set<Id>>();
+  for (const o of c.objects) {
+    const mine = new Set<Id>(free.has(o.id) ? [o.id] : []);
+    for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) for (const v of deps.get(p) ?? []) mine.add(v);
+    deps.set(o.id, mine);
+  }
+  const ownerOf = (value: unknown): Id | null => {
+    let best: Id | null = null;
+    for (const id of idsIn(value, new Set())) {
+      for (const v of deps.get(id) ?? []) if (best === null || order.get(v)! > order.get(best)!) best = v;
+    }
+    return best;
+  };
+  const ownK = new Map<Id, Constraint[]>();
+  for (const k of c.constraints) {
+    const v = ownerOf(k);
+    if (v !== null) ownK.set(v, [...(ownK.get(v) ?? []), k]);
+  }
+  const ownS = new Map<Id, Selector[]>();
+  for (const s of c.selectors) {
+    const v = ownerOf(s);
+    if (v !== null) ownS.set(v, [...(ownS.get(v) ?? []), s]);
+  }
+  const out: Ownership = { constraints: ownK, selectors: ownS };
+  ownershipCache.set(c, out);
+  return out;
+}
+
+function fitIntroducedPoints(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
+  const ids = freeIds(c);
+  if (ids.length === 0 || c.constraints.length === 0) return;
+  const { constraints: ownK, selectors: ownS } = ownershipOf(c);
+  if (ownK.size === 0) return;
+  const scale = residualScale(c, env);
+  for (const v of ids) {
+    const ks = ownK.get(v);
+    if (!ks) continue;
+    const sels = ownS.get(v) ?? [];
+    const withV = (p: Pt): Map<Id, Pt> => new Map(seeded).set(v, p);
+    const residualsAt = (x: number[]): number[] => {
+      const pos = place(c, env, withV({ x: x[0], y: x[1] }));
+      const at = (id: Id) => pos.get(id) ?? null;
+      return ks.flatMap((k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at), scale) ?? [0]);
+    };
+    const placed = place(c, env, seeded);
+    const pointOn = (a: Id, b: Id, t: number): Pt | null => {
+      const pa = placed.get(a);
+      const pb = placed.get(b);
+      return pa && pb ? { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) } : null;
+    };
+    const starts: Array<Pt | null> = [seeded.get(v) ?? null];
+    const pieces = [
+      ...ks.filter((k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.id === v && k.bounded === true),
+      ...sels.filter((s): s is Extract<Selector, { kind: 'between' }> => s.kind === 'between' && s.id === v),
+    ];
+    pieces.forEach((k, i) => starts.push(pointOn(k.a, k.b, 0.2 + 0.6 * jitter(seed, 1687 + i))));
+    if (!sels.some((s) => s.kind === 'beyond' && s.id === v)) {
+      for (const k of ks) {
+        if (k.t !== 'on-line-2pt' || k.id !== v) continue;
+        for (const t of [0.25, 0.5, 0.75]) starts.push(pointOn(k.a, k.b, t));
+      }
+    }
+    starts.push(hashed.get(v) ?? null);
+    // A fit ON an earlier point is the display's stacked pair (#1273, ADR-AG-181): kept below a separated one, or the
+    // walk would redraw the whole figure at another seed to part two labels that only the start put together.
+    const stackedOn = (pos: Map<Id, Pt>, p: Pt): boolean => {
+      const near = 2 * apartOf(pos);
+      return [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near);
+    };
+    let won: Pt | null = null;
+    let stacked: Pt | null = null;
+    let fallback: Pt | null = null;
+    for (const p0 of starts) {
+      if (!p0) continue;
+      const r = solveLM([p0.x, p0.y], residualsAt, 60);
+      if (!r.ok) continue;
+      const p = { x: r.values[0], y: r.values[1] };
+      const pos = place(c, env, withV(p));
+      if (sels.length === 0 || failingSelectors({ ...c, selectors: sels }, pos, env).length === 0) {
+        if (!stackedOn(pos, p)) {
+          won = p;
+          break;
+        }
+        stacked ??= p;
+      }
+      fallback ??= p;
+    }
+    const p = won ?? stacked;
+    if (p) seeded.set(v, p);
+  }
+}
+
 function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: Map<Id, Pt>, seed: number, choiceSeed: number, reach = 1, wide = seed !== 0): CreatedFit | null {
   const syms = paramRegister(c)
     .map((q) => q.sym)
@@ -2378,7 +2520,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const span = searchSpan(c, env);
   const stated = wide ? Math.max(6, 1.5 * statedScale(c.objects, c.constraints)) : 6;
   const wideSpan = stated > 6 ? searchSpan(c, env, stated) : span;
-  const reachedIds = wideSpan !== span ? reachedByGivens(c).ids : null;
+  /*
+   * #1687 (ADR-AG-348): reached means a given SOLVES the vertex — one it owns (`ownershipOf`). A vertex a later
+   * point's sentence merely names («D על BC» names C) is not moved by it, so its sample is still its drawn value and
+   * keeps its box: otherwise the sentence moved C by changing where C starts.
+   */
+  const owned = wideSpan !== span ? ownershipOf(c).constraints : null;
+  const reachedIds = owned ? new Set([...reachedByGivens(c).ids].filter((id) => owned.has(id))) : null;
   const seeded = new Map<Id, Pt>(
     // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
     ids.map((id) => {
@@ -2387,6 +2535,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       return [id, { x: freeCoord(seed, name, 0, box), y: freeCoord(seed, name, 1, box) }];
     }),
   );
+  /** The hashed starts, before any region seeding moves them — #1687's last start (ADR-AG-348). */
+  const hashed: ReadonlyMap<Id, Pt> = new Map(seeded);
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
    *
@@ -2422,8 +2572,10 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     for (const k of c.constraints) {
       if (k.t !== 'on-line-2pt' || !k.bounded) continue;
       const at = seeded.get(k.id);
-      const pa = pointAtId(c, env, k.a);
-      const pb = pointAtId(c, env, k.b);
+      // A FREE end is read at its seeded position (#1687, ADR-AG-348): `pointAtId` alone resolves only a stated point,
+      // so on «משולש ABC» the projection onto BC was a silent no-op.
+      const pa = seeded.get(k.a) ?? pointAtId(c, env, k.a);
+      const pb = seeded.get(k.b) ?? pointAtId(c, env, k.b);
       if (!at || !pa || !pb) continue;
       const dx = pb.x - pa.x;
       const dy = pb.y - pa.y;
@@ -2775,6 +2927,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     }
   }
 
+  // An introduced point starts where its sentence puts it, on the figure as it stood (#1687, ADR-AG-348).
+  fitIntroducedPoints(c, env, seeded, hashed, seed);
+
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
   const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
   if (fitted) {
@@ -2929,8 +3084,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     const restartsForBounded: Map<Id, Pt>[] = [];
     for (const k of c.constraints) {
       if (k.t !== 'on-line-2pt' || !k.bounded) continue;
-      const pa = pointAtId(c, env, k.a);
-      const pb = pointAtId(c, env, k.b);
+      const pa = seeded.get(k.a) ?? pointAtId(c, env, k.a); // a free end too (#1687, ADR-AG-348)
+      const pb = seeded.get(k.b) ?? pointAtId(c, env, k.b);
       if (!pa || !pb) continue;
       for (const t of [0.25, 0.75]) {
         const m = new Map(seeded);
