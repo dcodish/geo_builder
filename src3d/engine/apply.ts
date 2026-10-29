@@ -15,7 +15,7 @@ import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '..
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
-import { carrierParams3, readCoordGiven } from './carriers';
+import { carrierParams3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
@@ -214,6 +214,30 @@ const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism
  *  counts its w, being oblique by definition). */
 export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true }): number =>
   DIM_COUNT[s.kind] + (s.oblique && s.kind !== 'parallelepiped' ? 2 : 0);
+/**
+ * #1782 (ADR-3D-393) — THE DRIVE-OR-CHECK PREDICATE of every scalar or relation statement: does what the
+ * statement reads include a degree of freedom the student never stated? A solid's free shape dims, or a free
+ * carrier parameter of a point it names or is built from (`reachesFreeCarrier3`: a rider's `t`, a free
+ * offset, an unstated coordinate). The statement's own reach, never a count standing in for it: `freeDims`
+ * answered "determined" for a cube, so a stated length on a rider of its edge was checked against the sampled
+ * rider and refused. `freeDims` stays the COUNT its other readers want (the DOF cue, `size-on-solid`).
+ */
+export function statementReachesFreeDof3(c: Construction3, statement: unknown): boolean {
+  if (freeDims(c) > 0) return true;
+  // a declared vector atom («cos(u, AE)») reads the points it spans
+  const named: Id[] = [];
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      const o = v as { kind?: unknown; name?: unknown };
+      if (o.kind === 'named' && typeof o.name === 'string') named.push(...(atomEndpoints(c, { kind: 'named', name: o.name }) ?? []));
+      Object.values(v as Record<string, unknown>).forEach(walk);
+    }
+  };
+  walk(statement);
+  return reachesFreeCarrier3(c, [...claimPointIds(c, statement), ...named]);
+}
+
 export function freeDims(c: Construction3): number {
   let n = 0;
   // #1855 (ADR-3D-355): every solid after the first carries its own similarity (7 dims) — separate
@@ -1989,7 +2013,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (prior) {
           const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
           const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
-          if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
+          if (statementReachesFreeDof3(c, [a, b, cc, d]) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
           else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
         }
       }
@@ -2252,7 +2276,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (def && (def.kind === 'coord-sym' || (def.kind !== 'free3' && carrierParams3(c, cmd.claim.id, def).length > 0)))
           return applyCommand3(c, { type: 'point3', id: cmd.claim.id, x: cmd.claim.x, y: cmd.claim.y, z: cmd.claim.z });
       }
-      if (freeDims(c) > 0 || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
+      // #1782 (ADR-3D-393): the predicate is the statement's reach over the whole carrier table on a solid figure,
+      // beside #1311's clause (a NAMED `free3` point, on any figure) — and a magnitude also drives when the SCALE
+      // GIVEN in force reaches a free carrier («E על AB · AE = 1» then «AB = 2»): the rescale cannot hold both, so the
+      // demotion below takes them together.
+      const scaleReaches = c.scaleGivens.some((g) => statementReachesFreeDof3(c, g));
+      const reaches = statementReachesFreeDof3(c, cmd.claim) || (isScaleGivenClaim(cmd.claim) && scaleReaches);
+      if (reaches || claimPointIds(c, cmd.claim).some((id) => c.points.get(id)?.kind === 'free3')) {
         // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
         // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
         // must not turn a GIVEN into a refused claim). It lowers to the pivot pin exactly like
@@ -2304,12 +2334,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // magnitude would read refuted. Such a statement stays with the claim arbiter below.
         const symbolDefined = claimPointIds(c, cmd.claim).some((id) => c.vecDefs.some((vd) => vd.symbol && vd.unknown === id));
         const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
-        if (mag && freeDims(c) > 0) {
+        // #1782 (ADR-3D-393): free dims, or a free carrier of a solid figure in reach (the solid-free `free3` clause
+        // keeps its own length arm below, byte-preserved)
+        if (mag && reaches) {
           if (c.scaleGivens.length > 0) {
             next.scaleGivens = [];
             for (const g of c.scaleGivens) {
               const gp = magnitudeScalarPin(g);
-              if (gp) next.scalarPins.push(gp); // its claim is already recorded — the arbiter stays
+              if (!gp) continue;
+              next.scalarPins.push(gp);
+              // #1782 (ADR-3D-393): its claim is already recorded; a demoted LENGTH becomes the pin's arbiter
+              // (`given: true`, the #1567 seam), so it is judged as the given it now is — never as an answer
+              // the size-on-solid guard would refuse on a figure the pivot sized. Same slot, so its owner holds.
+              const at = next.claims.indexOf(g);
+              if (g.type === 'length-eq' && at >= 0) next.claims[at] = { ...g, given: true };
             }
           }
           next.scalarPins.push(mag);
@@ -3246,7 +3284,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1) — and, #1567 (ADR-3D-285), the pin
       // records its arbiter: the free dims may be a revolution's size, which no pivot drives.
-      if (freeDims(c) > 0) {
+      if (statementReachesFreeDof3(c, [cmd.a, cmd.b, plane])) {
         const next = clone(c);
         next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane });
         if (plane.length >= 3)
@@ -3643,7 +3681,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: true, next };
         }
       }
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
       return { ok: true, next };
     }
@@ -3673,7 +3711,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of [...cmd.e1, ...cmd.e2]) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       else next.claims.push({ type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       return { ok: true, next };
     }
@@ -3692,7 +3730,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of cmd.e) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
       else next.claims.push({ type: 'mag-val', e: cmd.e, value: cmd.value });
       return { ok: true, next };
     }
@@ -3705,7 +3743,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (miss) return { ok: false, error: miss };
       if (cmd.ids.length !== 4) return { ok: false, error: { code: 'bad-solid', kind: 'pyramidQuadR' } };
       const next = clone(c);
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
       else next.claims.push({ type: 'concyclic', ids: cmd.ids });
       return { ok: true, next };
     }
@@ -3720,7 +3758,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         drawAtom(next, a);
         drawAtom(next, b);
       }
-      const drive = freeDims(c) > 0 && c.solids.length > 0;
+      const drive = statementReachesFreeDof3(c, cmd) && c.solids.length > 0;
       for (let i = 1; i < cmd.ops.length; i++) {
         const [a, b] = cmd.ops[i - 1];
         const [cc, d] = cmd.ops[i];
@@ -3738,7 +3776,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.base);
       drawAtom(next, cmd.a);
       drawAtom(next, cmd.b);
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       return { ok: true, next };
     }
@@ -3778,7 +3816,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       const next = clone(c);
       for (const at of [cmd.a, cmd.b, cmd.c, cmd.d]) drawAtom(next, at);
-      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       return { ok: true, next };
     }
@@ -3824,7 +3862,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
         const next = clone(c);
         const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
-        if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
+        if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
         else next.claims.push({ type: 'bisector-dir', ...pin });
         if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
         return { ok: true, next };
@@ -3874,7 +3912,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       const deg = cmd.deg!;
-      if (freeDims(c) > 0 && c.solids.length > 0)
+      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0)
         next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       return { ok: true, next };
