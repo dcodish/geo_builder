@@ -2150,13 +2150,26 @@ function lineGroupsOf(c: Construction): LineGroups {
     else if (value && typeof value === 'object') for (const v of Object.values(value as Record<string, unknown>)) idsIn(v, out);
     return out;
   };
-  /** Per object, the free vertices it is placed from. */
+  /** Per object, the free vertices it is placed from, and the free symbols it is placed through (its own and its parents'). */
   const deps = new Map<Id, Set<Id>>();
+  const symsOf = new Map<Id, Set<string>>();
   for (const o of c.objects) {
     const mine = new Set<Id>(isFree(o) ? [o.id] : []);
-    for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) for (const v of deps.get(p) ?? []) mine.add(v);
+    const syms = new Set<string>(symbolDeps(o));
+    for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) {
+      for (const v of deps.get(p) ?? []) mine.add(v);
+      for (const sym of symsOf.get(p) ?? []) syms.add(sym);
+    }
     deps.set(o.id, mine);
+    symsOf.set(o.id, syms);
   }
+  /**
+   * Does a row run through a free SYMBOL — in its own expressions, or in anything it is placed from (a circle's free
+   * radius `r_O`, a line's free direction `θ_l4`, a parameter in a stated equation)? The symbol is in the solve vector
+   * as much as the points are, wherever the row reads it (`carrierSystem` solves every `paramRegister` symbol).
+   */
+  const throughSymbol = (k: Constraint): boolean =>
+    constraintSymbols([k]).length > 0 || [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0);
   let unknownLine = false;
   /** The free vertices `value` is placed from, its latest line, and that line's vertices — null for none. */
   const topOf = (value: unknown): { all: Set<Id>; line: number; ids: Id[] } | null => {
@@ -2180,20 +2193,21 @@ function lineGroupsOf(c: Construction): LineGroups {
   /** Per line, its rows with the vertices each moves, and whether it names an earlier line. */
   const byLine = new Map<number, Array<{ k: Constraint; ids: Id[]; onEarlier: boolean }>>();
   const moved = new Set<Id>();
-  let namesEarlier = false;
+  /** The vertices a row through a symbol would move (its latest line's): the joint solve places them, so no group fits them. */
+  const joint = new Set<Id>();
   for (const k of c.constraints) {
     const top = topOf(k);
     if (!top) continue;
-    if (constraintSymbols([k]).length > 0) {
+    if (throughSymbol(k)) {
       // A row through a free SYMBOL («נסמן זוית BAM כ-A1», «AB = k») could be met by the symbol or by the points, and
       // provenance does not say which: it stays the joint solve's, and reaches every vertex it names, as before.
       for (const v of top.all) moved.add(v);
+      for (const v of top.ids) joint.add(v);
       continue;
     }
     for (const v of top.ids) moved.add(v);
     // a row that names a vertex of an earlier line: the figure as it stood is in it
     const onEarlier = top.all.size > top.ids.length;
-    if (onEarlier) namesEarlier = true;
     byLine.set(top.line, [...(byLine.get(top.line) ?? []), { k, ids: top.ids, onEarlier }]);
   }
   if (unknownLine) {
@@ -2224,6 +2238,12 @@ function lineGroupsOf(c: Construction): LineGroups {
     }
     const first = (g: LineGroup) => Math.min(...g.ids.map((v) => order.get(v) ?? Number.POSITIVE_INFINITY));
     for (const g of [...parts.values()].sort((p, q) => first(p) - first(q))) {
+      /*
+       * A group with a vertex some symbol row also moves is left to the joint solve WHOLE: fitting it to its other rows
+       * first hands the joint solve a start the symbol row never shaped (measured: «נתון מעגל שמרכזו M» · «משולש ABC» ·
+       * the touch points D, E, F fitted to their sides, then tangent to a circle of free radius, faulted seed 16).
+       */
+      if (g.ids.some((v) => joint.has(v))) continue;
       groups.push(g);
       for (const v of g.ids) groupOf.set(v, g);
     }
@@ -2235,7 +2255,7 @@ function lineGroupsOf(c: Construction): LineGroups {
     const owners = top.ids.map((v) => groupOf.get(v)).filter((g): g is LineGroup => g !== undefined);
     if (owners.length > 0) owners.reduce((p, q) => (groups.indexOf(q) > groups.indexOf(p) ? q : p)).selectors.push(sel);
   }
-  const on = namesEarlier;
+  const on = groups.some((g) => g.onEarlier);
   const out: LineGroups = { groups: on ? groups : [], moved, on };
   lineGroupsCache.set(c, out);
   return out;

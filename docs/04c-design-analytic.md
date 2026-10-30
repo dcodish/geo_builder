@@ -1063,8 +1063,12 @@ and never substituted into (`NOT_SUBSTITUTED`). A construction built without a f
 **Groups** (`lineGroupsOf`, memoised per construction). Every constraint and selector belongs to the LATEST line among
 the free vertices it is placed from (directly, or through a derived point, curve or segment: `objectDeps` plus the
 object's own references, transitively); that line's vertices among them are what it moves. A row with no free vertex
-belongs to no line, and neither does a row through a free symbol (the joint solve keeps it). The stage is off when
-`objectLine` is absent or misses a vertex. It is on only when some row ties a line's new points to a free vertex of an
+belongs to no line, and neither does a row through a free symbol (the joint solve keeps it). "Through" is read the way
+the free vertices are: in the row's own expressions AND in every object it is placed from, transitively (`symbolDeps`:
+a circle's free radius `r_O`, a line's free direction `θ_l4`, a parameter in a stated equation), since the solve vector
+holds every `paramRegister` symbol wherever a row reads it. A group with a vertex that such a row also moves (its latest
+line's) is left to the joint solve whole, never half-fitted. The stage is off when
+`objectLine` is absent or misses a vertex. It is on only when some kept group's row ties a line's new points to a free vertex of an
 EARLIER line (the class); otherwise the joint solve draws the figure exactly as before.
 
 A line's points form one group only where a row ties them; untied points of one sentence are fitted one at a time in
