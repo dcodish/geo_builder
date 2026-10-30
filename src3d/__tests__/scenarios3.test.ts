@@ -269,11 +269,13 @@ describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, th
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 
-  it('a point NOT on ℓ is refused with not-on-line', () => {
+  // #1528 (ADR-3D-396): a COORDINATE point's membership on ℓ is a pin on m, so a point no m seats beside the ⟂
+  // is the root-find's honest `no-roots`, naming the statement and the pin it contradicts (was `not-on-line`)
+  it('a point NOT on ℓ is refused: no m satisfies it together with the ⟂', () => {
     HE.slice(0, 4).forEach(submit);
     submit('C(1,1,1) על הישר ℓ');
     expect(state().facts).toHaveLength(4);
-    expect(state().lastError).toEqual({ code: 'not-on-line', id: 'C' });
+    expect(state().lastError).toEqual({ code: 'no-roots', sym: 'm', stated: 'C(1,1,1) על הישר ℓ', others: ['הישר ℓ ניצב למישור π'] });
   });
 
   it('a never-parallel probe against a plane that CAN be parallel is refused', () => {

@@ -191,6 +191,17 @@ export function branchAnswer(sym: string, branches: number[]): string | null {
   return o ? valueOptionsText(o, (x) => cleanMag(x), { or: 'או', label: sym }) : null;
 }
 
+/**
+ * #1769 (ADR-3D-395) — does a symbol's ROOT SET agree across the sampled seeds? The set is a property of the GIVENS,
+ * so every seed must carry the same values (each within `relTol`, in any order). The one test both params lanes ask —
+ * the algebraic lane's branch set (at 1e-6, its closed form) and a pin symbol's admissible pool roots (at 1e-4, the
+ * pivot's numeric floor) — so "the branch set agrees" is defined once.
+ */
+export function rootSetsAgree(perSeed: readonly (readonly number[])[], relTol: number): boolean {
+  const sorted = perSeed.map((b) => [...b].sort((x, y) => x - y));
+  return sorted.every((b) => b.length === sorted[0].length && b.every((v, i) => Math.abs(v - sorted[0][i]) <= relTol * Math.max(1, Math.abs(v))));
+}
+
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
 
 /** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
@@ -1387,6 +1398,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     if (value && num !== undefined && Number.isFinite(num)) known.set(sym, num);
     return value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
   };
+  /** #1769: a pin symbol's root set when every seed's pool carries ≥ 2 roots and the sets agree; else null. */
+  const pinRootSets = (sym: string): number[] | null => {
+    const perSeed = resolved.map((r) => r.pivot?.symRoots?.[sym] ?? []);
+    if (perSeed.some((b) => b.length < 2) || !rootSetsAgree(perSeed, 1e-4)) return null;
+    return [...perSeed[0]].sort((x, y) => x - y);
+  };
   for (const sym of figureSymbolsOf(c)) {
     /**
      * #2594 ([ADR-3D-389](docs/06b-decisions-3d.md#adr-3d-389), operator ruling 2026-10-28: *"yes - show k=?"*) — a
@@ -1403,7 +1420,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       const perSeed = resolved.map((r) => r.param?.branches ?? []);
       // the branch set is a property of the GIVENS, so it must agree across seeds; if it somehow
       // does not, the symbol is not knowledge and reads open rather than picking a seed's version
-      const agree = perSeed.every((b) => b.length === perSeed[0].length && b.every((v, i) => Math.abs(v - perSeed[0][i]) <= 1e-6 * Math.max(1, Math.abs(v))));
+      const agree = rootSetsAgree(perSeed, 1e-6);
       const text = agree ? branchAnswer(sym, perSeed[0]) : null;
       params.push(paramRow(sym, text, perSeed[0].length === 1 ? perSeed[0][0] : undefined));
       continue;
@@ -1472,6 +1489,17 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     // values must ALSO be a singleton at every sampled seed (operator ruling: only a fully
     // determined symbol shows a value; otherwise «? »).
     const singleRoot = resolved.every((r) => (r.pivot?.symRoots?.[sym]?.length ?? 1) <= 1);
+    /**
+     * #1769 (ADR-3D-395, operator ruling 2026-10-04 «show both»; format ADR-3D-336, operator ruling W1): a symbol the
+     * givens leave on SEVERAL discrete roots reads its root SET — «k = -1 או k = 2» — when every sampled seed's
+     * admissible pool carries the same set, exactly as the algebraic lane's branch set reads (the branch above). Any
+     * disagreement between seeds — a seed whose drive missed a root — is not knowledge, and reads the open «k = ?».
+     */
+    const rootSet = singleRoot ? null : pinRootSets(sym);
+    if (rootSet) {
+      params.push(paramRow(sym, branchAnswer(sym, rootSet)));
+      continue;
+    }
     const stable =
       singleRoot &&
       nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));

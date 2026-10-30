@@ -447,6 +447,18 @@ const SEEDED: SeededCorpus = {
   // gauge-length-letter-2594.test.ts; these are the build + drift net.
   'gauge-length-letter-2594.geo3.json': ["תיבה ABCDA'B'C'D'", '|AB| = k'],
   'gauge-length-letter-tie-2594.geo3.json': ["תיבה ABCDA'B'C'D'", 'E(k,1,0)', '|AB| = k'],
+
+  // #1528 (ADR-3D-396) — the issue's sequence: a coordinate point stated on a plane written in m pins m (m = −2;
+  // before: refused «A is not on the plane»), and the line edition (m = 2). The class, the identity row and the
+  // no-root refusal are asserted in issue-1528-absolute-member-pins.test.ts; these are the build + drift net.
+  'point-on-param-plane-1528.geo3.json': ['הנקודה A(1, 2, 3)', 'המישור π: mx + z - 1 = 0', 'A על המישור π'],
+  'point-on-param-line-1528.geo3.json': ['הנקודה A(1, 2, 0)', 'הישר l: x = (0,0,0) + t(1,m,0)', 'A על הישר l'],
+
+  // #1782 (ADR-3D-393) — a length on a rider of a RIGID cube's edge drives the rider (before: refused claim-refuted,
+  // the rider checked at its sampled place). The reported four lines, and the reversed order where «AE = 1» took the
+  // size first. Geometry, the class rows and the refusals are asserted in issue-1782-rigid-rider-drive.test.ts.
+  'cube-rider-length-1782.geo3.json': ['קובייה ABCD', 'AB = 2', 'E על AB', 'AE = 1'],
+  'cube-rider-length-reversed-1782.geo3.json': ['קובייה ABCD', 'E על AB', 'AE = 1', 'AB = 2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

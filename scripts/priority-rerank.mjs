@@ -5,7 +5,7 @@
  * P2     = in the roadmap plan's workstreams; any `wrong-answer` outside a Later phase; a `reported`
  *          visible failure in an active product (the Now and Next phases).
  * P3     = maintenance (2-D), unusual cases found internally, polish and debt.
- * later  = a product or topic whose phase has not started (complex; conics and the sphere). Not ranked.
+ * later  = a product or topic whose phase has not started (complex; the hyperbola and the sphere). Not ranked.
  *
  * `reported` and `wrong-answer` are read from the issue's own text when the label is absent; the
  * reading is a proposal the operator reviews, never applied unreviewed.
@@ -31,7 +31,8 @@ for (let page = 1; ; page++) {
 }
 
 // The phases (roadmap, 2026-10-26). Same rule as roadmap-snapshot.mjs, plus the sphere (#1569).
-const conic = /ellips|parabol|hyperbol|אליפס|פרבול|היפרבול|מוקד|מדריך|focus|directrix/i;
+// Only the hyperbola is Later: the ellipse and the parabola are taught this term (ADR-W-166, 2026-10-30).
+const conic = /hyperbol|היפרבול/i;
 const sphere = /sphere|ספיר|כדור|round solid|גוף סיבוב|#1569/i;
 const phaseOf = (i) => {
   const l = i.labels;

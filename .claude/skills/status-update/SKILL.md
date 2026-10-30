@@ -92,7 +92,7 @@ analytic (Now), 3d (Next), 2d, then server/workspace)
 (same table shape)
 
 ## Later — not ranked until its phase opens
-(one line per product/topic with its count — complex, conics, sphere — no table; an ⚠ row is listed by number)
+(one line per product/topic with its count — complex, the hyperbola, the sphere — no table; an ⚠ row is listed by number)
 
 ## Waiting on you
 (the full attention surface, in four sub-lists — every row one sentence, readable without opening
@@ -151,11 +151,18 @@ reason the report exists as a habit. Its four sub-lists:
 
 **The recommendation** is a concrete next-round composition, not a restatement of the tables:
 - Every open P1 goes first, always, each with one line on why it can't wait.
-- Then the **roadmap plan's** P2 items, current week first (docs/22 §2) — an unarmed plan item is named as
-  "needs a fix plan" so the operator sees what holds the plan back. Never recommend a `later` issue.
-- Then a **mix** of P2 and P3 — the operator explicitly wants both, not a pure-P2 diet. Aim for
-  P2s that form a coherent theme (same module or mechanism — shared context makes a batch cheaper
-  than its parts) plus quick P3 wins riding along, landing inside the fix-round cap of **up to 20 items**
+- Then **the plan, strictly** ([ADR-W-165](../../../docs/06w-decisions-workspace.md#adr-w-165), docs/22 §2):
+  1. the current week's plan items;
+  2. the issues the operator pulled into this week (`plan/current.pulled`);
+  3. the next week's plan items, in plan order.
+
+  An unarmed plan item is named as "needs a fix plan" (or "needs a build session" for a feature), so the
+  operator sees what holds the plan back. Never recommend a `later` issue.
+- **Nothing outside the plan is composed.** An unplanned issue that looks urgent (a `wrong-answer`, a
+  `reported` failure in the Now tool) goes in a short **Pull candidates** list, one line each on why. The
+  operator pulls it on the overview page, or says so in chat and the session records the pull.
+- Within those items, aim for a coherent theme (same module or mechanism: shared context makes a batch
+  cheaper than its parts), landing inside the fix-round cap of **up to 20 items**
   ([ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028)) — fewer is always fine, and **no more than ~2 items on one
   chokepoint**, which does not scale with the cap and is usually what holds a composition below 20. Note the
   sitting: at ~30 min/item a full-20 round runs 8–11 hours, so size an ATTENDED round to what he can play in

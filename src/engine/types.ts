@@ -1199,7 +1199,7 @@ export type Command =
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id; implicit?: boolean }
   | { type: 'set-concyclic'; points: Id[] } // the points are concyclic (drives a DOF so they share a circle)
   | { type: 'set-collinear'; a: Id; b: Id; c: Id } // a, b, c collinear (drives a free DOF so the third lands on the line)
-  | { type: 'set-line'; points: Id[] } // "line ABE…": the points are collinear AND in the listed order (B between A and E)
+  | { type: 'set-line'; points: Id[]; structural?: true } // "line ABE…": the points are collinear AND in the listed order (B between A and E). `structural` (#2538, ADR-763): the points are ALREADY collinear by construction (a touch point on a side the tangent at it carries), so only the ORDER is stated — no driven collinear
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
   | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id; visible?: boolean }
   | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }

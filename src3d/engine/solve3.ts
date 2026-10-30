@@ -20,7 +20,7 @@ import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
-import { componentValue, distanceBetween, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
+import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
@@ -192,6 +192,14 @@ export interface MemberPin {
 /** A LinExpr's value at a symbol value — solve3's copy of the evaluator's `linVal` (evaluate imports
  *  solve3, never the reverse, so the one-line formula is duplicated rather than the direction inverted). */
 const linAt = (e: LinExpr, t: number): number => e.k + e.p * t;
+
+/**
+ * #1769 (ADR-3D-395) — WHICH ROOT a pool solution sits on: its open pin symbols' values, to 3 decimals. The ONE key
+ * the #797 walk (a base is walked once), the pool's round-robin interleave and stage 4's per-root keep all read, so
+ * "the same root" means the same thing at every site that builds the admissible set. '' when there is no pin symbol.
+ */
+export const pinRootKey = (pinSymbols: Readonly<Record<string, number>> | undefined, syms: readonly string[]): string =>
+  pinSymbols ? syms.map((sym) => pinSymbols[sym].toFixed(3)).join(',') : '';
 
 export interface PivotResult {
   /** Canonical → absolute transform to apply to every position. */
@@ -2170,6 +2178,9 @@ export function solvePivot(
     nSym === 0 && planeDrive && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.scalarPins.every((p) => p.kind !== 'length' && p.kind !== 'dot');
   const REG_SF = 1e-4;
+  /** #1769 (ADR-3D-395): the #797 walk's retry-only shape hold — strong on the pinned stage, soft on the release. */
+  const SHAPE_HOLD = 1;
+  const SHAPE_HOLD_SOFT = 1e-1;
   const ACCEPT = planeDrive || nPinSym > 0 || nRider > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
   /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
   // Sign givens select among DISCRETE placement branches — and those are not only the
@@ -2211,6 +2222,39 @@ export function solvePivot(
       // #1498: the one lane rule — see `gaugeFramePoint3`
       return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
     };
+  };
+  /**
+   * #1769 (ADR-3D-395) — DO THE MEMBER PINS HOLD BY THE VERIFIER'S OWN BAR at a candidate's final positions?
+   *
+   * The solver's `ACCEPT` (a sum of squares, 1e-10) and the membership arbiters (`onLineHolds3`, relative 1e-7;
+   * `memberHolds3`, relative 1e-4) were two definitions of "holds". On an anchored candidate they disagreed: the
+   * operator's prism (#1769) found k = −1 at error 6.3e-11 with C 5.8e-7 off ℓ, so the pool admitted it and stage 4's
+   * validation rejected a real root. `collect` asks this one predicate, so a candidate is a root only when the
+   * bar the verifier will judge it by already holds. Each carrier is read exactly as the residual reads it — a
+   * pin-symbol carrier at the candidate's own symbol value, a run carrier re-derived from the candidate's ring.
+   */
+  const membersHold = (mirror: boolean, x: number[]): boolean => {
+    if (memberPins.length === 0) return true;
+    const at = atFor(mirror, x);
+    return memberPins.every((m) => {
+      const q = m.frozen ?? at(m.id);
+      if (!q) return false;
+      if (m.symLine || m.symPlane) {
+        const t = symAt(x, (m.symLine ?? m.symPlane)!.sym);
+        if (t === null) return false;
+        if (m.symLine) {
+          const [a, d] = [m.symLine.anchor, m.symLine.dir];
+          return onLineHolds3(q, { anchor: v3(linAt(a[0], t), linAt(a[1], t), linAt(a[2], t)), dir: v3(linAt(d[0], t), linAt(d[1], t), linAt(d[2], t)) });
+        }
+        const pl = m.symPlane!;
+        return memberHolds3(q, { n: v3(linAt(pl.cx, t), linAt(pl.cy, t), linAt(pl.cz, t)), d: linAt(pl.d, t) });
+      }
+      if (m.plane) return memberHolds3(q, m.plane);
+      const ring = (m.run ?? []).map(at);
+      if (ring.length < 3 || ring.some((p) => !p)) return false;
+      const n = runNormal(ring as Vec3[]);
+      return memberHolds3(q, { n, d: -dot3(n, ring[0]!) });
+    });
   };
   if (probe && probe.freedom !== undefined) {
     // #2368 (ADR-3D-375): the read-back's placement probe. An anchored placement may keep a RIGID freedom
@@ -2340,8 +2384,16 @@ export function solvePivot(
     const fPin = (y6: number[]) => [...fP6(y6), 1e3 * (proj(y6) - step)];
     const rp = leastSquares(fPin, probe.x.slice(0, 6), 40);
     const rr = leastSquares(fP6, rp.x);
-    const xr = full(rr.x);
+    let xr = full(rr.x);
     if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, step)) return [];
+    // #1769 (ADR-3D-395): the slide's acceptance is the same root predicate `collect` applies — a slid figure exact
+    // on `ACCEPT` but outside a member pin's verifier bar is released on every unknown (the #1311 release) and
+    // judged again; one the release cannot bring onto the bar is no slide, and the drive's placement stands.
+    if (!membersHold(probe.mirror, xr)) {
+      const rel = leastSquares(fP, xr);
+      if (degenerate(rel.x) || pErr(rel.x) >= ACCEPT || !membersHold(probe.mirror, rel.x)) return [];
+      xr = rel.x;
+    }
     const g = { ...unpack(xr), mirror: probe.mirror };
     const dims = xr.slice(7, 7 + nDims);
     const symbols = coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined;
@@ -2515,18 +2567,27 @@ export function solvePivot(
        * the release only closes the last gap inside it. A candidate the release cannot make exact, or that
        * it collapses, is judged exactly as before.
        */
+      //
+      // #1769 (ADR-3D-395): the same release closes a candidate that is exact on `ACCEPT` but outside the member
+      // pins' verifier bar (`membersHold`) — an anchor equilibrium inside the solver's tolerance and outside the
+      // validation's. It admits nothing by itself: the candidate is judged again below by the one root predicate.
       let cand = cand0;
       if (anchored) {
         const pe = primaryErr(cand0.x);
-        if (pe >= ACCEPT && pe < 1e-6) {
+        const offBar = pe < ACCEPT && !membersHold(mirror, cand0.x);
+        if ((pe >= ACCEPT && pe < 1e-6) || offBar) {
           const rel = leastSquares(fPrimary, cand0.x);
-          if (!degenerate(rel.x) && primaryErr(rel.x) < pe) cand = rel;
+          if (!degenerate(rel.x) && (primaryErr(rel.x) < pe || (offBar && primaryErr(rel.x) < ACCEPT && membersHold(mirror, rel.x)))) cand = rel;
         }
       }
       const rAccept = anchored ? primaryErr(cand.x) : cand.err;
       if (!collectAll || rAccept >= ACCEPT) return;
       const parked = parkScale(cand.x); // #518: an undriven scale parks at the seed target, exactly
-      const cx = parked ?? cand.x; // #1854: the free-dim settle does NOT ride the pooled path — see `settleFreeDims`
+      // #1769 (ADR-3D-395): THE ROOT PREDICATE — exact on the primary residuals, not collapsed (above), and every
+      // member pin holding by the verifier's bar. A candidate outside it is dropped here exactly as stage 4's
+      // validation would drop it, so the pool never carries a root the drawing could not keep.
+      const cx = parked && membersHold(mirror, parked) ? parked : cand.x; // #1854: the free-dim settle does NOT ride the pooled path — see `settleFreeDims`
+      if (!membersHold(mirror, cx)) return;
       const g = { ...unpack(cx), mirror };
       // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
       // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
@@ -2571,13 +2632,18 @@ export function solvePivot(
     // cold solutions landed k ≈ 1 while k = 2 was equally admissible — a root the pool does not
     // carry is invisible to every honesty gate downstream). One round, from one base per
     // distinct symbol vector; roots within ±3 of a found one join the pool.
+    // #1769 (ADR-3D-395): the walk is a function so the dims-widening failure path below can run it on
+    // the roots IT finds — before, a root found only by the widening was never walked, so the other root
+    // stayed out of the pool (the operator's prism at seed 0: both mirrors empty after the cold starts,
+    // k = 2 found by the widening, k = −1 never looked for). `walked` keeps a base from being walked twice.
+    const walked = new Set<string>();
+    const symbolWalk = (): void => {
     if (collectAll && nPinSym > 0) {
-      const seenSym = new Set<string>();
       const bases = results.filter((r) => {
         if (r.mirror !== mirror || !r.pinSymbols) return false;
-        const key = pinSyms.map((s) => r.pinSymbols![s].toFixed(3)).join(',');
-        if (seenSym.has(key)) return false;
-        seenSym.add(key);
+        const key = pinRootKey(r.pinSymbols, pinSyms);
+        if (walked.has(key)) return false;
+        walked.add(key);
         return true;
       });
       for (const sol of bases) {
@@ -2595,9 +2661,42 @@ export function solvePivot(
             const fPin = (y: number[]) => [...fPrimary(y), 1e3 * (y[idx] - target)];
             // the pinned stage only steers the gauge into the target's basin — 40 iterations
             // suffice (warm start, and the RELEASE solve carries the precision)
-            const rp = leastSquares(fPin, x0, 40);
-            collect(leastSquares(fFor(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym)), rp.x));
-            return primaryErr(rp.x) < ACCEPT;
+            let rp = leastSquares(fPin, x0, 40);
+            /**
+             * #1769 (ADR-3D-395) — RETRY-ONLY SHAPE HOLD. The pinned stage can zero the primary residuals
+             * "for free" by collapsing the solid on its way to the target (the operator's prism: A ≡ C makes
+             * AA′ ⟂ AC hold trivially, so every fan target toward k = −1 came out degenerate at seeds 7, 13,
+             * 15 and 17). A collapsed pinned solve is run once more with the shape HELD — the log-scale and the
+             * dims pulled to the BASE solution's values at `SHAPE_HOLD` — and when the release from that held
+             * point collapses in turn, it is released once more through a softer hold (`SHAPE_HOLD_SOFT`) and
+             * then freely. The parkScale / ADR-238 retry-only pattern: a target whose pinned solve does not
+             * collapse never pays either, and nothing here admits a candidate — `collect` judges the release.
+             * (Measured: the soft anchor weight REG_SF = 1e-4 cannot hold the shape against the collapse, and
+             * changed no seed; a hold at 1 does.)
+             */
+            const holdRows = (y: number[], w: number): number[] => [w * (y[6] - sol.x[6]), ...y.slice(7, 7 + nDims).map((v, j) => w * (v - sol.x[7 + j]))];
+            let held = false;
+            if (degenerate(rp.x)) {
+              const h = leastSquares((y: number[]) => [...fPin(y), ...holdRows(y, SHAPE_HOLD)], x0, 40);
+              if (!degenerate(h.x)) {
+                rp = h;
+                held = true;
+              }
+            }
+            const fRel = fFor(rp.x.slice(7 + nDims + nSym, 7 + nDims + nSym + nPinSym));
+            let rel = leastSquares(fRel, rp.x);
+            if (held && degenerate(rel.x)) {
+              const soft = leastSquares((y: number[]) => [...fRel(y), ...holdRows(y, SHAPE_HOLD_SOFT)], rp.x);
+              const free = leastSquares(fRel, soft.x);
+              if (!degenerate(free.x)) rel = free;
+            }
+            collect(rel);
+            // #1769 (ADR-3D-395): a COLLAPSED figure is not a figure (`collect` already says so) — and it
+            // is no evidence that the displaced value is admissible either. The pinned stage zeroes the
+            // primary residuals "for free" by shrinking the solid (the operator's prism at k = 2.75: error
+            // 1e-27, every vertex coincident), and reading that as «continuous» skipped the fan that
+            // reaches the other root (k = −1, three units away) at most seeds.
+            return primaryErr(rp.x) < ACCEPT && !degenerate(rp.x);
           };
           // Probe first: a symbol admissible OFF its converged value is CONTINUOUS — its
           // openness is already honest (the Am. 2 seed anchor varies it), so the fan is
@@ -2609,6 +2708,8 @@ export function solvePivot(
         }
       }
     }
+    };
+    symbolWalk();
     // #818 (ADR-3D-179): SIGN-AXIS CONTINUATION — the #797 walk, for a stated coordinate sign. The
     // cold starts spread the GAUGE (eight rotations) and the symbol walk spreads the pin symbols; the
     // shape DIMS start at the seed's one sample in every start, so a branch that differs only in a dim
@@ -2698,6 +2799,9 @@ export function solvePivot(
           // one accepted solution is enough when we are not building the configuration pool
           if (!collectAll && best && (anchored ? primaryErr(best.x) : best.err) < ACCEPT) break;
         }
+        // #1769 (ADR-3D-395): the roots the widening found get the same symbol walk the cold starts'
+        // roots got above — failure path only, so a figure the cold starts solved is untouched.
+        symbolWalk();
       }
     }
     // #1735 (ADR-3D-306): deferred — fired below only when the WHOLE pool is empty after the #1499
@@ -2707,6 +2811,9 @@ export function solvePivot(
     if (collectAll) {
       reseatStages.push(() => {
         for (const x of offHostRejects.splice(0)) collect(reseatOffHost(x, offHost(x), riderBase, fPrimary, fSeed));
+        // #1769 (ADR-3D-395): a re-seated root is a root the walk has not seen — the same pool-closing walk the cold
+        // starts' and the widening's roots get (failure path only: this stage runs when the pool is empty).
+        symbolWalk();
       });
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
@@ -2730,7 +2837,7 @@ export function solvePivot(
   if (nPinSym > 0 && results.length > 1) {
     const groups = new Map<string, PivotResult[]>();
     for (const r of results) {
-      const key = r.pinSymbols ? pinSyms.map((s) => r.pinSymbols![s].toFixed(3)).join(',') : '';
+      const key = pinRootKey(r.pinSymbols, pinSyms);
       const list = groups.get(key) ?? [];
       if (list.length === 0) groups.set(key, list);
       list.push(r);

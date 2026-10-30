@@ -128,8 +128,8 @@ const CELLS: Record<string, CellStatus> = {
 
   // ---- point membership ----------------------------------------------------------------
   'on|point|plane-run': { status: 'supported', actions: ['rider', 'drive-gauge', 'claim'], note: 'ADR-3D-015/033' },
-  'on|point|plane-named': { status: 'supported', actions: ['rider', 'claim'], note: 'ADR-3D-015; branch-SELECT on `any`' },
-  'on|point|line': { status: 'supported', actions: ['rider', 'drive-gauge', 'claim'], note: 'S2 (#377): `B על l1` — the built on-line (ADR-3D-031), now reachable' },
+  'on|point|plane-named': { status: 'supported', actions: ['rider', 'param-root', 'claim'], note: 'ADR-3D-015; branch-SELECT on `any`; #1528 (ADR-3D-396): a COORDINATE point on a plane carrying the parameter pins it (paramPinningRels), a figure point re-homes the letter to the pivot (#815)' },
+  'on|point|line': { status: 'supported', actions: ['rider', 'drive-gauge', 'param-root', 'claim'], note: 'S2 (#377): `B על l1` — the built on-line (ADR-3D-031), now reachable; #1528 (ADR-3D-396): a COORDINATE point on a line carrying the parameter pins it (paramPinningRels)' },
   'on|point|point': { status: 'n/a', note: 'a point on a point is a coincidence statement, not a membership' },
   'on|point|vector': { status: 'n/a', note: 'a vector is not a carrier — membership lives on segments/lines/planes/circles' },
   'on|point|segment': { status: 'supported', actions: ['rider', 'claim'], note: 'point-on-segment3, V0; numeric t verifies (ADR-3D-047)' },

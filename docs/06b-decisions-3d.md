@@ -5398,6 +5398,11 @@ FIRST — «מנסרה ישרה משולשת ABCA'B'C'», then «משוואת ה
 order (that is #801) and derives green as a loaded file (ADR-3D-174 §2's re-homing acts on the SET).
 The interactive step refused a satisfiable statement and blamed the point.
 
+   *Amended by [ADR-3D-396](#adr-3d-396) (#1528): the door now asks the membership ITSELF — it is recorded
+   first and `releaseParamToPivot` reads the one pin list — so a COORDINATE point's membership (which the pivot
+   cannot move) keeps the letter in the algebraic lane, where the root-find pins it. A figure point re-homes
+   exactly as here.*
+
 **Class.** *A letter carried only by EQUATIONS is never an unknown any drive can solve for, even when
 a stated membership is exactly the given that determines it.* The algebraic lane's letter (`c.param`)
 is root-found post-pivot over angle / ⟂ / line-relation givens, or — with none of those — simply
@@ -11449,7 +11454,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Rejected.** (i) Extending the two per-column lists with the new relation words: that is the chokepoint growing by enumeration (docs/17 §3) and it keeps "the word decides" alive. (ii) Using the verifier's normalised classifiers as the scan residual: the normalised coplanarity and anchor offset are 1 everywhere except exactly at the root, so no grid sample lands on the zero and the minima scan has nothing to descend. (iii) A per-construction identity memo (WeakMap on `c`): content keys cost little and cannot go stale if a caller mutates a construction.
 
-**Not built (named).** An absolute point's MEMBERSHIP on an equation object carrying the parameter is re-homed to the pivot by the #815 door and cannot move a coordinate point — **#1528**, a different chokepoint (the plan split it out). Rows 5–6 (a DISTANCE from such a point) are in this ADR.
+**Not built (named).** An absolute point's MEMBERSHIP on an equation object carrying the parameter is re-homed to the pivot by the #815 door and cannot move a coordinate point — **#1528**, a different chokepoint (the plan split it out). *Built by [ADR-3D-396](#adr-3d-396): the list reads memberships too.* Rows 5–6 (a DISTANCE from such a point) are in this ADR.
 
 **Sibling products (docs/17 §1).** *2-D* has no equation parameter — the class cannot occur. *Complex* has no planes or lines. *Analytic*: measured `משוואת הישר AB היא y=mx+1` · `P(1,3)` · `P על AB` → m = 2 (its n-D solver treats the symbol as an unknown, so a relation determines it) — class not present. The plan's spelling «הנקודה (1, 3) על הישר» (and «הנקודה P(1,3) נמצאת על הישר AB») is `not-handled` there: a parse-coverage gap, not this class, reported to the round.
 
@@ -13900,3 +13905,133 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Locks.** `issue-1680-segment-equation.test.ts` arm (c): six spellings build with the sum holding at every `claimSeeds` seed; «הציגו תצורה אחרת» changes the triangle and keeps the sum; «AB = 3 · BC = 4 · AB + BC = 10» refuses; «AB + BC = AC» stays a vector equation and «AB + BC = 2√3» is not taken. Fixture `length-sum-1680.geo3.json`; parity row `cat-an-042` is now plain (all three build); catalog3 gains «AB + BC = 10».
 
 **Behaviour change for a student:** in 3-D, «AB + BC = 10» (and «AB − BC = 2», «AB + BC + CA = 12», «2AB + BC = 10») after «משולש ABC» now builds a triangle with that sum, written nowhere on the canvas; before, the sentence went to the model.
+
+## ADR-3D-395 — A pin symbol's admissible roots are one set: one root predicate, one pool-closing walk, every consumer reads the record (#1769)
+
+**Status:** accepted · 2026-10-29 · bug fix (P2) · fix round #2602 · plan: the "Fix plan — 2026-10-06" comment on #1769 (armed by the operator's "Arm all 26", 2026-10-06) · **amends** [ADR-3D-168](#adr-3d-168) Am. 1 (#797's «k = ?» for discrete roots becomes the root set) · **LADDER stage:** 3-D stage 4 (the [ADR-3D-033](#adr-3d-033) membership drive) and the pivot's continuation stage
+**Operator:** ruling 2026-10-04 on #1769, *"show both, then go fast"*. The format is [ADR-3D-336](#adr-3d-336)'s (operator ruling W1, 2026-10-08), which superseded ADR-3D-303's comma that the plan quoted: «k = -1 או k = 2». The same ruling covers moving #797's lock (the 2026-10-06 housekeeping comment).
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (amended: a letter left on several values by vector or membership givens lists them) · **Design:** [04b](04b-design-3d.md) § "The solver" (*A pin symbol's admissible roots are one set*)
+
+**Measured before** (`main` @ caf00532, store `submit` → `derive3` → `dataView`, nothing mocked). The figure is the operator's prism: «מנסרה ישרה משולשת ABCA'B'C'» · «AA'=(k-1,k-7,k+1)» · «AC על הישר x=(8,-1,-1)+t(k+1,0,k-3)». The right-prism condition is (k+1)(2k−4) = 0, so k ∈ {−1, 2}:
+
+| | before | after |
+| --- | --- | --- |
+| panel at seed 0 | «k = 2», `open: false` | «k = -1 או k = 2» |
+| pools carrying both roots, seeds 0–23 + 1013–1036 + 2027–2050 (the panel's samples) | 0 / 72 | 66 / 72 |
+| panel reads both, seeds 0–23 | 0 / 24 (one root printed at 20) | 18 / 24; the other 6 read «k = ?» |
+| not whole, same 72 samples | 4 (2030, 1019, 2042, 22) | 3 (2030, 2042, 22) |
+
+**Class (docs/17 §1).** *Search order, not the givens, decided which roots of a discrete pin symbol were admissible.* Six places each lost a root in a different way, and none of them owned the set:
+- stage 4 kept the first good candidate overall;
+- the #803 slide and the #2368 read-back image dropped the pool's record;
+- the #797 walk read a collapsed pinned solve as evidence of continuity, and it also collapsed on its way to the other root;
+- the roots found by the #816 widening and the #1735 re-seat were never walked;
+- the solver's `ACCEPT` (sum of squares 1e-10) and the verifier's `onLineHolds3` (relative 1e-7) were two definitions of "holds". A real root (k = −1, with C 5.8e-7 off ℓ at error 6.3e-11) entered the pool and was then rejected.
+
+The panel then read the one surviving root as knowledge. That is #797's class (*seed-stability is not determinedness*), one stage later.
+
+**Decision (M1 at the solver's root chokepoint).**
+1. **One root predicate.** `onLineHolds3` and `memberHolds3` move unchanged to `operands.ts` and are re-exported from `evaluate.ts` (solve3 never imports evaluate; the same move #818 made). `membersHold(mirror, x)` reads every member pin at the candidate's final positions, and reads a pin-symbol carrier at the candidate's own symbol value. `collect` admits a candidate only when it is exact, not degenerate, and passes `membersHold`. A candidate that is exact on `ACCEPT` but off the bar first gets the #1311 release, then is judged again. The #803 slide's acceptance asks the same predicate, with the same release: a slide that cannot be brought onto the bar is no slide. With no member pin the predicate is `true`, so no other solve changes.
+2. **One pool-closing walk.** The #797 walk is now `symbolWalk()`, with a per-mirror `walked` set. It runs after the cold starts, after the #816 widening, and inside the #1735 re-seat stage; the last two are failure-path only. `pinRootKey(pinSymbols, syms)`, exported from solve3, is the one root key. The walk, the round-robin interleave and stage 4 all read it, which removes three inline copies.
+3. **A collapse is no evidence, and the walk holds the shape on retry.** `explore` reports a target admissible only when the pinned solve is not degenerate. A collapsed pinned stage is retried once with the log-scale and dims held to the base solution (`SHAPE_HOLD = 1`). If the release from that held point collapses too, it is released once more through `SHAPE_HOLD_SOFT = 0.1`, then freely. This is retry-only: a target that does not collapse pays nothing. *Deviation from the plan:* the plan named `REG_SF` (1e-4) for the hold. Measured, that weight held nothing and changed no seed; a weight of 1 does.
+4. **Stage 4 keeps one validated representative per root** and applies them as the pool. `pool[seed % n]` then cycles the roots, and `symRoots` records all of them. A figure with no open pin symbol has one key and stops at its first good candidate, as before.
+5. **The record survives re-placement.** The slide and the read-back image keep the pool's `symRoots` when their own symbol values are among the roots. One rule decides this (`rootsDescribe`). The image keeps its one-entry point record, so the point rows do not change. *Beyond the plan's list, same class:* the image was a seventh site dropping the record. It was found because the panel samples it.
+6. **The panel prints the set.** `rootSetsAgree(perSeed, relTol)` (dataView) is the one test of whether the root set agrees. The algebraic lane's branch row uses it at 1e-6 and the pin-symbol row at 1e-4. When every sampled seed's pool carries the same two or more roots, the row is `${sym} = ${branchAnswer(sym, roots)}`: «k = -1 או k = 2», «±» for a symmetric pair, and nothing listed for three or more. Any disagreement between seeds reads «k = ?». The ask lane answers «k» from this same row (#1746), so the two surfaces cannot differ.
+
+**Measured after: the 24-seed sweep of every `fixtures3` file (91 files × 24 seeds, before vs after).** In 90 files the statuses, the root sets and the pool sizes are all identical. The one change is `symbolic-line-equation-863`, the operator's prism:
+- root sets go from {2} or {−1} to {−1, 2} at 22 seeds. Seed 11 is still {2}, and seed 22 keeps its pre-drive 10-value pool;
+- the whole-rate stays 23/24;
+- every seed that now draws k = −1 verifies. The new root is the one the algebra gives, (k+1)(2k−4) = 0, not an artefact.
+
+Timing: the total sweep went from 327.0 s to 331.1 s (+1.3 %). The #863 fixture went from 39.5 s to 43.8 s (+11 %, under the plan's 15 % report line). No other fixture moved by more than noise.
+
+**Not fixed, recorded.** At 6 of the 72 panel samples the pool still misses a root, and the panel then reads «k = ?», never a single value. There are two kinds:
+- (a) samples 2030, 2042 and 22 were not whole before and are not whole now. Every start of their stage-4 drive collapses, so the drive is rolled back. This is the drive failing, not the pool;
+- (b) samples 11, 1019 and 2045 carry {2}: the walk's release from near k = −1 still collapses.
+
+#863 Part B (the anchored solve) is the next item on this chokepoint, and it starts from these honest sets. The #818 sign-axis continuation still runs only on the cold-start pool. No fixture has a sign given together with a widened or re-seated root, so it is not folded in here.
+
+**Sibling audit.** The class is closed elsewhere:
+- 2-D: `drivenRoots` keeps every root of a 1-D carrier (LADDER 4.2);
+- analytic: each parameter is solved in closed form;
+- complex: all roots are enumerated (#1434);
+- 3-D's algebraic `param` lane: its branches are closed-form (#1474), and it now shares `rootSetsAgree`.
+
+No parity row: an R³ pin-symbol membership drive is not a plane-geometry sentence.
+
+**Locks.**
+- `src3d/__tests__/issue-1769-root-pool.test.ts`: the panel at seeds 0–2; both roots in the pool and every figure whole at seeds 0, 1, 2 and 10; both drawings reachable over seeds 0–3; the reversed entry order; `rootSetsAgree`.
+- `issue-797.test.ts` case 1 moves by the ruling, from «k = ?» to «k = 1 או k = 2». Its determined control still reads «k = 2».
+- The fixture `fixtures3/symbolic-line-equation-863.geo3.json` stays green.
+- Must-not-change, all run green: `issue-1440`, `-1474`, `-1591`, `-1735`, `-801`, `-803`, `-815`, `-818`, `-820`, `-863-resolve-memo`, `-863-sample-hoist`, `-902`, the #1394 `decideSubmit3` golden, and `fixtures3.test.ts`.
+
+**Perf (M3).**
+- Success path: one `membersHold` check per collected candidate in a solve with member pins, and no extra solve.
+- The walk's solve count is unchanged.
+- A shape-hold retry runs only on a collapsed target (at most 2 extra LM solves).
+- The widening and re-seat walks run on the failure path only.
+- Stage 4 validates each distinct root once.
+
+**Behaviour change for a student:** in 3-D, when two values of a letter both satisfy the givens (the prism's k = −1 and k = 2), the data panel and the ask lane now say so, «k = -1 או k = 2», instead of showing one as if it were determined. «הציגו תצורה אחרת» reaches both drawings. A letter the givens determine still shows its one value. #797's two-vector prism reads «k = 1 או k = 2» (was «k = ?»).
+
+## ADR-3D-396 — An absolute point's membership pins the parameter; the #815 door re-homes only a member the pivot can move (#1528)
+
+**Status:** accepted · 2026-10-29 · fix round #2602 · plan: the #1528 "Fix plan — 2026-10-06" comment, operator-approved (auto-ok, 2026-10-06, /decisions "Arm all 26"). **Amends** [ADR-3D-178](#adr-3d-178) (the #815 door's predicate) and [ADR-3D-286](#adr-3d-286) (the one pin list gains memberships).
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-CL-1** — "a stated relation between equation objects with a parameter determines the parameter" now includes a coordinate point stated on the plane or line · **Design:** [04b](04b-design-3d.md) *Relations as a disposition map* — the operand-routing paragraph: a membership reads position and joins the one list · **LADDER stage:** none new — the existing 1-DOF parameter root-find (`pinningGivens` / `paramRoots` / `chooseParam`).
+
+**The report.** «הנקודה A(1, 2, 3)» · «המישור π: mx + z - 1 = 0» · «A על המישור π» was refused «A is not on the plane» although m = −2 satisfies it.
+
+**Re-measured at pickup (`caf00532`, `submit` → `derive3`).** Every row of the plan's table reproduced: the issue's sequence, the plane-first order, the subject-noun spelling and English were refused `not-on-plane` A with m sampled (0.736 at seed 0); the line row `not-on-line` A. One finding beyond the table: the identity row alone («B(0, 0, 1)» on the same π, true for every m) was refused `not-on-plane` B too — the door had handed the letter to a pivot that had nothing to resolve, so the plane was not even evaluated. The cube row built (the #815 door), as the plan said.
+
+**Class.** *A membership of an absolute point on an equation carrier whose coefficients hold the parameter is routed to a mechanism that cannot move either operand, so a satisfiable given is judged at a sampled parameter* (the #909 / #1472 class, membership edition). Two gaps at one seam: `paramPinningRels` read only `c.claims`, and a membership is recorded in `c.memberships` / `c.onLines` — so «distance(A, π) = 2» pinned m while «A ∈ π», the same relation at distance 0, did not; and the door's predicate ("the lane holds nothing that pins") never asked whether the member itself was such a pin.
+
+**Decision.**
+1. **The membership joins the one pin list.** `memberPinsParam` (`operands.ts`) builds a `ParamPinRel3` `{ member, a: point, b: carrier, reads: 'position' }` for an `on-planes` record (no side, not `any`) or an `on-line` record, and admits it through the SAME rule as `claimPinsParam` (`admitsPin`: both operands `isParamPinOperand` — so the point must be `coord` — and one carrying the parameter in position). A `coord-sym` point keeps the letter already; a `partial` point stays on today's path (not built: a free component plus the letter is 2 DOF).
+2. **The residual is the verifier's own predicate.** `memberPinProbe` (`evaluate.ts`) scans the point's signed normalised distance (n·P + d)/|n| for a plane (sign roots + touch) and |(P − anchor) × dir|/|dir| for a line (touch); a candidate holds only where the store's own `memberHolds3` / `onLineHolds3` holds too, so a root is never offered that the `not-on-plane` / `not-on-line` pass would refuse. ADR-3D-286's identity guard applies unchanged: «B(0,0,1) ∈ π» pins nothing and m stays a free sampled DOF.
+3. **The door asks the membership itself.** `on-planes` and `on-line` record the membership FIRST and then call `adoptParamForCarrier`, whose `releaseParamToPivot` already reads `paramPinningRels`: one predicate, two readers (ADR-3D-286 step 6). A coordinate member keeps the letter; a figure member (a solid vertex) is not a pin operand and re-homes exactly as ADR-3D-178 ruled. An identity membership is admitted by the list (the identity guard lives in the root-find), so it too keeps the letter — which is what makes the B row verify.
+4. **Blame needs no code.** `paramPinKey` / `paramPinOwners` (store3) read `pinningGivens`, so a membership no m satisfies is refused `no-roots` naming «A על המישור π» (verified in the lock).
+5. **Relation table:** `on|point|plane-named` and `on|point|line` gain `param-root`, citing this ADR.
+
+**What the student sees.** «A על המישור π» with A typed by coordinates and π written in m now builds, and the data panel's parameters row shows «m = −2» (the #1472 / ADR-3D-079 display every pinned letter already takes). Where no m works, the refusal is the root-find's existing `no-roots` message naming the membership («אין אף ערך ממשי של m שבו «A על המישור π» מתקיים…») instead of «A is not on the plane». A membership true for every m leaves m free, as #1472 rules for every relation. The same holds on a figure whose m another given already pins: in the 2024 חורף Q2 gate («ℓ ⟂ π» pins m = −5), «C(1,1,1) על הישר ℓ» is now refused with the `no-roots` message naming it together with «הישר ℓ ניצב למישור π» («…הנתונים האלה סותרים זה את זה»), where it was `not-on-line` C. The scenario lock in `scenarios3.test.ts` is updated to that message.
+
+**Rejected.** (i) A second, membership-only gate at the door (`member is absolute ⇒ keep`): two predicates for one question, and it would still leave the root-find blind to the membership. (ii) Recording the membership as a `distance-rel` claim of 0: a second record of one statement, which the verifier would then judge twice.
+
+**Sibling products (docs/17 §1, ADR-W-108).** Parameters, equations and R³ lines/planes are `EXCEPTIONS.X3/X5`; no parity row. *Analytic*, measured at `caf00532`: «הנקודה A(1, 3)» · «הישר l: y = mx + 1» · «A על הישר l» records (its n-D solver treats the letter as an unknown) — class not present. *2-D* has no equation parameter. *Complex* has no planes or lines.
+
+**Locks.** `src3d/__tests__/issue-1528-absolute-member-pins.test.ts` (19 cases: the reported rows in four spellings and both orders, the offset, anchor, direction and plane∩plane variants, a two-root line reaching both roots at seeds 0/1, the panel row «m = −2», the list entry, the identity row alone and beside A, two `no-roots` refusals naming the membership with the facts not grown, and the door both ways — the cube row still re-homes and builds). Fixtures (rule 4): `fixtures3/point-on-param-plane-1528.geo3.json` (the issue's three lines) and `fixtures3/point-on-param-line-1528.geo3.json`. Unchanged and re-run: the #815, #801, #1472 and #1439 locks and the fixtures3 net.
+
+**Measured (solver gates).** *Whole-rate, 24 seeds, over all 93 `fixtures3/` sessions* (a sequential base/after run through the suite lock): the 91 pre-existing sessions keep their whole-seed counts (90 at 24/24; `symbolic-line-equation-863` at 23/24 on both); the two new fixtures go 0 → 24/24. *Timing:* the whole sweep 328.9 → 330.0 s, every per-fixture delta within ±2 % run-to-run noise, the largest on pivot figures with no algebraic-lane parameter (`rider-length-1735` 92.6 → 93.4 s). The new pin costs one touch scan per membership, memoised with the roots. *#1394 parity golden:* measured on this branch, 0 existing hashes drift and 0 keys are gone; the new keys are this ADR's lock arrays and fixtures. It is re-recorded by the round's batch, not here.
+
+**Consequences.** `src3d/engine/operands.ts` (`ParamPinRel3` becomes a union, `admitsPin`, `memberPinsParam`, `paramPinningRels` reads memberships), `src3d/engine/evaluate.ts` (`memberPinProbe`), `src3d/engine/apply.ts` (the door asks after recording), `src3d/engine/relationTable.ts`.
+
+## ADR-3D-393 — A given that reads a free carrier drives the figure, rigid or not; the predicate is the statement's reach (#1782)
+
+**Status:** accepted · 2026-10-29 · fix round #2602 · branch `fix/1782-cube-edge-rider-length` · **generalises** [ADR-3D-260](#adr-3d-260) (#1311's `free3` clause of the drive predicate) · composes with [ADR-3D-306](#adr-3d-306) (the rider lane's re-seat, which now receives these statements) · **LADDER stage:** apply-boundary routing only (3-D's eager driver/check decision); no new stage, no new solver code
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-2 (a stated length, angle or relation on a free point of a rigid solid moves that point) · **Design:** [04b](04b-design-3d.md) § "A never-positioned point is a pivot unknown" (the drive predicate is the statement's reach over the carrier table)
+
+**Measured before** (`main` @ caf00532, `decideSubmit3`, seeds 0–3, nothing mocked): «קובייה ABCD · AB = 2 · E על AB · AE = 1» refused `claim-refuted` at 4/4 seeds; the reversed order refused its «AB = 2»; «AE = 1.5», «DE = 2.5», «F על CD · EF = 2.5», «זווית ADE = 30» (no size), «CE ניצב ל-DE» and the volume-first row all `claim-refuted`. Controls: the cube with no size and «AE = 1» builds (the #754 scale given); the same four lines on a «תיבה» build; 2-D builds «ריבוע ABCD · AB = 2 · E על AB · AE = 1» (E ≈ (1, 0), all facts ok).
+
+**Class (docs/17 §1).** *A scalar or relation given whose reach includes a free carrier DOF — a rider's `t`, a free offset, an unstated coordinate — drives the figure only when the figure also has free solid dims; on a rigid solid it is judged against the sampled carrier, so a satisfiable given is refused «בדקו את החישוב», and whether it builds depends on whether some unrelated dimension is free.* Every drive-or-claim decision in `apply.ts` asked `freeDims(c) > 0` — a count standing in for the semantic fact "this statement reads something the student never stated" (§2.2). ADR-3D-260 widened it by one carrier kind (`free3`); the rest of the carrier table (`on-segment`, `scaled-offset`, a point-run plane's `on-plane`, `on-line`, `bisector-ray`, `partial`) stayed out.
+
+**Decision.**
+1. **One predicate,** `statementReachesFreeDof3(c, statement)` (`apply.ts`): the solids have free dims, or a point the statement names (a declared vector's endpoints included), or a point one of those is BUILT FROM, carries a `drivable` entry of the one carrier table — `reachesFreeCarrier3` (`carriers.ts`) over the parent walk `pointParents3`, a total `switch` over `PointDef['kind']` (a new kind is a compile error, not a silent stop). The carrier reach is read on a figure with a SOLID; a solid-free figure keeps exactly the routing it had — #1311's own clause (a statement that names a `free3` point drives) stays beside the predicate at the claim arm, and every sibling arm keeps its `&& c.solids.length > 0` half. (Measured: letting the carrier reach also act on solid-free `free3` figures turned the catalog's bare-canvas «AB ∥ ACD» and «שטח המשולש ABC = 4.5» from `point-not-determined` into built figures, and «AB ⊥ ACD» after them into `unknown-point` — behaviour beyond this issue, so it is not shipped; the #1394 golden is unchanged on those keys.) `freeDims` is unchanged: its other readers want the count.
+2. **Every drive-or-claim site asks it:** the claim arm and its magnitude demotion; `cos-angle`, `mag-rel`, `mag-val`, `concyclic`, `dot-eq`, `cos-eq` (both arms), the angle-letter pair, `bisector-dir`, `line-plane-angle`, and ⟂/∥-to-plane. The `&& c.solids.length > 0` halves stay.
+3. **#754's scale given yields to a driving statement** (M2 law i). The first magnitude on a rigid figure is still the scale given — every figure that built before is bit-identical and the fast path stays fast (the plan's experiment measured ~720 ms when the first rider length became a pin instead). A later magnitude that reads a free carrier, or that arrives while the scale given does («E על AB · AE = 1» then «AB = 2»), **demotes** it to its own pin, the #1447 demotion, until now gated on free dims. In the same change: the demoted length is re-recorded as its pin's **arbiter** (`given: true`, the #1567 seam) in the same claim slot, so its owner holds and the size-on-solid guard does not mark it red; and its fact **joins the pin owners** (`store3`), so a later contradiction names it.
+4. **A later magnitude that reads no free carrier is checked exactly** where the size is stated by a demoted pin (`magnitudeSizeStated3`, `scaleGiven.ts`: the scale given in force, or a length/area/volume pin that reads no free carrier). «AC = 10» after the drive is refused `claim-refuted`, exactly as «|AB| = 4 · |AC| = 10» is; without this it read `size-on-solid` («not supported yet») on a figure whose size the student stated.
+
+**Measured after** (same path): the report builds at 24/24 seeds with E at AB's midpoint, every fact ok, ~35 ms for the last line; the reversed order draws the same figure; «AE = 1.5», «DE = 2.5», «EF = 2.5», «A'E = 2.5», «זווית ADE = 30», the volume-first row, «M אמצע AE · AM = 0.25» and «E על AB · F על BC · DE ⊥ EF» build at 4/4 seeds. Refusals: «AB = 2 · E על AB · AE = 3» → `givens-contradict` stated «AE = 3», others «AB = 2»; «E על AB · AE = 1 · AB = 2 · AE = 1.5» → `givens-contradict` naming «AE = 1.5» with «AE = 1», «AB = 2»; «|AB| = 4 · |AC| = 10» → `claim-refuted` (unchanged). Box control unchanged. **Side effect, by the plan:** #1414's «קובייה ABCDA'B'C'D' · אורך AB = 2 · קטע BE · אורך BE = 5» (refused `point-not-determined` at HEAD) builds at 4/4 seeds, |BE| = 5, ~0.6 s for the last line: the free3 E's reach plus the scale-given demotion is exactly decision 3. Untouched, measured: #1816 «A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1», #1896 «… AB ⊥ AC» and #1783 «משולש ABC · D על AB · AD = 3BD» stay `claim-refuted`.
+
+**Deviations from the plan, measured.** (a) The plan listed «CE ניצב ל-DE» (E on AB) among the rows that build. It cannot: ∠CED is acute for every E on AB (ED·EC = t² − t + 1 > 0 on a unit cube), so the honest outcome is a refusal; it is now `givens-contradict` (a stated given that cannot hold) where it was `claim-refuted`. The ⟂ arm's satisfiable row is «E על AB · F על BC · DE ⊥ EF», which builds. (b) The plan forecast «… AE = 1 · AC = 10» as `givens-contradict` naming «AB = 2»; that came from its experiment's routing, which made «AC = 10» a pin. By this ADR's own predicate «AC = 10» reads no free carrier and is an answer check, so it is `claim-refuted` (decision 4), the register of the existing «|AB| = 4 · |AC| = 10» row. The pin-owner fix is still exercised: «AB = 2 · E על AB · AE = 3» names «AE = 3» with «AB = 2» in `others`. (c) «זווית ADE = 30» with no size draws the same figure at every seed: a cube is determined up to similarity, which is gauge (ADR-3D-054), so nothing free is left to vary.
+
+**Sibling audit.** Grepped every `freeDims(c)` reader in `apply.ts`: the drive-or-claim sites above now ask the predicate; `scaleGivenSafe`'s `freeDims(c) === 0` (may a LENGTH become the scale given) and the `coords-eq` arm (ADR-3D-291) are counts, not drive decisions, and stay. Store: `exactlyCheckable` (decision 4); the `size-on-solid` guard otherwise unchanged. Other builders: 2-D drives a rider for any stated scalar on a figure of stated size (measured above); analytic places riders by coordinates; complex has no solids. Solids are 3-D only (`EXCEPTIONS.X7`), so no parity row.
+
+**Successor, filed, not built:** solid-free absolute figures — «A(0,0,0) · B(4,0,0) · D על AB · AD = 1» has no solid for the pivot to run on; #1816 is that issue (the #1615 `solveCoordDeterminations` lane, generalised to a 1-DOF root-find). This ADR leaves it `claim-refuted`, unchanged.
+
+**Locks.** `src3d/__tests__/issue-1782-rigid-rider-drive.test.ts` (through `decideSubmit3`, asserting the geometry): the report at seeds 0–23; the reversed order equal to the forward figure; «AE = 1.5», «DE = 2.5», «EF = 2.5», «A'E = 2.5», «זווית ADE = 30», the volume-first row, a midpoint of a rider, «DE ⊥ EF» between two riders; the box control; the refusals («AE = 3» naming «AB = 2», «CE ⊥ DE», «|AB| = 4 · |AC| = 10», «AC = 10» after the drive); the predicate called on a cube and a box. Fixtures `fixtures3/cube-rider-length-1782.geo3.json` and `cube-rider-length-reversed-1782.geo3.json`. ADR-3D-171 / #1447 / ADR-3D-306 lock files unedited and green. **One ADR-3D-260 row is re-pointed, by the plan:** `issue-1311-free-pair-length-drive.test.ts` asserted #1414's sequence refuses `point-not-determined`; it now asserts the sequence builds with |BE| = 5 and |AB| = 2 (the plan: "if the walk covers it, #1414 closes as a side effect"). The not-determined guard is unchanged and keeps its other locks (issue-1590).
+
+**#1394 golden diff** (`UPDATE_PARITY_GOLDEN=1`, every key listed): one CHANGED key, #1414's sequence «קובייה ABCDA'B'C'D' · אורך AB = 2 · קטע BE · אורך BE = 5» (refusal → built, above); the rest are ADDED keys — this ADR's two fixtures and its test file's sequences. No other fixture, catalog specimen or suite sequence changed.
+
+**Perf.** The predicate is a structural walk over the named points' definitions; no sampling (M3). The reported line: ~35 ms per seed (was a refusal).
+
+**Behaviour change for a student:** in 3-D, a length, angle or perpendicular stated on a point riding a cube's edge now moves the point (E lands where the given puts it), in either order, where before it was refused «בדקו את החישוב». A given no point on the edge can meet is still refused, now as a contradiction naming the statements.

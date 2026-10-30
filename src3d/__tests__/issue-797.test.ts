@@ -23,13 +23,16 @@ const TWO_VECTORS = ['מנסרה ישרה משולשת ABC', "AA'=(k-1,k-7, k+1)
 describe('#797 — discrete pin-symbol roots read OPEN, and the pool carries them all', () => {
   beforeEach(reset);
 
-  it('two of the three vectors: k ∈ {1,2} — the panel reads «k = ?», never a picked branch', () => {
+  // #1769 (ADR-3D-395): operator ruling 2026-10-04 on #1769, «show both» — a symbol on several discrete roots now
+  // lists its root set (ADR-3D-336's format) instead of the open «k = ?» this case read under the 2026-08-26 ruling.
+  // Still never a picked branch: one root as if it were determined is what both rulings forbid.
+  it('two of the three vectors: k ∈ {1,2} — the panel reads both roots, never a picked branch', () => {
     for (const u of TWO_VECTORS) {
       submit(u);
       expect(err(), u).toBeNull();
     }
     const params = dataView(derive3(state().facts, state().seed).construction, state().seed).params;
-    expect(params).toEqual([{ sym: 'k', text: 'k = ?', value: '?', open: true }]);
+    expect(params).toEqual([{ sym: 'k', text: 'k = 1 או k = 2', value: '1 או k = 2', open: false }]);
   });
 
   it('both roots are REACHABLE: configurations across seeds visit k ≈ 1 and k ≈ 2, nothing else', () => {

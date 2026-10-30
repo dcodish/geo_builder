@@ -40,7 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, NO_PLACEMENT_FREEDOM3, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
+import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
@@ -702,7 +702,46 @@ function operandDefsKey(c: Construction3, op: Operand3): unknown {
   return op;
 }
 
+/**
+ * #1528 (ADR-3D-396) — a coordinate point's stated MEMBERSHIP in root-find form. The scan is the point's
+ * distance to the carrier at the candidate value — SIGNED for a plane (n·P + d)/|n|, so a crossing is found
+ * by bisection; |(P − anchor) × dir|/|dir| for a line (touch roots). The verdict is the verifier's own
+ * predicate (`memberHolds3` / `onLineHolds3`, the store's `not-on-plane` / `not-on-line` pass), so a root
+ * is never offered that the recorded membership would then refuse.
+ */
+function memberPinProbe(c: Construction3, pin: Extract<ParamPinRel3, { member: object }>): ParamPinProbe {
+  const key = JSON.stringify([c.param, pin.member, operandDefsKey(c, pin.a), operandDefsKey(c, pin.b)]);
+  const def = c.points.get(pin.member.id);
+  const P = def?.kind === 'coord' ? v3(def.x, def.y, def.z) : null;
+  const m = pin.member;
+  if (m.type === 'on-planes') {
+    const f = (a: number): number => {
+      if (!P) return NaN;
+      const pl = planeAt(c, m.plane, a);
+      const n = norm3(pl.n);
+      return n > 1e-12 ? (dot3(pl.n, P) + pl.d) / n : NaN;
+    };
+    return { scans: [f], holds: (a) => { const r = f(a); return !Number.isNaN(r) && Math.abs(r) <= PIN_TOL && memberHolds3(P!, planeAt(c, m.plane, a)); }, key };
+  }
+  const f = (a: number): number => {
+    const ln = lineAtParam(c, m.line, a);
+    if (!P || !ln) return NaN;
+    const d = norm3(ln.dir);
+    return d > 1e-12 ? norm3(cross3(sub3(P, ln.anchor), ln.dir)) / d : NaN;
+  };
+  return {
+    scans: [f],
+    holds: (a) => {
+      const r = f(a);
+      const ln = lineAtParam(c, m.line, a);
+      return !Number.isNaN(r) && r <= PIN_TOL && ln !== null && onLineHolds3(P!, ln);
+    },
+    key,
+  };
+}
+
 function relPinProbe(c: Construction3, pin: ParamPinRel3): ParamPinProbe {
+  if (pin.member) return memberPinProbe(c, pin);
   const geoms = (a: number): [OperandGeom, OperandGeom] | null => {
     const ga = operandAtParam(c, pin.a, a);
     const gb = operandAtParam(c, pin.b, a);
@@ -967,28 +1006,29 @@ const rootsMemo = new Map<string, number[]>();
  * branch although m is not forced, or differ although it is. A derived value is knowledge iff it agrees
  * across {@link knowledgeSamples3}, which enumerates the branches instead of asking this.
  */
+/**
+ * #1769 (ADR-3D-395) — does a pool's admissible ROOT record describe a re-placed configuration? Every pin-symbol value
+ * the re-placement holds must be one of the pool's roots for that symbol (a symbol the record does not list is no
+ * evidence against it). The one rule the stage-5 slide and the read-back image carry the pool's record by.
+ */
+const rootsDescribe = (symRoots: Record<string, number[]> | undefined, pinSymbols: Record<string, number> | undefined): boolean =>
+  Object.entries(pinSymbols ?? {}).every(([s, v]) => symRoots?.[s]?.some((r) => Math.abs(r - v) <= 1e-3 * Math.max(1, Math.abs(r))) ?? true);
+
 export const paramIsKnowledge = (param: Resolved3['param']): boolean =>
   !!param && Number.isFinite(param.value) && param.branches.length === 1;
 
 const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
 
-/** A stated membership's arbiter (ADR-3D-033): the point lies on the plane to within the
- *  DRIVE's numeric floor (the LM + regulariser equilibrium, ~1e-5 of the figure scale) —
- *  still orders of magnitude below any genuinely off-plane statement. Shared by the
- *  stage-4 unmet trigger and the store's verify pass so no drive/verify gap can exist. */
-export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
-  Math.abs(dot3(pl.n, p) + pl.d) / Math.max(norm3(pl.n), 1e-12) <= 1e-4 * Math.max(1, norm3(p));
+// #1769 (ADR-3D-395): the membership arbiters live in operands.ts — the pivot's root predicate judges a
+// candidate by them (solve3 must never import evaluate, the #818 `componentValue` move) — re-exported here.
+export { memberHolds3, onLineHolds3 } from './operands';
+import { memberHolds3, onLineHolds3 } from './operands';
 
-/** #801 (ADR-3D-174) — the LINE edition of {@link memberHolds3}, extracted from the store's verify pass
- *  so the stage-4 drive aims at exactly the bar the verifier judges by (the memberHolds3 discipline: a
- *  drive that stops short of the verifier's tolerance produces a refusal nothing can clear). */
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
 import { componentSignsHold } from './operands';
 
-export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
-  norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
 
 /**
  * Pick the parameter's value for this seed: an explicit `branch` on a line ⟂ plane given
@@ -2360,10 +2400,26 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
           const retry = solveStage(() => solvePivot(c, EC, dims0, seed, undefined, members, warm.x, lines));
           // several basins converge (mirrors, rotations) and not every one satisfies the
-          // membership on FINAL positions — validate each candidate and keep the first
-          // fully-good one (membership + signs + the param root-find), never seed-modulo
-          let accepted = false;
+          // membership on FINAL positions — validate each candidate (membership + signs + the
+          // param root-find) and keep the first fully-good one PER ROOT.
+          //
+          // #1769 (ADR-3D-395): «first fully-good one» overall was a root pick by START ORDER — the
+          // operator's prism (k ∈ {−1, 2}) landed k = 2 at 20 seeds and k = −1 at 4, the pool was size 1,
+          // so `symRoots` held one value and the panel printed «k = 2» as knowledge (#797's class, one
+          // stage later). Every admissible ROOT now joins the pool: one representative per distinct
+          // pin-symbol vector, each the first fully-good candidate of its root (the warm start's
+          // minimal-movement basin keeps winning within a root). A figure with no pin symbol has one key,
+          // so it still stops at its first good candidate — bit-identical, and no extra validation.
+          const openSyms = openPinSymsOf(c);
+          const rootKey = (sol: PivotResult): string => pinRootKey(sol.pinSymbols, openSyms);
+          const good: PivotResult[] = [];
+          const goodKeys = new Set<string>();
+          const pinKeyed = retry.some((sol) => rootKey(sol) !== '');
+          let lastApplied: PivotResult | null = null;
           for (const sol of retry) {
+            const key = rootKey(sol);
+            if (goodKeys.has(key)) continue; // this root already has its representative
+            lastApplied = sol;
             applySolutions([sol]);
             pinParam();
             resolveLatePlanes();
@@ -2371,9 +2427,19 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
             const paramBroke =
               paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
             if (!stillUnmet && !paramBroke && (!signsBefore || signsHold())) {
-              accepted = true;
-              break;
+              good.push(sol);
+              goodKeys.add(key);
+              if (!pinKeyed) break; // one key only ⇒ the first good candidate is the whole answer
             }
+          }
+          const accepted = good.length > 0;
+          if (good.length > 1 || (accepted && lastApplied !== good[0])) {
+            // the admissible pool: `applySolutions` picks `pool[seed % n]` (so «show another
+            // configuration» cycles the roots) and records every root in `symRoots` / `pointRoots`.
+            // (One root whose candidate is not the last one tried is re-applied the same way.)
+            applySolutions(good);
+            pinParam();
+            resolveLatePlanes();
           }
           if (!accepted && retry.length > 0) {
             pos.clear();
@@ -2428,8 +2494,22 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         if (!attempt(true)) restore();
       }
       if (pivot !== pivotBefore && pivotBefore) {
-        // the slide is a re-placement of the CHOSEN configuration, not a new pool
-        pivot = { ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen };
+        // the slide is a re-placement of the CHOSEN configuration, not a new pool — so the pool's own
+        // record stays the pool's: #1769 (ADR-3D-395), the admissible root sets were dropped here (the
+        // slid single solution carries one root), and the panel's singleton gate read the missing set
+        // as «one root» — the drive's k ∈ {−1, 2} printed «k = 2» at every seed whose drive slid.
+        // The record is carried only when it describes the slid figure: every symbol value the slid
+        // configuration holds must be one of the pool's roots. (A stage-4 drive that was rolled back
+        // leaves `warm` on its rejected candidate, so the slide can re-place a configuration the
+        // restored pool does not contain — that pool's roots say nothing about the drawing.)
+        const { symRoots, pointRoots } = pivotBefore;
+        const describes = rootsDescribe(symRoots, pivot!.pinSymbols);
+        const { symRoots: slidRoots, pointRoots: slidPoints, ...slid } = pivot!;
+        pivot = {
+          ...slid, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen,
+          ...(describes ? (symRoots ? { symRoots } : {}) : slidRoots ? { symRoots: slidRoots } : {}),
+          ...(describes ? (pointRoots ? { pointRoots } : {}) : slidPoints ? { pointRoots: slidPoints } : {}),
+        };
       }
     }
 
@@ -2576,7 +2656,14 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           restore();
           if (!attempt(true)) restore();
         }
-        if (pivot !== pivotBefore) pivot = { ...pivot!, placementFreedom };
+        if (pivot !== pivotBefore) {
+          // #1769 (ADR-3D-395): the image's one-entry pool keeps the point rows honest (a moved point is not a second
+          // configuration), but the pool's ROOT SET is a property of the givens — the image of a root configuration
+          // carries it, under stage 5's rule (only when its own symbol values are among those roots).
+          const { symRoots: imageRoots, ...image } = pivot!;
+          const roots = rootsDescribe(pivotBefore?.symRoots, pivot!.pinSymbols) ? pivotBefore?.symRoots : imageRoots;
+          pivot = { ...image, placementFreedom, ...(roots ? { symRoots: roots } : {}) };
+        }
       }
     }
   }

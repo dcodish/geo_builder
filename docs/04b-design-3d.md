@@ -127,7 +127,10 @@ the map is enumerable ([docs/26](archive/26-3d-relations-plan.md)). `operands.ts
 absolute objects a relation pins the figure parameter when an operand carries it **in what the relation
 reads** (ADR-3D-286, #1472: ⟂ / ∥ / angle read directions; coincidence, containment, intersection and
 distance read positions too), and is a claim otherwise. One list, `paramPinningRels` (`claimPinsParam`,
-`operandCarriesParam`), feeds the root-find; each pin's residual is the verifier's own function on the
+`operandCarriesParam`), feeds the root-find. A coordinate point's stated membership on such a plane or line
+is the same position relation at distance 0, so the list reads `c.memberships` / `c.onLines` too, through the
+same admission rule (`memberPinsParam`, ADR-3D-396, #1528); the #815 membership door asks that list with the
+membership already recorded, so only a member the pivot can move (a figure point) hands the letter over; each pin's residual is the verifier's own function on the
 operands rebuilt at the candidate value (`operandAtParam`). A residual that vanishes at every scan sample
 is **not** a pin (the identity guard). The claim is always recorded, and a number drawn from it shows only
 when it holds (`DIRECTION_REL_TOL`).
@@ -561,6 +564,19 @@ function of `(construction, seed, paramValue)`, memoized at that chokepoint (a W
 identity — `apply` clones, never mutates). Every consumer shares it through `knowledgeSamples3`;
 `resolveStats3` counts resolves and hits.
 
+**A pin symbol's admissible roots are one set (#1769, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395)).** One
+root predicate decides whether a candidate joins the pool: `collect` admits it only when it is exact on the primary
+residuals, not collapsed, and every member pin holds by the verifier's own bar (`membersHold`, which reads
+`onLineHolds3` / `memberHolds3` from `operands.ts`). A candidate exact on `ACCEPT` but outside that bar gets the #1311
+release and is judged again; the #803 slide's acceptance asks the same predicate. The #797 walk (`symbolWalk`) closes
+the pool over every source of a root: the cold starts, the #816 widening and the #1735 re-seat, each base walked once
+(`pinRootKey`, the one root key the walk, the round-robin interleave and stage 4 share). A collapsed pinned stage is
+no evidence of continuity, and is retried once with the shape held (retry-only). Stage 4 keeps one validated
+representative per root and applies them as the pool; the slide and the read-back image carry the pool's `symRoots`
+when their own symbol values are among them (`rootsDescribe`). The panel prints the set
+(`branchAnswer`) when every sampled seed's pool carries the same ≥ 2 roots (`rootSetsAgree`, shared with the
+algebraic lane's branch row); any disagreement reads «k = ?».
+
 **A symbolic coordinate lives in one of two lanes** (ADR-3D-218, #898): with a solid, a pivot **pin**
 carrying the full affine form, exponents included; with none, a `coord-sym` point stored as a degree-1
 `{k, p}`. The narrower lane **refuses what it cannot hold rather than narrowing it silently**.
@@ -636,7 +652,17 @@ A `free3` point («וקטור AB» on an empty canvas, «קטע BE» from a know
 unstated DOF that are **pivot unknowns**: each coordinate is a #820 rider-lane entry keyed
 `freeCoordKey(id, axis)` in `riderTs`, anchored at its canonical sample. `evaluateSolidsAndPoints` places a
 driven coordinate, and the pivot runs on a solid-less figure that holds one (`hasFreePoint3`). The apply
-fork drives a scalar statement when `freeDims(c) > 0` or it names a `free3` point (`claimPointIds`);
+fork drives a scalar statement when **its reach includes a free DOF** (`statementReachesFreeDof3`, [ADR-3D-393](06b-decisions-3d.md#adr-3d-393)):
+the solids have free dims, or a point it names — or a point one of those is built from (`pointParents3`, a total
+switch over `PointDef`) — carries a `drivable` entry of the carrier table (`reachesFreeCarrier3`, `carriers.ts`). The
+carrier reach is read only on a figure with a solid; on a solid-free figure #1311's clause (a NAMED `free3` point)
+stays the claim arm's second condition. Every
+drive-or-claim site in `apply.ts` asks it (the claim arm and its magnitude demotion, `cos-angle`, `mag-rel`,
+`mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane);
+`freeDims` stays a count. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
+that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
+arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
+that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).
 `lengthClaim` lowers a marked «וקטור AB = 5» to the one-word form's arrow. A candidate the anchors left just
 above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing
 a solid (a free coordinate's anchor equilibrium sits higher than a rider's, which moves within `[0, 1]`).

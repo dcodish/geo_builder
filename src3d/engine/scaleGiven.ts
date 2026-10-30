@@ -25,7 +25,8 @@
 import { scalePinned } from './solve3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { cross3, norm3, sub3, type Vec3 } from './vec3';
-import type { Claim3, Construction3, Id } from './types';
+import { reachesFreeCarrier3 } from './carriers';
+import { claimPointIds, type Claim3, type Construction3, type Id } from './types';
 
 /** The magnitude claim kinds that pin the scale, with the POWER the factor enters at. */
 export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
@@ -90,6 +91,21 @@ export function scaleGivenSafe(c: Construction3): boolean {
 /** Is a recorded scale given in force for THIS construction? (the one predicate all seams share) */
 export function scaleGivenActive(c: Construction3): boolean {
   return c.scaleGivens.length > 0 && scaleGivenSafe(c);
+}
+
+/**
+ * #1782 (ADR-3D-393) — IS THE FIGURE'S SIZE STATED by a magnitude the student gave? Either the scale given is in
+ * force, or a magnitude was DEMOTED from it to a pivot pin (a later given read a free carrier, so the rescale and
+ * the pivot could not both own the size) and that pin reads only points without a free carrier — «AB = 2» on a
+ * cube's edge, which fixes the size whatever the rider does. A pin like «AP = 3» to a free P fixes nothing: P
+ * moves instead. The store's later-magnitude check asks this, so a rigid figure sized by a demoted given checks
+ * «AC = 10» exactly, as it did while the same «AB = 2» was the scale given.
+ */
+export function magnitudeSizeStated3(c: Construction3): boolean {
+  if (scaleGivenActive(c)) return true;
+  return c.scalarPins.some(
+    (p) => (p.kind === 'length' || p.kind === 'area3' || p.kind === 'volume3') && !reachesFreeCarrier3(c, claimPointIds(c, p)),
+  );
 }
 
 /**

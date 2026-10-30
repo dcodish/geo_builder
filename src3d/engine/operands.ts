@@ -15,9 +15,25 @@
  * solved with the gauge frozen is decided by `isAbsolute` over its operands, never by its pin kind.
  */
 
-import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, Operand3 } from './types';
+import type { Claim3, ComponentTarget, Construction3, Id, MutualRel3, OnLineCommand, OnPlanesCommand, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
 import { centroid3, cross3, dist3, dot3, runNormal, norm3, sub3, v3, type Vec3 } from './vec3';
+
+/** A stated membership's arbiter (ADR-3D-033): the point lies on the plane to within the
+ *  DRIVE's numeric floor (the LM + regulariser equilibrium, ~1e-5 of the figure scale) —
+ *  still orders of magnitude below any genuinely off-plane statement. Shared by the
+ *  stage-4 unmet trigger and the store's verify pass so no drive/verify gap can exist. */
+export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
+  Math.abs(dot3(pl.n, p) + pl.d) / Math.max(norm3(pl.n), 1e-12) <= 1e-4 * Math.max(1, norm3(p));
+
+/** #801 (ADR-3D-174) — the LINE edition of {@link memberHolds3}, extracted from the store's verify pass
+ *  so the stage-4 drive aims at exactly the bar the verifier judges by (the memberHolds3 discipline: a
+ *  drive that stops short of the verifier's tolerance produces a refusal nothing can clear). */
+//
+// #1769 (ADR-3D-395): moved here from evaluate.ts, unchanged, so the pivot's root predicate (`isRoot` in
+// solve3's `collect`) judges a candidate by the very bar the stage-4 validation and the verifier use.
+export const onLineHolds3 = (p: Vec3, ln: ResolvedLine): boolean =>
+  norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -216,12 +232,24 @@ export const planeSym3 = (c: Construction3, name: string): string | null => c.pl
  * parameter: the claim itself (its kind and relation say which of the verifier's functions judges it),
  * its two operands in a uniform `a`/`b` shape, and what it reads of them.
  */
-export interface ParamPinRel3 {
-  claim: Extract<Claim3, { type: 'plane-rel' | 'line-rel' | 'mutual-rel' | 'distance-rel' }>;
-  a: Operand3;
-  b: Operand3;
-  reads: ParamReads;
-}
+export type ParamPinRel3 =
+  | {
+      claim: Extract<Claim3, { type: 'plane-rel' | 'line-rel' | 'mutual-rel' | 'distance-rel' }>;
+      member?: undefined;
+      a: Operand3;
+      b: Operand3;
+      reads: ParamReads;
+    }
+  | {
+      /** #1528 (ADR-3D-396): a stated MEMBERSHIP of a coordinate point («A על המישור π»), recorded in
+       *  `c.memberships` / `c.onLines` rather than as a claim — the distance-0 edition of a distance pin.
+       *  `a` is the point, `b` the carrier. */
+      claim?: undefined;
+      member: OnPlanesCommand | OnLineCommand;
+      a: Operand3;
+      b: Operand3;
+      reads: 'position';
+    };
 
 /**
  * #1472 (ADR-3D-286) — may this operand take part in a parameter pin? Only objects whose geometry the
@@ -276,9 +304,35 @@ export function claimPinsParam(c: Construction3, cl: Claim3): ParamPinRel3 | nul
   } else if (cl.type === 'distance-rel') {
     pin = { claim: cl, a: cl.a, b: cl.b, reads: 'position' };
   } else return null;
-  if (!isParamPinOperand(c, pin.a) || !isParamPinOperand(c, pin.b)) return null;
-  if (!operandCarriesParam(c, pin.a, pin.reads) && !operandCarriesParam(c, pin.b, pin.reads)) return null;
-  return pin;
+  return admitsPin(c, pin) ? pin : null;
+}
+
+/** The one admission rule every pin passes (#1472): both operands rebuildable at a candidate value, and
+ *  one of them carrying the parameter in what the relation reads. */
+const admitsPin = (c: Construction3, pin: ParamPinRel3): boolean =>
+  isParamPinOperand(c, pin.a) &&
+  isParamPinOperand(c, pin.b) &&
+  (operandCarriesParam(c, pin.a, pin.reads) || operandCarriesParam(c, pin.b, pin.reads));
+
+/**
+ * #1528 (ADR-3D-396) — does this stated MEMBERSHIP pin the figure parameter? «A על המישור π» with A a
+ * COORDINATE point and π written in the parameter is the relation «the distance from A to π is 0»: a
+ * closed position relation between two absolute objects, which is exactly what {@link claimPinsParam}
+ * admits — so it passes the same rule. A membership is recorded in `c.memberships` / `c.onLines`, not as
+ * a claim, which is why the claim reader never saw it: «distance(A, π) = 2» pinned m while «A ∈ π» was
+ * judged at a SAMPLED m and refused although a value satisfying it existed (the #909 / #1472 class).
+ * A side given («מעל») is an inequality and `any` names no carrier — neither pins. A figure point rides the
+ * gauge (the #815 door hands the letter to the pivot for it), so `isParamPinOperand` keeps it out.
+ */
+export function memberPinsParam(c: Construction3, m: OnPlanesCommand | OnLineCommand): ParamPinRel3 | null {
+  if (!c.param) return null;
+  let b: Operand3;
+  if (m.type === 'on-planes') {
+    if (m.side || m.plane === 'any') return null;
+    b = { kind: 'plane-named', name: m.plane };
+  } else b = { kind: 'line', name: m.line };
+  const pin: ParamPinRel3 = { member: m, a: { kind: 'point', id: m.id }, b, reads: 'position' };
+  return admitsPin(c, pin) ? pin : null;
 }
 
 /**
@@ -299,6 +353,11 @@ export function paramPinningRels(c: Construction3): ParamPinRel3[] {
   const out: ParamPinRel3[] = [];
   for (const cl of c.claims) {
     const pin = claimPinsParam(c, cl);
+    if (pin) out.push(pin);
+  }
+  // #1528 (ADR-3D-396): a coordinate point's membership is the same relation at distance 0
+  for (const m of [...c.memberships, ...c.onLines]) {
+    const pin = memberPinsParam(c, m);
     if (pin) out.push(pin);
   }
   return out;

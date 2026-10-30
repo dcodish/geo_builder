@@ -88,8 +88,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens), never refused and never invented at a specific value. **Two figures that share no point** (two
   triangles, a square beside a triangle, a cube beside a triangle) have a free relative size, orientation and
   placement: a length on each builds, a relation between them («AB ∥ DE») is driven, and «הציגו תצורה אחרת»
-  varies them (#1855).
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour).
+  varies them (#1855). **A stated length, angle or relation on a free point of a rigid solid moves that point:**
+  «קובייה ABCD · AB = 2 · E על AB · AE = 1» puts E at AB's midpoint, in either order, as it does on a box and as
+  2-D does on a square; a given no position of the point can meet is still refused (#1782).
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form).
@@ -525,13 +527,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens leave a figure parameter two values, the data panel and the ask lane both list them: a pair that
   are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —
   **«m = -2 או m = 4»** — never a set «{-2, 4}». Three or more roots list nothing: the panel reads the open
-  **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
+  **«m = ?»** and the ask lane says the value is not determined (#1861). The same holds for a letter that vector or
+  membership givens leave on several discrete values (the right prism with «AA'=(k-1,k-7,k+1)» and AC on
+  «x=(8,-1,-1)+t(k+1,0,k-3)»: **«k = -1 או k = 2»**), and «הציגו תצורה אחרת» reaches each value's drawing; a letter
+  the givens determine shows its one value. Where a sampled configuration misses one of the values, the row reads
+  «k = ?» rather than a single value (#1769). A point with exactly two
   configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking «S» answers the same coordinates,
   naming the point once: **«S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**. Every ask answer is the bare value after the
   question («B = (1, t, 2)», «k = 2»), never the label again. A declared basis vector asked by its own name
   answers its coordinates when they are knowledge (**«w = (0, 0, 12)»**) and otherwise «לא נקבע על ידי הנתונים»,
   never its own name; a pair keeps its decomposition («AS = w = (0, 0, 12)»).
-  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072.
+  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072, [ADR-3D-395](06b-decisions-3d.md#adr-3d-395), #1769.
 - **FR-EQ-5 (Must)** — **A named plane is placed by whatever is stated about it.** A π-plane may be declared free
   («מישור π3»), or it comes into being, free, from any statement that names it. «קובייה ABCDA'B'C'D'» · «הישר AC' מאונך
   למישור π3» builds with no declaration. So do ∥ / ⊂ a segment or a line, ⟂ / ∥ a vector or a plane, an angle to a
@@ -549,8 +555,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (`claim-refuted`) when it is wrong**. A claim never reshapes the figure. A statement about a part the
   tool sampled that no drive honours is refused as *not yet determined*, naming that part, never as wrong.
   A relation between objects given by equations or coordinates, where one carries the figure's parameter in
-  what the relation reads, determines the parameter instead; one that holds for every value leaves it free.
-  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286; #508, #512, #552, #1311, #1439, #1472.
+  what the relation reads, determines the parameter instead, including a coordinate point stated on the plane
+  or line («A(1, 2, 3)» · «π: mx + z − 1 = 0» · «A על המישור π» gives m = −2, shown as «m = −2»); one that
+  holds for every value leaves it free.
+  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396; #508, #512, #552, #1311, #1439, #1472, #1528.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. A role noun («אלכסון AB») is a claim too, judged again on the final figure; named

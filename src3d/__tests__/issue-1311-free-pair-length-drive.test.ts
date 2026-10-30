@@ -104,13 +104,18 @@ describe('#1311 — refusals stay honest', () => {
   });
 
   /**
-   * THE GUARD, the class half: a statement about a free point that NO drive pins is not refuted against
-   * the sampler — it names the point. Here the cube's size is already the scale given, so the second
-   * length takes the claim lane (#754), and E — minted free by «קטע BE» (#840) — was never positioned.
+   * THE GUARD's old case, now DRIVEN (#1782, ADR-3D-393 — the #1414 side effect its plan named). With the cube's size
+   * the scale given, «אורך BE = 5» to the free E used to take the claim lane and was refused `point-not-determined`
+   * — honest, but a missing capability. The drive predicate is now the statement's reach: E is free, so the scale
+   * given «אורך AB = 2» is demoted to a pin and both lengths drive. The guard itself is unchanged; its remaining
+   * readers are the free carriers no drive reaches (the not-determined rows in issue-1590 and this file's vector rows).
    */
-  it('a length on a free point the drive does not pin says the point is not determined, never «wrong»', () => {
+  it('a length to a free point after the cube is sized drives the point (was: not determined)', () => {
     const r = submitAll(["קובייה ABCDA'B'C'D'", 'אורך AB = 2', 'קטע BE', 'אורך BE = 5']);
-    expect(r.err).toMatchObject({ code: 'point-not-determined', id: 'E' });
+    expect(r.err).toBeNull();
+    expect(allOk(st().seed)).toBe(true);
+    expect(holds(st().seed, 'B', 'E', 5)).toBe(true);
+    expect(holds(st().seed, 'A', 'B', 2)).toBe(true);
   });
 });
 
