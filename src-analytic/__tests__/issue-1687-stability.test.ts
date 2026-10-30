@@ -142,3 +142,26 @@ describe('#1687 — line provenance: the fold records which line introduced each
     expect(SEEDS.some((seed) => moved(['משולש ABC', 'D על BC'], ['AB=5'], seed) > 1e-3)).toBe(true);
   });
 });
+
+describe('#1687 — a row through a free symbol stays the joint solve’s, read through what it is placed from', () => {
+  /*
+   * The symbol test read only a row's own expressions. «A על המעגל» on «מעגל O» reads the circle's free radius r_O, and
+   * a point on «ישר l4» reads l4's free direction θ: the solve vector holds both. Missed, the stage held O for the twin
+   * but not for one sentence (cat-2d-111's spellings drew two figures), and fitted the 572 exam's A and B with θ held.
+   */
+  const at = (lines: string[], seed: number) =>
+    derive(lines, seed).figure.points.map((p) => `${p.id}:${p.x.toFixed(6)},${p.y.toFixed(6)}`).sort().join(' ');
+  it('«A על מעגל O» and «מעגל O» · «A על המעגל» are one drawing at every seed', () => {
+    for (const seed of [0, 1, 2, 5, 11]) expect(at(['מעגל O', 'A על המעגל'], seed), `seed ${seed}`).toBe(at(['A על מעגל O'], seed));
+  });
+  it('the tangents meeting at D: the circle on its own line draws the one-sentence figure', () => {
+    for (const seed of [0, 2, 7]) {
+      expect(at(['מעגל O', 'המשיק בנקודה A והמשיק בנקודה C נפגשים בנקודה D'], seed), `seed ${seed}`).toBe(
+        at(['המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D'], seed),
+      );
+    }
+  });
+  it('a stated radius is no symbol: «מעגל O ברדיוס 3» · «A על המעגל» keeps O where the circle alone drew it', () => {
+    for (const seed of [0, 1, 2, 5, 11]) expect(moved(['מעגל O ברדיוס 3'], ['A על המעגל'], seed)).toBeLessThan(1e-6);
+  });
+});
