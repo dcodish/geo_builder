@@ -8,6 +8,8 @@
  * Usage: node scripts/roadmap-snapshot.mjs <plan.json> <out-dir>   (needs `gh` authenticated)
  * Reads GitHub through the REST API only (`gh api`): cloud routines refuse GraphQL, which `gh issue list/view` use.
  * Writes <out-dir>/issues.json (db doc state/issues) and <out-dir>/snapshot.json (db doc snapshots/<date>).
+ * `issues.json` also carries `outside`: the open P1/P2 issues in a Now or Next tool that no workstream
+ * names and nobody has pulled into a week (ADR-W-165). The page offers each one a pull into this week.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -28,7 +30,7 @@ const weekOf = (d) => { const i = plan.weeks.filter((w) => w.from <= d).length; 
 const open = [];
 for (let page = 1; ; page++) {
   const rows = JSON.parse(gh([`repos/${repo}/issues?state=open&per_page=100&page=${page}`]));
-  for (const i of rows) if (!i.pull_request) open.push({ number: i.number, title: i.title, labels: labelsOf(i) });
+  for (const i of rows) if (!i.pull_request) open.push({ number: i.number, title: i.title, labels: labelsOf(i), created: i.created_at.slice(0, 10) });
   if (rows.length < 100) break;
 }
 const ids = [...new Set(plan.workstreams.flatMap((w) => w.issues))];
@@ -80,7 +82,23 @@ for (const i of open) {
   }
 }
 
+// Outside the plan (ADR-W-165): P1/P2, open, in the Now or Next phase, named by no workstream and not
+// already pulled into a week. Sorted with the severity marks first, then newest.
+const inPlan = new Set([...ids, ...(plan.pulled || []).map((p) => p.issue)]);
+const outside = open
+  .filter((i) => !inPlan.has(i.number) && ['now', 'next'].includes(phaseOf(i)))
+  .map((i) => ({ n: i.number, t: i.title, l: i.labels.map((x) => x.name), created: i.created }))
+  .filter((i) => i.l.includes('P1') || i.l.includes('P2'))
+  .sort((a, b) => {
+    const w = (i) => (i.l.includes('P1') ? 4 : 0) + (i.l.includes('wrong-answer') ? 2 : 0) + (i.l.includes('reported') ? 1 : 0);
+    return w(b) - w(a) || b.created.localeCompare(a.created);
+  });
+for (const p of plan.pulled || []) if (!issues[p.issue]) {
+  const i = JSON.parse(gh([`repos/${repo}/issues/${p.issue}`]));
+  issues[p.issue] = { t: i.title, s: i.state.toUpperCase(), l: i.labels.map((l) => l.name), closedAt: i.closed_at || null };
+}
+
 mkdirSync(outDir, { recursive: true });
-writeFileSync(`${outDir}/issues.json`, JSON.stringify({ asOf: today, issues }, null, 1));
+writeFileSync(`${outDir}/issues.json`, JSON.stringify({ asOf: today, issues, outside }, null, 1));
 writeFileSync(`${outDir}/snapshot.json`, JSON.stringify({ date: today, week: weekOf(today), openTotal: open.length, phase, byProduct, ws }, null, 1));
-console.log(`snapshot ${today} (week ${weekOf(today)}): ${open.length} open, ${ids.length} plan issues`);
+console.log(`snapshot ${today} (week ${weekOf(today)}): ${open.length} open, ${ids.length} plan issues, ${outside.length} outside the plan`);

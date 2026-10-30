@@ -55,13 +55,21 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   fix shape; the cap below never forbids a correct bundle.
 - **Cap: up to 20 work items** per round — one number, no band (a bundle counts as ONE item) —
   [ADR-W-067](../../../docs/06w-decisions-workspace.md#adr-w-067--the-fix-round-cap-is-20-items-and-the-escalation-stop-becomes-a-rate-1290-amends-adr-w-028). **Fewer is always fine**: the cap is not a
-  quota, and a round with two eligible items runs rather than waits to fill up. **Composition
-  order follows the teaching plan** ([docs/22 §2](../../../docs/22-workflow.md), ADR-W-160): (1) P2
-  items in the roadmap plan's workstreams — read `plan/current` from the overview page's database
-  (the roadmap-refresh skill names the page and the tool), current week's workstreams first;
-  (2) the other P2s, `wrong-answer` first, then by phase Now (analytic) → Next (3-D) → 2-D → workspace/server;
-  (3) P3s riding along on the same themes. **Never compose a `later` issue**, even if armed: name it
-  under Skipped. Value density (per the /status-update rubric) breaks ties within a step.
+  quota, and a round with two eligible items runs rather than waits to fill up. **The round follows the
+  plan strictly** ([ADR-W-165](../../../docs/06w-decisions-workspace.md#adr-w-165), operator
+  2026-10-30, "rule A"; docs/22 §2). Read `plan/current` from the overview page's database (the
+  roadmap-refresh skill names the page and the tool), then compose **in this order and from nothing
+  else**:
+  1. the **current week's** plan items (every workstream whose weeks include it);
+  2. the issues in `plan/current.pulled` for the current week (the operator pulled them in);
+  3. the **next week's** plan items, in the plan's workstream order.
+
+  A week later than the next is never pulled ahead, and an issue outside the plan is never composed,
+  whatever its priority. Name it as a **pull candidate** in the announcement instead (one line: why it
+  looks urgent), so the operator can pull it on the page. An unarmed plan item is named as **holding
+  the plan back** (it needs a fix plan, or a feature build session), never replaced. A round with
+  nothing eligible says so and does not run. A P1 still preempts under Step 0's gate. **Never compose a
+  `later` issue.** Value density (per the /status-update rubric) breaks ties within a step.
   **Price the sitting before composing big:** ~30 min/item measured, so a full 20 is an 8–11 hour
   run — that is the unattended overnight shape ([ADR-W-054](../../../docs/06w-decisions-workspace.md));
   an attended round composes to what the operator can play in one go.
@@ -82,7 +90,8 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   ```
 
   Initial body: the announced composition verbatim (per item: issues, plan gist, route), **plus
-  every eligible `auto-ok` issue NOT picked and why** (cap, no plan, `needs-operator`) — so
+  every current- and next-week plan item NOT picked and why** (unarmed, needs a build session, cap,
+  chokepoint, `needs-operator`), **and the pull candidates** (outside the plan, so not composed) — so
   "why wasn't #N in this round?" is answerable later. The `in-round` label means *executing now
   or died mid-flight*; a session that finds an open `in-round` issue at start reports it instead
   of starting a new round.

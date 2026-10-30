@@ -6402,7 +6402,7 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 
 ## ADR-W-160 — Priority follows who hit it and where it sits in the teaching plan; `wrong-answer` and `reported` record severity (#2556)
 
-**Status:** accepted · 2026-10-27 · process (workspace) · amends [ADR-265](06-decisions.md#adr-265) (the P1/P2/P3 rubric, docs/22 §2)
+**Status:** accepted · 2026-10-27 · process (workspace) · amends [ADR-265](06-decisions.md#adr-265) (the P1/P2/P3 rubric, docs/22 §2) · **⚠ Partly superseded by [ADR-W-165](#adr-w-165) (2026-10-30):** §3's composition order. A round now takes only the plan's current and next week and what the operator pulled in.
 
 **Operator:** 2026-10-26, strategy session: *"there are so many items on priority 2 and priority 3, it doesn't really help us prioritize."* *"drop everything would be for cases where we have a user who actually tried to do something and ran into a P1 issue."* *"if I hit an issue, it means that any … other person would have hit it."* *"a P2 on the complex tool is not really that important because complex tool is a lower priority in general."* Scheme approved as roadmap decision D5 = A (2026-10-26, transcribed on #2556): the two labels and the Later bucket; a wrong answer a session finds in 2-D is P2 with the mark. 2026-10-27: *"we need that now so we can start working the new way"*.
 
@@ -6413,7 +6413,7 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Decision.**
 1. **Two marks record severity:** `wrong-answer` (a wrong figure shown as correct, a dropped or misread given, lost work; a false refusal is not one) and `reported` (a real person hit it: the operator in class or playing, a teacher, a prod-log student).
 2. **Priority:** P1 = `wrong-answer` + `reported`, or prod down. P2 = the roadmap plan's workstreams, any `wrong-answer` outside Later, a `reported` visible failure in the Now/Next product. P3 = 2-D maintenance, internal finds, polish, debt. `later` = a phase not started (complex, conics, the sphere); never composed into a round. Debt and workspace/server keep their own rule.
-3. **The fix round composes in plan order:** the roadmap's P2 items, then other P2s (`wrong-answer` first, then Now → Next → 2-D → workspace), then P3s on the same themes.
+3. **The fix round composes in plan order:** the roadmap's P2 items, then other P2s (`wrong-answer` first, then Now → Next → 2-D → workspace), then P3s on the same themes. **⚠ Superseded by [ADR-W-165](#adr-w-165)** (2026-10-30): a round takes only the plan's current and next week and what the operator pulled in; §1, §2, §4 and §5 stand.
 4. **Re-rank when a phase changes**, with `scripts/priority-rerank.mjs`. It reads the marks from labels; without a label it proposes `reported` from the issue's opening ("Operator report…" vs "Found while…") and flags `wrong-answer` candidates for a person to judge. **The operator reviews the summary of changes before any label changes.**
 5. **The one-time re-rank of 2026-10-27** applies the same way: the summary page first, labels only on his approval.
 
@@ -6488,3 +6488,35 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 3. **The §5c row:** `created-notice-rows.ts` gains a sixth row, run when a builder hands `CreatedNoticeSentences.circle` (setup, line, centre): the circle line records, the notice names the circle and no points, and ✕ removes the line and the centre. The meta-lock adds a `circle-as-point` broken adapter, which the row catches.
 
 **Consequences.** The ✕ and the banner are the points' own, so the circle notice cannot drift from them. A builder that later creates circles by reference hands the row its sentences.
+
+## ADR-W-165 — A fix round follows the plan strictly: the current week, what the operator pulled in, then the next week (#2606)
+
+**Status:** accepted · 2026-10-30 · process (workspace) · **supersedes** [ADR-W-160](#adr-w-160) §3 (the composition order); ADR-W-160's priority rubric and marks stand
+
+**Operator:** 2026-10-30, in chat, after round #2602. First the complaint: *"we agreed that we focus on analytics for this week but non of the items in this round were from analytics - why?"* Then: *"the next round needs to follow the plan. if we have added items, where are they located on the plan. is there a process to decide if they should go into this week for instance or do they by default push out since they were not on original plan?"* Offered A (strict plan, explicit pull), B (ADR-W-160 §3 as written) and C (he places every new issue by hand). Answer: *"rule A"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §2, the fix-round, status-update and roadmap-refresh skills, `scripts/roadmap-snapshot.mjs`, and the overview page's *Outside the plan* panel.
+
+**Context — measured on round #2602.** ADR-W-160 §3 read "the roadmap's P2 items, then other P2s". It did not say whether a later week's plan item comes before an unplanned issue, or what happens to an issue filed after the plan was made.
+- Round #2602 (week 1, analytic's week) composed 2 analytic items, both of which escalated, and then 4 3-D items from the plan's weeks 3–4.
+- Meanwhile 88 armed analytic issues sat outside the plan.
+- The analytic plan items for weeks 1–2 (#1177, #1186, #1825) carried no `auto-ok`, so no round could take them. "Follow the plan" also needs the plan's own items armed.
+
+**Decision.**
+1. **A new issue that fits a workstream joins it** at the next roadmap refresh (roadmap-refresh step 5) and takes that workstream's weeks. It is never moved forward on its own: #1687 stays in "the figure doesn't jump", weeks 3–4.
+2. **A new issue outside the plan gets no week.**
+   - `scripts/roadmap-snapshot.mjs` lists, in `state/issues.outside`, every open P2 or P1 issue in a Now or Next tool (analytic, 3-D) that no workstream names.
+   - The overview page shows that list under *Outside the plan*, each with a **Pull into this week** button that writes `pulls/<issue>` (`status: "pulled"`, the week, the time). An unrecorded pull can be undone.
+   - The next refresh records each pull in `plan/current.pulled` (`{issue, week, at}`), comments on the issue, and marks the pull `recorded`.
+3. **A fix round composes, in this order and from nothing else:**
+   1. the current week's plan items;
+   2. the issues pulled into the current week;
+   3. the next week's plan items, in plan order.
+
+   Eligibility (`auto-ok`, no `needs-operator`, no `[proposed]`) is unchanged. A plan item that is not armed is named in the composition as holding the plan back, never replaced by an unplanned issue. A P1 still preempts, announced first, under the P1 gate. A week later than the next is never pulled ahead.
+4. **`/status-update` recommends from the same order.** An unplanned issue it judges urgent is shown as a **pull candidate** with one line on why. It is never composed and never armed into a round.
+
+**Consequences.**
+- A round can be small, even empty, when the current and next weeks' items are done or unarmed. Its report then says what holds the plan back (an unarmed plan item, a feature needing a build session) instead of filling up from the rest of the queue.
+- The plan's progress on the overview page now measures what the rounds actually worked on.
+- New work reaches a round only through a workstream or the operator's pull. That makes the operator's hand the one route by which unplanned work enters the plan.

@@ -18,8 +18,9 @@ the session scratchpad, never in the repo.
 
 | Doc | Holds | Who writes it |
 | --- | --- | --- |
-| `plan/current` | the weeks and the workstreams, each with its issue numbers | a session, when the plan changes |
-| `state/issues` | each plan issue's title, state, labels, `closedAt`, plus `asOf` | this skill |
+| `plan/current` | the weeks and the workstreams, each with its issue numbers; `pulled` = `[{issue, week, at}]`, the issues the operator pulled into a week (ADR-W-165) | a session, when the plan changes or a pull is recorded |
+| `state/issues` | each plan issue's title, state, labels, `closedAt`, plus `asOf`; `outside` = the open P1/P2 issues in a Now or Next tool that no workstream names | this skill |
+| `pulls/<issue>` | a pull into a week: `pulled` (he clicked on the page) → `recorded` | the page, then this skill |
 | `snapshots/<YYYY-MM-DD>` | counts: open total, by phase, by tool × priority × type, per workstream | this skill, one per day |
 | `decisions/<id>` | a plan decision: `open` → `answered` (he clicked on the page) → `recorded` | the page, then this skill |
 | `tools/snapshot` | a pointer to `scripts/roadmap-snapshot.mjs` | — |
@@ -42,9 +43,17 @@ or delete it.** A second refresh on the same day replaces that day's snapshot (p
    `needs-operator` on that issue, never apply it.
 5. **Plan drift.** If the round or report filed or closed work that belongs to a workstream, edit the
    plan (`set` `plan/current`, pinned). A workstream whose issues are all closed is done: say so in
-   the report, never delete it.
+   the report, never delete it. **A new issue that fits a workstream joins it and takes its weeks;
+   a new issue that fits none is NOT added** ([ADR-W-165](../../../docs/06w-decisions-workspace.md#adr-w-165)):
+   it appears under the page's *Outside the plan* until he pulls it.
+5b. **Record pulls.** `list` `pulls`. For each `status: "pulled"`:
+   - append `{issue, week, at}` to `plan/current.pulled` (one pinned `set` for all of them);
+   - comment on the issue (*"Pulled into week W on the roadmap page, <date> (ADR-W-165)"*);
+   - `update` the pull to `status: "recorded"` with `github` = the comment URL.
+
+   A pull he asks for in chat is recorded the same way, written straight into the plan.
 6. **Report one line** in the calling skill's output: *"Roadmap page refreshed: N open (baseline
-   485), week W, workstreams done X/Y"*, plus any decision transcribed.
+   485), week W, workstreams done X/Y"*, plus any decision transcribed and any pull recorded.
 
 ## The daily cloud run
 
