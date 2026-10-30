@@ -628,6 +628,10 @@ const he = {
   manualRelations: 'קשרים בין עצמים',
   manualDerived: 'נקודות נגזרות',
   manualParameters: 'פרמטרים ואי-שוויונים',
+  manualLocus: 'מקום גאומטרי',
+  // #1177 (ADR-AG-352) — the locus chip names its next action (operator ruling 2A, 2026-10-30)
+  locusChipShow: 'הצג מקום גאומטרי',
+  locusChipHide: 'הסתר מקום גאומטרי',
   // A load says what it RESTORED and, separately, what it could not — a line that no longer builds
   // is named, never dropped in silence (ADR-242, and the reason a save holds lines and not points).
   loadRestored: 'טענתי את השרטוט — {{total}} נתונים.',
@@ -1165,6 +1169,9 @@ const en: typeof he = {
   manualRelations: 'Relations between objects',
   manualDerived: 'Derived points',
   manualParameters: 'Parameters and inequalities',
+  manualLocus: 'Locus',
+  locusChipShow: 'Show locus',
+  locusChipHide: 'Hide locus',
   loadRestored: 'Figure loaded — {{total}} givens.',
   loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
   errLoadForeign: 'The file «{{detail}}» belongs to another builder in the suite — open it there.',

@@ -3943,6 +3943,8 @@ merge of the copy cannot re-collapse them. Analytic lane 70 files / 1110 tests.
 
 ## ADR-AG-072 — A locus is a point with one degree of freedom, and the tool DRAWS it, NAMES it and SOLVES it (#1136, #1137, #1138)
 
+> **⚠ Superseded in part** by [ADR-AG-352](#adr-ag-352) (#1177, 2026-10-30): §2, the ask lane as the only surface. The locus also has a chip beside its point and a guide row, and the ask lane stays its one grammar.
+
 **Status:** accepted, 2026-09-16 · **Amends [ADR-AG-001](#adr-ag-001) D1** (the verify half of the
 charter is withdrawn) · **closes** the [ADR-AG-005](#adr-ag-005) open item *"whether an answer is
 ever revealed after a wrong claim"* — there are no claims
@@ -14042,3 +14044,41 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2552-d9-new-circle.test.ts` (13: the D9 case after the exam pair and beside one circle at three seeds, the centre on P; stability of the earlier circles; an existing letter as the centre; the ruled Hebrew text; ✕ restoring the figure; two fixtures; controls — «O_1 מרכז מעגל» · «O_2 מרכז מעגל» name the pair in turn, the definite form keeps `ambiguous-shape` / `already-named`, the empty figure records silently, «O מרכז מעגל» on circle O is not a second circle, a lone equation circle's centre is named); fixtures `issue-2552-d9-new-circle-after-pair`, `issue-2552-d9-new-circle-beside-one`; the shared created-notice rows' circle row through analytic's adapter (`created-notice-1467.test.ts`); parity row `centre-of-a-circle-new-2552`.
 
 **Behaviour change for a student:** in analytic, «P מרכז מעגל» typed when every circle already has a centre letter draws a new circle centred at P, and under the line «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה»; ✕ removes the line. Nothing else changes.
+
+## ADR-AG-352 — The locus has a way in: a chip beside a point that has one, and a guide row; the one-line point is taught as its two lines (#1177)
+
+**Status:** accepted · 2026-10-30 · feature (analytic) · fix round #2627 (stream D) · branch `feat/1177-locus-chip` · **supersedes [ADR-AG-072](#adr-ag-072) §2** (the ask lane as *the* surface) · LADDER stage: none (an affordance over `hasLocus` and the ask lane; no solver change)
+
+**Operator:** 2026-09-17 (T9 of PR #1172): *"It is not intuitive for the user to type in data panel about the locus of M. I want a chip next to points in the input panel that can show their locus. This will only be available for points that are not fully defined."* Ruling 2026-09-27: *"No, teach the two lines"*: the guide carries «המקום הגיאומטרי של M» as a featured row with its setup lines, and the one-line form is refused with a message that teaches the two lines. Rulings 2026-10-26: D2 = A (the givens-list chip and the guide row only, with no figure click menu), D3 = A (the path appears only on request), D4 = A («דרגות חופש: 1» only reports). Ruling 2026-10-30: 1A (build now, without waiting for the canvas-label design session #1218) and 2A (the chip reads «הצג מקום גאומטרי» when off and «הסתר מקום גאומטרי» when on).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R200 (new), R87 (amended: two ways in, one grammar), R18 (closed per D4), the F13 row. · **Design:** [04c](04c-design-analytic.md) § "The locus lane" → "The way in: the chip and the guide row".
+
+**Why ADR-AG-072 §2 is superseded.** §2 put the locus in the ask lane only, following the operator's earlier words. The locus is the corpus's most-asked construct (13 of 20 Q1s), so it needs to be discoverable. A question whose name the student must already know offers no way in.
+
+**Re-measured at pickup** (main `216cf8bb`, `derive` → `hasLocus` / `ask`): as the plan says. M alone gets a locus in `A(0,0) B(4,0) נקודה M MA = MB` (x − 2 = 0) and in `MA = 5` (the circle). M and N get one in the midpoint chain. Two 2-DOF points get none, two independent movers get none, and a determined triangle gets none. `hasLocus` takes 0.0–3.7 ms for every point of a fixture, so no memo is needed. «M נקודה המקיימת MA = MB» was `not-handled` (sent to the model). Two findings the plan did not have:
+- `d.created` / `d.minted` do not cover «נקודה M» (a declaration). The introducing line had to come from the fold.
+- Over every analytic fixture at seeds 0–2, the chip set equals the set of points the ask answers with a curve, with one exception. **C** in `exam-2024w-locus-1138` and its parameterised twin has a locus: a parabola with its vertex at (2, 0), which `locusOf` walks. Its shape gate returns null there, so the ask draws nothing. That is an ask-lane defect against R87, filed as **#2628**. The chip still offers C's locus, because the chip asks exactly what typing asks.
+
+**Decision.**
+1. **The chip** (`app/locusChip.ts`, `locusChips(d)`): one per point for which the engine's `hasLocus` holds at the shown configuration, started from `drawableAt`'s free positions (the start `locusOf` walks from). The chip never re-derives that predicate. It sits on the row that **introduced** the point: `Derivation.introducedOn`, the fold's own per-object attribution (`FoldResult.objectFact`, the first commit whose construction holds the id). *Round #2627 note:* stream A (#1687) builds `Construction.objectLine` for the same thing, and this attribution converges onto it at staging (marked in the code). The chip's sentence is «המקום הגיאומטרי של X». `App.tsx` puts it in the shared `FactRow.trail` slot, so `shell/` is unchanged. A click calls `toggleAsk`, which is ADR-AG-067's lifetime: ask → row + drawing · again → drawing hidden, row kept · ✕ → both go. The label comes from `isDrawn`: «הצג מקום גאומטרי» while the locus is not drawn, «הסתר מקום גאומטרי» while it is. When one row introduced two points with a locus (a triangle's B and C), each chip ends with its letter.
+2. **The guide row** (`catalogAnalytic.ts`): `lane: 'ask'`, a new category `locus` (section «מקום גאומטרי», after «קשרים בין עצמים»), and family F13, featured. Its needs are `A(0,0) · B(4,0) · נקודה M · MA = MB`, shown under the row. A click puts the question in the **ask** box. **The construction lane is `!e.lane`.** The LLM vocabulary (`llmSharedAnalytic.ts`) and every catalog guard that meant "givens" filter on the field's absence, never on `lane !== 'rewrite'`. The new row is therefore never taught to the model and never built as a given. The parse guard reads it through `ask` in both languages, and the build guard asserts it answers.
+3. **The one-line form** (`app/lostPart.ts`, arm 4 `declinedPointProperty`, after arms 2–3 in `decideSubmit`'s not-handled branch). A named point («M נקודה» · «M היא נקודה» · «נקודה M» · «הנקודה M»), then «המקיימת» / «שמקיימת», then a property, is refused `split-statements` with the existing one-input-per-line message: «… זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: (1) נקודה M  (2) MA = MB». This happens only when both lines record in that order, so the taught remedy is one the next two Enters accept. Anything else keeps its old path.
+
+**Not done, and why.** «המקום הגיאומטרי של הנקודות שמרחקן מ-A הוא 4» (the ruling's second example) is still `not-handled`. To teach it, the tool would have to choose a letter for an unnamed point and read a property written in prose. Neither one is ruled, and no runnable two-line remedy exists without both. This needs the operator.
+
+**Locks.** `src-analytic/__tests__/issue-1177-locus-chip.test.ts`:
+- the chip set and rows on seven figures, including a point created by reference;
+- the T9 fixture `issue-1177-locus-chip-t9` (chip on «נקודה M», «ישר · x - 4 = 0»);
+- the agreement lock over five figures and six locus fixtures at seeds 0–2: every point the ask answers with a curve has a chip; every chip's sentence round-trips; a chip whose ask draws nothing is allowed only for #2628's listed point;
+- the ADR-AG-067 lifetime and the ruled words;
+- the guide row: featured, in the locus section, its needs, answering in He and En, absent from the vocabulary;
+- the one-line refusal's exact Hebrew in four spellings, its taught lines recording and answering, and a property that would not record left untaught.
+
+The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.test.ts`, `analyticCorpus.ts`, `geo-input-parity.test.ts` and `issue-2427-capital-size.test.ts`.
+
+**Behaviour change for a student:** in analytic:
+- a point with a locus shows «הצג מקום גאומטרי» on the row that introduced it, and a click draws and answers the locus (the chip then reads «הסתר מקום גאומטרי»);
+- the guide has a «מקום גאומטרי» section with «המקום הגיאומטרי של M» and its setup lines;
+- «M נקודה המקיימת MA = MB» is refused, teaching «(1) נקודה M  (2) MA = MB» (before: sent to the AI).
+
+**Consequences.** `engine/apply.ts` (`objectFact`), `engine/derive.ts` (`introducedOn`), `app/locusChip.ts` (new), `parser/locusPhrases.ts` (new: the two composed sentences, grammar), `app/lostPart.ts`, `app/submit.ts`, `parser/catalogAnalytic.ts`, `parser/llmSharedAnalytic.ts`, `App.tsx`, `i18n/index.ts`; `seo-pages.ts` (the analytic page keeps teaching givens only, `!e.lane`: unchanged for a reader); docs 02c R200/R87/R18/F13, 04c.

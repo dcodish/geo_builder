@@ -170,7 +170,7 @@ describe('#2427 — the lone capital', () => {
 });
 
 describe('#2427 — catalog guard: no advertised sentence is a capital size', () => {
-  const entries = COMMAND_CATALOG_ANALYTIC.filter((e) => e.lane !== 'rewrite');
+  const entries = COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane); // #1177: the construction lane only
   it.each(entries.flatMap((e) => [[e.he, e.needs ?? []], [e.en, e.needs ?? []]] as const))('«%s»', (s, needs) => {
     let ctx: string[] = [];
     try {

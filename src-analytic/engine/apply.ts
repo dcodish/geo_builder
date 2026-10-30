@@ -5911,6 +5911,13 @@ export interface FoldResult {
   created: Array<Id[] | null>;
   /** #2552 D9 (ADR-AG-344): per fact, the centre letter of the NEW circle it stated (`createdCircle`), null elsewhere. */
   createdCircles: Array<Id | null>;
+  /**
+   * #1177 (ADR-AG-352): per OBJECT, the index of the FACT whose application put it in the construction — first writer
+   * wins. `constraintFact`'s twin over objects, read the same way (the construction before and after each commit), so a
+   * declared point («נקודה M»), a vertex of a noun, a point minted by reference and a tool-named centre are all
+   * attributed with nothing to remember. What the locus chip reads to sit on the row that introduced its point.
+   */
+  objectFact: Map<Id, number>;
 }
 
 /**
@@ -6001,11 +6008,14 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
   const touchByOnLine: boolean[] = facts.map(() => false);
+  // converge onto #1687's objectLine (round #2627) — the chip's attribution, kept to what the chip needs
+  const objectFact = new Map<Id, number>();
   const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
     touchByOnLine[i] = byOnLine === true;
     const before = c.constraints;
     const beforeSel = c.selectors;
     c = next;
+    for (const o of c.objects) if (!objectFact.has(o.id)) objectFact.set(o.id, i);
     // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
     // replacement belongs to the line that named the seat, not to the line that opened it.
     // A choice NARROWED in place (#1864, ADR-AG-267) — what remains open is still the opener's: every option it keeps
@@ -6154,7 +6164,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, touchByOnLine };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, objectFact, touchByOnLine };
 }
 
 /**

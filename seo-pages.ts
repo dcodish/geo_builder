@@ -105,7 +105,8 @@ const COPY: Copy[] = [
     description:
       'מקלידים את נתוני השאלה והכלי משרטט במערכת צירים: ישרים, מעגלים, פרבולות ואליפסות, שיפועים ומרחקים. תרגול גיאומטריה אנליטית חינם, לבגרות 4 ו-5 יחידות.',
     howTo: [TYPE_A_LINE, 'כל מה שהנתונים קובעים — נקודות, ישרים, מעגלים — מופיע על הציור.', KEEP_IT],
-    examples: featuredExamples(COMMAND_CATALOG_ANALYTIC),
+    // #1177 (ADR-AG-352): the page teaches lines to TYPE as givens — the construction lane only (`!e.lane`)
+    examples: featuredExamples(COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane)),
   },
 ];
 

@@ -161,6 +161,13 @@ export interface Derivation {
    */
   createdCircles: Array<{ index: number; centre: string }>;
   /**
+   * #1177 (ADR-AG-352) — THE LINE THAT INTRODUCED EACH OBJECT, by id: the fold's own attribution (`objectFact`) carried
+   * to the line, as `constraintLine` carries `constraintFact`. Every way a point enters — declared, given by
+   * coordinates, a noun's vertex, created by reference, named by the tool — has its line here, so a row-level affordance
+   * about a point (the locus chip) sits on the row the student reads it was introduced on.
+   */
+  introducedOn: Readonly<Record<string, number>>;
+  /**
    * WHAT A LINE THAT LANDED SHOULD TELL THE STUDENT (#1350, ADR-AG-183) — one entry per line whose
    * statement was accepted with a notice (`applyFact`'s `ApplyNotice`), never on a faulted line. The
    * submit path reads the new line's entry and carries it into the commit that records the line.
@@ -216,7 +223,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, objectFact } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
   // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
@@ -1112,7 +1119,12 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, created, createdCircles, notices, constraintLine, selectorLine, stated };
+  // converge onto #1687's objectLine (round #2627)
+  const introducedOn: Record<string, number> = {};
+  objectFact.forEach((i, id) => {
+    introducedOn[id] = owner[i];
+  });
+  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, created, createdCircles, introducedOn, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -1303,6 +1315,7 @@ export const EMPTY_DERIVATION: Derivation = {
   minted: [],
   created: [],
   createdCircles: [],
+  introducedOn: {},
   notices: [],
   constraintLine: [],
   selectorLine: [],
