@@ -38,7 +38,7 @@ import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { Construction, Id, NumCurve } from '../engine/types';
 import { knownCurve, knownCurveOptions } from '../engine/evaluate';
-import type { LocusShape } from '../engine/locusFit';
+import type { LocusShape, Monomial, SymbolicCurve } from '../engine/locusFit';
 
 /**
  * TWO POSITIONS, TWO FORMATTERS (#2394, ADR-AG-304; ADR-AG-085's position rule). A number INSIDE an equation — a
@@ -568,6 +568,7 @@ export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt, label?
  * disagreeing about what `4/3` looks like.
  */
 export function locusEquation(shape: LocusShape, fmt: (v: number) => string): string | null {
+  if (shape.symbolic) return symbolicLocusEquation(shape.symbolic, fmt);
   if (!shape.conic) return null;
   const c = shape.curve;
   // `x`, `x − 3`, `x + 3` — the bracketed term of a translated conic, with the no-op omitted.
@@ -611,6 +612,81 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
       return `y² = ${fmt(2 * c.p)}x`;
     case 'ellipse':
       return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
+  }
+}
+
+/**
+ * A MONOMIAL AS A TEXTBOOK WRITES IT (#1186, ADR-AG-351) — `16a`, `-a`, `a²`, `4a²`, `ab`, `3a/2`, `a²/4`: the number
+ * first and suppressed when it is 1, the letters with a superscript square, and a fraction's denominator AFTER the
+ * letters (`explicitLineText`'s `-x/2` rule — `3/2a` reads as `3/(2a)`). Magnitude only; the caller owns the sign.
+ */
+function monomialText(m: Monomial, fmt: (v: number) => string): string {
+  const letters = Object.keys(m.pow)
+    .sort()
+    .map((s) => (m.pow[s] === 2 ? `${s}²` : s))
+    .join('');
+  const mag = Math.abs(m.c);
+  if (letters === '') return fmt(mag);
+  const shown = fmt(mag);
+  const slash = shown.indexOf('/');
+  if (slash > 0) {
+    const num = shown.slice(0, slash);
+    return `${num === '1' ? '' : num}${letters}/${shown.slice(slash + 1)}`;
+  }
+  return `${shown === fmt(1) ? '' : shown}${letters}`;
+}
+
+/** A monomial that is ONE atom — a number or a single letter — needs no brackets before `²` or after `/`. */
+const isAtom = (t: string): boolean => /^(\d+|[A-Za-z])$/.test(t);
+
+/** `√m` as a monomial when it is one — every exponent even and the coefficient a perfect rational square — else null. */
+function monomialRoot(m: Monomial): Monomial | null {
+  if (m.c <= 0) return null;
+  const pow: Record<string, number> = {};
+  for (const [s, e] of Object.entries(m.pow)) {
+    if (e % 2 !== 0) return null;
+    pow[s] = e / 2;
+  }
+  const r = Math.sqrt(m.c);
+  const k = fractionClearingFactor([r]);
+  return k === null ? null : { c: r, pow };
+}
+
+/**
+ * THE LOCUS EQUATION IN THE STUDENT'S LETTERS (#1186, ADR-AG-351) — the same canonical forms as the numeric branch
+ * of `locusEquation`, term by term: a line in `lineText`'s general form with its fractions cleared (`x - 4a = 0`),
+ * a circle with `r²` written as a square when it is one (`(x − 16a)² + y² = (25a)²`, #1187), a parabola `y² = 4ax`,
+ * an ellipse `x²/(4a²) + y²/b² = 1`. Every monomial was verified against the traces before it reached here.
+ */
+function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
+  const signed = (m: Monomial, sym: string): string => {
+    if (m.c === 0) return '';
+    const body = monomialText(m, fmt);
+    const mag = body === fmt(1) && sym !== '' ? '' : body;
+    return `${m.c < 0 ? '-' : '+'} ${mag}${sym} `;
+  };
+  const shift = (v: string, m: Monomial) => (m.c === 0 ? v : `(${v} ${m.c > 0 ? '−' : '+'} ${monomialText(m, fmt)})`);
+  const under = (m: Monomial) => {
+    const t = monomialText(m, fmt);
+    return isAtom(t) || (Object.keys(m.pow).length === 1 && Math.abs(m.c) === 1) ? t : `(${t})`;
+  };
+  switch (s.kind) {
+    case 'line': {
+      const k = fractionClearingFactor([s.D.c, s.E.c, s.F.c]) ?? 1;
+      const scale = (m: Monomial): Monomial => ({ c: m.c * k, pow: m.pow });
+      const parts = `${signed(scale(s.D), 'x')}${signed(scale(s.E), 'y')}${signed(scale(s.F), '')}`.trim();
+      const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
+      return `${body} = 0`;
+    }
+    case 'circle': {
+      const root = monomialRoot(s.r2);
+      const rhs = root ? `${isAtom(monomialText(root, fmt)) ? monomialText(root, fmt) : `(${monomialText(root, fmt)})`}²` : monomialText(s.r2, fmt);
+      return `${shift('x', s.cx)}² + ${shift('y', s.cy)}² = ${rhs}`;
+    }
+    case 'parabola':
+      return `y² = ${s.twoP.c < 0 ? '-' : ''}${monomialText(s.twoP, fmt)}x`;
+    case 'ellipse':
+      return `x²/${under(s.a2)} + y²/${under(s.b2)} = 1`;
   }
 }
 

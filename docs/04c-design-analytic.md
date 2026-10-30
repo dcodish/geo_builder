@@ -1597,9 +1597,22 @@ The gate asks about the SET: the same set at two seeds shows kind and equation; 
 nothing.
 
 `A(−9a,0)`, `B(41a,0)`, `∠APB = 90°` is row 2: a circle for every `a`, r=25 at `a=1` and r=50 at
-`a=2`. The student gets the drawn circle and the word «מעגל» and no equation — no `hasParameter` test
+`a=2`. The two-seed comparison alone gives the drawn circle and the word «מעגל» (the third verdict below then states it in `a`) — no `hasParameter` test
 anywhere, which is the point. A rule written as "if the figure has a free parameter" would be a patch
 wearing a rule's clothes, and would also be wrong on a parameter the locus happens not to depend on.
+
+**The third verdict ([ADR-AG-351](06c-decisions-analytic.md#adr-ag-351), #1186).** The kinds agree, the equations
+differ, one component at every configuration: the gate's own configurations (the shown one, the compared one and the
+rest of `sampleSeeds` — no new sweep) go with their `env` to `parametricShape` (`locusFit.ts`). Per configuration:
+fit → `kindConic` → the canonical parameters; per parameter the lowest-degree monomial `c·∏ letterᵉ` (total degree
+≤ 2, at most `MAX_LETTERS = 2` varying letters, every varying `env` key a student letter) whose ratio snaps to one
+rational; then `verifySymbolic` substitutes each configuration's letters and checks its traced points to
+`snapAndVerify`'s bar. `LocusShape.symbolic` carries it; `locusEquation` prints it (`symbolicLocusEquation`). Not
+CAS: measure → snap → verify on a ratio. The kind itself is read by `kindConic` when the coarse rational snap fails
+(#2608): the same `KIND_TOL`, without demanding rational coefficients. So חורף 25 now reads
+`(x − 16a)² + y² = (25a)²`.
+
+*Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic`
 
 #### The set can be a UNION, and the tracer covers every component ([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166), #1500)
 
