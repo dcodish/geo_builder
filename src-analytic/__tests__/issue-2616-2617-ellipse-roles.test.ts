@@ -94,7 +94,8 @@ describe('#2616 — the book exercises build and answer the book (fixtures)', ()
     recordsLineByLine(p216);
     const a = String(answer(p216.lines, 'משוואת האליפסה'));
     expect(a).toContain('x²/18 + y²/2 = 1');
-    expect(a).toContain('y²/5 = 1');
+    // The book's second ellipse, x²/(45/4) + y²/5 = 1, prints cleared per ADR-AG-357 (#2614, ruled 2026-10-30).
+    expect(a).toContain('4x² + 9y² = 45');
   });
 
   it('p2-16 in the book\'s other spelling: «מרחק A מהמוקד השמאלי גדול פי 5 ממרחק A מהמוקד הימני», foci unlettered', () => {
