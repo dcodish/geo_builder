@@ -44,7 +44,30 @@ export interface LocusShape {
   curve: NumCurve;
   /** The six coefficients, snapped, when they survived the self-check. Absent ⇒ show the kind only. */
   conic?: Conic;
+  /**
+   * THE EQUATION IN THE STUDENT'S LETTERS (#1186, ADR-AG-351) — the gate's third verdict: the set VARIES with the
+   * figure's parameters, as a stated and verified monomial per canonical parameter. Present only when `conic` is
+   * absent (a determinate set prints its numbers) and only after the self-check against every sampled trace.
+   */
+  symbolic?: SymbolicCurve;
 }
+
+/** `c · ∏ sym^e` — `c` a small rational, each exponent 1 or 2, total degree ≤ 2 (#1186). `pow` holds no zero. */
+export interface Monomial {
+  c: number;
+  pow: Readonly<Record<string, number>>;
+}
+
+/**
+ * A locus's CANONICAL parameters as monomials in the student's letters (#1186, ADR-AG-351) — the same canonical
+ * families `classify` names and `locusEquation` prints: a line's monic `D·x + E·y + F`, a circle's centre and `r²`,
+ * a parabola's `2p` (`y² = 2p·x`), an ellipse's `a²` and `b²`.
+ */
+export type SymbolicCurve =
+  | { kind: 'line'; D: Monomial; E: Monomial; F: Monomial }
+  | { kind: 'circle'; cx: Monomial; cy: Monomial; r2: Monomial }
+  | { kind: 'parabola'; twoP: Monomial }
+  | { kind: 'ellipse'; a2: Monomial; b2: Monomial };
 
 /**
  * The largest denominator a coefficient may snap to.
@@ -102,6 +125,22 @@ function snapConic(k: Conic, tol: number): Conic | null {
     out[key] = v;
   }
   return out as Conic;
+}
+
+/** The tolerance the KIND is read at — the coarse snap's (ADR-AG-072 §5), relative to a monic fit. */
+const KIND_TOL = 1e-4;
+
+/**
+ * A MONIC fit cleaned for NAMING its family, never for printing (#2608, ADR-AG-351): a coefficient within `KIND_TOL`
+ * of zero is zero, and two square coefficients within `KIND_TOL` of each other are equal — exactly what the coarse
+ * snap decides, without its demand that every coefficient also be a rational with a small denominator. A parameter
+ * breaks that demand (`D = −2a` at an irrational `a`), and the family does not depend on it.
+ */
+function kindConic(k: Conic): Conic {
+  const z = (v: number) => (Math.abs(v) < KIND_TOL ? 0 : v);
+  const [A, B, C0, D, E, F] = [z(k.A), z(k.B), z(k.C), z(k.D), z(k.E), z(k.F)];
+  const C = A !== 0 && C0 !== 0 && Math.abs(A - C0) <= KIND_TOL * Math.max(1, Math.abs(C0)) ? A : C0;
+  return { A, B, C, D, E, F };
 }
 
 /** Symmetric 6×6 eigendecomposition by cyclic Jacobi — deterministic, and small enough to be exact
@@ -404,7 +443,15 @@ export function shapeOfTrace(pts: readonly LocusPt[]): LocusShape | null {
    * robustly — while `conic` below, the thing actually printed, keeps the tight tolerance and its
    * re-verification against the trace.
    */
-  const forKind = snapped ?? snapConic(normalized(raw) ?? raw, 1e-4) ?? normalized(raw);
+  /*
+   * …and when the coarse snap fails too, the kind is read at the SAME tolerance without the demand that the
+   * coefficients be rational (#2608, ADR-AG-351). A parameter makes a locus's coefficients irrational at most
+   * configurations — `A(a,0)`, `MA = 3` has `D = −2a` — and the last fallback here was the raw fit handed to
+   * `classify`, whose exact-probe `|A − C| ≤ 1e−9` refused the circle: the ask answered nothing at seeds 2 and 4
+   * and «מעגל» at the rest. Naming the family never needed rational coefficients.
+   */
+  const norm = normalized(raw);
+  const forKind = snapped ?? (norm ? snapConic(norm, KIND_TOL) ?? kindConic(norm) : null);
   if (!forKind) return null;
   const res = classify(forKind);
   if (!res.ok) return null;
@@ -549,4 +596,190 @@ export function conicPointsIn(
     for (const xx of roots(k.A, k.B * y + k.D, k.C * y * y + k.E * y + k.F)) out.push({ x: xx, y });
   }
   return out.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && inBox(p));
+}
+
+/**
+ * ═══ THE THIRD VERDICT — THE SET VARIES, AND HOW IT VARIES CAN BE STATED AND VERIFIED (#1186, ADR-AG-351) ═══
+ *
+ * The determinacy gate has two verdicts: the set is the same at every configuration (print the equation) or it
+ * differs (print the kind). חורף 25 with `A(−9a,0)`, `B(41a,0)` is neither: it is the circle `(x − 16a)² + y² =
+ * (25a)²` at every configuration, and the operator asked for exactly that (*"the shape still doesnt have the a
+ * shown"*). So from `k ≥ 3` configurations the gate already traces, each with the values its letters took there:
+ *
+ *     per configuration: fit → kind (robustly) → the canonical parameters (centre, r², a², b², 2p, a line's D E F)
+ *     per parameter:     the lowest-degree monomial c·∏ letter^e (total degree 0, 1, 2) whose ratio c is ONE small
+ *                        rational at every configuration
+ *     then:              substitute each configuration's letters back and VERIFY the curve against THAT
+ *                        configuration's traced points, to `snapAndVerify`'s own relative bar — one miss, no equation
+ *
+ * **This is not CAS** (src-analytic/CLAUDE.md rule 2, ADR-AG-001 D1). Nothing is simplified, expanded or solved
+ * symbolically: it is `snapAndVerify`'s measure → snap → verify, applied to a RATIO `value / letterᵉ` instead of to
+ * a value. A dependence that is not a monomial (`a + 1`, `a² − 9` in general form) is simply not found, and the
+ * answer stays the kind — which is why the CANONICAL parameters are regressed and never A…F: `A(a,0)`, `MA = 3` has
+ * `F = a² − 9` but centre `(a, 0)` and `r² = 9`, each a monomial.
+ */
+
+/** One sampled configuration: the student's letters' values there, and the walk traced there. */
+export interface LocusSample {
+  env: Readonly<Record<string, number>>;
+  points: readonly LocusPt[];
+}
+
+/** How far a sample's ratio may sit from the shared rational — the kind's tolerance; the self-check is the guard. */
+const MONO_TOL = 1e-4;
+
+/** A monomial's value under one configuration's letters. */
+export function monomialAt(m: Monomial, env: Readonly<Record<string, number>>): number {
+  let v = m.c;
+  for (const [s, e] of Object.entries(m.pow)) v *= (env[s] ?? NaN) ** e;
+  return v;
+}
+
+/** Every exponent vector over `letters` with each exponent ≤ 2 and total degree ≤ 2, lowest total degree first. */
+function exponentVectors(letters: readonly string[]): Array<Record<string, number>> {
+  const out: Array<Record<string, number>> = [{}];
+  for (let deg = 1; deg <= 2; deg += 1) {
+    const walk = (i: number, left: number, acc: Record<string, number>) => {
+      if (i === letters.length) {
+        if (left === 0) out.push({ ...acc });
+        return;
+      }
+      for (let e = Math.min(left, 2); e >= 0; e -= 1) {
+        const next = { ...acc };
+        if (e > 0) next[letters[i]] = e;
+        walk(i + 1, left - e, next);
+      }
+    };
+    walk(0, deg, {});
+  }
+  return out;
+}
+
+/** The lowest-degree monomial reproducing `vals` at every sample, its ratio one small rational — or `null`. */
+function fitMonomial(
+  vals: readonly number[],
+  envs: ReadonlyArray<Readonly<Record<string, number>>>,
+  letters: readonly string[],
+): Monomial | null {
+  for (const pow of exponentVectors(letters)) {
+    const ratios = vals.map((v, i) => v / monomialAt({ c: 1, pow }, envs[i]));
+    if (ratios.some((r) => !Number.isFinite(r))) continue;
+    const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length;
+    const c = snapRational(mean, MONO_TOL);
+    if (c === null) continue;
+    if (!ratios.every((r) => Math.abs(r - c) <= MONO_TOL * Math.max(1, Math.abs(c)))) continue;
+    return c === 0 ? { c: 0, pow: {} } : { c, pow };
+  }
+  return null;
+}
+
+/** The canonical parameters `SymbolicCurve` regresses, read off one configuration's classified curve. */
+function canonicalValues(curve: NumCurve): number[] {
+  switch (curve.kind) {
+    case 'line':
+      return [curve.a, curve.b, curve.c];
+    case 'circle':
+      return [curve.cx, curve.cy, curve.r * curve.r];
+    case 'parabola':
+      return [2 * curve.p];
+    case 'ellipse':
+      return [curve.a * curve.a, curve.b * curve.b];
+  }
+}
+
+/** The six coefficients of a symbolic curve at one configuration's letters — what the self-check measures. */
+export function symbolicConicAt(s: SymbolicCurve, env: Readonly<Record<string, number>>): Conic {
+  const at = (m: Monomial) => monomialAt(m, env);
+  switch (s.kind) {
+    case 'line':
+      return { A: 0, B: 0, C: 0, D: at(s.D), E: at(s.E), F: at(s.F) };
+    case 'circle': {
+      const [cx, cy] = [at(s.cx), at(s.cy)];
+      return { A: 1, B: 0, C: 1, D: -2 * cx, E: -2 * cy, F: cx * cx + cy * cy - at(s.r2) };
+    }
+    case 'parabola':
+      return { A: 0, B: 0, C: 1, D: -at(s.twoP), E: 0, F: 0 };
+    case 'ellipse':
+      // x²/a² + y²/b² = 1, multiplied through by a² so it is monic like every other fit here.
+      return { A: 1, B: 0, C: at(s.a2) / at(s.b2), D: 0, E: 0, F: -at(s.a2) };
+  }
+}
+
+/**
+ * THE SELF-CHECK, ONE LEVEL UP — the symbolic curve, substituted at each configuration's letters, must hold at every
+ * point that configuration traced, to `snapAndVerify`'s relative bar. Exported so its negative lock CALLS it with a
+ * deliberately wrong form (ADR-W-053): a verify arm that never runs would pass every case.
+ */
+export function verifySymbolic(s: SymbolicCurve, samples: readonly LocusSample[]): boolean {
+  for (const smp of samples) {
+    const k = normalized(symbolicConicAt(s, smp.env));
+    if (!k || [k.A, k.B, k.C, k.D, k.E, k.F].some((v) => !Number.isFinite(v))) return false;
+    const scale = Math.max(1, ...smp.points.map((p) => Math.hypot(p.x, p.y)));
+    const tol = 1e-6 * scale * scale;
+    for (const p of smp.points) if (!(Math.abs(evalConic(k, p)) <= tol)) return false;
+  }
+  return true;
+}
+
+/** How many letters the dependence may read — the operator's widening to two (#1186, ruling 11A, 2026-10-30). */
+const MAX_LETTERS = 2;
+
+/**
+ * The locus as a curve in the student's letters (#1186, ADR-AG-351), or `null` — the honest fallback to the kind.
+ *
+ * `letters` are the student's own symbols (never a tool symbol). Every key of the samples' `env` that VARIES must be
+ * one of them, at most `MAX_LETTERS` vary, there are at least three samples, every sample reads as the same family,
+ * at least one parameter genuinely depends on a letter (a constant set is the two-verdict gate's business), and the
+ * result passes `verifySymbolic`. Anything else is `null`.
+ */
+export function parametricShape(samples: readonly LocusSample[], letters: readonly string[]): SymbolicCurve | null {
+  if (samples.length < 3) return null;
+  const keys = new Set(samples.flatMap((s) => Object.keys(s.env)));
+  const varying: string[] = [];
+  for (const key of keys) {
+    const vs = samples.map((s) => s.env[key]);
+    if (vs.some((v) => v === undefined || !Number.isFinite(v))) return null;
+    const lo = Math.min(...vs);
+    const hi = Math.max(...vs);
+    if (hi - lo > 1e-9 * Math.max(1, Math.abs(hi), Math.abs(lo))) varying.push(key);
+  }
+  if (varying.length === 0 || varying.length > MAX_LETTERS) return null;
+  if (varying.some((k) => !letters.includes(k))) return null; // a hidden quantity moves the set — nothing to state
+  varying.sort();
+
+  const curves: NumCurve[] = [];
+  for (const s of samples) {
+    const raw = fitLine(s.points) ?? fitTrace(s.points);
+    const norm = raw ? normalized(raw) : null;
+    if (!norm) return null;
+    const res = classify(kindConic(norm));
+    if (!res.ok) return null;
+    curves.push(res.curve);
+  }
+  const kind = curves[0].kind;
+  if (curves.some((c) => c.kind !== kind)) return null;
+
+  const envs = samples.map((s) => s.env);
+  const cols = curves.map(canonicalValues);
+  const monos: Monomial[] = [];
+  for (let j = 0; j < cols[0].length; j += 1) {
+    const m = fitMonomial(
+      cols.map((col) => col[j]),
+      envs,
+      varying,
+    );
+    if (!m) return null;
+    monos.push(m);
+  }
+  if (monos.every((m) => Object.keys(m.pow).length === 0)) return null;
+
+  const sym: SymbolicCurve =
+    kind === 'line'
+      ? { kind, D: monos[0], E: monos[1], F: monos[2] }
+      : kind === 'circle'
+        ? { kind, cx: monos[0], cy: monos[1], r2: monos[2] }
+        : kind === 'parabola'
+          ? { kind, twoP: monos[0] }
+          : { kind, a2: monos[0], b2: monos[1] };
+  return verifySymbolic(sym, samples) ? sym : null;
 }

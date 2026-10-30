@@ -724,6 +724,8 @@ export const shapedObjectOf = (sym: string): Id | null => {
  */
 export const radiusSymbol = (centre: Id): string => `r_${centre}`;
 const RADIUS_PREFIX = radiusSymbol('');
+/** A radius the TOOL named (`r_<centre>`), never a letter the student wrote — the locus's letters exclude it (#1186). */
+export const isRadiusSymbol = (sym: string): boolean => sym.startsWith(RADIUS_PREFIX) && sym.length > RADIUS_PREFIX.length;
 
 /**
  * EVERY MINTED RADIUS IS READ (#2382, ADR-AG-305) — the structural guard for "a circle's radius is created in one place

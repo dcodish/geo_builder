@@ -1137,6 +1137,14 @@ a sentence the tool parsed.
 - «נקודה P» · «PA מאונך ל-PB» · «המקום הגיאומטרי של P» → trace, kind, equation
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
 - Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138.
+- **Amended by R199 (ADR-AG-351):** the equation also prints when the set varies with the student's letters in a way the tool can state and verify.
+
+**R199 — a locus that moves with the student's letters is written in those letters**. *(Operator, round #1181 T26: "the shape still doesnt have the a shown"; PR #1341 T16: "it would be nice if the locus would show x-4a=0"; ruling 11A, 2026-10-30: two letters, so the book's p10-9 answers x²/(4a²) + y²/b² = 1.)* When a single-component locus is the same family at every configuration and each of its canonical parameters (a line's coefficients, a circle's centre and r², a parabola's 2p, an ellipse's a² and b²) is a constant times a power of at most two of the student's letters (total degree ≤ 2), the row prints that equation in the letters, the same at every «הציגו תצורה אחרת» — after the tool has checked it against the traced curve at every configuration it sampled. Anything else (a dependence like `a + 1`, three letters, a union) keeps the kind alone. The kind of such a locus is named at every configuration, never at some and not others (#2608).
+- «A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB» → «מעגל · (x − 16a)² + y² = (25a)²»
+- «A(0,0)» · «B(8a,0)» · «נקודה M» · «MA = MB» → «ישר · x - 4a = 0»
+- «A(a,0)» · «נקודה M» · «MA = 3» → «מעגל · (x − a)² + y² = 3²» at every configuration
+- «A(a,b)» · «נקודה M» · «MA = 3» → «מעגל · (x − a)² + (y − b)² = 3²»
+- Sources: ADR-AG-351, #1186, #2608.
 
 ---
 

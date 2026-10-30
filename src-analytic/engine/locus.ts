@@ -32,7 +32,18 @@
  * outward in both directions, to the view box or to closure.
  */
 import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, someCrossingHasNoPoint, viewBox, type CarrierSystem } from './evaluate';
-import { agreeingUnion, conicPointsIn, curveOfTrace, distToConic, shapeOfTrace, type LocusShape } from './locusFit';
+import {
+  agreeingUnion,
+  conicPointsIn,
+  curveOfTrace,
+  distToConic,
+  parametricShape,
+  shapeOfTrace,
+  type LocusSample,
+  type LocusShape,
+  type SymbolicCurve,
+} from './locusFit';
+import { isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
 import type { Conic } from './conic';
 import { jacobianRank, solveLM, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from './solve';
 import type { Env } from './expr';
@@ -726,6 +737,37 @@ function walkedLocusOf(
     return comps.map(asTrace);
   };
 
+  /**
+   * The gate's configurations as `parametricShape`'s samples (#1186, ADR-AG-351): the shown one, the compared one,
+   * and every later gate configuration that measures as ONE component of the same family. A union, or a family that
+   * changes, at any of them ends it — the kind alone stands.
+   */
+  const letters = paramRegister(c)
+    .map((p) => p.sym)
+    .filter((sym) => !isDirectionSymbol(sym) && !isRadiusSymbol(sym));
+  const symbolicLocus = (
+    shown: LocusTrace,
+    compared: LocusTrace,
+    comparedSeed: number,
+    rest: readonly number[],
+    kind: LocusShape['curve']['kind'],
+  ): SymbolicCurve | null => {
+    if (letters.length === 0) return null;
+    const samples: LocusSample[] = [
+      { env: figAt(seeds[0]).env, points: shown.points },
+      { env: figAt(comparedSeed).env, points: compared.points },
+    ];
+    for (const s of rest) {
+      const more = componentsAt(s);
+      if (!more) continue;
+      const shapes = more.map((t) => shapeOfTrace(t.points));
+      if (shapes.some((x) => x === null)) continue; // not measurable here — no evidence either way (#1176)
+      if (more.length !== 1 || shapes[0]!.curve.kind !== kind) return null;
+      samples.push({ env: figAt(s).env, points: more[0].points });
+    }
+    return parametricShape(samples, letters);
+  };
+
   const primary = componentsAt(seeds[0]);
   if (!primary) return null;
 
@@ -759,7 +801,8 @@ function walkedLocusOf(
    * counts as agreement: two unions that both measure and DISAGREE still print the kinds alone —
    * `agreeingUnion` (#1500) is where the verdict lives.
    */
-  for (const s of sampleSeeds) {
+  for (let si = 0; si < sampleSeeds.length; si += 1) {
+    const s = sampleSeeds[si];
     const other = componentsAt(s);
     if (!other) continue;
     const otherShapes = other.map((t) => shapeOfTrace(t.points)).filter((x): x is LocusShape => x !== null);
@@ -769,6 +812,17 @@ function walkedLocusOf(
       otherShapes,
     );
     if (verdict === null) return { components: held.map((h) => ({ trace: h.trace, shape: null })) };
+    /**
+     * THE THIRD VERDICT (#1186, ADR-AG-351): the kinds agree and the equations do not — the set VARIES. When it is
+     * one component at every configuration, the configurations the gate visits (this one and the rest of
+     * `sampleSeeds`, never a new sweep — docs/17 §3's sampling-loop chokepoint) are handed with their letters'
+     * values to `parametricShape`, which states the dependence as monomials in the student's letters and verifies
+     * it against every trace, or returns nothing and the kind stands as before.
+     */
+    if (held.length === 1 && otherShapes.length === 1 && !verdict[0].conic) {
+      const symbolic = symbolicLocus(held[0].trace, other[0], s, sampleSeeds.slice(si + 1), verdict[0].curve.kind);
+      if (symbolic) return { components: [{ trace: held[0].trace, shape: { curve: verdict[0].curve, symbolic } }] };
+    }
     return { components: held.map((h, i) => ({ trace: h.trace, shape: verdict[i] })) };
   }
   // No measurable comparison at all: the fitted shapes stand ungated — the pre-existing behaviour.

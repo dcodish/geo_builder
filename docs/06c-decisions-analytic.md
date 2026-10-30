@@ -3945,7 +3945,10 @@ merge of the copy cannot re-collapse them. Analytic lane 70 files / 1110 tests.
 
 **Status:** accepted, 2026-09-16 · **Amends [ADR-AG-001](#adr-ag-001) D1** (the verify half of the
 charter is withdrawn) · **closes** the [ADR-AG-005](#adr-ag-005) open item *"whether an answer is
-ever revealed after a wrong claim"* — there are no claims
+ever revealed after a wrong claim"* — there are no claims · **⚠ §4 amended by [ADR-AG-351](#adr-ag-351)
+(2026-10-30, #1186):** the gate has a THIRD verdict — the set varies as a verified monomial in at most two of the
+student's letters, and the equation then prints in them (`(x − 16a)² + y² = (25a)²`); "stays refused" below no
+longer holds for that case
 
 **Requirements:** [02c](02c-requirements-analytic.md) R87. **Design:**
 [04c](04c-design-analytic.md) — "The locus lane".
@@ -14177,3 +14180,30 @@ Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל
 **2-D / 3-D (ADR-W-157):** no other tree prints a conic equation; nothing to port.
 
 **Behaviour change for a student:** in analytic, an ellipse whose a² or b² is a fraction reads as a whole-number equation («4x² + 9y² = 45», not «x²/45/4 + y²/5 = 1»), and a parabola with a fractional coefficient reads `2y² = 5x` (not `y² = 5/2x`), in the data panel, the «משוואת …» answer, the locus row and the locus label on the canvas; a locus parabola with coefficient 1 reads `y² = x` (not `y² = 1x`). Whole-number conics are unchanged.
+
+## ADR-AG-351 — The locus equation keeps its letters: the determinacy gate's third verdict (#1186, #2608)
+
+**Date:** 2026-10-30 · **Status:** accepted · feature #1186 with bug #2608 bundled, fix round #2627 stream C, branch `feat/1186-locus-with-letters`. **Amends [ADR-AG-072](#adr-ag-072) §4** (the "different set → shape only … stays refused" case). LADDER stage: none — the locus lane's honesty gate (`locus.ts`, `locusFit.ts`) and its printer (`curveText.ts`); no solver change.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R199 (new), R87 (amended). · **Design:** [04c](04c-design-analytic.md), "The locus lane" → "The honesty gate is at the level of the SET".
+
+**Operator.** Round #1181 T26 (2026-09-18): *"the shape still doesnt have the a shown"*. PR #1341 T16 (2026-09-21): *"it would be nice if the locus would show x-4a=0"*. #1187: *"the radius in equation should show as 25^2 and not 625"*. Rulings of 2026-10-30: **1A** build now, without the canvas-label design session (the change is the equation's text, not where any label sits); **11A** widen to two letters, so the book's p10-9 answers `x²/(4a²) + y²/b² = 1`.
+
+**Re-measured at pickup** (`main` `216cf8bb`, `derive` → `ask`, seeds 0–4): חורף 25 (`A(-9a,0)` · `B(41a,0)` · `נקודה P` · `PA מאונך ל-PB`) → «מעגל»; `A(0,0)` · `B(8a,0)` · `נקודה M` · `MA = MB` → «ישר»; `A(a,0)` · `נקודה M` · `MA = 3` → «מעגל» at seeds 0, 1, 3 and **nothing** at 2 and 4 (#2608). The plan's account held, including its two corrections to the issue body: no per-configuration snapped conic exists at an irrational `a`, so the self-check runs against the trace points; and the CANONICAL parameters are regressed, not A…F (`MA = 3` has `F = a² − 9` but centre `(a, 0)` and `r² = 9`).
+
+**Root cause.** The gate had two verdicts — invariant (the equation) or different (the kind) — and the truth has a third: the set varies in a way that can be stated and verified. Beneath it, kind-reading assumed rational coefficients: `shapeOfTrace` named the family off a coarse rational snap and, when that failed at an irrational `a`, handed the raw fit to `classify`, whose exact-probe `|A − C| ≤ 1e−9` refused the circle (#2608).
+
+**Decision.**
+1. **The kind is read without demanding rationality** (`kindConic`, `locusFit.ts`): the coarse snap's own tolerance (`KIND_TOL = 1e−4` on a monic fit) zeroes a negligible coefficient and equates two square coefficients, and nothing else. It is the last fallback in `shapeOfTrace` and the kind-reader of the third verdict.
+2. **The third verdict** (`parametricShape`): when `agreeingUnion` answers "kinds only" and the locus is ONE component at every configuration, the configurations the gate already visits — the shown one, the compared one and the rest of `sampleSeeds` (docs/17 §3's sampling-loop chokepoint: the loop collects, no new sweep) — are passed with their `env`. Required: ≥ 3 configurations; every `env` key that varies is a student letter (not `θ_…`, not a tool radius `r_…`); at most two vary (`MAX_LETTERS`, ruling 11A); every configuration is the same family. Per canonical parameter (a line's monic `D, E, F`; a circle's `cx, cy, r²`; a parabola's `2p`; an ellipse's `a², b²`) the lowest total degree (0, 1, 2) monomial `c·∏ letterᵉ` whose ratio snaps to one rational within `MONO_TOL = 1e−4` at every configuration. At least one parameter must actually depend on a letter (a constant set is the two-verdict gate's business).
+3. **The self-check** (`verifySymbolic`): the symbolic curve, substituted at each configuration's letters and made monic, must hold at every point that configuration traced to `snapAndVerify`'s bar (`1e−6 × scale²`). One miss → `null`, and the kind stands as before.
+4. **Not CAS** (src-analytic/CLAUDE.md rule 2, ADR-AG-001 D1): nothing is simplified, expanded or solved symbolically. It is `snapAndVerify`'s measure → snap → verify, applied to a ratio `value / letterᵉ`.
+5. **The printer** (`symbolicLocusEquation`, `curveText.ts`): the numeric branch's canonical forms, term by term. A monomial reads `16a`, `-a`, `a²`, `4a²`, `ab`, `3a/2`, `a²/4` (a fraction's denominator after the letters, `explicitLineText`'s rule). A line is `lineText`'s general form with fractions cleared (`4x + 3y - 25a = 0`); a circle's right side is a square when `r²` has a rational root monomial (`(25a)²`, `3²`, #1187); an ellipse's denominator is bracketed unless it is one atom or a bare letter power (`x²/(4a²) + y²/b² = 1`).
+
+**What the student sees** (every line `[asked]`/`[ruled]`, the plan's section on #1186): חורף 25 → «מעגל · (x − 16a)² + y² = (25a)²»; the bisector → «ישר · x - 4a = 0»; `A(a,0)`, `MA = 3` → «מעגל · (x − a)² + y² = 3²» at every configuration; two letters, e.g. `A(a,b)`, `MA = 3` → «מעגל · (x − a)² + (y − b)² = 3²»; anything not statable and verifiable (`A(a+1,0)`, three letters, a union) keeps the kind alone; the path is drawn only on request, as today.
+
+**Cost.** Measured per ask (dev machine, seeds 0–4): חורף 25 13–20 ms → 20–35 ms; `A(a,0)`, `MA = 3` 7–15 ms → 16–20 ms; the `B(8a,0)` bisector 101–129 ms → 192–277 ms (two more `componentsAt` calls inside the existing gate loop, discovery included, because a union at any configuration must end the third verdict). Numeric loci are unchanged (they return at the first agreeing comparison).
+
+**Locks.** `src-analytic/__tests__/issue-1186-locus-in-a.test.ts` — חורף 25 and the `B(8a,0)` bisector as text at seeds 0–7; a slanted bisector with fractions cleared; a parabola in `a`; the numeric bisector and חורף 25 unchanged; #2608's sequence at seeds 0–4; two letters (a circle centred `(a, b)`; an ellipse in `a`, `b` from the midpoint of P and its foot); the fallbacks (`A(a+1,0)`, three letters); `verifySymbolic` on real traces passing the true form and rejecting a wrong ratio and a wrong degree. Regression (rule 4): fixture `src-analytic/__tests__/fixtures/issue-1186-winter25-in-a.analytic.json`. **Answers that change, rewritten in their locks:** the existing fixture `exam-2024w-locus-param-1138` (חורף 2024 with `a`) now answers «parabola · y² = 4ax» where it answered «parabola» (`issue-1138-construction-locus` locks 5 and 7); the parameterised חורף 25 and bisector anti-locks in `issue-1136-1137-locus`, `issue-1176-locus-configuration` and `issue-1224-slanted-locus` now assert the equation in `a` — still never a numeric equation for a figure whose set varies.
+
+**Consequences.** `engine/locusFit.ts` (`kindConic`, `parametricShape`, `verifySymbolic`, `LocusShape.symbolic`), `engine/locus.ts` (the gate loop), `engine/carriers.ts` (`isRadiusSymbol`), `app/curveText.ts` (`symbolicLocusEquation`); docs 02c R87/R199, 04c. The book's p10-9 (`x²/a² + y²/b² = 1` · P on it · …) also needs #2613 (the spurious `y = 0` component); once that lands, the single ellipse answers in `a`, `b`.
