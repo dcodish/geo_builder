@@ -76,6 +76,22 @@ parabola, hyperbola) and the sphere/round solids · workspace and server sit out
 Debt keeps its own rule: **P3 by default, P2 when it blocks scheduled work** (§1). Workspace and server
 items are ranked by that rule and by the P1 definition, not by phase.
 
+**Priority ranks the queue; the plan decides what a round takes** ([ADR-W-165](06w-decisions-workspace.md#adr-w-165),
+operator 2026-10-30, "rule A"). The roadmap plan (`plan/current` on the overview page) puts each
+workstream in weeks.
+- **A new issue that fits a workstream** joins it at the next roadmap refresh and takes that
+  workstream's weeks.
+- **A new issue outside the plan gets no week.** The overview page lists it under *Outside the plan*,
+  with a button that pulls it into the current week. Only the operator pulls; the refresh records the
+  pull in the plan.
+- **A fix round composes, in this order and from nothing else:**
+  1. the current week's plan items;
+  2. the issues the operator pulled into the current week;
+  3. the next week's plan items, in plan order.
+  A P1 still preempts, announced first. A later week's items are never pulled ahead of the next week's.
+- **An unplanned issue a session thinks is urgent** is shown to the operator as a pull candidate, never
+  composed.
+
 **Grade the mark by the class, never by the reach.** A figure drawn green for givens that cannot hold
 is `wrong-answer` however unlikely the input; "it takes a mistake to reach" describes the honesty class,
 since a student's mistyped contradiction is exactly when the tool must refuse (#1328). What the mark
