@@ -453,6 +453,13 @@ const SEEDED: SeededCorpus = {
   // size first. Geometry, the class rows and the refusals are asserted in issue-1782-rigid-rider-drive.test.ts.
   'cube-rider-length-1782.geo3.json': ['קובייה ABCD', 'AB = 2', 'E על AB', 'AE = 1'],
   'cube-rider-length-reversed-1782.geo3.json': ['קובייה ABCD', 'E על AB', 'AE = 1', 'AB = 2'],
+
+  // #1566 (ADR-3D-398/399) — a guide click on a blank canvas: a role noun after the line it needs, the common
+  // perpendicular of two lines it creates (before: «unknown line ℓ1»), and a pyramid named by its letters in a volume
+  // given (before: «no solid ABCDS»). The click, the notice and the atomicity are asserted in guide-needs-1566.test.ts.
+  'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
+  'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
+  'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

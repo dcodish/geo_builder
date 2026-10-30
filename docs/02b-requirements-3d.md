@@ -698,13 +698,27 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «פירמידה SABCD» binds), and named by the shared notice «נוצרה נקודה חדשה X — אם זו טעות הקלדה, לחצו ✕ לביטול
   השורה» whose ✕ removes the line. A line that still fails creates nothing and says its real reason; a line that
   only declares («קטע QZ», a solid) announces nothing; «אלכסון AB» with no solid stays refused (#978).
-  - Sources: ADR-3D-382, ADR-W-162; #1467, #2048.
+  **A solid named by its letters is created too** (#2048 S2(c)): «נפח הפירמידה ABCDS = 11» on an empty canvas
+  creates pyramid ABCDS as «פירמידה ABCDS» declares it, of volume 11, and the notice names its points; the same for
+  every solid noun whose declaration the grammar reads (cube, box, tetrahedron, a four-letter pyramid). On a figure, new letters create their solid the same way, with the notice. «נפח הגוף
+  ABCDE» names no family and stays refused. A later line that contradicts the created solid is refused as the
+  contradiction, never «no such solid».
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-W-162; #1467, #2048, #1566.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two
   new lines in one sentence — and in English. A line declared anywhere in the list is used first; a name the
   declaration refuses (a vector's) is refused as the declaration refuses it. No notice: the new row is the signal.
-  - Sources: ADR-3D-383, ADR-W-163; #2489.
+  This holds in every slot that names a line, the common perpendicular's two included: «הישר d מאונך לישר ℓ1 ולישר
+  ℓ2» on an empty canvas creates ℓ1 and ℓ2 and draws d (#1566).
+  - Sources: ADR-3D-383, ADR-3D-399, ADR-W-163; #2489, #1566.
+- **FR-SP-27 (Must)** — **Every guide example builds on an empty canvas.** A click on a guide example submits it; when
+  the canvas is empty and the example has nothing it could create — a free-vector line («|u|=|v|=1»), a role noun
+  («גובה הפירמידה», «המנסרה ישרה»), a value for a letter («α = 70»), a solid's own element («אלכסון BD'») or a cone's
+  size — the click first submits the line it needs («פירמידה ABCDS», «∠BAC = α», «קובייה ABCDA'B'C'D'»), each as its
+  own row, then the example. On a canvas that already holds a figure the click submits the example alone. The
+  examples that still fail on an empty canvas are each owned by a named open issue, and their number only goes down.
+  - Sources: ADR-3D-398; #1566, #2048 (card d6), the operator's ruling of 2026-10-30 (3A).
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

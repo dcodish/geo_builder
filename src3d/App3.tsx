@@ -33,6 +33,7 @@ import { defaultPlaneDisplay3 } from './engine/types';
 import { bareNamingSlots } from './engine/notices';
 import { vectorNames3 } from './engine/vecExpr';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
+import { guideTryLines3 } from './app/guideTry3';
 import { logDebug3 } from './debug/sessionLog3';
 import { bidiSegments3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
 
@@ -1315,14 +1316,24 @@ export default function App3() {
           key: cat,
           title: t(`catalog.${cat}`),
           entries: COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => {
-            const raw = i18n.language === 'he' ? c.he : c.en;
+            const lang = i18n.language === 'he' ? 'he' : 'en';
+            const raw = c[lang];
             return {
               example: isolateLtrRuns3(raw),
               featured: c.featured,
               dir: textDir3(raw),
               onTry: () => {
                 setManualOpen(false);
-                void submitText(raw);
+                // #1566 (ADR-3D-398): on an EMPTY canvas an example that needs a figure first loads the lines it needs,
+                // each its own row, then the example; a line that is not taken stops the chain (the lock makes that
+                // unreachable). On a figure the click submits the example alone.
+                const lines = guideTryLines3(c, lang, useGeo3.getState().facts.length);
+                void (async () => {
+                  for (const line of lines.slice(0, -1)) {
+                    if (busy || (await submitSentence3(line)) !== 'consumed') return;
+                  }
+                  await submitText(raw);
+                })();
               },
             };
           }),
