@@ -1266,6 +1266,61 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
 }
 
 /**
+ * THE POINTS A CROSSING MUST STAY APART FROM (#2615, ADR-AG-350) — its signature siblings (#1113), and every point
+ * DECLARED BEFORE it that lies on BOTH of its carriers here, provided the pair has a root no such point holds.
+ *
+ * ADR-AG-263 sends a crossing to the root no earlier point holds, but only as a START, read at the SEEDED figure. When
+ * the curve reaches that earlier point only through the joint solve — p3-21's ellipse, whose a and b are fixed by c,
+ * a slope and «A על האליפסה» together — no root is taken at the seed, the start does nothing, and the solve put E on
+ * A; the judge kept E apart from signature siblings only, so E = A passed and «E» answered «(5/2, 9/2) או (5, -3)».
+ * This is that rule read at the JUDGED positions, so the start becomes a verdict: the judge (`crossing-distinct`) and
+ * the #1463 deflation (`collapsedPairs`) both read this one set.
+ *
+ * "On both carriers" is the two incidences' own residuals within `SATISFIED_EPS` with the earlier point in the
+ * crossing's place — the judge's own reading of an incidence. The proviso is ADR-AG-263's test: `orderedCrossings` on
+ * the pair, at least two roots, not touching, and at least one root on the drawn piece of a bounded crossing that no
+ * earlier point sits on (within `apartOf`).
+ * A tangency (#1924), a chord whose roots are all named (#1893, #1909), a pair of straights (one root, #1254) and an
+ * ordinal crossing (`crossing-nth`, which owns its root) are therefore untouched.
+ */
+function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): Id[] {
+  const sibs = crossingSiblings(c, id, at);
+  const pair = crossingIncidences(c, id);
+  if (!pair) return sibs;
+  const declaredAt = new Map<Id, number>();
+  c.objects.forEach((o, i) => declaredAt.set(o.id, i));
+  const mine = declaredAt.get(id) ?? Number.POSITIVE_INFINITY;
+  const atFn = (q: Id) => at.get(q) ?? null;
+  const curveAt = curveAtOf(c, env, atFn);
+  const lineAt = lineAtOf(c, env, atFn);
+  const scale = residualScale(c, env);
+  const onBoth = (q: Id) =>
+    pair.every((k) => {
+      const r = residual({ ...k, id: q } as Constraint, atFn, env, curveAt, lineAt, scale);
+      return r !== null && r.every((v) => Number.isFinite(v) && Math.abs(v) <= SATISFIED_EPS);
+    });
+  const earlier = [...at.keys()].filter(
+    (q) => q !== id && !sibs.includes(q) && (declaredAt.get(q) ?? Number.POSITIVE_INFINITY) < mine && onBoth(q),
+  );
+  if (earlier.length === 0) return sibs;
+  const o = orderedCrossings(pair, atFn, curveAt);
+  if (!o || o.touching || o.roots.length < 2) return sibs;
+  const apart = apartOf(at);
+  // A root outside the drawn piece of a bounded crossing («הקטע AP») is not a root of the sentence (ADR-AG-263's own filter).
+  const bounds = pair.filter(
+    (k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && k.crossing === true,
+  );
+  const onPiece = (r: Pt) =>
+    bounds.every((k) => {
+      const pa = atFn(k.a);
+      const pb = atFn(k.b);
+      return !pa || !pb || withinSegment(pa, pb, r);
+    });
+  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart));
+  return free ? [...sibs, ...earlier] : sibs;
+}
+
+/**
  * A CIRCLE'S REGION QUANTITY at this configuration (#1619 B1, ADR-AG-193) — the `power` of a point (|PC|² − r²,
  * positive outside) or the `arc-side` product (the point's side of the chord AB times the centre's, positive
  * on the major arc's side). Scale-free in sign, which is all the selector reads; a value within the solver's
@@ -1666,7 +1721,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
     // A crossing whose two straights are ONE LINE here names no point (#2613, ADR-AG-349): neither reading holds.
     if ((s.kind === 'crossing-distinct' || s.kind === 'crossing-nth') && crossingHasNoPoint(c, at, env, s.id)) return false;
     if (s.kind === 'crossing-distinct') {
-      for (const other of crossingSiblings(c, s.id, at)) {
+      for (const other of crossingPartners(c, s.id, at, env)) {
         const q = at.get(other)!;
         if (Math.hypot(p.x - q.x, p.y - q.y) < apart) return false;
       }
@@ -1749,7 +1804,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
  * point keeps its root. Judged with `apartOf`, so a pair is collapsed exactly when `failingSelectors`
  * would reject it.
  */
-function collapsedPairs(c: Construction, at: Map<Id, Pt>, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
+function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
   const apart = apartOf(at);
   const pairs: Array<[Id, Id]> = [];
   for (const s of c.selectors) {
@@ -1758,7 +1813,7 @@ function collapsedPairs(c: Construction, at: Map<Id, Pt>, free: ReadonlySet<Id>)
         for (let j = i + 1; j < s.ids.length; j += 1) pairs.push([s.ids[i], s.ids[j]]);
       }
     } else if (s.kind === 'crossing-distinct') {
-      for (const other of crossingSiblings(c, s.id, at)) pairs.push([other, s.id]);
+      for (const other of crossingPartners(c, s.id, at, env)) pairs.push([other, s.id]);
     }
   }
   const out: Array<{ mover: Id; partner: Id }> = [];
@@ -2898,7 +2953,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
     ...chordStarts(system, x),
-    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120),
+    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), system.envAt(x), ownFree), 120),
   ];
   /**
    * THE OTHER ROOT OF A STRAIGHT AND A CIRCLE, IN CLOSED FORM (#1619 B1, ADR-AG-193).
@@ -2915,7 +2970,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const chordStarts = (system: CarrierSystem, x: number[]): number[][] => {
     const pos = system.positionsAt(x);
     const env0 = system.envAt(x);
-    const pairs = collapsedPairs(c, pos, ownFree);
+    const pairs = collapsedPairs(c, pos, env0, ownFree);
     if (pairs.length === 0) return [];
     const atFn = (id: Id) => pos.get(id) ?? null;
     const curveAt = curveAtOf(c, env0, atFn);

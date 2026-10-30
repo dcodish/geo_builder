@@ -1079,6 +1079,11 @@ A root is taken when a point declared before it sits there within `apartOf`; a r
 is dropped by `withinSegment` (a bounded crossing) or by `failingSelectors` over its own `between` / `beyond`. It moves
 the start only when a root was dropped and exactly one admissible root is left — otherwise the seed still chooses and
 «הציגו תצורה אחרת» cycles.
+**The judge reads the same rule at the JUDGED positions** ([ADR-AG-350](06c-decisions-analytic.md#adr-ag-350), #2615): `crossingPartners`
+(`evaluate.ts`) is the signature siblings plus every point declared before the crossing that lies on both of its carriers
+(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds.
+`crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation) reads the same
+set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other root.
 An ordinal lowers to `crossing-nth {id, nth, pair}`, otherwise `crossing-distinct`. Two conics are ordered by the
 reading direction ([ADR-AG-236](06c-decisions-analytic.md#adr-ag-236): `orderedCrossings`, `conicsMeet`), and the
 duplicate fault names its operands (`incidenceWords`, `errCrossingAlreadyNamedOperands`). **Both crossings in one
