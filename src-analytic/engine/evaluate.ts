@@ -16,7 +16,7 @@ import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
-import { evalExpr, type Env } from './expr';
+import { evalExpr, symbolsOf as symbolsOfExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
 import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
 import { commonTangentLine } from './commonTangents';
@@ -1270,13 +1270,14 @@ export function orderQuantity(
   at: (id: Id) => Pt | null,
   env: Env,
   lineAt?: (name: string) => NamedLine | null,
+  curveAt?: (id: Id) => NumCurve | null,
 ): number | null {
   const side = (o: OrderSide): number | null => {
     if (o.t === 'value') {
       const v = evalExpr(o.value, env);
       return Number.isFinite(v) ? v : null;
     }
-    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt);
+    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt, curveAt);
     const v = at(o.at.v);
     const a = at(o.at.a);
     const b = at(o.at.b);
@@ -1461,7 +1462,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       /** AN ORDER (#1621 D3, ADR-AG-216) — strict unless the student wrote ≤ / ≥ (`closed`). */
       if (s.q.k === 'order') {
-        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn));
+        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn), curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed judges nothing, as below
         return signHolds(s, q);
       }
@@ -1572,6 +1573,18 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       const across = s.axis === 'y' ? t.b : t.a;
       if (Math.abs(across) <= SOLVE_RESOLUTION * Math.hypot(t.a, t.b)) return false;
       return sideOfBound(-t.c / across, 0, spanOf(at)) === (s.greater ? 1 : -1);
+    }
+    /**
+     * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
+     * letters: x holds when a > b, y when b > a, strictly at the figure's resolution (a circle, a = b, has no major axis).
+     */
+    if (s.kind === 'major-axis') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const k = curveAtOf(c, env, atFn)(s.curve);
+      if (!k) return true; // an unplaced curve judges nothing, as below
+      if (k.kind !== 'ellipse') return false;
+      const [major, minor] = s.axis === 'x' ? [k.a, k.b] : [k.b, k.a];
+      return sideOfBound(major - minor, 0, Math.max(k.a, k.b)) === 1;
     }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
@@ -1813,6 +1826,10 @@ function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>):
 function foldSignSelectors(c: Construction, env: Env): Env {
   let out = env;
   for (const sel of c.selectors) {
+    if (sel.kind === 'major-axis') {
+      out = foldMajorAxis(c, sel, out);
+      continue;
+    }
     if (sel.kind !== 'sign') continue;
     if (sel.q.k === 'order') {
       out = seedOrderParams(c, sel, sel.q, out);
@@ -1829,6 +1846,39 @@ function foldSignSelectors(c: Construction, env: Env): Env {
     if (isPositive !== sel.positive) out = { ...out, [sym]: Math.PI - reduced };
   }
   return out;
+}
+
+/**
+ * THE MAJOR AXIS SEEDS ITS ELLIPSE INTO ITS REGION (#2616/#2619, ADR-AG-353/354) — `seedOrderParams`' rule for a region
+ * (sample-and-reject would refuse a satisfiable figure at every seed whose sample fell the wrong way, #1071): where the
+ * sampled semi-axes break the stated orientation, the first free letter of the ellipse's equation that moves ONE
+ * semi-axis is scaled until the wanted axis is the longer one. A start, never a verdict: the solve may move it and the
+ * judge (`failingSelectors`) keeps the last word. Numeric, no CAS: the letter is scaled and the curve re-resolved.
+ */
+function foldMajorAxis(c: Construction, sel: Extract<Selector, { kind: 'major-axis' }>, env: Env): Env {
+  const o = objectById(c, sel.curve);
+  if (!o || o.kind !== 'curve') return env;
+  const axes = (e: Env): [number, number] | null => {
+    const r = resolveCurve(o.curve, e);
+    return r.ok && r.curve.kind === 'ellipse' ? [r.curve.a, r.curve.b] : null;
+  };
+  const ok = (ab: [number, number] | null) => !!ab && (sel.axis === 'x' ? ab[0] > 1.15 * ab[1] : ab[1] > 1.15 * ab[0]);
+  const now = axes(env);
+  if (!now || ok(now)) return env;
+  const free = new Set(paramRegister(c).map((p) => p.sym));
+  const syms = [...new Set(symbolsOfExpr(o.curve.eq))].filter((s) => free.has(s) && Number.isFinite(env[s]) && env[s] !== 0);
+  for (const sym of syms) {
+    for (const factor of [1.5, 1 / 1.5]) {
+      let e: Env = env;
+      for (let i = 0; i < 12; i += 1) {
+        e = { ...e, [sym]: e[sym] * factor };
+        const ab = axes(e);
+        if (!ab) break;
+        if (ok(ab)) return e;
+      }
+    }
+  }
+  return env;
 }
 
 /**
@@ -3265,7 +3315,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const lineAtT = lineAtOf(c, envT, atT);
       const span = figureScale(posT, envT, sys.syms);
       const vanishes = (le: LengthExpr, dim: number) => {
-        const v = evalLengthExpr(le, atT, envT, lineAtT);
+        const v = evalLengthExpr(le, atT, envT, lineAtT, curveAtOf(c, envT, atT));
         return v !== null && Math.abs(v) <= SATISFIED_EPS * Math.max(1, span) ** dim;
       };
       const heldFlat = c.constraints.every((k) => {

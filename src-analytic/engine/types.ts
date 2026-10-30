@@ -26,7 +26,7 @@
  * Constructive forms («מעגל שמרכזו M ורדיוסו 5») synthesize the same `Expr`, so there is one
  * representation, not two.
  */
-import type { DerivedRule, FootLine } from './derived';
+import type { DerivedRule, EllipseRole, EllipseSide, FootLine } from './derived';
 import type { AngleName, AngleRef, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
@@ -195,7 +195,11 @@ export type Fact =
    * cannot be decided at parse time: `parseLine` takes no figure context. The fold decides it, which
    * is the only layer that can see whether `seg-CE` is already there.
    */
-  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true })
+  /**
+   * `fresh` (#2619, ADR-AG-354): the curve's letters are the TOOL's choice («נתונה אליפסה קנונית» carries the book's a, b),
+   * so M1 takes the next free letter for any the figure already uses — never a silent coupling with the student's own.
+   */
+  | (FactBase & { t: 'curve'; id: Id; label: CurveLabel; curve: Curve; stated: boolean; inheritExtent?: true; fresh?: true })
   /**
    * `auto` (#1270, ADR-AG-184) — a name the TOOL gave, never the student: a canonical circle's centre
    * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
@@ -551,8 +555,31 @@ export type Fact =
    * to the side sum and never mints this fact.
    */
   | (FactBase & { t: 'perimeter-of'; noun?: string; value: Expr })
-  /** «F מוקד הפרבולה» (#1432) — names the focus; M1 resolves THE parabola, the centre's pattern. */
-  | (FactBase & { t: 'focus-of'; id: Id })
+  /**
+   * «F מוקד הפרבולה» (#1432) — names the focus; M1 resolves THE parabola, the centre's pattern. «F1 הוא המוקד הימני של
+   * האליפסה» (#2616, ADR-AG-353): `host` as the sentence named it (absent: the figure's one parabola or ellipse), `side`
+   * the side word, which asserts the major axis's direction.
+   */
+  | (FactBase & { t: 'focus-of'; id: Id; host?: 'parabola' | 'ellipse'; side?: EllipseSide })
+  /** «F1 ו-F2 מוקדי האליפסה» · «מוקדי האליפסה הם A ו-C» (#2616) — both foci named; which is which is a choice (R14). */
+  | (FactBase & { t: 'foci-of'; ids: [Id, Id] })
+  /**
+   * «A הקודקוד הימני של האליפסה» · «A הוא הקצה הימני של הציר הגדול» (#2616, ADR-AG-353) — a vertex named. `axis` when the
+   * sentence named the axis it ends («הקצה … של הציר הגדול»), which a side word on it then orients; no side is a choice.
+   */
+  | (FactBase & { t: 'vertex-of'; id: Id; side?: EllipseSide; axis?: 'major' | 'minor' })
+  /**
+   * «שהציר הגדול שלה על ציר ה-y» · «הציר הגדול של האליפסה על ציר ה-x» (#2619, ADR-AG-354) — the major axis's
+   * direction, stated; M1 resolves THE ellipse and records the `major-axis` selector.
+   */
+  | (FactBase & { t: 'major-axis-of'; axis: 'x' | 'y' })
+  /**
+   * A sentence with an ellipse's ROLE POINTS as operands (#2616/#2617, ADR-AG-353) — «הציר הגדול שלה הוא 20»,
+   * «המרחק בין המוקדים הוא 10», «מרחק המוקד הימני מהקודקוד הימני הוא 1». `facts` is the sentence read with
+   * `ELLIPSE_ROLE_SENTINELS[i]` standing for `roles[i]`; M1 resolves THE ellipse, writes in the letter of a point that
+   * already holds a role, and makes an unlettered one a role term of the measure (nothing drawn — ruling 2026-10-30).
+   */
+  | (FactBase & { t: 'via-ellipse-role'; facts: Fact[]; roles: EllipseRoleUse[]; phrase: string })
   /** «משוואת המדריך היא x=-2» (#1432) — a claim checked against the parabola's own directrix. */
   | (FactBase & { t: 'directrix-eq'; eq: Expr; eqSrc: string })
   /**
@@ -753,6 +780,15 @@ export type Fact =
    * construction `facts` carries (#1430, a free-direction line through it, tangent to the circle). M1 decides.
    */
   | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; facts: Fact[] });
+
+/** The stand-ins a `via-ellipse-role` sentence carries for an ellipse's role points (#2616) — names no student writes. */
+export const ELLIPSE_ROLE_SENTINELS = ['Z₈', 'Z₉'] as const;
+
+/** One role point a `via-ellipse-role` sentence names, and the major-axis direction its side word asserts. */
+export interface EllipseRoleUse {
+  role: EllipseRole;
+  axis?: 'x' | 'y';
+}
 
 /** The stand-ins a `centres-distance` sentence carries for the two centres (#2391, ADR-AG-315) — names no student writes. */
 export const CENTRES_SENTINELS = ['Z₆', 'Z₇'] as const;
@@ -1277,6 +1313,14 @@ export type Selector =
    * neither inside nor outside. A region, D7's kind 2. Judged inside validity, and seeded.
    */
   | { kind: 'in-polygon'; id: Id; ring: Id[]; inside: boolean; closed?: true }
+  /**
+   * «שהציר הגדול שלה על ציר ה-x» · «F1 הוא המוקד הימני של האליפסה» — WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619,
+   * ADR-AG-353/354). A branch selector (ADR-AG-005 D7 kind 2) over the RESOLVED semi-axes — x: a > b, y: b > a, strict —
+   * never over the signed letters (the #2619 trap: «b > a» on a sampled a = −3.4 drew a wider-than-tall ellipse). A
+   * focus side word asserts it (a right focus exists only then), and an unstated orientation under a stated size is a
+   * `choice` of the two (02c R14). `curve` is the id M1 resolved. Seeded into its region (`foldMajorAxis`).
+   */
+  | { kind: 'major-axis'; curve: Id; axis: 'x' | 'y' }
   /**
    * ONE OF SEVERAL REGIONS, THE SENTENCE NOT SAYING WHICH — «משולש קהה זווית ABC»: the angle at A, at B or at C is
    * obtuse (#1708, operator ruling 2026-10-03: *"It means one of them must be"*; ADR-AG-222). The region twin of the

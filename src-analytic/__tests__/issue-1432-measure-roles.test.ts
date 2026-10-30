@@ -330,8 +330,8 @@ describe('#1432 am. 1 — ONE role reader: every spelling of radius, focus, dire
     expect(ask(d, 'מדריך הפרבולה', fmtAnalytic).value).toBe('x = -2');
   });
 
-  it('«F מוקד האליפסה» is understood and refused out-of-scope (the ellipse focus point is not built)', () => {
-    expect(last(['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'F מוקד האליפסה']).key).toBe('out-of-scope');
+  it('«F מוקד האליפסה» builds — the ellipse focus is a role point (ADR-AG-353, superseding Am. 1\'s "not built"; operator 2026-10-30: "now we need to build all capabilities")', () => {
+    expect(last(['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'F מוקד האליפסה']).kind).toBe('record');
   });
 });
 
