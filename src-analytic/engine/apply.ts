@@ -19,8 +19,8 @@ import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
-import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm } from './lengths';
-import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
+import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
+import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { isHelperId } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
@@ -34,6 +34,7 @@ import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts,
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
 import {
   CENTRE_SENTINEL,
+  ELLIPSE_ROLE_SENTINELS,
   CENTRES_SENTINELS,
   ROLE_SIDE_SENTINELS,
   CIRCLE_SENTINEL,
@@ -2663,6 +2664,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'curve': {
+      // A curve whose letters are the tool's (#2619, ADR-AG-354): a letter the figure already uses is renamed to the next
+      // free one, in the equation and in the label that shows it, before anything else reads the curve.
+      if (f.fresh) return applyFact(c, freshLetters(c, f));
       /*
        * THE DRAWN LINE BC GETS ITS EQUATION (#1639, ADR-AG-198): «הישר BC» drew the line through B and C (a
        * `line-at` along B→C, `line-2pt`); «משוואת הישר BC היא …» is a statement about THAT line, so the stated
@@ -2898,6 +2902,18 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.k.t === 'param-rel') {
         const used = usedSymbols(c);
         if ([...symbolsOf(f.k.left), ...symbolsOf(f.k.right)].some((s) => !used.has(s))) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+        /*
+         * A ONE-SYMBOL PIN LINEAR IN ITS LETTER («a = 6», «2a = 12», «c = √10», «p = 4») is a VALUE for that letter
+         * (#2617, ADR-AG-353): it goes through the one binding seam (ADR-AG-332) — substituted everywhere, recorded in
+         * `bound`, its domain checked — exactly as «רדיוס המעגל הוא 5» binds a free radius. A non-linear one («a^2=36»)
+         * stays a `param-rel` in the joint solve, so each root is an option and a declared domain filters them
+         * (ADR-AG-303). Linearity is read at numeric probes (no CAS, ADR-AG-001 D1).
+         */
+        const pin = onePinValue(f.k.left, f.k.right);
+        if (pin) {
+          const bound = bindSymbol(c, pin.sym, pin.value, f.src);
+          return bound.ok ? { ok: true, next: bound.next, effect: 'narrowed' } : bound;
+        }
       }
       /**
        * AN EQUATION OPERAND RESOLVES TO THE CURVE IT DENOTES (#1429, the ADR-AG-023/#1342
@@ -4564,9 +4580,108 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // On a point that already exists («F(2,0)» first, or «מוקד הפרבולה הוא (2,0)», whose parser
       // mints the point) the derived fact lowers to the `derived-at` constraint (M1): a fixed parabola
       // judges it, a parameterised one is PINNED by it — «y²=2px» with focus (2,0) solves p = 4.
-      const parabolas = c.objects.filter((o) => curveKindOf(o) === 'parabola');
-      if (parabolas.length !== 1) return { ok: false, error: noHost(f.src, 'parabola', parabolas.length) };
-      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-focus', curve: parabolas[0].id }, src: f.src });
+      // THE ELLIPSE the same way (#2616, ADR-AG-353): a sentence naming no host means the figure's one conic with a focus.
+      const kinds: readonly string[] = f.host ? [f.host] : ['parabola', 'ellipse'];
+      const hosts = c.objects.filter((o) => kinds.includes(curveKindOf(o) ?? ''));
+      if (hosts.length !== 1) {
+        const kind = f.host ?? (hosts.length > 0 && hosts.every((o) => curveKindOf(o) === 'ellipse') ? 'ellipse' : 'parabola');
+        return { ok: false, error: noHost(f.src, kind, hosts.length) };
+      }
+      const host = hosts[0];
+      if (curveKindOf(host) === 'ellipse') {
+        // A side word names the end of the MAJOR axis AND asserts which axis that is (docs/17 §3b law 1); no side is a
+        // choice of the two foci (02c R14), cycled by «הציגו תצורה אחרת».
+        const which: Array<0 | 1> = f.side ? [f.side === 'right' || f.side === 'top' ? 0 : 1] : [0, 1];
+        const axis = f.side ? (f.side === 'right' || f.side === 'left' ? 'x' : 'y') : undefined;
+        return nameEllipseRole(c, f.id, host.id, which.map((w) => ({ k: 'focus' as const, which: w })), axis, f.src);
+      }
+      // A parabola has one focus; a side word about it names nothing the figure can check.
+      if (f.side) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      return applyFact(c, { t: 'derived', id: f.id, rule: { t: 'parabola-focus', curve: host.id }, src: f.src });
+    }
+
+    /**
+     * «F1 ו-F2 מוקדי האליפסה» · «מוקדי האליפסה הם A ו-C» (#2616, ADR-AG-353) — both foci of THE ellipse named. Which letter
+     * is which focus the sentence does not say: a choice of the two orders (02c R14), each option both `derived-at`s.
+     */
+    case 'foci-of': {
+      const [p, q] = f.ids;
+      if (p === q) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const host = theEllipse(c, f.src);
+      if (!host.ok) return host;
+      const at = (id: Id, which: 0 | 1): Constraint => ({ t: 'derived-at', id, rule: { t: 'ellipse-point', curve: host.id, role: { k: 'focus', which } } });
+      return applyAll(c, [
+        { t: 'declare', id: p, src: f.src },
+        { t: 'declare', id: q, src: f.src },
+        { t: 'constraint', k: { t: 'choice', options: [{ t: 'all', of: [at(p, 0), at(q, 1)] }, { t: 'all', of: [at(p, 1), at(q, 0)] }] }, src: f.src },
+      ]);
+    }
+
+    /**
+     * «A הקודקוד הימני של האליפסה» · «A הוא הקצה הימני של הציר הגדול» · «A קודקוד האליפסה» (#2616, ADR-AG-353). A side
+     * names the vertex; a side on a named axis also asserts that axis's direction; no side is a choice (02c R14).
+     */
+    case 'vertex-of': {
+      const host = theEllipse(c, f.src);
+      if (!host.ok) return host;
+      if (f.side) {
+        const horizontal = f.side === 'right' || f.side === 'left';
+        const axis = f.axis === undefined ? undefined : (f.axis === 'major') === horizontal ? 'x' : 'y';
+        return nameEllipseRole(c, f.id, host.id, [{ k: 'vertex', side: f.side }], axis, f.src);
+      }
+      const roles: EllipseRole[] = f.axis
+        ? ([0, 1] as const).map((which) => ({ k: f.axis === 'major' ? ('major-end' as const) : ('minor-end' as const), which }))
+        : (['right', 'left', 'top', 'bottom'] as const).map((side) => ({ k: 'vertex' as const, side }));
+      return nameEllipseRole(c, f.id, host.id, roles, undefined, f.src);
+    }
+
+    /**
+     * A SENTENCE WITH AN ELLIPSE'S ROLE POINTS AS OPERANDS (#2616/#2617, ADR-AG-353) — the `via-centre` substitution one
+     * conic over. THE ellipse (the host refusal for none or several); each sentinel becomes the letter of the point that
+     * already holds that role, or — unlettered — the role itself inside the measure (`ellipse-dist`): the stated
+     * distance is a real given, and nothing new is drawn (operator ruling 2026-10-30, Q1 → A). A side word's major-axis
+     * direction is recorded; with none stated anywhere, a parameterised ellipse's size leaves the direction an open
+     * choice, x first (02c R14, ADR-052).
+     */
+    case 'via-ellipse-role': {
+      const host = theEllipse(c, f.src);
+      if (!host.ok) return host;
+      let text = JSON.stringify(f.facts);
+      const open = new Map<string, EllipseRole>();
+      f.roles.forEach((use, i) => {
+        const s = ELLIPSE_ROLE_SENTINELS[i];
+        const holder = c.objects.find(
+          (o) => o.kind === 'derived' && o.rule.t === 'ellipse-point' && o.rule.curve === host.id && sameEllipseRole(o.rule.role, use.role),
+        );
+        if (holder) text = text.split(s).join(holder.id);
+        else open.set(s, use.role);
+      });
+      const mentionsOpen = (v: unknown): boolean => open.size > 0 && [...open.keys()].some((s) => JSON.stringify(v).includes(s));
+      const end = (id: Id): RoleEnd => (open.has(id) ? { role: open.get(id)! } : { p: id });
+      const lowerTerms = (le: LengthExpr): LengthExpr => ({
+        ...le,
+        terms: le.terms.map((t) =>
+          (t.kind === undefined || t.kind === 'length') && (open.has(t.a) || open.has(t.b)) ? { kind: 'ellipse-dist' as const, u: end(t.a), v: end(t.b), curve: host.id } : t,
+        ),
+      });
+      const facts = (JSON.parse(text) as Fact[])
+        // An unlettered role point is not drawn: no segment to it, no point declared for it.
+        .filter((g) => !((g.t === 'segment' || g.t === 'declare') && mentionsOpen(g)))
+        .map((g): Fact => (g.t === 'constraint' && g.k.t === 'length-eq' ? { ...g, k: { ...g.k, left: lowerTerms(g.k.left), right: lowerTerms(g.k.right) } } : g));
+      // A role used anywhere but a distance has no letter to stand on — the unknown reference it is, in the student's words.
+      if (facts.some(mentionsOpen)) return { ok: false, error: { code: 'unknown-reference', detail: f.phrase, expected: 'point' } };
+      const axes = [...new Set(f.roles.flatMap((u) => (u.axis ? [u.axis] : [])))];
+      const sels: Fact[] = axes.map((axis) => ({ t: 'selector', sel: { kind: 'major-axis', curve: host.id, axis }, src: f.src }));
+      const out = applyAll(c, [...facts, ...sels]);
+      if (!out.ok || axes.length > 0) return out;
+      return withOpenOrientation(out, host.id);
+    }
+
+    /** «שהציר הגדול שלה על ציר ה-y» (#2619, ADR-AG-354) — THE ellipse's major-axis direction, as its selector. */
+    case 'major-axis-of': {
+      const host = theEllipse(c, f.src);
+      if (!host.ok) return host;
+      return applyFact(c, { t: 'selector', sel: { kind: 'major-axis', curve: host.id, axis: f.axis }, src: f.src });
     }
 
     case 'directrix-eq': {
@@ -5069,8 +5184,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // A choice («משולש קהה זווית», #1708) names every point of every option.
         sel.kind === 'choice'
           ? sel.options.flatMap(refsOf)
-          : sel.kind === 'distinct-curves'
-          ? [] // #2395: names curves only, checked below
+          : sel.kind === 'distinct-curves' || sel.kind === 'major-axis'
+          ? [] // #2395: names curves only, checked below (#2616: the major axis names its ellipse)
           : sel.kind === 'axis-side' || sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth'
           ? [sel.id]
           : sel.kind === 'distinct' || sel.kind === 'acute'
@@ -5119,6 +5234,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.sel.kind === 'sign' && f.sel.q.k === 'slope' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
+      }
+      // The major axis of an ellipse the figure holds (#2616, ADR-AG-353).
+      if (f.sel.kind === 'major-axis') {
+        const o = objectById(c, f.sel.curve);
+        if (!o || curveKindOf(o) !== 'ellipse') return { ok: false, error: unknownRef(c, f.sel.curve) };
       }
       // Two curves stated different (#2395, ADR-AG-311) name curves the figure holds.
       if (f.sel.kind === 'distinct-curves') {
@@ -5459,6 +5579,90 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 }
 
 /**
+ * A SIZE GIVEN WITH THE MAJOR AXIS'S DIRECTION UNSTATED (#2617, ADR-AG-353): on a parameterised ellipse whose direction no
+ * sentence states, the direction is a region `choice` of the two — x first, «הציגו תצורה אחרת» reaches y (02c R14,
+ * ADR-052). A stated direction (a `major-axis` selector, alone or as a choice) leaves it as it is; a fixed ellipse has
+ * none to choose.
+ */
+function withOpenOrientation(out: Extract<ApplyOutcome, { ok: true }>, curve: Id): ApplyOutcome {
+  const c = out.next;
+  const o = objectById(c, curve);
+  if (!o || o.kind !== 'curve') return out;
+  const free = new Set(paramRegister(c).map((p) => p.sym));
+  if (!symbolsOf(o.curve.eq).some((s) => free.has(s))) return out;
+  const names = (s: Selector): boolean => (s.kind === 'choice' ? s.options.some(names) : s.kind === 'major-axis' && s.curve === curve);
+  if (c.selectors.some(names)) return out;
+  const choice: Selector = { kind: 'choice', options: [{ kind: 'major-axis', curve, axis: 'x' }, { kind: 'major-axis', curve, axis: 'y' }] };
+  return { ...out, next: { ...c, selectors: [...c.selectors, choice] } };
+}
+
+/** The letters a fresh curve may take, in order — the plane's x, y and the constant e excluded. */
+const FRESH_LETTERS = 'abcdghkmnpqrstuvw'.split('');
+
+function freshLetters(c: Construction, f: Extract<Fact, { t: 'curve' }>): Extract<Fact, { t: 'curve' }> {
+  const { fresh: _fresh, ...plain } = f;
+  void _fresh;
+  const used = usedSymbols(c);
+  let out = plain;
+  const taken = new Set(used);
+  for (const sym of symbolsOf(f.curve.eq).filter((s) => !RESERVED_SYMBOLS.has(s))) {
+    if (!used.has(sym)) {
+      taken.add(sym);
+      continue;
+    }
+    const next = FRESH_LETTERS.find((l) => !taken.has(l) && !symbolsOf(f.curve.eq).includes(l));
+    if (!next) continue;
+    taken.add(next);
+    out = {
+      ...out,
+      curve: { ...out.curve, eq: renameSym(out.curve.eq, sym, next) },
+      label: out.label.eqSrc ? { ...out.label, eqSrc: out.label.eqSrc.replace(new RegExp(`(?<![A-Za-z])${sym}(?![A-Za-z])`, 'g'), next) } : out.label,
+    };
+  }
+  return out;
+}
+
+/** A letter RENAMED in an expression tree (#2619) — a fresh curve's own letter moved aside, never a value bound (`bindSymbol`). */
+function renameSym(e: Expr, from: string, to: string): Expr {
+  switch (e.kind) {
+    case 'num':
+      return e;
+    case 'sym':
+      return e.name === from ? { kind: 'sym', name: to } : e;
+    case 'neg':
+    case 'sqrt':
+      return { ...e, a: renameSym(e.a, from, to) };
+    default:
+      return { ...e, a: renameSym(e.a, from, to), b: renameSym(e.b, from, to) };
+  }
+}
+
+/** THE ellipse a contextual role sentence means — the figure's one ellipse, or the host refusal (#2616). */
+function theEllipse(c: Construction, src: string): { ok: true; id: Id } | { ok: false; error: ApplyError } {
+  const ellipses = c.objects.filter((o) => curveKindOf(o) === 'ellipse');
+  return ellipses.length === 1 ? { ok: true, id: ellipses[0].id } : { ok: false, error: noHost(src, 'ellipse', ellipses) };
+}
+
+/**
+ * NAME A ROLE POINT OF AN ELLIPSE (#2616, ADR-AG-353) — the one lowering every role sentence shares. One role: the derived
+ * point (on a point that exists, M1's `derived-at`: a fixed ellipse judges it, a free one is pinned by it). Several (the
+ * sentence did not say which): the point and a `choice` of the roles, each a `derived-at` (02c R14). `axis`: the major
+ * axis's direction a side word asserted, recorded as its selector.
+ */
+function nameEllipseRole(c: Construction, id: Id, curve: Id, roles: readonly EllipseRole[], axis: 'x' | 'y' | undefined, src: string): ApplyOutcome {
+  const sel: Fact[] = axis ? [{ t: 'selector', sel: { kind: 'major-axis', curve, axis }, src }] : [];
+  const standing = objectById(c, id);
+  // The same role restated about the point that holds it adds nothing (the derivation's own idempotence, #1045).
+  if (standing && standing.kind === 'derived' && standing.rule.t === 'ellipse-point' && standing.rule.curve === curve) {
+    const held = standing.rule.role;
+    if (roles.some((r) => sameEllipseRole(r, held))) return sel.length ? applyAll(c, sel) : { ok: true, effect: 'known', next: c };
+  }
+  if (roles.length === 1) return applyAll(c, [{ t: 'derived', id, rule: { t: 'ellipse-point', curve, role: roles[0] }, src }, ...sel]);
+  const options: Constraint[] = roles.map((role) => ({ t: 'derived-at', id, rule: { t: 'ellipse-point', curve, role } }));
+  return applyAll(c, [{ t: 'declare', id, src }, { t: 'constraint', k: { t: 'choice', options }, src }, ...sel]);
+}
+
+/**
  * A selector's identity (#1953, [ADR-AG-259](../../docs/06c-decisions-analytic.md#adr-ag-259)). Structural, except
  * that a `distinct` selector is a SET of points: «מרובע ADCB» after «ריבוע ABCD» asks for the same four points
  * to be distinct, and its ids arrive in the ring's typed order. Compared by spelling, that restatement was a NEW
@@ -5625,6 +5829,23 @@ function readBound<T>(c: Construction, x: T): T {
   let out = x;
   for (const [sym, value] of Object.entries(bound)) out = substituteSym(out, sym, value);
   return out;
+}
+
+/**
+ * «a = 6» · «2a = 12» · «c = √10» — the value a one-symbol relation LINEAR in its letter gives that letter (#2617,
+ * ADR-AG-353), or null (two symbols, none, or not linear). A bare letter on one side keeps the other side as written, so
+ * an exact value («√10») stays exact; otherwise the value is the root of the linear form, read at numeric probes.
+ */
+function onePinValue(left: Expr, right: Expr): { sym: string; value: Expr } | null {
+  const syms = new Set([...symbolsOf(left), ...symbolsOf(right)]);
+  if (syms.size !== 1) return null;
+  const [sym] = syms;
+  if (left.kind === 'sym' && symbolsOf(right).length === 0) return { sym, value: right };
+  if (right.kind === 'sym' && symbolsOf(left).length === 0) return { sym, value: left };
+  const diff: Expr = { kind: 'sub', a: left, b: right };
+  const lin = linearIn(diff, sym);
+  if (!lin || Math.abs(lin.a) < 1e-12) return null;
+  return { sym, value: { kind: 'num', value: -lin.b / lin.a } };
 }
 
 /** `e` as `α·s + β` over its one symbol `s`, read at four numeric probes (no CAS), or null when it is not linear. */

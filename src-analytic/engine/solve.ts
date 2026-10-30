@@ -23,6 +23,7 @@
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
+import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { Odometer, resolveConstraintChoices } from './discreteAxes';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
@@ -650,6 +651,8 @@ function describeRule(r: DerivedRule): string {
       return `מרכז המעגל החסום ב-${r.v.join('')}`;
     case 'parabola-focus':
       return `מוקד ${r.curve}`;
+    case 'ellipse-point':
+      return `${r.role.k === 'focus' ? CONIC_ROLE_WORDS.focus : CONIC_ROLE_WORDS.vertex} ${r.curve}`;
     case 'circle-centre':
       return `מרכז ${r.curve}`;
     case 'touch-point':
@@ -775,6 +778,9 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return ofDir(k.u);
     case 'derived-at':
       return curveParentsOf(k.rule);
+    // An ellipse's role point measured (#2616, ADR-AG-353) names its ellipse.
+    case 'length-eq':
+      return [...new Set([...k.left.terms, ...k.right.terms].flatMap((t) => (t.kind === 'ellipse-dist' ? [t.curve] : [])))];
     case 'arc-sum':
       return [...new Set(k.terms.map((t) => t.circle))];
     case 'radius-ratio':
@@ -1107,8 +1113,8 @@ export function residualRows(
     case 'length-eq': {
       // `lineAt` threaded through (#1201): a point-to-line term is unresolvable without it, and an
       // unresolvable term makes this whole residual `null` -- which the solve reads as satisfied.
-      const l = evalLengthExpr(k.left, at, env, lineAt);
-      const r = evalLengthExpr(k.right, at, env, lineAt);
+      const l = evalLengthExpr(k.left, at, env, lineAt, curveAt);
+      const r = evalLengthExpr(k.right, at, env, lineAt, curveAt);
       if (l === null || r === null) return null;
       /**
        * Scale-normalised, like the area residual and for the same reason: a figure measured in

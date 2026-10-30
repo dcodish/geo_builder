@@ -222,6 +222,46 @@ resolves a noun-only perimeter.
 
 *Identifiers:* `engine/apply.ts`
 
+### An ellipse's roles and sizes; the canonical curve with no equation ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), [ADR-AG-354](06c-decisions-analytic.md#adr-ag-354), #2616, #2617, #2619)
+
+**One closed form.** `ellipseRolePoint(e, role)` (`engine/derived.ts`) is what a focus, a vertex, or an end of the major or
+minor axis IS over the resolved semi-axes (a on x, b on y). A focus counts along the MAJOR axis (`which` 0 is its
+positive end), so it is orientation-free; a vertex is by side. Two readers use it: the derived rule
+`ellipse-point {curve, role}` (a lettered role point; every `DerivedRule` switch declares it), and the measure term
+`ellipse-dist {u, v, curve}` (`engine/lengths.ts`; an end is a point or a role), evaluated through the `curveAt`
+argument `evalLengthExpr` gained.
+
+**The orientation is a selector.** `major-axis {curve, axis}` (`engine/types.ts` `Selector`) holds when the resolved
+semi-axis on that axis is the longer one, strictly — never an inequality over the signed letters. A focus side word,
+«הקצה הימני של הציר הגדול», «שהציר הגדול שלה על ציר ה-x» and «הציר הגדול של האליפסה על ציר ה-y» record it;
+`foldMajorAxis` (`engine/evaluate.ts`, beside `foldSignSelectors`) seeds the start into its region by scaling the
+first free letter that moves one semi-axis. A size given with no orientation stated anywhere adds a region `choice`
+of the two (`withOpenOrientation`, `engine/apply.ts`), x first.
+
+**The givens.** `readRoleRef` grew `focus.side`, `vertex {side?, axis?}`, `vertices`, `axis {which}`, `axes`,
+`focal-distance` (the side words in every gender, `SIDE_HE`; «קודקוד» in both spellings, since the frame folds the
+plene «קודקוד» to «קדקוד» at a word start). `parseMeasureRoles` lowers a named role to `focus-of` / `vertex-of` /
+`foci-of`, a coordinate slot through `withMint`; M1's `nameEllipseRole` emits the derived point (one role) or the
+point plus a constraint `choice` of `derived-at`s (no side), and the selector a side asserts. A size or a role
+operand is the `via-centre` seam one conic over (`parseEllipseMeasures` → `via-ellipse-role`): the sentence is read
+by the length grammar with `ELLIPSE_ROLE_SENTINELS` (Z₈, Z₉) for the role points («Z₈Z₉ = 20», «AZ₈+AZ₉ = 20», «מרחק
+Z₈ מ-Z₉ הוא 1»); M1 writes in the letter of a point that holds a role (`sameEllipseRole`), turns a length term with an
+unlettered end into `ellipse-dist`, and drops the segment and declaration such an end would draw. Two size clauses
+joined by «ו» are split on an enumerated joiner. The ask (`ellipseRoleAnswer`, `app/ask.ts`) reads the same closed
+form off `knownCurve`.
+
+**The one-letter pin.** `parseParamRelation` reads an equation over one letter; M1's used-symbol gate stays the judge,
+and a relation linear in its letter goes to `bindSymbol` (`onePinValue`), a non-linear one stays a `param-rel`.
+`sizeLetters` (`engine/carriers.ts`) gives an ellipse's semi-axis letters (`semiAxisLetters`: moving the letter
+moves one resolved semi-axis, as |t| — `even` — or as √t — `linear`) the positive domain R191 gives a radius.
+
+**The canonical curve** (`parseCanonicalConic`): an equation-less ellipse is read as «נתונה אליפסה שמשוואתה
+x^2/a^2+y^2/b^2=1» with `fresh: true` on its `curve` fact — M1 (`freshLetters`, `renameSym`) moves a letter the figure
+already uses to the next free one, in the equation and its label; a canonical circle is read as «נתון מעגל שמרכזו
+בראשית הצירים ורדיוסו R». The axis clause is stripped off the declaration and lowered to `major-axis-of`.
+
+*Identifiers:* `ellipseRolePoint` · `EllipseRole` · `EllipseSide` · `sameEllipseRole` · `ellipse-point` · `ellipse-dist` · `RoleEnd` · `roleEndAt` · `major-axis` · `foldMajorAxis` · `focus-of` · `foci-of` · `vertex-of` · `major-axis-of` · `via-ellipse-role` · `ELLIPSE_ROLE_SENTINELS` · `nameEllipseRole` · `theEllipse` · `withOpenOrientation` · `parseEllipseMeasures` · `parseCanonicalConic` · `onePinValue` · `semiAxisLetters` · `freshLetters` · `ellipseRoleAnswer` · `CONIC_ROLE_WORDS`
+
 ### A role noun is a claim; a length draws what it names ([ADR-AG-200](06c-decisions-analytic.md#adr-ag-200), #1651, #1652, #1620 item 2)
 
 `STRAIGHT_NOUNS` is the only list of straight-piece nouns; `HE_LINE`, `HE_LINE_PLAIN`, `PIECE_NOUN`,
