@@ -59,8 +59,10 @@ describe('#1566 S1 — what a guide click submits', () => {
     expect(green()).toBe(true);
   });
 
-  it('every one of the 37 examples that card d6 and ruling 3A name carries its lines', () => {
-    expect(COMMAND_CATALOG_3D.filter((e) => e.needs).length).toBe(37);
+  // 37 named by card d6 and ruling 3A, plus #1188 step 2's «w = u + v» and «w = 2u - 3v» (ADR-3D-390), which arrived
+  // in the round #2627 merge needing «וקטור u», «וקטור v» under the same rule.
+  it('every one of the 37 examples that card d6 and ruling 3A name carries its lines, and the two free-vector sums', () => {
+    expect(COMMAND_CATALOG_3D.filter((e) => e.needs).length).toBe(39);
   });
 });
 
