@@ -95,6 +95,7 @@
     "src/theorems/__tests__/b-corpus.test.ts",
     "src3d/__tests__/adr-3d-032.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
+    "src3d/__tests__/catalog-blank-canvas-1566.test.ts",
     "src3d/__tests__/decide-submit3-parity-1394.test.ts",
     "src3d/__tests__/fixtures3.test.ts",
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",

@@ -486,6 +486,25 @@ both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` �
 the WHOLE fold, so a later row may already own the name an earlier row introduces («נסמן: AB = u» · «וקטור u» on a
 blank page). A post-mint `already-defined` therefore keeps the row's created points as a `premint` candidate and lets
 the in-order refold judge; a clash that is real in list order is dropped by the refold exactly as any failing row is.
+**Slot keys are type-checked** ([ADR-3D-399](06b-decisions-3d.md#adr-3d-399), #1566): the walks read
+`LINE_SLOT_KEYS3` (`line`, `line1`, `line2`) and `PLANE_SLOT_KEYS3` (`plane`, `p1`, `p2`), and a compile-time
+assertion over every key of `Command3` (any depth) fails `tsc` when a `line…` or `plane…`/`pN` field is not in its list.
+**Solids** (ADR-3D-399): a `no-such-solid` whose id is a letter run carried with its noun by an operand
+(`mintableSolid3`: a `{noun, ids}` object, noun ≠ `any`) is minted by applying the commands of that noun's bare
+declaration (`solidDeclaration3`, the parser reading «פירמידה ABCDS»); its refusal is the line's. The declaration is
+not placed before the refold (its letters may belong to an earlier row): `presolids` prepends it to the row's own
+commands in `expandFact`, so it applies at the row, in list order. Its new points are in `created`. **A row red only
+because of a LATER row keeps what it created:** the refold drops a minted row only if it also fails in the fold of the
+rows up to it (`ownFailure`), so a contradiction between two statements is reported as one, never as a missing object.
+
+### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
+
+`CatalogEntry3.needs?: { he: string[]; en: string[] }` holds the lines an example needs on an empty canvas.
+`guideTryLines3(entry, lang, factCount)` (`src3d/app/guideTry3.ts`) is the one answer: the needs then the example when
+`factCount === 0`, else the example alone. `App3`'s manual `onTry` submits the needs lines through `submitSentence3`
+(stopping on the first one not taken) and the example through `submitText`. `ManualScreen`'s props are unchanged; the
+shell knows nothing of it. `catalog-blank-canvas-1566.test.ts` folds every construction-lane entry this way, in both
+languages, with a shrink-only allowlist naming the owning issue of each remaining failure.
 
 ### Free vectors ([ADR-3D-386](06b-decisions-3d.md#adr-3d-386), #1188)
 
