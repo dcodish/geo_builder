@@ -1416,7 +1416,10 @@ A fraction is RECOGNISED (relative `1e-6`, denominator ≤ 12) only for a value 
 ### Position decides notation ([ADR-AG-085](06c-decisions-analytic.md#adr-ag-085))
 
 A coefficient is never printed as a fraction: `fractionClearingFactor` and `lineText` clear the row
-(`-4/3x + y = 0` → `-4x + 3y = 0`).
+(`-4/3x + y = 0` → `-4x + 3y = 0`). The conics have one printer per kind, `ellipseEquationText` and
+`parabolaEquationText`, which both the panel (`curveParts`) and the locus row (`locusEquation`) call: a fractional
+ellipse clears to whole numbers (`4x² + 9y² = 45`), a fractional parabola to `2y² = 5x`; whole-number conics keep the
+canonical form ([ADR-AG-357](06c-decisions-analytic.md#adr-ag-357)).
 
 *Identifiers:* `4/3x` · `4/(3x)` · `eqSrc = null`
 

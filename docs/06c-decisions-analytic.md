@@ -4674,6 +4674,8 @@ So the shared formatter was never the defect. **Analytic is the one tree that ne
 
 ## ADR-AG-085 — A number's notation depends on its POSITION; a refusal's noun depends on the KIND (#1180 + #1179)
 
+> **Amended by [ADR-AG-357](#adr-ag-357)** (#2614, operator 2026-10-30): the clearing reaches the conics — a fractional ellipse prints as a whole-number equation («4x² + 9y² = 45»), a fractional parabola as `2y² = 5x`.
+
 **Requirements:** [02c](02c-requirements-analytic.md) R94 (amended). **Design:** [04c](04c-design-analytic.md) — *the tree's display formatter*. **LADDER stage:** display and refusal wording; no value, gate or comparison changes.
 
 Both found by the operator playing round #1173, and both are that round repairing its own output.
@@ -12909,6 +12911,8 @@ No other sequence moved.
 
 ## ADR-AG-304 — Tied parameters read as one row; a standalone value prints its radical (#2394)
 
+> **Amended by [ADR-AG-357](#adr-ag-357)** (#2614, 2026-10-30): a conic's denominator is an in-equation number that is CLEARED, not merely printed as a fraction.
+
 **Date:** 2026-10-20 · **Status:** accepted · P3 feature, fix round #2414 (stream A, item 3); branch `feat/2394-analytic-paired-exact`, stacked on `fix/2380-analytic-pin-roots` ([ADR-AG-303](#adr-ag-303)) and `fix/2381-analytic-choice-odometer` ([ADR-AG-302](#adr-ag-302)). **Operator ruling, 2026-10-20** ([#2394](https://github.com/dcodish/geo_builder/issues/2394)): *"2394 - option a"* — exact forms (radicals) everywhere in analytic, as 2-D does: lengths, coordinates, parameter values and ask answers; equation coefficients follow ADR-AG-085. **Amends** [ADR-AG-084](#adr-ag-084) (⚠ its "No surd tier" paragraph is superseded) and extends [ADR-AG-226](#adr-ag-226) / [ADR-AG-270](#adr-ag-270) (a vector row beside W1's scalar spelling). LADDER stage: none (display).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R94 amended (a standalone value that is p/q·√n prints exactly; an equation's coefficients do not), and "The data panel's rows" (tied parameters read paired). · **Design:** [04c](04c-design-analytic.md), "The tree's display formatter" and "One value gate; up to two values".
@@ -14148,3 +14152,26 @@ Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל
 **Consequences.** `engine/evaluate.ts` (`crossingPartners`; `failingSelectors`' `crossing-distinct`; `collapsedPairs` takes `env`); 04c. Cost (docs/17 §7): one residual pair per earlier point per crossing selector per judged configuration, and one closed-form `orderedCrossings` only when an earlier point is on both carriers.
 
 **Behaviour change for a student:** in analytic, a chord through a point already on a circle, parabola or ellipse lands its second end on the other crossing whatever givens fix the curve, and the earlier point is never offered as an answer for it.
+
+## ADR-AG-357 — A conic with a fractional coefficient prints cleared, through one printer per conic kind (#2614)
+
+**Status:** accepted · 2026-10-30 · bug (analytic) · fix round #2627 (stream G) · branch `fix/2614-conic-print` · amends [ADR-AG-085](#adr-ag-085) (its clearing reaches the conic arms) and [ADR-AG-304](#adr-ag-304) (a conic's denominator is a cleared position) · LADDER stage: none (display only; no value, gate or comparison changes)
+
+**Operator:** ruling 2026-10-30 on #2614, Q1 → B: *"an ellipse with a fractional a² prints with the fractions cleared, as a whole-number equation: «4x² + 9y² = 45» (not «4x²/45 + y²/5 = 1»). This is the same rule as ADR-AG-085 for lines; the parabola follows its existing [ruled] line."*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94 (the conic line) · **Design:** [04c](04c-design-analytic.md) § "Position decides notation"
+
+**Re-measured at pickup** (main `216cf8bb`, `decideSubmit` → `derive` → `ask`, real `fmtAnalytic`, no model): «משוואת האליפסה» on «4x^2/45+y^2/5=1» answered `x²/45/4 + y²/5 = 1` (x²/45 divided by 4?), on «x^2/12.5+y^2/2=1» `x²/25/2 + y²/2 = 1`; «משוואת הפרבולה» on «y^2=2.5x» `y² = 5/2x` (5/(2x)?); the midpoint locus of «x^2/25+y^2/9=1» read `x²/25/4 + y²/9/4 = 1` on its row and its canvas label, of «y^2=5x» `y² = 5/2x`, and of «y^2=2x» `y² = 1x`. Exactly the plan's account.
+
+**Root cause.** Class (docs/17 §1): a fraction-valued number placed INTO a conic's canonical equation — an ellipse's denominator, a parabola's `2p` — printed as a bare fraction juxtaposed with the next token, so the row read as a different expression. ADR-AG-085's `fractionClearingFactor` cleared it for lines only; ADR-AG-304 classed a conic denominator as an in-equation number (`fmtCoefficient`) without clearing it. And two printers spelled each conic — `curveParts` (the panel row, the ask by name, the «או» options) and `locusEquation` (the locus row, and through `drawnLoci` the canvas label) — breaking ADR-AG-084's one-formatter rule at the equation level (the locus's `y² = 1x` is that second printer lacking the panel's 1-rule). No other tree prints a conic equation.
+
+**Decision.**
+1. **One printer per conic kind** in `src-analytic/app/curveText.ts`: `ellipseEquationText(a², b²)` and `parabolaEquationText(k)`. `curveParts` and `locusEquation` both call them; neither spells a conic any more.
+2. **Ellipse:** whole-number a² and b² keep `x²/a² + y²/b² = 1`. When either is a small rational that is not whole (`fractionClearingFactor` > 1), the equation is multiplied through to whole numbers and reduced: `x²/(45/4) + y²/5 = 1` → `4x² + 9y² = 45`; `x²/12.5 + y²/2 = 1` → `4x² + 25y² = 50`. A surd denominator cannot be cleared and prints as before.
+3. **Parabola:** `y² = kx` with a fractional k clears to `qy² = (kq)x`: `2y² = 5x`, `2y² = -5x`, `2y² = x`. The sign stays attached, the 1-coefficient is never printed, a surd k prints as before.
+
+**Locks.** `src-analytic/__tests__/issue-2614-conic-fractions.test.ts` (20, the real door and formatter): the reported ellipse in two spellings and two more fractional ellipses; the midpoint-locus row AND `drawnLoci` label for the ellipse and two parabolas; the «או» options row; four fractional parabolas; the two printers agreeing on four conics; controls — whole-number ellipses and parabolas unchanged, surds unchanged, a fractional circle row and circle locus unchanged, `lineText` unchanged. No fixture: the essence is a printed string, not a figure.
+
+**2-D / 3-D (ADR-W-157):** no other tree prints a conic equation; nothing to port.
+
+**Behaviour change for a student:** in analytic, an ellipse whose a² or b² is a fraction reads as a whole-number equation («4x² + 9y² = 45», not «x²/45/4 + y²/5 = 1»), and a parabola with a fractional coefficient reads `2y² = 5x` (not `y² = 5/2x`), in the data panel, the «משוואת …» answer, the locus row and the locus label on the canvas; a locus parabola with coefficient 1 reads `y² = x` (not `y² = 1x`). Whole-number conics are unchanged.

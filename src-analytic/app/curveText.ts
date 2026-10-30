@@ -450,6 +450,45 @@ export function directrixText(c: NumCurve & { kind: 'parabola' }): string {
   return d.kind === 'line' ? roleLineText(d.a, d.b, d.c) : '';
 }
 
+/**
+ * ONE PRINTER PER CONIC KIND (#2614, [ADR-AG-357](../../docs/06c-decisions-analytic.md#adr-ag-357)) — the panel row,
+ * the ask by name, the «או» options, the locus row and the locus label on the canvas all print a conic through these.
+ *
+ * Two printers spelled each conic (`curveParts` and `locusEquation`), and neither carried ADR-AG-085's ruling that no
+ * fraction is left as a coefficient: `x²/45/4 + y²/5 = 1` reads as x²/45 divided by 4, `y² = 5/2x` as 5/(2x).
+ *
+ * **The ellipse** (operator, 2026-10-30, Q1 → B): whole-number a² and b² keep the canonical `x²/a² + y²/b² = 1`. A
+ * fractional one clears the WHOLE equation to whole numbers, the way the book states its givens: `x²/(45/4) + y²/5 = 1`
+ * → `4x² + 9y² = 45`. A denominator that is not a small rational (a surd) cannot be cleared and prints as before.
+ */
+export function ellipseEquationText(a2: number, b2: number): string {
+  const qa = fractionClearingFactor([a2]);
+  const qb = fractionClearingFactor([b2]);
+  if (qa !== null && qb !== null && (qa > 1 || qb > 1)) {
+    // x²·qa/pa + y²·qb/pb = 1, multiplied through by pa·pb, then reduced.
+    const pa = Math.round(a2 * qa);
+    const pb = Math.round(b2 * qb);
+    const [A, B, C] = [qa * pb, qb * pa, pa * pb];
+    const g = gcdInt(gcdInt(A, B), C);
+    const coef = (v: number) => (v === 1 ? '' : String(v));
+    return `${coef(A / g)}x² + ${coef(B / g)}y² = ${C / g}`;
+  }
+  return `x²/${fmt(a2)} + y²/${fmt(b2)} = 1`;
+}
+
+/**
+ * **The parabola** `y² = kx` (ADR-AG-085's ruling, transposed): a fractional k clears the equation, `y² = 5/2x` →
+ * `2y² = 5x`. The sign stays attached; `y² = x`, never `y² = 1x`; a surd k cannot be cleared and prints as before.
+ */
+export function parabolaEquationText(k: number): string {
+  const q = fractionClearingFactor([k]) ?? 1;
+  const m = Math.abs(k) * q;
+  const mag = fmt(m) === fmt(1) ? '' : fmt(m);
+  return `${q === 1 ? '' : q}y² = ${k < 0 ? '-' : ''}${mag}x`;
+}
+
+const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : a);
+
 export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): CurveParts {
   switch (c.kind) {
     case 'line': {
@@ -478,11 +517,8 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
       };
     case 'parabola': {
       const f = parabolaFocus(c);
-      // `y² = 2p·x`, with the same magnitude rule the line terms use: `y² = x`, never `y² = 1x`.
-      const k = 2 * c.p;
-      const mag = fmt(Math.abs(k)) === fmt(1) ? '' : fmt(Math.abs(k));
       return {
-        equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
+        equation: parabolaEquationText(2 * c.p),
         // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
         details: [
           { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${val(f.x)}, ${val(f.y)}`) },
@@ -493,7 +529,7 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
     case 'ellipse': {
       const [f1, f2] = ellipseFoci(c);
       return {
-        equation: `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`,
+        equation: ellipseEquationText(c.a * c.a, c.b * c.b),
         details: [
           { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
           { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${val(f1.x)}, ${val(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${val(f2.x)}, ${val(f2.y)}`)}` },
@@ -607,10 +643,11 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
       const clean = Number.isFinite(exact) && Math.abs(exact * exact - r2) < 1e-9;
       return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${clean ? `${shown}²` : fmt(r2)}`;
     }
+    // The conics print through the panel's ONE printer per kind (#2614, ADR-AG-357), never a spelling of their own.
     case 'parabola':
-      return `y² = ${fmt(2 * c.p)}x`;
+      return parabolaEquationText(2 * c.p);
     case 'ellipse':
-      return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
+      return ellipseEquationText(c.a * c.a, c.b * c.b);
   }
 }
 
