@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-30T17:12:36.657Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD שבסיסה מרובע",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramidQuad",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור p",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB = p",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "p"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "DC = p",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "D",
+          "to": "C",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "p"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

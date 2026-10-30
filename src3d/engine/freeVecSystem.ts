@@ -437,3 +437,109 @@ export function freeNamesIn3(c: Pick<Construction3, 'freeVectors'>, e: VecExpr):
   walk(e);
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Elimination to the figure — ADR-3D-390 Am. 1 (operator ruling 2A, 2026-10-30)
+// ---------------------------------------------------------------------------
+
+/**
+ * What a new vector equation says once its free vectors are ELIMINATED against what is already stated about them:
+ *  - `free`: a free vector survives the elimination — the equation is about the free vectors (a row of the system);
+ *  - `identity`: nothing survives — it holds on every figure («AB + BC = AC» once p is gone);
+ *  - `figure`: only the figure's own vectors survive — the equation IS a relation on the figure («AB = p» then
+ *    «AD = p» is «AD = AB»), to be decided by the figure's own vec-eq lane: contradiction, already known, or a drive.
+ *  - `null`: the elimination cannot be done at the level of whole vectors — a vector involved carries a stated
+ *    component, an affine letter or a named component, which only the component-wise system and a joint solve can
+ *    weigh (#2603). The caller keeps its existing verdict.
+ * Vector-level Gaussian elimination: the unknowns are the free vectors nothing defines and nothing has been stated
+ * about (each a whole vector); a DEFINED vector is its definition; a pair or an anchored name is a figure term.
+ */
+export type FigureRelation3 = { kind: 'free' } | { kind: 'identity' } | { kind: 'figure'; lhs: VecExpr; rhs: VecExpr };
+
+export function figureRelationOf3(c: Construction3, lhs: VecExpr, rhs: VecExpr): FigureRelation3 | null {
+  type Lin = { v: Map<string, number>; a: Map<string, { atom: VecAtom; k: number }> };
+  const named = new Set(c.partialNames.flatMap((b) => (b.target.kind === 'vector' ? [b.target.name] : [])));
+  const pureUnknown = (fv: FreeVec3, name: string) => !fv.def && !fv.symComps && fv.comps.every((x) => x === null) && !named.has(name);
+  const into = (out: Lin, e: VecExpr, k: number, depth: number): boolean => {
+    if (depth > 32) return false;
+    for (const t of e) {
+      const kk = k * t.coeff;
+      if (t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) {
+        const fv = c.freeVectors.get(t.atom.name)!;
+        if (fv.def) {
+          // a defined vector carrying a stated component is also a row of the component system: not ours to weigh
+          if (fv.symComps || fv.comps.some((x) => x !== null)) return false;
+          if (!into(out, fv.def, kk, depth + 1)) return false;
+        } else if (pureUnknown(fv, t.atom.name)) out.v.set(t.atom.name, (out.v.get(t.atom.name) ?? 0) + kk);
+        else return false;
+        continue;
+      }
+      if (t.atom.kind === 'named' && namedVector3(c, t.atom.name)?.kind !== 'anchored') return false;
+      const key = t.atom.kind === 'pair' ? `p:${t.atom.from}>${t.atom.to}` : `n:${t.atom.name}`;
+      const was = out.a.get(key);
+      out.a.set(key, { atom: t.atom, k: (was?.k ?? 0) + kk });
+    }
+    return true;
+  };
+  const lin = (l: VecExpr, r: VecExpr): Lin | null => {
+    const out: Lin = { v: new Map(), a: new Map() };
+    return into(out, l, 1, 0) && into(out, r, -1, 0) ? out : null;
+  };
+  const scaleOf = (x: Lin) => Math.max(1, ...[...x.v.values()].map(Math.abs), ...[...x.a.values()].map((t) => Math.abs(t.k)));
+  const axpy = (x: Lin, p: Lin, k: number) => {
+    for (const [n, a] of p.v) x.v.set(n, (x.v.get(n) ?? 0) + k * a);
+    for (const [key, t] of p.a) {
+      const was = x.a.get(key);
+      x.a.set(key, { atom: t.atom, k: (was?.k ?? 0) + k * t.k });
+    }
+  };
+  const pivots: { name: string; row: Lin }[] = [];
+  const reduce = (x: Lin) => {
+    for (const p of pivots) {
+      const k = x.v.get(p.name) ?? 0;
+      if (k !== 0) axpy(x, p.row, -k);
+      x.v.delete(p.name);
+    }
+  };
+  for (const eq of c.freeVecEqs) {
+    const row = lin(eq.lhs, eq.rhs);
+    if (!row) return null;
+    reduce(row);
+    const tol = TOL * scaleOf(row) * 1e3;
+    let best: string | null = null;
+    for (const [n, a] of row.v) if (Math.abs(a) > tol && (best === null || Math.abs(a) > Math.abs(row.v.get(best)!))) best = n;
+    if (best === null) continue; // an earlier relation the figure already carries
+    const k = row.v.get(best)!;
+    for (const [n, a] of row.v) row.v.set(n, a / k);
+    for (const [key, t] of row.a) row.a.set(key, { atom: t.atom, k: t.k / k });
+    for (const p of pivots) {
+      const kp = p.row.v.get(best) ?? 0;
+      if (kp !== 0) axpy(p.row, row, -kp);
+      p.row.v.delete(best);
+    }
+    pivots.push({ name: best, row });
+  }
+  const x = lin(lhs, rhs);
+  if (!x) return null;
+  reduce(x);
+  const tol = TOL * scaleOf(x) * 1e3;
+  if ([...x.v.values()].some((a) => Math.abs(a) > tol)) return { kind: 'free' };
+  const terms = [...x.a.values()].filter((t) => Math.abs(t.k) > tol);
+  // a relation that holds on every figure — the points cancel («AB + BC − AC»)
+  const atPoint = new Map<string, number>();
+  for (const t of terms) {
+    const ends = t.atom.kind === 'pair' ? t.atom : namedVector3(c, t.atom.name);
+    if (!ends || !('from' in ends)) return null;
+    atPoint.set(ends.to, (atPoint.get(ends.to) ?? 0) + t.k);
+    atPoint.set(ends.from, (atPoint.get(ends.from) ?? 0) - t.k);
+  }
+  if ([...atPoint.values()].every((a) => Math.abs(a) <= tol)) return { kind: 'identity' };
+  // the student's orientation: the first surviving term's sign is the left side
+  const round = (k: number) => (Math.abs(k - Math.round(k)) < 1e-9 ? Math.round(k) : k);
+  const s = Math.sign(terms[0].k);
+  return {
+    kind: 'figure',
+    lhs: terms.filter((t) => Math.sign(t.k) === s).map((t) => ({ coeff: round(s * t.k), atom: t.atom })),
+    rhs: terms.filter((t) => Math.sign(t.k) !== s).map((t) => ({ coeff: round(-s * t.k), atom: t.atom })),
+  };
+}

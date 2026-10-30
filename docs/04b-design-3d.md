@@ -510,7 +510,15 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
 - **Combinations (step 2, [ADR-3D-390](06b-decisions-3d.md#adr-3d-390)).** `freeVecEquation3` takes every `vec-eq`
   claim and every `vec-rel` that names a free vector or introduces a name (M1): one new name on a side → `def`; one
   free vector nothing has been said about → OWNED (`def`, M2 law (i)); one anchored arrow = a constant → that arrow's
-  pin (`inject-pair` / `inject-vector`; `injectFreeVector3` does the same for a vector defined as one arrow); else a
+  pin (`inject-pair` / `inject-vector`; `injectFreeVector3` does the same for a vector defined as one arrow); else,
+  **the elimination step** (Am. 1, `figureRelationOf3`): vector-level Gaussian elimination of the line against
+  `c.freeVecEqs`, the unknowns being the free vectors nothing defines or states (a defined one is its `def`; a vector
+  with a stated component, an affine letter or a named component makes it return `null` — the component system's
+  business). If only the figure's own atoms survive and their points do not cancel, the line is a relation ON THE
+  FIGURE: it is applied as an ordinary `vec-eq` claim (`lhs`/`rhs` eliminated, `stated` = the line as written), so the
+  claim lane decides it — verified, refuted, or pinned and driven — and the free vectors are untouched; `derive3`
+  turns a failed one into `givens-contradict` naming the earlier lines about those free vectors (a bare declaration
+  excluded), the panel prints `stated`, and the head-to-tail layout reads `stated` as an equation. Else a
   row in `c.freeVecEqs`. No free vector and no new name → the claim lane, unchanged. **The system**
   (`engine/freeVecSystem.ts`): each free vector's value is an affine form over the unknowns (unstated components of
   undefined vectors, affine letters — `SymbolOwner` `free-sym`), constants, and anchored endpoint coordinates; the

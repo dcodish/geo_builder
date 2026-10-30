@@ -51,7 +51,7 @@ export interface FreeVectorScene3 {
 }
 
 type Resolved = { positions: ReadonlyMap<string, Vec3>; freeVectors: ReadonlyMap<string, Vec3> };
-type LayoutC = Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecEqs' | 'vectors'>>;
+type LayoutC = Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecEqs' | 'vectors' | 'claims'>>;
 
 /** The free vectors' placements (the tray, and the chains' vectors). */
 export function layoutFreeVectors3(c: LayoutC, resolved: Resolved): FreeVectorPlacement3[] {
@@ -83,7 +83,9 @@ export function layoutFreeVectorScene3(c: LayoutC, resolved: Resolved): FreeVect
   // the stated combinations, in statement order: definitions, then equations with one single-vector side
   const sums: { r: VecAtom; terms: VecExpr }[] = [];
   for (const [name, fv] of c.freeVectors) if (fv.def && fv.def.length >= 2) sums.push({ r: { kind: 'named', name }, terms: fv.def });
-  for (const eq of c.freeVecEqs ?? []) {
+  // ADR-3D-390 Am. 1: a line whose free vectors were eliminated to a figure relation is still the combination stated
+  const statedEqs = (c.claims ?? []).flatMap((k) => (k.type === 'vec-eq' && k.stated ? [k.stated] : []));
+  for (const eq of [...(c.freeVecEqs ?? []), ...statedEqs]) {
     for (const [side, other] of [[eq.lhs, eq.rhs], [eq.rhs, eq.lhs]] as const) {
       if (side.length === 1 && Math.abs(side[0].coeff - 1) < 1e-12 && other.length >= 2) {
         sums.push({ r: side[0].atom, terms: other });

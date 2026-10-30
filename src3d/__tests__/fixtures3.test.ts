@@ -429,6 +429,9 @@ const SEEDED: SeededCorpus = {
   // issue-1188-free-vector-step2.test.ts; these are the build + drift net.
   'free-vector-sum-1188.geo3.json': ['וקטור u', 'וקטור v', 'w = u + v'],
   'free-vector-coupling-1188.geo3.json': ["קובייה ABCDA'B'C'D'", 'נסמן: AB = u', 'וקטור p', 'p = 2u'],
+  // ADR-3D-390 Am. 1 (operator ruling 2A, 2026-10-30) — two lines about one free vector are a relation on the figure: «AB = p ·
+  // DC = p» drives the base to a parallelogram (before: free-vector-coupling). Asserted in issue-1188-free-vector-step2.test.ts.
+  'free-vector-parallelogram-1188.geo3.json': ['פירמידה SABCD שבסיסה מרובע', 'וקטור p', 'AB = p', 'DC = p'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 
   // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued

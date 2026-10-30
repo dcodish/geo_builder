@@ -409,9 +409,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   w = u + v closing the triangle; every combination follows the same rule (2u − v: faded copies of 2u and −v,
   chained), and a sum of three terms closes the polygon. The copies are drawing only — never a vector, never data.
   The data panel lists a definition in vector notation («w = u + v»), and the ask lane answers «u + v», «2u - 3v»,
-  «|u - v|» when the value is known. **Not yet** (refused honestly as the tool's limit, naming the statement — never
-  «בדקו את החישוב» and never "u is not declared"): a statement that would make the figure and a free vector one joint
-  solve («AB = p» then «AD = p»; «AE = t·p»; a span point over a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
+  «|u - v|» when the value is known. **Two statements about one free vector that together relate the figure's own
+  vectors** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390) Am. 1, operator ruling 2026-10-30): with the free vector
+  eliminated, what remains is a relation on the figure, answered exactly as that relation written directly — «וקטור p ·
+  AB = p · AD = p» on a cube is refused as a contradiction naming «AD = p» and «AB = p»; «AB = p · DC = p» is already
+  true on a cube and drives a parallelogram on a figure free to become one. **Not yet** (refused honestly as the tool's
+  limit, naming the statement — never «בדקו את החישוב» and never "u is not declared"): a statement that would make the
+  figure and a free vector one joint solve, undecidable without solving both together («AE = t·p»; a span point over
+  a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
   product on a free vector («|u| = 5», «u ⟂ v»), #1188 step 4.
   - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**

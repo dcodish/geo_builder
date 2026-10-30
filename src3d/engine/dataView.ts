@@ -1552,7 +1552,7 @@ export function statedVectorRows(
     /** #1188 (ADR-3D-386): free vectors — a stated tuple prints as typed, a never-stated one as `u = (?, ?, ?)` */
     freeVectors?: ReadonlyMap<string, FreeVec3>;
     freeVecEqs?: readonly { lhs: VecTermLike[]; rhs: VecTermLike[] }[];
-    claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
+    claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[]; stated?: { lhs: VecTermLike[]; rhs: VecTermLike[] } }[];
     pairPins?: readonly StatedPin[];
     vectorPins?: readonly StatedPin[];
   },
@@ -1581,7 +1581,9 @@ export function statedVectorRows(
   for (const { head, p } of tuples) rows.push(`${head} = (${statedTupleText(p, known).join(', ')})`);
   for (const claim of c.claims) {
     if (claim.type !== 'vec-eq' || !claim.lhs || !claim.rhs) continue;
-    rows.push(`${vecSide(claim.lhs)} = ${vecSide(claim.rhs)}`);
+    // ADR-3D-390 Am. 1: a relation reached by eliminating free vectors prints as the student stated it («AD = p»)
+    const side = claim.stated ?? { lhs: claim.lhs, rhs: claim.rhs };
+    rows.push(`${vecSide(side.lhs)} = ${vecSide(side.rhs)}`);
   }
   // #1188 step 2 (ADR-3D-390): a free vector's definition and the free-vector equations, in the same notation
   for (const [name, fv] of c.freeVectors ?? []) if (fv.def) rows.push(`${name} = ${vecSide(fv.def)}`);

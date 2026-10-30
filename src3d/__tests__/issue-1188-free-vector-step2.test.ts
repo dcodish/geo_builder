@@ -42,6 +42,7 @@ const near = (a: Vec3, b: Vec3, tol = 1e-9) => norm3(sub3(a, b)) <= tol * Math.m
 const lin = (terms: [number, Vec3][]): Vec3 =>
   terms.reduce((acc, [k, v]) => ({ x: acc.x + k * v.x, y: acc.y + k * v.y, z: acc.z + k * v.z }), { x: 0, y: 0, z: 0 });
 const CUBE = "קובייה ABCDA'B'C'D'";
+const QUAD = 'פירמידה SABCD שבסיסה מרובע';
 const SEEDS = [0, 1, 2, 3, 7, 11];
 
 describe('#1188 step 2 — a combination DEFINES a new vector', () => {
@@ -191,8 +192,7 @@ describe('#1188 step 2 — a free vector and the figure', () => {
  * line; never «בדקו את החישוב», never "u is not declared". A row that starts to BUILD is its successor landing.
  */
 const COUPLING: string[][] = [
-  // after «AB = p» the statement «AD = p» says AD = AB — a relation on the FIGURE the free p cannot absorb
-  [CUBE, 'וקטור p', 'AB = p', 'AD = p'],
+  // (ADR-3D-390 Am. 1: «AB = p · AD = p» left this list — it is decided on the figure, below)
   // a ratio letter on a free vector: the point's root-find would be a joint solve
   ['וקטור p', 'A(0,0,0)', 'AE = t·p'],
   // a span point over a free vector
@@ -206,6 +206,85 @@ describe('#1188 step 2 — what it cannot solve yet is refused honestly', () => 
     expect(errs[errs.length - 1]).toBe('free-vector-coupling');
     expect(text()).toContain(`«${lines[lines.length - 1]}»`);
     expect(text()).toContain('מגבלה של הכלי');
+  });
+});
+
+/**
+ * ADR-3D-390 Am. 1 (operator, T32 on PR #2604, ruling 2A, 2026-10-30) — ELIMINATE THE FREE VECTOR, THEN DECIDE WHAT IS
+ * LEFT ON THE FIGURE. Measured before at 93ccd03b: «קובייה · וקטור p · AB = p · AD = p» was refused
+ * `free-vector-coupling` ("the tool can't yet…"), while its twins «p = (1,2,3) · AB = p · AD = p» (givens-contradict)
+ * and the anchored «AB = p · AD = p» (claim-refuted) said the statement is false. Two lines about one free vector
+ * relate the figure's own vectors; that relation gets the verdict the figure's vec-eq lane gives it written directly.
+ */
+describe('ADR-3D-390 Am. 1 — two statements about one free vector are a relation on the figure', () => {
+  const ab = (d: ReturnType<typeof built>) => sub3(d.positions.get('B')!, d.positions.get('A')!);
+  const dc = (d: ReturnType<typeof built>) => sub3(d.positions.get('C')!, d.positions.get('D')!);
+
+  it.each([
+    [[CUBE, 'וקטור p', 'AB = p', 'AD = p'], ['AB = p']],
+    [[CUBE, 'וקטור p', 'AB = 2p', 'AD = 2p'], ['AB = 2p']],
+    [[CUBE, 'וקטור p', 'וקטור q', 'AB = p + q', 'AD = p + q'], ['AB = p + q']],
+    [[CUBE, 'וקטור p', 'AB = p', 'BA = p'], ['AB = p']],
+  ] as const)('T32 class: «%s» is a contradiction naming the lines, never the tool limit', (lines, others) => {
+    const errs = run(lines);
+    expect(errs.slice(0, -1).every((e) => e === null)).toBe(true);
+    expect(errs[errs.length - 1]).toBe('givens-contradict');
+    expect(text()).toContain(`«${lines[lines.length - 1]}»`);
+    for (const o of others) expect(text()).toContain(`«${o}»`);
+    expect(text()).not.toContain('מגבלה של הכלי');
+    expect(text()).not.toContain('«וקטור p»'); // a bare declaration says nothing, so it is not blamed
+    expect(st().facts).toHaveLength(lines.length - 1);
+  });
+
+  it('one verdict: the eliminated line answers like the same relation written without p (the anchored twin refutes too)', () => {
+    expect(run([CUBE, 'וקטור AB = וקטור AD'])).toEqual([null, 'claim-refuted']);
+  });
+
+  it('already true: «AB = p · DC = p» on a cube builds, p stays AB, and the panel prints the line as stated', () => {
+    run([CUBE, 'וקטור p', 'AB = p']);
+    const p0 = val('p', 0);
+    expect(run(['DC = p'])).toEqual([null]);
+    expect(near(val('p', 0), p0)).toBe(true);
+    const rows = dataView(built().construction, 0).stated;
+    expect(JSON.stringify(rows)).toContain('DC⃗ = p');
+    expect(built().construction.freeVecEqs).toHaveLength(0);
+  });
+
+  it.each([
+    [['וקטור p', 'AB = p', 'DC = p']],
+    [['וקטור p', 'AB = 2p', 'DC = 2p']],
+  ] as const)('a drive: on a figure free to become one, «%s» makes ABCD a parallelogram at every seed', (tail) => {
+    run([QUAD]);
+    expect(near(ab(built(0)), dc(built(0)), 1e-3)).toBe(false); // a general quadrilateral before the lines
+    useGeo3.setState({ facts: [], seed: 0, lastError: null });
+    expect(run([QUAD, ...tail]).every((e) => e === null)).toBe(true);
+    for (const s of SEEDS) {
+      const d = built(s);
+      expect(near(ab(d), dc(d), 1e-6)).toBe(true);
+    }
+    // …the same figure the anchored relation drives (one statement, one drawing)
+    const withP = SEEDS.map((s) => built(s).positions);
+    useGeo3.setState({ facts: [], seed: 0, lastError: null });
+    run([QUAD, 'וקטור AB = וקטור DC']);
+    SEEDS.forEach((s, i) => {
+      for (const id of ['A', 'B', 'C', 'D']) expect(near(built(s).positions.get(id)!, withP[i].get(id)!, 1e-6)).toBe(true);
+    });
+  });
+
+  it('identity: a line that holds on every figure once p is gone is absorbed («AB + BC = p + BC»)', () => {
+    expect(run([CUBE, 'וקטור p', 'AB = p', 'AB + BC = p + BC'])).toEqual([null, null, null, null]);
+  });
+
+  it('ruling 1A unchanged: «AB = p + q» on two free vectors still builds', () => {
+    expect(run([CUBE, 'וקטור p', 'וקטור q', 'AB = p + q'])).toEqual([null, null, null, null]);
+  });
+
+  it('save and load: the refold gives the same verdicts', () => {
+    run([CUBE, 'וקטור p', 'AB = p', 'DC = p']);
+    const r = deserializeFigure3(serializeFigure3(st().facts, st().seed));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(Object.values(derive3(r.facts, r.seed).status).every((x) => x === 'ok')).toBe(true);
   });
 });
 

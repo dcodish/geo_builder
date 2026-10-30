@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames, namedVector3 } from './vecExpr';
-import { constantVec3, freeNamesIn3, freeVecSystemVerdict3, isPureFreeVector3 } from './freeVecSystem';
+import { constantVec3, figureRelationOf3, freeNamesIn3, freeVecSystemVerdict3, isPureFreeVector3 } from './freeVecSystem';
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
@@ -718,6 +718,9 @@ function singleAnchoredTerm3(c: Construction3, e: import('./types').VecExpr): { 
  *     statement (docs/17 M2 law (i)): it becomes defined by the other side, so the vectors already drawn stay put.
  *  3. A side that is ONE anchored arrow, the other side a constant («p = (1,2,3)» · «AB = p») is that arrow's PIN, so
  *     the pivot drives the figure — the pin «AB = (1,2,3)» lowers to.
+ *  3½. (ADR-3D-390 Am. 1) With its free vectors ELIMINATED against what is already stated, a line that leaves only
+ *     the figure's own vectors is a relation on the figure («AB = p» · «AD = p» is «AD = AB»): the figure's vec-eq
+ *     lane decides it, so a contradiction is a contradiction and a drivable one drives, never the coupling refusal.
  *  4. Otherwise it is an EQUATION of the free-vector system. Whether the system can absorb it — or it constrains the
  *     figure, or contradicts the stated numbers — is judged once, on the outermost call (`settleFreeVectors3`).
  */
@@ -767,6 +770,15 @@ function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs:
     const pin: Command3 =
       via.atom.kind === 'pair' ? { type: 'inject-pair', a: via.atom.from, b: via.atom.to, x, y, z } : { type: 'inject-vector', name: via.atom.name, x, y, z };
     return applyCommand3(c, pin);
+  }
+  // 3½. ADR-3D-390 Am. 1 (ruling 2A, 2026-10-30): ELIMINATE the free vectors against what is already stated about
+  // them. When only the figure's own vectors survive, the line is a relation ON THE FIGURE («AB = p» then «AD = p» is
+  // «AD = AB») and the figure's vec-eq lane decides it — refuted on a rigid figure, already true, or driven through
+  // its pin — exactly as the same relation written without p. The free vectors are untouched: p stays what it was.
+  const fig = figureRelationOf3(c, lhs, rhs);
+  if (fig?.kind === 'figure') {
+    const stated = { lhs: lhs.map((t) => ({ ...t })), rhs: rhs.map((t) => ({ ...t })) };
+    return applyCommand3(c, { type: 'claim', claim: { type: 'vec-eq', lhs: fig.lhs, rhs: fig.rhs, stated } });
   }
   // 4. an equation
   const next = clone(c);

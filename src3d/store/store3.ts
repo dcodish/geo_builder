@@ -36,6 +36,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
+import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
@@ -1732,6 +1733,19 @@ function deriveCore3(
       const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];
       const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => vectorsNamedBy3(k).some((n) => named.includes(n))));
       status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: by.map((g) => g.utterance) };
+    } else if (st.code === 'claim-refuted' || st.code === 'givens-contradict') {
+      // ADR-3D-390 Am. 1: a line whose free vectors were ELIMINATED to a relation on the figure («AB = p» · «AD = p»
+      // is «AD = AB») and that relation cannot hold — the contradiction is between this line and the earlier lines
+      // that said what those free vectors are, so it names them (a bare «וקטור p» says nothing, and is not named)
+      const own = claimOwners.find((o) => o.factId === f.id);
+      const via = own
+        ? c.claims.slice(own.from, own.to).flatMap((k) => (k.type === 'vec-eq' && k.stated ? freeNamesIn3(c, [...k.stated.lhs, ...k.stated.rhs]) : []))
+        : [];
+      if (via.length === 0) return;
+      const says = (g: Fact3) => g.cmds.some((k) => k.type !== 'declare-vector' && vectorsNamedBy3(k).some((n) => via.includes(n)));
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && says(g)).map((g) => g.utterance);
+      const was = st.code === 'givens-contradict' ? st.others : [];
+      status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: [...new Set([...was, ...by])] };
     }
   });
 

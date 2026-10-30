@@ -83,7 +83,12 @@ export type Claim3 =
    */
   | { type: 'length-letter'; a: Id; b: Id; coef: number; sym: string }
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
-  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
+  /**
+   * AM = ½u + ½v + 5/3·w. #1188 ADR-3D-390 Am. 1: `stated` — the line as the student wrote it, with free vectors in it,
+   * when `lhs`/`rhs` is that equation with its free vectors ELIMINATED («AB = p» then «AD = p» is «AD = AB»). The
+   * panel prints the stated form; derive3 names the lines about those free vectors when the relation fails.
+   */
+  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr; stated?: { lhs: VecExpr; rhs: VecExpr } }
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
