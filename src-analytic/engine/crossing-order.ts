@@ -29,12 +29,11 @@
 import type { Pt } from './derived';
 import { SOLVE_RESOLUTION, type Constraint } from './solve';
 import type { Id, NumCurve } from './types';
+import { conicSize, lineQuadratic, type Walk } from './lineQuadratic';
 
-/** A straight line with a DIRECTION: the point `p0` on it nearest the origin, and the way it is walked. */
-export interface Walk {
-  p0: Pt;
-  d: Pt;
-}
+// The substitution and a conic's size live in a leaf module the solver reads too (#2618, ADR-AG-355). A walk built
+// here starts at the point of its line nearest the origin.
+export { conicSize, type Walk };
 
 /** The line `a·x + b·y + c = 0` walked along `d` (which must be parallel to it). */
 function walkAlong(a: number, b: number, c: number, d: Pt): Walk | null {
@@ -82,35 +81,6 @@ export function conicMeet(w: Walk, conic: NumCurve): { roots: Pt[]; touching: bo
   if (!q) return { roots: [], touching: false };
   const { A, B, C } = q;
   return rootsOf(p0, d, A, B, C);
-}
-
-/** The quadratic `A·t² + B·t + C` a walked straight `p0 + t·d` leaves in a canonical conic — `null` for a non-conic. */
-function lineQuadratic(w: Walk, conic: NumCurve): { A: number; B: number; C: number } | null {
-  const { p0, d } = w;
-  let A = 0;
-  let B = 0;
-  let C = 0;
-  if (conic.kind === 'circle') {
-    const q = { x: p0.x - conic.cx, y: p0.y - conic.cy };
-    A = d.x * d.x + d.y * d.y;
-    B = 2 * (d.x * q.x + d.y * q.y);
-    C = q.x * q.x + q.y * q.y - conic.r * conic.r;
-  } else if (conic.kind === 'ellipse') {
-    const ia = 1 / (conic.a * conic.a);
-    const ib = 1 / (conic.b * conic.b);
-    A = d.x * d.x * ia + d.y * d.y * ib;
-    B = 2 * (p0.x * d.x * ia + p0.y * d.y * ib);
-    C = p0.x * p0.x * ia + p0.y * p0.y * ib - 1;
-  } else if (conic.kind === 'parabola') {
-    // y² = 2p·x
-    const two = 2 * conic.p;
-    A = d.y * d.y;
-    B = 2 * p0.y * d.y - two * d.x;
-    C = p0.y * p0.y - two * p0.x;
-  } else {
-    return null;
-  }
-  return { A, B, C };
 }
 
 function rootsOf(p0: Pt, d: Pt, A: number, B: number, C: number): { roots: Pt[]; touching: boolean } {
@@ -326,14 +296,6 @@ export function nthHolds(
   return dist.every((v, i) => i === nth || dist[nth] <= v);
 }
 
-/** A conic's own size — the scale its crossings are told apart at (a circle's radius, a conic's larger axis). */
-export function conicSize(cu: NumCurve): number {
-  if (cu.kind === 'circle') return Math.abs(cu.r);
-  if (cu.kind === 'ellipse') return Math.max(Math.abs(cu.a), Math.abs(cu.b));
-  if (cu.kind === 'parabola') return Math.abs(cu.p);
-  return 0;
-}
-
 /**
  * WHERE A STRAIGHT ONLY TOUCHES A CONIC (#1924, [ADR-AG-272](../../docs/06c-decisions-analytic.md#adr-ag-272); the
  * parabola and the ellipse, #1932, [ADR-AG-292](../../docs/06c-decisions-analytic.md#adr-ag-292)) — the touch point
@@ -373,8 +335,11 @@ export function touchPointOf(
  *
  * TANGENCY, NOT "MEETS ONCE": a straight parallel to a parabola's axis leaves no `t²` term — it crosses the curve once
  * without touching it, and is never a touch.
+ *
+ * Also the click path's touch test (#2618, ADR-AG-356): a walked straight whose crossings with a drawn conic are one
+ * point offers ONE ring there. Read on every kind — on a circle the chord it measures is the circle's own.
  */
-function conicTouchOf(w: Walk, conic: NumCurve): Pt | null {
+export function conicTouchOf(w: Walk, conic: NumCurve): Pt | null {
   const q = lineQuadratic(w, conic);
   const size = conicSize(conic);
   const n2 = w.d.x * w.d.x + w.d.y * w.d.y;

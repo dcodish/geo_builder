@@ -3378,7 +3378,7 @@ nothing the operator already had changed.
 ## ADR-AG-061 — A conic's crossings are offered too, and the ring you click is the point you get (#1096)
 
 **Status:** accepted, 2026-09-16 · **Overturns** [ADR-AG-054](#adr-ag-054)'s conic limit ·
-**Closes** [ADR-AG-049](#adr-ag-049)'s open question · **Extends** [ADR-AG-056](#adr-ag-056)
+**Closes** [ADR-AG-049](#adr-ag-049)'s open question · **Extends** [ADR-AG-056](#adr-ag-056) · **⚠ Partly superseded by [ADR-AG-356](#adr-ag-356) (2026-10-30, operator ruling Q2 → A on #2618):** a tangency now offers ONE ring on every curve — its sentence was re-measured to build
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R76 (amended again). **Design:**
 [04c](04c-design-analytic.md) — `engine/crossings.ts`.
@@ -14042,3 +14042,49 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2552-d9-new-circle.test.ts` (13: the D9 case after the exam pair and beside one circle at three seeds, the centre on P; stability of the earlier circles; an existing letter as the centre; the ruled Hebrew text; ✕ restoring the figure; two fixtures; controls — «O_1 מרכז מעגל» · «O_2 מרכז מעגל» name the pair in turn, the definite form keeps `ambiguous-shape` / `already-named`, the empty figure records silently, «O מרכז מעגל» on circle O is not a second circle, a lone equation circle's centre is named); fixtures `issue-2552-d9-new-circle-after-pair`, `issue-2552-d9-new-circle-beside-one`; the shared created-notice rows' circle row through analytic's adapter (`created-notice-1467.test.ts`); parity row `centre-of-a-circle-new-2552`.
 
 **Behaviour change for a student:** in analytic, «P מרכז מעגל» typed when every circle already has a centre letter draws a new circle centred at P, and under the line «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה»; ✕ removes the line. Nothing else changes.
+
+## ADR-AG-355 — The circle's relations are read about the ellipse and the parabola: one curve-host atom, one resolver, the conic's normal, the double-root row (#2618 PR 1)
+
+**Status:** accepted · 2026-10-30 · feature (analytic) · fix round #2627 (stream F) · branch `feat/2618-conic-relations` · PR 1 of #2618 (PR 2 is the circle–conic relations, ruling Q1) · LADDER stage: none (a parse lowering plus residual arms in the joint solve)
+
+**Operator:** 2026-10-30 in chat, on the ellipse sweep: *"now we need to build all capabilities"*. Ruling of the same day on the plan's questions — Q3: *"there is a קוטר and we need to support it. when drawing it, like in circle, there is dof as to where it is exactly"*, with the book's definition *"קוטר באליפסה – מיתר העובר דרך מרכז האליפסה נקרא קוטר"*; «AB קוטר בפרבולה» split out to #2625.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R204 (new) and the R132 amendment line · **Design:** [04c](04c-design-analytic.md) § "The same relations about the ellipse and the parabola"
+
+**Re-measured at pickup** (`216cf8bb`, `parseLine` → `derive`, no model), curves `x^2+y^2=25` / `x^2/25+y^2/9=1` / `y^2=8x`: every one of «מעוין ABCD חסום ב…», «AB מיתר ב…», «AB קוטר ב…», «הישר y=kx+3 משיק ל…», «הישר AB משיק ל… בנקודה A», «המשיק ל… בנקודה A», «דרך P עובר משיק ל…» was `not-handled` on the ellipse and the parabola and read on the circle; «קודקודי המעוין ABCD נמצאים על ה…» was `not-handled` on all three. As the plan said.
+
+**Root cause (the class).** A relation between a line or a polygon and a CURVE was read only when the curve was the circle: its readers spelled «מעגל» as the only host noun, and its apply arms resolved only a circle and lowered through circle-only geometry (centre distance = r, `Direction.radius`). The meaning of each sentence is kind-neutral.
+
+**Decision.**
+1. **Parse — one curve-host atom** (`CONIC_NOUN_HE/EN`, `conicHostOf`) beside the circle phrase in the chord readers, the diameter readers (the ELLIPSE only), the tangent noun (`TANGENT_HOST_HE/EN`), `TANGENT_FROM_*` and `parseCircleAt`'s line-first order. A conic takes no name or centre tail; the fact carries `host?: ConicHost` (`'ellipse' | 'parabola'`) beside `circle?`, absent for the circle, so every circle fact is byte-identical. The inscribed family gains `parseConicInscribed` (both word orders, «חוסמת», English "is inscribed in" / "circumscribes") after every circle reader, and «קודקודי ה<noun> XYZW נמצאים/נמצאות על <host>» ("the vertices of … lie on …") is `cyclicFacts` on the circle and `conicInscribedFacts` on a conic: the same claim as the inscribed sentence.
+2. **Apply — one resolver,** `curveHost(c, host, name, src)`: `circleNamed` with no host, else the figure's ONE curve of that kind, with `noHost` for none or several. Read by `tangent-of`, `tangent-line-at`, `tangent-through` and `diameter-of`; `tangent-eq` reaches it through `tangent-of`. A conic host M1 built a tangent object on is accepted as `circleId`.
+3. **Inscribed in a conic** lowers to the polygon plus `on-kind { kind: host }` per vertex — what «A, B, C ו-D נמצאות על האליפסה» already lowered to, green at 216cf8bb. The ring is not marked `cyclic` (a circle claim); a ring the curve cannot carry is the solver's honest refusal (a rhombus on a parabola: `polygon-collapsed`, as the two-step form). A chord is both ends `on-kind { kind: host }`, the segment and `distinct`.
+4. **The conic's normal is a direction:** `Direction` gains `{ k: 'normal', curve, at }` — circle the radius vector, ellipse `(x/a², y/b²)`, parabola `y² = 2px` → `(−p, y)`. `touchNormal(host, at)` gives `radius` on a circle (the lowering every circle figure already carries, so nothing moves) and `normal` on a conic; `applyTouchAt` and the tangent object read it, and the tangent-object readers (`isTangentObject`, `ask.ts`, `derive.ts`'s by-construction tangency) accept both.
+5. **A line tangent to a conic, no touch point:** `tangent-curve` may name an ellipse or a parabola; its row is `conicTangencyRows`, the double-root condition of the straight's substitution, `(B² − 4AC)·|d|² / (A²·size²)` — signed, scale-free (the squared chord over the conic's squared size). `lineQuadratic` and `conicSize` move to a leaf module (`engine/lineQuadratic.ts`), re-exported by `crossing-order.ts`, so the solver reads the one substitution `conicMeet` and `touchPointOf` share without an import cycle. A straight parallel to a parabola's axis is a unit miss (ADR-AG-292: never a touch); a bounded segment keeps `t* = −B/2A` in [0, 1] as two hinge rows (#1503's rule). The freedom consumed is the line's, so «דרך P עובר משיק לאליפסה» is the free-direction line plus this row.
+6. **Diameter of the ellipse:** the existing general lowering (both ends on the curve, `distinct`, AB ∥ `radius(A)`), with `radius` on an ellipse read as its ray from the centre (the origin; canonical only). A's position stays a free DOF, so the diameter turns under «הציגו תצורה אחרת» (ruling Q3). The parabola's diameter sentence is left exactly as it was (`not-handled`, #2625).
+
+**Not this ADR:** a circle touching a conic and the circle inscribed in / around the ellipse (PR 2, ruling Q1 = A); the crossing dot at a touch (ADR-AG-356).
+
+**2-D (ADR-W-157):** conics are analytic-only (EXCEPTIONS X2). The one plane sentence added, «קודקודי … נמצאים על המעגל», is `not-handled` in 2-D; see Locks. 3-D: circles are X8.
+
+**Measured after.** Every row of the pickup table records on the ellipse and the parabola, and the circle rows are unchanged. The book's k values are each reached in its own configuration over seeds 0–5: p8-7 k = ±1, p8-8 k = ±9, p8-9 k = 1, p8-10 k = 5 or −4; y = kx+2 on y² = 8x gives k = 1; y = kx+1 inside the ellipse is `unsatisfiable`; the tangent from P(10,0) to x²/25+y²/9=1 reaches both slopes ±√(9/75). **Perf (docs/17 §7)**, mean `derive` over seeds 0–5 on this machine: p8-7 3.2 ms (the circle's y = kx+10 tangency 2.0 ms); p4-24 one-line form 73.5 ms against 70.3 ms for the two-step form main already read (the same facts). p5-26 is PR 2's.
+
+**Locks.** `src-analytic/__tests__/issue-2618-conic-relations.test.ts` (seeds 0–5: every spelling × ellipse and parabola, He and En, both word orders; one lowering for the inscribed spellings; the k table; the touch at A ⊥ the normal on all three curves; the tangent object and its equation; the from-point tangents; the refusals — a rhombus on a parabola, a segment touching outside its ends, a line that cannot touch, a wrong tangent equation, a chord with no or two ellipses; the parabola diameter left `not-handled`). Fixtures `src-analytic/__tests__/fixtures/ellipse-book-p3-22a`, `-p4-24a`, `-p5-27a`, `-p5-28`, `-p6-1b`, `-p8-7`, `-p8-8`, `-p8-9`, `-p8-10` (the exact book lines). The circle suites (R132, #1619 B3, #1924, #2385, #2387) are unchanged and green. Catalog: 14 rows (He + En). Parity: the known-gap row `vertices-on-circle-2618` (2-D owes it, #2629, filed `needs-operator`); the conic sentences are X2.
+
+**Behaviour change for a student:** in analytic, the circle's chord, diameter, inscribed and tangent sentences now work about the ellipse and the parabola (the diameter on the ellipse only), and «קודקודי המעוין ABCD נמצאים על המעגל / האליפסה» means the polygon is inscribed. Nothing about a circle figure changes.
+
+## ADR-AG-356 — A line touching a curve offers ONE crossing dot at the touch point, on every curve (#2618 PR 1)
+
+**Status:** accepted · 2026-10-30 · feature (analytic) · fix round #2627 (stream F) · branch `feat/2618-conic-relations` · **Partly supersedes** [ADR-AG-061](#adr-ag-061)'s tangency carve-out (#1096, #1100) · LADDER stage: none
+
+**Operator:** ruling 2026-10-30 on #2618, Q2 → A: *the crossing dot at a tangency is offered on all three curves (circle, ellipse, parabola)*.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R205 (new) · **Design:** [04c](04c-design-analytic.md) § "A pair's crossings have ONE order" (the touch paragraph)
+
+**Context.** ADR-AG-061 withheld a ring at a touch because the sentence it would offer did not build (ADR-AG-054: a ring whose click fails is worse than no ring). Re-measured at `216cf8bb`, the sentence builds on every curve: «A נקודת החיתוך של הישר y=5 עם המעגל» → (0,5); «… y=-x+5 עם האליפסה» (x²+4y²=20) → (4,1); «… y=x+2 עם הפרבולה» (y²=8x) → (2,4). The premise no longer holds, and 0 dots were offered on any curve.
+
+**Decision.** `crossings.ts` `meetConic` asks `conicTouchOf` first — the scale-free touch test the touch lowerings already use (the chord the straight would cut under `SOLVE_RESOLUTION` × the conic's size; on a circle, the circle's own chord) — and offers the touch once, with no ordinal. Only a straight that does not touch reads `conicMeet`'s roots. `conicMeet`'s own `touching` flag judges an absolute root gap, which a tangency the solve PINNED (a parameter it found, p8-7) does not meet: two dots a hair apart, numbered first and second, would be offered for one point.
+
+**Locks.** `issue-2618-conic-relations.test.ts`: one dot, no ordinal, at the touch point on the circle, the ellipse (p8-1, p8-3, p8-6) and the parabola, its sentence building at seeds 0–5, and after a tangency pinned k (p8-7); fixtures `ellipse-book-p8-1`, `-p8-3`, `-p8-6` (the student's own touch sentence records the point, within the solve's resolution of it). `conic-rings.test.ts`'s "a TANGENT offers nothing" becomes "a TANGENT offers ONE ring, whose click builds".
+
+**Behaviour change for a student:** a line that touches a circle, an ellipse or a parabola now shows one dot at the touch point; clicking it adds «A נקודת החיתוך של הישר … עם …».

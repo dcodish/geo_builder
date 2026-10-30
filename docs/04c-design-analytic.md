@@ -854,6 +854,35 @@ Four one-side lines stay a solved `circle-at`.
 
 *Identifiers:* `dirVector` · `dirRefs` · `at` · `tangent-of { …, at }` · `on-curve(at, circle)` · `relation ⊥ (radius, target)` · `peelTouchList` · `ordered` · `touchFacts` · `line-at { id: tangentLineId(at), through: at, dir: radius, perp: true }` · `tangent` · `tangent-eq` · `parseTangentObject` · `tangent-axis` · `parseCircleFamilies` · `touchAt` · `toolPoint('touch', 'from-P…')`
 
+### The same relations about the ellipse and the parabola ([ADR-AG-355](06c-decisions-analytic.md#adr-ag-355), #2618)
+
+**Parse: one curve-host atom.** `CONIC_NOUN_HE` / `CONIC_NOUN_EN` («אליפסה», «פרבולה») sit beside the circle phrase in the
+chord readers (`CHORD_CIRCLE_HE`, `CHORD_ONE_EN`, `CHORD_LIST_EN`), the diameter readers (the ellipse only: a parabola has
+no centre, #2625), the tangent noun (`TANGENT_HOST_HE/EN` → `readTangentNoun`), the from-point reader (`TANGENT_FROM_*`)
+and the line-first order of `parseCircleAt`. The inscribed family adds `parseConicInscribed` after every circle reader,
+and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/EN`) is `cyclicFacts` on a circle and
+`conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
+`host?: ConicHost` beside `circle?`, absent for the circle.
+
+**Apply: one resolver.** `curveHost(c, host, name, src)` is `circleNamed` with no host, and otherwise the figure's ONE
+curve of that kind (`noHost` for none or several). `tangent-of`, `tangent-line-at`, `tangent-eq` (through `tangent-of`),
+`tangent-through` and `diameter-of` read it. A chord's and an inscribed vertex's incidence is `on-kind { kind: host }`,
+the lowering «A על האליפסה» has; an inscribed ring on a conic is never marked `cyclic`.
+
+**Directions.** `Direction` gains `{ k: 'normal', curve, at }`, the canonical conic's gradient (circle: the radius
+vector; ellipse `(x/a², y/b²)`; parabola `(−p, y)`). `touchNormal(host, at)` gives `radius` on a circle — so every circle
+lowering is unchanged — and `normal` on a conic; `applyTouchAt` and the tangent object read it. `radius` on an ELLIPSE is
+its ray from the centre (the origin), which is what makes the diameter's existing lowering (ends on the curve,
+`distinct`, AB ∥ `radius(A)`) the chord through the centre.
+
+**Tangency with no touch point.** `tangent-curve { circle, line }` may name an ellipse or a parabola; its row is then
+`conicTangencyRows`: the straight substituted into the conic (`lineQuadratic`, now in the leaf module
+`engine/lineQuadratic.ts` with `conicSize`, so the solver reads it without a cycle through `crossing-order.ts`) and the
+double-root condition `(B² − 4AC)·|d|² / (A²·size²)`, signed. A line parallel to a parabola's axis is a unit miss; a
+bounded segment keeps `t* = −B/2A` within [0, 1] as two hinge rows.
+
+*Identifiers:* `ConicHost` · `conicHostOf` · `curveHost` · `touchNormal` · `conicTangencyRows` · `parseConicInscribed` · `conicInscribedFacts`
+
 ### The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
 
 `the-circle { create, about, match? }` is the one contextual-circle fact; M1's `theCircle(c, match)` binds, creates or
@@ -1072,6 +1101,9 @@ promotion; it binds crossings only (`crossing`, `parseIntersection`).
 by `nth` (`crossingsOf`), the `crossing-nth` selector and the seeding. A straight is a `Walk` (`walkThrough(from, to)`,
 `walkOfCoefficients`).
 `conicMeet` substitutes the walk into the canonical conic and returns EVERY root, `t` ascending, plus whether it is a touch. The order is taken before the extent: `crossingsOf` numbers the unfiltered roots and only then applies `within` and the occupancy test, so a side's single ring carries its line's number and a taken ring never renumbers its sibling.
+**A touch offers ONE ring** ([ADR-AG-356](06c-decisions-analytic.md#adr-ag-356), #2618): `meetConic` asks `conicTouchOf`
+first — the scale-free test (the chord the straight would cut, under `SOLVE_RESOLUTION` × the conic's size) the touch
+lowerings use — and offers its point once, with no ordinal; only a straight that does not touch reads `conicMeet`'s roots.
 **A SECOND READER of the seeding** ([ADR-AG-263](06c-decisions-analytic.md#adr-ag-263), #1917): the block after the
 ordinal's reads the same `orderedCrossings` for every point with exactly TWO incidences and no ordinal, and starts it
 on the root no EARLIER point holds — 2-D's `otherCrossing` ([ADR-045](06-decisions.md#adr-045) R8), ported as a start.

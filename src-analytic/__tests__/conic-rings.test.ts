@@ -61,15 +61,19 @@ describe('#1096 — a line crossing a conic offers its rings', () => {
     expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=99']).crossings).toHaveLength(0);
   });
 
-  it('and a TANGENT offers nothing either — deliberately', () => {
+  it('and a TANGENT offers ONE ring, at the touch, whose click builds (#2618, ADR-AG-356)', () => {
     /**
-     * A tangency is a real meeting point, but measured, the sentence a ring would offer there does
-     * NOT build: the two incidences are degenerate at a touch and the solve returns `unsatisfiable`
-     * even while landing on the right point. A ring whose click fails is worse than no ring — the
-     * ADR-AG-054 principle, which outranks the ruling to offer more rings (that ruling was about
-     * anonymous conics, not about tangency). Filed separately rather than papered over.
+     * #1096 withheld this ring because the sentence it would offer did not build at a touch (ADR-AG-054: a ring whose
+     * click fails is worse than no ring). Re-measured for #2618 it builds on the circle, the ellipse and the parabola,
+     * and the operator ruled the dot on all three (2026-10-30, Q2 → A). One ring, no ordinal: the two crossings are
+     * one point.
      */
-    expect(at(['x^2/9+y^2/4=1', 'נתון הישר l1: y=2']).crossings).toHaveLength(0);
+    const lines = ['x^2/9+y^2/4=1', 'נתון הישר l1: y=2'];
+    const { d, crossings } = at(lines);
+    expect(crossings).toHaveLength(1);
+    expect([round(crossings[0].x), round(crossings[0].y)]).toEqual([0, 2]);
+    expect(crossings[0].nth).toBeUndefined();
+    expect(derive([...lines, crossingSentence(crossings[0], freeLetter(d.construction))], 0).faults).toEqual([]);
   });
 });
 
