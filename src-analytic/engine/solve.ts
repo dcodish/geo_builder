@@ -1407,6 +1407,16 @@ export function withToleranceFactor<T>(factor: number, fn: () => T): T {
  */
 export const SOLVE_RESOLUTION = 10 * Math.sqrt(SOLVE_TOL);
 
+/** The damping at or below which `solveLM` is in its Newton regime and anchors its step (#1182, ADR-AG-347): its
+ *  starting λ, so the regime is "no attempt refused since the last accepted step". */
+const ANCHOR_LAMBDA = 1e-3;
+const ANCHOR_WINDOW = 3;
+const NEWTON_RATIO = 0.25;
+const ANCHOR_MIN_PULL = 0.25;
+const ANCHOR_RAISES = 2;
+/** The plain iterations that finish an anchored solve stopped short of the loop's tolerance (#1182). */
+const POLISH_ITER = 8;
+
 export interface SolveResult {
   /** The carrier values that satisfy the constraints, in the order they were handed in. */
   values: number[];
@@ -1432,14 +1442,36 @@ export function solveLM(
   x0: number[],
   residuals: (x: number[]) => number[],
   maxIter = 120,
+  /**
+   * How many LEADING coordinates are ANCHORED at `x0` (#1182, [ADR-AG-347](../../docs/06c-decisions-analytic.md#adr-ag-347)):
+   * in the Newton regime their step lands on the point of the linearised solution set nearest `x0`, not the point
+   * nearest the current iterate. `0` (the default) is the plain damped step. A figure solve anchors its free
+   * vertices (`2 · ids.length`) and leaves the parameters after them on the plain step.
+   */
+  anchored = 0,
 ): SolveResult {
   const n = x0.length;
+  /*
+   * A DETERMINED START IS NOT ANCHORED (round #2627, ruling 2026-10-30 "5 A"): with no free direction at the start
+   * (`freeRank` = 0) the solution set is isolated points, the nearest one is the one the descent reaches anyway, and
+   * the anchored pull could only slow the last steps (the exam's «שטח המשולש APQ» read «99.999999»). One rank of the
+   * start's Jacobian, paid only by an anchored solve.
+   */
+  /** A figure solve (one that asks to anchor) is always finished by the plain step at the tight tolerance — below. */
+  const finish = anchored > 0;
+  if (anchored > 0 && freeRank(x0, residuals) === 0) anchored = 0;
   let x = [...x0];
   let lambda = 1e-3;
 
   const cost = (v: number[]) => residuals(v).reduce((s, r) => s + r * r, 0);
   let f = cost(x);
   let stalled = 0;
+  /** The costs of the last accepted iterates, newest last — the anchored step's non-monotone reference (#1182). */
+  const recent: number[] = [];
+  /** Is the descent in its Newton regime — did the last plain step cut the cost at least fourfold (#1182)? */
+  let newton = false;
+  let raises = 0;
+
 
   const tol = SOLVE_TOL * TOLERANCE_FACTOR;
   for (let iter = 0; iter < maxIter && f > tol * tol; iter += 1) {
@@ -1460,18 +1492,57 @@ export function solveLM(
       for (let i = 0; i < m; i += 1) J[i][j] = (ru[i] - rd[i]) / (2 * h);
     }
 
+    /**
+     * THE STEP IS ANCHORED AT THE START, in the Newton regime (#1182, ADR-AG-347).
+     *
+     * The plain step `(JᵀJ + λ·diag) δ = −Jᵀr` is the shortest step from the CURRENT iterate. On an under-determined
+     * figure the free directions then drift with every step's curvature, and the solve stops wherever the descent
+     * lands on the solution set: «A(0,0) · B(6,8) · נקודה M · MA = MB» seeded M beside the figure and stopped it two
+     * spans out, A and B a dot in 39 % of the view. The anchored step lands on the point of the linearised set
+     * `r + J (x' − x) = 0` nearest `x0` instead: `x' = x0 + J⁺ (J (x − x0) − r)`, i.e. `x' = x + a + δ'` with
+     * `a = x0 − x` on the anchored coordinates (0 on the rest) and `δ'` the answer of the same `JᵀJ`, damped by
+     * `λ·I` (the Euclidean nearest point), for the right-hand side `−Jᵀ(r + J a)`: one extra matrix–vector product
+     * and one more small elimination, no extra Jacobian. At `x = x0` it IS the plain step.
+     *
+     * Only in the Newton regime (the last plain step cut the cost at least fourfold, λ at or below its start), so
+     * the far regime keeps today's damped descent (ADR-AG-144). On a CURVED set the jump back to the start leaves
+     * the set, so the pull is halved down to a quarter, and it may raise the cost above the current iterate's (never
+     * above the last three accepted ones'), at most twice per solve. Once the anchored and plain candidates agree to
+     * the solver's resolution the plain step finishes, so convergence stays quadratic.
+     */
+    const anchoring = anchored > 0 && newton && lambda <= ANCHOR_LAMBDA;
+    let a: number[] | null = null;
+    let Ja: number[] | null = null;
+    if (anchoring) {
+      a = x.map((v, i) => (i < anchored ? x0[i] - v : 0));
+      Ja = new Array(m).fill(0);
+      for (let k = 0; k < m; k += 1) {
+        let s = 0;
+        for (let j = 0; j < anchored; j += 1) s += J[k][j] * a[j];
+        Ja[k] = s;
+      }
+    }
+
     // Normal equations (JᵀJ + λ·diag) δ = −Jᵀr, solved by Gaussian elimination. n is small — the
     // corpus's figures have a handful of unknowns — so a dense solve is the honest simple choice.
     const A: number[][] = Array.from({ length: n }, () => new Array(n + 1).fill(0));
+    // The anchored step's system: the same JᵀJ, damped by λ·I — the EUCLIDEAN nearest point, never the scaled one.
+    const N: number[][] | null = Ja ? Array.from({ length: n }, () => new Array(n + 1).fill(0)) : null;
     for (let i = 0; i < n; i += 1) {
       for (let j = 0; j < n; j += 1) {
         let s = 0;
         for (let k = 0; k < m; k += 1) s += J[k][i] * J[k][j];
         A[i][j] = s + (i === j ? lambda * (1 + s) : 0);
+        if (N) N[i][j] = s + (i === j ? lambda : 0);
       }
       let b = 0;
       for (let k = 0; k < m; k += 1) b -= J[k][i] * r[k];
       A[i][n] = b;
+      if (N && Ja) {
+        let b2 = 0;
+        for (let k = 0; k < m; k += 1) b2 -= J[k][i] * (r[k] + Ja[k]);
+        N[i][n] = b2;
+      }
     }
 
     const delta = gaussian(A, n);
@@ -1480,10 +1551,31 @@ export function solveLM(
       if (lambda > 1e12) break;
       continue;
     }
+    const toward = a && N ? gaussian(N, n) : null;
 
-    const next = x.map((v, i) => v + delta[i]);
-    const fn = cost(next);
-    if (fn < f) {
+    const plain = x.map((v, i) => v + delta[i]);
+    let next = plain;
+    let fn = Infinity;
+    let anchoredStep = false;
+    if (toward) {
+      const near = x.map((v, i) => v + a![i] + toward[i]);
+      const scale = Math.max(1, ...x.map((v) => Math.abs(v)));
+      let gap = 0;
+      for (let i = 0; i < n; i += 1) gap = Math.max(gap, Math.abs(near[i] - plain[i]));
+      const ref = raises < ANCHOR_RAISES ? Math.max(f, ...recent) : f;
+      for (let t = 1; t >= ANCHOR_MIN_PULL && gap * t > SOLVE_RESOLUTION * scale; t /= 2) {
+        const cand = t === 1 ? near : plain.map((v, i) => v + t * (near[i] - v));
+        const fc = cost(cand);
+        if (fc < ref) {
+          next = cand;
+          fn = fc;
+          anchoredStep = true;
+          break;
+        }
+      }
+    }
+    if (!anchoredStep) fn = cost(next);
+    if (fn < f || anchoredStep) {
       /**
        * A STALL IS NOT CONVERGENCE (ADR-AG-144, #1317). A descent parked at a saddle or on a valley
        * toward infinity keeps accepting steps that shave a millionth off the cost, and used to spend the
@@ -1492,14 +1584,37 @@ export function solveLM(
        * takes far more than a millionth per step; eight such steps in a row is a stall, and stopping
        * there returns the same best effort a hundred iterations later would.
        */
-      stalled = fn > f * (1 - 1e-6) ? stalled + 1 : 0;
+      if (fn >= f) raises += 1;
+      else stalled = fn > f * (1 - 1e-6) ? stalled + 1 : 0;
+      if (!anchoredStep) newton = fn <= f * NEWTON_RATIO;
+      recent.push(f);
+      if (recent.length > ANCHOR_WINDOW) recent.shift();
       x = next;
       f = fn;
+
       lambda = Math.max(lambda * 0.3, 1e-12);
       if (stalled >= 8) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
+    }
+  }
+
+  /**
+   * THE PLAIN STEP FINISHES (#1182). The anchored step's pull is halved on a curved set, so near the set its
+   * convergence can be linear, and a solve can stop inside `ok`'s tolerance but short of the plain step's precision:
+   * «B על ציר ה-x» landed 1.4e-6 off its exact 2, and an area printed «99.999999». A few plain steps from there are
+   * the tiny minimum-norm correction from a point already on the set: they restore the precision without drifting.
+   * ALWAYS, for a figure solve (round #2627, ruling 2026-10-30 "5 A": "always polish"): the loop stops at its own
+   * tolerance, and the plain step's overshoot is what used to carry a figure far below it, so the finish runs at the
+   * TIGHT tolerance (ADR-AG-143's factor) — a few quadratic steps from a point already on the set, which move it by less
+   * than the loop's tolerance. A determined start (not anchored) is finished the same way.
+   */
+  if (finish) {
+    const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x, residuals, POLISH_ITER));
+    if (cost(p.values) < f) {
+      x = p.values;
+      f = cost(x);
     }
   }
 

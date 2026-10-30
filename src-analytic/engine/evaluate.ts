@@ -2273,9 +2273,18 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
   // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
   const budget = paramRegister(c).length > 0 ? 40 : 120;
   for (const g of groups) {
+    /*
+     * The unknowns: a line placed on the earlier figure moves its own points; a line that REPLAYS the earlier figure's
+     * solve (no row of it names an earlier line) is solved over the same vector stage one uses — every free vertex, the
+     * ones its rows do not reach held by zero columns — so the anchored step (#1182, ADR-AG-347) takes the same path and
+     * lands where the earlier figure's own stage one landed. That figure's vector holds the free vertices of the lines
+     * before the first line placed on it, so this one does too (a later point's start would change the step's scale).
+     */
+    const firstPlaced = Math.min(...groups.filter((q) => q.onEarlier).map((q) => q.line));
+    const unknowns = g.onEarlier ? g.ids : freeIds(c).filter((id) => g.ids.includes(id) || (c.objectLine?.[id] ?? Number.POSITIVE_INFINITY) < firstPlaced);
     const asMap = (x: number[]): Map<Id, Pt> => {
       const m = new Map(seeded);
-      g.ids.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      unknowns.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
       return m;
     };
     const residualsAt = (x: number[]): number[] => {
@@ -2331,9 +2340,12 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       // precision the figure is drawn at (measured: at the loop tolerance corpus 471's 2/4 drew F 6e-7 off E's x, where the
       // joint descent's overshoot had given 8e-9). The earlier figure's own solve, replayed here, is therefore finished a
       // little further than that figure ran it: it can differ by the loop tolerance (≤ 2.2e-7 measured), never visibly.
-      const x0 = g.ids.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
+      const x0 = unknowns.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
       const iters = g.ids.length === 1 ? 60 : budget;
-      const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
+      // Anchored at the start as stage one is (#1182, ADR-AG-347): a line's replayed solve must land where the earlier
+      // figure's own stage one landed, and a new point lands on the member of its set nearest where it was seeded.
+      const solve = () => solveLM(x0, residualsAt, iters, x0.length);
+      const r = g.onEarlier ? withToleranceFactor(TIGHT_TOLERANCE_FACTOR, solve) : solve();
       if (!r.ok) continue;
       const m = asMap(r.values);
       if (!admissible(place(c, env, m))) continue;
@@ -3090,6 +3102,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * solution found, the fallback is today's figure and the post-hoc judge still has the last word.
    */
   const ownFree = new Set(ids);
+  /** The free vertices lead the vector (`carrierSystem`); the parameters after them stay on the plain step (#1182). */
+  const anchorAt = (system: CarrierSystem): number => 2 * system.ids.length;
   const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
     c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
@@ -3233,16 +3247,21 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       // A figure with no parameters keeps the multi-start as it always was.
       const budget = solved.syms.length > 0 ? 40 : 120;
       const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
-      const first = solvePreferring(
-        vertexStarts.map((m) => stageOne.toVec(m)),
-        stageOne.residualsAt,
-        budget,
-        () => true,
-        (x) => selectorsHoldAt(stageOne, x),
-        // With parameters, stage one is only a question (see below) and stage two — where a parameter can
-        // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
-        (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
-      );
+      const near = solveLM(stageOne.toVec(starts[0]), stageOne.residualsAt, budget, anchorAt(stageOne));
+      // A start the anchored step could not bring home is still tried on the plain step (the multi-start below
+      // re-solves it first), so the anchored solve can never cost a figure the convergence it had.
+      const first = near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env)
+        ? near
+        : solvePreferring(
+            vertexStarts.map((m) => stageOne.toVec(m)),
+            stageOne.residualsAt,
+            budget,
+            () => true,
+            (x) => selectorsHoldAt(stageOne, x),
+            // With parameters, stage one is only a question (see below) and stage two — where a parameter can
+            // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
+            (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
+          );
       firstEffort = stageOne.asMap(first.values);
       // A converged stage one the selectors reject is not the answer while a parameter could still move
       // (#1463): at the seed's radius only the COLLAPSED kite fits the circle, and the configuration the
