@@ -20,19 +20,29 @@ import saved from './fixtures/issue-2615-p3-21-chord.analytic.json';
 const SEEDS = Array.from({ length: 24 }, (_, i) => i);
 const kindWord = ((k: string) => k) as never;
 
-/** Every line through the REAL submit door; the recorded lines and the first refusal, if any. */
-function submitAll(lines: readonly string[], seed: number): { acc: string[]; refused?: string } {
+/**
+ * Every line through the REAL submit door; the recorded lines, the lines answered «already known» (not recorded, the
+ * student carries on), and the first refusal, if any.
+ */
+function submitAll(lines: readonly string[], seed: number): { acc: string[]; known: string[]; refused?: string } {
   const acc: string[] = [];
+  const known: string[] = [];
   for (const line of lines) {
     const v = decideSubmit(line, acc, seed) as { kind: string; line?: string; error?: { key: string } };
-    if (v.kind !== 'record') return { acc, refused: `${line} → ${v.error?.key ?? v.kind}` };
+    if (v.kind === 'already-known') {
+      known.push(line);
+      continue;
+    }
+    if (v.kind !== 'record') return { acc, known, refused: `${line} → ${v.error?.key ?? v.kind}` };
     acc.push(v.line ?? line);
   }
-  return { acc };
+  return { acc, known };
 }
-const E = (lines: readonly string[], seed: number) => {
+/** `known`: the lines the door answers «already known» — only a sign the figure already implies (ADR-AG-353 §6). */
+const E = (lines: readonly string[], seed: number, known: readonly string[] = []) => {
   const r = submitAll(lines, seed);
   expect(r.refused, `seed ${seed}`).toBeUndefined();
+  expect(r.known, `seed ${seed}`).toEqual(known);
   const d = derive(r.acc, seed);
   expect(d.faults, `seed ${seed}`).toEqual([]);
   return ask(d, 'E', fmtAnalytic, kindWord).value;
@@ -40,7 +50,9 @@ const E = (lines: readonly string[], seed: number) => {
 
 describe('#2615 — p3-21: E is the chord’s other end, never A', () => {
   it.each(SEEDS)('seed %i: «E» answers exactly (5, -3)', (seed) => {
-    expect(E(saved.lines, seed)).toBe('(5, -3)');
+    // «b > 0» after «x²/a²+y²/b²=1»: an ellipse's semi-axis letters are positive (ADR-AG-353 §6, R191), as «r > 0» is
+    // after a radius (#2419) — answered «already known», never recorded; the student's sequence still builds E.
+    expect(E(saved.lines, seed, ['b > 0'])).toBe('(5, -3)');
   });
 
   it.each(SEEDS.slice(0, 6))('seed %i: E is never within sight of A in any drawable configuration', (seed) => {

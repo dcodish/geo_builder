@@ -528,8 +528,9 @@ describe('fixtures3 — the regression net', () => {
         for (const f of r.facts) {
           expect(d.status[f.id], f.utterance).toBe(f.enabled ? 'ok' : 'disabled');
         }
-        // #1188: a figure of FREE vectors draws without a single point — it is still a figure
-        expect(d.positions.size + d.resolved.freeVectors.size).toBeGreaterThan(0);
+        // #1188: a figure of FREE vectors draws without a single point — it is still a figure; so is one of free lines or
+        // planes alone (#1566: «הישר d מאונך לישר ℓ1 ולישר ℓ2» on a blank canvas creates ℓ1, ℓ2 and d, and no point)
+        expect(d.positions.size + d.resolved.freeVectors.size + d.resolved.lines.size + d.resolved.planes.size).toBeGreaterThan(0);
       });
 
       it('no parser drift: every stored utterance still lowers to the stored commands', () => {
