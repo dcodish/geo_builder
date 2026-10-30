@@ -268,6 +268,9 @@ const SEEDED: SeededCorpus = {
   // angle drove the figure (#909) but the arc lane was keyed on a shared NAME, so nothing was drawn
   // where they meet.
   'box-seg-angle-cross-917.geo3.json': ["תיבה ABCDA'B'C'D'", "הזווית בין AC' לבין BD' היא 55"],
+  // #1310 (ADR-3D-397) — the operator's exact sequence: a second free vector keeps the first (before: the AB arrow vanished
+  // and line 1 turned red). The other sequences, the notice and the class guard are in issue-1310-many-free-vectors.test.ts.
+  'vectors-two-free-1310.geo3.json': ['וקטור AB', 'וקטור CD'],
   // #1311 (ADR-3D-260) — the operator's exact sequence, both orders. A stated length on a FREE vector was
   // refuted `claim-refuted` against the ≈2.34 the sampler invented; it is a GIVEN the pivot drives, and the
   // one-line form (refused `unknown-point: A`) now builds the same figure. Green replay + no drift.

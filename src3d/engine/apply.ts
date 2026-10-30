@@ -404,29 +404,14 @@ function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
 }
 
 /**
- * A DRAWING REGISTER MAY INTRODUCE ITS OWN POINTS ON AN EMPTY CANVAS (#1184).
- *
- * Operator, 2026-09-18: *"on 3d tool, i cannot create a simple vector AB. on first classes of the
- * subject this is required."* The 3-D tool was solid-first: every lane that draws a pair refused two
- * unknown endpoints, which is right once a figure exists — «קטע QZ» with both ends unknown is a typo,
- * and minting for it would hide the mistake. On an EMPTY canvas every pair is both-fresh, so the
- * typo guard also blocked the first thing the vectors unit asks a student to draw.
- *
- * An empty canvas has nothing to have mistyped against, so there is no typo to catch and nothing is
- * lost by drawing what they asked for. Once ANY figure exists the guard is exactly as it was.
- *
- * **Applied to the ARROW lane only**, and that scope was measured rather than assumed. Widening the
- * bare-segment lane too moves two locks that encode decisions which should stand: «קטע AB» then
- * «דלתון ABCD» stops being a declaration and takes the completion arm with two unknowns (#601), and
- * «אלכסון AB» before any solid stops being refused although no solid exists for it to be a diagonal
- * of (#978). The difference is structural, not arbitrary: the segment lane feeds shape-completion and
- * role rules that ask *which points already exist*, so widening it changes what THEY do; an arrow
- * feeds none of them. It is a named predicate anyway, so the next register that needs this asks the
- * same question in the same place.
+ * (History) #1184 let the arrow lane mint its own endpoints on an EMPTY canvas, through a predicate
+ * `canStartFigure` (no points, no solids). ⚠ RETIRED by #1310 ([ADR-3D-397](../../docs/06b-decisions-3d.md#adr-3d-397)):
+ * the predicate read the existence of points the line did not name, and the #1467 mint pass refolds with the points
+ * it created for LATER rows already placed — so «וקטור AB» · «וקטור CD» refolded row 1 onto a canvas holding C and D,
+ * and the first arrow vanished. An arrow's missing endpoints are now created by the one point-creating mechanism, the
+ * fold's mint pass (docs/17 §3 "mint eligibility"); FR-VC-1b's "the first vector on an empty canvas announces
+ * nothing" is the notice filter's rule, read over the list (`store3.ts`, `created`).
  */
-function canStartFigure(c: Construction3): boolean {
-  return c.points.size === 0 && c.solids.length === 0;
-}
 
 /** Mint the missing endpoints as `free3` (ADR-052 — an unstated position is a free DOF, never a fixed default). */
 export function mintFree(c: Construction3, ids: Id[]): Construction3 {
@@ -1944,7 +1929,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
        * it was is replaced by the created-points notice (which a declaration never shows). «אלכסון AB» is not bare
        * drawing: it keeps its refusal with no solid (#978) — the `diagonal` guard below and `mintEligible3`.
        *
-       * (History) THE BOTH-FRESH REFUSAL STAYS HERE, and #1184 measured why (see `canStartFigure`).
+       * (History) THE BOTH-FRESH REFUSAL STAYS HERE, and #1184 measured why (`canStartFigure`, retired by #1310).
        *
        * The empty-canvas relaxation that lets «וקטור AB» start a figure is applied to the ARROW lane
        * only. Widening it here as well was built and measured, and it moves two locks that encode
@@ -2128,15 +2113,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'draw-arrow': {
       // #72: `חץ A'C` — pure ink: record the unnamed arrow + draw its carrier segment.
       /**
-       * #1184: the arrow is a DRAWING REGISTER, so it may start a figure on an empty canvas — the
-       * same rule, and the same predicate, as the bare segment above. It matters more here than
-       * there: after arm 3 this is the lane «וקטור AB» lands in, and the vectors unit begins with
-       * nothing on the canvas at all.
+       * #1310 (ADR-3D-397): the arrow lane never creates a point. A missing endpoint is reported `unknown-point` and
+       * the fold's mint pass creates it, like every other referenced point — so no lane predicate can read the points
+       * the pass created for a later row (the retired `canStartFigure`, #1184).
        */
-      const base = canStartFigure(c) ? mintFree(c, [cmd.from, cmd.to]) : c;
-      const missing = missingPoint(base, [cmd.from, cmd.to]);
+      const missing = missingPoint(c, [cmd.from, cmd.to]);
       if (missing) return { ok: false, error: missing };
-      const next = clone(base);
+      const next = clone(c);
       if (!next.arrows.some(([f, t]) => f === cmd.from && t === cmd.to)) next.arrows.push([cmd.from, cmd.to]);
       if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]);
       return { ok: true, next };

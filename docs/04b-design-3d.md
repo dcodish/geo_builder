@@ -458,13 +458,14 @@ configuration. `knowledgeSamples3(c, seeds, { readback: true })` adds one image 
 non-zero; `dataView` and every `answerQuery` lane read back, claims and narrowing keep the plain samples, and the
 drawing never walks.
 
-### Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
+### Who may introduce a point (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253); #1310, [ADR-3D-397](06b-decisions-3d.md#adr-3d-397))
 
-A **carrier** («נסמן: AB = u») never introduces its own subject (`v7-t1`); only a **drawing register** —
-`segment3 {bare}` and `draw-arrow` — may introduce points. Both refuse a pair with two unknown endpoints
-(the typo guard) except where `canStartFigure(c)` holds (no points, no solids), and that exception is
-applied to the arrow lane only: `segment3 {bare}` feeds shape-completion and role rules that ask which
-points exist (#601, #978). `canStartFigure` is the named predicate the next register asks.
+A **carrier** («נסמן: AB = u») never introduces its own subject in its own lane (`v7-t1`). The bare segment
+(`segment3 {bare}`) declares its fresh ends (ADR-3D-382). **The arrow lane (`draw-arrow`) never creates a
+point**: a missing endpoint is reported `unknown-point` and the fold's mint pass creates it (below). #1184's
+`canStartFigure` (no points, no solids), which let the arrow lane mint on an empty canvas, is retired: it read the
+existence of points the line did not name, and the mint pass's refold places points created for LATER rows first.
+"The first vector on an empty canvas announces nothing" (FR-VC-1b) is the notice filter's rule (`startsFigure3`).
 
 ### The mint pass ([ADR-3D-382](06b-decisions-3d.md#adr-3d-382), #1467)
 
@@ -486,6 +487,15 @@ both fresh ends. `Derived3.created` → the store's `lastCreated` on `record` �
 the WHOLE fold, so a later row may already own the name an earlier row introduces («נסמן: AB = u» · «וקטור u» on a
 blank page). A post-mint `already-defined` therefore keeps the row's created points as a `premint` candidate and lets
 the in-order refold judge; a clash that is real in list order is dropped by the refold exactly as any failing row is.
+**The refold checks every row** ([ADR-3D-397](06b-decisions-3d.md#adr-3d-397), #1310): the rows the fold made ok before
+the pass (`okBeforePass`) are passed to the refold (`mustStayOk`), which reports those its fold turned red
+(`foldOut`). A red one that is ok again once the points created for the rows AFTER it are withheld (`readsLater`, one
+extra fold, only on a breakage) read a later row's points: the choice is rejected (the newest minting row gives its
+points back) and `deriveStats3.refoldBroke` counts it — the class guard asserts 0 over every fixture. A row an EARLIER
+row's points turn red is list order's own verdict and stands. **The notice in list order:** `created` omits a row made
+only of `draw-arrow` commands when no ok row before it in the list put a point on the figure (`pointAdders`) or had
+points created for it (`startsFigure3`) — the first vector on an empty canvas; computed over the list, never the
+refold's construction.
 
 ### Free vectors ([ADR-3D-386](06b-decisions-3d.md#adr-3d-386), #1188)
 

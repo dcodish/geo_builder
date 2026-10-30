@@ -10167,7 +10167,7 @@ The narrow repair — widen the guard so `→` counts as "already marked" — wo
 
 ### ADR-3D-253 — A vector may START a figure, and the vector WORD draws an arrow (#1184)
 
-**Status:** accepted, 2026-09-20 · **Issue:** #1184 (feature, P2, `3d`) · operator report + rulings 2026-09-18 · round #1292
+**Status:** accepted, 2026-09-20 · **Issue:** #1184 (feature, P2, `3d`) · operator report + rulings 2026-09-18 · round #1292 · **⚠ Superseded in part by [ADR-3D-397](#adr-3d-397) (2026-10-30):** `canStartFigure` and the arrow lane's own minting are retired; an arrow's missing endpoints are created by the fold's mint pass, and "the first vector on an empty canvas announces nothing" is the notice filter's rule.
 **Requirements:** [02b](02b-requirements-3d.md) — FR-VC · **Design:** [04b](04b-design-3d.md)
 **Completes** [ADR-3D-013 Am.](#adr-3d-013)'s answer to *"how would a user enter a vector?"*, and **supersedes** [ADR-3D-039](#adr-3d-039)'s scope note about the vector word
 **Builds on** [ADR-3D-250](#adr-3d-250)/#1183 — the `marked` bit, so there is ONE notion of "the student said vector"
@@ -13601,7 +13601,7 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 
 ## ADR-3D-382 — A line that refers to a point the figure lacks creates it, last, in the fold: the mint pass (#1467)
 
-**Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · the 3-D half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-3D-191](#adr-3d-191) (the both-fresh «קטע» refusal is withdrawn: a bare segment declares its ends) · **supersedes** #840's 2026-08-31 typo guard and the "nothing is invented" clauses of [ADR-3D-257](#adr-3d-257) / [ADR-3D-259](#adr-3d-259) for points · folds in #2048 S2(a) (points inside a vector line are created too, so `v7-t1`'s "kept" refusal is rewritten here, not locked and rewritten later)
+**Status:** accepted · 2026-10-27 · feature (3d) · fix round #2561, stream I · branch `feat/1467-create-on-mention` · **amended by** [ADR-3D-397](#adr-3d-397) (2026-10-30: the refold checks every row, not only the rows that minted) · the 3-D half of [ADR-W-162](06w-decisions-workspace.md#adr-w-162) · **amends** [ADR-3D-191](#adr-3d-191) (the both-fresh «קטע» refusal is withdrawn: a bare segment declares its ends) · **supersedes** #840's 2026-08-31 typo guard and the "nothing is invented" clauses of [ADR-3D-257](#adr-3d-257) / [ADR-3D-259](#adr-3d-259) for points · folds in #2048 S2(a) (points inside a vector line are created too, so `v7-t1`'s "kept" refusal is rewritten here, not locked and rewritten later)
 
 **Operator:** ruling 2026-09-27 on #1467, *"Create everywhere + notice"*, *"Notice with one-click undo"*; T41 (2026-10-24) cube · «E אמצע XC»: *"we can create a point X so the claim satisfies. point x just has 3 dofs at this declaration until user narrows it."*; T49 «קובייה ABCD» · «PQ = 2AB»: *"same comment"*; #2048 ruling A.
 
@@ -13957,3 +13957,29 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Perf.** The predicate is a structural walk over the named points' definitions; no sampling (M3). The reported line: ~35 ms per seed (was a refusal).
 
 **Behaviour change for a student:** in 3-D, a length, angle or perpendicular stated on a point riding a cube's edge now moves the point (E lands where the given puts it), in either order, where before it was refused «בדקו את החישוב». A given no point on the edge can meet is still refused, now as a contradiction naming the statements.
+
+
+## ADR-3D-397 — An arrow's endpoints are created only by the mint pass, and the refold checks every row (#1310)
+
+**Status:** accepted · 2026-10-30 · fix (3d, P2, wrong-answer) · fix round #2627, stream H · branch `fix/1310-mint-only` · plan: the #1310 "Fix plan — 2026-10-30" comment, operator-approved 2026-10-30 ("7 yes") · **supersedes in part** [ADR-3D-253](#adr-3d-253) (`canStartFigure`) · **amends** [ADR-3D-382](#adr-3d-382) (the refold's acceptance check)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-1b — unchanged in substance; "however many vectors the figure already has" added to the created-endpoints sentence · **Design:** [04b](04b-design-3d.md) § "Who may introduce a point" and § "The mint pass" (the every-row check, the list-order notice) · **LADDER stage:** none — the fold and its mint pass, before the pivot
+
+**Operator:** 2026-09-21 on #1310, *"we need to be able to create as many free vectors as we want"*; confirmed in a browser 2026-10-30: «וקטור AB» then «וקטור CD» draws only CD.
+
+**Re-measured at pickup** (`216cf8bb`, `useGeo3.submit` → `derive3`), exactly the plan's table: «וקטור AB» · «וקטור CD» (and «חץ», three vectors, after «וקטור u») drew only the later arrows, line 1 red `unknown-point A`; «וקטור AB» · «וקטור BC» refused `unknown-point B`; «וקטור AB» · «DC→=3AB→» refused `two-unknowns`; «וקטור AB» · «וקטור CD» · «נסמן: AB = u» refused; «וקטור AB» · «קובייה ABCDA'B'C'D'» refused the cube `already-defined A`.
+
+**Root cause.** The arrow lane minted its own endpoints under an apply-time predicate, `canStartFigure(c)` (no points, no solids). The #1467 mint pass creates C and D for row 2 and refolds with them placed BEFORE row 1; there row 1 met a non-empty canvas, the predicate said no, and row 1 failed. The refold re-checked only the rows that minted through the pass, so the broken row 1 went unnoticed. **Class:** an apply-time predicate that reads the existence of points the line did not name, evaluated on a refold whose start holds points created for later rows — and, behind it, a second point-creating mechanism beside the docs/17 §3 "mint eligibility" chokepoint.
+
+**Decision.**
+1. **The arrow lane never creates a point** (`apply.ts` `draw-arrow`). A missing endpoint is `unknown-point`, and the mint pass creates it like every other referenced point. `canStartFigure` is deleted (it was the only emptiness predicate in `src3d/engine`). Because the pass runs after the deferral fixpoint, «וקטור AB» typed above «A(1,2,3)» or above a cube binds to that declaration (ADR-W-162 §2).
+2. **FR-VC-1b's notice rule moves to the notice filter**, read over the list: `created` omits a row made only of arrow drawings when no ok row before it put a point on the figure or had points created for it (`startsFigure3`). «וקטור AB» on an empty canvas (or after «וקטור u») stays silent; a later vector's new endpoints are named.
+3. **The refold checks every row.** Rows ok before the pass must stay ok in the refold's fold. A row that turns red, and is ok again once the points created for rows AFTER it are withheld, read a later row's points: the pass's choice is rejected (the newest minting row gives its points back) and `deriveStats3.refoldBroke` counts it, so the class fails a lock instead of silently reddening a line.
+
+**Deviation from the plan, step 3.** The plan said "a row that was ok before the pass must be ok after it". Built literally, it broke ADR-3D-387's lock («נסמן: AB = u» · «וקטור u»): there the later «וקטור u» is ok in the first fold only because row 1 is still red, and list order rightly refuses it once row 1 has its points. The check therefore rejects only a breakage caused by LATER rows' points (one extra fold, run only when a row breaks), which is the plan's own class statement; a breakage from an earlier row is list order's verdict and stands.
+
+**Verified against the old code:** with `canStartFigure` put back, the class guard goes red (`refoldBroke` = 1 on «וקטור AB» · «וקטור CD» and on the fixtures net), as do 12 of the new rows.
+
+**Locks.** `src3d/__tests__/issue-1310-many-free-vectors.test.ts`: every sequence of the plan's table green with every arrow drawn; free, seed-varying endpoints; «וקטור AB» · «וקטור BC» creates only C; «וקטור AB» · «DC→=3AB→» with C − D = 3(B − A) at three seeds; u in the basis after two vectors; «A(1,2,3)» and a cube typed after the vector bind; the notice rows (silent first vector, silent after «וקטור u», C/D and E/F named, «חץ QZ» after «נקודה P(0,0,0)» names Q, Z); the class guard over every `fixtures3` figure and the vector sequences. Fixture `fixtures3/vectors-two-free-1310.geo3.json` (the operator's exact two lines). `created-notice-1467.test.ts`, `issue-1184-vector-starts-a-figure.test.ts` and `issue-1188-free-vector.test.ts` unedited and green.
+
+**Behaviour change for a student:** a second (third, …) vector no longer erases the first; «וקטור AB» · «וקטור BC» shares B; «וקטור AB» · «DC→=3AB→» builds; a vector typed above the point or solid it names uses that point. The first vector on an empty canvas still shows no notice.

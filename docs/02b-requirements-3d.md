@@ -386,7 +386,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
   that moves on «הציגו תצורה אחרת», never a fixed default), and the student can name what they drew
   in the next line («נסמן: AB = u»). Once a figure exists, a pair with unknown endpoints creates them
-  too, and the created-points notice names them (FR-SP-25; this replaced the by-name refusal, #1467). A vector given
+  too, and the created-points notice names them (FR-SP-25; this replaced the by-name refusal, #1467), however many
+  vectors the figure already has: every earlier vector stays drawn ([ADR-3D-397](06b-decisions-3d.md#adr-3d-397), #1310). A vector given
   only by name or by components, with no points at all, is FR-VC-1d.
   - Sources: ADR-052, ADR-3D-253; #1184, #1188.
 - **FR-VC-1d (Must)** — **A vector may be declared with no position**: by name («וקטור u», «הווקטורים u, v ו-w»,

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-30T15:52:58.229Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור AB",
+      "cmds": [
+        {
+          "type": "draw-arrow",
+          "from": "A",
+          "to": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור CD",
+      "cmds": [
+        {
+          "type": "draw-arrow",
+          "from": "C",
+          "to": "D"
+        }
+      ]
+    }
+  ]
+}

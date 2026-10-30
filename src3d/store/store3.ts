@@ -501,7 +501,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
 
 /** #1422 — the memo's counter lock seam (the 2-D `conflictSearchStats` idiom): one press must
  *  cost exactly one uncached derive, asserted by count, never by clock. */
-export const deriveStats3 = { uncached: 0 };
+/** #1310 (ADR-3D-397): `refoldBroke` counts mint-pass refolds that broke a row the fold had made ok — the class
+ *  guard (`issue-1310-many-free-vectors.test.ts`) asserts it stays 0 over every fixture. */
+export const deriveStats3 = { uncached: 0, refoldBroke: 0 };
 function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   deriveStats3.uncached++;
   return deriveCore3(facts, seed, true);
@@ -529,6 +531,10 @@ function deriveCore3(
   postMint?: Readonly<Record<string, FactStatus3>>,
   /** #2484 (ADR-3D-388): the PLANES the pass decided to create, by row — placed with the points and lines. */
   preplanes?: Readonly<Record<string, readonly string[]>>,
+  /** #1310 (ADR-3D-397): the rows that were ok BEFORE the mint pass — each must still be ok in the refold's fold. */
+  mustStayOk?: readonly string[],
+  /** #1310: where the refold reports which of {@link mustStayOk} its fold broke (read by the pass, never a reader). */
+  foldOut?: { broken: string[] },
 ): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
@@ -559,6 +565,8 @@ function deriveCore3(
    *  below was deliberately widened to EVERY pin kind while the message it emits stayed the
    *  injection-specific one, so a figure carrying no coordinate at all was told to check its. */
   const coordPinOwnerIds = new Set<string>();
+  /** #1310 (ADR-3D-397): the rows whose application added a point to the figure (what "holds a point" reads). */
+  const pointAdders = new Set<string>();
   /** #492: the facts that contributed something CONSTRAINING THE PARAMETER — a pinning given
    *  (`pinningGivens`: plane angles, line⟂plane, S2 line relations) or a `paramGivens` claim. Kept in
    *  fact order, so the LAST is the newest statement: a refusal names what the student just said
@@ -645,6 +653,7 @@ function deriveCore3(
    * fact owns its additions exactly as an in-order one does (the 2-D `recordOwnership` discipline).
    */
   const applyFact = (f: Fact3): FactStatus3 => {
+    const pointsBefore = c.points.size;
     const claimsBefore = c.claims.length;
     const pinsBefore = pivotPinKey(c);
     const coordPinsBefore = c.pins.length + c.vectorPins.length;
@@ -668,6 +677,7 @@ function deriveCore3(
       probe = r.next;
     }
     c = probe;
+    if (c.points.size > pointsBefore) pointAdders.add(f.id); // #1310: the row put a point on the figure
     if (exp.cmds !== f.cmds) resolvedCmds[f.id] = [...exp.cmds];
     // count-delta attribution: EVERY claim recorded while this fact applied belongs to
     // it — including claims composite commands create indirectly (none can escape)
@@ -801,6 +811,8 @@ function deriveCore3(
    * would no longer be true. Eligibility (`mintEligible3`) excludes only the solid-relative noun «אלכסון», whose
    * refusal on a canvas with no solid is the #978 lock.
    */
+  /** #1310 (ADR-3D-397): every row the fold made ok BEFORE the pass — the refold must leave each of them ok. */
+  const okBeforePass = premint ? [] : facts.filter((f) => status[f.id] === 'ok').map((f) => f.id);
   const failedAfterMint: Record<string, FactStatus3> = {};
   /** Every point the pass created, by the row it was created for — what the in-order refold places first. */
   const mintedBy: Record<string, string[]> = premint ? Object.fromEntries(Object.entries(premint).map(([k, v]) => [k, [...v]])) : {};
@@ -912,10 +924,32 @@ function deriveCore3(
     let keepPlanes: Record<string, string[]> = planesBy;
     const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
     for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
-      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes);
-      const failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok');
-      if (failed.length === 0) return again;
-      for (const id of failed) reasons[id] = again.status[id]; // the post-mint reason, read in list order
+      const out = { broken: [] as string[] };
+      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, okBeforePass, out);
+      let failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok');
+      /**
+       * #1310 (ADR-3D-397) — THE REFOLD CHECKS EVERY ROW, not only the rows that minted. A row the fold made ok before
+       * the pass and that the refold's fold turns red is judged: if it is ok again once the points created for the
+       * rows AFTER it are withheld, its verdict depended on a later row's points — the #1310 class (an apply-time
+       * predicate reading a later row's points), which list order forbids. The choice is rejected (the newest row that
+       * minted gives its points back, as a failed minting row does) and counted, so the class surfaces as a red lock,
+       * never as a silently red line. A row an EARLIER row's created points turn red is list order's own verdict and
+       * stands (ADR-3D-387: «נסמן: AB = u» · «וקטור u»). Compared on the FOLD's verdict: a verification verdict reached
+       * later is the row's own and is judged identically with or without the pass.
+       */
+      const order = (id: string) => factsIn.findIndex((f) => f.id === id);
+      const readsLater = (id: string): boolean => {
+        const before = (rec: Record<string, string[]>) => Object.fromEntries(Object.entries(rec).filter(([k]) => order(k) < order(id)));
+        if (Object.keys(keep).every((k) => order(k) < order(id))) return false;
+        const probe = { broken: [] as string[] };
+        deriveCore3(factsIn, seed, false, before(keep), before(keepLines), reasons, before(keepPlanes), [id], probe);
+        return probe.broken.length === 0;
+      };
+      if (failed.length === 0 && out.broken.some(readsLater)) {
+        deriveStats3.refoldBroke++;
+        failed = [Object.keys(keep).reduce((a, b) => (order(b) > order(a) ? b : a))];
+      } else if (failed.length === 0) return again;
+      else for (const id of failed) reasons[id] = again.status[id]; // the post-mint reason, read in list order
       keep = Object.fromEntries(Object.entries(keep).filter(([id]) => !failed.includes(id)));
       keepLines = Object.fromEntries(Object.entries(keepLines).filter(([id]) => !failed.includes(id)));
       keepPlanes = Object.fromEntries(Object.entries(keepPlanes).filter(([id]) => !failed.includes(id)));
@@ -924,9 +958,21 @@ function deriveCore3(
   }
   // a row whose created points were dropped reports why it failed WITH them, never «unknown point» (atomicity)
   if (postMint) for (const [id, st] of Object.entries(postMint)) if (typeof status[id] !== 'string') status[id] = st;
+  if (foldOut && mustStayOk) foldOut.broken = mustStayOk.filter((id) => status[id] !== 'ok');
+  /**
+   * #1310 (ADR-3D-397; 02b FR-VC-1b) — THE FIRST VECTOR ON AN EMPTY CANVAS ANNOUNCES NOTHING: a row made only of arrow
+   * drawings, with no row BEFORE it in list order holding a point, starts the figure — there is nothing it could have
+   * mistyped against. Read over the list (which ok rows put a point on the figure, or had points created for them),
+   * never over the construction the refold sees, so it cannot change geometry or status.
+   */
+  const startsFigure3 = (id: string): boolean => {
+    const at = factsIn.findIndex((f) => f.id === id);
+    if (at < 0 || !factsIn[at].cmds.every((k) => k.type === 'draw-arrow')) return false;
+    return !factsIn.slice(0, at).some((g) => status[g.id] === 'ok' && (pointAdders.has(g.id) || (mintedBy[g.id]?.length ?? 0) > 0));
+  };
   /** What the notice names: the points created by REFERENCE — a row that only declares («קטע AB» · «דלתון ABCD») is silent. */
   const created: Record<string, string[]> = Object.fromEntries(
-    Object.entries(mintedBy).filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? [])),
+    Object.entries(mintedBy).filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? []) && !startsFigure3(id)),
   );
   // #2235 (ADR-3D-351): from here on every reader asks what each line stated ABOUT THE FIGURE — a shape reference is
   // read as the ring it was applied to (the blame, crossing, collapse and narrowing passes below never see a placeholder)
