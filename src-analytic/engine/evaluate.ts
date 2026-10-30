@@ -2100,6 +2100,261 @@ function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construc
   return hit;
 }
 
+/**
+ * THE FIGURE, LINE BY LINE (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)) — which rows each
+ * line's new points answer to, read off the construction's line provenance (`Construction.objectLine`).
+ *
+ * Every constraint and selector belongs to the LATEST line among the free vertices it is placed from — directly, or
+ * through a derived point, a curve or a segment (`objectDeps` and the object's own references, transitively). That
+ * line's new vertices are the ones it moves; every vertex it names from an earlier line is the figure as it stood.
+ * - «משולש ABC» · «D על BC»: «D on BC» names B, C (line 0) and D (line 1), so it is line 1's, and moves D only.
+ * - «משולש ABC» · «AB = 5»: «AB = 5» names A and B, both of line 0, so it is line 0's: a given that constrains the
+ *   earlier figure still moves it (whether it should deform it less is #2039).
+ * - «משולש ABC חוסם את מעגל O»: the ring's vertices came in one sentence, so the rows tying them are one group, fitted
+ *   together — same-sentence nouns stay jointly solved.
+ * A row with no free vertex (a parameter's equation) belongs to no line, and neither does a row through a free symbol: the
+ * symbol or the points could meet it, and provenance does not say which, so the joint solve keeps it as before. A vertex of unknown provenance, or a
+ * construction built without a fold, turns the whole stage off: that figure is solved exactly as before. The stage is
+ * also off unless some row ties a line's new points to a free vertex of an EARLIER line — the class: without such a row
+ * no later line is placed on the figure as it stood, and the joint solve draws it exactly as before.
+ * Memoized per construction.
+ */
+interface LineGroup {
+  line: number;
+  /** The free vertices this line introduced that its rows move. */
+  ids: Id[];
+  rows: Constraint[];
+  selectors: Selector[];
+  /** Does a row of this line name a free vertex of an earlier line — is this line placed ON the figure as it stood? */
+  onEarlier: boolean;
+}
+interface LineGroups {
+  /** In line order; only the lines that own a row. Empty when the stage is off. */
+  groups: LineGroup[];
+  /** The free vertices some row moves (they are among that row's latest-line vertices). */
+  moved: ReadonlySet<Id>;
+  on: boolean;
+}
+const NO_GROUPS: LineGroups = { groups: [], moved: new Set(), on: false };
+const lineGroupsCache = new WeakMap<Construction, LineGroups>();
+function lineGroupsOf(c: Construction): LineGroups {
+  const lines = c.objectLine;
+  if (!lines) return NO_GROUPS;
+  const hit = lineGroupsCache.get(c);
+  if (hit) return hit;
+  const known = new Set(c.objects.map((o) => o.id));
+  const idsIn = (value: unknown, out: Set<Id>): Set<Id> => {
+    if (typeof value === 'string') {
+      if (known.has(value)) out.add(value);
+    } else if (Array.isArray(value)) for (const v of value) idsIn(v, out);
+    else if (value && typeof value === 'object') for (const v of Object.values(value as Record<string, unknown>)) idsIn(v, out);
+    return out;
+  };
+  /** Per object, the free vertices it is placed from. */
+  const deps = new Map<Id, Set<Id>>();
+  for (const o of c.objects) {
+    const mine = new Set<Id>(isFree(o) ? [o.id] : []);
+    for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) for (const v of deps.get(p) ?? []) mine.add(v);
+    deps.set(o.id, mine);
+  }
+  let unknownLine = false;
+  /** The free vertices `value` is placed from, its latest line, and that line's vertices — null for none. */
+  const topOf = (value: unknown): { all: Set<Id>; line: number; ids: Id[] } | null => {
+    let line = Number.NEGATIVE_INFINITY;
+    let ids: Id[] = [];
+    const all = new Set<Id>();
+    for (const id of idsIn(value, new Set())) for (const v of deps.get(id) ?? []) all.add(v);
+    for (const v of all) {
+      const at = lines[v];
+      if (at === undefined) {
+        unknownLine = true;
+        return null;
+      }
+      if (at > line) {
+        line = at;
+        ids = [v];
+      } else if (at === line) ids.push(v);
+    }
+    return ids.length > 0 ? { all, line, ids } : null;
+  };
+  /** Per line, its rows with the vertices each moves, and whether it names an earlier line. */
+  const byLine = new Map<number, Array<{ k: Constraint; ids: Id[]; onEarlier: boolean }>>();
+  const moved = new Set<Id>();
+  let namesEarlier = false;
+  for (const k of c.constraints) {
+    const top = topOf(k);
+    if (!top) continue;
+    if (constraintSymbols([k]).length > 0) {
+      // A row through a free SYMBOL («נסמן זוית BAM כ-A1», «AB = k») could be met by the symbol or by the points, and
+      // provenance does not say which: it stays the joint solve's, and reaches every vertex it names, as before.
+      for (const v of top.all) moved.add(v);
+      continue;
+    }
+    for (const v of top.ids) moved.add(v);
+    // a row that names a vertex of an earlier line: the figure as it stood is in it
+    const onEarlier = top.all.size > top.ids.length;
+    if (onEarlier) namesEarlier = true;
+    byLine.set(top.line, [...(byLine.get(top.line) ?? []), { k, ids: top.ids, onEarlier }]);
+  }
+  if (unknownLine) {
+    lineGroupsCache.set(c, NO_GROUPS);
+    return NO_GROUPS;
+  }
+  /*
+   * One line's new points are fitted TOGETHER only where a row ties them: «המעגל עובר דרך הנקודות A, B ו-C» puts three
+   * points on the circle by three separate rows, so it is fitted as «A על המעגל» · «B על המעגל» · «C על המעגל» is, one
+   * point at a time in the order declared; a ring's vertices, tied by its sides, stay one group.
+   */
+  const order = new Map(freeIds(c).map((id, i) => [id, i] as const));
+  const groups: LineGroup[] = [];
+  const groupOf = new Map<Id, LineGroup>();
+  for (const [line, rows] of [...byLine].sort((p, q) => p[0] - q[0])) {
+    const parent = new Map<Id, Id>();
+    const find = (v: Id): Id => (parent.get(v) === v ? v : find(parent.get(v)!));
+    for (const r of rows) for (const v of r.ids) if (!parent.has(v)) parent.set(v, v);
+    for (const r of rows) for (const v of r.ids.slice(1)) parent.set(find(v), find(r.ids[0]));
+    const parts = new Map<Id, LineGroup>();
+    for (const r of rows) {
+      const root = find(r.ids[0]);
+      let g = parts.get(root);
+      if (!g) parts.set(root, (g = { line, ids: [], rows: [], selectors: [], onEarlier: false }));
+      g.rows.push(r.k);
+      g.onEarlier ||= r.onEarlier;
+      for (const v of r.ids) if (!g.ids.includes(v)) g.ids.push(v);
+    }
+    const first = (g: LineGroup) => Math.min(...g.ids.map((v) => order.get(v) ?? Number.POSITIVE_INFINITY));
+    for (const g of [...parts.values()].sort((p, q) => first(p) - first(q))) {
+      groups.push(g);
+      for (const v of g.ids) groupOf.set(v, g);
+    }
+  }
+  // A selector is judged with the last-fitted group among the points it moves.
+  for (const sel of c.selectors) {
+    const top = topOf(sel);
+    if (!top) continue;
+    const owners = top.ids.map((v) => groupOf.get(v)).filter((g): g is LineGroup => g !== undefined);
+    if (owners.length > 0) owners.reduce((p, q) => (groups.indexOf(q) > groups.indexOf(p) ? q : p)).selectors.push(sel);
+  }
+  const on = namesEarlier;
+  const out: LineGroups = { groups: on ? groups : [], moved, on };
+  lineGroupsCache.set(c, out);
+  return out;
+}
+
+/**
+ * THE FIGURE AS IT STOOD, THEN WHAT EACH LINE ADDED (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348))
+ * — #1647's created-circle fit, generalised to every free vertex, by line.
+ *
+ * «משולש ABC» · «D על BC»: D's letter hashes to a start nowhere near BC, and the joint descent then satisfied the
+ * incidence by moving B, C and D together — a least-squares step spreads its correction over every unknown in the
+ * row — so adding the sentence moved the triangle (24/24 seeds), and the display walk, handed a start that broke
+ * `between` or the spread, redrew the whole figure at another seed. 2-D never re-solves an earlier point for a later
+ * one: a point-on-object is evaluated after its parents.
+ *
+ * This is that rule as a START. In line order, each line's new vertices are fitted TOGETHER to that line's rows
+ * (`lineGroupsOf`), every earlier vertex held where its own line left it. The first lines' fit is the solve the earlier
+ * figure ran, from the same starts; each later line is then fitted to the figure as it was drawn. The joint solve that
+ * follows starts where every fitted row already holds, so it has nothing to spread onto the earlier figure.
+ *
+ * Starts for a line that introduced ONE vertex, in order: its region-seeded position (#1071, #1168, #1268, ADR-AG-208,
+ * ADR-AG-217 already set it); a seed-varied point inside each piece it is bounded to (0.2–0.8, so ADR-052 holds and the
+ * seed still moves it); the quarter points of each carrier through two points, only when no `beyond` selector names it
+ * (a carrier start ignores the extension's region — measured, it broke every «E על המשך …»); the hashed seed. A line
+ * that introduced several starts where they were seeded. The first fit that converges, keeps the line's selectors and
+ * bounded pieces, and puts no new vertex on another point is taken; with none, the line's starts are left as they were.
+ * A fit ON another point is never taken: that is the coincidence the verdict owns (the crossing-already-named family,
+ * ADR-AG-213; the stacked pair, #1273), and the joint solve and the judge decide it exactly as before.
+ * A start, never a verdict: the joint solve and the judge keep the last word.
+ */
+function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
+  const { groups, on } = lineGroupsOf(c);
+  if (!on) return;
+  const scale = residualScale(c, env);
+  // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
+  const budget = paramRegister(c).length > 0 ? 40 : 120;
+  for (const g of groups) {
+    const asMap = (x: number[]): Map<Id, Pt> => {
+      const m = new Map(seeded);
+      g.ids.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      return m;
+    };
+    const residualsAt = (x: number[]): number[] => {
+      const pos = place(c, env, asMap(x));
+      const at = (id: Id) => pos.get(id) ?? null;
+      return g.rows.flatMap((k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at), scale) ?? [0]);
+    };
+    const bounded = g.rows.filter((k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && g.ids.includes(k.id));
+    const starts: Array<Map<Id, Pt> | null> = [new Map(seeded)];
+    if (g.ids.length === 1) {
+      const v = g.ids[0];
+      const placed = place(c, env, seeded);
+      const pointOn = (a: Id, b: Id, t: number): Map<Id, Pt> | null => {
+        const pa = placed.get(a);
+        const pb = placed.get(b);
+        return pa && pb ? new Map(seeded).set(v, { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) }) : null;
+      };
+      const pieces = [
+        ...bounded,
+        ...g.selectors.filter((s): s is Extract<Selector, { kind: 'between' }> => s.kind === 'between' && s.id === v),
+      ];
+      pieces.forEach((k, i) => starts.push(pointOn(k.a, k.b, 0.2 + 0.6 * jitter(seed, 1687 + i))));
+      if (!g.selectors.some((s) => s.kind === 'beyond' && s.id === v)) {
+        for (const k of g.rows) {
+          if (k.t !== 'on-line-2pt' || k.id !== v) continue;
+          for (const t of [0.25, 0.5, 0.75]) starts.push(pointOn(k.a, k.b, t));
+        }
+      }
+      const h = hashed.get(v);
+      if (h) starts.push(new Map(seeded).set(v, h));
+    }
+    const admissible = (pos: Map<Id, Pt>): boolean => {
+      for (const k of bounded) {
+        const pa = pos.get(k.a);
+        const pb = pos.get(k.b);
+        const p = pos.get(k.id);
+        if (pa && pb && p && !withinSegment(pa, pb, p)) return false;
+      }
+      const near = 2 * apartOf(pos);
+      for (const v of g.ids) {
+        const p = pos.get(v);
+        if (p && [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near)) return false;
+      }
+      // A ring this line's points are vertices of keeps the promise its noun makes (#1817's position-level judge): a fit
+      // that collapses «משולש ABC חוסם את מעגל O» is not a start (measured: taken, it faulted 7 of 24 configurations).
+      const hard = ringFaultsOf(c, (id) => pos.get(id)).filter(isHardRingFault);
+      if (hard.some((r) => { const o = objectById(c, r.id); return o?.kind === 'polygon' && o.vertices.some((v) => g.ids.includes(v)); })) return false;
+      return g.selectors.length === 0 || failingSelectors({ ...c, selectors: g.selectors }, pos, env).length === 0;
+    };
+    for (const m0 of starts) {
+      if (!m0) continue;
+      // At the TIGHT tolerance (ADR-AG-143's factor): the joint solve starts on the fit and stops at once, so the fit is the
+      // precision the figure is drawn at (measured: at the loop tolerance corpus 471's 2/4 drew F 6e-7 off E's x, where the
+      // joint descent's overshoot had given 8e-9). The earlier figure's own solve, replayed here, is therefore finished a
+      // little further than that figure ran it: it can differ by the loop tolerance (≤ 2.2e-7 measured), never visibly.
+      const x0 = g.ids.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
+      const iters = g.ids.length === 1 ? 60 : budget;
+      const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
+      if (!r.ok) continue;
+      const m = asMap(r.values);
+      if (!admissible(place(c, env, m))) continue;
+      for (const id of g.ids) seeded.set(id, m.get(id)!);
+      break;
+    }
+  }
+}
+
+/**
+ * The vertices a given reaches (`reachedByGivens`, ADR-AG-324's box) — where a row reaches only the vertices it MOVES,
+ * its latest line's (#1687, ADR-AG-348): «D על BC» places D, it does not solve C, so C keeps the box it was drawn in.
+ */
+function reachedByLine(c: Construction): ReadonlySet<Id> {
+  const all = reachedByGivens(c).ids;
+  if (!c.objectLine) return all;
+  const { moved } = lineGroupsOf(c);
+  const free = new Set(freeIds(c));
+  return new Set([...all].filter((id) => !free.has(id) || moved.has(id)));
+}
+
 interface CreatedFit {
   env: Env;
   seeded: Map<Id, Pt>;
@@ -2378,7 +2633,11 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const span = searchSpan(c, env);
   const stated = wide ? Math.max(6, 1.5 * statedScale(c.objects, c.constraints)) : 6;
   const wideSpan = stated > 6 ? searchSpan(c, env, stated) : span;
-  const reachedIds = wideSpan !== span ? reachedByGivens(c).ids : null;
+  /*
+   * #1687 (ADR-AG-348): a row reaches the vertices it moves, its latest line's (`lineGroupsOf`) — «D על BC» places D,
+   * it does not solve C — so C keeps its box: otherwise the sentence moved C by changing where C starts.
+   */
+  const reachedIds = wideSpan !== span ? reachedByLine(c) : null;
   const seeded = new Map<Id, Pt>(
     // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
     ids.map((id) => {
@@ -2387,6 +2646,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       return [id, { x: freeCoord(seed, name, 0, box), y: freeCoord(seed, name, 1, box) }];
     }),
   );
+  /** The hashed starts, before any region seeding moves them — #1687's last start (ADR-AG-348). */
+  const hashed: ReadonlyMap<Id, Pt> = new Map(seeded);
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
    *
@@ -2774,6 +3035,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       }
     }
   }
+
+  // The figure as it stood, then what each line added: every line's new points start fitted to it (#1687, ADR-AG-348).
+  fitLineByLine(c, env, seeded, hashed, seed);
 
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
   const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);

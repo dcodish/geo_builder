@@ -370,7 +370,8 @@ conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-
 glyphs (`shell/glyphFold`, [ADR-3D-329](06b-decisions-3d.md#adr-3d-329)): its own ∢/∡ and ⁰ rows moved into
 that shared table, which also brings ⟂ → ⊥, the guarded `<` → ∠, º/˚ → ° and «שורש N» → √. A tangency with no circle
 applies `touchedCircleFacts` (tool symbols, `toolSymbol`), and `theCircle` binds `{ inscribed: ring }`; created
-shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`). A
+shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`), and so
+does every line's new free points ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), below). A
 non-cyclic noun refuses `inscribed-contradicts-noun { shape, forced }` (`ShapeRow.notCyclic`, `cyclicFacts`,
 `errInscribedContradictsNoun`). The same pair in TWO sentences, either order, is refused at M1
 ([ADR-AG-252](06c-decisions-analytic.md#adr-ag-252), #1918): `cyclicFacts` marks the ring's polygon fact `cyclic`, the
@@ -1051,6 +1052,36 @@ derivation about an existing point is `derived-at` for every `DerivedRule`; `cur
 curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
+
+### The figure line by line: line provenance and the per-line fit ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), #1687)
+
+**Provenance.** `foldPass` records, in `commit`, the first fact that brought each object into the construction
+(`objectFact`, compared before and after each commit like `constraintFact`); `fold` maps it through the fact → line
+groups onto the construction as `Construction.objectLine` (`withObjectLines`). It is pure over the lines, never saved,
+and never substituted into (`NOT_SUBSTITUTED`). A construction built without a fold carries none.
+
+**Groups** (`lineGroupsOf`, memoised per construction). Every constraint and selector belongs to the LATEST line among
+the free vertices it is placed from (directly, or through a derived point, curve or segment: `objectDeps` plus the
+object's own references, transitively); that line's vertices among them are what it moves. A row with no free vertex
+belongs to no line, and neither does a row through a free symbol (the joint solve keeps it). The stage is off when
+`objectLine` is absent or misses a vertex. It is on only when some row ties a line's new points to a free vertex of an
+EARLIER line (the class); otherwise the joint solve draws the figure exactly as before.
+
+A line's points form one group only where a row ties them; untied points of one sentence are fitted one at a time in
+declaration order, as the same points stated line by line are.
+
+**The fit** (`fitLineByLine`), in `evaluateUncached` after every region seeding and before `fitCreatedShapes` and stage
+one. In line order, each group's vertices are fitted TOGETHER to the group's rows (`solveLM`; 60 iterations for one
+vertex, else stage one's budget), every other point held at its current start. The first groups' fit is the earlier
+figure's own solve from the same starts, so each later line is fitted to the figure as it was drawn. One-vertex groups
+try the region-seeded start, a seed-varied point in 0.2–0.8 of each bounded piece or `between`, the quarter points of
+each two-point carrier unless a `beyond` names the vertex, and the hashed seed; larger groups their seeded start. A fit is
+taken only if it converged, its bounded pieces and the group's selectors hold, no ring of its points has a hard fault, and no group vertex sits on another point
+(2·`apartOf`: that coincidence is the verdict's, the crossing-already-named family). Otherwise the starts are unchanged.
+A start, never a verdict.
+
+**The box.** ADR-AG-324's wide seeding box reads `reachedByLine`: a free vertex counts as reached only by a row that
+moves it, so «D על BC» does not change where C starts.
 
 ### The resolver reaches the SOLVER too ([ADR-AG-091](06c-decisions-analytic.md#adr-ag-091))
 

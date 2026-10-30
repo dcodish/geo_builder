@@ -66,12 +66,20 @@ describe('#2512 analytic — a second ring around a circle builds, tangent and d
   }
 
   const HEAD: [string[], Record<string, [number, number]>][] = [
-    [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], { A: [-11.788851, -3.728168], B: [1.928575, -6.371655], C: [0.793507, 1.673937] }],
-    [['מעגל O ברדיוס 3', 'ריבוע ABCD חוסם את מעגל O'], { A: [-1.983759, -0.46192], B: [3.844366, -1.887739], C: [2.418548, -7.715864], D: [-3.409577, -6.290046] }],
-    [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'משולש DEF חוסם את מעגל O'], { D: [-2.746438, 5.438678], E: [-4.262314, -4.67558], F: [5.437614, -1.983203] }],
+    /*
+     * Re-measured under #1687 (ADR-AG-348, line provenance): the ring's vertices start fitted to the circle as line 1 drew
+     * it, so the circle no longer moves for the ring where that fit holds. At seed 0 the triangle keeps O exactly at
+     * (−3.547089, −2.541066), where «מעגל O ברדיוס 3» alone draws it (at 045a8546 the ring moved O to (−1.63, −2.63)).
+     * The square and DEF start configurations change with it (the inscribed ABC is now fitted vertex by vertex, as
+     * three «X על המעגל» lines are). Still the lock's point: #2512's dual start is for a SECOND
+     * ring only, and never touches these.
+     */
+    [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], { A: [-12.395431, -3.503007], B: [-0.107452, -6.45159], C: [-1.022111, 2.020167], O: [-3.547089, -2.541066] }],
+    [['מעגל O ברדיוס 3', 'ריבוע ABCD חוסם את מעגל O'], { A: [-3.89946, -1.137603], B: [1.924106, -2.581929], C: [0.47978, -8.405495], D: [-5.343786, -6.961169] }],
+    [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'משולש DEF חוסם את מעגל O'], { D: [-0.378594, -2.01532], E: [12.709113, -0.575194], F: [1.347761, 6.122901] }],
   ];
   for (const [lines, want] of HEAD) {
-    it(`a ring with no ring around its circle before it keeps its start: «${lines.at(-1)}» draws as at 045a8546 (seed 0)`, () => {
+    it(`a ring with no ring around its circle before it keeps its start: «${lines.at(-1)}» draws as at 045a8546, re-measured under #1687 (seed 0)`, () => {
       const P = new Map(derive(play(lines), 0).figure.points.map((p) => [p.id, p] as const));
       for (const [id, [x, y]] of Object.entries(want)) {
         expect(P.get(id)!.x, `${id}.x`).toBeCloseTo(x, 5);

@@ -48,7 +48,12 @@ function sameFigure(prefix: string, line: string, twin: string) {
     const p = points([prefix, line], s);
     const q = points([prefix, twin], s);
     const { C, M, D, A } = p;
-    expect(Math.abs(d(C, A) + d(A, D) - d(C, D)), `seed ${s}: A on CD`).toBeLessThan(1e-5);
+    // On the LINE CD (#1687, ADR-AG-348): the triangle CMD stays as drawn, so on an obtuse one an altitude's foot falls on
+    // the side's extension, as in 2-D (measured at 216cf8bb: «משולש CMD» · «MA גובה לצלע CD», foot outside CD at 11/24
+    // seeds, the triangle unmoved). A median's foot and a bisector's foot are inside by construction.
+    const onLine = Math.abs((D.x - C.x) * (A.y - C.y) - (D.y - C.y) * (A.x - C.x)) / d(C, D);
+    expect(onLine, `seed ${s}: A on the line CD`).toBeLessThan(1e-5);
+    if (role !== 'altitude') expect(Math.abs(d(C, A) + d(A, D) - d(C, D)), `seed ${s}: A on CD`).toBeLessThan(1e-5);
     if (role === 'median') expect(d(C, A)).toBeCloseTo(d(A, D), 4);
     if (role === 'altitude') expect(Math.abs((A.x - M.x) * (D.x - C.x) + (A.y - M.y) * (D.y - C.y)) / (d(A, M) * d(C, D))).toBeLessThan(1e-5);
     if (role === 'bisector') expect(ang(C, M, A)).toBeCloseTo(ang(A, M, D), 4);

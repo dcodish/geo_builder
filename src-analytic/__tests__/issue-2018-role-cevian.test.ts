@@ -196,7 +196,10 @@ describe('#2018 — the class: the base and the legs, the median and the altitud
       const d = built([ISO, 'תיכון לבסיס BC'], seed);
       expect(apexOf(d), `seed ${seed}`).toBe('A');
       expect(isMid(d, 'M', 'BC')).toBe(true);
-      expect(d.construction).toEqual(built([ISO, 'הבסיס BC', 'תיכון לצלע BC'], seed).construction);
+      // The same construction, apart from WHICH LINE introduced the foot (#1687's provenance): the twin says it in two lines.
+      const { objectLine: _l1, ...one } = d.construction;
+      const { objectLine: _l2, ...two } = built([ISO, 'הבסיס BC', 'תיכון לצלע BC'], seed).construction;
+      expect(one).toEqual(two);
     }
   });
 

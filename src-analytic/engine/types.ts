@@ -1082,6 +1082,16 @@ export interface Construction {
    * recorded too: harmless, since no sentence can name them.
    */
   bound?: Readonly<Record<string, Expr>>;
+  /**
+   * WHICH LINE INTRODUCED EACH OBJECT (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)) —
+   * `object id → line index`, written by the fold (`apply.ts` `withObjectLines`) from its own per-fact record.
+   *
+   * It is what lets the solve tell the figure as it stood from what a later line added: «משולש ABC» · «D על BC» puts
+   * A, B, C on line 0 and D on line 1, so D is fitted to BC before the joint solve and the triangle is not moved for it
+   * (`evaluate.ts` `fitIntroducedPoints`). Absent on a construction built without a fold — such a figure is solved
+   * jointly from its seeded starts, as before. Pure over the lines, like the rest of the construction; never saved.
+   */
+  objectLine?: Readonly<Record<Id, number>>;
 }
 
 /**

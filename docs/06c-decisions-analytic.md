@@ -14042,3 +14042,55 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2552-d9-new-circle.test.ts` (13: the D9 case after the exam pair and beside one circle at three seeds, the centre on P; stability of the earlier circles; an existing letter as the centre; the ruled Hebrew text; ✕ restoring the figure; two fixtures; controls — «O_1 מרכז מעגל» · «O_2 מרכז מעגל» name the pair in turn, the definite form keeps `ambiguous-shape` / `already-named`, the empty figure records silently, «O מרכז מעגל» on circle O is not a second circle, a lone equation circle's centre is named); fixtures `issue-2552-d9-new-circle-after-pair`, `issue-2552-d9-new-circle-beside-one`; the shared created-notice rows' circle row through analytic's adapter (`created-notice-1467.test.ts`); parity row `centre-of-a-circle-new-2552`.
 
 **Behaviour change for a student:** in analytic, «P מרכז מעגל» typed when every circle already has a centre letter draws a new circle centred at P, and under the line «נוצר מעגל חדש שמרכזו P — אם זו טעות הקלדה, לחצו ✕ לביטול השורה»; ✕ removes the line. Nothing else changes.
+
+## ADR-AG-348 — Adding a sentence moves what it introduced, not what was already there: line provenance, and each line's new points fitted to the figure as it stood (#1687)
+
+**Status:** accepted · 2026-10-30 · bug (P2, analytic) · fix round #2627 stream A · branch `fix/1687-line-provenance` · operator ruling 2026-10-30 on #1687, option A (*"I would go with A"*: carry line provenance into the construction) · generalises [ADR-AG-202](#adr-ag-202)'s created-circle fit (#1647) to every free vertex · closes [ADR-AG-209](#adr-ag-209)'s "Not done: Stability of a free figure" bullet · LADDER stage 4 (the analytic evaluate: the solve's seeding, after the region seedings and before `fitCreatedShapes` and stage one)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R53 (amended: placing a point leaves the earlier figure where it was, and «הציגו תצורה אחרת» reaches as many of its configurations) and R192 (amended: "reaches" means a given that moves the point) · **Design:** [04c](04c-design-analytic.md) § "The figure line by line" (`Construction.objectLine`, `withObjectLines`, `lineGroupsOf`, `fitLineByLine`, `reachedByLine`)
+
+**Report.** Operator: «משולש ABC» then «D על BC» redraws the whole triangle. On 2026-10-30 he asked for a re-check (*"this is pretty basic and has worked since day 1"*). The browser re-measure confirmed it in analytic at every configuration (labels moved 25–442 px), with 2-D at 0 px.
+
+**Re-measured at pickup** (`216cf8bb`, `derive` and raw `evaluate`, seeds 0–23, the same seed before and after): an earlier vertex moved at 24/24 seeds on every row of the triage's class table. «D על BC» moved up to 13.11 shown and 2.93 raw, and 24 seeds gave 11 distinct triangles against 17 for the bare triangle. 2-D at the same commit (`factsOf → replay`): «D על BC», «AD גובה לצלע BC», «AD תיכון לצלע BC», «AD חוצה זווית A» moved 0 at 24/24.
+
+**Class.** *A sentence that introduces free points tied to earlier free points is solved jointly with them, from starts that ignore the sentence, so the earlier points move.*
+1. The joint least-squares descent spreads every row's correction over all its unknowns, so B and C move to meet D.
+2. The display walk then redraws the whole figure at seed+k when the drifted figure breaks `between`, the spread or the separation.
+3. ADR-AG-324's wide box (past configuration 0) applies to a free vertex "no given reaches". «D על BC» names C, so C changed box and started elsewhere.
+
+**Why provenance** (round #2602's escalation). A first attempt (`fix/1687-rider-keeps-triangle` @ 0c6bec22) gave each row to the latest-DECLARED free vertex. It closed the class, but it fitted vertices one sentence introduced together one at a time: a ring's vertices, a noun's apex. That changed first drawings and verdicts well outside the class (35 tests). Only the line that introduced each point can say what "the figure as it stood" is.
+
+**Decision.**
+1. **Provenance.** `foldPass` records the first fact that brought each object in (`objectFact`, in `commit`, compared like `constraintFact`). `fold` maps it through the fact → line groups onto `Construction.objectLine` (`withObjectLines`). It is pure over the lines and never saved. A construction built without a fold has none, and is solved exactly as before.
+2. **Groups** (`lineGroupsOf`). A row belongs to the latest line among the free vertices it is placed from (through derived points, curves and segments, transitively), and moves that line's vertices only. Vertices one sentence introduced are one group, fitted together, so same-sentence nouns stay jointly solved.
+   - A row through a free symbol («נסמן זוית BAM כ-A1», «AB = k») belongs to no group: the symbol or the points could meet it, and provenance does not say which. It stays the joint solve's, as before. Measured, giving it to the points cut «נסמן זוית BAM כ-A1»'s configurations from 11 to 8.
+   - The stage is on only when some row ties a line's new points to a free vertex of an earlier line, which is the class. Otherwise the joint solve draws the figure as before. Measured: turning it on for independent lines changed which touch point the four-line twin of the exam's «שני מעגלים … משיקים למעגל M בנקודה A» gives N₁, against its one-sentence form (#2391).
+3. **The fit** (`fitLineByLine`). In line order, each group's vertices are fitted together to the group's rows, every other point held where its line left it. The first lines' fit is the earlier figure's own solve from the same starts, so «AB=5» then «D על BC» fits D to the side as drawn.
+   - Within a line, points are fitted together only where a row ties them («המעגל עובר דרך הנקודות A, B ו-C» is three separate rows, so it fits as «A על המעגל» · «B על המעגל» · «C על המעגל» do, in declaration order). That keeps one sentence and its line-by-line twin on one drawing (`issue-1619-integration`, `issue-2391-exam-twins` row 12, both measured red without it).
+   - A one-vertex group also tries a seed-varied point inside its bounded piece, the quarter points of its carrier (never with a `beyond`), and the hashed seed.
+   - A fit is taken only if it converged, its bounded pieces and the group's selectors hold, every ring its points are vertices of keeps its noun's promise (#1817's judge), and no new vertex lands on another point. That last coincidence belongs to the verdict (the crossing-already-named family). Measured, without the ring check a collapsed fit of «משולש ABC חוסם את מעגל O» was taken and faulted 7 of 24 configurations.
+   - It is a start, never a verdict: the joint solve and the judge keep the last word.
+   - Each fit runs at the tight tolerance (ADR-AG-143's factor). The joint solve starts on the fits and stops at once, so the fit is the precision the figure is drawn at. Measured: at the loop tolerance, corpus 471's 2/4 drew F 6e-7 off E's x, where the joint descent's overshoot had given 8e-9. The earlier figure's own solve is therefore finished a little further than that figure ran it, up to 2.2e-7 on «משולש ABC · AB=5» + «D על BC», which is never visible. Where the earlier figure has no given, the move is exactly 0.
+4. **The box.** ADR-AG-324's wide box reads `reachedByLine`: a vertex is reached only by a row that moves it.
+5. **Not done.** The plan's step 3, a student-named cevian foot lowered as derived, is not needed, because the fit closes the cevian rows. The blind reads in the #1168 projection and the bounded restarts are left as they are, because the fit's in-piece start subsumes them for the class. Changing them would have moved single-sentence figures. The store adopting the walked seed (#2039 step 1) is not needed either: with the earlier figure fixed at every seed, the shown configuration is kept at every seed (measured 0/24). #2039 keeps it.
+
+**Measured after** (24 seeds, shown / raw max displacement): every class row is 0 / 0, in He and En:
+- «D על BC», «D על הישר BC», «AD גובה לצלע BC», «AD תיכון לצלע BC», «AD חוצה זווית A», «D על AB · E על AC»
+- «מרובע ABCD» + «E על AB», «מרובע ABCD» + «M מפגש AC ו-BD»
+- the stated-vertex base (0), and the «AB=5» base (at most 2.2e-7: the tight finish above)
+
+Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל O ברדיוס 3» + «משולש ABC חוסם את מעגל O» keeps O at seed 0 (it moved 1.92 before). The rings still move the circle where their own fit fails (the square at most seeds); that is not in the class table.
+
+**Changes a student can see, beyond the class.**
+- **An altitude's foot on an obtuse triangle** lands on the side's extension. Before, the triangle was redrawn so that it fell inside. This is 2-D's behaviour, measured at `216cf8bb`: «משולש CMD» · «MA גובה לצלע CD», triangle unmoved, foot outside CD at 11/24 seeds. The analytic lowering never bounded it (`on-line-2pt` without `bounded`). `issue-1999-cevian-letter-order.test.ts` now asserts the line for the altitude.
+- **Opening configurations** of a few free figures with a later point change, because the earlier figure is no longer moved for them. Examples are #2512's rings and the medians figure of #1166.
+- **The medians figure of #1166** now offers the bare triangle's own configurations, and those have one near-duplicate pair. The bare figure has that defect too (#2633, found here).
+- **No verdict changes.** Two verdicts that a version of this stage flipped are held: #1715's perpendicular bisector × AM, and #1909/#1932's crossings. A fit that lands on an existing point is not taken. The figure #1715 locks draws the triangle isosceles without saying so, filed as #2631.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1687-stability.test.ts`: the operator's sequence at 24 seeds; D strictly on BC; every class row, He and En, shown and raw; the controls («AB=5» still moves, «M אמצע AB» never did); the ADR-052 count; provenance read off the fold.
+- `issue-1620-bisectors-cevians.test.ts`, widened to a free triangle.
+- Fixture `issue-1687-point-on-side.analytic.json`.
+- Re-based, each measured: `issue-1999` (the altitude's line, as 2-D); `issue-2018` (the construction compared apart from `objectLine`); `issue-2512` (the seed-0 snapshot); `issue-1158-1166` (the 0 → 1 offer pair named as #2633's known gap).
+
+**Overlap.** #1182 (ADR-AG-347) anchors `solveLM` at its start, and is stacked on this branch: its anchored stage-one solve and this stage's group fits must solve the earlier figure the same way. #2039 (a given that constrains the drawn figure) builds its weighted anchoring on `objectLine`.

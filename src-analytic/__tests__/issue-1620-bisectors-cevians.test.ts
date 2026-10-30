@@ -248,6 +248,21 @@ describe('free DOFs stay free, and the figure does not jump', () => {
     },
   );
 
+  /** #1687 (ADR-AG-348): the escalation above, closed — a FREE triangle does not move either, at any seed. */
+  it.each([['AD חוצה את הזווית BAC'], ['AD גובה'], ['AD גובה לצלע BC'], ['AD תיכון לצלע BC'], ['תיכון לצלע BC']])(
+    'a free triangle does not move when «%s» is added',
+    (line) => {
+      for (const seed of SEEDS) {
+        const before = pts(['משולש ABC'], seed);
+        const after = pts(['משולש ABC', line], seed);
+        for (const id of ['A', 'B', 'C']) {
+          expect(get(after, id).x, `seed ${seed} ${id}`).toBeCloseTo(get(before, id).x, 9);
+          expect(get(after, id).y, `seed ${seed} ${id}`).toBeCloseTo(get(before, id).y, 9);
+        }
+      }
+    },
+  );
+
   it.each([
     ['AD גובה', 'AD גובה לצלע BC'],
     ['AD תיכון', 'AD תיכון לצלע BC'],
