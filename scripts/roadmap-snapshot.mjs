@@ -53,7 +53,8 @@ for (const w of plan.workstreams) {
 }
 
 // The whole queue by teaching phase (same rule as the roadmap map: most urgent phase wins).
-const conic = /ellips|parabol|hyperbol|אליפס|פרבול|היפרבול|מוקד|מדריך|focus|directrix/i;
+// Only the hyperbola is Later: the ellipse and the parabola are taught this term (ADR-W-166, 2026-10-30).
+const conic = /hyperbol|היפרבול/i;
 const phaseOf = (i) => {
   const l = i.labels.map((x) => x.name);
   if (l.includes('analytic') && !conic.test(i.title)) return 'now';
