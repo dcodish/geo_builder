@@ -903,6 +903,10 @@ a sentence the tool parsed.
 - «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → refused, naming E, exactly as without «נקודה Q»
 - the line that FORCES the coincidence is refused too, with the figure still free: «A(0,0)» · «D(0,4)» · «F(4,2)» · «נקודה E» · «P נקודת החיתוך של הישר AD עם הישר EF» (drawn) · «E על ציר ה-y» → refused
 - a crossing genuinely free to move off the point it sits on still records — unless no configuration CAN separate them, which is the next member
+- **two lines that are ONE LINE in the figure drawn have no crossing, whatever their spelling** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613; operator ruling 2026-10-30, Q1 → A): the crossing sentence is refused with the same sentence as a line written twice («שני הישרים במשפט «…» הם אותו ישר…»). A configuration where they coincide is never a position of the figure: the solve does not choose it, and a locus never draws it.
+  - «נתונה אליפסה שמשוואתה x^2/16+y^2/12=1» · «P(4,0)» · «האנך מ-P לציר ה-x חותך אותו בנקודה N» · «O ראשית הצירים» · «דרך N עובר ישר l1 מקביל ל-PO» · «דרך P עובר ישר l2 מקביל לציר ה-x» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused
+  - «P נקודה על האליפסה» · «דרך P עובר ישר l2 מקביל לציר ה-y» · «דרך O עובר ישר l1 מקביל לציר ה-y» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused (P is never moved onto the vertex to make them meet)
+  - with «P נקודה על האליפסה», the same construction records, and «המקום הגיאומטרי של M» is «אליפסה · x²/64 + y²/12 = 1» alone (R87)
 - **a third crossing asked of a line through two points already on the circle is refused, in the ruled sentence** ([ADR-AG-271](06c-decisions-analytic.md#adr-ag-271), #1893; #1834's ruling): «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.», with the student's letters. The two points are on the circle by construction (a stated incidence, a defining point of a computed circle — never an incircle's ring vertex) or are fixed points on a fixed circle. **The same for a parabola and an ellipse** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909; the 2026-10-08 ruling *"Yes, same sentence"*), with the curve's noun: «AC כבר חותך את הפרבולה ב-A וב-C — לישר אין נקודת חיתוך שלישית עם הפרבולה.» (likewise «…האליפסה…»).
   - «מעגל O» · «A על מעגל O» · «C על מעגל O» · «AC חותך את המעגל בנקודה E» → refused, at every configuration
   - every spelling: «הישר / המיתר / המשך AC», «בנקודות A ו-E», «AB קוטר», an inscribed triangle, the circle through A, B and C, an existing D, «P על AC» · «P על מעגל O» in either order; in the other order the line refused is the one that completes it («C על מעגל O»)
@@ -916,7 +920,7 @@ a sentence the tool parsed.
   - «y^2=4x» · «A(1,2)» · «P(10,0)» · «AP חותך את הפרבולה בנקודה E» → records, E = (100,−20); with P(7,0), E = (49,−14)
   - every spelling of that sentence reads the same: «הישר AP», «PA», «AO», «E נקודת החיתוך (האחרת) של הישר AP עם המעגל», «E על הישר AP» · «E על המעגל», and a line given by its equation («נתון הישר l1: y=x+1» → E = (−4,−3))
   - still refused: «הקטע AP חותך את המעגל בנקודה E» and «E על AP» · «E על המעגל» (a bare pair is the segment, R60's own reading / ADR-AG-248) — that piece reaches the circle only at A
-- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924.
+- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924, ADR-AG-349, #2613.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»

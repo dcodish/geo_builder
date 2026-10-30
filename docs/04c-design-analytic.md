@@ -1222,7 +1222,11 @@ order. Search first is kept by the predicate, not by a budget: a dart-capable pa
 A crossing on an existing point is refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
-`self-crossing`.
+`self-crossing`. **Positionally** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613): `crossingHasNoPoint`
+(`evaluate.ts`) reads a crossing's two incidences as numeric straights at the judged positions (`on-line-2pt` as the line
+through its points) and asks `curvesCoincide`; both crossing selectors (`crossing-distinct`, `crossing-nth`) fail there,
+so no configuration where the two lines are one line is admitted, and `derive` words a failing crossing selector whose
+drawn lines coincide as `self-crossing`.
 
 **The positional arm reads the PAIR's freedom, never the figure's** ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254), #1938).
 It used to borrow the vacancy pass's whole-figure predicate (`reportedDof === 0`), which leaked exactly as the ring arm's
@@ -1622,6 +1626,13 @@ traced points → print, or print nothing`.
 
 The walk passes each step through `resolvedAt` and `admissibleAt` (`selectorsHold`, `ringFaultsOf`); `LocusTrace`
 holds `points` and `pieces`, and only the pieces are drawn.
+
+**Where the figure stops existing, the walk stops** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613). A step at
+which a crossing sentence names no point (`someCrossingHasNoPoint`: its two straights coincide) ends that direction
+unrecorded, and a walk starting there returns `null`. That is a bifurcation — the carrier system grows a second branch
+along the common line — never a gap of the same branch to cross. Each step is corrected at `TIGHT_TOLERANCE_FACTOR`: next
+to such a configuration the crossing of two nearly parallel lines is ill-conditioned (a residual of `SOLVE_TOL` places
+it only to `SOLVE_TOL / sin θ`), and the fit's re-verification reads every walked point.
 
 *Identifiers:* `starts`
 

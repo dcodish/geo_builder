@@ -1185,6 +1185,71 @@ export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]):
 }
 
 /**
+ * A crossing's two INCIDENCES (`on-line-2pt` / `on-line` / `on-curve`) — the set the #1254 arm and the ADR-AG-263
+ * start already call "crossed". Anything else (one incidence, three) is not a crossing of a pair.
+ */
+function crossingIncidences(c: Construction, id: Id): [Constraint, Constraint] | null {
+  const ks = c.constraints.filter(
+    (k) => (k.t === 'on-line-2pt' || k.t === 'on-line' || k.t === 'on-curve') && (k as { id?: Id }).id === id,
+  );
+  return ks.length === 2 ? [ks[0], ks[1]] : null;
+}
+
+/** An incidence's carrier as a numeric STRAIGHT at these positions — `null` for a conic or anything unplaced. */
+function straightCarrierOf(k: Constraint, at: (id: Id) => Pt | null, curveAt: (id: Id) => NumCurve | null): NumCurve | null {
+  if (k.t === 'on-line-2pt') {
+    const a = at(k.a);
+    const b = at(k.b);
+    if (!a || !b || Math.hypot(b.x - a.x, b.y - a.y) < 1e-12) return null;
+    return { kind: 'line', a: b.y - a.y, b: a.x - b.x, c: (b.x - a.x) * a.y - (b.y - a.y) * a.x };
+  }
+  if (k.t === 'on-line') return { kind: 'line', a: k.a, b: k.b, c: k.c };
+  if (k.t === 'on-curve') {
+    const cu = curveAt(k.curve);
+    return cu && cu.kind === 'line' ? cu : null;
+  }
+  return null;
+}
+
+/**
+ * A CROSSING OF TWO STRAIGHTS THAT ARE ONE LINE HERE NAMES NO POINT (#2613, ADR-AG-349 — the positional member of
+ * ADR-AG-140).
+ *
+ * «M נקודת החיתוך של הישר l1 עם הישר l2» asserts that the two lines meet in a point. Where they COINCIDE in the
+ * configuration being judged, their "crossing" is the whole line: the sentence names no point, and the leftover
+ * freedom of M along the common line is not freedom of the figure. ADR-AG-140 refuses the structural member («הישר
+ * AB עם הישר BA») at parse; this is the same sentence reached at a configuration — two lines written differently
+ * that the givens (or the solve, or the locus walk) put on top of each other.
+ *
+ * Judged by `curvesCoincide` (ADR-AG-311's judge, at the figure's visible resolution — it states no magnitude), on
+ * the two carriers as numeric straights at these positions; an `on-line-2pt` reads as the line through its two
+ * points. Two straights only, because that is the sentence ADR-AG-140 rules on and the refusal it words; a conic
+ * pair is never "one line". One predicate: the crossing selectors read it in `failingSelectors` (so `evaluate`,
+ * `selectorsHold` and the locus walk's `admissibleAt` agree), the locus walk reads it to END a direction rather than
+ * cross the gap (`traceLocus`), and `derive` reads it to choose ADR-AG-140's sentence for the refusal.
+ */
+export function crossingHasNoPoint(c: Construction, at: Map<Id, Pt>, env: Env, id: Id): boolean {
+  const pair = crossingIncidences(c, id);
+  if (!pair) return false;
+  const atFn = (q: Id) => at.get(q) ?? null;
+  const curveAt = curveAtOf(c, env, atFn);
+  const p = straightCarrierOf(pair[0], atFn, curveAt);
+  const q = straightCarrierOf(pair[1], atFn, curveAt);
+  return !!p && !!q && curvesCoincide(p, q, at, apartOf(at));
+}
+
+/**
+ * DOES ANY CROSSING SENTENCE NAME NO POINT HERE (#2613, ADR-AG-349) — {@link crossingHasNoPoint} over every crossing
+ * the student named (every crossing sentence carries `crossing-distinct` or `crossing-nth`). Read by the locus walk:
+ * such a configuration is where the figure stops existing, a bifurcation, never a gap to walk across.
+ */
+export function someCrossingHasNoPoint(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
+  return c.selectors.some(
+    (s) => (s.kind === 'crossing-distinct' || s.kind === 'crossing-nth') && at.has(s.id) && crossingHasNoPoint(c, at, env, s.id),
+  );
+}
+
+/**
  * The points a crossing is a SIBLING of (#1113) — every other point whose incidence signature matches.
  * Shared by the judge and the separation restart (#1463).
  */
@@ -1598,6 +1663,8 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * would state a magnitude the student never gave (ADR-052), and this is the exact epsilon defect
      * that made the ring dedupe re-offer a taken crossing.
      */
+    // A crossing whose two straights are ONE LINE here names no point (#2613, ADR-AG-349): neither reading holds.
+    if ((s.kind === 'crossing-distinct' || s.kind === 'crossing-nth') && crossingHasNoPoint(c, at, env, s.id)) return false;
     if (s.kind === 'crossing-distinct') {
       for (const other of crossingSiblings(c, s.id, at)) {
         const q = at.get(other)!;

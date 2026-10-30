@@ -9,7 +9,7 @@
 import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, crossingHasNoPoint, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -456,6 +456,15 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)) || (applied !== undefined && failing.has(JSON.stringify(applied))))) {
         blamed.add(owner[i]);
         const sel = applied ?? f.sel;
+        /*
+         * A CROSSING WHOSE TWO LINES ARE ONE LINE in the figure drawn (#2613, ADR-AG-349; operator ruling 2026-10-30, Q1
+         * → A): the sentence names no point, so it is refused with ADR-AG-140's sentence — the one a line written twice
+         * («הישר AB עם הישר BA») already gets. Read off the drawn figure, like the side arm below.
+         */
+        if ((sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth') && crossingHasNoPoint(construction, drawnAt, figure.env, sel.id)) {
+          noSide.set(owner[i], { index: owner[i], code: 'self-crossing', detail: lines[owner[i]] });
+          return;
+        }
         if (sel.kind !== 'line-compare') return;
         const none = lineCompareNoSide(construction, sel, drawnAt, figure.env);
         const side = sel.axis === 'y' ? (sel.greater ? 'above' : 'below') : sel.greater ? 'right' : 'left';
