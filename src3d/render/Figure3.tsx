@@ -435,6 +435,17 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             strokeLinecap="round"
           />
         ))}
+        {/* #1188 step 3 (ADR-3D-390): the head-to-tail chain's COPIES — display only, the source's hue at reduced
+            opacity, dashed, an arrowhead and NO label: a copy is not a vector (no `vec-…` test id), only where it is drawn */}
+        {(scene.vectorCopies ?? []).map((k, ki) => {
+          const ink = k.free !== undefined ? freeVectorColor3(k.free) : VECTOR_COLOR;
+          return (
+            <g key={`copy-${ki}`} data-testid={`vec-copy-${k.of}-${ki}`} opacity={0.55}>
+              <line x1={k.x1} y1={k.y1} x2={k.x2} y2={k.y2} stroke={ink} strokeWidth={2} strokeDasharray="6 4" strokeLinecap="round" />
+              <path d="M 0 0 L -9 -4.5 L -9 4.5 Z" transform={`translate(${k.x2} ${k.y2}) rotate(${k.angleDeg})`} fill={ink} />
+            </g>
+          );
+        })}
         {scene.vectors.map((v, vi) => {
           // #1188: a FREE vector floats in its own hue (no tail dot, no endpoint letters — it has no points)
           const ink = v.free !== undefined ? freeVectorColor3(v.free) : VECTOR_COLOR;

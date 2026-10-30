@@ -12,7 +12,7 @@
  */
 
 import { openCrossings3 } from '../engine/crossings3';
-import { layoutFreeVectors3 } from './freeVectorLayout';
+import { layoutFreeVectorScene3 } from './freeVectorLayout';
 import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
@@ -208,6 +208,21 @@ export interface Scene3 {
   crossings: SceneCrossing3[];
   /** #1476 — the dihedral constructions whose chip is on. */
   constructions: SceneDihedral3[];
+  /** #1188 step 3 (ADR-3D-390): the head-to-tail chain's display-only COPIES — no label, never a vector. */
+  vectorCopies?: SceneVectorCopy3[];
+}
+
+/** #1188 step 3 (ADR-3D-390): one display-only link of a head-to-tail chain (a copy of `coeff·of`), in screen space. */
+export interface SceneVectorCopy3 {
+  of: string;
+  coeff: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  angleDeg: number;
+  /** the source's free-vector palette index; absent for an anchored source (the vector colour) */
+  free?: number;
 }
 
 export interface Viewport {
@@ -1163,7 +1178,9 @@ export function buildScene3(
 
   // #1188 (ADR-3D-386): the floating free vectors' world tails and heads — display only, chosen beside the figure
   // before the fit so the fit includes them
-  const freePlaced = layoutFreeVectors3(c, resolved);
+  // #1188 step 3 (ADR-3D-390): …and the head-to-tail chains' display-only copies
+  const freeScene = layoutFreeVectorScene3(c, resolved);
+  const freePlaced = freeScene.vectors;
 
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
   const projOf = (p: Vec3): { x: number; y: number } => {
@@ -1186,6 +1203,7 @@ export function buildScene3(
     // #1476: the construction's foot and legs stay in frame (a fallback leg is sized after the fit)
     ...wConstr.flatMap((w) => [w.foot, ...(w.legLen !== null ? [add3(w.foot, scale3(w.armQ, w.legLen))] : [])]),
     ...freePlaced.flatMap((fp) => [fp.tail, fp.head]), // #1188: a floating vector is never clipped
+    ...freeScene.copies.flatMap((k) => [k.tail, k.head]), // #1188 step 3: nor is a chain's copy
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
@@ -1608,5 +1626,13 @@ export function buildScene3(
     });
   }
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings, constructions };
+  // #1188 step 3 (ADR-3D-390): the chains' copies, projected like the free vectors (end-on: nothing to draw)
+  const vectorCopies: SceneVectorCopy3[] = [];
+  for (const k of freeScene.copies) {
+    const a = w2s(k.tail);
+    const b = w2s(k.head);
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 1e-6) continue;
+    vectorCopies.push({ of: k.of, coeff: k.coeff, x1: a.x, y1: a.y, x2: b.x, y2: b.y, angleDeg: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI, ...(k.index !== undefined ? { free: k.index } : {}) });
+  }
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, measures, crossings, constructions, ...(vectorCopies.length > 0 ? { vectorCopies } : {}) };
 }

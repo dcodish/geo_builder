@@ -74,6 +74,11 @@ describe('#1746 — the class: every query kind\'s JOINED row names its subject 
       { lines: ['הישר ℓ: x = (0,0,0) + t(m,1,1)', 'המישור π: mx - y - z + 3 = 0', 'הישר ℓ מקביל למישור π', 'המישור π2: z = 0', 'המישור π4: y = 0'], q: 'm', want: 'm = ±√2' },
     ],
     vector: [{ lines: ['A(0,0,0)', 'B(1,2,2)'], q: 'AB', want: 'AB = (1, 2, 2)' }],
+    // #1188 step 2 (ADR-3D-390): a combination of free vectors, and its magnitude
+    combo: [
+      { lines: ['u = (1,2,3)', 'v = (1,1,1)'], q: 'u + v', want: 'u + v = (2, 3, 4)' },
+      { lines: ['u = (2,2,0)', 'v = (1,0,0)'], q: '|2u - v|', want: '|2u - v| = 5' },
+    ],
     length: [{ lines: ['A(0,0,0)', 'B(1,2,2)'], q: '|AB|', want: '|AB| = 3' }],
     dot: [{ lines: CUBE, q: 'AB·AD', want: 'AB·AD = 0' }],
     'angle-vertex': [{ lines: CUBE, q: '∠ABC', want: '∠ABC = 90°' }],

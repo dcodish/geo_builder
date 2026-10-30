@@ -3,7 +3,8 @@
  * Pure — returns a new construction or a structured error; never mutates.
  */
 
-import { exprPointIds, exprVectorNames } from './vecExpr';
+import { exprPointIds, exprVectorNames, namedVector3 } from './vecExpr';
+import { constantVec3, figureRelationOf3, freeNamesIn3, freeVecSystemVerdict3, isPureFreeVector3 } from './freeVecSystem';
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
@@ -145,6 +146,7 @@ function clone(c: Construction3): Construction3 {
     relMarks: [...c.relMarks],
     vectors: new Map(c.vectors),
     freeVectors: new Map(c.freeVectors),
+    freeVecEqs: [...c.freeVecEqs],
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
     requirements: [...c.requirements],
@@ -440,16 +442,17 @@ export function mintFree(c: Construction3, ids: Id[]): Construction3 {
  * the USE it makes of it:
  *  - `'metric'` — a magnitude, angle, ⟂, ∥ or dot product: on a FREE vector it refuses `free-vector-metric` until
  *    #1188 step 4 builds metric givens on free vectors;
- *  - `'combination'` — a vector equation or a figure relation that contains the name: on a FREE vector it refuses
- *    `free-vector-combination` until #1188 step 2 builds the free-vector linear system.
- * A free name is checked FIRST, so «w = u + v» over free u, v (w new) is the honest "not yet", never `unknown-vector`
- * about w — and never `claim-refuted`: a satisfiable given is not «בדקו את החישוב». An anchored name passes; a name in
+ *  - `'figure'` — a FIGURE relation the free-vector system cannot carry (a span point over a free vector): it refuses
+ *    `free-vector-coupling`. #1188 step 2 (ADR-3D-390): vector equations and definitions are no longer refused here —
+ *    `freeVecEquation3` and the vec-rel arm take them.
+ * A free name is checked FIRST, so a refusal about a declared u is the honest "not yet", never `unknown-vector`
+ * about it — and never `claim-refuted`: a satisfiable given is not «בדקו את החישוב». An anchored name passes; a name in
  * neither store is `unknown-vector`, exactly as before.
  */
-function vectorRefsError3(c: Construction3, names: Iterable<string>, use: 'metric' | 'combination'): EngineError3 | null {
+function vectorRefsError3(c: Construction3, names: Iterable<string>, use: 'metric' | 'figure'): EngineError3 | null {
   const list = [...names];
   const free = list.find((n) => c.freeVectors.has(n));
-  if (free !== undefined) return { code: use === 'metric' ? 'free-vector-metric' : 'free-vector-combination', id: free };
+  if (free !== undefined) return { code: use === 'metric' ? 'free-vector-metric' : 'free-vector-coupling', id: free };
   const unknown = list.find((n) => !c.vectors.has(n));
   return unknown !== undefined ? { code: 'unknown-vector', id: unknown } : null;
 }
@@ -643,26 +646,222 @@ function vectorNameTaken3(c: Construction3, name: string): boolean {
  * #1188 (ADR-3D-386) — THE M1 DUALITY OF A COMPONENT TUPLE ON A FREE VECTOR. An unknown name is DECLARED with these
  * components; a free one has each stated component SET (it was free) or VERIFIED (it was stated: an equal number is
  * a redundant restatement, a different one is `free-vector-conflict`, reported by derive3 as `givens-contradict`
- * naming both lines). A bare letter («u = (1, a, 3)») leaves that component free and NAMES it (#814's channel). An
- * affine component («u = (k-1, 2, k)») is a linear relation — #1188 step 2 — refused `free-vector-combination`.
+ * naming both lines). A bare letter («u = (1, a, 3)») leaves that component free and NAMES it (#814's channel).
+ *
+ * #1188 step 2 (ADR-3D-390): an AFFINE component («u = (k-1, 2, k)») is recorded as such — its letters are unknowns of
+ * the free-vector system. On a DEFINED vector («w = u + v» then «w = (3,2,3)») the stated components are equations
+ * of that system; on a vector defined as ONE anchored arrow («AB = p» then «p = (1,2,3)») they are that arrow's pin,
+ * so the pivot drives the figure (M1 — the same pin «AB = (1,2,3)» lowers to).
  */
 function injectFreeVector3(c: Construction3, cmd: Extract<Command3, { type: 'inject-vector' }>): ApplyResult3 {
   const was = c.freeVectors.get(cmd.name);
   if (!was && (!/^[a-w]$/.test(cmd.name) || vectorNameTaken3(c, cmd.name))) {
     return { ok: false, error: { code: vectorNameTaken3(c, cmd.name) ? 'already-defined' : 'bad-name', id: cmd.name } };
   }
-  if (cmd.symExprs?.some((e) => e !== null)) return { ok: false, error: { code: 'free-vector-combination', id: cmd.name } };
+  const via = was?.def ? singleAnchoredTerm3(c, was.def) : null;
+  if (via && was) {
+    // the vector IS that arrow (times k): its components are the arrow's, scaled — the pivot's pin
+    const k = via.coeff;
+    const sc = (v: number | null): number | null => (v === null ? null : v / k);
+    const se = (e: SymComp | null | undefined): SymComp | null => (e ? { c: e.c / k, terms: e.terms.map((t) => ({ ...t, k: t.k / k })) } : null);
+    const exprs = cmd.symExprs ? ([se(cmd.symExprs[0]), se(cmd.symExprs[1]), se(cmd.symExprs[2])] as [SymComp | null, SymComp | null, SymComp | null]) : undefined;
+    const pin: Command3 =
+      via.atom.kind === 'pair'
+        ? { type: 'inject-pair', a: via.atom.from, b: via.atom.to, x: sc(cmd.x), y: sc(cmd.y), z: sc(cmd.z), ...(exprs ? { symExprs: exprs } : {}) }
+        : { type: 'inject-vector', name: via.atom.name, x: sc(cmd.x), y: sc(cmd.y), z: sc(cmd.z), ...(exprs ? { symExprs: exprs } : {}) };
+    const r = applyCommand3(c, pin);
+    if (!r.ok) return r;
+    const next = clone(r.next);
+    next.freeVectors.set(cmd.name, { ...was, ...statedComps(next, cmd) }); // the tuple as typed, for the panel only
+    return { ok: true, next };
+  }
   const stated = [cmd.x, cmd.y, cmd.z];
+  const exprs = cmd.symExprs ?? [null, null, null];
   const prior = was?.comps ?? [null, null, null];
+  const priorSym = was?.symComps ?? [null, null, null];
   const comps = prior.map((p, i) => {
     const v = stated[i];
     return v === null ? p : v;
   }) as [number | null, number | null, number | null];
   const conflict = prior.some((p, i) => p !== null && stated[i] !== null && Math.abs(p - stated[i]!) > 1e-9 * Math.max(1, Math.abs(p)));
   if (conflict) return { ok: false, error: { code: 'free-vector-conflict', id: cmd.name } };
+  // a second, different affine form on one component has no slot of its own — the joint statement is not built
+  const sameAffine = (a: SymComp, b: SymComp) => JSON.stringify(a) === JSON.stringify(b);
+  if (priorSym.some((p, i) => p && exprs[i] && !sameAffine(p, exprs[i]!))) return { ok: false, error: { code: 'free-vector-coupling', id: cmd.name } };
+  const symComps = priorSym.map((p, i) => exprs[i] ?? p) as [SymComp | null, SymComp | null, SymComp | null];
   const next = clone(c);
-  next.freeVectors.set(cmd.name, { comps, ...statedComps(next, cmd) });
-  bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps);
+  next.freeVectors.set(cmd.name, {
+    ...(was ?? {}),
+    comps,
+    ...(symComps.some((e) => e !== null) ? { symComps } : {}),
+    ...(cmd.srcs ? statedComps(next, cmd) : was?.stated ? { stated: was.stated } : {}),
+  });
+  // a component an affine form owns is not a free slot a bare letter can name
+  bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps.map((x, i) => (x === null && symComps[i] !== null ? 0 : x)) as [number | null, number | null, number | null]);
+  return { ok: true, next };
+}
+
+/** #1188 step 2 (ADR-3D-390): a combination that is ONE anchored arrow (a pair, or a «נסמן» vector) times k ≠ 0. */
+function singleAnchoredTerm3(c: Construction3, e: import('./types').VecExpr): { atom: VecAtom; coeff: number } | null {
+  if (e.length !== 1 || Math.abs(e[0].coeff) < 1e-12) return null;
+  const { atom } = e[0];
+  if (atom.kind === 'pair' || namedVector3(c, atom.name)?.kind === 'anchored') return { atom, coeff: e[0].coeff };
+  return null;
+}
+
+/**
+ * #1188 step 2 ([ADR-3D-390](../../docs/06b-decisions-3d.md#adr-3d-390)) — A VECTOR EQUATION WITH A FREE VECTOR IN
+ * IT, decided by M1 on what the figure already holds. `null`: no free vector takes part and no name is new — today's
+ * claim lane, byte-identical.
+ *  1. A side that is ONE new name («w = u + v», «u + v = w») DEFINES it: a free vector whose value is the other side.
+ *  2. A side that is ONE free vector nothing has been said about («וקטור p» · «p = 2u», «AB = p») is OWNED by the
+ *     statement (docs/17 M2 law (i)): it becomes defined by the other side, so the vectors already drawn stay put.
+ *  3. A side that is ONE anchored arrow, the other side a constant («p = (1,2,3)» · «AB = p») is that arrow's PIN, so
+ *     the pivot drives the figure — the pin «AB = (1,2,3)» lowers to.
+ *  3½. (ADR-3D-390 Am. 1) With its free vectors ELIMINATED against what is already stated, a line that leaves only
+ *     the figure's own vectors is a relation on the figure («AB = p» · «AD = p» is «AD = AB»): the figure's vec-eq
+ *     lane decides it, so a contradiction is a contradiction and a drivable one drives, never the coupling refusal.
+ *  4. Otherwise it is an EQUATION of the free-vector system. Whether the system can absorb it — or it constrains the
+ *     figure, or contradicts the stated numbers — is judged once, on the outermost call (`settleFreeVectors3`).
+ */
+function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs: import('./types').VecExpr): ApplyResult3 | null {
+  const all = [...lhs, ...rhs];
+  const names = exprVectorNames(all);
+  const isNew = (n: string) => namedVector3(c, n) === undefined;
+  const single = (e: import('./types').VecExpr): string | null =>
+    e.length === 1 && e[0].atom.kind === 'named' && Math.abs(e[0].coeff - 1) < 1e-12 ? e[0].atom.name : null;
+  const fresh = [...new Set(names.filter(isNew))];
+  if (fresh.length === 0 && !names.some((n) => c.freeVectors.has(n))) return null; // no free vector: today's claim
+  // a name that is new and is not the one side the line defines: the old answer, unless a definition takes it
+  const missing = missingPoint(c, exprPointIds(all));
+  if (missing) return { ok: false, error: missing };
+  // 1. a definition — but «u = AB», a new name equal to ONE anchored arrow, is the naming sentence's business, not a free
+  // vector's: it keeps today's answer (the anchored lane owns «AB = u»; #1188 does not decide the mirrored spelling)
+  for (const [side, other] of [[lhs, rhs], [rhs, lhs]] as const) {
+    const n = single(side);
+    if (n === null || !isNew(n) || fresh.length !== 1 || exprVectorNames(other).includes(n)) continue;
+    const named = singleAnchoredTerm3(c, other);
+    if (named && Math.abs(named.coeff - 1) < 1e-12) return null;
+    if (!/^[a-w]$/.test(n)) return { ok: false, error: { code: 'bad-name', id: n } };
+    if (vectorNameTaken3(c, n)) return { ok: false, error: { code: 'already-defined', id: n } };
+    const next = clone(c);
+    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ coeff: t.coeff, atom: t.atom })) });
+    return { ok: true, next };
+  }
+  if (fresh.length > 0) return { ok: false, error: { code: 'unknown-vector', id: fresh[0] } };
+  // 2. ownership of a free vector nothing constrains
+  for (const [side, other] of [[lhs, rhs], [rhs, lhs]] as const) {
+    const n = single(side);
+    const fv = n === null ? undefined : c.freeVectors.get(n);
+    if (n === null || !fv || fv.def || fv.stated || fv.symComps || fv.comps.some((x) => x !== null)) continue;
+    if (freeNamesIn3(c, other).includes(n)) continue; // never circular
+    if (c.freeVecEqs.some((eq) => exprVectorNames([...eq.lhs, ...eq.rhs]).includes(n))) continue; // already constrained
+    if ([...c.freeVectors.values()].some((o) => o.def && exprVectorNames(o.def).includes(n))) continue; // another is defined by it
+    const next = clone(c);
+    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ coeff: t.coeff, atom: t.atom })) });
+    return { ok: true, next };
+  }
+  // 3. an anchored arrow equal to a constant: its pin
+  for (const [side, other] of [[lhs, rhs], [rhs, lhs]] as const) {
+    const via = singleAnchoredTerm3(c, side);
+    const k = via ? constantVec3(c, other) : null;
+    if (!via || !k) continue;
+    const [x, y, z] = [k.x / via.coeff, k.y / via.coeff, k.z / via.coeff];
+    const pin: Command3 =
+      via.atom.kind === 'pair' ? { type: 'inject-pair', a: via.atom.from, b: via.atom.to, x, y, z } : { type: 'inject-vector', name: via.atom.name, x, y, z };
+    return applyCommand3(c, pin);
+  }
+  // 3½. ADR-3D-390 Am. 1 (ruling 2A, 2026-10-30): ELIMINATE the free vectors against what is already stated about
+  // them. When only the figure's own vectors survive, the line is a relation ON THE FIGURE («AB = p» then «AD = p» is
+  // «AD = AB») and the figure's vec-eq lane decides it — refuted on a rigid figure, already true, or driven through
+  // its pin — exactly as the same relation written without p. The free vectors are untouched: p stays what it was.
+  const fig = figureRelationOf3(c, lhs, rhs);
+  if (fig?.kind === 'figure') {
+    const stated = { lhs: lhs.map((t) => ({ ...t })), rhs: rhs.map((t) => ({ ...t })) };
+    return applyCommand3(c, { type: 'claim', claim: { type: 'vec-eq', lhs: fig.lhs, rhs: fig.rhs, stated } });
+  }
+  // 4. an equation
+  const next = clone(c);
+  next.freeVecEqs.push({ lhs: lhs.map((t) => ({ ...t })), rhs: rhs.map((t) => ({ ...t })) });
+  return { ok: true, next };
+}
+
+/**
+ * #1188 step 2 (ADR-3D-390) — A FIGURE RELATION «XY = Σ coeff·atom» NAMING A FREE VECTOR.
+ *  - Every point exists: it is a vector EQUATION («AB = p», «AE = u + p») — `freeVecEquation3` decides it, and the
+ *    stated vector is drawn (the V1 auto-draw convention the claim arm keeps).
+ *  - One point is new: it is DEFINED by the relation, as today, with each DEFINED free vector replaced by its
+ *    combination (exact: a definition holds by construction). A free vector nothing defines stays a term the point
+ *    pass reads — admitted only while it is PURE (resolvable without the figure, `settleFreeVectors3`) and without
+ *    a ratio letter, whose root-find is a joint solve.
+ */
+function freeVecRel3(c: Construction3, cmd: Extract<Command3, { type: 'vec-rel' }>): ApplyResult3 {
+  const flat = (terms: import('./types').SymTerm[]): import('./types').VecExpr => terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom }));
+  const firstFree = (terms: import('./types').SymTerm[]): string => freeNamesIn3(c, flat(terms))[0] ?? '?';
+  const unknownPts = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
+  if (unknownPts.length === 0) {
+    if (cmd.symbol || cmd.terms.some((t) => t.coeff.p !== 0)) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+    const r = freeVecEquation3(c, [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], flat(cmd.terms));
+    if (!r || !r.ok) return r ?? { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+    if (hasSegment(r.next, cmd.from, cmd.to)) return r;
+    const withSeg = clone(r.next);
+    withSeg.segments.push([cmd.from, cmd.to]);
+    return { ok: true, next: withSeg };
+  }
+  if (unknownPts.length > 1) return { ok: false, error: { code: 'two-unknowns', id: unknownPts[1] } };
+  // inline every DEFINED free vector by its combination, recursively (definitions only reference earlier names)
+  const expand = (terms: import('./types').SymTerm[]): import('./types').SymTerm[] =>
+    terms.flatMap((t) => {
+      const fv = t.atom.kind === 'named' ? c.freeVectors.get(t.atom.name) : undefined;
+      if (!fv?.def) return [t];
+      return expand(fv.def.map((d) => ({ coeff: { k: t.coeff.k * d.coeff, p: t.coeff.p * d.coeff }, atom: d.atom })));
+    });
+  const terms = expand(cmd.terms);
+  const freeLeft = terms.filter((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name));
+  if (freeLeft.length > 0 && (cmd.symbol || terms.some((t) => t.coeff.p !== 0))) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+  const unknown = unknownPts[0];
+  const next = clone(c);
+  const defIndex = next.vecDefs.length;
+  next.vecDefs.push({ from: cmd.from, to: cmd.to, terms, unknown, symbol: cmd.symbol });
+  next.points.set(unknown, { kind: 'vec-defined', def: defIndex });
+  if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]); // the stated vector is drawn
+  return { ok: true, next };
+}
+
+/**
+ * #1188 step 2 (ADR-3D-390) — WHAT THE LINE DID TO THE FREE-VECTOR SYSTEM, judged once on the outermost call (the
+ * `settleLetters3` discipline: in either order, on the ✎ edit and on load). Refused, naming this line:
+ *  - a combination that now constrains the FIGURE, which the free vectors cannot absorb (`free-vector-coupling`) — a
+ *    joint pivot ↔ free solve is not built; so is a figure point defined over a free vector that stopped being pure;
+ *  - one that contradicts the stated numbers (`free-vector-conflict`, reported as `givens-contradict`);
+ *  - a free vector's letter that another lane also owns (`already-defined`): one letter, one solver.
+ * A verdict `before` already carried is not this line's doing.
+ */
+function settleFreeVectors3(before: Construction3, next: Construction3): ApplyResult3 {
+  if (next.freeVectors.size === 0) return { ok: true, next };
+  const changed = [...next.freeVectors.keys()].filter((n) => before.freeVectors.get(n) !== next.freeVectors.get(n));
+  for (const eq of next.freeVecEqs.slice(before.freeVecEqs.length))
+    for (const n of exprVectorNames([...eq.lhs, ...eq.rhs])) if (next.freeVectors.has(n) && !changed.includes(n)) changed.push(n);
+  const blame = changed[0] ?? [...next.freeVectors.keys()].pop()!;
+  const v = freeVecSystemVerdict3(next);
+  if (!v.ok && freeVecSystemVerdict3(before).ok) {
+    return { ok: false, error: v.kind === 'conflict' ? { code: 'free-vector-conflict', id: blame } : { code: 'free-vector-coupling', id: blame } };
+  }
+  const impure = (k: Construction3): string | undefined => {
+    for (const vd of k.vecDefs) for (const t of vd.terms) if (t.atom.kind === 'named' && k.freeVectors.has(t.atom.name) && !isPureFreeVector3(k, t.atom.name)) return t.atom.name;
+    return undefined;
+  };
+  const bad = impure(next);
+  if (bad !== undefined && impure(before) === undefined) return { ok: false, error: { code: 'free-vector-coupling', id: bad } };
+  const clash = (k: Construction3): string | undefined => {
+    for (const fv of k.freeVectors.values())
+      for (const e of fv.symComps ?? [])
+        for (const sym of e ? symsOfAffine(e) : [])
+          if (symbolOwnersOf(k, sym).some((o) => o.kind !== 'free-sym' && !(o.kind === 'component' && o.target.kind === 'vector' && k.freeVectors.has(o.target.name)))) return sym;
+    return undefined;
+  };
+  const taken = clash(next);
+  if (taken !== undefined && clash(before) === undefined) return { ok: false, error: { code: 'already-defined', id: taken } };
   return { ok: true, next };
 }
 
@@ -791,7 +990,7 @@ function releaseParamToPivot(c: Construction3): Construction3 | null {
 }
 
 /** #393/#335 (ADR-3D-107): a vector EXPRESSION's references — pair points + named vectors. */
-function exprRefsError(c: Construction3, expr: import('./types').VecExpr, use: 'metric' | 'combination'): EngineError3 | null {
+function exprRefsError(c: Construction3, expr: import('./types').VecExpr, use: 'metric' | 'figure'): EngineError3 | null {
   const pointErr = missingPoint(c, exprPointIds(expr));
   if (pointErr) return pointErr;
   return vectorRefsError3(c, exprVectorNames(expr), use);
@@ -814,7 +1013,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'distance-rel':
       return operandRefsError(c, claim.a) ?? operandRefsError(c, claim.b);
     case 'vec-eq': {
-      return exprRefsError(c, [...claim.lhs, ...claim.rhs], 'combination');
+      return exprRefsError(c, [...claim.lhs, ...claim.rhs], 'figure');
     }
     // #393/#335 (ADR-3D-107): magnitude claims validate exactly like vec-eq — every pair
     // atom's points and every named vector must exist.
@@ -1415,6 +1614,8 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     // #2580 / #2581 (ADR-3D-384, ADR-3D-385): what the line did to the figure's LETTERS is judged once, here, on the
     // outermost call — so it holds in either order, on the ✎ edit and on load, never at one submit seam (#2582)
     if (r.ok && APPLY_DEPTH === 1) r = settleLetters3(c, r.next);
+    // #1188 step 2 (ADR-3D-390): and what it did to the free-vector system, the same way
+    if (r.ok && APPLY_DEPTH === 1) r = settleFreeVectors3(c, r.next);
   } finally {
     APPLY_DEPTH -= 1;
   }
@@ -2217,7 +2418,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       const missing = missingPoint(c, [cmd.a, cmd.b, cmd.vecFrom]);
       if (missing) return { ok: false, error: missing };
-      const spanErr = vectorRefsError3(c, cmd.span, 'combination'); // #1188: a span point is a combination
+      const spanErr = vectorRefsError3(c, cmd.span, 'figure'); // #1188: a span point over a free vector is a joint solve
       if (spanErr) return { ok: false, error: spanErr };
       // the closed-form drive needs a full declared basis with a 1-dim complement (docs/20 §6.2)
       if (c.vectors.size !== 3 || new Set(cmd.span).size !== 2) return { ok: false, error: { code: 'need-basis' } };
@@ -2227,6 +2428,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'claim': {
+      // #1188 step 2 (ADR-3D-390): a vector equation with a free vector in it, or one introducing a name
+      if (cmd.claim.type === 'vec-eq') {
+        const fr = freeVecEquation3(c, cmd.claim.lhs, cmd.claim.rhs);
+        if (fr) return fr;
+      }
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
       if (cmd.claim.type === 'length-letter') return { ok: true, next: lowerLengthLetter3(c, cmd.claim) };
@@ -2803,7 +3009,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // than honestly declined. The sign rides the SAME `paramSigns` list every other lane uses —
       // {@link firstNonDegenerateRoot} reads it, filtered to this symbol.
       const owners = symbolOwnersOf(c, cmd.sym);
-      const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'vec-def');
+      // #1188 step 2 (ADR-3D-390): a free vector's letter — its sampled half-range follows the sign
+      const solverOwned = owners.some((o) => o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'vec-def' || o.kind === 'free-sym');
       const components = owners.filter((o): o is Extract<SymbolOwner, { kind: 'component' }> => o.kind === 'component');
       if (!solverOwned && components.length === 0) {
         const code = owners.length ? ('sign-not-selectable' as const) : ('unknown-symbol' as const);
@@ -3151,8 +3358,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // (`vector-named-bare`), pointing at «|AB| = k» for the length reading (operator ruling 2026-10-14)
         return applyCommand3(c, { type: 'name-vector', name: cmd.terms[0].atom.name, from: cmd.from, to: cmd.to, bare: true });
       }
-      // named vectors must exist — and, until #1188 step 2, must not be free (a figure coupling)
-      const namedErr = vectorRefsError3(c, cmd.terms.flatMap((t) => (t.atom.kind === 'named' ? [t.atom.name] : [])), 'combination');
+      // #1188 step 2 (ADR-3D-390): a relation naming a FREE vector
+      if (cmd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name))) return freeVecRel3(c, cmd);
+      // named vectors must exist
+      const namedErr = vectorRefsError3(c, cmd.terms.flatMap((t) => (t.atom.kind === 'named' ? [t.atom.name] : [])), 'figure');
       if (namedErr) return { ok: false, error: namedErr };
       const unknowns = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
       if (unknowns.length === 0) {
@@ -3394,7 +3603,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // reads back on its own terms — the point's k, a substitution into the pivot's unknown layout, the
       // parameter's one admissible root. It replaces any prior pin on the symbol (the student
       // substituting the value the earlier relation produced).
-      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param')) {
+      // #1188 step 2 (ADR-3D-390): a free vector's letter reads the same record — the free-vector system substitutes it
+      if (owners.some((o) => o.kind === 'vec-def' || o.kind === 'pin-sym' || o.kind === 'param' || o.kind === 'free-sym')) {
         const next = clone(c);
         next.symbolPins = next.symbolPins.filter((p) => p.sym !== cmd.symbol);
         next.symbolPins.push({ rel: 'value', value: cmd.value, sym: cmd.symbol });

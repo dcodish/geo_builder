@@ -83,7 +83,12 @@ export type Claim3 =
    */
   | { type: 'length-letter'; a: Id; b: Id; coef: number; sym: string }
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
-  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
+  /**
+   * AM = ½u + ½v + 5/3·w. #1188 ADR-3D-390 Am. 1: `stated` — the line as the student wrote it, with free vectors in it,
+   * when `lhs`/`rhs` is that equation with its free vectors ELIMINATED («AB = p» then «AD = p» is «AD = AB»). The
+   * panel prints the stated form; derive3 names the lines about those free vectors when the relation fails.
+   */
+  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr; stated?: { lhs: VecExpr; rhs: VecExpr } }
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
@@ -685,12 +690,25 @@ export interface StatedComps {
 /**
  * #1188 (ADR-3D-386) — ONE FREE VECTOR: components and no position. A component is a stated number or `null`
  * (unstated: a free DOF, sampled per seed by `resolveFreeVectors3` and moved by «הציגו תצורה אחרת», ADR-052).
- * Step 2 of #1188 widens a component to an affine `SymComp` and adds a `def` (a vector defined by a combination);
- * until then both are refused at apply (`free-vector-combination`). `stated` is the tuple as typed, for the panel.
+ * `stated` is the tuple as typed, for the panel.
+ *
+ * #1188 step 2 (ADR-3D-390): a component may be an AFFINE form in free letters («u = (k-1, 2, k)», `symComps`, the
+ * number slot then null), and a vector may be DEFINED by a linear combination («w = u + v», `def`). A defined
+ * vector's value is its combination; a component stated on it is an equation of the free-vector system
+ * (`freeVecSystem.ts`). `def` only references names that existed before it, so it is never circular.
  */
 export interface FreeVec3 {
   comps: [number | null, number | null, number | null];
+  symComps?: [SymComp | null, SymComp | null, SymComp | null];
+  def?: VecExpr;
   stated?: StatedComps;
+}
+
+/** #1188 step 2 (ADR-3D-390): a stated vector equation with a free vector in it that DEFINES nothing — every name
+ *  existed («u + v = w» over three declared vectors, «p = 2u» on a declared p that something else constrains). */
+export interface FreeVecEq3 {
+  lhs: VecExpr;
+  rhs: VecExpr;
 }
 
 /** The distinct symbols an affine component names, in first-written order. */
@@ -1392,6 +1410,8 @@ export interface Construction3 {
    * per configuration is `Resolved3.freeVectors`; ask "what is the vector named n" through `namedVector3`.
    */
   freeVectors: Map<string, FreeVec3>;
+  /** #1188 step 2 (ADR-3D-390): the free-vector system's EQUATIONS — vec-eqs with a free vector that define no name. */
+  freeVecEqs: FreeVecEq3[];
   /** #72: UNNAMED ink arrows (`חץ A'C`) — rendered like a named vector, no label, never a basis member. */
   arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
@@ -1625,6 +1645,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   points: new Map(),
   vectors: new Map(),
   freeVectors: new Map(),
+  freeVecEqs: [],
   arrows: [],
   segments: [],
   angleMarks: [],
@@ -1701,6 +1722,7 @@ export function figureSymbolsOf(c: Construction3): string[] {
   for (const b of c.riderNames) out.add(b.sym);
   for (const m of c.angleMarks) if (m.label) out.add(m.label);
   for (const m of c.lengthMarks) out.add(m.label); // #2092
+  for (const s of freeVecSymsOf(c)) out.add(s); // #1188 step 2 (ADR-3D-390): a free vector's affine letter
   return [...out];
 }
 
@@ -1791,7 +1813,17 @@ export type SymbolOwner =
   /** #2092 (ADR-3D-381): the letter names a LENGTH («|AB| = k») */
   | { kind: 'length'; marks: Construction3['lengthMarks'] }
   | { kind: 'component'; target: ComponentTarget; axis: 'x' | 'y' | 'z' }
-  | { kind: 'rider'; id: Id; fromB: boolean };
+  | { kind: 'rider'; id: Id; fromB: boolean }
+  /** #1188 step 2 (ADR-3D-390): a letter in an AFFINE component of a free vector («u = (k-1, 2, k)») — an unknown of
+   *  the free-vector system, solved there and never by the pivot */
+  | { kind: 'free-sym' };
+
+/** #1188 step 2 (ADR-3D-390): the letters the free vectors' affine components name, in first-written order. */
+export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'>): string[] {
+  const out: string[] = [];
+  for (const fv of c.freeVectors.values()) for (const e of fv.symComps ?? []) if (e) for (const s of symsOfAffine(e)) if (!out.includes(s)) out.push(s);
+  return out;
+}
 
 export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   const out: SymbolOwner[] = [];
@@ -1806,6 +1838,7 @@ export function symbolOwnersOf(c: Construction3, sym: string): SymbolOwner[] {
   if (lengths.length > 0) out.push({ kind: 'length', marks: lengths });
   for (const b of c.partialNames) if (b.sym === sym) out.push({ kind: 'component', target: b.target, axis: b.axis });
   for (const b of c.riderNames) if (b.sym === sym) out.push({ kind: 'rider', id: b.id, fromB: b.fromB }); // #921
+  if (freeVecSymsOf(c).includes(sym)) out.push({ kind: 'free-sym' }); // #1188 step 2
   return out;
 }
 
@@ -1880,6 +1913,7 @@ export function letterMeanings3(c: Construction3): Map<string, LetterMeaningOf3[
   if (c.param) add(c.param, { kind: 'param' });
   for (const b of c.partialNames) add(b.sym, { kind: 'param' });
   for (const s of pinSymsOf(c)) add(s, { kind: 'param' });
+  for (const s of freeVecSymsOf(c)) add(s, { kind: 'param' }); // #1188 step 2: a free vector's affine letter is a number
   return out;
 }
 /** #2581 (ADR-3D-385): the first lowercase letter the figure gives no meaning — the example a refusal or note offers,
@@ -1940,9 +1974,10 @@ export type EngineError3 =
   /** #1188 (ADR-3D-386): a MAGNITUDE / angle / ⟂ / ∥ / dot given on a FREE vector — not built until #1188 step 4.
    *  `sentence` is the refused line (filled by the store). Never `claim-refuted`, never `unknown-vector`. */
   | { code: 'free-vector-metric'; id: string; sentence?: string }
-  /** #1188 (ADR-3D-386): a free vector inside a COMBINATION («w = u + v», «AE = u + p») or with an affine component
-   *  («u = (k-1, 2, k)») — not built until #1188 step 2. `sentence` is the refused line (filled by the store). */
-  | { code: 'free-vector-combination'; id: string; sentence?: string }
+  /** #1188 step 2 (ADR-3D-390): a free vector in a statement that would make the FIGURE and the free vectors one
+   *  joint solve («AB = p + q» on two free vectors; a span point over a free vector; a ratio letter on one) — the
+   *  tool's limit, named with the line. `sentence` is the refused line (filled by the store). */
+  | { code: 'free-vector-coupling'; id: string; sentence?: string }
   /** #1188 (ADR-3D-386): engine-internal — a component restated with a DIFFERENT number. `derive3` reports it as
    *  `givens-contradict` naming this line and the line that stated the component first (the #2061 precedent). */
   | { code: 'free-vector-conflict'; id: string }

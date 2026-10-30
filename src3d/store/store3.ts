@@ -36,6 +36,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
+import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
@@ -486,6 +487,17 @@ function placementFixers3(
 /** #1923 (ADR-3D-314)'s narrow reading: fixed BY COORDINATES only — a solid's vertex is not in its ruled scope. */
 const coordinateFixers3 = (c: Construction3, facts: readonly Fact3[], id: Id): Set<string> | null =>
   placementFixers3(c, facts, id, false);
+
+/** #1188 step 2 (ADR-3D-390): the vectors this command says something about — a tuple on it, a declaration of it, or
+ *  a vector equation / relation that names it (the conflict sentence's earlier lines). */
+function vectorsNamedBy3(k: Command3): string[] {
+  const named = (e: readonly { atom: { kind: string; name?: string } }[]) => e.flatMap((t) => (t.atom.kind === 'named' && t.atom.name ? [t.atom.name] : []));
+  if (k.type === 'inject-vector') return [k.name];
+  if (k.type === 'declare-vector') return [...k.names];
+  if (k.type === 'vec-rel') return named(k.terms);
+  if (k.type === 'claim' && k.claim.type === 'vec-eq') return [...named(k.claim.lhs), ...named(k.claim.rhs)];
+  return [];
+}
 
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
@@ -1715,10 +1727,25 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-metric' || st.code === 'free-vector-combination') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-metric' || st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
-      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => k.type === 'inject-vector' && k.name === st.id));
+      // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
+      const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => vectorsNamedBy3(k).some((n) => named.includes(n))));
       status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: by.map((g) => g.utterance) };
+    } else if (st.code === 'claim-refuted' || st.code === 'givens-contradict') {
+      // ADR-3D-390 Am. 1: a line whose free vectors were ELIMINATED to a relation on the figure («AB = p» · «AD = p»
+      // is «AD = AB») and that relation cannot hold — the contradiction is between this line and the earlier lines
+      // that said what those free vectors are, so it names them (a bare «וקטור p» says nothing, and is not named)
+      const own = claimOwners.find((o) => o.factId === f.id);
+      const via = own
+        ? c.claims.slice(own.from, own.to).flatMap((k) => (k.type === 'vec-eq' && k.stated ? freeNamesIn3(c, [...k.stated.lhs, ...k.stated.rhs]) : []))
+        : [];
+      if (via.length === 0) return;
+      const says = (g: Fact3) => g.cmds.some((k) => k.type !== 'declare-vector' && vectorsNamedBy3(k).some((n) => via.includes(n)));
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && says(g)).map((g) => g.utterance);
+      const was = st.code === 'givens-contradict' ? st.others : [];
+      status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: [...new Set([...was, ...by])] };
     }
   });
 
