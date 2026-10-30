@@ -92,7 +92,7 @@ analytic (Now), 3d (Next), 2d, then server/workspace)
 (same table shape)
 
 ## Later — not ranked until its phase opens
-(one line per product/topic with its count — complex, conics, sphere — no table; an ⚠ row is listed by number)
+(one line per product/topic with its count — complex, the hyperbola, the sphere — no table; an ⚠ row is listed by number)
 
 ## Waiting on you
 (the full attention surface, in four sub-lists — every row one sentence, readable without opening

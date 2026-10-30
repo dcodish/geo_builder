@@ -6520,3 +6520,19 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 - A round can be small, even empty, when the current and next weeks' items are done or unarmed. Its report then says what holds the plan back (an unarmed plan item, a feature needing a build session) instead of filling up from the rest of the queue.
 - The plan's progress on the overview page now measures what the rounds actually worked on.
 - New work reaches a round only through a workstream or the operator's pull. That makes the operator's hand the one route by which unplanned work enters the plan.
+
+## ADR-W-166 — The teaching calendar of 2026-10-30: the ellipse and the parabola open now, the hyperbola stays Later (roadmap)
+
+**Status:** accepted · 2026-10-30 · process (workspace) · amends [ADR-W-160](#adr-w-160) §2's phase list (conics were Later)
+
+**Operator:** 2026-10-30, in chat: *"I start elipses on nov-14. that will be about 2 weeks and then parabola. locus of allipses and parabola will be taught as part of the shape. dec. 1 is a good guess for starting vectors"*. Earlier the same day: *"issues should be allocated by feature … its ok to start pushing items out to weeks 6-7 and onwards based on teh pace of issues"*, *"i want features added and capabilities to match what i teach and not just to complete items. so locus is priority since this is what i teach now"*. The re-rank of the conic issues was approved as *"6yes"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §2, `scripts/roadmap-snapshot.mjs`, `scripts/priority-rerank.mjs`, the status-update skill, and the roadmap page's plan (`plan/current` v5+).
+
+**Decision.**
+1. **The Now phase is analytic in teaching order:** locus until 13 Nov; the ellipse from 14 Nov for about two weeks; the parabola from about 28 Nov. Each conic's loci are taught as part of the shape. 3-D vectors (Next) start about 1 Dec.
+2. **Only the hyperbola stays Later** among the conics. It is outside the curriculum (02c R174 refuses it by name). The phase rule in both scripts reads it alone.
+3. **The ellipse and parabola issues are re-ranked P2:** #1218, #1863, #1752.
+4. **The roadmap runs past five weeks** (eight from 27 Oct), allocated by topic. Each topic ends with a readiness check the operator plays before its lessons start: locus by 12 Nov, ellipse by 13 Nov, parabola by 27 Nov, vectors by 30 Nov. Each week keeps about a quarter of its room for new issues a person hits. Measured pace since September: about 90 issues closed a week, about 200 opened.
+
+**Consequences.** Work is ordered by what is taught next, not by queue size. A conic issue filed from now on ranks like any analytic issue, and a topic's readiness check is the gate that matters before each lesson block.

@@ -58,9 +58,10 @@ priority in general"*). Severity is recorded separately, by two marks:
   student in the prod logs. An issue a session found carries no `reported`, however it was later ruled on.
 
 **The phases** come from the roadmap (the overview page,
-https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew): **Now** = analytic (lines, circles, locus) ·
-**Next** = 3-D (vectors) · **Maintenance** = 2-D, bugs only · **Later** = complex, conics (ellipse,
-parabola, hyperbola) and the sphere/round solids · workspace and server sit outside the phases.
+https://claude.ai/artifact/2RxjAuuDfhvG5kcNAFw7Ew): **Now** = analytic (lines, circles, locus, then the ellipse from 14 Nov and the parabola from about
+28 Nov, each with its loci — [ADR-W-166](06w-decisions-workspace.md#adr-w-166)) · **Next** = 3-D (vectors, from about
+1 Dec) · **Maintenance** = 2-D, bugs only · **Later** = complex, the hyperbola and the sphere/round solids ·
+workspace and server sit outside the phases.
 
 - **P1 — drop everything.** A `wrong-answer` that is also `reported`, or production down. Fix before any
   other work; a hotfix may land directly on `main` (gates still apply); deploy promptly.
