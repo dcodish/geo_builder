@@ -5559,7 +5559,7 @@ function symbolNodes(x: unknown, out: Set<string> = new Set()): Set<string> {
 }
 
 /** The construction's fields that are not expressions over the figure's symbols — never substituted into. */
-const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound']);
+const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound', 'objectLine']);
 
 /**
  * THE ONE PLACE A STATED VALUE REPLACES A FREE SYMBOL (#2521, ADR-AG-332).
@@ -5911,6 +5911,12 @@ export interface FoldResult {
   created: Array<Id[] | null>;
   /** #2552 D9 (ADR-AG-344): per fact, the centre letter of the NEW circle it stated (`createdCircle`), null elsewhere. */
   createdCircles: Array<Id | null>;
+  /**
+   * #1687 (ADR-AG-348): per object id, the index of the FACT that first put it in the construction — recorded where
+   * `constraintFact` is, by comparing the construction before and after each commit. `fold` turns it into the
+   * construction's `objectLine`.
+   */
+  objectFact?: Map<Id, number>;
 }
 
 /**
@@ -5971,9 +5977,27 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
           r.createdCircles[i] = null;
         }
       });
-      return r;
+      return withObjectLines(r, group);
     }
   }
+}
+
+/**
+ * LINE PROVENANCE (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)): which line introduced each
+ * object, carried on the construction as `objectLine` so the solve can tell the figure as it stood from what a later
+ * line added. Read off the fold's own per-fact record (`objectFact`) through the fact → line map — never re-derived.
+ * The internal record is dropped from the result.
+ */
+function withObjectLines(r: FoldResult, group: readonly number[]): FoldResult {
+  const byFact = r.objectFact;
+  delete r.objectFact;
+  if (!byFact || byFact.size === 0) return r;
+  const objectLine: Record<Id, number> = {};
+  for (const o of r.construction.objects) {
+    const i = byFact.get(o.id);
+    if (i !== undefined) objectLine[o.id] = group[i];
+  }
+  return { ...r, construction: { ...r.construction, objectLine } };
 }
 
 /** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */
@@ -6001,8 +6025,11 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
   const touchByOnLine: boolean[] = facts.map(() => false);
+  const objectFact = new Map<Id, number>();
   const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
     touchByOnLine[i] = byOnLine === true;
+    // #1687 (ADR-AG-348): the first fact that brought each object in — the object's provenance.
+    for (const o of next.objects) if (!objectFact.has(o.id)) objectFact.set(o.id, i);
     const before = c.constraints;
     const beforeSel = c.selectors;
     c = next;
@@ -6154,7 +6181,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, touchByOnLine };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, touchByOnLine, objectFact };
 }
 
 /**
