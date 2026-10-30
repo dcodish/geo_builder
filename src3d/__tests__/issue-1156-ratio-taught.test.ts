@@ -1,5 +1,5 @@
 /**
- * #1156 — «AA'=3BC» IS ASKED ABOUT, NEVER CALLED FALSE. And «AB:BC = 3:1» DRIVES.
+ * #1156 — «AA'=3BC» IS NEVER CALLED FALSE (since ADR-3D-391 Am. 1 it builds as lengths). And «AB:BC = 3:1» DRIVES.
  *
  * **Live in production.** From the prod log (session `i8gw52ej`): one student, 7 submits, 4 spellings,
  * every one answered `claim-refuted` — the tool telling them their true statement was false — after
@@ -48,15 +48,21 @@ const lenOf = (a: string, b: string) => {
   return Math.hypot(Q.x - P.x, Q.y - P.y, Q.z - P.z);
 };
 
-describe('#1156 — the bare-label ratio is taught, not refuted', () => {
-  /** The operator's own table, every spelling the student actually tried. */
+describe('#1156 — the bare-label ratio is never refuted; since ADR-3D-391 Am. 1 it builds as lengths', () => {
+  /**
+   * The operator's own table, every spelling the student actually tried. Between two non-collinear edges the vector
+   * reading is impossible, so by the operator's rule of 2026-10-30 (PR #2605: *"if only one can be true, we will
+   * assume this is the case"*) the length reading is taken and built — the 2026-09-17 "ask and teach" answer is
+   * kept only where both readings can hold and differ.
+   */
   it.each([
     ["AA'=3BC", 'A', "A'", 'B', 'C', 3],
     ["AA'=2BC", 'A', "A'", 'B', 'C', 2],
     ["AD=0.5AA'", 'A', 'D', 'A', "A'", 0.5],
-  ])('«%s» asks which reading was meant', (line, a1, b1, a2, b2, c) => {
+  ])('«%s» builds as lengths', (line, a1, b1, a2, b2, c) => {
     const { err } = build(['תיבה', line]);
-    expect(err, `${line} must not be refuted`).toEqual({ code: 'ambiguous-vector-length', a1, b1, a2, b2, c });
+    expect(err, `${line} must not be refuted`).toBeNull();
+    expect(lenOf(a1, b1) / lenOf(a2, b2)).toBeCloseTo(c, 6);
   });
 
   it('…and never says the student is wrong', () => {
@@ -65,16 +71,6 @@ describe('#1156 — the bare-label ratio is taught, not refuted', () => {
       build(['תיבה', line]);
       expect((st().lastError as { code: string } | null)?.code, line).not.toBe('claim-refuted');
     }
-  });
-
-  /**
-   * THE TEACHING HALF (#778 — *non-canonical input is TAUGHT, never silently accepted*). The refusal
-   * carries the student's OWN letters so the message can show the two spellings that work; a bare
-   * "which did you mean?" would leave them no way forward, which is worse than the bug.
-   */
-  it('the refusal carries the pairs the message needs', () => {
-    const { err } = build(['תיבה', "AA'=3BC"]);
-    expect(err).toMatchObject({ a1: 'A', b1: "A'", a2: 'B', b2: 'C', c: 3 });
   });
 
   /** The spelling it teaches must actually work — otherwise the advice is a dead end. */
@@ -122,13 +118,13 @@ describe('#1156 — what must NOT move (round #1169’s escalation tripwire)', (
   });
 
   /**
-   * #1783 (ADR-3D-391), the operator's card-11 ruling (2026-10-13): a point-on-a-segment sentence builds only where
-   * its vector reading can hold. «AE = 2·A'E» puts E at t = 2 as vectors (off AA') and at ⅔ as lengths, so it is
-   * ASKED about — #748's 'refuse rather than pick' still holds; the refusal is the question, no longer «בדקו את החישוב».
+   * #1783 (ADR-3D-391 Am. 1), the operator's rule of 2026-10-30: *"if only one can be true, we will assume this is the
+   * case"*. «AE = 2·A'E» puts E at t = 2 as vectors (off AA') and at ⅔ as lengths: only the length reading can hold,
+   * so it builds as lengths — never refuted as arithmetic, and no question.
    */
-  it('the rider NON-chain is asked about, never refuted as arithmetic', () => {
+  it('the rider NON-chain builds as lengths, never refuted as arithmetic', () => {
     const { err } = build(['מקבילון', "E על AA'", "AE = 2*A'E"]);
-    expect(err).toEqual({ code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: "A'", b2: 'E', c: 2 });
+    expect(err).toBeNull();
   });
 
   /**
@@ -151,10 +147,10 @@ describe('#1156 — what must NOT move (round #1169’s escalation tripwire)', (
     expect((err as { code: string } | null)?.code).not.toBe('ambiguous-vector-length');
   });
 
-  /** #1680 (ADR-3D-391): a bare `c = 1` pair is asked at the apply boundary now, still with no pairs (the generic text). */
-  it('the bare c=1 form keeps the generic clarification', () => {
+  /** #1680 (ADR-3D-391 Am. 1): «AS = AB» as vectors would put S on B, so only the length reading can hold — it builds. */
+  it('the bare c=1 form builds as lengths where its vector reading cannot hold', () => {
     const { err } = build(['פירמידה ABCDS שבסיסה ריבוע', 'AS = AB']);
-    expect(err).toEqual({ code: 'ambiguous-vector-length' });
+    expect(err).toBeNull();
   });
 
   /** A scalar given on the same bare box is untouched — it was never ambiguous. */

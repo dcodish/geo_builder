@@ -1044,29 +1044,22 @@ function ratioStatement(
  * - `k > 0`, which is also why a driven `t` can never leave the segment (`riderChainT`)
  */
 /**
- * #1680 / #1783 (ADR-3D-391) — HOW AN UNMARKED SEGMENT EQUATION `XY = k·ZW` IS READ: ONE PREDICATE.
+ * #1680 / #1783 (ADR-3D-391, Am. 1) — HOW AN UNMARKED SEGMENT EQUATION `XY = k·ZW` IS READ.
  *
- * The sentence has two readings, a vector one and a length one. Which one it gets used to depend on which code
- * path parsed it: the parser asked about the plain `XY = ZW` before any rule ran (blind to the figure, so it asked
- * about «AK = AD» with K new and about «AE = EA'» over a rider), and this guard asked about `k ≠ 1` with blanket
- * exemptions (so «AB = 1AC» was asked about by nobody and refuted, and a midpoint counted as "a rider" and was
- * refuted against the tool's own sample, «SM = 2SA»). The reading now depends only on what the sentence does to
- * the figure (docs/17 §2.2), decided here, at the outermost apply, where the figure is known:
+ * The sentence has two readings, a vector one and a length one. Which one it got used to depend on which code
+ * path parsed it (ADR-3D-391's class). The operator's rule (2026-10-30, PR #2605): *"if something is not sure if
+ * its a vector or length, we should ask if both can be true and if only one can be true, we will assume this is
+ * the case"*. So the sentence is judged by what it does to the figure:
  *
  * - **marked** (an arrow, «וקטור») → `vector` (#1183): the student said which reading.
- * - **a point not yet drawn** → `vector`: the sentence DEFINES it (ADR-3D-010, «A'K = 4/5 DN»; and, by the
- *   operator ruling of 2026-10-13, «AK = AD» like «AK = 2AD»).
- * - **a FREE rider** (`on-segment`, `t` absent) → `vector-or-ask`: the sentence PLACES it. The vector reading is
- *   tried (`riderRatioRetarget` places it in closed form, or the claim lane drives it); where the figure refutes
- *   it, the student is ASKED, never told the statement is false (ruling 2026-10-13, card 11: "the exemption
- *   applies only when the vector reading can hold"; #1783).
- * - **one segment on both sides** («AB = 2AB») → `vector`: not two segments, so nothing to ask, except at
- *   `k = 1` («AB = BA»), which is the plain form's question and stays asked as it always was.
- * - **anything else** → `ask` (rulings of 2026-10-04 and 2026-10-13), with or without a coefficient, so
- *   `X = 1·Y` and `X = Y` always get one verdict. A midpoint or a rider whose `t` is already stated is placed:
- *   this sentence places nothing.
+ * - **a point not yet drawn** → `vector`: the sentence DEFINES it (ADR-3D-010, «A'K = 4/5 DN», «AK = AD»).
+ * - **a negative coefficient** → `vector`: no length is a negative multiple of another, so only one reading can hold.
+ * - **one segment on both sides** with `k ≠ 1` («AB = 2AB») → `vector`, as it always was.
+ * - **anything else** → `two-readings`. Which of them can hold, and whether they give one figure, is a question
+ *   about the SOLVED figure, so the store's fold answers it (`readSegmentEquations3`, which tries both) and writes
+ *   the answer on the command as `reading`. A two-reading sentence with no `reading` asks.
  */
-type SegmentEquationReading = 'vector' | 'vector-or-ask' | 'ask';
+export type SegmentEquationKind3 = 'vector' | 'two-readings';
 
 function segmentEquationShape(cmd: Command3): { pair1: [Id, Id]; pair2: [Id, Id]; k: number } | null {
   if (cmd.type !== 'vec-rel' || cmd.symbol || cmd.terms.length !== 1) return null;
@@ -1075,19 +1068,18 @@ function segmentEquationShape(cmd: Command3): { pair1: [Id, Id]; pair2: [Id, Id]
   return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k };
 }
 
-function segmentEquationReading(c: Construction3, cmd: Command3): SegmentEquationReading {
+/** Is `cmd` a segment equation at all (one pair against a numeric multiple of one pair)? Null when it is not. */
+export function segmentEquationKind3(c: Construction3, cmd: Command3): SegmentEquationKind3 | null {
   const shape = segmentEquationShape(cmd);
-  if (!shape || (cmd.type === 'vec-rel' && cmd.marked)) return 'vector';
+  if (!shape) return null;
+  if (cmd.type === 'vec-rel' && cmd.marked) return 'vector';
   const { pair1, pair2, k } = shape;
   const all = [...pair1, ...pair2];
   if (all.some((id) => !c.points.has(id))) return 'vector'; // a definition, not a statement
+  if (k < 0) return 'vector'; // no length reading: a length is never a negative multiple of another
   const unit = Math.abs(k - 1) < 1e-12;
-  if (pair1.every((p) => pair2.includes(p))) return unit ? 'ask' : 'vector'; // one segment, not two
-  const freeRider = all.some((id) => {
-    const def = c.points.get(id);
-    return def?.kind === 'on-segment' && def.t === undefined;
-  });
-  return freeRider ? 'vector-or-ask' : 'ask';
+  if (pair1.every((p) => pair2.includes(p)) && !unit) return 'vector'; // one segment, not two
+  return 'two-readings';
 }
 
 /** The question itself: the student's own pairs and coefficient, except at `k = 1`, whose generic wording
@@ -1098,14 +1090,33 @@ export function segmentEquationAsk(pair1: [Id, Id], pair2: [Id, Id], k: number):
     : { code: 'ambiguous-vector-length', a1: pair1[0], b1: pair1[1], a2: pair2[0], b2: pair2[1], c: k };
 }
 
-/** `segmentEquationReading`'s verdict for one command at the outermost apply: an error to return now, the
- *  command to apply (carrying `askIfRefuted` for a free rider), or the command unchanged. */
-function readSegmentEquation(c: Construction3, cmd: Command3): { ask: EngineError3 } | { cmd: Command3 } {
-  const reading = segmentEquationReading(c, cmd);
-  if (reading === 'vector') return { cmd };
+/**
+ * The reading at the outermost apply: an error to return now (the question), the commands the length reading
+ * lowers to (exactly what «|XY| = k|ZW|» parses to, so the two spellings give one figure), or the command itself
+ * read as a vector — with `arrows`, the pairs every vector reading draws (T46: "draw EC as a vector as well").
+ */
+function readSegmentEquation(c: Construction3, cmd: Command3): { ask: EngineError3 } | { length: Command3[] } | { cmd: Command3; arrows: [Id, Id][] } {
+  const kind = segmentEquationKind3(c, cmd);
+  if (kind === null) return { cmd, arrows: [] };
   const { pair1, pair2, k } = segmentEquationShape(cmd)!;
-  if (reading === 'ask') return { ask: segmentEquationAsk(pair1, pair2, k) };
-  return { cmd: { ...(cmd as VecRelCommand), askIfRefuted: true } };
+  const reading = kind === 'vector' ? 'vector' : (cmd as VecRelCommand).reading;
+  if (reading === 'vector') return { cmd, arrows: [pair1, pair2] };
+  if (reading === 'length')
+    return { length: [{ type: 'segment3', a: pair1[0], b: pair1[1] }, { type: 'length-rel', a1: pair1[0], b1: pair1[1], rhs: { pair: pair2 }, c: k }] };
+  return { ask: segmentEquationAsk(pair1, pair2, k) };
+}
+
+/** A vector reading draws every vector the sentence names as an arrow, in the stated direction (the ink-arrow
+ *  register, `draw-arrow`'s), each over its segment. Points the line did not leave on the figure are skipped. */
+function withStatedArrows(next: Construction3, arrows: readonly [Id, Id][]): Construction3 {
+  const todo = arrows.filter(([f, t]) => f !== t && next.points.has(f) && next.points.has(t) && !next.arrows.some(([x, y]) => x === f && y === t));
+  if (todo.length === 0) return next;
+  const out = clone(next);
+  for (const [f, t] of todo) {
+    out.arrows.push([f, t]);
+    if (!hasSegment(out, f, t)) out.segments.push([f, t]);
+  }
+  return out;
 }
 
 function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
@@ -1133,7 +1144,8 @@ function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
    * The halves shape already demanded the chain; the whole-host shape matched its pairs as sets, so «AB = 4DA»
    * (vector: D at t = −¼) built at t = ¼, silently read as lengths, while its halves twin «AD = 3BD» did not.
    * One linear solve on the host line (`riderVectorT`) is both shapes' vector reading; when it puts the rider
-   * off its segment nothing is placed, and the statement goes on as a vector claim (asked about if unmarked).
+   * off its segment nothing is placed, and the statement goes on as a vector claim (an unmarked two-reading line
+   * reaches here only as the fold's vector trial, ADR-3D-391 Am. 1).
    */
   if (directed && k !== null) {
     for (const rider of new Set([...pair1, ...pair2])) {
@@ -1442,11 +1454,23 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
    * figure, so it is asked here — at the OUTERMOST call, because the engine lowers other commands to
    * this same shape and they are not sentences anyone wrote.
    */
+  let arrows: [Id, Id][] = [];
   if (APPLY_DEPTH === 0) {
-    // #1680/#1783 (ADR-3D-391): one reading for every unmarked segment equation, plain or with a coefficient
+    // #1680/#1783 (ADR-3D-391 Am. 1): one reading for every unmarked segment equation, plain or with a coefficient
     const read = readSegmentEquation(c, cmd);
     if ('ask' in read) return { ok: false, error: read.ask };
+    if ('length' in read) {
+      // the length reading IS the «|XY| = k|ZW|» sentence: its own commands, each an outermost apply as the store's
+      let at = c;
+      for (const k of read.length) {
+        const step = applyCommand3(at, k);
+        if (!step.ok) return step;
+        at = step.next;
+      }
+      return { ok: true, next: at };
+    }
     cmd = read.cmd;
+    arrows = read.arrows;
   }
   APPLY_DEPTH += 1;
   let r: ApplyResult3;
@@ -1458,6 +1482,7 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
   } finally {
     APPLY_DEPTH -= 1;
   }
+  if (r.ok && arrows.length > 0) r = { ok: true, next: withStatedArrows(r.next, arrows) };
   if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
   return r;
 }
@@ -3260,10 +3285,6 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             type: 'vec-eq',
             lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }],
             rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })),
-            // #1680/#1783 (ADR-3D-391): a free rider's unmarked equation — refuted, it is asked about instead
-            ...(cmd.askIfRefuted && cmd.terms[0].atom.kind === 'pair'
-              ? { askIfRefuted: { a1: cmd.from, b1: cmd.to, a2: cmd.terms[0].atom.from, b2: cmd.terms[0].atom.to, c: cmd.terms[0].coeff.k } }
-              : {}),
           },
         });
         if (!asClaim.ok) return asClaim;

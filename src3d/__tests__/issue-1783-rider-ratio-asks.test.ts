@@ -1,5 +1,5 @@
 /**
- * #1783 (ADR-3D-391) — «AD = 3BD» on a rider is ASKED about, never refuted as the student's arithmetic.
+ * #1783 (ADR-3D-391, Am. 1) — «AD = 3BD» on a rider is never refuted as the student's arithmetic.
  *
  * «משולש ABC · D על AB · AD = 3BD»: read as vectors, D would sit at 1.5·AB, off its segment; read as lengths,
  * D sits at ¾. #748 ruled the tool must not pick between two readings that disagree, and that stands. What was
@@ -7,9 +7,10 @@
  * while the whole-host shape («AB = 4DA», vector D at −¼) silently built at ¼ as lengths. One rider family read
  * direction in one shape and not in the other.
  *
- * Now (the operator's card-11 ruling, 2026-10-13): the vector reading is tried; where it places the rider it
- * builds, and where the figure refutes it the student is asked, with the bar form taught in their own letters.
- * A MARKED statement is a vector and keeps its honest refutation (ADR-3D-250).
+ * Now (the operator's rule of 2026-10-30, PR #2605, which replaces card 11's "ask" here): *"if only one can be true,
+ * we will assume this is the case"*. Where the vector reading cannot place D and the length reading can, the line
+ * builds as lengths (T36, T38); where both agree it builds (T39). A MARKED statement is a vector and keeps its honest
+ * refutation (ADR-3D-250).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
@@ -33,28 +34,27 @@ const tOf = (x: string, a: string, b: string) => {
   return d(a, x) / d(a, b);
 };
 
-describe('#1783 — a rider coefficient whose vector reading fails asks', () => {
+describe('#1783 — a rider coefficient whose vector reading fails is read as lengths', () => {
   it.each([
-    ['AD = 3BD', { a1: 'A', b1: 'D', a2: 'B', b2: 'D', c: 3 }],
-    ['AD = 3·BD', { a1: 'A', b1: 'D', a2: 'B', b2: 'D', c: 3 }],
-    ['AD = 3*BD', { a1: 'A', b1: 'D', a2: 'B', b2: 'D', c: 3 }],
-    // the swapped sides lower to the same relation, «AD = ⅓·BD» (it was a bare vec-eq claim, refuted)
-    ['3BD = AD', { a1: 'A', b1: 'D', a2: 'B', b2: 'D', c: 1 / 3 }],
-    ['AD = 0.5BD', { a1: 'A', b1: 'D', a2: 'B', b2: 'D', c: 0.5 }],
-    ['BD = 3AD', { a1: 'B', b1: 'D', a2: 'A', b2: 'D', c: 3 }],
-    // WITHDRAWN: the whole-host shape built this at t = ¼, read silently as lengths
-    ['AB = 4DA', { a1: 'A', b1: 'B', a2: 'D', b2: 'A', c: 4 }],
-  ])('«%s» asks, in the student’s own letters, and commits nothing', (line, pairs) => {
+    ['AD = 3BD', 0.75],
+    ['AD = 3·BD', 0.75],
+    ['AD = 3*BD', 0.75],
+    // the swapped sides lower to the same relation, «AD = 3·BD» (Am. 1: it was lowered with the reciprocal)
+    ['3BD = AD', 0.75],
+    ['AD = 0.5BD', 1 / 3],
+    ['BD = 3AD', 0.25],
+    // T38: the whole-host shape, as vectors D at −¼
+    ['AB = 4DA', 0.25],
+  ])('«%s» builds D where the length reading puts it, without a question', (line, t) => {
     const { err, facts } = run([TRI, 'D על AB', line]);
-    expect(err?.code).toBe('ambiguous-vector-length');
-    const e = err as unknown as { a1: string; b1: string; a2: string; b2: string; c: number };
-    expect([e.a1, e.b1, e.a2, e.b2]).toEqual([pairs.a1, pairs.b1, pairs.a2, pairs.b2]);
-    expect(e.c).toBeCloseTo(pairs.c, 12);
-    expect(facts).toBe(2);
+    expect(err).toBeNull();
+    expect(facts).toBe(3);
+    expect(tOf('D', 'A', 'B')).toBeCloseTo(t, 6);
   });
 
-  it('the English spelling asks the same', () => {
-    expect(run(['triangle ABC', 'D on AB', 'AD = 3BD']).err?.code).toBe('ambiguous-vector-length');
+  it('the English spelling builds the same', () => {
+    expect(run(['triangle ABC', 'D on AB', 'AD = 3BD']).err).toBeNull();
+    expect(tOf('D', 'A', 'B')).toBeCloseTo(0.75, 6);
   });
 
   it.each([

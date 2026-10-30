@@ -124,14 +124,16 @@ describe('#1183 — the taught vector spelling is reachable', () => {
   });
 
   /**
-   * THE TRIPWIRE. #1156's ruling — an UNMARKED `XY = k·ZW` has two readings and the tool refuses
-   * rather than picks (#748), asking which was meant — must be untouched. If this moves, the fix has
-   * drifted into the routing option round #1169 escalated on, and that is an escalation, not an
-   * adjustment.
+   * THE TRIPWIRE. #1156's ruling — an UNMARKED `XY = k·ZW` has two readings and the tool refuses rather than picks
+   * (#748), asking which was meant. The operator narrowed it on 2026-10-30 (PR #2605, ADR-3D-391 Am. 1): *"we should
+   * ask if both can be true and if only one can be true, we will assume this is the case"*. Between two
+   * non-collinear box edges only the length reading can hold, so «AA'=3BC» builds as lengths; a quadrilateral's
+   * «AB = DC», where both readings hold and differ, still asks. Moving either is an escalation, not an adjustment.
    */
-  it('an UNMARKED statement still ASKS — #748 and ADR-3D-249 stand', () => {
-    const { err } = build(['תיבה', "AA'=3BC"]);
-    expect(err).toEqual({ code: 'ambiguous-vector-length', a1: 'A', b1: "A'", a2: 'B', b2: 'C', c: 3 });
+  it('an UNMARKED statement asks only when both readings can hold — #748 and ADR-3D-249 as narrowed', () => {
+    expect(build(['תיבה', "AA'=3BC"]).err).toBeNull();
+    st().clear();
+    expect(build(['מרובע ABCD', 'AB = DC']).err).toEqual({ code: 'ambiguous-vector-length' });
   });
 
   it('the LENGTH half the message offers still builds', () => {

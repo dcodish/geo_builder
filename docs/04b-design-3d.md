@@ -593,14 +593,20 @@ only (`1/t` is not a name). A **numeric `vec-rel` is directed** (ADR-3D-391, #17
 vector equation on the host line (`a ↦ 0`, `b ↦ 1`, rider `↦ t`) for both shapes at once, so «AB = 4DA» (vector
 `t = −¼`) is not placed — the set-matching whole-host test had built it as lengths.
 
-**One reading for an unmarked segment equation** (ADR-3D-391, #1680). The parser no longer refuses a bare
-«AB = AC»: it lowers, like «AB = 1AC», to an unmarked single-pair `vec-rel`, and `segmentEquationReading`
-(`apply.ts`, at the outermost `applyCommand3` only — the engine lowers other commands to the same shape) decides:
-marked → vector; a point not yet drawn → vector (a definition); a free rider (`on-segment`, `t` absent) →
-`vector-or-ask`, i.e. the command carries `askIfRefuted` onto its `vec-eq` claim and the store turns that claim's
-refutation into `ambiguous-vector-length` (`segmentEquationAsk`, shared); one segment on both sides → vector,
-except at `k = 1`; anything else → ask. The ask carries the pairs except at `k = 1`, whose generic wording names
-both spellings.
+**One reading for an unmarked segment equation** (ADR-3D-391 and its Am. 1, #1680). The parser no longer refuses
+a bare «AB = AC»: it lowers, like «AB = 1AC», to an unmarked single-pair `vec-rel` («3BD = AD» lowers to «AD = 3·BD»).
+`segmentEquationKind3` (`apply.ts`) classifies it against the figure: marked, a point not yet drawn (a definition), a
+negative coefficient, or one segment on both sides with `k ≠ 1` → `vector`; anything else → `two-readings`. Which
+reading a two-reading line takes is decided by the **store's fold**, not the engine, because "can this reading hold"
+is a question about the solved figure: `applyFact` hands the line to `readSegmentEquation3` (`store3.ts`), which folds
+the list up to and including the line twice through `deriveCore3` itself — once with `reading: 'vector'`, once with
+`reading: 'length'` on the command — at one canonical seed, and reads the line's own status: one green → that
+reading; both green and the same positions → `'length'`; otherwise `'ask'`. Memoized by the prefix, so the verdict
+never changes with the seed or with a later line; recorded per line in `Derived3.readings`. The outermost
+`applyCommand3` then applies it: `'vector'` as the vector command plus an ink arrow (`arrows`) for each pair of the
+sentence; `'length'` as exactly «|XY| = k|ZW|»'s commands (`segment3` + `length-rel`); `'ask'` or no reading as
+`ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers `already-stated` for
+a two-reading line whose reading `verifyClaim` finds true in every sample of the figure before it (T45).
 
 **A length sum** (ADR-3D-392, #1680) is the `length-sum` claim and `ScalarPin` (Σ cᵢ·|aᵢbᵢ| = value, the
 `lengthSum` rule, 2-D's `set-measure-sum`). It routes exactly as `length-eq`: the driving pin plus its recorded

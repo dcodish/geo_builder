@@ -1,17 +1,15 @@
 /**
  * #1680 (ADR-3D-391, ADR-3D-392) — ONE READING FOR EVERY UNMARKED SEGMENT EQUATION, and a length sum in 3-D.
  *
- * The operator's rulings:
- * - 2026-10-04: in 3-D an unmarked segment name on both sides of an equation, with or without a coefficient
- *   («AB = AC», «AB = CD», «AB = 2AD», «AB = ½CD»), asks «length or vector?». It is a vector only when marked.
- * - 2026-10-13 (card 12, option A): *"A new point or a point on a segment never asks."* «AK = AD» builds like
- *   «AK = 2AD»; every other unmarked segment equation keeps asking.
- * - 2026-10-13 (card 11): «E על AA'» then «AE = AB» keeps asking — the point-on-a-segment exemption applies only
- *   when the vector reading can hold.
- *
- * Before this, the reading depended on which code path parsed the sentence: the parser asked about the plain
- * form before any rule ran (blind to the figure), and the apply guard asked about `k ≠ 1` with exemptions of its
- * own — so «AB = 1AC» was asked about by nobody and refuted, and «AK = AD» asked while «AK = 2AD» built.
+ * The operator's rule (2026-10-30, PR #2605, ADR-3D-391 Am. 1), which replaces the 2026-10-04 / 2026-10-13 "ask"
+ * rulings for every case it reaches: *"if something is not sure if its a vecotor or length, we should ask if both can
+ * be true and if only one can be true, we will assume this is the case"*. So:
+ * - only ONE reading can hold → that reading builds, no question (T36, T38, T40, T41, T42);
+ * - both hold and give ONE figure → it builds (T39);
+ * - both hold and DIFFER, or neither holds → it asks;
+ * - a line the figure already states → «already on the figure», no row (T45);
+ * - a vector reading draws every vector of the sentence as an arrow (T46).
+ * Marked statements and definitions of a new point are unchanged.
  *
  * Every case is driven through the store's `submit`, the student's entry point.
  */
@@ -43,38 +41,99 @@ const tOf = (x: string, a: string, b: string) => {
   return dist(pos, a, x) / dist(pos, a, b);
 };
 
-describe('#1680 — every other unmarked segment equation asks length-or-vector', () => {
+/** |XY| = k·|ZW| at every claim seed — the length reading holds on the drawn figure. */
+const lengthHolds = (x: string, y: string, k: number, z: string, w: string) => {
+  for (const seed of claimSeeds(st().seed)) {
+    const pos = posAt(seed);
+    expect(dist(pos, x, y)).toBeCloseTo(k * dist(pos, z, w), 6);
+  }
+};
+const readingOfLast = () => {
+  const facts = st().facts;
+  return derive3(facts, st().seed).readings[facts[facts.length - 1].id];
+};
+
+describe('#1680 Am. 1 — only ONE reading can hold: it is taken and built, no question', () => {
   it.each([
-    [[TRI, 'AB = AC'], { code: 'ambiguous-vector-length' }],
+    // T36: as vectors D would sit at 1.5·AB, off its segment
+    [[TRI, 'D על AB', 'AD = 3BD'], ['A', 'D', 3, 'B', 'D']],
+    // T38: as vectors D would sit at −¼
+    [[TRI, 'D על AB', 'AB = 4DA'], ['A', 'B', 4, 'D', 'A']],
+    // T41: as vectors the apex would lie in the base
+    [[PYR, 'M אמצע BC', 'SM = 2SA'], ['S', 'M', 2, 'S', 'A']],
+    // T42: AE runs along AA', AB does not (this reverses card 11 for this case, by the 2026-10-30 rule)
+    [[P, "E על AA'", 'AE = AB'], ['A', 'E', 1, 'A', 'B']],
+    // as vectors B and C would be one point (T40's class, in a figure whose lengths can hold it)
+    [[TRI, 'AB = AC'], ['A', 'B', 1, 'A', 'C']],
+    [[TRI, 'AB = 1AC'], ['A', 'B', 1, 'A', 'C']],
+    [[P, "E על AA'", "AE = 2*A'E"], ['A', 'E', 2, "A'", 'E']],
+  ] as [string[], [string, string, number, string, string]][])('%j builds as lengths', (lines, [x, y, k, z, w]) => {
+    const { err, facts } = run(lines);
+    expect(err).toBeNull();
+    expect(facts).toBe(lines.length);
+    expect(readingOfLast()).toBe('length');
+    lengthHolds(x, y, k, z, w);
+  });
+
+  it('T36 puts D at ¾ of AB, exactly where «|AD| = 3|BD|» does, and draws no arrow', () => {
+    run([TRI, 'D על AB', 'AD = 3BD']);
+    expect(tOf('D', 'A', 'B')).toBeCloseTo(0.75, 6);
+    expect(derive3(st().facts, st().seed).construction.arrows).toEqual([]);
+  });
+
+  it('a negative coefficient has no length reading, so it is a vector', () => {
+    const { err } = run([P, "E על AA'", "AE = -A'E"]);
+    expect(err).toBeNull();
+    expect(tOf('E', 'A', "A'")).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe('#1680 Am. 1 — both readings can hold and DIFFER, or neither can: it asks, and commits nothing', () => {
+  it.each([
+    // a parallelogram (vectors) or two equal sides (lengths)
+    [['מרובע ABCD', 'AB = DC'], { code: 'ambiguous-vector-length' }],
     [['מרובע ABCD', 'AB = CD'], { code: 'ambiguous-vector-length' }],
+    // the engine draws a quadrilateral with A, B, D in line, so both readings build, and they differ
     [['מרובע ABCD', 'AB = 2 AD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'A', b2: 'D', c: 2 }],
-    [[PYR, 'AB = ½CD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'C', b2: 'D', c: 0.5 }],
-    // the hole: «AB = 1AC» was the parser's shape for nobody, so it fell to the vector claim and was refuted
+    // T40: «פירמידה SABCD» is a regular pyramid, so AB (a side) and AC (a diagonal) are never equal either: NEITHER
+    // reading can hold, a case the 2026-10-30 rule does not cover, so it keeps asking (reported for a ruling)
     [[PYR, 'AB = 1AC'], { code: 'ambiguous-vector-length' }],
-    [[PYR, 'AB = 1·AC'], { code: 'ambiguous-vector-length' }],
-    // a midpoint is already placed — this sentence places nothing, so it asks (it was refuted against the sample)
-    [[PYR, 'M אמצע BC', 'SM = 2SA'], { code: 'ambiguous-vector-length', a1: 'S', b1: 'M', a2: 'S', b2: 'A', c: 2 }],
-    [[PYR, 'M אמצע BC', 'BM = 1MC'], { code: 'ambiguous-vector-length' }],
-    [[PYR, 'M אמצע BC', 'BM = MC'], { code: 'ambiguous-vector-length' }],
-    // card 11: a rider whose vector reading cannot hold keeps asking
-    [[P, "E על AA'", 'AE = AB'], { code: 'ambiguous-vector-length' }],
-    [[P, "E על AA'", 'AE = 2AB'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: 'A', b2: 'B', c: 2 }],
-    // a rider whose vector reading only a FLAT triangle would hold (D the midpoint of AC, on AB) asks — never «the triangle would be flat»
-    [[TRI, 'D על AB', 'AD = DC'], { code: 'ambiguous-vector-length' }],
-    // neither reading places E (t = 2): the sentence places nothing, so it asks like every other one
+    [[PYR, 'AB = ½CD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'C', b2: 'D', c: 0.5 }],
+    // neither reading places E (t = 2 either way)
     [[P, "E על AA'", "AE = 2AA'"], { code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: 'A', b2: "A'", c: 2 }],
+    // a stated t = ⅔ contradicted under both readings
+    [[P, "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"], { code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: 'E', b2: "A'", c: 3 }],
   ])('%j asks', (lines, expected) => {
-    const before = (() => {
-      run(lines.slice(0, -1));
-      return st().facts.length;
-    })();
+    run(lines.slice(0, -1));
+    const before = st().facts.length;
     const { err, facts } = run(lines);
     expect(err).toEqual(expected);
     expect(facts, 'nothing is committed').toBe(before);
   });
+});
 
-  it('the c = 1 forms carry no pairs, so they show the generic wording, as «AB = AC» always did', () => {
-    expect(run([PYR, 'AB = 1AC']).err).toEqual(run([PYR, 'AB = AC']).err);
+describe('#1680 Am. 1 — T45: a line the figure already states is «already on the figure», and adds no row', () => {
+  it.each([
+    [[P, "E על AA' כך ש-AE = 2EA'", "AE = 2EA'"]],
+    [[PYR, 'M אמצע BC', 'BM = MC']],
+  ])('%j', (lines) => {
+    run(lines.slice(0, -1));
+    const before = st().facts.length;
+    st().submit(lines[lines.length - 1]);
+    expect(st().lastError).toBeNull();
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().facts.length).toBe(before);
+  });
+});
+
+describe('#1680 Am. 1 — T46: a vector reading draws every vector of the sentence as an arrow', () => {
+  it('«BE = EC» on an empty canvas draws BE and EC', () => {
+    expect(run(['BE = EC']).err).toBeNull();
+    expect(derive3(st().facts, st().seed).construction.arrows).toEqual(expect.arrayContaining([['B', 'E'], ['E', 'C']]));
+  });
+  it('«AK = 2AD» (a definition) draws AK and AD', () => {
+    expect(run([P, 'AK = 2AD']).err).toBeNull();
+    expect(derive3(st().facts, st().seed).construction.arrows).toEqual(expect.arrayContaining([['A', 'K'], ['A', 'D']]));
   });
 });
 
@@ -112,15 +171,16 @@ describe('#1680 — a segment equation that DEFINES a new point builds as a vect
   });
 });
 
-describe('#1680 / #1783 — a segment equation that PLACES a free rider builds where the vector reading holds', () => {
+describe('#1680 / #1783 — a segment equation that PLACES a free rider builds where its readings agree (T35, T39)', () => {
   it.each([
     [[P, "E על AA'", "AE = EA'"], ['E', 'A', "A'"], 0.5],
     [[P, "E על AA'", "EA' = AE"], ['E', 'A', "A'"], 0.5],
     [[P, "E על AA'", "A'E = EA"], ['E', 'A', "A'"], 0.5],
     [[P, "E על AA'", "AE = 2EA'"], ['E', 'A', "A'"], 2 / 3],
+    // T36 and T38: only the length reading can hold
+    [[TRI, 'D על AB', 'AD = 3BD'], ['D', 'A', 'B'], 0.75],
+    [[TRI, 'D על AB', 'AB = 4DA'], ['D', 'A', 'B'], 0.25],
     [[PYR, 'E על SA', 'SE = EA'], ['E', 'S', 'A'], 0.5],
-    // the whole-host form: both readings put E on A' (the plan's «AE = AA'» line)
-    [[P, "E על AA'", "AE = AA'"], ['E', 'A', "A'"], 1],
     [[TRI, 'D על AB', 'AD = DB'], ['D', 'A', 'B'], 0.5],
     [[TRI, 'D על AB', 'AD = 3DB'], ['D', 'A', 'B'], 0.75],
     [[TRI, 'D על AB', 'DB = 3AD'], ['D', 'A', 'B'], 0.25],

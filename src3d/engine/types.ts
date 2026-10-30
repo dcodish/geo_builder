@@ -83,14 +83,7 @@ export type Claim3 =
    */
   | { type: 'length-letter'; a: Id; b: Id; coef: number; sym: string }
   | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
-  | {
-      type: 'vec-eq';
-      lhs: VecExpr;
-      rhs: VecExpr;
-      /** #1680/#1783 (ADR-3D-391): an UNMARKED `XY = k·ZW` over a free rider. The vector reading is tried; where
-       *  the figure refutes it the student is ASKED (with these pairs), never told the statement is false. */
-      askIfRefuted?: { a1: Id; b1: Id; a2: Id; b2: Id; c: number };
-    } // AM = ½u + ½v + 5/3·w
+  | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
@@ -852,10 +845,17 @@ export interface VecRelCommand {
    * than to the concept); it travels on the command now.
    */
   marked?: true;
-  /** #1680/#1783 (ADR-3D-391): set ONLY by the outermost apply's segment-equation reading, never by a parser.
-   *  This unmarked relation is about a free rider, so a refuted vector reading asks instead of refusing. */
-  askIfRefuted?: true;
+  /**
+   * #1680/#1783 (ADR-3D-391 Am. 1): which reading an UNMARKED two-reading segment equation takes. Set ONLY by the
+   * store's fold (`readSegmentEquations3`), which tries both readings on the figure, never by a parser: `'vector'`
+   * (only the vector reading can hold), `'length'` (only the length reading can hold, or both give one figure) or
+   * `'ask'` (both can hold and differ, or neither can). Absent on a two-reading sentence, the outermost apply asks.
+   */
+  reading?: SegmentEquationReading3;
 }
+
+/** #1680 (ADR-3D-391 Am. 1): the fold's verdict on an unmarked two-reading segment equation. */
+export type SegmentEquationReading3 = 'vector' | 'length' | 'ask';
 
 /**
  * V7 — a segment/vector ∥-or-⟂-to-plane RELATION. APPLY decides: when an endpoint

@@ -2147,7 +2147,8 @@ const vecEqClaim: Rule = (s0) => {
     // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
     return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
   }
-  // #1783 (ADR-3D-391): «3BD = AD» is «AD = ⅓·BD» — the same sentence with its sides swapped. It lowers to the same
+  // #1783 (ADR-3D-391): «3BD = AD» is «AD = 3·BD» — the same sentence with its sides swapped (Am. 1: it was lowered
+  // with the reciprocal, «AD = ⅓·BD», a different sentence). It lowers to the same
   // `vec-rel`, so the one segment-equation reading at apply sees it (it was a bare vec-eq claim, refuted where its
   // mirror asks, and a definition «2AK = AD» of a new K could not reach the affine lane at all)
   const rhsPair = parts[1].trim().match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
@@ -2157,7 +2158,7 @@ const vecEqClaim: Rule = (s0) => {
     if (l && !l.symbol && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
       return [{
         type: 'vec-rel', from: rhsPair[1], to: rhsPair[2],
-        terms: [{ coeff: { k: 1 / term.coeff.k, p: 0 }, atom: term.atom }],
+        terms: [{ coeff: { k: term.coeff.k, p: 0 }, atom: term.atom }],
         ...(VEC_MARKED ? { marked: true as const } : {}),
       }];
   }

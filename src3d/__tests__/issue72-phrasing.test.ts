@@ -64,11 +64,11 @@ describe('#72 — parse: the prod phrasings lower deterministically', () => {
       { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['B', 'C'] }, c: 1 },
     ]);
     expect(cmd('length AB = BC')).toMatchObject([{ type: 'segment3' }, { type: 'length-rel' }]);
-    // the bare pair=pair stays the honest clarification — the marker is what disambiguates. #1680 (ADR-3D-391): the
-    // question is asked at the outermost apply, where the figure is known, so it is locked at submit, not at parse3
+    // #1680 (ADR-3D-391 Am. 1): the bare pair=pair is read at the fold, where the figure is known. In a triangle its
+    // vector reading (B the midpoint of AC) cannot hold, so only the length reading can, and it builds
     submit('משולש ABC');
     submit('AB=BC');
-    expect(state().lastError).toEqual({ code: 'ambiguous-vector-length' });
+    expect(state().lastError).toBeNull();
   });
   it('אנך יורד מMלבסיס (the glued prod form) → perp-to-base', () => {
     expect(cmd('אנך יורד מMלבסיס')).toMatchObject([{ type: 'perp-to-base', from: 'M' }]);
@@ -151,10 +151,11 @@ describe('#55 (ADR-3D-040): the coefficient form of the length/vector ambiguity'
       expect(r.ok, u).toBe(true);
       if (r.ok) expect(r.commands.some((c) => c.type === 'vec-rel')).toBe(true);
     }
-    // the no-coefficient bare pair is still the length/vector ambiguity (unchanged) — asked at submit since #1680
+    // the no-coefficient bare pair is read at the fold since #1680 (ADR-3D-391 Am. 1): as vectors S would sit on B,
+    // so only the length reading can hold, and it builds
     submit('פירמידה SABCD');
     submit('AS = AB');
-    expect(state().lastError).toEqual({ code: 'ambiguous-vector-length' });
+    expect(state().lastError).toBeNull();
   });
 
   it("gap (b): a LENGTH-marked LHS accepts a bare pair RHS with a coefficient", () => {

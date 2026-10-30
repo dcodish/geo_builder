@@ -91,10 +91,10 @@ describe('#1590 — a given false as stated keeps «בדקו את החישוב»
 });
 
 describe('#1590 — an ANSWER over a sampled carrier keeps its register (the fix is about givens)', () => {
-  // #1783 (ADR-3D-391, the card-11 ruling of 2026-10-13): this answer's register is the length-or-vector question now —
-  // its vector reading cannot place E and its length reading can, so it is asked, never refuted as arithmetic
-  it('«AE = 2*A\'E» over a rider E on AA\' is asked about, never refuted', () => {
-    expect(refusal(['מקבילון', "E על AA'", "AE = 2*A'E"])?.code).toBe('ambiguous-vector-length');
+  // #1783 (ADR-3D-391 Am. 1, the operator's rule of 2026-10-30): its vector reading cannot place E and its length
+  // reading can, so it builds as lengths — never refuted as arithmetic
+  it('«AE = 2*A\'E» over a rider E on AA\' builds as lengths, never refuted', () => {
+    expect(refusal(['מקבילון', "E על AA'", "AE = 2*A'E"])).toBeNull();
   });
 });
 
