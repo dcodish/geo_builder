@@ -6,9 +6,10 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-30",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
+    "src-analytic/__tests__/issue-1177-locus-chip.test.ts",
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
