@@ -1110,6 +1110,11 @@ A root is taken when a point declared before it sits there within `apartOf`; a r
 is dropped by `withinSegment` (a bounded crossing) or by `failingSelectors` over its own `between` / `beyond`. It moves
 the start only when a root was dropped and exactly one admissible root is left — otherwise the seed still chooses and
 «הציגו תצורה אחרת» cycles.
+**The judge reads the same rule at the JUDGED positions** ([ADR-AG-350](06c-decisions-analytic.md#adr-ag-350), #2615): `crossingPartners`
+(`evaluate.ts`) is the signature siblings plus every point declared before the crossing that lies on both of its carriers
+(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds.
+`crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation) reads the same
+set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other root.
 An ordinal lowers to `crossing-nth {id, nth, pair}`, otherwise `crossing-distinct`. Two conics are ordered by the
 reading direction ([ADR-AG-236](06c-decisions-analytic.md#adr-ag-236): `orderedCrossings`, `conicsMeet`), and the
 duplicate fault names its operands (`incidenceWords`, `errCrossingAlreadyNamedOperands`). **Both crossings in one
@@ -1253,7 +1258,11 @@ order. Search first is kept by the predicate, not by a budget: a dart-capable pa
 A crossing on an existing point is refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
-`self-crossing`.
+`self-crossing`. **Positionally** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613): `crossingHasNoPoint`
+(`evaluate.ts`) reads a crossing's two incidences as numeric straights at the judged positions (`on-line-2pt` as the line
+through its points) and asks `curvesCoincide`; both crossing selectors (`crossing-distinct`, `crossing-nth`) fail there,
+so no configuration where the two lines are one line is admitted, and `derive` words a failing crossing selector whose
+drawn lines coincide as `self-crossing`.
 
 **The positional arm reads the PAIR's freedom, never the figure's** ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254), #1938).
 It used to borrow the vacancy pass's whole-figure predicate (`reportedDof === 0`), which leaked exactly as the ring arm's
@@ -1653,6 +1662,13 @@ traced points → print, or print nothing`.
 
 The walk passes each step through `resolvedAt` and `admissibleAt` (`selectorsHold`, `ringFaultsOf`); `LocusTrace`
 holds `points` and `pieces`, and only the pieces are drawn.
+
+**Where the figure stops existing, the walk stops** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613). A step at
+which a crossing sentence names no point (`someCrossingHasNoPoint`: its two straights coincide) ends that direction
+unrecorded, and a walk starting there returns `null`. That is a bifurcation — the carrier system grows a second branch
+along the common line — never a gap of the same branch to cross. Each step is corrected at `TIGHT_TOLERANCE_FACTOR`: next
+to such a configuration the crossing of two nearly parallel lines is ill-conditioned (a residual of `SOLVE_TOL` places
+it only to `SOLVE_TOL / sin θ`), and the fit's re-verification reads every walked point.
 
 *Identifiers:* `starts`
 

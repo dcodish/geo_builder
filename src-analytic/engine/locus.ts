@@ -31,10 +31,10 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, viewBox, type CarrierSystem } from './evaluate';
+import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, someCrossingHasNoPoint, viewBox, type CarrierSystem } from './evaluate';
 import { agreeingUnion, conicPointsIn, curveOfTrace, distToConic, shapeOfTrace, type LocusShape } from './locusFit';
 import type { Conic } from './conic';
-import { jacobianRank, solveLM, SOLVE_TOL } from './solve';
+import { jacobianRank, solveLM, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
 import { isFree, type Construction, type Id } from './types';
@@ -196,15 +196,24 @@ export function traceLocus(
    * student described — `admissibleAt`, the configuration's own validity predicate, called on the positions the step
    * already computed. Never a second reading of the selectors.
    */
-  const judge = (x: number[]): { p: Pt | null; ok: boolean } => {
+  /*
+   * …and whether the figure EXISTS there at all (#2613, ADR-AG-349): a crossing sentence whose two straights coincide
+   * names no point (`someCrossingHasNoPoint`). That is not a stretch the givens rule out on the same branch (#1817's
+   * gap, which the walk crosses to reach the next ray) — it is a BIFURCATION, where the carrier system grows a second
+   * branch along the common line, and walking on is a branch switch. So such a step ends the walk's direction and is
+   * not recorded, and a walk whose START is there has nothing to trace.
+   */
+  const judge = (x: number[]): { p: Pt | null; ok: boolean; gone: boolean } => {
     const pos = sys.positionsAt(x);
     const q = pos.get(id);
     const p = q && Number.isFinite(q.x) && Number.isFinite(q.y) ? q : null;
-    return { p, ok: p !== null && admissibleAt(c, pos, sys.envAt(x)) };
+    const env1 = sys.envAt(x);
+    const gone = someCrossingHasNoPoint(c, pos, env1);
+    return { p, ok: p !== null && !gone && admissibleAt(c, pos, env1), gone };
   };
   const o0 = judge(x0);
   const origin = o0.p;
-  if (!origin) return null;
+  if (!origin || o0.gone) return null;
 
   const inBounds = (p: Pt) =>
     !opts.bounds ||
@@ -228,20 +237,23 @@ export function traceLocus(
       // same `solveLM` the figure itself is solved with, started from the predicted point, so a step
       // never drifts off the curve it is tracing.
       const predicted = x.map((v, k) => v + sign * step * d[k]);
-      const res = solveLM(predicted, sys.residualsAt, 40);
+      // At the TIGHT tolerance (#2613, ADR-AG-349): beside a configuration where a crossing's two lines coincide, the
+      // crossing of two nearly parallel lines is ill-conditioned — a residual of SOLVE_TOL places it only to
+      // SOLVE_TOL / sin θ — and the fit re-verifies its equation against every walked point.
+      const res = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(predicted, sys.residualsAt, 40));
       if (!res.ok) {
         // The corrector could not get back. A smaller step is the honest retry — the curve may be
         // turning sharply — and giving up after one is what would leave a trace ending in mid-air.
         const half = x.map((v, k) => v + sign * step * 0.25 * d[k]);
-        const res2 = solveLM(half, sys.residualsAt, 40);
+        const res2 = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(half, sys.residualsAt, 40));
         if (!res2.ok) break;
         x = res2.values;
       } else {
         x = res.values;
       }
 
-      const { p, ok } = judge(x);
-      if (!p) break;
+      const { p, ok, gone } = judge(x);
+      if (!p || gone) break;
       /**
        * CLOSURE: the walk came back to where it started — IN CARRIER SPACE (#2384, ADR-AG-308), and only after
        * enough steps that the first few cannot trigger it.
