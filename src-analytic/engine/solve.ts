@@ -28,6 +28,7 @@ import { Odometer, resolveConstraintChoices } from './discreteAxes';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
 import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
+import { conicSize, lineQuadratic, type Walk } from './lineQuadratic';
 import {
   describeLengthExpr,
   evalLengthExpr,
@@ -88,6 +89,15 @@ export type Direction =
    * so a circle stated by its equation, by its centre point or computed from points is the same operand.
    */
   | { k: 'radius'; circle: Id; at: Id }
+  /**
+   * THE NORMAL TO A CONIC AT A POINT — the gradient of the resolved canonical conic at `at` (#2618, ADR-AG-355).
+   *
+   * What a tangent AT a named point is perpendicular to, on any conic: on a circle it IS the radius vector (so a
+   * circle's touch lowering, which keeps `radius`, reads the same numbers either way), on an ellipse `(x/a², y/b²)`,
+   * on a parabola `y² = 2px` the vector `(−p, y)`. Read off the RESOLVED curve at every iterate, so a parameter in
+   * the conic's equation moves it. A point where the gradient vanishes (a circle's centre) judges nothing.
+   */
+  | { k: 'normal'; curve: Id; at: Id }
   /**
    * THE BISECTOR OF THE ANGLE (a, v, b) — «חוצה זווית ABC» drawn on its own (#1284, ADR-AG-209; 2-D's `bisector`
    * command with `visible`). The sum of the two unit rays from `v`, so the line through `v` along it is the
@@ -365,6 +375,9 @@ export type Constraint =
    * points. Both numbers are read off the RESOLVED circle (`curveAt`), so the freedom the given consumes is
    * the LINE's (a parameter in its equation, a free point it passes through), never the circle's. Same
    * rows as `tangent-line` (`lineTangencyRows`), so a bounded side is bounded identically.
+   *
+   * WIDENED TO THE CONICS (#2618, ADR-AG-355): `circle` may name the figure's ellipse or parabola, whose row is the
+   * double-root condition of the line's substitution (`conicTangencyRows`). On a circle the rows are unchanged.
    */
   | { t: 'tangent-curve'; circle: Id; line: TangentLineRef }
   /**
@@ -492,7 +505,7 @@ export function resolveChoices(ks: readonly Constraint[], seed: number): Constra
  */
 export function canonicalConstraint(k: Constraint): string {
   const dir = (d: Direction): string =>
-    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : d.k === 'bisector' ? `b:${d.v},${[d.a, d.b].sort().join(',')}` : `f:${d.sym}`;
+    d.k === 'points' ? `p:${[d.a, d.b].sort().join(',')}` : d.k === 'axis' ? `a:${d.axis}` : d.k === 'curve' ? `c:${d.id}` : d.k === 'radius' ? `r:${d.circle},${d.at}` : d.k === 'normal' ? `n:${d.curve},${d.at}` : d.k === 'bisector' ? `b:${d.v},${[d.a, d.b].sort().join(',')}` : `f:${d.sym}`;
   if (k.t === 'relation') {
     // Both relations are symmetric in their operands: `u ∥ v` is `v ∥ u`, and likewise for ⊥.
     const [u, v] = [dir(k.u), dir(k.v)].sort();
@@ -756,7 +769,7 @@ export function describeConstraint(k: Constraint): string {
  * reference as "not a point", which is the opposite defect.
  */
 /** The CURVES a direction names — a named line, a radius's circle; `dirRefs` is its points half. */
-export const dirCurveRefs = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
+export const dirCurveRefs = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : d.k === 'normal' ? [d.curve] : []);
 
 export function constraintCurveRefs(k: Constraint): Id[] {
   const ofDir = dirCurveRefs;
@@ -801,8 +814,9 @@ export function dirRefs(d: Direction): Id[] {
   switch (d.k) {
     case 'points':
       return [d.a, d.b];
-    // The point the radius runs to; the circle is a CURVE ref (`constraintCurveRefs`), never a point.
+    // The point the radius (or a conic's normal) runs to; the curve is a CURVE ref (`constraintCurveRefs`), never a point.
     case 'radius':
+    case 'normal':
       return [d.at];
     case 'bisector':
       return [d.v, d.a, d.b];
@@ -833,6 +847,9 @@ function describeDir(d: Direction): string {
       return 'ישר';
     case 'radius':
       return `הרדיוס ל-${d.at}`;
+    case 'normal':
+      // No new inline Hebrew (the #2201 ratchet): this description reaches no student (describeConstraint is internal).
+      return `n(${d.curve}, ${d.at})`;
     case 'bisector':
       return `חוצה הזווית ${d.a}${d.v}${d.b}`;
     default: {
@@ -884,8 +901,26 @@ export function dirVector(
       // centre has no radius direction: `null`, "cannot be judged", below.
       const c = curveAt?.(d.circle) ?? null;
       const p = at(d.at);
-      if (!c || c.kind !== 'circle' || !p) return null;
+      if (!c || !p) return null;
+      // An ELLIPSE's ray from its centre (#2618, ADR-AG-355): canonical, so the centre is the origin. What makes
+      // «AB קוטר באליפסה» the chord through the centre, exactly as the circle's diameter lowering reads it.
+      if (c.kind === 'ellipse') {
+        v = { x: p.x, y: p.y };
+        break;
+      }
+      if (c.kind !== 'circle') return null;
       v = { x: p.x - c.cx, y: p.y - c.cy };
+      break;
+    }
+    case 'normal': {
+      // The gradient of the resolved canonical conic at the point (#2618, ADR-AG-355); on a circle, the radius.
+      const c = curveAt?.(d.curve) ?? null;
+      const p = at(d.at);
+      if (!c || !p) return null;
+      if (c.kind === 'circle') v = { x: p.x - c.cx, y: p.y - c.cy };
+      else if (c.kind === 'ellipse') v = { x: p.x / (c.a * c.a), y: p.y / (c.b * c.b) };
+      else if (c.kind === 'parabola') v = { x: -c.p, y: p.y };
+      else return null;
       break;
     }
     case 'bisector': {
@@ -1193,6 +1228,7 @@ export function residualRows(
       // The centre and radius of the RESOLVED circle (#1430, ADR-AG-195) — a circle stated by its equation
       // or computed from points; a vacancy judges nothing (apply refuses a non-circle by name).
       const circle = curveAt?.(k.circle) ?? null;
+      if (circle && (circle.kind === 'ellipse' || circle.kind === 'parabola')) return conicTangencyRows(circle, k.line, p, curveAt);
       if (!circle || circle.kind !== 'circle') return null;
       return lineTangencyRows({ x: circle.cx, y: circle.cy }, circle.r, k.line, p, curveAt);
     }
@@ -1338,6 +1374,51 @@ function lineTangencyRows(
     return { eq: [d - radius], bound: [Math.max(0, -t) * n, Math.max(0, t - 1) * n] };
   }
   return { eq: [d - radius] };
+}
+
+/**
+ * THE ROWS OF "THIS LINE TOUCHES THE ELLIPSE / THE PARABOLA" (#2618, ADR-AG-355) — `tangent-curve` on a conic with no
+ * centre-and-radius to measure a distance against. The straight is substituted into the conic (`lineQuadratic`, the one
+ * substitution `conicMeet` and `touchPointOf` share) and the row is its DOUBLE-ROOT condition, made scale-free:
+ * `(B² − 4AC)·|d|² / (A²·size²)`, the squared chord the line would cut over the conic's squared size, signed — zero at
+ * a touch, positive across it, negative where it misses — so the freedom it consumes is the line's (a parameter in its
+ * equation, a free point's direction) and the solve reaches each root from its own configuration.
+ *
+ * A straight PARALLEL TO A PARABOLA'S AXIS (`A = 0`) meets it once and never touches it (ADR-AG-292): a unit miss.
+ * A BOUNDED pair («הצלע AB משיקה …») keeps its touch `t* = −B/2A` on the piece, as `lineTangencyRows` keeps the foot.
+ */
+function conicTangencyRows(
+  conic: Extract<NumCurve, { kind: 'ellipse' | 'parabola' }>,
+  line: TangentLineRef,
+  pair: Pt[],
+  curveAt?: (id: Id) => NumCurve | null,
+): ResidualRows | null {
+  let w: Walk | null;
+  if (line.kind === 'curve') {
+    const cv = curveAt?.(line.id) ?? null;
+    if (!cv || cv.kind !== 'line') return null;
+    const n = Math.hypot(cv.a, cv.b);
+    if (n < 1e-12) return null;
+    // Any point of the line and its direction: the row is invariant under where the walk starts.
+    w = { p0: { x: (-cv.a * cv.c) / (n * n), y: (-cv.b * cv.c) / (n * n) }, d: { x: -cv.b / n, y: cv.a / n } };
+  } else {
+    // From the first end toward the second, so `t ∈ [0, 1]` is the piece.
+    const [q, s] = pair;
+    w = { p0: q, d: { x: s.x - q.x, y: s.y - q.y } };
+  }
+  const n2 = w.d.x * w.d.x + w.d.y * w.d.y;
+  const size = conicSize(conic);
+  const qd = lineQuadratic(w, conic);
+  if (!qd || !(n2 > 1e-24) || !(size > 0)) return null;
+  const { A, B, C } = qd;
+  if (!(Math.abs(A) > 1e-12 * n2)) return { eq: [1] };
+  const row = ((B * B - 4 * A * C) * n2) / (A * A * size * size);
+  if (line.kind === 'points' && line.bounded) {
+    const t = -B / (2 * A);
+    const len = Math.sqrt(n2);
+    return { eq: [row], bound: [Math.max(0, -t) * len, Math.max(0, t - 1) * len] };
+  }
+  return { eq: [row] };
 }
 
 /**

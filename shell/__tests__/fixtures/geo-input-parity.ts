@@ -318,6 +318,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
   '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
+  '#2629': 'open', // #2618 (ADR-AG-355): 2-D does not read «קודקודי ה<noun> ABCD נמצאים על המעגל» (analytic reads it as the inscribed sentence)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1845,6 +1846,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // Beside ONE lettered circle 2-D renames the centre instead (#2586). Both are `builds` in this vocabulary, so that half
   // cannot be a known-gap row (it would read as agreeing); its lock is analytic's own (issue-2552-d9-new-circle.test.ts).
   { id: 'centre-of-a-circle-new-2552', family: 'circles', steps: ['מעגל O', 'מעגל Q', 'P מרכז מעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a third circle on P; analytic refused it ambiguous-shape before ADR-AG-344' },
+  // ── #2618 (ADR-AG-355): the inscribed sentence said through the vertices; the conic hosts are X2 ──
+  { id: 'vertices-on-circle-2618', family: 'inscribed', steps: ['קודקודי המעוין ABCD נמצאים על המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2629' }], note: 'analytic reads it as «מעוין ABCD חסום במעגל» since ADR-AG-355; 2-D hands it to the model' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

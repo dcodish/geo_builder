@@ -750,7 +750,7 @@ function askOne(
     if (tangent) {
       const ids = tangent.at
         ? [tangentLineId(tangent.at)].filter((id) => objectById(d.construction, id))
-        : d.construction.objects.filter((o) => o.kind === 'line-at' && o.dir.k === 'radius' && o.perp).map((o) => o.id);
+        : d.construction.objects.filter((o) => o.kind === 'line-at' && (o.dir.k === 'radius' || o.dir.k === 'normal') && o.perp).map((o) => o.id);
       if (ids.length !== 1) return { question, value: null, missing: missingCurve(d, name) };
       return curveAnswer(d, ids[0], null, question, fmt);
     }

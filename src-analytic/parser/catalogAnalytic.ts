@@ -643,6 +643,29 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'conics', family: 'F6', he: 'המרחק בין המוקדים הוא 10', en: 'the distance between the foci is 10', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
   { category: 'conics', family: 'F6', he: 'סכום המרחקים של הנקודה A משני המוקדים של האליפסה הוא 20', en: 'the sum of the distances of A from the foci is 20', needs: [...['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'], 'A(6,4.8)'] },
   { category: 'conics', family: 'F6', he: 'a = 6', en: 'a = 6', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  // --- F6 · the circle's relations, about the ellipse and the parabola (#2618, ADR-AG-355) ---
+  // The section now passes the guide's cap of six: the six rows it always showed are the featured ones, so the guide
+  // a student opens is unchanged (#1347); which new rows to feature is the operator's choice.
+  { category: 'conics', family: 'F6', he: 'מעוין ABCD חסום באליפסה', en: 'rhombus ABCD is inscribed in the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'קודקודי המלבן ABCD נמצאים על האליפסה', en: 'the vertices of rectangle ABCD lie on the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'circles', family: 'F5', he: 'קודקודי המעוין ABCD נמצאים על המעגל', en: 'the vertices of rhombus ABCD lie on the circle', needs: ['נתון מעגל שמשוואתו x^2+y^2=25'] },
+  { category: 'conics', family: 'F6', he: 'משולש ABC חסום בפרבולה', en: 'triangle ABC is inscribed in the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'AB מיתר באליפסה', en: 'AB is a chord of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'AB מיתר בפרבולה', en: 'AB is a chord of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'AB קוטר באליפסה', en: 'AB is a diameter of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'הישר y=kx+5 משיק לאליפסה', en: 'the line y=kx+5 is tangent to the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'הישר y=kx+2 משיק לפרבולה', en: 'the line y=kx+2 is tangent to the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'הישר AB משיק לאליפסה בנקודה A', en: 'the line AB is tangent to the ellipse at A', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'A על האליפסה'] },
+  { category: 'conics', family: 'F6', he: 'המשיק לאליפסה בנקודה A', en: 'the tangent to the ellipse at A', needs: ['נתונה אליפסה שמשוואתה x^2/8+y^2/2=1', 'A(2,1)'] },
+  { category: 'conics', family: 'F6', he: 'המשיק לפרבולה בנקודה A', en: 'the tangent to the parabola at A', needs: ['נתונה פרבולה שמשוואתה y^2=8x', 'A(2,4)'] },
+  {
+    category: 'conics',
+    family: 'F6',
+    he: 'משוואת המשיק לאליפסה בנקודה A היא x+2y=4',
+    en: 'the equation of the tangent to the ellipse at A is x+2y=4',
+    needs: ['נתונה אליפסה שמשוואתה x^2/8+y^2/2=1', 'A(2,1)'],
+  },
+  { category: 'conics', family: 'F6', he: 'דרך P עובר משיק לאליפסה', en: 'a tangent to the ellipse passes through P', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'P(10,0)'] },
 
   // Unfeatured for #1501 (provisional, flagged for the operator): the named form of the same
   // equation capability — «נתון מעגל I שמשוואתו …» — stays featured.

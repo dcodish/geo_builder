@@ -108,6 +108,13 @@ export function domainText(sym: string, d: Domain): string {
  */
 export type CurveKind = 'line' | 'circle' | 'parabola' | 'ellipse';
 
+/**
+ * THE CONIC A RELATION IS ABOUT, when it is not the circle (#2618, ADR-AG-355) — «AB מיתר באליפסה», «הישר … משיק
+ * לפרבולה». A relation fact carries it beside its `circle` name; absent, the relation is about a circle, exactly as
+ * before. Both conics are anonymous and one per figure (D6), so the kind alone names the host; M1 resolves it.
+ */
+export type ConicHost = 'ellipse' | 'parabola';
+
 export interface Curve {
   /**
    * The kind the STATEMENT claimed, when it named one — an EXPECTATION, not the answer.
@@ -459,7 +466,7 @@ export type Fact =
    * with one circle it attaches to, it is a statement ABOUT that circle. `circle` is the id of a circle
    * the sentence named, absent for «במעגל».
    */
-  | (FactBase & { t: 'diameter-of'; a: Id; b: Id; define: boolean; circle?: Id })
+  | (FactBase & { t: 'diameter-of'; a: Id; b: Id; define: boolean; circle?: Id; host?: ConicHost })
   /**
    * «המעגל משיק לציר ה-x» — tangency stated about the ONE circle in the figure (#1060).
    *
@@ -483,7 +490,7 @@ export type Fact =
    * a circle the sentence must create is that ring's incircle (the only circle tangent to every side at a point ON
    * it — an excircle touches extensions): created closed form, never as a free circle the solve must fit.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: Array<TangentLineRef | EqOperand>; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: Array<TangentLineRef | EqOperand>; circle?: string; circleId?: Id; at?: Id; ring?: Id[]; host?: ConicHost })
   /**
    * «AB משיק משותף למעגלים M ו-N» — THE LINE ab IS TANGENT TO BOTH CIRCLES (#2385, ADR-AG-312). Written over the
    * circle-slot sentinels inside `circles-about`, so `circles` are the two circle ids by the time M1 reads it. M1 decides
@@ -533,13 +540,13 @@ export type Fact =
    * the circle and lowers it to A on the circle plus a `line-at` whose direction is that radius turned a
    * quarter — a derived line, 0 DOF, id {@link tangentLineId}.
    */
-  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string })
+  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string; host?: ConicHost })
   /**
    * «משוואת המשיק היא 4x+3y=40» — the equation of «THE tangent», with no touch point named (#1619 B3).
    * WHICH tangent is M1's question: the one tangent object the figure holds (the equation is then a
    * given about it), none (the stated line is tangent to the circle), several (refused, never a pick).
    */
-  | (FactBase & { t: 'tangent-eq'; id: Id; eq: Expr; eqSrc: string; circle?: string })
+  | (FactBase & { t: 'tangent-eq'; id: Id; eq: Expr; eqSrc: string; circle?: string; host?: ConicHost })
   /**
    * «רדיוס המעגל (I|O)? הוא 5» — the radius stated as its own given (#1432). WHICH circle is M1's
    * question (`circle` as the sentence named it, or the contextual one); what it does depends on
@@ -779,7 +786,7 @@ export type Fact =
    * ON that circle is the touch point (the tangent AT it, «המשיק למעגל I בנקודה A»); any other point is the from-point
    * construction `facts` carries (#1430, a free-direction line through it, tangent to the circle). M1 decides.
    */
-  | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; facts: Fact[] });
+  | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; host?: ConicHost; facts: Fact[] });
 
 /** The stand-ins a `via-ellipse-role` sentence carries for an ellipse's role points (#2616) — names no student writes. */
 export const ELLIPSE_ROLE_SENTINELS = ['Z₈', 'Z₉'] as const;
@@ -854,7 +861,7 @@ export const factsWithin = (f: Fact): Fact[] =>
           ? [f, ...f.operand.flatMap(factsWithin)]
         : // #2391 (ADR-AG-315): a tangent-through applies the tangent AT its point, or the from-point construction.
           f.t === 'tangent-through'
-          ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
+          ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), ...(f.host ? { host: f.host } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
           : [f];
 
 // ---------------------------------------------------------------------------

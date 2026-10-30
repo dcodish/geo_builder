@@ -453,6 +453,13 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R132 amendment — tangents FROM a point, in every spelling 2-D reads**. Unnamed touch points are T then S; a point inside the circle is refused.
 - «מנקודה P יוצאים שני משיקים למעגל»
 - Sources: ADR-AG-233, #1430.
+- **Amended by R204 (#2618, ADR-AG-355, 2026-10-30):** the tangent at a named point, the tangent object and its equation, tangency with no touch point and «דרך P עובר משיק …» are read about the ellipse and the parabola too; the touch is perpendicular to the curve's normal (on a circle, the radius).
+
+**R204 — the circle's relations, about the ellipse and the parabola**. *(Operator, 2026-10-30, #2618: "now we need to build all capabilities"; the diameter per his ruling of the same day (Q3): "there is a קוטר and we need to support it. when drawing it, like in circle, there is dof as to where it is exactly".)* A polygon inscribed in the ellipse or the parabola has every vertex on it, as «A, B, C ו-D נמצאות על האליפסה» draws it; a ring the curve cannot carry (a rhombus on a parabola) is refused as that sentence is. A chord has its two ends on the curve. A diameter of the ellipse is a chord through its centre, its direction left free. A line touches the ellipse or the parabola with no point named (pinning its parameter, each value in its own configuration; a line that cannot touch is refused), at a named point (on the curve, perpendicular to the normal there), as the tangent object «המשיק לאליפסה בנקודה A» and its equation, and from a point. «קודקודי ה<noun> … נמצאים על …» is the inscribed sentence on every curve, the circle included. «AB קוטר בפרבולה» is not read (#2625); a circle touching a conic, and a circle inscribed in or around one, are not this requirement.
+- «מעוין ABCD חסום באליפסה», «באליפסה חסום מלבן ABCD», «האליפסה חוסמת את המשולש ABC», «קודקודי המעוין ABCD נמצאים על האליפסה / על המעגל»; "rhombus ABCD is inscribed in the ellipse", "the vertices of rectangle ABCD lie on the ellipse"
+- «AB מיתר באליפסה», «AB מיתר בפרבולה»; «AB קוטר באליפסה», «AB קוטר של האליפסה»; "AB is a diameter of the ellipse"
+- «הישר y=kx+3 משיק לאליפסה» → k = ±1 on x²/6+y²/3=1, cycled; «הישר AB משיק לפרבולה בנקודה A»; «משוואת המשיק לאליפסה בנקודה A היא x+2y=4»; «דרך P עובר משיק לאליפסה»
+- Sources: ADR-AG-355, #2618.
 
 **R133 — «המעגל» is the circle the figure has**. *(Operator: "The student stated ONE circle twice.")* With two or more circles «המעגל» is refused as ambiguous.
 - «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» → one circle, M at (3,1)
@@ -1171,6 +1178,10 @@ a sentence the tool parsed.
 **R76 — a crossing can be clicked, and it adds the SENTENCE**. The ring commits the sentence typing would add; a curve's equation is a name, conics included (ADR-AG-056, ADR-AG-061).
 - clicking → «P נקודת החיתוך של הישר AB עם הישר CD»
 - Sources: ADR-AG-054, ADR-AG-056, #1092, ADR-AG-061, #1096, #1100.
+
+**R205 — a line touching a curve offers ONE crossing dot, at the touch point**. *(Operator ruling 2026-10-30 on #2618, Q2 → A: "all three curves".)* On the circle, the ellipse and the parabola; its sentence names no ordinal and builds, also after a tangency pinned the line's parameter.
+- «נתונה אליפסה שמשוואתה x^2+4y^2=20» · «נתון הישר y=-x+5» → one dot at (4,1); clicking → «A נקודת החיתוך של הישר y=-x+5 עם האליפסה»
+- Sources: ADR-AG-356, #2618.
 
 **R77 — the session can be SAVED, and a load says what it restored**. A line that no longer builds is NAMED, never dropped.
 - `<name>-analytic.json`, replayed through the real parser

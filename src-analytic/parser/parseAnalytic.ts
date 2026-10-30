@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, lineEqToken, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr, type LineEquation } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type ConicHost, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -3229,20 +3229,38 @@ function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOut
 // ADR-AG-213): the order 2-D's «המשיק בנקודה A והמשיק בנקודה C למעגל O» writes its second tangent in.
 const TANGENT_CIRCLE_HE = `\\s+(?:ל|של\\s+)ה?מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${CIRCLE_NAME}))?`;
 const TANGENT_CIRCLE_EN = `\\s+(?:to|of)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?`;
+
+/**
+ * THE CURVE-HOST ATOM (#2618, ADR-AG-355) — the conic nouns a relation may name as its host beside «מעגל». The chord,
+ * diameter, inscribed and tangent readers compose it beside their circle phrase; the fact then carries the conic's KIND
+ * (`host`), because the ellipse and the parabola are anonymous and one per figure (D6) — the kind names the curve, and
+ * M1 resolves it (`curveHost`). A circle phrase keeps its own name and centre tails; a conic takes none.
+ */
+const CONIC_NOUN_HE = '(?:אליפסה|פרבולה)';
+const CONIC_NOUN_EN = '(?:ellipse|parabola)';
+/** The conic a matched host phrase names — `undefined` for the circle. */
+const conicHostOf = (phrase: string | undefined): ConicHost | undefined =>
+  phrase === undefined ? undefined : /אליפסה|ellipse/i.test(phrase) ? 'ellipse' : /פרבולה|parabola/i.test(phrase) ? 'parabola' : undefined;
+
+/** The tangent noun's host phrase: the circle (one capture, its name), or a conic (no capture — its kind is read off). */
+const TANGENT_HOST_HE = `\\s+(?:ל|של\\s+)ה?(?:מעגל(?:\\s+(?:ש?מרכזו\\s+)?(${CIRCLE_NAME}))?|${CONIC_NOUN_HE})`;
+const TANGENT_HOST_EN = `\\s+(?:to|of)\\s+(?:the\\s+)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|${CONIC_NOUN_EN})`;
 const TANGENT_NOUN_HE = new RegExp(
-  `^ה?משיק(?:${TANGENT_CIRCLE_HE})?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?(${TANGENT_CIRCLE_HE})?$`,
+  `^ה?משיק(?:${TANGENT_HOST_HE})?(?:\\s+ב(?:נקודה\\s+|-\\s*|נקודת\\s+ה?השקה\\s+)(${NAME}))?(${TANGENT_HOST_HE})?$`,
 );
 const TANGENT_NOUN_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:${TANGENT_CIRCLE_EN})?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?(${TANGENT_CIRCLE_EN})?$`,
+  `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:${TANGENT_HOST_EN})?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?(${TANGENT_HOST_EN})?$`,
 );
-export function readTangentNoun(text: string): { circle?: string; at?: Id } | null {
+export function readTangentNoun(text: string): { circle?: string; at?: Id; host?: ConicHost } | null {
   const m = TANGENT_NOUN_HE.exec(text) ?? TANGENT_NOUN_EN.exec(text);
   if (!m) return null;
-  // Groups: [1] a leading circle's name, [2] the point, [3] a TRAILING circle phrase ([4] its name). One circle
+  // Groups: [1] a leading circle's name, [2] the point, [3] a TRAILING host phrase ([4] a circle's name). One host
   // phrase, before the point or after it — never both («המשיק למעגל O בנקודה A למעגל K» names two circles).
-  if (m[3] !== undefined && /מעגל|circle/i.test(m[0].slice(0, m[0].length - m[3].length))) return null;
+  if (m[3] !== undefined && /מעגל|circle|אליפסה|פרבולה|ellipse|parabola/i.test(m[0].slice(0, m[0].length - m[3].length))) return null;
   const circle = m[1] ?? m[4];
-  return { ...(circle ? { circle } : {}), ...(m[2] ? { at: m[2] } : {}) };
+  // A point is one capital letter, so a conic noun anywhere in the phrase is its host (#2618).
+  const host = conicHostOf(m[0]);
+  return { ...(circle ? { circle } : {}), ...(m[2] ? { at: m[2] } : {}), ...(host ? { host } : {}) };
 }
 
 /** The meet verbs, plural, either gender — «נחתכים», «נפגשות», «מצטלבים» (#1081's alternation). */
@@ -3332,7 +3350,7 @@ function tangentObjectFacts(text: string, line: string): Fact[] {
   if (!t || !t.at) return [];
   return [
     { t: 'declare', id: t.at, src: line },
-    { t: 'tangent-line-at', at: t.at, ...(t.circle ? { circle: t.circle } : {}), src: line },
+    { t: 'tangent-line-at', at: t.at, ...(t.circle ? { circle: t.circle } : {}), ...(t.host ? { host: t.host } : {}), src: line },
   ];
 }
 
@@ -3358,7 +3376,8 @@ function parseTangentObject(line: string): RuleOutcome {
     const eq = equationExpr(eqSrc);
     if (!eq || !symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) return unreadable(eqSrc);
     const id = `curve-${anonIndex(eqSrc)}`;
-    if (!noun.at) return made([{ t: 'tangent-eq', id, eq, eqSrc, ...(noun.circle ? { circle: noun.circle } : {}), src: line }]);
+    const host = noun.host ? { host: noun.host } : {};
+    if (!noun.at) return made([{ t: 'tangent-eq', id, eq, eqSrc, ...(noun.circle ? { circle: noun.circle } : {}), ...host, src: line }]);
     return made([
       ...tangentObjectFacts(trim(eqm[1]), line),
       {
@@ -3367,6 +3386,7 @@ function parseTangentObject(line: string): RuleOutcome {
         // The equation is resolved at M1 (#2432, ADR-AG-318): an existing line with it IS the tangent's line.
         lines: [{ kind: 'eq', id, label: eqSrc, eqSrc, eq, role: 'carrier' }],
         ...(noun.circle ? { circle: noun.circle } : {}),
+        ...host,
         at: noun.at,
         src: line,
       },
@@ -3378,7 +3398,10 @@ function parseTangentObject(line: string): RuleOutcome {
   const fromHe = TANGENT_FROM_HE.exec(trim(bare));
   const fromEn = fromHe ? null : TANGENT_FROM_EN.exec(trim(bare));
   if (fromHe || fromEn) {
-    const [p, circle] = fromHe ? [fromHe[1], fromHe[2]] : [fromEn![2], fromEn![1]];
+    const [p, circle, conic] = fromHe ? [fromHe[1], fromHe[2], fromHe[3]] : [fromEn![3], fromEn![1], fromEn![2]];
+    // «דרך P עובר משיק לאליפסה» (#2618, ADR-AG-355): the same construction about the figure's ellipse / parabola.
+    const host = conicHostOf(conic);
+    const about = { ...(circle ? { circle } : {}), ...(host ? { host } : {}) };
     const through = parseClause(`דרך ${p} עובר ישר`);
     if (!through.ok) return null;
     const lineAt = through.facts.find((x) => x.t === 'line-at');
@@ -3388,14 +3411,14 @@ function parseTangentObject(line: string): RuleOutcome {
       {
         t: 'tangent-through',
         at: p,
-        ...(circle ? { circle } : {}),
+        ...about,
         facts: [
           ...through.facts.map((x) => ({ ...x, src: line })),
           {
             t: 'tangent-of',
             axes: [],
             lines: [{ kind: 'curve', id: lineAt.id, label: `משיק דרך ${p}` }],
-            ...(circle ? { circle } : {}),
+            ...about,
             src: line,
           },
         ],
@@ -3447,10 +3470,10 @@ function parseCentresDistance(line: string): RuleOutcome {
 
 /** «דרך (הנקודה) P עובר משיק למעגל» / "a tangent to the circle passes through P" (#1430). */
 const TANGENT_FROM_HE = new RegExp(
-  `^דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?(?:ישר\\s+)?(?:ה)?משיק\\s+(?:ל|של\\s+)?ה?מעגל(?:\\s+(${CIRCLE_NAME}))?$`,
+  `^דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?(?:ישר\\s+)?(?:ה)?משיק\\s+(?:ל|של\\s+)?ה?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?|(${CONIC_NOUN_HE}))$`,
 );
 const TANGENT_FROM_EN = new RegExp(
-  `^(?:[Aa]\\s+|[Tt]he\\s+)?[Tt]angent(?:\\s+line)?\\s+to\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
+  `^(?:[Aa]\\s+|[Tt]he\\s+)?[Tt]angent(?:\\s+line)?\\s+to\\s+(?:the\\s+)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|(${CONIC_NOUN_EN}))\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
 );
 
 /**
@@ -3466,12 +3489,13 @@ const TANGENT_FROM_EN = new RegExp(
  * «במעגל שמרכזו M» names the circle by its centre: the sentence is about that circle, which «נתון מעגל
  * שמרכזו M» states (idempotent when it already exists).
  */
-const CHORD_CIRCLE_HE = `ב(?:ה)?מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?`;
+// The host: the circle with its centre or name — or the ellipse or parabola (#2618, ADR-AG-355), the third capture.
+const CHORD_CIRCLE_HE = `ב(?:ה)?(?:מעגל(?:\\s+(?:ש?מרכזו\\s+(${NAME})|(${CIRCLE_NAME})))?|(${CONIC_NOUN_HE}))`;
 const CHORD_ONE_HE = new RegExp(
   `^${HE_GIVEN}(?:(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?מיתר|(?:ה)?מיתר\\s+(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
 );
 const CHORD_ONE_EN = new RegExp(
-  `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${CIRCLE_NAME}))?)?$`,
+  `^(?:(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+chord|(?:the\\s+)?chord\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?(?:circle(?:\\s+(?:centred\\s+at\\s+|centered\\s+at\\s+)?(${CIRCLE_NAME}))?|(${CONIC_NOUN_EN})))?$`,
 );
 const CHORD_PAIR_HE = new RegExp(
   `^(?:${CHORD_CIRCLE_HE}\\s*,?\\s+)?(?:ה)?מיתרים\\s+(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME})\\s+(.+)$`,
@@ -3485,7 +3509,7 @@ const CHORD_LIST_HE = new RegExp(
   `^${HE_GIVEN}(?:(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME})\\s+(?:(?:הם|הינם)\\s+)?(?:ה)?מיתרים|(?:ה)?מיתרים\\s+(${NAME})(${NAME})\\s+ו-?\\s*(${NAME})(${NAME}))(?:\\s+${CHORD_CIRCLE_HE})?$`,
 );
 const CHORD_LIST_EN = new RegExp(
-  `^(?:(?:[Tt]he\\s+)?(?:segments\\s+)?(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME})\\s+are\\s+chords|(?:[Tt]he\\s+)?[Cc]hords\\s+(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
+  `^(?:(?:[Tt]he\\s+)?(?:segments\\s+)?(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME})\\s+are\\s+chords|(?:[Tt]he\\s+)?[Cc]hords\\s+(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME}))(?:\\s+(?:of|in)\\s+(?:the\\s+)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|(${CONIC_NOUN_EN})))?$`,
 );
 const CHORD_PAIR_EN = new RegExp(
   `^(?:[Ii]n\\s+the\\s+circle(?:\\s+(${NAME}))?\\s*,?\\s+)?(?:[Tt]he\\s+)?[Cc]hords\\s+(${NAME})(${NAME})\\s+and\\s+(${NAME})(${NAME})\\s+(.+)$`,
@@ -3496,13 +3520,15 @@ const CHORD_PAIR_EN = new RegExp(
  * the one the phrase named — by its centre letter (`circle-at-M`), by its numeral, or the contextual one
  * (`on-kind`, resolved at M1 exactly as «A על המעגל» is).
  */
-function chordFacts(a: Id, b: Id, circle: string | undefined, line: string): Fact[] | null {
+function chordFacts(a: Id, b: Id, circle: string | undefined, line: string, host?: ConicHost): Fact[] | null {
   const seg = parseClause(`הקטע ${a}${b}`);
   if (!seg.ok) return null;
   // The circle rides the contextual marker with its NAME (a ring description #1663, a centre letter, a numeral) and M1
   // resolves it through the one name chain, exactly as «A על מעגל O» does — so a circle named after it was stated
   // («M מרכז המעגל»), or not stated at all (#1670, ADR-AG-210: the reference states it), is the same circle there.
-  const on = (id: Id): Fact => ({ t: 'on-kind', id, kind: 'circle', ...(circle !== undefined ? { circle } : {}), src: line });
+  // A chord of the ellipse or the parabola (#2618, ADR-AG-355) is both ends on THAT curve: «A על האליפסה», twice.
+  const on = (id: Id): Fact =>
+    host ? { t: 'on-kind', id, kind: host, src: line } : { t: 'on-kind', id, kind: 'circle', ...(circle !== undefined ? { circle } : {}), src: line };
   return [
     { t: 'declare', id: a, src: line },
     { t: 'declare', id: b, src: line },
@@ -3542,8 +3568,9 @@ function parseChord(line: string): RuleOutcome {
     if (a === b) return refuse('repeated-vertex', line);
     const centre = one ? one[5] : undefined;
     const name = one ? one[6] : oneEn![5];
+    const host = conicHostOf(one ? one[7] : oneEn![6]);
     const created = centre ? clauseFacts(`נתון מעגל שמרכזו ${centre}`, line) : [];
-    const chord = chordFacts(a, b, centre ?? name, line);
+    const chord = chordFacts(a, b, centre ?? name, line, host);
     return created && chord ? made([...created, ...chord]) : null;
   }
   const list = CHORD_LIST_HE.exec(line);
@@ -3554,19 +3581,24 @@ function parseChord(line: string): RuleOutcome {
     if (a === b || c === d) return refuse('repeated-vertex', line);
     const centre = list ? list[9] : undefined;
     const name = list ? list[10] : listEn![9];
+    const host = conicHostOf(list ? list[11] : listEn![10]);
     const created = centre ? clauseFacts(`נתון מעגל שמרכזו ${centre}`, line) : [];
-    const first = chordFacts(a, b, centre ?? name, line);
-    const second = chordFacts(c, d, centre ?? name, line);
+    const first = chordFacts(a, b, centre ?? name, line, host);
+    const second = chordFacts(c, d, centre ?? name, line, host);
     return created && first && second ? made([...created, ...first, ...second, chordPairDistinct([a, b, c, d], line)]) : null;
   }
   const he = CHORD_PAIR_HE.exec(line);
   const en = he ? null : CHORD_PAIR_EN.exec(line);
   if (!he && !en) return null;
-  const [centre, name, a, b, c, d, rest] = he ? [he[1], he[2], he[3], he[4], he[5], he[6], he[7]] : [undefined, en![1], en![2], en![3], en![4], en![5], en![6]];
+  // Groups (He): [1] centre, [2] name, [3] a conic host (#2618), [4–7] the two chords, [8] the predicate.
+  const [centre, name, conic, a, b, c, d, rest] = he
+    ? [he[1], he[2], he[3], he[4], he[5], he[6], he[7], he[8]]
+    : [undefined, en![1], undefined, en![2], en![3], en![4], en![5], en![6]];
   if (a === b || c === d) return refuse('repeated-vertex', line);
+  const host = conicHostOf(conic);
   const created = centre ? clauseFacts(`נתון מעגל שמרכזו ${centre}`, line) : [];
-  const first = chordFacts(a, b, centre ?? name, line);
-  const second = chordFacts(c, d, centre ?? name, line);
+  const first = chordFacts(a, b, centre ?? name, line, host);
+  const second = chordFacts(c, d, centre ?? name, line, host);
   if (!created || !first || !second) return null;
   const chords = [...created, ...first, ...second, chordPairDistinct([a, b, c, d], line)];
   const meet =
@@ -4113,6 +4145,34 @@ function parseCircleAt(line: string): RuleOutcome {
   if (circleSubject) return made(circleSubject);
   if (objectText === null) return null;
 
+  /*
+   * THE LINE-FIRST ORDER ABOUT A CONIC (#2618, ADR-AG-355) — «הישר y=kx+3 משיק לאליפסה», «הישר AB משיק לפרבולה
+   * בנקודה A», "the line l1 is tangent to the ellipse": the circle's sentence with the curve-host atom as its object.
+   * The subject is a line / axis target list (never a circle — a circle touching a conic is not this reading), and
+   * the facts are the circle's, carrying the conic's kind.
+   */
+  const conicObject =
+    new RegExp(`^(?:ל|של\\s+)ה?(${CONIC_NOUN_HE})$`).exec(trim(objectText)) ??
+    new RegExp(`^(?:the\\s+)?(${CONIC_NOUN_EN})$`, 'i').exec(trim(objectText));
+  if (conicObject) {
+    const host = conicHostOf(conicObject[1])!;
+    const targets = tangentTargets(subjectText);
+    if (!targets || targets.circles.length > 0 || mods.branch || mods.reciprocal) return null;
+    if (touchApplies(targets, mods)) {
+      const touched = touchFacts(targets, touchesOf(mods)!, undefined, line);
+      // Each touch about the conic — never a ring's incircle, which only a circle can be.
+      const onConic = (f: Fact): Fact =>
+        f.t === 'tangent-of' ? { t: 'tangent-of', axes: f.axes, ...(f.lines ? { lines: f.lines } : {}), ...(f.at !== undefined ? { at: f.at } : {}), host, src: f.src } : f;
+      return touched ? made(touched.map(onConic)) : null;
+    }
+    if (mods.ats || mods.at !== undefined || targets.axes.length + targets.lines.length === 0) return null;
+    return made([
+      ...targets.facts,
+      { t: 'tangent-of', axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), host, src: line },
+      ...targets.pieces.flatMap((q) => pieceFacts(q.noun, q.a, q.b, line)),
+    ]);
+  }
+
   // THE LINE-FIRST ORDER — the subject is a target list, the object ONE circle (named or contextual),
   // both read by the one target reader.
   const object = tangentTargets(objectText);
@@ -4418,6 +4478,80 @@ const INCIRCLE_CENTRED_EN = new RegExp(
 );
 
 /**
+ * A POLYGON INSCRIBED IN THE ELLIPSE OR THE PARABOLA (#2618, ADR-AG-355) — «מעוין ABCD חסום באליפסה», «באליפסה חסום
+ * משולש ABC», «האליפסה חוסמת את המלבן ABCD», "rhombus ABCD is inscribed in the ellipse", "the ellipse circumscribes …".
+ * The circle readers above, with the curve-host atom in the circle's place and no tail (a conic takes no name or centre).
+ */
+const CONIC_SUBJECT_HE = new RegExp(
+  `^${HE_GIVEN}(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?(${CONIC_NOUN_HE})$`,
+);
+const CONIC_CONTAINER_HE = new RegExp(
+  `^${HE_GIVEN}ב(?:ה)?(${CONIC_NOUN_HE})\\s+${INSCRIBED_VERB_HE}\\s+(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}$`,
+);
+const CONIC_CIRCUMSCRIBING_HE = new RegExp(
+  `^${HE_GIVEN}ה?(${CONIC_NOUN_HE})\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?(?:${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}$`,
+);
+const CONIC_SUBJECT_EN = new RegExp(
+  `^(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}\\s+is\\s+inscribed\\s+in\\s+(?:a|the)\\s+(${CONIC_NOUN_EN})$`,
+  'i',
+);
+const CONIC_CIRCUMSCRIBING_EN = new RegExp(
+  `^(?:the\\s+)?(${CONIC_NOUN_EN})\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}$`,
+  'i',
+);
+/**
+ * «קודקודי המעוין ABCD נמצאים על האליפסה» (#2618, ADR-AG-355) — THE SAME CLAIM as «מעוין ABCD חסום ב…», said through
+ * the vertices, on every host: the circle (its name and centre tail kept, read by `cyclicFacts`), the ellipse, the
+ * parabola. "the vertices of (the) rhombus ABCD lie on the ellipse" in English.
+ */
+const VERTICES_ON_HE = new RegExp(
+  `^${HE_GIVEN}ק(?:ו)?דקודי\\s+(?:ה${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+(?:נמצאים|נמצאות|מונחים|מונחות)\\s+על\\s+ה?(?:מעגל${CIRCLE_TAIL}|(${CONIC_NOUN_HE}))$`,
+);
+const VERTICES_ON_EN = new RegExp(
+  `^(?:the\\s+)?vertices\\s+of\\s+(?:the\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}\\s+(?:all\\s+)?lie\\s+on\\s+(?:the\\s+|a\\s+)?(?:circle|(${CONIC_NOUN_EN}))$`,
+  'i',
+);
+
+/**
+ * The facts of a polygon inscribed in the ellipse or the parabola: the polygon, and each vertex ON that curve — exactly
+ * what «A, B, C ו-D נמצאות על האליפסה» states. The ring is not marked `cyclic` (a circle claim); a ring the curve
+ * cannot carry (a rhombus on a parabola) is the solver's honest refusal.
+ */
+function conicInscribedFacts(noun: string | undefined, run: string, host: ConicHost, line: string, en = false): RuleOutcome {
+  const shape = inscribedShape(noun, run, en);
+  if (!shape || !('vertices' in shape)) return shape;
+  return made([
+    ...shape.facts.map((f) => ({ ...f, src: line })),
+    ...shape.vertices.map((id): Fact => ({ t: 'on-kind', id, kind: host, src: line })),
+  ]);
+}
+
+/** The conic inscribed readers and the vertices spelling, after every circle reader (#2618). */
+function parseConicInscribed(line: string): RuleOutcome {
+  const sub = CONIC_SUBJECT_HE.exec(line);
+  if (sub) return conicInscribedFacts(sub[1], sub[2], conicHostOf(sub[3])!, line);
+  const cont = CONIC_CONTAINER_HE.exec(line);
+  if (cont) return conicInscribedFacts(cont[2], cont[3], conicHostOf(cont[1])!, line);
+  const circ = CONIC_CIRCUMSCRIBING_HE.exec(line);
+  if (circ) return conicInscribedFacts(circ[2], circ[3], conicHostOf(circ[1])!, line);
+  const subEn = CONIC_SUBJECT_EN.exec(line);
+  if (subEn) return conicInscribedFacts(subEn[1], subEn[2], conicHostOf(subEn[3])!, line, true);
+  const circEn = CONIC_CIRCUMSCRIBING_EN.exec(line);
+  if (circEn) return conicInscribedFacts(circEn[2], circEn[3], conicHostOf(circEn[1])!, line, true);
+  const vHe = VERTICES_ON_HE.exec(line);
+  if (vHe) {
+    const [, noun, run, tail, conic] = vHe;
+    return conic ? conicInscribedFacts(noun, run, conicHostOf(conic)!, line) : cyclicFacts(noun, run, tail, line);
+  }
+  const vEn = VERTICES_ON_EN.exec(line);
+  if (vEn) {
+    const [, noun, run, conic] = vEn;
+    return conic ? conicInscribedFacts(noun, run, conicHostOf(conic)!, line, true) : cyclicFacts(noun, run, undefined, line, true);
+  }
+  return null;
+}
+
+/**
  * The polygon a sentence names — its own lowering (`parseShape`), or, with no noun, the generic ring of its
  * arity («ABCD חסום במעגל» is a quadrilateral). `null` when the phrase is not a shape noun the registry knows,
  * so a phrase that merely LOOKS like one leaves the sentence to the rules after this one.
@@ -4642,7 +4776,7 @@ function parseInscribedLettered(line: string): RuleOutcome {
   if (activeIn) return incircleFacts(activeIn[1], activeIn[2], activeIn[3], line, true);
   const relIn = INCIRCLE_RELATIVE_HE.exec(line);
   if (relIn) return incircleFacts(relIn[1], relIn[2], undefined, line);
-  return null;
+  return parseConicInscribed(line);
 }
 
 /**
@@ -4729,19 +4863,23 @@ const THRU_BARE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+(${NAME}${NAME}${NAME})
  * «של מעגל» (a circle, indefinite), «במעגל חדש», "with diameter", "a new circle". «של המעגל» / «במעגל» are
  * the definite reading and attach to the figure's circle when it has one.
  */
+/*
+ * «AB קוטר באליפסה / של האליפסה» (#2618, ADR-AG-355; operator ruling 2026-10-30, Q3): the book's «מיתר העובר דרך מרכז
+ * האליפסה» — the seventh capture. The ELLIPSE only: a parabola has no centre, and its sentence is #2625's question.
+ */
 const DIAM_HE = new RegExp(
   `^${HE_GIVEN}(?:ה?(?:קטע|צלע)\\s+)?(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר` +
-    `(?:\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?)?$`,
+    `(?:\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה)))?$`,
 );
 /** «קוטר BD במעגל» — the noun first, the same statement. */
 const DIAM_NOUN_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?$`,
+  `^${HE_GIVEN}(?:ה)?קוטר\\s+(${NAME})(${NAME})\\s+(ב|של\\s+)(ה)?(?:מעגל(?:\\s+(${CIRCLE_NAME}))?(\\s+ה?חדש)?|(אליפסה))$`,
 );
 /** «נתון מעגל שקוטרו BD» — the circle DEFINED by its diameter, always a new circle. */
 const DIAM_DEFINE_HE = new RegExp(`^${HE_GIVEN}ה?מעגל\\s+ש(?:ה)?קוטר(?:ו|\\s+שלו)(?:\\s+(?:הוא|היא))?\\s+(${NAME})(${NAME})$`);
 const DIAM_EN = new RegExp(
   `^(?:the\\s+)?(?:segment\\s+)?(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+diameter` +
-    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?circle(?:\\s+(${CIRCLE_NAME}))?)?$`,
+    `(?:\\s+of\\s+(the\\s+|a\\s+(new\\s+)?)?(?:circle(?:\\s+(${CIRCLE_NAME}))?|(ellipse)))?$`,
 );
 const DIAM_DEFINE_EN = new RegExp(`^(?:the\\s+|a\\s+)?circle\\s+(?:with|on)\\s+(?:the\\s+|a\\s+)?diameter\\s+(${NAME})(${NAME})$`, 'i');
 
@@ -4783,14 +4921,17 @@ function parseCircleThru(line: string): RuleOutcome {
   }
   const he = DIAM_HE.exec(line) ?? DIAM_NOUN_FIRST_HE.exec(line);
   if (he) {
-    const [, a, b, prep, article, circle, fresh] = he;
+    const [, a, b, prep, article, circle, fresh, ellipse] = he;
+    // A diameter of THE ellipse is about the figure's one ellipse — it never defines a curve (#2618).
+    if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     // «של מעגל» — OF A circle, indefinite — defines one; «במעגל חדש» says so outright.
     const isDefine = Boolean(fresh) || (prep !== undefined && prep.startsWith('של') && !article);
     return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }, ...pieceFacts('segment', a, b, line)]);
   }
   const en = DIAM_EN.exec(line);
   if (en) {
-    const [, a, b, det, fresh, circle] = en;
+    const [, a, b, det, fresh, circle, ellipse] = en;
+    if (ellipse) return made([{ t: 'diameter-of', a, b, define: false, host: 'ellipse', src: line }, ...pieceFacts('segment', a, b, line)]);
     const isDefine = Boolean(fresh) || (det !== undefined && /^a\s/i.test(det));
     return made([{ t: 'diameter-of', a, b, define: isDefine, ...(circle ? { circle } : {}), src: line }, ...pieceFacts('segment', a, b, line)]);
   }
@@ -7611,6 +7752,7 @@ function describeDirId(d: Direction): string {
   if (d.k === 'curve') return `curve-${d.id}`;
   if (d.k === 'free') return `free-${d.sym}`;
   if (d.k === 'radius') return `radius-${d.circle}-${d.at}`;
+  if (d.k === 'normal') return `normal-${d.curve}-${d.at}`;
   if (d.k === 'bisector') return `bisector-${d.a}${d.v}${d.b}`;
   return `pts-${d.a}${d.b}`;
 }

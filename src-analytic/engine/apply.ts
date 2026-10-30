@@ -51,6 +51,7 @@ import {
   namesObject,
   objectById,
   tangentLineId,
+  type ConicHost,
   type Construction,
   type Curve,
   type CurveObject,
@@ -1196,7 +1197,7 @@ function priorOf(
 }
 
 /** A tangent OBJECT (#1619 B3): the line built at a touch point, perpendicular to the radius there. */
-const isTangentObject = (o: GeoObject): boolean => o.kind === 'line-at' && o.dir.k === 'radius' && o.perp;
+const isTangentObject = (o: GeoObject): boolean => o.kind === 'line-at' && (o.dir.k === 'radius' || o.dir.k === 'normal') && o.perp;
 
 /**
  * THE CIRCLE A NAME MEANS — the `tangent-of`/`diameter-of` chain (a numeral id, a centre-letter id, the
@@ -1217,6 +1218,31 @@ function circleNamed(
   if (circles.length !== 1) return { ok: false, error: noHost(src, 'circle', circles) };
   return { ok: true, o: circles[0] };
 }
+
+/**
+ * THE CURVE A RELATION IS ABOUT (#2618, ADR-AG-355) — the one resolver every chord, diameter, tangent and inscribed
+ * sentence reaches for its host. With no conic named it is the circle chain above, unchanged (`circleNamed`); with
+ * one («באליפסה», «לפרבולה») it is the figure's ONE curve of that kind, by the fit (`curveKindOf`), and none or
+ * several is the contextual refusal for that kind (`noHost`) — the corpus never draws two of either (D6).
+ */
+function curveHost(
+  c: Construction,
+  host: ConicHost | undefined,
+  name: string | undefined,
+  src: string,
+): { ok: true; o: GeoObject } | { ok: false; error: ApplyError } {
+  if (!host) return circleNamed(c, name, src);
+  const found = c.objects.filter((o) => curveKindOf(o) === host);
+  if (found.length !== 1) return { ok: false, error: noHost(src, host, found) };
+  return { ok: true, o: found[0] };
+}
+
+/**
+ * WHAT A TANGENT AT `at` IS PERPENDICULAR TO, on `host` (#2618, ADR-AG-355): the radius on a circle — the direction
+ * every circle lowering has always carried, so a circle figure is unchanged — and the conic's normal otherwise.
+ */
+const touchNormal = (host: GeoObject, at: Id): Direction =>
+  curveKindOf(host) === 'circle' ? { k: 'radius', circle: host.id, at } : { k: 'normal', curve: host.id, at };
 
 /**
  * THE ONE PLACE A CIRCLE ON A CENTRE IS CREATED WITH A FREE RADIUS (#2382, ADR-AG-305): the object and its radius
@@ -1794,7 +1820,8 @@ function applyTouchAt(
       }
     }
   }
-  facts.push({ t: 'constraint', k: { t: 'relation', rel: 'perpendicular', u: { k: 'radius', circle: host.id, at }, v: dir }, src });
+  // ⊥ the radius on a circle, ⊥ the normal on an ellipse or a parabola (#2618, ADR-AG-355) — one lowering per curve.
+  facts.push({ t: 'constraint', k: { t: 'relation', rel: 'perpendicular', u: touchNormal(host, at), v: dir }, src });
   return applyAll(c, facts);
 }
 
@@ -3647,7 +3674,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // By the fit, not the declaration (`curveKindOf`): «(x-3)^2+(y-4)^2=9» declares no kind and IS a circle.
       const isCircle = (o: GeoObject) => curveKindOf(o) === 'circle';
       let host: GeoObject | undefined;
-      if (f.circle !== undefined) {
+      if (f.host) {
+        // «AB קוטר באליפסה» (#2618, ADR-AG-355; operator ruling 2026-10-30, Q3): the chord through the ellipse's
+        // centre — the general lowering below, whose ray from the centre the resolved ellipse supplies.
+        const conic = curveHost(c, f.host, undefined, f.src);
+        if (!conic.ok) return conic;
+        host = conic.o;
+      } else if (f.circle !== undefined) {
         host = circleByName(c, f.circle);
         // A named circle the figure lacks is stated by the reference (#1670, ADR-AG-210).
         if (!host) return statingNamedCircle(c, f.circle, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
@@ -4227,7 +4260,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       let host: GeoObject | undefined;
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
-        if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, f.circleId) };
+        // A host M1 itself resolved: a circle, or the ellipse / parabola a tangent object was built on (#2618).
+        const k = host ? curveKindOf(host) : null;
+        if (!host || (k !== 'circle' && k !== 'ellipse' && k !== 'parabola')) return { ok: false, error: unknownRef(c, f.circleId) };
+      } else if (f.host) {
+        // «הישר … משיק לאליפסה / לפרבולה» (#2618, ADR-AG-355): the figure's one conic of that kind.
+        const conic = curveHost(c, f.host, undefined, f.src);
+        if (!conic.ok) return conic;
+        host = conic.o;
       } else if (f.circle !== undefined) {
         // The line-first order names its circle — «הישר l1 משיק למעגל M» (#1501). The same lookup
         // chain as `diameter-of`: a numeral id, a centre-letter id, or the student's own name.
@@ -4280,6 +4320,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * circle (`tangent-curve`), so the freedom consumed is the line's («y=kx+1» pins k). An AXIS has no
        * freedom to give, so a determined circle touching one is a claim this rule does not judge — refused
        * BY NAME (`out-of-scope`), never dropped (the `diameter-of` rule, one case up).
+       */
+      /*
+       * …and an ELLIPSE or a PARABOLA (#2618, ADR-AG-355): the same `tangent-curve`, whose row on a conic is the double
+       * root of the line's substitution (`conicTangencyRows`); an axis is refused by name, as on a determined circle.
        */
       if (host.kind !== 'circle-at') {
         if (f.axes.length > 0) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
@@ -4464,13 +4508,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * radius there — a `line-at` on the radius direction turned a quarter, 0 DOF, closed form.
      */
     case 'tangent-line-at': {
-      const host = circleNamed(c, f.circle, f.src);
+      // The curve resolver (#2618, ADR-AG-355): the circle chain, or the figure's one ellipse / parabola.
+      const host = curveHost(c, f.host, f.circle, f.src);
       // A named circle the figure lacks is stated by the reference (#1670, ADR-AG-210): «המשיק למעגל O בנקודה A».
       if (!host.ok && f.circle !== undefined && !circleByName(c, f.circle)) return statingNamedCircle(c, f.circle, f) ?? host;
       if (!host.ok) return host;
       return applyAll(c, [
         { t: 'constraint', k: { t: 'on-curve', id: f.at, curve: host.o.id }, src: f.src },
-        { t: 'line-at', id: tangentLineId(f.at), through: f.at, dir: { k: 'radius', circle: host.o.id, at: f.at }, perp: true, src: f.src },
+        { t: 'line-at', id: tangentLineId(f.at), through: f.at, dir: touchNormal(host.o, f.at), perp: true, src: f.src },
       ]);
     }
 
@@ -4499,10 +4544,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       });
       if (tangents.length === 1) {
         const t = tangents[0] as Extract<GeoObject, { kind: 'line-at' }>;
-        const circleId = t.dir.k === 'radius' ? t.dir.circle : undefined;
+        const circleId = t.dir.k === 'radius' ? t.dir.circle : t.dir.k === 'normal' ? t.dir.curve : undefined;
         return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('carrier')], ...(circleId ? { circleId } : {}), at: t.through, src: f.src });
       }
-      return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('stated')], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src });
+      return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('stated')], ...(f.circle !== undefined ? { circle: f.circle } : {}), ...(f.host ? { host: f.host } : {}), src: f.src });
     }
 
     case 'radius-of': {
@@ -4756,10 +4801,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * are the solve's two roots.
      */
     case 'tangent-through': {
-      const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+      const kind = f.host ?? 'circle';
+      const circles = c.objects.filter((o) => curveKindOf(o) === kind);
       const host = f.circle !== undefined ? circleByName(c, f.circle) : circles.length === 1 ? circles[0] : undefined;
-      if (host && curveKindOf(host) === 'circle' && onCurveByConstruction(c, host, f.at)) {
-        return applyFact(c, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src });
+      if (host && curveKindOf(host) === kind && onCurveByConstruction(c, host, f.at)) {
+        return applyFact(c, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), ...(f.host ? { host: f.host } : {}), src: f.src });
       }
       return applyAll(c, f.facts);
     }

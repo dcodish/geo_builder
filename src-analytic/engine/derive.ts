@@ -711,8 +711,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     /** Is the straight tangent to K at Q BY CONSTRUCTION? The line that made it so, or null. */
     const tangentByConstruction = (s: Straight, K: (typeof construction.objects)[number], Q: string): number | null => {
       const centre = centreIdOf(construction, K);
-      const isRadius = (d: { k: string; circle?: string; at?: string; a?: string; b?: string }) =>
-        (d.k === 'radius' && d.circle === K.id && d.at === Q) || (d.k === 'points' && centre !== null && sameSet([d.a!, d.b!], [centre, Q]));
+      // The radius on a circle, the conic's normal on an ellipse or a parabola (#2618, ADR-AG-355).
+      const isRadius = (d: { k: string; circle?: string; curve?: string; at?: string; a?: string; b?: string }) =>
+        (d.k === 'radius' && d.circle === K.id && d.at === Q) ||
+        (d.k === 'normal' && d.curve === K.id && d.at === Q) ||
+        (d.k === 'points' && centre !== null && sameSet([d.a!, d.b!], [centre, Q]));
       const isStraight = (d: { k: string; id?: string; a?: string; b?: string }) =>
         (d.k === 'points' && sameSet([d.a!, d.b!], s.pts)) || (d.k === 'curve' && s.curve !== undefined && d.id === s.curve);
       const rel = construction.constraints.findIndex(
@@ -721,7 +724,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (rel >= 0) return constraintOn[rel];
       const isTangentObject = (id: string) => {
         const T = objectById(construction, id);
-        return !!T && T.kind === 'line-at' && T.perp && T.through === Q && T.dir.k === 'radius' && T.dir.circle === K.id && T.dir.at === Q;
+        return (
+          !!T && T.kind === 'line-at' && T.perp && T.through === Q &&
+          ((T.dir.k === 'radius' && T.dir.circle === K.id && T.dir.at === Q) || (T.dir.k === 'normal' && T.dir.curve === K.id && T.dir.at === Q))
+        );
       };
       if (s.curve && isTangentObject(s.curve)) return objectLine(s.curve);
       // Through Q and a point stated on K's tangent object at Q.
