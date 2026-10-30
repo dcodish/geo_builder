@@ -20,7 +20,9 @@ export type CatalogCategory =
   | 'conics'
   | 'shapes'
   | 'derived'
-  | 'relations';
+  | 'relations'
+  /** #1177 (ADR-AG-352): QUESTIONS about the figure, not givens — every row is `lane: 'ask'`. */
+  | 'locus';
 
 export interface CatalogEntryAnalytic {
   category: CatalogCategory;
@@ -31,7 +33,7 @@ export interface CatalogEntryAnalytic {
    * families, read from the 572 conic corpus; F16/F17 come from the «lines and points» corpus
    * (02c §8) and are the first entries whose source is a different exam topic.
    */
-  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17' | 'F18' | 'F19' | 'F20';
+  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F13' | 'F16' | 'F17' | 'F18' | 'F19' | 'F20';
   /**
    * Lines that must be typed BEFORE this one for it to mean anything — «M אמצע AB» needs A and B.
    *
@@ -62,8 +64,15 @@ export interface CatalogEntryAnalytic {
    * catalog is also the in-app guide (2-D left rename out and the operator could not find it), but it
    * is never taught to the LLM: the fallback adds givens, and a model line that rewrites the student's
    * history is rejected. Every consumer reads THIS field rather than learning about rename separately.
+   *
+   * `'ask'` (#1177, ADR-AG-352) = a QUESTION the ask lane answers («המקום הגיאומטרי של M»), not a given: `ask`
+   * (app/ask.ts) reads it, `parseLine` never does. Listed so the guide can teach the most-asked construct; never
+   * taught to the LLM, whose lane adds givens. A guide click puts it in the ASK box, never the givens box.
+   *
+   * **The construction lane is `!e.lane`** — a consumer that wants givens filters on the field's absence, never on
+   * `lane !== 'rewrite'`, so the next lane added cannot leak into the LLM vocabulary or the build guards.
    */
-  lane?: 'rewrite';
+  lane?: 'rewrite' | 'ask';
 }
 
 export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
@@ -1474,4 +1483,20 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A on it' },
   { category: 'lines', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '5 < AB < 9', en: '5 < AB < 9' },
+
+  // --- F13 · the locus — ASKED, not stated (ADR-AG-072 §1); the guide's way in (#1177, ADR-AG-352) ---
+  /**
+   * The operator's ruling of 2026-09-27 (#1177): the guide carries «המקום הגיאומטרי של M» as a FEATURED row with its
+   * two setup lines — `נקודה M` and the property — so the two-line form the tool reads is the form it teaches. The
+   * needs are the reported figure's (A and B to state the property against); the guard asks the question after them.
+   */
+  {
+    featured: true,
+    category: 'locus',
+    family: 'F13',
+    lane: 'ask',
+    he: 'המקום הגיאומטרי של M',
+    en: 'the locus of M',
+    needs: ['A(0,0)', 'B(4,0)', 'נקודה M', 'MA = MB'],
+  },
 ];

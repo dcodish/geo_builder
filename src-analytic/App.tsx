@@ -94,6 +94,7 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { unstatedChoices } from './engine/unstatedChoices';
 import { unstatedChoiceText } from './app/unstatedChoice';
+import { locusChips } from './app/locusChip';
 
 
 declare const __BUILD__: string;
@@ -596,6 +597,11 @@ export function App() {
     configurationPool(out.construction).defer();
     return out;
   }, [active, seed, seedNames]);
+  /**
+   * #1177 (ADR-AG-352) — THE LOCUS CHIPS: one per point that has a locus, on the row that introduced it. The predicate
+   * is the engine's `hasLocus` (app/locusChip.ts), never re-derived here; a click is the measure menu's `toggleAsk`.
+   */
+  const chips = useMemo(() => locusChips(d), [d]);
   /** The «נתון:» list «הורידו שאלה» prints (#1872) — read here so the button is disabled when it is empty. */
   const questionGivens = useMemo(
     () => questionLines(lines, disabled, spokenFor, new Set(d.construction.objects.map((o) => o.id))),
@@ -1487,6 +1493,35 @@ export function App() {
                         )),
                     }
                   : {}),
+                /**
+                 * #1177 (ADR-AG-352) — the LOCUS CHIP, in the shared row's `trail` slot (3-D's plane chips' seat). Its
+                 * label names the NEXT action (the 2026-10-06 rule; words ruled 2026-10-30): «הצג» while the locus is not
+                 * drawn, «הסתר» while it is. The click asks the sentence through the ask lane's own lifetime (ADR-AG-067):
+                 * ask → row + drawing · again → drawing hidden, row kept · ✕ on the row → both go.
+                 */
+                ...(chips.some((c) => rows[c.line] === i)
+                  ? {
+                      trail: chips
+                        .filter((c) => rows[c.line] === i)
+                        .map((c) => {
+                          const on = isDrawn(queries, c.sentence);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              data-testid="locus-chip"
+                              aria-pressed={on}
+                              title={c.sentence}
+                              onClick={() => toggleAsk(c.sentence)}
+                              style={on ? { ...locusChipStyle, ...locusChipOn } : locusChipStyle}
+                            >
+                              {t(on ? 'locusChipHide' : 'locusChipShow')}
+                              {chips.filter((k) => rows[k.line] === i).length > 1 && ` ${c.id}`}
+                            </button>
+                          );
+                        }),
+                    }
+                  : {}),
                 // #1548: a derivation indexes the ACTIVE lines; a muted row is not in it and carries no fault
                 error: d.faults.find((f) => rows[f.index] === i)?.detail,
                 disabled: disabled.includes(i),
@@ -2341,8 +2376,16 @@ export function App() {
               example: analyticBidi.isolateLtrRuns(raw),
               dir: analyticBidi.textDir(raw) as 'rtl' | 'ltr',
               featured: e.featured,
+              // #1177 — the setup lines an ASK row stands on, shown under it (the ruling: «with its two setup lines»).
+              ...(e.lane === 'ask' && e.needs ? { description: <span dir="auto">{(e.needs ?? []).join(' · ')}</span> } : {}),
               onTry: () => {
                 setManualOpen(false);
+                // #1177 — a QUESTION goes to the ask box, never the givens box: it is not a given (ADR-AG-072 §1).
+                if (e.lane === 'ask') {
+                  setAskText(raw);
+                  askRef.current?.focus();
+                  return;
+                }
                 submit(raw);
               },
             };
@@ -2407,6 +2450,8 @@ const MANUAL_SECTIONS = [
   { key: 'shapes' as const, titleKey: 'manualShapes' },
   { key: 'derived' as const, titleKey: 'manualDerived' },
   { key: 'relations' as const, titleKey: 'manualRelations' },
+  // #1177 (ADR-AG-352): questions, after the statements they are asked about
+  { key: 'locus' as const, titleKey: 'manualLocus' },
   { key: 'parameters' as const, titleKey: 'manualParameters' },
 ];
 
@@ -2417,6 +2462,21 @@ const askTrace: CSSProperties = {
   fontSize: fs.small,
   color: color.muted,
 };
+
+/** #1177 — the locus chip, off and on (3-D's display chips' look: a small bordered pill, amber while lit). */
+const locusChipStyle: CSSProperties = {
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  fontSize: 11,
+  lineHeight: '16px',
+  padding: '2px 6px',
+  borderRadius: 6,
+  border: `1px solid ${color.border}`,
+  background: '#f8fafc',
+  color: color.muted,
+  cursor: 'pointer',
+};
+const locusChipOn: CSSProperties = { borderColor: '#fbbf24', background: '#fffbeb', color: '#92400e' };
 
 /** The measure menu (#1048) — a small list at the click, over everything. */
 const measureMenu: CSSProperties = {

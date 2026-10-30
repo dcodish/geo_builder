@@ -1701,6 +1701,12 @@ range tail read here only when it is selectors (any other tail is the condition 
 
 *Identifiers:* `coordSide` · `closed`
 
+#### The way in: the chip and the guide row ([ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), #1177)
+
+`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start). It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`, and a click is `toggleAsk`, the measure menu's ADR-AG-067 lifetime. Its label follows `isDrawn`. The guide's ask rows are `lane: 'ask'` in category `locus`. The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
+
+*Identifiers:* `locusChips` · `objectLine` · `declinedPointProperty` · `lane: 'ask'`
+
 #### The exam's own questions, and its named lines ([ADR-AG-341](06c-decisions-analytic.md#adr-ag-341), #1138)
 
 The ask lane rewrites «… שעליו נמצאות כל הנקודות X», «הביעו באמצעות a את …» and «הראו כי … הוא <kind> …» to the
