@@ -1,0 +1,102 @@
+{
+ "name": "fix-2026-10-31b",
+ "title": "Fixes of 2026-10-31, second batch: solids stay on the floor (#2630) and many free vectors (#1310)",
+ "cases": [
+  {
+   "id": "T13",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 2630,
+   "class": "play",
+   "title": "A triangle with two side lengths stays flat on the floor",
+   "lines": ["משולש ABC", "אורך AB = 5", "אורך AC = 3"],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל». Press «הציגו תצורה אחרת» a few times: the triangle's shape changes, but it always lies flat, AB along the floor, and AB always draws longer than AC.",
+   "before": "From the second configuration on, the triangle tipped up off the floor."
+  },
+  {
+   "id": "T14",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 2630,
+   "class": "play",
+   "title": "A pyramid with given edges keeps its base down and its apex up",
+   "lines": ["פירמידה SABCD", "אורך AB = 4", "אורך SA = 6"],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל». At every «הציגו תצורה אחרת» the base ABCD sits on the floor and S is above it.",
+   "before": "The pyramid tumbled; in the third configuration it was upside-down, S below the floor."
+  },
+  {
+   "id": "T15",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 2630,
+   "class": "look",
+   "title": "A box with three edge lengths stays upright",
+   "lines": ["תיבה ABCDA'B'C'D'", "אורך AB = 3", "אורך BC = 4", "אורך AA' = 5"],
+   "cycles": 2,
+   "lookFor": "In every screenshot ABCD is on the floor and A'B'C'D' above it.",
+   "before": "The box tumbled from the second configuration on."
+  },
+  {
+   "id": "T16",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 2630,
+   "class": "look",
+   "title": "A vector given by its components keeps them",
+   "lines": ["AB = (1,2,3)", "אורך AC = 2", "אורך BC = 3"],
+   "cycles": 1,
+   "lookFor": "Every row is green; AB points along (1,2,3) in the axes, not along the floor's x direction.",
+   "before": "The figure was turned so AB lay along x, (3.74, 0, 0), and the row «AB = (1,2,3)» was marked wrong."
+  },
+  {
+   "id": "T17",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 1310,
+   "class": "play",
+   "title": "A second free vector keeps the first one",
+   "lines": ["וקטור AB", "וקטור CD"],
+   "lookFor": "Start: press «נקה הכל». Both arrows, AB and CD, are drawn and both rows are green.",
+   "before": "Only CD was drawn: the AB arrow vanished."
+  },
+  {
+   "id": "T18",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 1310,
+   "class": "look",
+   "title": "Three free vectors, all drawn",
+   "lines": ["וקטור AB", "וקטור CD", "וקטור EF"],
+   "lookFor": "Three arrows, AB, CD and EF; three green rows.",
+   "before": "Only the last arrow was drawn."
+  },
+  {
+   "id": "T19",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "section": "main",
+   "issue": 1310,
+   "class": "look",
+   "title": "Your T35 figure stays flat (vector first, then the triangle)",
+   "lines": ["וקטור AB", "משולש ABC", "אורך AB = 5", "אורך AC = 3"],
+   "cycles": 2,
+   "lookFor": "Every row green; the triangle lies flat with AB along the floor in every configuration.",
+   "before": "unchanged"
+  }
+ ]
+}

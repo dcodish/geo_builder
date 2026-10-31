@@ -72,7 +72,8 @@ describe('#2630 — a driven, unplaced solid keeps its base on the floor at ever
 
 describe('#2630 — a figure whose orientation the student stated is never turned', () => {
   it('«AB = (1,2,3)» with two lengths keeps its components (no solid)', () => {
-    for (const l of ['נקודה A', 'נקודה B', 'נקודה C', 'AB = (1,2,3)', 'אורך AC = 2', 'אורך BC = 3']) submit(l);
+    for (const l of ['AB = (1,2,3)', 'אורך AC = 2', 'אורך BC = 3']) submit(l);
+    expect(useGeo3.getState().facts).toHaveLength(3);
     for (const seed of SEEDS) {
       const d = derived(seed);
       for (const f of useGeo3.getState().facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
