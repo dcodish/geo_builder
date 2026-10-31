@@ -1849,18 +1849,26 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}): Resolved3 {
-  const key = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '') + (opts.solvedFrame ? '|raw' : '');
+  const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
   let per = resolveMemo3.get(c);
-  const hit = per?.get(key);
-  if (hit) {
-    resolveStats3.hits++;
-    return hit;
-  }
-  const out = resolve3Uncached(c, seed, opts);
   if (!per) resolveMemo3.set(c, (per = new Map()));
-  per.set(key, out);
-  if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
-  return out;
+  const memo = per;
+  const remember = (key: string, out: Resolved3): Resolved3 => {
+    memo.set(key, out);
+    if (memo.size > RESOLVE_MEMO_PER_FIGURE) memo.delete(memo.keys().next().value as string);
+    return out;
+  };
+  /**
+   * #2630 (ADR-3D-400 §3): ONE solve per configuration, in the solved frame — the knowledge gates read it as is, and
+   * the drawing is that same solution turned onto the floor (`drawnFrame3`, no second solve). A figure the
+   * normalisation leaves alone is served the SAME object both ways, so no consumer can see two figures (#863).
+   */
+  const solvedKey = `${base}|raw`;
+  let solved = memo.get(solvedKey);
+  if (solved) resolveStats3.hits++;
+  else solved = remember(solvedKey, resolve3Uncached(c, seed, opts));
+  if (opts.solvedFrame) return solved;
+  return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
 }
 
 /** What a configuration is resolved at. */
@@ -3106,54 +3114,6 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     }
   }
 
-  /**
-   * THE GAUGE IS NOT A CONFIGURATION (#1421, ADR-3D-272 — operator ruling 2026-09-27, twice:
-   * "keep it flat on the floor").
-   *
-   * A figure with nothing fixing it in space has six rigid-motion values, and once a driven given
-   * ran the solve, «הציגו תצורה אחרת» resampled them with the real freedom — the operator's
-   * triangle (|AB| = 5, |AC| = 3) tumbled edge-on to the camera at 3 of 4 seeds and AB drew
-   * SHORTER than AC. Turning the whole figure changes nothing a student stated or could state
-   * (ADR-052: do not sample what cannot matter), so an UNANCHORED figure is normalised after
-   * every solve to the canonical placement a lone triangle already keeps: first point at the
-   * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
-   * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
-   * and line, so every relation survives verbatim; configurations change the SHAPE alone.
-   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, revolutions,
-   * circles — is untouched.
-   *
-   * #2630 (ADR-3D-400 — operator 2026-10-31: *"they are on the floor until they are placed by user
-   * somewhere"*): a SOLID is no exception. A figure holding one takes the frame from the first
-   * solid's own base, the frame its builder lays it in — base[0] at the origin, base[0]→base[1]
-   * along +x, the base plane on the floor, the rest of the solid above it (a flat polygon: its ring
-   * counter-clockwise from above). The first three points are not that frame: an apex-first or
-   * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
-   */
-  if (!opts.solvedFrame && !orientationStated3(c) && c.revolutions.length === 0 && c.circles3.length === 0) {
-    const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
-    for (let i = 1; i < ordered.length && !frame; i += 1) {
-      const d1 = sub3(ordered[i], ordered[0]);
-      if (norm3(d1) < 1e-9) continue;
-      for (let j = i + 1; j < ordered.length; j += 1) {
-        const d2 = sub3(ordered[j], ordered[0]);
-        const nRaw = cross3(d1, d2);
-        if (norm3(nRaw) < 1e-9) continue;
-        const e1 = normalize3(d1);
-        const n = normalize3(nRaw);
-        frame = { p0: ordered[0], e1, e2: cross3(n, e1), n };
-        break;
-      }
-    }
-    if (frame) {
-      const { p0, e1, e2, n } = frame;
-      const rot = (v: Vec3): Vec3 => v3(dot3(v, e1), dot3(v, e2), dot3(v, n));
-      for (const [id, p] of pos) pos.set(id, rot(sub3(p, p0)));
-      for (const [name, pl] of planes) planes.set(name, { n: rot(pl.n), d: pl.d + dot3(pl.n, p0) });
-      for (const [name, ln] of lines) lines.set(name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) });
-    }
-  }
-
   return {
     positions: pos,
     planes,
@@ -3175,6 +3135,58 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       return { freeVectors: fs3.values, freeSyms: fs3.syms };
     })(),
   };
+}
+
+/**
+ * THE GAUGE IS NOT A CONFIGURATION (#1421, ADR-3D-272 — operator ruling 2026-09-27, twice:
+ * "keep it flat on the floor").
+ *
+ * A figure with nothing fixing it in space has six rigid-motion values, and once a driven given
+ * ran the solve, «הציגו תצורה אחרת» resampled them with the real freedom — the operator's
+ * triangle (|AB| = 5, |AC| = 3) tumbled edge-on to the camera at 3 of 4 seeds and AB drew
+ * SHORTER than AC. Turning the whole figure changes nothing a student stated or could state
+ * (ADR-052: do not sample what cannot matter), so an UNANCHORED figure is normalised after
+ * every solve to the canonical placement a lone triangle already keeps: first point at the
+ * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
+ * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
+ * and line, so every relation survives verbatim; configurations change the SHAPE alone.
+ * Anything anchored — coordinates, pins, equation planes/lines, frame relations, revolutions,
+ * circles — is untouched.
+ *
+ * #2630 (ADR-3D-400 — operator 2026-10-31: *"they are on the floor until they are placed by user
+ * somewhere"*): a SOLID is no exception. A figure holding one takes the frame from the first
+ * solid's own base, the frame its builder lays it in — base[0] at the origin, base[0]→base[1]
+ * along +x, the base plane on the floor, the rest of the solid above it (a flat polygon: its ring
+ * counter-clockwise from above). The first three points are not that frame: an apex-first or
+ * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
+ */
+function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
+  if (orientationStated3(c) || c.revolutions.length > 0 || c.circles3.length > 0) return solved;
+  const pos = solved.positions;
+  const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+  let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
+  for (let i = 1; i < ordered.length && !frame; i += 1) {
+    const d1 = sub3(ordered[i], ordered[0]);
+    if (norm3(d1) < 1e-9) continue;
+    for (let j = i + 1; j < ordered.length; j += 1) {
+      const d2 = sub3(ordered[j], ordered[0]);
+      const nRaw = cross3(d1, d2);
+      if (norm3(nRaw) < 1e-9) continue;
+      const e1 = normalize3(d1);
+      const n = normalize3(nRaw);
+      frame = { p0: ordered[0], e1, e2: cross3(n, e1), n };
+      break;
+    }
+  }
+  if (!frame) return solved;
+  const { p0, e1, e2, n } = frame;
+  const rot = (v: Vec3): Vec3 => v3(dot3(v, e1), dot3(v, e2), dot3(v, n));
+  const positions: Positions3 = new Map([...pos].map(([id, p]) => [id, rot(sub3(p, p0))]));
+  const planes = new Map([...solved.planes].map(([name, pl]) => [name, { ...pl, n: rot(pl.n), d: pl.d + dot3(pl.n, p0) }]));
+  const lines = new Map([...solved.lines].map(([name, ln]) => [name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) }]));
+  // #1188 (ADR-3D-386): the free-vector pass runs at the drawn figure, as it always has
+  const fs3 = solveFreeVectors3(c, solved.seed, positions);
+  return { ...solved, positions, planes, lines, freeVectors: fs3.values, freeSyms: fs3.syms };
 }
 
 /**
