@@ -1,0 +1,109 @@
+{
+ "name": "prod-2026-10-31b",
+ "title": "Prod smoke, prod/2026-10-31-2: #2640, PR #2605, #2630, #1310",
+ "cases": [
+  {
+   "id": "P1",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "prod",
+   "issue": 2640,
+   "class": "verified",
+   "title": "5/3 prints as a stacked fraction",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=5/3x"
+   ],
+   "asks": [
+    "משוואת הפרבולה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The answer reads y² = then 5 over 3 (stacked) then x.",
+   "before": "«3y² = 5x»."
+  },
+  {
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 1680,
+   "class": "verified",
+   "title": "Your T66: a box row shows the length form",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AA'=3BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». It builds; the row reads «|AA'|=3|BC|».",
+   "before": "The row read the vector wording.",
+   "id": "P2"
+  },
+  {
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 1680,
+   "class": "verified",
+   "title": "Your T64: neither reading holds, so it is read as lengths and refused",
+   "lines": [
+    "פירמידה SABCD",
+    "AB = 1AC"
+   ],
+   "expectRefusal": "שטוחה",
+   "lookFor": "Start: press «נקה הכל». Refused: «לא ניתן: «AB = 1AC» מתקיים רק אם הפירמידה SABCD שטוחה…», the same answer «|AB| = |AC|» gets. No question; nothing added.",
+   "before": "Asked length-or-vector.",
+   "id": "P3"
+  },
+  {
+   "id": "P4",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 2630,
+   "class": "verified",
+   "title": "A pyramid with given edges keeps its base down and its apex up",
+   "lines": [
+    "פירמידה SABCD",
+    "אורך AB = 4",
+    "אורך SA = 6"
+   ],
+   "cycles": 3,
+   "lookFor": "Start: press «נקה הכל». At every «הציגו תצורה אחרת» the base ABCD sits on the floor and S is above it.",
+   "before": "The pyramid tumbled; in the third configuration it was upside-down, S below the floor."
+  },
+  {
+   "id": "P5",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 2630,
+   "class": "verified",
+   "title": "A vector given by its components keeps them",
+   "lines": [
+    "AB = (1,2,3)",
+    "אורך AC = 2",
+    "אורך BC = 3"
+   ],
+   "cycles": 1,
+   "lookFor": "Every row is green; AB points along (1,2,3) in the axes, not along the floor's x direction.",
+   "before": "The figure was turned so AB lay along x, (3.74, 0, 0), and the row «AB = (1,2,3)» was marked wrong."
+  },
+  {
+   "id": "P6",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 1310,
+   "class": "verified",
+   "title": "A second free vector keeps the first one",
+   "lines": [
+    "וקטור AB",
+    "וקטור CD"
+   ],
+   "lookFor": "Start: press «נקה הכל». Both arrows, AB and CD, are drawn and both rows are green.",
+   "before": "Only CD was drawn: the AB arrow vanished."
+  }
+ ]
+}
