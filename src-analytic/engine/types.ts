@@ -630,7 +630,12 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef; pronoun?: 'fem' })
+  /*
+   * `pronoun: 'fem'` (#2619 D, ADR-AG-362) — «היא עוברת דרך …»: the subject is the feminine pronoun, so "which curve" is
+   * the figure's one curve that takes it — an ellipse or a parabola — rather than the one of `kind`. None or several is
+   * the refusal the noun gets; several of different kinds name each with its own noun.
+   */
   /*
    * `kind: 'parallel'` / `'perp-bisector'` (#1138, ADR-AG-341) — «הישר המקביל», «האנך האמצעי»: the one line the figure
    * built through a point parallel to something (a `line-at`, not perpendicular, with a stated direction), the one

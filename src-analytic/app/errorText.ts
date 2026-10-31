@@ -189,6 +189,8 @@ export function errorText(error: InputError, t: Translate): string {
   // The noun a candidate's name follows is the HOST's kind when a host is carried (a curve kind there).
   const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind === 'perpendicular' ? 'line' : (host.kind as RefKind)) : (kind ?? 'curve');
   const theNoun = t(THE_NOUN_KEY[nounKind]);
+  // Candidates of DIFFERENT kinds (#2619 D, ADR-AG-362 — «היא» beside an ellipse and a parabola) each keep their own noun.
+  const nounOf = (i: number): string => (host?.kinds?.[i] ? t(THE_NOUN_KEY[host.kinds[i]]) : theNoun);
   const key: string = {
     // #1868 (ADR-W-151) — the one ruled sentence, in every builder, with no echo of the line: a suite key
     'not-handled': 'suite.refusal.notUnderstood',
@@ -323,9 +325,9 @@ export function errorText(error: InputError, t: Translate): string {
     claimed: t(KIND_NOUN_KEY[kind ?? 'curve']),
     noun: t(KIND_NOUN_KEY[kind ?? 'curve']),
     numNoun: t(NUMERAL_NOUN_KEY[kind ?? 'curve']),
-    candidates: candidates.map((n) => `${theNoun} ${n}`).join(', '),
+    candidates: candidates.map((n, i) => `${nounOf(i)} ${n}`).join(', '),
     example: candidates.length > 0
-      ? ambiguousCurveExample(error.detail, theNoun, candidates[0])
+      ? ambiguousCurveExample(error.detail, nounOf(0), candidates[0])
       : 'example' in error ? (error.example ?? '') : '',
     found: host ? host.found : 0,
     options: error.key === 'ambiguous-angle' && error.options

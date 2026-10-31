@@ -222,7 +222,7 @@ resolves a noun-only perimeter.
 
 *Identifiers:* `engine/apply.ts`
 
-### An ellipse's roles and sizes; the canonical curve with no equation ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), [ADR-AG-354](06c-decisions-analytic.md#adr-ag-354), #2616, #2617, #2619)
+### An ellipse's roles and sizes; the canonical curve with no equation ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), [ADR-AG-354](06c-decisions-analytic.md#adr-ag-354), [ADR-AG-362](06c-decisions-analytic.md#adr-ag-362), #2616, #2617, #2619)
 
 **One closed form.** `ellipseRolePoint(e, role)` (`engine/derived.ts`) is what a focus, a vertex, or an end of the major or
 minor axis IS over the resolved semi-axes (a on x, b on y). A focus counts along the MAJOR axis (`which` 0 is its
@@ -259,6 +259,8 @@ moves one resolved semi-axis, as |t| — `even` — or as √t — `linear`) the
 x^2/a^2+y^2/b^2=1» with `fresh: true` on its `curve` fact — M1 (`freshLetters`, `renameSym`) moves a letter the figure
 already uses to the next free one, in the equation and its label; a canonical circle is read as «נתון מעגל שמרכזו
 בראשית הצירים ורדיוסו R». The axis clause is stripped off the declaration and lowered to `major-axis-of`.
+
+**The pronoun subject** ([ADR-AG-362](06c-decisions-analytic.md#adr-ag-362), #2619 D). The through-converse (`parseIncidence`) reads «היא» as its subject before `lineObject`, lowers it onto «P על האליפסה» through `viaCanonical`, and marks the `on-kind` fact `pronoun: 'fem'`. M1's `on-kind` arm widens its candidates to `FEM_CURVE_KINDS` (ellipse, parabola) — one binds; none or several of one kind is that noun's `noHost`; several of two kinds carry `HostRef.kinds`, which `errorText` uses to put each candidate's own noun before its name in `errHost.named`. No point list (ADR-W-167).
 
 *Identifiers:* `ellipseRolePoint` · `EllipseRole` · `EllipseSide` · `sameEllipseRole` · `ellipse-point` · `ellipse-dist` · `RoleEnd` · `roleEndAt` · `major-axis` · `foldMajorAxis` · `focus-of` · `foci-of` · `vertex-of` · `major-axis-of` · `via-ellipse-role` · `ELLIPSE_ROLE_SENTINELS` · `nameEllipseRole` · `theEllipse` · `withOpenOrientation` · `parseEllipseMeasures` · `parseCanonicalConic` · `onePinValue` · `semiAxisLetters` · `freshLetters` · `ellipseRoleAnswer` · `CONIC_ROLE_WORDS`
 

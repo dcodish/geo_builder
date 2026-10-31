@@ -193,7 +193,7 @@ export type InputError =
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string; options?: string[] }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
-  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[] } }
+  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[]; kinds?: Array<'circle' | 'parabola' | 'ellipse'> } }
   /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */
   | { key: 'numeral-notation'; detail: string; holder?: string; expected?: RefKind }
   /** #1432 am. 1 — a stated value outside its symbol's domain («רדיוס המעגל הוא -3»), with the bound. */
