@@ -1,0 +1,1203 @@
+{
+ "name": "round-2627",
+ "title": "Fix round #2627 (overnight, 30 Oct)",
+ "cases": [
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "play",
+   "title": "Adding a point on a side leaves the triangle where it is",
+   "lines": [
+    "משולש ABC",
+    "D על BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». After the second line, A, B and C do not move; D sits on BC. Then press «הציגו תצורה אחרת» a few times: each press is a new triangle, and D stays on BC.",
+   "before": "The whole triangle was redrawn when D was added (labels moved 25–440 px).",
+   "id": "T1"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "play",
+   "title": "A named median leaves the triangle where it is",
+   "lines": [
+    "משולש ABC",
+    "AD תיכון לצלע BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The triangle stays put; D is the midpoint of BC.",
+   "before": "The triangle moved.",
+   "id": "T2"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "look",
+   "title": "The diagonals' crossing leaves the quadrilateral where it is",
+   "lines": [
+    "מרובע ABCD",
+    "M מפגש AC ו-BD"
+   ],
+   "lookFor": "Start: press «נקה הכל». The quadrilateral stays put; M is where the diagonals cross.",
+   "before": "It moved by up to 13 units.",
+   "id": "T3"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "look",
+   "title": "On an obtuse triangle, an altitude's foot falls outside the side (as in 2-D)",
+   "lines": [
+    "משולש CMD",
+    "MA גובה לצלע CD"
+   ],
+   "lookFor": "Start: press «נקה הכל». The triangle stays put. If it is obtuse at C or D, A sits on the extension of CD, with the right-angle mark, as 2-D draws it.",
+   "before": "The triangle was redrawn so that the foot fell inside CD.",
+   "cycles": 3,
+   "id": "T4"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "verified",
+   "title": "Every spelling of \"the tangents meet\" draws the same figure",
+   "lines": [
+    "מעגל O",
+    "המשיק בנקודה A והמשיק בנקודה C נפגשים בנקודה D"
+   ],
+   "lookFor": "Start: press «נקה הכל». The circle, A, C and D drawn; D is where the two tangents meet.",
+   "before": "Unchanged (a guard for the provenance change).",
+   "id": "T5"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 1687,
+   "class": "verified",
+   "title": "A given still reshapes the triangle",
+   "lines": [
+    "משולש ABC",
+    "AB=5"
+   ],
+   "lookFor": "Start: press «נקה הכל». The triangle changes so that AB = 5 (moving a figure when it must change stays #2039).",
+   "before": "Unchanged.",
+   "id": "T6"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2613,
+   "class": "play",
+   "title": "The locus of M is the ellipse alone (book p10-9)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/16+y^2/12=1",
+    "P נקודה על האליפסה",
+    "האנך מ-P לציר ה-x חותך אותו בנקודה N",
+    "O ראשית הצירים",
+    "דרך N עובר ישר l1 מקביל ל-PO",
+    "דרך P עובר ישר l2 מקביל לציר ה-x",
+    "M נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer reads «אליפסה · x²/64 + y²/12 = 1» and one ellipse is drawn, with no x-axis line. Press «הציגו תצורה אחרת» a few times: the same answer each time.",
+   "before": "«אליפסה · ישר» with the whole x-axis drawn too, or «ישר · y = 0» alone, or nothing.",
+   "cycles": 3,
+   "id": "T7"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2613,
+   "class": "play",
+   "title": "REFUSAL: two lines that are the same line have no crossing point",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/16+y^2/12=1",
+    "P(4,0)",
+    "האנך מ-P לציר ה-x חותך אותו בנקודה N",
+    "O ראשית הצירים",
+    "דרך N עובר ישר l1 מקביל ל-PO",
+    "דרך P עובר ישר l2 מקביל לציר ה-x",
+    "M נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused: the two lines are the same line, so there is no crossing point (read the whole sentence).",
+   "before": "The line was accepted and M was put somewhere on the x-axis.",
+   "expectRefusal": "הם אותו ישר",
+   "id": "T8"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2613,
+   "class": "play",
+   "title": "REFUSAL: two parallel lines never meet, and P is not moved to make them",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/16+y^2/12=1",
+    "P נקודה על האליפסה",
+    "O ראשית הצירים",
+    "דרך P עובר ישר l2 מקביל לציר ה-y",
+    "דרך O עובר ישר l1 מקביל לציר ה-y",
+    "M נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused, and P stays where it was.",
+   "before": "It was accepted green, with P moved onto the ellipse's top vertex so the two lines became one.",
+   "expectRefusal": "אותו ישר",
+   "id": "T9"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2615,
+   "class": "play",
+   "title": "The chord's second end is never A again (book p3-21)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1",
+    "c > 0",
+    "b > 0",
+    "F1(c,0)",
+    "a^2-b^2=c^2",
+    "A(2.5,4.5)",
+    "A על האליפסה",
+    "B(0,-b)",
+    "שיפוע הישר F1B הוא √1.5",
+    "הישר AF1 חותך את האליפסה בנקודה E"
+   ],
+   "asks": [
+    "E"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «E» in the «שאלו» box. Every line green; the answer to «E» is «(5, -3)» alone, with no «או».",
+   "before": "«(5/2, 9/2) או (5, -3)» (the first value is A itself), and at one configuration the line was refused.",
+   "id": "T10"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2615,
+   "class": "look",
+   "title": "A chord through a circle's centre finds its other end",
+   "lines": [
+    "נתון מעגל שמשוואתו (x-c)^2+y^2=r^2",
+    "c > 0",
+    "F(c,0)",
+    "B(0,-r)",
+    "שיפוע הישר FB הוא 1",
+    "A(1,7)",
+    "A על המעגל",
+    "הישר AF חותך את המעגל בנקודה E"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is accepted, with E at (49, −7).",
+   "before": "Refused: \"the crossing is already named A\".",
+   "id": "T11"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2614,
+   "class": "play",
+   "title": "A fractional ellipse prints as a whole-number equation",
+   "lines": [
+    "נתונה אליפסה שמשוואתה 4x^2/45+y^2/5=1"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. The answer and the panel read «4x² + 9y² = 45».",
+   "before": "«x²/45/4 + y²/5 = 1», which reads as x²/45 divided by 4.",
+   "id": "T12"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2614,
+   "class": "play",
+   "title": "A fractional parabola prints cleared too",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=2.5x"
+   ],
+   "asks": [
+    "משוואת הפרבולה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת הפרבולה» in the «שאלו» box. The answer reads «2y² = 5x».",
+   "before": "«y² = 5/2x».",
+   "id": "T13"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2614,
+   "class": "look",
+   "title": "A locus ellipse prints cleared on the row and on the canvas label",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "O(0,0)",
+    "נקודה P על האליפסה",
+    "M אמצע OP"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer row and the label on the drawn curve both read «אליפסה · 36x² + 100y² = 225».",
+   "before": "«x²/25/4 + y²/9/4 = 1».",
+   "id": "T14"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "batch",
+   "issue": 2614,
+   "class": "verified",
+   "title": "A whole-number ellipse keeps its canonical form",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. «x²/25 + y²/9 = 1».",
+   "before": "Unchanged.",
+   "id": "T15"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "play",
+   "title": "The חורף 25 locus is written in a",
+   "lines": [
+    "A(-9a,0)",
+    "B(41a,0)",
+    "נקודה P",
+    "PA מאונך ל-PB"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של P"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של P» in the «שאלו» box. The answer reads «מעגל · (x − 16a)² + y² = (25a)²», the same after «הציגו תצורה אחרת».",
+   "before": "«מעגל» with no equation.",
+   "cycles": 2,
+   "id": "T16"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "play",
+   "title": "A perpendicular bisector is written in a",
+   "lines": [
+    "A(0,0)",
+    "B(8a,0)",
+    "נקודה M",
+    "MA = MB"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer reads «ישר · x - 4a = 0».",
+   "before": "«ישר» with no equation.",
+   "id": "T17"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 2608,
+   "class": "play",
+   "title": "A circle about (a, 0) answers at every configuration",
+   "lines": [
+    "A(a,0)",
+    "נקודה M",
+    "MA = 3"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. Press «הציגו תצורה אחרת» 4 times: every time the answer reads «מעגל · (x − a)² + y² = 3²».",
+   "before": "«מעגל» at some configurations and nothing at all at others.",
+   "cycles": 4,
+   "id": "T18"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "play",
+   "title": "Two letters: a circle about (a, b)",
+   "lines": [
+    "A(a,b)",
+    "נקודה M",
+    "MA = 3"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer reads «מעגל · (x − a)² + (y − b)² = 3²».",
+   "before": "«מעגל».",
+   "id": "T19"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "play",
+   "title": "Two letters on an ellipse: the midpoint of P and its foot",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1",
+    "P נקודה על האליפסה",
+    "האנך מ-P לציר ה-x חותך אותו בנקודה N",
+    "M אמצע PN"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. An equation in a and b. CHECK THE FORM: it prints «x²/a² + y²/(b²/4) = 1», a fraction inside the letter (your 2B ruling cleared number fractions; say if this should read «x²/a² + 4y²/b² = 1»).",
+   "before": "«אליפסה».",
+   "id": "T20"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5301",
+   "path": "/analytic.html",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "look",
+   "title": "Not a simple product of letters: the kind alone",
+   "lines": [
+    "A(a+1,0)",
+    "נקודה M",
+    "MA = 3"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer reads «מעגל» with no equation (an a + 1 dependence is not written).",
+   "before": "Unchanged.",
+   "id": "T21"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "play",
+   "title": "Show and hide a point's locus from the chip",
+   "lines": [
+    "A(0,0)",
+    "B(8,0)",
+    "נקודה M",
+    "MA = MB"
+   ],
+   "lookFor": "Start: press «נקה הכל». Click «הצג מקום גאומטרי» on the «נקודה M» row: the line x = 4 is drawn and the row «ישר · x - 4 = 0» appears; the chip now reads «הסתר מקום גאומטרי». Click it again: the line hides, the row stays.",
+   "before": "No chip: the student had to type «המקום הגיאומטרי של M».",
+   "id": "T22"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "play",
+   "title": "✕ on the answer row removes the row and the drawing",
+   "lines": [
+    "A(0,0)",
+    "B(8,0)",
+    "נקודה M",
+    "MA = MB"
+   ],
+   "lookFor": "Start: press «נקה הכל». Click the chip, then ✕ on the answer row: the row and the line both go, and the chip reads «הצג מקום גאומטרי» again.",
+   "before": "No chip.",
+   "id": "T23"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "look",
+   "title": "A point with no locus gets no chip",
+   "lines": [
+    "A(0,0)",
+    "נקודה M",
+    "נקודה N"
+   ],
+   "lookFor": "Start: press «נקה הכל». No chip on any row (M and N each move freely in the plane).",
+   "before": "Unchanged.",
+   "id": "T24"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "look",
+   "title": "Chips on a midpoint chain",
+   "lines": [
+    "A(0,0)",
+    "נקודה M",
+    "MA = 5",
+    "B(6,0)",
+    "N אמצע MB"
+   ],
+   "lookFor": "Start: press «נקה הכל». A chip on the «נקודה M» row and one on the «N אמצע MB» row; N's chip answers a circle centred (3, 0).",
+   "before": "No chips.",
+   "id": "T25"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "play",
+   "title": "The guide teaches the locus question",
+   "lines": [
+    "A(0,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». Open «מדריך»: a «מקום גאומטרי» section has «המקום הגיאומטרי של M». Clicking it closes the guide and puts the question in the ASK box, not the givens. (New wording to judge: the section title, and «הצג מקום גאומטרי B» when one row has two chips.)",
+   "before": "No such row.",
+   "id": "T26"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5302",
+   "path": "/analytic.html",
+   "section": "pr-2635",
+   "issue": 1177,
+   "class": "play",
+   "title": "REFUSAL: the point and its property in one line",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "M נקודה המקיימת MA = MB"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused with «בכל שורה נתון אחד … נסו להקליד אותם בשני שלבים: (1) נקודה M (2) MA = MB»; nothing drawn.",
+   "before": "The line went to the AI fallback.",
+   "expectRefusal": "בשני שלבים",
+   "id": "T27"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "play",
+   "title": "A rhombus inscribed in a canonical ellipse (book p4-24)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1",
+    "מעוין ABCD חסום באליפסה",
+    "היקף המעוין ABCD הוא 20",
+    "שטח המעוין ABCD הוא 24",
+    "האלכסון AC על ציר ה-x"
+   ],
+   "lookFor": "Start: press «נקה הכל». Every line green; the vertices at (±4,0) and (0,±3).",
+   "before": "Line 2 was not understood.",
+   "id": "T28"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "look",
+   "title": "An equilateral triangle inscribed in an ellipse (book p5-27)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה 7x^2+9y^2=63",
+    "משולש שווה צלעות ABC חסום באליפסה",
+    "A(3,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». B and C at (−1.2, ±2.42).",
+   "before": "Not understood.",
+   "id": "T29"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "play",
+   "title": "A tangent line pins k (book p8-7)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/6+y^2/3=1",
+    "הישר y=kx+3 משיק לאליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The line touches the ellipse with k = 1; «הציגו תצורה אחרת» shows k = −1.",
+   "before": "Not understood.",
+   "cycles": 2,
+   "id": "T30"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "play",
+   "title": "A dot is offered where a line just touches (book p8-1)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2+4y^2=20",
+    "נתון הישר y=-x+5"
+   ],
+   "lookFor": "Start: press «נקה הכל». One dot at (4, 1); clicking it adds «A נקודת החיתוך של הישר … עם האליפסה».",
+   "before": "No dot at a touch point.",
+   "id": "T31"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "look",
+   "title": "A diameter of an ellipse (book p3-22)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2+5y^2=45",
+    "AB קוטר באליפסה",
+    "AB=10",
+    "שיפוע AB חיובי"
+   ],
+   "lookFor": "Start: press «נקה הכל». A and B at ±(4.47, 2.24), the segment through the centre.",
+   "before": "Not understood.",
+   "id": "T32"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "play",
+   "title": "A tangent at a point of the parabola",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=8x",
+    "הישר AB משיק לפרבולה בנקודה A"
+   ],
+   "lookFor": "Start: press «נקה הכל». AB touches the parabola at A; A moves under «הציגו תצורה אחרת».",
+   "before": "Not understood.",
+   "cycles": 2,
+   "id": "T33"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "look",
+   "title": "REFUSAL: a line through a point inside the ellipse can't touch it",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "הישר y=kx+1 משיק לאליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused (the existing \"no configuration\" refusal).",
+   "before": "Not understood.",
+   "expectRefusal": "לא נמצאה תצורה",
+   "id": "T34"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5303",
+   "path": "/analytic.html",
+   "section": "pr-2636",
+   "issue": 2618,
+   "class": "verified",
+   "title": "The circle gets the touch dot too",
+   "lines": [
+    "נתון מעגל שמשוואתו x^2+y^2=25",
+    "נתון הישר y=5"
+   ],
+   "lookFor": "Start: press «נקה הכל». One dot at (0, 5).",
+   "before": "No dot.",
+   "id": "T35"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2616,
+   "class": "play",
+   "title": "Name the right focus and the top vertex",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "F1 הוא המוקד הימני של האליפסה",
+    "A הקודקוד העליון של האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». F1 at (4, 0) and A at (0, 3), both lettered.",
+   "before": "Both lines refused.",
+   "id": "T36"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2616,
+   "class": "play",
+   "title": "A focus with no side: «הציגו תצורה אחרת» swaps it",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "F מוקד האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». F at (4, 0) or (−4, 0); «הציגו תצורה אחרת» moves it to the other; no note names the choice.",
+   "before": "Refused \"understood but not supported\".",
+   "cycles": 2,
+   "id": "T37"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2616,
+   "class": "play",
+   "title": "REFUSAL: a focus the ellipse does not have",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "F המוקד העליון של האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused (no configuration).",
+   "before": "Refused as not understood.",
+   "expectRefusal": "לא נמצאה תצורה",
+   "id": "T38"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "look",
+   "title": "Book p1-4: the axis and the distance between the foci",
+   "lines": [
+    "נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x",
+    "הציר הגדול שלה הוא 20 והמרחק בין המוקדים הוא 10"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. The answer reads «x²/100 + y²/75 = 1».",
+   "before": "Both lines refused.",
+   "id": "T39"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "play",
+   "title": "Book p1-7: a focus and a vertex without letters",
+   "lines": [
+    "נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x",
+    "הציר הקטן שלה הוא 10 ומרחק המוקד הימני מהקודקוד הימני הוא 1"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. «x²/169 + y²/25 = 1»; no new letter appears on the canvas (your ruling: nothing to draw until the foci are marked).",
+   "before": "Refused.",
+   "id": "T40"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "look",
+   "title": "Book p7-11: the sum of the focal distances",
+   "lines": [
+    "נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x",
+    "A(6,4.8)",
+    "A על האליפסה",
+    "סכום המרחקים של הנקודה A משני המוקדים של האליפסה הוא 20"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. «x²/100 + y²/36 = 1».",
+   "before": "Refused.",
+   "id": "T41"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "look",
+   "title": "Book p2-13: the bottom focus",
+   "lines": [
+    "נתונה אליפסה קנונית שהציר הגדול שלה הוא על ציר ה-y",
+    "F המוקד התחתון של האליפסה",
+    "A(5/3,2)",
+    "A על האליפסה",
+    "AF=13/3"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. «x²/5 + y²/9 = 1».",
+   "before": "Refused.",
+   "id": "T42"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "play",
+   "title": "Pin a letter: «a = 6»",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1",
+    "a = 6",
+    "b^2=16"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. «x²/36 + y²/16 = 1».",
+   "before": "«a = 6» went to the AI.",
+   "id": "T43"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2617,
+   "class": "play",
+   "title": "«a > b» always draws a wide ellipse",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1",
+    "a>b"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press «הציגו תצורה אחרת» several times: wide (major axis on x) every time.",
+   "before": "Some configurations drew it tall.",
+   "cycles": 4,
+   "id": "T44"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2619,
+   "class": "play",
+   "title": "A canonical ellipse with no equation",
+   "lines": [
+    "נתונה אליפסה קנונית"
+   ],
+   "lookFor": "Start: press «נקה הכל». The givens show «x²/a² + y²/b² = 1»; its size changes with «הציגו תצורה אחרת».",
+   "before": "Refused.",
+   "cycles": 2,
+   "id": "T45"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2619,
+   "class": "play",
+   "title": "The axis clause: major axis on y",
+   "lines": [
+    "נתונה אליפסה שהציר הגדול שלה הוא על ציר ה-y"
+   ],
+   "lookFor": "Start: press «נקה הכל». A tall ellipse at every configuration.",
+   "before": "Refused.",
+   "cycles": 3,
+   "id": "T46"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2619,
+   "class": "verified",
+   "title": "REFUSAL: the wrong axis on a fixed ellipse",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "הציר הגדול של האליפסה על ציר ה-y"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused (no configuration).",
+   "before": "Refused as not understood.",
+   "expectRefusal": "לא נמצאה תצורה",
+   "id": "T47"
+  },
+  {
+   "product": "analytic",
+   "base": "http://localhost:5304",
+   "path": "/analytic.html",
+   "section": "pr-2637",
+   "issue": 2616,
+   "class": "look",
+   "title": "The new asks: vertices, the distance between the foci, the major axis",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"
+   ],
+   "asks": [
+    "קודקודי האליפסה",
+    "המרחק בין המוקדים",
+    "אורך הציר הגדול"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «קודקודי האליפסה», «המרחק בין המוקדים», «אורך הציר הגדול» in the «שאלו» box. Answers: (±5, 0) and (0, ±3); 8; 10.",
+   "before": "Not understood.",
+   "id": "T48"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5305",
+   "path": "/3d.html",
+   "section": "pr-2638",
+   "issue": 1566,
+   "class": "play",
+   "title": "A guide example on an empty canvas loads what it needs",
+   "lines": [
+    "פירמידה ABCDS",
+    "גובה הפירמידה"
+   ],
+   "lookFor": "Start: press «נקה הכל». On an empty canvas open «מדריך» and click «גובה הפירמידה»: two rows appear, «פירמידה ABCDS» then «גובה הפירמידה», both green, with the height drawn.",
+   "before": "Refused.",
+   "id": "T49"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5305",
+   "path": "/3d.html",
+   "section": "pr-2638",
+   "issue": 1566,
+   "class": "look",
+   "title": "The common perpendicular on an empty canvas",
+   "lines": [
+    "הישר d מאונך לישר ℓ1 ולישר ℓ2"
+   ],
+   "lookFor": "Start: press «נקה הכל». d, ℓ1 and ℓ2 drawn; one green row; no notice.",
+   "before": "Refused: unknown line ℓ1.",
+   "id": "T50"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5305",
+   "path": "/3d.html",
+   "section": "pr-2638",
+   "issue": 1566,
+   "class": "play",
+   "title": "A pyramid by its volume and letters",
+   "lines": [
+    "נפח הפירמידה ABCDS = 11"
+   ],
+   "lookFor": "Start: press «נקה הכל». A pyramid drawn with the notice naming A, B, C, D, S; its volume is 11.",
+   "before": "Refused «אין בציור גוף «ABCDS»».",
+   "id": "T51"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5305",
+   "path": "/3d.html",
+   "section": "pr-2638",
+   "issue": 1566,
+   "class": "play",
+   "title": "REFUSAL: a second, contradicting volume",
+   "lines": [
+    "נפח הפירמידה ABCDS = 11",
+    "נפח הפירמידה ABCDS = 12"
+   ],
+   "lookFor": "Start: press «נקה הכל». The second line is refused «הטענה לא מתקיימת…»; the pyramid stays.",
+   "before": "The first line was already refused.",
+   "expectRefusal": "לא מתקיימת",
+   "id": "T52"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5305",
+   "path": "/3d.html",
+   "section": "pr-2638",
+   "issue": 1566,
+   "class": "play",
+   "title": "NOT ASKED FOR: a solid named by letters is created next to another figure",
+   "lines": [
+    "פירמידה SABCD",
+    "נפח הפירמידה WXYZ = 11"
+   ],
+   "lookFor": "Start: press «נקה הכל». A second solid, the tetrahedron WXYZ, appears with the notice. YOUR CALL: is that wanted, or should it be refused as before?",
+   "before": "Refused «אין בציור גוף «WXYZ»».",
+   "id": "T53"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5292",
+   "path": "/3d.html",
+   "section": "pr-2604",
+   "issue": 1188,
+   "class": "play",
+   "title": "REFUSAL: one free vector equal to two different cube edges is a contradiction",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "AB = p",
+    "AD = p"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused «הנתונים סותרים זה את זה — אין גוף שמקיים את «AD = p» יחד עם «AB = p»»; no \"tool limitation\" wording.",
+   "before": "«הכלי עדיין לא יודע לפתור… זו מגבלה של הכלי».",
+   "expectRefusal": "סותרים",
+   "id": "T54"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5292",
+   "path": "/3d.html",
+   "section": "pr-2604",
+   "issue": 1188,
+   "class": "look",
+   "title": "A free vector makes a quadrilateral base a parallelogram",
+   "lines": [
+    "פירמידה SABCD שבסיסה מרובע",
+    "וקטור p",
+    "AB = p",
+    "DC = p"
+   ],
+   "lookFor": "Start: press «נקה הכל». All lines accepted; the base becomes a parallelogram, with the note «בגלל הנתונים, ABCD הוגבל ממרובע למקבילית»; it stays one under «הציגו תצורה אחרת». (Wording to judge: this refusal reads «אין גוף שמקיים…», while the twin with p named by an edge still says «בדקו את החישוב».)",
+   "before": "«DC = p» refused as a tool limitation.",
+   "cycles": 2,
+   "id": "T55"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5292",
+   "path": "/3d.html",
+   "section": "pr-2604",
+   "issue": 1188,
+   "class": "verified",
+   "title": "«AB = p + q» still builds",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "וקטור q",
+    "AB = p + q"
+   ],
+   "lookFor": "Start: press «נקה הכל». All lines accepted.",
+   "before": "Unchanged.",
+   "id": "T56"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5292",
+   "path": "/3d.html",
+   "section": "pr-2604",
+   "issue": 1188,
+   "class": "verified",
+   "title": "REFUSAL: a ratio letter on a free vector is still the tool's limit",
+   "lines": [
+    "וקטור p",
+    "A(0,0,0)",
+    "AE = t·p"
+   ],
+   "lookFor": "Start: press «נקה הכל». The tool-limitation sentence, quoting «AE = t·p» (#2603).",
+   "before": "Unchanged.",
+   "expectRefusal": "מגבלה של הכלי",
+   "id": "T57"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "«AD = 3BD» builds with no question (only the length reading can hold)",
+   "lines": [
+    "משולש ABC",
+    "D על AB",
+    "AD = 3BD"
+   ],
+   "lookFor": "Start: press «נקה הכל». D at ¾ of AB; no question; no arrows.",
+   "before": "Refused «הטענה לא מתקיימת».",
+   "id": "T58"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "«AB = 4DA» builds with no question",
+   "lines": [
+    "משולש ABC",
+    "D על AB",
+    "AB = 4DA"
+   ],
+   "lookFor": "Start: press «נקה הכל». D at ¼ of AB from A; no question.",
+   "before": "The first cut of this PR asked.",
+   "id": "T59"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "A midpoint statement builds",
+   "lines": [
+    "פירמידה SABCD",
+    "M אמצע BC",
+    "SM = 2SA"
+   ],
+   "lookFor": "Start: press «נקה הכל». Builds as lengths; no question.",
+   "before": "Refused.",
+   "id": "T60"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "An edge point placed by a length (reverses card 11 for this case)",
+   "lines": [
+    "מקבילון ABCDA'B'C'D'",
+    "E על AA'",
+    "AE = AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». E on AA' with AE as long as AB; no question.",
+   "before": "Asked length-or-vector.",
+   "id": "T61"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "A restated ratio is already known",
+   "lines": [
+    "מקבילון ABCDA'B'C'D'",
+    "E על AA' כך ש-AE = 2EA'",
+    "AE = 2EA'"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line answers «זה כבר קיים באיור» and adds no row (two rows stay).",
+   "before": "It was added silently.",
+   "id": "T62"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "Both vectors drawn as arrows",
+   "lines": [
+    "BE = EC"
+   ],
+   "lookFor": "Start: press «נקה הכל». Arrowheads on both BE and EC.",
+   "before": "Only EB drawn, with no arrows (you failed this case last round).",
+   "id": "T63"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "NEEDS A RULING: neither reading can hold, so it still asks",
+   "lines": [
+    "פירמידה SABCD",
+    "AB = 1AC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The length-or-vector question; nothing added. In a regular pyramid AB (a side) never equals AC (a diagonal). Your rule covered \"only one\" and \"both\"; should \"neither\" refuse as a contradiction instead?",
+   "before": "Refused «הטענה לא מתקיימת».",
+   "expectRefusal": "לווקטור או לאורך",
+   "id": "T64"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "REFUSAL: both readings fit and differ, so it asks",
+   "lines": [
+    "מרובע ABCD",
+    "AB = DC"
+   ],
+   "lookFor": "Start: press «נקה הכל». The length-or-vector question; nothing added.",
+   "before": "Unchanged.",
+   "expectRefusal": "לווקטור או לאורך",
+   "id": "T65"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "A knock-on of your rule: «תיבה · AA'=3BC» now builds",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AA'=3BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». It builds as lengths, with no question. Your 17 Sep ruling had it ask and teach; under the new rule only the length reading can hold.",
+   "before": "Asked length-or-vector.",
+   "id": "T66"
+  }
+ ]
+}

@@ -106,9 +106,11 @@ describe('#766 — the definite noun resolves against the DECLARED figure', () =
     expect(r.committed, 'the tool must not agree that the pyramid has zero volume').toBe(false);
   });
 
+  // ⚠ RE-BASED by #1566 (ADR-3D-399; #2048 ruling A, S2(c)): a solid NOUN with letters the figure lacks now creates that
+  // solid («נפח הפירמידה WXYZ» → tetrahedron WXYZ, with the notice); a noun that names no family still refuses.
   it('letters naming NO declared solid refuse, naming the student’s statement', () => {
     expect(submit(PYRAMID).committed).toBe(true);
-    const r = submit('נפח הפירמידה WXYZ = 11');
+    const r = submit('נפח הגוף WXYZ = 11');
     expect(r.committed).toBe(false);
     expect(r.error).toEqual({ code: 'no-such-solid', id: 'WXYZ' });
   });

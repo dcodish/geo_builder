@@ -381,16 +381,19 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   statement the figure cannot satisfy is refused. The input strip previews a marked line's notation
   (`DC⃗ = 3AB⃗`) before commit, only for a line the student marked.
   **An unmarked segment equation is read by what it does to the figure, with or without a coefficient** (one
-  reading for «AB = AC» and «AB = 1·AC», [ADR-3D-391](06b-decisions-3d.md#adr-3d-391) and its Am. 1). One that
+  reading for «AB = AC» and «AB = 1·AC», [ADR-3D-391](06b-decisions-3d.md#adr-3d-391) and its Am. 1, Am. 2). One that
   defines a new point («AK = AD», «A'K = 4/5 DN», «BE = EC» on an empty canvas) is a vector. Otherwise the tool asks
   «length or vector?» **only when both readings can hold and give different figures** («מרובע ABCD» · «AB = DC»):
   where only one reading can hold it takes that one and builds, with no question («D על AB» · «AD = 3BD» and
   «AB = 4DA» as lengths; «משולש ABC» · «AB = AC»; a midpoint's «SM = 2SA»; «E על AA'» · «AE = AB»); where both
-  give one figure it builds («AD = 3DB»); where neither can hold it asks. A line the figure already states
+  give one figure it builds («AD = 3DB»); where the vector reading cannot hold the sentence is a length statement
+  even if the length reading cannot hold either, and then it gets the length statement's own verdict (a
+  contradiction naming it), never the question («פירמידה SABCD» · «AB = 1AC»). A line read as lengths shows in the
+  fact list in the length spelling, «|AA'| = 3|BC|» for «AA'=3BC»; a line read as vectors keeps its arrows. A line the figure already states
   («E על AA' כך ש-AE = 2EA'» · «AE = 2EA'», «M אמצע BC» · «BM = MC») answers «זה כבר קיים באיור» and adds no row.
   A vector reading draws every vector of the sentence as an arrow («BE = EC»: BE and EC). An unmarked statement
   over a point on a segment is never refuted as the student's arithmetic.
-  - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255, ADR-3D-391 (and Am. 1); #1183, #1185, #1194, #1195, #1312, #1680, #1783; operator rulings 2026-10-04 and 2026-10-13 on #1680, and 2026-10-30 on PR #2605.
+  - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255, ADR-3D-391 (and Am. 1, Am. 2); #1183, #1185, #1194, #1195, #1312, #1680, #1783; operator rulings 2026-10-04 and 2026-10-13 on #1680, and 2026-10-30 on PR #2605 (T36; T64, T66).
 - **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
@@ -408,10 +411,26 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   configuration; the ask lane answers «u» and «|u|» on the same terms. A name means one thing: a free vector's name
   cannot also name an anchored vector («נסמן: AB = u»), a line or a plane, in either order; a component restated
   with another number is refused naming both lines. A free vector is never part of the named basis (`need-basis`
-  counts the anchored vectors only). **Not yet** (refused honestly as the tool's limit, naming the statement — never
-  «בדקו את החישוב» and never "u is not declared"): a combination that contains a free vector («w = u + v», «p = 2u»,
-  an affine component), #1188 step 2; the head-to-tail drawing of a stated sum, step 3; a magnitude, angle, ⟂, ∥ or
-  dot product on a free vector («|u| = 5», «u ⟂ v»), step 4.
+  counts the anchored vectors only). **Combinations** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390)): a linear
+  combination DEFINES a new vector («w = u + v», «w = 2u - 3v», «u + v = w», «p = ½u»), and an equation among existing
+  vectors is a given the tool solves («u = (k,1,2)», «v = (1,1,1)», «w = (3,2,3)», «w = u + v» gives k = 2),
+  whatever order the givens come in once the vectors are declared; a component may be an expression in a letter («u = (k-1, 2, k)»), which «k = 3» then values. Stating a
+  combination moves nothing already drawn; what the givens leave free still moves with «הציגו תצורה אחרת»; givens
+  that cannot all hold are refused naming the lines. A free vector may be equated to an arrow of the figure («p = 2u»
+  on a «נסמן» u; «AB = p», which pins AB when p's components are stated) and may define a point («AE = p»). **A stated
+  combination is drawn head to tail** (operator, 2026-10-06): u, then a faded copy of v starting at u's head, and
+  w = u + v closing the triangle; every combination follows the same rule (2u − v: faded copies of 2u and −v,
+  chained), and a sum of three terms closes the polygon. The copies are drawing only — never a vector, never data.
+  The data panel lists a definition in vector notation («w = u + v»), and the ask lane answers «u + v», «2u - 3v»,
+  «|u - v|» when the value is known. **Two statements about one free vector that together relate the figure's own
+  vectors** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390) Am. 1, operator ruling 2026-10-30): with the free vector
+  eliminated, what remains is a relation on the figure, answered exactly as that relation written directly — «וקטור p ·
+  AB = p · AD = p» on a cube is refused as a contradiction naming «AD = p» and «AB = p»; «AB = p · DC = p» is already
+  true on a cube and drives a parallelogram on a figure free to become one. **Not yet** (refused honestly as the tool's
+  limit, naming the statement — never «בדקו את החישוב» and never "u is not declared"): a statement that would make the
+  figure and a free vector one joint solve, undecidable without solving both together («AE = t·p»; a span point over
+  a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
+  product on a free vector («|u| = 5», «u ⟂ v»), #1188 step 4.
   - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
@@ -714,13 +733,27 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «פירמידה SABCD» binds), and named by the shared notice «נוצרה נקודה חדשה X — אם זו טעות הקלדה, לחצו ✕ לביטול
   השורה» whose ✕ removes the line. A line that still fails creates nothing and says its real reason; a line that
   only declares («קטע QZ», a solid) announces nothing; «אלכסון AB» with no solid stays refused (#978).
-  - Sources: ADR-3D-382, ADR-W-162; #1467, #2048.
+  **A solid named by its letters is created too** (#2048 S2(c)): «נפח הפירמידה ABCDS = 11» on an empty canvas
+  creates pyramid ABCDS as «פירמידה ABCDS» declares it, of volume 11, and the notice names its points; the same for
+  every solid noun whose declaration the grammar reads (cube, box, tetrahedron, a four-letter pyramid). On a figure, new letters create their solid the same way, with the notice. «נפח הגוף
+  ABCDE» names no family and stays refused. A later line that contradicts the created solid is refused as the
+  contradiction, never «no such solid».
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-W-162; #1467, #2048, #1566.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two
   new lines in one sentence — and in English. A line declared anywhere in the list is used first; a name the
   declaration refuses (a vector's) is refused as the declaration refuses it. No notice: the new row is the signal.
-  - Sources: ADR-3D-383, ADR-W-163; #2489.
+  This holds in every slot that names a line, the common perpendicular's two included: «הישר d מאונך לישר ℓ1 ולישר
+  ℓ2» on an empty canvas creates ℓ1 and ℓ2 and draws d (#1566).
+  - Sources: ADR-3D-383, ADR-3D-399, ADR-W-163; #2489, #1566.
+- **FR-SP-27 (Must)** — **Every guide example builds on an empty canvas.** A click on a guide example submits it; when
+  the canvas is empty and the example has nothing it could create — a free-vector line («|u|=|v|=1»), a role noun
+  («גובה הפירמידה», «המנסרה ישרה»), a value for a letter («α = 70»), a solid's own element («אלכסון BD'») or a cone's
+  size — the click first submits the line it needs («פירמידה ABCDS», «∠BAC = α», «קובייה ABCDA'B'C'D'»), each as its
+  own row, then the example. On a canvas that already holds a figure the click submits the example alone. The
+  examples that still fail on an empty canvas are each owned by a named open issue, and their number only goes down.
+  - Sources: ADR-3D-398; #1566, #2048 (card d6), the operator's ruling of 2026-10-30 (3A).
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

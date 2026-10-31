@@ -56,7 +56,7 @@ describe('#1649 — analytic gives 2-D’s verdict on every plane-geometry parit
   }, 120_000);
 
   it('every construction sentence of the analytic catalog is a parity step, a topic exception, or on the shrinking allowlist', () => {
-    const sentences = COMMAND_CATALOG_ANALYTIC.filter((e) => e.lane !== 'rewrite').map((e) => e.he);
+    const sentences = COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane).map((e) => e.he); // #1177: the construction lane only
     expect(catalogCoverageFaults('analytic', sentences)).toEqual([]);
   });
 });

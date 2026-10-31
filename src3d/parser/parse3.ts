@@ -1221,6 +1221,28 @@ const solidNounOf = (word: string | undefined, en: boolean): SolidNoun | null =>
   }
   return null;
 };
+/**
+ * #1566 ([ADR-3D-399](../../docs/06b-decisions-3d.md#adr-3d-399)) — WHAT A SOLID NOUN DECLARES over a letter run: the
+ * commands its bare declaration lowers to («הפירמידה ABCDS» → what «פירמידה ABCDS» builds). The mint pass applies them
+ * when a line names a solid by its letters that the figure lacks (#2048 ruling A, S2(c)). It reads the declaration
+ * through this parser, so a noun means here exactly what the student typing «פירמידה ABCDS» gets — one reader of
+ * noun → kind. A run the declaration grammar does not read («מנסרה ABCDEF») declares nothing and stays refused.
+ */
+const SOLID_DECLARATION_HE: Record<Exclude<SolidNoun, 'any'>, string> = {
+  pyramid: 'פירמידה',
+  tetra: 'טטראדר',
+  cube: 'קובייה',
+  box: 'תיבה',
+  prism: 'מנסרה',
+};
+export function solidDeclaration3(noun: Exclude<SolidNoun, 'any'>, ids: readonly Id[]): Command3[] | null {
+  const r = parse3(`${SOLID_DECLARATION_HE[noun]} ${ids.join('')}`);
+  if (!r.ok || r.commands.length === 0 || !r.commands.every((k) => k.type === 'solid')) return null;
+  // the declaration must be OVER the run the student named (a short cube run is completed with primes, which is the
+  // same solid; a declaration whose letters miss one of the run's would be a different object)
+  const declared = new Set(r.commands.flatMap((k) => (k.type === 'solid' ? k.ids : [])));
+  return ids.every((x) => declared.has(x)) ? r.commands : null;
+}
 const NOUN_HE = SOLID_NOUNS_HE.map(([src]) => src).join('|');
 export const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
 

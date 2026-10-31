@@ -125,14 +125,14 @@ catalog carries it.
 | **F3** | Line by equation | `נתון הישר ℓ1: 4y−3x−20=0` · `משוואת הישר AC היא y=−2x+8` | `line l1: 4y−3x−20=0` |
 | **F4** | Line by construction | `D היא נקודת החיתוך של הישר AC עם ציר ה-y` · `דרך A העבירו ישר המקביל לציר ה-x` | `through A draw a line parallel to the x-axis` |
 | **F5** | Circle | `נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9` · `מעגל שמרכזו F העובר דרך B` · `… ומרכזו בנקודה K` · `מרכז המעגל I הוא K` · `K ו-L מרכזי המעגלים I ו-II בהתאמה` · `מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …` · `שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, …` · `אורכו של הקטע המחבר את מרכזי המעגלים הוא 9` (ADR-AG-315) | `circle centred M through B` · `circle I with equation … and centre K` · `the distance between the centres is 9` |
-| **F6** | Conic (canonical only, R174) | `נתונה פרבולה קנונית שמשוואתה y²=54x` · `אורך הציר הראשי של האליפסה הוא 4t` | `canonical parabola y²=54x` |
-| **F7** | Role | `F1 הוא המוקד הימני של האליפסה` · `AC הוא קוטר במעגל` | `AC is a diameter of the circle` |
+| **F6** | Conic (canonical only, R174) | `נתונה פרבולה קנונית שמשוואתה y²=54x` · `אורך הציר הראשי של האליפסה הוא 4t` · `נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x` (R202, R203) | `canonical parabola y²=54x` · `a canonical ellipse whose major axis is on the x-axis` |
+| **F7** | Role | `F1 הוא המוקד הימני של האליפסה` (built, R201) · `AC הוא קוטר במעגל` | `AC is a diameter of the circle` · `F1 is the right focus of the ellipse` |
 | **F8** | Tangency | `הישר y=x משיק למעגל` · `שני מעגלים המשיקים זה לזה מבחוץ` | `the tangent to the circle at A` |
 | **F9** | Mutual position | `הישר BM מאונך לציר ה-x` · `AC מקביל ל-MB` | `BM is perpendicular to the x-axis` |
 | **F10** | Metric given | `AB = 4√5` · `שטח המשולש KLM הוא 9` | `the ratio of the radii is 1:2` |
 | **F11** | Parameter declaration (a domain, not a constraint) | `a הוא פרמטר חיובי` · `0<k<6` | `a is a positive parameter` |
 | **F12** | Curve edit (affine) | `מזיזים את המעגל ב-9 יחידות ימינה ו-12 יחידות למטה` | `translate the circle 9 right and 12 down` |
-| **F13** | Locus: **asked, not stated** (R87, [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072)) | `המקום הגיאומטרי של P` · `משוואת המקום הגיאומטרי של P` | `the locus of P` |
+| **F13** | Locus: **asked, not stated**; reached by typing, by the chip beside its point, or by the guide row (R87, R200, [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072), [ADR-AG-352](06c-decisions-analytic.md#adr-ag-352)) | `המקום הגיאומטרי של P` · `משוואת המקום הגיאומטרי של P` | `the locus of P` |
 | **F14** | Branch selector / sweep range | `שיעור ה-y של B קטן מ-6` | `the y-coordinate of B is less than 6` |
 | **F15** | Ask (the data panel's lane, R23) | `משוואת BD` · `\|AB\|` · `שטח ABC` | `equation of BD` |
 
@@ -265,7 +265,8 @@ From the «lines and points» corpus (§8), numbered onward.
 **R53 — a point can be placed ON an object, and the NOUN says whether that is bounded**. Either way `D` has one DOF and moves under «הציגו תצורה אחרת»; a bound consumes no freedom. A point already placed off the object is refused.
 - «D על הצלע BC», «D על הקטע BC» → between B and C
 - «D על הישר BC» → anywhere on the line
-- Sources: ADR-AG-029.
+- Placing it leaves every point an earlier line drew where it was, at every configuration, and «הציגו תצורה אחרת» reaches as many configurations of the earlier figure as before. The same holds for a named cevian's foot («AD גובה / תיכון לצלע BC», «AD חוצה זווית A») and a named crossing («M מפגש AC ו-BD»). A sentence that constrains the earlier figure itself («AB=5» on a free triangle) still changes it. *(#1687, 2-D's behaviour measured at `216cf8bb`; operator ruling 2026-10-30, option A.)*
+- Sources: ADR-AG-029, ADR-AG-348.
 
 **R58 — a point can be placed in a QUADRANT**. A REGION: the point keeps both degrees of freedom and moves inside it; a point placed elsewhere is refused.
 - «C ברביע השלישי», «C is in the third quadrant»
@@ -393,6 +394,16 @@ From the «lines and points» corpus (§8), numbered onward.
 - «נתון מעגל O שרדיוסו 5», «היקף המשולש ABC הוא 12»
 - «מוקד הפרבולה הוא (2,0)» → pins the parabola
 - Sources: #1432, ADR-AG-169. Numbered R122 until #2404 (the id was defined twice).
+- **⚠ Amended by R201–R202 ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), 2026-10-30):** the ellipse's foci, vertices and sizes are sayable and askable too, and «R=5» / «r=5» pin the letter when the figure's circle is written with it («שרדיוסו r»); beside a circle whose radius is the tool's own symbol («נתון מעגל O») they stay not a given.
+
+**R201 — an ellipse's foci and vertices can be named, given and asked**. *(Operator, 2026-10-30 on #2616: "1 - yes - now we need to build all capabilities"; Q1 → A, Q2 → A of the same day.)* «F1 הוא המוקד הימני של האליפסה», «F המוקד התחתון של האליפסה», «F מוקד האליפסה», «F1 ו-F2 מוקדי האליפסה», «מוקדי האליפסה הם A ו-C», «A הקודקוד הימני של האליפסה», «A הוא הקצה הימני של הציר הגדול», each in every copula order and in English ("F1 is the right focus of the ellipse"), draw the student's letter at that point. A side word («הימני / השמאלי / העליון / התחתון») of a focus or of an end of the major axis puts the major axis on that axis in every configuration. A focus or vertex with no side, and which of F1 / F2 is which, are choices «הציגו תצורה אחרת» cycles, and the note does not name the choice. A coordinate focus («מוקד האליפסה הוא (√10,0)», «אחד מהמוקדים שלה הוא בנקודה (√10,0)») puts a tool-named point there and pins a parameterised ellipse; on a fixed ellipse a focus or vertex it does not have is refused as unsatisfiable. A sentence that mentions a focus or vertex without a letter («מרחק המוקד הימני מהקודקוד הימני הוא 1», «מרחק A מהמוקד השמאלי גדול פי 5 ממרחק A מהמוקד הימני») is accepted and draws nothing new. The ask answers «קודקודי האליפסה», «המוקד הימני של האליפסה», «הקודקוד הימני», «שיעורי המוקד התחתון» on a known ellipse (null on a parameterised one, and null for a side the ellipse's foci are not on).
+- Sources: #2616, ADR-AG-353 (supersedes ADR-AG-169 Am. 1's ellipse "not built").
+
+**R202 — an ellipse's sizes are givens and asks; a one-letter equation pins that letter; an ellipse's semi-axis letters are positive**. *(Operator, 2026-10-30 on #2617: "now we need to build all capabilities"; R191's ruling for the sign.)* «הצירים שלה הם 12 ו-8» (the larger is the major axis), «הציר הגדול / הקטן שלה הוא N», «אורך הציר הגדול / הקטן / הראשי של האליפסה הוא N», «המרחק בין המוקדים הוא 10» and «סכום המרחקים של הנקודה A משני המוקדים של האליפסה הוא 20», alone or two joined by «ו», set the ellipse: on a parameterised one they pin it; on a fixed one a true size is «כבר נובע» and a false one is refused as unsatisfiable. When a size is given and no sentence says where the major axis is, the first drawing puts it on x and «הציגו תצורה אחרת» reaches y. «a = 6», «2a = 12», «a^2 = 36», «c = √10», «p = 4», «r = 5» pin a letter the figure uses; a letter it does not use stays not understood. The letters of an ellipse's semi-axes («x²/a² + y²/b² = 1», «b²x² + a²y² = a²b²», «x²/a + y²/b = 1») are positive: «a^2 = 36» gives a = 6, and «a > b» puts the major axis on x in every configuration. The ask answers «אורך הציר הגדול», «הציר הקטן של האליפסה», «צירי האליפסה», «המרחק בין המוקדים».
+- Sources: #2617, ADR-AG-353.
+
+**R203 — a canonical curve can be stated with no equation, and an ellipse's major axis can be put on an axis**. *(Operator, 2026-10-30 on #2619: "now we need to build all capabilities"; Q1 → A: the book's letters, shown in the givens.)* «נתונה אליפסה קנונית», «נתונה האליפסה הקנונית», «נתונה אליפסה שציריה הם צירי השיעורים» ("a canonical ellipse") draw x²/a² + y²/b² = 1 with a and b free and positive (a letter the figure already uses is replaced by the next free one); «נתון מעגל קנוני», «נתון מעגל שמרכזו בראשית הצירים», «… שמרכזו בנקודה (0,0)» draw x² + y² = R² on the origin. «שהציר הגדול שלה (הוא) על ציר ה-x / ה-y» after any ellipse declaration (with or without its equation, «נתונה אליפסה שהציר הגדול שלה הוא על ציר ה-y» included), and «הציר הגדול של האליפסה (נמצא) על ציר ה-y» as its own sentence, keep the major axis there in every configuration; on a fixed ellipse whose major axis is the other one it is refused as unsatisfiable. The sizes move under «הציגו תצורה אחרת».
+- Sources: #2619 parts A and B, ADR-AG-354. Parts C (a curve introduced inside a relation) and D (the through-list and «היא») are #2619's remainder.
 
 **R122 — two circles can be stated tangent, and which touch is a configuration until the student says**. Sum or difference of radii, cycled by «הציגו תצורה אחרת» until «מבחוץ»/«מבפנים» pins it; concentric circles are never tangent (operator ruling). A circle named by its centre letter is the circle the figure already has on that centre: its given radius stays its radius, and no free radius is added beside it (ADR-AG-305). Either circle may be given by its EQUATION («(x−a)²+y²=r²», «מעגל I ומעגל II משיקים מבחוץ»): its centre and radius are read off the equation, so the touch pins the equation's parameters; two equation circles with one centre are refused like any concentric pair; a circle computed from points is still refused by name (ADR-AG-306).
 - «נתון מעגל I שמשוואתו (x−a)²+y²=r²» · «נתון מעגל II שמשוואתו (x−13)²+y²=(2r)²» · «המעגלים משיקים מבחוץ»
@@ -442,6 +453,13 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R132 amendment — tangents FROM a point, in every spelling 2-D reads**. Unnamed touch points are T then S; a point inside the circle is refused.
 - «מנקודה P יוצאים שני משיקים למעגל»
 - Sources: ADR-AG-233, #1430.
+- **Amended by R204 (#2618, ADR-AG-355, 2026-10-30):** the tangent at a named point, the tangent object and its equation, tangency with no touch point and «דרך P עובר משיק …» are read about the ellipse and the parabola too; the touch is perpendicular to the curve's normal (on a circle, the radius).
+
+**R204 — the circle's relations, about the ellipse and the parabola**. *(Operator, 2026-10-30, #2618: "now we need to build all capabilities"; the diameter per his ruling of the same day (Q3): "there is a קוטר and we need to support it. when drawing it, like in circle, there is dof as to where it is exactly".)* A polygon inscribed in the ellipse or the parabola has every vertex on it, as «A, B, C ו-D נמצאות על האליפסה» draws it; a ring the curve cannot carry (a rhombus on a parabola) is refused as that sentence is. A chord has its two ends on the curve. A diameter of the ellipse is a chord through its centre, its direction left free. A line touches the ellipse or the parabola with no point named (pinning its parameter, each value in its own configuration; a line that cannot touch is refused), at a named point (on the curve, perpendicular to the normal there), as the tangent object «המשיק לאליפסה בנקודה A» and its equation, and from a point. «קודקודי ה<noun> … נמצאים על …» is the inscribed sentence on every curve, the circle included. «AB קוטר בפרבולה» is not read (#2625); a circle touching a conic, and a circle inscribed in or around one, are not this requirement.
+- «מעוין ABCD חסום באליפסה», «באליפסה חסום מלבן ABCD», «האליפסה חוסמת את המשולש ABC», «קודקודי המעוין ABCD נמצאים על האליפסה / על המעגל»; "rhombus ABCD is inscribed in the ellipse", "the vertices of rectangle ABCD lie on the ellipse"
+- «AB מיתר באליפסה», «AB מיתר בפרבולה»; «AB קוטר באליפסה», «AB קוטר של האליפסה»; "AB is a diameter of the ellipse"
+- «הישר y=kx+3 משיק לאליפסה» → k = ±1 on x²/6+y²/3=1, cycled; «הישר AB משיק לפרבולה בנקודה A»; «משוואת המשיק לאליפסה בנקודה A היא x+2y=4»; «דרך P עובר משיק לאליפסה»
+- Sources: ADR-AG-355, #2618.
 
 **R133 — «המעגל» is the circle the figure has**. *(Operator: "The student stated ONE circle twice.")* With two or more circles «המעגל» is refused as ambiguous.
 - «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» → one circle, M at (3,1)
@@ -821,7 +839,8 @@ a sentence the tool parsed.
 - «נתונה אליפסה שמשוואתה x²+a·y²=1»
 - Sources: ADR-AG-005.
 
-**R18 — The DOF cue is visible**, as in the siblings («דרגות חופש: 1»). **OPEN:** passive reporting only, or may the tool prompt?
+**R18 — The DOF cue is visible**, as in the siblings («דרגות חופש: 1»). **It reports only; it invites nothing** (operator ruling D4 = A, 2026-10-26, #1177). The locus chip (R200) is the one invitation.
+- Sources: #1177, ADR-AG-352.
 
 ### Choosing and cycling configurations
 
@@ -831,7 +850,8 @@ a sentence the tool parsed.
 **R192 — a free parameter and a free point range across the stated figure**. *(Operator ruling 2026-10-20 on #2426: up to 1.5× the largest number stated, 2-D's rule.)* A parameter or a free point that no given reaches is drawn, over «הציגו תצורה אחרת», up to 1.5× the largest number the construction states (never less than today's 1 to 4); the first drawing is the one it always was, and anything a given solves is drawn as before.
 - «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)» → M is drawn beyond N (a > 13) and before it; «M(a,0)» · «N(130,0)» → |a| up to about 195
 - «N(13,0)» · «נקודה M» → M reaches the origin's side
-- Sources: ADR-AG-324, #2426 (round #2414 T9).
+- "Reaches" means a given that places the point itself. A later line that only names it as an anchor («D על BC» names C) does not change its range (R53).
+- Sources: ADR-AG-324, #2426 (round #2414 T9); ADR-AG-348.
 
 **R191 — a letter that stands for a size is positive**. *(Operator ruling 2026-10-20 on #2419: "r for radius like any letter represending size needs to be positive".)* A circle's radius however it is written (by its centre «שרדיוסו r», a positive multiple «שרדיוסו 2r», squared in its equation «(x−a)²+y²=r²», «x²+y²=4r²», «R²»), and a length, a distance, a perimeter or an area valued by a letter or a positive multiple of one («AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «היקף המשולש ABC הוא k», «שטח המשולש ABC הוא k»): the letter's row reads «0 < r» while it is open, and only its positive values are configurations. «r > 0» typed after it is already known.
 - «x²+y²=r²» · «A(3,4)» · «A על המעגל» → «r = 5» (not «r = −5 או 5»); Q2 in the exam's own form → r = 3, R = 6, one equation per circle
@@ -903,6 +923,10 @@ a sentence the tool parsed.
 - «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → refused, naming E, exactly as without «נקודה Q»
 - the line that FORCES the coincidence is refused too, with the figure still free: «A(0,0)» · «D(0,4)» · «F(4,2)» · «נקודה E» · «P נקודת החיתוך של הישר AD עם הישר EF» (drawn) · «E על ציר ה-y» → refused
 - a crossing genuinely free to move off the point it sits on still records — unless no configuration CAN separate them, which is the next member
+- **two lines that are ONE LINE in the figure drawn have no crossing, whatever their spelling** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613; operator ruling 2026-10-30, Q1 → A): the crossing sentence is refused with the same sentence as a line written twice («שני הישרים במשפט «…» הם אותו ישר…»). A configuration where they coincide is never a position of the figure: the solve does not choose it, and a locus never draws it.
+  - «נתונה אליפסה שמשוואתה x^2/16+y^2/12=1» · «P(4,0)» · «האנך מ-P לציר ה-x חותך אותו בנקודה N» · «O ראשית הצירים» · «דרך N עובר ישר l1 מקביל ל-PO» · «דרך P עובר ישר l2 מקביל לציר ה-x» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused
+  - «P נקודה על האליפסה» · «דרך P עובר ישר l2 מקביל לציר ה-y» · «דרך O עובר ישר l1 מקביל לציר ה-y» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused (P is never moved onto the vertex to make them meet)
+  - with «P נקודה על האליפסה», the same construction records, and «המקום הגיאומטרי של M» is «אליפסה · x²/64 + y²/12 = 1» alone (R87)
 - **a third crossing asked of a line through two points already on the circle is refused, in the ruled sentence** ([ADR-AG-271](06c-decisions-analytic.md#adr-ag-271), #1893; #1834's ruling): «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.», with the student's letters. The two points are on the circle by construction (a stated incidence, a defining point of a computed circle — never an incircle's ring vertex) or are fixed points on a fixed circle. **The same for a parabola and an ellipse** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909; the 2026-10-08 ruling *"Yes, same sentence"*), with the curve's noun: «AC כבר חותך את הפרבולה ב-A וב-C — לישר אין נקודת חיתוך שלישית עם הפרבולה.» (likewise «…האליפסה…»).
   - «מעגל O» · «A על מעגל O» · «C על מעגל O» · «AC חותך את המעגל בנקודה E» → refused, at every configuration
   - every spelling: «הישר / המיתר / המשך AC», «בנקודות A ו-E», «AB קוטר», an inscribed triangle, the circle through A, B and C, an existing D, «P על AC» · «P על מעגל O» in either order; in the other order the line refused is the one that completes it («C על מעגל O»)
@@ -916,7 +940,7 @@ a sentence the tool parsed.
   - «y^2=4x» · «A(1,2)» · «P(10,0)» · «AP חותך את הפרבולה בנקודה E» → records, E = (100,−20); with P(7,0), E = (49,−14)
   - every spelling of that sentence reads the same: «הישר AP», «PA», «AO», «E נקודת החיתוך (האחרת) של הישר AP עם המעגל», «E על הישר AP» · «E על המעגל», and a line given by its equation («נתון הישר l1: y=x+1» → E = (−4,−3))
   - still refused: «הקטע AP חותך את המעגל בנקודה E» and «E על AP» · «E על המעגל» (a bare pair is the segment, R60's own reading / ADR-AG-248) — that piece reaches the circle only at A
-- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924.
+- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924, ADR-AG-349, #2613.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»
@@ -1006,9 +1030,10 @@ a sentence the tool parsed.
 - Sources: ADR-AG-046.
 
 **R94 — a value the student stated exactly is DISPLAYED exactly**. Small rationals and simple radicals (p/q·√n), where the value is knowledge; a decimal the student typed stays theirs (#723). *(Operator ruling 2026-10-20 on #2394: exact forms everywhere, as 2-D.)* A standalone value — a parameter, a length, a coordinate, an answer — prints its radical; an equation's coefficients do not (ADR-AG-085).
+- **A conic's equation clears its fractions** (#2614, operator 2026-10-30): an ellipse with a fractional a² or b² reads as a whole-number equation, «4x² + 9y² = 45» for x²/(45/4) + y²/5 = 1 (whole-number a², b² keep «x²/a² + y²/b² = 1»); a parabola reads `2y² = 5x`, never `y² = 5/2x` — in the panel, the ask, the locus row and its canvas label (ADR-AG-357)
 - slope of «y=(4/3)x» → `4/3`, not `1.33`; m of a common tangent → `√2/4`, not `0.35`; a length «√10 או √34», not «3.16 או 5.83»; `1.41x + y = 0` stays
 - **Tied parameters read as ONE row** (#2394): when each value of one parameter comes with one value of another, «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]», the drawn configuration bracketed as the point rows bracket it
-- Sources: #1120, #723, #2394, ADR-AG-304.
+- Sources: #1120, #723, #2394, ADR-AG-304, #2614, ADR-AG-357.
 
 **R99 — a panel heading names what the rows ARE, in the student's own word**. A heading is a promise about its rows.
 - «משוואות» / «Equations», not «עקומים» (`kind: 'curve'`)
@@ -1126,10 +1151,25 @@ a sentence the tool parsed.
 - clicking a point → its coordinates and its distance to each named line, drawn as a perpendicular
 - Sources: ADR-AG-066, ADR-AG-067.
 
-**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated.** The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). The locus question is **one question however the exam words it** — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» answer the same row (ADR-AG-341). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
+**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated**: there are two ways in and one grammar, the typed question and the chip beside the point (R200). The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). The locus question is **one question however the exam words it** — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» answer the same row (ADR-AG-341). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
 - «נקודה P» · «PA מאונך ל-PB» · «המקום הגיאומטרי של P» → trace, kind, equation
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
-- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138.
+- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138, ADR-AG-352.
+- **Amended by R199 (ADR-AG-351):** the equation also prints when the set varies with the student's letters in a way the tool can state and verify.
+
+**R199 — a locus that moves with the student's letters is written in those letters**. *(Operator, round #1181 T26: "the shape still doesnt have the a shown"; PR #1341 T16: "it would be nice if the locus would show x-4a=0"; ruling 11A, 2026-10-30: two letters, so the book's p10-9 answers x²/(4a²) + y²/b² = 1.)* When a single-component locus is the same family at every configuration and each of its canonical parameters (a line's coefficients, a circle's centre and r², a parabola's 2p, an ellipse's a² and b²) is a constant times a power of at most two of the student's letters (total degree ≤ 2), the row prints that equation in the letters, the same at every «הציגו תצורה אחרת» — after the tool has checked it against the traced curve at every configuration it sampled. Anything else (a dependence like `a + 1`, three letters, a union) keeps the kind alone. The kind of such a locus is named at every configuration, never at some and not others (#2608).
+- «A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB» → «מעגל · (x − 16a)² + y² = (25a)²»
+- «A(0,0)» · «B(8a,0)» · «נקודה M» · «MA = MB» → «ישר · x - 4a = 0»
+- «A(a,0)» · «נקודה M» · «MA = 3» → «מעגל · (x − a)² + y² = 3²» at every configuration
+- «A(a,b)» · «נקודה M» · «MA = 3» → «מעגל · (x − a)² + (y − b)² = 3²»
+- Sources: ADR-AG-351, #1186, #2608.
+
+**R200 — a point that has a locus offers it: a chip on the row that introduced it, and the guide teaches the question**. *(Operator, 2026-09-17: "I want to have a chip next to points in the input panel that can show their locus. This will only be available for points that are not fully defined."; rulings 2026-09-27 "No, teach the two lines", D2–D4 of 2026-10-26, and 1A/2A of 2026-10-30.)*
+- A point with a one-dimensional locus at the configuration shown has a chip on the row that introduced it: «הצג מקום גאומטרי» while its locus is not drawn, and «הסתר מקום גאומטרי» while it is. A point with two degrees of freedom, a point that is fully determined, and a point whose freedom is not one-dimensional (two independent movers) have no chip. When one row introduced two such points, each chip ends with its letter.
+- A click does exactly what typing «המקום הגיאומטרי של M» does: the answer row and the drawing. A second click hides the drawing and keeps the row. The row's ✕ removes both. Nothing is drawn until it is asked for (D3). A click on a point on the figure offers no locus (D2).
+- The guide has a «מקום גאומטרי» section whose featured row is «המקום הגיאומטרי של M», shown with its setup lines «A(0,0) · B(4,0) · נקודה M · MA = MB». A click puts the question in the ask box. It is never offered to the AI as a given.
+- «M נקודה המקיימת MA = MB» (also «M היא נקודה …», «נקודה M המקיימת …», «… שמקיימת …») is refused with the one-given-per-line message listing «(1) נקודה M  (2) MA = MB», but only when both lines would be accepted in that order. «המקום הגיאומטרי של הנקודות ש…» typed as a given is not read yet; it awaits the operator.
+- Sources: ADR-AG-352, #1177, ADR-AG-067, #2628.
 
 ---
 
@@ -1138,6 +1178,10 @@ a sentence the tool parsed.
 **R76 — a crossing can be clicked, and it adds the SENTENCE**. The ring commits the sentence typing would add; a curve's equation is a name, conics included (ADR-AG-056, ADR-AG-061).
 - clicking → «P נקודת החיתוך של הישר AB עם הישר CD»
 - Sources: ADR-AG-054, ADR-AG-056, #1092, ADR-AG-061, #1096, #1100.
+
+**R205 — a line touching a curve offers ONE crossing dot, at the touch point**. *(Operator ruling 2026-10-30 on #2618, Q2 → A: "all three curves".)* On the circle, the ellipse and the parabola; its sentence names no ordinal and builds, also after a tangency pinned the line's parameter.
+- «נתונה אליפסה שמשוואתה x^2+4y^2=20» · «נתון הישר y=-x+5» → one dot at (4,1); clicking → «A נקודת החיתוך של הישר y=-x+5 עם האליפסה»
+- Sources: ADR-AG-356, #2618.
 
 **R77 — the session can be SAVED, and a load says what it restored**. A line that no longer builds is NAMED, never dropped.
 - `<name>-analytic.json`, replayed through the real parser

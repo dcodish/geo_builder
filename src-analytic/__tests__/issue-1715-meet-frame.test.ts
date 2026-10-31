@@ -159,7 +159,17 @@ describe('#1715 — the cross-product: every pair of kinds, in both orders, E on
   // Two lines through one NAMED point meet at that point (the bisector of B and the median from B, the altitude from A
   // and the line AM) — the crossing-already-named family, a different question; every other pair is a new point.
   const through: Record<string, string> = { 'bisector of B': 'B', 'median from B': 'B', 'altitude from A': 'A', 'line AM': 'A' };
-  const pairs = kinds.flatMap((k1) => kinds.filter((k2) => k2 !== k1 && (!through[k1] || through[k1] !== through[k2])).map((k2) => [k1, k2] as const));
+  /*
+   * Two pairs are BOTH perpendicular to BC (#2613, ADR-AG-349): the altitude from A and the perpendicular bisector of BC
+   * are parallel unless the triangle is isosceles, where they are ONE line; the line AM and the perpendicular bisector
+   * of BC meet at the named M, or are one line. Before ADR-AG-349 the solve made the triangle isosceles and E slid
+   * along the common line, green; now each is refused (locked under «refusals» below).
+   */
+  const oneLine = (k1: string, k2: string) =>
+    [k1, k2].includes('perpendicular bisector of BC') && ([k1, k2].includes('altitude from A') || [k1, k2].includes('line AM'));
+  const pairs = kinds.flatMap((k1) =>
+    kinds.filter((k2) => k2 !== k1 && (!through[k1] || through[k1] !== through[k2]) && !oneLine(k1, k2)).map((k2) => [k1, k2] as const),
+  );
   it.each(pairs)('%s × %s', (k1, k2) => {
     // the perpendicular is drawn first: «האנך מ-C ל-AB» refers to it (ADR-AG-207)
     const steps = [TRI, 'M אמצע BC', 'האנך מ-C ל-AB', `${ON[k1].np} ו${ON[k2].np} נפגשים בנקודה E`];
@@ -193,6 +203,14 @@ describe('#1715 — the retired per-kind meets keep their verdicts on the one fr
 });
 
 describe('#1715 — refusals', () => {
+  it('two lines that can meet only by being one line are refused, never drawn on an isosceles triangle (#2613, ADR-AG-349)', () => {
+    const steps = (k1: string, k2: string) => [TRI, 'M אמצע BC', 'האנך מ-C ל-AB', `${ON[k1].np} ו${ON[k2].np} נפגשים בנקודה E`];
+    expect(verdict(steps('altitude from A', 'perpendicular bisector of BC'))).toBe('refused:self-crossing');
+    expect(verdict(steps('perpendicular bisector of BC', 'altitude from A'))).toBe('refused:self-crossing');
+    // through M, which the figure already names — refused naming it
+    expect(verdict(steps('line AM', 'perpendicular bisector of BC'))).toBe('refused:crossing-already-named');
+    expect(verdict(steps('perpendicular bisector of BC', 'line AM'))).toBe('refused:crossing-already-named');
+  });
   it('parallel lines are `unsatisfiable` — two named lines, and two perpendiculars to one side', () => {
     expect(verdict(['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'])).toBe('refused:unsatisfiable');
     expect(verdict(['מלבן ABCD', 'האנך מ-A ל-BC', 'האנך מ-D ל-BC', 'האנך מ-A ל-BC והאנך מ-D ל-BC נפגשים בנקודה E'])).toBe('refused:unsatisfiable');

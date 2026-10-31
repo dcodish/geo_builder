@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-30T16:35:17.248Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה ABCDS",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "גובה הפירמידה",
+      "cmds": [
+        {
+          "type": "perp-to-base"
+        }
+      ]
+    }
+  ]
+}

@@ -97,12 +97,15 @@ describe('#748 — honesty: what must still refuse, and what must not move', () 
    * under either reading. A contradicting one holds under NEITHER, so it is asked about — never redefined, and never
    * refuted as arithmetic. The bar form keeps the honest claim lane: a contradiction refuses.
    */
-  it('a ratio CONTRADICTING an already-stated one is never a redefinition — asked about, and the bar form refuses', () => {
+  // ADR-3D-391 Am. 2 (the T64 ruling, 2026-10-30): the vector reading cannot hold here, so the unmarked line IS the
+  // length statement and refuses exactly as its bar form does — it no longer asks
+  it('a ratio CONTRADICTING an already-stated one is never a redefinition — the plain and the bar form refuse alike', () => {
     const { err: e } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"]);
-    expect(e).toMatchObject({ code: 'ambiguous-vector-length' });
+    expect(e).not.toBeNull();
     const { err: bar } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "|AE| = 3|EA'|"]);
     expect(bar).not.toBeNull(); // refused (today in the polygon-collapse register), never asked: the bars answered the question
     expect((bar as { code: string }).code).not.toBe('ambiguous-vector-length');
+    expect((e as { code: string }).code).toBe((bar as { code: string }).code);
   });
 
   it('a ratio AGREEING with the stated one verifies in the bar form (idempotent, no false accusation)', () => {

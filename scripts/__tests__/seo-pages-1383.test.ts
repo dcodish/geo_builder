@@ -31,7 +31,7 @@ const CATALOGS: Record<string, readonly { he: string; descHe?: string; featured?
   '2d': COMMAND_CATALOG,
   '3d': COMMAND_CATALOG_3D,
   complex: COMPLEX_CATALOG,
-  analytic: COMMAND_CATALOG_ANALYTIC,
+  analytic: COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane), // #1177: givens only, as the page builds it
 };
 
 /** Width × height from a PNG's IHDR — no image library for a two-number question. */
@@ -105,7 +105,7 @@ describe('#1383 — every example a page teaches is a line the product understan
   // 2-D (PAR-10, src/parser/__tests__/llm-contract.test.ts), 3-D (src3d/parser/__tests__/catalog3.test.ts)
   // and complex (src-complex/__tests__/manual.test.ts) already parse EVERY catalog row; the page shows
   // only featured rows, so they are covered there. Analytic had no whole-catalog guard — it gets one here.
-  it.each(featuredExamples(COMMAND_CATALOG_ANALYTIC).map((e) => [e.text]))('analytic: «%s» parses', (line) => {
+  it.each(featuredExamples(CATALOGS.analytic).map((e) => [e.text]))('analytic: «%s» parses', (line) => {
     expect(parseLine(line).ok, line).toBe(true);
   });
 });

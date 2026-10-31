@@ -20,7 +20,9 @@ export type CatalogCategory =
   | 'conics'
   | 'shapes'
   | 'derived'
-  | 'relations';
+  | 'relations'
+  /** #1177 (ADR-AG-352): QUESTIONS about the figure, not givens — every row is `lane: 'ask'`. */
+  | 'locus';
 
 export interface CatalogEntryAnalytic {
   category: CatalogCategory;
@@ -31,7 +33,7 @@ export interface CatalogEntryAnalytic {
    * families, read from the 572 conic corpus; F16/F17 come from the «lines and points» corpus
    * (02c §8) and are the first entries whose source is a different exam topic.
    */
-  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F16' | 'F17' | 'F18' | 'F19' | 'F20';
+  family: 'F1' | 'F3' | 'F5' | 'F6' | 'F11' | 'F13' | 'F16' | 'F17' | 'F18' | 'F19' | 'F20';
   /**
    * Lines that must be typed BEFORE this one for it to mean anything — «M אמצע AB» needs A and B.
    *
@@ -62,8 +64,15 @@ export interface CatalogEntryAnalytic {
    * catalog is also the in-app guide (2-D left rename out and the operator could not find it), but it
    * is never taught to the LLM: the fallback adds givens, and a model line that rewrites the student's
    * history is rejected. Every consumer reads THIS field rather than learning about rename separately.
+   *
+   * `'ask'` (#1177, ADR-AG-352) = a QUESTION the ask lane answers («המקום הגיאומטרי של M»), not a given: `ask`
+   * (app/ask.ts) reads it, `parseLine` never does. Listed so the guide can teach the most-asked construct; never
+   * taught to the LLM, whose lane adds givens. A guide click puts it in the ASK box, never the givens box.
+   *
+   * **The construction lane is `!e.lane`** — a consumer that wants givens filters on the field's absence, never on
+   * `lane !== 'rewrite'`, so the next lane added cannot leak into the LLM vocabulary or the build guards.
    */
-  lane?: 'rewrite';
+  lane?: 'rewrite' | 'ask';
 }
 
 export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
@@ -607,26 +616,62 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   },
 
   // --- F6 · conics by equation (canonical only — D6/§2a) ---
-  { category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
+  { featured: true, category: 'conics', family: 'F6', he: 'נתונה פרבולה קנונית שמשוואתה y^2=54x', en: 'canonical parabola y^2=54x' },
   // A conic may be NAMED like a circle (#1271) — two parabolas in one figure are referable.
-  { category: 'conics', family: 'F6', he: 'נתונה פרבולה I שמשוואתה y^2=2x', en: 'parabola I: y^2=2x' },
+  { featured: true, category: 'conics', family: 'F6', he: 'נתונה פרבולה I שמשוואתה y^2=2x', en: 'parabola I: y^2=2x' },
   // `p`, not `a` (#1022). It is not an arbitrary parameter name in this topic: the 5-unit formula
   // sheet does NOT carry the parabola, so «y² = 2px, focus (p/2,0), directrix x = -p/2» is recited
   // from memory as a triple (docs/19 §3). A card offering `2ax` teaches a student to rename the one
   // letter whose meaning they already know. Both spellings parse identically; only the teaching differs.
-  { category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה y^2=2px', en: 'parabola y^2=2px' },
+  { featured: true, category: 'conics', family: 'F6', he: 'נתונה פרבולה שמשוואתה y^2=2px', en: 'parabola y^2=2px' },
   {
+    featured: true,
     category: 'conics',
     family: 'F6',
     he: 'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
     en: 'ellipse x^2/9+y^2/16=1',
   },
+  // #2616/#2617/#2619 (ADR-AG-353/354) — the ellipse's roles and sizes, and the canonical curve with no equation. Not
+  // featured: the section's six featured rows are the six it showed before these were added, so the guide is unchanged.
+  { category: 'conics', family: 'F6', he: 'נתונה אליפסה קנונית שהציר הגדול שלה על ציר ה-x', en: 'a canonical ellipse whose major axis is on the x-axis' },
+  { category: 'conics', family: 'F6', he: 'נתון מעגל קנוני', en: 'a canonical circle' },
+  { category: 'conics', family: 'F6', he: 'F1 הוא המוקד הימני של האליפסה', en: 'F1 is the right focus of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'F1 ו-F2 מוקדי האליפסה', en: 'F1 and F2 are the foci of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'A הקודקוד הימני של האליפסה', en: 'A is the right vertex of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'הצירים שלה הם 12 ו-8', en: 'the axes of the ellipse are 12 and 8', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'אורך הציר הגדול של האליפסה הוא 20', en: 'the length of the major axis of the ellipse is 20', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'המרחק בין המוקדים הוא 10', en: 'the distance between the foci is 10', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  { category: 'conics', family: 'F6', he: 'סכום המרחקים של הנקודה A משני המוקדים של האליפסה הוא 20', en: 'the sum of the distances of A from the foci is 20', needs: [...['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'], 'A(6,4.8)'] },
+  { category: 'conics', family: 'F6', he: 'a = 6', en: 'a = 6', needs: ['נתונה אליפסה שמשוואתה x^2/a^2+y^2/b^2=1'] },
+  // --- F6 · the circle's relations, about the ellipse and the parabola (#2618, ADR-AG-355) ---
+  // The section now passes the guide's cap of six: the six rows it always showed are the featured ones, so the guide
+  // a student opens is unchanged (#1347); which new rows to feature is the operator's choice.
+  { category: 'conics', family: 'F6', he: 'מעוין ABCD חסום באליפסה', en: 'rhombus ABCD is inscribed in the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'קודקודי המלבן ABCD נמצאים על האליפסה', en: 'the vertices of rectangle ABCD lie on the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'circles', family: 'F5', he: 'קודקודי המעוין ABCD נמצאים על המעגל', en: 'the vertices of rhombus ABCD lie on the circle', needs: ['נתון מעגל שמשוואתו x^2+y^2=25'] },
+  { category: 'conics', family: 'F6', he: 'משולש ABC חסום בפרבולה', en: 'triangle ABC is inscribed in the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'AB מיתר באליפסה', en: 'AB is a chord of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'AB מיתר בפרבולה', en: 'AB is a chord of the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'AB קוטר באליפסה', en: 'AB is a diameter of the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'הישר y=kx+5 משיק לאליפסה', en: 'the line y=kx+5 is tangent to the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'הישר y=kx+2 משיק לפרבולה', en: 'the line y=kx+2 is tangent to the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x'] },
+  { category: 'conics', family: 'F6', he: 'הישר AB משיק לאליפסה בנקודה A', en: 'the line AB is tangent to the ellipse at A', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'A על האליפסה'] },
+  { category: 'conics', family: 'F6', he: 'המשיק לאליפסה בנקודה A', en: 'the tangent to the ellipse at A', needs: ['נתונה אליפסה שמשוואתה x^2/8+y^2/2=1', 'A(2,1)'] },
+  { category: 'conics', family: 'F6', he: 'המשיק לפרבולה בנקודה A', en: 'the tangent to the parabola at A', needs: ['נתונה פרבולה שמשוואתה y^2=8x', 'A(2,4)'] },
+  {
+    category: 'conics',
+    family: 'F6',
+    he: 'משוואת המשיק לאליפסה בנקודה A היא x+2y=4',
+    en: 'the equation of the tangent to the ellipse at A is x+2y=4',
+    needs: ['נתונה אליפסה שמשוואתה x^2/8+y^2/2=1', 'A(2,1)'],
+  },
+  { category: 'conics', family: 'F6', he: 'דרך P עובר משיק לאליפסה', en: 'a tangent to the ellipse passes through P', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'P(10,0)'] },
 
   // Unfeatured for #1501 (provisional, flagged for the operator): the named form of the same
   // equation capability — «נתון מעגל I שמשוואתו …» — stays featured.
   { category: 'circles', family: 'F5', he: '(x-3)^2+(y-4)^2=9', en: '(x-3)^2+(y-4)^2=9' },
-  { category: 'conics', family: 'F6', he: 'y^2=54x', en: 'y^2=54x' },
-  { category: 'conics', family: 'F6', he: 'x^2/9+y^2/16=1', en: 'x^2/9+y^2/16=1' },
+  { featured: true, category: 'conics', family: 'F6', he: 'y^2=54x', en: 'y^2=54x' },
+  { featured: true, category: 'conics', family: 'F6', he: 'x^2/9+y^2/16=1', en: 'x^2/9+y^2/16=1' },
 
   // --- F17 · segments and NEUTRAL shape nouns (02c §8) ---
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
@@ -1474,4 +1519,20 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F17', he: 'קו ועליו נקודה A', en: 'a line with point A on it' },
   { category: 'lines', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '5 < AB < 9', en: '5 < AB < 9' },
+
+  // --- F13 · the locus — ASKED, not stated (ADR-AG-072 §1); the guide's way in (#1177, ADR-AG-352) ---
+  /**
+   * The operator's ruling of 2026-09-27 (#1177): the guide carries «המקום הגיאומטרי של M» as a FEATURED row with its
+   * two setup lines — `נקודה M` and the property — so the two-line form the tool reads is the form it teaches. The
+   * needs are the reported figure's (A and B to state the property against); the guard asks the question after them.
+   */
+  {
+    featured: true,
+    category: 'locus',
+    family: 'F13',
+    lane: 'ask',
+    he: 'המקום הגיאומטרי של M',
+    en: 'the locus of M',
+    needs: ['A(0,0)', 'B(4,0)', 'נקודה M', 'MA = MB'],
+  },
 ];

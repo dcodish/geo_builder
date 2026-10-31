@@ -6,7 +6,10 @@
  * be true and if only one can be true, we will assume this is the case"*. So:
  * - only ONE reading can hold → that reading builds, no question (T36, T38, T40, T41, T42);
  * - both hold and give ONE figure → it builds (T39);
- * - both hold and DIFFER, or neither holds → it asks;
+ * - both hold and DIFFER → it asks;
+ * - the VECTOR reading cannot hold → it is a length statement, and a length that cannot hold either gets the length
+ *   spelling's own verdict, never the question (Am. 2, T64: *"since AB=AC cannot be vectors for a quad pyramid to
+ *   hold, we must assume these are length and write them as such"*);
  * - a line the figure already states → «already on the figure», no row (T45);
  * - a vector reading draws every vector of the sentence as an arrow (T46).
  * Marked statements and definitions of a new point are unchanged.
@@ -88,26 +91,49 @@ describe('#1680 Am. 1 — only ONE reading can hold: it is taken and built, no q
   });
 });
 
-describe('#1680 Am. 1 — both readings can hold and DIFFER, or neither can: it asks, and commits nothing', () => {
+describe('#1680 Am. 1 — both readings can hold and DIFFER: it asks, and commits nothing', () => {
   it.each([
     // a parallelogram (vectors) or two equal sides (lengths)
     [['מרובע ABCD', 'AB = DC'], { code: 'ambiguous-vector-length' }],
     [['מרובע ABCD', 'AB = CD'], { code: 'ambiguous-vector-length' }],
     // the engine draws a quadrilateral with A, B, D in line, so both readings build, and they differ
     [['מרובע ABCD', 'AB = 2 AD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'A', b2: 'D', c: 2 }],
-    // T40: «פירמידה SABCD» is a regular pyramid, so AB (a side) and AC (a diagonal) are never equal either: NEITHER
-    // reading can hold, a case the 2026-10-30 rule does not cover, so it keeps asking (reported for a ruling)
-    [[PYR, 'AB = 1AC'], { code: 'ambiguous-vector-length' }],
-    [[PYR, 'AB = ½CD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'C', b2: 'D', c: 0.5 }],
-    // neither reading places E (t = 2 either way)
-    [[P, "E על AA'", "AE = 2AA'"], { code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: 'A', b2: "A'", c: 2 }],
-    // a stated t = ⅔ contradicted under both readings
-    [[P, "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"], { code: 'ambiguous-vector-length', a1: 'A', b1: 'E', a2: 'E', b2: "A'", c: 3 }],
   ])('%j asks', (lines, expected) => {
     run(lines.slice(0, -1));
     const before = st().facts.length;
     const { err, facts } = run(lines);
     expect(err).toEqual(expected);
+    expect(facts, 'nothing is committed').toBe(before);
+  });
+});
+
+/**
+ * Am. 2 (2026-10-30, T64) — these asked under Am. 1 ("neither reading holds", left for a ruling). The ruling:
+ * a sentence whose vector reading cannot hold IS a length statement. The length reading cannot hold here either, so
+ * each gets exactly the verdict its explicit length spelling gets — the existing contradiction, naming the statement
+ * (only `stated` differs: it quotes the line as typed). No new message, and never the question.
+ */
+describe('#1680 Am. 2 — the vector reading cannot hold: a length statement, with the length spelling’s own verdict', () => {
+  it.each([
+    // T64: the pyramid's base forces AB (a side) ≠ AC (a diagonal) — «|AB| = |AC|» flattens it
+    [[PYR, 'AB = 1AC'], '|AB| = 1|AC|'],
+    [[PYR, 'AB = ½CD'], '|AB| = ½|CD|'],
+    // E on AA' with |AE| = 2|AA'| holds only with the edge collapsed
+    [[P, "E על AA'", "AE = 2AA'"], "|AE| = 2|AA'|"],
+    // a stated t = ⅔ contradicted by the length reading
+    [[P, "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"], "|AE| = 3|EA'|"],
+    // a midpoint makes |AM| = |MA'|, so «AM = 2MA'» is false as lengths (and as vectors)
+    [[P, "M אמצע AA'", "AM = 2MA'"], "|AM| = 2|MA'|"],
+  ])('%j refuses as «%s» does, and commits nothing', (lines, lengthSpelling) => {
+    const ctx = lines.slice(0, -1);
+    const spelled = run([...ctx, lengthSpelling]).err as { code: string; stated?: string } | null;
+    expect(spelled, 'the length spelling itself refuses').not.toBeNull();
+    run(ctx);
+    const before = st().facts.length;
+    const { err, facts } = run(lines);
+    expect(err?.code).not.toBe('ambiguous-vector-length');
+    expect({ ...(err as object), stated: undefined }).toEqual({ ...spelled, stated: undefined });
+    expect((err as { stated?: string }).stated ?? lines[lines.length - 1]).toBe(lines[lines.length - 1]);
     expect(facts, 'nothing is committed').toBe(before);
   });
 });

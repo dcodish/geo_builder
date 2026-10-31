@@ -16,7 +16,7 @@ import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
-import { evalExpr, type Env } from './expr';
+import { evalExpr, symbolsOf as symbolsOfExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
 import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
 import { commonTangentLine } from './commonTangents';
@@ -1185,6 +1185,71 @@ export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]):
 }
 
 /**
+ * A crossing's two INCIDENCES (`on-line-2pt` / `on-line` / `on-curve`) — the set the #1254 arm and the ADR-AG-263
+ * start already call "crossed". Anything else (one incidence, three) is not a crossing of a pair.
+ */
+function crossingIncidences(c: Construction, id: Id): [Constraint, Constraint] | null {
+  const ks = c.constraints.filter(
+    (k) => (k.t === 'on-line-2pt' || k.t === 'on-line' || k.t === 'on-curve') && (k as { id?: Id }).id === id,
+  );
+  return ks.length === 2 ? [ks[0], ks[1]] : null;
+}
+
+/** An incidence's carrier as a numeric STRAIGHT at these positions — `null` for a conic or anything unplaced. */
+function straightCarrierOf(k: Constraint, at: (id: Id) => Pt | null, curveAt: (id: Id) => NumCurve | null): NumCurve | null {
+  if (k.t === 'on-line-2pt') {
+    const a = at(k.a);
+    const b = at(k.b);
+    if (!a || !b || Math.hypot(b.x - a.x, b.y - a.y) < 1e-12) return null;
+    return { kind: 'line', a: b.y - a.y, b: a.x - b.x, c: (b.x - a.x) * a.y - (b.y - a.y) * a.x };
+  }
+  if (k.t === 'on-line') return { kind: 'line', a: k.a, b: k.b, c: k.c };
+  if (k.t === 'on-curve') {
+    const cu = curveAt(k.curve);
+    return cu && cu.kind === 'line' ? cu : null;
+  }
+  return null;
+}
+
+/**
+ * A CROSSING OF TWO STRAIGHTS THAT ARE ONE LINE HERE NAMES NO POINT (#2613, ADR-AG-349 — the positional member of
+ * ADR-AG-140).
+ *
+ * «M נקודת החיתוך של הישר l1 עם הישר l2» asserts that the two lines meet in a point. Where they COINCIDE in the
+ * configuration being judged, their "crossing" is the whole line: the sentence names no point, and the leftover
+ * freedom of M along the common line is not freedom of the figure. ADR-AG-140 refuses the structural member («הישר
+ * AB עם הישר BA») at parse; this is the same sentence reached at a configuration — two lines written differently
+ * that the givens (or the solve, or the locus walk) put on top of each other.
+ *
+ * Judged by `curvesCoincide` (ADR-AG-311's judge, at the figure's visible resolution — it states no magnitude), on
+ * the two carriers as numeric straights at these positions; an `on-line-2pt` reads as the line through its two
+ * points. Two straights only, because that is the sentence ADR-AG-140 rules on and the refusal it words; a conic
+ * pair is never "one line". One predicate: the crossing selectors read it in `failingSelectors` (so `evaluate`,
+ * `selectorsHold` and the locus walk's `admissibleAt` agree), the locus walk reads it to END a direction rather than
+ * cross the gap (`traceLocus`), and `derive` reads it to choose ADR-AG-140's sentence for the refusal.
+ */
+export function crossingHasNoPoint(c: Construction, at: Map<Id, Pt>, env: Env, id: Id): boolean {
+  const pair = crossingIncidences(c, id);
+  if (!pair) return false;
+  const atFn = (q: Id) => at.get(q) ?? null;
+  const curveAt = curveAtOf(c, env, atFn);
+  const p = straightCarrierOf(pair[0], atFn, curveAt);
+  const q = straightCarrierOf(pair[1], atFn, curveAt);
+  return !!p && !!q && curvesCoincide(p, q, at, apartOf(at));
+}
+
+/**
+ * DOES ANY CROSSING SENTENCE NAME NO POINT HERE (#2613, ADR-AG-349) — {@link crossingHasNoPoint} over every crossing
+ * the student named (every crossing sentence carries `crossing-distinct` or `crossing-nth`). Read by the locus walk:
+ * such a configuration is where the figure stops existing, a bifurcation, never a gap to walk across.
+ */
+export function someCrossingHasNoPoint(c: Construction, at: Map<Id, Pt>, env: Env): boolean {
+  return c.selectors.some(
+    (s) => (s.kind === 'crossing-distinct' || s.kind === 'crossing-nth') && at.has(s.id) && crossingHasNoPoint(c, at, env, s.id),
+  );
+}
+
+/**
  * The points a crossing is a SIBLING of (#1113) — every other point whose incidence signature matches.
  * Shared by the judge and the separation restart (#1463).
  */
@@ -1198,6 +1263,61 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
     );
   const mine = sig(id);
   return [...at.keys()].filter((other) => other !== id && sig(other) === mine);
+}
+
+/**
+ * THE POINTS A CROSSING MUST STAY APART FROM (#2615, ADR-AG-350) — its signature siblings (#1113), and every point
+ * DECLARED BEFORE it that lies on BOTH of its carriers here, provided the pair has a root no such point holds.
+ *
+ * ADR-AG-263 sends a crossing to the root no earlier point holds, but only as a START, read at the SEEDED figure. When
+ * the curve reaches that earlier point only through the joint solve — p3-21's ellipse, whose a and b are fixed by c,
+ * a slope and «A על האליפסה» together — no root is taken at the seed, the start does nothing, and the solve put E on
+ * A; the judge kept E apart from signature siblings only, so E = A passed and «E» answered «(5/2, 9/2) או (5, -3)».
+ * This is that rule read at the JUDGED positions, so the start becomes a verdict: the judge (`crossing-distinct`) and
+ * the #1463 deflation (`collapsedPairs`) both read this one set.
+ *
+ * "On both carriers" is the two incidences' own residuals within `SATISFIED_EPS` with the earlier point in the
+ * crossing's place — the judge's own reading of an incidence. The proviso is ADR-AG-263's test: `orderedCrossings` on
+ * the pair, at least two roots, not touching, and at least one root on the drawn piece of a bounded crossing that no
+ * earlier point sits on (within `apartOf`).
+ * A tangency (#1924), a chord whose roots are all named (#1893, #1909), a pair of straights (one root, #1254) and an
+ * ordinal crossing (`crossing-nth`, which owns its root) are therefore untouched.
+ */
+function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): Id[] {
+  const sibs = crossingSiblings(c, id, at);
+  const pair = crossingIncidences(c, id);
+  if (!pair) return sibs;
+  const declaredAt = new Map<Id, number>();
+  c.objects.forEach((o, i) => declaredAt.set(o.id, i));
+  const mine = declaredAt.get(id) ?? Number.POSITIVE_INFINITY;
+  const atFn = (q: Id) => at.get(q) ?? null;
+  const curveAt = curveAtOf(c, env, atFn);
+  const lineAt = lineAtOf(c, env, atFn);
+  const scale = residualScale(c, env);
+  const onBoth = (q: Id) =>
+    pair.every((k) => {
+      const r = residual({ ...k, id: q } as Constraint, atFn, env, curveAt, lineAt, scale);
+      return r !== null && r.every((v) => Number.isFinite(v) && Math.abs(v) <= SATISFIED_EPS);
+    });
+  const earlier = [...at.keys()].filter(
+    (q) => q !== id && !sibs.includes(q) && (declaredAt.get(q) ?? Number.POSITIVE_INFINITY) < mine && onBoth(q),
+  );
+  if (earlier.length === 0) return sibs;
+  const o = orderedCrossings(pair, atFn, curveAt);
+  if (!o || o.touching || o.roots.length < 2) return sibs;
+  const apart = apartOf(at);
+  // A root outside the drawn piece of a bounded crossing («הקטע AP») is not a root of the sentence (ADR-AG-263's own filter).
+  const bounds = pair.filter(
+    (k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && k.crossing === true,
+  );
+  const onPiece = (r: Pt) =>
+    bounds.every((k) => {
+      const pa = atFn(k.a);
+      const pb = atFn(k.b);
+      return !pa || !pb || withinSegment(pa, pb, r);
+    });
+  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart));
+  return free ? [...sibs, ...earlier] : sibs;
 }
 
 /**
@@ -1270,13 +1390,14 @@ export function orderQuantity(
   at: (id: Id) => Pt | null,
   env: Env,
   lineAt?: (name: string) => NamedLine | null,
+  curveAt?: (id: Id) => NumCurve | null,
 ): number | null {
   const side = (o: OrderSide): number | null => {
     if (o.t === 'value') {
       const v = evalExpr(o.value, env);
       return Number.isFinite(v) ? v : null;
     }
-    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt);
+    if (o.t === 'length') return evalLengthExpr(o.le, at, env, lineAt, curveAt);
     const v = at(o.at.v);
     const a = at(o.at.a);
     const b = at(o.at.b);
@@ -1461,7 +1582,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       /** AN ORDER (#1621 D3, ADR-AG-216) — strict unless the student wrote ≤ / ≥ (`closed`). */
       if (s.q.k === 'order') {
-        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn));
+        const q = orderQuantity(s.q, atFn, env, lineAtOf(c, env, atFn), curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed judges nothing, as below
         return signHolds(s, q);
       }
@@ -1573,6 +1694,18 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (Math.abs(across) <= SOLVE_RESOLUTION * Math.hypot(t.a, t.b)) return false;
       return sideOfBound(-t.c / across, 0, spanOf(at)) === (s.greater ? 1 : -1);
     }
+    /**
+     * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
+     * letters: x holds when a > b, y when b > a, strictly at the figure's resolution (a circle, a = b, has no major axis).
+     */
+    if (s.kind === 'major-axis') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const k = curveAtOf(c, env, atFn)(s.curve);
+      if (!k) return true; // an unplaced curve judges nothing, as below
+      if (k.kind !== 'ellipse') return false;
+      const [major, minor] = s.axis === 'x' ? [k.a, k.b] : [k.b, k.a];
+      return sideOfBound(major - minor, 0, Math.max(k.a, k.b)) === 1;
+    }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
     /**
@@ -1598,8 +1731,10 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
      * would state a magnitude the student never gave (ADR-052), and this is the exact epsilon defect
      * that made the ring dedupe re-offer a taken crossing.
      */
+    // A crossing whose two straights are ONE LINE here names no point (#2613, ADR-AG-349): neither reading holds.
+    if ((s.kind === 'crossing-distinct' || s.kind === 'crossing-nth') && crossingHasNoPoint(c, at, env, s.id)) return false;
     if (s.kind === 'crossing-distinct') {
-      for (const other of crossingSiblings(c, s.id, at)) {
+      for (const other of crossingPartners(c, s.id, at, env)) {
         const q = at.get(other)!;
         if (Math.hypot(p.x - q.x, p.y - q.y) < apart) return false;
       }
@@ -1682,7 +1817,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
  * point keeps its root. Judged with `apartOf`, so a pair is collapsed exactly when `failingSelectors`
  * would reject it.
  */
-function collapsedPairs(c: Construction, at: Map<Id, Pt>, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
+function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
   const apart = apartOf(at);
   const pairs: Array<[Id, Id]> = [];
   for (const s of c.selectors) {
@@ -1691,7 +1826,7 @@ function collapsedPairs(c: Construction, at: Map<Id, Pt>, free: ReadonlySet<Id>)
         for (let j = i + 1; j < s.ids.length; j += 1) pairs.push([s.ids[i], s.ids[j]]);
       }
     } else if (s.kind === 'crossing-distinct') {
-      for (const other of crossingSiblings(c, s.id, at)) pairs.push([other, s.id]);
+      for (const other of crossingPartners(c, s.id, at, env)) pairs.push([other, s.id]);
     }
   }
   const out: Array<{ mover: Id; partner: Id }> = [];
@@ -1813,6 +1948,10 @@ function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>):
 function foldSignSelectors(c: Construction, env: Env): Env {
   let out = env;
   for (const sel of c.selectors) {
+    if (sel.kind === 'major-axis') {
+      out = foldMajorAxis(c, sel, out);
+      continue;
+    }
     if (sel.kind !== 'sign') continue;
     if (sel.q.k === 'order') {
       out = seedOrderParams(c, sel, sel.q, out);
@@ -1829,6 +1968,39 @@ function foldSignSelectors(c: Construction, env: Env): Env {
     if (isPositive !== sel.positive) out = { ...out, [sym]: Math.PI - reduced };
   }
   return out;
+}
+
+/**
+ * THE MAJOR AXIS SEEDS ITS ELLIPSE INTO ITS REGION (#2616/#2619, ADR-AG-353/354) — `seedOrderParams`' rule for a region
+ * (sample-and-reject would refuse a satisfiable figure at every seed whose sample fell the wrong way, #1071): where the
+ * sampled semi-axes break the stated orientation, the first free letter of the ellipse's equation that moves ONE
+ * semi-axis is scaled until the wanted axis is the longer one. A start, never a verdict: the solve may move it and the
+ * judge (`failingSelectors`) keeps the last word. Numeric, no CAS: the letter is scaled and the curve re-resolved.
+ */
+function foldMajorAxis(c: Construction, sel: Extract<Selector, { kind: 'major-axis' }>, env: Env): Env {
+  const o = objectById(c, sel.curve);
+  if (!o || o.kind !== 'curve') return env;
+  const axes = (e: Env): [number, number] | null => {
+    const r = resolveCurve(o.curve, e);
+    return r.ok && r.curve.kind === 'ellipse' ? [r.curve.a, r.curve.b] : null;
+  };
+  const ok = (ab: [number, number] | null) => !!ab && (sel.axis === 'x' ? ab[0] > 1.15 * ab[1] : ab[1] > 1.15 * ab[0]);
+  const now = axes(env);
+  if (!now || ok(now)) return env;
+  const free = new Set(paramRegister(c).map((p) => p.sym));
+  const syms = [...new Set(symbolsOfExpr(o.curve.eq))].filter((s) => free.has(s) && Number.isFinite(env[s]) && env[s] !== 0);
+  for (const sym of syms) {
+    for (const factor of [1.5, 1 / 1.5]) {
+      let e: Env = env;
+      for (let i = 0; i < 12; i += 1) {
+        e = { ...e, [sym]: e[sym] * factor };
+        const ab = axes(e);
+        if (!ab) break;
+        if (ok(ab)) return e;
+      }
+    }
+  }
+  return env;
 }
 
 /**
@@ -2098,6 +2270,281 @@ function priorOf(raw: Construction, removed: ReadonlySet<Id>): { prior: Construc
     priorMemo.set(raw, hit);
   }
   return hit;
+}
+
+/**
+ * THE FIGURE, LINE BY LINE (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348)) — which rows each
+ * line's new points answer to, read off the construction's line provenance (`Construction.objectLine`).
+ *
+ * Every constraint and selector belongs to the LATEST line among the free vertices it is placed from — directly, or
+ * through a derived point, a curve or a segment (`objectDeps` and the object's own references, transitively). That
+ * line's new vertices are the ones it moves; every vertex it names from an earlier line is the figure as it stood.
+ * - «משולש ABC» · «D על BC»: «D on BC» names B, C (line 0) and D (line 1), so it is line 1's, and moves D only.
+ * - «משולש ABC» · «AB = 5»: «AB = 5» names A and B, both of line 0, so it is line 0's: a given that constrains the
+ *   earlier figure still moves it (whether it should deform it less is #2039).
+ * - «משולש ABC חוסם את מעגל O»: the ring's vertices came in one sentence, so the rows tying them are one group, fitted
+ *   together — same-sentence nouns stay jointly solved.
+ * A row with no free vertex (a parameter's equation) belongs to no line, and neither does a row through a free symbol: the
+ * symbol or the points could meet it, and provenance does not say which, so the joint solve keeps it as before. A vertex of unknown provenance, or a
+ * construction built without a fold, turns the whole stage off: that figure is solved exactly as before. The stage is
+ * also off unless some row ties a line's new points to a free vertex of an EARLIER line — the class: without such a row
+ * no later line is placed on the figure as it stood, and the joint solve draws it exactly as before.
+ * Memoized per construction.
+ */
+interface LineGroup {
+  line: number;
+  /** The free vertices this line introduced that its rows move. */
+  ids: Id[];
+  rows: Constraint[];
+  selectors: Selector[];
+  /** Does a row of this line name a free vertex of an earlier line — is this line placed ON the figure as it stood? */
+  onEarlier: boolean;
+}
+interface LineGroups {
+  /** In line order; only the lines that own a row. Empty when the stage is off. */
+  groups: LineGroup[];
+  /** The free vertices some row moves (they are among that row's latest-line vertices). */
+  moved: ReadonlySet<Id>;
+  on: boolean;
+}
+const NO_GROUPS: LineGroups = { groups: [], moved: new Set(), on: false };
+const lineGroupsCache = new WeakMap<Construction, LineGroups>();
+function lineGroupsOf(c: Construction): LineGroups {
+  const lines = c.objectLine;
+  if (!lines) return NO_GROUPS;
+  const hit = lineGroupsCache.get(c);
+  if (hit) return hit;
+  const known = new Set(c.objects.map((o) => o.id));
+  const idsIn = (value: unknown, out: Set<Id>): Set<Id> => {
+    if (typeof value === 'string') {
+      if (known.has(value)) out.add(value);
+    } else if (Array.isArray(value)) for (const v of value) idsIn(v, out);
+    else if (value && typeof value === 'object') for (const v of Object.values(value as Record<string, unknown>)) idsIn(v, out);
+    return out;
+  };
+  /** Per object, the free vertices it is placed from, and the free symbols it is placed through (its own and its parents'). */
+  const deps = new Map<Id, Set<Id>>();
+  const symsOf = new Map<Id, Set<string>>();
+  for (const o of c.objects) {
+    const mine = new Set<Id>(isFree(o) ? [o.id] : []);
+    const syms = new Set<string>(symbolDeps(o));
+    for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) {
+      for (const v of deps.get(p) ?? []) mine.add(v);
+      for (const sym of symsOf.get(p) ?? []) syms.add(sym);
+    }
+    deps.set(o.id, mine);
+    symsOf.set(o.id, syms);
+  }
+  /**
+   * Does a row run through a free SYMBOL — in its own expressions, or in anything it is placed from (a circle's free
+   * radius `r_O`, a line's free direction `θ_l4`, a parameter in a stated equation)? The symbol is in the solve vector
+   * as much as the points are, wherever the row reads it (`carrierSystem` solves every `paramRegister` symbol).
+   */
+  const throughSymbol = (k: Constraint): boolean =>
+    constraintSymbols([k]).length > 0 || [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0);
+  let unknownLine = false;
+  /** The free vertices `value` is placed from, its latest line, and that line's vertices — null for none. */
+  const topOf = (value: unknown): { all: Set<Id>; line: number; ids: Id[] } | null => {
+    let line = Number.NEGATIVE_INFINITY;
+    let ids: Id[] = [];
+    const all = new Set<Id>();
+    for (const id of idsIn(value, new Set())) for (const v of deps.get(id) ?? []) all.add(v);
+    for (const v of all) {
+      const at = lines[v];
+      if (at === undefined) {
+        unknownLine = true;
+        return null;
+      }
+      if (at > line) {
+        line = at;
+        ids = [v];
+      } else if (at === line) ids.push(v);
+    }
+    return ids.length > 0 ? { all, line, ids } : null;
+  };
+  /** Per line, its rows with the vertices each moves, and whether it names an earlier line. */
+  const byLine = new Map<number, Array<{ k: Constraint; ids: Id[]; onEarlier: boolean }>>();
+  const moved = new Set<Id>();
+  /** The vertices a row through a symbol would move (its latest line's): the joint solve places them, so no group fits them. */
+  const joint = new Set<Id>();
+  for (const k of c.constraints) {
+    const top = topOf(k);
+    if (!top) continue;
+    if (throughSymbol(k)) {
+      // A row through a free SYMBOL («נסמן זוית BAM כ-A1», «AB = k») could be met by the symbol or by the points, and
+      // provenance does not say which: it stays the joint solve's, and reaches every vertex it names, as before.
+      for (const v of top.all) moved.add(v);
+      for (const v of top.ids) joint.add(v);
+      continue;
+    }
+    for (const v of top.ids) moved.add(v);
+    // a row that names a vertex of an earlier line: the figure as it stood is in it
+    const onEarlier = top.all.size > top.ids.length;
+    byLine.set(top.line, [...(byLine.get(top.line) ?? []), { k, ids: top.ids, onEarlier }]);
+  }
+  if (unknownLine) {
+    lineGroupsCache.set(c, NO_GROUPS);
+    return NO_GROUPS;
+  }
+  /*
+   * One line's new points are fitted TOGETHER only where a row ties them: «המעגל עובר דרך הנקודות A, B ו-C» puts three
+   * points on the circle by three separate rows, so it is fitted as «A על המעגל» · «B על המעגל» · «C על המעגל» is, one
+   * point at a time in the order declared; a ring's vertices, tied by its sides, stay one group.
+   */
+  const order = new Map(freeIds(c).map((id, i) => [id, i] as const));
+  const groups: LineGroup[] = [];
+  const groupOf = new Map<Id, LineGroup>();
+  for (const [line, rows] of [...byLine].sort((p, q) => p[0] - q[0])) {
+    const parent = new Map<Id, Id>();
+    const find = (v: Id): Id => (parent.get(v) === v ? v : find(parent.get(v)!));
+    for (const r of rows) for (const v of r.ids) if (!parent.has(v)) parent.set(v, v);
+    for (const r of rows) for (const v of r.ids.slice(1)) parent.set(find(v), find(r.ids[0]));
+    const parts = new Map<Id, LineGroup>();
+    for (const r of rows) {
+      const root = find(r.ids[0]);
+      let g = parts.get(root);
+      if (!g) parts.set(root, (g = { line, ids: [], rows: [], selectors: [], onEarlier: false }));
+      g.rows.push(r.k);
+      g.onEarlier ||= r.onEarlier;
+      for (const v of r.ids) if (!g.ids.includes(v)) g.ids.push(v);
+    }
+    const first = (g: LineGroup) => Math.min(...g.ids.map((v) => order.get(v) ?? Number.POSITIVE_INFINITY));
+    for (const g of [...parts.values()].sort((p, q) => first(p) - first(q))) {
+      /*
+       * A group with a vertex some symbol row also moves is left to the joint solve WHOLE: fitting it to its other rows
+       * first hands the joint solve a start the symbol row never shaped (measured: «נתון מעגל שמרכזו M» · «משולש ABC» ·
+       * the touch points D, E, F fitted to their sides, then tangent to a circle of free radius, faulted seed 16).
+       */
+      if (g.ids.some((v) => joint.has(v))) continue;
+      groups.push(g);
+      for (const v of g.ids) groupOf.set(v, g);
+    }
+  }
+  // A selector is judged with the last-fitted group among the points it moves.
+  for (const sel of c.selectors) {
+    const top = topOf(sel);
+    if (!top) continue;
+    const owners = top.ids.map((v) => groupOf.get(v)).filter((g): g is LineGroup => g !== undefined);
+    if (owners.length > 0) owners.reduce((p, q) => (groups.indexOf(q) > groups.indexOf(p) ? q : p)).selectors.push(sel);
+  }
+  const on = groups.some((g) => g.onEarlier);
+  const out: LineGroups = { groups: on ? groups : [], moved, on };
+  lineGroupsCache.set(c, out);
+  return out;
+}
+
+/**
+ * THE FIGURE AS IT STOOD, THEN WHAT EACH LINE ADDED (#1687, [ADR-AG-348](../../docs/06c-decisions-analytic.md#adr-ag-348))
+ * — #1647's created-circle fit, generalised to every free vertex, by line.
+ *
+ * «משולש ABC» · «D על BC»: D's letter hashes to a start nowhere near BC, and the joint descent then satisfied the
+ * incidence by moving B, C and D together — a least-squares step spreads its correction over every unknown in the
+ * row — so adding the sentence moved the triangle (24/24 seeds), and the display walk, handed a start that broke
+ * `between` or the spread, redrew the whole figure at another seed. 2-D never re-solves an earlier point for a later
+ * one: a point-on-object is evaluated after its parents.
+ *
+ * This is that rule as a START. In line order, each line's new vertices are fitted TOGETHER to that line's rows
+ * (`lineGroupsOf`), every earlier vertex held where its own line left it. The first lines' fit is the solve the earlier
+ * figure ran, from the same starts; each later line is then fitted to the figure as it was drawn. The joint solve that
+ * follows starts where every fitted row already holds, so it has nothing to spread onto the earlier figure.
+ *
+ * Starts for a line that introduced ONE vertex, in order: its region-seeded position (#1071, #1168, #1268, ADR-AG-208,
+ * ADR-AG-217 already set it); a seed-varied point inside each piece it is bounded to (0.2–0.8, so ADR-052 holds and the
+ * seed still moves it); the quarter points of each carrier through two points, only when no `beyond` selector names it
+ * (a carrier start ignores the extension's region — measured, it broke every «E על המשך …»); the hashed seed. A line
+ * that introduced several starts where they were seeded. The first fit that converges, keeps the line's selectors and
+ * bounded pieces, and puts no new vertex on another point is taken; with none, the line's starts are left as they were.
+ * A fit ON another point is never taken: that is the coincidence the verdict owns (the crossing-already-named family,
+ * ADR-AG-213; the stacked pair, #1273), and the joint solve and the judge decide it exactly as before.
+ * A start, never a verdict: the joint solve and the judge keep the last word.
+ */
+function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
+  const { groups, on } = lineGroupsOf(c);
+  if (!on) return;
+  const scale = residualScale(c, env);
+  // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
+  const budget = paramRegister(c).length > 0 ? 40 : 120;
+  for (const g of groups) {
+    const asMap = (x: number[]): Map<Id, Pt> => {
+      const m = new Map(seeded);
+      g.ids.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      return m;
+    };
+    const residualsAt = (x: number[]): number[] => {
+      const pos = place(c, env, asMap(x));
+      const at = (id: Id) => pos.get(id) ?? null;
+      return g.rows.flatMap((k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at), scale) ?? [0]);
+    };
+    const bounded = g.rows.filter((k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && g.ids.includes(k.id));
+    const starts: Array<Map<Id, Pt> | null> = [new Map(seeded)];
+    if (g.ids.length === 1) {
+      const v = g.ids[0];
+      const placed = place(c, env, seeded);
+      const pointOn = (a: Id, b: Id, t: number): Map<Id, Pt> | null => {
+        const pa = placed.get(a);
+        const pb = placed.get(b);
+        return pa && pb ? new Map(seeded).set(v, { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) }) : null;
+      };
+      const pieces = [
+        ...bounded,
+        ...g.selectors.filter((s): s is Extract<Selector, { kind: 'between' }> => s.kind === 'between' && s.id === v),
+      ];
+      pieces.forEach((k, i) => starts.push(pointOn(k.a, k.b, 0.2 + 0.6 * jitter(seed, 1687 + i))));
+      if (!g.selectors.some((s) => s.kind === 'beyond' && s.id === v)) {
+        for (const k of g.rows) {
+          if (k.t !== 'on-line-2pt' || k.id !== v) continue;
+          for (const t of [0.25, 0.5, 0.75]) starts.push(pointOn(k.a, k.b, t));
+        }
+      }
+      const h = hashed.get(v);
+      if (h) starts.push(new Map(seeded).set(v, h));
+    }
+    const admissible = (pos: Map<Id, Pt>): boolean => {
+      for (const k of bounded) {
+        const pa = pos.get(k.a);
+        const pb = pos.get(k.b);
+        const p = pos.get(k.id);
+        if (pa && pb && p && !withinSegment(pa, pb, p)) return false;
+      }
+      const near = 2 * apartOf(pos);
+      for (const v of g.ids) {
+        const p = pos.get(v);
+        if (p && [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near)) return false;
+      }
+      // A ring this line's points are vertices of keeps the promise its noun makes (#1817's position-level judge): a fit
+      // that collapses «משולש ABC חוסם את מעגל O» is not a start (measured: taken, it faulted 7 of 24 configurations).
+      const hard = ringFaultsOf(c, (id) => pos.get(id)).filter(isHardRingFault);
+      if (hard.some((r) => { const o = objectById(c, r.id); return o?.kind === 'polygon' && o.vertices.some((v) => g.ids.includes(v)); })) return false;
+      return g.selectors.length === 0 || failingSelectors({ ...c, selectors: g.selectors }, pos, env).length === 0;
+    };
+    for (const m0 of starts) {
+      if (!m0) continue;
+      // At the TIGHT tolerance (ADR-AG-143's factor): the joint solve starts on the fit and stops at once, so the fit is the
+      // precision the figure is drawn at (measured: at the loop tolerance corpus 471's 2/4 drew F 6e-7 off E's x, where the
+      // joint descent's overshoot had given 8e-9). The earlier figure's own solve, replayed here, is therefore finished a
+      // little further than that figure ran it: it can differ by the loop tolerance (≤ 2.2e-7 measured), never visibly.
+      const x0 = g.ids.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
+      const iters = g.ids.length === 1 ? 60 : budget;
+      const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
+      if (!r.ok) continue;
+      const m = asMap(r.values);
+      if (!admissible(place(c, env, m))) continue;
+      for (const id of g.ids) seeded.set(id, m.get(id)!);
+      break;
+    }
+  }
+}
+
+/**
+ * The vertices a given reaches (`reachedByGivens`, ADR-AG-324's box) — where a row reaches only the vertices it MOVES,
+ * its latest line's (#1687, ADR-AG-348): «D על BC» places D, it does not solve C, so C keeps the box it was drawn in.
+ */
+function reachedByLine(c: Construction): ReadonlySet<Id> {
+  const all = reachedByGivens(c).ids;
+  if (!c.objectLine) return all;
+  const { moved } = lineGroupsOf(c);
+  const free = new Set(freeIds(c));
+  return new Set([...all].filter((id) => !free.has(id) || moved.has(id)));
 }
 
 interface CreatedFit {
@@ -2378,7 +2825,11 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const span = searchSpan(c, env);
   const stated = wide ? Math.max(6, 1.5 * statedScale(c.objects, c.constraints)) : 6;
   const wideSpan = stated > 6 ? searchSpan(c, env, stated) : span;
-  const reachedIds = wideSpan !== span ? reachedByGivens(c).ids : null;
+  /*
+   * #1687 (ADR-AG-348): a row reaches the vertices it moves, its latest line's (`lineGroupsOf`) — «D על BC» places D,
+   * it does not solve C — so C keeps its box: otherwise the sentence moved C by changing where C starts.
+   */
+  const reachedIds = wideSpan !== span ? reachedByLine(c) : null;
   const seeded = new Map<Id, Pt>(
     // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
     ids.map((id) => {
@@ -2387,6 +2838,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       return [id, { x: freeCoord(seed, name, 0, box), y: freeCoord(seed, name, 1, box) }];
     }),
   );
+  /** The hashed starts, before any region seeding moves them — #1687's last start (ADR-AG-348). */
+  const hashed: ReadonlyMap<Id, Pt> = new Map(seeded);
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
    *
@@ -2775,6 +3228,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     }
   }
 
+  // The figure as it stood, then what each line added: every line's new points start fitted to it (#1687, ADR-AG-348).
+  fitLineByLine(c, env, seeded, hashed, seed);
+
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
   const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
   if (fitted) {
@@ -2831,7 +3287,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
     ...chordStarts(system, x),
-    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), ownFree), 120),
+    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), system.envAt(x), ownFree), 120),
   ];
   /**
    * THE OTHER ROOT OF A STRAIGHT AND A CIRCLE, IN CLOSED FORM (#1619 B1, ADR-AG-193).
@@ -2848,7 +3304,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const chordStarts = (system: CarrierSystem, x: number[]): number[][] => {
     const pos = system.positionsAt(x);
     const env0 = system.envAt(x);
-    const pairs = collapsedPairs(c, pos, ownFree);
+    const pairs = collapsedPairs(c, pos, env0, ownFree);
     if (pairs.length === 0) return [];
     const atFn = (id: Id) => pos.get(id) ?? null;
     const curveAt = curveAtOf(c, env0, atFn);
@@ -3265,7 +3721,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const lineAtT = lineAtOf(c, envT, atT);
       const span = figureScale(posT, envT, sys.syms);
       const vanishes = (le: LengthExpr, dim: number) => {
-        const v = evalLengthExpr(le, atT, envT, lineAtT);
+        const v = evalLengthExpr(le, atT, envT, lineAtT, curveAtOf(c, envT, atT));
         return v !== null && Math.abs(v) <= SATISFIED_EPS * Math.max(1, span) ** dim;
       };
       const heldFlat = c.constraints.every((k) => {

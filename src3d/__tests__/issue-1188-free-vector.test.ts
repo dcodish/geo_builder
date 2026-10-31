@@ -198,16 +198,14 @@ describe('#1188 — need-basis: a free vector never joins the basis (Q5)', () =>
  * THE HONEST INTERIM REFUSALS — the known gaps of step 1, each naming the #1188 step that closes it. A row here
  * that starts to BUILD is that step landing: move the row into its step's own lock, never just delete it.
  */
-const KNOWN_GAPS_1188: { lines: string[]; code: 'free-vector-metric' | 'free-vector-combination'; step: number }[] = [
+// #1188 step 2 (ADR-3D-390) built the four `free-vector-combination` rows («w = u + v», «w = 2u - 3v», the cube's «p = 2u»,
+// «u = (k-1, 2, k)»): they moved into issue-1188-free-vector-step2.test.ts, and the code is retired.
+const KNOWN_GAPS_1188: { lines: string[]; code: 'free-vector-metric'; step: number }[] = [
   { lines: ['וקטור u', '|u| = 5'], code: 'free-vector-metric', step: 4 },
   { lines: ['וקטור u', 'וקטור v', 'u ⟂ v'], code: 'free-vector-metric', step: 4 },
   { lines: ['וקטור u', 'וקטור v', 'u·v = 0'], code: 'free-vector-metric', step: 4 },
   { lines: ['וקטור u', 'וקטור v', '|u| = |v|'], code: 'free-vector-metric', step: 4 },
   { lines: ['וקטור u', 'וקטור v', 'הזווית בין u ל-v היא 60'], code: 'free-vector-metric', step: 4 },
-  { lines: ['וקטור u', 'וקטור v', 'w = u + v'], code: 'free-vector-combination', step: 2 },
-  { lines: ['וקטור u', 'וקטור v', 'w = 2u - 3v'], code: 'free-vector-combination', step: 2 },
-  { lines: [CUBE, 'נסמן: AB = u', 'וקטור p', 'p = 2u'], code: 'free-vector-combination', step: 2 },
-  { lines: ['u = (k-1, 2, k)'], code: 'free-vector-combination', step: 2 },
 ];
 
 describe('#1188 — a given on a free vector that step 1 cannot build is refused honestly', () => {

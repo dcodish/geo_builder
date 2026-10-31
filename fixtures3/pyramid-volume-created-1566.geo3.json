@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-30T16:35:17.257Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "נפח הפירמידה ABCDS = 11",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "volume-poly",
+            "noun": "pyramid",
+            "ids": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "S"
+            ],
+            "value": 11
+          }
+        }
+      ]
+    }
+  ]
+}

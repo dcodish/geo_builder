@@ -21,7 +21,7 @@ import type { Constraint } from './solve';
 import { objectById } from './types';
 import { numeralKey, refKindOf, statedName } from './names';
 import { isPolygonSide, withinSegment } from './extent';
-import { conicMeet, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
+import { conicMeet, conicTouchOf, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
 
 export interface Crossing {
   /** Where, in world coordinates. */
@@ -278,14 +278,18 @@ function straightOfCurve(id: Id, curve: NumCurve, c: Construction): Straight | n
  * which is what the #1113 comment below always claimed and what this function used to undo by filtering
  * one call deeper, so a segment's ring carried no ordinal at all.
  *
- * A TANGENCY OFFERS NO RING, deliberately (#1096): measured, the sentence a ring would offer at a touch
- * does not build — the two incidences are degenerate there and the solve returns `unsatisfiable` even
- * though it lands on the right point. **A ring whose click fails is worse than no ring** (ADR-AG-054).
+ * A TANGENCY OFFERS ONE RING (#2618, ADR-AG-356 — operator ruling 2026-10-30, Q2 → A, on every curve). #1096
+ * withheld it because the sentence a ring would offer at a touch did not build; re-measured, «A נקודת החיתוך של
+ * הישר … עם …» at a touch builds on the circle, the ellipse and the parabola, so the premise of ADR-AG-054's carve-out
+ * no longer holds. The touch is judged scale-free (`conicTouchOf`, the solver's resolution relative to the conic's
+ * size), never by `conicMeet`'s absolute root gap: a tangency the solve PINNED (a parameter it found) leaves two roots
+ * a hair apart, and they are one point, offered once with no ordinal.
  */
 function meetConic(l: Straight, conic: NumCurve): Array<{ x: number; y: number }> {
   if (!l.walk) return [];
-  const m = conicMeet(l.walk, conic);
-  return m.touching ? [] : m.roots;
+  const touch = conicTouchOf(l.walk, conic);
+  if (touch) return [touch];
+  return conicMeet(l.walk, conic).roots;
 }
 
 /** A drawn conic the student can NAME — the other half of a crossing (#1096). */

@@ -80,7 +80,9 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
     expect(v).toBe('מעגל · (x − 16)² + y² = 25²'); // right-hand side by #1187; #1224 changed neither side
   });
 
-  it('A PARAMETERISED LOCUS STILL PRINTS THE KIND ALONE — the honesty gate', () => {
+  // ADR-AG-351 (#1186): a parameterised locus prints its equation IN THE LETTER, verified at every configuration —
+  // never a numeric equation, which would state one configuration's set as the answer.
+  it('A PARAMETERISED LOCUS NEVER PRINTS A NUMERIC EQUATION — the honesty gate', () => {
     /**
      * The anti-lock, and the one that matters most. A fix that loosened tolerances until everything
      * printed would state an equation for a figure whose locus genuinely differs between
@@ -95,7 +97,7 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
           kind,
         ).value,
         `seed ${seed}`,
-      ).toBe('מעגל');
+      ).toBe('מעגל · (x − 16a)² + y² = (25a)²');
     }
   });
 

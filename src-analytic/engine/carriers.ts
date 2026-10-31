@@ -464,6 +464,9 @@ export function sizeLetters(c: Construction): ReadonlyMap<string, SizeRole> {
     if (o.kind === 'circle-at') linear(positiveMultipleOf(o.r));
     else if (o.kind === 'curve' && symbolsOf(o.curve.eq).some((s) => !RESERVED_SYMBOLS.has(s)) && curveIsCircle(o.curve)) {
       for (const sym of evenRadiusLetters(o.curve.eq)) if (!out.has(sym)) out.set(sym, 'even');
+    } else if (o.kind === 'curve' && symbolsOf(o.curve.eq).some((s) => !RESERVED_SYMBOLS.has(s)) && curveIsKind(o.curve, 'ellipse')) {
+      // An ellipse's SEMI-AXIS letters (#2617, ADR-AG-353): «x²/a²+y²/b²=1» · «b²x²+a²y²=a²b²» · «x²/a+y²/b=1».
+      for (const [sym, role] of semiAxisLetters(o.curve)) if (!out.has(sym)) out.set(sym, role);
     }
   }
   // A size valued by a letter — only a constraint that HOLDS (top level, or inside `all`); a `choice` option may not.
@@ -487,11 +490,50 @@ export function sizeLetters(c: Construction): ReadonlyMap<string, SizeRole> {
 
 /** Is the curve a circle at a probe environment (the kind does not turn on its parameters' values in any corpus form)? */
 function curveIsCircle(curve: { eq: Expr; kind?: string }): boolean {
-  if (curve.kind) return curve.kind === 'circle';
+  return curveIsKind(curve, 'circle');
+}
+
+function curveIsKind(curve: { eq: Expr; kind?: string }, kind: 'circle' | 'ellipse'): boolean {
+  if (curve.kind) return curve.kind === kind;
   const env: Record<string, number> = {};
   symbolsOf(curve.eq).forEach((s, i) => (env[s] = SIZE_PROBES[i % SIZE_PROBES.length]));
   const r = resolveCurve({ eq: curve.eq }, env);
-  return r.ok && r.curve.kind === 'circle';
+  return r.ok && r.curve.kind === kind;
+}
+
+/**
+ * THE LETTERS AN ELLIPSE HOLDS AS ITS SEMI-AXES (#2617, ADR-AG-353; R191, operator ruling 2026-10-20: *"any letter
+ * represending size needs to be positive"*). A letter is a semi-axis letter when moving it moves exactly ONE of the
+ * resolved semi-axes and leaves the other alone:
+ *
+ * - `even` — that semi-axis is a positive multiple of |t| («x²/a²», «b²x²+a²y²=a²b²», «x²/(4a²)»): the equation reads t²
+ *   only, so a declared negative letter contradicts nothing (`evenRadiusLetters`' reading, one conic over);
+ * - `linear` — its SQUARE is a positive multiple of t («x²/a»): no ellipse exists for t ≤ 0.
+ *
+ * Read off the RESOLVED curve at numeric probes (no CAS, ADR-AG-001 D1), so every equation form is one reading, and a
+ * letter that also moves the other semi-axis («x²/a² + y²/(a+1)²») is not a size of either.
+ */
+function semiAxisLetters(curve: { eq: Expr; kind?: string }): Array<[string, SizeRole]> {
+  const syms = symbolsOf(curve.eq).filter((s) => !RESERVED_SYMBOLS.has(s));
+  const out: Array<[string, SizeRole]> = [];
+  const close = (u: number, v: number) => Math.abs(u - v) <= 1e-9 * Math.max(1, Math.abs(u), Math.abs(v));
+  for (const sym of syms) {
+    const base: Record<string, number> = {};
+    syms.forEach((s, i) => (base[s] = SIZE_PROBES[i % SIZE_PROBES.length]));
+    const axesAt = (t: number): [number, number] | null => {
+      const r = resolveCurve({ eq: curve.eq, ...(curve.kind ? { kind: curve.kind } : {}) } as Parameters<typeof resolveCurve>[0], { ...base, [sym]: t });
+      return r.ok && r.curve.kind === 'ellipse' ? [r.curve.a, r.curve.b] : null;
+    };
+    const [p, q, n] = [axesAt(1), axesAt(2), axesAt(-1.5)];
+    if (!p || !q) continue;
+    for (const i of [0, 1] as const) {
+      const j = i === 0 ? 1 : 0;
+      if (!close(p[j], q[j]) || !(p[i] > 1e-12)) continue;
+      if (close(q[i], 2 * p[i]) && n && close(n[i], 1.5 * p[i]) && close(n[j], p[j])) out.push([sym, 'even']);
+      else if (close(q[i] * q[i], 2 * p[i] * p[i]) && !n) out.push([sym, 'linear']);
+    }
+  }
+  return out;
 }
 
 /** Every value of `d` is positive. */
@@ -724,6 +766,8 @@ export const shapedObjectOf = (sym: string): Id | null => {
  */
 export const radiusSymbol = (centre: Id): string => `r_${centre}`;
 const RADIUS_PREFIX = radiusSymbol('');
+/** A radius the TOOL named (`r_<centre>`), never a letter the student wrote — the locus's letters exclude it (#1186). */
+export const isRadiusSymbol = (sym: string): boolean => sym.startsWith(RADIUS_PREFIX) && sym.length > RADIUS_PREFIX.length;
 
 /**
  * EVERY MINTED RADIUS IS READ (#2382, ADR-AG-305) — the structural guard for "a circle's radius is created in one place

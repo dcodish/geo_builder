@@ -21,7 +21,8 @@
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
 import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
-import type { Pt } from './derived';
+import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
+import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import type { Id } from './types';
 
 /**
@@ -76,7 +77,23 @@ export type MeasureTerm =
    * Both names are AS WRITTEN, for the reason the point-line member records: «l1» and «AB» are both
    * legal and mean different things, and only the caller holding the figure can tell them apart.
    */
-  | { kind: 'line-line'; u: string; v: string };
+  | { kind: 'line-line'; u: string; v: string }
+  /**
+   * A distance with an ellipse's ROLE POINT at one end or both (#2616/#2617, ADR-AG-353) — «המרחק בין המוקדים», «הציר
+   * הגדול», «מרחק המוקד הימני מהקודקוד הימני», «AF₁ + AF₂» with the foci unlettered. M1 writes it from a length term whose
+   * end is an unlettered role (`via-ellipse-role`); each end is a point or a role of `curve` (`ellipseRolePoint`, the one
+   * closed form). Nothing is drawn for an unlettered end (operator ruling 2026-10-30, Q1 → A).
+   */
+  | { kind: 'ellipse-dist'; u: RoleEnd; v: RoleEnd; curve: Id };
+
+/** One end of an `ellipse-dist` term: a point, or a role point of the term's ellipse. */
+export type RoleEnd = { p: Id } | { role: EllipseRole };
+
+/** The point a role end stands at, given the points and the ellipse's semi-axes. */
+export function roleEndAt(end: RoleEnd, at: (id: Id) => Pt | null, ellipse: { a: number; b: number } | null): Pt | null {
+  if ('p' in end) return at(end.p);
+  return ellipse ? ellipseRolePoint(ellipse, end.role) : null;
+}
 
 /** @deprecated the name the union grew out of — kept so existing callers read unchanged. */
 export type LengthTerm = MeasureTerm;
@@ -408,7 +425,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
       // «AB» are one question with one answer instead of a point-line term naming a line called «B».
       if (IS_POINT.test(x) && IS_POINT.test(y)) {
         if (x === y) return _m; // a degenerate statement, as LENGTH_TOKEN also refuses
-        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === x && t.b === y);
+        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === x && t.b === y);
       }
       // Exactly one point: the other operand is the line, whichever side it was written on.
       const p = IS_POINT.test(x) ? x : IS_POINT.test(y) ? y : null;
@@ -434,7 +451,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
   // A DISTANCE noun in front of a bare pair is a distance, not a named pair (#1652).
   const withDistances = withPL.replace(DISTANCE_NOUN, (_m, a: string, b: string) => {
     if (a === b) return _m;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === a && t.b === b);
     return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push({ a, b }) - 1));
   });
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
@@ -450,7 +467,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
     // Identical endpoints have zero length always; they are a degenerate statement rather than a
     // term, and admitting them would let `AA = 5` look satisfiable-but-failing instead of wrong.
     if (a === b) return `${a}${b}`;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
     named?.add(i); // the pair token itself reached this term: the student NAMED the segment (#1652)
     return String.fromCharCode(PLACEHOLDER_BASE + i);
@@ -522,6 +539,8 @@ export function evalLengthExpr(
    * against.
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
+  /** Resolve a curve by id — an ellipse's role points need it (#2616); absent, such a term cannot be judged. */
+  curveAt?: (id: Id) => { kind: string; a?: number; b?: number } | null,
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {
@@ -558,6 +577,13 @@ export function evalLengthExpr(
       // Same normal DIRECTION, or the constants subtract the wrong way: orient v to u before comparing.
       const flip = lu.a * lv.a + lu.b * lv.b < 0 ? -1 : 1;
       value = Math.abs(lu.c / nu - (flip * lv.c) / nv);
+    } else if (term.kind === 'ellipse-dist') {
+      const k = curveAt?.(term.curve) ?? null;
+      const e = k && k.kind === 'ellipse' && typeof k.a === 'number' && typeof k.b === 'number' ? { a: k.a, b: k.b } : null;
+      const p = roleEndAt(term.u, at, e);
+      const q = roleEndAt(term.v, at, e);
+      if (!p || !q) return null;
+      value = Math.hypot(q.x - p.x, q.y - p.y);
     } else if (term.kind === 'point-line') {
       const p = at(term.p);
       // A line resolved at M1 is read by its id (#2429): a rename cannot strand the term.
@@ -583,8 +609,11 @@ export function evalLengthExpr(
 export function lengthRefs(le: LengthExpr): Id[] {
   // A point-to-line term references the POINT only: the line is named, and whether that name is a
   // curve or a pair of vertices is the caller's question, not the solver's.
-  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : [t.a, t.b]));
+  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : t.kind === 'ellipse-dist' ? roleEndPoints(t) : [t.a, t.b]));
 }
+
+/** The lettered points an `ellipse-dist` term measures from (#2616) — a role end is the curve's, not a point. */
+export const roleEndPoints = (t: { u: RoleEnd; v: RoleEnd }): Id[] => [t.u, t.v].flatMap((e) => ('p' in e ? [e.p] : []));
 
 /** The student's own words are carried on the fact; this is the internal shorthand for a refusal. */
 export function describeLengthExpr(le: LengthExpr): string {
@@ -597,7 +626,9 @@ export function describeLengthExpr(le: LengthExpr): string {
           ? `מרחק ${t.p}-${t.line}`
           : t.kind === 'line-line'
             ? `מרחק ${t.u}-${t.v}`
-            : `${t.a}${t.b}`,
+            : t.kind === 'ellipse-dist'
+              ? `${CONIC_ROLE_WORDS.distance} ${[t.u, t.v].map((e) => ('p' in e ? e.p : e.role.k === 'focus' ? CONIC_ROLE_WORDS.focus : CONIC_ROLE_WORDS.vertex)).join('-')}`
+              : `${t.a}${t.b}`,
     )
     .join('+');
 }

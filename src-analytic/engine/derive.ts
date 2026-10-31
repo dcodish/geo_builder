@@ -9,7 +9,7 @@
 import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, crossingHasNoPoint, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -456,6 +456,15 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)) || (applied !== undefined && failing.has(JSON.stringify(applied))))) {
         blamed.add(owner[i]);
         const sel = applied ?? f.sel;
+        /*
+         * A CROSSING WHOSE TWO LINES ARE ONE LINE in the figure drawn (#2613, ADR-AG-349; operator ruling 2026-10-30, Q1
+         * → A): the sentence names no point, so it is refused with ADR-AG-140's sentence — the one a line written twice
+         * («הישר AB עם הישר BA») already gets. Read off the drawn figure, like the side arm below.
+         */
+        if ((sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth') && crossingHasNoPoint(construction, drawnAt, figure.env, sel.id)) {
+          noSide.set(owner[i], { index: owner[i], code: 'self-crossing', detail: lines[owner[i]] });
+          return;
+        }
         if (sel.kind !== 'line-compare') return;
         const none = lineCompareNoSide(construction, sel, drawnAt, figure.env);
         const side = sel.axis === 'y' ? (sel.greater ? 'above' : 'below') : sel.greater ? 'right' : 'left';
@@ -702,8 +711,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     /** Is the straight tangent to K at Q BY CONSTRUCTION? The line that made it so, or null. */
     const tangentByConstruction = (s: Straight, K: (typeof construction.objects)[number], Q: string): number | null => {
       const centre = centreIdOf(construction, K);
-      const isRadius = (d: { k: string; circle?: string; at?: string; a?: string; b?: string }) =>
-        (d.k === 'radius' && d.circle === K.id && d.at === Q) || (d.k === 'points' && centre !== null && sameSet([d.a!, d.b!], [centre, Q]));
+      // The radius on a circle, the conic's normal on an ellipse or a parabola (#2618, ADR-AG-355).
+      const isRadius = (d: { k: string; circle?: string; curve?: string; at?: string; a?: string; b?: string }) =>
+        (d.k === 'radius' && d.circle === K.id && d.at === Q) ||
+        (d.k === 'normal' && d.curve === K.id && d.at === Q) ||
+        (d.k === 'points' && centre !== null && sameSet([d.a!, d.b!], [centre, Q]));
       const isStraight = (d: { k: string; id?: string; a?: string; b?: string }) =>
         (d.k === 'points' && sameSet([d.a!, d.b!], s.pts)) || (d.k === 'curve' && s.curve !== undefined && d.id === s.curve);
       const rel = construction.constraints.findIndex(
@@ -712,7 +724,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (rel >= 0) return constraintOn[rel];
       const isTangentObject = (id: string) => {
         const T = objectById(construction, id);
-        return !!T && T.kind === 'line-at' && T.perp && T.through === Q && T.dir.k === 'radius' && T.dir.circle === K.id && T.dir.at === Q;
+        return (
+          !!T && T.kind === 'line-at' && T.perp && T.through === Q &&
+          ((T.dir.k === 'radius' && T.dir.circle === K.id && T.dir.at === Q) || (T.dir.k === 'normal' && T.dir.curve === K.id && T.dir.at === Q))
+        );
       };
       if (s.curve && isTangentObject(s.curve)) return objectLine(s.curve);
       // Through Q and a point stated on K's tangent object at Q.

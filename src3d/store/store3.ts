@@ -36,7 +36,8 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3 } from '../engine/apply';
-import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintEligible3 } from '../engine/mintable';
+import { freeNamesIn3 } from '../engine/freeVecSystem';
+import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -55,7 +56,7 @@ import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusa
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, parse3, parseRewrite3 } from '../parser/parse3';
+import { isBareAltitude3, parse3, parseRewrite3, solidDeclaration3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -101,7 +102,12 @@ export interface Derived3 {
  * once per reading, through this same fold (never a second reader), and reading the line's own status:
  * - only one reading builds → that reading;
  * - both build and give one figure → the length reading (nothing on the figure asserts a vector);
- * - both build and differ, or neither builds → `'ask'` (the question; neither reading is silently picked).
+ * - both build and differ → `'ask'` (the question; neither reading is silently picked);
+ * - the VECTOR reading cannot hold → `'length'`, whether or not the length reading then holds (Am. 2, the operator
+ *   on T64, 2026-10-30: *"since AB=AC cannot be vectors for a quad pyramid to hold, we must assume these are length
+ *   and write them as such"*). A length reading that cannot hold either goes through the ordinary length path and
+ *   gets that path's own verdict — the contradiction naming the statement — so no sentence is ever asked about
+ *   when only one of its readings was ever possible.
  * The trials run at one canonical seed, so a line's reading never changes with «הציגו תצורה אחרת»; the verdict
  * depends only on the list up to the line, so a later line never re-reads an earlier one. Memoized by that prefix.
  */
@@ -118,7 +124,7 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
     return d.status[line.id] === 'ok' ? d : null;
   };
   const asVector = trial('vector');
-  const asLength = trial('length');
+  const asLength = asVector ? trial('length') : null; // Am. 2: with no vector reading, the length one is taken as is
   const sameFigure = (a: Derived3, b: Derived3): boolean => {
     if (a.positions.size !== b.positions.size) return false;
     for (const [id, p] of a.positions) {
@@ -128,7 +134,7 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
     return true;
   };
   const out: SegmentEquationReading3 =
-    asVector && asLength ? (sameFigure(asVector, asLength) ? 'length' : 'ask') : asVector ? 'vector' : asLength ? 'length' : 'ask';
+    !asVector ? 'length' : asLength ? (sameFigure(asVector, asLength) ? 'length' : 'ask') : 'vector';
   if (readingMemo3.size > 500) readingMemo3.delete(readingMemo3.keys().next().value as string);
   readingMemo3.set(key, out);
   return out;
@@ -533,6 +539,17 @@ function placementFixers3(
 const coordinateFixers3 = (c: Construction3, facts: readonly Fact3[], id: Id): Set<string> | null =>
   placementFixers3(c, facts, id, false);
 
+/** #1188 step 2 (ADR-3D-390): the vectors this command says something about — a tuple on it, a declaration of it, or
+ *  a vector equation / relation that names it (the conflict sentence's earlier lines). */
+function vectorsNamedBy3(k: Command3): string[] {
+  const named = (e: readonly { atom: { kind: string; name?: string } }[]) => e.flatMap((t) => (t.atom.kind === 'named' && t.atom.name ? [t.atom.name] : []));
+  if (k.type === 'inject-vector') return [k.name];
+  if (k.type === 'declare-vector') return [...k.names];
+  if (k.type === 'vec-rel') return named(k.terms);
+  if (k.type === 'claim' && k.claim.type === 'vec-eq') return [...named(k.claim.lhs), ...named(k.claim.rhs)];
+  return [];
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
   const hit = per?.get(seed);
@@ -544,6 +561,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   if (m.size > 32) m.delete(m.keys().next().value as number);
   return out;
 }
+
+/** #1566 (ADR-3D-399): a solid the mint pass created for a row — the declaration it applies, and the points that made. */
+type MintedSolid3 = { readonly cmds: readonly Command3[]; readonly ids: readonly string[] };
 
 /** #1422 — the memo's counter lock seam (the 2-D `conflictSearchStats` idiom): one press must
  *  cost exactly one uncached derive, asserted by count, never by clock. */
@@ -575,6 +595,10 @@ function deriveCore3(
   postMint?: Readonly<Record<string, FactStatus3>>,
   /** #2484 (ADR-3D-388): the PLANES the pass decided to create, by row — placed with the points and lines. */
   preplanes?: Readonly<Record<string, readonly string[]>>,
+  /** #1566 (ADR-3D-399): the SOLIDS the pass decided to create, by row — the declaration that row applies first, and the
+   *  points it created (what the notice names). Applied AT the row, in list order: a solid's letters may be declared by
+   *  an earlier row, so it cannot be placed before the fold the way a free point or line is. */
+  presolids?: Readonly<Record<string, MintedSolid3>>,
 ): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
@@ -584,9 +608,11 @@ function deriveCore3(
   const readings: Record<string, SegmentEquationReading3> = {};
   /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
   const expandFact = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
-    if (!f.cmds.some((k) => k.type === 'shape-ref3')) return { ok: true, cmds: f.cmds };
+    const solid = presolids?.[f.id]; // #1566: a solid the mint pass created for this row is declared by it, first
+    if (!f.cmds.some((k) => k.type === 'shape-ref3')) return solid ? { ok: true, cmds: [...solid.cmds, ...f.cmds] } : { ok: true, cmds: f.cmds };
     const r = expandShapeRefs3(at, f.cmds);
-    return r.ok ? r : { ok: false, error: withShapeSentence3(r.error, f.utterance) };
+    if (!r.ok) return { ok: false, error: withShapeSentence3(r.error, f.utterance) };
+    return solid ? { ok: true, cmds: [...solid.cmds, ...r.cmds] } : r;
   };
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
@@ -863,6 +889,8 @@ function deriveCore3(
   const linesBy: Record<string, string[]> = prelines ? Object.fromEntries(Object.entries(prelines).map(([k, v]) => [k, [...v]])) : {};
   /** #2484: every plane the pass created, by row (never in the notice — ruling 2026-10-24, e11 = A). */
   const planesBy: Record<string, string[]> = preplanes ? Object.fromEntries(Object.entries(preplanes).map(([k, v]) => [k, [...v]])) : {};
+  /** #1566 (ADR-3D-399): every solid the pass created, by row (its points ARE in the notice — #2048 ruling A, S2(c)). */
+  const solidsBy: Record<string, MintedSolid3> = presolids ? { ...presolids } : {};
   const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
     let probe = base;
     const exp = expandFact(base, f);
@@ -876,7 +904,7 @@ function deriveCore3(
     return null;
   };
   /** What the latest attempt says is missing and the pass may create: a point, or (#2489) a line named in a line slot. */
-  type Missing3 = { kind: 'point' | 'line' | 'plane'; id: string };
+  type Missing3 = { kind: 'point' | 'line' | 'plane'; id: string } | { kind: 'solid'; id: string; cmds: Command3[] };
   const missingOf = (st: FactStatus3 | null, base: Construction3, f: Fact3): Missing3 | null => {
     if (st === null || typeof st !== 'object') return null;
     const id = (st as { id?: unknown }).id;
@@ -885,6 +913,13 @@ function deriveCore3(
     if (st.code === 'unknown-line' && !base.lines.has(id) && !base.pointLines.has(id) && lineSlotNames3(f.cmds).has(id)) return { kind: 'line', id };
     // #2484 (ADR-3D-388): a π-plane named in a plane slot that the figure lacks is created as «מישור π3» creates it
     if (st.code === 'unknown-plane' && mintablePlane3(id, base, f.cmds)) return { kind: 'plane', id };
+    // #1566 (ADR-3D-399; #2048 ruling A, S2(c)): a solid named by its letters («נפח הפירמידה ABCDS») that the figure
+    // lacks is created as its bare declaration («פירמידה ABCDS») creates it — the parser says what the noun declares
+    const solid = mintableSolid3(st, f.cmds);
+    if (solid) {
+      const cmds = solidDeclaration3(solid.noun, solid.ids);
+      if (cmds) return { kind: 'solid', id, cmds };
+    }
     return null;
   };
   for (let guard = 0; guard < facts.length && !premint; guard++) {
@@ -897,7 +932,31 @@ function deriveCore3(
       const ids: string[] = [];
       const lineIds: string[] = [];
       const planeIds: string[] = [];
+      let solidMade: MintedSolid3 | null = null;
       for (let m = missingOf(st, probe, f), n = 0; m !== null && n < 24; m = missingOf(st, probe, f), n++) {
+        if (m.kind === 'solid') {
+          // #1566 (ADR-3D-399): the declaration's own clash rules are inherited, and its refusal is the line's (atomic)
+          if (solidMade) break; // one solid per line: a second «no such solid» after the first is the line's own reason
+          let made = probe;
+          let refused: FactStatus3 | null = null;
+          for (const cmd of m.cmds) {
+            const r = applyCommand3(made, seated(cmd));
+            if (!r.ok) {
+              refused = r.error;
+              break;
+            }
+            made = r.next;
+          }
+          if (refused) {
+            st = refused;
+            break;
+          }
+          const before = probe;
+          solidMade = { cmds: m.cmds, ids: [...made.points.keys()].filter((k) => !before.points.has(k)) };
+          probe = made;
+          st = dryRunOn(probe, f);
+          continue;
+        }
         if (m.kind === 'point') {
           ids.push(m.id);
           probe = mintFree(probe, [m.id]);
@@ -921,7 +980,7 @@ function deriveCore3(
       // row («וקטור u») may own the name this earlier row («נסמן: AB = u») introduces. Only the in-order refold below
       // may judge it: the row keeps its created points as a candidate and the refold decides (and drops them if the
       // clash is real in list order). Every other post-mint reason is the row's own and is final here, as before.
-      if (st !== null && typeof st === 'object' && st.code === 'already-defined' && (ids.length > 0 || lineIds.length > 0)) {
+      if (st !== null && typeof st === 'object' && st.code === 'already-defined' && (ids.length > 0 || lineIds.length > 0) && !solidMade) {
         mintedBy[f.id] = ids;
         if (lineIds.length) linesBy[f.id] = lineIds;
         failedAfterMint[f.id] = restatedAgainst(f, st);
@@ -939,6 +998,7 @@ function deriveCore3(
         mintedBy[f.id] = ids;
         if (lineIds.length) linesBy[f.id] = lineIds;
         if (planeIds.length) planesBy[f.id] = planeIds;
+        if (solidMade) solidsBy[f.id] = solidMade;
       }
       minted = true;
       break;
@@ -965,23 +1025,41 @@ function deriveCore3(
     let keep: Record<string, string[]> = mintedBy;
     let keepLines: Record<string, string[]> = linesBy;
     let keepPlanes: Record<string, string[]> = planesBy;
+    let keepSolids: Record<string, MintedSolid3> = solidsBy;
     const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
     for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
-      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes);
-      const failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok');
+      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, keepSolids);
+      /**
+       * #1566 (ADR-3D-399): a row that is green in the fold of the rows UP TO IT failed only because a LATER row
+       * contradicts it — two statements in conflict, which the declared-first figure reports as a conflict on both. It
+       * keeps what it created. Dropping it made the later row read «אין בציור גוף ABCDS» (or «unknown point») about an
+       * object the student had just created and could see.
+       */
+      const ownFailure = (id: string): boolean => {
+        const at = factsIn.findIndex((f) => f.id === id);
+        if (at < 0 || at === factsIn.length - 1) return true;
+        const upTo = new Set(factsIn.slice(0, at + 1).map((f) => f.id));
+        const pick = <V,>(r: Record<string, V>): Record<string, V> => Object.fromEntries(Object.entries(r).filter(([k]) => upTo.has(k)));
+        const alone = deriveCore3(factsIn.slice(0, at + 1), seed, false, pick(keep), pick(keepLines), pick(reasons), pick(keepPlanes), pick(keepSolids));
+        return alone.status[id] !== 'ok';
+      };
+      const failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok' && ownFailure(id));
       if (failed.length === 0) return again;
       for (const id of failed) reasons[id] = again.status[id]; // the post-mint reason, read in list order
       keep = Object.fromEntries(Object.entries(keep).filter(([id]) => !failed.includes(id)));
       keepLines = Object.fromEntries(Object.entries(keepLines).filter(([id]) => !failed.includes(id)));
       keepPlanes = Object.fromEntries(Object.entries(keepPlanes).filter(([id]) => !failed.includes(id)));
-      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, {}, reasons, {});
+      keepSolids = Object.fromEntries(Object.entries(keepSolids).filter(([id]) => !failed.includes(id)));
+      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, {}, reasons, {}, {});
     }
   }
   // a row whose created points were dropped reports why it failed WITH them, never «unknown point» (atomicity)
   if (postMint) for (const [id, st] of Object.entries(postMint)) if (typeof status[id] !== 'string') status[id] = st;
   /** What the notice names: the points created by REFERENCE — a row that only declares («קטע AB» · «דלתון ABCD») is silent. */
   const created: Record<string, string[]> = Object.fromEntries(
-    Object.entries(mintedBy).filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? [])),
+    Object.entries(mintedBy)
+      .filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? []))
+      .map(([id, pts]) => [id, solidsBy[id] ? [...solidsBy[id].ids, ...pts] : pts]),
   );
   // #2235 (ADR-3D-351): from here on every reader asks what each line stated ABOUT THE FIGURE — a shape reference is
   // read as the ring it was applied to (the blame, crossing, collapse and narrowing passes below never see a placeholder)
@@ -1770,10 +1848,25 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-metric' || st.code === 'free-vector-combination') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-metric' || st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
-      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => k.type === 'inject-vector' && k.name === st.id));
+      // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
+      const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => vectorsNamedBy3(k).some((n) => named.includes(n))));
       status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: by.map((g) => g.utterance) };
+    } else if (st.code === 'claim-refuted' || st.code === 'givens-contradict') {
+      // ADR-3D-390 Am. 1: a line whose free vectors were ELIMINATED to a relation on the figure («AB = p» · «AD = p»
+      // is «AD = AB») and that relation cannot hold — the contradiction is between this line and the earlier lines
+      // that said what those free vectors are, so it names them (a bare «וקטור p» says nothing, and is not named)
+      const own = claimOwners.find((o) => o.factId === f.id);
+      const via = own
+        ? c.claims.slice(own.from, own.to).flatMap((k) => (k.type === 'vec-eq' && k.stated ? freeNamesIn3(c, [...k.stated.lhs, ...k.stated.rhs]) : []))
+        : [];
+      if (via.length === 0) return;
+      const says = (g: Fact3) => g.cmds.some((k) => k.type !== 'declare-vector' && vectorsNamedBy3(k).some((n) => via.includes(n)));
+      const by = facts.slice(0, i).filter((g) => g.enabled && status[g.id] === 'ok' && says(g)).map((g) => g.utterance);
+      const was = st.code === 'givens-contradict' ? st.others : [];
+      status[f.id] = { code: 'givens-contradict', stated: f.utterance, others: [...new Set([...was, ...by])] };
     }
   });
 

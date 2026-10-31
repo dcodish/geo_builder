@@ -38,6 +38,16 @@ export interface CatalogEntry3 {
    * section has fewer than the cap, so the next addition cannot quietly vanish into the tail.
    */
   featured?: true;
+  /**
+   * #1566 ([ADR-3D-398](../../docs/06b-decisions-3d.md#adr-3d-398); #2048 card d6 and the operator's ruling of
+   * 2026-10-30, 3A) — THE LINES THIS EXAMPLE NEEDS BEFORE IT, when there is nothing it could create: a free-vector
+   * line needs its vectors («נסמן: AB = u …»), a role noun its solid («גובה הפירמידה» needs «פירמידה ABCDS»), a value
+   * its letter («α = 70» needs «∠BAC = α»). A guide click on an EMPTY canvas submits these first, then the example; on a
+   * figure the click submits the example alone. Analytic's `needs` is the precedent; 3-D carries both languages
+   * because the click submits in the UI language. `catalog-blank-canvas-1566.test.ts` builds every entry after its
+   * needs on a blank canvas, in both languages.
+   */
+  needs?: { he: string[]; en: string[] };
 }
 
 export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
@@ -63,7 +73,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: "מנסרה ABCA'B'C'", en: "prism ABCA'B'C'" },
   { category: 'solids', he: 'מנסרה שבסיסה משולש', en: 'prism with a triangle base' },
   { category: 'solids', he: 'מנסרה שבסיסה מרובע', en: 'prism with a quadrilateral base' },
-  { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right' }, // #289 (M1): make the existing prism a right prism
+  { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right', needs: { he: ['מנסרה משולשת ABC'], en: ['triangular prism ABC'] } }, // #289 (M1): make the existing prism a right prism
   { category: 'solids', he: 'פירמידה ישרה שבסיסה משולש שווה צלעות', en: 'right pyramid with an equilateral triangle base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה מקבילית', en: 'pyramid SABCD with a parallelogram base' },
   { featured: true, category: 'solids', he: 'פירמידה ישרה ABCDS שבסיסה ריבוע', en: 'right pyramid ABCDS with a square base' },
@@ -78,17 +88,17 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מעוין', en: 'right pyramid SABCD with a rhombus base' },
   { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מקבילית', en: 'right pyramid SABCD with a parallelogram base' },
   { category: 'solids', he: 'טטראדר ABCD', en: 'tetrahedron ABCD' },
-  { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|' },
+  { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'vectors', he: 'אורך AS שווה לאורך AB', en: '|AS| = |AB|' },
   // #2092 (ADR-3D-381): a length given as a LETTER — the taught spelling («AB = k» names a vector)
   { category: 'vectors', he: '|AB| = k', en: '|AB| = k' },
   // #393/#335 (ADR-3D-107): chained + expression magnitudes
-  { featured: true, category: 'vectors', he: '|u|=|v|=1', en: '|u|=|v|=1' },
-  { category: 'vectors', he: '|u|=|v|=|w|', en: '|u|=|v|=|w|' },
-  { category: 'vectors', he: '|w+u| = |w-u|', en: '|w+u| = |w-u|' },
-  { category: 'vectors', he: '|2w+3v| = |3v-2w|', en: '|2w+3v| = |3v-2w|' },
+  { featured: true, category: 'vectors', he: '|u|=|v|=1', en: '|u|=|v|=1', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  { category: 'vectors', he: '|u|=|v|=|w|', en: '|u|=|v|=|w|', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  { category: 'vectors', he: '|w+u| = |w-u|', en: '|w+u| = |w-u|', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  { category: 'vectors', he: '|2w+3v| = |3v-2w|', en: '|2w+3v| = |3v-2w|', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { featured: true, category: 'vectors', he: 'וקטור SE = 3/4 וקטור SD', en: 'vector SE = 3/4 vector SD' },
-  { category: 'vectors', he: 'k = 1/2', en: 'k = 1/2' },
+  { category: 'vectors', he: 'k = 1/2', en: 'k = 1/2', needs: { he: ['|AB| = k'], en: ['|AB| = k'] } },
   { category: 'points', he: 'הקודקוד D נמצא על החלק החיובי של ציר ה-x', en: 'D is on the positive x-axis' },
   // #510: a coordinate takes the same VALUE literals as a stated magnitude — √, fractions, the palette's ½
   { category: 'points', he: 'C(√2,1,0)', en: 'C(√2,1,0)' },
@@ -97,7 +107,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // run, resolved against the DECLARED figure — the base run of a pyramid names the pyramid, and on a
   // figure with exactly one, the letters can be left off entirely.
   { featured: true, category: 'claims', he: 'נפח הפירמידה ABCDS = 11', en: 'the volume of the pyramid ABCDS = 11' },
-  { category: 'claims', he: 'נפח הפירמידה שווה ל 11', en: 'the volume of the pyramid is 11' },
+  { category: 'claims', he: 'נפח הפירמידה שווה ל 11', en: 'the volume of the pyramid is 11', needs: { he: ['פירמידה ABCDS'], en: ['pyramid ABCDS'] } },
   { category: 'claims', he: '∠SAB = ∠SAD', en: '∠SAB = ∠SAD' }, // #271: a general angle equality (drives a free-dim solid / verifies a determined one)
   // #337: the SAME relation in the corpus's between-form wording (vector / line / segment nouns all accepted)
   { category: 'claims', he: 'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', en: 'the angle between AB and AC = the angle between AB and AD' },
@@ -107,7 +117,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- points ---
   { featured: true, category: 'points', he: "M אמצע BB'", en: "M is the midpoint of BB'" },
   { category: 'points', he: "אמצע BB'", en: "midpoint of BB'" },
-  { category: 'claims', he: 'זווית O ישרה', en: 'angle at O is right' },
+  { category: 'claims', he: 'זווית O ישרה', en: 'angle at O is right', needs: { he: ['משולש AOB'], en: ['triangle AOB'] } },
   { category: 'points', he: "K על AA' כך ש-AK = 2KA'", en: "K on AA' such that AK = 2KA'" },
   { featured: true, category: 'points', he: 'E על AC כך ש-AE:EC = 2:1', en: 'E on AC such that AE:EC = 2:1' },
   // #748 (ADR-3D-159): the same ratio as its OWN fact — the rider is already on the segment
@@ -115,7 +125,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { featured: true, category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
   { featured: true, category: 'points', he: 'O מפגש האלכסונים של הפאה ABCD', en: 'O is the intersection of the diagonals of face ABCD' },
   // #834: the point-free arm — DRAW the base's diagonals without naming a crossing (2 prod users)
-  { category: 'points', he: 'אלכסוני הבסיס', en: 'diagonals of the base' },
+  { category: 'points', he: 'אלכסוני הבסיס', en: 'diagonals of the base', needs: { he: ['פירמידה ABCDS'], en: ['pyramid ABCDS'] } },
   { featured: true, category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },
   {
     // ADR-3D-032: one symbolic coordinate = the figure parameter (a later given pins it)
@@ -123,21 +133,21 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
     he: 'נתונה נקודה M(k,1,3), k הוא פרמטר חיובי',
     en: 'point M(k,1,3), k is a positive parameter',
   },
-  { category: 'points', he: 'P על AM כך ש-KP = αu + βv', en: 'P on AM such that KP = αu + βv' },
+  { category: 'points', he: 'P על AM כך ש-KP = αu + βv', en: 'P on AM such that KP = αu + βv', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   {
     // #325 (ADR-3D-079): affine symbolic coordinates — the symbols stay OPEN (free) until data pins them
     category: 'points',
     he: 'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)',
     en: 'given the points: A(1, 4, -3), B(2t, t, k)',
   },
-  { category: 'points', he: 't פרמטר חיובי', en: 't is a positive parameter' },
-  { category: 'points', he: 't > 0', en: 't > 0' },
+  { category: 'points', he: 't פרמטר חיובי', en: 't is a positive parameter', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
+  { category: 'points', he: 't > 0', en: 't > 0', needs: { he: ['A(t, 1, 2)'], en: ['A(t, 1, 2)'] } },
   // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane (lowercase x/y/z) or axis
   { category: 'planesLines', he: 'הבסיס ABCD מונח על מישור שמקביל למישור [xy]', en: 'base ABCD lies on a plane parallel to the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מונח על המישור [xy]', en: 'plane ABC lies on the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מאונך למישור [xz]', en: 'plane ABC is perpendicular to the xz-plane' },
   { category: 'planesLines', he: 'המישור ABC מקביל לציר ה-z', en: 'plane ABC is parallel to the z-axis' },
-  { category: 'planesLines', he: 'הבסיס מונח במישור המקביל למישור ה-xy', en: 'the base lies in a plane parallel to the xy-plane' },
+  { category: 'planesLines', he: 'הבסיס מונח במישור המקביל למישור ה-xy', en: 'the base lies in a plane parallel to the xy-plane', needs: { he: ['פירמידה ABCDS'], en: ['pyramid ABCDS'] } },
   // --- vectors ---
   { featured: true, category: 'vectors', he: "נסמן: AB = u, AD = v, AA' = w", en: "denote AB = u, AD = v, AA' = w" },
   { featured: true, category: 'vectors', he: 'נתון: v = (10,-5,0), u = (5,5,-5)', en: 'given: v = (10,-5,0), u = (5,5,-5)' },
@@ -176,7 +186,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
     he: 'הצגה פרמטרית של הישר AB היא x = (0,7,6) + t(0,2,1)',
     en: 'a parametric representation of line AB is x = (0,7,6) + t(0,2,1)',
   },
-  { category: 'planesLines', he: 'הזווית בין המישורים π1 ו-π2 היא 45', en: 'the angle between planes π1 and π2 is 45' },
+  { category: 'planesLines', he: 'הזווית בין המישורים π1 ו-π2 היא 45', en: 'the angle between planes π1 and π2 is 45', needs: { he: ['המישור π1: z - 3 = 0', 'המישור π2: ay + z - 8 = 0'], en: ['plane π1: z - 3 = 0', 'plane π2: ay + z - 8 = 0'] } },
   { category: 'planesLines', he: 'הישר ℓ ניצב למישור π1', en: 'line ℓ is perpendicular to plane π1' },
   // #375 (ADR-3D-100): the plane written as its POINT RUN — either order, and the noun is not what decides
   { category: 'planesLines', he: 'מישור ABC אנך לישר ℓ', en: 'plane ABC is perpendicular to line ℓ' },
@@ -205,12 +215,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'AF גובה הפירמידה לפאה BDC', en: 'AF is the height of the pyramid to face BDC' },
   // #448: the same height stated by its APEX instead of its segment — the foot is auto-minted, so the
   // student never has to name a point the question does not give them.
-  { category: 'planesLines', he: 'גובה הפירמידה מנקודה D', en: 'height of the pyramid from D' },
-  { category: 'planesLines', he: 'גובה מנקודה D לבסיס ABC', en: 'height from D to base ABC' },
+  { category: 'planesLines', he: 'גובה הפירמידה מנקודה D', en: 'height of the pyramid from D', needs: { he: ['פירמידה ABCD'], en: ['pyramid ABCD'] } },
+  { category: 'planesLines', he: 'גובה מנקודה D לבסיס ABC', en: 'height from D to base ABC', needs: { he: ['פירמידה ABCD'], en: ['pyramid ABCD'] } },
   // #503 (ADR-3D-142): the APEX-LESS height — the apex is the pyramid's own, derived at apply — and
   // the imperative + relative-clause phrasing the prod session actually typed.
-  { category: 'planesLines', he: 'גובה הפירמידה', en: 'the height of the pyramid' },
-  { category: 'planesLines', he: 'שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה', en: 'draw a height of the pyramid that goes from vertex D to the base of the pyramid' },
+  { category: 'planesLines', he: 'גובה הפירמידה', en: 'the height of the pyramid', needs: { he: ['פירמידה ABCDS'], en: ['pyramid ABCDS'] } },
+  { category: 'planesLines', he: 'שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה', en: 'draw a height of the pyramid that goes from vertex D to the base of the pyramid', needs: { he: ['פירמידה ABCD'], en: ['pyramid ABCD'] } },
   { category: 'planesLines', he: 'E על המישור ABC', en: 'E is on plane ABC' },
   { category: 'planesLines', he: 'E מעל המישור ABC', en: 'E is above plane ABC' },
   { category: 'planesLines', he: 'E מתחת למישור ABC', en: 'E is below plane ABC' },
@@ -219,7 +229,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'A נקודת החיתוך של ℓ עם π1', en: 'A is the intersection of ℓ and π1' },
   { category: 'planesLines', he: 'הישר ℓ1 חותך את מישור ACD בנקודה E', en: 'line ℓ1 cuts plane ACD at E' },
   { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
-  { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes' },
+  { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes', needs: { he: ['מישור π1', 'A על המישור π1'], en: ['plane π1', 'A on plane π1'] } },
   { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },
   // S2 (#378, ADR-3D-103): the NAMED-LINE column — point-on-ℓ short forms + ∥/⟂/angle with a
   // named-line operand (segment / vector / second line / named plane / point-run plane)
@@ -241,10 +251,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'הישר d מאונך לישר ℓ1 ולישר ℓ2', en: 'd is the common perpendicular of ℓ1 and ℓ2' },
   { category: 'planesLines', he: "שיעור ה-z של C' חיובי", en: "the z-coordinate of C' is positive" },
   // --- claims (the student's answers, verified) ---
-  { category: 'claims', he: 'AM = 1/2u + 1/2v + 5/3w', en: 'AM = 1/2u + 1/2v + 5/3w' },
+  { category: 'claims', he: 'AM = 1/2u + 1/2v + 5/3w', en: 'AM = 1/2u + 1/2v + 5/3w', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { featured: true, category: 'claims', he: "CA' מאונך למישור BC'D", en: "CA' is perpendicular to plane BC'D" },
   { category: 'claims', he: 'SM מאונך ל-DB', en: 'SM is perpendicular to DB' },
-  { category: 'claims', he: 'u ⊥ v', en: 'u ⊥ v' },
+  { category: 'claims', he: 'u ⊥ v', en: 'u ⊥ v', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'claims', he: "E, C, A' על ישר אחד", en: "E, C, A' are collinear" },
   { featured: true, category: 'claims', he: 'AB = 3', en: 'AB = 3' },
   { featured: true, category: 'claims', he: 'שטח המשולש ABC = 4.5', en: 'the area of triangle ABC = 4.5' },
@@ -256,16 +266,16 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // catalog is the coverage MAP as well as the panel: a spelling the grammar reads and the catalog
   // omits is invisible to every catalog-wide property (the despacing sweep, the parse guards).
   { category: 'claims', he: 'BE/ED = 1:3', en: 'BE/ED = 1:3' },
-  { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m' },
-  { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π' },
-  { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π' },
+  { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m', needs: { he: ['הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', 'המישור π1: 3x + my + (m+6)z + 4 = 0'], en: ['line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', 'plane π1: 3x + my + (m+6)z + 4 = 0'] } },
+  { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π', needs: { he: ['חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12'], en: ['cone with apex S base center O radius 5 height 12'] } },
+  { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π', needs: { he: ['חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12'], en: ['cone with apex S base center O radius 5 height 12'] } },
   // #1449 (ADR-3D-279): the TOTAL surface (lateral + base) — sayable, and so askable
-  { category: 'claims', he: 'שטח הפנים של החרוט = 90π', en: 'the surface area of the cone = 90π' },
+  { category: 'claims', he: 'שטח הפנים של החרוט = 90π', en: 'the surface area of the cone = 90π', needs: { he: ['חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12'], en: ['cone with apex S base center O radius 5 height 12'] } },
   // --- V7: vector relations & exam terminology ---
   { category: 'points', he: "A'K = 4/5 DN", en: "A'K = 4/5 DN" },
   { category: 'points', he: "DF = (k/2)DB + kDC'", en: "DF = (k/2)DB + kDC'" },
-  { category: 'points', he: 'AS = (1-t)u + 0.5v + tw', en: 'AS = (1-t)u + 0.5v + tw' },
-  { category: 'points', he: 'AM = (0.5+k/6)u + (k+3.5)w', en: 'AM = (0.5+k/6)u + (k+3.5)w' },
+  { category: 'points', he: 'AS = (1-t)u + 0.5v + tw', en: 'AS = (1-t)u + 0.5v + tw', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  { category: 'points', he: 'AM = (0.5+k/6)u + (k+3.5)w', en: 'AM = (0.5+k/6)u + (k+3.5)w', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'points', he: 'EF מקביל למישור ABC', en: 'EF is parallel to plane ABC' },
   { category: 'points', he: 'ABEC מלבן', en: 'ABEC is a rectangle' },
   { featured: true, category: 'points', he: 'D בראשית הצירים', en: 'D is at the origin' },
@@ -285,7 +295,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'הזווית בין המישור ABC לבין המישור ABD היא 60', en: 'the angle between plane ABC and plane ABD is 60' },
   { category: 'planesLines', he: 'המישור ABC מתלכד עם המישור ABD', en: 'plane ABC coincides with plane ABD' },
   { category: 'planesLines', he: 'π1 ניצב ל-π2', en: 'π1 is perpendicular to π2' },
-  { category: 'planesLines', he: 'u מאונך למישור ABC', en: 'u is perpendicular to plane ABC' },
+  { category: 'planesLines', he: 'u מאונך למישור ABC', en: 'u is perpendicular to plane ABC', needs: { he: ['פירמידה ABCS', 'נסמן: SA = u, SB = v, SC = w'], en: ['pyramid ABCS', 'denote SA = u, SB = v, SC = w'] } },
   // S5 (#378, ADR-3D-106): the DISTANCE family — the one relation carrying units
   { featured: true, category: 'planesLines', he: 'המרחק בין D למישור ABC הוא 6', en: 'the distance between D and plane ABC is 6' },
   // #529 (ADR-3D-145): the «מ…ל» framing — the same fact as the בין row, in the spelling that matches
@@ -294,12 +304,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'המרחק בין D לישר AB הוא 5', en: 'the distance between D and line AB is 5' },
   { category: 'planesLines', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD is 3' },
   // --- V8-f: vector-relation givens ---
-  { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10' },
+  { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'vectors', he: 'קוסינוס הזווית ACB = 3/4', en: 'cos∠ACB = 3/4' },
   // #862 (ADR-3D-205): the MIXED arm — a segment against a declared vector. The table declared this
   // cell supported long before any sentence reached it; the catalog is where a student finds out it can.
-  { featured: true, category: 'vectors', he: 'הזווית בין AB לבין v היא 60', en: 'the angle between AB and v is 60' },
-  { featured: true, category: 'vectors', he: 'u·v = v·w = u·w', en: 'u·v = v·w = u·w' },
+  { featured: true, category: 'vectors', he: 'הזווית בין AB לבין v היא 60', en: 'the angle between AB and v is 60', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
+  { featured: true, category: 'vectors', he: 'u·v = v·w = u·w', en: 'u·v = v·w = u·w', needs: { he: ['מקבילון ABCDEFGH', 'נסמן: AB = u, AD = v, AE = w'], en: ['parallelepiped ABCDEFGH', 'denote AB = u, AD = v, AE = w'] } },
   { category: 'vectors', he: 'AE יוצר זוויות שוות עם AB ו-AD', en: 'AE makes equal angles with AB and AD' },
   { category: 'points', he: 'D על AC כך ש-OD חוצה-זווית AOC', en: 'D on AC such that OD bisects angle AOC' },
   // #343 (ADR-3D-207): the carrier-LESS bisector — the way a textbook usually states it. How far
@@ -329,7 +339,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'כדור', en: 'sphere' },
   { category: 'solids', he: 'ABCD ארבעון', en: 'tetrahedron ABCD' },
   { category: 'points', he: 'CD תיכון במשולש ABC', en: 'CD is the median in triangle ABC' },
-  { category: 'points', he: 'DE גובה בטטראדר', en: 'DE is the altitude in the tetrahedron' },
+  { category: 'points', he: 'DE גובה בטטראדר', en: 'DE is the altitude in the tetrahedron', needs: { he: ['טטראדר ABCD'], en: ['tetrahedron ABCD'] } },
   { category: 'planesLines', he: 'המישור x-y+z=1', en: 'plane x-y+z=1' },
   { featured: true, category: 'claims', he: "הזווית בין הישר AC' לבין המישור ABCD היא 30", en: "the angle between line AC' and plane ABCD is 30" },
   { category: 'planesLines', he: 'הישר d מאונך לישר AB ולישר CD', en: 'd is the common perpendicular of AB and CD' },
@@ -350,9 +360,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { featured: true, category: 'drawing', he: "קטע CA'", en: "segment CA'" },
   // #72 (ADR-3D-039): the baseline log-triage phrasing batch
   { category: 'drawing', he: "נחבר את D'F", en: "connect D'F" },
-  { featured: true, category: 'drawing', he: "אלכסון BD'", en: "the diagonal BD'" },
+  { featured: true, category: 'drawing', he: "אלכסון BD'", en: "the diagonal BD'", needs: { he: ["קובייה ABCDA'B'C'D'"], en: ["cube ABCDA'B'C'D'"] } },
   // #449 (2 users): the same segment, with the solid named — the phrasing students actually type
-  { featured: true, category: 'drawing', he: "אלכסון תיבה AC'", en: "the space diagonal of the box AC'" },
+  { featured: true, category: 'drawing', he: "אלכסון תיבה AC'", en: "the space diagonal of the box AC'", needs: { he: ["תיבה ABCDA'B'C'D'"], en: ["box ABCDA'B'C'D'"] } },
   // #438: the solid and its SPACE diagonal in one sentence (a bare «אלכסון» stays ambiguous — face or
   // space — and refuses honestly rather than guessing)
   { category: 'solids', he: 'תיבה מלבנית עם אלכסון תיבה', en: 'a box with a space diagonal' },
@@ -360,10 +370,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'drawing', he: '∠SDB = α', en: '∠SDB = α' },
   { featured: true, category: 'drawing', he: "חץ A'C", en: "arrow A'C" },
   { category: 'drawing', he: 'אורך AB=BC', en: 'length AB = BC' },
-  { featured: true, category: 'drawing', he: 'אנך יורד מ-M לבסיס', en: 'drop a perpendicular from M to the base' },
+  { featured: true, category: 'drawing', he: 'אנך יורד מ-M לבסיס', en: 'drop a perpendicular from M to the base', needs: { he: ['פירמידה ABCDS', 'M אמצע SA'], en: ['pyramid ABCDS', 'M is the midpoint of SA'] } },
   // #271/#272/#273 (ADR-3D-052/053): the named-measure layer — equal angles, a value for a name, bounds
   { category: 'relations', he: 'זווית SAB = זווית SAD', en: 'angle SAB = angle SAD' },
-  { category: 'relations', he: 'α = 70', en: 'α = 70' },
+  { category: 'relations', he: 'α = 70', en: 'α = 70', needs: { he: ['∠BAC = α'], en: ['∠BAC = α'] } },
   { category: 'relations', he: '60 < זווית SAB < 90', en: '60 < angle SAB < 90' },
   { category: 'relations', he: 'זווית SAB גדולה מ-60', en: 'angle SAB is greater than 60' },
   // --- editing the figure ---
@@ -385,6 +395,11 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // at the END so every earlier entry keeps its index (the #1394 golden keys catalog rows by index)
   { category: 'vectors', he: 'וקטור u', en: 'vector u' },
   { category: 'vectors', he: 'הווקטורים u, v ו-w', en: 'vectors u, v and w' },
+  // #1188 steps 2–3 (ADR-3D-390): a combination of free vectors DEFINES the new one, drawn head to tail. Appended LAST
+  // (the #1394 golden keys catalog rows by index)
+  // Each carries the declarations it needs, so a guide click on a blank canvas builds it (#1566, ADR-3D-398).
+  { category: 'vectors', he: 'w = u + v', en: 'w = u + v', needs: { he: ['וקטור u', 'וקטור v'], en: ['vector u', 'vector v'] } },
+  { category: 'vectors', he: 'w = 2u - 3v', en: 'w = 2u - 3v', needs: { he: ['וקטור u', 'וקטור v'], en: ['vector u', 'vector v'] } },
   // #1680 (ADR-3D-392): a sum of segment lengths equal to a number (2-D's `set-measure-sum`). Appended LAST (the #1394 key)
   { category: 'vectors', he: 'AB + BC = 10', en: 'AB + BC = 10' },
 ];

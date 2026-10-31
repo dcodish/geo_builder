@@ -1,0 +1,105 @@
+{
+  "name": "feat-1188-step2-rework",
+  "title": "#1188 steps 2–3 rework — eliminate the free vector, decide on the figure (3-D, ADR-3D-390 Am. 1)",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "REFUSAL — «AB = p» then «AD = p» on a cube is a contradiction, naming both lines",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "וקטור p",
+        "AB = p",
+        "AD = p"
+      ],
+      "expectRefusal": "הנתונים סותרים",
+      "lookFor": "The last line is refused: «הנתונים סותרים זה את זה — אין גוף שמקיים את «AD = p» יחד עם «AB = p»». Never «זו מגבלה של הכלי». The first three lines stay.",
+      "before": "Refused as the tool's limit: «הכלי עדיין לא יודע לפתור את «AD = p» עם הווקטור החופשי p … זו מגבלה של הכלי.» (T32)"
+    },
+    {
+      "id": "T2",
+      "title": "REFUSAL — the same with a multiple: «AB = 2p» then «AD = 2p»",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "וקטור p",
+        "AB = 2p",
+        "AD = 2p"
+      ],
+      "expectRefusal": "הנתונים סותרים",
+      "lookFor": "The last line is refused as a contradiction naming «AD = 2p» and «AB = 2p».",
+      "before": "Refused as the tool's limit («… זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T3",
+      "title": "A free vector makes a quadrilateral base a parallelogram: «AB = p», «DC = p»",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "פירמידה SABCD שבסיסה מרובע",
+        "וקטור p",
+        "AB = p",
+        "DC = p"
+      ],
+      "cycles": 2,
+      "lookFor": "All four lines accepted. The base ABCD becomes a parallelogram (AB and DC equal and parallel), with the note that the base was narrowed to a parallelogram; it stays a parallelogram on «הציגו תצורה אחרת». The data panel lists «DC = p».",
+      "before": "«DC = p» was refused as the tool's limit («… זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T4",
+      "title": "Already true on a cube: «AB = p», «DC = p» is accepted and p does not move",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "וקטור p",
+        "AB = p",
+        "DC = p"
+      ],
+      "lookFor": "All four lines accepted; the cube unchanged; the data panel lists «p = AB» and «DC = p».",
+      "before": "«DC = p» was refused as the tool's limit."
+    },
+    {
+      "id": "T5",
+      "title": "Ruling 1A: «AB = p + q» on two free vectors still builds",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "וקטור p",
+        "וקטור q",
+        "AB = p + q"
+      ],
+      "lookFor": "All four lines accepted; p and q float, and their head-to-tail chain closes on AB.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T6",
+      "title": "REFUSAL — a ratio letter on a free vector is still the tool's limit",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "וקטור p",
+        "A(0,0,0)",
+        "AE = t·p"
+      ],
+      "expectRefusal": "זו מגבלה של הכלי",
+      "lookFor": "The last line is refused with the tool's-limit sentence quoting «AE = t·p».",
+      "before": "unchanged"
+    }
+  ]
+}

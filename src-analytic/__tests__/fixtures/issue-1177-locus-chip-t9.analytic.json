@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "A(0,0)",
+    "B(8,0)",
+    "נקודה M",
+    "MA = MB"
+  ],
+  "seed": 0,
+  "name": "#1177 — T9: «נקודה M» · «MA = MB» — the locus chip sits on «נקודה M» and asks «המקום הגיאומטרי של M» (ישר · x - 4 = 0)"
+}

@@ -175,16 +175,17 @@ describe('#1137 — the determinacy gate (ADR-AG-072 §4, §5)', () => {
    * Operator: *"only if we are positive about the equation we show it. otherwise, we stick to
    * showing the shape."*
    */
-  it('חורף 25 WITH A PARAMETER: «מעגל», and no equation', () => {
+  // ADR-AG-351 (#1186) amends §4: the set VARIES, as a verified monomial in a — the equation is written in a, never in numbers.
+  it('חורף 25 WITH A PARAMETER: «מעגל» with its equation in a, never a numeric one', () => {
     const a = answer(['A(-9a,0)', 'B(41a,0)', 'נקודה P', 'PA מאונך ל-PB'], 'המקום הגיאומטרי של P');
-    expect(a.value).toBe('מעגל');
+    expect(a.value).toBe('מעגל · (x − 16a)² + y² = (25a)²');
     // The KIND is shown, so the curve is still drawn — a shape-only answer is an answer.
     expect(a.locus!.components[0].points.length).toBeGreaterThan(20);
   });
 
-  it('a parameterised bisector, likewise: «ישר» with no equation', () => {
+  it('a parameterised bisector, likewise: «ישר» with its equation in a (ADR-AG-351)', () => {
     const a = answer(['A(0,0)', 'B(8a,0)', 'נקודה M', 'MA = MB'], 'המקום הגיאומטרי של M');
-    expect(a.value).toBe('ישר');
+    expect(a.value).toBe('ישר · x - 4a = 0');
   });
 
   /**

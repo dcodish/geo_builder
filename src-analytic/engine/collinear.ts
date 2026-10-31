@@ -71,6 +71,7 @@ function ruleCarriers(c: Construction, rule: DerivedRule): string[] {
     case 'incircle-centre':
     case 'circle-centre':
     case 'parabola-focus':
+    case 'ellipse-point':
     case 'touch-point':
     case 'regular-vertex':
       return [];
