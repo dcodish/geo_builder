@@ -89,9 +89,10 @@ describe('#837 — the seam is NARROW: it must not swallow its neighbours', () =
     // «וקטור AB = …» and «|AB| = …» are different statements; the ambiguous-vector-length guard exists
     // to keep them apart, so `וקטור` is deliberately absent from the strip list.
     expect(cmds('וקטור AB = (1,2,3)').map((c) => c.type)).toEqual(['inject-pair']);
+    // #1680 (ADR-3D-391): the bare form lowers to an UNMARKED vec-rel, and the outermost apply asks about it
     const bare = parse3('AB = CD');
-    expect(bare.ok).toBe(false);
-    if (!bare.ok) expect(bare.reason).toBe('ambiguous-vector-length');
+    expect(bare.ok && bare.commands.map((c) => c.type)).toEqual(['vec-rel']);
+    if (bare.ok) expect(bare.commands[0]).not.toHaveProperty('marked');
   });
 
   it('a noun that is the SUBJECT, not a prefix, is untouched', () => {

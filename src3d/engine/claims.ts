@@ -187,6 +187,17 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       }
       return true;
     }
+    case 'length-sum': {
+      // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| against the stated value, the `length-eq` tolerance
+      let sum = 0;
+      for (const t of claim.terms) {
+        const a = pos.get(t.a);
+        const b = pos.get(t.b);
+        if (!a || !b) return false;
+        sum += t.c * norm3(sub3(b, a));
+      }
+      return Math.abs(sum - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
     case 'length-eq': {
       const a = pos.get(claim.a);
       const b = pos.get(claim.b);

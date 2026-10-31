@@ -42,7 +42,6 @@ export type ParseResult3 =
   | { ok: false; reason: 'not-handled' }
   // bare `AS = AB` — vector equation or length equality? NEVER assumed (operator rule):
   // the student is asked to write וקטור AS = וקטור AB (or with the ⃗ arrow), or |AS| = |AB|.
-  | { ok: false; reason: 'ambiguous-vector-length' }
   // #516: «x=m(m-1, 5-m, -2)» — one letter as BOTH the running parameter and a figure DOF. A typed
   // refusal, never `not-handled`: an ambiguity the parser RECOGNIZED must surface a clarification,
   // because `not-handled` escalates to the LLM lane, whose job is to guess — and it resolved exactly
@@ -2037,6 +2036,55 @@ const lengthRel: Rule = (s) => {
  * pins to the value (`mag-val`, |e| = v/c), else adjacent pairs relate (`mag-rel`,
  * |eᵢ| = (cᵢ₊₁/cᵢ)·|eᵢ₊₁|). Apply normalizes simple atoms onto vec-mag/length-eq/length-rel.
  */
+/**
+ * #1680 (ADR-3D-392) — a SUM OF SEGMENT LENGTHS equal to a number: «AB + BC = 10», «AB - BC = 2»,
+ * «AB + BC + CA = 12», «2AB + BC = 10», «|AB| + |BC| = 10», «אורך AB + אורך BC = 10».
+ *
+ * 2-D's `measureSum` (length unit), ported. A numeric right-hand side has no vector reading, so there is
+ * nothing to ask: it is a length statement in the only sense it can be. Read like 2-D, which is the reference
+ * (ADR-W-118 B1): ≥ 2 signed terms with numeric coefficients on the left, a plain number on the right (a radical
+ * or a letter target is not taken, because 2-D escalates it). Pair terms on BOTH sides («AB + BC = AC») are not
+ * claimed: in 3-D that is a vector equation (X7), which `vecEqClaim` keeps.
+ */
+const lengthSum: Rule = (s) => {
+  if (VEC_MARKED) return null; // an arrow says vectors, and a vector sum is never a number
+  const parts = s.split('=');
+  if (parts.length !== 2) return null;
+  const rhs = parts[1].trim();
+  const rm = rhs.match(new RegExp(String.raw`^(-?${UNUM})(?:\s*\/\s*(${UNUM}))?$`));
+  if (!rm) return null;
+  const value = rm[2] !== undefined ? +rm[1] / +rm[2] : +rm[1];
+  if (!Number.isFinite(value)) return null;
+  const P = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const TERM = new RegExp(String.raw`^(${UNUM}(?:\s*\/\s*${UNUM})?)?\s*[·*]?\s*(?:\|${P}\||(?:אורך|length)\s+${P}|${P})$`);
+  const lhs = parts[0].trim();
+  const pieces = lhs.match(/[+-]?\s*[^+-]+/g);
+  if (!pieces || pieces.length < 2 || pieces.join('').replace(/\s/g, '') !== lhs.replace(/\s/g, '')) return null;
+  const terms: { a: Id; b: Id; c: number }[] = [];
+  for (const raw of pieces) {
+    const p = raw.trim();
+    const sign = p.startsWith('-') ? -1 : 1;
+    const body = p.replace(/^[+-]\s*/, '');
+    const m = body.match(TERM);
+    if (!m) return null;
+    const coef = m[1] === undefined ? 1 : m[1].includes('/') ? (([x, y]) => +x / +y)(m[1].split('/').map((t) => t.trim())) : +m[1];
+    if (!Number.isFinite(coef) || coef === 0) return null;
+    const a = m[2] ?? m[4] ?? m[6];
+    const b = m[3] ?? m[5] ?? m[7];
+    if (a === b) return null;
+    terms.push({ a, b, c: sign * coef });
+  }
+  const draws: Command3[] = [];
+  const seen = new Set<string>();
+  for (const t of terms) {
+    const key = [t.a, t.b].sort().join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    draws.push({ type: 'segment3', a: t.a, b: t.b });
+  }
+  return [...draws, { type: 'claim', claim: { type: 'length-sum', terms, value } }];
+};
+
 const magEquality: Rule = (s) => {
   if (!s.includes('|')) return null;
   const links = s.split(/\s*=\s*|\s+שווה\s+ל-?\s*/).map((t0) => t0.trim()).filter((t0) => t0 !== '');
@@ -2120,6 +2168,21 @@ const vecEqClaim: Rule = (s0) => {
     // guard refused the arrow form its own clarification teaches. Recorded only when true, so an
     // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
     return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
+  }
+  // #1783 (ADR-3D-391): «3BD = AD» is «AD = 3·BD» — the same sentence with its sides swapped (Am. 1: it was lowered
+  // with the reciprocal, «AD = ⅓·BD», a different sentence). It lowers to the same
+  // `vec-rel`, so the one segment-equation reading at apply sees it (it was a bare vec-eq claim, refuted where its
+  // mirror asks, and a definition «2AK = AD» of a new K could not reach the affine lane at all)
+  const rhsPair = parts[1].trim().match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
+  if (rhsPair) {
+    const l = parseSymExpr(parts[0]);
+    const [term] = l?.terms ?? [];
+    if (l && !l.symbol && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
+      return [{
+        type: 'vec-rel', from: rhsPair[1], to: rhsPair[2],
+        terms: [{ coeff: { k: term.coeff.k, p: 0 }, atom: term.atom }],
+        ...(VEC_MARKED ? { marked: true as const } : {}),
+      }];
   }
   const lhs = parseVecExpr(parts[0]);
   const rhs = parseVecExpr(parts[1]);
@@ -5260,6 +5323,7 @@ export const RULES: Rule[] = [
   midpoint,
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition
   onSegment,
+  lengthSum, // #1680 (ADR-3D-392): «AB + BC = 10» — a numeric RHS, so no vector reading; before vecEqClaim
   lengthRel, // BEFORE vecEqClaim: bare AS = AB is a LENGTH equality unless ⃗-marked
   magEquality, // #393/#335: chained/expression magnitudes — AFTER lengthRel (its forms keep their owner)
   symbolValue,
@@ -5389,8 +5453,9 @@ export function parse3(utterance: string): ParseResult3 {
   SOLID_SIZE_UNREAD = null;
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
-  if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
-    return { ok: false, reason: 'ambiguous-vector-length' };
+  // #1680 (ADR-3D-391): a bare «AB = AC» is no longer refused here. The parser is context-free and cannot see
+  // whether the sentence defines a new point or places a rider, so it lowers (vecEqClaim) to the same unmarked
+  // `vec-rel` as «AB = 1AC», and the one reading at the outermost apply (`segmentEquationReading`) decides.
   // #1891: an incircle the engine does not draw — read before any rule, so no form of it reaches the model
   const incircleSides = uninscribableIncircle3(s);
   if (incircleSides !== null) return { ok: false, reason: 'incircle-not-drawn', sides: incircleSides };

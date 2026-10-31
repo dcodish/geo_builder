@@ -112,13 +112,14 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
     expect(state().lastError).toEqual({ code: 'unknown-symbol', id: 'm' });
   });
 
-  it('bare AS = AB asks for clarification — never assumed (operator rule); explicit forms disambiguate', () => {
+  it('bare AS = AB builds as lengths — its vector reading cannot hold (ADR-3D-391 Am. 1); explicit forms disambiguate', () => {
     submit('פירמידה ABCDS שבסיסה ריבוע');
     const n = state().facts.length;
-    // ambiguous: vector equation or length equality? ask, never guess — and never the LLM
+    // as vectors S would sit on B, so only the length reading can hold: the operator's rule of 2026-10-30 (PR #2605),
+    // "if only one can be true, we will assume this is the case" — built, never guessed between two, never the LLM
     submit('AS = AB');
-    expect(state().facts).toHaveLength(n);
-    expect(state().lastError).toEqual({ code: 'ambiguous-vector-length' });
+    expect(state().facts).toHaveLength(n + 1);
+    expect(state().lastError).toBeNull();
     // the LENGTH forms
     submit('|AS| = |AB|');
     expectAllOk();

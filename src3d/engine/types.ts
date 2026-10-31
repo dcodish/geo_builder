@@ -108,6 +108,8 @@ export type Claim3 =
    */
   | { type: 'polygon-open'; ids: Id[]; given: true }
   | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true } // AB = 3 (all points pinned ⇒ a CHECK)
+  /** #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — «AB + BC = 10», 2-D's `set-measure-sum` (length unit). Fixes the scale. */
+  | { type: 'length-sum'; terms: { a: Id; b: Id; c: number }[]; value: number; given?: true }
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   // #1546 (ADR-3D-282): a component is `null` when the statement left it UNSTATED or SYMBOLIC («B(3, n, p)»
   // checks x only) — the verifier compares the components that are present. The `A = (…)` claim spelling
@@ -204,6 +206,8 @@ export type ScalarPin =
    */
   | { kind: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // DC⃗ = 3·AB⃗
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  /** #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value. NOT similarity-invariant: like `length`, it fixes the scale. */
+  | { kind: 'length-sum'; terms: { a: Id; b: Id; c: number }[]; value: number }
   /** #2580 (ADR-3D-384): |ab| = coef·(the letter's number), where the PIVOT owns that number — a pin symbol, a named
    *  free component or a rider's parameter. The residual twin of the `length-letter` claim (which stays the arbiter). */
   | { kind: 'letter-tie'; a: Id; b: Id; coef: number; q: PivotLetter3 }
@@ -848,7 +852,7 @@ export interface VecRelCommand {
   symbol?: string;
   /**
    * #1183 — the student wrote the VECTOR marking explicitly (`⃗`/`→`/`⟶`, or the «וקטור»/`vector`
-   * word), so this relation is not the two-reading sentence {@link ambiguousPairRatio} asks about.
+   * word), so this relation is not the two-reading sentence {@link segmentEquationReading} asks about.
    *
    * The parser used to consume the marking and throw it away: `markVectorContext` set `VEC_MARKED`,
    * used it to pick the vector lane over the length lane, and emitted a `vec-rel` carrying no record
@@ -859,7 +863,17 @@ export interface VecRelCommand {
    * than to the concept); it travels on the command now.
    */
   marked?: true;
+  /**
+   * #1680/#1783 (ADR-3D-391 Am. 1): which reading an UNMARKED two-reading segment equation takes. Set ONLY by the
+   * store's fold (`readSegmentEquations3`), which tries both readings on the figure, never by a parser: `'vector'`
+   * (only the vector reading can hold), `'length'` (only the length reading can hold, or both give one figure) or
+   * `'ask'` (both can hold and differ, or neither can). Absent on a two-reading sentence, the outermost apply asks.
+   */
+  reading?: SegmentEquationReading3;
 }
+
+/** #1680 (ADR-3D-391 Am. 1): the fold's verdict on an unmarked two-reading segment equation. */
+export type SegmentEquationReading3 = 'vector' | 'length' | 'ask';
 
 /**
  * V7 — a segment/vector ∥-or-⟂-to-plane RELATION. APPLY decides: when an endpoint
@@ -1969,6 +1983,8 @@ export type EngineError3 =
    * refusal would be worse than the bug it replaces.
    */
   | { code: 'ambiguous-vector-length'; a1: Id; b1: Id; a2: Id; b2: Id; c: number }
+  /** #1680 (ADR-3D-391): the coefficient-1 form («AB = AC», «AB = 1AC») carries no pairs: the generic wording. */
+  | { code: 'ambiguous-vector-length' }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
   /** #1188 (ADR-3D-386): a MAGNITUDE / angle / ⟂ / ∥ / dot given on a FREE vector — not built until #1188 step 4.

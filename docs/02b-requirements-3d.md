@@ -382,7 +382,20 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «וקטור»/`vector`, commits the sentence to the vector lane. Every spelling of the marking is equal; a marked
   statement the figure cannot satisfy is refused. The input strip previews a marked line's notation
   (`DC⃗ = 3AB⃗`) before commit, only for a line the student marked.
-  - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255; #1183, #1185, #1194, #1195, #1312.
+  **An unmarked segment equation is read by what it does to the figure, with or without a coefficient** (one
+  reading for «AB = AC» and «AB = 1·AC», [ADR-3D-391](06b-decisions-3d.md#adr-3d-391) and its Am. 1, Am. 2). One that
+  defines a new point («AK = AD», «A'K = 4/5 DN», «BE = EC» on an empty canvas) is a vector. Otherwise the tool asks
+  «length or vector?» **only when both readings can hold and give different figures** («מרובע ABCD» · «AB = DC»):
+  where only one reading can hold it takes that one and builds, with no question («D על AB» · «AD = 3BD» and
+  «AB = 4DA» as lengths; «משולש ABC» · «AB = AC»; a midpoint's «SM = 2SA»; «E על AA'» · «AE = AB»); where both
+  give one figure it builds («AD = 3DB»); where the vector reading cannot hold the sentence is a length statement
+  even if the length reading cannot hold either, and then it gets the length statement's own verdict (a
+  contradiction naming it), never the question («פירמידה SABCD» · «AB = 1AC»). A line read as lengths shows in the
+  fact list in the length spelling, «|AA'| = 3|BC|» for «AA'=3BC»; a line read as vectors keeps its arrows. A line the figure already states
+  («E על AA' כך ש-AE = 2EA'» · «AE = 2EA'», «M אמצע BC» · «BM = MC») answers «זה כבר קיים באיור» and adds no row.
+  A vector reading draws every vector of the sentence as an arrow («BE = EC»: BE and EC). An unmarked statement
+  over a point on a segment is never refuted as the student's arithmetic.
+  - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255, ADR-3D-391 (and Am. 1, Am. 2); #1183, #1185, #1194, #1195, #1312, #1680, #1783; operator rulings 2026-10-04 and 2026-10-13 on #1680, and 2026-10-30 on PR #2605 (T36; T64, T66).
 - **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
@@ -582,6 +595,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. Both
   terms are positive.
   - Sources: ADR-3D-251, #1163; parity with 2-D's `segmentRatio`.
+- **FR-CL-2b (Must)** — **A sum of segment lengths equal to a number is a given.** «AB + BC = 10», «AB − BC = 2»,
+  «AB + BC + CA = 12», «2AB + BC = 10», «|AB| + |BC| = 10» build a figure with that sum, recorded in the givens and
+  written nowhere on the canvas, and «הציגו תצורה אחרת» still varies the shape. A sum the other givens contradict is
+  refused naming it. As in 2-D, a radical or letter target is not taken, and pair terms on both sides («AB + BC = AC»)
+  stay a vector equation.
+  - Sources: ADR-3D-392, #1680; the 2-D twin is `measureSum` → `set-measure-sum`.
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
 - **FR-CL-4 (Must)** — **A measure the student can STATE, they can ASK.** Every angle between objects

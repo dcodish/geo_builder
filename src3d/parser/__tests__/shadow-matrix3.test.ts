@@ -23,9 +23,8 @@
  *
  * NOTE: rules share one piece of per-parse pre-state — the module-level VEC_MARKED flag `parse3` sets
  * from the RAW utterance before normalization. `analyze` applies the same pre-state (markVectorContext)
- * and the same `normalize3`, so it sees exactly what the rules see. `parse3`'s early ambiguity refusal
- * (bare pair=pair → 'ambiguous-vector-length') runs BEFORE the rules; no catalog utterance hits it, so
- * the matrix is faithful for this corpus.
+ * and the same `normalize3`, so it sees exactly what the rules see. (`parse3`'s early bare pair=pair refusal
+ * is gone since #1680, ADR-3D-391: that sentence reaches the rules like any other, and apply asks about it.)
  */
 
 import { describe, expect, it } from 'vitest';

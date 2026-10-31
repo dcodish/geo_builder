@@ -8,7 +8,7 @@ import { constantVec3, figureRelationOf3, freeNamesIn3, freeVecSystemVerdict3, i
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
-import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
+import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
@@ -17,7 +17,7 @@ import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { carrierParams3, reachesFreeCarrier3, readCoordGiven } from './carriers';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecRelCommand } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -475,7 +475,7 @@ const firstAtomError = (c: Construction3, atoms: import('./types').VecAtom[]): E
  */
 type PinGivenClaim = Extract<
   Claim3,
-  { type: 'vec-val' } | { type: 'dot-val' } | { type: 'length-eq' } | { type: 'angle-seg-eq' } | { type: 'vertex-angle-eq' } | { type: 'cos-angle-eq' } | { type: 'length-rel' } | { type: 'perp-plane' } | { type: 'par-plane' }
+  { type: 'vec-val' } | { type: 'dot-val' } | { type: 'length-eq' } | { type: 'length-sum' } | { type: 'angle-seg-eq' } | { type: 'vertex-angle-eq' } | { type: 'cos-angle-eq' } | { type: 'length-rel' } | { type: 'perp-plane' } | { type: 'par-plane' }
 >;
 function recordPinGiven(next: Construction3, claim: PinGivenClaim): void {
   if (claim.type === 'vec-val' && claim.x === null && claim.y === null && claim.z === null) return;
@@ -992,6 +992,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'length-eq':
     case 'length-letter': // #2580
       return missingPoint(c, [claim.a, claim.b]);
+    case 'length-sum': // #1680 (ADR-3D-392)
+      return missingPoint(c, claim.terms.flatMap((t) => [t.a, t.b]));
     case 'area-eq':
       return missingPoint(c, claim.ids);
     case 'coords-eq':
@@ -1203,49 +1205,79 @@ function ratioStatement(
  * - `k > 0`, which is also why a driven `t` can never leave the segment (`riderChainT`)
  */
 /**
- * Is this `XY = k·ZW` the AMBIGUOUS shape — the one the tool must ask about rather than decide?
+ * #1680 / #1783 (ADR-3D-391, Am. 1) — HOW AN UNMARKED SEGMENT EQUATION `XY = k·ZW` IS READ.
  *
- * All five conditions are load-bearing, and each protects a lane that must keep working:
+ * The sentence has two readings, a vector one and a length one. Which one it got used to depend on which code
+ * path parsed it (ADR-3D-391's class). The operator's rule (2026-10-30, PR #2605): *"if something is not sure if
+ * its a vector or length, we should ask if both can be true and if only one can be true, we will assume this is
+ * the case"*. So the sentence is judged by what it does to the figure:
  *
- * - **a single PAIR term with a numeric coefficient** — a named vector («AC' = u + v + w») is a
- *   different statement and stays the verified claim v7-t1 locks;
- * - **`k ≠ 1`** — the bare `c = 1` form is already asked about, by the parser, before it gets here;
- * - **every point already known** — with an unknown the relation DEFINES it (ADR-3D-010's affine
- *   lane, the 2018 gate's «A'K = 4/5 DN»), and that is untouched;
- * - **neither pair rides a segment** — the rider family's readings have a known relationship and #748
- *   has already ruled on it, chain form and non-chain form alike;
- * - **the pairs are distinct** — «AB = 2AB» is a statement about one segment, not two.
+ * - **marked** (an arrow, «וקטור») → `vector` (#1183): the student said which reading.
+ * - **a point not yet drawn** → `vector`: the sentence DEFINES it (ADR-3D-010, «A'K = 4/5 DN», «AK = AD»).
+ * - **a negative coefficient** → `vector`: no length is a negative multiple of another, so only one reading can hold.
+ * - **one segment on both sides** with `k ≠ 1` («AB = 2AB») → `vector`, as it always was.
+ * - **anything else** → `two-readings`. Which of them can hold, and whether they give one figure, is a question
+ *   about the SOLVED figure, so the store's fold answers it (`readSegmentEquations3`, which tries both) and writes
+ *   the answer on the command as `reading`. A two-reading sentence with no `reading` asks.
  */
-function ambiguousPairRatio(c: Construction3, cmd: Command3): EngineError3 | null {
-  if (cmd.type !== 'vec-rel' || cmd.symbol) return null;
-  /**
-   * #1183 — AN EXPLICITLY MARKED STATEMENT HAS ALREADY ANSWERED THE QUESTION.
-   *
-   * The clarification below tells the student to write the arrow form if they meant vectors. Until
-   * this line, that form arrived here as the byte-identical command the bare form produces and got
-   * the SAME refusal — the tool asking a question, offering two answers, and rejecting one of them
-   * with the question. The ask is right; it was unanswerable because the answer was indistinguishable
-   * from the question.
-   *
-   * Nothing about the ambiguity ruling changes: an UNMARKED `XY = k·ZW` still asks, so #748 (refuse
-   * rather than pick where the readings disagree) and ADR-3D-249 both stand untouched. This only
-   * declines to ask a student who already said which reading they meant, down the vector lane
-   * ADR-3D-010 says a coefficient commits to at parse time.
-   */
-  if (cmd.marked) return null;
-  if (cmd.terms.length !== 1) return null;
+export type SegmentEquationKind3 = 'vector' | 'two-readings';
+
+function segmentEquationShape(cmd: Command3): { pair1: [Id, Id]; pair2: [Id, Id]; k: number } | null {
+  if (cmd.type !== 'vec-rel' || cmd.symbol || cmd.terms.length !== 1) return null;
   const [term] = cmd.terms;
   if (term.atom.kind !== 'pair' || term.coeff.p !== 0) return null;
-  const k = term.coeff.k;
-  if (Math.abs(k - 1) < 1e-12) return null; // the parser already asks about this one
-  const pair1: [Id, Id] = [cmd.from, cmd.to];
-  const pair2: [Id, Id] = [term.atom.from, term.atom.to];
-  if (pair1.every((p) => pair2.includes(p))) return null; // one segment, not two
+  return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k };
+}
+
+/** Is `cmd` a segment equation at all (one pair against a numeric multiple of one pair)? Null when it is not. */
+export function segmentEquationKind3(c: Construction3, cmd: Command3): SegmentEquationKind3 | null {
+  const shape = segmentEquationShape(cmd);
+  if (!shape) return null;
+  if (cmd.type === 'vec-rel' && cmd.marked) return 'vector';
+  const { pair1, pair2, k } = shape;
   const all = [...pair1, ...pair2];
-  if (all.some((id) => !c.points.has(id))) return null; // a definition, not a statement
-  // The rider family — #748's ruling owns it.
-  if (all.some((id) => c.points.get(id)?.kind === 'on-segment')) return null;
-  return { code: 'ambiguous-vector-length', a1: pair1[0], b1: pair1[1], a2: pair2[0], b2: pair2[1], c: k };
+  if (all.some((id) => !c.points.has(id))) return 'vector'; // a definition, not a statement
+  if (k < 0) return 'vector'; // no length reading: a length is never a negative multiple of another
+  const unit = Math.abs(k - 1) < 1e-12;
+  if (pair1.every((p) => pair2.includes(p)) && !unit) return 'vector'; // one segment, not two
+  return 'two-readings';
+}
+
+/** The question itself: the student's own pairs and coefficient, except at `k = 1`, whose generic wording
+ *  («וקטור AB = וקטור CD … או |AB| = |CD|») already names the two spellings. */
+export function segmentEquationAsk(pair1: [Id, Id], pair2: [Id, Id], k: number): EngineError3 {
+  return Math.abs(k - 1) < 1e-12
+    ? { code: 'ambiguous-vector-length' }
+    : { code: 'ambiguous-vector-length', a1: pair1[0], b1: pair1[1], a2: pair2[0], b2: pair2[1], c: k };
+}
+
+/**
+ * The reading at the outermost apply: an error to return now (the question), the commands the length reading
+ * lowers to (exactly what «|XY| = k|ZW|» parses to, so the two spellings give one figure), or the command itself
+ * read as a vector — with `arrows`, the pairs every vector reading draws (T46: "draw EC as a vector as well").
+ */
+function readSegmentEquation(c: Construction3, cmd: Command3): { ask: EngineError3 } | { length: Command3[] } | { cmd: Command3; arrows: [Id, Id][] } {
+  const kind = segmentEquationKind3(c, cmd);
+  if (kind === null) return { cmd, arrows: [] };
+  const { pair1, pair2, k } = segmentEquationShape(cmd)!;
+  const reading = kind === 'vector' ? 'vector' : (cmd as VecRelCommand).reading;
+  if (reading === 'vector') return { cmd, arrows: [pair1, pair2] };
+  if (reading === 'length')
+    return { length: [{ type: 'segment3', a: pair1[0], b: pair1[1] }, { type: 'length-rel', a1: pair1[0], b1: pair1[1], rhs: { pair: pair2 }, c: k }] };
+  return { ask: segmentEquationAsk(pair1, pair2, k) };
+}
+
+/** A vector reading draws every vector the sentence names as an arrow, in the stated direction (the ink-arrow
+ *  register, `draw-arrow`'s), each over its segment. Points the line did not leave on the figure are skipped. */
+function withStatedArrows(next: Construction3, arrows: readonly [Id, Id][]): Construction3 {
+  const todo = arrows.filter(([f, t]) => f !== t && next.points.has(f) && next.points.has(t) && !next.arrows.some(([x, y]) => x === f && y === t));
+  if (todo.length === 0) return next;
+  const out = clone(next);
+  for (const [f, t] of todo) {
+    out.arrows.push([f, t]);
+    if (!hasSegment(out, f, t)) out.segments.push([f, t]);
+  }
+  return out;
 }
 
 function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
@@ -1267,6 +1299,24 @@ function riderRatioRetarget(c: Construction3, cmd: Command3): Command3 | null {
     const def = c.points.get(id);
     return def?.kind === 'on-segment' && def.t === undefined ? def : null;
   };
+
+  /**
+   * #1783 (ADR-3D-391) — a DIRECTED numeric statement (a `vec-rel`) is read as the vector it is, in both shapes.
+   * The halves shape already demanded the chain; the whole-host shape matched its pairs as sets, so «AB = 4DA»
+   * (vector: D at t = −¼) built at t = ¼, silently read as lengths, while its halves twin «AD = 3BD» did not.
+   * One linear solve on the host line (`riderVectorT`) is both shapes' vector reading; when it puts the rider
+   * off its segment nothing is placed, and the statement goes on as a vector claim (an unmarked two-reading line
+   * reaches here only as the fold's vector trial, ADR-3D-391 Am. 1).
+   */
+  if (directed && k !== null) {
+    for (const rider of new Set([...pair1, ...pair2])) {
+      const def = freeRider(rider);
+      if (!def) continue;
+      const t = riderVectorT(rider, def.a, def.b, pair1[0], pair1[1], pair2[0], pair2[1], k);
+      if (t !== 'invalid') return { type: 'point-on-segment3', id: rider, a: def.a, b: def.b, t };
+    }
+    return null;
+  }
 
   for (const [P, Q, kk] of orientations) {
     // ── the HALVES shape (#748): the host's two halves against each other, `|aR| = k·|Rb|`.
@@ -1565,9 +1615,23 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
    * figure, so it is asked here — at the OUTERMOST call, because the engine lowers other commands to
    * this same shape and they are not sentences anyone wrote.
    */
+  let arrows: [Id, Id][] = [];
   if (APPLY_DEPTH === 0) {
-    const amb = ambiguousPairRatio(c, cmd);
-    if (amb) return { ok: false, error: amb };
+    // #1680/#1783 (ADR-3D-391 Am. 1): one reading for every unmarked segment equation, plain or with a coefficient
+    const read = readSegmentEquation(c, cmd);
+    if ('ask' in read) return { ok: false, error: read.ask };
+    if ('length' in read) {
+      // the length reading IS the «|XY| = k|ZW|» sentence: its own commands, each an outermost apply as the store's
+      let at = c;
+      for (const k of read.length) {
+        const step = applyCommand3(at, k);
+        if (!step.ok) return step;
+        at = step.next;
+      }
+      return { ok: true, next: at };
+    }
+    cmd = read.cmd;
+    arrows = read.arrows;
   }
   APPLY_DEPTH += 1;
   let r: ApplyResult3;
@@ -1581,6 +1645,7 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
   } finally {
     APPLY_DEPTH -= 1;
   }
+  if (r.ok && arrows.length > 0) r = { ok: true, next: withStatedArrows(r.next, arrows) };
   if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
   return r;
 }
@@ -2424,7 +2489,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
         c.scaleGivens.length === 0 &&
-        (cmd.claim.type !== 'length-eq' || freeDims(c) === 0)
+        ((cmd.claim.type !== 'length-eq' && cmd.claim.type !== 'length-sum') || freeDims(c) === 0)
       ) {
         next.scaleGivens.push(cmd.claim);
         next.claims.push(cmd.claim);
@@ -2498,6 +2563,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const magnitudeScalarPin = (cl: Claim3): ScalarPin | null =>
           cl.type === 'length-eq'
             ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value }
+            : cl.type === 'length-sum' // #1680 (ADR-3D-392): drives like `length`, by its own signed residual
+              ? { kind: 'length-sum', terms: cl.terms, value: cl.value }
             : cl.type === 'area-eq'
               ? { kind: 'area3', ids: cl.ids, value: cl.value }
               : cl.type === 'volume-poly'
@@ -2525,8 +2592,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             }
           }
           next.scalarPins.push(mag);
-          if (cmd.claim.type !== 'length-eq') next.claims.push(cmd.claim);
-          else recordPinGiven(next, cmd.claim); // #1567 (ADR-3D-285): the length pin records its arbiter
+          if (cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum') recordPinGiven(next, cmd.claim);
+          else next.claims.push(cmd.claim); // #1567 (ADR-3D-285): the length pin records its arbiter
           return { ok: true, next };
         }
         // #754: once a scale given is in force the rescale owns the figure's size — a second
@@ -2534,8 +2601,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // double-apply); it falls through to the claim lane, where the store refuses it honestly
         // against still-free dims and checks it exactly against a rigid one. (#1447: with free
         // dims the demotion above now takes it; this arm keeps the free3-only reach.)
-        if (cmd.claim.type === 'length-eq' && c.scaleGivens.length === 0) {
-          next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+        if ((cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum') && c.scaleGivens.length === 0) {
+          next.scalarPins.push(
+            cmd.claim.type === 'length-eq'
+              ? { kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value }
+              : { kind: 'length-sum', terms: cmd.claim.terms, value: cmd.claim.value },
+          );
           recordPinGiven(next, cmd.claim); // #1567 (ADR-3D-285)
           return { ok: true, next };
         }
@@ -3379,7 +3450,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          */
         const asClaim = applyCommand3(c, {
           type: 'claim',
-          claim: { type: 'vec-eq', lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })) },
+          claim: {
+            type: 'vec-eq',
+            lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }],
+            rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })),
+          },
         });
         if (!asClaim.ok) return asClaim;
         // the stated vector is drawn (the V1 auto-draw convention, preserved through the relation path)

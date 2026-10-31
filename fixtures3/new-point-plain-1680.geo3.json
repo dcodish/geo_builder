@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-29T17:14:41.511Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מקבילון ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "prism4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ],
+          "oblique": true
+        }
+      ]
+    },
+    {
+      "utterance": "AK = AD",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "K",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "A",
+                "to": "D"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

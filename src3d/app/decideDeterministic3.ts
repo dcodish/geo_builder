@@ -55,7 +55,9 @@ export function decideDeterministic3(
  */
 export type RefusalCategory3 = 'guided' | 'clarify' | 'refused';
 type StoreOwnCode3 = Exclude<NonNullable<StoreError3>, EngineError3>['code'];
-const STORE_CATEGORY3: Record<StoreOwnCode3, RefusalCategory3> = {
+// #1680 (ADR-3D-391): the length-or-vector question is an ENGINE code now (one reading at the outermost apply, for
+// the plain and the coefficient forms alike), and it is still the clarification it always was, in either form.
+const STORE_CATEGORY3: Record<StoreOwnCode3 | 'ambiguous-vector-length', RefusalCategory3> = {
   'proof-target': 'guided', // #1666: what the student must PROVE, answered with the pointer (2-D's `scope:proof`)
   'radian-angle': 'guided', // #1837: an angle in radians, answered with 2-D's degrees sentence (`scope:radian-angle`)
   'unread-name': 'guided', // #1919: a letter the tool cannot read, answered with the point-name sentence

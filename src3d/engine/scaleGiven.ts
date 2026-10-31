@@ -32,6 +32,7 @@ import { claimPointIds, type Claim3, type Construction3, type Id } from './types
 export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
   switch (claim.type) {
     case 'length-eq':
+    case 'length-sum': // #1680 (ADR-3D-392): a sum of lengths scales by k, like one length
       return 1;
     case 'area-eq':
       return 2;
@@ -46,6 +47,7 @@ export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
 export function scaleGivenValue(claim: Claim3): number | null {
   switch (claim.type) {
     case 'length-eq':
+    case 'length-sum':
     case 'area-eq':
     case 'volume-poly':
       return claim.value;
@@ -57,6 +59,8 @@ export function scaleGivenValue(claim: Claim3): number | null {
 /** Is this claim a magnitude statement a scale given can be minted from? (value must be a real size) */
 export function isScaleGivenClaim(claim: Claim3): boolean {
   const v = scaleGivenValue(claim);
+  // #1680: a SIGNED sum («AB − BC = 2») has no uniform factor that is sure to be positive — only an all-positive one
+  if (claim.type === 'length-sum' && claim.terms.some((t) => !(t.c > 0))) return false;
   return v !== null && Number.isFinite(v) && v > 0;
 }
 
@@ -114,6 +118,16 @@ export function scaleGivenMagnitude(claim: Claim3, c: Construction3, pos: Map<Id
       const a = pos.get(claim.a);
       const b = pos.get(claim.b);
       return a && b ? norm3(sub3(b, a)) : null;
+    }
+    case 'length-sum': {
+      let sum = 0;
+      for (const t of claim.terms) {
+        const a = pos.get(t.a);
+        const b = pos.get(t.b);
+        if (!a || !b) return null;
+        sum += t.c * norm3(sub3(b, a));
+      }
+      return sum;
     }
     case 'area-eq': {
       const ps = claim.ids.map((id) => pos.get(id));

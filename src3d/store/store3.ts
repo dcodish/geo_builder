@@ -35,7 +35,7 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
@@ -52,7 +52,7 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -86,12 +86,63 @@ export interface Derived3 {
   /** #1467 (ADR-3D-382): by fact id, the points that line CREATED by reference — the fold's mint pass, last resort
    *  after the deferral fixpoint. What the «נוצרה נקודה חדשה …» notice names. Absent for a line that created none. */
   created: Readonly<Record<string, readonly string[]>>;
+  /** #1680 (ADR-3D-391 Am. 1): by fact id, the reading the fold gave a line's unmarked two-reading segment equation
+   *  (`readSegmentEquation3`). Absent for a line that holds none. */
+  readings: Readonly<Record<string, SegmentEquationReading3>>;
+}
+
+/**
+ * #1680 / #1783 (ADR-3D-391 Am. 1) — WHICH READING AN UNMARKED TWO-READING SEGMENT EQUATION TAKES: try both.
+ *
+ * The operator's rule (2026-10-30, PR #2605): *"if something is not sure if its a vector or length, we should ask if
+ * both can be true and if only one can be true, we will assume this is the case"*; and where both readings give
+ * the same figure (T39, «AD = 3DB» over a rider), it builds. "Can be true" is a question about the SOLVED figure —
+ * the vector reading of «AD = 3BD» over a rider puts D off its segment, of «AB = 1AC» makes B and C one point, of
+ * «SM = 2SA» lays the apex in the base — so it is answered by folding the list up to and including the line twice,
+ * once per reading, through this same fold (never a second reader), and reading the line's own status:
+ * - only one reading builds → that reading;
+ * - both build and give one figure → the length reading (nothing on the figure asserts a vector);
+ * - both build and differ → `'ask'` (the question; neither reading is silently picked);
+ * - the VECTOR reading cannot hold → `'length'`, whether or not the length reading then holds (Am. 2, the operator
+ *   on T64, 2026-10-30: *"since AB=AC cannot be vectors for a quad pyramid to hold, we must assume these are length
+ *   and write them as such"*). A length reading that cannot hold either goes through the ordinary length path and
+ *   gets that path's own verdict — the contradiction naming the statement — so no sentence is ever asked about
+ *   when only one of its readings was ever possible.
+ * The trials run at one canonical seed, so a line's reading never changes with «הציגו תצורה אחרת»; the verdict
+ * depends only on the list up to the line, so a later line never re-reads an earlier one. Memoized by that prefix.
+ */
+const READING_SEED = 0;
+const readingMemo3 = new Map<string, SegmentEquationReading3>();
+function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEquationReading3 {
+  const key = JSON.stringify(prefix.map((f) => [f.enabled, f.cmds])) + '#' + at;
+  const hit = readingMemo3.get(key);
+  if (hit) return hit;
+  const line = prefix[prefix.length - 1];
+  const trial = (reading: SegmentEquationReading3): Derived3 | null => {
+    const forced: Fact3 = { ...line, cmds: line.cmds.map((k, i) => (i === at && k.type === 'vec-rel' ? { ...k, reading } : k)) };
+    const d = deriveCore3([...prefix.slice(0, -1), forced], READING_SEED, true);
+    return d.status[line.id] === 'ok' ? d : null;
+  };
+  const asVector = trial('vector');
+  const asLength = asVector ? trial('length') : null; // Am. 2: with no vector reading, the length one is taken as is
+  const sameFigure = (a: Derived3, b: Derived3): boolean => {
+    if (a.positions.size !== b.positions.size) return false;
+    for (const [id, p] of a.positions) {
+      const q = b.positions.get(id);
+      if (!q || Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) > 1e-6 * Math.max(1, Math.hypot(p.x, p.y, p.z))) return false;
+    }
+    return true;
+  };
+  const out: SegmentEquationReading3 =
+    !asVector ? 'length' : asLength ? (sameFigure(asVector, asLength) ? 'length' : 'ask') : 'vector';
+  if (readingMemo3.size > 500) readingMemo3.delete(readingMemo3.keys().next().value as string);
+  readingMemo3.set(key, out);
+  return out;
 }
 
 export type StoreError3 =
   | EngineError3
   | { code: 'not-understood' }
-  | { code: 'ambiguous-vector-length' }
   /** #516: one letter as both the running parameter and a figure DOF — a recognized ambiguity
    *  surfaces a clarification and NEVER escalates to the LLM lane (which would guess). */
   | { code: 'param-roles-conflated'; letter: string }
@@ -559,6 +610,8 @@ function deriveCore3(
   let facts = factsIn;
   /** #2235 (ADR-3D-351): the commands each fact holding a `shape-ref3` applied as, against the figure before it */
   const resolvedCmds: Record<string, Command3[]> = {};
+  /** #1680 (ADR-3D-391 Am. 1): the reading each line's two-reading segment equation took */
+  const readings: Record<string, SegmentEquationReading3> = {};
   /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
   const expandFact = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
     const solid = presolids?.[f.id]; // #1566: a solid the mint pass created for this row is declared by it, first
@@ -691,8 +744,15 @@ function deriveCore3(
     let probe = c;
     const exp = expandFact(c, f); // #2235: an unnamed shape noun names the ring the figure holds NOW
     if (!exp.ok) return exp.error;
-    for (const cmd of exp.cmds) {
-      if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
+    for (const [j, stated] of exp.cmds.entries()) {
+      if (droppedSoft(stated)) continue; // an explicit ∠=90 on this triangle superseded the soft default
+      // #1680 (ADR-3D-391 Am. 1): an unmarked two-reading segment equation takes the reading trying both gives
+      let cmd = stated;
+      if (stated.type === 'vec-rel' && segmentEquationKind3(probe, stated) === 'two-readings') {
+        const reading = stated.reading ?? readSegmentEquation3([...facts.slice(0, facts.indexOf(f)), { ...f, cmds: [...exp.cmds] }], j);
+        readings[f.id] = reading;
+        cmd = { ...stated, reading };
+      }
       const r = applyCommand3(probe, seated(cmd));
       if (!r.ok) return r.error;
       probe = r.next;
@@ -1862,7 +1922,7 @@ function deriveCore3(
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds, created };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds, created, readings };
 }
 
 export interface Geo3State {
@@ -2141,9 +2201,7 @@ function readStatement3(
   return {
     ok: false,
     error:
-      parsed.reason === 'ambiguous-vector-length'
-        ? { code: 'ambiguous-vector-length' }
-        : parsed.reason === 'param-roles-conflated'
+      parsed.reason === 'param-roles-conflated'
           ? { code: 'param-roles-conflated', letter: parsed.letter }
           : parsed.reason === 'ambiguous-main-diagonal'
             ? { code: 'ambiguous-main-diagonal', pairs: mainDiagonalCandidates(st) }
@@ -2359,8 +2417,13 @@ export function decideCommands3(
   }
   const fact: Fact3 = { id: newId(), utterance: utterance.trim(), cmds: [...commands], enabled: true };
   const candidate = [...facts, fact];
-  const status = derive3(candidate, seed).status[fact.id];
+  const derived = derive3(candidate, seed);
+  const status = derived.status[fact.id];
   if (status !== 'ok' && status !== 'disabled') return { kind: 'refused', error: status }; // keep-prior
+  if (opts.twins) {
+    const twin = knownSegmentEquationTwin3(facts, seed, fact, derived);
+    if (twin) return { kind: 'already-stated', twin, facts };
+  }
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
   // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
   // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
@@ -2368,6 +2431,45 @@ export function decideCommands3(
   const found = seedForRequirements(candidate, seed);
   if (found === null) return { kind: 'refused', error: { code: 'bound-unsatisfiable', id: '' } };
   return { kind: 'record', fact, facts: candidate, seed: found };
+}
+
+/**
+ * #1680 (ADR-3D-391 Am. 1, T45) — A TWO-READING SEGMENT EQUATION THE FIGURE ALREADY STATES IS ALREADY KNOWN.
+ *
+ * «E על AA' כך ש-AE = 2EA'» then «AE = 2EA'»: the operator (2026-10-30): *"we understood this a row above so its
+ * wierd that now we dont. anyway, we should say this is already known and not add the line"*. The #613 twin rule
+ * (ADR-W-031) compares SPELLINGS, and a ratio clause and a segment equation are two spellings of one statement, so it
+ * is judged on the figure instead: the reading the fold gave the line holds in EVERY sample of the figure before it
+ * (`verifyClaim`: every claim seed × every branch), so the line adds nothing and no row is appended. Only an
+ * unmarked two-reading line is judged here (the class the ruling covers); a definition or a marked vector is not.
+ * The twin the notice stands for is the latest enabled line naming every point of the equation (the line that
+ * already says it), else the latest enabled line; it is always enabled, so nothing is re-enabled.
+ */
+function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: number, fact: Fact3, derived: Derived3): Fact3 | null {
+  const reading = derived.readings[fact.id];
+  if (reading !== 'vector' && reading !== 'length') return null;
+  const cmd = fact.cmds.find((k) => k.type === 'vec-rel');
+  if (fact.cmds.length !== 1 || cmd?.type !== 'vec-rel' || cmd.terms.length !== 1 || cmd.terms[0].atom.kind !== 'pair') return null;
+  const { from: a2, to: b2 } = cmd.terms[0].atom;
+  const k = cmd.terms[0].coeff.k;
+  const claim: Claim3 =
+    reading === 'length'
+      ? { type: 'length-rel', a1: cmd.from, b1: cmd.to, a2, b2, c: k }
+      : { type: 'vec-eq', lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], rhs: [{ coeff: k, atom: { kind: 'pair', from: a2, to: b2 } }] };
+  if (!verifyClaim(claim, derive3(facts as Fact3[], seed).construction, seed)) return null;
+  const ids = [cmd.from, cmd.to, a2, b2];
+  const names = (f: Fact3): boolean => {
+    const seen = new Set<string>();
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') seen.add(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (typeof v === 'object' && v !== null) Object.values(v).forEach(walk);
+    };
+    walk(f.cmds);
+    return ids.every((id) => seen.has(id));
+  };
+  const enabled = facts.filter((f) => f.enabled);
+  return [...enabled].reverse().find(names) ?? enabled[enabled.length - 1] ?? null;
 }
 
 /**

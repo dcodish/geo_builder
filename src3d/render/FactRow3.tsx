@@ -31,6 +31,7 @@ import { factDisplay3, isVectorFact3, vectorNotation } from './notation';
 import { isVectorMarked3 } from '../lexicon/marks3';
 import { VecMath, tokenizeRow } from './VecMath';
 import type { QueryEcho3 } from '../engine/queries';
+import type { SegmentEquationReading3 } from '../engine/types';
 
 /** The structural shape a row needs — matching `isVectorFact3`, so a test may pass a literal. */
 export type FactRowFact3 = {
@@ -54,8 +55,8 @@ export type FactRowFact3 = {
  * `InputArea` preview already use. The source text must be the SAME string the renderer gets, or the
  * container and its content can disagree about what the row is.
  */
-export function factRowDir3(f: FactRowFact3, vecNames: Set<string>): 'rtl' | 'ltr' {
-  return textDir3(factRowText3(f, vecNames));
+export function factRowDir3(f: FactRowFact3, vecNames: Set<string>, reading?: SegmentEquationReading3): 'rtl' | 'ltr' {
+  return textDir3(factRowText3(f, vecNames, reading));
 }
 
 /**
@@ -64,11 +65,17 @@ export function factRowDir3(f: FactRowFact3, vecNames: Set<string>): 'rtl' | 'lt
  * The direction decision moved into the chrome; which string it is decided FROM stays here, beside
  * the renderer, for the reason above — it must be the string `FactRowText3` renders.
  */
-export function factRowText3(f: FactRowFact3, vecNames: Set<string>): string {
-  return factDisplay3(f, vecNames);
+export function factRowText3(f: FactRowFact3, vecNames: Set<string>, reading?: SegmentEquationReading3): string {
+  return factDisplay3(f, vecNames, reading);
 }
 
-export function FactRowText3({ f, vecNames }: { f: FactRowFact3; vecNames: Set<string> }): React.ReactElement {
+/**
+ * `reading` is the fold's verdict on the row's unmarked segment equation (`Derived3.readings`). A row read as LENGTHS
+ * is not a vector statement whatever its command's kind, so it takes the plain branch with the length spelling
+ * (`|AA'| = 3|BC|`, ADR-3D-391 Am. 2) — exactly the row the student gets for typing that spelling.
+ */
+export function FactRowText3({ f, vecNames, reading }: { f: FactRowFact3; vecNames: Set<string>; reading?: SegmentEquationReading3 }): React.ReactElement {
+  if (reading === 'length') return plainRowNode3(factDisplay3(f, vecNames, reading));
   if (isVectorFact3(f)) return <VecMath text={factDisplay3(f, vecNames)} vecNames={vecNames} />;
   return plainRowNode3(f.utterance);
 }

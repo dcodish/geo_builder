@@ -928,7 +928,7 @@ export default function App3() {
                 : {}),
               // #934 (ADR-3D-228) → #1401 (ADR-W-088): the row's DIRECTION is the shared chrome's now,
               // derived with `textDir3` from this text — this callback used to set `dir` itself.
-              text: factRowText3(f, new Set(vectorNames3(derived.construction))),
+              text: factRowText3(f, new Set(vectorNames3(derived.construction)), derived.readings[f.id]),
               lead:
                 f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
                   <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
@@ -941,7 +941,7 @@ export default function App3() {
                 <span className="block min-w-0 truncate text-sm">
                   {/* #900 (ADR-3D-216): the routing lives in FactRow3, not in this callback — a decision
                       inside a `rows={facts.map(...)}` ternary is one no test can reach. */}
-                  <FactRowText3 f={f} vecNames={new Set(vectorNames3(derived.construction))} />
+                  <FactRowText3 f={f} vecNames={new Set(vectorNames3(derived.construction))} reading={derived.readings[f.id]} />
                 </span>
               ),
               trail: (planeChips.get(f.id) ?? []).length > 0 || dihedralChips.has(f.id) ? (

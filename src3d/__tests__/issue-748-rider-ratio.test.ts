@@ -92,14 +92,24 @@ describe('#748 — the ratio determines the rider, stated on its own line', () =
 describe('#748 — honesty: what must still refuse, and what must not move', () => {
   beforeEach(reset);
 
-  it('a ratio CONTRADICTING an already-stated one still refuses — a determined rider is claimed about, not redefined', () => {
+  /**
+   * #1680 (ADR-3D-391 Am. 1): a rider whose t is already STATED is placed, so an unmarked equation about it is a claim
+   * under either reading. A contradicting one holds under NEITHER, so it is asked about — never redefined, and never
+   * refuted as arithmetic. The bar form keeps the honest claim lane: a contradiction refuses.
+   */
+  // ADR-3D-391 Am. 2 (the T64 ruling, 2026-10-30): the vector reading cannot hold here, so the unmarked line IS the
+  // length statement and refuses exactly as its bar form does — it no longer asks
+  it('a ratio CONTRADICTING an already-stated one is never a redefinition — the plain and the bar form refuse alike', () => {
     const { err: e } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "AE = 3EA'"]);
     expect(e).not.toBeNull();
-    expect(e).toMatchObject({ code: 'claim-refuted' });
+    const { err: bar } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "|AE| = 3|EA'|"]);
+    expect(bar).not.toBeNull(); // refused (today in the polygon-collapse register), never asked: the bars answered the question
+    expect((bar as { code: string }).code).not.toBe('ambiguous-vector-length');
+    expect((e as { code: string }).code).toBe((bar as { code: string }).code);
   });
 
-  it('a ratio AGREEING with the stated one verifies (idempotent, no false accusation)', () => {
-    const { err: e, pos } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "AE = 2EA'"]);
+  it('a ratio AGREEING with the stated one verifies in the bar form (idempotent, no false accusation)', () => {
+    const { err: e, pos } = build(['מקבילון', "E על AA' כך ש-AE = 2EA'", "|AE| = 2|EA'|"]);
     expect(e).toBeNull();
     expect(ratio(pos)).toBeCloseTo(2, 6);
   });
@@ -110,13 +120,13 @@ describe('#748 — honesty: what must still refuse, and what must not move', () 
     expect(dist(pos.get('A')!, pos.get('M')!)).toBeCloseTo(dist(pos.get('M')!, pos.get("A'")!), 6);
   });
 
-  it('the NON-chain spelling is not guessed at — «AE = 2*A\'E» reads vector≠length, so it is no ratio given', () => {
-    // The rider is not the shared middle letter, so the vector reading (t = 2, off the segment) and the
-    // length reading (t = ⅔) disagree — believing either would be a guess. It REFUSES, and leaves E
-    // where the seed put it rather than quietly adopting the chain value.
+  it('the NON-chain spelling «AE = 2*A\'E» is read as lengths — the only reading that can hold', () => {
+    // The rider is not the shared middle letter, so the vector reading (t = 2) puts E off its segment and only the
+    // length reading (t = ⅔) can hold. #1783 (ADR-3D-391 Am. 1, the operator's rule of 2026-10-30): "if only one can
+    // be true, we will assume this is the case" — it builds as lengths (it was refuted, then asked).
     const { err: e, pos } = build(['מקבילון', "E על AA'", "AE = 2*A'E"]);
-    expect(e).toMatchObject({ code: 'claim-refuted' });
-    expect(ratio(pos)).not.toBeCloseTo(2, 3);
+    expect(e).toBeNull();
+    expect(dist(pos.get('A')!, pos.get('E')!) / dist(pos.get("A'")!, pos.get('E')!)).toBeCloseTo(2, 6);
   });
 
   it('STABILITY: adding the ratio moves E and nothing else', () => {

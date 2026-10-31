@@ -400,4 +400,6 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // Each carries the declarations it needs, so a guide click on a blank canvas builds it (#1566, ADR-3D-398).
   { category: 'vectors', he: 'w = u + v', en: 'w = u + v', needs: { he: ['וקטור u', 'וקטור v'], en: ['vector u', 'vector v'] } },
   { category: 'vectors', he: 'w = 2u - 3v', en: 'w = 2u - 3v', needs: { he: ['וקטור u', 'וקטור v'], en: ['vector u', 'vector v'] } },
+  // #1680 (ADR-3D-392): a sum of segment lengths equal to a number (2-D's `set-measure-sum`). Appended LAST (the #1394 key)
+  { category: 'vectors', he: 'AB + BC = 10', en: 'AB + BC = 10' },
 ];

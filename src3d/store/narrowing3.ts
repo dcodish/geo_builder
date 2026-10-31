@@ -68,7 +68,7 @@ const DEFINITION_CMDS = new Set<string>([
 const VALUE_CMDS = new Set<string>(['vertex-angle', 'vec-mag', 'mag-val', 'distance-rel', 'symbol-value', 'inject-vector', 'inject-pair', 'dot-given']);
 /** The claim kinds that state a number (every other claim relates two things). */
 const VALUE_CLAIMS = new Set<string>([
-  'length-eq', 'area-eq', 'coords-eq', 'angle-seg-eq', 'vertex-angle-eq', 'volume-eq', 'lateral-area-eq', 'surface-area-eq',
+  'length-eq', 'length-sum', 'area-eq', 'coords-eq', 'angle-seg-eq', 'vertex-angle-eq', 'volume-eq', 'lateral-area-eq', 'surface-area-eq',
   'volume-poly', 'cos-angle-eq', 'vec-val', 'dot-val', 'mag-val', 'line-plane-angle', 'plane-eq',
 ]);
 

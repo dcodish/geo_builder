@@ -29,6 +29,15 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1680 (ADR-3D-391, ADR-3D-392) — the operator's rulings of 2026-10-13: a segment equation that places a rider or defines a new
+  // point builds as a vector, and a sum of lengths reads in 3-D. The ask/build split is asserted in
+  // issue-1680-segment-equation.test.ts; these are the build + drift net.
+  'length-sum-1680.geo3.json': ['משולש ABC', 'AB + BC = 10'],
+  'rider-halves-1680.geo3.json': ["מקבילון ABCDA'B'C'D'", "E על AA'", "AE = EA'"],
+  'new-point-plain-1680.geo3.json': ["מקבילון ABCDA'B'C'D'", 'AK = AD'],
+  // ADR-3D-391 Am. 1 — the operator's T36 and T42 (2026-10-30): only the length reading can hold, so it builds with no question
+  'rider-lengths-only-1680.geo3.json': ['משולש ABC', 'D על AB', 'AD = 3BD'],
+  'edge-point-lengths-only-1680.geo3.json': ["מקבילון ABCDA'B'C'D'", "E על AA'", 'AE = AB'],
   // #2484 (ADR-3D-388) — the operator's two sequences (2026-10-24): a relation naming a missing π-plane creates it free, and a
   // segment ⟂ a free plane pins it. The class is asserted in free-plane-relations-2484.test.ts; this is the build + drift net.
   'free-plane-perp-2484-undeclared.geo3.json': ["קובייה ABCDA'B'C'D'", "הישר AC' מאונך למישור π3"],
