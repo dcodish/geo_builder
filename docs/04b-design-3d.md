@@ -647,7 +647,7 @@ only (`1/t` is not a name).
 
 A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no stated orientation, `orientationStated3`;
 no revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). A figure holding a solid takes
-the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, ADR-3D-400); any other figure takes its first three points. The **landing
+the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, ADR-3D-400); any other figure takes its first three points. The solve is memoised in the solved frame, and the drawing is a memoised rigid motion of it (`drawnFrame3`). The knowledge gates (`knowledgeSamples3`) read the solved frame, so a placement-only number never passes as knowledge (ADR-3D-400 §3). The **landing
 funnel** classifies which gauge components are *provably* free, which licenses
 [`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
 
