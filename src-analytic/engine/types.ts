@@ -607,6 +607,17 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; circles?: [Id, Id]; branch?: 'external' | 'internal'; at?: Id })
   /**
+   * A CIRCLE AND A CONIC (#2618 PR 2, ADR-AG-360 / ADR-AG-361) — «המעגל משיק לאליפסה (בנקודה B / בנקודות B ו-D)», «מעגל
+   * חסום באליפסה», «האליפסה חסומה במעגל». `circle` is the circle's id, written over a circle-slot sentinel inside
+   * `circles-about` (the one resolver for «המעגל» / «מעגל M»: bind, state, or ask); `host` the figure's one conic of
+   * that kind (`curveHost`). Exactly one reading:
+   * - `ats` — the touch points named: each on both curves, the circle's radius there ∥ the conic's normal there;
+   * - `fit` — the textbook's concentric circle (operator ruling Q1 → A): through the minor-axis vertices
+   *   (`inscribed`) or the major-axis vertices (`circumscribed`), the ellipse only;
+   * - neither — a touch the sentence does not place: the tool's own touch parameter on the conic.
+   */
+  | (FactBase & { t: 'circle-conic'; circle: Id; host: ConicHost; ats?: Id[]; fit?: 'inscribed' | 'circumscribed' })
+  /**
    * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
    * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
    * unnamed ones are an unstated order — a `choice` over both (R14, ADR-052).

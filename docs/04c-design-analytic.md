@@ -924,6 +924,27 @@ bounded segment keeps `t* = −B/2A` within [0, 1] as two hinge rows.
 
 *Identifiers:* `ConicHost` · `conicHostOf` · `curveHost` · `touchNormal` · `conicTangencyRows` · `parseConicInscribed` · `conicInscribedFacts`
 
+### A circle and a conic ([ADR-AG-360](06c-decisions-analytic.md#adr-ag-360), [ADR-AG-361](06c-decisions-analytic.md#adr-ag-361), #2618 PR 2)
+
+**Parse.** A circle SUBJECT before the curve-host atom in `parseCircleAt`'s conic branch («המעגל משיק לאליפסה», «מעגל M
+משיק לפרבולה בנקודה B», «… בנקודות B ו-D») and the concentric readings appended to `parseConicInscribed`
+(`parseCircleEllipseFit`: «מעגל חסום באליפסה», «באליפסה חסום מעגל», «האליפסה חוסמת את המעגל» inside; «האליפסה חסומה
+במעגל», «במעגל חסומה האליפסה», «המעגל חוסם את האליפסה» around; the English twins; the ellipse only) all lower to ONE
+fact, `circle-conic { circle, host, ats?, fit? }`, inside `circles-about` over one slot (`oneCircleSlot`): the figure's
+one circle binds, none draws one (ADR-AG-198's created circle), a letter states the circle on it, several ask.
+
+**Apply.** The circle arrives by id; the conic is `curveHost`'s. Named touch points lower to three rows each, all
+existing: on the circle, on the conic (each skipped when the point is on it by construction), and
+`relation parallel (touchNormal(circle, T), touchNormal(conic, T))` — the radius ∥ the conic's normal. Otherwise one
+constraint, `circle-conic { circle: CircleSide, curve, rel }`:
+- `rel: { k: 'touch', s }` — `s` is the tool's touch parameter, a `θ_` symbol with no part (`directionSymbol`, so the
+  created-shape fit leaves it alone and the sampler draws it in angle units). The conic's point is P(s): ellipse
+  `(a·cos s, b·sin s)`, parabola y² = 2px `(p·s²/2, p·s)`; the rows are `(|C − P| − r)/size` and the sine between
+  `C − P` and the conic's normal at P. Net −1 DOF.
+- `rel: { k: 'inscribed' | 'circumscribed' }` — `(cx, cy, r − min/max(|a|, |b|)) / size`: the concentric circle.
+
+*Identifiers:* `circle-conic` (fact and constraint) · `parseCircleEllipseFit` · `CIRCLE_ELLIPSE_FIT` · `CIRCLE_CONIC_WORDS`
+
 ### The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
 
 `the-circle { create, about, match? }` is the one contextual-circle fact; M1's `theCircle(c, match)` binds, creates or
