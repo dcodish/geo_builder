@@ -48,12 +48,12 @@ import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, open
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind } from './types';
+import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3} from './vec3';
-import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
+import { baseRingOf, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -1438,6 +1438,48 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 
 // #1498: GAUGE_KINDS + gaugeFramePoint3 moved to types.ts — the lane rule is asked in ONE place,
 // shared with solve3's residual accessor (which had drifted to "gauge everything").
+
+/**
+ * #2630 (ADR-3D-400): the floor frame of a solid — the frame its builder lays it in. Origin base[0],
+ * e1 along base[0]→base[1], n the base plane's normal turned toward the rest of the solid (apex or
+ * top), or for a flat polygon the ring's own winding (counter-clockwise from +z). Null when the base
+ * is unknown or degenerate; the caller then falls back to the first three points.
+ */
+function solidFloorFrame3(s: SolidObj, pos: Positions3): { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null {
+  const ring = baseRingOf(s)?.map((id) => pos.get(id));
+  if (!ring || ring.length < 3 || ring.some((p) => !p)) return null;
+  const pts = ring as Vec3[];
+  let nRaw = newellNormal(pts);
+  if (norm3(nRaw) < 1e-9) return null;
+  const rest = s.ids.filter((id) => !baseRingOf(s)!.includes(id)).map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+  if (rest.length > 0 && dot3(nRaw, sub3(centroid3(rest), centroid3(pts))) < 0) nRaw = scale3(nRaw, -1);
+  const n = normalize3(nRaw);
+  const d1 = sub3(pts[1], pts[0]);
+  const d1p = sub3(d1, scale3(n, dot3(d1, n)));
+  if (norm3(d1p) < 1e-9) return null;
+  const e1 = normalize3(d1p);
+  return { p0: pts[0], e1, e2: cross3(n, e1), n };
+}
+
+/**
+ * #2630 (ADR-3D-400): has the student said anything about WHICH WAY the figure faces? That is a wider
+ * question than {@link hasAbsoluteFrameObject} (is the placement itself a DOF, #367): a component given
+ * on a pair or a vector («AB = (1,2,3)»), a plane equation, a component's sign or a coordinate
+ * determination fixes the figure's turn against the axes without placing a point. The gauge
+ * normalisation may turn only a figure for which this is false; turning any other one rewrites a
+ * stated component (measured before this: «AB = (1,2,3)» with two lengths drew AB as (3.74, 0, 0)).
+ */
+export function orientationStated3(c: Construction3): boolean {
+  return (
+    hasAbsoluteFrameObject(c) ||
+    c.pairPins.length > 0 ||
+    c.vectorPins.length > 0 ||
+    c.planePins.length > 0 ||
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.coordDeterminations.length > 0
+  );
+}
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -3070,18 +3112,19 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
    * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
    * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
    * and line, so every relation survives verbatim; configurations change the SHAPE alone.
-   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, solids,
-   * revolutions, circles — is untouched.
+   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, revolutions,
+   * circles — is untouched.
+   *
+   * #2630 (ADR-3D-400 — operator 2026-10-31: *"they are on the floor until they are placed by user
+   * somewhere"*): a SOLID is no exception. A figure holding one takes the frame from the first
+   * solid's own base, the frame its builder lays it in — base[0] at the origin, base[0]→base[1]
+   * along +x, the base plane on the floor, the rest of the solid above it (a flat polygon: its ring
+   * counter-clockwise from above). The first three points are not that frame: an apex-first or
+   * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
    */
-  if (
-    !hasAbsoluteFrameObject(c) &&
-    absolutePointCount(c) === 0 &&
-    c.solids.length === 0 &&
-    c.revolutions.length === 0 &&
-    c.circles3.length === 0
-  ) {
+  if (!orientationStated3(c) && c.revolutions.length === 0 && c.circles3.length === 0) {
     const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = null;
+    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
     for (let i = 1; i < ordered.length && !frame; i += 1) {
       const d1 = sub3(ordered[i], ordered[0]);
       if (norm3(d1) < 1e-9) continue;

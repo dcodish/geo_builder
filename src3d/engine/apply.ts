@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -519,29 +519,6 @@ function freeSymbolOf(c: Construction3, id: Id): string | null {
   return c.symbolPins.some((p) => p.sym === vd.symbol) ? null : vd.symbol; // already pinned ⇒ can't pin twice
 }
 
-/** #324 (ADR-3D-079): a solid's BASE ring — the drawing convention everywhere in the engine is
- *  base ids first (prisms: first half; pyramids: all but the apex-last; flat polygons: all). */
-function baseRingOf(s: SolidObj): Id[] | null {
-  if (isQuadPyramid(s.kind)) return s.ids.slice(0, 4); // #305: any base × any top — one rule
-  switch (s.kind) {
-    case 'cube': case 'box': case 'parallelepiped':
-    case 'prism4': case 'prism4g': case 'prism4sq': case 'prism4r':
-      return s.ids.slice(0, 4);
-    case 'prism3': case 'prism3e':
-      return s.ids.slice(0, 3);
-    case 'prismReg5':
-      return s.ids.slice(0, 5);
-    case 'prismReg6':
-      return s.ids.slice(0, 6);
-    case 'tetra': case 'pyramid3': case 'pyramid3e':
-      return s.ids.slice(0, 3);
-
-    case 'polygon3': case 'polygon4': case 'polygon5':
-      return [...s.ids];
-    default:
-      return null;
-  }
-}
 
 /** Apply-time validation of a claim's references (order matters, like every fact). */
 /** S2 (#378, ADR-3D-103): every reference a line-rel names must exist — the operand's points /

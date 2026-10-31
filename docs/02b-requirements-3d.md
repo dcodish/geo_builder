@@ -97,13 +97,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - Sources: ADR-052 (this is its 3-D form).
 - **FR-SP-4 (Must)** — **Gauge is not knowledge.** A figure's placement, rotation and scale are a gauge.
   An unanchored figure is normalised onto the floor, so «הציגו תצורה אחרת» changes only its shape (operator:
-  *"Keep it flat on the floor"*). **A number drawn on the canvas must be seed-invariant knowledge** — the
+  *"Keep it flat on the floor"*). A solid is no exception: its base stays on the floor and its apex or top above it,
+  "until they are placed by user somewhere" (operator 2026-10-31, #2630). A figure whose orientation the student stated
+  (a coordinate, a component given such as «AB = (1,2,3)», an equation, a component sign) is never turned. **A number drawn on the canvas must be seed-invariant knowledge** — the
   shared statement is [FR-DP-3](02w-requirements-workspace.md).
   An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
   AB to a new angle. The first drawing may no longer sit square on the floor."*; 2026-10-24, #2504 d03b).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379.
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400.
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:

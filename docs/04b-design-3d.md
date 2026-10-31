@@ -645,8 +645,9 @@ only (`1/t` is not a name).
 
 ### Gauge, and why the landing funnel exists
 
-A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no absolute object, solid,
-revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). The **landing
+A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no stated orientation, `orientationStated3`;
+no revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). A figure holding a solid takes
+the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, ADR-3D-400); any other figure takes its first three points. The **landing
 funnel** classifies which gauge components are *provably* free, which licenses
 [`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
 

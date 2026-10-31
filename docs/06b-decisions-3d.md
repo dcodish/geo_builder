@@ -11104,7 +11104,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 ## ADR-3D-272 — The gauge is not a configuration: an unanchored figure keeps the floor (#1421)
 
-**Status:** accepted · 2026-09-28 · operator rulings 2026-09-27 (Option A, and again in the /decisions pass: *"Keep it flat on the floor"*) · round #1510
+**Status:** accepted · 2026-09-28 · operator rulings 2026-09-27 (Option A, and again in the /decisions pass: *"Keep it flat on the floor"*) · round #1510 · **⚠ Amended by [ADR-3D-400](#adr-3d-400)** (2026-10-31): solids are no longer exempt, and the gate asks whether the ORIENTATION was stated
 
 **Requirements:** [02b](02b-requirements-3d.md) FR-SP-4 (amended 2026-10-07, #1861) · **Design:** this entry
 
@@ -14054,3 +14054,29 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/guide-needs-1566.test.ts`: the slot walk reads both lines; He and En blank builds with ℓ1, ℓ2 created and no notice; one existing line; He and En pyramid of volume 11 with the notice; the class over cube, box, tetrahedron and a four-letter pyramid; «נפח המנסרה ABCDEF», «נפח הגוף ABCDE» still refused; an existing pyramid used, not re-created; atomicity (a negative volume, a clashing coordinate point: no solid, no point); the contradiction refused as with a declared pyramid, the first line keeping its pyramid; a later role noun builds on the created pyramid. Fixtures `fixtures3/common-perp-created-1566.geo3.json`, `fixtures3/pyramid-volume-created-1566.geo3.json`. The two `tsc` assertions are the slot-key lock.
 
 **Consequences.** `src3d/engine/mintable.ts` (`LINE_SLOT_KEYS3`, `PLANE_SLOT_KEYS3`, the assertions, `mintableSolid3`), `src3d/parser/parse3.ts` (`solidDeclaration3`), `src3d/store/store3.ts` (the `solid` mint kind, `presolids`, `ownFailure`, `created` with solid points).
+
+## ADR-3D-400 — A solid stays on the floor until the student places it; a stated orientation is never turned (#2630)
+
+**Status:** accepted · 2026-10-31 · bug (3-D) · operator ruling 2026-10-31 in chat, on the plan's open question: *"they are on the floor until they are placed by user somewhere"* · **amends** [ADR-3D-272](#adr-3d-272).
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-4 (amended) · **Design:** [04b](04b-design-3d.md) *Gauge, and why the landing funnel exists* · **LADDER stage:** the terminal normalisation in `resolve3` (after the solve, before output).
+
+**Measured at `main` 74000a9f** (`derive3` positions, seeds 0–3). «משולש ABC» · «אורך AB = 5» · «אורך AC = 3» left the floor at seeds 1–3; so did a quadrilateral, «פירמידה SABCD» (the apex at z = −4.65 at seed 2: drawn upside-down), «פירמידה SABC», a box with three edge lengths, and two triangles. Angle-only givens, a cube with its size alone and an undriven pyramid stayed put (no driven solve).
+
+**Class and root cause.** ADR-3D-272's normalisation skipped every figure with `c.solids.length > 0`, and a declared polygon is a solid. Its frame, "the first three points", is not a solid's frame (an apex-first or diagonal triple lays a pyramid on its side), so the exclusion kept solids from a wrong frame and left them out of the ruling. A second defect sat in the same gate. "Anchored" was read from `hasAbsoluteFrameObject`, which answers #367's question (is the PLACEMENT a DOF?) and counts no component given that fixes only a direction. Measured on main with no solid at all: «נקודה A/B/C» · «AB = (1,2,3)» · «אורך AC = 2» · «אורך BC = 3» drew AB as (3.74, 0, 0), and the verifier flagged the student's own row.
+
+**Decision.**
+1. **The frame of a figure holding a solid is the first solid's own base**, the frame its builder lays it in (`solidFloorFrame3`): base[0] (`baseRingOf`, now exported from `baseShapes.ts`) at the origin, base[0]→base[1] along +x, the base plane on the floor with its normal turned toward the rest of the solid (apex or top above), and a flat polygon's ring counter-clockwise from above. Other solids follow rigidly. A degenerate base falls back to the first-three-points frame; a figure with no solid keeps that frame unchanged.
+2. **The gate is `orientationStated3(c)`**: `hasAbsoluteFrameObject`, or any pair, vector or plane pin, sign given, component sign or coordinate determination. Such a figure was placed by the student, and it is never turned. Revolutions and circles stay exempt, as before. `hasAbsoluteFrameObject` itself is unchanged, because widening it would change #367's placement sampling.
+
+**What the student will see.** `[ruled]` (ADR-3D-272, *"Keep it flat on the floor"*): a triangle or polygon declared by name, with side lengths given, stays on the floor at every «הציגו תצורה אחרת». `[asked]` (*"they are on the floor until they are placed by user somewhere"*): a pyramid, box or prism whose shape a length drives keeps its base on the floor and its apex or top above it. A figure a coordinate, component or equation placed keeps that placement. `[ruled]` (the honesty invariant): «AB = (1,2,3)» on free points keeps its components.
+
+**Measured after.** A census of all 101 `fixtures3` figures at seeds 0–3: 12 change, every one a driven, unanchored solid, and only at seeds 1–3 (at seed 0 the largest move is 2e-7, solver noise). Before the gate change, two component-vector fixtures (`prism-sym-pair-794`, `pyramid-param-pair-vector-2077`) were turned at seed 0 too. That finding is what decision 2 fixes, and they are now unchanged. Every fixture builds green.
+
+**Rejected.** (i) Keeping solids exempt and fixing the declared polygon alone: the operator ruled solids in. (ii) Widening `hasAbsoluteFrameObject`: it also decides whether the placement is sampled (#367), a different question.
+
+**Sibling products (docs/17 §1).** *2-D* and *analytic* draw in a fixed plane with no free rigid motion in depth; class not present. *Complex*: none.
+
+**Locks.** `src3d/__tests__/issue-2630-solid-floor.test.ts`: the six measured rows at seeds 0, 1, 2, 3 and 7. Each asserts base[0] at the origin, the first edge on +x, the base at z = 0, the apex or top above, the stated lengths exact, and that the shape still varies. Two more cases: the component given with no solid, and the #794 prism keeping AB = (1,2,3). `issue-1421-gauge.test.ts` is green, unchanged except one test title, which claimed solids were never normalised.
+
+**Consequences.** `src3d/engine/evaluate.ts` (`solidFloorFrame3`, `orientationStated3`, the gate), `src3d/engine/baseShapes.ts` (`baseRingOf`, moved from `apply.ts`).
