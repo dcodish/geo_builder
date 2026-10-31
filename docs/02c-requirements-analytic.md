@@ -853,6 +853,11 @@ a sentence the tool parsed.
 - "Reaches" means a given that places the point itself. A later line that only names it as an anchor («D על BC» names C) does not change its range (R53).
 - Sources: ADR-AG-324, #2426 (round #2414 T9); ADR-AG-348.
 
+**R213 — a letter that names a measure the figure already has takes the figure's value; adding it never moves the figure**. *(2-D's behaviour, measured at `fb94d176`: 0/24 seeds moved.)* A row that equates a measure on the drawn figure with a letter nothing has used before — «נסמן זוית BAM כ-A1», «נסמן זוית BAC כ-α», «AB = a», «זווית A = α», «שטח המשולש ABC הוא S» — leaves every point exactly where it is, and the letter's value is the measure the figure shows. «הציגו תצורה אחרת» still changes the figure, and the letter's value changes with it.
+- A stated range wins: «α < 30» · «משולש ABC» · «∢ABC = α» keeps α under 30, so the angle is a given the figure is shaped to.
+- A letter already used is a given: «AB = a» · «AC = a» makes the triangle isosceles.
+- Sources: ADR-AG-365, #2632.
+
 **R191 — a letter that stands for a size is positive**. *(Operator ruling 2026-10-20 on #2419: "r for radius like any letter represending size needs to be positive".)* A circle's radius however it is written (by its centre «שרדיוסו r», a positive multiple «שרדיוסו 2r», squared in its equation «(x−a)²+y²=r²», «x²+y²=4r²», «R²»), and a length, a distance, a perimeter or an area valued by a letter or a positive multiple of one («AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «היקף המשולש ABC הוא k», «שטח המשולש ABC הוא k»): the letter's row reads «0 < r» while it is open, and only its positive values are configurations. «r > 0» typed after it is already known.
 - «x²+y²=r²» · «A(3,4)» · «A על המעגל» → «r = 5» (not «r = −5 או 5»); Q2 in the exam's own form → r = 3, R = 6, one equation per circle
 - «a < 0» then «AB = a», or «AB = a» then «a < 0» → refused, naming the later sentence, with the radius's out-of-range message
