@@ -55,7 +55,8 @@ import { readAngleAsk, readRoleRef, readTangentNoun, touchTangentNoun, type Role
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveEquationOf, curveParts, directrixText, locusEquation } from './curveText';
-import { ellipseFoci, parabolaFocus } from '../engine/curves';
+import { parabolaFocus } from '../engine/curves';
+import { ellipseRolePoint, type EllipseRole, type EllipseSide } from '../engine/derived';
 import { ringsNamed } from '../engine/shapes';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
@@ -749,7 +750,7 @@ function askOne(
     if (tangent) {
       const ids = tangent.at
         ? [tangentLineId(tangent.at)].filter((id) => objectById(d.construction, id))
-        : d.construction.objects.filter((o) => o.kind === 'line-at' && o.dir.k === 'radius' && o.perp).map((o) => o.id);
+        : d.construction.objects.filter((o) => o.kind === 'line-at' && (o.dir.k === 'radius' || o.dir.k === 'normal') && o.perp).map((o) => o.id);
       if (ids.length !== 1) return { question, value: null, missing: missingCurve(d, name) };
       return curveAnswer(d, ids[0], null, question, fmt);
     }
@@ -821,7 +822,7 @@ function askOne(
    */
   const missingPoint = measure.terms
     // #1205: a line-line term names no POINT — both its operands are lines, checked just below.
-    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : [t.a, t.b]))
+    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' || t.kind === 'ellipse-dist' ? [] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
   if (missingPoint !== undefined)
     return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
@@ -863,6 +864,8 @@ function askOne(
       f.env,
       // The NAMED line this configuration drew (#1048) — see `lineNamed`.
       (nm) => lineNamed(f, nm),
+      // An ellipse's role points (#2616): the curve this configuration drew.
+      (id) => f.curves.find((q) => q.id === id)?.curve ?? null,
     );
   const k = isKnowledge(d.construction, readMeasure);
   /**
@@ -873,7 +876,7 @@ function askOne(
    * it. The trace explains a row; it does not narrate a calculation.
    */
   const one = measure.terms.length === 1 ? measure.terms[0] : null;
-  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' && one.kind !== 'line-line' ? one : null;
+  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' && one.kind !== 'line-line' && one.kind !== 'ellipse-dist' ? one : null;
   let trace: string | undefined;
   let mark: Answer['mark'];
   /**
@@ -1019,15 +1022,15 @@ function roleAnswer(
   }
   // Focus, foci, directrix: THE parabola / THE ellipse. A parameterised conic has no invariant focus,
   // and that is `value: null` in the lane's own honest wording — a different answer from "there is none".
-  const wantKind = role.role === 'foci' || (role.role === 'focus' && role.host === 'ellipse') ? 'ellipse' : 'parabola';
-  const hosts = hostsOf(d, wantKind);
+  // An ellipse's own roles and sizes (#2616/#2617, ADR-AG-353): THE ellipse. A focus named by no host is the figure's one
+  // conic with a focus, parabola or ellipse — the given's reading (M1's `focus-of`).
+  const ellipseOnly = role.role !== 'focus' && role.role !== 'directrix';
+  const wantKind = ellipseOnly || (role.role === 'focus' && role.host === 'ellipse') ? 'ellipse' : 'parabola';
+  const hosts = role.role === 'focus' && !role.host ? [...hostsOf(d, 'parabola'), ...hostsOf(d, 'ellipse')] : hostsOf(d, wantKind);
   if (hosts.length !== 1) return { question, value: null, host: { kind: wantKind, found: hosts.length } };
   const cv = knownCurve(d.construction, hosts[0].id);
   if (!cv) return { question, value: null };
-  if (cv.kind === 'ellipse') {
-    const [f1, f2] = ellipseFoci(cv);
-    return { question, value: `(${fmt(f1.x)}, ${fmt(f1.y)}), (${fmt(f2.x)}, ${fmt(f2.y)})` };
-  }
+  if (cv.kind === 'ellipse') return ellipseRoleAnswer(cv, role, question, fmt);
   if (cv.kind === 'parabola') {
     // The directrix in the one role-line wording the panel prints (am. 1) — derived from the line
     // itself, so no orientation is assumed here.
@@ -1036,6 +1039,49 @@ function roleAnswer(
     return { question, value: `(${fmt(fp.x)}, ${fmt(fp.y)})` };
   }
   return { question, value: null };
+}
+
+/**
+ * AN ELLIPSE'S ROLE OR SIZE ASKED (#2616/#2617, ADR-AG-353) — read off the KNOWN curve through `ellipseRolePoint`, the
+ * closed form the givens use, so the ask and the given cannot disagree. A sided focus or axis end the ellipse does not
+ * have («המוקד העליון» of a wide ellipse) answers null — there is none — never the other one.
+ */
+function ellipseRoleAnswer(cv: { a: number; b: number }, role: RoleRef, question: string, fmt: (v: number) => string): Answer {
+  const pt = (r: EllipseRole) => {
+    const p = ellipseRolePoint(cv, r);
+    return p ? `(${fmt(p.x + 0)}, ${fmt(p.y + 0)})` : null;
+  };
+  const xMajor = cv.a > cv.b;
+  const yMajor = cv.b > cv.a;
+  const sideAxis = (s: EllipseSide) => (s === 'right' || s === 'left' ? 'x' : 'y');
+  const holds = (axis: 'x' | 'y') => (axis === 'x' ? xMajor : yMajor);
+  const list = (rs: EllipseRole[]) => ({ question, value: rs.map(pt).filter((v): v is string => v !== null).join(', ') || null });
+  switch (role.role) {
+    case 'focus':
+      if (!role.side) return list([{ k: 'focus', which: 0 }, { k: 'focus', which: 1 }]);
+      if (!holds(sideAxis(role.side))) return { question, value: null };
+      return { question, value: pt({ k: 'focus', which: role.side === 'right' || role.side === 'top' ? 0 : 1 }) };
+    case 'foci':
+      return list([{ k: 'focus', which: 0 }, { k: 'focus', which: 1 }]);
+    case 'vertex':
+      if (role.side && role.axis) {
+        const axis = (role.axis === 'major') === (sideAxis(role.side) === 'x') ? 'x' : 'y';
+        if (!holds(axis)) return { question, value: null };
+      }
+      if (role.side) return { question, value: pt({ k: 'vertex', side: role.side }) };
+      if (role.axis) return list(([0, 1] as const).map((which) => ({ k: role.axis === 'major' ? ('major-end' as const) : ('minor-end' as const), which })));
+      return list((['right', 'left', 'top', 'bottom'] as const).map((side) => ({ k: 'vertex' as const, side })));
+    case 'vertices':
+      return list((['right', 'left', 'top', 'bottom'] as const).map((side) => ({ k: 'vertex' as const, side })));
+    case 'axis':
+      return { question, value: fmt(2 * (role.which === 'major' ? Math.max(cv.a, cv.b) : Math.min(cv.a, cv.b))) };
+    case 'axes':
+      return { question, value: `${fmt(2 * Math.max(cv.a, cv.b))}, ${fmt(2 * Math.min(cv.a, cv.b))}` };
+    case 'focal-distance':
+      return { question, value: fmt(2 * Math.sqrt(Math.abs(cv.a * cv.a - cv.b * cv.b))) };
+    default:
+      return { question, value: null };
+  }
 }
 
 /**

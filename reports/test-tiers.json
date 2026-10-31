@@ -6,9 +6,10 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-30",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
+    "src-analytic/__tests__/issue-1177-locus-chip.test.ts",
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
@@ -95,6 +96,7 @@
     "src/theorems/__tests__/b-corpus.test.ts",
     "src3d/__tests__/adr-3d-032.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
+    "src3d/__tests__/catalog-blank-canvas-1566.test.ts",
     "src3d/__tests__/decide-submit3-parity-1394.test.ts",
     "src3d/__tests__/fixtures3.test.ts",
     "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",

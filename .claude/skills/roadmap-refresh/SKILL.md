@@ -64,6 +64,11 @@ edit the plan: answered decisions wait for the next session's step 4. Debug it w
 which `gh issue list/view/comment` use, and the `repositories/{id}/...` links that `--paginate`
 follows, so it pages by number.
 
+Since 2026-10-31 a cloud session may have no `ArtifactData`, only `mcp__claude-artifacts__db_get`
+/ `db_list` / `db_write`. Their `slug` is the **full artifact URL** (the bare id fails with
+`invalid_argument` 400), `path` is `collection/doc_id`, and they return the document inline rather
+than saving a file. The routine's prompt handles both tool sets; keep it doing so when you edit it.
+
 ## Known limits
 
 - **Writes from the page are lost in the Claude Code desktop side panel** (seen 2026-10-26). The page

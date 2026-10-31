@@ -18,6 +18,7 @@
  * which would be [ADR-052](../../docs/06-decisions.md#adr-052)'s sin in derived clothing.
  */
 import type { Id } from './types';
+import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 
 export interface Pt {
   x: number;
@@ -67,6 +68,14 @@ export type DerivedRule =
    *  named it (the unnamed focus is #1218's chip, no letter spent). */
   | { t: 'parabola-focus'; curve: Id }
   /**
+   * «F1 הוא המוקד הימני של האליפסה» · «F מוקד האליפסה» · «A הקודקוד הימני של האליפסה» (#2616, ADR-AG-353) — a ROLE POINT
+   * of a canonical ellipse (a focus, a vertex, an end of the major or minor axis), read off the resolved curve: the
+   * parabola focus's pattern one conic over, the closed form in {@link ellipseRolePoint}. A focus counts along the MAJOR
+   * axis (`which` 0 is its positive end, right or top), so the rule is orientation-free, and a side word («הימני») is
+   * this rule plus the `major-axis` selector the word asserts (docs/17 §3b law 1).
+   */
+  | { t: 'ellipse-point'; curve: Id; role: EllipseRole }
+  /**
    * «מעגל M משיק למעגל K בנקודה T» — the point where two TANGENT circles touch (#1504, ADR-AG-167
    * amendment 1). Its parents are the two CIRCLES (like `circle-centre`, curves, not points).
    *
@@ -101,6 +110,43 @@ export type DerivedRule =
    */
   | { t: 'regular-vertex'; a: Id; b: Id; n: number; k: number };
 
+/** Which end of an ellipse's axes a vertex is: «הימני» (+x), «השמאלי» (−x), «העליון» (+y), «התחתון» (−y). */
+export type EllipseSide = 'right' | 'left' | 'top' | 'bottom';
+
+/**
+ * A ROLE POINT of a canonical ellipse (#2616/#2617, ADR-AG-353) — what a focus, a vertex, or an end of the major/minor
+ * axis IS, as a closed form over the resolved semi-axes `a` (on x) and `b` (on y). The ONE source: the derived rules
+ * above and the role measures of `lengths.ts` («המרחק בין המוקדים», «מרחק המוקד הימני מהקודקוד הימני») read it, so a
+ * named focus and an unnamed one cannot disagree. `which` counts along the axis it names, positive end first.
+ */
+export type EllipseRole =
+  | { k: 'focus'; which: 0 | 1 }
+  | { k: 'vertex'; side: EllipseSide }
+  | { k: 'major-end'; which: 0 | 1 }
+  | { k: 'minor-end'; which: 0 | 1 };
+
+export function ellipseRolePoint(e: { a: number; b: number }, role: EllipseRole): Pt | null {
+  const { a, b } = e;
+  if (!(a > 0) || !(b > 0)) return null;
+  const xMajor = a >= b;
+  const sign = (w: 0 | 1) => (w === 0 ? 1 : -1);
+  switch (role.k) {
+    case 'focus': {
+      const f = Math.sqrt(Math.abs(a * a - b * b)) * sign(role.which);
+      return xMajor ? { x: f, y: 0 } : { x: 0, y: f };
+    }
+    case 'vertex':
+      return role.side === 'right' ? { x: a, y: 0 } : role.side === 'left' ? { x: -a, y: 0 } : role.side === 'top' ? { x: 0, y: b } : { x: 0, y: -b };
+    case 'major-end':
+      return xMajor ? { x: a * sign(role.which), y: 0 } : { x: 0, y: b * sign(role.which) };
+    case 'minor-end':
+      return xMajor ? { x: 0, y: b * sign(role.which) } : { x: a * sign(role.which), y: 0 };
+  }
+}
+
+/** One role, one spelling — the identity two role points are compared by. */
+export const sameEllipseRole = (p: EllipseRole, q: EllipseRole): boolean => JSON.stringify(p) === JSON.stringify(q);
+
 /** The line a foot is dropped onto — the three `Direction` members that are a LINE, not only a direction. */
 export type FootLine = { k: 'axis'; axis: 'x' | 'y' } | { k: 'points'; a: Id; b: Id } | { k: 'curve'; id: Id };
 
@@ -129,6 +175,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     // send it through every check that assumes a parent is positional.
     case 'circle-centre':
     case 'parabola-focus':
+    case 'ellipse-point':
     case 'touch-point':
       return [];
     default: {
@@ -159,6 +206,8 @@ export function ruleLabel(r: DerivedRule): string {
       return 'מרכז המעגל';
     case 'parabola-focus':
       return 'מוקד הפרבולה';
+    case 'ellipse-point':
+      return r.role.k === 'focus' ? CONIC_ROLE_WORDS.ellipseFocus : CONIC_ROLE_WORDS.ellipseVertex;
     case 'touch-point':
       return 'נקודת ההשקה';
     case 'side-touch':
@@ -346,13 +395,13 @@ export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
  * sentence or admit an invalid one.
  */
 export function curveParentOf(r: DerivedRule): Id | null {
-  return r.t === 'circle-centre' || r.t === 'parabola-focus' ? r.curve : null;
+  return r.t === 'circle-centre' || r.t === 'parabola-focus' || r.t === 'ellipse-point' ? r.curve : null;
 }
 
 /** EVERY curve a rule is defined in terms of — one for a centre, two for a touch point (#1504).
  *  The existence check and the reference walk use this; provenance keeps the single-curve reading. */
 export function curveParentsOf(r: DerivedRule): Id[] {
-  if (r.t === 'circle-centre' || r.t === 'parabola-focus') return [r.curve];
+  if (r.t === 'circle-centre' || r.t === 'parabola-focus' || r.t === 'ellipse-point') return [r.curve];
   if (r.t === 'touch-point') return [r.a, r.b];
   if (r.t === 'side-touch') return [r.circle];
   if (r.t === 'foot' && r.onto.k === 'curve') return [r.onto.id];
@@ -401,6 +450,12 @@ export function evalRule(
       const c = curveAt?.(r.curve) as { kind?: string; p?: number } | null;
       if (!c || c.kind !== 'parabola' || typeof c.p !== 'number') return null;
       return { x: c.p / 2, y: 0 };
+    }
+    case 'ellipse-point': {
+      // The same vacancy discipline: not an ellipse here, no role point here (#2616).
+      const c = curveAt?.(r.curve);
+      if (!c || c.kind !== 'ellipse' || typeof c.a !== 'number' || typeof c.b !== 'number') return null;
+      return ellipseRolePoint({ a: c.a, b: c.b }, r.role);
     }
     case 'touch-point': {
       const circle = (id: Id) => {
@@ -632,6 +687,7 @@ export function constructionOf(
     // The focus likewise: read off the equation, no auxiliary lines.
     case 'circle-centre':
     case 'parabola-focus':
+    case 'ellipse-point':
       return null;
 
     // Its scaffolding would be the line of centres; the parents are curves, so none is drawn here.

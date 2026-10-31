@@ -1,0 +1,184 @@
+{
+  "name": "feat-1188-step2",
+  "title": "#1188 steps 2–3 — free vectors combine, drawn head to tail (3-D)",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "«w = u + v» over two declared vectors draws the head-to-tail triangle",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "וקטור u",
+        "וקטור v",
+        "w = u + v"
+      ],
+      "cycles": 2,
+      "lookFor": "Three coloured floating arrows u, v, w (three hues). A faded dashed copy of v starts at u's head, and w runs from u's tail to the copy's head — a closed triangle. The separate v still floats in the tray. On «הציגו תצורה אחרת» the triangle changes shape and stays closed.",
+      "before": "The third line was refused: «הכלי עדיין לא יודע לחשב ביטוי שבו מופיע הווקטור החופשי u, ולכן «w = u + v» לא נוסף — זו מגבלה של הכלי.»"
+    },
+    {
+      "id": "T2",
+      "title": "Subtraction and a multiple follow the same rule: «w = 2u - v»",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "וקטור u",
+        "וקטור v",
+        "w = 2u - v"
+      ],
+      "lookFor": "Two faded dashed copies chained head to tail from w's tail: one along u, twice as long (2u), then one pointing opposite to v (−v); w closes the triangle from the start of the 2u copy to the end of the −v copy.",
+      "before": "The third line was refused («… «w = 2u - v» לא נוסף — זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T3",
+      "title": "With stated components the sum is a value: the panel and the ask read it",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "u = (1,2,3)",
+        "v = (1,1,1)",
+        "w = u + v"
+      ],
+      "asks": [
+        "u + v",
+        "2u - 3v"
+      ],
+      "expect": [
+        "(2, 3, 4)",
+        "(-1, 1, 3)"
+      ],
+      "lookFor": "The triangle drawn. Data panel: stated rows «u = (1, 2, 3)», «v = (1, 1, 1)», «w = u + v»; the vectors section shows w = (2, 3, 4) with |w|. Asking «u + v» answers (2, 3, 4); asking «2u - 3v» answers (-1, 1, 3).",
+      "before": "«w = u + v» was refused; asking «u + v» was not understood."
+    },
+    {
+      "id": "T4",
+      "title": "An equation among existing vectors solves a letter: k = 2",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "u = (k,1,2)",
+        "v = (1,1,1)",
+        "w = (3,2,3)",
+        "w = u + v"
+      ],
+      "asks": [
+        "k"
+      ],
+      "expect": [
+        "k = 2"
+      ],
+      "lookFor": "All four lines accepted. The panel's parameters row reads «k = 2», and asking «k» answers 2.",
+      "before": "The fourth line was refused («… «w = u + v» לא נוסף — זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T5",
+      "title": "A component written with a letter, then the letter valued",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "u = (k-1, 2, k)",
+        "k = 3"
+      ],
+      "expect": [
+        "u = (2, 2, 3)"
+      ],
+      "lookFor": "After the first line: one floating arrow u, the panel reads «u = (k-1, 2, k)» and «k = ?». After «k = 3»: the panel reads «u = (2, 2, 3)» and «k = 3».",
+      "before": "The first line was refused («הכלי עדיין לא יודע לחשב ביטוי שבו מופיע הווקטור החופשי u, ולכן «u = (k-1, 2, k)» לא נוסף — זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T6",
+      "title": "Givens that cannot all hold are refused, naming the lines",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "u = (1,1,1)",
+        "v = (1,1,1)",
+        "w = (3,2,3)",
+        "w = u + v"
+      ],
+      "expectRefusal": "הנתונים סותרים זה את זה",
+      "lookFor": "The fourth line is refused with the full sentence: «הנתונים סותרים זה את זה — אין גוף שמקיים את «w = u + v» יחד עם «u = (1,1,1)», «v = (1,1,1)», «w = (3,2,3)»». The first three stay.",
+      "before": "Refused with the interim «… זו מגבלה של הכלי.» message."
+    },
+    {
+      "id": "T7",
+      "title": "A free vector from a cube's named vector: «p = 2u» is twice the edge",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "נסמן: AB = u",
+        "וקטור p",
+        "p = 2u"
+      ],
+      "lookFor": "The cube with the teal arrow u = AB. p (its own hue) floats in the tray, twice as long as AB and parallel to it. Panel: «p = 2u».",
+      "before": "The fourth line was refused («… «p = 2u» לא נוסף — זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T8",
+      "title": "A stated free vector equated to an edge pins the edge",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "p = (1,2,3)",
+        "AB = p"
+      ],
+      "asks": [
+        "AB"
+      ],
+      "expect": [
+        "(1, 2, 3)"
+      ],
+      "lookFor": "The cube is turned and sized so that AB = (1, 2, 3); asking «AB» answers (1, 2, 3).",
+      "before": "«AB = p» was refused («… זו מגבלה של הכלי.»)."
+    },
+    {
+      "id": "T9",
+      "title": "REFUSAL — a statement the tool cannot yet solve together with the figure",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "וקטור p",
+        "A(0,0,0)",
+        "AE = t·p"
+      ],
+      "expectRefusal": "זו מגבלה של הכלי",
+      "lookFor": "The last line is refused with the tool's-limit sentence quoting «AE = t·p» («… זו מגבלה של הכלי.»). The first two lines stay.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T10",
+      "title": "Regression: the cube's anchored sum still builds",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5292",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "נסמן: AB = u, AD = v, AA' = w",
+        "AC' = u + v + w"
+      ],
+      "lookFor": "All three lines accepted, as before; no floating arrow appears.",
+      "before": "unchanged"
+    }
+  ]
+}

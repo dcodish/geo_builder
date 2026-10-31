@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "A(-9a,0)",
+    "B(41a,0)",
+    "נקודה P",
+    "PA מאונך ל-PB"
+  ],
+  "seed": 0,
+  "name": "#1186 — חורף 25 with the parameter a: המקום הגיאומטרי של P is (x − 16a)² + y² = (25a)²"
+}

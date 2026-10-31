@@ -65,6 +65,8 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
       return b.t === 'circle-centre' && a.curve === b.curve;
     case 'parabola-focus':
       return b.t === 'parabola-focus' && a.curve === b.curve;
+    case 'ellipse-point':
+      return b.t === 'ellipse-point' && a.curve === b.curve && JSON.stringify(a.role) === JSON.stringify(b.role);
     // Where two circles touch is one point whichever circle is named first (#1504).
     case 'touch-point':
       return b.t === 'touch-point' && sameSet([a.a, a.b], [b.a, b.b]);

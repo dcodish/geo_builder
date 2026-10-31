@@ -497,6 +497,26 @@ only of `draw-arrow` commands when no ok row before it in the list put a point o
 points created for it (`startsFigure3`) — the first vector on an empty canvas; computed over the list, never the
 refold's construction.
 
+**Slot keys are type-checked** ([ADR-3D-399](06b-decisions-3d.md#adr-3d-399), #1566): the walks read
+`LINE_SLOT_KEYS3` (`line`, `line1`, `line2`) and `PLANE_SLOT_KEYS3` (`plane`, `p1`, `p2`), and a compile-time
+assertion over every key of `Command3` (any depth) fails `tsc` when a `line…` or `plane…`/`pN` field is not in its list.
+**Solids** (ADR-3D-399): a `no-such-solid` whose id is a letter run carried with its noun by an operand
+(`mintableSolid3`: a `{noun, ids}` object, noun ≠ `any`) is minted by applying the commands of that noun's bare
+declaration (`solidDeclaration3`, the parser reading «פירמידה ABCDS»); its refusal is the line's. The declaration is
+not placed before the refold (its letters may belong to an earlier row): `presolids` prepends it to the row's own
+commands in `expandFact`, so it applies at the row, in list order. Its new points are in `created`. **A row red only
+because of a LATER row keeps what it created:** the refold drops a minted row only if it also fails in the fold of the
+rows up to it (`ownFailure`), so a contradiction between two statements is reported as one, never as a missing object.
+
+### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
+
+`CatalogEntry3.needs?: { he: string[]; en: string[] }` holds the lines an example needs on an empty canvas.
+`guideTryLines3(entry, lang, factCount)` (`src3d/app/guideTry3.ts`) is the one answer: the needs then the example when
+`factCount === 0`, else the example alone. `App3`'s manual `onTry` submits the needs lines through `submitSentence3`
+(stopping on the first one not taken) and the example through `submitText`. `ManualScreen`'s props are unchanged; the
+shell knows nothing of it. `catalog-blank-canvas-1566.test.ts` folds every construction-lane entry this way, in both
+languages, with a shrink-only allowlist naming the owning issue of each remaining failure.
+
 ### Free vectors ([ADR-3D-386](06b-decisions-3d.md#adr-3d-386), #1188)
 
 A **free vector** has components and no position. It lives in a sibling store, `Construction3.freeVectors`
@@ -512,12 +532,37 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   on a free name. `inject-vector` on a name that is not anchored is the M1 duality (`injectFreeVector3`): an unknown
   name is declared with the tuple; a free one has each component SET (was free) or VERIFIED (equal: redundant;
   different: `free-vector-conflict`, which `derive3` reports as `givens-contradict` naming both lines). A bare letter
-  names a free component through #814's `partialNames`; an affine component is a linear relation (step 2). On an
+  names a free component through #814's `partialNames`; an affine component is recorded in `symComps` (step 2). On an
   anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names,
   use)`: every command that names a vector states its use — `'metric'` (magnitude, angle, ⟂, ∥, dot: refused
-  `free-vector-metric` on a free name until step 4) or `'combination'` (a vector equation, a vec-rel, a span point:
-  `free-vector-combination` until step 2). A free name is checked before an unknown one, so «w = u + v» is the honest
-  "not yet", never `unknown-vector` about w.
+  `free-vector-metric` on a free name until step 4) or `'figure'` (a span point: `free-vector-coupling`). A free name
+  is checked before an unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
+- **Combinations (step 2, [ADR-3D-390](06b-decisions-3d.md#adr-3d-390)).** `freeVecEquation3` takes every `vec-eq`
+  claim and every `vec-rel` that names a free vector or introduces a name (M1): one new name on a side → `def`; one
+  free vector nothing has been said about → OWNED (`def`, M2 law (i)); one anchored arrow = a constant → that arrow's
+  pin (`inject-pair` / `inject-vector`; `injectFreeVector3` does the same for a vector defined as one arrow); else,
+  **the elimination step** (Am. 1, `figureRelationOf3`): vector-level Gaussian elimination of the line against
+  `c.freeVecEqs`, the unknowns being the free vectors nothing defines or states (a defined one is its `def`; a vector
+  with a stated component, an affine letter or a named component makes it return `null` — the component system's
+  business). If only the figure's own atoms survive and their points do not cancel, the line is a relation ON THE
+  FIGURE: it is applied as an ordinary `vec-eq` claim (`lhs`/`rhs` eliminated, `stated` = the line as written), so the
+  claim lane decides it — verified, refuted, or pinned and driven — and the free vectors are untouched; `derive3`
+  turns a failed one into `givens-contradict` naming the earlier lines about those free vectors (a bare declaration
+  excluded), the panel prints `stated`, and the head-to-tail layout reads `stated` as an equation. Else a
+  row in `c.freeVecEqs`. No free vector and no new name → the claim lane, unchanged. **The system**
+  (`engine/freeVecSystem.ts`): each free vector's value is an affine form over the unknowns (unstated components of
+  undefined vectors, affine letters — `SymbolOwner` `free-sym`), constants, and anchored endpoint coordinates; the
+  equations are the rows, the stated components of defined vectors, and a component-naming letter that is also an
+  affine unknown. `settleFreeVectors3` (the outermost apply, beside `settleLetters3`) eliminates once by modified
+  Gram-Schmidt, carrying the constants and anchored coefficients: anchored residue → `free-vector-coupling`, numeric
+  residue → `free-vector-conflict` (`givens-contradict` naming the lines about those vectors); a free letter another
+  lane owns → `already-defined`; a figure point over a free vector that is no longer PURE → `free-vector-coupling`.
+  `solveFreeVectors3` projects the seeded sample onto the solution set (min-norm, x = s − Uᵀ(Us − β)); with no row it
+  returns the sample, so step 1's values are bit-identical. `freeDofCount3` reads unknowns − rank. A `vec-rel` that
+  DEFINES a point inlines each defined free vector by its combination and keeps an undefined pure one as a term;
+  `solveVecDef` reads it from `pureFreeVectors3(c, seed)` (the pre-pivot block of the same solve, memoised).
+  `Resolved3.freeSyms` carries each free letter's value for the panel's params row. The ask lane's `combo` query
+  evaluates Σ k·atom per knowledge sample.
 - **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
   reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
   unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a
@@ -538,6 +583,14 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   `buildScene3` adds the tails and heads to the fit and emits a `SceneVector3` with `free: index`; `Figure3` inks it
   from `FREE_VECTOR_COLORS` (distinct from `VECTOR_COLOR` and the plane patches). No point exists, so no dot and no
   letter is drawn.
+- **The head-to-tail chain (step 3, ADR-3D-390; rulings 2026-10-06).** `layoutFreeVectorScene3` reads each stated
+  combination (a `def` of ≥ 2 terms, or a `freeVecEqs` row with one single-vector side) in statement order and places
+  it as a chain from R's tail (R's own place, else x₁'s tail, else a new tray group rooted at x₁); x₁ with c₁ = 1,
+  drawn as a vector, is the first link, every other link is a `FreeVectorCopy3` of cᵢxᵢ, and R closes it. Each tray
+  group's band extent is the union of its members and copies, so a triangle never overlaps the next band; a chain
+  anchored at a figure point is drawn in world space. `buildScene3` fits the copies and emits `vectorCopies`
+  (`SceneVectorCopy3`); `Figure3` draws them dashed at reduced opacity in the source's hue, with no label. A copy is
+  display only — the angle-mark / draw-arrow precedents — in no engine structure, never knowledge, never a DOF.
 - **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
   free vectors from the lines that stated them.
 
@@ -603,8 +656,9 @@ only (`1/t` is not a name).
 
 ### Gauge, and why the landing funnel exists
 
-A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no absolute object, solid,
-revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). The **landing
+A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no stated orientation, `orientationStated3`;
+no revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). A figure holding a solid takes
+the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, ADR-3D-400); any other figure takes its first three points. The **landing
 funnel** classifies which gauge components are *provably* free, which licenses
 [`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
 

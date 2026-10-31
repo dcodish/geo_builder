@@ -25,7 +25,7 @@
 
 import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
-import type { Command3, Construction3, Id, PointDef, SolidKind } from './types';
+import type { Command3, Construction3, Id, PointDef, SolidKind, SolidObj } from './types';
 import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 
@@ -593,6 +593,30 @@ export function declaredKind3(q: { readonly base: QuadBase; readonly adj?: Shape
 /** Is this kind a 4-base pyramid (any base × right/free apex)? The one predicate every
  *  hand-maintained "which kinds are quad pyramids" list in the engine now defers to. */
 export const isQuadPyramid = (kind: SolidKind): boolean => Object.prototype.hasOwnProperty.call(QUAD_PYRAMIDS, kind);
+
+/** #324 (ADR-3D-079): a solid's BASE ring — the drawing convention everywhere in the engine is
+ *  base ids first (prisms: first half; pyramids: all but the apex-last; flat polygons: all). */
+export function baseRingOf(s: SolidObj): Id[] | null {
+  if (isQuadPyramid(s.kind)) return s.ids.slice(0, 4); // #305: any base × any top — one rule
+  switch (s.kind) {
+    case 'cube': case 'box': case 'parallelepiped':
+    case 'prism4': case 'prism4g': case 'prism4sq': case 'prism4r':
+      return s.ids.slice(0, 4);
+    case 'prism3': case 'prism3e':
+      return s.ids.slice(0, 3);
+    case 'prismReg5':
+      return s.ids.slice(0, 5);
+    case 'prismReg6':
+      return s.ids.slice(0, 6);
+    case 'tetra': case 'pyramid3': case 'pyramid3e':
+      return s.ids.slice(0, 3);
+
+    case 'polygon3': case 'polygon4': case 'polygon5':
+      return [...s.ids];
+    default:
+      return null;
+  }
+}
 
 /** A quad pyramid's dim count, derived from its base and top — never hand-counted. */
 export function quadPyramidDimCount(kind: SolidKind): number | null {

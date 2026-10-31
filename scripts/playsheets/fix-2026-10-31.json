@@ -1,0 +1,212 @@
+{
+ "name": "fix-2026-10-31",
+ "title": "Fixes of 2026-10-31: the parabola's book form (#2640) and length-or-vector (PR #2605)",
+ "cases": [
+  {
+   "id": "T1",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "main",
+   "issue": 2640,
+   "class": "play",
+   "title": "A parabola with a decimal coefficient keeps y² = 2.5x (your T13)",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=2.5x"
+   ],
+   "asks": [
+    "משוואת הפרבולה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The answer and the panel row read «y² = 2.5x».",
+   "before": "«2y² = 5x»."
+  },
+  {
+   "id": "T2",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "main",
+   "issue": 2640,
+   "class": "play",
+   "title": "5/3 prints as a stacked fraction",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=5/3x"
+   ],
+   "asks": [
+    "משוואת הפרבולה"
+   ],
+   "lookFor": "Start: press «נקה הכל». The answer reads y² = then 5 over 3 (stacked) then x.",
+   "before": "«3y² = 5x»."
+  },
+  {
+   "id": "T3",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "main",
+   "issue": 2640,
+   "class": "look",
+   "title": "A negative fraction keeps the form",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=-5/3x"
+   ],
+   "asks": [
+    "משוואת הפרבולה"
+   ],
+   "lookFor": "The answer reads y² = −5 over 3, then x; the parabola opens left.",
+   "before": "«3y² = -5x»."
+  },
+  {
+   "id": "T4",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "section": "main",
+   "issue": 2640,
+   "class": "verified",
+   "title": "The ellipse still clears its fractions (unchanged)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/(45/4)+y^2/5=1"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "The answer reads «4x² + 9y² = 45».",
+   "before": "unchanged"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "Your T66: a box row shows the length form",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AA'=3BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». It builds; the row reads «|AA'|=3|BC|».",
+   "before": "The row read the vector wording.",
+   "id": "T5"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "Your T64: neither reading holds, so it is read as lengths and refused",
+   "lines": [
+    "פירמידה SABCD",
+    "AB = 1AC"
+   ],
+   "expectRefusal": "שטוחה",
+   "lookFor": "Start: press «נקה הכל». Refused: «לא ניתן: «AB = 1AC» מתקיים רק אם הפירמידה SABCD שטוחה…», the same answer «|AB| = |AC|» gets. No question; nothing added.",
+   "before": "Asked length-or-vector.",
+   "id": "T6"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "A rider ratio row shows the length form",
+   "lines": [
+    "משולש ABC",
+    "D על AB",
+    "AD = 3BD"
+   ],
+   "lookFor": "D at ¾ of AB; the row reads «|AD| = 3|BD|».",
+   "before": "Built, but the row read as vectors.",
+   "id": "T7"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "A midpoint statement row shows the length form",
+   "lines": [
+    "פירמידה SABCD",
+    "M אמצע BC",
+    "SM = 2SA"
+   ],
+   "lookFor": "Builds; the row reads «|SM| = 2|SA|».",
+   "before": "Built, but the row read as vectors.",
+   "id": "T8"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "An edge point placed by a length shows the length form",
+   "lines": [
+    "מקבילון ABCDA'B'C'D'",
+    "E על AA'",
+    "AE = AB"
+   ],
+   "lookFor": "E on AA'; the row reads «|AE| = |AB|».",
+   "before": "Built, but the row read as vectors.",
+   "id": "T9"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "play",
+   "title": "Behaviour change: an impossible ratio on an edge is refused, not asked",
+   "lines": [
+    "מקבילון ABCDA'B'C'D'",
+    "E על AA'",
+    "AE = 2AA'"
+   ],
+   "expectRefusal": "לא ניתן",
+   "lookFor": "Refused the way «|AE| = 2|AA'|» is; no question.",
+   "before": "Asked length-or-vector.",
+   "id": "T10"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "REFUSAL: both readings fit and differ, so it still asks",
+   "lines": [
+    "מרובע ABCD",
+    "AB = DC"
+   ],
+   "expectRefusal": "לווקטור או לאורך",
+   "lookFor": "The length-or-vector question; nothing added.",
+   "before": "unchanged",
+   "id": "T11"
+  },
+  {
+   "product": "3d",
+   "base": "http://localhost:5186",
+   "path": "/3d.html",
+   "section": "pr-2605",
+   "issue": 1680,
+   "class": "look",
+   "title": "A marked vector row is unchanged",
+   "lines": [
+    "BE = EC"
+   ],
+   "lookFor": "Arrowheads on BE and EC; the row keeps the vector wording.",
+   "before": "unchanged",
+   "id": "T12"
+  }
+ ]
+}

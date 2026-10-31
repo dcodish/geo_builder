@@ -427,6 +427,14 @@ const SEEDED: SeededCorpus = {
   // «u = (1,2,3)» refused unknown-vector). Seeds, panel, ask, drawing and refusals are asserted in
   // issue-1188-free-vector.test.ts; this is the build + drift net.
   'free-vector-declare-1188.geo3.json': ['וקטור u', 'וקטור v', 'u = (1,2,3)'],
+  // #1188 steps 2–3 (ADR-3D-390) — a sum of free vectors, and a free vector defined from an anchored one (before: both
+  // refused `free-vector-combination`). The system, the coupling and the head-to-tail picture are asserted in
+  // issue-1188-free-vector-step2.test.ts; these are the build + drift net.
+  'free-vector-sum-1188.geo3.json': ['וקטור u', 'וקטור v', 'w = u + v'],
+  'free-vector-coupling-1188.geo3.json': ["קובייה ABCDA'B'C'D'", 'נסמן: AB = u', 'וקטור p', 'p = 2u'],
+  // ADR-3D-390 Am. 1 (operator ruling 2A, 2026-10-30) — two lines about one free vector are a relation on the figure: «AB = p ·
+  // DC = p» drives the base to a parallelogram (before: free-vector-coupling). Asserted in issue-1188-free-vector-step2.test.ts.
+  'free-vector-parallelogram-1188.geo3.json': ['פירמידה SABCD שבסיסה מרובע', 'וקטור p', 'AB = p', 'DC = p'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 
   // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued
@@ -456,6 +464,13 @@ const SEEDED: SeededCorpus = {
   // size first. Geometry, the class rows and the refusals are asserted in issue-1782-rigid-rider-drive.test.ts.
   'cube-rider-length-1782.geo3.json': ['קובייה ABCD', 'AB = 2', 'E על AB', 'AE = 1'],
   'cube-rider-length-reversed-1782.geo3.json': ['קובייה ABCD', 'E על AB', 'AE = 1', 'AB = 2'],
+
+  // #1566 (ADR-3D-398/399) — a guide click on a blank canvas: a role noun after the line it needs, the common
+  // perpendicular of two lines it creates (before: «unknown line ℓ1»), and a pyramid named by its letters in a volume
+  // given (before: «no solid ABCDS»). The click, the notice and the atomicity are asserted in guide-needs-1566.test.ts.
+  'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
+  'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
+  'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
@@ -516,8 +531,9 @@ describe('fixtures3 — the regression net', () => {
         for (const f of r.facts) {
           expect(d.status[f.id], f.utterance).toBe(f.enabled ? 'ok' : 'disabled');
         }
-        // #1188: a figure of FREE vectors draws without a single point — it is still a figure
-        expect(d.positions.size + d.resolved.freeVectors.size).toBeGreaterThan(0);
+        // #1188: a figure of FREE vectors draws without a single point — it is still a figure; so is one of free lines or
+        // planes alone (#1566: «הישר d מאונך לישר ℓ1 ולישר ℓ2» on a blank canvas creates ℓ1, ℓ2 and d, and no point)
+        expect(d.positions.size + d.resolved.freeVectors.size + d.resolved.lines.size + d.resolved.planes.size).toBeGreaterThan(0);
       });
 
       it('no parser drift: every stored utterance still lowers to the stored commands', () => {

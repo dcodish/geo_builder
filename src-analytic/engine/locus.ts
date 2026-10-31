@@ -31,10 +31,21 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, viewBox, type CarrierSystem } from './evaluate';
-import { agreeingUnion, conicPointsIn, curveOfTrace, distToConic, shapeOfTrace, type LocusShape } from './locusFit';
+import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, someCrossingHasNoPoint, viewBox, type CarrierSystem } from './evaluate';
+import {
+  agreeingUnion,
+  conicPointsIn,
+  curveOfTrace,
+  distToConic,
+  parametricShape,
+  shapeOfTrace,
+  type LocusSample,
+  type LocusShape,
+  type SymbolicCurve,
+} from './locusFit';
+import { isDirectionSymbol, isRadiusSymbol, paramRegister } from './carriers';
 import type { Conic } from './conic';
-import { jacobianRank, solveLM, SOLVE_TOL } from './solve';
+import { jacobianRank, solveLM, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
 import { isFree, type Construction, type Id } from './types';
@@ -196,15 +207,24 @@ export function traceLocus(
    * student described — `admissibleAt`, the configuration's own validity predicate, called on the positions the step
    * already computed. Never a second reading of the selectors.
    */
-  const judge = (x: number[]): { p: Pt | null; ok: boolean } => {
+  /*
+   * …and whether the figure EXISTS there at all (#2613, ADR-AG-349): a crossing sentence whose two straights coincide
+   * names no point (`someCrossingHasNoPoint`). That is not a stretch the givens rule out on the same branch (#1817's
+   * gap, which the walk crosses to reach the next ray) — it is a BIFURCATION, where the carrier system grows a second
+   * branch along the common line, and walking on is a branch switch. So such a step ends the walk's direction and is
+   * not recorded, and a walk whose START is there has nothing to trace.
+   */
+  const judge = (x: number[]): { p: Pt | null; ok: boolean; gone: boolean } => {
     const pos = sys.positionsAt(x);
     const q = pos.get(id);
     const p = q && Number.isFinite(q.x) && Number.isFinite(q.y) ? q : null;
-    return { p, ok: p !== null && admissibleAt(c, pos, sys.envAt(x)) };
+    const env1 = sys.envAt(x);
+    const gone = someCrossingHasNoPoint(c, pos, env1);
+    return { p, ok: p !== null && !gone && admissibleAt(c, pos, env1), gone };
   };
   const o0 = judge(x0);
   const origin = o0.p;
-  if (!origin) return null;
+  if (!origin || o0.gone) return null;
 
   const inBounds = (p: Pt) =>
     !opts.bounds ||
@@ -228,20 +248,23 @@ export function traceLocus(
       // same `solveLM` the figure itself is solved with, started from the predicted point, so a step
       // never drifts off the curve it is tracing.
       const predicted = x.map((v, k) => v + sign * step * d[k]);
-      const res = solveLM(predicted, sys.residualsAt, 40);
+      // At the TIGHT tolerance (#2613, ADR-AG-349): beside a configuration where a crossing's two lines coincide, the
+      // crossing of two nearly parallel lines is ill-conditioned — a residual of SOLVE_TOL places it only to
+      // SOLVE_TOL / sin θ — and the fit re-verifies its equation against every walked point.
+      const res = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(predicted, sys.residualsAt, 40));
       if (!res.ok) {
         // The corrector could not get back. A smaller step is the honest retry — the curve may be
         // turning sharply — and giving up after one is what would leave a trace ending in mid-air.
         const half = x.map((v, k) => v + sign * step * 0.25 * d[k]);
-        const res2 = solveLM(half, sys.residualsAt, 40);
+        const res2 = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(half, sys.residualsAt, 40));
         if (!res2.ok) break;
         x = res2.values;
       } else {
         x = res.values;
       }
 
-      const { p, ok } = judge(x);
-      if (!p) break;
+      const { p, ok, gone } = judge(x);
+      if (!p || gone) break;
       /**
        * CLOSURE: the walk came back to where it started — IN CARRIER SPACE (#2384, ADR-AG-308), and only after
        * enough steps that the first few cannot trigger it.
@@ -714,6 +737,37 @@ function walkedLocusOf(
     return comps.map(asTrace);
   };
 
+  /**
+   * The gate's configurations as `parametricShape`'s samples (#1186, ADR-AG-351): the shown one, the compared one,
+   * and every later gate configuration that measures as ONE component of the same family. A union, or a family that
+   * changes, at any of them ends it — the kind alone stands.
+   */
+  const letters = paramRegister(c)
+    .map((p) => p.sym)
+    .filter((sym) => !isDirectionSymbol(sym) && !isRadiusSymbol(sym));
+  const symbolicLocus = (
+    shown: LocusTrace,
+    compared: LocusTrace,
+    comparedSeed: number,
+    rest: readonly number[],
+    kind: LocusShape['curve']['kind'],
+  ): SymbolicCurve | null => {
+    if (letters.length === 0) return null;
+    const samples: LocusSample[] = [
+      { env: figAt(seeds[0]).env, points: shown.points },
+      { env: figAt(comparedSeed).env, points: compared.points },
+    ];
+    for (const s of rest) {
+      const more = componentsAt(s);
+      if (!more) continue;
+      const shapes = more.map((t) => shapeOfTrace(t.points));
+      if (shapes.some((x) => x === null)) continue; // not measurable here — no evidence either way (#1176)
+      if (more.length !== 1 || shapes[0]!.curve.kind !== kind) return null;
+      samples.push({ env: figAt(s).env, points: more[0].points });
+    }
+    return parametricShape(samples, letters);
+  };
+
   const primary = componentsAt(seeds[0]);
   if (!primary) return null;
 
@@ -747,7 +801,8 @@ function walkedLocusOf(
    * counts as agreement: two unions that both measure and DISAGREE still print the kinds alone —
    * `agreeingUnion` (#1500) is where the verdict lives.
    */
-  for (const s of sampleSeeds) {
+  for (let si = 0; si < sampleSeeds.length; si += 1) {
+    const s = sampleSeeds[si];
     const other = componentsAt(s);
     if (!other) continue;
     const otherShapes = other.map((t) => shapeOfTrace(t.points)).filter((x): x is LocusShape => x !== null);
@@ -757,6 +812,17 @@ function walkedLocusOf(
       otherShapes,
     );
     if (verdict === null) return { components: held.map((h) => ({ trace: h.trace, shape: null })) };
+    /**
+     * THE THIRD VERDICT (#1186, ADR-AG-351): the kinds agree and the equations do not — the set VARIES. When it is
+     * one component at every configuration, the configurations the gate visits (this one and the rest of
+     * `sampleSeeds`, never a new sweep — docs/17 §3's sampling-loop chokepoint) are handed with their letters'
+     * values to `parametricShape`, which states the dependence as monomials in the student's letters and verifies
+     * it against every trace, or returns nothing and the kind stands as before.
+     */
+    if (held.length === 1 && otherShapes.length === 1 && !verdict[0].conic) {
+      const symbolic = symbolicLocus(held[0].trace, other[0], s, sampleSeeds.slice(si + 1), verdict[0].curve.kind);
+      if (symbolic) return { components: [{ trace: held[0].trace, shape: { curve: verdict[0].curve, symbolic } }] };
+    }
     return { components: held.map((h, i) => ({ trace: h.trace, shape: verdict[i] })) };
   }
   // No measurable comparison at all: the fitted shapes stand ungated — the pre-existing behaviour.

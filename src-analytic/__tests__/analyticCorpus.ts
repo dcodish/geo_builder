@@ -24,8 +24,8 @@ export function analyticCorpus(): string[][] {
       seqs.set(JSON.stringify(items), items);
     }
   }
-  // #1154: a `rewrite` entry (rename) is a session edit, not a figure line — not corpus material.
-  for (const e of COMMAND_CATALOG_ANALYTIC.filter((x) => x.lane !== 'rewrite')) {
+  // #1154: a `rewrite` entry (rename) is a session edit, and #1177 an `ask` entry a question — not figure lines.
+  for (const e of COMMAND_CATALOG_ANALYTIC.filter((x) => !x.lane)) {
     const s = [...(e.needs ?? []), e.he];
     seqs.set(JSON.stringify(s), s);
   }

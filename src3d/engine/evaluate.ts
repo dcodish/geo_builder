@@ -43,16 +43,17 @@ import {
 import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
+import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3 } from './freeVecSystem';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind } from './types';
+import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3} from './vec3';
-import { quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
+import { baseRingOf, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -489,49 +490,26 @@ export interface Resolved3 {
   /** #1188 (ADR-3D-386) — every FREE vector's value at this configuration: its stated components verbatim, its
    *  unstated ones sampled (`resolveFreeVectors3`). Values, never positions — nothing positional reads this. */
   freeVectors: ReadonlyMap<string, Vec3>;
+  /** #1188 step 2 (ADR-3D-390): each free-vector LETTER («u = (k-1, 2, k)») at this configuration — solved or sampled. */
+  freeSyms: ReadonlyMap<string, number>;
 }
 
-/** #1188 (ADR-3D-386): the range an unstated free-vector component is sampled in, ±FREE_VEC_RANGE. */
-export const FREE_VEC_RANGE = 1.2;
-/** #1188: the NORM FLOOR — a free vector is never drawn shorter than this fraction of the range (never a dot). */
-export const FREE_VEC_FLOOR = 0.3;
-const FREE_VEC_REDRAWS = 8;
+export { FREE_VEC_FLOOR, FREE_VEC_RANGE } from './freeVecSystem';
 
 /**
  * #1188 (ADR-3D-386) — THE FREE-VECTOR PASS: each free vector's value at `seed`.
  *
- * A pure post-pivot stage of `resolve3` that reads NOTHING positional (no point, no plane, no pivot output), so every
- * figure without a free vector resolves bit-identically. A stated component is kept verbatim; an unstated one is a
- * free DOF (ADR-052), sampled from the STRUCTURAL key `fvec-<name>-<axis>` — adding a fact never reshuffles an
- * earlier vector's sample — inside the half-range a stated sign («a חיובי» on a named component) allows. The norm
- * floor: a draw shorter than `FREE_VEC_FLOOR × FREE_VEC_RANGE` re-draws its sampled components from the next key
- * (`fvec-<name>-<axis>#k`), so the floating arrow is never a dot; a vector the student STATED short stays as stated.
+ * A post-pivot stage of `resolve3` that reads no position except the endpoints of an ANCHORED vector a free one is
+ * combined with, so every figure without a free vector resolves bit-identically. A stated component is kept verbatim;
+ * an unstated one is a free DOF (ADR-052), sampled from the STRUCTURAL key `fvec-<name>-<axis>` — adding a fact never
+ * reshuffles an earlier vector's sample — inside the half-range a stated sign allows, with the norm floor's re-draws
+ * (`fvec-<name>-<axis>#k`), so the floating arrow is never a dot.
+ *
+ * #1188 step 2 (ADR-3D-390): the values are the free-vector system's solution (`freeVecSystem.ts`) — definitions,
+ * equations and affine letters — the minimum-norm projection of that same sample, so with no equation it IS the sample.
  */
-export function resolveFreeVectors3(c: Construction3, seed: number): Map<string, Vec3> {
-  const out = new Map<string, Vec3>();
-  const axes = ['x', 'y', 'z'] as const;
-  for (const [name, fv] of c.freeVectors) {
-    const sign = (ax: 'x' | 'y' | 'z'): number | undefined => {
-      const g = c.componentSigns.find((s) => s.target.kind === 'vector' && s.target.name === name && s.axis === ax);
-      return g ? (g.positive ? 1 : -1) : undefined;
-    };
-    const draw = (k: number): Vec3 => {
-      const [x, y, z] = axes.map((ax, i) => {
-        const stated = fv.comps[i];
-        if (stated !== null) return stated;
-        const key = `fvec-${name}-${ax}${k === 0 ? '' : `#${k}`}`;
-        const sg = sign(ax);
-        return sg === undefined ? sample(seed, key, -FREE_VEC_RANGE, FREE_VEC_RANGE) : sg * sample(seed, key, 0.15, 1) * FREE_VEC_RANGE;
-      });
-      return v3(x, y, z);
-    };
-    let v = draw(0);
-    if (fv.comps.some((x) => x === null)) {
-      for (let k = 1; k <= FREE_VEC_REDRAWS && norm3(v) < FREE_VEC_FLOOR * FREE_VEC_RANGE; k++) v = draw(k);
-    }
-    out.set(name, v);
-  }
-  return out;
+export function resolveFreeVectors3(c: Construction3, seed: number, positions: Positions3 = new Map()): Map<string, Vec3> {
+  return solveFreeVectors3(c, seed, positions).values;
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -1146,9 +1124,8 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
  */
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   // #1188 (ADR-3D-386): a free vector's unstated components are sampled DOF (the pass's own source: `comps` null)
-  let freeVecDof = 0;
-  for (const fv of c.freeVectors.values()) freeVecDof += fv.comps.filter((x) => x === null).length;
-  return freeVecDof + figureFreeDofCount3(c, resolved);
+  // #1188 step 2 (ADR-3D-390): the free-vector system's unknowns less its rank — a defined vector adds none
+  return freeVecDofCount3(c) + figureFreeDofCount3(c, resolved);
 }
 
 function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
@@ -1259,7 +1236,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1272,6 +1249,9 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         const a = get(t.atom.from);
         const b = get(t.atom.to);
         vvec = a && b ? sub3(b, a) : null;
+      } else if (c.freeVectors.has(t.atom.name)) {
+        // #1188 step 2 (ADR-3D-390): a PURE free vector («AE = p») — its value, resolved without positions
+        vvec = free?.get(t.atom.name) ?? null;
       } else {
         const dv = c.vectors.get(t.atom.name);
         const a = dv && get(dv.from);
@@ -1458,6 +1438,48 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 
 // #1498: GAUGE_KINDS + gaugeFramePoint3 moved to types.ts — the lane rule is asked in ONE place,
 // shared with solve3's residual accessor (which had drifted to "gauge everything").
+
+/**
+ * #2630 (ADR-3D-400): the floor frame of a solid — the frame its builder lays it in. Origin base[0],
+ * e1 along base[0]→base[1], n the base plane's normal turned toward the rest of the solid (apex or
+ * top), or for a flat polygon the ring's own winding (counter-clockwise from +z). Null when the base
+ * is unknown or degenerate; the caller then falls back to the first three points.
+ */
+function solidFloorFrame3(s: SolidObj, pos: Positions3): { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null {
+  const ring = baseRingOf(s)?.map((id) => pos.get(id));
+  if (!ring || ring.length < 3 || ring.some((p) => !p)) return null;
+  const pts = ring as Vec3[];
+  let nRaw = newellNormal(pts);
+  if (norm3(nRaw) < 1e-9) return null;
+  const rest = s.ids.filter((id) => !baseRingOf(s)!.includes(id)).map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+  if (rest.length > 0 && dot3(nRaw, sub3(centroid3(rest), centroid3(pts))) < 0) nRaw = scale3(nRaw, -1);
+  const n = normalize3(nRaw);
+  const d1 = sub3(pts[1], pts[0]);
+  const d1p = sub3(d1, scale3(n, dot3(d1, n)));
+  if (norm3(d1p) < 1e-9) return null;
+  const e1 = normalize3(d1p);
+  return { p0: pts[0], e1, e2: cross3(n, e1), n };
+}
+
+/**
+ * #2630 (ADR-3D-400): has the student said anything about WHICH WAY the figure faces? That is a wider
+ * question than {@link hasAbsoluteFrameObject} (is the placement itself a DOF, #367): a component given
+ * on a pair or a vector («AB = (1,2,3)»), a plane equation, a component's sign or a coordinate
+ * determination fixes the figure's turn against the axes without placing a point. The gauge
+ * normalisation may turn only a figure for which this is false; turning any other one rewrites a
+ * stated component (measured before this: «AB = (1,2,3)» with two lengths drew AB as (3.74, 0, 0)).
+ */
+export function orientationStated3(c: Construction3): boolean {
+  return (
+    hasAbsoluteFrameObject(c) ||
+    c.pairPins.length > 0 ||
+    c.vectorPins.length > 0 ||
+    c.planePins.length > 0 ||
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.coordDeterminations.length > 0
+  );
+}
 
 /**
  * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
@@ -3090,18 +3112,19 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
    * origin, first edge along +x, the first three points' plane on the floor (z = 0, third point
    * at y > 0). One rigid motion (det +1 — never a reflection) applied to every position, plane
    * and line, so every relation survives verbatim; configurations change the SHAPE alone.
-   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, solids,
-   * revolutions, circles — is untouched.
+   * Anything anchored — coordinates, pins, equation planes/lines, frame relations, revolutions,
+   * circles — is untouched.
+   *
+   * #2630 (ADR-3D-400 — operator 2026-10-31: *"they are on the floor until they are placed by user
+   * somewhere"*): a SOLID is no exception. A figure holding one takes the frame from the first
+   * solid's own base, the frame its builder lays it in — base[0] at the origin, base[0]→base[1]
+   * along +x, the base plane on the floor, the rest of the solid above it (a flat polygon: its ring
+   * counter-clockwise from above). The first three points are not that frame: an apex-first or
+   * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
    */
-  if (
-    !hasAbsoluteFrameObject(c) &&
-    absolutePointCount(c) === 0 &&
-    c.solids.length === 0 &&
-    c.revolutions.length === 0 &&
-    c.circles3.length === 0
-  ) {
+  if (!orientationStated3(c) && c.revolutions.length === 0 && c.circles3.length === 0) {
     const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = null;
+    let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
     for (let i = 1; i < ordered.length && !frame; i += 1) {
       const d1 = sub3(ordered[i], ordered[0]);
       if (norm3(d1) < 1e-9) continue;
@@ -3139,7 +3162,11 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     ratioSymbols: Object.fromEntries(ratioSymbols),
     coordDetermined,
     seed,
-    freeVectors: resolveFreeVectors3(c, seed), // #1188 (ADR-3D-386): the post-pivot free-vector pass
+    // #1188 (ADR-3D-386): the post-pivot free-vector pass; step 2 (ADR-3D-390): the system, at the drawn figure
+    ...(() => {
+      const fs3 = solveFreeVectors3(c, seed, pos);
+      return { freeVectors: fs3.values, freeSyms: fs3.syms };
+    })(),
   };
 }
 
@@ -3519,7 +3546,8 @@ function evaluateSolidsAndPoints(
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
-      const P = solveVecDef(c, vd, pos, k);
+      // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol

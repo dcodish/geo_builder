@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-29T16:40:44.063Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור u",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "u"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור v",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "v"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "w = u + v",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vec-eq",
+            "lhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "named",
+                  "name": "w"
+                }
+              }
+            ],
+            "rhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "named",
+                  "name": "u"
+                }
+              },
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "named",
+                  "name": "v"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

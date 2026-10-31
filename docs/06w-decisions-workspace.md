@@ -6536,3 +6536,20 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 4. **The roadmap runs past five weeks** (eight from 27 Oct), allocated by topic. Each topic ends with a readiness check the operator plays before its lessons start: locus by 12 Nov, ellipse by 13 Nov, parabola by 27 Nov, vectors by 30 Nov. Each week keeps about a quarter of its room for new issues a person hits. Measured pace since September: about 90 issues closed a week, about 200 opened.
 
 **Consequences.** Work is ordered by what is taught next, not by queue size. A conic issue filed from now on ranks like any analytic issue, and a topic's readiness check is the gate that matters before each lesson block.
+
+## ADR-W-167 — One given per row: new input support is built for one given per line, and a student who types two is taught the rows (#2641)
+
+**Status:** accepted · 2026-10-31 · operator ruling · process and product principle (workspace, every builder)
+
+**Operator:** 2026-10-30, playing round #2627 T40: *"I think that in this case and previous case we could ask user to insert one input at a time and not solve both in one sentence. Since this works now, the fix for this is very low priority but for future cases we should stick to supporting one input at a time where possible"*. 2026-10-31, confirmed as a ruling, with a measurement asked for: *"yes - this is a ruling that i think is the right one. however, i want you to measure it in todays test cases"*. 2026-10-31, after the measurement: *"moving forward we do not support cases of 2 inputs in a line and we teach this everytime the user tries"*.
+
+**Requirements:** none yet. The teaching answer is [#2644](https://github.com/dcodish/geo_builder/issues/2644), which edits each builder's requirements doc when it is built. · **Design:** none (internal). This entry governs how input work is scoped.
+
+**Measured (#2641).** Every compound line on round #2627's 66-case sheet was written one given per row and played in a real browser on the server that played it, with no model calls. 18 of 19 build. The 19th, «הישר d מאונך לישר ℓ1 ולישר ℓ2», fails split too, because of a separate 3-D bug (#2642: a line named by a lowercase letter is read as a vector).
+
+**Decision.**
+1. **New input support is built for one given per row.** A compound textbook sentence («מעוין ABCD חסום באליפסה», «E על AA' כך ש-AE = 2EA'») is not a reason to grow a grammar. A plan or issue that proposes reading one is scoped back to its single-given rows.
+2. **A student who types two givens in one line is taught the rows**, every time, in the existing voice «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד…». How it is detected, whether lines that already build also get the note, and whether such a line still reaches the AI fallback are the open questions on #2644.
+3. **Compound forms that work today are not removed by this entry.** Whether they keep building silently is #2644's question 1.
+
+**Consequences.** Triage of a "the tool does not read this sentence" report first asks whether the sentence holds more than one given. If it does, the fix is the teaching answer (#2644), not a new grammar row. A failure of the split rows themselves (#2642) is an ordinary bug.

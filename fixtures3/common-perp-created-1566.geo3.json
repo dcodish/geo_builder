@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-30T16:35:17.253Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "הישר d מאונך לישר ℓ1 ולישר ℓ2",
+      "cmds": [
+        {
+          "type": "line-common-perp",
+          "name": "d",
+          "line1": "ℓ1",
+          "line2": "ℓ2"
+        }
+      ]
+    }
+  ]
+}

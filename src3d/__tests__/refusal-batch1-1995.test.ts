@@ -105,9 +105,11 @@ describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one n
     expect(submit('שיעור ה-x של C שלילי')).toBe('אף תצורה של הנתונים אינה נותנת לשיעור של «C» את הסימן הזה — הנתונים כבר קובעים אותו אחרת, ולכן הנתון לא נוסף.');
   });
 
+  // ⚠ RE-BASED by #1566 (ADR-3D-399; #2048 ruling A, S2(c)): «נפח הפירמידה WXYZ» now CREATES tetrahedron WXYZ with the
+  // notice, as «פירמידה WXYZ» would. The refusal stands for a noun that names no family, which nothing can create.
   it('no such solid: write the claim about a solid in the figure, with its letters', () => {
     setUp([PYRAMID]);
-    expect(submit('נפח הפירמידה WXYZ = 11')).toBe('אין בציור גוף «WXYZ» אחד בדיוק, ולכן לא ברור על איזה גוף הטענה. כתבו את הטענה על גוף שבציור, עם האותיות שלו.');
+    expect(submit('נפח הגוף WXYZ = 11')).toBe('אין בציור גוף «WXYZ» אחד בדיוק, ולכן לא ברור על איזה גוף הטענה. כתבו את הטענה על גוף שבציור, עם האותיות שלו.');
     expect(submit('נפח הפירמידה SABCD = 11')).toBeNull();
   });
 

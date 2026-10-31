@@ -38,7 +38,7 @@ import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { Construction, Id, NumCurve } from '../engine/types';
 import { knownCurve, knownCurveOptions } from '../engine/evaluate';
-import type { LocusShape } from '../engine/locusFit';
+import type { LocusShape, Monomial, SymbolicCurve } from '../engine/locusFit';
 
 /**
  * TWO POSITIONS, TWO FORMATTERS (#2394, ADR-AG-304; ADR-AG-085's position rule). A number INSIDE an equation — a
@@ -450,6 +450,65 @@ export function directrixText(c: NumCurve & { kind: 'parabola' }): string {
   return d.kind === 'line' ? roleLineText(d.a, d.b, d.c) : '';
 }
 
+/**
+ * ONE PRINTER PER CONIC KIND (#2614, [ADR-AG-357](../../docs/06c-decisions-analytic.md#adr-ag-357)) — the panel row,
+ * the ask by name, the «או» options, the locus row and the locus label on the canvas all print a conic through these.
+ *
+ * Two printers spelled each conic (`curveParts` and `locusEquation`), and neither carried ADR-AG-085's ruling that no
+ * fraction is left as a coefficient: `x²/45/4 + y²/5 = 1` reads as x²/45 divided by 4, `y² = 5/2x` as 5/(2x).
+ *
+ * **The ellipse** (operator, 2026-10-30, Q1 → B): whole-number a² and b² keep the canonical `x²/a² + y²/b² = 1`. A
+ * fractional one clears the WHOLE equation to whole numbers, the way the book states its givens: `x²/(45/4) + y²/5 = 1`
+ * → `4x² + 9y² = 45`. A denominator that is not a small rational (a surd) cannot be cleared and prints as before.
+ */
+export function ellipseEquationText(a2: number, b2: number): string {
+  const qa = fractionClearingFactor([a2]);
+  const qb = fractionClearingFactor([b2]);
+  if (qa !== null && qb !== null && (qa > 1 || qb > 1)) {
+    // x²·qa/pa + y²·qb/pb = 1, multiplied through by pa·pb, then reduced.
+    const pa = Math.round(a2 * qa);
+    const pb = Math.round(b2 * qb);
+    const [A, B, C] = [qa * pb, qb * pa, pa * pb];
+    const g = gcdInt(gcdInt(A, B), C);
+    const coef = (v: number) => (v === 1 ? '' : String(v));
+    return `${coef(A / g)}x² + ${coef(B / g)}y² = ${C / g}`;
+  }
+  return `x²/${fmt(a2)} + y²/${fmt(b2)} = 1`;
+}
+
+/**
+ * **The parabola** keeps the book's `y² = kx` — its `y²` is never multiplied (#2640, ADR-AG-357 Am. 1). Clearing the
+ * fraction (`2y² = 5x`, #2614) was ruled wrong for the parabola: operator, 2026-10-30, *"a parabola equation should always
+ * be in the y^2=ax format so showing 2y^2=5x is not what a student would see in a book"*. So it is k that is spelled:
+ *
+ *  - an integer as before — `y² = 8x`, `y² = x` (never `1x`);
+ *  - a TERMINATING rational as its exact decimal (ruling (a), 2026-10-31) — `y² = 2.5x`, `y² = 0.125x`;
+ *  - a NON-terminating rational as the exact fraction (ruling, 2026-10-31: *"it should print 5/3 nicely"*) — `y² = 5/3x`,
+ *    which every surface that shows it typesets through `shell/math` `MathText` as a stacked 5-over-3 before the x;
+ *  - a surd (not a small rational) as before #2614, `fmtCoefficient`'s decimal.
+ *
+ * The sign stays attached: `y² = -2.5x`, `y² = -5/3x`.
+ */
+export function parabolaEquationText(k: number): string {
+  const mag = parabolaCoefficient(Math.abs(k));
+  return `y² = ${k < 0 ? '-' : ''}${mag}x`;
+}
+
+/** `|k|` as the coefficient of `y² = kx` — `''` for 1. A decimal only where it is exact (the denominator divides a power of 10). */
+function parabolaCoefficient(m: number): string {
+  const q = fractionClearingFactor([m]);
+  if (q !== null && q > 1) {
+    let d = 0;
+    while (d <= 6 && 10 ** d % q !== 0) d += 1;
+    // Terminating: print the exact rational p/q to its d places. Non-terminating: the fraction tier's `p/q`.
+    if (d <= 6) return (Math.round(m * q) / q).toFixed(d);
+    return fmt(m);
+  }
+  return fmt(m) === fmt(1) ? '' : fmt(m);
+}
+
+const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : a);
+
 export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): CurveParts {
   switch (c.kind) {
     case 'line': {
@@ -478,11 +537,8 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
       };
     case 'parabola': {
       const f = parabolaFocus(c);
-      // `y² = 2p·x`, with the same magnitude rule the line terms use: `y² = x`, never `y² = 1x`.
-      const k = 2 * c.p;
-      const mag = fmt(Math.abs(k)) === fmt(1) ? '' : fmt(Math.abs(k));
       return {
-        equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
+        equation: parabolaEquationText(2 * c.p),
         // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
         details: [
           { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${val(f.x)}, ${val(f.y)}`) },
@@ -493,7 +549,7 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
     case 'ellipse': {
       const [f1, f2] = ellipseFoci(c);
       return {
-        equation: `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`,
+        equation: ellipseEquationText(c.a * c.a, c.b * c.b),
         details: [
           { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
           { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${val(f1.x)}, ${val(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${val(f2.x)}, ${val(f2.y)}`)}` },
@@ -568,6 +624,7 @@ export function describeCurve(name: string, c: NumCurve, nameAt?: NameAt, label?
  * disagreeing about what `4/3` looks like.
  */
 export function locusEquation(shape: LocusShape, fmt: (v: number) => string): string | null {
+  if (shape.symbolic) return symbolicLocusEquation(shape.symbolic, fmt);
   if (!shape.conic) return null;
   const c = shape.curve;
   // `x`, `x − 3`, `x + 3` — the bracketed term of a translated conic, with the no-op omitted.
@@ -607,10 +664,86 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
       const clean = Number.isFinite(exact) && Math.abs(exact * exact - r2) < 1e-9;
       return `${shift('x', c.cx)}² + ${shift('y', c.cy)}² = ${clean ? `${shown}²` : fmt(r2)}`;
     }
+    // The conics print through the panel's ONE printer per kind (#2614, ADR-AG-357), never a spelling of their own.
     case 'parabola':
-      return `y² = ${fmt(2 * c.p)}x`;
+      return parabolaEquationText(2 * c.p);
     case 'ellipse':
-      return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
+      return ellipseEquationText(c.a * c.a, c.b * c.b);
+  }
+}
+
+/**
+ * A MONOMIAL AS A TEXTBOOK WRITES IT (#1186, ADR-AG-351) — `16a`, `-a`, `a²`, `4a²`, `ab`, `3a/2`, `a²/4`: the number
+ * first and suppressed when it is 1, the letters with a superscript square, and a fraction's denominator AFTER the
+ * letters (`explicitLineText`'s `-x/2` rule — `3/2a` reads as `3/(2a)`). Magnitude only; the caller owns the sign.
+ */
+function monomialText(m: Monomial, fmt: (v: number) => string): string {
+  const letters = Object.keys(m.pow)
+    .sort()
+    .map((s) => (m.pow[s] === 2 ? `${s}²` : s))
+    .join('');
+  const mag = Math.abs(m.c);
+  if (letters === '') return fmt(mag);
+  const shown = fmt(mag);
+  const slash = shown.indexOf('/');
+  if (slash > 0) {
+    const num = shown.slice(0, slash);
+    return `${num === '1' ? '' : num}${letters}/${shown.slice(slash + 1)}`;
+  }
+  return `${shown === fmt(1) ? '' : shown}${letters}`;
+}
+
+/** A monomial that is ONE atom — a number or a single letter — needs no brackets before `²` or after `/`. */
+const isAtom = (t: string): boolean => /^(\d+|[A-Za-z])$/.test(t);
+
+/** `√m` as a monomial when it is one — every exponent even and the coefficient a perfect rational square — else null. */
+function monomialRoot(m: Monomial): Monomial | null {
+  if (m.c <= 0) return null;
+  const pow: Record<string, number> = {};
+  for (const [s, e] of Object.entries(m.pow)) {
+    if (e % 2 !== 0) return null;
+    pow[s] = e / 2;
+  }
+  const r = Math.sqrt(m.c);
+  const k = fractionClearingFactor([r]);
+  return k === null ? null : { c: r, pow };
+}
+
+/**
+ * THE LOCUS EQUATION IN THE STUDENT'S LETTERS (#1186, ADR-AG-351) — the same canonical forms as the numeric branch
+ * of `locusEquation`, term by term: a line in `lineText`'s general form with its fractions cleared (`x - 4a = 0`),
+ * a circle with `r²` written as a square when it is one (`(x − 16a)² + y² = (25a)²`, #1187), a parabola `y² = 4ax`,
+ * an ellipse `x²/(4a²) + y²/b² = 1`. Every monomial was verified against the traces before it reached here.
+ */
+function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
+  const signed = (m: Monomial, sym: string): string => {
+    if (m.c === 0) return '';
+    const body = monomialText(m, fmt);
+    const mag = body === fmt(1) && sym !== '' ? '' : body;
+    return `${m.c < 0 ? '-' : '+'} ${mag}${sym} `;
+  };
+  const shift = (v: string, m: Monomial) => (m.c === 0 ? v : `(${v} ${m.c > 0 ? '−' : '+'} ${monomialText(m, fmt)})`);
+  const under = (m: Monomial) => {
+    const t = monomialText(m, fmt);
+    return isAtom(t) || (Object.keys(m.pow).length === 1 && Math.abs(m.c) === 1) ? t : `(${t})`;
+  };
+  switch (s.kind) {
+    case 'line': {
+      const k = fractionClearingFactor([s.D.c, s.E.c, s.F.c]) ?? 1;
+      const scale = (m: Monomial): Monomial => ({ c: m.c * k, pow: m.pow });
+      const parts = `${signed(scale(s.D), 'x')}${signed(scale(s.E), 'y')}${signed(scale(s.F), '')}`.trim();
+      const body = parts.startsWith('+ ') ? parts.slice(2) : parts.replace(/^- /, '-');
+      return `${body} = 0`;
+    }
+    case 'circle': {
+      const root = monomialRoot(s.r2);
+      const rhs = root ? `${isAtom(monomialText(root, fmt)) ? monomialText(root, fmt) : `(${monomialText(root, fmt)})`}²` : monomialText(s.r2, fmt);
+      return `${shift('x', s.cx)}² + ${shift('y', s.cy)}² = ${rhs}`;
+    }
+    case 'parabola':
+      return `y² = ${s.twoP.c < 0 ? '-' : ''}${monomialText(s.twoP, fmt)}x`;
+    case 'ellipse':
+      return `x²/${under(s.a2)} + y²/${under(s.b2)} = 1`;
   }
 }
 

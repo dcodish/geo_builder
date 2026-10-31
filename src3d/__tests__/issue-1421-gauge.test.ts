@@ -63,7 +63,7 @@ describe('#1421 — anchored figures are untouched', () => {
     expect([a.x, a.y, a.z]).toEqual([2, 1, 3]);
   });
 
-  it('a cube keeps its canonical solid placement — the normalisation never runs for solids', () => {
+  it('a cube keeps its canonical solid placement — an undriven solid is already on the floor (#2630)', () => {
     submit("קובייה ABCDA'B'C'D'");
     const a0 = at(0).get('A')!;
     const b0 = at(0).get('B')!;

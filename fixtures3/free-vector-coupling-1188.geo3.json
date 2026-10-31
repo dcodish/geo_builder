@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-29T16:40:44.074Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AB = u",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "A",
+          "to": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור p",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "p = 2u",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vec-eq",
+            "lhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "named",
+                  "name": "p"
+                }
+              }
+            ],
+            "rhs": [
+              {
+                "coeff": 2,
+                "atom": {
+                  "kind": "named",
+                  "name": "u"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

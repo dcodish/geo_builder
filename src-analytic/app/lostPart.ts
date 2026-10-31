@@ -34,6 +34,7 @@
  * reading left open (a `choice` of perpendiculars at its vertices) and the lost part names one of its vertices.
  * Decided by the reading, never by the spelling.
  */
+import { pointDeclaration } from '../parser/locusPhrases';
 import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../../shell/readExtent';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
@@ -226,4 +227,27 @@ export function declinedThrough(line: string, records: (piece: string, before: r
     held.push(piece);
   }
   return { parts: more.length ? [head, first, ...more] : [head, rest] };
+}
+
+/**
+ * ARM 4 — #1177 ([ADR-AG-352](../../docs/06c-decisions-analytic.md#adr-ag-352)): THE LOCUS POINT IN ONE LINE, taught as
+ * its two. Operator, 2026-09-27, asked whether «M נקודה המקיימת MA = MB» should be read: *"No, teach the two lines"* —
+ * the two-line form (`נקודה M` · the property) stays the only form, ADR-AG-072 §1, and the one-line form is refused with
+ * the one-input-per-line message listing them, so the next two Enters build what the student meant.
+ *
+ * A point NAMED in the line («M נקודה» · «M היא נקודה» · «נקודה M» · «הנקודה M»), then a satisfying-clause opener
+ * («המקיימת» · «שמקיימת»), then a property. («M נקודה כך ש-…» is not this arm's: the grammar reads its head and the
+ * lost-operand rule hands it to the model, as before.) Taught only when BOTH lines record, the point first and the
+ * property in the figure it makes — a taught remedy is one the next Enter accepts (ADR-W-030's promise). Anything else
+ * returns null and the line keeps the path it had.
+ */
+const POINT_PROPERTY = /^(?:ה?נקודה\s+([A-Z][0-9]?)|([A-Z][0-9]?)\s+(?:היא\s+|הינה\s+)?נקודה)\s*,?\s+(?:ה?מקיימת|שמקיימת)\s+(.+?)\s*[.]?$/;
+
+export function declinedPointProperty(line: string, records: (piece: string, before: readonly string[]) => boolean): LostPart | null {
+  const m = POINT_PROPERTY.exec(line.trim());
+  if (!m) return null;
+  const point = pointDeclaration(m[1] ?? m[2]);
+  const property = m[3];
+  if (!records(point, []) || !records(property, [point])) return null;
+  return { parts: [point, property] };
 }

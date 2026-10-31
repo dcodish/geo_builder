@@ -177,13 +177,14 @@ describe('#1176 — the point lies on its own locus', () => {
   });
 
   /** And the parameterised figure still declines to print an equation, at every seed. */
-  it('a parameterised locus still shows the KIND only, at every configuration', () => {
+  // ADR-AG-351 (#1186): the row is the SAME at every configuration — now the kind with its equation in a.
+  it('a parameterised locus reads the same at every configuration', () => {
     const kind = ((k: string) => (k === 'circle' ? 'מעגל' : k)) as never;
     for (const seed of [0, 1, 2, 3]) {
       expect(
         ask(derive(PARAM_CIRCLE, seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind).value,
         `seed ${seed}`,
-      ).toBe('מעגל');
+      ).toBe('מעגל · (x − 16a)² + y² = (25a)²');
     }
   });
 });

@@ -168,10 +168,10 @@ describe('#1138 lock 5 — the exam’s locus questions answer the locus row', (
       expect(a.missing, q).toBeUndefined();
     }
   });
-  it('with the parameter a, «הביעו באמצעות a את …» answers the kind (the symbolic half is #1186)', () => {
+  it('with the parameter a, «הביעו באמצעות a את …» answers in a (#1186, ADR-AG-351)', () => {
     const plain = locus(winterParam.lines, 'M');
     const expressed = locus(winterParam.lines, 'M', 0, 'הביעו באמצעות a את משוואת המקום הגיאומטרי שעליו נמצאות כל הנקודות M');
-    expect(expressed.value).toBe('parabola');
+    expect(expressed.value).toBe('parabola · y² = 4ax');
     expect({ ...expressed, question: '' }).toEqual({ ...plain, question: '' });
   });
   it("«הראו כי המקום הגיאומטרי של כל הנקודות G הוא פרבולה ומצאו את משוואתו» on the קיץ ב' 24 property figure", () => {
@@ -252,8 +252,8 @@ describe('#1138 lock 7 — חורף 2024: the exam’s sentences, with a = 2 and
     built(winter.lines);
     for (const seed of [0, 1]) expect(locus(winter.lines, 'M', seed).value).toBe('parabola · y² = 8x');
   });
-  it('with a: every line records, the locus of M is a parabola (the kind)', () => {
+  it('with a: every line records, the locus of M is the parabola y² = 4ax (#1186, ADR-AG-351)', () => {
     built(winterParam.lines);
-    expect(locus(winterParam.lines, 'M').value).toBe('parabola');
+    expect(locus(winterParam.lines, 'M').value).toBe('parabola · y² = 4ax');
   });
 });

@@ -1,0 +1,123 @@
+{
+ "name": "prod-2026-10-31",
+ "title": "Prod smoke 2026-10-31",
+ "cases": [
+  {
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "batch",
+   "issue": 1687,
+   "class": "play",
+   "title": "Adding a point on a side leaves the triangle where it is",
+   "lines": [
+    "משולש ABC",
+    "D על BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». After the second line, A, B and C do not move; D sits on BC. Then press «הציגו תצורה אחרת» a few times: each press is a new triangle, and D stays on BC.",
+   "before": "The whole triangle was redrawn when D was added (labels moved 25–440 px).",
+   "id": "T1"
+  },
+  {
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "batch",
+   "issue": 2613,
+   "class": "play",
+   "title": "The locus of M is the ellipse alone (book p10-9)",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/16+y^2/12=1",
+    "P נקודה על האליפסה",
+    "האנך מ-P לציר ה-x חותך אותו בנקודה N",
+    "O ראשית הצירים",
+    "דרך N עובר ישר l1 מקביל ל-PO",
+    "דרך P עובר ישר l2 מקביל לציר ה-x",
+    "M נקודת החיתוך של הישר l1 עם הישר l2"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של M"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של M» in the «שאלו» box. The answer reads «אליפסה · x²/64 + y²/12 = 1» and one ellipse is drawn, with no x-axis line. Press «הציגו תצורה אחרת» a few times: the same answer each time.",
+   "before": "«אליפסה · ישר» with the whole x-axis drawn too, or «ישר · y = 0» alone, or nothing.",
+   "cycles": 3,
+   "id": "T7"
+  },
+  {
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "batch",
+   "issue": 2614,
+   "class": "play",
+   "title": "A fractional ellipse prints as a whole-number equation",
+   "lines": [
+    "נתונה אליפסה שמשוואתה 4x^2/45+y^2/5=1"
+   ],
+   "asks": [
+    "משוואת האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «משוואת האליפסה» in the «שאלו» box. The answer and the panel read «4x² + 9y² = 45».",
+   "before": "«x²/45/4 + y²/5 = 1», which reads as x²/45 divided by 4.",
+   "id": "T12"
+  },
+  {
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "pr-2634",
+   "issue": 1186,
+   "class": "play",
+   "title": "The חורף 25 locus is written in a",
+   "lines": [
+    "A(-9a,0)",
+    "B(41a,0)",
+    "נקודה P",
+    "PA מאונך ל-PB"
+   ],
+   "asks": [
+    "המקום הגיאומטרי של P"
+   ],
+   "lookFor": "Start: press «נקה הכל». Type the givens in the main box, then «המקום הגיאומטרי של P» in the «שאלו» box. The answer reads «מעגל · (x − 16a)² + y² = (25a)²», the same after «הציגו תצורה אחרת».",
+   "before": "«מעגל» with no equation.",
+   "cycles": 2,
+   "id": "T16"
+  },
+  {
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "pr-2637",
+   "issue": 2616,
+   "class": "play",
+   "title": "Name the right focus and the top vertex",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+    "F1 הוא המוקד הימני של האליפסה",
+    "A הקודקוד העליון של האליפסה"
+   ],
+   "lookFor": "Start: press «נקה הכל». F1 at (4, 0) and A at (0, 3), both lettered.",
+   "before": "Both lines refused.",
+   "id": "T36"
+  },
+  {
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "pr-2604",
+   "issue": 1188,
+   "class": "play",
+   "title": "REFUSAL: one free vector equal to two different cube edges is a contradiction",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "AB = p",
+    "AD = p"
+   ],
+   "lookFor": "Start: press «נקה הכל». The last line is refused «הנתונים סותרים זה את זה — אין גוף שמקיים את «AD = p» יחד עם «AB = p»»; no \"tool limitation\" wording.",
+   "before": "«הכלי עדיין לא יודע לפתור… זו מגבלה של הכלי».",
+   "expectRefusal": "סותרים",
+   "id": "T54"
+  }
+ ]
+}

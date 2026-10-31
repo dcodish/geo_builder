@@ -37,7 +37,7 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'unknown-point': [{ id: 'P' }],
   'unknown-vector': [{ id: 'AB' }],
   'free-vector-metric': [{ id: 'u', sentence: '|u| = 5' }, { id: 'u' }],
-  'free-vector-combination': [{ id: 'w', sentence: 'w = u + v' }, { id: 'w' }],
+  'free-vector-coupling': [{ id: 'p', sentence: 'AB = p + q' }, { id: 'p' }],
   'free-vector-conflict': [{ id: 'u' }],
   'unknown-plane': [{ id: 'π1' }, { id: 'base' }],
   'not-a-diagonal': [{ a: 'A', b: 'B', kind: 'any' }, { a: 'A', b: 'B', kind: 'space' }],
