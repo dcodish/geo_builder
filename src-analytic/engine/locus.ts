@@ -31,7 +31,7 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, someCrossingHasNoPoint, viewBox, type CarrierSystem } from './evaluate';
+import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, resolvedAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
 import {
   agreeingUnion,
   conicPointsIn,
@@ -535,7 +535,8 @@ function distToPolyline(p: Pt, pts: readonly Pt[]): number {
 export function locusOf(
   c: Construction,
   id: Id,
-  seeds: readonly [number, number] = [0, 1],
+  /** The configuration SHOWN (a seed, or one the display walk landed on — #2039, ADR-AG-358), then the one compared against. */
+  seeds: readonly [Seed, number] = [0, 1],
   bounds?: TraceOptions['bounds'],
 ): LocusResult | null {
   const walked = walkedLocusOf(c, id, seeds, bounds);
@@ -547,17 +548,19 @@ export function locusOf(
 function walkedLocusOf(
   c: Construction,
   id: Id,
-  seeds: readonly [number, number],
+  seeds: readonly [Seed, number],
   bounds: TraceOptions['bounds'] | undefined,
 ): LocusResult | null {
   // One drawable figure per configuration — discovery and the gate visit the same seeds, so the
   // solves are shared rather than repeated.
-  const figures = new Map<number, ReturnType<typeof drawableAt>>();
-  const figAt = (seed: number) => {
-    let f = figures.get(seed);
+  const figures = new Map<string, ReturnType<typeof drawableAt>>();
+  const figAt = (seed: Seed) => {
+    const k = configurationOf(seed);
+    const key = `${k.seed}:${k.reach}:${k.wide ? 1 : 0}`;
+    let f = figures.get(key);
     if (!f) {
       f = drawableAt(c, seed);
-      figures.set(seed, f);
+      figures.set(key, f);
     }
     return f;
   };
@@ -619,8 +622,9 @@ function walkedLocusOf(
    * sample landing off every component held so far seeds one more walk; a trace that mostly
    * overlaps what is already held is the same component reached again, and is dropped.
    */
-  const componentsAt = (seed: number): LocusTrace[] | null => {
-    const f = figAt(seed);
+  const componentsAt = (at: Seed): LocusTrace[] | null => {
+    const seed = seedNumber(at);
+    const f = figAt(at);
     const start = freeStart(f);
     if (!start) return null;
     const room = roomOf(f);

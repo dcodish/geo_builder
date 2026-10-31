@@ -2093,6 +2093,8 @@ export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !==
   if (hit) return hit;
   const out = evaluateTryingChoices(raw, seed, reach, wide);
   perSeed.set(key, out);
+  // #2039 (ADR-AG-358): which configuration this figure is — first writer wins, so a figure two keys share keeps one name
+  if (!evaluatedAt.has(out)) evaluatedAt.set(out, { seed, reach, wide });
   return out;
 }
 
@@ -4078,6 +4080,73 @@ const RING_REACH_TRIES = 8;
 const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
 
 /**
+ * WHICH CONFIGURATION IS DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
+ *
+ * A configuration is not a seed alone: `evaluate` is pure over `(seed, reach, wide)`, and `drawableAt`'s walk from
+ * configuration 0 evaluates the seeds after it NARROW (`wide` false, ADR-AG-324) and its ring search at a widened
+ * `reach` (ADR-AG-256). So the configuration a walk LANDED on is named by all three — the seed number alone would
+ * re-derive a different figure. A plain number is the canonical configuration of that seed (`reach` 1, `wide` iff the
+ * seed is not 0), which is every configuration a caller names today.
+ */
+export interface Configuration {
+  seed: number;
+  reach: number;
+  wide: boolean;
+}
+/** A seed, or a configuration the walk landed on — what `derive`, `drawableAt` and the session store take. */
+export type Seed = number | Configuration;
+/** The configuration a seed names (the canonical one for a plain number). */
+export const configurationOf = (at: Seed): Configuration =>
+  typeof at === 'number' ? { seed: at, reach: 1, wide: at !== 0 } : at;
+/** The seed number of a configuration — what «הציגו תצורה אחרת» counts on from, and the choice odometer reads. */
+export const seedNumber = (at: Seed): number => (typeof at === 'number' ? at : at.seed);
+/** The SHORTEST spelling of a configuration: a plain number whenever it is that seed's canonical one (a save file and
+ *  the undo slice then hold exactly what they held before this existed). */
+export const canonicalSeed = (at: Seed): Seed => {
+  const k = configurationOf(at);
+  return k.reach === 1 && k.wide === (k.seed !== 0) ? k.seed : { seed: k.seed, reach: k.reach, wide: k.wide };
+};
+/** Do two seeds name the same configuration? */
+export const sameSeed = (a: Seed, b: Seed): boolean => {
+  const x = configurationOf(a);
+  const y = configurationOf(b);
+  return x.seed === y.seed && x.reach === y.reach && x.wide === y.wide;
+};
+/** Every figure `evaluate` computed, with the configuration it is the figure OF — read back by `drawnConfiguration`. */
+const evaluatedAt = new WeakMap<Figure, Configuration>();
+/**
+ * WHICH SAMPLE A FIGURE DRAWS (#2633, ADR-AG-358): the raw seed its free quantities were sampled at and the discrete options
+ * it took — but not the box (`wide`) or the reach. ADR-AG-324's two boxes make one hashed sample reachable twice
+ * (configuration 0's walk draws raw seed 3 narrow, configuration 1's draws it wide), and the second is the first re-scaled:
+ * the same configuration to a student. `undefined` for a figure `evaluate` did not compute (a hand-built one).
+ */
+export function drawnSampleOf(f: Figure): string | undefined {
+  const k = evaluatedAt.get(f);
+  return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
+}
+/** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
+const drawnCache = new WeakMap<Construction, Map<string, Configuration>>();
+
+/**
+ * THE CONFIGURATION `drawableAt` DREW, as a value that draws it again (#2039 step 1, ADR-AG-358): `drawableAt(c, drawn)`
+ * returns the same figure as `drawableAt(c, at)`. When the walk landed on a PREFERRED figure that is its own configuration —
+ * re-asked there, it is the first figure evaluated and is taken at once. Any other outcome (no walk, or a fallback tier the
+ * walk settled for) is the requested configuration itself, which by purity draws it again. So the session can record what
+ * is on the screen, and the next line is solved from there instead of from a configuration the student never saw.
+ */
+export function drawnConfiguration(c: Construction, at: Seed, preferSpread = false): Configuration {
+  const key = drawableKey(at, preferSpread);
+  const hit = drawnCache.get(c)?.get(key);
+  if (hit) return hit;
+  drawableAt(c, at, preferSpread);
+  return drawnCache.get(c)?.get(key) ?? configurationOf(at);
+}
+const drawableKey = (at: Seed, preferSpread: boolean): string => {
+  const k = configurationOf(at);
+  return `${k.seed}:${k.reach}:${k.wide ? 1 : 0}:${preferSpread ? 1 : 0}`;
+};
+
+/**
  * The figure the tool would SHOW at this seed (#1083).
  *
  * Operator, 2026-09-15: *"on this shape, point C should be able to be positioned"* — on a figure
@@ -4098,7 +4167,7 @@ const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
  */
 export function drawableAt(
   c: Construction,
-  seed: number,
+  at: Seed,
   /**
    * Prefer a WELL-SPREAD configuration among the valid ones (#1174).
    *
@@ -4118,9 +4187,11 @@ export function drawableAt(
     perSeed = new Map();
     drawableCache.set(c, perSeed);
   }
-  const key = `${seed}:${preferSpread ? 1 : 0}`;
+  const key = drawableKey(at, preferSpread);
   const hit = perSeed.get(key);
   if (hit) return hit;
+  // #2039 (ADR-AG-358): the requested configuration — a seed's canonical one, or one a walk landed on and the session recorded
+  const { seed, reach: atReach, wide } = configurationOf(at);
 
   /**
    * A figure is drawable when its selectors hold AND every object the student NAMED is in it.
@@ -4219,7 +4290,7 @@ export function drawableAt(
   const wholeOn = (f: Figure) => whole(f) && meetsOnDiagonals(f);
   const preferred = (f: Figure) => wholeOn(f) && (!preferSpread || (spread(f) && separated(f)));
 
-  const first = evaluate(c, seed);
+  const first = evaluate(c, seed, atReach, wide);
   let chosen = first;
   // The tiers, weakest last: a whole SEPARATED figure beats a whole stacked one, which is merely narrow
   // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
@@ -4287,7 +4358,7 @@ export function drawableAt(
   let crossSeparated: Figure | null = null;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
-      const candidate = evaluate(c, seed + extra, 1, seed !== 0);
+      const candidate = evaluate(c, seed + extra, 1, wide);
       if (!sameChoices(candidate, seed + extra)) {
         if (mayCross && !crossSeparated && wholeOn(candidate) && separated(candidate)) crossSeparated = candidate;
         continue;
@@ -4329,7 +4400,7 @@ export function drawableAt(
       if (unproven.length > 0 && paramRegister(c).length > 0) {
         search: for (const reach of RING_REACHES) {
           for (let extra = 0; extra < RING_REACH_TRIES; extra += 1) {
-            const candidate = evaluate(c, seed + extra, reach, seed !== 0);
+            const candidate = evaluate(c, seed + extra, reach, wide);
             noteRings(candidate);
             if (whole(candidate)) {
               chosen = candidate;
@@ -4353,6 +4424,15 @@ export function drawableAt(
     }
   }
   perSeed.set(key, chosen);
+  let drawn = drawnCache.get(c);
+  if (!drawn) {
+    drawn = new Map();
+    drawnCache.set(c, drawn);
+  }
+  // #2039 (ADR-AG-358): a walk that landed on a PREFERRED figure is recorded as that figure's own configuration (asked
+  // there, it is taken at once); anything else is the requested configuration, which draws the same figure by purity.
+  const landed = chosen !== first && preferred(chosen) ? evaluatedAt.get(chosen) : undefined;
+  drawn.set(key, landed ?? configurationOf(at));
   return chosen;
 }
 /**
@@ -4609,7 +4689,7 @@ class Pool implements ConfigurationPool {
   private done = false;
   constructor(private readonly c: Construction) {}
   private has(seed: number): boolean {
-    return drawableCache.get(this.c)?.has(`${seed}:0`) ?? false;
+    return drawableCache.get(this.c)?.has(drawableKey(seed, false)) ?? false;
   }
   ready(): number[] {
     const out: number[] = [];

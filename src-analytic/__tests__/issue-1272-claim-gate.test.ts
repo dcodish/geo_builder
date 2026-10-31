@@ -109,7 +109,7 @@ describe('#1272 — a rule that matched a noun and never read the tail answers n
       return { steps: ['נתון מעגל I: x^2+y^2=16'] };
     };
     const out = await runFallback('נתון מעגל I - x^2+y^2=16', [], 0, ask);
-    expect(out).toEqual({ kind: 'lines', lines: ['נתון מעגל I: x^2+y^2=16'] });
+    expect(out).toMatchObject({ kind: 'lines', lines: ['נתון מעגל I: x^2+y^2=16'] });
   });
 
   it('the seam predicate is the one question App.tsx asks — refused ∧ not-handled, nothing else', () => {

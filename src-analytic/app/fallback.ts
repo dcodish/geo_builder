@@ -32,6 +32,7 @@
 
 import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
+import type { Seed } from '../engine/evaluate';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
 import { existingNamesAnalytic, faithfulnessAnalytic, restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
 import type { InputError } from '../store/useAnalyticStore';
@@ -48,7 +49,7 @@ export type FallbackOutcome =
    * so the caller can log them: both siblings do, and it is how #536 was diagnosed at all — without it
    * a `source:'llm'` submit that was silently corrected is indistinguishable from one that was not.
    */
-  | { kind: 'lines'; lines: string[]; restored?: string[]; notice?: RecordNotice }
+  | { kind: 'lines'; lines: string[]; restored?: string[]; notice?: RecordNotice; /** #2039 (ADR-AG-358): the configuration the last line was drawn in. */ configuration?: Seed }
   /**
    * The model answered and at least one line would be refused. Nothing is recorded, and the caller
    * keeps the ORIGINAL refusal rather than reporting the model's line — the student never wrote it,
@@ -105,7 +106,7 @@ export function fallbackContext(lines: readonly string[]): string {
 export async function runFallback(
   utterance: string,
   lines: readonly string[],
-  seed: number,
+  seed: Seed,
   ask: (utterance: string, context: string) => Promise<LlmStepsOutcome | null>,
 ): Promise<FallbackOutcome> {
   const answer = await ask(utterance, fallbackContext(lines));
@@ -131,9 +132,11 @@ export async function runFallback(
   const accepted: string[] = [];
   // #1350 — a line the model named («ישר 3» beside «l3») earns the same notice a typed one does.
   let notice: RecordNotice | undefined;
+  // #2039 (ADR-AG-358): each step is decided on the figure the step before it DREW, and the last drawn configuration is recorded
+  let at: Seed = seed;
   for (const step of gated.lines) {
     const soFar = [...lines, ...accepted];
-    const verdict: SubmitVerdict = decideSubmit(step, soFar, seed, derive(soFar, seed));
+    const verdict: SubmitVerdict = decideSubmit(step, soFar, at, derive(soFar, at));
     // #1154 / #1303: a model line that RENAMES or SWAPS is rejected — the fallback adds givens; rewriting the student's
     // history is theirs to ask for, never the model's.
     if (verdict.kind === 'refused' || verdict.kind === 'ignored' || verdict.kind === 'rename' || verdict.kind === 'swap') {
@@ -144,6 +147,7 @@ export async function runFallback(
     // something true. Drop the line and keep going rather than recording a duplicate.
     if (verdict.kind === 'record') {
       accepted.push(verdict.line);
+      if (verdict.configuration !== undefined) at = verdict.configuration;
       notice ??= verdict.notice;
     }
   }
@@ -167,7 +171,7 @@ export async function runFallback(
   }
 
   return accepted.length
-    ? { kind: 'lines', lines: accepted, ...(gated.restored.length ? { restored: gated.restored } : {}), ...(notice ? { notice } : {}) }
+    ? { kind: 'lines', lines: accepted, configuration: at, ...(gated.restored.length ? { restored: gated.restored } : {}), ...(notice ? { notice } : {}) }
     : { kind: 'none' };
 }
 

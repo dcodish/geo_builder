@@ -94,7 +94,7 @@ describe('#1251 — every returned line goes back through the real submit gate',
 
   it('records the lines when they all parse and fold', async () => {
     const out = await runFallback('סמן את A(0,0) ואת B(6,8)', [], 0, ask(['A(0,0)', 'B(6,8)']));
-    expect(out).toEqual({ kind: 'lines', lines: ['A(0,0)', 'B(6,8)'] });
+    expect(out).toMatchObject({ kind: 'lines', lines: ['A(0,0)', 'B(6,8)'] });
   });
 
   /**
@@ -136,13 +136,13 @@ describe('#1251 — every returned line goes back through the real submit gate',
   /** A restatement of something already true is not a failure — it contributes nothing and is dropped. */
   it('drops a line that restates what the figure already holds', async () => {
     const out = await runFallback('A(0,0) ו-B(6,8)', ['A(0,0)'], 0, ask(['A(0,0)', 'B(6,8)']));
-    expect(out).toEqual({ kind: 'lines', lines: ['B(6,8)'] });
+    expect(out).toMatchObject({ kind: 'lines', lines: ['B(6,8)'] });
   });
 
   /** A later line may depend on an earlier one — each is decided against the figure as it then stands. */
   it('lets a later line build on an earlier one', async () => {
     const out = await runFallback('משולש ABC ותיכון AD לצלע BC', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
-    expect(out).toEqual({ kind: 'lines', lines: ['משולש ABC', 'AD תיכון לצלע BC'] });
+    expect(out).toMatchObject({ kind: 'lines', lines: ['משולש ABC', 'AD תיכון לצלע BC'] });
   });
 
   it('the accepted lines actually build', async () => {

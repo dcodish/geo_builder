@@ -45,7 +45,7 @@ import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
-import { configurationPool, knownCurve, settled } from './engine/evaluate';
+import { configurationPool, knownCurve, settled, type Seed } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
@@ -974,7 +974,7 @@ export function App() {
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
-  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: number): Promise<boolean> => {
+  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed): Promise<boolean> => {
     setThinking(true);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
@@ -1009,7 +1009,7 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines, noticeText(out.notice, t));
+        recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
         return true;
       }
       /**

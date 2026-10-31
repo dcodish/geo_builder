@@ -112,7 +112,7 @@ function drawnOption(d: Derivation, k: Choice): Constraint {
   const held = k.options.find((o) => holdsOn(d.construction, o, d.figure));
   if (held) return held;
   // #2381 (ADR-AG-302): THIS choice's own digit of the drawn assignment — `[k]` alone read slot 0's.
-  return assignmentAt(d.construction, d.figure.choiceSeed ?? d.seed).picked.get(k) ?? k.options[0];
+  return assignmentAt(d.construction, d.figure.choiceSeed ?? d.configuration.seed).picked.get(k) ?? k.options[0];
 }
 
 /** The option of a region choice the drawn figure took: the first whose region holds at its positions. */
@@ -120,7 +120,7 @@ function drawnRegion(d: Derivation, s: Extract<Selector, { kind: 'choice' }>): S
   const pos = new Map(d.figure.points.map((p) => [p.id, { x: p.x, y: p.y }]));
   const held = s.options.find((o) => selectorsHold({ ...d.construction, selectors: [o] }, pos, d.figure.env));
   if (held) return held;
-  return assignmentAt(d.construction, d.figure.choiceSeed ?? d.seed).pickedRegions.get(s) ?? s.options[0];
+  return assignmentAt(d.construction, d.figure.choiceSeed ?? d.configuration.seed).pickedRegions.get(s) ?? s.options[0];
 }
 
 /** The figure's positions, as `selectorsHold` reads them. */

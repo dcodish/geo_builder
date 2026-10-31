@@ -53,7 +53,7 @@ export interface LocusChip {
  */
 export function locusChips(d: Derivation): LocusChip[] {
   if (d.figure.points.length === 0) return [];
-  const f = drawableAt(d.construction, d.seed);
+  const f = drawableAt(d.construction, d.configuration);
   const start = new Map<Id, { x: number; y: number }>();
   for (const o of d.construction.objects) {
     if (!isFree(o)) continue;
@@ -65,7 +65,7 @@ export function locusChips(d: Derivation): LocusChip[] {
   for (const p of d.figure.points) {
     const line = d.construction.objectLine?.[p.id];
     if (line === undefined) continue;
-    if (!hasLocus(d.construction, f.env, p.id, start, d.seed)) continue;
+    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed)) continue;
     chips.push({ line, id: p.id, sentence: locusSentence(p.id) });
   }
   return chips;

@@ -34,6 +34,7 @@ import { anotherConfiguration } from '../app/another';
 import { drawableAt, figureSignature, isKnowledge } from '../engine/evaluate';
 import { minInteriorAngleOf, SPREAD_MIN_DEG } from '../engine/rings';
 import type { Figure } from '../engine/evaluate';
+import type { Seed } from '../engine/evaluate';
 
 /** The operator's two figures, and the bare triangle that proved it is the sampler and not the median. */
 const F1 = ['משולש ABC', 'A(2,-5)', 'AD תיכון לצלע BC'];
@@ -150,7 +151,7 @@ describe('#1174 — «הציגו תצורה אחרת» still has somewhere to go
     ['F3', F3],
   ])('%s offers at least eight distinct configurations in ten presses', (_name, lines) => {
     const seen = new Set<string>();
-    let seed = 0;
+    let seed: Seed = 0;
     for (let i = 0; i < 10; i += 1) {
       seen.add(figureSignature(derive(lines, seed).figure));
       const next = anotherConfiguration(lines, seed);

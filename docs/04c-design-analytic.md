@@ -1399,6 +1399,22 @@ nature: a conic has no radius, and analytic has no conic-tangency sentence.
 
 *Identifiers:* `normalizedLine`
 
+#### The configuration drawn is the configuration recorded ([ADR-AG-358](06c-decisions-analytic.md#adr-ag-358), #2039, #2633)
+
+A configuration is `(seed, reach, wide)` (`Configuration`, `engine/evaluate.ts`): `evaluate` is pure over the three, and
+`drawableAt`'s walk from configuration 0 evaluates later seeds NARROW (ADR-AG-324) and its ring search at a widened reach.
+`Seed = number | Configuration` — a number is that seed's canonical configuration. `drawableAt` records, per requested
+configuration, the one it DREW (`drawnConfiguration`): the landed figure's own configuration when the walk landed on a
+preferred figure (asked there, it is taken at once: a fixed point), else the requested one. `derive(lines, at)` carries it
+as `Derivation.configuration`. The submit path solves the trial from `current.configuration` and its `record` verdict carries
+the trial's; `recordLine` / `recordLlmLines` / `goToSeed` write it into `seed` in the same set (`canonicalSeed`: a plain
+number whenever canonical, so saves and the undo slice are unchanged for them; `cleanSeed` validates a loaded one). The
+ask lane (`locusOf` takes `[Seed, number]`), the locus chip and `unstatedChoices` read `d.configuration`.
+`anotherConfiguration` returns the configuration its candidate drew and skips a candidate whose `drawnSampleOf` (raw seed,
+choice seed, root) is the one on the screen (#2633).
+
+*Identifiers:* `Configuration` · `Seed` · `configurationOf` · `seedNumber` · `canonicalSeed` · `sameSeed` · `drawnConfiguration` · `drawnSampleOf` · `cleanSeed`
+
 #### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
 
 Every gate reads **`configurationPool(c)`** — seeds 0..23, one per construction. On the page,

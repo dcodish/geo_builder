@@ -1184,6 +1184,11 @@ a sentence the tool parsed.
 - «נתונה אליפסה שמשוואתה x^2+4y^2=20» · «נתון הישר y=-x+5» → one dot at (4,1); clicking → «A נקודת החיתוך של הישר y=-x+5 עם האליפסה»
 - Sources: ADR-AG-356, #2618.
 
+**R206 — the next sentence is drawn on the figure the student is looking at; another configuration is never the same one re-scaled**. *(Operator ruling 2026-10-13 on #2039: "the outcome follows 2-D"; 2026-10-31 on #1182: "fix it"; on #1166: "we need to give the user different options and not similar options".)* When the tool opened a figure on a configuration other than the one asked for (it skips a sliver, two stacked points or a crossed ring), that configuration is the one the session keeps: a given added next («AB = 5» after «משולש ABC») changes the triangle on the screen in place and never replaces it with another triangle, an undo and a saved file show the same picture, and a question about the figure («המקום הגיאומטרי של P») is answered on the figure drawn. «הציגו תצורה אחרת» never offers the configuration on the screen again at another size. The first drawing of every figure is unchanged.
+- «משולש ABC» → «AB = 5»: the triangle on the screen is reshaped in place and C does not move; A and B both adjust (keeping the earlier one exactly is #2039's open part)
+- «משולש ABC» · «A(2,-5)» → «הציגו תצורה אחרת»: a triangle of another shape, never the first one bigger
+- Sources: ADR-AG-358, #2039, #2633.
+
 **R77 — the session can be SAVED, and a load says what it restored**. A line that no longer builds is NAMED, never dropped.
 - `<name>-analytic.json`, replayed through the real parser
 - Sources: ADR-AG-055.

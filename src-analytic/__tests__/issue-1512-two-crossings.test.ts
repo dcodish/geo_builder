@@ -19,6 +19,7 @@ import { conicMeet, walkOfCoefficients, walkThrough } from '../engine/crossing-o
 import { anotherConfiguration } from '../app/another';
 import { parseLine } from '../parser/parseAnalytic';
 import type { NumCurve } from '../engine/types';
+import type { Seed } from '../engine/evaluate';
 
 type P = { x: number; y: number };
 const CIRCLE = 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9';
@@ -112,7 +113,7 @@ describe('#1512 — the 12-seed sweep and «הציגו תצורה אחרת»', (
 
   it('pressing «הציגו תצורה אחרת» reaches the swapped assignment, and every press keeps A and B on the two roots', () => {
     const lines = [...FREE, VERB];
-    let seed = 0;
+    let seed: Seed = 0;
     let moved = 0;
     let swaps = 0;
     for (let press = 0; press < 6; press += 1) {

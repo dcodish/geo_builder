@@ -24,7 +24,7 @@ import { VOCABULARY_ANALYTIC, imperativeCandidates } from '../parser/scopeAnalyt
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
-import { holdsInEveryConfiguration } from '../engine/evaluate';
+import { holdsInEveryConfiguration, type Seed } from '../engine/evaluate';
 import { circleByName, type ApplyNotice } from '../engine/apply';
 import { RING_OF_FIGURE } from '../engine/names';
 import { factsWithin, type Fact } from '../engine/types';
@@ -65,7 +65,11 @@ export type SubmitVerdict =
    * centre letter of the NEW circle the line stated («X מרכז מעגל» with every centre lettered). A line carries at most
    * one of the two: the circle notice already names its centre, so a new X is not announced twice.
    */
-  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string }
+  /**
+   * `configuration` (#2039 step 1, ADR-AG-358): the configuration the new figure was DRAWN in — the trial starts from the
+   * one on the screen, and the session records where it landed in the same set as the line.
+   */
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string; configuration?: Seed }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -240,7 +244,7 @@ export function lostPartOf(line: string, facts: readonly Fact[], figureLabels: r
 export function decideSubmit(
   raw: string,
   lines: readonly string[],
-  seed: number,
+  seed: Seed,
   current: Derivation = derive(lines, seed),
 ): SubmitVerdict {
   return withNearMiss(raw.trim(), decideOnce(raw, lines, seed, current), (l) => decideOnce(l, lines, seed, current), current);
@@ -280,7 +284,7 @@ function withNearMiss(
 function decideOnce(
   raw: string,
   lines: readonly string[],
-  seed: number,
+  seed: Seed,
   current: Derivation,
 ): SubmitVerdict {
   const line = raw.trim();
@@ -398,7 +402,9 @@ function decideOnce(
    * still folds. A refusal keeps the prior figure and names the student's own words.
    */
   // #1631: the trial is THIS figure plus the line — the same seed names, so it starts where the canvas drew.
-  const trial = derive([...lines, line], seed, current.construction.seedNames ?? {});
+  // #2039 step 1 (ADR-AG-358): and the same CONFIGURATION — the one drawn, not the one asked for. The display walk may have
+  // stepped past the session's seed; solving the line from there replaced the triangle on the screen with another one.
+  const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {});
   /**
    * #2427 (ADR-AG-325) — a capital the grammar READ as a parameter («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M»):
    * asked of the register, so every family is one question. R, S beside an area, and a point of the figure are not this.
@@ -417,6 +423,7 @@ function decideOnce(
   const recorded: SubmitVerdict = {
     kind: 'record',
     line,
+    configuration: trial.configuration,
     ...(raised ? { notice: { code: raised.code, detail: raised.detail, holder: raised.holder } } : {}),
     ...(circle ? { createdCircle: circle } : made?.length ? { created: made } : {}),
   };
@@ -615,10 +622,11 @@ function decideOnce(
  */
 export function commitRecord(
   verdict: Extract<SubmitVerdict, { kind: 'record' }>,
-  recordLine: (line: string, notice?: string | null) => void,
+  recordLine: (line: string, notice?: string | null, at?: Seed) => void,
   t: NoticeT,
 ): void {
-  recordLine(verdict.line, noticeText(verdict.notice, t));
+  // #2039 (ADR-AG-358): the configuration the decision drew rides in the same commit
+  recordLine(verdict.line, noticeText(verdict.notice, t), verdict.configuration);
 }
 
 /** The translate function a notice is worded with — `i18next`'s `t`, narrowed to what is used here. */
@@ -659,7 +667,7 @@ export function decideToggle(
   index: number,
   lines: readonly string[],
   disabled: readonly number[],
-  seed: number,
+  seed: Seed,
   current: Derivation = derive(activeOf(lines, disabled), seed),
 ): ToggleVerdict {
   if (!disabled.includes(index)) return { kind: 'apply', disabled: [...disabled, index].sort((a, b) => a - b) };
@@ -701,7 +709,7 @@ export function decideEdit(
   next: string,
   lines: readonly string[],
   disabled: readonly number[],
-  seed: number,
+  seed: Seed,
   seedNames: Readonly<Record<string, string>> = {},
 ): boolean {
   // #1888 / #1889 (ADR-AG-251): an edit that loses a part is refused, as the typed line is (ADR-W-006: one gate, both seams).
@@ -775,7 +783,7 @@ export function sentenceOutcome(verdict: SubmitVerdict): SentenceOutcome {
  *
  * Each decision sees the lines before it AS CONFIRMED, exactly as the session would hold them.
  */
-export function confirmTaught(typed: readonly string[], seed: number): string[] {
+export function confirmTaught(typed: readonly string[], seed: Seed): string[] {
   const out: string[] = [];
   for (const line of typed) {
     const v = decideSubmit(line, out, seed);
