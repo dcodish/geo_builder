@@ -1184,6 +1184,15 @@ a sentence the tool parsed.
 - «נתונה אליפסה שמשוואתה x^2+4y^2=20» · «נתון הישר y=-x+5» → one dot at (4,1); clicking → «A נקודת החיתוך של הישר y=-x+5 עם האליפסה»
 - Sources: ADR-AG-356, #2618.
 
+**R206 — the next sentence is drawn on the figure the student is looking at; another configuration is never the same one re-scaled**. *(Operator ruling 2026-10-13 on #2039: "the outcome follows 2-D"; 2026-10-31 on #1182: "fix it"; on #1166: "we need to give the user different options and not similar options".)* When the tool opened a figure on a configuration other than the one asked for (it skips a sliver, two stacked points or a crossed ring), that configuration is the one the session keeps: a given added next («AB = 5» after «משולש ABC») changes the triangle on the screen in place and never replaces it with another triangle, an undo and a saved file show the same picture, and a question about the figure («המקום הגיאומטרי של P») is answered on the figure drawn. «הציגו תצורה אחרת» never offers the configuration on the screen again at another size. The first drawing of every figure is unchanged.
+- «משולש ABC» → «AB = 5»: the triangle shown keeps its place; B moves to meet the length (the points the given does not mention stay put is #2039's open part)
+- «משולש ABC» · «A(2,-5)» → «הציגו תצורה אחרת»: a triangle of another shape, never the first one bigger
+- Sources: ADR-AG-358, #2039, #1182, #2633.
+
+**R207 — a free point is drawn near the figure the student stated**. *(Operator, 2026-09-18: "seeds should always try to find a close point and work backwards if no choice"; ruled 2026-09-20 "change the solve", 2026-10-28 "1182 - A", 2026-10-29 card 2 A.)* When the givens leave a point free, it is drawn as close to the stated figure as the givens allow and goes far only when they force it; the stated points are never shrunk into a corner of the view. A stated fact that adds nothing does not move the figure. «הציגו תצורה אחרת» still moves the point, over at least 10 clearly different places on «A(0,0) · B(6,8) · נקודה M · MA = MB».
+- «A(0,0)» · «B(6,8)» · «נקודה M» · «MA = MB»: A and B fill most of the view at every configuration
+- Sources: ADR-AG-359, #1182.
+
 **R77 — the session can be SAVED, and a load says what it restored**. A line that no longer builds is NAMED, never dropped.
 - `<name>-analytic.json`, replayed through the real parser
 - Sources: ADR-AG-055.

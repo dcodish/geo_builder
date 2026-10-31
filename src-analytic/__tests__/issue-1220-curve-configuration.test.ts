@@ -36,6 +36,7 @@
 import { describe, expect, it } from 'vitest';
 import { anotherConfiguration } from '../app/another';
 import { derive } from '../engine/derive';
+import type { Seed } from '../engine/evaluate';
 
 /** The operator's figure: one curve, no points, `p` free. */
 const PARABOLA = ['נתונה פרבולה שמשוואתה y^2=2px'];
@@ -53,7 +54,7 @@ describe('#1220 — a figure whose only freedom is a curve parameter has other c
      * student sees a different figure rather than a re-render.
      */
     const r = anotherConfiguration(PARABOLA, 0);
-    const pAt = (seed: number) => {
+    const pAt = (seed: Seed) => {
       const c = derive(PARABOLA, seed).figure.curves[0]?.curve;
       return c && c.kind === 'parabola' ? c.p : NaN;
     };

@@ -19,7 +19,7 @@
  * pressing the button on it should not quietly redraw the same picture for ever.
  */
 import { derive } from '../engine/derive';
-import { sameConfiguration } from '../engine/evaluate';
+import { canonicalSeed, drawnSampleOf, sameConfiguration, seedNumber, type Seed } from '../engine/evaluate';
 
 /** How far to look. The same budget the drawable search uses, for the same reason. */
 const TRIES = 24;
@@ -36,29 +36,40 @@ const TRIES = 24;
  * (#1201, #1220), is now stated once and CALLED
  * ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
  */
-const figureAt = (lines: readonly string[], seed: number, seedNames: Readonly<Record<string, string>>) =>
-  derive(lines, seed, seedNames).figure;
+const derivedAt = (lines: readonly string[], seed: Seed, seedNames: Readonly<Record<string, string>>) => derive(lines, seed, seedNames);
 
 export interface AnotherConfiguration {
-  /** The seed to move to — unchanged when nothing different was found. */
-  seed: number;
+  /**
+   * The configuration to move to — unchanged when nothing different was found. It is the one the derivation DREW
+   * (#2039 step 1, ADR-AG-358): the next seed may walk on to a later configuration, and the session records that one.
+   */
+  seed: Seed;
   /** Did the figure actually change? `false` is worth telling the student. */
   found: boolean;
 }
 
 export function anotherConfiguration(
   lines: readonly string[],
-  seed: number,
+  seed: Seed,
   tries = TRIES,
   // #1631: the session's seed names, so the search compares the figures the canvas would actually draw
   seedNames: Readonly<Record<string, string>> = {},
 ): AnotherConfiguration {
-  if (lines.length === 0) return { seed: seed + 1, found: true };
+  const from = seedNumber(seed);
+  if (lines.length === 0) return { seed: from + 1, found: true };
   // TOLERANCE-AWARE (#1539, ADR-AG-197): a picture that differs only by the solver's noise — «-0.0000» against
   // «0.0000» above all — is the SAME picture, so the walk moves on to a configuration that really differs.
-  const current = figureAt(lines, seed, seedNames);
+  const current = derivedAt(lines, seed, seedNames).figure;
+  /**
+   * THE SAME SAMPLE IS THE SAME CONFIGURATION (#2633, ADR-AG-358 — the operator on #1166: *"we need to give the user
+   * different options and not similar options"*). A candidate that draws the sample already on the screen in the other box
+   * is that configuration re-scaled, whatever its positions; it is skipped before the pictures are compared.
+   */
+  const shownSample = drawnSampleOf(current);
   for (let step = 1; step <= tries; step += 1) {
-    if (!sameConfiguration(figureAt(lines, seed + step, seedNames), current)) return { seed: seed + step, found: true };
+    const next = derivedAt(lines, from + step, seedNames);
+    if (shownSample !== undefined && drawnSampleOf(next.figure) === shownSample) continue;
+    if (!sameConfiguration(next.figure, current)) return { seed: canonicalSeed(next.configuration), found: true };
   }
   return { seed, found: false };
 }

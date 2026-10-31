@@ -28,13 +28,14 @@ import { derive } from '../engine/derive';
 import { drawableAt } from '../engine/evaluate';
 import { ringViolation, type RingPt } from '../engine/rings';
 import { SHAPES } from '../engine/shapes';
+import type { Seed } from '../engine/evaluate';
 
 const SEEDS = 24;
 // Ten letters: the registry holds polygons up to ten sides (#1622, ADR-AG-217).
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
 /** The ring as DRAWN, read off the figure `derive` actually produced. */
-function drawnRing(lines: string[], seed: number, verts: string[]): RingPt[] | null {
+function drawnRing(lines: string[], seed: Seed, verts: string[]): RingPt[] | null {
   const d = derive(lines, seed);
   const pts = verts.map((v) => d.figure.points.find((p) => p.id === v));
   if (pts.some((p) => !p)) return null;
@@ -260,7 +261,7 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
      * 0,1,2… would measure a list no student is ever shown.
      */
     const prints: number[][] = [];
-    let seed = 0;
+    let seed: Seed = 0;
     for (let press = 0; press < 8; press += 1) {
       const ring = drawnRing(lines, seed, ['A', 'B', 'C']);
       expect(ring, `no triangle at offer ${press}`).not.toBeNull();
@@ -274,12 +275,10 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
     }
     /*
      * #1687 (ADR-AG-348): the medians no longer redraw the triangle, so these are the bare triangle's own offers
-     * («משולש ABC · A(2,-5)»). Its offers 0 and 1 are one sample drawn at two sizes — a known gap of the bare figure,
-     * #2633, which the medians' redraw used to hide. Every other successive pair is held to the bar.
+     * («משולש ABC · A(2,-5)»). Its offers 0 and 1 were one sample drawn at two sizes (#2633); since ADR-AG-358 the button
+     * skips a re-scaled copy of the sample on the screen, so every successive pair is held to the bar.
      */
-    const KNOWN_GAP = new Set([1]); // #2633
     for (let i = 1; i < prints.length; i += 1) {
-      if (KNOWN_GAP.has(i)) continue;
       const diff = Math.max(...prints[i].map((v, k) => Math.abs(v - prints[i - 1][k])));
       expect(diff, `offers ${i - 1} and ${i} look the same`).toBeGreaterThan(0.03);
     }

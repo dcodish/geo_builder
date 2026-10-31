@@ -34,7 +34,9 @@ describe('#1273 — the figure opens on a configuration that separates its named
   it('a raw configuration stacks P on a vertex — the measured baseline this lock protects against', () => {
     const c = derive(STRAIGHTS, 0).construction;
     const stacks = [...Array(16).keys()].filter((s) => stacked(evaluate(c, s)));
-    expect(stacks, 'some raw seeds alone put P on a vertex').toEqual([1, 3, 12, 14]);
+    // RE-BASED by #1182 (ADR-AG-359), measured: the anchored step lands each raw configuration nearest its start, which
+    // changes WHICH raw seeds stack (was [1, 3, 12, 14]); what is shown stays separated at every seed (the locks below).
+    expect(stacks, 'some raw seeds alone put P on a vertex').toEqual([0, 1, 7, 9, 12, 13, 14]);
   });
 
   it('what is SHOWN at every seed 0–7 keeps P off the vertex, for the straights too', () => {
@@ -61,7 +63,7 @@ describe('#1273 — the figure opens on a configuration that separates its named
     const c = derive(STRAIGHTS, 0).construction;
     const pool = [...Array(16).keys()].filter((s) => stacked(drawableAt(c, s)));
     const shown = [...Array(16).keys()].filter((s) => stacked(drawableAt(c, s, true)));
-    expect(pool, 'the honesty gates see every admissible configuration').toEqual([1, 3, 12, 14]);
+    expect(pool, 'the honesty gates see every admissible configuration').toEqual([0, 1, 7, 9, 12, 13, 14]); // re-based, #1182
     expect(shown, 'the display opens on none of them').toEqual([]);
   });
 

@@ -1122,6 +1122,20 @@ curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
 
+### The anchored step: a free point lands nearest its start ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), #1182)
+
+`solveLM(x0, residuals, maxIter, anchored)` (`engine/solve.ts`): the leading `anchored` coordinates (stage one passes its free
+vertices, `2 · ids.length`; parameters stay on the plain step) are ANCHORED at `x0`. In the Newton regime (the last plain step
+cut the cost fourfold, λ at or below its start) the step lands on the point of the linearised set nearest `x0`:
+`x' = x + a + δ'`, `a = x0 − x`, `(JᵀJ + λI) δ' = −Jᵀ(r + J a)` — one more elimination, no extra Jacobian. On a curved set
+the pull halves down to a quarter and may raise the cost at most twice (never above the last three accepted costs). A
+start with `freeRank` 0 is not anchored; every anchored solve is finished by plain steps at the tight tolerance. Stage one
+tries the anchored solve from the seeded start first and keeps it only when it converged and `admissibleAt` holds; else
+the multi-start runs as before. `fitLineByLine` (ADR-AG-348) anchors its fits the same way, over stage one's own vector
+when a line replays the earlier figure. Direct `solveLM` sites elsewhere (the locus trace, repairs) pass no anchor.
+
+*Identifiers:* `ANCHOR_LAMBDA` · `ANCHOR_WINDOW` · `NEWTON_RATIO` · `ANCHOR_MIN_PULL` · `ANCHOR_RAISES` · `POLISH_ITER`
+
 ### The figure line by line: line provenance and the per-line fit ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), #1687)
 
 **Provenance.** `foldPass` records, in `commit`, the first fact that brought each object into the construction
@@ -1398,6 +1412,22 @@ nature: a conic has no radius, and analytic has no conic-tangency sentence.
 `isKnowledge` and by «הציגו תצורה אחרת».
 
 *Identifiers:* `normalizedLine`
+
+#### The configuration drawn is the configuration recorded ([ADR-AG-358](06c-decisions-analytic.md#adr-ag-358), #2039, #2633)
+
+A configuration is `(seed, reach, wide)` (`Configuration`, `engine/evaluate.ts`): `evaluate` is pure over the three, and
+`drawableAt`'s walk from configuration 0 evaluates later seeds NARROW (ADR-AG-324) and its ring search at a widened reach.
+`Seed = number | Configuration` — a number is that seed's canonical configuration. `drawableAt` records, per requested
+configuration, the one it DREW (`drawnConfiguration`): the landed figure's own configuration when the walk landed on a
+preferred figure (asked there, it is taken at once: a fixed point), else the requested one. `derive(lines, at)` carries it
+as `Derivation.configuration`. The submit path solves the trial from `current.configuration` and its `record` verdict carries
+the trial's; `recordLine` / `recordLlmLines` / `goToSeed` write it into `seed` in the same set (`canonicalSeed`: a plain
+number whenever canonical, so saves and the undo slice are unchanged for them; `cleanSeed` validates a loaded one). The
+ask lane (`locusOf` takes `[Seed, number]`), the locus chip and `unstatedChoices` read `d.configuration`.
+`anotherConfiguration` returns the configuration its candidate drew and skips a candidate whose `drawnSampleOf` (raw seed,
+choice seed, root) is the one on the screen (#2633).
+
+*Identifiers:* `Configuration` · `Seed` · `configurationOf` · `seedNumber` · `canonicalSeed` · `sameSeed` · `drawnConfiguration` · `drawnSampleOf` · `cleanSeed`
 
 #### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
 

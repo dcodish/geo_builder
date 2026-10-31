@@ -192,6 +192,90 @@ describe('#1132 — the commit-seam registry is an assertion, not a comment', ()
 });
 
 /* ------------------------------------------------------------------ *
+ * 1b. Analytic: the seams that WRITE THE FIGURE record the configuration drawn (#2039, ADR-AG-358).
+ * ------------------------------------------------------------------ */
+
+/**
+ * #2039 step 1 / #1182 / #2633 (ADR-AG-358): analytic's display walk may draw a later configuration than the session's
+ * seed. A seam that writes the lines and keeps the seed it was given records a configuration the student never saw, and
+ * the next line was solved from there — a different triangle replaced the one on the screen. So every action of the analytic
+ * store that writes `lines` is declared here, discovered rather than listed: `wired` records the configuration its
+ * decision drew in the same set; `exempt` says why the next commit cannot inherit the stale seed.
+ */
+const ANALYTIC_STORE = 'src-analytic/store/useAnalyticStore.ts';
+function lineWritingActions(storeFile: string): string[] {
+  const src = read(storeFile);
+  const body = src.slice(src.indexOf('(set, get) => ({'));
+  let current: string | null = null;
+  const found = new Set<string>();
+  for (const ln of body.split('\n')) {
+    const m = ACTION.exec(ln);
+    if (m) current = m[1];
+    if (/\blines:\s*(?!s\.lines\s*[,}])/.test(ln) && current) found.add(current);
+  }
+  return [...found].sort();
+}
+const ANALYTIC_LINE_SEAMS: Seam[] = [
+  { action: 'recordLine', status: 'wired', note: 'the typed line: commitRecord passes the verdict drawn configuration' },
+  { action: 'recordLlmLines', status: 'wired', note: 'the fallback lane: runFallback chains each step drawn configuration' },
+  {
+    action: 'removeLine',
+    status: 'exempt',
+    note:
+      'Keeps the seed. The figure after it is derive(lines, seed), pure, and the next commit cannot inherit a stale ' +
+      'start: decideSubmit solves its trial from current.configuration, the configuration drawn (ADR-AG-358).',
+  },
+  {
+    action: 'replaceLine',
+    status: 'exempt',
+    note: 'An edit, as removeLine: the next commit solves from current.configuration, never from the seed this keeps.',
+  },
+  {
+    action: 'clearAll',
+    status: 'not-a-seam',
+    note: 'Empties the session (seed 0, no lines) — there is no drawn configuration left to record.',
+  },
+  {
+    action: 'restore',
+    status: 'wired',
+    note: 'A load: the saved seed IS the drawn configuration (serialize writes it, cleanSeed reads it back).',
+  },
+  {
+    action: 'serialize',
+    status: 'not-a-seam',
+    note: 'Not a mutation: it builds the save file and the extractor sees its lines: field. The seed it writes is drawn.',
+  },
+  {
+    action: 'partialize',
+    status: 'not-a-seam',
+    note: 'The undo slice (zundo): it reads the lines and the seed together, so an undo entry always holds the drawn configuration.',
+  },
+  {
+    action: 'set',
+    status: 'not-a-seam',
+    note: 'The initial state object (lines: []), attributed to the first action-like line the extractor meets.',
+  },
+];
+
+describe('#2039 — analytic: every seam that writes the lines is declared (ADR-AG-358)', () => {
+  it('the discovered line-writing actions are exactly the declared ones', () => {
+    expect(
+      lineWritingActions(ANALYTIC_STORE),
+      'an analytic store action writes the lines and is not declared — decide whether it records the drawn configuration',
+    ).toEqual(ANALYTIC_LINE_SEAMS.map((x) => x.action).filter((a) => a !== 'set').sort());
+  });
+  it('every wired seam takes the configuration in the same set', () => {
+    const src = read(ANALYTIC_STORE);
+    for (const sm of ANALYTIC_LINE_SEAMS.filter((x) => x.status === 'wired' && x.action !== 'restore')) {
+      expect(src, `«${sm.action}» is wired but does not record a seed`).toMatch(new RegExp(`${sm.action}: \\([^)]*\\bat\\)`));
+    }
+  });
+  it('every non-wired analytic seam carries a reason', () => {
+    for (const sm of ANALYTIC_LINE_SEAMS.filter((x) => x.status !== 'wired')) expect(sm.note.length).toBeGreaterThan(40);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * 2. Every app-layer decision module is exercised by a test.
  * ------------------------------------------------------------------ */
 

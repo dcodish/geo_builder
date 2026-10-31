@@ -9,7 +9,7 @@
 import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, crossingHasNoPoint, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -134,6 +134,16 @@ export interface Derivation {
    */
   seed: number;
   /**
+   * THE CONFIGURATION DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
+   *
+   * `seed` is the configuration ASKED for; the display walk (`drawableAt`'s spread, separation and ring preferences)
+   * may have drawn a later one. This is the one on the screen, as a value that draws it again: `derive(lines,
+   * configuration)` shows this figure. The session store records it in the same set as the commit, the next line is
+   * solved from it, and a question about the figure («המקום הגיאומטרי של P») is traced on it — so the canvas, the
+   * next commit and the answers describe one configuration (the #1176 promise, kept through a walk).
+   */
+  configuration: Configuration;
+  /**
    * THE LINES THIS DERIVATION IS OF (#2393 R10, ADR-AG-316) — carried, as `seed` is (#1176), so a question that names its
    * own condition («… של כל הנקודות M המקיימות MA = MB») is traced on THIS figure plus that condition, never on lines
    * re-assembled elsewhere. Optional: a hand-built derivation has none, and such a question is then read without it.
@@ -187,7 +197,9 @@ export interface Derivation {
  * every evaluation of THIS figure — the drawn one, the gates, the pool — starts its free vertices from
  * the same places. Empty for a figure no letter change touched, which is then byte-for-byte the old fold.
  */
-export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<Record<string, string>> = {}): Derivation {
+export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readonly<Record<string, string>> = {}): Derivation {
+  /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
+  const seed = seedNumber(at);
   const facts: Fact[] = [];
   const faults: LineFault[] = [];
   /** Which line produced each fact, so an apply refusal can be blamed on the right one. */
@@ -321,7 +333,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    */
   // THE DISPLAYED figure asks for the spread preference (#1174): among the configurations that may
   // be drawn, open on one that is not a sliver. Every honesty gate calls `drawableAt` without it.
-  let figure = drawableAt(construction, seed, true);
+  const figure = drawableAt(construction, at, true);
 
   /**
    * …and WHICH line: the one whose removal lets the figure solve (#1492 ruling 3, ADR-AG-231), when one does. The
@@ -1127,7 +1139,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, created, createdCircles, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -1313,6 +1325,7 @@ export const EMPTY_DERIVATION: Derivation = {
   figure: { env: {}, points: [], curves: [], segments: [], construction: [], vacant: [], unsatisfied: [], selectorsOk: true, ringFaults: [], carrierDof: 0, provenance: {}, usedSymbols: [] },
   box: { minX: -10, minY: -10, maxX: 10, maxY: 10 },
   seed: 0,
+  configuration: { seed: 0, reach: 1, wide: false },
   faults: [],
   outcomes: [],
   minted: [],

@@ -24,6 +24,7 @@ import { useAnalyticStore } from '../store/useAnalyticStore';
 import { askOnceAnswer } from '../app/answers';
 import { ask } from '../app/ask';
 import { derive } from '../engine/derive';
+import { seedNumber } from '../engine/evaluate';
 
 const st = () => useAnalyticStore.getState();
 
@@ -99,7 +100,7 @@ describe('#1110 — the ask lane follows the figure', () => {
     build();
     askIt('AB');
     const before = rowsNow()[0].value;
-    st().goToSeed(st().seed + 1);
+    st().goToSeed(seedNumber(st().seed) + 1);
     // The question survives the seed change; the reading is taken again at the new one.
     expect(st().queries.map((q) => q.sentence)).toEqual(['AB']);
     expect(rowsNow()[0].value).toBe(before); // AB is determined here, so it is stable — and re-read

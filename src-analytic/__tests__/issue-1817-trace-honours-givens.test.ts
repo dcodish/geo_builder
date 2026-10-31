@@ -237,7 +237,7 @@ describe('#1817 lock 8 — an unrestricted locus is unchanged: one stroke, the w
         const d = derive([...lines], seed);
         const a = ask(d, `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord);
         expect(a.value).toBe(row);
-        const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box)!;
+        const res = locusOf(d.construction, name, [d.configuration, d.configuration.seed + 1], d.box)!; // as the ask lane traces (ADR-AG-358)
         for (const [i, cp] of res.components.entries()) {
           // The drawing IS the walk — same points, same closure — exactly as before the clip existed.
           expect(cp.trace.pieces).toEqual([{ points: cp.trace.points, closed: cp.trace.closed }]);
@@ -248,10 +248,12 @@ describe('#1817 lock 8 — an unrestricted locus is unchanged: one stroke, the w
     });
   }
 
-  it('the measured extents of main are kept (bisector y ∈ [−36.96, 25.05], circle on diameter AB closed)', () => {
+  // RE-BASED by #1182 (ADR-AG-359), measured: M now lands nearest its start, so the view the walk is bounded by is tighter —
+  // the bisector's extent goes from y ∈ [−36.96, 25.05] to [−23.00, 18.18]; still one stroke, the whole walk.
+  it('the measured extents are kept (bisector y ∈ [−23.00, 18.18], circle on diameter AB closed)', () => {
     const m = drawn(answer(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 'M'));
-    expect(Math.min(...m.map((p) => p.y))).toBeCloseTo(-36.961, 2);
-    expect(Math.max(...m.map((p) => p.y))).toBeCloseTo(25.05, 2);
+    expect(Math.min(...m.map((p) => p.y))).toBeCloseTo(-22.999, 2);
+    expect(Math.max(...m.map((p) => p.y))).toBeCloseTo(18.183, 2);
     const c = answer(['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'], 'P');
     expect(c.locus!.components[0].closed).toBe(true);
     expect(c.locus!.components[0].points).toHaveLength(68);

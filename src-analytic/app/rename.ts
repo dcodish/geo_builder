@@ -67,6 +67,7 @@ import { activeOf, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import { segKey } from '../render/scene';
+import type { Seed } from '../engine/evaluate';
 
 export { parseRenameAnalytic, parseSwapAnalytic };
 
@@ -264,7 +265,7 @@ export interface RenameState {
   disabled: readonly number[];
   queries: readonly AskedQuestion[];
   spokenFor: Readonly<Record<number, string>>;
-  seed: number;
+  seed: Seed;
   /** #1631 — the session's seed-name map (`Construction.seedNames`); absent = none. */
   seedNames?: LetterMap;
   /** #1653 — the segment display map (keyed by endpoint pair); absent = none. */

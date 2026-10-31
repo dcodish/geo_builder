@@ -148,10 +148,14 @@ describe('#1938 — the false-refusal net', () => {
     const d = derive(lines);
     const a = d.figure.points.find((p) => p.id === 'A')!;
     const e = d.figure.points.find((p) => p.id === 'E')!;
-    expect(Math.hypot(a.x - e.x, a.y - e.y)).toBeLessThan(1e-3); // the coincidence is really there
+    // the coincidence is really there — on A, or (since #1182's anchored step, ADR-AG-359) on C: the refused line's own
+    // figure, never drawn; the verdict below is unchanged
+    const c = d.figure.points.find((p) => p.id === 'C')!;
+    expect(Math.min(Math.hypot(a.x - e.x, a.y - e.y), Math.hypot(c.x - e.x, c.y - e.y))).toBeLessThan(1e-3);
+    const on = Math.hypot(a.x - e.x, a.y - e.y) < 1e-3 ? 'A' : 'C';
     // RE-BASED by #2383 (ADR-AG-309): the separation rows lie in the equations' row space (σ falls 1.0 → 3.4e-8), so the
     // one rank reads the pair forced — the structural truth the seed-3 row below already recorded. The fault is unchanged.
-    expect(d.figure.separationDof?.('E', 'A')).toBe(0);
+    expect(d.figure.separationDof?.('E', on)).toBe(0);
     expect(d.faults).toMatchObject([{ index: 3, code: 'third-crossing', line: 'AC', a: 'A', b: 'C' }]);
   });
 
