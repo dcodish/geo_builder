@@ -1849,7 +1849,7 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}): Resolved3 {
-  const key = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
+  const key = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '') + (opts.solvedFrame ? '|raw' : '');
   let per = resolveMemo3.get(c);
   const hit = per?.get(key);
   if (hit) {
@@ -1874,6 +1874,13 @@ export interface Resolve3Opts {
    * its own key; a placement with no leftover freedom resolves exactly as the plain configuration.
    */
   placementImage?: boolean;
+  /**
+   * #2630 (ADR-3D-400): the configuration as SOLVED, before the gauge normalisation turns it onto the floor. The
+   * normalisation is a drawing convention: it makes a placement-only number (the components of a vector on a figure
+   * nothing orients) the same at every seed, so agreement across seeds would read it as knowledge. The knowledge gates
+   * sample this way; a drawing never does.
+   */
+  solvedFrame?: boolean;
 }
 
 function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
@@ -3122,7 +3129,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
    * counter-clockwise from above). The first three points are not that frame: an apex-first or
    * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
    */
-  if (!orientationStated3(c) && c.revolutions.length === 0 && c.circles3.length === 0) {
+  if (!opts.solvedFrame && !orientationStated3(c) && c.revolutions.length === 0 && c.circles3.length === 0) {
     const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
     let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
     for (let i = 1; i < ordered.length && !frame; i += 1) {
@@ -3297,12 +3304,15 @@ export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 
  * moves the branch and nothing else. The one sampler for the ask lane, the panel and the claim verifier
  * (docs/17 M3): do not reach configurations any other way.
  */
+/** #2630 (ADR-3D-400): knowledge is judged in the solved frame — see {@link Resolve3Opts.solvedFrame}. */
+const RAW: Resolve3Opts = { solvedFrame: true };
+
 export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[], opts: { readback?: boolean } = {}): Resolved3[] {
   return baseSeeds.flatMap((s) => {
-    const r0 = resolve3(c, s);
+    const r0 = resolve3(c, s, RAW);
     const vals = paramConfigValues3(c, s, r0);
     const confs: { r: Resolved3; paramValue?: number }[] =
-      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { paramValue: v }), paramValue: v }));
+      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { ...RAW, paramValue: v }), paramValue: v }));
     if (!opts.readback) return confs.map((k) => k.r);
     // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
     // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
@@ -3310,7 +3320,7 @@ export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[]
     // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
     return confs.flatMap(({ r, paramValue }) =>
       (r.pivot?.placementFreedom?.().dim ?? 0) > 0
-        ? [r, resolve3(c, s, { ...(paramValue !== undefined ? { paramValue } : {}), placementImage: true })]
+        ? [r, resolve3(c, s, { ...RAW, ...(paramValue !== undefined ? { paramValue } : {}), placementImage: true })]
         : [r],
     );
   });

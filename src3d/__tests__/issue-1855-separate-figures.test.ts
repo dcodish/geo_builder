@@ -109,7 +109,8 @@ describe('#1855 a one-solid figure is bit-identical (positions captured on main 
   it.each([
     [['קובייה ABCDA1B1C1D1'], { A: [0, 0, 0], B: [1, 0, 0], C: [1, 1, 0], D: [0, 1, 0], A1: [0, 0, 1], B1: [1, 0, 1], C1: [1, 1, 1], D1: [0, 1, 1] }],
     [['פירמידה ישרה SABCD שבסיסה ריבוע'], { A: [0, 0, 0], B: [1, 0, 0], C: [1, 1, 0], D: [0, 1, 0], S: [0.5, 0.5, 0.9664285738021136] }],
-    [['משולש ABC', 'AB = 5', '∠ABC = 50°'], { A: [-1.548942034641968e-8, -4.1908037355747276e-8, 0], B: [4.99999998451058, -6.882400909235252e-8, 0], C: [1.7887343897665533, 3.8270372823254806, 0] }],
+    // #2630 (ADR-3D-400): a driven solid is normalised onto the floor, so the solver's 1e-8 drift off the origin is gone
+    [['משולש ABC', 'AB = 5', '∠ABC = 50°'], { A: [0, 0, 0], B: [5, 0, 0], C: [1.788734384654288, 3.827037333862623, 0] }],
   ] as const)('%j', (lines, expected) => {
     const d = derive3(build(lines, 0), 0);
     for (const [id, [x, y, z]] of Object.entries(expected)) {
