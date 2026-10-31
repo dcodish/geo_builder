@@ -14353,7 +14353,7 @@ The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.tes
 5. **A line tangent to a conic, no touch point:** `tangent-curve` may name an ellipse or a parabola; its row is `conicTangencyRows`, the double-root condition of the straight's substitution, `(B² − 4AC)·|d|² / (A²·size²)` — signed, scale-free (the squared chord over the conic's squared size). `lineQuadratic` and `conicSize` move to a leaf module (`engine/lineQuadratic.ts`), re-exported by `crossing-order.ts`, so the solver reads the one substitution `conicMeet` and `touchPointOf` share without an import cycle. A straight parallel to a parabola's axis is a unit miss (ADR-AG-292: never a touch); a bounded segment keeps `t* = −B/2A` in [0, 1] as two hinge rows (#1503's rule). The freedom consumed is the line's, so «דרך P עובר משיק לאליפסה» is the free-direction line plus this row.
 6. **Diameter of the ellipse:** the existing general lowering (both ends on the curve, `distinct`, AB ∥ `radius(A)`), with `radius` on an ellipse read as its ray from the centre (the origin; canonical only). A's position stays a free DOF, so the diameter turns under «הציגו תצורה אחרת» (ruling Q3). The parabola's diameter sentence is left exactly as it was (`not-handled`, #2625).
 
-**Not this ADR:** a circle touching a conic and the circle inscribed in / around the ellipse (PR 2, ruling Q1 = A); the crossing dot at a touch (ADR-AG-356).
+**Not this ADR:** a circle touching a conic and the circle inscribed in / around the ellipse (PR 2, ruling Q1 = A: [ADR-AG-360](#adr-ag-360), [ADR-AG-361](#adr-ag-361)); the crossing dot at a touch (ADR-AG-356).
 
 **2-D (ADR-W-157):** conics are analytic-only (EXCEPTIONS X2). The one plane sentence added, «קודקודי … נמצאים על המעגל», is `not-handled` in 2-D; see Locks. 3-D: circles are X8.
 
@@ -14378,3 +14378,67 @@ The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.tes
 **Locks.** `issue-2618-conic-relations.test.ts`: one dot, no ordinal, at the touch point on the circle, the ellipse (p8-1, p8-3, p8-6) and the parabola, its sentence building at seeds 0–5, and after a tangency pinned k (p8-7); fixtures `ellipse-book-p8-1`, `-p8-3`, `-p8-6` (the student's own touch sentence records the point, within the solve's resolution of it). `conic-rings.test.ts`'s "a TANGENT offers nothing" becomes "a TANGENT offers ONE ring, whose click builds".
 
 **Behaviour change for a student:** a line that touches a circle, an ellipse or a parabola now shows one dot at the touch point; clicking it adds «A נקודת החיתוך של הישר … עם …».
+
+## ADR-AG-360 — A circle touching the ellipse or the parabola: named touch points are three existing rows, an unnamed one is the tool's touch parameter on the conic (#2618 PR 2)
+
+**Status:** accepted · 2026-10-31 · feature (analytic) · fix round #2645 (stream B) · branch `feat/2618-ellipse-relations` · PR 2 of #2618 (PR 1: [ADR-AG-355](#adr-ag-355), [ADR-AG-356](#adr-ag-356)) · LADDER stage: none (a parse lowering plus one residual arm in the joint solve)
+
+**Operator:** 2026-10-30 in chat, on the ellipse sweep: *"now we need to build all capabilities"*. The plan's line "«המעגל משיק לאליפסה» and «המעגל משיק לאליפסה בנקודה B / בנקודות B ו-D» draw a circle touching the ellipse. With no point named, where it touches cycles under «הציגו תצורה אחרת»" is `[asked]`; its parabola twin is the class sibling, `[asked]` under the same ruling.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R208 (new) · **Design:** [04c](04c-design-analytic.md) § "A circle and a conic"
+
+**Re-measured at pickup** (`fb94d176`, after PR 1 merged; `parseLine` → `derive`, no model): «המעגל משיק לאליפסה», «המעגל משיק לאליפסה בנקודה B», «המעגל משיק לאליפסה בנקודות B ו-D», "the circle is tangent to the ellipse", «המעגל משיק לפרבולה» were each `not-handled`, as the plan's table said.
+
+**Root cause (the class).** The plan's: a relation between a CIRCLE and a curve was read only when the curve was a circle. PR 1 widened the line and polygon relations. The circle subject before a conic object fell through `parseCircleAt`'s conic branch (a circle subject is no line target), and no apply arm or residual related a circle to a conic.
+
+**Decision.**
+1. **Parse.** In `parseCircleAt`'s conic branch, a ONE-circle subject (contextual «המעגל», a centre letter, a numeral; no size, position or branch word) lowers to `circle-conic { circle: SLOT1, host, ats? }` inside `circles-about` over `oneCircleSlot`. That is the one resolver for «המעגל» / «מעגל M»: it binds the figure's one circle, states the circle on the letter, draws one when there is none, and asks when there are several (ADR-AG-196 / ADR-AG-198 / ADR-AG-219). Touch points the sentence names are declared; one named twice is `repeated-vertex`.
+2. **Named touch points** lower to three rows each, all existing: T on the circle, T on the conic (each skipped when T is on it by construction — p5-26's B and D are the ellipse's y-axis crossings), and the circle's radius at T ∥ the conic's normal at T (`touchNormal` on both curves, ADR-AG-355's direction).
+3. **No touch point** is a new constraint kind `circle-conic { circle: CircleSide, curve, rel: { k: 'touch', s } }`. `s` is the tool's own touch parameter (`θ_<circle>~touch~<conic>`, ADR-AG-198's family). It is spelled with no part, like a free line's direction, so the created-shape fit does not read it and it samples in angle units. P(s) is the conic's parametrisation: ellipse (a·cos s, b·sin s), parabola y² = 2px (p·s²/2, p·s). The rows are |C − P(s)| = r and (C − P(s)) ∥ the normal at P(s), each over the conic's size. Net −1 DOF; where it touches and from which side stay free (ADR-052).
+4. **Worst-case multiplier (docs/17 M3):** one extra symbol per sentence and two rows; no search, no choice.
+
+**Not this ADR:** the concentric circle (ADR-AG-361). A circle touching a conic with a branch word («מבחוץ»), a size tail («מעגל שרדיוסו 3 משיק לאליפסה») or two circle subjects is left `not-handled`, as it was: not asked.
+
+**2-D (ADR-W-157):** conics are analytic-only (EXCEPTIONS X2). 3-D: circles are X8.
+
+**Measured after.** Every pickup sentence records.
+- p5-26 ב typed line by line («B ו-D נקודות החיתוך של האליפסה עם ציר ה-y» · «נתון מעגל M» · «המעגל משיק לאליפסה בנקודות B ו-D») draws x²+y²=9 at seeds 0–5.
+- With no point named, the circle touches the ellipse and the parabola at every seed 0–5 (judged by an independent scan of the conic's normals), and the figure is whole at 24 of 24 seeds on both (the lock's floor is 20, ADR-AG-144).
+- **Perf (docs/17 §7)**, mean warm `derive` over seeds 0–5: p5-26 ב 7.4 ms; the free touch 1.2 ms (ellipse), 1.0 ms (parabola); p8-7 unchanged at 1.8 ms.
+
+**Locks.** `src-analytic/__tests__/issue-2618-circle-conic.test.ts`:
+- the readings (He and En, contextual and named, both conics);
+- the touch with no point on both conics in three spellings at seeds 0–5, moving between configurations, and the 24-seed whole-rate;
+- named points on both conics (on both curves, radius ∥ normal) and p5-26 ב's centre and radius;
+- the refusals (a point named twice; no ellipse is the existing contextual refusal); a size tail and a branch word stay `not-handled`.
+
+Fixture `src-analytic/__tests__/fixtures/ellipse-book-p5-26b.analytic.json` (typed line by line, every line records). Catalog: 3 rows (He + En), not featured.
+
+**Behaviour change for a student:** in analytic, «המעגל משיק לאליפסה» (or «לפרבולה») now draws a circle touching the curve. It touches at the points the sentence names or, with none named, somewhere that «הציגו תצורה אחרת» moves.
+
+## ADR-AG-361 — A circle inscribed in the ellipse, or around it, is the textbook's concentric circle (#2618 PR 2, ruling Q1 → A)
+
+**Status:** accepted · 2026-10-31 · feature (analytic) · fix round #2645 (stream B) · branch `feat/2618-ellipse-relations` · PR 2 of #2618 · LADDER stage: none
+
+**Operator:** ruling 2026-10-30 on #2618, Q1 → A: *«מעגל חסום באליפסה» / «האליפסה חסומה במעגל» / «המעגל חוסם את האליפסה» draw the textbook's figure: the concentric circle through the minor-axis vertices (inside) or the major-axis vertices (around).*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R209 (new) · **Design:** [04c](04c-design-analytic.md) § "A circle and a conic"
+
+**Re-measured at pickup** (`fb94d176`): «מעגל חסום באליפסה», «המעגל חסום באליפסה», «האליפסה חסומה במעגל», «המעגל חוסם את האליפסה», "the ellipse is inscribed in the circle" and "a circle is inscribed in the ellipse" were each `not-handled`.
+
+**Decision.**
+1. **Parse** (`parseCircleEllipseFit`, the last reader of `parseConicInscribed`). Each spelling is `circle-conic { circle: SLOT1, host: 'ellipse', fit }` over the one circle slot, as in ADR-AG-360. That is the plan's "created when no circle exists … otherwise bound to the one circle", with several circles asked about.
+   - Inside: «(נתון) (ה)מעגל (M) חסום באליפסה», «באליפסה חסום מעגל», «האליפסה חוסמת את המעגל», "a circle is inscribed in the ellipse", "the ellipse circumscribes the circle".
+   - Around: «האליפסה חסומה במעגל (M)», «במעגל חסומה האליפסה», «(ה)מעגל חוסם את האליפסה», "the ellipse is inscribed in a circle", "the circle circumscribes the ellipse".
+2. **The constraint** is `circle-conic { rel: { k: 'inscribed' | 'circumscribed' } }`: the centre at the ellipse's centre (the origin, canonical only) and r = the smaller / larger of |a|, |b|, as three rows over the ellipse's size. A tall ellipse (major axis on y) is handled by the same rows, and a parametric one gives r = min(a, b) in every configuration. A circle the figure already has of another size is `unsatisfiable` on the line.
+3. **The parabola has no centre:** «מעגל חסום בפרבולה» is not read (`not-handled`, as before). The apply arm refuses a fit on any conic but the ellipse by name.
+
+**Locks.** `issue-2618-circle-conic.test.ts`:
+- every spelling is one lowering per direction;
+- x²/25+y²/9=1 → r = 3 inside and 5 around, centred at the origin, seeds 0–5; x²/9+y²/16=1 → 3 and 4;
+- «נתון מעגל M» binds (M at the origin, r = 5); the parametric ellipse;
+- the refusals (a circle of another size; two circles; no ellipse).
+
+Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog: 2 rows (He + En), not featured. Perf: 1.0 ms per warm `derive`.
+
+**Behaviour change for a student:** in analytic, «מעגל חסום באליפסה» draws the circle through the ellipse's minor-axis vertices, and «האליפסה חסומה במעגל» the one through its major-axis vertices.

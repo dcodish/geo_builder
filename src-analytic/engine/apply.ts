@@ -28,7 +28,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, no
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
-import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols } from './carriers';
+import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
@@ -4808,6 +4808,43 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(c, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), ...(f.host ? { host: f.host } : {}), src: f.src });
       }
       return applyAll(c, f.facts);
+    }
+
+    /**
+     * A CIRCLE AND A CONIC (#2618 PR 2, ADR-AG-360 / ADR-AG-361). The circle arrives resolved (`circles-about` wrote its
+     * id over the slot: bound, stated on its letter, or drawn); the conic is the figure's one of that kind (`curveHost`).
+     */
+    case 'circle-conic': {
+      const circle = objectById(c, f.circle);
+      if (!circle || curveKindOf(circle) !== 'circle') return { ok: false, error: unknownRef(c, f.circle) };
+      const conic = curveHost(c, f.host, undefined, f.src);
+      if (!conic.ok) return conic;
+      /*
+       * THE TOUCH POINTS NAMED — «… בנקודה B», «… בנקודות B ו-D»: each point on both curves, the circle's radius there
+       * parallel to the conic's normal there (three rows `applyTouchAt` already reads, `touchNormal` on each curve). A
+       * point the figure already puts on a curve is not restated on it.
+       */
+      if (f.ats) {
+        const facts: Fact[] = f.ats.flatMap((at): Fact[] => [
+          ...[circle, conic.o].flatMap((o): Fact[] => (onCurveByConstruction(c, o, at) ? [] : [{ t: 'constraint', k: { t: 'on-curve', id: at, curve: o.id }, src: f.src }])),
+          { t: 'constraint', k: { t: 'relation', rel: 'parallel', u: touchNormal(circle, at), v: touchNormal(conic.o, at) }, src: f.src },
+        ]);
+        return applyAll(c, facts);
+      }
+      // The circle as a side of the relation — `tangent-circles`' reading: a centre point and its radius, or an equation.
+      const side: CircleSide | null = circle.kind === 'circle-at' ? { centre: circle.centre, r: circle.r } : circle.kind === 'curve' ? { circle: circle.id } : null;
+      if (!side) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      // The concentric circle is the ellipse's alone (ruling Q1); the parser reads it about no other conic.
+      if (f.fit && f.host !== 'ellipse') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      /*
+       * The touch parameter is the tool's own `θ_` symbol (ADR-AG-198's family: free, never a parameter row) spelled with
+       * no part, as a free line's direction is: it is an angle-like parameter on the conic, not a part of a created shape,
+       * so the created-shape fit (#1647) does not read it and the sampler draws it in angle units.
+       */
+      const rel: Extract<Constraint, { t: 'circle-conic' }>['rel'] = f.fit
+        ? { k: f.fit }
+        : { k: 'touch', s: { kind: 'sym', name: directionSymbol(`${circle.id}~touch~${conic.o.id}`) } };
+      return applyFact(c, { t: 'constraint', k: { t: 'circle-conic', circle: side, curve: conic.o.id, rel }, src: f.src });
     }
 
     case 'tangent-circles': {

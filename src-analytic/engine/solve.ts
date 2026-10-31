@@ -24,6 +24,7 @@
  */
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
+import { CIRCLE_CONIC_WORDS } from '../parser/circleConicWords';
 import { Odometer, resolveConstraintChoices } from './discreteAxes';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
@@ -394,6 +395,18 @@ export type Constraint =
    */
   | { t: 'tangent-circle'; a: CircleSide; b: CircleSide; branch: 'external' | 'internal' }
   /**
+   * A CIRCLE AND A CANONICAL CONIC, with no touch point named (#2618 PR 2, ADR-AG-360 / ADR-AG-361). The circle is a
+   * {@link CircleSide}; the conic is read off the resolved curve (`curveAt`), so a parameter in its equation can give way.
+   *
+   * - `touch` — «המעגל משיק לאליפסה»: the circle touches the conic at the point P(s) of the conic's own
+   *   parametrisation — ellipse (a·cos s, b·sin s), parabola y² = 2px (p·s²/2, p·s) — where `s` is the TOOL's touch
+   *   parameter (a `θ_` symbol, ADR-AG-198's family: a free DOF, never a parameter row). Two rows: |C − P| = r, and
+   *   (C − P) ∥ the conic's normal at P. Net −1 DOF; where it touches and from which side stay free (ADR-052).
+   * - `inscribed` / `circumscribed` — the textbook's concentric circle (operator ruling Q1 → A, the ellipse only): the
+   *   centre at the ellipse's centre (the origin, canonical) and the radius its smaller / larger semi-axis.
+   */
+  | { t: 'circle-conic'; circle: CircleSide; curve: Id; rel: { k: 'touch'; s: Expr } | { k: 'inscribed' } | { k: 'circumscribed' } }
+  /**
    * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
    * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
    *
@@ -622,6 +635,9 @@ export function constraintRefs(k: Constraint): Id[] {
     // point: its freedom is its parameters', and its curve is a CURVE ref (#2387).
     case 'tangent-circle':
       return [...circleSidePoint(k.a), ...circleSidePoint(k.b)];
+    // The circle's centre may move; the conic is a CURVE ref, the touch parameter a symbol in the register.
+    case 'circle-conic':
+      return circleSidePoint(k.circle);
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
     // A parameter's value names no point: its freedom lives in the register.
@@ -724,6 +740,11 @@ export function describeConstraint(k: Constraint): string {
       return `${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`} משיק למעגל`;
     case 'tangent-circle':
       return `מעגל ${circleSideName(k.a)} משיק למעגל ${circleSideName(k.b)}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
+    case 'circle-conic': {
+      const w = CIRCLE_CONIC_WORDS;
+      const verb = k.rel.k === 'touch' ? w.touches : k.rel.k === 'inscribed' ? w.inscribedIn : w.circumscribes;
+      return `${w.circle} ${circleSideName(k.circle)} ${verb}${k.curve}`;
+    }
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'arc-sum':
@@ -785,6 +806,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
     // An equation circle on either side of a circle-to-circle touch must exist to be touched (#2387).
     case 'tangent-circle':
       return [k.a, k.b].flatMap((s) => ('circle' in s ? [s.circle] : []));
+    case 'circle-conic':
+      return ['circle' in k.circle ? [k.circle.circle] : [], [k.curve]].flat();
     case 'relation':
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
@@ -1267,6 +1290,47 @@ export function residualRows(
       const floor = SOLVE_RESOLUTION * Math.max(Math.abs(r1), Math.abs(r2), d);
       if (d < floor) return { eq: [Math.max(Math.abs(miss), floor - d)] };
       return { eq: [miss] };
+    }
+    case 'circle-conic': {
+      /*
+       * A CIRCLE AND A CONIC (#2618 PR 2, ADR-AG-360 / ADR-AG-361). The circle's centre and radius as `tangent-circle`
+       * reads a side (a centre POINT from `p` and its radius expression, or a resolved equation circle's own); the conic
+       * resolved, canonical. Every row over the conic's own size, so a figure in tens and one in units converge alike.
+       */
+      const conic = curveAt?.(k.curve) ?? null;
+      if (!conic || (conic.kind !== 'ellipse' && conic.kind !== 'parabola')) return null;
+      let centre: Pt;
+      let r: number;
+      if ('centre' in k.circle) {
+        centre = p[0];
+        r = evalExpr(k.circle.r, env);
+      } else {
+        const circle = curveAt?.(k.circle.circle) ?? null;
+        if (!circle || circle.kind !== 'circle') return null;
+        centre = { x: circle.cx, y: circle.cy };
+        r = circle.r;
+      }
+      if (!centre || !Number.isFinite(r)) return null; // an unbound radius judges nothing
+      const size = Math.max(conicSize(conic), 1e-9);
+      if (k.rel.k !== 'touch') {
+        // The concentric circle (ruling Q1 → A): an ellipse's own; a parabola has no centre, so it judges nothing.
+        if (conic.kind !== 'ellipse') return null;
+        const [a, b] = [Math.abs(conic.a), Math.abs(conic.b)];
+        const want = k.rel.k === 'inscribed' ? Math.min(a, b) : Math.max(a, b);
+        return { eq: [centre.x / size, centre.y / size, (r - want) / size] };
+      }
+      const s = evalExpr(k.rel.s, env);
+      if (!Number.isFinite(s)) return null;
+      // P(s) on the conic, and the conic's normal there (the `normal` direction's gradient).
+      const at: Pt = conic.kind === 'ellipse' ? { x: conic.a * Math.cos(s), y: conic.b * Math.sin(s) } : { x: (conic.p * s * s) / 2, y: conic.p * s };
+      const n: Pt = conic.kind === 'ellipse' ? { x: at.x / (conic.a * conic.a), y: at.y / (conic.b * conic.b) } : { x: -conic.p, y: at.y };
+      const d = { x: centre.x - at.x, y: centre.y - at.y };
+      const dist = Math.hypot(d.x, d.y);
+      const nn = Math.hypot(n.x, n.y);
+      const miss = (dist - r) / size;
+      // The centre ON the conic (a radius of no length) has no direction to judge: the miss alone, kept off zero there.
+      if (dist < SOLVE_RESOLUTION * size || nn === 0) return { eq: [miss, 1] };
+      return { eq: [miss, (d.x * n.y - d.y * n.x) / (dist * nn)] };
     }
     /**
      * ARC MEASURES (#1622 E4, ADR-AG-220) — each arc the unsigned central angle of its resolved circle, the sum less
