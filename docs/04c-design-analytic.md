@@ -1494,8 +1494,11 @@ A fraction is RECOGNISED (relative `1e-6`, denominator ≤ 12) only for a value 
 A coefficient is never printed as a fraction: `fractionClearingFactor` and `lineText` clear the row
 (`-4/3x + y = 0` → `-4x + 3y = 0`). The conics have one printer per kind, `ellipseEquationText` and
 `parabolaEquationText`, which both the panel (`curveParts`) and the locus row (`locusEquation`) call: a fractional
-ellipse clears to whole numbers (`4x² + 9y² = 45`), a fractional parabola to `2y² = 5x`; whole-number conics keep the
-canonical form ([ADR-AG-357](06c-decisions-analytic.md#adr-ag-357)).
+ellipse clears to whole numbers (`4x² + 9y² = 45`); whole-number conics keep the canonical form
+([ADR-AG-357](06c-decisions-analytic.md#adr-ag-357)). The parabola is the exception to clearing: it keeps the book's
+monic `y² = kx`, and `parabolaCoefficient` spells k — an integer as is, a rational whose denominator divides a power
+of 10 as its exact decimal (`y² = 2.5x`), any other small rational as `p/q` (`y² = 5/3x`, which `MathText` stacks), a
+surd as `fmtCoefficient`'s decimal (ADR-AG-357 Am. 1, #2640).
 
 *Identifiers:* `4/3x` · `4/(3x)` · `eqSrc = null`
 

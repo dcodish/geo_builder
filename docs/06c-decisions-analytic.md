@@ -4679,7 +4679,7 @@ So the shared formatter was never the defect. **Analytic is the one tree that ne
 
 ## ADR-AG-085 — A number's notation depends on its POSITION; a refusal's noun depends on the KIND (#1180 + #1179)
 
-> **Amended by [ADR-AG-357](#adr-ag-357)** (#2614, operator 2026-10-30): the clearing reaches the conics — a fractional ellipse prints as a whole-number equation («4x² + 9y² = 45»), a fractional parabola as `2y² = 5x`.
+> **Amended by [ADR-AG-357](#adr-ag-357)** (#2614, operator 2026-10-30): the clearing reaches the conics — a fractional ellipse prints as a whole-number equation («4x² + 9y² = 45»); a parabola is NOT cleared — it keeps `y² = kx` (`y² = 2.5x`, `y² = 5/3x`; ADR-AG-357 Am. 1, #2640).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R94 (amended). **Design:** [04c](04c-design-analytic.md) — *the tree's display formatter*. **LADDER stage:** display and refusal wording; no value, gate or comparison changes.
 
@@ -14162,6 +14162,8 @@ Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל
 
 ## ADR-AG-357 — A conic with a fractional coefficient prints cleared, through one printer per conic kind (#2614)
 
+> **⚠ Superseded in part** by **Am. 1** below (#2640, operator 2026-10-30/31): §3, the parabola. A parabola keeps `y² = kx` — `y² = 2.5x`, `y² = 5/3x` — never `2y² = 5x`. The ellipse (§2) is unchanged.
+
 **Status:** accepted · 2026-10-30 · bug (analytic) · fix round #2627 (stream G) · branch `fix/2614-conic-print` · amends [ADR-AG-085](#adr-ag-085) (its clearing reaches the conic arms) and [ADR-AG-304](#adr-ag-304) (a conic's denominator is a cleared position) · LADDER stage: none (display only; no value, gate or comparison changes)
 
 **Operator:** ruling 2026-10-30 on #2614, Q1 → B: *"an ellipse with a fractional a² prints with the fractions cleared, as a whole-number equation: «4x² + 9y² = 45» (not «4x²/45 + y²/5 = 1»). This is the same rule as ADR-AG-085 for lines; the parabola follows its existing [ruled] line."*
@@ -14182,6 +14184,31 @@ Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל
 **2-D / 3-D (ADR-W-157):** no other tree prints a conic equation; nothing to port.
 
 **Behaviour change for a student:** in analytic, an ellipse whose a² or b² is a fraction reads as a whole-number equation («4x² + 9y² = 45», not «x²/45/4 + y²/5 = 1»), and a parabola with a fractional coefficient reads `2y² = 5x` (not `y² = 5/2x`), in the data panel, the «משוואת …» answer, the locus row and the locus label on the canvas; a locus parabola with coefficient 1 reads `y² = x` (not `y² = 1x`). Whole-number conics are unchanged.
+
+### ADR-AG-357 Am. 1 — a parabola keeps the book's `y² = kx`: a terminating k as a decimal, any other rational as the exact fraction (#2640)
+
+**Status:** accepted · 2026-10-31 · bug (analytic, P2, reported) · branch `fix/2640-parabola-print` · supersedes §3 (the parabola) of this ADR; §1 (one printer per kind) and §2 (the ellipse, ruled 2B) are unchanged · LADDER stage: none (display only; no value, gate or comparison changes)
+
+**Operator:** 2026-10-30, failing T13 of round #2627: *"a parabola equation should always be in the y^2=ax format so showing 2y^2=5x is not what a student would see in a book"*. Ruling (a) on #2640, 2026-10-31: a terminating coefficient prints as a decimal, «y² = 2.5x». Ruling, 2026-10-31: *"it should print 5/3 nicely"* — a non-terminating rational keeps the exact fraction.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94 (the conic line, its parabola half) · **Design:** [04c](04c-design-analytic.md) § "Position decides notation"
+
+**Root cause.** §3 applied ADR-AG-085's line rule — clear the fractions by multiplying the whole equation — to the parabola. For a line that IS the book's form (`-4x + 3y = 0`); for a parabola the book's form is monic in `y²` (`y² = 2px`), so multiplying through produces an equation a textbook never prints. The class is "a canonical conic printed outside its canonical form", and its one member is the parabola: the ellipse's cleared form was ruled (2B) and stays. The printer is still the one function `parabolaEquationText`, so every surface — the panel row (`curveParts`), the ask by name and its «או» options, the locus row (`locusEquation`) and its canvas label (`drawnLoci`) — moves together. There is no up/down parabola (`x² = ky`) to carry the same rule: `classifyConic` refuses it (`translated-conic`) and `NumCurve` has no such kind.
+
+**Decision.** `parabolaEquationText(k)` prints `y² = kx` and spells k:
+- an integer as before — `y² = 8x`, `y² = -4x`; a magnitude of 1 is never printed (`y² = x`, `y² = -x`);
+- a small rational whose denominator divides a power of 10 as its exact decimal — `y² = 2.5x`, `y² = 0.5x`, `y² = 1.25x`, `y² = 0.125x`;
+- any other small rational as the fraction tier's `p/q` — `y² = 5/3x`, `y² = 1/3x`, `y² = 7/6x`. Every MathML surface typesets it through `shell/math` `MathText` as a stacked 5-over-3 before the x (`<mfrac><mn>5</mn><mn>3</mn></mfrac><mi>x</mi>`); a negative one by the typesetter's existing signed-fraction rule, the minus in the numerator ((−5)/3, then x);
+- a surd as before #2614, `fmtCoefficient`'s decimal.
+The sign stays attached (`y² = -2.5x`, `y² = -5/3x`). The parser reads the printed form back: «y^2=5/3x», «y^2=(5/3)x» and «y^2=5x/3» all state k = 5/3.
+
+**Plain-text surfaces (reported, not decided).** One surface shows the equation WITHOUT `MathText`: the locus label on the canvas (`render/Figure.tsx`, an SVG `<text>`, fed by `drawnLoci` → `buildScene`), and the PNG/clipboard image and the .docx figure, which rasterise that canvas. There a non-terminating k reads as the characters `y² = 5/3x` — the `5/(3x)` reading this ADR's root cause named. A decimal (`y² = 2.5x`) and an integer are unambiguous there. Only a locus row reaches the canvas as text; the .docx givens are the student's own sentences (`app/questionLines`), not this printer. Whether the canvas label needs a different spelling is a question for the operator, not decided here. The letters locus (`symbolicLocusEquation`, ADR-AG-351) has its own parabola arm, `y² = <monomial>x`, and was not part of the report.
+
+**Locks.** `src-analytic/__tests__/issue-2640-parabola-book-form.test.ts`: the operator's T13 utterance «נתונה פרבולה שמשוואתה y^2=2.5x» → «משוואת הפרבולה» answers `y² = 2.5x`, and the panel row agrees; `5/3` stated three ways (`y^2=5/3x`, `y^2=5x/3`, `3y^2=5x`) and `-5/3` answer `y² = 5/3x` / `y² = -5/3x` on the ask and the panel; `MathText` typesets it stacked; fourteen k values through all three printers' callers (`parabolaEquationText`, `curveParts`, `locusEquation`); surds; the midpoint-locus row AND canvas label for `y^2=5x` (`y² = 2.5x`), `3y^2=10x` (`y² = 5/3x`) and `y^2=2x` (`y² = x`). `issue-2614-conic-fractions.test.ts`'s parabola locks asserted `2y² = 5x`, `3y² = 5x`, `2y² = -5x`, `2y² = x` and the locus `2y² = 5x`: they now assert this ruling (`y² = 2.5x`, `y² = 5/3x`, `y² = -2.5x`, `y² = 0.5x`, `y² = 2.5x`), because the form they locked was ruled wrong; its ellipse locks are untouched. No fixture: the essence is a printed string, not a figure.
+
+**2-D / 3-D (ADR-W-157):** no other tree prints a conic equation; nothing to port.
+
+**Behaviour change for a student:** in analytic, a parabola with a fractional coefficient reads in the book's form again: `y² = 2.5x` (not `2y² = 5x`), `y² = 5/3x` with 5/3 as a stacked fraction (not `3y² = 5x`), in the data panel, the «משוואת …» answer, the locus row and the locus label on the canvas. Whole-number parabolas and every ellipse are unchanged.
 
 ## ADR-AG-351 — The locus equation keeps its letters: the determinacy gate's third verdict (#1186, #2608)
 

@@ -1030,10 +1030,11 @@ a sentence the tool parsed.
 - Sources: ADR-AG-046.
 
 **R94 — a value the student stated exactly is DISPLAYED exactly**. Small rationals and simple radicals (p/q·√n), where the value is knowledge; a decimal the student typed stays theirs (#723). *(Operator ruling 2026-10-20 on #2394: exact forms everywhere, as 2-D.)* A standalone value — a parameter, a length, a coordinate, an answer — prints its radical; an equation's coefficients do not (ADR-AG-085).
-- **A conic's equation clears its fractions** (#2614, operator 2026-10-30): an ellipse with a fractional a² or b² reads as a whole-number equation, «4x² + 9y² = 45» for x²/(45/4) + y²/5 = 1 (whole-number a², b² keep «x²/a² + y²/b² = 1»); a parabola reads `2y² = 5x`, never `y² = 5/2x` — in the panel, the ask, the locus row and its canvas label (ADR-AG-357)
+- **An ellipse's equation clears its fractions** (#2614, operator 2026-10-30): an ellipse with a fractional a² or b² reads as a whole-number equation, «4x² + 9y² = 45» for x²/(45/4) + y²/5 = 1 (whole-number a², b² keep «x²/a² + y²/b² = 1») — in the panel, the ask, the locus row and its canvas label (ADR-AG-357)
+- **A parabola keeps the book's «y² = kx»** (#2640, operator 2026-10-30/31; ADR-AG-357 Am. 1), never cleared to «2y² = 5x»: a terminating k as a decimal, «y² = 2.5x»; any other rational as the exact fraction, «y² = 5/3x», typeset as a stacked 5-over-3; an integer as is, «y² = x» never «1x»; the sign attached, «y² = -5/3x» — on the same surfaces
 - slope of «y=(4/3)x» → `4/3`, not `1.33`; m of a common tangent → `√2/4`, not `0.35`; a length «√10 או √34», not «3.16 או 5.83»; `1.41x + y = 0` stays
 - **Tied parameters read as ONE row** (#2394): when each value of one parameter comes with one value of another, «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]», the drawn configuration bracketed as the point rows bracket it
-- Sources: #1120, #723, #2394, ADR-AG-304, #2614, ADR-AG-357.
+- Sources: #1120, #723, #2394, ADR-AG-304, #2614, ADR-AG-357, #2640 (ADR-AG-357 Am. 1).
 
 **R99 — a panel heading names what the rows ARE, in the student's own word**. A heading is a promise about its rows.
 - «משוואות» / «Equations», not «עקומים» (`kind: 'curve'`)

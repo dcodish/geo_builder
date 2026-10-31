@@ -7,7 +7,9 @@
  * midpoint locus `y² = 5/2x` (or `y² = 1x`: the locus had a printer of its own, without the panel's 1-rule).
  *
  * Operator ruling 2026-10-30, Q1 → B: a fractional ellipse prints CLEARED, as a whole-number equation, «4x² + 9y² = 45»;
- * whole-number a², b² keep «x²/a² + y²/b² = 1». The parabola follows ADR-AG-085's ruling: `2y² = 5x`.
+ * whole-number a², b² keep «x²/a² + y²/b² = 1». The parabola half (`2y² = 5x`) was ruled wrong by #2640 (ADR-AG-357
+ * Am. 1): a parabola keeps the book's `y² = kx`, with a terminating k as a decimal and a non-terminating one as the
+ * exact fraction. Its locks below now assert that ruling; #2640's own file carries the operator's utterance.
  *
  * Everything goes through the real door (`decideSubmit` → `derive` → `ask`) with the real formatter (ADR-W-053).
  */
@@ -55,18 +57,19 @@ describe('#2614 — a fractional ellipse prints cleared, as a whole-number equat
   });
 });
 
-describe('#2614 — a fractional parabola clears its coefficient (ADR-AG-085)', () => {
+// #2640 (ADR-AG-357 Am. 1) replaced `2y² = 5x`: the book's monic `y² = kx`, k terminating → decimal, else the fraction.
+describe('#2614 — a fractional parabola keeps y² = kx (#2640 replaced the cleared form)', () => {
   it.each([
-    ['נתונה פרבולה שמשוואתה y^2=2.5x', '2y² = 5x'],
-    ['נתונה פרבולה שמשוואתה 3y^2=5x', '3y² = 5x'],
-    ['נתונה פרבולה שמשוואתה y^2=-2.5x', '2y² = -5x'],
-    ['נתונה פרבולה שמשוואתה y^2=0.5x', '2y² = x'],
+    ['נתונה פרבולה שמשוואתה y^2=2.5x', 'y² = 2.5x'],
+    ['נתונה פרבולה שמשוואתה 3y^2=5x', 'y² = 5/3x'],
+    ['נתונה פרבולה שמשוואתה y^2=-2.5x', 'y² = -2.5x'],
+    ['נתונה פרבולה שמשוואתה y^2=0.5x', 'y² = 0.5x'],
   ])('«משוואת הפרבולה» on %s answers %s', (given, eq) => {
     expect(answer([given], 'משוואת הפרבולה').value).toBe(eq);
   });
 
   it.each([
-    ['y^2=5x', 'פרבולה · 2y² = 5x'],
+    ['y^2=5x', 'פרבולה · y² = 2.5x'],
     ['y^2=2x', 'פרבולה · y² = x'],
   ])('the midpoint locus of %s: row and canvas label read %s', (eq, shown) => {
     const a = answer(MIDPOINT(`נתונה פרבולה שמשוואתה ${eq}`, 'פרבולה'), 'המקום הגיאומטרי של M');

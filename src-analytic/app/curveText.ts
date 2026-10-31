@@ -477,14 +477,34 @@ export function ellipseEquationText(a2: number, b2: number): string {
 }
 
 /**
- * **The parabola** `y² = kx` (ADR-AG-085's ruling, transposed): a fractional k clears the equation, `y² = 5/2x` →
- * `2y² = 5x`. The sign stays attached; `y² = x`, never `y² = 1x`; a surd k cannot be cleared and prints as before.
+ * **The parabola** keeps the book's `y² = kx` — its `y²` is never multiplied (#2640, ADR-AG-357 Am. 1). Clearing the
+ * fraction (`2y² = 5x`, #2614) was ruled wrong for the parabola: operator, 2026-10-30, *"a parabola equation should always
+ * be in the y^2=ax format so showing 2y^2=5x is not what a student would see in a book"*. So it is k that is spelled:
+ *
+ *  - an integer as before — `y² = 8x`, `y² = x` (never `1x`);
+ *  - a TERMINATING rational as its exact decimal (ruling (a), 2026-10-31) — `y² = 2.5x`, `y² = 0.125x`;
+ *  - a NON-terminating rational as the exact fraction (ruling, 2026-10-31: *"it should print 5/3 nicely"*) — `y² = 5/3x`,
+ *    which every surface that shows it typesets through `shell/math` `MathText` as a stacked 5-over-3 before the x;
+ *  - a surd (not a small rational) as before #2614, `fmtCoefficient`'s decimal.
+ *
+ * The sign stays attached: `y² = -2.5x`, `y² = -5/3x`.
  */
 export function parabolaEquationText(k: number): string {
-  const q = fractionClearingFactor([k]) ?? 1;
-  const m = Math.abs(k) * q;
-  const mag = fmt(m) === fmt(1) ? '' : fmt(m);
-  return `${q === 1 ? '' : q}y² = ${k < 0 ? '-' : ''}${mag}x`;
+  const mag = parabolaCoefficient(Math.abs(k));
+  return `y² = ${k < 0 ? '-' : ''}${mag}x`;
+}
+
+/** `|k|` as the coefficient of `y² = kx` — `''` for 1. A decimal only where it is exact (the denominator divides a power of 10). */
+function parabolaCoefficient(m: number): string {
+  const q = fractionClearingFactor([m]);
+  if (q !== null && q > 1) {
+    let d = 0;
+    while (d <= 6 && 10 ** d % q !== 0) d += 1;
+    // Terminating: print the exact rational p/q to its d places. Non-terminating: the fraction tier's `p/q`.
+    if (d <= 6) return (Math.round(m * q) / q).toFixed(d);
+    return fmt(m);
+  }
+  return fmt(m) === fmt(1) ? '' : fmt(m);
 }
 
 const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : a);
