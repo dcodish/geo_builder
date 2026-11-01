@@ -6557,3 +6557,40 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 3. **Compound forms that work today are not removed by this entry.** Whether they keep building silently is #2644's question 1.
 
 **Consequences.** Triage of a "the tool does not read this sentence" report first asks whether the sentence holds more than one given. If it does, the fix is the teaching answer (#2644), not a new grammar row. A failure of the split rows themselves (#2642) is an ordinary bug.
+
+## ADR-W-168 — A round shrinks the queue: found work is fixed in the round, the operator plays only 🎮, a new issue is checked against the queue first, and a round with nothing for him deploys itself (#2654)
+
+**Status:** accepted · 2026-11-01 · operator ruling · process (workspace) · amends [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544) (the round's validation signal), [ADR-W-068](#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054) and [ADR-W-092](#adr-w-092) (who plays which class), [ADR-W-117](#adr-w-117) Am. 1 (found work is filed)
+
+**Operator:** 2026-11-01, in chat, after seeing that the six rounds of 24 Oct – 1 Nov closed 52 issues and filed 47: *"if the ratio was not reasonable, something is completely wrong with this methodology"*. Then: *"1 - option 1 - issues found during a round are fixed immediately are the test case of the round tests them. 2 - i want to have more automated testing and not have so much work go through me. all look and verified items can be closed automatically without me spenmding time on them. … 3 - review all open issues and we need to see what are the same families and can be combined. 4 - new issues are first checked to see where they can be placed within existing issues and only if its a new issue completely, we create an issue."* On the proposed guards: *"other items 1-2-4 im ok with"*. On the bigger ideas: 1 ok, 2 ok, 3 yes, 4 ok (*"known issues dont go away and if we ever run into them again, we move them back the que and not create new ones"*), 5 yes, 6 ok (*"just need to make sure this doesnt create a very long test everytime"*), 7 ok, 8 ok. On deploy: *"if nothing needs my attention, you should deploy automatically."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §1, §2d and §5, docs/RUNBOOK.md, CLAUDE.md rules 5 and 7 and the workflow section, the fix-round and playsheet skills, `scripts/issue-create-guard.mjs` (a PreToolUse hook in `.claude/settings.json`).
+
+**Measured (#2654).** The six rounds #2543, #2561, #2585, #2602, #2627 and #2645 composed 67 items and closed 52. Issues naming those rounds: 47 filed, 32 still open, so the rounds took 20 issues off the queue in a week. Over the same nine days the queue took 144 new issues and closed 76; 22 of the 144 carry `reported`. In the four weeks to 1 Nov, 815 issues were opened, almost all filed by sessions: sibling phrasings, cross-builder ports, audits and splits.
+
+**Decision.**
+1. **Found work is fixed in the round (R1).** A case found while fixing an item, with the same cause and the same chokepoint, is fixed inside that item, and the round's play sheet gets its own case for it, marked *found in round*. A finding that is not the same cause is a checklist line or comment on its parent issue (R4), not a new issue. A found case whose student-visible outcome nobody ruled on still needs a ruling (rule 7). The round collects those in ONE list in its report and posts them to the roadmap page's decisions panel (idea 7), and it never files one issue per question.
+2. **The operator plays only 🎮 (R2).** ✅ verified and 👁 look cases are closed by the session.
+   - A 👁 case closes on an assertion that replaces the look: page text, a measured distance, a row status, a count read from the rendered panel. Where no assertion can say it, it closes on a **blind review**: a subagent that receives only the case's student-facing description (lines, Look for) and its screenshots, never the fix, the plan or the session's expectation, and answers pass or fail with what it saw. A fail goes back to the fix, as a red case does today.
+   - **Spot audit:** about one auto-closed case in ten, picked at random, is added to the operator's next 🎮 session. A failed audit returns that kind of case (its product and what it checks) to 🎮 until three clean audits.
+   - A case for a bug **he reported** is 👁 at most, and goes into a short digest (his sentence and the screenshot) that closes unless he objects within a day.
+   - **Anything beyond what he asked for stays 🎮** ([ADR-W-117](#adr-w-117)), as do a new refusal or status sentence shown in full ([ADR-W-154](#adr-w-154)) and every feature PR.
+   - **His session is capped at about ten 🎮 cases**, ranked by risk (idea 8). More than that splits into the next session, never into a longer one.
+3. **Families (R3).** All open issues are swept into families (parent, children, why), and the operator approves each family whole. Exact duplicates merge without asking. A merged child closes "not planned" with a link to its parent, so nothing is lost and a merge can be undone.
+4. **Check before filing (R4).** Every new issue's body says where it was looked for: `Searched: <queries> — no parent`, or `Parent: #N` for a child filed on purpose. `scripts/issue-create-guard.mjs` refuses `gh issue create` without one of these lines. A finding that fits an existing issue goes there as a comment or checklist line. A closed or parked issue hit again is **reopened**, never filed fresh.
+5. **A round with nothing for the operator deploys itself.** A round whose sheet has no 🎮 case and which opened no feature PR deploys per docs/RUNBOOK.md on: the batch's full suite green, every ✅/👁 case closed under §2, and the post-deploy prod smoke green. It then closes its own round issue, which skips `awaiting-play`, and reports with the deploy tag and the spot-audit cases. A round with any 🎮 case or PR waits for his play, as before. Every deploy is tagged, so a rollback is one step.
+6. **Approved, built as their own items under #2654:**
+   - (1) each round's net queue change and his minutes, on the roadmap page; a round that does not shrink the queue is flagged;
+   - (2) one cross-builder parity table, where a gap is a cell, not an issue;
+   - (3) a deterministic sibling-phrasing generator through the real parser, whose failing variants are tests, not issues;
+   - (4) a session-found P3 that no user or operator ever hit, idle 30 days, moves to a known-gaps list and closes, and is reopened on a hit;
+   - (5) a standing-rulings list, so most `[proposed]` lines resolve by precedent;
+   - (6) the exam corpus replays in the batch's full suite only, with its cost measured before it becomes a gate;
+   - (7) rulings a round needs go to the decisions panel while it carries on;
+   - (8) the ~10-case cap in §2.
+
+**Consequences.**
+- A round's report counts what it closed and what it left open.
+- A round with nothing for the operator now reaches students without his play. The spot audits are what keep that honest.
+- The play sheet still lists every case (rule 5), but only its 🎮 section is his sitting.
+- The rule-7 boundary is unchanged: a found case outside what he asked for is still a question, not a fix.

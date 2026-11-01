@@ -28,6 +28,13 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
+**Check before filing ([ADR-W-168](06w-decisions-workspace.md#adr-w-168), #2654).** Before filing, search the open issues, and the closed ones of the same product, for the family the finding belongs to.
+- **It fits an existing issue:** add it there as a comment or a checklist line. Do not file.
+- **It fits a closed or parked one:** reopen that issue.
+- **It is genuinely new:** the body carries a line `Searched: <the queries you ran> — no parent`, or `Parent: #N` for a child filed on purpose.
+
+A PreToolUse hook (`scripts/issue-create-guard.mjs`) refuses `gh issue create` without one of those lines. In the four weeks to 1 Nov, sessions filed 815 issues, most of them siblings of an issue already open.
+
 **The title leads with his words.** Its first clause is the sentence the operator typed, in Hebrew «guillemets»; the class name goes after the dash. He finds his reports by scanning titles for his own words, and re-reports one he cannot see (#1323).
 
 **Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
@@ -37,7 +44,7 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 - **`feature`** — the product cannot do something it should: a sentence it does not read, a capability or surface that does not exist. A "bug" diagnosed as a missing capability is relabelled `feature`. Route: always a PR, played and approved (§4).
 - **`debt`** — the product is right for the student, but the code makes the next change harder, slower or riskier. Nothing a student sees or can do changes. Examples: duplicated mechanisms to hoist into `shell/`, machinery to retire or tidy, performance nobody sees, audits and conformance checks, follow-up bookkeeping, umbrella hardening programmes. Route: straight to `main` like a bug (no PR, no play gate — there is nothing for the operator to judge); its gates are the same tests. Priority: **P3 by default**; **P2 when it blocks other scheduled work** (e.g. a hoist that stops a fourth copy from being written). The moment a debt item would change what a student sees, it is not debt — split that part out as a `bug` or `feature`.
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1), **after the check above, and outside a round**. Inside a round, a same-cause finding is fixed in the item (§2d, ADR-W-168): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
 
 **`icebox` is parked, not dead.** A parked issue is closed "not planned" with a comment saying it is reopened when a student hits it or the operator asks; `/log-triage` reopens one when the prod logs show a student hitting it (#1804). Nothing that shows something false is ever parked: a wrong figure, a false "contradicts", a silent misread, a guide sentence that fails.
 
@@ -204,7 +211,7 @@ in the artifact database for a later session to read with `read_db` — and reco
 issue ([ADR-W-068](06w-decisions-workspace.md#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054), universalising
 [ADR-W-054](06w-decisions-workspace.md)'s overnight-only clause). The artifact is the operator's surface;
 the issue stays the durable ledger, all three copies carry the same case list, and the operator plays the
-batch in one sitting and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
+batch's 🎮 cases in one sitting and **closes the round issue as the validation signal**. A round with no 🎮 case closes it itself (ADR-W-168, below). Open P1s or a stale `in-round` issue stop a
 round before it starts — a P1 is never taken silently, and there is never a second live round.
 
 **Since [ADR-W-092](06w-decisions-workspace.md#adr-w-092) the sheet is PRE-PLAYED.** The round writes a
@@ -221,6 +228,14 @@ which answers `/api/parse` itself. A case that exercises the AI lane declares th
 `/playsheet` skill.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
+
+**Since [ADR-W-168](06w-decisions-workspace.md#adr-w-168) (operator ruling 2026-11-01, #2654) a round shrinks the queue, and the operator plays only 🎮.**
+- **Found work is fixed in the round.** A case found while fixing an item, with the same cause and the same chokepoint, is fixed inside that item and gets its own case on the sheet, marked *found in round*. Anything else is a line on its parent issue (§1). A found case whose student-visible outcome nobody ruled on is a question: the round lists those in its report and on the roadmap page's decisions panel, never as one issue each.
+- **The session closes ✅ and 👁.** A 👁 case closes on an assertion that replaces the look (page text, a measured distance, a row status). Where no assertion can say it, it closes on a **blind review**: a subagent given only the case's lines, its Look-for and its screenshots, never the fix or the plan.
+- **Spot audits keep that honest.** About one auto-closed case in ten goes into the operator's next sitting. A failed audit returns that kind of case to 🎮 until three clean audits.
+- **His sitting is the 🎮 cases only, about ten at most**, ranked by risk. A bug he reported is 👁 at most, in a skim digest that closes unless he objects within a day.
+- **A round with no 🎮 case and no feature PR deploys itself** (§5) and closes its own round issue; it never takes `awaiting-play`. A round with any 🎮 case or PR waits for his play, as before.
+- **A round's report counts its effect on the queue:** items closed, issues it filed, and how many of those are still open.
 
 **Gating and landing (ADR-W-034, operator ruling 2026-08-30; per-item gate amended by ADR-W-113):** each
 item is gated on `tsc`, build, `npm run test:fast` (every product) and its own new or changed test files
@@ -330,6 +345,9 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 ## 5. Main, deploys, and the deploy log
 
 - **`main` is the trunk** — always green (CI), always deployable. `rebuild-foundation` is retired; sessions work on `main` + topic branches. *(Migrated 2026-07-10: main fast-forwarded to the rebuild-foundation head.)*
+- **When a deploy happens** ([ADR-W-168](06w-decisions-workspace.md#adr-w-168), operator 2026-11-01: *"if nothing needs my attention, you should deploy automatically"*):
+  - **Nothing for him:** a round or fix with no 🎮 case and no feature PR deploys as soon as the full suite is green and every ✅/👁 case is closed (§2d). It is then checked on prod with a playsheet smoke.
+  - **Something for him:** anything with a 🎮 case deploys after his play, and a feature after he approves its PR.
 - **Deploy only committed state** from `main`, following **[RUNBOOK.md](RUNBOOK.md)**. The old habit of deploying an uncommitted working tree is retired — commit (or PR-merge) first, so every prod bundle is reconstructable.
 - **Every deploy gets:** a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit, **and** an entry in **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (date, tag, commit, which app(s), bundle hash, one-line what-changed). The deploy log is canonical; its bottom table holds the untagged deploys made before adoption.
 - Why it matters here specifically: log-triage re-runs prod utterances against HEAD, silently assuming prod ≈ HEAD; the tag + log make "what is actually live?" answerable (the ADR-115 "stale dev server" class, prod edition).

@@ -117,10 +117,9 @@ summary, not prose. The operator works down it without opening any other documen
 5. **Every server named is RUNNING and `curl`-checked**; one port per unmerged PR, from its own
    worktree. A list pointing at a dead port is not a finished report.
 6. **Every case is PRE-PLAYED before the sheet ships** ([ADR-W-092](docs/06w-decisions-workspace.md#adr-w-092)):
-   the session drives it in a real browser (`npm run playsheet -- --sheet <spec>`), reads the
-   screenshots, and a mechanically red case goes back to the fix — the operator never receives one.
-   Cases are classed **🎮 play** (needs the operator's hands/judgment) · **👁 look** (judge from the
-   embedded screenshot, no typing) · **✅ verified** (record only); the published `report.html`
+   the session drives it in a browser (`npm run playsheet`), reads the shots, fixes any red case first.
+   Cases are classed **🎮 play** (**all he plays**) · **👁 look** · **✅ verified**,
+   both closed by the session, spot-audited (ADR-W-168); the published `report.html`
    carries the evidence, and the chat report keeps the 🎮 utterances copy-pasteable per rule 3.
 
 How: the `/playsheet` skill. Enforced by the `Stop` hook `scripts/ensure-test-server.mjs`, which fails
@@ -157,7 +156,7 @@ and needs his dated ruling.
 Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-decisions.md#adr-265)).
 
 **Every operator report or request is FILED as a GitHub issue first** (`gh issue create` on
-`dcodish/geo_builder`, even when fixed in the same session). Labels: type `bug`/`feature`/`debt` + priority
+`dcodish/geo_builder`, even when fixed in the same session). **Check first**: a fitting find is a comment on its parent (ADR-W-168). Labels: type `bug`/`feature`/`debt` + priority
 `P1`/`P2`/`P3`/`later` by who hit it and the plan, + marks `wrong-answer`/`reported`
 ([docs/22 §2](docs/22-workflow.md); P1 = a wrong answer a person hit) + product `2d`/`3d`/`analytic`/`complex`/`server`/`workspace`; `needs-operator` when blocked
 on a decision; `icebox` for a closed, parked issue (never one that shows something false); `auto-ok`
@@ -176,7 +175,7 @@ never silently built under a bug's banner.
   feature branch — and **branch in a worktree** when the tree has uncommitted work, never `git checkout`
   over it. Worktree paths, cleanup, and the `node_modules` junction hazard: [docs/22 §7](docs/22-workflow.md).
 - **`main` is the trunk** — always green, always deployable. **Deploys use only committed `main` state**, per
-  [docs/RUNBOOK.md](docs/RUNBOOK.md), each with a `prod/YYYY-MM-DD[-n]` tag and a DEPLOY-LOG entry; a session runs them itself, never hands them back.
+  [docs/RUNBOOK.md](docs/RUNBOOK.md), each with a `prod/YYYY-MM-DD[-n]` tag and a DEPLOY-LOG entry; a session runs them itself, never hands them back. With no 🎮 case or PR, it deploys now (ADR-W-168).
 - **Commit ⇒ push.** GitHub is the real backup and the only channel to the other machine.
 
 ## Multi-product workspace

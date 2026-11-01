@@ -89,6 +89,8 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
     --label workspace --label in-round --body-file <composition.md>
   ```
 
+  The body's first line is `Searched: n/a — round ledger, not a work item`, which the issue-creation hook
+  requires (ADR-W-168).
   Initial body: the announced composition verbatim (per item: issues, plan gist, route), **plus
   every current- and next-week plan item NOT picked and why** (unarmed, needs a build session, cap,
   chokepoint, `needs-operator`), **and the pull candidates** (outside the plan, so not composed) — so
@@ -216,6 +218,11 @@ Each item, inside its stream:
    '{"branch":"…","sha":"…","adrs":[…],"deviations":"…"}'` when its gates are green (a feature emits
    `pr --data '{"pr":N}'` instead) · or `escalated` / `closed` with a one-line `--note`. A failed emit
    (exit 2) is a typo to fix, not a step to skip.
+4c. **Found work is fixed here, not filed** ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168), operator 2026-11-01:
+   *"issues found during a round are fixed immediately are the test case of the round tests them"*).
+   - **Same cause, same chokepoint:** a case the fix turns up that has the item's cause and chokepoint (a sibling phrasing, the same gap in another spelling) is fixed inside the item. It gets its own play-sheet case, marked *found in round*, and a line in the item's ledger entry.
+   - **Anything else:** a comment or checklist line on its parent issue (docs/22 §1). A new issue only when the search finds no parent; the issue-creation hook asks for the `Searched:` line.
+   - **A found case whose student-visible outcome nobody ruled on** (rule 7) is not fixed. It goes in the round report's **Questions** list and on the roadmap page's decisions panel, and the stream carries on.
 5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
@@ -322,6 +329,13 @@ Final body, in order:
   different ports. The numbering still runs **continuously across every section**, and an empty
   section is omitted rather than printed as an empty heading.
   ([ADR-W-028](../../../docs/06w-decisions-workspace.md))
+- **Queue effect**, one machine-greppable line beside the stats line
+  ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)):
+  `queue: closed=N filed=N filed-open=N found-in-round=N`. Here `filed` counts every issue this round
+  filed, `filed-open` how many of those are still open, and `found-in-round` how many found cases it
+  fixed in place. A round whose `closed` is not above `filed-open` says why in the Heads-up.
+- **Questions** — the found cases that need a ruling (Step 2, 4c), one line each. They are also posted
+  on the roadmap page's decisions panel.
 - **The published report's URL** (Step 5b), on its own line near the top — the artifact is the
   operator's surface onto this ledger, and a URL that lives only in the session chat is lost.
 - **The stats line**, exactly this machine-greppable form, always last:
@@ -329,8 +343,10 @@ Final body, in order:
   — the Phase-2 landing-policy decision (#543) aggregates these by listing round issues,
   never by re-reading prose.
 
-The operator plays, files normal issue reports for anything wrong, and **closes the round
-issue when done** — that close is the validation signal. `/status-update` reads open
+**Who closes what** ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)):
+- **✅ and 👁 cases are closed by the session**, on an assertion or a blind review, with spot audits (the `/playsheet` skill §3b).
+- **No 🎮 case and no PR:** the round deploys itself (Step 7) and closes its own round issue, and it never takes `awaiting-play`.
+- **Otherwise** the operator plays the 🎮 cases, at most about ten, ranked by risk, plus the spot audits. He files normal reports for anything wrong and **closes the round issue when done**. That close is the validation signal, and the deploy follows it. `/status-update` reads open
 `awaiting-play` issues as the validation queue and open `in-round` issues as a round
 executing now or crashed mid-flight.
 
@@ -397,12 +413,29 @@ what's blocked on them): open `needs-operator` decisions (one line each, the que
 and remaining planned issues awaiting `auto-ok` (so the NEXT round can be armed with one
 reply). Keep it to one short list; `/status-update` stays the full surface.
 
+## Step 7 — deploy when nothing needs him
+
+Operator, 2026-11-01: *"if nothing needs my attention, you should deploy automatically."*
+([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168).)
+
+**When the round deploys itself.** All of these must hold:
+- the round has no 🎮 case and opened no feature PR;
+- the batch's full suite is green (read from `reports/suite-verdict.json`);
+- every ✅/👁 case is closed under the `/playsheet` skill §3b.
+
+**How.**
+1. Deploy per docs/RUNBOOK.md, from the pushed `main` tip: preflight, upload, tag, a DEPLOY-LOG row.
+2. Run the prod smoke: a `scripts/playsheets/prod-<date>.json` sheet against https://themathbible.com, with the round's own cases and one load case per builder.
+3. A red smoke rolls back to the previous `prod/*` tag and reports it.
+
+The final message names the tag and lists the spot-audit cases queued for his next sitting. A round with any 🎮 case or PR does not deploy. Its deploy follows his play.
+
 ## What a round NEVER does
 
 Pick anything without `auto-ok` · write a fix plan for an unplanned issue · merge a feature PR
-· deploy · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
+· deploy before his play when it has a 🎮 case or a PR (Step 7) · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
 question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
-an escalation · exceed the announced composition mid-round (found new work → file an issue, never armed by the round:
+an escalation · exceed the announced composition mid-round (found new work of the same cause is fixed in its item, Step 2 4c; anything else → a line on its parent, or an issue only when no parent exists, never armed by the round:
 a bug with the priority the round judges by docs/22 §2 — a round's own find is never `reported`, so a
 `wrong-answer` it finds is P2, not P1; a feature `needs-operator` with a proposed priority — ADR-W-117 Am. 1) · take a default on an open question · ship a `[proposed]` outcome ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips

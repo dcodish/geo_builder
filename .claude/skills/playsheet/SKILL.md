@@ -42,9 +42,13 @@ A case is a claim about the product, so it is measured before it goes on the she
   and fact-keyed wiring never fires (#943). Enumerate the surfaces by how far the input got: refused at
   parse, refused before commit, committed then failed.
 - **A new or rewritten refusal or status sentence is shown IN FULL** in its case (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)): his play of it is the approval, so the sheet quotes the whole Hebrew sentence, never a paraphrase.
-- **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (he judges the embedded screenshot)
-  · ✅ verified (record only). **Anything beyond what he asked for is always 🎮** and is named in the
-  Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)).
+- **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (judged from the screenshot) ·
+  ✅ verified (an assertion decides it). **Since [ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)
+  he plays only 🎮**: you close ✅ and 👁 yourself (§3b).
+  - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); a new or rewritten refusal or status sentence shown in full; every feature PR's cases.
+  - **👁 at most:** a case for a bug he reported. It goes in the skim digest (§3b).
+  - **Prefer ✅.** Write `expect` / `expectAbsent` / `expectRefusal` so the driver decides the case, rather than a Look-for only an eye can check.
+  - **Cap his sitting at about ten 🎮 cases**, ranked by risk; the rest move to the next sitting.
 - **His screenshot shows the whole run.** Before diagnosing a reported case from one, re-run the case's own
   lines on a clear canvas and read his run in the dev log (docs/17 §5 step 1); earlier cases' marks are in
   the frame (#1116 T32).
@@ -116,6 +120,18 @@ believing a red, and never change the product to satisfy them.
 Verify such a case with a timed probe built on the driver's helpers (`APPS`, `refusals`, `dismissModal`)
 that waits for «חושב» to disappear, on the branch AND on `main`, and record it as verified-by-probe with
 the timings. A probe reporting ~3 ms per line never waited.
+
+## 3b. Close ✅ and 👁 without him (ADR-W-168)
+
+Operator, 2026-11-01: *"all look and verified items can be closed automatically without me spenmding time on them."*
+
+- **✅ verified** closes when the driver's assertions pass and you have read the screenshot.
+- **👁 look** closes on one of two things:
+  1. **An assertion that replaces the look.** Turn the Look-for into `expect` text, a row status, a count read from the rendered panel, or a measured distance in a bespoke probe. This is the default: most "look" cases are a sentence on the page.
+  2. **A blind review**, when no assertion can say it (a shape, a placement, a colour). Spawn a subagent with ONLY the case's lines, its Look-for and Before, and the screenshot paths. Never give it the fix, the plan, the issue or your expectation. Ask for pass or fail and one line on what it saw. A fail is a red case: it goes back to the fix.
+- **Spot audit.** Pick about one closed ✅/👁 case in ten at random. Put it in his next 🎮 sitting, under a "Spot audit" heading. If he fails one, its kind (product × what it checks) is 🎮 again until three clean audits; record that on #2654.
+- **The reported-bug digest.** A case for a bug he reported goes in a short list at the top of the report: his own sentence, the screenshot, one line on what changed. It closes unless he objects within a day.
+- **Record** each closure in the report: the case, how it closed (assertion / blind review), and the reviewer's line.
 
 ## 4. Publish it
 
