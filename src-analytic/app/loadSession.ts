@@ -13,7 +13,7 @@
 
 import { derive } from '../engine/derive';
 import { logAnalytic } from '../debug/sessionLogAnalytic';
-import { useAnalyticStore } from '../store/useAnalyticStore';
+import { cleanSeed, useAnalyticStore } from '../store/useAnalyticStore';
 import { parseLine } from '../parser/parseAnalytic';
 import { activeOf, rowOf } from './active';
 
@@ -30,7 +30,7 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
   const st = useAnalyticStore.getState();
   st.restore({
     lines: savedLines,
-    seed: typeof envelope.seed === 'number' ? envelope.seed : 0,
+    seed: cleanSeed(envelope.seed),
     name: typeof envelope.name === 'string' ? envelope.name : fallbackName,
     // #1632 (ADR-AG-199) — the AI lane's display sentences. `serialize` wrote them and this call never
     // passed them on, so a loaded file showed the canonical command lines in place of the student's own

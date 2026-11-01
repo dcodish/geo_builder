@@ -21,10 +21,11 @@ import { canonicalConstraint } from '../engine/solve';
 import { parseLine } from '../parser/parseAnalytic';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { analyticI18n } from '../i18n';
+import type { Seed } from '../engine/evaluate';
 
 const TRI = ['משולש ABC'];
 
-const angleDeg = (lines: string[], v: string, a: string, b: string, seed = 0) => {
+const angleDeg = (lines: string[], v: string, a: string, b: string, seed: Seed = 0) => {
   const d = derive(lines, seed);
   const P = (id: string) => d.figure.points.find((q) => q.id === id)!;
   const V = P(v), A = P(a), B = P(b);
@@ -97,7 +98,7 @@ describe('#1407 — the figure HOLDS the stated angle, over 24 seeds and «הצ�
   });
 
   it('and across the button\'s own walk to other configurations', () => {
-    let seed = 0;
+    let seed: Seed = 0;
     for (let press = 0; press < 5; press += 1) {
       const next = anotherConfiguration(lines, seed);
       expect(next.found, `press ${press}`).toBe(true);

@@ -18,6 +18,7 @@ import { derive } from '../engine/derive';
 import { anotherConfiguration } from '../app/another';
 import { INITIAL_VIEW, boxContains, viewAfterChange, viewBox, type CanvasView } from '../render/view';
 import type { Box } from '../engine/curves';
+import type { Seed } from '../engine/evaluate';
 
 const SURFACE = { width: 1200, height: 800 };
 const PRESSES = 24;
@@ -41,7 +42,7 @@ describe('#1624 — every press leaves the whole figure inside the view', () => 
   for (const noun of NOUNS) {
     it(`«${noun}»: ${PRESSES} presses — every point and segment end inside, a fitting press keeps the frame, no press shrinks it`, () => {
       const lines = [noun];
-      let seed = 0;
+      let seed: Seed = 0;
       let d = derive(lines, seed);
       let view: CanvasView = INITIAL_VIEW;
       let shown = viewBox(d.box, view, SURFACE);

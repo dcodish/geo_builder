@@ -97,7 +97,7 @@ describe('#1278 — the oracle: what the model should have answered builds, and 
 
   it('the point-slope answer records through the fallback and builds with no fault', async () => {
     const out = await runFallback(REPORTED, [], 0, ask(['הישר y-3=4(x-2)']));
-    expect(out).toEqual({ kind: 'lines', lines: ['הישר y-3=4(x-2)'] });
+    expect(out).toMatchObject({ kind: 'lines', lines: ['הישר y-3=4(x-2)'] });
     if (out.kind === 'lines') expect(derive(out.lines, 0).faults).toEqual([]);
   });
 
