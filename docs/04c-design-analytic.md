@@ -65,6 +65,17 @@ unreached; a solved parameter or vertex keeps the old start. Configuration 0 nev
 wide)` carries the flag through the choice walk, the created-shape fit, the restarts and `drawableAt`'s walk from 0.
 `residualScale` keeps the ruled span.
 
+**A letter that names a measure starts at the measure** ([ADR-AG-365](06c-decisions-analytic.md#adr-ag-365), #2632):
+`carriers.ts` `labelRows` finds each symbol whose first row is a NAME — it reads that symbol alone, no object and no
+earlier row reads it, and its value is the bare symbol (an angle's value in any measure, an area's value, one side of a
+length equation whose other side is measures). `evaluate.ts` `labelsFromFigure` runs after the line fit and the
+created-shape fit: the symbol takes its row's measure on the seeded figure, unless the value falls outside the symbol's
+domain or a selector that reads it rejects it (a stated range wins: the sample is kept and the row is a given). A name
+nothing else reads is left out of stage one's system and measured again on stage one's solution, so a figure with
+givens before the name solves exactly as it did without it. `settledLabels` (names of symbols with no stated range) are
+read as met by the structural stages: `lineGroupsOf` skips their rows, and the line fit's and stage one's budget/start
+policy counts only the open symbols (`openSymbols`).
+
 **The freedom count has one rank** ([ADR-AG-309](06c-decisions-analytic.md#adr-ag-309), #2383): `solve.ts`
 `jacobianRank` — the central-difference Jacobian, rows equilibrated to unit length, a one-sided Jacobi SVD, a singular
 value counted above `RANK_REL_TOL · σ_max` (`10 · SOLVE_TOL`, the residue a dependent row keeps at an accepted solve).

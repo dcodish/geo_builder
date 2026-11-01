@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
@@ -2369,7 +2369,10 @@ function lineGroupsOf(c: Construction): LineGroups {
   const moved = new Set<Id>();
   /** The vertices a row through a symbol would move (its latest line's): the joint solve places them, so no group fits them. */
   const joint = new Set<Id>();
+  const labels = new Set(settledLabels(c).values());
   for (const k of c.constraints) {
+    // A row naming a measure the figure has (#2632, ADR-AG-365): its symbol meets it, so it moves no vertex.
+    if (labels.has(k)) continue;
     const top = topOf(k);
     if (!top) continue;
     if (throughSymbol(k)) {
@@ -2465,7 +2468,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
   if (!on) return;
   const scale = residualScale(c, env);
   // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
-  const budget = paramRegister(c).length > 0 ? 40 : 120;
+  const budget = openSymbols(c).length > 0 ? 40 : 120;
   for (const g of groups) {
     const asMap = (x: number[]): Map<Id, Pt> => {
       const m = new Map(seeded);
@@ -2769,6 +2772,97 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
     env,
   );
   return { env: out, pins };
+}
+
+/**
+ * The names (`labelRows`) whose symbol carries no STATED range — a name whatever the figure measures, so the structural
+ * stages (which vertices a row moves, the fit's budget) can treat its row as met before any value is read (#2632). A
+ * symbol the student bounded («α < 30» · «∢ABC = α») is a name only where the figure's measure lies inside the range:
+ * those stages keep its row as a given, as before, and the value is decided in `labelsFromFigure`.
+ */
+function settledLabels(c: Construction): ReadonlyMap<string, Constraint> {
+  const labels = labelRows(c);
+  // a range is stated as a declaration's domain, or as a comparison («α < 30» is a selector the judge holds)
+  const bounded = [
+    ...c.params.filter((p) => p.domain.min !== undefined || p.domain.max !== undefined).map((p) => p.sym),
+    ...constraintSymbols(c.selectors as never),
+  ];
+  return bounded.some((sym) => labels.has(sym)) ? new Map([...labels].filter(([sym]) => !bounded.includes(sym))) : labels;
+}
+
+/** The register's symbols no row NAMES from the figure (`labelRows`, #2632) — the ones the solve has to find. */
+function openSymbols(c: Construction): string[] {
+  const labels = settledLabels(c);
+  return paramRegister(c)
+    .map((p) => p.sym)
+    .filter((s) => !labels.has(s));
+}
+
+/**
+ * A SYMBOL A ROW NAMES STARTS AT THE FIGURE'S OWN MEASURE (#2632, [ADR-AG-365](../../docs/06c-decisions-analytic.md#adr-ag-365),
+ * amending ADR-AG-144's "every parameter held at its sample").
+ *
+ * «משולש ABC» · «נקודה M על BC» · «נסמן זוית BAM כ-A1»: `∠A1` was sampled independently of the figure (47.31° at seed 0),
+ * and stage one, holding it there, moved the triangle until ∠BAM was 47.31° — the figure redrew at every seed (13.2 at
+ * worst), for a sentence that only gave a measure a name. 2-D reads the same sentence as a name (`measure-*` with a
+ * variable, `angle-alias`) and moves nothing. So each symbol `labelRows` finds takes the value its row measures on the
+ * figure as it stood — the seeded vertices, after every earlier line was fitted — and the row holds before any solve.
+ *
+ * A STATED RANGE WINS: a value outside the symbol's domain (its declaration narrowed by the range its use implies, the
+ * sampler's own domain), or one a stated comparison rejects («α < 30» is a selector), keeps the sample, and the row is
+ * then a real given, solved as before (measured on #1622 E5). A measure that cannot be
+ * read (a ray of no length) or does not make the row hold (a sin row on the other root) keeps the sample too. One
+ * measure per symbol, no solve. Returns the symbols set, which stage one does not count as unknowns.
+ */
+function labelsFromFigure(
+  c: Construction,
+  env: Env,
+  seeded: ReadonlyMap<Id, Pt>,
+  only?: ReadonlySet<string>,
+): { env: Env; labelled: ReadonlySet<string> } {
+  const labels = only ? new Map([...labelRows(c)].filter(([sym]) => only.has(sym))) : labelRows(c);
+  if (labels.size === 0) return { env, labelled: new Set() };
+  const domains = new Map(paramRegister(c).map((p) => [p.sym, p.domain] as const));
+  const pos = place(c, env, new Map(seeded));
+  const at = (id: Id) => pos.get(id) ?? null;
+  const curveAt = curveAtOf(c, env, at);
+  const lineAt = lineAtOf(c, env, at);
+  const scale = residualScale(c, env);
+  const out: Record<string, number> = { ...env };
+  const labelled = new Set<string>();
+  for (const [sym, k] of labels) {
+    let v: number | null = null;
+    if (k.t === 'angle') {
+      const [pv, pa, pb] = [at(k.at.v), at(k.at.a), at(k.at.b)];
+      const theta = pv && pa && pb ? angleAt(pv, pa, pb) : null;
+      if (theta !== null) {
+        v = k.measure === 'tan' ? Math.tan(theta) : k.measure === 'cos' ? Math.cos(theta) : k.measure === 'sin' ? Math.sin(theta) : (theta * 180) / Math.PI;
+      }
+    } else if (k.t === 'area') {
+      const ps = k.ids.map(at);
+      if (ps.every((p): p is Pt => p !== null)) {
+        let s = 0;
+        ps.forEach((p, i) => {
+          const q = ps[(i + 1) % ps.length];
+          s += p.x * q.y - q.x * p.y;
+        });
+        v = Math.abs(s) / 2;
+      }
+    } else if (k.t === 'length-eq') {
+      v = evalLengthExpr(k.left.terms.length === 0 ? k.right : k.left, at, env, lineAt, curveAt);
+    }
+    if (v === null || !Number.isFinite(v)) continue;
+    if (!inDomain(narrowedDomain(domains.get(sym) ?? {}, impliedRange(c, sym)), v)) continue;
+    const trial = { ...out, [sym]: v };
+    // …a range stated as a comparison («α < 30», a selector) wins the same way
+    const ranges = c.selectors.filter((s) => constraintSymbols([s] as never).includes(sym));
+    if (ranges.length > 0 && failingSelectors({ ...c, selectors: ranges }, pos, trial).length > 0) continue;
+    const r = residual(k, at, trial, curveAt, lineAt, scale);
+    if (!r || r.some((e) => !(Math.abs(e) < 1e-9))) continue;
+    out[sym] = v;
+    labelled.add(sym);
+  }
+  return { env: out, labelled };
 }
 
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1, wide = seed !== 0): Figure {
@@ -3240,6 +3334,10 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     for (const [id, p] of fitted.seeded) seeded.set(id, p);
   }
 
+  // A symbol a row names from the figure starts at the figure's own measure (#2632, ADR-AG-365): the row already holds.
+  const named = labelsFromFigure(c, env, seeded);
+  env = named.env;
+
   const unsatisfied: Constraint[] = [];
   /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
   const collapsedRings: Id[] = [];
@@ -3265,7 +3363,21 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * old solve could never reach — a given that DETERMINES a parameter — and it is the only case in
    * which moving one is honest.
    */
-  const stageOne = carrierSystem(c, env, { params: 'fixed' });
+  /*
+   * A NAME NOTHING ELSE READS is not asked of stage one (#2632, ADR-AG-365): «משולש ABC» · «AB = 5» · «זווית A = α» — the
+   * seeded triangle does not yet hold AB = 5, so α measured there would make stage one solve a triangle the figure
+   * without the name never drew. Stage one solves the figure without such rows, exactly as it did before the name, and
+   * the symbol is measured on what it found. A symbol another row reads («AB = a» · «AC = a») keeps its seeded measure
+   * and its row: the later row is a real given.
+   */
+  const pureNames = new Set(
+    [...named.labelled].filter((sym) => {
+      const own = labelRows(c).get(sym);
+      return !c.constraints.some((k) => k !== own && constraintSymbols([k]).includes(sym)) && !constraintSymbols(c.selectors as never).includes(sym);
+    }),
+  );
+  const pureRows = new Set([...pureNames].map((sym) => labelRows(c).get(sym)));
+  const stageOne = carrierSystem(pureRows.size > 0 ? { ...c, constraints: c.constraints.filter((k) => !pureRows.has(k)) } : c, env, { params: 'fixed' });
   let converged = false;
 
   /**
@@ -3425,8 +3537,11 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       // …and asked from the SEEDED start alone when parameters exist: the restarts (a bounded crossing's
       // quarter points, the seed pushed off itself) are stage two's attempts, walked in the student's order.
       // A figure with no parameters keeps the multi-start as it always was.
-      const budget = solved.syms.length > 0 ? 40 : 120;
-      const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
+      // A symbol a row names from the figure (#2632, ADR-AG-365) already holds its row: it is no unknown the question
+      // asks about, so a figure whose only symbols are such names keeps the multi-start the figure without them ran.
+      const open = solved.syms.filter((sym) => !named.labelled.has(sym)).length;
+      const budget = open > 0 ? 40 : 120;
+      const vertexStarts = open > 0 ? [starts[0]] : starts;
       const first = solvePreferring(
         vertexStarts.map((m) => stageOne.toVec(m)),
         stageOne.residualsAt,
@@ -3435,16 +3550,24 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         (x) => selectorsHoldAt(stageOne, x),
         // With parameters, stage one is only a question (see below) and stage two — where a parameter can
         // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
-        (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
+        (x) => (open > 0 ? [] : separatedFrom(stageOne, x)),
       );
       firstEffort = stageOne.asMap(first.values);
+      // …and each name nothing else reads is measured on the figure stage one found (#2632, ADR-AG-365).
+      // A name whose measure there cannot be read (a collapsed side) leaves its row unmet: stage one is then no answer.
+      let pureUnmet = false;
+      if (pureNames.size > 0) {
+        const re = labelsFromFigure(c, env, firstEffort, pureNames);
+        env = re.env;
+        pureUnmet = [...pureNames].some((sym) => !re.labelled.has(sym));
+      }
       // A converged stage one the selectors reject is not the answer while a parameter could still move
       // (#1463): at the seed's radius only the COLLAPSED kite fits the circle, and the configuration the
       // selectors accept needs the radius to change. Stage two is tried with the parameters free, and this
       // solution is its fallback — so a figure no configuration rescues draws exactly what it drew.
-      const stageOneRejected = first.ok && solved.syms.length > 0 && !selectorsHoldAt(stageOne, first.values);
+      const stageOneRejected = first.ok && open > 0 && !selectorsHoldAt(stageOne, first.values);
       if (stageOneRejected) stageOneFallback = { ...first, values: solved.toVec(firstEffort, env) };
-      if ((first.ok && !stageOneRejected) || solved.syms.length === 0) {
+      if ((first.ok && !stageOneRejected && !pureUnmet) || solved.syms.length === 0) {
         converged = true;
         free = firstEffort;
         solvedVec = solved.toVec(free, env);
