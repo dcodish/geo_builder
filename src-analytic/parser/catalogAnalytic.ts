@@ -666,6 +666,18 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['נתונה אליפסה שמשוואתה x^2/8+y^2/2=1', 'A(2,1)'],
   },
   { category: 'conics', family: 'F6', he: 'דרך P עובר משיק לאליפסה', en: 'a tangent to the ellipse passes through P', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'P(10,0)'] },
+  // --- F6 · a circle and a conic (#2618 PR 2, ADR-AG-360 / ADR-AG-361) — not featured, as the rows above ---
+  { category: 'conics', family: 'F6', he: 'המעגל משיק לאליפסה', en: 'the circle is tangent to the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'נתון מעגל M'] },
+  {
+    category: 'conics',
+    family: 'F6',
+    he: 'המעגל משיק לאליפסה בנקודות B ו-D',
+    en: 'the circle is tangent to the ellipse at B and D',
+    needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1', 'B ו-D נקודות החיתוך של האליפסה עם ציר ה-y', 'נתון מעגל M'],
+  },
+  { category: 'conics', family: 'F6', he: 'המעגל משיק לפרבולה', en: 'the circle is tangent to the parabola', needs: ['נתונה פרבולה שמשוואתה y^2=8x', 'נתון מעגל M'] },
+  { category: 'conics', family: 'F6', he: 'מעגל חסום באליפסה', en: 'a circle is inscribed in the ellipse', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
+  { category: 'conics', family: 'F6', he: 'האליפסה חסומה במעגל', en: 'the ellipse is inscribed in a circle', needs: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'] },
 
   // Unfeatured for #1501 (provisional, flagged for the operator): the named form of the same
   // equation capability — «נתון מעגל I שמשוואתו …» — stays featured.

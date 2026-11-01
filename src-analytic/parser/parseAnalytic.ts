@@ -4156,6 +4156,22 @@ function parseCircleAt(line: string): RuleOutcome {
     new RegExp(`^(?:the\\s+)?(${CONIC_NOUN_EN})$`, 'i').exec(trim(objectText));
   if (conicObject) {
     const host = conicHostOf(conicObject[1])!;
+    /*
+     * A CIRCLE SUBJECT (#2618 PR 2, ADR-AG-360) — «המעגל משיק לאליפסה», «מעגל M משיק לפרבולה בנקודה B», «המעגל משיק
+     * לאליפסה בנקודות B ו-D», "the circle is tangent to the ellipse at B": ONE circle, contextual or named (a centre
+     * letter, a numeral), resolved by the one circle slot (bind, state on the letter, or draw); the touch points named or
+     * the tool's. A size or position tail, a branch word or «זה לזה» is not this reading.
+     */
+    if (subject?.kind === 'one') {
+      if (subject.radius !== undefined || subject.placed !== undefined || subject.coords !== undefined) return null;
+      if (mods.branch || mods.reciprocal) return null;
+      const ats = mods.ats ?? (mods.at !== undefined ? [mods.at] : undefined);
+      if (ats && new Set(ats).size !== ats.length) return refuse('repeated-vertex', line);
+      return aboutCircles([oneCircleSlot(subject.name)], [
+        ...declareAll(ats ?? [], line),
+        { t: 'circle-conic', circle: SLOT1, host, ...(ats ? { ats } : {}), src: line },
+      ], line);
+    }
     const targets = tangentTargets(subjectText);
     if (!targets || targets.circles.length > 0 || mods.branch || mods.reciprocal) return null;
     if (touchApplies(targets, mods)) {
@@ -4547,6 +4563,40 @@ function parseConicInscribed(line: string): RuleOutcome {
   if (vEn) {
     const [, noun, run, conic] = vEn;
     return conic ? conicInscribedFacts(noun, run, conicHostOf(conic)!, line, true) : cyclicFacts(noun, run, undefined, line, true);
+  }
+  return parseCircleEllipseFit(line);
+}
+
+/*
+ * A CIRCLE INSCRIBED IN THE ELLIPSE, OR AROUND IT (#2618 PR 2, ADR-AG-361; operator ruling 2026-10-30, Q1 → A): the
+ * textbook's figure — the concentric circle through the minor-axis vertices («מעגל חסום באליפסה») or through the
+ * major-axis vertices («האליפסה חסומה במעגל»). The circle is ONE circle, contextual or named, resolved by the one circle
+ * slot: the figure's circle is bound, none draws it, several ask which. The ellipse only: a parabola has no centre.
+ */
+const FIT_CIRCLE_HE = `ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const FIT_CIRCLE_EN = `(?:the\\s+|a\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const FIT_ELLIPSE_EN = '(?:the\\s+|an\\s+)?ellipse';
+const CIRCLE_ELLIPSE_FIT: ReadonlyArray<{ re: RegExp; fit: 'inscribed' | 'circumscribed' }> = [
+  // «(נתון) מעגל חסום באליפסה» · «באליפסה חסום מעגל» · «האליפסה חוסמת את המעגל»
+  { re: new RegExp(`^${HE_GIVEN}${FIT_CIRCLE_HE}\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?אליפסה$`), fit: 'inscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ב(?:ה)?אליפסה\\s+${INSCRIBED_VERB_HE}\\s+${FIT_CIRCLE_HE}$`), fit: 'inscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ה?אליפסה\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?${FIT_CIRCLE_HE}$`), fit: 'inscribed' },
+  // «האליפסה חסומה במעגל» · «במעגל חסומה האליפסה» · «המעגל חוסם את האליפסה»
+  { re: new RegExp(`^${HE_GIVEN}ה?אליפסה\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?${FIT_CIRCLE_HE.replace(/^ה\?/, '')}$`), fit: 'circumscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ב(?:ה)?${FIT_CIRCLE_HE.replace(/^ה\?/, '')}\\s+${INSCRIBED_VERB_HE}\\s+ה?אליפסה$`), fit: 'circumscribed' },
+  { re: new RegExp(`^${HE_GIVEN}${FIT_CIRCLE_HE}\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?ה?אליפסה$`), fit: 'circumscribed' },
+  // "a circle is inscribed in the ellipse" · "the ellipse circumscribes the circle"
+  { re: new RegExp(`^${FIT_CIRCLE_EN}\\s+is\\s+inscribed\\s+in\\s+${FIT_ELLIPSE_EN}$`, 'i'), fit: 'inscribed' },
+  { re: new RegExp(`^${FIT_ELLIPSE_EN}\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+${FIT_CIRCLE_EN}$`, 'i'), fit: 'inscribed' },
+  // "the ellipse is inscribed in a circle" · "the circle circumscribes the ellipse"
+  { re: new RegExp(`^${FIT_ELLIPSE_EN}\\s+is\\s+inscribed\\s+in\\s+${FIT_CIRCLE_EN}$`, 'i'), fit: 'circumscribed' },
+  { re: new RegExp(`^${FIT_CIRCLE_EN}\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+${FIT_ELLIPSE_EN}$`, 'i'), fit: 'circumscribed' },
+];
+
+function parseCircleEllipseFit(line: string): RuleOutcome {
+  for (const { re, fit } of CIRCLE_ELLIPSE_FIT) {
+    const m = re.exec(line);
+    if (m) return aboutCircles([oneCircleSlot(m[1])], [{ t: 'circle-conic', circle: SLOT1, host: 'ellipse', fit, src: line }], line);
   }
   return null;
 }
