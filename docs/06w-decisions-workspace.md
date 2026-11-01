@@ -6594,3 +6594,12 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 - A round with nothing for the operator now reaches students without his play. The spot audits are what keep that honest.
 - The play sheet still lists every case (rule 5), but only its 🎮 section is his sitting.
 - The rule-7 boundary is unchanged: a found case outside what he asked for is still a question, not a fix.
+
+**Amendment 1 (2026-11-01, #2654 step 3) — §2 built: how ✅/👁 close.** Operator, the same day: *"Starr with 3"*.
+- **Measured before building.** The 72 tracked sheets hold 1863 cases: 703 🎮, 711 👁 and 449 ✅. 881 of them already carried a driver check, and 415 👁 cases carried none. So the gain is in turning a Look-for into a check, and the blind review is for the rest.
+- **New driver checks:** `expectFigure` (labels drawn on the figure: the page's largest SVG, which is the figure in all four builders), `expectRows` (a row of the shared givens list, `[data-fact-text]`) and `expectConfigsDiffer` (the drawing's markup hash changes on «הציגו תצורה אחרת»). The text matcher now also folds the drawn prime «′» to the typed «'»: on first contact a 3-D box's «D'» failed against a figure that draws «D′».
+- **A row's status (green, amber, red) is not a check yet.** Each builder draws it differently, and analytic and complex draw none, so it needs a product change to expose.
+- **`scripts/lib/case-closure.mjs`** decides how a case closes (operator / assertion / blind-review), builds the blind packet (lines, Look-for and screenshots, never the title, issue, notes or Before), picks spot audits deterministically, and keeps the ledger.
+- **A demoted kind is audited in full, not reclassed 🎮.** Reclassing would leave nothing of the kind to audit, so it could never be restored. Every closed case of the kind goes to the operator, and three clean audits restore it.
+- **`npm run playsheet:close`** folds the blind verdicts in, queues the audits in the tracked `scripts/playsheets/spot-audits.json`, re-renders the report (🎮, then pending audits, then closed cases with how each closed) and prints `NOTHING FOR THE OPERATOR` or `WAITS FOR HIS PLAY`, the line the §5 deploy reads.
+- **First contact:** `scripts/playsheets/closure-2654-demo.json`, five real cases on all four builders. The run closed three on checks and one on blind review, and left one 🎮. The blind reviewer was given a control: the same 2-D screenshot with a false Look-for («a circle through A, B and C»). It failed the control and passed the true case.

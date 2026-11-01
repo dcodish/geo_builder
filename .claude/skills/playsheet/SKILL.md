@@ -47,7 +47,7 @@ A case is a claim about the product, so it is measured before it goes on the she
   he plays only 🎮**: you close ✅ and 👁 yourself (§3b).
   - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); a new or rewritten refusal or status sentence shown in full; every feature PR's cases.
   - **👁 at most:** a case for a bug he reported. It goes in the skim digest (§3b).
-  - **Prefer ✅.** Write `expect` / `expectAbsent` / `expectRefusal` so the driver decides the case, rather than a Look-for only an eye can check.
+  - **Prefer a check the driver decides** (§3b lists them: page text, a refusal, a drawn label, a givens row, a changed configuration) over a Look-for only an eye can check.
   - **Cap his sitting at about ten 🎮 cases**, ranked by risk; the rest move to the next sitting.
 - **His screenshot shows the whole run.** Before diagnosing a reported case from one, re-run the case's own
   lines on a clear canvas and read his run in the dev log (docs/17 §5 step 1); earlier cases' marks are in
@@ -125,13 +125,42 @@ the timings. A probe reporting ~3 ms per line never waited.
 
 Operator, 2026-11-01: *"all look and verified items can be closed automatically without me spenmding time on them."*
 
-- **✅ verified** closes when the driver's assertions pass and you have read the screenshot.
-- **👁 look** closes on one of two things:
-  1. **An assertion that replaces the look.** Turn the Look-for into `expect` text, a row status, a count read from the rendered panel, or a measured distance in a bespoke probe. This is the default: most "look" cases are a sentence on the page.
-  2. **A blind review**, when no assertion can say it (a shape, a placement, a colour). Spawn a subagent with ONLY the case's lines, its Look-for and Before, and the screenshot paths. Never give it the fix, the plan, the issue or your expectation. Ask for pass or fail and one line on what it saw. A fail is a red case: it goes back to the fix.
-- **Spot audit.** Pick about one closed ✅/👁 case in ten at random. Put it in his next 🎮 sitting, under a "Spot audit" heading. If he fails one, its kind (product × what it checks) is 🎮 again until three clean audits; record that on #2654.
+How a ✅/👁 case closes is decided by its spec (`scripts/lib/case-closure.mjs`):
+
+- **On assertion**, when it carries a check the driver decides. This is the default; write one wherever the Look-for can be said as one:
+  - `expect` / `expectAbsent`: text on the page;
+  - `expectRefusal`: a refusal containing this text;
+  - `expectFigure: ["x²+y²=9", "M"]`: labels DRAWN on the figure (the page's largest SVG, all four builders);
+  - `expectRows: ["נתון מעגל M"]`: a row of the givens list reads this;
+  - `expectConfigsDiffer: true` with `cycles` ≥ 1: «הציגו תצורה אחרת» changes the drawing.
+
+  The matcher ignores bidi marks, and «'» matches the drawn prime «′».
+- **On blind review**, when no check can say it (a shape, a placement, a colour). The driver writes `reports/playsheets/<name>/review.json`: the brief, then per case only its lines, its Look-for and its screenshot paths. Never its title, issue, notes or Before.
+  - Spawn ONE subagent per sheet whose prompt is only "read this file, follow its brief, write `[{id, pass, saw}]` to <path>". Never add the fix, the plan or your expectation.
+  - A fail is a red case and goes back to the fix.
+
+Then close the sheet:
+
+```sh
+npm run playsheet:close -- --sheet scripts/playsheets/<name>.json --reviews <verdicts.json>
+```
+
+It folds the verdicts in and re-renders the report. The report shows 🎮 first, then the pending spot audits, then the closed cases with how each closed. It **exits non-zero while any case is red or unreviewed**. Its last line says `NOTHING FOR THE OPERATOR` (the round may deploy itself, fix-round Step 7) or `WAITS FOR HIS PLAY`.
+
+**Spot audits** are picked by the close step, not by you, deterministically by sheet and case id:
+- about one closed case in ten, at least one;
+- **every** closed case of a demoted kind (builder × how it closed).
+
+They queue in `scripts/playsheets/spot-audits.json` (tracked, commit it) and appear in every report until he answers:
+
+```sh
+npm run playsheet:close -- --pending                                # what his next sitting holds
+npm run playsheet:close -- --audit <sheet>:<id> pass|fail --note "<his words>"
+```
+
+A fail demotes its kind; three clean audits of the kind restore it. Record a demotion on #2654.
+
 - **The reported-bug digest.** A case for a bug he reported goes in a short list at the top of the report: his own sentence, the screenshot, one line on what changed. It closes unless he objects within a day.
-- **Record** each closure in the report: the case, how it closed (assertion / blind review), and the reviewer's line.
 
 ## 4. Publish it
 
