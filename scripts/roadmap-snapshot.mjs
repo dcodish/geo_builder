@@ -7,7 +7,8 @@
  *
  * Usage: node scripts/roadmap-snapshot.mjs <plan.json> <out-dir>   (needs `gh` authenticated)
  * Reads GitHub through the REST API only (`gh api`): cloud routines refuse GraphQL, which `gh issue list/view` use.
- * Writes <out-dir>/issues.json (db doc state/issues) and <out-dir>/snapshot.json (db doc snapshots/<date>).
+ * Writes <out-dir>/issues.json (db doc state/issues), <out-dir>/snapshot.json (db doc snapshots/<date>) and
+ * <out-dir>/history.json (db doc history/open: the open count per day since the first issue, #2652).
  * `issues.json` also carries `outside`: the open P1/P2 issues in a Now or Next tool that no workstream
  * names and nobody has pulled into a week (ADR-W-165). The page offers each one a pull into this week.
  */
@@ -23,16 +24,18 @@ const labelsOf = (i) => i.labels.map((l) => ({ name: l.name }));
 const today = new Date().toISOString().slice(0, 10);
 const weekOf = (d) => { const i = plan.weeks.filter((w) => w.from <= d).length; return d > plan.end ? 6 : i; };
 
-// Every open issue (for phase counts) plus each plan issue's own state (closed ones too).
+// Every issue, open and closed (open ones for the phase counts, all of them for the history), plus each
+// plan issue's own state.
 // The REST issues list includes pull requests; they are dropped, as `gh issue list` did. Pages are
 // requested by number, never with `--paginate`: its next-page links use `repositories/{id}/...`
 // paths, which the cloud proxy refuses (HTTP 403, dry run 2026-10-27).
-const open = [];
+const every = [];
 for (let page = 1; ; page++) {
-  const rows = JSON.parse(gh([`repos/${repo}/issues?state=open&per_page=100&page=${page}`]));
-  for (const i of rows) if (!i.pull_request) open.push({ number: i.number, title: i.title, labels: labelsOf(i), created: i.created_at.slice(0, 10) });
+  const rows = JSON.parse(gh([`repos/${repo}/issues?state=all&per_page=100&page=${page}`]));
+  for (const i of rows) if (!i.pull_request) every.push({ number: i.number, title: i.title, labels: labelsOf(i), created: i.created_at.slice(0, 10), closed: i.state === 'closed' ? (i.closed_at || '').slice(0, 10) || null : null });
   if (rows.length < 100) break;
 }
+const open = every.filter((i) => !i.closed);
 const ids = [...new Set(plan.workstreams.flatMap((w) => w.issues))];
 const issues = {};
 for (const n of ids) {
@@ -99,7 +102,34 @@ for (const p of plan.pulled || []) if (!issues[p.issue]) {
   issues[p.issue] = { t: i.title, s: i.state.toUpperCase(), l: i.labels.map((l) => l.name), closedAt: i.closed_at || null };
 }
 
+// Open issues over time (#2652): the count still open at the end of each day since the first issue, for the
+// whole system and per group, plus opened and closed per week (weeks start Monday, as the plan's do). An issue
+// counts under the tool labels it carries today and by its last close; with two tool labels it counts under each.
+const GROUPS = { '2d': ['2d'], '3d': ['3d'], analytic: ['analytic'], complex: ['complex'], infra: ['server', 'workspace'] };
+const groupsOf = (i) => { const l = i.labels.map((x) => x.name); return Object.keys(GROUPS).filter((g) => GROUPS[g].some((t) => l.includes(t))); };
+const addDays = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const monday = (d) => addDays(d, -((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7));
+const first = every.reduce((m, i) => (i.created < m ? i.created : m), today);
+const days = []; for (let d = first; d <= today; d = addDays(d, 1)) days.push(d);
+const keys = ['all', ...Object.keys(GROUPS)];
+const delta = Object.fromEntries(keys.map((k) => [k, new Array(days.length + 1).fill(0)]));
+const weeks = new Map();
+const week = (d) => { const m = monday(d); if (!weeks.has(m)) weeks.set(m, Object.fromEntries(keys.map((k) => [k, { opened: 0, closed: 0 }]))); return weeks.get(m); };
+const dayIndex = (d) => Math.round((Date.parse(d) - Date.parse(first)) / 864e5);
+for (const i of every) {
+  const ks = ['all', ...groupsOf(i)];
+  for (const k of ks) { delta[k][dayIndex(i.created)]++; week(i.created)[k].opened++; }
+  if (i.closed) for (const k of ks) { delta[k][dayIndex(i.closed)]--; week(i.closed)[k].closed++; }
+}
+const openByDay = Object.fromEntries(keys.map((k) => { let run = 0; return [k, days.map((_, n) => (run += delta[k][n]))]; }));
+const history = {
+  asOf: today, from: first, days, open: openByDay,
+  weeks: [...weeks.keys()].sort().map((from) => ({ from, ...weeks.get(from) })),
+  unlabelled: every.filter((i) => !groupsOf(i).length).length,
+};
+
 mkdirSync(outDir, { recursive: true });
+writeFileSync(`${outDir}/history.json`, JSON.stringify(history));
 writeFileSync(`${outDir}/issues.json`, JSON.stringify({ asOf: today, issues, outside }, null, 1));
 writeFileSync(`${outDir}/snapshot.json`, JSON.stringify({ date: today, week: weekOf(today), openTotal: open.length, phase, byProduct, ws }, null, 1));
 console.log(`snapshot ${today} (week ${weekOf(today)}): ${open.length} open, ${ids.length} plan issues, ${outside.length} outside the plan`);
