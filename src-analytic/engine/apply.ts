@@ -299,6 +299,11 @@ export interface HostRef {
    * sentence with a name in it («P על הפרבולה I»).
    */
   candidates?: string[];
+  /**
+   * Each candidate's OWN kind, parallel to `candidates`, when they differ (#2619 D, ADR-AG-362): «היא» on a figure with
+   * an ellipse and a parabola names each by its noun («האליפסה …, הפרבולה …»), never both by the host's.
+   */
+  kinds?: Array<'circle' | 'parabola' | 'ellipse'>;
 }
 
 export interface ApplyError {
@@ -848,6 +853,9 @@ const PROBE_ENVS: Env[] = [
  * Lifted out of `on-kind` when «BD קוטר במעגל» needed the same question (#1324): a second copy that read
  * the declaration only missed «(x-3)^2+(y-4)^2=9» — measured — and treated the figure as circle-less.
  */
+/** The curves the feminine pronoun «היא» can stand for (#2619 D, ADR-AG-362): «אליפסה» and «פרבולה» are feminine nouns. */
+const FEM_CURVE_KINDS: ReadonlySet<string> = new Set(['ellipse', 'parabola']);
+
 export function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'circle-at' || o.kind === 'circle-thru') return 'circle';
   // A line CONSTRUCTED through a point is a line, however it was stated (#1501; the `on-curve`
@@ -3851,7 +3859,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: lines[0].id }, src: f.src });
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
-      const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      const matches = c.objects.filter((o) =>
+        f.kind === 'tangent' ? isTangentObject(o) : f.pronoun ? FEM_CURVE_KINDS.has(curveKindOf(o) ?? '') : curveKindOf(o) === f.kind,
+      );
+      // «היא» (#2619 D, ADR-AG-362): several of ONE kind is that noun's refusal; of two kinds, each candidate keeps its noun.
+      if (f.pronoun && matches.length !== 1) {
+        const kinds = [...new Set(matches.map((o) => curveKindOf(o) as 'ellipse' | 'parabola'))];
+        if (kinds.length < 2) return { ok: false, error: noHost(f.src, kinds[0] ?? 'ellipse', matches) };
+        const error = noHost(f.src, 'ellipse', matches);
+        if (error.code === 'ambiguous-shape' && error.host?.candidates) error.host.kinds = matches.flatMap((o) => (callable(o) ? [curveKindOf(o) as 'ellipse' | 'parabola'] : []));
+        return { ok: false, error };
+      }
       /*
        * A POINT ON «המעגל» WITH NO CIRCLE: THE SENTENCE STATES IT (#1669 for a chord's end, ADR-AG-204; #1670 for every
        * incidence, ADR-AG-210 — operator 2026-10-02, "analytic should mimic 2d"). The tangency's create path (ADR-AG-198

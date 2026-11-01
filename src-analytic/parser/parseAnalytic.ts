@@ -10293,6 +10293,8 @@ function lineObject(raw: string): LineObject | null {
 /** «הישר CD עובר דרך P» · «CD מכיל את P» · «ישר 3 עובר בנקודה N» · "the line CD passes through P". */
 const CONVERSE_HE = new RegExp(`^${HE_GIVEN}(.+?)\\s+(?:עובר(?:ת)?\\s+(?:דרך|ב-?)\\s*|מכיל(?:ה)?\\s+את\\s+)(.+)$`);
 const CONVERSE_EN = /^(.+?)\s+(?:passes\s+through|goes\s+through|contains)\s+(.+)$/i;
+/** «היא» as the subject (#2619 D): the feminine pronoun, which only a feminine curve (an ellipse, a parabola) takes. */
+const PRONOUN_FEM = /^היא$/;
 
 /** «הצלע BC נמצאת על …» · «האלכסון BD מונח על …» · "the side BC lies on …" — a SIDE as the subject (#1495). */
 const SIDE_ON_HE = new RegExp(
@@ -10364,6 +10366,18 @@ function parseIncidence(line: string): RuleOutcome {
 
   const conv = CONVERSE_HE.exec(line) ?? CONVERSE_EN.exec(line);
   if (conv) {
+    /**
+     * «היא עוברת דרך הנקודה (3,√2)» — the book's sentence about the curve the exercise just gave (#2619 D, ADR-AG-362).
+     * The pronoun is a CONTEXTUAL reference, like «האליפסה»: lowered onto «P על האליפסה», whose `on-kind` fact carries
+     * the pronoun so M1 widens "which curve" to the figure's one curve of that gender (`pronoun: 'fem'` — an ellipse or
+     * a parabola). One point per row (ADR-W-167); a point list stays unread.
+     */
+    if (PRONOUN_FEM.test(trim(conv[1]))) {
+      const slot = pointSlot(conv[2]);
+      if (!slot) return null;
+      const r = viaCanonical(line, slot, (p) => [`${p} על האליפסה`]);
+      return r?.ok ? made(r.facts.map((f) => (f.t === 'on-kind' ? { ...f, pronoun: 'fem' as const } : f))) : r;
+    }
     const obj = lineObject(conv[1]);
     /**
      * «CD עובר דרך מרכז המעגל» (#1619 B1) — the centre by its ROLE, as the point. The same sentence with the

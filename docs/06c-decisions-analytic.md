@@ -14490,3 +14490,26 @@ Fixture `src-analytic/__tests__/fixtures/ellipse-book-p5-26b.analytic.json` (typ
 Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog: 2 rows (He + En), not featured. Perf: 1.0 ms per warm `derive`.
 
 **Behaviour change for a student:** in analytic, «מעגל חסום באליפסה» draws the circle through the ellipse's minor-axis vertices, and «האליפסה חסומה במעגל» the one through its major-axis vertices.
+
+## ADR-AG-362 — «היא» as the subject of the through-sentence is the figure's one ellipse or parabola; #2619's compound lines are scoped back by ADR-W-167 (#2619 parts C and D)
+
+**Date:** 2026-10-31 · **Status:** accepted · feature (analytic), fix round #2645 stream C, branch `feat/2619-ellipse-clauses`. Closes #2619 (parts A and B were [ADR-AG-354](#adr-ag-354)). LADDER stage: none (a parse lowering and M1's contextual resolver).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R210 (new); R203's sources line. · **Design:** [04c](04c-design-analytic.md) § "An ellipse's roles and sizes; the canonical curve with no equation" (the pronoun subject).
+
+**Operator rulings.** 2026-10-30 on #2619: *"now we need to build all capabilities"*. 2026-10-31, [ADR-W-167](06w-decisions-workspace.md#adr-w-167): *"moving forward we do not support cases of 2 inputs in a line and we teach this everytime the user tries"* — a plan that proposes reading a compound sentence is scoped back to its one-given rows.
+
+**Re-measured at pickup** (`fb94d176`, `decideSubmit` → `derive` → `ask`, no model). A and B had landed (ADR-AG-354). Still `not-handled`: «היא עוברת דרך הנקודה (3,√2)» after any ellipse (and after a parabola); every through-list («היא / האליפסה עוברת דרך הנקודות (3,√2) ו-(√6,-2)», «… דרך A ו-B», «המעגל עובר דרך הנקודות (3,4) ו-(0,5)»); every curve introduced inside a relation («הנקודה (3,1) נמצאת על אליפסה שציריה הם צירי השיעורים», «מעגל קנוני חותך את האליפסה בנקודה A …», «נתונה אליפסה קנונית שעוברת דרך B ו-D», p2-11's one-sentence form). Each of those compound lines' one-given rows already records («נתונה אליפסה שציריה הם צירי השיעורים» / «הנקודה (3,1) נמצאת על האליפסה»; «נתון מעגל קנוני» / «המעגל חותך את האליפסה בנקודה A» / «A ברביע הראשון»; «האליפסה עוברת דרך B» / «… D»).
+
+**Decision.**
+1. **The pronoun.** The through-converse reads «היא» as its subject and lowers «היא עוברת דרך P» onto «P על האליפסה», its `on-kind` fact marked `pronoun: 'fem'`. M1 resolves it as it resolves the noun, over the feminine curves (ellipse, parabola): one binds; none, or several of one kind, is that noun's refusal (`errHost.none.ellipse`, `errHost.named` / `errHost.many.*`); an ellipse and a parabola together are refused with `errHost.named`, each candidate under its own noun (`HostRef.kinds`). A circle is not a candidate. No new wording.
+2. **Not built, per ADR-W-167:** the through-list (plan class D's `POINT_LIST`) and the curve introduced inside a relation (plan class C's clause splitter). Both read two or more givens in one line. Their rows build, and are locked. Teaching the rows when a student types the compound line is [#2644](https://github.com/dcodish/geo_builder/issues/2644).
+3. **Not built, a narrowing of the plan:** «הוא» (a circle) and English "it". «הוא» competes with every line in the figure («ישר» is masculine too), and a line through two points is not an object M1's kind resolver counts, so «הוא» beside a line could bind the circle the student did not mean. "it" has no gender at all. Both wait for the operator (asked on #2619).
+
+**2-D (ADR-W-157 / ADR-W-118 B1):** conics are analytic-only (EXCEPTIONS X1/X2); the pronoun is read only about a conic. No parity row (the plan's row was for the through-list, not built).
+
+**Measured after.** p1-8 in the book's words, one point per row, answers x²/12 + y²/8 = 1; p2-11 answers x²/20 + y²/40 = 1; «היא» and «האליפסה» give the same ellipse at seeds 0–3; a parabola reads; a circle beside the ellipse does not compete; none / two ellipses / an ellipse and a parabola are refused as above; the compound lines stay `not-handled`.
+
+**Locks.** `src-analytic/__tests__/issue-2619-pronoun-subject.test.ts`; fixtures `ellipse-book-p1-8-2619`, `ellipse-book-p2-11-2619` (the book's «היא», one point per row), `ellipse-book-p4-24-2619` (p4-24 ג one given per row).
+
+**Behaviour change for a student:** in analytic, «היא עוברת דרך הנקודה …» after an ellipse or a parabola adds the point on it, as «האליפסה עוברת דרך …» does.
