@@ -1,5 +1,19 @@
 {
-  "pending": [],
+  "pending": [
+    {
+      "sheet": "round-2665",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-02",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "נתון: v = (10,-5,0)"
+      ],
+      "lookFor": "A floating arrow v with no dot at its start; the row is green."
+    }
+  ],
   "results": [],
   "demoted": {}
 }

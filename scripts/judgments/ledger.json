@@ -993,6 +993,40 @@
       "limits": "Only a crossing forced onto a named point in every configuration. The «התיכון מ-A» misreading found on #2631 is not decided here.",
       "at": "2026-11-02T15:46:12.151Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-2621-side",
+      "kind": "corpus-priority",
+      "issue": "#2621",
+      "what": "«הישר l עובר מימין לראשית הצירים» as its own row (book p6-2), built",
+      "choice": "P2: the ellipse lesson he dated, 14 Nov; next round with items C and E",
+      "chosen": true,
+      "at": "2026-11-02T17:15:55.213Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2621-parallel",
+      "question": "Analytic: «מעגל O» · «קטע AB» · «ישר המקביל ל-AB חותך את המעגל בנקודות P ו-Q», while 2-D drops the parallel (#2669). What does analytic do?",
+      "class": "cross-tool-parity-when-2d-is-wrong",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Analytic draws a true parallel to AB at a free offset that «הציגו תצורה אחרת» moves, and cuts the circle at P and Q. It does not copy 2-D's dropped relation; 2-D's gap is #2669, plus a known-gap parity row.",
+      "precedents": [
+        {
+          "quote": "Q2 → A: the shape clauses land in analytic now; the 2-D gap gets its own issue (filed alongside).",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/2621#issuecomment-6526778950"
+        },
+        {
+          "quote": "yes — 2-D follows the other two",
+          "date": "2026-10-10",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Not how #2669 is fixed; once 2-D is fixed and differs, it goes back to him. A cross-tool divergence: named in the Heads-up.",
+      "at": "2026-11-02T17:16:49.501Z",
+      "status": "pending"
     }
   ],
   "demoted": {}
