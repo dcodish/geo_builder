@@ -47,7 +47,7 @@ The labels lag reality. Scan for all eight shapes:
 **Rule these OUT — they are not operator questions:**
 
 - An issue with a concrete plan, no open question, no `needs-operator`, and a `## What the student
-  will see` section whose every line is `[asked]`, `[ruled]` or `[2-D]`. Under
+  will see` section whose every line is `[asked]`, `[ruled]`, `[2-D]` or `[judged]`. Under
   [ADR-W-014](../../docs/06w-decisions-workspace.md) Am. 1 as narrowed by ADR-W-117 that is already
   approved; report it as **armable** so the caller arms it. A plan with a `[proposed]` line — or one
   that changes what a student sees with no such section — IS an operator question (CLAUDE.md rule 7):

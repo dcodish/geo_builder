@@ -6603,3 +6603,42 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 - **A demoted kind is audited in full, not reclassed 🎮.** Reclassing would leave nothing of the kind to audit, so it could never be restored. Every closed case of the kind goes to the operator, and three clean audits restore it.
 - **`npm run playsheet:close`** folds the blind verdicts in, queues the audits in the tracked `scripts/playsheets/spot-audits.json`, re-renders the report (🎮, then pending audits, then closed cases with how each closed) and prints `NOTHING FOR THE OPERATOR` or `WAITS FOR HIS PLAY`, the line the §5 deploy reads.
 - **First contact:** `scripts/playsheets/closure-2654-demo.json`, five real cases on all four builders. The run closed three on checks and one on blind review, and left one 🎮. The blind reviewer was given a control: the same 2-D screenshot with a false Look-for («a circle through A, B and C»). It failed the control and passed the true case.
+
+## ADR-W-173 — A judge agent rules on the operator's behalf from his own dated words, and sends back everything else (#2661)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · amends [ADR-W-117](#adr-w-117) (a `[judged]` outcome arms like `[ruled]`) · builds on [ADR-W-168](#adr-w-168) idea 5 (standing rulings)
+
+**Operator:** 2026-11-02, in chat, shown the 31 drafted standing rulings: *"Out if these 31, do you really need me?"*, then *"I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave"*. On the proposed design (a daily digest that stands unless he objects within a day; an overrule is precedent and sends its class back to him until three judgments in a row stand; the reserved list): *"Go ahead. Build this now"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — `.claude/agents/judge.md`, `scripts/precedents.mjs`, `scripts/judgments.mjs` with its tracked ledger `scripts/judgments/ledger.json`, docs/22 §2b and §2e, CLAUDE.md rule 7, the decisions and fix-round skills.
+
+**Context.** Rule 7 sends every student-visible outcome to the operator. The idea-5 research found that most of the questions reaching him are already answered by something he said earlier. Nothing applied his precedent on his behalf, so every plan line waited for him, case by case.
+
+**Decision.**
+1. **The judge** is an agent that receives a question and its options. It never receives the session's recommendation or the fix, so it cannot rubber-stamp them.
+   - It searches the record: `scripts/precedents.mjs`, built from every issue comment that reads as a ruling or quotes him with a date, every ADR that carries his words, and its own judgments that stood or were overruled.
+   - It rules only when his dated words cover the question, and it quotes them, dated and linked. Otherwise it escalates. "He would probably want" is an escalation.
+2. **Never judged:**
+   - reversing a shipped promise;
+   - what he kept for himself;
+   - a feature's scope or priority;
+   - anything with no precedent, or with conflicting precedent no later ruling settles;
+   - a class he took back.
+3. **Recording.** `judgments.mjs record` refuses a ruling without a quoted, dated, linked precedent. A ruling is posted on its issue under `## Judged on the operator's behalf — <date>`, and its plan line takes the new tag `[judged]`, which arms like `[ruled]`. An escalation stays `[proposed]`, `needs-operator`.
+4. **Oversight.**
+   - A ruling appears in his digest with the quote it rests on. It stands after 24 hours unless he objects.
+   - His overrule is recorded in his words and becomes precedent. Its class goes back to him until three judgments of it in a row stand.
+
+**Measured — first use, 2026-11-02.** Four judges took the 31 standing-ruling cards blind, with the recommendations and the drafter's precedents stripped.
+- **14 ruled.** 10 at high confidence, 4 at medium (a general rule from several consistent one-off rulings).
+  - Three rulings chose an outcome no card offered, because his words did not match any option: sr-02, sr-11 and sr-24.
+- **17 escalated.**
+  - **Reserved, as feature scope or priority:** sr-04, sr-06 and sr-31.
+  - **Kept by him:** sr-30, the #1182 pictures.
+  - **Precedents in conflict:** sr-05, sr-19 and sr-22. sr-22 also found that every option assumed two decimals, while his 2026-10-16 rule is at most three.
+  - **No precedent:** the rest.
+- **Precedent index:** 2,579 ruling comments and 781 ADRs with his words, built in about 30 s, refreshed incrementally.
+
+His review of the 14 and his answers to the 17 are on the standing-rulings page. Nothing is armed from them until he has seen them, per his 2026-11-02 ruling on #2661.
+
+**Consequences.** A product question no longer waits for him when he has already answered it. The ones that reach him are the ones only he can answer, each with the reason it came back. A judge that over-reaches is caught by his digest, and corrected by demotion, not by trust.

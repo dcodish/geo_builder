@@ -250,7 +250,7 @@ statement is asserting a given the student never gave.
   constraint, escalates, or errors — it never vanishes); every stated **value** is visible on the figure
   (length, angle, area, letter, right-angle knee) and a stated **relation** is in the givens list, drawn
   only in an opt-in relations layer, never as a mark at rest ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2); error messages name the conflicting *statement*, not internal state.
-- **Nothing the operator did not ask for**: every student-visible change is `[asked]`, `[ruled]` or `[2-D]`
+- **Nothing the operator did not ask for**: every student-visible change is `[asked]`, `[ruled]`, `[2-D]` or `[judged]`
   in the plan's `## What the student will see` (CLAUDE.md rule 7).
 - **ADR names the class**, the mechanism, and the root cause in one paragraph; the commit message
   states the root cause (CLAUDE.md rule 1).

@@ -46,9 +46,9 @@ The layering `engine ← replay ← store` is mechanically enforced by
 
 ## Where the current state lives
 
-**No state in this file.** The live sources, in order of reliability:
+The live sources, in order of reliability:
 
-- **The five decision logs**: [06](docs/06-decisions.md) (2-D, `ADR-NNN`), [06b](docs/06b-decisions-3d.md) (3-D, `ADR-3D-NNN`), [06c](docs/06c-decisions-analytic.md) (analytic, `ADR-AG-NNN`), [06d](docs/06d-decisions-complex.md) (complex, `ADR-CX-NNN`), [06w](docs/06w-decisions-workspace.md) (workspace, `ADR-W-NNN`). They record what was decided and why. The newest entries sit near the end of each log, but not in strict numeric order. A replaced entry carries a **⚠ Superseded** stamp naming its successor; a behaviour the operator has ruled to change before any code changed carries **⚠ Ruled to change**. **An ADR is required for any significant decision.**
+- **The five decision logs**: [06](docs/06-decisions.md) (2-D, `ADR-NNN`), [06b](docs/06b-decisions-3d.md) (3-D, `ADR-3D-NNN`), [06c](docs/06c-decisions-analytic.md) (analytic, `ADR-AG-NNN`), [06d](docs/06d-decisions-complex.md) (complex, `ADR-CX-NNN`), [06w](docs/06w-decisions-workspace.md) (workspace, `ADR-W-NNN`). They record what was decided and why. The newest entries sit near each log's end, not in strict numeric order. A replaced entry carries a **⚠ Superseded** stamp naming its successor; a behaviour the operator has ruled to change before any code changed carries **⚠ Ruled to change**. **An ADR is required for any significant decision.**
 - **What a product promises today** is its requirements doc (rule 6), edited in the same commit as the code. Where an old ADR and the requirements doc differ, the doc and the newer ADR win.
 - **`gh issue list`** — the live queue (labels: type + priority + product). "What's open / what's next" is answered with the **open-issues report** ([docs/22 §2c](docs/22-workflow.md)) — grouped, with complexity and a recommended order — never a raw dump.
 - **`gh pr list`** — work that is finished and pushed but **not merged**: an open PR is a feature awaiting the operator's play-and-approve, and nothing else records it. Pushed is not the finish line ([ADR-W-007](docs/06w-decisions-workspace.md)).
@@ -140,7 +140,7 @@ that a dated operator ruling, or 2-D measured at HEAD, already defines. Anything
 (drawn, hidden, labelled, refused, accepted, read, worded or computed differently) is a **product decision**
 and needs his dated ruling.
 - Every fix plan ends with `## What the student will see`, one line per change, tagged `[asked]` (quote him),
-  `[ruled]` (link), `[2-D]` (measured at a named commit) or `[proposed]`. A `[proposed]` line makes the issue
+  `[ruled]` (link), `[2-D]` (measured at a named commit), `[judged]` (the judge, from his precedent: ADR-W-173) or `[proposed]`. A `[proposed]` line makes the issue
   `needs-operator`; it is never armed.
 - **Measured beats written.** If the pickup measurement contradicts the plan's account of the request, of 2-D
   or of another builder, stop and escalate (docs/17 §8). Never ship "because the plan lists it".
@@ -155,14 +155,13 @@ and needs his dated ruling.
 
 Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-decisions.md#adr-265)).
 
-**Every operator report or request is FILED as a GitHub issue first** (`gh issue create` on
-`dcodish/geo_builder`, even when fixed in the same session). **Check first**: a fitting find is a comment on its parent (ADR-W-168). Labels: type `bug`/`feature`/`debt` + priority
+**Every operator report or request is FILED as a GitHub issue first** (even when fixed in the same session). **Check first**: a fitting find is a comment on its parent (ADR-W-168). Labels: type `bug`/`feature`/`debt` + priority
 `P1`/`P2`/`P3`/`later` by who hit it and the plan, + marks `wrong-answer`/`reported`
 ([docs/22 §2](docs/22-workflow.md); P1 = a wrong answer a person hit) + product `2d`/`3d`/`analytic`/`complex`/`server`/`workspace`; `needs-operator` when blocked
 on a decision; `icebox` for a closed, parked issue (never one that shows something false); `auto-ok`
 marks a fix plan approved for the autonomous `/fix-round` loop. A session applies `auto-ok` only as
 transcription of the operator's explicit approval, or to a plan whose every `What the student will see`
-line is `[asked]`/`[ruled]`/`[2-D]` (rule 7), always with an audit comment (ADR-W-014, ADR-W-117). The loop's round issues carry `awaiting-play` until the
+line is `[asked]`/`[ruled]`/`[2-D]`/`[judged]` (rule 7), always with an audit comment (ADR-W-014, ADR-W-117). The loop's round issues carry `awaiting-play` until the
 operator validates the batch ([docs/22 §2d](docs/22-workflow.md), ADR-W-012). A "bug" diagnosed as a **missing capability is relabelled `feature` and treated as one** —
 never silently built under a bug's banner.
 
