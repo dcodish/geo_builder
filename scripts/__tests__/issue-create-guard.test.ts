@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — a plain .mjs script, deliberately not part of the TS project
-import { checkCommand } from '../issue-create-guard.mjs';
+import { checkCommand, invokesIssueCreate } from '../issue-create-guard.mjs';
 
 const files: Record<string, string> = {
   '/s/searched.md': '## Why\n\nbody\n\nSearched: open 2d issues for "chord through" — no parent.\n',
@@ -38,6 +38,15 @@ describe('#2654 — gh issue create needs a Searched: or Parent: line', () => {
     expect(checkCommand('gh issue create --title x --body "text\nSearched: q — no parent"', read).ok).toBe(true);
     expect(checkCommand("gh issue create --title x --body 'just text'", read).ok).toBe(false);
     expect(checkCommand('gh issue create --title x --body "$(cat <<\'EOF\'\nwhy\nParent: #12\nEOF\n)"', read).ok).toBe(true);
+  });
+  it('fires on a filing, never on a command that only names one (ADR-W-169)', () => {
+    const G = 'gh issue ' + 'create';
+    for (const c of [`cd a && ${G} -t x --body q`, `FOO=1 ${G} -t x --body q`, `& ${G} -t x --body q`, `echo x; gh.exe issue create -t x --body q`, `x=$(${G} -t x --body q)`])
+      expect(invokesIssueCreate(c)).toBe(true);
+    for (const c of [`grep -n "${G}" f`, `git commit -m "refuse ${G}"`, `cat <<EOF\n${G}\nEOF`, `node -e '${G}'`])
+      expect(invokesIssueCreate(c)).toBe(false);
+    expect(checkCommand(`grep -rn "${G}" docs`, read).ok).toBe(true);
+    expect(checkCommand(`${G} --title x --body-file /s/bare.md`, read).reason).toContain('icebox');
   });
   it('fails open on what it cannot read', () => {
     expect(checkCommand('gh issue create --title x --body-file "$F"', read).ok).toBe(true);

@@ -29,11 +29,25 @@ function argAfter(command, flags) {
 }
 
 /**
+ * Does the command RUN `gh issue create`, rather than mention it? Quoted strings and heredoc bodies are
+ * blanked first, then the words must stand at a command position: the start, or after `;` `&` `|` `(`
+ * `$(` or a newline, optionally behind environment assignments or PowerShell's `&` call operator. A
+ * `grep "gh issue create"` or a commit message quoting the rule is not a filing (#2654: the first version
+ * refused the session's own clean-up command for naming it).
+ */
+export function invokesIssueCreate(command) {
+  const bare = command
+    .replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2\s*(?=\n|$)/g, ' ')
+    .replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""');
+  return /(?:^|[;&|(\n]|\$\()\s*(?:\w+=\S*\s+)*(?:&\s*)?gh(?:\.exe)?\s+issue\s+create\b/.test(bare);
+}
+
+/**
  * The verdict for one tool command: `{ ok: true }` or `{ ok: false, reason }`.
  * `readFile(path)` returns the body file's text or throws.
  */
 export function checkCommand(command, readFile, cwd = process.cwd()) {
-  if (typeof command !== 'string' || !/\bgh\s+issue\s+create\b/.test(command)) return { ok: true };
+  if (typeof command !== 'string' || !invokesIssueCreate(command)) return { ok: true };
   const file = argAfter(command, ['--body-file', '-F']);
   let body = null;
   if (file && file !== '-') {
@@ -57,7 +71,8 @@ export function checkCommand(command, readFile, cwd = process.cwd()) {
       'Check before filing (#2654, ADR-W-168): search the open issues for a parent first. ' +
       'If the finding belongs to an existing issue, add it there as a comment or checklist line instead. ' +
       'If it is genuinely new, add a line to the body: "Searched: <the queries you ran> — no parent" ' +
-      '(or "Parent: #N" for a child filed on purpose), then file again.',
+      '(or "Parent: #N" for a child filed on purpose), then file again. ' +
+      'Search the closed `icebox` issues and docs/known-gaps.md too: a parked gap that is hit again is REOPENED, never filed again (ADR-W-169).',
   };
 }
 

@@ -80,6 +80,10 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   a composition below 20 — say so at composition time rather than discovering it at item 14.
 - **Announce the composition** — one line per item (issues, plan gist, route bug/feature) —
   before any code. This is the round's contract; anything not listed is not touched.
+- **Park what nobody hit** ([ADR-W-169](../../../docs/06w-decisions-workspace.md#adr-w-169)): with
+  `plan/current` saved to a file, run `node scripts/known-gaps.mjs --apply --plan <that file>`. It parks
+  idle, never-hit P3 features and debt (`icebox`, closed, a row in `docs/known-gaps.md`, their parity
+  gaps parked). Its file edits ride the batch commit; list the parked issues in the round issue body.
 - **Open the round issue NOW, not at the end** ([ADR-W-013](../../../docs/06w-decisions-workspace.md)) —
   it is the round's live ledger, and creating it before any code makes a crashed session
   discoverable instead of leaving orphaned pushed commits:
@@ -334,6 +338,8 @@ Final body, in order:
   `queue: closed=N filed=N filed-open=N found-in-round=N`. Here `filed` counts every issue this round
   filed, `filed-open` how many of those are still open, and `found-in-round` how many found cases it
   fixed in place. A round whose `closed` is not above `filed-open` says why in the Heads-up.
+  Beside it, the operator's load, as `npm run playsheet:close` prints it: `operator: play=N audits=N`.
+  `scripts/round-metrics.mjs` reads both lines for the roadmap page's "Fix rounds" panel (ADR-W-169).
 - **Questions** — the found cases that need a ruling (Step 2, 4c), one line each. They are also posted
   on the roadmap page's decisions panel.
 - **The published report's URL** (Step 5b), on its own line near the top — the artifact is the

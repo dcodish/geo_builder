@@ -75,6 +75,8 @@ async function closeSheet(sheetPath, reviewsPath, outArg) {
       `${by('closed').filter((r) => r.closure.method === 'blind-review').length} on blind review) · ` +
       `${audits.length} queued as spot audits · ${ledger.pending.length} audits pending in all`,
   );
+  // The round's ledger carries this line verbatim; round-metrics reads it (ADR-W-169).
+  console.log(`ledger line → operator: play=${by('operator').length} audits=${audits.length}`);
   const red = by('red');
   const waiting = by('awaiting-review');
   if (red.length) fail(`${red.length} red case(s): ${red.map((r) => `${r.id}${r.closure.saw ? ` (${r.closure.saw})` : ''}`).join(' · ')}`);

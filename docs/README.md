@@ -60,6 +60,7 @@ design, `02w`/`04w` for shared surfaces), registered in [`DOCS.json`](../DOCS.js
 | — | [LADDER-CX](LADDER-CX.md) | The same contract for the complex-numbers engine |
 | — | [test-scenarios](test-scenarios.md) | Index of every reported-bug regression scenario; parity with the corpus is test-enforced |
 | — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for each app + the proxy, verification, troubleshooting, rollback |
+| — | [known-gaps](known-gaps.md) | Parked P3 features and debt nobody hit; a later hit reopens the original issue (ADR-W-169) |
 | — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live, paired with `prod/*` git tags |
 
 ## Domain & reference
