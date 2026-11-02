@@ -1756,9 +1756,7 @@ Every arm that resolves a curve object answers through `curveAnswer` → `curveE
 
 `SET_FORMER` reads «כל הנקודות M (המקיימות S)». With S, the trial `derive([...d.lines, S])` is traced (`Derivation.lines`, carried like `seed`), and a fault there is `Answer.refused`, worded by `errorText`. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
 
-**A described subject** ([ADR-AG-370](06c-decisions-analytic.md#adr-ag-370), #2620 B). A `LOCUS_OF` subject that is no letter of the figure and no `SET_FORMER` is offered to `describedSubject` (`parser/locusSubject.ts`), a pure rewrite over two enumerated families: «כל הנקודות ש<clause>» (the clause's plural anaphors, `ANAPHORS`, rewritten onto a helper letter, after «נקודה <helper>»), and the meet of two lines («(נקודת) מפגש / חיתוך …», each line a name or a described line, the construction register's `predicate` turning its relative clause into «דרך A עובר ישר <helper line> …»). The trial is `derive([...d.lines, ...lines])`, as R10's; a fault at or after the figure's last line is `Answer.refused` with the fault's detail when it names none of the helpers, else the student's subject. A subject that opens as a family but is not read (`opensAsDescription`) is `unreadable`, never `missing`.
-
-*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported` · `describedSubject` · `opensAsDescription`
+*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported`
 
 ### Measuring by clicking
 

@@ -14583,7 +14583,9 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **2-D (ADR-W-157 / ADR-W-118 B1):** 2-D already builds the copula sentence; parity row `respectively-copula-2620`. 3-D does not read it (`not-handled`): an unscheduled cell (ADR-W-170), not ported here because the plan did not judge the 3-D port. The named-line lesson is X4 (2-D names no line). That analytic TEACHES the exam's imperatives where 2-D builds them is ADR-AG-206's, unchanged.
 
-**Locks.** `src-analytic/__tests__/issue-2620-book-loci.test.ts` (C block); the fixtures above record the taught lines.
+**Locks.** `src-analytic/__tests__/issue-2620-book-construction.test.ts`; fixture `ellipse-book-p9-7-2620` (p9-7's construction in the book's «… הן נקודות על … בהתאמה»).
+
+**Item B withdrawn before merge.** This PR first also carried #2620 B, a locus subject described inside the ask («המקום הגיאומטרי של מפגש הישרים l1 ו-l2», «… של כל הנקודות ש…»). The operator ruled it out on 2026-11-02: *"we should not have these long sentences because they will easily break with slight syntax changes"* and *"we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."* (the typed-ask withdrawal is #2673). B never shipped; its ADR number (370) and requirement (R218) are unused.
 
 **Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
 

@@ -1204,13 +1204,6 @@ a sentence the tool parsed.
 - «M נקודה המקיימת MA = MB» (also «M היא נקודה …», «נקודה M המקיימת …», «… שמקיימת …») is refused with the one-given-per-line message listing «(1) נקודה M  (2) MA = MB», but only when both lines would be accepted in that order. «המקום הגיאומטרי של הנקודות ש…» typed as a given is not read yet; it awaits the operator.
 - Sources: ADR-AG-352, #1177, ADR-AG-067, #2628.
 
-**R218 — the locus of a point the question DESCRIBES is answered as the locus of a lettered point**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «המקום הגיאומטרי של כל הנקודות ש…» (the book's relative clause, its subject in the plural: «מרחקן», «ממרחקן», «מרחקיהן», «המרחק שלהן», «מהן») and «המקום הגיאומטרי של מפגש הישרים l1 ו-l2» (also «נקודת החיתוך של …», «מפגש הישר l1 עם הישר l2», and a line described in the book's words, «מפגש הישר העובר דרך A והמאונך לציר ה-x עם הישר העובר דרך B והמאונך לציר ה-y») answer the locus row the lettered question answers on the same figure, and the figure is untouched (R24). Nothing the tool uses to answer is named on the canvas, in the panel or in the answer. A description the figure refuses is answered with the input's own refusal; a description the tool cannot read is not understood, never a point named by the whole phrase.
-- «A(2,0)» · «מצא את המקום הגיאומטרי של כל הנקודות שמרחקן מ-A הוא 5» → «מעגל · (x − 2)² + y² = 5²»
-- p10-9 with «x^2/16+y^2/12=1»: «המקום הגיאומטרי של מפגש הישרים l1 ו-l2» → «אליפסה · x²/64 + y²/12 = 1»
-- p9-7, its sum of squared distances written «d_{Al}^2 + d_{Bl}^2 = 4» → «אליפסה · x²/20 + y²/5 = 1»
-- A clause in a measure the tool does not read yet (a coordinate point inside a distance, «סכום ריבועי המרחקים») is not understood; it answers when its sentence is read (#2620 A).
-- Sources: ADR-AG-370, #2620.
-
 ---
 
 ## Session and chrome

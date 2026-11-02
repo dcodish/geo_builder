@@ -193,11 +193,8 @@ const RELATIVE = new RegExp(String.raw`(^|\s*,\s*|\s+)(ו?)ה(${PARTICIPLES.join
  */
 const SHE_RELATIVE = new RegExp(String.raw`^ש(?=(?:${PARTICIPLES.join('|')})(?:\s|$))`);
 
-/**
- * Turn the object's relative clauses into its predicate: the first loses «ה» (or a leading «ש»), each later one gains «ו».
- * Exported for the ask lane's described line (#2620 B, `app/locusSubject.ts`): one relative-clause reader.
- */
-export function predicate(rest: string): string {
+/** Turn the object's relative clauses into its predicate: the first loses «ה» (or a leading «ש»), each later one gains «ו». */
+function predicate(rest: string): string {
   let seen = 0;
   return rest
     .replace(SHE_RELATIVE, 'ה')
