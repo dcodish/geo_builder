@@ -14253,3 +14253,16 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/issue-2630-solid-floor.test.ts`: the six measured rows at seeds 0, 1, 2, 3 and 7. Each asserts base[0] at the origin, the first edge on +x, the base at z = 0, the apex or top above, the stated lengths exact, and that the shape still varies. Two more cases: the component given with no solid, and the #794 prism keeping AB = (1,2,3). `issue-1421-gauge.test.ts` is green, unchanged except one test title, which claimed solids were never normalised.
 
 **Consequences.** `src3d/engine/evaluate.ts` (`solidFloorFrame3`, `orientationStated3`, the gate, `Resolve3Opts.solvedFrame`, `knowledgeSamples3`), `src3d/engine/baseShapes.ts` (`baseRingOf`, moved from `apply.ts`).
+
+## ADR-3D-404 — Two letters the drawing puts on one dot get 2-D's notice (#1595)
+
+**Status:** accepted · 2026-11-02 · feature (P2, 3-D) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · operator rulings 2026-09-30 (#1595) and 2026-10-30 (PR #2605 T34) · the cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-17 (new) · **Design:** [04b](04b-design-3d.md) § *A declared shape the drawing no longer is* (the «same point» notice) · **LADDER stage:** none (a read of the drawn figure).
+
+**Context.** Measured at `17f35282` (`decideDeterministic3` → `derive3`): «A(0,0,0) · B(2,0,0) · M אמצע AB · N(1,0,0)» records with N on M; the T34 row «מקבילון ABCDA'B'C'D' · AK = AD» records K by the vector equation (`vec-defined`) on D at seeds 0–7; «משולש ABC · D על AB · AD = AB» puts D on B. No message in any. ADR-3D-399's table left T34 "building silently until #1595".
+
+**Decision.** `samePlace3(p, q)` (crossings3.ts) is the identity test `namedPointAt` already asked (`NAMED_TOL` relative to the point's magnitude), now a predicate both call. `coincidences3(c, positions)` lists every pair of `c.points` (every one is labelled on the canvas) at one place, in placement order, through `shell/converge`'s `coincidentPairs`. `derive3` returns it as `coincidences`; `App3` renders `convergeText` in the blue notice strip (`role="note"`) under the build notices, while `!busy`. `point-coincides` (a NEW derived letter on an existing point, ADR-3D-183) stays a refusal.
+
+**Sibling audit.** 2-D is the reference (ADR-123). Analytic and complex: same item, ADR-AG-366 and ADR-CX-086.
+
+**Behaviour change for a student:** a line whose givens put two letters on one dot still records, and a notice «D ו-K נפלו על אותה נקודה.» now shows while the drawing has the pair.

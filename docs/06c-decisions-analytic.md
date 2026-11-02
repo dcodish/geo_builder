@@ -14513,3 +14513,17 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 **Locks.** `src-analytic/__tests__/issue-2619-pronoun-subject.test.ts`; fixtures `ellipse-book-p1-8-2619`, `ellipse-book-p2-11-2619` (the book's «היא», one point per row), `ellipse-book-p4-24-2619` (p4-24 ג one given per row).
 
 **Behaviour change for a student:** in analytic, «היא עוברת דרך הנקודה …» after an ellipse or a parabola adds the point on it, as «האליפסה עוברת דרך …» does.
+
+## ADR-AG-366 — Two letters the drawing puts on one dot get 2-D's notice (#1595, #2401)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (P2, analytic), fix round #2665 stream T, branch `feat/1595-coincidence-notice`. Operator ruling 2026-09-30 (#1595, playing round #1571 T23 in this tree). Covers #2401 (merged into #1595, 2026-11-01). The cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176). LADDER stage: none (a read of the drawn figure).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R214 (new) · **Design:** [04c](04c-design-analytic.md) § "The configuration search: validity, then preference" (the notice after it).
+
+**Context.** Measured at `17f35282` (`decideSubmit` → `derive`): #1571 T23 «V(0,0) · X(4,0) · Y נמצאת על הישר y=x · שיעור ה-x של Y הוא 0» records Y on V; #2401 «N1(1,1) · N2(1,1) · קטע N1N2» draws a zero-length segment; «משולש ABC · AB=4 · D על AB · AD=4» puts D on B. No message in any. «N אמצע AB» after «M אמצע AB» is refused `already-named` (the #1254 rule) and stays so.
+
+**Decision.** `app/coincidences.ts` `coincidencesOf(d)`: the pairs of `d.figure.points` at one place, at `crossings.apart` (the identity tolerance `pointAt` uses, ADR-AG-021), through `shell/converge`. Not `stackedPairs` (the 1% display ruler of #1526): that one asks "would a student see them stacked", and the sentence says they ARE one point. The App memoises it on the drawn derivation and renders `convergeText` as an ⓘ `Banner kind="notice"` after the narrowing notes. The separation preference (#1526, ADR-AG-181) runs first, so an unforced pair is drawn apart and gets nothing.
+
+**Sibling audit.** 2-D is the reference (ADR-123). 3-D and complex: same item, ADR-3D-404 and ADR-CX-086.
+
+**Behaviour change for a student:** a line whose givens put two letters on one dot still records, and «V ו-Y נפלו על אותה נקודה.» now shows while the drawing has the pair.

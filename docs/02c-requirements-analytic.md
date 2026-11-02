@@ -969,6 +969,11 @@ a sentence the tool parsed.
 **R61 — two distinct named points are never opened on top of each other**. *(Operator: "It should automatically look for a different config and show them differently".)* A preference below validity; closer than a hundredth of the frame counts as stacked. When the coincidence comes from a combination of discrete choices (two circles tangent to M at A on the same side), the opening drawing takes another combination (#2381).
 - Sources: ADR-W-072, ADR-AG-138, #1254, #1526, ADR-AG-181, ADR-AG-302.
 
+**R214 — two letters the givens put on one dot are accepted, and the page says so**. *(Operator: "when 2 dots are on top of each other we should accept but always give a message about it".)* 2-D's sentence, while the drawing has the pair; a NEW name defined onto an existing point stays refused (#1254).
+- «V(0,0)» · «X(4,0)» · «Y נמצאת על הישר y=x» · «שיעור ה-x של Y הוא 0» → recorded, «V ו-Y נפלו על אותה נקודה.»
+- «N1(1,1)» · «N2(1,1)» · «קטע N1N2» → recorded, «N1 ו-N2 נפלו על אותה נקודה.»
+- Sources: ADR-AG-366, ADR-W-176, #1595, #2401.
+
 **R184 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
 - «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)
 - «המעגלים N1 ו-N2 שונים» → two circles; «הישרים l1 ו-l2 שונים», «l1 ≠ l2» → two lines

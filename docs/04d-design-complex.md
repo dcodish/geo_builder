@@ -117,6 +117,10 @@ never as a contradiction or a refutation.
   object at (0,0), known; `buildScene` lifts point objects out of `shapes` into `marks` (one per label),
   and the renderer draws a mark in the point layer's ink and drops the axis letter O while one is shown.
   Because a bare «O» now parses as a statement, the ask lane (#789) never sees it — no routing change.
+- **Two named numbers on one dot are said** ([ADR-CX-086](06d-decisions-complex.md#adr-cx-086), #1595). `app/coincidences.ts`
+  `coincidencesCx(d)` pairs the plotted points whose values agree within the solver's `TOL` relative to their size, named by
+  `display`, through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) per render. A bound letter is
+  one point already (#791), so it never pairs.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference

@@ -1255,6 +1255,11 @@ and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisi
 which stacks two named points may open on a whole, separated candidate of another assignment (`crossSeparated`, below
 the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)).
 
+**After the search: two letters it could not separate are said ([ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), #1595).**
+`app/coincidences.ts` `coincidencesOf(d)` reads the drawn figure's points at `crossings.apart` (identity, not the
+`stackedPairs` display ruler) through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) as an ⓘ
+notice after the narrowing notes, per render.
+
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
 

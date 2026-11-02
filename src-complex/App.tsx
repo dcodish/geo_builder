@@ -58,6 +58,8 @@ import { complexBidi } from './i18n';
 import registry from '../products.json';
 import { EXAMPLE_LINES } from './app/example';
 import { errorText } from './app/errorText';
+import { coincidencesCx } from './app/coincidences';
+import { convergeText } from '../shell/converge';
 import { knowledgeAnswerText } from './replay/scene2';
 
 export function App() {
@@ -407,6 +409,7 @@ export function App() {
     [activeIndex, display],
   );
   const derived2 = useMemo(() => deriveLines(active, seed, seed, queries, letterLines), [active, seed, queries, letterLines]);
+  const coincidences = useMemo(() => coincidencesCx(derived2), [derived2]);
   /** store line index → the chip its row carries (only rows whose two forms compete on the canvas) */
   const chipByLine = useMemo(
     () => new Map(derived2.paramChips.map((c) => [activeIndex[c.line], c] as const)),
@@ -797,6 +800,11 @@ export function App() {
               )}
               {/* #2268 (ADR-CX-084): a true restatement added nothing — a notice, not a refusal */}
               {lastNote && <Banner kind="notice">{t('suite.notice.alreadyDrawn')}</Banner>}
+              {/* #1595 (ADR-CX-086, ADR-W-176): two named numbers on one dot are accepted, and the page always says so —
+                  2-D's ADR-123 sentence through the suite key, read from the drawn figure while it has the pair */}
+              {coincidences.length > 0 && (
+                <Banner kind="notice">ⓘ {convergeText(coincidences, (k, o) => t(k, o) as string)}</Banner>
+              )}
             </InputArea>
           </>}
           factsZone={<>

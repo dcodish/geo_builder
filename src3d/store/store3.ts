@@ -50,7 +50,7 @@ import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, m
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
-import { namedPointAt } from '../engine/crossings3';
+import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
@@ -79,6 +79,9 @@ export interface Derived3 {
   /** #1918 (ADR-3D-313): what the DRAWN figure shows that a stated noun says it cannot be (a declared
    *  trapezoid drawn as a parallelogram) — the amber mismatch channel, derived per render. */
   shapeWarnings: ShapeWarning3[];
+  /** #1595 (ADR-3D-404, ADR-W-176): the pairs of letters the DRAWN figure puts on one dot — what the suite notice
+   *  «{{a}} ו-{{b}} נפלו על אותה נקודה.» reads, derived per render (2-D's ADR-123 `coincidences`). */
+  coincidences: [Id, Id][];
   /** #2235 (ADR-3D-351): each applied fact holding an unnamed shape noun (`shape-ref3`), by id → its commands with the
    *  ring the fold picked. The fact list keeps the reference; every reader that asks "what did this line state?" of
    *  the figure reads these. */
@@ -1922,7 +1925,7 @@ function deriveCore3(
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds, created, readings };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, readings };
 }
 
 export interface Geo3State {

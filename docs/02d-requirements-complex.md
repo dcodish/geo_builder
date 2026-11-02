@@ -83,6 +83,10 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   The angle at the origin between two numbers («∠z1Ow») is not yet read (#2021, after #2181).
   - Sources: [ADR-CX-085](06d-decisions-complex.md#adr-cx-085), #2021 (operator ruling 2026-10-12)
 
+- **FR-GP-9 (Must)** — **Two named numbers on one dot are said.** «z1 = 2+3i» · «z2 = 2+3i» (or «z2 = z1») records, and
+  2-D's notice «z₁ ו-z₂ נפלו על אותה נקודה.» shows while both are on the figure. A letter bound to a number («A = z1») is one
+  point with a dual label, never a pair. Sources: ADR-CX-086, ADR-W-176, #1595.
+
 ## Exactness and configuration
 
 - **FR-CN-1 (Must)** — **The multiplicative core is answered EXACTLY, not numerically.** Products,

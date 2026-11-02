@@ -727,6 +727,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   own knee and the ⟂ adds none.
   - Sources: ADR-3D-360, ADR-3D-366, ADR-W-118 B2 (Am. 3), #2091, #1946, #2103.
 
+- **FR-RD-17 (Must)** — **Two letters the drawing puts on one dot are said.** When the givens put two letters on one
+  point — «מקבילון ABCDA'B'C'D'» · «AK = AD» (K on D), «A(0,0,0)» · «B(2,0,0)» · «M אמצע AB» · «N(1,0,0)» — the line
+  records and 2-D's notice «D ו-K נפלו על אותה נקודה.» shows while the drawing has the pair. A NEW derived letter defined onto
+  an existing point is still refused (`point-coincides`). Sources: ADR-3D-404, ADR-W-176, #1595.
+
 ## Coverage
 
 - **FR-SP-25 (Must)** — **A line that refers to a point the figure lacks creates it.** «M אמצע AB», «AB = 3»,
