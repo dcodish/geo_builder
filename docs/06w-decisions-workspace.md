@@ -6603,3 +6603,51 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 - **A demoted kind is audited in full, not reclassed 🎮.** Reclassing would leave nothing of the kind to audit, so it could never be restored. Every closed case of the kind goes to the operator, and three clean audits restore it.
 - **`npm run playsheet:close`** folds the blind verdicts in, queues the audits in the tracked `scripts/playsheets/spot-audits.json`, re-renders the report (🎮, then pending audits, then closed cases with how each closed) and prints `NOTHING FOR THE OPERATOR` or `WAITS FOR HIS PLAY`, the line the §5 deploy reads.
 - **First contact:** `scripts/playsheets/closure-2654-demo.json`, five real cases on all four builders. The run closed three on checks and one on blind review, and left one 🎮. The blind reviewer was given a control: the same 2-D screenshot with a false Look-for («a circle through A, B and C»). It failed the control and passed the true case.
+
+## ADR-W-169 — Every round is measured by what it did to the queue, and what nobody hit is parked where a later hit reopens it (#2654 ideas 1 and 4)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · builds [ADR-W-168](#adr-w-168) ideas 1 and 4 · keeps [ADR-W-119](#adr-w-119) (closing an owning issue parks its gaps)
+
+**Operator:** 2026-11-01, approving the #2654 ideas: 1 *"ok"* (a round is measured by net queue change and operator minutes, both on the roadmap page; a round that does not shrink the queue is flagged); 4 *"ok - i assume known issues dont go away and if we ever run into them again, we move them back the que and not create new ones. eventually we might reach them"*. 2026-11-02: *"2654:go ahead with the approved items"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — `scripts/round-metrics.mjs`, `scripts/known-gaps.mjs`, `docs/known-gaps.md`, docs/22 §2d, the fix-round, roadmap-refresh and log-triage skills, the roadmap page's "Fix rounds" panel (db doc `history/rounds`).
+
+**Decision.**
+1. **Each round has a row on the roadmap page.** The row shows:
+   - **closed**: the round's items closed by the day after it ended;
+   - **filed**: issues opened during the round that name it (`round #R`);
+   - **net** = filed − closed, flagged ⚑ when it is zero or more;
+   - **the operator's cases** and an estimate of his minutes. The estimate is labelled as one: 3 per 🎮, 1 per 👁 or spot audit, ½ per ✅. Before ADR-W-168 every case went through him.
+
+   A round from 1 Nov writes `queue: …` and `operator: play=N audits=N` in its ledger; `npm run playsheet:close` prints the second line. The script reads those lines. Older rounds are estimated from their composition section and the GitHub record. The roadmap-refresh skill (step 3b) rewrites the doc at every refresh. The script uses REST only, so the daily cloud routine can run it too.
+2. **What nobody hit is parked.** A round runs `known-gaps.mjs --apply` when it composes. It parks every P3 feature or debt item that a session found, that no student and not the operator hit, that has been idle 30 days and that the plan does not name. Parking means:
+   - a comment, then `icebox`, then closed "not planned", with `auto-ok` removed;
+   - a row in `docs/known-gaps.md`;
+   - any parity gap the issue owns is parked in the same batch (ADR-W-119).
+
+   **Bugs are never parked**, whatever their label. docs/22 §2 never parks something that shows something false: a wrong figure, a false «contradicts», a guide sentence that fails. Labels cannot tell those apart from other bugs. `reported`, `wrong-answer`, `needs-operator`, P1/P2 and plan items stay too.
+3. **A later hit reopens the original issue**, under its own number: `known-gaps.mjs --reopen <N> --note …`. It removes the row and un-parks the issue's gaps. `/log-triage` reopens the same way. The issue-create guard's refusal now names the icebox and the known-gaps list.
+4. **The guard fires on a filing, not a mention.** It blanks quoted strings and heredoc bodies, then looks for the filing command at a command position. The first version refused a clean-up command, and an edit script, for only containing the words.
+
+**Found in the same pass.** The family sweep of 2026-11-01 closed eight children that still owned parity gaps in `GAP_ISSUES`. Their gaps now name the parents:
+
+| Children | Parent |
+|---|---|
+| #1171 | #2226 |
+| #1842 | #2644 |
+| #1903 | #1908 |
+| #2342, #2356, #2357 | #2365 |
+| #2448 | #2409 |
+| #2041 (superseded) | #2174 |
+
+Two closed issues, #1888 and #1839, were fixed in 2-D without their port. Their gaps are now parked. Parking by script makes this repair automatic from now on; a manual merge still has to do it by hand.
+
+**Measured (2026-11-02).**
+- **Rounds since 1 Oct:** 31.
+  - Estimated: 447 closed, 345 filed, net −102.
+  - 10 of the 31 did not shrink the queue.
+  - Last five: 52 closed, 42 filed.
+- **Cross-check.** For the six rounds ADR-W-168 counted by hand (52 closed, 47 filed), the script gives 59 closed and 48 filed.
+- **Parking.** 321 open P3s. 15 are idle features or debt items that nobody hit and would park today, before the plan exclusion.
+
+**Consequences.** The ratio the operator questioned is now on the page and in every round's ledger, rather than a one-off measurement. The queue loses issues that stay untouched for a month without losing them: each one is reopened, never filed again.

@@ -252,7 +252,7 @@ export interface KnownGap {
  * 3-D, so they are parked with it until someone files the 3-D plane-height port.
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
-  '#1171': 'open',
+  '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1257': 'open',
   '#1448': 'closed',
   '#1531': 'open',
@@ -263,20 +263,20 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1796': 'open',
   '#1799': 'open',
   '#1802': 'open',
-  '#1842': 'open',
+  '#2644': 'open', // was #1842, merged into #2644 by the #2654 family sweep 2026-11-01
   '#1858': 'open',
-  '#1888': 'open',
+  '#1888': 'closed', // closed as fixed in 2-D without this port: parked (ADR-W-119), found 2026-11-02
   '#1905': 'open',
-  '#1903': 'open',
+  '#1908': 'open', // was #1903, merged into #1908 by the #2654 family sweep 2026-11-01
   '#1961': 'open',
-  '#1839': 'open', // #2018 (ADR-AG-298): analytic does not read a bare role with typed letters until 2-D's reading is ruled
+  '#1839': 'closed', // #2018 (ADR-AG-298): analytic does not read a bare role with typed letters until 2-D's reading is ruled · closed as fixed in 2-D without this port: parked (ADR-W-119), found 2026-11-02
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
-  '#2041': 'open', // #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
+  '#2174': 'open', // was #2041, merged into #2174 by the #2654 family sweep 2026-11-01: #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
 
   '#2131': 'open', // #2090 (ADR-665): analytic does not read the incremental trapezoid mid-segment or «… מקביל לבסיסים»
 
@@ -305,11 +305,9 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2323': 'open', // #2215 (ADR-723): analytic does not read «AB קוטר במעגל O ו-CD מיתר במעגל O» (not-handled)
 
-  '#2342': 'open', // #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30»)
+  '#2365': 'open', // was #2342, merged into #2365 by the #2654 family sweep 2026-11-01: #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30») · was #2356, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane · was #2357, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): analytic sends the same spellings to the model
   '#2327': 'open', // #2177 (ADR-733): analytic does not read the reserved r on a several-circle figure; 2-D refuses it naming the circles
 
-  '#2356': 'open', // #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane
-  '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2417': 'open', // #2395 (ADR-AG-311): 2-D does not read a stated distinctness («P ≠ Q», «המעגלים N1 ו-N2 שונים»)
 
@@ -319,7 +317,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
-  '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
+  '#2409': 'open', // was #2448, merged into #2409 by the #2654 family sweep 2026-11-01: #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2509': 'open', // #2257 (ADR-767): analytic reads no unnamed polygon-in-polygon inscription («הריבוע חסום במשולש EFG»); 2-D moves the drawn square
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
@@ -536,7 +534,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-009', family: 'polygons', steps: ['ABCD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-010', family: 'polygons', steps: ['דלתון ABCD'], expect: 'builds' },
   { id: 'cat-2d-011', family: 'polygons', steps: ['משולש שווה שוקיים ABC'], expect: 'builds' },
-  { id: 'cat-2d-012', family: 'lengths', steps: ['ABC משולש שווה שוקיים (AB=AC)'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1888' }], note: '3-D does not read the parenthetical (it drew «(AB=BC)» with apex A too), so ADR-3D-316 refuses it — "refuse it too" (#1888); reading it in 3-D is found work' },
+  { id: 'cat-2d-012', family: 'lengths', steps: ['ABC משולש שווה שוקיים (AB=AC)'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1888', parked: true }], note: '3-D does not read the parenthetical (it drew «(AB=BC)» with apex A too), so ADR-3D-316 refuses it — "refuse it too" (#1888); reading it in 3-D is found work' },
   { id: 'cat-2d-013', family: 'polygons', steps: ['ריבוע ABCD שצלעו הוא 1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-014', family: 'polygons', steps: ['ריבוע שצלעו 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-015', family: 'lengths', steps: ['מלבן במידות 4*6'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -597,8 +595,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'role-cevian-plain-triangle-2018', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לבסיס'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): a plain triangle has no base (operator ruling 2026-10-13) — 2-D input.roleSideUnresolved' },
   { id: 'role-cevian-equilateral-2018', family: 'cevians-centres', steps: ['משולש שווה צלעות ABC', 'תיכון לבסיס'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): no single base' },
   { id: 'role-cevian-trapezoid-2018', family: 'cevians-centres', steps: ['טרפז ABCD', 'גובה לבסיס'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): 2-D reads the role cevian on a triangle only' },
-  { id: 'role-cevian-typed-foot-1839', family: 'cevians-centres', steps: ['משולש שווה שוקיים ABC', 'AD תיכון לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1839' }, { product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): typed letters with a bare role stay literal in 2-D; whether they pin the apex is #1839, so analytic does not read them yet' },
-  { id: 'role-cevian-lettered-leg-1839', family: 'cevians-centres', steps: ['משולש שווה שוקיים ABC', 'גובה לשוק AC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1839' }, { product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): a lettered leg is literal in 2-D, no pin — #1839' },
+  { id: 'role-cevian-typed-foot-1839', family: 'cevians-centres', steps: ['משולש שווה שוקיים ABC', 'AD תיכון לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1839', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): typed letters with a bare role stay literal in 2-D; whether they pin the apex is #1839, so analytic does not read them yet' },
+  { id: 'role-cevian-lettered-leg-1839', family: 'cevians-centres', steps: ['משולש שווה שוקיים ABC', 'גובה לשוק AC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1839', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: '#2018 (ADR-AG-298): a lettered leg is literal in 2-D, no pin — #1839' },
   { id: 'hypotenuse-no-right-angle', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
   // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
@@ -684,7 +682,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diameter-cut-end-2056', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2056): F, a stated end of the diameter, is put on circle O — cat-2d-128 without «F על מעגל O»' },
   { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic builds it as 4π degrees until #2013 — the verdict row cannot see degrees against length, the class test does' },
   { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic draws a 12.57° arc until #2013' },
-  { id: 'arc-symbol-value-2041', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = x'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2041' }], note: 'ADR-664 (#2041): 2-D asks degrees or length with the ruled sentence; analytic\x27s half of the ruling is open' },
+  { id: 'arc-symbol-value-2041', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = x'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2174' }], note: 'ADR-664 (#2041): 2-D asks degrees or length with the ruled sentence; analytic\x27s half of the ruling is open' },
   { id: 'arc-fresh-2037-01', family: 'chords-arcs', steps: ['קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2037): 2-D creates circle O and puts A and B on it; analytic does the same since ADR-W-162 (#1467 closed #2129)' },
   { id: 'cat-2d-129', family: 'chords-arcs', steps: ['קוטר מנקודה F במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-130', family: 'chords-arcs', steps: ['קוטר העובר בנקודה A במעגל O'], expect: 'builds', exception: 'X8' },
@@ -928,7 +926,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circle-numeral-on', family: 'circles', steps: ['נתון מעגל I', 'P על המעגל I'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1257' }] },
 
   // ── known gaps the audit seeded (B2), re-measured ──
-  { id: 'frame-paren', family: 'frame', steps: ['המרובע ABCD הוא טרפז (AB ∥ CD)'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1888' }], note: '3-D does not read the parenthetical («(AD ∥ BC)» drew AB ∥ CD), so ADR-3D-316 refuses it (#1888)' },
+  { id: 'frame-paren', family: 'frame', steps: ['המרובע ABCD הוא טרפז (AB ∥ CD)'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1888', parked: true }], note: '3-D does not read the parenthetical («(AD ∥ BC)» drew AB ∥ CD), so ADR-3D-316 refuses it (#1888)' },
   { id: 'frame-dash', family: 'frame', steps: ['מעגל O', 'O – מרכז המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'frame-noun-after', family: 'frame', steps: ['המרובע ABCD מלבן'], expect: 'builds' },
   { id: 'frame-figure', family: 'frame', steps: ['בסרטוט שלפניך מתואר משולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -1177,7 +1175,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-line-equation', family: 'topic', steps: ['משוואת הישר AC היא y=-2x+8'], expect: 'builds', exception: 'X2' },
   { id: 'ex-named-line-equation', family: 'topic', steps: ['נתון הישר l1: 4y-3x-20=0'], expect: 'builds', exception: 'X2' },
   { id: 'ex-parametric-line', family: 'topic', steps: ['הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)'], expect: 'builds', exception: 'X3' },
-  { id: 'ex-named-line', family: 'topic', steps: ['ישר l1'], expect: 'builds', exception: 'X4', knownGap: [{ product: 'analytic', issue: '#1171' }] },
+  { id: 'ex-named-line', family: 'topic', steps: ['ישר l1'], expect: 'builds', exception: 'X4', knownGap: [{ product: 'analytic', issue: '#2226' }] },
   { id: 'ex-parameter', family: 'topic', steps: ['k הוא פרמטר'], expect: 'builds', exception: 'X5', only: ['analytic'], note: "3-D declares a parameter its own way («t פרמטר חיובי»)" },
   { id: 'ex-coordinate-of', family: 'topic', steps: ['נקודה A', 'x של A הוא 5'], contextFor: { '3d': [] }, expect: 'builds', exception: 'X6', note: '3-D has no bare point declaration; the coordinate creates A there (#1547)' },
   { id: 'ex-coordinate-of-vertex-1621', family: 'topic', steps: ['משולש ABC', 'שיעור ה-y של הקודקוד A הוא 10'], expect: 'builds', exception: 'X6', note: '#1621: the exam names a vertex «הקודקוד A»' },
@@ -1339,11 +1337,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unlettered-1554-15', family: 'inscribed', steps: ['מעגל חסום בדלתון'], expect: 'builds', exception: 'X8' },
   { id: 'right-trapezoid-1554-16', family: 'inscribed', steps: ['טרפז ישר זווית ABCD חסום במעגל'], expect: 'refused', exception: 'X8', note: 'operator ruling 2026-10-01: a cyclic right trapezoid is a rectangle — refused naming both nouns' },
   // #1798 (ADR-598, operator ruling 2026-10-06): a one-line compound is all or nothing — refused whole when a clause is not honoured
-  { id: 'compound-all-or-none-1798-01', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB מקביל ל-CD ו-D על BC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1842' }] },
+  { id: 'compound-all-or-none-1798-01', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB מקביל ל-CD ו-D על BC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2644' }] },
   { id: 'compound-all-or-none-1798-02', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC'], expect: 'refused' },
-  { id: 'compound-all-or-none-1798-03', family: 'intersections', steps: ['ריבוע ABCD', 'F אמצע DO, O - חיתוך של AC ו-BD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1842' }, { product: '3d', issue: '#1842' }], note: 'analytic reads both clauses and builds; 2-D refuses per the 2026-10-04 #553 ruling — which one should move is the question #1842 asks' },
-  { id: 'compound-all-or-none-1798-04', family: 'lengths', steps: ['מרובע ABCD', 'AB=4, CD=3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
-  { id: 'compound-all-or-none-1798-05', family: 'points-incidence', steps: ['ריבוע ABCD, נקודה G על AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1842' }], note: 'every clause honoured: a compound commits' },
+  { id: 'compound-all-or-none-1798-03', family: 'intersections', steps: ['ריבוע ABCD', 'F אמצע DO, O - חיתוך של AC ו-BD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2644' }, { product: '3d', issue: '#2644' }], note: 'analytic reads both clauses and builds; 2-D refuses per the 2026-10-04 #553 ruling — which one should move is the question #1842 asks' },
+  { id: 'compound-all-or-none-1798-04', family: 'lengths', steps: ['מרובע ABCD', 'AB=4, CD=3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2644' }], note: 'every clause honoured: a compound commits' },
+  { id: 'compound-all-or-none-1798-05', family: 'points-incidence', steps: ['ריבוע ABCD, נקודה G על AD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2644' }], note: 'every clause honoured: a compound commits' },
   // #1832 (ADR-AG-246): a domain on x or y is a restriction on the CURVE — analytic refuses it, never a parameter named x
   { id: 'coordinate-restriction-line-1832', family: 'topic', steps: ['y = 2x + 1, x > 0'], expect: 'refused', exception: 'X2', note: 'used to commit the whole line with a parameter named x' },
   { id: 'coordinate-restriction-circle-1832', family: 'topic', steps: ['x^2 + y^2 = 4, y > 0'], expect: 'refused', exception: 'X2' },
@@ -1373,7 +1371,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-tail-1889-02', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E שהיא אמצע BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1905' }, { product: '3d', issue: '#1679', parked: true }], note: 'analytic reads both parts (E is the midpoint); 2-D reads no relative clause, so it refuses the line whole — reading it is #1905' },
   // #1891 (ADR-606, ADR-3D-311; operator rulings 2026-10-08): a circle inscribed in a pentagon is refused as a known tool
   // limit (W19) until #1908 draws it. 3-D circle geometry is X8 (its own lock); analytic still asks its model (#1903).
-  { id: 'pentagon-incircle-1891', family: 'circles', steps: ['מעגל חסום במחומש ABCDE'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }] },
+  { id: 'pentagon-incircle-1891', family: 'circles', steps: ['מעגל חסום במחומש ABCDE'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1908' }] },
   // #1918 (ADR-607 / ADR-3D-313 / ADR-AG-252, operator ruling 2026-10-08 "Refuse in both"): a declared trapezoid keeps its
   // identity. A circle through a declared right trapezoid is refused in either order (3-D locks its refusal in
   // issue-1918-trapezoid-identity.test.ts — X8 leaves circles out of 3-D's plain rows); a trapezoid forced into a
@@ -1585,7 +1583,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'voices-circum-relative-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל שחוסם את המשולש ABC'], expect: 'builds', note: 'analytic read no relative clause before ADR-AG-275' },
   { id: 'voices-in-named-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל O חסום במשולש ABC'], expect: 'builds' },
   { id: 'voices-in-relative-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל ש-ABC חוסם'], expect: 'builds', note: '3-D drew the circle THROUGH A, B, C before ADR-3D-341 (the #2098 trap)' },
-  { id: 'voices-in-pentagon-refused-1975', family: 'inscribed', steps: ['מחומש ABCDE', 'ABCDE חוסם מעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }], note: 'the other voice of pentagon-incircle-1891 (the same gap); #1908 lifts both' },
+  { id: 'voices-in-pentagon-refused-1975', family: 'inscribed', steps: ['מחומש ABCDE', 'ABCDE חוסם מעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1908' }], note: 'the other voice of pentagon-incircle-1891 (the same gap); #1908 lifts both' },
   { id: 'voices-feminine-inscribed-1975', family: 'inscribed', steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'], expect: 'builds', note: '#2035-01' },
   { id: 'voices-feminine-circumscribes-1975', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חוסמת מעגל'], expect: 'builds', note: '#2035-02' },
   { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
@@ -1718,13 +1716,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'rider-perp-foot-2089', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'E על CD', 'AE ⟂ CD'], expect: 'builds', note: '2-D refused it before ADR-728' },
 
   // ── #2096 / #2106 (ADR-730): a right-angle vertex then «ו-∠…» is refused with the taught list, never a cut inside the angle ──
-  { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2342' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
+  { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2365' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
 
   // ── #2234 / #2143 (ADR-737): "right-angled at X" is never a given and never the AI's, in any spelling (ruling 2026-10-18) ──
-  { id: 'right-angled-at-definite-2234', family: 'angles', steps: ['משולש ABC', 'המשולש ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737; 3-D and analytic still hand it to their model' },
-  { id: 'right-angled-at-bare-2234', family: 'angles', steps: ['משולש ABC', 'ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737' },
-  { id: 'right-angled-at-english-2234', family: 'angles', steps: ['triangle ABC is right-angled at B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737 (#2143 asked it be read; reversed 2026-10-18)' },
-  { id: 'right-angled-at-english-and-2143', family: 'angles', steps: ['triangle ABC right-angled at B and AB = 4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D gave a fragment list «(1) triangle ABC right-  (2) angled at B …» before ADR-737; now the teach with «(3) AB = 4»' },
+  { id: 'right-angled-at-definite-2234', family: 'angles', steps: ['משולש ABC', 'המשולש ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2365' }, { product: 'analytic', issue: '#2365' }], note: '2-D escalated it before ADR-737; 3-D and analytic still hand it to their model' },
+  { id: 'right-angled-at-bare-2234', family: 'angles', steps: ['משולש ABC', 'ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2365' }, { product: 'analytic', issue: '#2365' }], note: '2-D escalated it before ADR-737' },
+  { id: 'right-angled-at-english-2234', family: 'angles', steps: ['triangle ABC is right-angled at B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2365' }, { product: 'analytic', issue: '#2365' }], note: '2-D escalated it before ADR-737 (#2143 asked it be read; reversed 2026-10-18)' },
+  { id: 'right-angled-at-english-and-2143', family: 'angles', steps: ['triangle ABC right-angled at B and AB = 4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2365' }, { product: 'analytic', issue: '#2365' }], note: '2-D gave a fragment list «(1) triangle ABC right-  (2) angled at B …» before ADR-737; now the teach with «(3) AB = 4»' },
   // ── #2195 (ADR-738): an English word is never read as point labels ──
   { id: 'english-words-not-labels-2195', family: 'angles', steps: ['משולש ABC', 'highlight right triangles'], expect: 'not-handled', note: '2-D committed ∠TRI = s («triangles» read as T, R, I) before ADR-738; analytic and 3-D already did not read it' },
 
@@ -1768,7 +1766,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'all-common-tangents-2390', family: 'tangents', steps: ['שני מעגלים זרים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the counts agree since ADR-751 (#2405): both draw the four; the names differ by design (2-D touch letters AB, CD, EF, GH; analytic l1…)' },
   // ── #2405 (ADR-751): 2-D draws the whole set by the pair's stated position; an unstated position asks ──
   { id: 'all-common-tangents-crossing-2405', family: 'tangents', steps: ['שני מעגלים נחתכים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: '2-D draws the two external tangents (ADR-751); before, one' },
-  { id: 'all-common-tangents-ext-touch-2405', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2448' }], note: '2-D draws the two external tangents and the tangent at T (ADR-751); before, one; analytic does not read it on a touching pair' },
+  { id: 'all-common-tangents-ext-touch-2405', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2409' }], note: '2-D draws the two external tangents and the tangent at T (ADR-751); before, one; analytic does not read it on a touching pair' },
   { id: 'all-common-tangents-unstated-2405', family: 'tangents', steps: ['שני מעגלים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2442' }], note: '2-D asks which position (input.ambiguousConstruct, the P1 interim answer of ADR-751); analytic does not read it; the permanent answer for both is #2442' },
   { id: 'touch-tangent-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק המשותף בנקודת ההשקה'], expect: 'builds', exception: 'X8', note: 'analytic did not read it before ADR-AG-314' },
   { id: 'touch-tangent-through-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; 2-D draws a two-touch tangent there, not the tangent at T (found work); analytic did not read it before ADR-AG-314' },
