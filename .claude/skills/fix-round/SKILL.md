@@ -195,7 +195,11 @@ Each item, inside its stream:
 4. **Per-item gates, no exceptions:** a 2-D plane-geometry input change carries its **analytic port
    in the same item**, and its 3-D port when the plan judged it simple ([ADR-W-157](../../../docs/06w-decisions-workspace.md#adr-w-157)):
    parity row agreeing, an analytic (and 3-D) case on the play sheet; a known-gap row only for a
-   prerequisite the plan names. ADR entry in the product's log; per-fix unit test; the
+   prerequisite the plan names. **A port gap is a cell, never a new issue**
+   ([ADR-W-170](../../../docs/06w-decisions-workspace.md#adr-w-170), docs/22 §10): a port left out, or a
+   sibling builder found differing while fixing, is an unscheduled `knownGap: [{ product }]` cell with
+   a `note` naming what that builder lacks. It names an issue only when an open one already owns the port.
+   A port item, when the plan carries one, takes its cells from `npm run parity-table -- --product <p> --state unscheduled`. ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; **`npm run test:fast` green** (every product, ~2 min) plus

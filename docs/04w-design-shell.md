@@ -424,12 +424,15 @@ The 2-D members are `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)
 | --- | --- |
 | `Verdict` | `builds` (recorded, or already known) · `refused` (an owned refusal) · `asks` (a clarifying question: 2-D `clarify`, analytic and 3-D `ambiguous-*`) · `not-handled` (the line would go to the model) |
 | `StepRunner` | the product's REAL submit decision over an empty canvas, carrying the figure forward; one verdict per step |
-| `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` (`{ product, issue, parked? }`) |
+| `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` (`{ product, issue?, parked? }`: one cell per builder that differs; no `issue` = an unscheduled cell, [ADR-W-170](06w-decisions-workspace.md#adr-w-170)) |
+| `gapState(gap)` | a cell's state: `scheduled` (names an open issue) · `unscheduled` (names none) · `parked` (names the closed or iceboxed issue that parked it) |
 | `GAP_ISSUES` | the state (`open` / `closed` / `icebox`) of every issue that owns a gap: a dated `gh issue view` snapshot, because a test cannot call GitHub ([ADR-W-119](06w-decisions-workspace.md#adr-w-119)) |
 | `EXCEPTIONS` X1–X10 (X10: [ADR-W-109](06w-decisions-workspace.md#adr-w-109)) | per family: the builders that read it, the builders that must not BUILD it (`mustRefuse`), whether it is a topic outside plane geometry, and its sentence patterns |
 | `parityFaults(runners)` | per row and product: an early return; a context line that does not build; an expected product off `expect`; a known gap that now gives `expect` ("move it to the parity rows"); a `mustRefuse` product that builds |
 | `catalogCoverageFaults(product, sentences)` | each construction sentence of the catalog is a step of a row the product takes part in, a topic-family sentence the product reads, or on `UNCOVERED_CATALOG` (a ratchet under `UNCOVERED_CEILING`) |
-| `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked; every gap's issue listed in `GAP_ISSUES`, a gap on a closed or iceboxed issue `parked`, no parked gap on an open issue, no snapshot entry that owns no gap |
+| `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked; every gap's issue listed in `GAP_ISSUES`, a gap on a closed or iceboxed issue `parked`, no parked gap on an open issue, no parked gap without its issue, no snapshot entry that owns no gap |
+
+**The table view** (`scripts/parity-table.mjs`, `npm run parity-table`, [ADR-W-170](06w-decisions-workspace.md#adr-w-170)) reads the same module and prints one cell per (row, builder): `agrees` (the row's verdict), `scheduled`, `unscheduled`, `parked`, `exception` (a `mustRefuse` builder) or `unchecked`, with the counts per state. It is a pure read: the thin locks remain the only thing that asserts a cell.
 
 **The runners.**
 - 2-D: `decideDeterministic2D`, applying binds, the batch commit or the store operation as `runSubmit` does.
