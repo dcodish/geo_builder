@@ -6697,3 +6697,39 @@ Two closed issues, #1888 and #1839, were fixed in 2-D without their port. Their 
 - The 110 rows are findings, not issues. Which are fixed, and in which item, is the queue's business; each fix deletes rows.
 - A new catalog sentence is covered on arrival, and a parser change that breaks a spelling that used to work fails the suite.
 - The rows hold the decision of today's parsers, including ones that may be by design (analytic's «V» is not read as a circle centre). A row that turns out to be intended is answered by removing or narrowing the operator, never by a row that stays forever.
+
+## ADR-W-172 — The exam corpus is named and replayable on its own: the batch gate stays `test:full`, which already runs it, and an item replays the exams of the builders it touches (#2654 idea 6)
+
+**Status:** accepted · 2026-11-02 · operator approval of idea 6 in [ADR-W-168](#adr-w-168) · process (workspace)
+
+**Operator:** 2026-11-01, on idea 6 (*"The exam corpus replays as the batch gate (full suite only); an item's quick check replays only the exams it touches. Cost measured and reported before it becomes a gate."*): *"just need to make sure this doesnt create a very long test everytime"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §2d (item gates, "The exam corpus"), docs/08 tier table, the fix-round skill's item gate, `scripts/lib/exam-corpus.mjs`, `scripts/test-exams.mjs`, `src-analytic/__tests__/fixtures.test.ts`.
+
+**Context — measured before building.** "The exam corpus" was not one thing. Every sequence the suite replays from a real exam or textbook question already ran through its builder's real parse → replay → verify path, scattered over these nets:
+
+| Builder | Members | Where they replay | In `test:full` before this ADR |
+|---|---|---|---|
+| 2-D | ~35 bagrut scenarios (of 506), 1 exam fixture (`2022-summer-a-issue59`), the theorem corpus (Q5–Q7 and the 22 B-series booklet questions) | `scenarios-e2e-1..8` (slow tier), `fixtures.test.ts` (slow tier), `src/theorems/__tests__/{corpus,b-corpus}.test.ts` | yes, all |
+| 3-D | the exam GATE files (2019, 2020, 2022, 2023, 2024 Q2; 2026 קיץ ב Q2; the תיבה exam) and 4 exam fixtures (`*-20xx-q2`) | `scenarios3`, `exam-2026-2`, `adr-3d-032`, `fixtures3.test.ts` | yes, all |
+| analytic | the 471 corpus (46 questions, 361 lines), 71 exam/textbook fixtures (of 99: `exam-*`, `ellipse-book-*`, and fixtures whose name cites the exam) | `issue-1618-corpus471-ratchet` (slow tier), `issue-2391-exam-fixtures`, `issue-2393-exam-asks`, and each fixture's own issue test | the ratchet and the issue tests, yes. **The fixtures: only as far as each one's issue test asserts**, and 3 fixtures no test imported |
+| complex | 3 exam fixtures (`exam-*`) | `fixtures.test.ts` | yes |
+
+So the batch half of the idea **was already true**, with one gap: analytic, alone of the four builders, had no fixtures net (docs/22 §9 names its folder, and the other three each run theirs through one zero-authoring net). What was missing everywhere was the ability to *name* the corpus and replay only it.
+
+**Measured cost** (this machine, through the suite lock, while sibling sessions' full suites ran on the same machine, so an upper bound): `npm run test:exams` over all four builders took **88.6 s wall** (247 s of summed test time on parallel workers): 2-D 61 exam units, 120 tests, 152.4 s test time · 3-D 65 units, 73 tests, 59.0 s · analytic 132 units, 274 tests, 35.5 s · complex 3 units, 9 tests, 0.1 s. One builder alone: analytic **30.8 s** (the 471 ratchet is 23.6 s of it), 3-D **45.3 s**, complex **1.3 s**, 2-D **84.4 s** (61 units, 146.9 s test time: the 8 scenario shards each collect the whole 506-scenario corpus, and each bagrut scenario runs its full oracle set, seed sweep included; the slowest is 16.7 s). The new analytic net alone: 99 fixtures, 296 tests, **7.2 s** wall; a probe replaying every analytic fixture twice took 3.1 s, one fixture (`exam-2379-q3-route-2392`) 2.3 s of it. All green.
+
+**Decision.**
+1. **The batch gate stays `npm run test:full`.** Every member already runs in it, so a separate exam stage would replay the corpus twice for nothing. The one addition to `test:full` is the analytic fixtures net (2), **~7 s**: the operator's condition holds.
+2. **Analytic gets its fixtures net** (`src-analytic/__tests__/fixtures.test.ts`), with the 2-D contract: every saved line still parses (drift), the real load path (`loadAnalyticSession`) reports nothing failed, and `derive` at the saved seed has no fault. The two fixtures saved to lock a refusal (`issue-1963-…`, `issue-2115-…`) are listed with the refusal code they must produce, and only those. Its tier is measured like every file's (ADR-394), not pinned: at ~7 s it will sit in the fast tier, as the complex net does.
+3. **The corpus is defined in `scripts/lib/exam-corpus.mjs`**, as files that are exam gates whole plus each builder's general nets filtered by an exam mark in the test's name (`EXAM_NAME`: `bagrut`, `בגרות`, `exam`, `מבחן`, `בחינה`, `קיץ`, `חורף`, `summer`, `winter`, `ellipse-book`, `ספר האליפסה`, `20xx-qN`, `QN`). An exam joins by being named for its exam; no registry to keep.
+4. **`npm run test:exams`** replays it (`--builder X`, `--list`), under the suite lock, and writes `reports/exam-run.json` (gitignored). **`--changed [base]`** (default `origin/main`; committed, uncommitted and untracked files) replays only the builders the diff touches: a builder's own tree or extra root (`fixtures3/`), or a tree it imports by `BOUNDARIES.json`'s allowed edges (today every builder imports `shell/`, so a shell change replays all four), or the toolchain (`package.json`, `tsconfig*`, `vite*`/`vitest*` config). A docs, scripts or server-only diff replays nothing.
+5. **An item's quick check adds `npm run test:exams -- --changed`** after `test:fast` (docs/22 §2d, the fix-round skill's item gate). A typical item touches one builder: complex ~1 s, analytic ~31 s, 3-D ~45 s, 2-D ~84 s; a `shell/` or toolchain change replays all four (~89 s).
+
+**Not built: selecting exams finer than by builder.** A map from each exam to the parser rules and chokepoints it exercises, intersected with the rules a diff changes, would cut an item's replay further. It was not built because the inputs are not there. Import-graph selection (`vitest related`) was measured in ADR-W-113 at 85–110 % of a lane, since nearly every test imports the parser and the engine. A rule-level map needs each parse to report the rule that read each line in all four parsers, plus a hunk-to-rule map for the diff. Cost estimate: the map itself is cheap (it needs a parse, not a replay, and the full replay of all 99 analytic fixtures measured 3.1 s), but the hunk-to-rule step is a parser-wide refactor of four parsers to expose rule identity, and a missed edge silently skips an exam the change broke. Per builder, the replay is already at most ~84 s (2-D) and the batch's full suite still catches anything a narrow selection would miss, so the saving does not pay for that risk today.
+
+**Consequences.**
+- A round's items see an exam regression in their own builder before the batch, at 1–84 s each, and the batch costs ~7 s more.
+- **2-D is the expensive case (84 s).** A lighter 2-D exam replay (replay + verifier only, without the scenario oracles) would be cheaper per item but would replay those scenarios a second time inside `test:full`; it is not built, and is the lever if 84 s per 2-D item proves too long.
+- An exam whose fixture or scenario is not named for its exam is not in `test:exams` (it is still in `test:full`). The 3 analytic fixtures no test imported are now covered by the net.
+- `test:exams` duplicates work that `test:full` also does; that is the price of a quick check and is paid only per item, never at the batch.

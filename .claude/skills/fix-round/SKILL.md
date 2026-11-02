@@ -208,7 +208,8 @@ Each item, inside its stream:
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; **`npm run test:fast` green** (every product, ~2 min) plus
    **every test file the item added or changed, run by path** (a slow-tier file is excluded from
-   `test:fast`, so the item's own heavy locks must be named). **Not the product lane:** a lane
+   `test:fast`, so the item's own heavy locks must be named), plus **`npm run test:exams -- --changed`**
+   (the exams of the builders the diff touches; [ADR-W-172](../../../docs/06w-decisions-workspace.md#adr-w-172)). **Not the product lane:** a lane
    costs 4–11 min because it waits on its slowest file, and only 4 of 59 recorded red full runs
    were caught by slow files alone ([ADR-W-113](../../../docs/06w-decisions-workspace.md#adr-w-113),
    #1813). Those surface at the batch, whose full suite and in-round bisect are built for it. The
