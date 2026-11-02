@@ -165,6 +165,11 @@ const NOUN_RE = new RegExp(String.raw`^(?:את\s+)?(שני\s+)?ה?(${Object.keys
 /** The object's own names — «AD», «EF», «OD ו-BE»: one- or two-letter names, as a list. */
 const SEG = String.raw`(?:${LBL}){1,2}`;
 const LABELS_AFTER_NOUN = new RegExp(String.raw`^(${SEG}(?:\s*(?:,|ו-?)\s*${SEG})*)(?=[\s,]|$)\s*`);
+/**
+ * #2620 C (ADR-AG-371) — a LINE's own name after «ישר»: «דרך N מעבירים ישר **l1** שמקביל ל-PO» (book p10-9). The register's
+ * line names are the parser's `FREE_LINE_NAME` (`l` / `ℓ` and one digit), read only after the noun «ישר».
+ */
+const LINE_LABEL_AFTER_NOUN = /^([ℓl][0-9]?)(?=[\s,]|$)\s*/;
 
 /**
  * The relative participles whose clause becomes the PREDICATE — «ישר **המקביל** לציר ה-x **החותך** את…»
@@ -181,10 +186,18 @@ const PARTICIPLES = [
 ];
 const RELATIVE = new RegExp(String.raw`(^|\s*,\s*|\s+)(ו?)ה(${PARTICIPLES.join('|')})(?=\s|$)`, 'g');
 
-/** Turn the object's relative clauses into its predicate: the first loses «ה», each later one gains «ו». */
+/**
+ * The relative clause written with «ש» right after the object — «ישר l1 **שמקביל** ל-PO» (#2620 C, the book's p10-9) — is
+ * the clause «**המקביל** …»: the same closed participle list. Only at the HEAD of the rest, so a «ש»-clause later in a
+ * line («… לציר ה-x שחותך אותו בנקודה N», the perpendicular's own) is never touched.
+ */
+const SHE_RELATIVE = new RegExp(String.raw`^ש(?=(?:${PARTICIPLES.join('|')})(?:\s|$))`);
+
+/** Turn the object's relative clauses into its predicate: the first loses «ה» (or a leading «ש»), each later one gains «ו». */
 function predicate(rest: string): string {
   let seen = 0;
   return rest
+    .replace(SHE_RELATIVE, 'ה')
     .replace(RELATIVE, (_m, _lead: string, vav: string, p: string) => ` ${seen++ === 0 && !vav ? '' : 'ו'}${p}`)
     .replace(/\s+/g, ' ')
     .trim();
@@ -242,7 +255,7 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   // «שני» counts a PLURAL noun («שני משיקים», «שני אנכים»); before a singular it is not this grammar.
   if (nm[1] && !spec.plural) return [];
   s = s.slice(nm[0].length);
-  const lm = s.match(LABELS_AFTER_NOUN);
+  const lm = s.match(LABELS_AFTER_NOUN) ?? (noun === 'ישר' ? s.match(LINE_LABEL_AFTER_NOUN) : null);
   const labels = lm ? lm[1] : '';
   if (lm) s = s.slice(lm[0].length);
   let rest = predicate(s.replace(/^,\s*/, ''));
@@ -303,6 +316,15 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
       const anchor = from ? fromNp : through ? throughNp : '';
       const anchorLetters = from ? from.labels : through ? through.label : '';
       if ((from && through) || through?.on) return [];
+      /*
+       * #2620 C (ADR-AG-371) — a line NAMED by its own letter through a point: «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught
+       * as the register's named-line sentence «דרך N עובר ישר l1 מקביל ל-PO», its anchor as the student wrote it.
+       */
+      if (noun === 'ישר' && LINE_LABEL_AFTER_NOUN.test(labels)) {
+        if (!through || setting) return [];
+        out.push(join('דרך', through.noun ? `ה${through.noun}` : '', through.label, 'עובר ישר', labels, rest));
+        break;
+      }
       // «דרך E מעבירים קטע EF המקביל ל-DA» — a named segment that already starts at its anchor says it.
       if (labels && anchor && anchorLetters.split(/\s*(?:,|ו-?)\s*/).every((l) => labels.includes(l))) out.push(join(spec.def, labels, rest, tail));
       else out.push(join(spec.def, labels, anchor ? `העובר דרך ${anchor}` : '', rest, tail));
