@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-02",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
     "src-analytic/__tests__/issue-1177-locus-chip.test.ts",
@@ -117,6 +117,7 @@
     "src3d/__tests__/narrowing-note-1996.test.ts",
     "src3d/__tests__/quad-noun-pairs-2169.test.ts",
     "src3d/__tests__/right-apex.test.ts",
+    "src3d/__tests__/sibling-phrasings.test.ts",
     "src3d/__tests__/student-text-1455.test.ts",
     "src3d/__tests__/symbol-pin-collapse.test.ts"
   ]

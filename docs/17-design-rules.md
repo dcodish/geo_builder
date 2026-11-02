@@ -37,6 +37,9 @@ the exemplar). A true class fix usually closes bugs nobody reported yet. If your
 close an unreported sibling, it is a patch. **A sibling has the same wrong outcome** — in another
 spelling, rule, seed or builder. A behaviour the report did not describe is not a sibling: it is a
 `[proposed]` line for the operator, never part of the fix (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
+**Spelling siblings are found by a machine:** for a sentence the guide teaches, the sibling-phrasing
+ratchet already sends its other spellings through every builder's real parser, and a failing one is a
+row of its list, not a new issue (docs/22 §10a, [ADR-W-171](06w-decisions-workspace.md#adr-w-171)).
 
 **Search the SIBLING PRODUCT too** (ADR-W-004). The products copy patterns by design, so they copy
 *defects* by design: ADR-3D-110 is "the ADR-3D-069 shape verbatim", ADR-3D-093 is "the ADR-167 shape",
