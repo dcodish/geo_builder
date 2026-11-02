@@ -363,6 +363,12 @@ From the «lines and points» corpus (§8), numbered onward.
 - «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E»
 - Sources: ADR-AG-224, #1715, #1727.
 
+**R216 — a line given by its direction alone is drawn, its position free**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities" — the ellipse book, p2-15 and p6-2 ב.)* A line parallel or perpendicular to an axis, with no point and no equation, is drawn as `x = c` or `y = c` with `c` unstated: «הציגו תצורה אחרת» moves it, and a later given (a crossing's length, a point on it, the side it crosses an axis on) pins or bounds it. Its equation is printed only once the givens fix it. A named line the figure already has keeps its reading: the sentence is the relation about it. One given per row ([ADR-W-167](06w-decisions-workspace.md#adr-w-167)): the book's compound sentences are written as their rows.
+- «ישר מאונך לציר ה-x», «ישר המקביל לציר ה-y», «נתון ישר l המאונך לציר ה-x», «ישר l מאונך לציר ה-x», "a line perpendicular to the x-axis", "line l parallel to the x-axis"
+- p2-15's «ישר המקביל לציר ה-x חותך את האליפסה בנקודות P ו-Q» is the rows «נתון ישר l המקביל לציר ה-x» · «הישר l חותך את האליפסה בנקודות P ו-Q» (R85); p6-2 ב's «…, שעובר מימין לראשית הצירים» is the row «הישר l חותך את ציר ה-x בנקודה הנמצאת מימין לציר ה-y» (R182). The compound line itself is not read
+- not read here: a direction given by a line rather than an axis («ישר המקביל ל-AB»)
+- Sources: ADR-AG-367, #2621.
+
 ### Circles, tangency and conics
 
 **R63 — a letter after «מעגל» is the centre; a NUMERAL is the circle's own name**. A circle named by a centre letter stays anonymous; «נתון מעגל 1» with no equation is still refused (a gap).
@@ -475,6 +481,12 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R209 — a circle inscribed in the ellipse, or around it**. *(Operator ruling 2026-10-30 on #2618, Q1 → A: the textbook's figure.)* «מעגל חסום באליפסה» is the circle centred at the ellipse's centre through its minor-axis vertices (radius the smaller semi-axis); «האליפסה חסומה במעגל» / «המעגל חוסם את האליפסה» is the one through its major-axis vertices (the larger). The circle is bound, stated or asked about as in R208; a circle the figure already has of another size is refused on the line. The parabola has no centre: «מעגל חסום בפרבולה» is not read.
 - «מעגל חסום באליפסה» on x²/25+y²/9=1 → x²+y²=9; «האליפסה חסומה במעגל» → x²+y²=25; "a circle is inscribed in the ellipse", "the ellipse is inscribed in a circle"
 - Sources: ADR-AG-361, #2618.
+
+**R217 — the drawn tangent is a line every sentence can refer to, and it can be named**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities" — the ellipse book, p4-24 ג.)* «המשיק למעגל בנקודה A» (and bare «המשיק», the figure's one tangent) is read wherever a line is: its slope, its sign, ∥ and ⊥, a line through a point parallel to it. Named by its touch point it is drawn by the sentence that names it, and never twice. Bare, with no tangent or with several, it is refused as «P על המשיק» is, naming no internal id. It takes a name as any constructed line does (R182): the name then refers to it, and the tangent noun still does.
+- «שיפוע המשיק למעגל בנקודה A הוא -16/9», «שיפוע המשיק הוא -16/9», "the slope of the tangent at A is -16/9"
+- «נסמן את המשיק ב-l», «נסמן את המשיק למעגל בנקודה A ב-l», «נסמן ב-l את המשיק», "denote the tangent by l"; a second name is refused naming the first
+- «l הוא המשיק למעגל בנקודה A», «הישר l משיק למעגל בנקודה A» with no l in the figure draw the tangent at A named l; after the unnamed tangent they are R182's restated-line refusal, offering «נסמן את המשיק בנקודה A ב-l»; likewise «P נקודת ההשקה של l2 עם מעגל O_1» with no l2 draws the tangent at P named l2 (it was refused)
+- Sources: ADR-AG-368, #2621.
 
 **R133 — «המעגל» is the circle the figure has**. *(Operator: "The student stated ONE circle twice.")* With two or more circles «המעגל» is refused as ambiguous.
 - «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» → one circle, M at (3,1)

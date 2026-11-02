@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-02T15:55:31.309Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "B",
+          "x": null,
+          "y": null,
+          "z": 3,
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -1
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 0
+            },
+            null
+          ],
+          "syms": [
+            "k",
+            "k",
+            null
+          ],
+          "srcs": [
+            "k-1",
+            "k",
+            "3"
+          ]
+        },
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "C",
+          "x": null,
+          "y": 0,
+          "z": null,
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 1
+            },
+            null,
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -3
+            }
+          ],
+          "syms": [
+            "k",
+            null,
+            "k"
+          ],
+          "srcs": [
+            "k+1",
+            "0",
+            "k-3"
+          ]
+        }
+      ]
+    }
+  ]
+}
