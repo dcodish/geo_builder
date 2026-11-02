@@ -185,7 +185,7 @@ opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-w
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
 is fixed **at the root, per its plan**, in its own worktree under the item gates (ADR + rule-4
-regression lock + `tsc` + build + `test:fast`; the full suite runs once per batch, see "Gating and landing" below).
+regression lock + `tsc` + build + `test:fast` + `test:exams -- --changed`; the full suite runs once per batch, see "Gating and landing" below).
 A plan armed before 2026-10-07 has no outcome section: the round writes it at pickup from the issue
 thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]` escalates. **A round never takes a default
 on an open question** — the item waits for the operator; a P1 session may
@@ -242,6 +242,14 @@ item is gated on `tsc`, build, `npm run test:fast` (every product) and its own n
 run by path, not on its product lane; the FULL suite runs once per batch, on the merged staging tip, and
 the batch lands on `main` in ONE push. Round #822 measured the per-item full-suite alternative at ~5 hours
 for 8 items, and round #1776 spent ≥170 min on 47 per-item lane runs (#1813).
+
+**The exam corpus ([ADR-W-172](06w-decisions-workspace.md#adr-w-172), #2654 idea 6).** Every sequence the suite
+replays from a real exam or textbook question (the bagrut scenarios, the exam fixtures, the 471 corpus, the 3-D
+exam GATE files, the ellipse book) is in the batch's `test:full` already, so the **batch gate is unchanged**. An
+item's quick check adds **`npm run test:exams -- --changed`**: it replays only the exams of the builders the
+item's diff touches (its tree, or a tree it imports per `BOUNDARIES.json`; a docs/scripts/server-only diff
+replays nothing). Measured cost and membership are in the ADR; `scripts/lib/exam-corpus.mjs` defines the corpus,
+and an exam joins it by its name (`exam-…`, `ellipse-book-…`, «קיץ 2024», «bagrut Q4»), with no registry edit.
 
 **Execution (ADR-W-114):** items run in PARALLEL, one background agent per chokepoint stream, each in its
 own worktree. Items sharing a chokepoint are stacked in one stream. Test runs queue on the shared suite lock
