@@ -15,10 +15,15 @@ import { describe, expect, it } from 'vitest';
 import { derive, type Derivation } from '../engine/derive';
 import { centroid, circumcentre, incentre, orthocentre } from '../engine/derived';
 import { decideSubmit } from '../app/submit';
+import { errorText } from '../app/errorText';
+import { analyticI18n } from '../i18n';
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
 type P = { x: number; y: number };
 const TRI = 'משולש ABC';
+type T = (k: string, o?: Record<string, unknown>) => string;
+/** The locale wraps Latin runs in bidi isolates; the lock reads the words. */
+const tHe: T = (k, o) => (analyticI18n.getFixedT('he') as unknown as T)(k, o).replace(/[⁦-⁩]/g, '');
 
 const pt = (d: Derivation, id: string): P => {
   const p = d.figure.points.find((q) => q.id === id);
@@ -210,6 +215,37 @@ describe('#1715 — refusals', () => {
     // through M, which the figure already names — refused naming it
     expect(verdict(steps('line AM', 'perpendicular bisector of BC'))).toBe('refused:crossing-already-named');
     expect(verdict(steps('perpendicular bisector of BC', 'line AM'))).toBe('refused:crossing-already-named');
+  });
+  /*
+   * #2631 (judged A, ADR-W-173; the record is ADR-AG-349): the issue's exact four lines. The perpendicular bisector of
+   * BC and the line AM meet at M in a general triangle, so the sentence is refused NAMING M, the line is not recorded,
+   * and the triangle the student drew stays where it was (before ADR-AG-349 it was redrawn isosceles, AB = AC).
+   */
+  it('#2631: «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» is refused naming M, the triangle unchanged', () => {
+    const context = [TRI, 'M אמצע BC', 'האנך מ-C ל-AB'];
+    for (const line of ['האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E', 'הישר AM והאנך האמצעי לצלע BC נפגשים בנקודה E']) {
+      const lines: string[] = [];
+      for (const step of context) {
+        const v = decideSubmit(step, lines, 0);
+        expect(v.kind, step).toBe('record');
+        if (v.kind === 'record') lines.push(v.line);
+      }
+      const v = decideSubmit(line, lines, 0);
+      expect(v.kind, line).toBe('refused');
+      if (v.kind !== 'refused') continue;
+      expect(v.error.key).toBe('crossing-already-named');
+      expect('holder' in v.error ? v.error.holder : undefined).toBe('M');
+      expect(errorText(v.error, tHe), line).toMatch(/\bM\b/);
+      expect(lines, 'the refused line is not recorded').toEqual(context);
+      for (const seed of [0, 3, 6]) {
+        const before = derive(context, seed);
+        const after = derive(lines, seed);
+        expect(before.faults).toEqual([]);
+        for (const id of ['A', 'B', 'C', 'M']) expect(dist(pt(after, id), pt(before, id))).toBe(0);
+        const [a, b, c] = ['A', 'B', 'C'].map((id) => pt(after, id));
+        expect(Math.abs(dist(a, b) - dist(a, c)) / scaleOf(after), `not made isosceles @${seed}`).toBeGreaterThan(1e-3);
+      }
+    }
   });
   it('parallel lines are `unsatisfiable` — two named lines, and two perpendiculars to one side', () => {
     expect(verdict(['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'])).toBe('refused:unsatisfiable');
