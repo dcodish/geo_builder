@@ -108,6 +108,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
   { featured: true, category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
   { featured: true, category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
+  // #2621 B (ADR-AG-367): a line given by its direction alone, its offset a free DOF (book p2-15, p6-2 ב, one given per row).
+  { category: 'lines', family: 'F3', he: 'נתון ישר l המאונך לציר ה-x', en: 'line l perpendicular to the x-axis' },
+  { category: 'lines', family: 'F3', he: 'ישר המקביל לציר ה-x', en: 'a line parallel to the x-axis' },
   // A side named by its ROLE alone (#1807, ADR-AG-266): the base the figure says — stated, or cycled while the apex is open.
   { category: 'lines', family: 'F3', he: 'משוואת הבסיס היא x-2y+6=0', en: 'the base lies on the line x-2y+6=0', needs: ['משולש שווה שוקיים ABC'] },
   // The LINE through two named points, drawn (#1639, ADR-AG-198) — «הישר AB» the line, where «הקטע AB» is the segment.
@@ -1483,6 +1486,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #2584 (ADR-AG-346): a constructed line named by its description — the sentence a restated line's refusal offers.
   { category: 'relations', family: 'F17', he: 'נסמן את האנך האמצעי ל-AB ב-l2', en: 'denote the perpendicular bisector of AB by l2', needs: ['A(1,2)', 'B(3,5)', 'אנך אמצעי ל-AB'] },
   { category: 'relations', family: 'F17', he: 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x', en: 'line AB crosses the y-axis above the x-axis', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
+  // #2621 A (ADR-AG-368): the drawn tangent in a slot that takes a line, and named — the book's p4-24 ג.
+  { category: 'circles', family: 'F5', he: 'שיפוע המשיק למעגל בנקודה A הוא -3/4', en: 'the slope of the tangent to the circle at A is -3/4', needs: ['נתון מעגל x^2+y^2=25', 'A נקודה על המעגל'] },
+  { category: 'circles', family: 'F5', he: 'נסמן את המשיק ב-l', en: 'denote the tangent by l', needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)', 'המשיק למעגל בנקודה A'] },
+  { category: 'circles', family: 'F5', he: 'l הוא המשיק למעגל בנקודה A', en: 'l is the tangent to the circle at A', needs: ['נתון מעגל x^2+y^2=25', 'A(3,4)'] },
   { category: 'circles', family: 'F5', he: 'מנקודה A יוצאים שני משיקים לשני המעגלים', en: 'from point A two tangents to the two circles' },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל O ומשיק למעגל P', en: 'AB is a chord of circle O and tangent to circle P', needs: ['מעגל O', 'מעגל P'] },
   /*

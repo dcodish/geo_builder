@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1613 (built by #1467, ADR-3D-382; locked in round #2665) — the operator's sequence: a vector from a known point creates
+  // its head. B's position, k staying open and the notice are asserted in issue-1613-vector-creates-head.test.ts; this is the build + drift net.
+  'vector-creates-head-1613.geo3.json': ['A(0,0,0)', 'AB = (1,2,3)'],
+  'vector-creates-head-sym-1613.geo3.json': ['A(0,0,0)', 'נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)'],
   // #1680 (ADR-3D-391, ADR-3D-392) — the operator's rulings of 2026-10-13: a segment equation that places a rider or defines a new
   // point builds as a vector, and a sum of lengths reads in 3-D. The ask/build split is asserted in
   // issue-1680-segment-equation.test.ts; these are the build + drift net.

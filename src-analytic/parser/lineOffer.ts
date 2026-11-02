@@ -31,6 +31,11 @@ function directionText(c: Construction, d: Direction, lang: Lang): string | null
 /** The line as a noun phrase a sentence can name it by, or null when no description reaches it. */
 export function lineDescription(c: Construction, o: GeoObject, lang: Lang): string | null {
   if (o.kind !== 'line-at') return null;
+  // The tangent at a point (#2621 A, ADR-AG-368): built perpendicular to the radius / the conic's normal there, and
+  // addressed by that point alone (`tangentLineId`), so «המשיק בנקודה A» names it whatever curve it touches.
+  if (o.perp && (o.dir.k === 'radius' || o.dir.k === 'normal')) {
+    return lang === 'he' ? `המשיק בנקודה ${o.through}` : `the tangent at ${o.through}`;
+  }
   const through = objectById(c, o.through);
   if (o.perp && o.dir.k === 'points' && through?.kind === 'derived' && through.rule.t === 'midpoint') {
     const [a, b] = [o.dir.a, o.dir.b];

@@ -37,6 +37,7 @@ import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 import { INDEXED_NAME_RE } from '../../shell/indexedName';
 import { resolveCurve } from './curves';
+import { toolSymbol } from './names';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -792,7 +793,8 @@ export const directionSymbol = (lineId: Id): string => `θ_${lineId}`;
  * Spelled under the same prefix so every surface that already keeps the free direction out of the givens' rows
  * keeps these out by the same test.
  */
-export const toolSymbol = (objectId: Id, part: string): string => `θ_${objectId}.${part}`;
+// Spelled in `names.ts` (#2621, ADR-AG-367) so `types.ts` can lower a direction line without an import cycle.
+export { toolSymbol };
 export const isDirectionSymbol = (sym: string): boolean => sym.startsWith('θ_');
 /**
  * The object a SHAPE symbol shapes — `θ_<object>.<part>`, made by {@link toolSymbol} — or `null` for any other
