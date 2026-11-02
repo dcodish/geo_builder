@@ -233,6 +233,9 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מעבירים משיק למעגל I דרך הנקודה A ומשיק למעגל II דרך הנקודה B» (the through-phrase after the noun, two tangents in one sentence) → «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B» (ADR-AG-315, #2391)
 - Sources: ADR-AG-150, #1353, ADR-W-030, ADR-AG-206, #1620, ADR-AG-315.
 
+**R219 — the book's «מעבירים ישר … ש…» and «הן נקודות על … בהתאמה» are its sentences**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (R114's card); a relative clause with «ש» after the object reads as the one with «ה». «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» (also «… נקודות על …», "A and B are points on … respectively") states what «A ו-B נמצאות על … בהתאמה» states.
+- Sources: ADR-AG-371, #2620.
+
 **R89 — a notation the tool WRITES is a notation it READS**. And a sentence the tool OFFERS (a crossing ring) must be one worth writing.
 - `x_A = 5`, «x של A הוא 5» → read; `y` stays free
 - `X_B<X_D`, `X_{A} = 4`, `B_X`, `Y_A = 2`: the axis letter of a subscripted coordinate is read in either case, with the same verdict as `x_B<x_D` (#1773, ADR-AG-274)
@@ -1188,6 +1191,13 @@ a sentence the tool parsed.
 - The guide has a «מקום גאומטרי» section whose featured row is «המקום הגיאומטרי של M», shown with its setup lines «A(0,0) · B(4,0) · נקודה M · MA = MB». A click puts the question in the ask box. It is never offered to the AI as a given.
 - «M נקודה המקיימת MA = MB» (also «M היא נקודה …», «נקודה M המקיימת …», «… שמקיימת …») is refused with the one-given-per-line message listing «(1) נקודה M  (2) MA = MB», but only when both lines would be accepted in that order. «המקום הגיאומטרי של הנקודות ש…» typed as a given is not read yet; it awaits the operator.
 - Sources: ADR-AG-352, #1177, ADR-AG-067, #2628.
+
+**R218 — the locus of a point the question DESCRIBES is answered as the locus of a lettered point**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «המקום הגיאומטרי של כל הנקודות ש…» (the book's relative clause, its subject in the plural: «מרחקן», «ממרחקן», «מרחקיהן», «המרחק שלהן», «מהן») and «המקום הגיאומטרי של מפגש הישרים l1 ו-l2» (also «נקודת החיתוך של …», «מפגש הישר l1 עם הישר l2», and a line described in the book's words, «מפגש הישר העובר דרך A והמאונך לציר ה-x עם הישר העובר דרך B והמאונך לציר ה-y») answer the locus row the lettered question answers on the same figure, and the figure is untouched (R24). Nothing the tool uses to answer is named on the canvas, in the panel or in the answer. A description the figure refuses is answered with the input's own refusal; a description the tool cannot read is not understood, never a point named by the whole phrase.
+- «A(2,0)» · «מצא את המקום הגיאומטרי של כל הנקודות שמרחקן מ-A הוא 5» → «מעגל · (x − 2)² + y² = 5²»
+- p10-9 with «x^2/16+y^2/12=1»: «המקום הגיאומטרי של מפגש הישרים l1 ו-l2» → «אליפסה · x²/64 + y²/12 = 1»
+- p9-7, its sum of squared distances written «d_{Al}^2 + d_{Bl}^2 = 4» → «אליפסה · x²/20 + y²/5 = 1»
+- A clause in a measure the tool does not read yet (a coordinate point inside a distance, «סכום ריבועי המרחקים») is not understood; it answers when its sentence is read (#2620 A).
+- Sources: ADR-AG-370, #2620.
 
 ---
 

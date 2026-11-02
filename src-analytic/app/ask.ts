@@ -50,6 +50,7 @@ import { ANGLE_STEM_HE } from '../engine/shapes';
 import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techniques';
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed, lineNamesOf } from './lines';
+import { describedSubject, opensAsDescription } from '../parser/locusSubject';
 import { pointText, scalarText } from './pointText';
 import { readAngleAsk, readRoleRef, readTangentNoun, touchTangentNoun, type RoleRef } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
@@ -475,6 +476,31 @@ function askOne(
       }
     }
     const o = objectById(d.construction, name);
+    if (!o && !set && d.lines) {
+      /*
+       * A SUBJECT DEFINED BY A SENTENCE (#2620 B, ADR-AG-370): «כל הנקודות שמרחקן מ-A …», «מפגש הישרים l1 ו-l2». Rewritten
+       * onto a helper letter the figure lacks (`parser/locusSubject.ts`) and traced on the TRIAL — this figure plus the helper's
+       * definition, discarded after (02c R24) — exactly as R10's condition is. A definition the figure refuses is answered
+       * with the input's own refusal, naming the student's words, never the helper's.
+       */
+      const named = lineNamesOf(d.construction);
+      const described = describedSubject(
+        name,
+        (n) => !!objectById(d.construction, n) || named.includes(n) || d.lines!.some((l) => l.includes(n)),
+      );
+      if (described) {
+        const at = d.lines.length;
+        const trial = derive([...d.lines, ...described.lines], d.configuration, d.construction.seedNames ?? {});
+        const fault = trial.faults.find((f) => f.index >= at);
+        if (fault) {
+          const own = fault.detail && !described.helpers.some((h) => fault.detail.includes(h)) && fault.code !== 'not-handled';
+          return { question, value: null, refused: { key: fault.code, detail: own ? fault.detail : name } };
+        }
+        return { ...askOne(trial, described.question, fmt, kindWord), question };
+      }
+      // A description the tables cannot read is unread — never a missing point named by the whole phrase.
+      if (opensAsDescription(name)) return { question, value: null, unreadable: true };
+    }
     if (!o) return { question, value: null, missing: { name, kind: 'point' } };
     /**
      * TRACED AT THE CONFIGURATION BEING SHOWN (#1176), not at a fixed pair.

@@ -14513,3 +14513,48 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 **Locks.** `src-analytic/__tests__/issue-2619-pronoun-subject.test.ts`; fixtures `ellipse-book-p1-8-2619`, `ellipse-book-p2-11-2619` (the book's «היא», one point per row), `ellipse-book-p4-24-2619` (p4-24 ג one given per row).
 
 **Behaviour change for a student:** in analytic, «היא עוברת דרך הנקודה …» after an ellipse or a parabola adds the point on it, as «האליפסה עוברת דרך …» does.
+
+## ADR-AG-370 — A locus subject the question describes is rewritten onto a helper letter and traced on the trial (#2620 B)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream K, branch `feat/2620-book-locus-ask`. #2620 work item B (items A and D are not this round's). LADDER stage: none (the ask lane; the trial is the existing R24 dry run).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R218 (new). · **Design:** [04c](04c-design-analytic.md) § the ask lane ("A described subject").
+
+**Operator rulings.** 2026-10-30 on #2620: *"now we need to build all capabilities"* — the book's locus questions are `[asked]`. 2026-10-30, Q2: the locus spellings are analytic-only by design (an `EXCEPTIONS` family, not a 2-D gap); the locus question itself is already analytic-only (X1/X2), so B adds no parity row.
+
+**Re-measured at pickup** (`17f35282`, `derive` → `ask`, no model). «מצא את המקום הגיאומטרי של כל הנקודות שמרחקן מ-A …», «… של מפגש הישרים l1 ו-l2» and p9-7's «… של מפגש הישר העובר דרך A והמאונך לציר ה-x עם …» each answered `missing` with the whole phrase as a point's name. Their lettered forms answered (p10-9 at 16/12: x²/64 + y²/12 = 1; p9-7: x²/20 + y²/5 = 1). #2613's spurious `y = 0` component no longer appears, and p10-9 in the book's letters already answers x²/(4a²) + y²/b² = 1 (#1186, ADR-AG-351), so D's answer half has landed.
+
+**Decision.**
+1. **The subject is a description, read by enumerated tables** (`app/locusSubject.ts`, the #1301 anti-widening rule, never `.*`). Two families:
+   - «כל הנקודות ש<clause>» / «הנקודות אשר …» / "all the points whose …": the clause's plural anaphors — «מרחקן/מרחקם», «מרחקיהן/מרחקיהם», «שלהן/שלהם», «מהן/מהם», with the proclitics «ו», «מ», «ל», «ב» — are rewritten onto ONE point: «נקודה X» plus the clause about X («ממרחקן» → «מהמרחק של X», «למרחקן» → «למרחק של X»). A clause with no anaphor in the table is not rewritten.
+   - The meet of two lines: «(נקודת) (ה)מפגש / (ה)חיתוך (של) …» over «הישרים L1 ו-L2», «L1 עם L2», «בין L1 לבין L2», and "the intersection of lines l1 and l2". Each line is a name (`l`, `l1`, «AB», an axis) or a line described in the book's relative clause («הישר העובר דרך A והמאונך לציר ה-x», «… שעובר דרך A ומאונך …»): the construction register's `predicate` turns the clause into the register's named-line sentence «דרך A עובר ישר <helper line> מאונך לציר ה-x», because the crossing sentence reads names (a nameless described line inside «נקודת החיתוך של …» is `bad-operand`, measured). Then «X נקודת החיתוך של L1 עם L2».
+2. **The helpers are never seen.** The helper point (X, Y, Z, …) and helper lines (l9, l8, …) are names the figure does not use and the question does not contain. They exist only in the trial `derive([...d.lines, ...lines])`, discarded after (R24), and the answer is «המקום הגיאומטרי של <helper>» asked of the trial — the kind and the equation, never the letter.
+3. **Refusals.** A fault at or after the figure's last line is `Answer.refused`, worded by the input's own refusal; its detail is the fault's when that names none of the helpers («l7»), else the student's subject. A subject that opens as one of the families but is not read is `unreadable` («לא הבנתי»), never a missing point named by the phrase.
+4. **Not in this item:** the measures the book's clauses use and the grammar lacks (a coordinate point inside a distance, «ממרחקה», «סכום ריבועי המרחקים», «אורך המשיק» — item A) answer `refused · not-handled` today and answer through this lane when A reads them, with no change here. «(הבע בעזרת a ו-b)» after the question is item D.
+
+**Measured after.** Every question above answers the lettered row (equal `Answer`, with `locus`); p10-9 in the book's letters answers x²/(4a²) + y²/b² = 1; p9-5 with a lettered focus answers x²/16 + y²/12 = 1; the figure's lines and construction are byte-identical after the ask; a figure with its own X moves the helper to Y and answers the same.
+
+**Locks.** `src-analytic/__tests__/issue-2620-book-loci.test.ts`; fixtures `ellipse-book-p10-9-2620`, `ellipse-book-p9-7-2620`.
+
+**Behaviour change for a student:** «המקום הגיאומטרי של כל הנקודות ש…» and «… של מפגש הישרים l1 ו-l2» answer the locus row. A description the tool cannot read now says «לא הבנתי» instead of «אין בשרטוט נקודה בשם …».
+
+## ADR-AG-371 — The book's «מעבירים ישר l1 ש…» is taught as the named-line sentence; «הן נקודות על … בהתאמה» is the location sentence (#2620 C)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream K, branch `feat/2620-book-locus-ask`. #2620 work item C. LADDER stage: none (the construction register and a parse lowering).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R219 (new). · **Design:** [04c](04c-design-analytic.md) § "The exam's construction register".
+
+**Operator ruling.** 2026-10-30 on #2620: *"now we need to build all capabilities"*: «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (the existing teach card), and «A ו-B הן נקודות על … בהתאמה» builds — both `[asked]`.
+
+**Re-measured at pickup** (`17f35282`): «דרך N מעבירים ישר l1 שמקביל ל-PO», «דרך P מעבירים ישר l2 שמקביל לציר ה-x» and «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» were `not-handled`; their plan workarounds recorded. 2-D (`run-sequence --app 2d`) builds «D ו-E הן נקודות על AB ועל AC בהתאמה» and «דרך C מעבירים ישר שמקביל ל-AB».
+
+**Decision.**
+1. **The «ש» relative clause.** `constructionCandidates`' `predicate` reads «ש» + a participle at the HEAD of the object's rest as «ה» + the participle (`SHE_RELATIVE`, the same closed list). Only at the head: the perpendicular's «… לציר ה-x שחותך אותו בנקודה N» keeps its taught sentence.
+2. **A line's own name.** After «ישר» the register reads a line name (`l`/`ℓ` and one digit, `LINE_LABEL_AFTER_NOUN`). Through a point, the lesson is the named-line sentence «דרך N עובר ישר l1 <predicate>», the anchor as the student wrote it («דרך הנקודה P …» stays). The verbs are the register's own (`מעבירים`, `העבירו`, …); none is added.
+3. **The copula with its noun.** `distributeClauses` reads «הן / הם» and «נקודות» before «על» as the location sentence («A ו-B (הן) נקודות על … בהתאמה» ≡ «A ו-B נמצאות על … בהתאמה»), and "A and B are points on … respectively" in English.
+
+**2-D (ADR-W-157 / ADR-W-118 B1):** 2-D already builds the copula sentence; parity row `respectively-copula-2620`. 3-D does not read it (`not-handled`): an unscheduled cell (ADR-W-170), not ported here because the plan did not judge the 3-D port. The named-line lesson is X4 (2-D names no line). That analytic TEACHES the exam's imperatives where 2-D builds them is ADR-AG-206's, unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-2620-book-loci.test.ts` (C block); the fixtures above record the taught lines.
+
+**Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
