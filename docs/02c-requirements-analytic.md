@@ -233,6 +233,9 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מעבירים משיק למעגל I דרך הנקודה A ומשיק למעגל II דרך הנקודה B» (the through-phrase after the noun, two tangents in one sentence) → «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B» (ADR-AG-315, #2391)
 - Sources: ADR-AG-150, #1353, ADR-W-030, ADR-AG-206, #1620, ADR-AG-315.
 
+**R219 — the book's «מעבירים ישר … ש…» and «הן נקודות על … בהתאמה» are its sentences**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (R114's card); a relative clause with «ש» after the object reads as the one with «ה». «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» (also «… נקודות על …», "A and B are points on … respectively") states what «A ו-B נמצאות על … בהתאמה» states.
+- Sources: ADR-AG-371, #2620.
+
 **R89 — a notation the tool WRITES is a notation it READS**. And a sentence the tool OFFERS (a crossing ring) must be one worth writing.
 - `x_A = 5`, «x של A הוא 5» → read; `y` stays free
 - `X_B<X_D`, `X_{A} = 4`, `B_X`, `Y_A = 2`: the axis letter of a subscripted coordinate is read in either case, with the same verdict as `x_B<x_D` (#1773, ADR-AG-274)

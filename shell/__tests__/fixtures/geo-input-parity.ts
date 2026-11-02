@@ -1852,6 +1852,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'centre-of-a-circle-new-2552', family: 'circles', steps: ['מעגל O', 'מעגל Q', 'P מרכז מעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a third circle on P; analytic refused it ambiguous-shape before ADR-AG-344' },
   // ── #2618 (ADR-AG-355): the inscribed sentence said through the vertices; the conic hosts are X2 ──
   { id: 'vertices-on-circle-2618', family: 'inscribed', steps: ['קודקודי המעוין ABCD נמצאים על המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2629' }], note: 'analytic reads it as «מעוין ABCD חסום במעגל» since ADR-AG-355; 2-D hands it to the model' },
+  // ── #2620 C (ADR-AG-371): the book's copula with its noun, «… הן נקודות על … בהתאמה»; 2-D built it already (measured 17f35282) ──
+  { id: 'respectively-copula-2620', family: 'points-incidence', steps: ['משולש ABC', 'D ו-E הן נקודות על AB ועל AC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic did not read «הן נקודות» before ADR-AG-371; 3-D does not read the copula «הן נקודות על» (not-handled, measured)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -377,6 +377,9 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 
 `constructionCandidates` (`parser/scopeAnalytic.ts`) reads the closed grammar `ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST`
 (`CONSTRUCTION_VERBS_HE`); its candidates are flagged `exam` and kept only when parser and fold accept them.
+A relative clause written with «ש» at the head of the rest («ישר l1 שמקביל ל-PO») is read as the «ה» clause
+(`SHE_RELATIVE`, in `predicate`), and «ישר» takes a line's own name (`LINE_LABEL_AFTER_NOUN`): through a point it is
+taught as «דרך N עובר ישר l1 …» ([ADR-AG-371](06c-decisions-analytic.md#adr-ag-371), #2620 C).
 `confirmTaught(lines, seed)` (`app/submit.ts`) is what the 471 ratchet calls.
 
 *Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`

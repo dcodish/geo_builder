@@ -14612,3 +14612,27 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 **Found, not decided.** 2-D renames a TOOL letter to the student's («תיכון מ-A …» · «D אמצע BC»); analytic keeps M and says «M ו-D נפלו על אותה נקודה.». Reported on #1595.
 
 **Behaviour change for a student:** in analytic, «N אמצע AB» after «M אמצע AB», a crossing the givens put on a named point (#2631: «… נפגשים בנקודה E» on M), and a second name for one crossing of two lines are accepted with «M ו-N נפלו על אותה נקודה.» instead of refused.
+
+## ADR-AG-371 — The book's «מעבירים ישר l1 ש…» is taught as the named-line sentence; «הן נקודות על … בהתאמה» is the location sentence (#2620 C)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream K, branch `feat/2620-book-locus-ask`. #2620 work item C. LADDER stage: none (the construction register and a parse lowering).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R219 (new). · **Design:** [04c](04c-design-analytic.md) § "The exam's construction register".
+
+**Operator ruling.** 2026-10-30 on #2620: *"now we need to build all capabilities"*: «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (the existing teach card), and «A ו-B הן נקודות על … בהתאמה» builds — both `[asked]`.
+
+**Re-measured at pickup** (`17f35282`): «דרך N מעבירים ישר l1 שמקביל ל-PO», «דרך P מעבירים ישר l2 שמקביל לציר ה-x» and «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» were `not-handled`; their plan workarounds recorded. 2-D (`run-sequence --app 2d`) builds «D ו-E הן נקודות על AB ועל AC בהתאמה» and «דרך C מעבירים ישר שמקביל ל-AB».
+
+**Decision.**
+1. **The «ש» relative clause.** `constructionCandidates`' `predicate` reads «ש» + a participle at the HEAD of the object's rest as «ה» + the participle (`SHE_RELATIVE`, the same closed list). Only at the head: the perpendicular's «… לציר ה-x שחותך אותו בנקודה N» keeps its taught sentence.
+2. **A line's own name.** After «ישר» the register reads a line name (`l`/`ℓ` and one digit, `LINE_LABEL_AFTER_NOUN`). Through a point, the lesson is the named-line sentence «דרך N עובר ישר l1 <predicate>», the anchor as the student wrote it («דרך הנקודה P …» stays). The verbs are the register's own (`מעבירים`, `העבירו`, …); none is added.
+3. **The copula with its noun.** `distributeClauses` reads «הן / הם» and «נקודות» before «על» as the location sentence («A ו-B (הן) נקודות על … בהתאמה» ≡ «A ו-B נמצאות על … בהתאמה»), and "A and B are points on … respectively" in English.
+
+**2-D (ADR-W-157 / ADR-W-118 B1):** 2-D already builds the copula sentence; parity row `respectively-copula-2620`. 3-D does not read it (`not-handled`): an unscheduled cell (ADR-W-170), not ported here because the plan did not judge the 3-D port. The named-line lesson is X4 (2-D names no line). That analytic TEACHES the exam's imperatives where 2-D builds them is ADR-AG-206's, unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-2620-book-construction.test.ts`; fixture `ellipse-book-p9-7-2620` (p9-7's construction in the book's «… הן נקודות על … בהתאמה»).
+
+**Item B withdrawn before merge.** This PR first also carried #2620 B, a locus subject described inside the ask («המקום הגיאומטרי של מפגש הישרים l1 ו-l2», «… של כל הנקודות ש…»). The operator ruled it out on 2026-11-02: *"we should not have these long sentences because they will easily break with slight syntax changes"* and *"we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."* (the typed-ask withdrawal is #2673). B never shipped; its ADR number (370) and requirement (R218) are unused.
+
+**Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
+
