@@ -37,14 +37,14 @@ A PreToolUse hook (`scripts/issue-create-guard.mjs`) refuses `gh issue create` w
 
 **The title leads with his words.** Its first clause is the sentence the operator typed, in Hebrew «guillemets»; the class name goes after the dash. He finds his reports by scanning titles for his own words, and re-reports one he cannot see (#1323).
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]`/`[judged]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **What each type means** (#1763). The type is decided by what the STUDENT experiences, not by the size of the change:
 - **`bug`** — the product does something wrong for a student: a wrong figure, a dropped or misread given, a false refusal, a crash, a misleading message. Route: a fix on `main` (§3).
 - **`feature`** — the product cannot do something it should: a sentence it does not read, a capability or surface that does not exist. A "bug" diagnosed as a missing capability is relabelled `feature`. Route: always a PR, played and approved (§4).
 - **`debt`** — the product is right for the student, but the code makes the next change harder, slower or riskier. Nothing a student sees or can do changes. Examples: duplicated mechanisms to hoist into `shell/`, machinery to retire or tidy, performance nobody sees, audits and conformance checks, follow-up bookkeeping, umbrella hardening programmes. Route: straight to `main` like a bug (no PR, no play gate — there is nothing for the operator to judge); its gates are the same tests. Priority: **P3 by default**; **P2 when it blocks other scheduled work** (e.g. a hoist that stops a fourth copy from being written). The moment a debt item would change what a student sees, it is not debt — split that part out as a `bug` or `feature`.
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1), **after the check above, and outside a round**. Inside a round, a same-cause finding is fixed in the item (§2d, ADR-W-168): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1), **after the check above, and outside a round**. Inside a round, a same-cause finding is fixed in the item (§2d, ADR-W-168): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`/`[judged]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
 
 **`icebox` is parked, not dead.** A parked issue is closed "not planned" with a comment saying it is reopened when a student hits it or the operator asks; `/log-triage` reopens one when the prod logs show a student hitting it (#1804). Nothing that shows something false is ever parked: a wrong figure, a false "contradicts", a silent misread, a guide sentence that fails.
 
@@ -111,7 +111,7 @@ The operator raises issues **while testing**, often several per pass. If the rep
 
 1. **File the issue** (§1) with type + priority + app labels, and **`reported`**: the operator hit it. Add **`wrong-answer`** if it is one, which makes it P1 (§2).
 2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
-3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit, and **not itself an open bug**: search the queue first, [ADR-W-158](06w-decisions-workspace.md#adr-w-158)) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
+3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit, and **not itself an open bug**: search the queue first, [ADR-W-158](06w-decisions-workspace.md#adr-w-158)), `[judged]` (the judge agent ruled it from the operator's own dated words — link its recorded judgment, [ADR-W-173](06w-decisions-workspace.md#adr-w-173), §2e) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
 **A plan that adds or rewrites a refusal or status sentence writes it under the one-next-step rule** (operator rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)): name the student's statement and give one next step, or say plainly there is none. No ballot card per sentence: the sentence is shown in full on the play sheet, and his play is the approval.
@@ -187,7 +187,7 @@ a live ledger, so a crashed session leaves a discoverable round rather than orph
 is fixed **at the root, per its plan**, in its own worktree under the item gates (ADR + rule-4
 regression lock + `tsc` + build + `test:fast` + `test:exams -- --changed`; the full suite runs once per batch, see "Gating and landing" below).
 A plan armed before 2026-10-07 has no outcome section: the round writes it at pickup from the issue
-thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]` escalates. **A round never takes a default
+thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]`/`[judged]` escalates. **A round never takes a default
 on an open question** — the item waits for the operator; a P1 session may
 ship only an honest refusal that reuses an existing message, flagged in the Heads-up. **Each ledger item
 carries a `beyond the request:` line**, which should read "none" ([ADR-W-117](06w-decisions-workspace.md#adr-w-117)). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
@@ -276,6 +276,31 @@ a human at the keyboard, so unattended running remains a separate risk argument.
 
 **A round item that adds or rewrites a student-facing refusal or status sentence** writes it under the one-next-step rule (rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)); the refusal-style ratchet checks it, and the batch play sheet shows the sentence in full: his play is its approval, with no ballot card per sentence.
 
+## 2e. The judge: rulings from the operator's own precedent ([ADR-W-173](06w-decisions-workspace.md#adr-w-173), #2661)
+
+Operator, 2026-11-02: *"I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave"*; on the design, *"Go ahead. Build this now"*.
+
+**Before a product question goes to the operator, the judge sees it.** That covers a `[proposed]` line, a decisions card, or a found case's question in a round.
+
+- **Who: the `judge` agent** (`.claude/agents/judge.md`).
+  - It gets the question and its options. It never gets the session's recommendation or the fix.
+  - It searches `node scripts/precedents.mjs search …`. That index holds every ruling comment, every ADR with his words, and the judge's own judgments that stood.
+  - It rules only when his dated words cover the question, and it quotes them. Otherwise it escalates.
+- **Never judged:**
+  - reversing a shipped promise;
+  - anything he kept for himself;
+  - a feature's scope or priority;
+  - anything with no precedent;
+  - a class he took back.
+- **Recording.** The session records every verdict with `node scripts/judgments.mjs record <file>`. The script refuses a ruling without a quoted, dated, linked precedent. It then:
+  - writes the ruling on the issue as `## Judged on the operator's behalf — <date>`, quoting the precedent;
+  - tags the plan line `[judged]` with that comment's link.
+
+  A `[judged]` line arms like `[ruled]`. An escalation stays a question for him, `needs-operator`.
+- **His oversight.**
+  - `node scripts/judgments.mjs digest --md` is his skim list: one line per ruling, with the quote it rests on. It goes in the round report, or on its own. A ruling stands after 24 hours unless he objects (`settle`).
+  - When he objects: `overrule <id> --note "<his words>"`, and the issue's plan follows his words. That kind of question goes back to him until three judgments of it in a row stand. His overrule is itself precedent from then on.
+
 ## 3. The bug route (operator reports something broken)
 
 Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated fix session or on an explicit "fix now"** (§2b).
@@ -329,7 +354,7 @@ Both routes carry it, because the contract was the one artifact with **no home a
 Applies to feature requests **and** bug reports reclassified as capability gaps. Steps 1–2 run in the reporting session; building (steps 3–7) starts **only in a dedicated session on operator go** (§2b).
 
 1. **File the issue** labeled `feature` + priority.
-2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20). An armed feature plan counts as scoped only if every line of its `## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7).
+2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20). An armed feature plan counts as scoped only if every line of its `## What the student will see` is `[asked]`, `[ruled]`, `[2-D]` or `[judged]` (CLAUDE.md rule 7).
 3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** when the shared tree carries another session's work — created **outside the repo tree** under `"$TMPDIR"/claude/geo-wt/<branch>` (§7).
 4. **Build** under the normal gates (ADR, tests, scenario/fixture, suite + `tsc` + build green).
    **If the change touches a UI surface, the visual smoke is part of those gates**

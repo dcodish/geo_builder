@@ -64,7 +64,7 @@ frees none — the point of this pass is throughput after it ends. Break ties wi
 
 An issue that merely *lacks* a plan is **not** automatically blocking. If the plan is writable from the
 code and the rulings already on record, **write it** — and arm it only if every line of its
-`## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7). Do not spend an
+`## What the student will see` is `[asked]`, `[ruled]`, `[2-D]` or `[judged]` (CLAUDE.md rule 7). Do not spend an
 operator question on mechanism the session can work out. Bring them only what is genuinely theirs: product behaviour, pedagogy, UX,
 scope, a **feature's** priority, and anything that reverses a shipped promise. A bug's priority is never a card: the session sets it
 and says so in the report (ADR-W-117 Am. 1). Likewise a 2-D plane-geometry change's analytic port is never a card, and neither
@@ -94,6 +94,14 @@ have been measured at HEAD, not assumed. A dossier built on a guess wastes a rul
 is worse than no ruling, because it gets recorded and then built.
 
 ---
+
+## Step 2b — the judge goes first ([ADR-W-173](../../../docs/06w-decisions-workspace.md#adr-w-173), #2661)
+
+Before a card reaches him, give each question and its options to the `judge` agent: never your
+recommendation, never the fix. Record what it returns with `node scripts/judgments.mjs record`. A
+**ruled** question gets no card: transcribe it under `## Judged on the operator's behalf — <date>`,
+quoting its precedent, tag the line `[judged]`, and list it in his digest
+(`node scripts/judgments.mjs digest --md`, docs/22 §2e). Only the **escalated** questions become cards.
 
 ## Step 3 — ask in an HTML artifact, never in the chat
 

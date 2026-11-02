@@ -37,8 +37,11 @@ Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs
 `[proposed]` line in its `## What the student will see` and no open question (CLAUDE.md rule 7,
 [ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)). A plan armed before 2026-10-07 has no such section:
 **write it at pickup** from the issue thread — quote the operator for `[asked]`, link the ruling for
-`[ruled]`, measure 2-D for `[2-D]` — and post it on the issue. Any line you cannot tag that way is
-`[proposed]` → Step 4 escalation, never a default.
+`[ruled]`, measure 2-D for `[2-D]` — and post it on the issue. Any line you cannot tag that way goes
+to the `judge` agent (docs/22 §2e, [ADR-W-173](../../../docs/06w-decisions-workspace.md#adr-w-173)): a ruling
+is recorded and tagged `[judged]`, and the round goes on; an escalation is `[proposed]` → Step 4, never a
+default. The same holds for a found case's question (Step 2, 4c): judge first, then the Questions list.
+The round report carries `node scripts/judgments.mjs digest --md` for his skim.
 **Without `--limit`, `gh` returns 30 rows** and the round silently never sees the rest of the queue.
 An `auto-ok` issue with no real plan is a labeling error: record it in the ledger's Skipped
 section, leave a comment asking for triage, skip it — never invent the plan inline.
