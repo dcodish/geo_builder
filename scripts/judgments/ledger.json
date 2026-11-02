@@ -969,6 +969,30 @@
       "chosen": true,
       "at": "2026-11-02T15:16:25.248Z",
       "status": "pending"
+    },
+    {
+      "id": "q-2631",
+      "question": "Analytic: «משולש ABC» · «M אמצע BC» · «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» — the lines meet exactly at M, already named. Refuse, or record E as a second name for M?",
+      "class": "new-name-on-forced-coincident-point",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A newly named point forced onto an existing named point in every configuration is refused, naming the point already there; here, the existing message that the lines meet at M.",
+      "precedents": [
+        {
+          "quote": "if P and B must be on the same location, like in this case, it should be refused. The only case where P and B can fall [together] is if one of them has a degree of freedom",
+          "date": "2026-09-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/1254#issuecomment-5748133471"
+        },
+        {
+          "quote": "the 2d and 3d tools should follow the same logic about points being on the same location",
+          "date": "2026-09-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/1273"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Only a crossing forced onto a named point in every configuration. The «התיכון מ-A» misreading found on #2631 is not decided here.",
+      "at": "2026-11-02T15:46:12.151Z",
+      "status": "pending"
     }
   ],
   "demoted": {}

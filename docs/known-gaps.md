@@ -12,3 +12,17 @@ A P3 feature or debt item that a session found goes here when it has been untouc
 | Issue | Title | Product | Type | Parked | Last activity |
 | --- | --- | --- | --- | --- | --- |
 <!-- rows: maintained by scripts/known-gaps.mjs; one per parked issue, by number -->
+| [#3](https://github.com/dcodish/geo_builder/issues/3) | Apply-time satisfiability is judged at a single composition (+ fixed-coordinate auto free-points cousin) | 2d | debt | 2026-11-02 | 2026-08-26 |
+| [#63](https://github.com/dcodish/geo_builder/issues/63) | parser: bounded candidate-retry — when the winning parse trips an honesty gate, try the next matching rule before escalating to the LLM | 2d | debt | 2026-11-02 | 2026-09-22 |
+| [#64](https://github.com/dcodish/geo_builder/issues/64) | solver hygiene: a typed strength field (required \| preference \| visual) on constraints, replacing per-mechanism convention | 2d | debt | 2026-11-02 | 2026-08-14 |
+| [#216](https://github.com/dcodish/geo_builder/issues/216) | Feature: shaded region — «השטח האפור ABCDE» fills the region closed by the named points (gray / dotted / hatched) for "area of the shaded part" book questions | 2d | feature | 2026-11-02 | 2026-09-17 |
+| [#254](https://github.com/dcodish/geo_builder/issues/254) | Feature: unnamed CIRCLE-cut statement — «CD חותך את המעגל» with no points named (the ADR-383 point-free sibling) | 2d | feature | 2026-11-02 | 2026-08-14 |
+| [#386](https://github.com/dcodish/geo_builder/issues/386) | 3-D: a CLOSED mutual position against an absolute named line has no drive (gauge×absolute — «AB חותך את l1» verifies but cannot flex) | 3d | feature | 2026-11-02 | 2026-09-21 |
+| [#507](https://github.com/dcodish/geo_builder/issues/507) | 2-D: EXCLUSION capability — «זווית A לא תהיה ישרה» builds a ≠ requirement instead of refusing (the #436 capability half, requirement lane) | 2d | feature | 2026-11-02 | 2026-08-14 |
+| [#537](https://github.com/dcodish/geo_builder/issues/537) | 3-D: the remaining coordinate-frame cells — standalone «מישור [xy]», axis relations, and a DRIVE for gauge×frame ⟂/∥ | 3d | feature | 2026-11-02 | 2026-08-14 |
+| [#663](https://github.com/dcodish/geo_builder/issues/663) | unify A4: the ADR extraction pass — derive the contract row list from all 665 ADRs | workspace | debt | 2026-11-02 | 2026-08-16 |
+| [#664](https://github.com/dcodish/geo_builder/issues/664) | unify A5: the conformance matrix harness — an unexamined cell fails the suite | workspace | debt | 2026-11-02 | 2026-09-08 |
+| [#725](https://github.com/dcodish/geo_builder/issues/725) | workspace: symbol palette - shared BASE vocabulary + per-product extensions, split visible in the UI | workspace | debt | 2026-11-02 | 2026-09-08 |
+| [#758](https://github.com/dcodish/geo_builder/issues/758) | 2-D: retire the dropped* gates the span accountant subsumes — one gate per PR, gated by the retirement differential (#659 step-3 remainder) | 2d | debt | 2026-11-02 | 2026-08-25 |
+| [#1115](https://github.com/dcodish/geo_builder/issues/1115) | analytic: the measure menu offers distances to NAMED lines only — an anonymous «ישר y=9» is nameable by its equation and is skipped (#1048 follow-up) | analytic | feature | 2026-11-02 | 2026-09-21 |
+| [#1293](https://github.com/dcodish/geo_builder/issues/1293) | 3-D: «קטע AB» cannot start a figure although «וקטור AB» now can — the segment lane's downstream rules | 3d | feature | 2026-11-02 | 2026-09-21 |
