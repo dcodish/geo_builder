@@ -992,7 +992,11 @@
       "confidence": "high",
       "limits": "Only a crossing forced onto a named point in every configuration. The «התיכון מ-A» misreading found on #2631 is not decided here.",
       "at": "2026-11-02T15:46:12.151Z",
-      "status": "pending"
+      "status": "overruled",
+      "overrule": {
+        "note": "Operator 2026-11-02 on #1595: 'accept with message' — a new letter forced onto an existing point is accepted with the notice, not refused.",
+        "at": "2026-11-02T21:50:59.544Z"
+      }
     },
     {
       "id": "chose-2621-side",
@@ -1029,5 +1033,7 @@
       "status": "pending"
     }
   ],
-  "demoted": {}
+  "demoted": {
+    "new-name-on-forced-coincident-point": 0
+  }
 }

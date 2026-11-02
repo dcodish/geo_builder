@@ -1,5 +1,6 @@
 {
-  "pending": [
+  "pending": [],
+  "results": [
     {
       "sheet": "round-2665",
       "id": "T4",
@@ -11,9 +12,11 @@
       "lines": [
         "נתון: v = (10,-5,0)"
       ],
-      "lookFor": "A floating arrow v with no dot at its start; the row is green."
+      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+      "pass": true,
+      "date": "2026-11-02",
+      "note": "operator 2026-11-02: all the rest of the tests pass"
     }
   ],
-  "results": [],
   "demoted": {}
 }
