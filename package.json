@@ -32,7 +32,8 @@
     "test:coverage": "vitest run src/ --coverage --coverage.provider=v8 --coverage.reporter=text-summary --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.include='src/**/*.tsx' --coverage.exclude='src/**/__tests__/**'",
     "playsheet": "node scripts/play-sheet-drive.mjs",
     "playsheet:close": "node scripts/play-sheet-close.mjs",
-    "find-message": "node scripts/find-message.mjs"
+    "find-message": "node scripts/find-message.mjs",
+    "parity-table": "node scripts/parity-table.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

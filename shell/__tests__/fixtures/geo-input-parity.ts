@@ -22,9 +22,12 @@
  * ## The three kinds of row
  *
  * - **A parity row** — every product it is expected in gives `expect` on its last line.
- * - **A known-gap row** (`knownGap`) — a measured disparity with the issue that owns it. The named product
- *   must STILL differ; when a fix makes it agree, the row fails with "now …s — move it to the parity rows",
- *   so the gap list only ever shrinks (the #1618 corpus-ratchet idea).
+ * - **A known-gap row** (`knownGap`) — a measured disparity, one CELL per builder that differs: scheduled
+ *   (it names the open issue porting it), unscheduled (no issue: the table is the record, ADR-W-170) or
+ *   parked (its issue was closed or iceboxed as a decision not to port, ADR-W-119). The named product must
+ *   STILL differ; when a fix makes it agree, the row fails with "now …s — move it to the parity rows", so
+ *   the gap list only ever shrinks (the #1618 corpus-ratchet idea). `npm run parity-table` prints the
+ *   sentence × builder view.
  * - **An exception row** (`exception: 'Xn'`) — a sentence family one builder reads by design and another
  *   does not (coordinates, equations, solids …). The builders in `mustRefuse` must answer it honestly —
  *   refuse, ask, or hand it to the model — and never BUILD it: building a slope as a length (#1654) or a
@@ -32,8 +35,9 @@
  *
  * ## The rule this lock enforces (docs/22 §10)
  *
- * A plane-geometry input change lands in every builder that should read it, or adds a known-gap row
- * naming its issue; a sentence one builder reads by design needs a family in {@link EXCEPTIONS}. The
+ * A plane-geometry input change lands in every builder that should read it, or adds a known-gap cell
+ * (unscheduled unless an open issue already owns the port, ADR-W-170); a sentence one builder reads by
+ * design needs a family in {@link EXCEPTIONS}. The
  * catalog check ({@link catalogCoverageFaults}) makes that rule reach every sentence a builder's guide
  * advertises: each one is a step of some row, or belongs to a topic exception, or sits on a ratchet
  * allowlist that may only shrink.
@@ -221,23 +225,39 @@ export type Family =
   | 'topic';
 
 /**
- * The issue that owns a known gap — always a filed issue. A gap with no issue is not committed: file it
- * first (`rowFaults` rejects anything but `#NNNN`, whatever the type checker lets through).
+ * The issue that owns a known gap, when one does. `rowFaults` rejects anything but `#NNNN` (no `to-file:`
+ * placeholder), whatever the type checker lets through.
  */
 export type GapIssue = `#${number}`;
 
 export interface KnownGap {
   product: Product;
-  issue: GapIssue;
+  /**
+   * The OPEN issue scheduled to port this cell, or the closed/iceboxed issue that parked it. **Absent = an
+   * unscheduled cell** ([ADR-W-170](../../../docs/06w-decisions-workspace.md#adr-w-170), #2654 idea 2): the
+   * gap is measured and locked here, and the table, not a GitHub issue, is its record. A newly found port
+   * gap is recorded this way; port rounds pick their work from these cells (`npm run parity-table`).
+   */
+  issue?: GapIssue;
   /**
    * The gap is PARKED: its issue is closed or in the icebox, so nobody is scheduled to close it (operator
    * ruling B15, 2026-10-07, [ADR-W-118](../../../docs/06w-decisions-workspace.md#adr-w-118): *"3-D's core
    * plane parity is parked, not realised"*). It is still a gap — the thin lock still asserts the builder
    * differs, and a healed gap still fails with "move it to the parity rows". What `parked` changes is the
-   * claim: a gap that is not parked names OPEN work. {@link rowFaults} holds both directions against
-   * {@link GAP_ISSUES}.
+   * claim: a gap that is not parked names OPEN work or none. {@link rowFaults} holds both directions against
+   * {@link GAP_ISSUES}, and a parked gap names the issue that parked it (parking is a decision, so it has a
+   * record; an issue closed INTO the table instead drops `issue`, and its cells become unscheduled).
    */
   parked?: true;
+}
+
+/** The three states of a known-gap cell (ADR-W-170). */
+export type GapState = 'scheduled' | 'unscheduled' | 'parked';
+
+/** A cell's state: parked, scheduled (names an open issue), or unscheduled (names none). */
+export function gapState(g: KnownGap): GapState {
+  if (g.parked) return 'parked';
+  return g.issue ? 'scheduled' : 'unscheduled';
 }
 
 /**
@@ -245,7 +265,9 @@ export interface KnownGap {
  * call GitHub, so this is a SNAPSHOT (2026-10-07, #1861 C4), and {@link rowFaults} reads it: a gap whose
  * issue is `closed` or `icebox` must be `parked`, a parked gap's issue must not be `open`, every gap's issue
  * must be listed here, and every issue listed must still own a gap. When an issue is closed or iceboxed,
- * update its line here and park its gaps in the same commit; a new gap adds its issue here when it is filed.
+ * update its line here and park its gaps in the same commit, or, when it is closed INTO the table (its whole
+ * content was the port), drop `issue` from its gaps and its line from here. A new gap names no issue
+ * (ADR-W-170); it is added here only when it names an existing open issue.
  *
  * `icebox` is a closed issue carrying the `icebox` label (CLAUDE.md, the label glossary). #1448 closed as
  * completed for the PYRAMID height; the trapezoid and triangle height rows it is cited on still differ in
@@ -414,7 +436,7 @@ export async function parityFaults(
         faults.push(`${where}: «${line}» gave ${show(last)}, expected ${row.expect} (2-D's verdict)`);
       } else if (role === 'gap' && last.verdict === row.expect) {
         const gap = row.knownGap!.find((g) => g.product === product)!;
-        faults.push(`${where}: «${line}» now ${row.expect === 'builds' ? 'builds' : `gives ${row.expect}`} — move it to the parity rows (drop the known gap ${gap.issue})`);
+        faults.push(`${where}: «${line}» now ${row.expect === 'builds' ? 'builds' : `gives ${row.expect}`} — move it to the parity rows (drop the known gap${gap.issue ? ` ${gap.issue}` : ', unscheduled'})`);
       } else if (role === 'must-refuse' && last.verdict === 'builds') {
         faults.push(`${where}: «${line}» BUILDS, but it is an ${row.exception} sentence (${EXCEPTIONS[row.exception!].title}) this builder must refuse honestly`);
       }
@@ -451,8 +473,13 @@ export function rowFaults(
     for (const g of row.knownGap ?? []) {
       const base = roleOf({ ...row, knownGap: undefined }, g.product);
       if (base !== 'expected') faults.push(`[${row.id}] a known gap in ${g.product}, where the row is not expected (${base})`);
+      if (g.issue === undefined) {
+        // ADR-W-170: an unscheduled cell. Parking is a decision with a record, so a parked cell names its issue.
+        if (g.parked) faults.push(`[${row.id}] the known gap in ${g.product} is parked but names no issue — a parked gap names the closed or iceboxed issue that parked it; drop \`parked\` for an unscheduled cell`);
+        continue;
+      }
       if (!/^#\d+$/.test(g.issue)) {
-        faults.push(`[${row.id}] the known gap in ${g.product} names no filed issue («${g.issue}») — file it first`);
+        faults.push(`[${row.id}] the known gap in ${g.product} names no filed issue («${g.issue}») — name an open issue, or drop \`issue\` for an unscheduled cell (ADR-W-170)`);
         continue;
       }
       // #1861 C4 (ADR-W-118 B15): a gap names OPEN work, or says it is parked.
@@ -511,7 +538,7 @@ export function catalogCoverageFaults(
     if (isCovered(s)) {
       if (allow.includes(s)) faults.push(`${product}: «${s}» is covered now — remove it from the uncovered allowlist`);
     } else if (!allow.includes(s)) {
-      faults.push(`${product}: catalog sentence «${s}» is in no parity row and no topic exception — add a row (a known gap names its issue) or an EXCEPTIONS family`);
+      faults.push(`${product}: catalog sentence «${s}» is in no parity row and no topic exception — add a row (a builder that differs is a known-gap cell) or an EXCEPTIONS family`);
     }
   }
   for (const s of allow) if (!inCatalog.has(s)) faults.push(`${product}: allowlisted «${s}» is no longer in the catalog — remove it`);
