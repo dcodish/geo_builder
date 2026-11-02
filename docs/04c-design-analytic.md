@@ -670,6 +670,32 @@ capped by `residualScale`; `completingStatement` is the drop-one blame for the w
 
 *Identifiers:* `unsatisfiable` · `AngleName` · `right-angle` · `example` · `DE` · `הצלע AB` · `ℓ1` · `הישר l1` · `ax + by + c = 0` · `ציר ה-x` · `(.+)`
 
+#### A line given by its direction alone ([ADR-AG-367](06c-decisions-analytic.md#adr-ag-367), #2621 B)
+
+`parseDirectionLine` reads «(נתון) ישר (l) (ה|ש)מקביל/מאונך לציר ה-x/y» and its English twin before the relation rule
+(which read «ישר» as an operand), and lowers it to one `direction-line { id, name?, rel, axis }` fact. M1 decides new vs
+existing: a named line the figure has is the `relation` about it, exactly as before; otherwise `directionLineFacts`
+(`types.ts`, so `factsWithin` sees the curve it builds) states the `curve` `x - c` or `y - c` over the tool's offset
+symbol `toolSymbol(id, 'c')` (spelled in `names.ts`, re-exported by `carriers.ts`), a free DOF the register finds by
+use; the panel prints no tool symbol (`readsToolSymbol`). An anonymous id hashes the sentence, so two sentences are two
+lines. Anything after the direction declines the sentence (one given per row, ADR-W-167).
+
+*Identifiers:* `parseDirectionLine` · `direction-line` · `directionLineFacts` · `toolSymbol` · `readsToolSymbol`
+
+#### The tangent as an operand, and named ([ADR-AG-368](06c-decisions-analytic.md#adr-ag-368), #2621 A)
+
+`direction()` reads the tangent noun through `readTangentNoun` (the ask lane's reader): at a point it is the
+`tangentLineId(at)` curve, and its build (`tangentObjectFacts`) rides `ClaimSink.lead` so `claimed()` puts it ahead
+of the statement; bare it is `FIGURE_TANGENT_ID`, which `resolveFigureTangent` (top of `applyFact`) replaces with the
+figure's one tangent object or refuses with `noHost`. `parseNameLineObject` names the tangent the same way, and
+`name-line-object` keeps the id `tangentLineId(through)` (only the name changes; references by name go through
+`resolveLineRefs`). «l הוא המשיק …» (`parseNamedAsTangent`) is «הישר l משיק …», and `tangent-of` with an unknown named
+line and a touch point states `tangent-line-at { name }`; a `line-at` restated under its own id with a new name takes
+`restatedLine`'s verdict, and `lineDescription` writes the tangent as «המשיק בנקודה A» for the offer. `callable` gives
+an unnamed tangent no name, so a refusal never lists `tangent-A`.
+
+*Identifiers:* `readTangentNoun` · `ClaimSink.lead` · `claimed` · `FIGURE_TANGENT_ID` · `resolveFigureTangent` · `parseNamedAsTangent` · `restatedLine` · `lineDescription` · `callable`
+
 #### The relation rule's notations ([ADR-AG-093](06c-decisions-analytic.md#adr-ag-093))
 
 `RELATION_HE`, `RELATION_EN` and `RELATION_SYM` («AB ∥ DC», «AB ⊥ DC») share one handler through `direction()`;
