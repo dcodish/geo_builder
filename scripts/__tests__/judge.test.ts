@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error — plain .mjs tool scripts, deliberately not part of the TS project
-import { digest, emptyLedger, overrule, record, settle, validateVerdict } from '../judgments.mjs';
+import { chose, digest, emptyLedger, overrule, record, settle, validateVerdict } from '../judgments.mjs';
 // @ts-expect-error — as above
 import { isRuling, operatorAdrs, search } from '../precedents.mjs';
 
@@ -74,5 +74,23 @@ describe('#2661 — the precedent record', () => {
     expect(search(recs, 'decimals rounded')[0].r.text).toMatch(/decimals/);
     expect(search(recs, 'מעגל')[0].r.text).toMatch(/המעגל/);
     expect(search(recs, 'the of')).toEqual([]);
+  });
+});
+
+describe('#2663 — what he delegated is decided, shipped, and listed for review', () => {
+  const d = { id: 'c1', kind: 'text', issue: '#2625', what: 'refusal for «AB קוטר בפרבולה»', choice: '«לפרבולה אין מרכז, ולכן אין לה קוטר.»' };
+  it('chose records a pending review item and refuses one it cannot place', () => {
+    const l = chose(emptyLedger(), [d], '2026-11-02T10:00:00Z');
+    expect(l.judgments[0]).toMatchObject({ id: 'c1', chosen: true, status: 'pending' });
+    expect(() => chose(emptyLedger(), [{ ...d, kind: 'scope' }], 'x')).toThrow(/kind must be/);
+    expect(() => chose(emptyLedger(), [{ ...d, issue: '2625' }], 'x')).toThrow(/#N/);
+  });
+  it('the digest lists it apart from the judgments, and changing it sends nothing back to him', () => {
+    const l = chose(record(emptyLedger(), [ruled('q1')], '2026-11-02T10:00:00Z'), [d], '2026-11-02T10:00:00Z');
+    const md = digest(l, true);
+    expect(md).toMatch(/Ruled on your behalf \(1\)/);
+    expect(md).toMatch(/Decided for you — review \(1\)[\s\S]*#2625/);
+    overrule(l, 'c1', 'say it shorter', '2026-11-02T12:00:00Z');
+    expect(l.demoted).toEqual({});
   });
 });

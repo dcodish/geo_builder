@@ -6264,6 +6264,8 @@ The operator accepted both on 2026-10-16: *"The English versions of today's word
 **Status:** accepted · 2026-10-23 · debt (workspace) · fix round #2466, stream C · branch `fix/2201-p2-1995-s5-ratchets` · **Operator rulings** 2026-10-13 (#1995, ballot card 18, answer B) and **2026-10-15** (#1995, ballot card 3b, answer A: *"I accepted all recommendations"*) · **Discharges** the entry [ADR-W-130](#adr-w-130) recorded as "owed on #1995" · **Builds on** [ADR-W-153](#adr-w-153) (the shared walker) and ADR-W-130 (the floor locks' payload tables)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-5 (a refusal gives one next step or says there is none) · **Design:** [04w](04w-design-shell.md) § *Student-facing text* (the refusal-style lock); [08](08-testing-strategy.md) § *i18n*
 
+> **Amended by [ADR-W-174](#adr-w-174)** (operator 2026-11-02): new text no longer waits for his play. It ships and is listed for his review afterwards.
+
 **The rulings.** 2026-10-13 (card 18 B): *"Name the student's statement and give one next step, or say plainly there is none."* 2026-10-15 (card 3b A): the rule **covers NEW refusal and status sentences too**, not only rewrites. A session writes a new sentence under the rule; the sentence is shown in full on the play sheet, and the operator's play is the approval. No ballot card per new sentence. Docs/22 §2b and §2d and the `/playsheet` and `/decisions` skills cite it.
 
 **Context.** Nothing enforced the rule: a refusal was reviewed only when someone read it, so the audit's 26 strings were written one PR at a time, each green. The class is *a student-facing refusal added or edited with no machine check of the house style*.
@@ -6772,3 +6774,65 @@ So the batch half of the idea **was already true**, with one gap: analytic, alon
 His review of the 14 and his answers to the 17 are on the standing-rulings page. Nothing is armed from them until he has seen them, per his 2026-11-02 ruling on #2661.
 
 **Consequences.** A product question no longer waits for him when he has already answered it. The ones that reach him are the ones only he can answer, each with the reason it came back. A judge that over-reaches is caught by his digest, and corrected by demotion, not by trust.
+
+## ADR-W-174 — What does not have to wait for the operator does not: new text, a construct an exercise needs, and a known construct in another wording are decided by the session and listed for his review (#2663)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · amends [ADR-W-154](#adr-w-154) (new text no longer waits for his play) and [ADR-W-117](#adr-w-117) (wording leaves the list of product decisions that need his ruling first) · builds on [ADR-W-173](#adr-w-173) (the digest) and [ADR-W-168](#adr-w-168) idea 5 (standing rulings, cards sr-01, sr-04, sr-06)
+
+**Operator:** 2026-11-02, in chat, answering the standing-rulings page:
+- **sr-01** (who writes new text): *"I want you to build all text. If there is a new text that we need, you can go ahead and build it. … And then we have this mechanism where you after the fact tell me, okay, here are things that we need to decide, or things that I decided for you and I just want you to review. … If I want to change wording, that's not a big change. We can always go back and fix it. In any case, wrong wording or wording I wouldn't want is not a critical issue for a student. So I don't want anything to wait for me that doesn't have to wait for me."*
+- **sr-04** (a construct a textbook or bagrut exercise needs): *"this is a real issue that we need to be able to build so if you ask me should we build it, i will say yes. so why ask if we know the answer. re P3 - I dont know if its p3 or p2."*
+- **sr-06** (a construct the tool reads, written another way): *"I would go with the recommendation you have option A"*, and *"there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — `scripts/judgments.mjs chose`, docs/22 §2e, CLAUDE.md rule 7, the decisions, fix-round and playsheet skills, the judge agent.
+
+**Decision.**
+1. **New text is the session's.** That covers every new student-facing string: refusal, note, chip, row label, English twin, spelling choice.
+   - The session writes it under the pedagogy style rule (name the student's statement, one next step, the book's word).
+   - It ships. It is shown in full on the sheet, but it is not a 🎮 case by itself and holds no deploy.
+2. **A construct a corpus exercise needs is built without a card.** This applies to a textbook or bagrut exercise in a builder meant to cover it.
+   - Its priority is the session's: P2 when the exercise is in the exam corpus (`npm run test:exams`) or in a lesson he dated, P3 otherwise. He left this open ("I dont know if its p3 or p2"); the split is the session's proposal and is itself on his review list.
+   - A construct with no exercise behind it is still a found feature for him.
+3. **A construct the tool already reads, in another wording, is read (sr-06 A).** This covers word order, active voice, a synonym, or a typo with no other reading. It is P3 and gets no card, but only when the wording means exactly what the canonical form means. A wording with a second meaning still comes to him.
+   - **The LLM fallback is the net, so these are never urgent.** A wording the parser misses escalates to the fallback, which will usually read it. A sibling-phrasing failure ([ADR-W-171](#adr-w-171)) is a P3 reading at most.
+   - It rises above P3 only when the fallback is measured to fail on it too. Measuring means acting as the oracle under rule 2, never a live call.
+   - Not every variant is worth building. The ones worth building are textbook forms and forms seen in the prod logs.
+4. **Listed afterwards.** The plan line is tagged `[ruled]` with this ADR.
+   - The session records it with `node scripts/judgments.mjs chose` (kinds `text` and `corpus-priority`), and the digest lists it under *Decided for you — review*.
+   - His change to one is an ordinary fix. It demotes nothing and sends nothing back to him.
+
+**Consequences.** Five open lines stop waiting: #2628 Q2, #2625, #1863, #2335 and #2286's wording half, plus #2623 and #2069 for sr-04. The cost is text he may not have chosen, live until his review. He ruled that this is not critical for a student.
+
+## ADR-W-175 — Standing rulings, first set: the operator's answers to the standing-rulings cards of 2026-11-02 (#2654 idea 5)
+
+**Status:** accepted · 2026-11-02 · operator rulings · product (every builder) · builds on [ADR-W-168](#adr-w-168) idea 5 and [ADR-W-173](#adr-w-173) (these were the 17 cards the judge sent back) · sr-01, sr-04 and sr-06 are [ADR-W-174](#adr-w-174)
+
+**Operator:** 2026-11-02, on the standing-rulings page (https://claude.ai/artifact/MjkSamdi7PYXbeGTQtfGnW), taps between 15:09 and 15:20 UTC, his pasted list of all answers, and chat for sr-16, sr-22 and sr-26. Where his chat words and his tap differ, his words win, because they are the more specific of the two (decisions skill, step 3).
+
+**Requirements:** owed per builder by the item that first applies each rule. The rows are named in each line below. · **Design:** none (internal). These are rules a plan cites; the mechanism is each item's own.
+
+**The rulings.** Each is a standing rule: a later plan line that it covers is tagged `[ruled]` with this ADR.
+- **sr-05, A: a ruling applies to every builder by default.** A ruling on a plane-geometry or display behaviour applies to every builder that has that element, unless he names one builder. The ports are tracked as parity-table cells (ADR-W-170).
+- **sr-07, A: 2-D's next-free-letter rule everywhere.** A tool label never repeats a letter the student used. A letter the student put on the object wins. If the book's letter (for example a focus's F) is taken, the mark shows with no letter, never with an invented one.
+- **sr-10, A: a newer ruling's effect on a case he already passed is a Heads-up line, not a question.** This holds when the newer ruling covers the case on its face. The change is a 🎮 case marked changed. A real conflict between two rulings still goes to him (docs/17 §9).
+- **sr-12, A: a definite noun binds the drawn object of its kind.** This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created. A pronoun binds only to a kind that can be its subject.
+- **sr-15, A: a helper appears only when a stated object is measured in it, or the student asked for it.** Axes appear only with a coordinate, equation or parametric object. A note appears only when something changed. In his words: *"clean canvas always"* (2026-09-06).
+- **sr-16, A, with his words** (chat): *"An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees. For vectors, we said that if the tool can understand if it's a length or a vector, … the tool can decide what it is, and of course writes a correct input text, or format, and if not, it asks. So I would say in general, if you don't know ask, it's always better to ask and tell the user how to write each specific item. … for an angle, we agreed that it's a Latin letter and not like the letter B"*. The rule:
+  - Where the book or an earlier ruling fixes a reading, the tool takes it and shows the form it read. Examples: a bare number on an arc is degrees; a length or a vector is read from the context, per PR #2605's rulings of 2026-10-30; the angle-letter conventions already ruled, such as complex #2030, where the angle is a Greek letter and a Latin one is refused.
+  - Where nothing fixes it, the tool **asks**, and teaches how to write each reading. It never guesses silently.
+  - These were recorded rules, and the card wrongly called them open. The judge's precedent index holds them.
+- **sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure.** «הוכיחו» is refused in every builder. No ✓ "verified" ever appears on a given.
+- **sr-22: computed in full, shown to two decimals when needed; a value within a thousandth of a whole number shows as that number.** He tapped C. His chat words, given afterwards, are more specific: *"the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8. … if 3 decimals are .999 or .001 or something like that, we would round it."* So «AC = 7.9999» shows «8», and the canvas and the panel show the same text (#2361). Typed and computed values follow the same rule.
+- **sr-25, A: one legibility bound for every free sample, in every builder.** These limits apply:
+  - no free corner above 165°, or below a minimum;
+  - no two vertices closer than a fixed share of the figure;
+  - no stacked points while a separated view exists.
+
+  A stated value is always drawn as stated, however extreme.
+- **sr-26: inputs and answers share one curve family.** He tapped B: an answer outside the family draws the curve without naming it. In chat he added: *"the tool itself should be able to support non-canonical forms. If it doesn't right now, we should add it as a future feature"*. So the shared family is to grow: #2664 (P3 feature). Until then, the locus of #2628 is drawn, not named.
+- **sr-27, C: an object placed by value stays exactly put; a free one moves as little as possible.** Placed by value means coordinates or a stated length, angle or other magnitude. When a student adds a line, those objects do not move at all, and free objects move minimally.
+- **sr-29, A: dashed for every extension, directrix or helper.** A line is solid only when the student stated it as a segment or a shape. One style rule across the builders.
+- **sr-30, A: «הציגו תצורה אחרת» never repeats the drawing on screen while another valid one exists.** A repeat is a bug. A numeric variety bar is the session's mechanism.
+- **sr-31, A: a session sets the priority of a found feature that extends one he asked for or ruled.** P3 is the default, and the report says so; he can overrule any priority there. A new capability is still his to prioritise.
+
+**Consequences.** Each rule is cited by the plans of the issues named in its transcription comment. The cards no longer exist as questions.

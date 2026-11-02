@@ -19,7 +19,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:13:12.865Z",
+        "by": "operator",
+        "note": "Sessions write all text; it ships, and he reviews it afterwards. Nothing waits for him that does not have to (#2663, ADR-W-174).",
+        "issue": "#2663"
+      }
     },
     {
       "id": "sr-02",
@@ -98,7 +104,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:13:12.866Z",
+        "by": "operator",
+        "note": "A construct a corpus exercise needs is built without asking; its priority is the session's, listed for his review (#2663, ADR-W-174).",
+        "issue": "#2663"
+      }
     },
     {
       "id": "sr-05",
@@ -119,7 +131,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.033Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-06",
@@ -150,7 +168,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:14:21.224Z",
+        "by": "operator",
+        "note": "Option A: read it at P3; the LLM fallback is the net, so a missed wording is urgent only when the fallback fails too (#2663, ADR-W-174).",
+        "issue": "#2663"
+      }
     },
     {
       "id": "sr-07",
@@ -176,7 +200,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-08",
@@ -260,7 +290,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-11",
@@ -320,7 +356,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-13",
@@ -414,7 +456,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-16",
@@ -445,7 +493,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A (+ his chat words)",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-17",
@@ -539,7 +593,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-20",
@@ -623,7 +683,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "C tapped; his chat words win: compute in full, show 2 decimals when needed, near-integers round",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-23",
@@ -707,7 +773,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-26",
@@ -723,7 +795,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "B (+ #2664 widens the shared family)",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-27",
@@ -744,7 +822,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "C",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-28",
@@ -794,7 +878,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-30",
@@ -820,7 +910,13 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
     },
     {
       "id": "sr-31",
@@ -836,7 +932,43 @@
         }
       ],
       "at": "2026-11-02T09:26:18.792Z",
-      "status": "escalated"
+      "status": "escalated",
+      "answered": {
+        "at": "2026-11-02T15:23:57.034Z",
+        "by": "operator",
+        "note": "A",
+        "adr": "ADR-W-175"
+      }
+    },
+    {
+      "id": "chose-2625-text",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "refusal for «AB קוטר בפרבולה»",
+      "choice": "«לפרבולה אין מרכז, ולכן אין לה קוטר.» (English: \"A parabola has no centre, so it has no diameter.\")",
+      "chosen": true,
+      "at": "2026-11-02T15:16:25.248Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2623-priority",
+      "kind": "corpus-priority",
+      "issue": "#2623",
+      "what": "a locus as a host (book p9-7 ב), built",
+      "choice": "P2: the ellipse lesson he dated, 14 Nov",
+      "chosen": true,
+      "at": "2026-11-02T15:16:25.248Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-corpus-split",
+      "kind": "corpus-priority",
+      "issue": "#2663",
+      "what": "the priority rule for a construct an exercise needs",
+      "choice": "P2 when in the exam corpus or a lesson he dated; P3 otherwise",
+      "chosen": true,
+      "at": "2026-11-02T15:16:25.248Z",
+      "status": "pending"
     }
   ],
   "demoted": {}

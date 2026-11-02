@@ -137,10 +137,10 @@ existing points must not jump when a fact is added — is a first-class test.
 **7 — The operator decides what a student sees; a session decides how** ([ADR-W-117](docs/06w-decisions-workspace.md#adr-w-117)).
 A session decides the mechanism alone (files, tests, refactors, performance), and may restore a behaviour
 that a dated operator ruling, or 2-D measured at HEAD, already defines. Anything else a student can see
-(drawn, hidden, labelled, refused, accepted, read, worded or computed differently) is a **product decision**
-and needs his dated ruling.
+(drawn, hidden, labelled, refused, accepted, read or computed differently) is a **product decision**
+and needs his dated ruling. New text is the session's, reviewed after (ADR-W-174).
 - Every fix plan ends with `## What the student will see`, one line per change, tagged `[asked]` (quote him),
-  `[ruled]` (link), `[2-D]` (measured at a named commit), `[judged]` (the judge, from his precedent: ADR-W-173) or `[proposed]`. A `[proposed]` line makes the issue
+  `[ruled]` (link), `[2-D]` (measured at a named commit), `[judged]` (ADR-W-173) or `[proposed]`. A `[proposed]` line makes the issue
   `needs-operator`; it is never armed.
 - **Measured beats written.** If the pickup measurement contradicts the plan's account of the request, of 2-D
   or of another builder, stop and escalate (docs/17 §8). Never ship "because the plan lists it".
@@ -161,7 +161,7 @@ Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-dec
 on a decision; `icebox` for a closed, parked issue (never one that shows something false); `auto-ok`
 marks a fix plan approved for the autonomous `/fix-round` loop. A session applies `auto-ok` only as
 transcription of the operator's explicit approval, or to a plan whose every `What the student will see`
-line is `[asked]`/`[ruled]`/`[2-D]`/`[judged]` (rule 7), always with an audit comment (ADR-W-014, ADR-W-117). The loop's round issues carry `awaiting-play` until the
+line is `[asked]`/`[ruled]`/`[2-D]`/`[judged]` (rule 7), with an audit comment (ADR-W-014, ADR-W-117). The loop's round issues carry `awaiting-play` until the
 operator validates the batch ([docs/22 §2d](docs/22-workflow.md), ADR-W-012). A "bug" diagnosed as a **missing capability is relabelled `feature` and treated as one** —
 never silently built under a bug's banner.
 

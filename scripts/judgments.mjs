@@ -15,6 +15,12 @@
  *   node scripts/judgments.mjs overrule <id> --note "…"   his overrule, in his words
  *   node scripts/judgments.mjs settle                     judgments older than the window stand
  *   node scripts/judgments.mjs demoted                    the classes that must escalate
+ *   node scripts/judgments.mjs chose <decision.json>      a session's own decision under his delegation, for his review
+ *
+ * A `chose` entry is no judgment ([ADR-W-174](../docs/06w-decisions-workspace.md#adr-w-174), #2663): the session
+ * decided it itself because he delegated that kind (new text, a corpus construct's priority). Operator,
+ * 2026-11-02: *"I don't want anything to wait for me that doesn't have to wait for me."* It ships at once,
+ * and his digest lists it to review. His change to one is an ordinary fix and sends nothing back to him.
  *
  * Ledger: `scripts/judgments/ledger.json`, tracked, so it travels with git like the play-sheet audits.
  */
@@ -67,13 +73,31 @@ export function record(ledger, verdicts, at) {
   return ledger;
 }
 
-/** His overrule: the judgment is his now, and its class goes back to him. */
+/** What a session may decide itself and list for his review afterwards (ADR-W-174). */
+export const DELEGATED = ['text', 'corpus-priority'];
+
+/** A session's own decision under a delegation: it stands unless he changes it, and never escalates. */
+export function chose(ledger, decisions, at) {
+  for (const d of decisions) {
+    const p = [];
+    if (!d?.id) p.push('id missing');
+    if (!DELEGATED.includes(d?.kind)) p.push(`kind must be one of ${DELEGATED.join(', ')}`);
+    if (!/^#\d+$/.test(d?.issue || '')) p.push('issue must read #N');
+    if (!d?.what) p.push('what was decided, in one line');
+    if (!d?.choice) p.push('the choice itself (the text, or the priority)');
+    if (p.length) throw new Error(`${d?.id || '?'}: ${p.join('; ')}`);
+    ledger.judgments = ledger.judgments.filter((x) => x.id !== d.id).concat({ ...d, chosen: true, at, status: 'pending' });
+  }
+  return ledger;
+}
+
+/** His overrule: the judgment is his now, and its class goes back to him. A session's own choice is just changed. */
 export function overrule(ledger, id, note, at) {
   const j = ledger.judgments.find((x) => x.id === id);
   if (!j) throw new Error(`no judgment ${id}`);
   j.status = 'overruled';
   j.overrule = { note, at };
-  ledger.demoted[j.class] = 0;
+  if (!j.chosen) ledger.demoted[j.class] = 0;
   return ledger;
 }
 
@@ -95,7 +119,8 @@ export function settle(ledger, now, windowHours = WINDOW_HOURS) {
 
 /** The skim list: one line per ruling, with the quote it rests on. */
 export function digest(ledger, md = false) {
-  const pend = ledger.judgments.filter((j) => j.status === 'pending');
+  const pend = ledger.judgments.filter((j) => j.status === 'pending' && !j.chosen);
+  const mine = ledger.judgments.filter((j) => j.status === 'pending' && j.chosen);
   const esc = ledger.judgments.filter((j) => j.status === 'escalated' && !j.answered);
   const lines = [];
   if (md) lines.push(`## Ruled on your behalf (${pend.length}) — each stands in ${WINDOW_HOURS} h unless you object`, '');
@@ -107,6 +132,8 @@ export function digest(ledger, md = false) {
   }
   if (md) lines.push('', `## Sent back to you (${esc.length})`, '');
   for (const j of esc) lines.push(md ? `- **${j.id}** · ${j.question}\n  why: ${j.reason}` : `${j.id} ESCALATED: ${j.reason}`);
+  if (md) lines.push('', `## Decided for you — review (${mine.length}); nothing waits on these, change any you want`, '');
+  for (const j of mine) lines.push(md ? `- **${j.id}** · ${j.issue} · ${j.what}\n  → ${j.choice}` : `${j.id} CHOSE ${j.issue} ${j.what}: ${j.choice}`);
   return lines.join('\n');
 }
 
@@ -124,6 +151,10 @@ function main() {
     save(l);
     const mine = (Array.isArray(raw) ? raw : [raw]).map((v) => l.judgments.find((j) => j.id === v.id));
     console.log(`recorded ${mine.length}: ${mine.filter((j) => j.status === 'pending').length} ruled, ${mine.filter((j) => j.status === 'escalated').length} sent back to the operator`);
+  } else if (cmd === 'chose') {
+    const raw = JSON.parse(readFileSync(arg, 'utf8'));
+    save(chose(load(), Array.isArray(raw) ? raw : [raw], now));
+    console.log(`recorded ${Array.isArray(raw) ? raw.length : 1} decision(s) for his review`);
   } else if (cmd === 'overrule') {
     const note = val('--note');
     if (!arg || !note) { console.error('usage: overrule <id> --note "<his words>"'); process.exit(1); }
@@ -137,7 +168,7 @@ function main() {
   } else if (cmd === 'demoted') {
     console.log(JSON.stringify(load().demoted));
   } else {
-    console.error('usage: record <file> | digest [--md] | overrule <id> --note "…" | settle | demoted');
+    console.error('usage: record <file> | chose <file> | digest [--md] | overrule <id> --note "…" | settle | demoted');
     process.exit(1);
   }
 }

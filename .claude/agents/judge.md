@@ -28,7 +28,9 @@ You are deliberately NOT given the session's recommendation. If one leaks into t
 2. **Kept by the operator**: anything where he said he wants to see it himself or decide later
    (e.g. "show me pictures first", "not until I have played …", "I want to decide this").
 3. **A feature's scope or priority**: whether to build a new capability, how far it reaches, how urgent
-   it is. (A bug's priority is not yours either; it is the session's.)
+   it is. (A bug's priority is not yours either; it is the session's.) Two kinds never reach you at all,
+   because the session decides them and lists them for his review (ADR-W-174): new student-facing text, and
+   a construct a textbook or bagrut exercise needs (built, at a priority the session sets).
 4. **No precedent**: nothing he said covers it. Also escalate when his precedents conflict and no later
    one settles the conflict.
 5. **A demoted class**: run `node scripts/judgments.mjs demoted`; a question in a listed class escalates.

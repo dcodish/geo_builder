@@ -41,6 +41,7 @@ Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs
 to the `judge` agent (docs/22 §2e, [ADR-W-173](../../../docs/06w-decisions-workspace.md#adr-w-173)): a ruling
 is recorded and tagged `[judged]`, and the round goes on; an escalation is `[proposed]` → Step 4, never a
 default. The same holds for a found case's question (Step 2, 4c): judge first, then the Questions list.
+New text and a corpus construct's priority never go to the judge or to him first: the round decides, tags the line `[ruled]` with [ADR-W-174](../../../docs/06w-decisions-workspace.md#adr-w-174), and records it with `judgments.mjs chose`.
 The round report carries `node scripts/judgments.mjs digest --md` for his skim.
 **Without `--limit`, `gh` returns 30 rows** and the round silently never sees the rest of the queue.
 An `auto-ok` issue with no real plan is a labeling error: record it in the ledger's Skipped

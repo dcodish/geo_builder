@@ -300,6 +300,13 @@ Operator, 2026-11-02: *"I think need a judgment agent that can make decisions on
 - **His oversight.**
   - `node scripts/judgments.mjs digest --md` is his skim list: one line per ruling, with the quote it rests on. It goes in the round report, or on its own. A ruling stands after 24 hours unless he objects (`settle`).
   - When he objects: `overrule <id> --note "<his words>"`, and the issue's plan follows his words. That kind of question goes back to him until three judgments of it in a row stand. His overrule is itself precedent from then on.
+- **Decided, not asked** ([ADR-W-174](06w-decisions-workspace.md#adr-w-174), #2663). Operator, 2026-11-02: *"I don't want anything to wait for me that doesn't have to wait for me."* Three kinds skip both the judge and him:
+  - **new student-facing text**: refusal, note, chip, row label, English twin, spelling. The session writes it under the pedagogy style rule, and it ships. It is not a 🎮 case by itself.
+  - **a construct a textbook or bagrut exercise needs**, in a builder meant to cover that exercise: it is built. Its priority is the session's: P2 when the exercise is in the exam corpus (`npm run test:exams`) or a lesson he dated, P3 otherwise. A construct with no exercise behind it is still a found feature for him.
+
+  - **a construct the tool already reads, in another wording** (word order, a synonym, a typo with no other reading) that means exactly the same: read it, at P3. The LLM fallback is the net for the rest, so such a gap rises above P3 only when the fallback is measured (as oracle, rule 2) to fail too. A wording with a second meaning still goes to him.
+
+  Its plan line is tagged `[ruled]` with ADR-W-174. The session records it with `node scripts/judgments.mjs chose <file>` (`{id, kind: text|corpus-priority, issue: "#N", what, choice}`), and the digest lists it under *Decided for you — review*. When he changes one, that is an ordinary fix; nothing goes back to him.
 
 ## 3. The bug route (operator reports something broken)
 

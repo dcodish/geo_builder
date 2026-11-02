@@ -41,11 +41,11 @@ A case is a claim about the product, so it is measured before it goes on the she
   and read the string (`[role="status"]` texts), because a line refused before commit never becomes a fact
   and fact-keyed wiring never fires (#943). Enumerate the surfaces by how far the input got: refused at
   parse, refused before commit, committed then failed.
-- **A new or rewritten refusal or status sentence is shown IN FULL** in its case (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)): his play of it is the approval, so the sheet quotes the whole Hebrew sentence, never a paraphrase.
+- **New text is shown IN FULL** in its case, never paraphrased, but it is **not a 🎮 case by itself** and holds nothing: it ships, and it is recorded with `node scripts/judgments.mjs chose` for his after-the-fact review (operator 2026-11-02, [ADR-W-174](../../../docs/06w-decisions-workspace.md#adr-w-174); amends ADR-W-154).
 - **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (judged from the screenshot) ·
   ✅ verified (an assertion decides it). **Since [ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)
   he plays only 🎮**: you close ✅ and 👁 yourself (§3b).
-  - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); a new or rewritten refusal or status sentence shown in full; every feature PR's cases.
+  - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); every feature PR's cases.
   - **👁 at most:** a case for a bug he reported. It goes in the skim digest (§3b).
   - **Prefer a check the driver decides** (§3b lists them: page text, a refusal, a drawn label, a givens row, a changed configuration) over a Look-for only an eye can check.
   - **Cap his sitting at about ten 🎮 cases**, ranked by risk; the rest move to the next sitting.
