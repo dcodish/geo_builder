@@ -1,0 +1,149 @@
+[
+  {
+    "builder": "3d",
+    "base": "60 < זווית SAB < 90",
+    "variant": "60 < זווית SGH < 90",
+    "operator": "rename-letters",
+    "differs": "builds → refused (bound-unsatisfiable)"
+  },
+  {
+    "builder": "3d",
+    "base": "אלכסון תיבה AC'",
+    "variant": "נתון אלכסון תיבה AC'",
+    "operator": "given-lead",
+    "differs": "refused (unknown-point) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "אלכסון BD'",
+    "variant": "נתון אלכסון BD'",
+    "operator": "given-lead",
+    "differs": "refused (unknown-point) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "גובה הפירמידה מנקודה D",
+    "variant": "נתון גובה הפירמידה מנקודה D",
+    "operator": "given-lead",
+    "differs": "refused (unknown-point) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "גובה הפירמידה",
+    "variant": "נתון גובה הפירמידה",
+    "operator": "given-lead",
+    "differs": "refused (unknown-plane) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "גובה מנקודה D לבסיס ABC",
+    "variant": "נתון גובה מנקודה D לבסיס ABC",
+    "operator": "given-lead",
+    "differs": "refused (unknown-point) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
+    "variant": "נתון הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "הישר ℓ1: x = (0,0,0) + t(1,0,0)",
+    "variant": "נתון הישר ℓ1: x = (0,0,0) + t(1,0,0)",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "הישר ℓ1: x = t(0,m,2m-2)",
+    "variant": "נתון הישר ℓ1: x = t(0,m,2m-2)",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "המישור ABC מקביל למישור A'B'C'",
+    "variant": "המישור MNP מקביל למישור M'N'P'",
+    "operator": "rename-letters",
+    "differs": "refused (point-not-determined) → builds"
+  },
+  {
+    "builder": "3d",
+    "base": "המישור BC'D",
+    "variant": "נתון המישור BC'D",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "המישור KBC: x + 2y + 3z - 26 = 0",
+    "variant": "נתון המישור KBC: x + 2y + 3z - 26 = 0",
+    "operator": "given-lead",
+    "differs": "refused (point-not-determined) → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "המישור π1: z - 3 = 0",
+    "variant": "נתון המישור π1: z - 3 = 0",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "מ-A מורידים אנך למישור π1 החותך אותו בנקודה B",
+    "variant": "מ- A מורידים אנך למישור π1 החותך אותו בנקודה B",
+    "operator": "prefix-hyphen-space",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C",
+    "variant": "מ- B מעבירים אנך לישר ℓ החותך אותו בנקודה C",
+    "operator": "prefix-hyphen-space",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "מישור π1 - x + 2y + 3z - 5",
+    "variant": "נתון מישור π1 - x + 2y + 3z - 5",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "מעגל A משיק לישר BC בנקודה F",
+    "variant": "המעגל A משיק לישר BC בנקודה F",
+    "operator": "definite-article",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "קטע CA'",
+    "variant": "הקטע CA'",
+    "operator": "definite-article",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "קטע CA'",
+    "variant": "נתון קטע CA'",
+    "operator": "given-lead",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "3d",
+    "base": "שיעור ה-z של C' חיובי",
+    "variant": "שיעור ה-z של K' חיובי",
+    "operator": "rename-letters",
+    "differs": "builds → refused (sign-unsatisfiable)"
+  },
+  {
+    "builder": "3d",
+    "base": "AE יוצר זוויות שוות עם AB ו-AD",
+    "variant": "AE יוצר זויות שוות עם AB ו-AD",
+    "operator": "ktiv-haser",
+    "differs": "refused (point-not-determined) → not-handled"
+  }
+]

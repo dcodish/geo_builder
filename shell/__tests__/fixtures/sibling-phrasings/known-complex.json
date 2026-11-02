@@ -1,0 +1,324 @@
+[
+  {
+    "builder": "complex",
+    "base": "-2z1 = conj(z3)",
+    "variant": "-2z1 = conj(z3).",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "|z1-z2|",
+    "variant": "|z1-z2|.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "|z1| = 2|z2|",
+    "variant": "|z1| = 2|z2|.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "|z1| = 9r",
+    "variant": "|z1| = 9r.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "אורך AB",
+    "variant": "אורך AB.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "אורך z1z2 = 15r",
+    "variant": "אורך z1z2 = 15r.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "ה-n המינימלי שעבורו w^n מדומה טהור הוא 2",
+    "variant": "ה-n המינימלי שעבורו w^n מדומה טהור הוא 2.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "היחס בין שטח Oz1z2 לשטח Oz1z3",
+    "variant": "היחס בין שטח Oz1z2 לשטח Oz1z3.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "היקף המרובע Oz1z2z3 = 60r",
+    "variant": "היקף המרובע Oz1z2z3 = 60r.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המעגל החוסם את המשולש z1z2z3",
+    "variant": "נתון המעגל החוסם את המשולש z1z2z3",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המעגל החוסם את המשולש z1z2z3",
+    "variant": "המעגל החוסם את המשולש z1z2z3.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המעגל שמרכזו O ורדיוסו r",
+    "variant": "נתון המעגל שמרכזו O ורדיוסו r",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המעגל שמרכזו O ורדיוסו r",
+    "variant": "המעגל שמרכזו O ורדיוסו r.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המרובע Oz1z2z3",
+    "variant": "נתון המרובע Oz1z2z3",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "המרובע Oz1z2z3",
+    "variant": "המרובע Oz1z2z3.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "הקטע z1z2",
+    "variant": "נתון הקטע z1z2",
+    "operator": "given-lead",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "הקטע z1z2",
+    "variant": "הקטע z1z2.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "שטח Oz1z2z3 הוא 150r^2",
+    "variant": "שטח Oz1z2z3 הוא 150r^2.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "שטח Oz1z2z3",
+    "variant": "שטח Oz1z2z3.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "A = 5+i",
+    "variant": "A = 5+i.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "arg w",
+    "variant": "arg w.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "arg z1 - arg z2 = 90",
+    "variant": "arg z1 - arg z2 = 90.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "arg z1 = 45",
+    "variant": "arg z1 = 45.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "arg z2 < 45",
+    "variant": "arg z2 < 45.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "d_{z1z2}",
+    "variant": "d_{z1z2}.",
+    "operator": "trailing-period",
+    "differs": "asks (ask-lane) → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "O ראשית הצירים",
+    "variant": "O ראשית הצירים.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "u מספר מרוכב",
+    "variant": "u מספר מרוכב.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "w = conj(z3)",
+    "variant": "w = conj(z3).",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "w = z1*z2",
+    "variant": "w = z1*z2.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z^2 - 4z + 13 = 0",
+    "variant": "z^2 - 4z + 13 = 0.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z^3 - 1 = 0",
+    "variant": "z^3 - 1 = 0.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z^3 = 8",
+    "variant": "z^3 = 8.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = √3 + i",
+    "variant": "z1 = √3 + i.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = 2(cos45 + i·sin45)",
+    "variant": "z1 = 2(cos45 + i·sin45).",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = 2cis(θ)",
+    "variant": "z1 = 2cis(θ).",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = 3+4i",
+    "variant": "z1 = 3+4i.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = a+bi",
+    "variant": "z1 = a+bi.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 = A",
+    "variant": "z1 = A.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 ו-z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא z4",
+    "variant": "z1 ו־z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא z4",
+    "operator": "prefix-maqaf",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1 ו-z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא z4",
+    "variant": "z1 ו-z2 הם שני האיברים הראשונים בסדרה הנדסית שבה האיבר השלישי הוא z4.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1, z2, z3 סדרה הנדסית",
+    "variant": "z1, z2, z3 סדרה הנדסית.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1, z2, z3 סדרה חשבונית",
+    "variant": "z1, z2, z3 סדרה חשבונית.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1*conj(z1) + z2*conj(z2) = 25",
+    "variant": "z1*conj(z1) + z2*conj(z2) = 25.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1^3 = z3",
+    "variant": "z1^3 = z3.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z1",
+    "variant": "z1.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "complex",
+    "base": "z2 = 2cis150",
+    "variant": "z2 = 2cis150.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  }
+]
