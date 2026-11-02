@@ -17,7 +17,7 @@ import { resolveToolLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
-import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, tangentLineId, type Construction, type Fact } from './types';
 import { SOLVE_RESOLUTION, SOLVE_TOL, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
@@ -255,7 +255,10 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
    */
   const lineExistsFields = (e: ApplyError): Partial<LineFault> => {
     if (e.code !== 'line-exists' || e.twin === undefined) return {};
-    const j = facts.findIndex((f) => factsWithin(f).some((g) => (g.t === 'line-at' || g.t === 'curve') && g.id === e.twin));
+    // The tangent at A is built by its `tangent-line-at` (#2621 A, ADR-AG-368), under the id `tangentLineId(at)`.
+    const j = facts.findIndex((f) =>
+      factsWithin(f).some((g) => ((g.t === 'line-at' || g.t === 'curve') && g.id === e.twin) || (g.t === 'tangent-line-at' && tangentLineId(g.at) === e.twin)),
+    );
     return { twin: e.twin, ...(e.lineName !== undefined ? { lineName: e.lineName } : {}), ...(j >= 0 ? { declared: lines[owner[j]] } : {}) };
   };
   /** #1737 (ADR-AG-265): the shape a height named, or the pair and ring a diagonal claim named — what the refusal says. */
