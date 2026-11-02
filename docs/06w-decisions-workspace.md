@@ -6622,6 +6622,6 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 5. **Port rounds take their work from the table.** ADR-W-157 §4's "the backlog is cleared by dedicated rounds" now reads the unscheduled cells; the round still composes only from the plan ([ADR-W-165](#adr-w-165)), so a port item is a plan item naming a builder and a family.
 
 **Consequences.**
-- The queue stops growing by one issue per port, and existing pure-port issues can be closed into cells (an audit list is on #2654; the operator or a session acts on it, never this ADR).
+- The queue stops growing by one issue per port, and existing pure-port issues can be closed into cells (the audit list is in this ADR's PR description; the operator or a session acts on it, never this ADR).
 - The C4 promise "a gap names open work" becomes "a gap names open work, names none, or names the issue that parked it". An unscheduled cell claims no schedule, so it cannot claim work nobody is doing, which was C4's point.
 - Not built: a cell carries no priority. A port that a student hit stays an issue (`reported`), and its gap cell names it.
