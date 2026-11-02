@@ -362,6 +362,12 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   (`crossings3.ts`) lists the pairs of `c.points` at one place by `samePlace3`, the identity test `namedPointAt` asks;
   `derive3` returns it as `coincidences`, and `App3` renders `shell/converge`'s `convergeText` (the suite key
   `suite.notice.converge`) in the blue notice strip. Read per render, so it clears with the pair.
+- **The mint judgement, narrowed ([ADR-3D-405](06b-decisions-3d.md#adr-3d-405), #1595).** `deriveCore3`'s derived-point
+  pass still finds the earlier point a 0-DOF derived point lands on (`namedPointAt`), but sets `point-coincides` only
+  when `writtenOnto3(c, def, holder)` holds: a crossing whose two carriers are written through the holder (`plane-cut`
+  with the holder an end of the segment and in the plane's letters, `seg-cross` sharing it, `line-plane` through named
+  carriers), or a foot dropped from the holder onto a carrier through it. Every other landing records and is said by
+  `coincidences3`.
 
 **A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through

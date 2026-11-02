@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { crossingsOf, offersOf } from '../engine/crossings';
 import { conicMeet, walkOfCoefficients, walkThrough } from '../engine/crossing-order';
 import { anotherConfiguration } from '../app/another';
@@ -126,12 +127,13 @@ describe('#1268 — the pair, and «הציגו תצורה אחרת»', () => {
     expect(near(pt(lines, 'Q'), roots[0])).toBe(true);
   });
 
-  it('REFUSED: the same ordinal twice names a point that already has a name', () => {
+  it('the same ordinal twice names the point that already has a name — recorded, with the notice', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): Q is forced onto P, so the
+    // line records and the drawn figure says «P ו-Q נפלו על אותה נקודה.» (was `crossing-already-named`).
     const second = cross('Q', 0, 'הקטע AB');
     const d = derive([...CHORD, cross('P', 0, 'הקטע AB'), second], 0);
-    expect(d.faults).toHaveLength(1);
-    expect(d.faults[0].detail).toBe(second);
-    expect(d.faults[0].code).toBe('crossing-already-named');
+    expect(d.faults).toEqual([]);
+    expect(coincidencesOf(d)).toEqual([['P', 'Q']]);
   });
 
   it('cycling configurations never swaps an ordinal-named crossing', () => {

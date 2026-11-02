@@ -8,8 +8,11 @@
  * so, we give a message to the user. this needs to happen here too."*
  *
  * Each row is typed through the store the App submits to (`useGeo3.submit`) and read from `derive3(facts, seed)`, the
- * derivation App3 renders. The refusal of a NEW derived letter on an existing point (`point-coincides`, ADR-3D-183,
- * the 2026-09-20 ruling) is untouched and locked here as a refusal.
+ * derivation App3 renders.
+ *
+ * Operator ruling 2026-11-02 on #1595 ("accept with message", ADR-3D-405, ADR-W-177): a NEW derived letter its definition
+ * FORCES onto a named point records with the same notice — `point-coincides` (ADR-3D-183) now refuses only 2-D's
+ * structural member: a crossing whose two carriers are WRITTEN through the holder (#1274, ADR-W-066).
  */
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -65,10 +68,20 @@ describe('#1595 — 3-D: a forced coincidence records, with the notice', () => {
     expect(drawn().coincidences).toEqual([]);
   });
 
-  it('unchanged refusal: a NEW derived letter defined onto an existing point is still refused (ADR-3D-183)', () => {
-    type(['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB']);
-    st().submit('N אמצע AB');
-    expect(st().lastError).toMatchObject({ code: 'point-coincides', id: 'N', with: 'M' });
+  it.each([
+    [['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB', 'N אמצע AB'], 'M ו-N נפלו על אותה נקודה.'], // the ruling's own row
+    [['משולש ABC', 'M אמצע AB', 'N אמצע AB'], 'M ו-N נפלו על אותה נקודה.'],
+    [["קובייה ABCDA'B'C'D'", "A'H גובה לפאה ABCD"], 'A ו-H נפלו על אותה נקודה.'], // a foot on a vertex (2-D: «∠B = 90°» · «AD גובה לצלע BC»)
+  ])('a NEW derived letter its definition forces onto a named point records, with the notice (2026-11-02): %j', (lines, sentence) => {
+    type(lines);
+    expect(st().facts).toHaveLength(lines.length);
+    expect(notice()).toBe(sentence);
+  });
+
+  it('still refused, as 2-D refuses «D חיתוך AB ו-BC»: a crossing whose two carriers are written through the holder', () => {
+    type(["תיבה ABCDA'B'C'D'", "E אמצע BB'", 'מישור ADE']);
+    st().submit("G נקודת חיתוך של AC' עם מישור ADE");
+    expect(st().lastError).toMatchObject({ code: 'point-coincides', id: 'G', with: 'A' });
     expect(st().facts).toHaveLength(3);
   });
 });

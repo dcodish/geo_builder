@@ -729,8 +729,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 
 - **FR-RD-17 (Must)** — **Two letters the drawing puts on one dot are said.** When the givens put two letters on one
   point — «מקבילון ABCDA'B'C'D'» · «AK = AD» (K on D), «A(0,0,0)» · «B(2,0,0)» · «M אמצע AB» · «N(1,0,0)» — the line
-  records and 2-D's notice «D ו-K נפלו על אותה נקודה.» shows while the drawing has the pair. A NEW derived letter defined onto
-  an existing point is still refused (`point-coincides`). Sources: ADR-3D-404, ADR-W-176, #1595.
+  records and 2-D's notice «D ו-K נפלו על אותה נקודה.» shows while the drawing has the pair. **A NEW derived letter
+  its definition forces onto a named point records with the same notice** *(operator ruling 2026-11-02 on #1595:
+  "accept with message")*: «A(0,0,0)» · «B(2,0,0)» · «M אמצע AB» · «N אמצע AB» → «M ו-N נפלו על אותה נקודה.»;
+  «קובייה ABCDA'B'C'D'» · «A'H גובה לפאה ABCD» → «A ו-H נפלו על אותה נקודה.». Still refused, as 2-D refuses «D חיתוך AB
+  ו-BC»: a crossing whose two carriers are written through the point («G נקודת חיתוך של AC' עם מישור ADE», A is on both),
+  naming it (`point-coincides`). Sources: ADR-3D-404, ADR-3D-405, ADR-W-176, ADR-W-177, #1595.
 
 ## Coverage
 

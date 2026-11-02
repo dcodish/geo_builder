@@ -76,11 +76,13 @@ describe('#1423 — neighbours unchanged', () => {
     expect(v.kind === 'already-known' || v.kind === 'already-follows' || v.kind === 'record', JSON.stringify(v)).toBe(true);
   });
 
-  it('ADR-AG-157: naming a crossing that is already named keeps its own holder-naming refusal', () => {
+  it('ADR-AG-157: a new letter for a crossing that is already named is recorded on it (#1595)', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): S is forced onto R,
+    // so the line records and the notice says «R ו-S נפלו על אותה נקודה.» (was the `crossing-already-named` refusal).
+    // A REUSED letter keeps its own refusal (the cases above).
     const lines = build();
     const v = decideSubmit('S נקודת החיתוך הראשונה של הצלע CA עם המעגל x^2+y^2=16', lines, 0);
-    expect(v.kind).toBe('refused');
-    if (v.kind === 'refused') expect(v.error.key).toBe('crossing-already-named');
+    expect(v.kind).toBe('record');
   });
 
   it('a refusal with NO reused letter carries no reused fields', () => {

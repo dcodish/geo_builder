@@ -84,9 +84,10 @@ describe('#2583 — a perpendicular bisector draws only its line (ADR-AG-345)', 
     const P = d.figure.points.find((p) => p.id === 'P')!;
     expect(P.x).toBeCloseTo((E.x + 1) / 2, 9);
     expect(P.y).toBeCloseTo(E.y / 2, 9);
-    // the bisector restated afterwards is the same line; a second name for the point is refused, naming P
+    // the bisector restated afterwards is the same line; a second name for the point records on P (#1595, ADR-AG-372;
+    // operator ruling 2026-11-02, "accept with message" — was the `already-named` refusal)
     expect(decideSubmit('אנך אמצעי ל-EK', lines, 0, d).kind).toBe('already-known');
-    expect(decideSubmit('Q אמצע EK', lines, 0, d)).toMatchObject({ kind: 'refused', error: { key: 'already-named', holder: 'P' } });
+    expect(decideSubmit('Q אמצע EK', lines, 0, d).kind).toBe('record');
   });
 
   it('«P אמצע EK» before the line: the line runs through P, as before', () => {
@@ -176,11 +177,15 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
     expect(curves[0].kind === 'curve' && curves[0].label.name).toBe('l2');
   });
 
-  it('the named-then-unnamed order stays known; a point’s second name keeps the point sentence', () => {
+  it('the named-then-unnamed order stays known; a point’s second name records on it (#1595)', () => {
     expect(lastVerdict([...EK, 'l2 אנך אמצעי ל-EK', 'אנך אמצעי ל-EK']).v.kind).toBe('already-known');
-    const { v } = lastVerdict(['A(0,0)', 'B(4,0)', 'P אמצע AB', 'Q אמצע AB']);
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): «Q אמצע AB» after
+    // «P אמצע AB» records, with «P ו-Q נפלו על אותה נקודה.» (was «כבר יש שם לנקודה הזו: P.»). A curve's centre named
+    // twice keeps that sentence (issue-1153).
+    expect(lastVerdict(['A(0,0)', 'B(4,0)', 'P אמצע AB', 'Q אמצע AB']).v.kind).toBe('record');
+    const { v } = lastVerdict(['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'P מרכז המעגל I', 'O מרכז המעגל I']);
     expect(v).toMatchObject({ kind: 'refused', error: { key: 'already-named', holder: 'P' } });
-    if (v.kind === 'refused') expect(plain(errorText(v.error, he))).toMatch(/^כבר יש שם לנקודה הזו: P\./);
+    if (v.kind === 'refused') expect(plain(errorText(v.error, he))).toContain('P');
   });
 
   it('the offer is written from the line, whatever row drew it (unit: lineOfferCandidate)', () => {

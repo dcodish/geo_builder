@@ -1292,6 +1292,14 @@ function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): I
   const mine = declaredAt.get(id) ?? Number.POSITIVE_INFINITY;
   const atFn = (q: Id) => at.get(q) ?? null;
   const curveAt = curveAtOf(c, env, atFn);
+  /*
+   * #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message") — TWO STRAIGHTS MEET ONCE. A second letter
+   * for their crossing («AC ו-BD נחתכים בנקודה O» · «… בנקודה E») is forced onto the first: there is no other root
+   * to keep it apart on, so demanding one judged every configuration false and refused the line `unsatisfiable`. 2-D
+   * records it with «O ו-E נפלו על אותה נקודה.», and so does this tree now (`app/coincidences.ts`). A pair with two
+   * roots (a line and a circle) keeps #1113's rule: its second crossing is the OTHER root.
+   */
+  if (pair.every((k) => straightCarrierOf(k, atFn, curveAt) !== null)) return [];
   const lineAt = lineAtOf(c, env, atFn);
   const scale = residualScale(c, env);
   const onBoth = (q: Id) =>
@@ -2459,8 +2467,8 @@ function lineGroupsOf(c: Construction): LineGroups {
  * (a carrier start ignores the extension's region — measured, it broke every «E על המשך …»); the hashed seed. A line
  * that introduced several starts where they were seeded. The first fit that converges, keeps the line's selectors and
  * bounded pieces, and puts no new vertex on another point is taken; with none, the line's starts are left as they were.
- * A fit ON another point is never taken: that is the coincidence the verdict owns (the crossing-already-named family,
- * ADR-AG-213; the stacked pair, #1273), and the joint solve and the judge decide it exactly as before.
+ * A fit ON another point is taken only when no start gives one apart (#1595: a coincidence the givens force is
+ * recorded with the notice; the stacked pair's preference, #1273, still picks a separated fit first).
  * A start, never a verdict: the joint solve and the judge keep the last word.
  */
 function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
@@ -2504,7 +2512,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       const h = hashed.get(v);
       if (h) starts.push(new Map(seeded).set(v, h));
     }
-    const admissible = (pos: Map<Id, Pt>): boolean => {
+    const admissible = (pos: Map<Id, Pt>, stacked = false): boolean => {
       for (const k of bounded) {
         const pa = pos.get(k.a);
         const pb = pos.get(k.b);
@@ -2512,7 +2520,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
         if (pa && pb && p && !withinSegment(pa, pb, p)) return false;
       }
       const near = 2 * apartOf(pos);
-      for (const v of g.ids) {
+      for (const v of stacked ? [] : g.ids) {
         const p = pos.get(v);
         if (p && [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near)) return false;
       }
@@ -2522,6 +2530,25 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       if (hard.some((r) => { const o = objectById(c, r.id); return o?.kind === 'polygon' && o.vertices.some((v) => g.ids.includes(v)); })) return false;
       return g.selectors.length === 0 || failingSelectors({ ...c, selectors: g.selectors }, pos, env).length === 0;
     };
+    /*
+     * #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message"): a fit ON another point is taken LAST, when no
+     * start gives one apart. It used to be never taken, because the coincidence was the refusal's to report; that
+     * refusal is gone for a coincidence the givens force (#2631: E on M), and without this start the joint solve spread
+     * the crossing's correction over the triangle again — A moved 8.6 at seed 0. A separated fit still wins whenever
+     * one exists (ADR-W-072's preference), and only a crossing of straights takes it (below).
+     */
+    let onPoint: Map<Id, Pt> | null = null;
+    let took = false;
+    // Only where the group's incidences are all STRAIGHTS: two lines cross transversally, so a fit on the point is a clean
+    // root. A line touching a conic there is a double root, and starting on it blinds the rank reads the tangent and
+    // third-crossing arms judge by (#1924, #1932 — measured: «P על הישר l1» on the tangent lost its refusal at seed 1).
+    const straightsOnly = g.rows
+      .filter((k) => (k.t === 'on-line-2pt' || k.t === 'on-line' || k.t === 'on-curve') && g.ids.includes((k as { id: Id }).id))
+      .every((k) => {
+        const pos = place(c, env, seeded);
+        const at = (id: Id) => pos.get(id) ?? null;
+        return straightCarrierOf(k, at, curveAtOf(c, env, at)) !== null;
+      });
     for (const m0 of starts) {
       if (!m0) continue;
       // At the TIGHT tolerance (ADR-AG-143's factor): the joint solve starts on the fit and stops at once, so the fit is the
@@ -2533,10 +2560,15 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
       if (!r.ok) continue;
       const m = asMap(r.values);
-      if (!admissible(place(c, env, m))) continue;
+      if (!admissible(place(c, env, m))) {
+        if (!onPoint && admissible(place(c, env, m), true)) onPoint = m;
+        continue;
+      }
       for (const id of g.ids) seeded.set(id, m.get(id)!);
+      took = true;
       break;
     }
+    if (!took && onPoint && straightsOnly) for (const id of g.ids) seeded.set(id, onPoint.get(id)!);
   }
 }
 
@@ -4419,6 +4451,13 @@ export function drawableAt(
   // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
   let wholeSeparated: Figure | null = wholeOn(first) && (!preferSpread || separated(first)) ? first : null;
   let wholeFallback: Figure | null = wholeOn(first) ? first : null;
+  /*
+   * #1595 (ADR-AG-372): a whole SPREAD figure that stacks — the tier a coincidence the givens FORCE lands in. Such a
+   * figure has no separated candidate at all, and taking the first whole one (`wholeFallback`) dropped the spread
+   * preference with it: #2631's «… נפגשים בנקודה E» (E forced onto M) redrew the triangle the student was looking at,
+   * whose drawing the walk had chosen for its spread. Below every separated tier, so ADR-W-072's preference is unchanged.
+   */
+  let wholeSpread: Figure | null = wholeOn(first) && (!preferSpread || spread(first)) ? first : null;
   // #1937: whole, but a diagonal meet sits on the diagonals' extension — drawn only if no crossing figure turns up.
   let wholeExtended: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
@@ -4496,13 +4535,14 @@ export function drawableAt(
         break;
       }
       if (!wholeSeparated && wholeOn(candidate) && (!preferSpread || separated(candidate))) wholeSeparated = candidate;
+      if (!wholeSpread && wholeOn(candidate) && (!preferSpread || spread(candidate))) wholeSpread = candidate;
       if (!wholeFallback && wholeOn(candidate)) wholeFallback = candidate;
       if (!wholeExtended && whole(candidate)) wholeExtended = candidate;
       // Second best: the selectors hold and something the student named is missing. Remembered, so a
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!preferred(chosen)) chosen = wholeSeparated ?? crossSeparated ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
+    if (!preferred(chosen)) chosen = wholeSeparated ?? crossSeparated ?? wholeSpread ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
     /**
      * SEARCH FIRST, REFUSE LAST (#1927 / #1939, ADR-AG-256; the operator's ruling of 2026-10-09: *"When a letter in the
      * sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the

@@ -1210,7 +1210,9 @@ figure's own solve from the same starts, so each later line is fitted to the fig
 try the region-seeded start, a seed-varied point in 0.2–0.8 of each bounded piece or `between`, the quarter points of
 each two-point carrier unless a `beyond` names the vertex, and the hashed seed; larger groups their seeded start. A fit is
 taken only if it converged, its bounded pieces and the group's selectors hold, no ring of its points has a hard fault, and no group vertex sits on another point
-(2·`apartOf`: that coincidence is the verdict's, the crossing-already-named family). Otherwise the starts are unchanged.
+(2·`apartOf`). A fit that fails only that last test is kept as `onPoint` and taken when no start gives one apart, for a group whose incidences are all straights
+([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372), #1595: a coincidence the givens force is recorded with the notice,
+and without its start the joint solve redrew the earlier figure). Otherwise the starts are unchanged.
 A start, never a verdict.
 
 **The box.** ADR-AG-324's wide seeding box reads `reachedByLine`: a free vertex counts as reached only by a row that
@@ -1279,11 +1281,14 @@ and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisi
 `separationMoves`, 2-D's `solutionAccepted` in `multiStartSolve`). The walk compares candidates' discrete assignments
 (`choiceOptions`, the `assignmentAt` key): a preference never crosses one (ADR-AG-227), except that a whole first figure
 which stacks two named points may open on a whole, separated candidate of another assignment (`crossSeparated`, below
-the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)).
+the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)). When nothing in the walk is
+separated (a coincidence the givens force), a whole SPREAD candidate (`wholeSpread`) wins before the first whole one, so the
+pair cannot cost the drawing its spread preference ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)).
 
 **After the search: two letters it could not separate are said ([ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), #1595).**
 `app/coincidences.ts` `coincidencesOf(d)` reads the drawn figure's points at `crossings.apart` (identity, not the
-`stackedPairs` display ruler) through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) as an ⓘ
+`stackedPairs` display ruler), floored at `SOLVE_TOL · 10` (a figure whose points all sit on the one dot has no span;
+ADR-AG-372), through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) as an ⓘ
 notice after the narrowing notes, per render.
 
 *Identifiers:* `crossings.apart()` · `a > 0`
@@ -1394,9 +1399,16 @@ order. Search first is kept by the predicate, not by a budget: a dart-capable pa
 
 *Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `convexWhenSimple` · `ringOrderFault` · `InputError`
 
-### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
+### A forced coincidence is recorded with the notice; a structural one is refused ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372), was [ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
 
-A crossing on an existing point is refused by position only when no configuration separates them. Structurally, in
+**Since #1595 (ADR-AG-372, operator ruling 2026-11-02) the positional arm below is retired:** a crossing, or a second
+letter for a point built from points (`apply.ts`'s #1153 arm; `namesCurveFeature` keeps a curve's centre, focus, ellipse
+point and touch points refused), that the givens force onto a named point records, and `coincidencesOf` says so. Two
+straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name for their crossing, and `crossingPartners`
+returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
+refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
+
+A crossing on an existing point was refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
 `self-crossing`. **Positionally** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613): `crossingHasNoPoint`

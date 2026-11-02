@@ -33,6 +33,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 
 const LINE = 'משוואת הישר AB היא y=2x';
 const CIRCLE = 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9';
@@ -68,18 +69,20 @@ describe('#1114 — a third crossing of a two-root pair is refused', () => {
     expect(derive([LINE, CIRCLE, cross('P')], 0).faults).toHaveLength(0);
   });
 
-  it('two STRAIGHTS meet once, so a second name on that pair is refused', () => {
+  it('two STRAIGHTS meet once, so a second name on that pair is the same point named again — recorded, with the notice', () => {
     /**
-     * The same bound at a different arity, which is what makes it a rule rather than the number two
-     * written down twice.
+     * ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"). This was a
+     * refusal: the count read a second name of one straight × straight crossing as an impossible extra crossing. It is
+     * a new letter its definition forces onto P, which 2-D records with «P ו-Q נפלו על אותה נקודה.»; so does this tree.
+     * A line × conic's third crossing (the cases above) is still refused.
      */
     const base = ['נתון הישר l1: y=2x', 'נתון הישר l2: y=-x+6'];
     const meet = (id: string) => `${id} נקודת החיתוך של הישר l1 עם הישר l2`;
     expect(derive([...base, meet('P')], 0).faults).toHaveLength(0);
 
     const d = derive([...base, meet('P'), meet('Q')], 0);
-    expect(d.faults).toHaveLength(1);
-    expect(d.faults[0].detail).toBe(meet('Q'));
+    expect(d.faults).toEqual([]);
+    expect(coincidencesOf(d)).toEqual([['P', 'Q']]);
   });
 
   it('a DIFFERENT pair is unaffected — the cap is per pair, not per point', () => {

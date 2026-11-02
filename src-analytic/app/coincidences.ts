@@ -16,10 +16,17 @@
  */
 import { coincidentPairs } from '../../shell/converge';
 import { apart } from '../engine/crossings';
+import { SOLVE_TOL } from '../engine/solve';
 import type { Derivation } from '../engine/derive';
 
+/*
+ * The floor (#1595, ADR-AG-372): `apart` is relative to the figure's span, and a figure whose points ALL sit on the one
+ * dot («A(0,0)» · two equation lines through it · their crossing P) has no span, while the solver leaves the crossing up
+ * to ~1e-9 away. So "the same point" is floored at ten times the solve's own tolerance — the rule the retired
+ * `crossing-already-named` arm used for this same question (#1276: a threshold below the residual decides nothing).
+ */
 export function coincidencesOf(d: Pick<Derivation, 'figure'>): [string, string][] {
-  const near = apart(d.figure);
+  const near = Math.max(apart(d.figure), SOLVE_TOL * 10);
   return coincidentPairs(
     d.figure.points.map((p) => [p.id, p] as const),
     (a, b) => Math.hypot(a.x - b.x, a.y - b.y) < near,

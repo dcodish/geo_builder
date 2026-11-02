@@ -3669,6 +3669,8 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 
 ## ADR-W-072 — Two distinct named points are never OPENED on top of each other, in every builder (#1273; cross-product ruling of 2026-09-20)
 
+> **Amended** 2026-11-02 by [ADR-W-177](#adr-w-177): the table's first column changes for 3-D and analytic — a NEW letter its definition forces onto a named point is ACCEPTED with the «X ו-Y נפלו על אותה נקודה.» notice (2-D's verdict); only the structural member (two carriers written through the point) stays refused. The second column — the separation preference — is unchanged.
+
 **Status:** accepted, 2026-09-21 · **Issue:** #1273 (bug, P2, `analytic` — the display half; #1254 is the naming half) · operator, 2026-09-20 (T18): *"even if they do fall on the same point by chance, but not necessarily because there is a degree of freedom, the system should not show them on top of each other. It should automatically look for a different config and show them differently"* — and, the same day: *"the 2d and 3d tools should follow the same logic about points being on the same location"* · round #1332
 **Requirements:** [02](02-requirements.md) FR-ALT-2 / [02c](02c-requirements-analytic.md) R61 · **Design:** per product — [04](04-design.md) `firstSatisfyingSeed`, [04c](04c-design-analytic.md) the configuration search
 
@@ -3679,8 +3681,8 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 | tree | a NEW letter named where a point already is | two EXISTING points that fall together by chance |
 | --- | --- | --- |
 | 2-D | notice only → #1274 | a separating configuration is preferred first — `firstSatisfyingSeed` ranks with `separatedView`/`pointsDistinct`, a coincident one remembered and used only if nothing else turns up ([ADR-486](06-decisions.md#adr-486), #942) ✔ |
-| 3-D | refused — `point-coincides` ([ADR-3D-183](06b-decisions-3d.md#adr-3d-183)) ✔ | — |
-| analytic | structural refused (#1175); positional → #1254 | **this round: [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)** — the 2-D ranking ported into `drawableAt` ✔ |
+| 3-D | refused — `point-coincides` ([ADR-3D-183](06b-decisions-3d.md#adr-3d-183)) ✔ · **since 2026-11-02:** accepted with the notice; refused only when both carriers are written through the point ([ADR-3D-405](06b-decisions-3d.md#adr-3d-405)) | — |
+| analytic | structural refused (#1175); positional → #1254 · **since 2026-11-02:** positional accepted with the notice ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)) | **this round: [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)** — the 2-D ranking ported into `drawableAt` ✔ |
 
 **One deviation from #1273's own lock list, recorded.** Its fourth lock said «הציגו תצורה אחרת» *"keeps offering every configuration, including stacked ones — the student asked"*. That is the filing session's inference; the operator's sentence is *"the system should not show them on top of each other"*, and the walk shows configurations through the same search the opening does. So a stacked configuration is not offered while a separated one exists within the budget; it remains admissible to every knowledge gate (the preference is display-only, like spread — ADR-AG-128). Flagged reversible on the play sheet: if he wants the stacked one reachable on request, the walk gets a "raw" mode, not the opening.
 
@@ -6839,6 +6841,8 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 
 ## ADR-W-176 — Two letters on one dot are accepted, and every builder says so in 2-D's sentence, one suite key (#1595)
 
+> **⚠ Superseded in part** 2026-11-02 by [ADR-W-177](#adr-w-177) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): the first bullet of *How the rulings fit together* — a NEW letter whose definition puts it on a point already there is refused — no longer holds for a coincidence the definition FORCES; that is accepted with this ADR's notice in every builder.
+
 **Status:** accepted · 2026-11-02 · feature (P2, all four builders) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · **Operator rulings:** 2026-09-30 (#1595, playing round #1571 T23: *"when 2 dots are on top of each other we should accept but always give a message about it. this is correct for all tools"*); 2026-10-30 (PR #2605 T34: *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user. this needs to happen here too"*) · plan of 2026-10-07 (#1595), armed `auto-ok` 2026-10-04 · **Extends:** [ADR-W-148](#adr-w-148) (a notice joins the suite text), [ADR-W-152](#adr-w-152)'s shape · per-product: 2-D unchanged (ADR-123, ADR-447 Am. 1), [ADR-3D-404](06b-decisions-3d.md#adr-3d-404), [ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), [ADR-CX-086](06d-decisions-complex.md#adr-cx-086)
 **Requirements:** [02w](02w-requirements-workspace.md) the cross-builder row *Two letters on one dot the givens force* (new, **Same**); [02](02-requirements.md) FR-EN-20 (the sentence is the suite's); [02b](02b-requirements-3d.md) FR-RD-17 (new); [02c](02c-requirements-analytic.md) R214 (new); [02d](02d-requirements-complex.md) FR-GP-9 (new) · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* (*The «same point» notice*)
 
@@ -6860,3 +6864,30 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 **Locks.** `shell/__tests__/converge-1595.test.ts` (the pair reader, the text, the suite file). `<tree>/__tests__/converge-1595.test.ts` in each of the four trees (shared assertions `shell/__tests__/fixtures/converge-1595.ts`): each drives the measured rows through its own door and reads the notice from the derivation its App renders, a control with no notice, the kept refusal (3-D, analytic), the mute/without-the-line clearing (3-D, analytic), and its i18n instance and App source.
 
 **Behaviour change for a student:** in 3-D, analytic and complex, when the givens put two letters on one dot, the line is accepted as before and a notice now says so: 2-D's «{{a}} ו-{{b}} נפלו על אותה נקודה.». 2-D unchanged.
+
+## ADR-W-177 — A new letter its definition forces onto a named point is accepted, with the notice, in every builder (#1595)
+
+**Status:** accepted · 2026-11-03 · feature (P2, all builders) · PR #2666, branch `feat/1595-coincidence-notice` · **Operator ruling:** 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the question of the same day (*"1955 - accept with message"*, read as #1595): option **B** · **Amends:** [ADR-W-176](#adr-w-176) (its first bullet), [ADR-W-072](#adr-w-072) (the table's first column) · per-product: [ADR-3D-405](06b-decisions-3d.md#adr-3d-405), [ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-17 (extended); [02c](02c-requirements-analytic.md) R60, R98, R214 (rewritten / extended) · **Design:** [04b](04b-design-3d.md) § *Two letters on one dot* (the mint judgement, narrowed); [04c](04c-design-analytic.md) § *A forced coincidence is recorded with the notice* and the line-by-line start / configuration-search tiers
+
+**Context.** The operator's two earlier rulings pointed opposite ways: 2026-09-20 (#1254/#1273) *"if P and B must be on the same location … it should be refused"*, and 2026-10-30 (PR #2605 T34) *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user"*. He ruled B on 2026-11-02: accepted, with the message, in every builder, as 2-D already does. A coincidence the givens do NOT force stays ADR-W-072's (prefer a separating configuration); unchanged.
+
+**2-D measured at this branch's HEAD** (`driveThroughGate` and `decideDeterministic2D`, model mocked) — the reference ([2-D] rule):
+
+| kind | 2-D sequence | 2-D verdict |
+| --- | --- | --- |
+| positional: a second letter for a point built from points | «משולש ABC» · «M אמצע AB» · «N אמצע AB»; a second «מפגש התיכונים / הגבהים / חוצי הזוויות / האנכים האמצעיים», «מפגש האלכסונים» | accepted, «M ו-N נפלו על אותה נקודה.» |
+| positional: a magnitude or a foot forcing it | «AB=4 · D על AB · AD=4»; «∠B = 90° · AD גובה לצלע BC» | accepted, notice |
+| crossing named onto a point by the geometry | «ריבוע ABCD · AC ו-BD נחתכים בנקודה O · … בנקודה E»; the medians' concurrency (G, H) | accepted, notice |
+| crossing of two carriers WRITTEN through one shared letter | «משולש ABC · D חיתוך AB ו-BC», «AB ו-BC נחתכים בנקודה D» | **refused** `crossingAlreadyNamed` (#1274, ADR-W-066) |
+| a curve's centre named again | «מעגל שמרכזו O · P מרכז המעגל» | a rename (`store-op`), no coincidence |
+| a tool-lettered point named | «תיכון מ-A במשולש ABC · D אמצע BC» | accepted, the tool's M **renamed** to D (auto-bind) |
+
+**Decision.** Each sibling gives 2-D's verdict per kind, at its existing chokepoint, and the existing notice (ADR-W-176) says it — no second detection:
+1. **Accepted with the notice:** every positional kind and every crossing the geometry forces (3-D: `point-coincides` narrowed, ADR-3D-405; analytic: the #1254 arm retired, the #1153 arm, the two-straights cap and the crossing-distinct sibling rule opened, ADR-AG-372). #2631's «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» records with «M ו-E נפלו על אותה נקודה.», which overrules the judge's q-2631 "refuse" (the ledger is left to the operator's session).
+2. **Still refused, as 2-D refuses it:** a crossing whose two carriers are written through the point (analytic's parser #1175; 3-D's `writtenOnto3`, which keeps ADR-3D-183's own AC' ∩ ADE).
+3. **Out of this class, unchanged:** a curve's feature named twice (analytic `already-named`; 2-D answers it as a rename), the third crossing of a line and a conic (#1893) and a tangent's second crossing (#1924), which carry their own ruled sentences.
+
+**Not decided here (reported on #1595).** 2-D hands a TOOL letter over to the student's («תיכון מ-A …» · «D אמצע BC»: M becomes D, no notice); analytic now keeps M and shows «M ו-D נפלו על אותה נקודה.». Same verdict (accepted), different drawing — a parity cell for the operator.
+
+**Behaviour change for a student:** in 3-D and analytic, a new letter whose definition puts it exactly on a point that already has a name («N אמצע AB» after «M אמצע AB», #2631's «… נפגשים בנקודה E» on M) is now accepted and the page says «M ו-N נפלו על אותה נקודה.»; it used to be refused. 2-D and complex unchanged.

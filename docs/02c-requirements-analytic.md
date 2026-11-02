@@ -801,9 +801,10 @@ a sentence the tool parsed.
 - «המרחק מ-A לישר l1 = 5» → drives the figure, or is refused naming the sentence
 - Sources: #1201.
 
-**R98 — a position carries at most one name, and a second naming is REFUSED, never silent**. Renaming is the student's action; the same letter again is a no-op.
+**R98 — a curve's feature carries at most one name, and a second naming is REFUSED, never silent; a second letter for a point built from points is recorded with the notice**. Renaming is the student's action; the same letter again is a no-op. A centre, a focus, an ellipse's vertex or a touch point is one object, and a second name for it is refused naming the first (2-D answers it as a rename). A midpoint, a triangle's centre or a diagonals' meet named again is a new letter its definition forces onto the first: recorded, with «M ו-N נפלו על אותה נקודה.» *(operator ruling 2026-11-02 on #1595)*.
 - «P מרכז המעגל I» then «O מרכז המעגל I» → refused, naming P
-- Sources: #1153, ADR-052.
+- «M אמצע AB» then «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
+- Sources: #1153, ADR-052, ADR-AG-372, #1595.
 
 **R98a — an angle or a segment carries at most one letter; a second, different one is REFUSED naming the first line; the same one again is a no-op** (2-D's verdict and sentences, ADR-661). The same letter with another coefficient contradicts the first line and is refused in 2-D's over-constrained frame, whatever else the figure holds.
 - «זוית B=α» · «זוית ABC=β» → «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.»
@@ -947,11 +948,13 @@ a sentence the tool parsed.
 - «זוית», «מעויין», «שוה» → read as «זווית», «מעוין», «שווה»
 - Sources: ADR-AG-155, #1407.
 
-**R60 — a crossing that lands on a point the figure ALREADY HAS is refused, naming it**. The crossing is affirmed and the name refused; a line crossed with itself gets an owned refusal (operator ruling). The refusal is **the PAIR's business, whatever else in the figure is free** — the freedom of the separation of the crossing and the holder decides, never the figure's ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254)); a crossing that can still move off the holder keeps its silence, and «הציגו תצורה אחרת» may separate them.
-- «P נקודת החיתוך של הישר AB עם הישר CD» where it is `B` → refused, naming B
-- «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → refused, naming E, exactly as without «נקודה Q»
-- the line that FORCES the coincidence is refused too, with the figure still free: «A(0,0)» · «D(0,4)» · «F(4,2)» · «נקודה E» · «P נקודת החיתוך של הישר AD עם הישר EF» (drawn) · «E על ציר ה-y» → refused
-- a crossing genuinely free to move off the point it sits on still records — unless no configuration CAN separate them, which is the next member
+**R60 — a crossing that lands on a point the figure ALREADY HAS is recorded on it, and the page says so; two straights written through one shared letter are refused**. *(Operator ruling 2026-11-02 on #1595, "accept with message", which reverses the 2026-09-20 T18 ruling for a coincidence the givens force; [ADR-AG-372](06c-decisions-analytic.md#adr-ag-372).)* The verdict is the same whatever else in the figure is free ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254)); a crossing that can still move off the point is drawn apart where a configuration allows (R61). Two straights named through a shared letter («הישר AB עם הישר BC») meet at that letter in every configuration and are refused naming it, as in 2-D; a line crossed with itself gets an owned refusal (operator ruling).
+- «P נקודת החיתוך של הישר AB עם הישר CD» where it is `B` → recorded, «B ו-P נפלו על אותה נקודה.»
+- «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → recorded on E with the notice, exactly as without «נקודה Q»
+- «משולש ABC» · «M אמצע BC» · «האנך מ-C ל-AB» · «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» (#2631) → recorded, «M ו-E נפלו על אותה נקודה.», the triangle unmoved
+- one crossing of two straights named twice («AC ו-BD נחתכים בנקודה O» · «… בנקודה E») → recorded, «O ו-E נפלו על אותה נקודה.»
+- «P נקודת החיתוך של הישר AB עם הישר BC» → refused, naming B
+- a crossing genuinely free to move off the point it sits on still records apart
 - **two lines that are ONE LINE in the figure drawn have no crossing, whatever their spelling** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613; operator ruling 2026-10-30, Q1 → A): the crossing sentence is refused with the same sentence as a line written twice («שני הישרים במשפט «…» הם אותו ישר…»). A configuration where they coincide is never a position of the figure: the solve does not choose it, and a locus never draws it.
   - «נתונה אליפסה שמשוואתה x^2/16+y^2/12=1» · «P(4,0)» · «האנך מ-P לציר ה-x חותך אותו בנקודה N» · «O ראשית הצירים» · «דרך N עובר ישר l1 מקביל ל-PO» · «דרך P עובר ישר l2 מקביל לציר ה-x» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused
   - «P נקודה על האליפסה» · «דרך P עובר ישר l2 מקביל לציר ה-y» · «דרך O עובר ישר l1 מקביל לציר ה-y» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused (P is never moved onto the vertex to make them meet)
@@ -981,10 +984,11 @@ a sentence the tool parsed.
 **R61 — two distinct named points are never opened on top of each other**. *(Operator: "It should automatically look for a different config and show them differently".)* A preference below validity; closer than a hundredth of the frame counts as stacked. When the coincidence comes from a combination of discrete choices (two circles tangent to M at A on the same side), the opening drawing takes another combination (#2381).
 - Sources: ADR-W-072, ADR-AG-138, #1254, #1526, ADR-AG-181, ADR-AG-302.
 
-**R214 — two letters the givens put on one dot are accepted, and the page says so**. *(Operator: "when 2 dots are on top of each other we should accept but always give a message about it".)* 2-D's sentence, while the drawing has the pair; a NEW name defined onto an existing point stays refused (#1254).
+**R214 — two letters the givens put on one dot are accepted, and the page says so**. *(Operator: "when 2 dots are on top of each other we should accept but always give a message about it".)* 2-D's sentence, while the drawing has the pair. Since the 2026-11-02 ruling («accept with message») this includes a NEW letter its definition forces onto a named point (R60, R98); a curve's feature named twice and two straights written through a shared letter stay refused.
 - «V(0,0)» · «X(4,0)» · «Y נמצאת על הישר y=x» · «שיעור ה-x של Y הוא 0» → recorded, «V ו-Y נפלו על אותה נקודה.»
 - «N1(1,1)» · «N2(1,1)» · «קטע N1N2» → recorded, «N1 ו-N2 נפלו על אותה נקודה.»
-- Sources: ADR-AG-366, ADR-W-176, #1595, #2401.
+- «A(0,0)» · «B(4,0)» · «M אמצע AB» · «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
+- Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401.
 
 **R184 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
 - «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)

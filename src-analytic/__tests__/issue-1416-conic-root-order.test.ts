@@ -15,6 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { conicsMeet } from '../engine/crossing-order';
 import { decideSubmit } from '../app/submit';
 import { errorText, type Translate } from '../app/errorText';
@@ -104,15 +105,13 @@ describe('#1416 — «הראשונה» / «השנייה» of two conics name the
 describe('#1416 — the duplicate-ordinal refusal names its operands, never «הישרים»', () => {
   const after = [...TWO_CIRCLES, 'P נקודת החיתוך הראשונה של המעגל I עם המעגל II'];
 
-  it('a second «הראשונה» is refused naming P and the two circles; «השנייה» is recorded', () => {
+  it('a second «הראשונה» is recorded on P with the notice; «השנייה» is recorded', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): a second name for the
+    // first crossing is forced onto P — recorded, «P ו-Q נפלו על אותה נקודה.» (was `crossing-already-named`, naming
+    // the two circles). The operand wording is still the structural refusal's (#1175), below.
     const v = decideSubmit('Q נקודת החיתוך הראשונה של המעגל I עם המעגל II', after, 0);
-    expect(v.kind).toBe('refused');
-    const error = (v as { error: InputError }).error;
-    expect(error).toMatchObject({ key: 'crossing-already-named', holder: 'P', operands: ['המעגל I', 'המעגל II'] });
-    const text = errorText(error, he).replace(/[⁦-⁩]/g, '');
-    expect(text).toContain('המעגל I');
-    expect(text).toContain('המעגל II');
-    expect(text).not.toContain('הישרים');
+    expect(v.kind).toBe('record');
+    if (v.kind === 'record') expect(coincidencesOf(derive([...after, v.line], v.configuration ?? 0))).toEqual([['P', 'Q']]);
 
     expect(decideSubmit('Q נקודת החיתוך השנייה של המעגל I עם המעגל II', after, 0).kind).toBe('record');
   });
@@ -121,5 +120,6 @@ describe('#1416 — the duplicate-ordinal refusal names its operands, never «ה
     const v = decideSubmit('P נקודת החיתוך של הישר AB עם הישר BC', ['משולש ABC'], 0) as { kind: string; error?: InputError };
     expect(v.kind).toBe('refused');
     expect(v.error).toMatchObject({ key: 'crossing-already-named', holder: 'B' });
+    expect(errorText(v.error!, he).replace(/[⁦-⁩]/g, '')).toContain('B');
   });
 });

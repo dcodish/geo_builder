@@ -8,8 +8,12 @@
  * notice, not the missing refusal".
  *
  * Each line goes through `decideSubmit` (the App's door) and the notice is read from `derive(lines, configuration)`,
- * the derivation the App renders, by the App's own `coincidencesOf`. The refusals the 2026-09-20 rulings keep — a NEW
- * name defined onto a point that is already there (#1175, #1254) — are locked as refusals.
+ * the derivation the App renders, by the App's own `coincidencesOf`.
+ *
+ * Operator ruling 2026-11-02 on #1595 ("accept with message", ADR-AG-372, ADR-W-177): a NEW letter whose definition
+ * FORCES it onto a named point is accepted with the same notice — the positional #1254 refusal, the second name for a
+ * point built from points (#1153) and #2631's crossing on M all record now. Two straights WRITTEN through one shared
+ * letter (#1175, 2-D's #1274) and a curve's centre named twice stay refused, as in 2-D.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -62,10 +66,22 @@ describe('#1595 — analytic: a forced coincidence records, with the notice', ()
     expect(coincidencesOf(play(['ריבוע ABCD']).d)).toEqual([]);
   });
 
-  it('unchanged refusal: a NEW name defined onto a point that is already there (#1254)', () => {
-    const { recorded, last } = play(['A(0,0)', 'B(4,0)', 'M אמצע AB', 'N אמצע AB']);
-    expect(recorded).toHaveLength(3);
-    expect(last).toMatchObject({ kind: 'refused', error: { key: 'already-named', holder: 'M' } });
+  it.each([
+    [['A(0,0)', 'B(4,0)', 'M אמצע AB', 'N אמצע AB'], 'M ו-N נפלו על אותה נקודה.'], // the ruling's own row
+    [['משולש ABC', 'M אמצע BC', 'האנך מ-C ל-AB', 'האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E'], 'M ו-E נפלו על אותה נקודה.'], // #2631
+    [['ריבוע ABCD', 'AC ו-BD נחתכים בנקודה O', 'AC ו-BD נחתכים בנקודה E'], 'O ו-E נפלו על אותה נקודה.'], // one crossing named twice
+    [['A(0,0)', 'B(6,2)', 'C(1,7)', 'D(7,1)', 'P נקודת החיתוך של הישר AB עם הישר CD'], 'B ו-P נפלו על אותה נקודה.'], // #1254 T18
+    [['משולש ABC', 'M אמצע BC', 'N אמצע AC', 'AM ו-BN נחתכים בנקודה G', 'P אמצע AB', 'CP ו-AM נחתכים בנקודה H'], 'G ו-H נפלו על אותה נקודה.'],
+  ])('a NEW letter its definition forces onto a named point records, with the notice (2026-11-02): %j', (lines, sentence) => {
+    const { recorded, d } = play(lines);
+    expect(recorded).toHaveLength(lines.length);
+    expect(d.faults).toEqual([]);
+    expect(notice(d)).toBe(sentence);
+  });
+
+  it('still refused, as in 2-D: two straights written through one shared letter (#1175), a curve centre named twice', () => {
+    expect(play(['משולש ABC', 'AB ו-BC נחתכים בנקודה D']).last).toMatchObject({ kind: 'refused', error: { key: 'crossing-already-named', holder: 'B' } });
+    expect(play(['מעגל שמרכזו O', 'P מרכז המעגל']).last).toMatchObject({ kind: 'refused', error: { key: 'already-named', holder: 'O' } });
   });
 });
 

@@ -465,6 +465,40 @@ const DERIVED_POINT_KINDS3: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * #1595 (ADR-3D-405) — is a derived point WRITTEN onto `holder` by its own letters: 2-D's structural refusal (#1274,
+ * ADR-W-066), the one member of the coincidence family 2-D still refuses. A crossing whose two carriers both name
+ * `holder` (a segment and a plane through it, two segments sharing it) meets there whatever the configuration, and a
+ * foot dropped from `holder` onto a carrier through it is `holder` (2-D's degenerate-cevian refusal). Read from the
+ * definition and the named carriers' letters alone — no position, no tolerance. A carrier named without letters (ℓ, π1)
+ * shares none, so it never matches.
+ */
+function writtenOnto3(c: Construction3, def: PointDef, holder: Id): boolean {
+  const planeHas = (name: string) => c.pointPlanes.get(name)?.includes(holder) === true;
+  const lineHas = (name: string) => {
+    const l = c.pointLines.get(name);
+    return l !== undefined && (l.a === holder || l.b === holder);
+  };
+  switch (def.kind) {
+    case 'plane-cut':
+      return (def.a === holder || def.b === holder) && planeHas(def.plane);
+    case 'seg-cross':
+      return (def.a1 === holder || def.b1 === holder) && (def.a2 === holder || def.b2 === holder);
+    case 'line-plane':
+      return lineHas(def.line) && planeHas(def.plane);
+    case 'foot-plane':
+      return def.from === holder && planeHas(def.plane);
+    case 'foot-line':
+      return def.from === holder && lineHas(def.line);
+    case 'foot-face':
+      return def.from === holder && def.face.includes(holder);
+    case 'foot-seg':
+      return def.from === holder && (def.a === holder || def.b === holder);
+    default:
+      return false;
+  }
+}
+
+/**
  * #1923 (ADR-3D-314) — is this point FIXED BY COORDINATES, and by which facts? The ruled scope of the crossed-ring
  * refusal ("fixed points"): such a point cannot move, so the drawn ring is the only ring. A point is fixed when
  *  - it was minted at numeric coordinates (`coord`);
@@ -1641,6 +1675,14 @@ function deriveCore3(
   // command that surfaced it; provenance is derived from the fact list (the first fact naming the id
   // minted it), never from a list of minting command types. The judgement is the click-offer's own
   // (`namedPointAt`), so the OFFER lane and the TYPED lane answer one question the same way (#653).
+  //
+  // #1595 (ADR-3D-405, ADR-W-177; operator ruling 2026-11-02, "accept with message") — NARROWED to 2-D's one refusal.
+  // A new letter whose definition FORCES it onto a point that already has a name is accepted, and the drawn figure's
+  // `coincidences3` says «X ו-Y נפלו על אותה נקודה.» (2-D's verdict, measured: «M אמצע AB» · «N אמצע AB», a foot on a
+  // vertex, a second name for one crossing). What 2-D still refuses is the STRUCTURAL member (#1274, ADR-W-066, «we
+  // refuse the B=D»): a crossing whose two carriers are WRITTEN through one shared letter meets at that letter in every
+  // configuration, so there is no new point to name — «G נקודת חיתוך של AC' עם מישור ADE» names A. `writtenOnto3` reads
+  // that from the definition's own letters, never from a position; everything else this judgement finds now records.
   {
     const DERIVED = DERIVED_POINT_KINDS3;
     const order = [...c.points.keys()];
@@ -1659,7 +1701,7 @@ function deriveCore3(
         return Q ? [[q, Q]] : [];
       });
       const with_ = namedPointAt(P, earlier);
-      if (with_ !== null) status[fid] = { code: 'point-coincides', id, with: with_ };
+      if (with_ !== null && writtenOnto3(c, def, with_)) status[fid] = { code: 'point-coincides', id, with: with_ };
     }
   }
 

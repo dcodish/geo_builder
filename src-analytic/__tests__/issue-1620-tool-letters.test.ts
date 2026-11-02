@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { decideSubmit } from '../app/submit';
 import { decideRename, type RenameState } from '../app/rename';
 
@@ -93,9 +94,13 @@ describe('one point, one name (#1153), and stable letters', () => {
     expect(verdictKey(['משולש ABC', 'גובה מ-A במשולש ABC', 'גובה מנקודה A'])).toBe('already-known');
   });
 
-  it('a later NAME for the tool’s point is #1153’s already-named, naming the tool’s letter', () => {
+  it('a later NAME for the tool’s point is recorded on it, and the notice names the tool’s letter (#1595)', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): D is forced onto M, so the
+    // line records with «M ו-D נפלו על אותה נקודה.» (was #1153's `already-named`). 2-D instead hands the tool's letter
+    // over to D (an auto-rename); that drawing difference is reported on #1595, not decided here.
     const d = derive(['משולש ABC', 'תיכון מ-A במשולש ABC', 'D אמצע BC'], 0);
-    expect(d.faults[0]).toMatchObject({ index: 2, code: 'already-named', holder: 'M' });
+    expect(d.faults).toEqual([]);
+    expect(coincidencesOf(d)).toEqual([['M', 'D']]);
   });
 
   it('a later line that uses the letter refers to the tool’s point, and never re-letters it', () => {

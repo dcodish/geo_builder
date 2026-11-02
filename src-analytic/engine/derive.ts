@@ -18,19 +18,13 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, tangentLineId, type Construction, type Fact } from './types';
-import { SOLVE_RESOLUTION, SOLVE_TOL, sameConstraint, type Constraint } from './solve';
+import { SOLVE_RESOLUTION, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
-import { incidenceWords } from './crossings';
 import { convexWhenSimple, shapeRow } from './shapes';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
-/** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
-function incidenceIds(k: { t: string; id?: string }): string[] {
-  return k.t === 'on-line-2pt' || k.t === 'on-curve' || k.t === 'on-line' ? [k.id ?? ''] : [];
-}
-
 export interface LineFault {
   index: number;
   code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
@@ -818,85 +812,16 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     });
   }
 
-  /**
-   * A NAMED CROSSING THAT IS A POINT THE FIGURE ALREADY HAS (#1254, the operator’s T18 ruling).
-   *
-   * *"if P and B must be on the same location … it should be refused. The only case where P and B can
-   * fall [together] is if one of them has a degree of freedom … even if they do fall on the same point
-   * by chance … the system should not show them on top of each other."*
-   *
-   * [#1175](https://github.com/dcodish/geo_builder/issues/1175) answered the STRUCTURAL member — two
-   * lines named by two points each that share a written letter meet at that letter, whatever the
-   * configuration — and pre-declared the positional one an escalation rather than an expansion. This
-   * is that escalation, ruled: «P נקודת החיתוך של הישר AB עם הישר CD» on his own figure put P exactly on
-   * B, with `faults: []`, and the sheet used that very figure as its CONTROL.
-   *
-   * **THE PAIR'S OWN FREEDOM, NEVER THE FIGURE'S** (#1938, ADR-AG-254). The ruling's two branches are
-   * *"P and B must be on the same location"* versus *"one of them has a degree of freedom"* — a question
-   * about the PAIR. This arm borrowed the vacancy pass's whole-figure predicate (`reportedDof === 0`) as
-   * an approximation of it, and the approximation leaked exactly where #1929's ring arm leaked: «נקודה Q»
-   * typed first — any unrelated free point, line or circle — left the figure 1–2 DOF, the check never
-   * fired, and a second name was minted onto an existing point, green, with two labels on one dot. So the
-   * predicate is `Figure.separationDof(crossing, holder) === 0`: the freedom of the SEPARATION of those two
-   * points along the constraints, where a freedom elsewhere cancels out. On a determined figure it is 0 for
-   * every pair, so every figure this already refused is refused identically.
-   *
-   * The second branch keeps its silence, and keeps it for the right reason: a crossing whose carriers can
-   * still move off the holder has `separationDof > 0`, another configuration may separate them, and #1273
-   * is what will prefer it. Unmeasured (`undefined` — a point this configuration cannot place) is read as
-   * free: a false refusal is the worse defect. This is why the arm sits here rather than in the parser —
-   * whether a coincidence is FORCED is a question about the figure.
-   *
-   * Scoped to a point a sentence CROSSED into being — two incidences and a declaration. A midpoint or
-   * a foot landing on an existing point is the same family and is deliberately left for the wider
-   * ruling; refusing them here would reach past what was measured.
+  /*
+   * A NAMED CROSSING THAT IS A POINT THE FIGURE ALREADY HAS (#1254) — no longer a refusal. #1595 (ADR-AG-372, ADR-W-177;
+   * operator ruling 2026-11-02, "accept with message", which reverses the 2026-09-20 T18 ruling for this member): a
+   * crossing its givens FORCE onto a named point — «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» with M the midpoint
+   * of BC (#2631), «CP ו-AM נחתכים בנקודה H» after the medians met at G — records, and the drawn figure says «M ו-E
+   * נפלו על אותה נקודה.» (`app/coincidences.ts`), as 2-D does. The arm that refused it here (`separationDof === 0`) is
+   * gone, not bypassed. Two straights WRITTEN through one shared letter are still refused, by the parser (#1175, 2-D's
+   * #1274); a pair that is only coincident in this configuration is still the separation preference's (ADR-AG-138,
+   * ADR-W-072); a third crossing of a circle and a crossing of its tangent keep their own ruled refusals (above).
    */
-  {
-    const xs = figure.points.map((q) => q.x);
-    const ys = figure.points.map((q) => q.y);
-    const span = Math.max(1e-9, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-    // Relative to the figure (ADR-AG-021), with a floor tied to the SOLVE's own tolerance rather than
-    // an arbitrary small number: a figure whose points all sit at the origin has no span, and the
-    // solver leaves its crossing ~1e-9 away from the point it coincides with. #1276 is the same lesson
-    // — an absolute threshold below the residual the solver actually leaves behind decides nothing.
-    const near = Math.max(span * 1e-6, SOLVE_TOL * 10);
-    // Counted off the CONSTRAINTS, not the objects: a crossing is `declare`d and does not carry the
-    // `point` kind, which is what made a first version of this check find nothing at all.
-    const incidences = new Map<string, number>();
-    for (const k of construction.constraints)
-      for (const id of incidenceIds(k)) incidences.set(id, (incidences.get(id) ?? 0) + 1);
-    const crossed = new Set([...incidences].filter(([, n]) => n >= 2).map(([id]) => id));
-    // A CROSSING is `declare`d, which `namesObject` does not cover — so `lineOf`, built for naming
-    // facts, has no entry for it. The owning line is read here rather than by widening that map, whose
-    // shape the vacancy pass below depends on.
-    const declaredOn = new Map<string, number>();
-    facts.forEach((f, i) => {
-      const t = (f as { t: string }).t;
-      const id = (f as { id?: string }).id;
-      if (t === 'declare' && id && !declaredOn.has(id)) declaredOn.set(id, owner[i]);
-    });
-    const ownerLine = (id: string) => declaredOn.get(id) ?? lineOf.get(id);
-    for (const pt of figure.points) {
-      if (!crossed.has(pt.id) || thirdCrossed.has(pt.id) || tangentCrossed.has(pt.id)) continue; // #1893/#1924: already refused, in its own words
-      const index = ownerLine(pt.id);
-      if (index === undefined) continue;
-      const holder = figure.points.find((q) => {
-        if (q.id === pt.id) return false;
-        const qi = ownerLine(q.id);
-        if (qi !== undefined && qi > index) return false; // only a point that was ALREADY there
-        if (!(Math.hypot(q.x - pt.x, q.y - pt.y) < near)) return false;
-        // …and FORCED there, not merely coincident in this configuration (#1938): asked of the pair, so an
-        // unrelated free point cannot silence it and a crossing free to move off `q` is still not accused.
-        // Asked only of a pair already found near, so a figure with no coincidence ranks nothing.
-        return figure.separationDof?.(pt.id, q.id) === 0;
-      });
-      if (!holder) continue;
-      // The refusal names the two operands (#1416) — read off the crossing's own incidences, never assumed lines.
-      const said = construction.constraints.filter((k) => incidenceIds(k).includes(pt.id)).map((k) => incidenceWords(construction, k));
-      const operands: [string, string] | undefined = said.length === 2 && said[0] && said[1] ? [said[0], said[1]] : undefined;
-      faults.push({ index, code: 'crossing-already-named', detail: lines[index], holder: holder.id, ...(operands ? { operands } : {}) });
-    }
-  }
   for (const v of figure.vacant) {
     const index = lineOf.get(v.id);
     if (index === undefined) continue; // no line owns it — nothing honest to say about it

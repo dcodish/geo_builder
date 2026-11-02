@@ -13,9 +13,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive, type Derivation } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
+import { convergeText } from '../../shell/converge';
 import { centroid, circumcentre, incentre, orthocentre } from '../engine/derived';
 import { decideSubmit } from '../app/submit';
-import { errorText } from '../app/errorText';
 import { analyticI18n } from '../i18n';
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -212,16 +213,18 @@ describe('#1715 — refusals', () => {
     const steps = (k1: string, k2: string) => [TRI, 'M אמצע BC', 'האנך מ-C ל-AB', `${ON[k1].np} ו${ON[k2].np} נפגשים בנקודה E`];
     expect(verdict(steps('altitude from A', 'perpendicular bisector of BC'))).toBe('refused:self-crossing');
     expect(verdict(steps('perpendicular bisector of BC', 'altitude from A'))).toBe('refused:self-crossing');
-    // through M, which the figure already names — refused naming it
-    expect(verdict(steps('line AM', 'perpendicular bisector of BC'))).toBe('refused:crossing-already-named');
-    expect(verdict(steps('perpendicular bisector of BC', 'line AM'))).toBe('refused:crossing-already-named');
+    // through M, which the figure already names: recorded on M, with the notice — #2631, below (#1595)
+    expect(verdict(steps('line AM', 'perpendicular bisector of BC'))).toBe('record');
+    expect(verdict(steps('perpendicular bisector of BC', 'line AM'))).toBe('record');
   });
   /*
-   * #2631 (judged A, ADR-W-173; the record is ADR-AG-349): the issue's exact four lines. The perpendicular bisector of
-   * BC and the line AM meet at M in a general triangle, so the sentence is refused NAMING M, the line is not recorded,
-   * and the triangle the student drew stays where it was (before ADR-AG-349 it was redrawn isosceles, AB = AC).
+   * #2631: the issue's exact four lines. The perpendicular bisector of BC and the line AM meet at M in a general
+   * triangle. ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message": *"#2631's
+   * sentence would then be accepted, with «E ו-M נפלו על אותה נקודה»"*, which overrules the judge's q-2631 "refuse"):
+   * the line RECORDS, E is drawn on M, the notice names M and E, and the triangle the student drew stays where it was
+   * and is not made isosceles (ADR-AG-349's fix holds).
    */
-  it('#2631: «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» is refused naming M, the triangle unchanged', () => {
+  it('#2631: «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» records on M with the notice, the triangle unchanged', () => {
     const context = [TRI, 'M אמצע BC', 'האנך מ-C ל-AB'];
     for (const line of ['האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E', 'הישר AM והאנך האמצעי לצלע BC נפגשים בנקודה E']) {
       const lines: string[] = [];
@@ -231,17 +234,17 @@ describe('#1715 — refusals', () => {
         if (v.kind === 'record') lines.push(v.line);
       }
       const v = decideSubmit(line, lines, 0);
-      expect(v.kind, line).toBe('refused');
-      if (v.kind !== 'refused') continue;
-      expect(v.error.key).toBe('crossing-already-named');
-      expect('holder' in v.error ? v.error.holder : undefined).toBe('M');
-      expect(errorText(v.error, tHe), line).toMatch(/\bM\b/);
-      expect(lines, 'the refused line is not recorded').toEqual(context);
+      expect(v.kind, line).toBe('record');
+      if (v.kind !== 'record') continue;
+      const recorded = [...lines, v.line];
       for (const seed of [0, 3, 6]) {
         const before = derive(context, seed);
-        const after = derive(lines, seed);
+        const after = derive(recorded, seed);
         expect(before.faults).toEqual([]);
-        for (const id of ['A', 'B', 'C', 'M']) expect(dist(pt(after, id), pt(before, id))).toBe(0);
+        expect(after.faults, `${line} @${seed}`).toEqual([]);
+        expect(coincidencesOf(after), `${line} @${seed}`).toEqual([['M', 'E']]);
+        expect(convergeText(coincidencesOf(after), (k, o) => tHe(k, o)), line).toBe('M ו-E נפלו על אותה נקודה.');
+        for (const id of ['A', 'B', 'C', 'M']) expect(dist(pt(after, id), pt(before, id)), `${id} @${seed}`).toBeLessThan(1e-9);
         const [a, b, c] = ['A', 'B', 'C'].map((id) => pt(after, id));
         expect(Math.abs(dist(a, b) - dist(a, c)) / scaleOf(after), `not made isosceles @${seed}`).toBeGreaterThan(1e-3);
       }
