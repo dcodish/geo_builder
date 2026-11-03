@@ -92,6 +92,27 @@ describe('#1334 — passing proves nothing: genuine thin figures and ordinary on
   });
 });
 
+/*
+ * Round #2678: the collapse verdict is read off the STATEMENTS, never off how far the solve got. The anchored step's
+ * round (#1182) added an "armless angle is not held" test to the flat-figure check; an angle whose arm vanishes is
+ * exactly what the needle's flat limit is (B onto C takes ray BC with it), so the needle lost its ruled refusal at
+ * every seed. What separates «AB = AC · ∠ABC = 90» from «∠ABC = 90 · ∠ACB = 90» is 2-D's split (ADR-746 / ADR-658,
+ * measured at b034df12): stated angles that alone break a triangle's angle sum are an over-constraint; one stated
+ * angle that only a flat triangle holds is the collapse.
+ */
+describe('round #2678 — the collapse verdict is the statements’, at every seed', () => {
+  it.each([
+    [['משולש ABC', 'AB = AC', '∠ABC = 90'], 'polygon-collapsed@2', 'one stated angle + an equality: the flat ring is the only answer'],
+    [['משולש ABC', 'AB = BC', 'AC ⊥ BC'], 'polygon-collapsed@2', 'the ⟂ spelling'],
+    [['משולש ABC', '∠ACB = 90', 'AB = BC'], 'polygon-collapsed@2', 'the equality typed last'],
+    [['משולש ABC', '∠ABC = 90', '∠ACB = 90'], 'unsatisfiable@2', 'two STATED right angles: the angles alone (2-D: over-constrained)'],
+    [['משולש ישר-זווית ABC', 'זווית C ישרה', 'תיכון ליתר AC'], 'unsatisfiable@2', 'a hypotenuse that states the second right angle'],
+    [['משולש ABC', '∠BAC = 100', '∠ABC = 80'], 'unsatisfiable@2', 'two stated angles summing to 180° (2-D: over-constrained)'],
+  ])('%j → %s — %s', (lines, code) => {
+    for (let seed = 0; seed < 8; seed++) expect(codes(lines as string[], seed), `seed ${seed}`).toEqual([code]);
+  });
+});
+
 describe('#1334 — the tolerance factor is scoped and always restored', () => {
   it('withToleranceFactor tightens inside and restores outside, even when the body throws', () => {
     expect(toleranceFactor()).toBe(1);

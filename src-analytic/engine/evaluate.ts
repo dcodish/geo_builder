@@ -226,6 +226,49 @@ function mentionsAny(value: unknown, ids: ReadonlySet<Id>): boolean {
   return false;
 }
 
+/**
+ * DO THE RING'S STATED ANGLES ALONE CONTRADICT A POLYGON? (round #2678 — 2-D's angle-sum split, ADR-746 / ADR-658.)
+ *
+ * Read off the STATEMENTS, never a position: a right angle at a corner (`rightAngleAt`'s ⟂ between the corner's two
+ * sides) or a numeric angle in degrees between them, one value per corner. An n-gon's corners sum to (n − 2)·180°,
+ * each one positive, so stated corners that leave the rest no room (fewer than n stated, their sum already at the
+ * total) or that miss the total (all n stated) are a contradiction among the angles themselves — the over-constraint,
+ * not the flat polygon. A corner stated twice keeps its first value; a value that is not a number (a free symbol) is
+ * not read.
+ */
+function statedAnglesContradict(c: Construction, ring: readonly Id[]): boolean {
+  const n = ring.length;
+  const corner = new Map<Id, number>();
+  const sides = (v: Id): [Id, Id] | null => {
+    const i = ring.indexOf(v);
+    return i < 0 ? null : [ring[(i + n - 1) % n], ring[(i + 1) % n]];
+  };
+  const isCorner = (v: Id, p: Id, q: Id): boolean => {
+    const s = sides(v);
+    return s !== null && ((s[0] === p && s[1] === q) || (s[0] === q && s[1] === p));
+  };
+  for (const k of c.constraints) {
+    if (k.t === 'relation' && k.rel === 'perpendicular' && k.u.k === 'points' && k.v.k === 'points') {
+      const { a, b } = k.u;
+      const { a: c2, b: d } = k.v;
+      // the two rays leave one shared vertex: (v→p) ⟂ (v→q) in any spelling
+      const v = a === c2 || a === d ? a : b === c2 || b === d ? b : null;
+      if (v === null) continue;
+      const p = a === v ? b : a;
+      const q = c2 === v ? d : c2;
+      if (isCorner(v, p, q) && !corner.has(v)) corner.set(v, 90);
+    } else if (k.t === 'angle' && k.measure === undefined) {
+      const deg = evalExpr(k.value);
+      if (Number.isFinite(deg) && isCorner(k.at.v, k.at.a, k.at.b) && !corner.has(k.at.v)) corner.set(k.at.v, deg);
+    }
+  }
+  if (corner.size === 0) return false;
+  const total = (n - 2) * 180;
+  const sum = [...corner.values()].reduce((s, x) => s + x, 0);
+  const EPS_DEG = 1e-6;
+  return corner.size < n ? sum >= total - EPS_DEG : Math.abs(sum - total) > EPS_DEG;
+}
+
 /** With nothing placed, the figure has no scale of its own and this is as good as any. */
 const DEFAULT_SPAN: Span = { x: { lo: -6, hi: 6 }, y: { lo: -6, hi: 6 } };
 
@@ -4301,36 +4344,24 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         const v = evalLengthExpr(le, atT, envT, lineAtT, curveAtOf(c, envT, atT));
         return v !== null && Math.abs(v) <= SATISFIED_EPS * Math.max(1, span) ** dim;
       };
-      /*
-       * …and an ANGLE whose arm has no length on the flat figure is not read there either (round #2678, the same rule as
-       * `vanishes` below): «משולש ישר-זווית ABC» · «זווית C ישרה» · «תיכון ליתר AC» flattens with B on C, where «∢C = 90°»
-       * has no ray CB, so its zero residual measures nothing — whether it then read as "held" depended on which start the
-       * solve came from.
-       */
-      const armless = (k: Constraint): boolean => {
-        const len = (u: Id, v: Id) => {
-          const p = atT(u);
-          const q = atT(v);
-          return p && q ? Math.hypot(p.x - q.x, p.y - q.y) : Number.POSITIVE_INFINITY;
-        };
-        // an arm shorter than the eye can see (the stacking ruler) carries no direction to measure the angle by
-        const floor = VISIBLE_FRACTION * Math.max(1, span);
-        if (k.t === 'perpendicular') return len(k.a, k.b) <= floor || len(k.c, k.d) <= floor;
-        if (k.t === 'angle') return len(k.at.v, k.at.a) <= floor || len(k.at.v, k.at.b) <= floor;
-        if (k.t === 'relation') return [k.u, k.v].some((d) => d.k === 'points' && len(d.a, d.b) <= floor);
-        return false;
-      };
       const heldFlat = c.constraints.every((k) => {
         const r = residual(k, atT, envT, curveAtOf(c, envT, atT), lineAtT, scaleT);
         if (r === null || !r.every((v) => Number.isFinite(v) && Math.abs(v) <= SATISFIED_EPS)) return false;
-        if (armless(k)) return false;
         if (k.t !== 'length-eq') return true;
         const dim = [...k.left.terms, ...k.right.terms].some((t) => t.kind === 'area') ? 2 : 1;
         return !(vanishes(k.left, dim) && vanishes(k.right, dim));
       });
       for (const ring of thin) {
         if (!collapsed.has(ring.id)) continue;
-        if (heldFlat) collapsedRings.push(ring.id);
+        /*
+         * …and the ring's STATED ANGLES ALONE do not already contradict a polygon (round #2678; 2-D's ADR-746 / ADR-658
+         * split, measured at `b034df12`). «משולש ABC» · «∢ABC = 90» · «∢ACB = 90» (or «זווית C ישרה» · «תיכון ליתר AC», whose
+         * hypotenuse states the right angle at B) is refused by the angles' own sum, before any figure is asked about: 2-D
+         * says «over-constrained», and so does this product («unsatisfiable»). «AB = AC» · «∢ABC = 90» states ONE angle; only
+         * the flat ring holds the pair, and that is the collapse (#1334, ADR-AG-143 / ADR-AG-247). A VERDICT over the
+         * statements, never over the drawing the solve stopped at, so no start, step or display bound can move it.
+         */
+        if (heldFlat && !statedAnglesContradict(c, ring.vertices)) collapsedRings.push(ring.id);
         const vertices = new Set<Id>(ring.vertices);
         const k = [...c.constraints].reverse().find((con) => mentionsAny(con, vertices));
         if (k && !unsatisfied.includes(k)) unsatisfied.push(k);

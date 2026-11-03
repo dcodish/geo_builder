@@ -842,6 +842,7 @@ a sentence the tool parsed.
 **R172 — givens that force a declared polygon flat are refused, and the refusal says why**. *(Operator, ADR-W-115: "a flat line is not a triangle".)* Never «לא נמצאה תצורה», never drawn flat; amends R105's message and R64's pinned arm (ADR-AG-129).
 - «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» → refused, naming the polygon
 - 5, 3, 7.9 → drawn
+- «משולש ABC» · «AB = AC» · «∠ABC = 90» → refused as flattened at every configuration; but stated angles that alone break the angle sum («∠ABC = 90» · «∠ACB = 90», «∠BAC = 100» · «∠ABC = 80») are the angles' contradiction, refused «לא נמצאה תצורה» as 2-D refuses them over-constrained (ADR-AG-378 found item 3, round #2678)
 - A pinned flat ring is refused whatever else in the figure is free: «נקודה Q» · «A(0,0)» · «B(1,1)» · «C(2,2)» · «משולש ABC» → «משולש ABC» refused ([ADR-AG-249](06c-decisions-analytic.md#adr-ag-249), #1929)
 - Sources: ADR-AG-247, #1849, ADR-W-115, ADR-AG-129, ADR-AG-249.
 
