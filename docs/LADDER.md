@@ -41,11 +41,13 @@ The reinterpretation chain, first non-null wins (M1: a statement about an existi
 | # | Reinterpreter | Trace token |
 |---|---|---|
 | 1a | `reinterpretAsConstraint` — a point-placement re-statement → hidden twin + driven `coincide` (or a carrier-less coincide for the failure path) | `m1:constraint` |
-| 1b | `reinterpretAsCollinear` — "P on a–b" on an existing P → rider conversion (free P) or collinear+order | `m1:collinear` |
+| 1b | `reinterpretAsCollinear` — "P on a–b" on an existing P → rider conversion (free P; at a STATED t the fixed rider the blank page builds) or collinear+order | `m1:collinear` |
 | 1c | `replaceCyclicForDiameter` — diameter over a ≥3-vertex cyclic polygon → re-place all vertices | `m1:cyclic-diameter` |
 | 1d | `reinterpretDiameter` — diameter over two existing points → midpoint≡centre driven coincide | `m1:diameter` |
 
 Then the M1 branch's own mini-ladder: **primary** evaluate + non-vacuous gate (`m1:primary`) → **settle** on frozen prior (`m1:settle`) → **recruit** (`m1:recruit`, → stage 3) → refuse with `blameNewStatement` (`m1:refuse`). No reinterpreter fires → the plain "already defined" conflict (`m1:conflict-refuse`).
+
+**1b's stated-ratio tail** ([ADR-773](06-decisions.md#adr-773), #2591): when 1b lowered a STATED t («D מחלקת את AB ביחס 1:2» on an existing D) to the membership alone (a derived, pinned or directive-carrying P), the accepted M1 result is followed by the colon form's `set-ratio` `|a·P| = t/(1−t)·|P·b|`, applied as its OWN step through the main ladder; that step's refusal is the line's (`m1:stated-ratio`, then the main tokens).
 
 > **As-found divergence (S1.1 target):** this branch runs **no orphaned-coincide sweep and no scale rescue**, unlike stage 2 — undocumented whether intent or drift.
 
