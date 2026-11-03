@@ -16,6 +16,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
 import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
+import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -55,6 +56,9 @@ export interface SavedAnalyticSession {
   /** #2238 — the per-CURVE display choices (hidden; dashed for a line or a conic other than a circle), keyed by
    *  the curve's object id. Omitted when none, so every save from before it loads unchanged. */
   curveStyle?: SegDisplayMap;
+  /** #1863 (ADR-AG-375) — the annotation channel: per object id, what the student chose to show on the figure (the
+   *  conic chip's state today). Omitted when empty, so every save from before it loads unchanged. */
+  annotations?: AnnotationMap;
 }
 
 /**
@@ -288,6 +292,8 @@ export interface LetterCommit {
   segStyle?: SegDisplayMap;
   /** #2238 — the curve display map under the new curve ids; absent = unchanged. */
   curveStyle?: SegDisplayMap;
+  /** #1863 — the annotation map under the new object ids; absent = unchanged. */
+  annotations?: AnnotationMap;
 }
 
 interface AnalyticState {
@@ -383,6 +389,14 @@ interface AnalyticState {
   /** Flip one curve's hidden / dashed flag — the same shared `toggleSegFlag`. */
   toggleCurveHidden: (id: string) => void;
   toggleCurveDashed: (id: string) => void;
+  /**
+   * #1863 (ADR-AG-375) — THE ANNOTATION CHANNEL: per object id, what the student chose to show on the figure that the
+   * figure does not show at rest (`app/annotations.ts`). Not a given and not a question. Rides in the undo slice, the
+   * save file and the share link exactly as `curveStyle` does.
+   */
+  annotations: AnnotationMap;
+  /** Record the map a surface decided on (the conic chip's press: `withConic`). The store decides nothing. */
+  setAnnotations: (next: AnnotationMap) => void;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -424,7 +438,7 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown }) => void;
+  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown; annotations?: unknown }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
   recordLlmLines: (spoken: string, lines: string[], notice?: string | null, at?: Seed) => void;
@@ -443,19 +457,20 @@ export const spokenSentence = (label: string): string => label.replace(/ \(\d+\/
  * model answered it with ONE line (#1297, unchanged), and the row's OWN machine line when the model split it into
  * parts — a marked label is a part, and showing the same sentence on every part read as a duplicate. The marker
  * stays in the store: the question export (#1872), rename and saves read it. Every surface that names a row by
- * its text (the givens list, the shape warning, the narrowing note) reads it through here.
+ * its text (the givens list, the shape warning, the narrowing note, the circle note) reads it through here.
  */
 export const rowShownText = (line: string, spoken: string | undefined): string =>
   spoken !== undefined && spokenSentence(spoken) === spoken ? spoken : line;
 
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
-const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle }: LetterCommit) => ({
+const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle, annotations }: LetterCommit) => ({
   lines: lines.map(ingestTypedText),
   queries: [...queries],
   spokenFor: { ...spokenFor },
   seedNames: { ...seedNames },
   ...(segStyle ? { segStyle: { ...segStyle } } : {}),
   ...(curveStyle ? { curveStyle: { ...curveStyle } } : {}),
+  ...(annotations ? { annotations: { ...annotations } } : {}),
   error: null,
   notice: null,
 });
@@ -506,6 +521,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   seedNames: {},
   segStyle: {},
   curveStyle: {},
+  annotations: {},
   seed: 0,
   name: '',
   loadAudit: null,
@@ -551,10 +567,11 @@ export const useAnalyticStore = create<AnalyticState>()(
   toggleSegDashed: (key) => set((s) => ({ segStyle: toggleSegFlag(s.segStyle, key, 'dashed') })),
   toggleCurveHidden: (id) => set((s) => ({ curveStyle: toggleSegFlag(s.curveStyle, id, 'hidden') })),
   toggleCurveDashed: (id) => set((s) => ({ curveStyle: toggleSegFlag(s.curveStyle, id, 'dashed') })),
+  setAnnotations: (annotations) => set({ annotations }),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, segStyle: {}, curveStyle: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, segStyle: {}, curveStyle: {}, annotations: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -585,7 +602,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle } = get();
+    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, annotations } = get();
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
@@ -597,15 +614,18 @@ export const useAnalyticStore = create<AnalyticState>()(
       ...(Object.keys(seedNames).length ? { seedNames: { ...seedNames } } : {}),
       ...(Object.keys(segStyle).length ? { segStyle: JSON.parse(JSON.stringify(segStyle)) as SegDisplayMap } : {}),
       ...(Object.keys(curveStyle).length ? { curveStyle: JSON.parse(JSON.stringify(curveStyle)) as SegDisplayMap } : {}),
+      ...(Object.keys(annotations).length ? { annotations: cleanAnnotations(annotations) } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle }) =>
+  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, annotations }) =>
     set({
       // #1653 — the segment display map, kept only as key → {hidden?, dashed?: true}
       segStyle: cleanSegDisplay(segStyle),
       // #2238 — the curve display map, the same shape and the same cleaning
       curveStyle: cleanSegDisplay(curveStyle),
+      // #1863 — the annotation map, kept only as object id → known facets
+      annotations: cleanAnnotations(annotations),
       lines: lines.map(ingestTypedText),
       spokenFor: cleanSpokenFor(spokenFor, lines.length),
       seedNames: cleanSeedNames(seedNames),
@@ -639,12 +659,13 @@ export const useAnalyticStore = create<AnalyticState>()(
       // #1653: the segment display map rides along — a hide is a step the student took on the canvas, and the
       // operator's lock is «one «בטל» restores it» (the ask lane's `shown` is the same kind of choice, and is here).
       // #2238: the curve display map rides along for the same reason.
+      // #1863: the annotation map rides along — a chip press is a step the student took (ADR-AG-375: "undoable").
       partialize: (s) =>
-        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle }) as AnalyticState,
+        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle, annotations: s.annotations }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
       equality: (a, b) =>
         a.lines === b.lines && sameSeed(a.seed, b.seed) && a.queries === b.queries && a.disabled === b.disabled &&
-        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle,
+        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle && a.annotations === b.annotations,
       limit: 100,
     },
   ),

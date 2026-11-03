@@ -1689,6 +1689,41 @@ free letter is marked `bare`, and the renderer writes it alone («S»), every ot
 
 *Identifiers:* `render/scene.ts` · `alt` · `origin` · `{ num }` · `{ text }` · `statedText` · `App` · `ticks` · `labels` · `SceneSegment.label` · `FigureSegment.pinnedLength` · `pinnedLengths` · `wedgeBisector` · `equalTickSegments` · `unitOf` · `shell/__tests__/fixtures/mark-geometry-rows.ts` · `LabelRequest`
 
+### The annotation channel, and its first surface: the conic chip ([ADR-AG-375](06c-decisions-analytic.md#adr-ag-375), [ADR-AG-376](06c-decisions-analytic.md#adr-ag-376), [ADR-AG-377](06c-decisions-analytic.md#adr-ag-377), #1863)
+
+**The channel.** `app/annotations.ts`: `AnnotationMap = Record<objectId, Annotation>`, one record per object, one optional
+FACET per surface (`conic` today). It lives in the store beside `curveStyle` (`annotations`, `setAnnotations`) and
+travels everywhere that map travels: the `zundo` partialize and equality, `clearAll`, `serialize` / `restore` (an
+optional envelope field cleaned by `cleanAnnotations`, so an old file loads with nothing shown), `loadAnalyticSession`,
+`sessionPersistAn`'s change test, the share link (it serializes the store), and a letter change's `RelabelCommit`
+(re-keyed by `relabelCurveStyle`, now generic over the value). The fold never reads it, so it is never a given or a
+question. A key whose object is gone is kept and ignored. **How the later surfaces plug in:** #1211 adds a `coords`
+facet keyed by a point id and written from the point's click menu; #1121 adds a `line` facet (equation, slope) keyed
+by a line id, drawn BESIDE the name (2026-10-09 answer 4) through the same placement; #1752 adds the focus mark's click
+(naming it), which records a sentence through `decideSubmit` as the centre offer does — the mark itself is this one.
+Each is a facet, a reader in `cleanAnnotations`, and a projection into `SceneKnowledge`; no store or envelope field.
+
+**The chip.** `app/conicMarks.ts` `conicChips(d, annotations)`: one per STATED parabola or ellipse, on its
+`objectLine` row, in the givens row's `trail` seat after the locus chips; `state` and `next` from
+`CONIC_CYCLE` (none → directrix → focus → both). The label key is `conicChip.<kind>.<next>`. A press is
+`setAnnotations(withConic(map, id, next))`: one undo entry, nothing submitted.
+
+**The marks.** `conicMarksOf(d, annotations, hidden)` returns world-space marks from the closed forms
+(`parabolaFocus`, `parabolaDirectrix`, `ellipseFoci`, `ellipseDirectrices` — new, `x = ±a²/c` or `y = ±b²/c`, null
+when a = b). Labels: the book's letter unless a student's point holds it (`F₁` ≡ `F1`), plus `(x, y)` through
+`fmtAnalytic` only when `knownCurve` holds; a directrix's `roleLineOf` (the panel's `roleLineText`) only when known;
+nothing at all where a student's point stands at the focus. A hidden curve (#2238) draws none. `buildScene` takes them
+as `SceneKnowledge.roleMarks` and returns `scene.roles`: foci as dots, directrices clipped to the view box by
+`polylines`, their labels as requests in the ONE `placeSceneLabels` call (priority 2, after angles and lengths),
+through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra points (a focus; where a directrix crosses its axis). `Figure.tsx` paints them in `analytic-roles`: dashed 1.25px directrices, blue dots, ink labels.
+
+**The circle case.** `isCircleShaped(c, id)` — `(a − b)/max(1, a, b)` read through `isKnowledge`, zero in every
+configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross
+at the origin, labelled `(0, 0)` under the circle's own rule. `circleNotesOf(lines, d, rederive)` finds the cause as
+the narrowing note does — every other line whose removal stops it being round, else its own line — and `App.tsx`
+computes it in a passive effect after paint and renders it as an ⓘ `Banner kind="notice"` after the narrowing notes
+(`circleNoteText`, the narrowing note's `cause` keys and voice). `isCircleShaped` is the engine's `isRoundEllipse` (`engine/crossings.ts`), so the offer list reads it too: `roundEllipseCentresOf` offers the centre on the circle centre's path (`offersOf` → the letter popover → `decideCentreName` → `centreSentenceOf(…, construction)`), recording «<letter> מרכז האליפסה» — the `centre` role of `readRoleRef`, lowered (`ellipse-centre-of`) by `nameEllipseRole` to `ellipse-point` `{ k: 'centre' }`. `curveParts` prints such an ellipse's row with «מרכז: (0, 0)» (`curveRoundCentreLabel`) instead of its foci.
+
 ### The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))
 
 `render/Figure.tsx`'s click-only affordances sit inside `data-noexport` (FR-EX-3), locked by

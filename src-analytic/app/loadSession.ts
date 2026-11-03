@@ -43,6 +43,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     segStyle: envelope.segStyle,
     // #2238 — the curve display choices, cleaned by the store the same way
     curveStyle: envelope.curveStyle,
+    // #1863 (ADR-AG-375) — the annotation channel (the conic chip's state); the store keeps only known facets
+    annotations: envelope.annotations,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:

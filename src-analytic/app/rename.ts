@@ -66,6 +66,7 @@ import { positionalOf } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
+import type { AnnotationMap } from './annotations';
 import { segKey } from '../render/scene';
 import type { Seed } from '../engine/evaluate';
 
@@ -272,6 +273,8 @@ export interface RenameState {
   segStyle?: SegDisplayMap;
   /** #2238 — the curve display map (keyed by curve object id); absent = none. */
   curveStyle?: SegDisplayMap;
+  /** #1863 — the annotation map (keyed by object id); absent = none. */
+  annotations?: AnnotationMap;
 }
 
 /**
@@ -293,6 +296,8 @@ export interface RelabelCommit {
   segStyle: SegDisplayMap;
   /** #2238 — the curve display map, re-keyed to the curve ids the relabelled lines mint: a hidden `circle-at-O` stays hidden as `circle-at-K`. */
   curveStyle: SegDisplayMap;
+  /** #1863 (ADR-AG-375) — the annotation map, re-keyed like `curveStyle`: a parabola's chip state survives a letter change. */
+  annotations?: AnnotationMap;
 }
 
 /**
@@ -303,11 +308,11 @@ export interface RelabelCommit {
  * k-th after.
  * A key that names no curve of `before` (a stale entry) is kept as it was.
  */
-export function relabelCurveStyle(style: SegDisplayMap, before: Derivation, after: Derivation): SegDisplayMap {
+export function relabelCurveStyle<T extends object>(style: Record<string, T>, before: Derivation, after: Derivation): Record<string, T> {
   const ids = (d: Derivation) => d.figure.curves.map((c) => c.id);
   const from = ids(before);
   const to = ids(after);
-  const out: SegDisplayMap = {};
+  const out: Record<string, T> = {};
   for (const [k, v] of Object.entries(style)) {
     const i = from.indexOf(k);
     out[i >= 0 && from.length === to.length ? to[i] : k] = { ...v };
@@ -527,6 +532,8 @@ function relabelSession(
     seedNames,
     segStyle: relabelSegStyle(state.segStyle ?? {}, map),
     curveStyle: relabelCurveStyle(state.curveStyle ?? {}, current, after),
+    // #1863: the annotation channel is keyed by object id too — the same re-keying (ADR-AG-375)
+    ...(state.annotations ? { annotations: relabelCurveStyle(state.annotations, current, after) } : {}),
   };
 }
 
@@ -633,7 +640,7 @@ export interface SwapActions {
   setError: (e: InputError | null) => void;
 }
 
-const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle, curveStyle: v.curveStyle });
+const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle, curveStyle: v.curveStyle, ...(v.annotations ? { annotations: v.annotations } : {}) });
 
 /**
  * DISPATCH A RENAME — decide, then write ONE commit (one undo step) or show the refusal.

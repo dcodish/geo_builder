@@ -1336,6 +1336,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1832 (ADR-AG-246): a domain on x or y is a restriction on the CURVE — analytic refuses it, never a parameter named x
   { id: 'coordinate-restriction-line-1832', family: 'topic', steps: ['y = 2x + 1, x > 0'], expect: 'refused', exception: 'X2', note: 'used to commit the whole line with a parameter named x' },
   { id: 'coordinate-restriction-circle-1832', family: 'topic', steps: ['x^2 + y^2 = 4, y > 0'], expect: 'refused', exception: 'X2' },
+  // #1863 (ADR-AG-376): the conic chip's curves — analytic's alone by design (2-D and 3-D have no conics; X2)
+  { id: 'conic-parabola-chip-1863', family: 'topic', steps: ['נתונה פרבולה שמשוואתה y^2=54x'], expect: 'builds', exception: 'X2', note: 'carries the focus/directrix chip in analytic' },
+  { id: 'conic-ellipse-chip-1863', family: 'topic', steps: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'], expect: 'builds', exception: 'X2', note: 'carries the foci/directrices chip in analytic' },
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
   // #1849 (ADR-W-115, operator ruling 2026-10-07): a DECLARED polygon the givens force flat is REFUSED in every builder — a flat line is not a triangle

@@ -149,6 +149,7 @@ describe('#2424 — every surface that names a row reads the one rule', () => {
   it('App.tsx names no row through `spokenFor[...] ?? …` any more', () => {
     const src = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf8');
     expect(src).not.toMatch(/spokenFor\[[^\]]+\]\]?\s*\?\?/);
-    expect(src.match(/rowShownText\(/g)?.length).toBe(3);
+    // the givens list, the shape warning, the narrowing note, and #1863's circle note (ADR-AG-377)
+    expect(src.match(/rowShownText\(/g)?.length).toBe(4);
   });
 });

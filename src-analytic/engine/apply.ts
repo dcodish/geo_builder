@@ -4808,6 +4808,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * «A הקודקוד הימני של האליפסה» · «A הוא הקצה הימני של הציר הגדול» · «A קודקוד האליפסה» (#2616, ADR-AG-353). A side
      * names the vertex; a side on a named axis also asserts that axis's direction; no side is a choice (02c R14).
      */
+    /** «P מרכז האליפסה» (#1863, ADR-AG-377) — THE ellipse's centre named, the vertex rule's path with the one centre role. */
+    case 'ellipse-centre-of': {
+      const host = theEllipse(c, f.src);
+      if (!host.ok) return host;
+      return nameEllipseRole(c, f.id, host.id, [{ k: 'centre' }], undefined, f.src);
+    }
+
     case 'vertex-of': {
       const host = theEllipse(c, f.src);
       if (!host.ok) return host;

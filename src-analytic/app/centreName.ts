@@ -29,7 +29,7 @@ const currentOf = (state: RenameState): Derivation => derive(activeOf(state.line
 
 /** The sentence the gate accepted, or why not — the one path both the name and the swap go through. */
 function recordable(offerId: string, letter: string, state: RenameState, current: Derivation): CentreNameVerdict {
-  const sentence = centreSentenceOf(current.figure, offerId, letter);
+  const sentence = centreSentenceOf(current.figure, offerId, letter, current.construction);
   // the offer went stale under the popover (the centre was named meanwhile) — say so, never guess a circle
   if (!sentence) return { kind: 'refused', error: { key: 'already-named', detail: letter } };
   const v = decideSubmit(sentence, activeOf(state.lines, state.disabled), state.seed, current);
@@ -74,8 +74,8 @@ export function decideCentreSwap(
   const named: RenameState = { ...state, lines: [...state.lines, first.verdict.line] };
   const sv = decideSwap(auto, taken, named);
   if (sv.kind === 'refused') return sv;
-  const { lines, queries, spokenFor, seedNames, segStyle, curveStyle } = sv;
-  return { kind: 'apply', commit: { lines, queries, spokenFor, seedNames, segStyle, curveStyle } };
+  const { lines, queries, spokenFor, seedNames, segStyle, curveStyle, annotations } = sv;
+  return { kind: 'apply', commit: { lines, queries, spokenFor, seedNames, segStyle, curveStyle, ...(annotations ? { annotations } : {}) } };
 }
 
 /** The store actions the dispatch writes through — the real ones, so the locks drive what App drives. */

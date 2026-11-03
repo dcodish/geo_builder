@@ -1110,6 +1110,8 @@ function ellipseRoleAnswer(cv: { a: number; b: number }, role: RoleRef, question
       return { question, value: `${fmt(2 * Math.max(cv.a, cv.b))}, ${fmt(2 * Math.min(cv.a, cv.b))}` };
     case 'focal-distance':
       return { question, value: fmt(2 * Math.sqrt(Math.abs(cv.a * cv.a - cv.b * cv.b))) };
+    case 'centre':
+      return { question, value: pt({ k: 'centre' }) };
     default:
       return { question, value: null };
   }

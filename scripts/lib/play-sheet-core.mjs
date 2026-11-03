@@ -80,8 +80,12 @@ export function validateSheet(sheet, products) {
         c.after.forEach((st, k) => {
           const ok =
             (st && Number.isInteger(st.toggle) && st.toggle >= 1 && Object.keys(st).length === 1) ||
-            (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1);
-          if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> } or { "type": "<utterance>" }`);
+            (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1) ||
+            // #1863: press a button by its exact label (a chip, «בטל»)
+            (st && typeof st.click === 'string' && st.click.trim() !== '' && Object.keys(st).length === 1) ||
+            (st && typeof st.clickOn === 'string' && st.clickOn.trim() !== '' && typeof st.say === 'string' && st.say.trim() !== '' && Object.keys(st).length === 2) ||
+            (st && typeof st.typeInto === 'string' && st.typeInto.trim() !== '' && typeof st.text === 'string' && st.text.trim() !== '' && Object.keys(st).length === 2);
+          if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> }, { "type": "<utterance>" } { "click": "<button label>" }, { "clickOn": "<css>", "say": "<instruction>" } or { "typeInto": "<css>", "text": "…" }`);
         });
     }
     // #2654 (ADR-W-168): the checks that let a 👁 case close without the operator.
@@ -144,7 +148,7 @@ export function caseVerdict(spec, drive) {
 }
 
 /**
- * #1548 — the steps AFTER the typed lines, in order: a row's checkbox, or one more utterance. A
+ * #1548 — the steps AFTER the typed lines, in order: a row's checkbox, a button press (#1863), or one more utterance. A
  * toggle is an instruction, not an utterance, so it never enters a copy-paste block; each typed
  * line keeps its own block so the operator can still paste it.
  */
@@ -153,7 +157,13 @@ const afterSteps = (after) =>
     .map((st) =>
       st.toggle !== undefined
         ? `<p class="step">☐ לחצו על תיבת הסימון בשורה ${esc(st.toggle)} ברשימת הנתונים</p>`
-        : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
+        : st.click !== undefined
+          ? `<p class="step">👆 לחצו על «${esc(st.click)}»</p>`
+          : st.clickOn !== undefined
+          ? `<p class="step">👆 ${esc(st.say)}</p>`
+          : st.typeInto !== undefined
+          ? `<p class="step">⌨ הקלידו ${esc(st.text)} ולחצו Enter</p>`
+          : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
     )
     .join('\n');
 

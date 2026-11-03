@@ -113,7 +113,7 @@ And for the builders whose exam prints no figure:
   | --- | --- |
   | **A measurement the student asked to see** is drawn on the canvas | *"i want to see values on the canvas as well as in the data panel … he can always untick a meansurement he wanted to see"* (#1121) |
   | **Analytic: a circle's centre** is always marked, with its coordinates when known | *"in analytical geo the center is always important … if center is known, put its values."* (ADR-AG-036) |
-  | **Analytic: a parabola's focus and directrix, an ellipse's foci** | *"analytics also address the foci and the מדריך for parabola and elipses"* (B7, #1863; not built yet) |
+  | **Analytic: a parabola's focus and directrix, an ellipse's foci and directrices, on request** | *"analytics also address the foci and the מדריך for parabola and elipses"* (B7, #1863), drawn when the student presses the curve's chip: *"the 9 October four-state control wins"* (2026-10-14; ADR-AG-376) |
   | **3-D: computed coordinates** while the data panel is open | ADR-3D-014 Am. 3 |
   | **Complex: a typed number** shows as typed, and in its polar form in the polar view | D1, 2026-10-07 (#1862) |
 
@@ -264,7 +264,7 @@ And for the builders whose exam prints no figure:
 
 ### Analytic geometry
 - **The exam prints no figure,** so the tool draws the one the question describes. It is built on *"geometry with coordinates, because that is how the bagrut is built"* (ADR-AG-009).
-- **Conic marks.** A circle's centre is always marked (P5 exception). A parabola's focus and directrix, and an ellipse's foci, follow the same rule (#1863).
+- **Conic marks.** A circle's centre is always marked (P5 exception). A parabola's focus and directrix, and an ellipse's foci and directrices, are drawn when the student presses the curve's chip, nothing → directrix → focus → both (2026-10-14, #1863), with their values when the givens determine them. An ellipse the givens make a circle is said to be one (P16).
 - **Formulas, not working.** An asked-for distance or equation shows its formula with this figure's numbers, never the arithmetic (P7).
 - **No checking of answers:** *"I dont want a validation tool"* (ADR-AG-072).
 - **Locus on request.** A locus appears when the student asks for it.

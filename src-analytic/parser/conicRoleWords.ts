@@ -9,4 +9,6 @@ export const CONIC_ROLE_WORDS = {
   distance: 'מרחק',
   ellipseFocus: 'מוקד האליפסה',
   ellipseVertex: 'קודקוד האליפסה',
+  /** #1863 (ADR-AG-377): the centre offer's sentence «<letter> מרכז האליפסה», read back by `readRoleRef`'s `centre` role. */
+  ellipseCentre: 'מרכז האליפסה',
 } as const;

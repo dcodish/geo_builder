@@ -48,7 +48,14 @@ export interface DrawnAnswer {
  * way. The auto-refit effect keys on the box's numbers, so a recomputation that differed in the last
  * bit would re-frame the canvas under a student who had deliberately zoomed.
  */
-export function drawnBox(figure: Figure, figureOwn: Box, answers: readonly DrawnAnswer[]): Box {
+export function drawnBox(
+  figure: Figure,
+  figureOwn: Box,
+  answers: readonly DrawnAnswer[],
+  /** #1863 (ADR-AG-376) — the annotation channel's drawn anchors (a focus, where a directrix crosses its axis). */
+  annotated: readonly { x: number; y: number }[] = [],
+): Box {
   const trace = answers.flatMap((a) => (a.shown && a.locus ? a.locus.components.flatMap((cp) => cp.points) : []));
-  return trace.length === 0 ? figureOwn : viewBox(figure, 0.15, trace);
+  const extra = [...trace, ...annotated];
+  return extra.length === 0 ? figureOwn : viewBox(figure, 0.15, extra);
 }
