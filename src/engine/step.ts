@@ -8,6 +8,7 @@
  */
 
 import { engineErrorDebugText } from './errors';
+import { statedSegmentRatio, statedSegmentT } from './verify';
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
@@ -1514,7 +1515,14 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     if (!constrained && (constrained = reinterpretAsCollinear(prev, ncmd, prevPositions))) trace.push('m1:collinear');
     if (!constrained && (constrained = replaceCyclicForDiameter(prev, ncmd))) trace.push('m1:cyclic-diameter');
     if (!constrained && (constrained = reinterpretDiameter(prev, ncmd))) trace.push('m1:diameter');
-    if (constrained) return solveReinterpreted(prev, constrained, prevPositions, trace);
+    if (constrained) {
+      const res = solveReinterpreted(prev, constrained, prevPositions, trace);
+      const tail = res.ok ? statedRatioTail(constrained, ncmd) : null;
+      if (!res.ok || !tail) return res;
+      const r2 = applyStepLadder(res.construction, tail);
+      if (r2.ok) return { ...r2, ladder: [...(res.ladder ?? []), 'm1:stated-ratio', ...(r2.ladder ?? [])] };
+      return { ...r2, construction: prev, positions: prevPositions, ladder: [...(res.ladder ?? []), 'm1:stated-ratio', ...(r2.ladder ?? [])] };
+    }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions, ladder: ['m1:conflict-refuse'] };
   }
 
@@ -2441,8 +2449,14 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
   if (cmd.id === cmd.a || cmd.id === cmd.b) return null; // "A on AB" is malformed → the plain conflict
   const existing = prev.objects.find((o) => o.id === cmd.id);
   if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
+  // #2591 (ADR-773): a STATED position («D מחלקת את AB ביחס 1:2», the prose «היחס בין AD ל-DB הוא 1:2», «D על AB
+  // ב-0.3») is part of the statement and survives the lowering in every branch — M1 keeps everything it states.
+  const statedT = statedSegmentT(cmd);
+  const solveOf = (existing as { solve?: SolveDirective }).solve;
   if (
     !cmd.extension &&
+    !(statedT !== undefined && solveOf) && // a point already carrying a directive keeps it: the ratio follows as its own step (statedRatioTail)
+    existing.kind === 'free-point' &&
     existing.kind === 'free-point' &&
     !existing.pinned &&
     !(existing as { rigid?: boolean }).rigid &&
@@ -2458,8 +2472,14 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
     // inscription's seat put it there), where the statement already holds and moving P would make the figure jump
     const onSpan = P && A && B && L > 1e-12 && proj > 0 && proj < 1 && Math.abs((P.x - A.x) * (B.y - A.y) - (P.y - A.y) * (B.x - A.x)) / L < 1e-7;
     const t = onSpan ? proj : Math.min(0.88, Math.max(0.12, proj));
+    // a stated t is the rider the same command builds on a blank page — fixed, not a free DOF (ADR-052: a default
+    // yields to a statement, so D moving to the stated ratio IS the statement, not a jump)
     const objects = prev.objects.map((o) =>
-      o.id === cmd.id ? ({ kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t, free: true, ...(solve ? { solve } : {}) } as GeoObject) : o,
+      o.id === cmd.id
+        ? ((statedT !== undefined
+            ? { kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t: statedT }
+            : { kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t, free: true, ...(solve ? { solve } : {}) }) as GeoObject)
+        : o,
     );
     return { objects, constraints: [...prev.constraints] };
   }
@@ -2485,6 +2505,20 @@ function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<
   const constraints = [...next.constraints];
   addCollinearOrder(objects, constraints, cmd.extension ? [cmd.a, cmd.b, cmd.id] : [cmd.a, cmd.id, cmd.b]);
   return { objects, constraints };
+}
+
+/** #2591 (ADR-773): the ratio a stated t still owes after the M1 lowering. The free branch re-homes the point as the
+ *  fixed rider the same command builds on a blank page, so nothing is owed. Every other branch (a derived point, a
+ *  pinned one, one already carrying a directive) lowers only the membership, and the stated position then follows as
+ *  the ratio the colon form «D על AB כך ש-AD:DB = p:q» states, `|a·id| = t/(1−t)·|id·b|`, applied as its OWN step through
+ *  the same `set-ratio` command: a point that can move is driven by the existing ratio machinery, and one that cannot (a
+ *  midpoint) meets the colon form's own over-constrained verdict, naming the ratio. One encoding of a ratio, never two. */
+function statedRatioTail(constrained: Construction, cmd: Command): Command | null {
+  const statedT = statedSegmentT(cmd);
+  if (statedT === undefined || cmd.type !== 'point-on-segment') return null;
+  const o = constrained.objects.find((x) => x.id === cmd.id) as { kind?: string; t?: number; free?: boolean } | undefined;
+  if (o?.kind === 'on-segment' && !o.free && o.t === statedT) return null; // re-homed at the stated t
+  return { type: 'set-ratio', a: cmd.a, b: cmd.id, c: cmd.id, d: cmd.b, k: statedSegmentRatio(statedT) };
 }
 
 const centroid = (ps: Vec[]): Vec => ({

@@ -2247,3 +2247,7 @@ over all four (ADR-041).
 ### `incircle-given-only-an-excircle-meets-2538` — «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «AB = 4»: never green, never drawn outside (#2538, ADR-763)
 
 **Guards against:** «AB = 4», which only an excircle can meet, committed green with O outside the triangle. **Asserts** (ADR-W-158: what must never happen) the line is not green and the circle is drawn inside at seeds 0 and 1. The interim answer (waiting for givens, operator ruling 2026-10-28) is deliberately not asserted; #2572 tightens it to a refusal.
+
+### `divides-existing-point-2591` — «נקודה D» · «D מחלקת את AB ביחס 1:2»: D at the stated ratio; a midpoint that divides 1:2 is refused (#2591, ADR-773)
+
+**Guards against:** a stated ratio given to an existing point dropped by the M1 lowering: D drawn at AD/DB = 0.14, green, and «D אמצע AB» · «D מחלקת את AB ביחס 1:2» committed green with D at the midpoint. **Asserts** every step green and AD/DB = 0.5; on «משולש ABC» · «D אמצע AB» the divider line is refused by the engine, naming «|AD| = 0.5·|DB|» as the colon form does. The class matrix is `src/engine/__tests__/existing-point-stated-t-2591.test.ts`.

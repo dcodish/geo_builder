@@ -1592,7 +1592,12 @@ one; the first two points keep their places. A declared polygon that a step's so
 free vertices (no constraint, no directive, not pinned), tries the sampler's positions for those vertices before the
 refusal (`freeVertexRestart`, LADDER 2h″); forced flatness is refused earlier (0h) and incidence-forced flatness
 finds no start.
-`reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`.
+`reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`. A **stated** position survives the
+lowering in every branch ([ADR-773](06-decisions.md#adr-773), #2591): a free point is re-homed as the fixed rider the same
+command builds on a blank page (`t` as stated, not `free`), and any other point gets the membership and then the colon
+form's `set-ratio` as its own step (`statedRatioTail`), so one encoding of a ratio serves both spellings. The verifier's
+`point-on-segment` row checks a stated `t` (`statedSegmentT`, strictly inside the span, never an extension's default)
+as that ratio, so a lowering that drops it reads amber, never green.
 
 ### A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
 
