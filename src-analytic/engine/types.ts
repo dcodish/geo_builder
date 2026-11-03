@@ -959,7 +959,12 @@ export type GeoObject =
    * `helper` (#2583, ADR-AG-345) — a point the tool needs and nobody drew (a perpendicular bisector's midpoint): placed
    * for what is built through it, never drawn, lettered or listed. Its id is `toolLetters.helperId`, the one source.
    */
-  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true }
+  /**
+   * `tool` (#2674, ADR-AG-387) — the letter is the TOOL's (a median's M, an altitude's H, a canonical centre's O) and no
+   * sentence since has typed it. A student's fresh letter deriving the same point takes it over (M1, ONE POSITION, ONE
+   * NAME); the first sentence that types the letter makes it the student's (`foldPass`), and the mark is dropped.
+   */
+  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true; tool?: true }
   /**
    * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
    *

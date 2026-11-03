@@ -1420,6 +1420,14 @@ straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name fo
 returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
 refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
 
+**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), #2674). A derived point the
+tool lettered is applied with `auto`, and its object carries `tool`. That covers a fresh mint in `resolveToolLetters`,
+a `toolFoot` cevian and the canonical centre. `foldPass` drops the mark when a fact's sentence types the letter
+(`typedLetters`). ONE POSITION, ONE NAME then treats a `tool` holder as it treats a helper: a student's derivation of
+the same point renames it (`renamePoint`, segments re-keyed), with effect `narrowed`. A student-named cevian foot over
+a `tool` point is lowered to that derived foot, so the same arm renames it. A holder the student lettered still mints
+the second point, and the notice reads the pair.
+
 A crossing on an existing point was refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
