@@ -490,6 +490,12 @@ const SEEDED: SeededCorpus = {
   // in blank-canvas-drive-2609.test.ts.
   'blank-area-triangle-2609.geo3.json': ['שטח המשולש ABC = 4.5'],
   'blank-line-parallel-plane-2609.geo3.json': ['AB∥ACD'],
+  // #2610 (ADR-3D-409) — a face, or a plane named by four letters, over letters a blank canvas lacks: created in one
+  // plane (before: refused «segments-do-not-meet» / «not-coplanar»). The coplanarity, the notice and the controls are
+  // asserted in coplanar-mint-2610.test.ts.
+  'face-diagonals-blank-2610.geo3.json': ['O מפגש האלכסונים של הפאה ABCD'],
+  'plane-cut-four-letters-blank-2610.geo3.json': ["ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'"],
+  'projection-on-four-letter-plane-blank-2610.geo3.json': ['BE היטל הישר TB על המישור ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

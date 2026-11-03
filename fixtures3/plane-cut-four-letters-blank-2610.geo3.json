@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T09:14:22.032Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "BC'D",
+          "ids": [
+            "B",
+            "C'",
+            "D"
+          ]
+        },
+        {
+          "type": "plane-through",
+          "name": "BCC'B'",
+          "ids": [
+            "B",
+            "C",
+            "C'",
+            "B'"
+          ]
+        },
+        {
+          "type": "plane-plane-line",
+          "name": "ℓ",
+          "p1": "BC'D",
+          "p2": "BCC'B'"
+        }
+      ]
+    }
+  ]
+}

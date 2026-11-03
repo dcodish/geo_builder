@@ -1243,6 +1243,22 @@ export function solidDeclaration3(noun: Exclude<SolidNoun, 'any'>, ids: readonly
   const declared = new Set(r.commands.flatMap((k) => (k.type === 'solid' ? k.ids : [])));
   return ids.every((x) => declared.has(x)) ? r.commands : null;
 }
+/**
+ * #2610 ([ADR-3D-409](../../docs/06b-decisions-3d.md#adr-3d-409)) — WHAT A FACE OR POLYGON NAMED BY ITS LETTERS
+ * DECLARES: the flat polygon declaration of the run («הפאה ABCD» / «המרובע ABCD» → what «מרובע ABCD» builds). The mint
+ * pass applies it when a line names a face over letters the figure lacks — the ADR-3D-399 solid shape, polygon edition.
+ * Read through this parser, so the polygon is exactly the one the student typing the declaration gets. A run the
+ * polygon grammar does not declare (six letters and more) declares nothing.
+ */
+const POLYGON_DECLARATION_HE: Record<number, string> = { 4: 'מרובע', 5: 'מחומש' };
+export function polygonDeclaration3(ids: readonly Id[]): Command3[] | null {
+  const noun = POLYGON_DECLARATION_HE[ids.length];
+  if (!noun) return null;
+  const r = parse3(`${noun} ${ids.join('')}`);
+  if (!r.ok || r.commands.length === 0 || !r.commands.every((k) => k.type === 'solid')) return null;
+  const declared = r.commands.flatMap((k) => (k.type === 'solid' ? k.ids : []));
+  return declared.join(',') === ids.join(',') ? r.commands : null;
+}
 const NOUN_HE = SOLID_NOUNS_HE.map(([src]) => src).join('|');
 export const NOUN_EN = SOLID_NOUNS_EN.map(([src]) => src).join('|');
 

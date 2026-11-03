@@ -32,10 +32,6 @@ const STILL_FAILS: Record<string, string> = {
   // a crossing placed off the segment, and the right-pyramid point's own no-solution: not a drive decision
   "הישר A'C חותך את המישור BC'D בנקודה K": '#2609',
   'T על הקטע SC כך ש-TABCD היא פירמידה ישרה': '#2609',
-  // #2610 — a face or plane named by four letters creates four points that are not in one plane (C3)
-  'O מפגש האלכסונים של הפאה ABCD': '#2610',
-  "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'": '#2610',
-  'BE היטל הישר TB על המישור ABCD': '#2610',
   // #2611 — «D על המעגל» creates no circle (C6)
   'D על המעגל': '#2611',
   // #2563 — a new point with letter coordinates
