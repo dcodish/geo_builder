@@ -131,6 +131,12 @@ export interface ScenePoint {
    * shows its name alone (operator ruling, 2026-09-15).
    */
   coords?: [ScenePart, ScenePart];
+  /**
+   * #2691 (ADR-AG-389) — WHERE THE LETTER IS WRITTEN: the start of its text and its baseline, chosen by
+   * {@link placePointLetters} clear of every drawn line, dot and other letter. Absent on a point built outside
+   * `buildScene` (a test's bare point): the letter then sits at the old fixed offset up-right of the dot.
+   */
+  at?: { x: number; y: number };
 }
 
 /** A drawn straight piece — a stated segment or one side of a polygon (#1028), in SCREEN space. */
@@ -204,8 +210,13 @@ export interface LabelBox {
  */
 const textWidth = (chars: number, font: number): number => Math.max(1, chars) * font * 0.6;
 
-/** The box a point's label covers: name, then its stated coordinates when it has any (subscripts at 9px). */
-export function pointLabelBox(p: ScenePoint): LabelBox {
+/** Where a point's label text starts and its baseline — the placed position, else the fixed offset (#2691). */
+export function pointLabelAnchor(p: ScenePoint): { x: number; y: number } {
+  return p.at ?? { x: p.cx + POINT_LABEL.dx, y: p.cy + POINT_LABEL.dy };
+}
+
+/** A point label's width, and whether a subscript deepens it. */
+function pointLabelSize(p: ScenePoint): { w: number; sub: boolean } {
   const f = POINT_LABEL.font;
   let w = textWidth(p.label.length, f);
   let sub = false;
@@ -220,8 +231,14 @@ export function pointLabelBox(p: ScenePoint): LabelBox {
       }
     }
   }
-  const x0 = p.cx + POINT_LABEL.dx;
-  const base = p.cy + POINT_LABEL.dy;
+  return { w, sub };
+}
+
+/** The box a point's label covers: name, then its stated coordinates when it has any (subscripts at 9px). */
+export function pointLabelBox(p: ScenePoint): LabelBox {
+  const f = POINT_LABEL.font;
+  const { w, sub } = pointLabelSize(p);
+  const { x: x0, y: base } = pointLabelAnchor(p);
   return { x0, y0: base - f * 0.8, x1: x0 + w, y1: base + f * 0.25 + (sub ? 3 : 0) };
 }
 
@@ -252,6 +269,133 @@ const crosses = (l: ScreenLine, b: LabelBox): boolean => {
   }
   return true;
 };
+
+/** The clear air between a point's dot and its letter box, and the second, farther ring tried when the first is full. */
+const LETTER_GAP = 5;
+const LETTER_RING2 = 9;
+/** Candidate directions around the dot — 2-D's 24 (`chooseLabelDirs` in `src/render/Figure.tsx`). */
+const LETTER_DIRS = 24;
+/** A drawn line counts as passing THROUGH a dot within this many px (a polyline's chord, a rounded endpoint). */
+const ON_DOT = 1.5;
+
+/** The bisector of the widest angular gap between the directions — 2-D's `outwardDir` (`src/render/scene.ts`). */
+function widestGap(dirs: readonly { x: number; y: number }[]): number {
+  // no incident line: up-right on screen, 2-D's default (its world up-right, Y-flipped)
+  if (dirs.length === 0) return -Math.PI / 4;
+  const angles = dirs.map((d) => Math.atan2(d.y, d.x)).sort((p, q) => p - q);
+  let bestStart = angles[0];
+  let bestGap = -1;
+  for (let i = 0; i < angles.length; i += 1) {
+    const a1 = i + 1 < angles.length ? angles[i + 1] : angles[0] + 2 * Math.PI;
+    if (a1 - angles[i] > bestGap) {
+      bestGap = a1 - angles[i];
+      bestStart = angles[i];
+    }
+  }
+  return bestStart + bestGap / 2;
+}
+
+/** Distance from a point to a screen segment, and where along it (0…1) the foot falls. */
+function footOn(p: { x: number; y: number }, l: ScreenLine): { d: number; t: number } {
+  const dx = l.x2 - l.x1;
+  const dy = l.y2 - l.y1;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - l.x1) * dx + (p.y - l.y1) * dy) / len2)) : 0;
+  return { d: Math.hypot(p.x - (l.x1 + t * dx), p.y - (l.y1 + t * dy)), t };
+}
+
+/**
+ * WHERE A POINT'S LETTER IS WRITTEN (#2691, ADR-AG-389) — 2-D's point-label rule (`outwardDir` in
+ * `src/render/scene.ts` seeds it, `chooseLabelDirs` in `src/render/Figure.tsx` turns it off the lines), measured
+ * against boxes because a letter here carries its stated coordinates and can be many glyphs wide.
+ *
+ * Operator, 2026-11-03: *"points C and D are not located correctly and are on the line instead of next to it"*. The
+ * letter used to sit at a fixed offset up-right of its dot, so it landed on any line that left the dot up and to the
+ * right — side BC from C, and BC again through its midpoint D. **The class: a point letter was never placed.** Now:
+ *
+ * 1. The SEED direction is the bisector of the widest gap between the lines at the dot — every drawn segment ending
+ *    there, and both ways along every line, curve or segment passing through it (up-right when there is none).
+ * 2. The candidates are the 24 directions turned from the seed, nearest turn first, on a near ring and then a
+ *    farther one. Each puts the letter's BOX just clear of the dot along that direction.
+ * 3. The first candidate whose box crosses no drawn line, covers no other dot and no letter already placed, and
+ *    keeps off the axis furniture and the canvas edge, wins; failing that, the first clear of the drawn lines, dots
+ *    and letters alone; failing that, the one with the fewest collisions (the letter is never dropped).
+ *
+ * Letters are placed in screen order (x, then y — 2-D's order), each yielding to those before it. The value labels
+ * (`placeSceneLabels`) are placed AFTER, around the letters.
+ */
+export function placePointLetters(
+  points: readonly ScenePoint[],
+  ink: readonly ScreenLine[],
+  soft: readonly LabelBox[],
+  soft2: readonly ScreenLine[],
+  size: { width: number; height: number },
+): ScenePoint[] {
+  const f = POINT_LABEL.font;
+  const placed: LabelBox[] = [];
+  const at = new Map<ScenePoint, { x: number; y: number }>();
+  const dots = points.map((p) => ({ p, box: { x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 } }));
+  const order = [...points].sort((a, b) => a.cx - b.cx || a.cy - b.cy);
+  for (const p of order) {
+    const { w, sub } = pointLabelSize(p);
+    const h = f * 1.05 + (sub ? 3 : 0);
+    const reachOf = Math.hypot(w, h) + LETTER_RING2 + 4;
+    const near = (l: ScreenLine) =>
+      Math.min(l.x1, l.x2) <= p.cx + reachOf && Math.max(l.x1, l.x2) >= p.cx - reachOf &&
+      Math.min(l.y1, l.y2) <= p.cy + reachOf && Math.max(l.y1, l.y2) >= p.cy - reachOf;
+    const local = ink.filter(near);
+    const localSoft = soft2.filter(near);
+    // 1. the lines at the dot
+    const dirs: Array<{ x: number; y: number }> = [];
+    for (const l of local) {
+      const { d, t } = footOn({ x: p.cx, y: p.cy }, l);
+      if (d > ON_DOT) continue;
+      const len = Math.hypot(l.x2 - l.x1, l.y2 - l.y1);
+      if (len < 1e-9) continue;
+      const u = { x: (l.x2 - l.x1) / len, y: (l.y2 - l.y1) / len };
+      const atStart = t * len <= ON_DOT;
+      const atEnd = (1 - t) * len <= ON_DOT;
+      if (!atStart) dirs.push({ x: -u.x, y: -u.y });
+      if (!atEnd) dirs.push(u);
+    }
+    const seed = widestGap(dirs);
+    const others = dots.filter((o) => o.p !== p && Math.hypot(o.p.cx - p.cx, o.p.cy - p.cy) > 1e-6).map((o) => o.box);
+    // 2. the candidates, nearest turn first
+    const cands: LabelBox[] = [];
+    for (const gap of [LETTER_GAP, LETTER_RING2]) {
+      for (let k = 0; k < LETTER_DIRS; k += 1) {
+        const turn = k === 0 ? 0 : (Math.ceil(k / 2) * (k % 2 === 1 ? 1 : -1) * 2 * Math.PI) / LETTER_DIRS;
+        const th = seed + turn;
+        const d = { x: Math.cos(th), y: Math.sin(th) };
+        const reach = gap + (w / 2) * Math.abs(d.x) + (h / 2) * Math.abs(d.y);
+        const c = { x: p.cx + d.x * reach, y: p.cy + d.y * reach };
+        cands.push({ x0: c.x - w / 2, y0: c.y - h / 2, x1: c.x + w / 2, y1: c.y + h / 2 });
+      }
+    }
+    const hardHits = (b: LabelBox) =>
+      local.filter((l) => crosses(l, b)).length + others.filter((o) => overlaps(o, b)).length + placed.filter((o) => overlaps(o, b)).length;
+    const softClear = (b: LabelBox) =>
+      !soft.some((o) => overlaps(o, b)) && !localSoft.some((l) => crosses(l, b)) &&
+      b.x0 >= 0 && b.y0 >= 0 && b.x1 <= size.width && b.y1 <= size.height;
+    // 3. clear of everything, else of the drawn figure, else the fewest collisions
+    let best = cands.find((b) => hardHits(b) === 0 && softClear(b)) ?? cands.find((b) => hardHits(b) === 0);
+    if (!best) {
+      let fewest = Infinity;
+      for (const b of cands) {
+        const n = hardHits(b);
+        if (n < fewest) {
+          fewest = n;
+          best = b;
+        }
+      }
+    }
+    const b = best ?? cands[0];
+    placed.push(b);
+    // the box is the 0.8/0.25 em split around the baseline (`pointLabelBox`), so the baseline sits 0.8 em below its top
+    at.set(p, { x: b.x0, y: b.y0 + f * 0.8 });
+  }
+  return points.map((p) => ({ ...p, at: at.get(p) }));
+}
 
 /** The clear gap between a segment and its length label, and the step taken outward while the label still collides. */
 const LENGTH_GAP = 4;
@@ -612,16 +756,24 @@ export function buildScene(
    * the student sees shows what the student asked for. This is the renderer's own decision, which
    * is why it lives here and not in `evaluate`.
    */
+  /** #2691: every straight piece of drawn ink, in screen space — what a point's letter must not sit on. */
+  const drawnInk: ScreenLine[] = [];
+  const inkRun = (pts: ReadonlyArray<readonly [number, number]>, lift?: ReadonlySet<number>) => {
+    for (let i = 1; i < pts.length; i += 1) {
+      if (lift?.has(i)) continue;
+      drawnInk.push({ x1: pts[i - 1][0], y1: pts[i - 1][1], x2: pts[i][0], y2: pts[i][1] });
+    }
+  };
   const curves: SceneCurve[] = fig.curves.filter((c) => c.stated).map((c) => {
     const ink = curveInk(c.curve.kind, knows.curveStyle?.[c.id]);
+    const screen = polylines(c.curve, box).map((pl) => pl.map(([x, y]) => [t.sx(x), t.sy(y)] as const));
+    if (ink === 'solid' || ink === 'dashed') for (const pl of screen) inkRun(pl);
     return {
       id: c.id,
       kind: c.curve.kind,
       name: c.label.name,
       ink,
-      d: polylines(c.curve, box)
-        .map((pl) => pl.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${t.sx(x).toFixed(2)},${t.sy(y).toFixed(2)}`).join(''))
-        .join(' '),
+      d: screen.map((pl) => pl.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('')).join(' '),
       /**
        * The centre is marked whenever there IS one, and labelled only when it is knowledge (#1024).
        *
@@ -700,11 +852,15 @@ export function buildScene(
   const arcs: SceneArc[] = (fig.arcs ?? []).map((a) => {
     const n = Math.max(2, Math.ceil((Math.abs(a.sweep) / (2 * Math.PI)) * ARC_STEPS));
     const pts: string[] = [];
+    const run: Array<readonly [number, number]> = [];
     for (let i = 0; i <= n; i += 1) {
       const th = a.start + (a.sweep * i) / n;
-      pts.push(`${t.sx(a.cx + a.r * Math.cos(th)).toFixed(2)},${t.sy(a.cy + a.r * Math.sin(th)).toFixed(2)}`);
+      run.push([t.sx(a.cx + a.r * Math.cos(th)), t.sy(a.cy + a.r * Math.sin(th))]);
+      pts.push(`${run[i][0].toFixed(2)},${run[i][1].toFixed(2)}`);
     }
     const centre = `${t.sx(a.cx).toFixed(2)},${t.sy(a.cy).toFixed(2)}`;
+    const c0 = [t.sx(a.cx), t.sy(a.cy)] as const;
+    inkRun(a.radii ? [c0, ...run, c0] : run);
     const d = a.radii ? `M${centre}L${pts.join('L')}L${centre}` : `M${pts.join('L')}`;
     return { id: a.id, d };
   });
@@ -722,7 +878,7 @@ export function buildScene(
     feet: c.feet.map((f) => ({ cx: t.sx(f.x), cy: t.sy(f.y) })),
   }));
 
-  const points: ScenePoint[] = fig.points.map((p) => {
+  const bare: ScenePoint[] = fig.points.map((p) => {
     const prov = fig.provenance[p.id];
     /**
      * A STATED EXPRESSION BEATS THE INVENTED SYMBOL (#1230).
@@ -787,6 +943,32 @@ export function buildScene(
         { x0: colR - textWidth(colW, tf), y0: -FAR, x1: colR, y1: FAR },
       ]
     : [{ x0: colR - textWidth(1, tf), y0: rowY - tf * 0.8, x1: colR, y1: rowY + tf * 0.25 }];
+  /**
+   * #2691 (ADR-AG-389): the point LETTERS are placed now — before every value label, which then keeps clear of them.
+   * Hard ink: every inked segment, curve and arc, the always-drawn extensions, the answered perpendiculars and the
+   * traced loci. Kept off where possible: the axis lines and their number rows, a circle's centre cross and its
+   * label, a crossing's offer ring, the dotted construction behind «הצג בנייה».
+   */
+  for (const s of projected) if (s.ink !== 'ghost') drawnInk.push(s);
+  for (const e of fig.extensions ?? []) drawnInk.push({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) });
+  for (const m of knows.marks ?? []) drawnInk.push({ x1: t.sx(m.from.x), y1: t.sy(m.from.y), x2: t.sx(m.foot.x), y2: t.sy(m.foot.y) });
+  for (const l of knows.loci ?? []) if (l.points.length >= 2) inkRun(l.points.map((q) => [t.sx(q.x), t.sy(q.y)] as const), new Set(l.starts ?? []));
+  const softBoxes: LabelBox[] = [...furniture];
+  for (const c of curves) {
+    if (!c.centre) continue;
+    softBoxes.push({ x0: c.centre.cx - 5, y0: c.centre.cy - 5, x1: c.centre.cx + 5, y1: c.centre.cy + 5 });
+    if (c.centre.label) {
+      const y = c.centre.cy - 7;
+      softBoxes.push({ x0: c.centre.cx + 7, y0: y - POINT_LABEL.font * 0.8, x1: c.centre.cx + 7 + textWidth(c.centre.label.replace(/[⁦-⁩]/g, '').length, POINT_LABEL.font), y1: y + POINT_LABEL.font * 0.25 });
+    }
+  }
+  for (const k of knows.crossings ?? []) softBoxes.push({ x0: t.sx(k.x) - 7, y0: t.sy(k.y) - 7, x1: t.sx(k.x) + 7, y1: t.sy(k.y) + 7 });
+  const softLines: ScreenLine[] = [
+    { x1: -FAR, y1: xAxisY, x2: FAR, y2: xAxisY },
+    { x1: yAxisX, y1: -FAR, x2: yAxisX, y2: FAR },
+    ...construction.flatMap((c) => c.lines),
+  ];
+  const points = placePointLetters(bare, drawnInk, softBoxes, softLines, { width, height });
   const labelled = projected.filter((s) => s.label);
   // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
   // one placement keeps every stated value clear of every other (#1717's rule, one path).

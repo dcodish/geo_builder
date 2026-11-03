@@ -1667,6 +1667,14 @@ An injected isolator can be forgotten, so the kit lives in `i18n/bidi.ts`, re-ex
 `placeLengthLabels` places each stated length outward from its midpoint until clear (2-D's rule, copied), sharing
 `POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`.
 
+#### Where a point's letter is written ([ADR-AG-389](06c-decisions-analytic.md#adr-ag-389), #2691)
+
+`placePointLetters` runs in `buildScene` before `placeSceneLabels`: 2-D's seed (`outwardDir`, the widest gap between the
+lines at the dot) and 2-D's 24 turned directions (`chooseLabelDirs`), each a letter BOX just clear of the dot; the first
+clear of drawn ink, other dots and earlier letters (then, softly, the axes, centre marks, offer rings, construction and edge)
+wins. The result is `ScenePoint.at`; `pointLabelAnchor` / `pointLabelBox` read it, so `Figure.tsx` and the value placement
+agree on where a letter is.
+
 ### The stated-measure layer ([ADR-AG-225](06c-decisions-analytic.md#adr-ag-225), #1714)
 
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality (two plain lengths, an `angle-ratio` with k = 1) draws no tick or arc at rest; it stays in the givens list, drawn only in an opt-in relations layer. The text below describes the code until that ships.
