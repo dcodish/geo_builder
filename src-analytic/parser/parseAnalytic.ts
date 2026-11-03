@@ -4703,9 +4703,14 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
     ...(maker?.t === 'curve' ? [{ t: 'circle-eq' as const, circleId: CIRCLE_SENTINEL, eq: maker.curve.eq, src: line }] : []),
     ...shape.vertices.map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: CIRCLE_SENTINEL }, src: line })),
   ];
+  /*
+   * An UNDESCRIBED circle (no tail) carries its ring (#2130/#2376, ADR-AG-386): M1 binds the figure's one circle only
+   * when a vertex is new, or when that circle already carries every vertex — 2-D's rule (ADR-156) — and otherwise
+   * takes the creation. The definite «המעגל» sentences (ADR-AG-196 (a)/(c)/(d)) carry no ring and keep their binding.
+   */
   return made([
     ...ringFacts,
-    { t: 'the-circle', create: created, about, ...(match ? { match } : {}), src: line },
+    { t: 'the-circle', create: created, about, ...(match ? { match } : { ring: { vertices: [...shape.vertices] } }), src: line },
   ]);
 }
 

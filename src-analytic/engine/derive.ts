@@ -17,7 +17,7 @@ import { resolveToolLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
-import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, tangentLineId, type Construction, type Fact } from './types';
+import { EMPTY_CONSTRUCTION, circleDefPoints, diameterCircleId, factsWithin, namesObject, objectById, tangentLineId, type Construction, type Fact } from './types';
 import { SOLVE_RESOLUTION, sameConstraint, type Constraint } from './solve';
 import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
@@ -1173,7 +1173,23 @@ function nameCanonicalCentres(
   const isCircleFactShallow = (f: Fact): boolean =>
     f.t === 'circle-at' || f.t === 'circle-thru' || f.t === 'diameter-of' || (f.t === 'curve' && f.curve.kind === 'circle');
   /** Will this `the-circle` CREATE, given what precedes it? A static reading of M1's `theCircle`. */
-  const willCreate = (f: Extract<Fact, { t: 'the-circle' }>, before: readonly Fact[]): boolean => {
+  const willCreate = (f: Extract<Fact, { t: 'the-circle' }>, before: readonly Fact[], earlier: readonly Fact[]): boolean => {
+    /*
+     * An undescribed inscription over vertices earlier lines mention (#2130/#2376, ADR-AG-386): it states its own circle
+     * unless a circle before it already carries every vertex (a defining point or a stated incidence) — M1's rule.
+     */
+    if (!f.match && f.ring && f.ring.vertices.every((v) => earlier.some((g) => JSON.stringify(g).includes(JSON.stringify(v))))) {
+      const vs = f.ring.vertices;
+      const carries = (id: string) =>
+        vs.every((v) =>
+          before.some(
+            (g) =>
+              (g.t === 'circle-thru' && g.id === id && g.def.t !== 'incircle' && circleDefPoints(g.def).includes(v)) ||
+              (g.t === 'constraint' && g.k.t === 'on-curve' && g.k.id === v && g.k.curve === id),
+          ),
+        );
+      return !before.some((g) => isCircleFactShallow(g) && 'id' in g && carries(g.id));
+    }
     if (!f.match) return !before.some(isCircleFactShallow);
     if ('eq' in f.match) {
       const made = f.create.find((g) => g.t === 'curve');
@@ -1184,7 +1200,7 @@ function nameCanonicalCentres(
   const predicted: Fact[] = [];
   const creates = new Set<number>();
   facts.forEach((f, i) => {
-    if (f.t === 'the-circle' && willCreate(f, predicted)) {
+    if (f.t === 'the-circle' && willCreate(f, predicted, facts.filter((_, j) => j < i && owner[j] !== owner[i]))) {
       creates.add(i);
       predicted.push(...f.create);
     } else predicted.push(f);

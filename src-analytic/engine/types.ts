@@ -752,7 +752,19 @@ export type Fact =
    * states TANGENT TO EVERY SIDE of that ring (the touch sentence typed first created it) is this circle; with
    * none, the sentence states the computed incircle as before.
    */
-  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] } })
+  /*
+   * `ring` (#2130/#2376, ADR-AG-386; 2-D's `boundInscribeCircle` + `reusedInscribeCircle`, ADR-156) — an UNDESCRIBED
+   * inscription («ABC חסום במעגל», «מעגל חוסם את ABC»): the ring whose vertices the sentence puts on the circle. When
+   * every vertex was in the figure before the sentence (`held`, written by the fold, never by the parser), the
+   * contextual circle is bound only if it already carries every vertex; otherwise the sentence states its own circle.
+   */
+  | (FactBase & {
+      t: 'the-circle';
+      create: Fact[];
+      about: Fact[];
+      match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] };
+      ring?: { vertices: Id[]; held?: true };
+    })
   /**
    * «משוואת המעגל היא …» about a circle the figure ALREADY HAS (#1633, ADR-AG-196) — a statement about it,
    * never a second circle: an equation circle must be this equation (else `conflicting-restatement`), a circle

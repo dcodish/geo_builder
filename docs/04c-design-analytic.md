@@ -992,7 +992,11 @@ constraint, `circle-conic { circle: CircleSide, curve, rel }`:
 `the-circle { create, about, match? }` is the one contextual-circle fact; M1's `theCircle(c, match)` binds, creates or
 refuses; `circle-eq { circleId, eq }` states an equation about it.
 
-*Identifiers:* `CIRCLE_SENTINEL` · `match.centre` · `match.eq` · `applyAll` · `resolveCurve` · `point(centre, cx, cy)` · `radius-of(circleId, r)` · `factsWithin(f)` · `submit` · `tangent-of { at }`
+**The inscription predicate ([ADR-AG-386](06c-decisions-analytic.md#adr-ag-386), #2130, #2376; 2-D's `boundInscribeCircle` + `reusedInscribeCircle`).** `cyclicFacts` gives an undescribed inscription's `the-circle` a `ring { vertices }`; `foldPass` (`aged`) marks it `held` when every vertex was brought in by another line's committed fact (`objectFact`). `theCircle(c, match, ring)` over held vertices binds the circle that carries every vertex (`onCurveByConstruction`) and otherwise creates; with a new vertex the one/none/several rule stands. `nameCanonicalCentres`' static `willCreate` mirrors it on the fact list.
+
+**The arc names the drawn circle by use (ADR-AG-386; 2-D's ADR-748 §5).** `arcHost(c, name, f, ends)` asks `arcNamesByUse` before `statingNamedCircle`: a fresh point letter, beside the unnamed circles (`centreIdOf` null) carrying every end, names the one such circle by its centre (`namingByOrder`); several → `noHost`; none → the circle is stated as before.
+
+*Identifiers:* `CIRCLE_SENTINEL` · `match.centre` · `match.eq` · `applyAll` · `resolveCurve` · `point(centre, cx, cy)` · `radius-of(circleId, r)` · `factsWithin(f)` · `submit` · `tangent-of { at }` · `ring.held` · `arcNamesByUse`
 
 ### A circle named by its ring; a diameter on any circle; the panel prints no tool symbol ([ADR-AG-203](06c-decisions-analytic.md#adr-ag-203), #1659, #1665, #1663)
 
