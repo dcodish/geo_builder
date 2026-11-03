@@ -318,7 +318,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   spelling, is still answered as already in the figure.
   A circle draws no plane of its own (#2126, operator 2026-10-15): no patch, no label and no «מישורים» row, as a
   triangle draws none and as in 2-D; a plane is drawn only when the student names it («מישור ABC», «π1»), and then once.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126.
+  **A point stated on the circle is placed on it** (#2611, as in 2-D): after «משולש ABC חסום במעגל», «D על המעגל» /
+  "D is on the circle" puts a new D on the circle (any of the figure's one circle: through a polygon, inside it, or
+  tangent to a line), free to move along it, and «הציגו תצורה אחרת» moves it. A letter an earlier line created as a
+  free point is placed on the circle the same way. A point the figure already places (a vertex, a midpoint) is
+  checked, and refused (today with «D אינה על הישר», the line wording) when it is not on it. With two circles,
+  «המעגל» names neither, as before.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350, ADR-3D-410; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126, #2611.
 - **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's

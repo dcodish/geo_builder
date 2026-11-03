@@ -14283,3 +14283,26 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/converge-1595.test.ts` (the ruling's rows record with the notice; AC' ∩ ADE still refused); `src3d/__tests__/issue-769.test.ts` (the midpoint and the foot flipped, citing the ruling; AC' ∩ ADE, BB' ∩ ABCD and the CC' control unchanged).
 
 **Behaviour change for a student:** «N אמצע AB» after «M אמצע AB», or a height that lands on a vertex, is accepted with «M ו-N נפלו על אותה נקודה.» instead of refused; «G נקודת חיתוך של AC' עם מישור ADE» is still refused naming A.
+
+## ADR-3D-410 — A point stated on a circle rides it: the on-line rider's circle twin (#2611, stage A)
+
+**Status:** accepted · 2026-11-03 · bug (P2, 3-D) · fix round #2678, stream Z · branch `fix/2611-on-circle-rider` · plan of 2026-11-03 on #2611 (`[2-D]` measured at `3225756c`)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 (extended: a point stated on the circle is placed on it) · **Design:** [04b](04b-design-3d.md) § *The sampled-carrier table and the one frame rule* (*The circle rider*) · **LADDER stage:** placement (a new carrier kind; the store's status pass stays the verifier).
+
+**Context.** Measured at `2142a8d1` through `useGeo3.submit`: «משולש ABC חסום במעגל» · «D על המעגל» refused `not-on-line D`; «D על המעגל» on a blank canvas refused `unknown-line circle`. `point-on-circle3` only checked that the point and the circle exist and returned the construction unchanged, so the fold's mint pass made D a `free3` point and the status pass found it off the circle. 2-D at `3225756c` places D on the circumcircle. The line twin was fixed long ago: `on-line` creates a new id as a rider (ADR-3D-031). The circle never got the same shape.
+
+**Decision.**
+1. A point kind `{kind: 'on-circle3', circle}` (`engine/types.ts`): one sampled DOF, the angle in the circle's own frame (`seatOnCircleRider3`, key `oncircle-th-<id>`, stepped clear of placed points like the plane rider, ADR-3D-080). It is resolved from the circle as resolved, so circumcircles, incircles and tangent-line circles are all covered.
+2. `circleGeom3` is the one circle resolver. The post-pivot circle pass and the point pass both call it, so the point pass seats the rider as soon as the circle's own points are placed. A circle whose carrier resolves only later seats its rider after the circle pass. A rider of a free plane's or a free line's circle re-seats with the #557 free-object pass.
+3. A polygon's circle (`ringCircle3`) makes its rider a gauge-frame point (`gaugeFramePoint3`, the on-plane point-run rule) and a drivable row of the carrier table (`carrierParams3`), so it rides the figure's placement and scale with its ring, and a later given on it drives the angle. A tangent-line circle's rider is counted but not driven. The DOF cue counts the angle through the same table.
+4. The `point-on-circle3` arm: a new letter is created as the rider. A `free3` letter an earlier line minted re-homes onto the circle (M1), unless the circle is built from it (`builtFrom3`, a cycle), and the points are re-ordered parents-first (`parentsFirst3`) so the rider and everything built from it follow the circle. Every placed point stays a check. The status pass is the arbiter on final coordinates either way.
+
+**Not built here (stage B).** «D על המעגל» on a blank canvas creating a circle waits on #253's free `Circle3Def`. Today's refusal is kept, and the `'D על המעגל': '#2611'` row of `catalog-blank-canvas-1566.test.ts` stays.
+
+**Sibling products (ADR-W-157).** 2-D is the reference. Analytic: a point on an existing circle already rides it, and the blank-canvas case is #2048 card d5's. Complex: no circle membership of this shape.
+
+**Locks.** `fixtures3/point-on-circumcircle-2611.geo3.json` (the reported two lines). `src3d/__tests__/point-on-circle-2611.test.ts`: D on the circumcircle at seeds 0–3 with a moving angle, the DOF count +1, English, the incircle and the tangent-line circle, a cube-face circle with «AE = 1» driving E, a size given after the rider, a midpoint of the rider, a minted free D re-homed with its midpoint following, a cube vertex off the circle still refused `not-on-line`, a vertex on it kept, a circle's own centre never re-homed, two circles and the blank canvas unchanged.
+
+**Consequences.** `src3d/engine/types.ts` (`on-circle3`, `ringCircle3`, `gaugeFramePoint3`), `src3d/engine/carriers.ts` (the carrier row, `pointParents3` exported, `builtFrom3`), `src3d/engine/evaluate.ts` (`circleGeom3`, `seatOnCircleRider3`, the point-pass arm, the late seat, the #557 re-seat), `src3d/engine/apply.ts` (the arm, `parentsFirst3`).
+
+**Behaviour change for a student:** after a circle is drawn, «D על המעגל» places D on it, and «הציגו תצורה אחרת» moves D along it. Before, it was refused «D אינה על הישר».

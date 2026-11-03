@@ -16,7 +16,7 @@ import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '..
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
-import { carrierParams3, reachesFreeCarrier3, readCoordGiven } from './carriers';
+import { builtFrom3, carrierParams3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecRelCommand } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
@@ -398,6 +398,32 @@ function resolveQuadRing(c: Construction3, face: Id[], errId: Id): { ok: true; f
   const missing = missingPoint(c, ring);
   if (missing) return { ok: false, error: missing };
   return { ok: true, face: ring };
+}
+
+/** #2611: the points a circle of the figure is built from (its ring, its centre, its carrier line's or plane's points). */
+const circleParentIds3 = (c: Construction3, circle: string): Id[] => pointParents3(c, { kind: 'on-circle3', circle });
+
+/**
+ * #2611 (ADR-3D-410) — THE POINT ORDER, PARENTS FIRST. The point pass evaluates in insertion order, so a point re-defined
+ * in place (a minted letter re-homed onto a circle drawn after it) must move behind what it now reads, and every point
+ * built from it behind it in turn. A stable topological order: a figure already in order is returned unchanged.
+ */
+function parentsFirst3(c: Construction3): Construction3 {
+  const order = [...c.points.keys()];
+  const out = new Map<Id, PointDef>();
+  const visiting = new Set<Id>();
+  const visit = (id: Id): boolean => {
+    if (out.has(id)) return true;
+    if (visiting.has(id)) return false; // a cycle — keep the order as it was
+    visiting.add(id);
+    const def = c.points.get(id)!;
+    for (const p of pointParents3(c, def)) if (p !== id && c.points.has(p) && !visit(p)) return false;
+    visiting.delete(id);
+    out.set(id, def);
+    return true;
+  };
+  for (const id of order) if (!visit(id)) return c;
+  return { ...c, points: out };
 }
 
 function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
@@ -3895,13 +3921,30 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
-    // V8-i: `A נמצאת על המעגל` — a verified membership (checked in the store vs the resolved circle).
+    // V8-i: `A נמצאת על המעגל` — a membership, checked in the store against the resolved circle (the arbiter on final
+    // coordinates, whatever the arm below did).
     case 'point-on-circle3': {
-      const missing = missingPoint(c, [cmd.point]);
-      if (missing) return { ok: false, error: missing };
       // '' = the single circle (ADR-029 implicit-reference); a named id must exist
       if (cmd.circle === '' ? c.circles3.length !== 1 : !c.circles3.some((k) => k.id === cmd.circle)) {
         return { ok: false, error: { code: 'unknown-line', id: cmd.circle || 'circle' } };
+      }
+      const circle = cmd.circle === '' ? c.circles3[0] : c.circles3.find((k) => k.id === cmd.circle)!;
+      // #2611 (ADR-3D-410) — the on-line rider's circle twin (ADR-3D-031). A NEW id stated onto the circle is CREATED
+      // riding it (1 sampled DOF); before, the statement was only checked, so the fold's mint pass made the letter a free
+      // point and the check refused a true statement `not-on-line`.
+      if (!c.points.has(cmd.point)) {
+        const next = clone(c);
+        next.points.set(cmd.point, { kind: 'on-circle3', circle: circle.id });
+        return { ok: true, next };
+      }
+      // An EXISTING point the figure leaves free (a letter an earlier line minted) re-homes onto the circle — M1: a
+      // statement about an existing object lowers to a constraint on it, never to a check against a guess. Not when
+      // the circle is built from the point itself (a cycle): the claim stays a claim. A placed point (a vertex, a
+      // midpoint, a coordinate point) keeps its owner, and its membership is the check's.
+      if (c.points.get(cmd.point)?.kind === 'free3' && !builtFrom3(c, circleParentIds3(c, circle.id), cmd.point)) {
+        const next = clone(c);
+        next.points.set(cmd.point, { kind: 'on-circle3', circle: circle.id });
+        return { ok: true, next: parentsFirst3(next) };
       }
       return { ok: true, next: c };
     }

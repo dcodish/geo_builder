@@ -484,6 +484,10 @@ const SEEDED: SeededCorpus = {
   'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
   'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
   'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
+
+  // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
+  // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
+  'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
