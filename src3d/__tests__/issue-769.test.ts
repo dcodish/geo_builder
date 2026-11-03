@@ -7,6 +7,11 @@
  * crosses at t = ½ and still builds. Stated over every derived-point kind (one check at the mint
  * chokepoint, provenance derived from the fact list), with the judgement the click-offer already uses
  * (`namedPointAt`), so the offer lane and the typed lane answer one question the same way (#653).
+ *
+ * ⚠ NARROWED by #1595 (ADR-3D-405, ADR-W-177; operator ruling 2026-11-02, "accept with message"): a derived letter its
+ * definition FORCES onto a named point now records, with «X ו-Y נפלו על אותה נקודה.». The refusal keeps 2-D's
+ * structural member only (#1274, ADR-W-066): a crossing whose two carriers are WRITTEN through the holder — the
+ * operator's own AC' ∩ ADE (A is in both) and BB' ∩ ABCD (B is in both) stay refused.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3, type Fact3 } from '../store/store3';
@@ -64,16 +69,18 @@ describe('#769 — the operator’s box', () => {
 describe('#769 — the CLASS: every derived-point kind, not the one that surfaced it', () => {
   beforeEach(reset);
 
-  it('a midpoint minted twice: «F אמצע AB» after «E אמצע AB» names E', () => {
+  it('a midpoint minted twice: «F אמצע AB» after «E אמצע AB» records on E, with the notice (#1595)', () => {
     ["קובייה ABCDA'B'C'D'", 'E אמצע AB'].forEach(submit);
     submit('F אמצע AB');
-    expect(state().lastError).toEqual({ code: 'point-coincides', id: 'F', with: 'E' });
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, state().seed).coincidences).toEqual([['E', 'F']]);
   });
 
-  it('a foot that lands on a vertex: the perpendicular from A′ onto the base meets it at A', () => {
+  it('a foot that lands on a vertex: the perpendicular from A′ onto the base meets it at A — recorded (#1595)', () => {
     ["קובייה ABCDA'B'C'D'"].forEach(submit);
     submit("A'H גובה לפאה ABCD"); // the V8-e height-to-face mints H as the foot of A′ on the base — which is A
-    expect(state().lastError).toEqual({ code: 'point-coincides', id: 'H', with: 'A' });
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, state().seed).coincidences).toEqual([['A', 'H']]);
   });
 
   it('a plane∩segment crossing at an endpoint names the endpoint', () => {

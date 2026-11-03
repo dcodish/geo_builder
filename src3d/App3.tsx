@@ -76,6 +76,7 @@ import { VecMath } from './render/VecMath';
 import { errorText3 } from './i18n/errorText3';
 import { narrowingText3 } from './i18n/narrowingText3';
 import type { NarrowTranslate } from '../shell/narrowing';
+import { convergeText, type ConvergeTranslate } from '../shell/converge';
 import { emptyStateChips3 } from './emptyChips3';
 
 /**
@@ -853,6 +854,13 @@ export default function App3() {
                       : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
+          {/* #1595 (ADR-3D-404, ADR-W-176): two letters on one dot are accepted, and the page says so — 2-D's ADR-123
+              sentence through the suite key, read from the DRAWN figure, so it holds while the drawing has the pair. */}
+          {!busy && derived.coincidences.length > 0 && (
+            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              ⓘ {convergeText(derived.coincidences, t as ConvergeTranslate)}
+            </div>
+          )}
           {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared
               trapezoid the drawing shows with both pairs parallel. Derived per render, so it holds while the
               drawing is a parallelogram and clears on the edit, mute or delete that makes it a trapezoid again. */}

@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { decideSubmit } from '../app/submit';
 import { errorText, type Translate } from '../app/errorText';
 import { analyticI18n } from '../i18n';
@@ -32,6 +33,13 @@ function lastRefused(lines: string[], seed: number): InputError {
   const v = decideSubmit(lines[lines.length - 1], lines.slice(0, -1), seed);
   expect(v.kind, `«${lines[lines.length - 1]}» at seed ${seed}`).toBe('refused');
   return (v as { error: InputError }).error;
+}
+
+/** #1595: the last line records, and the drawn figure puts `id` on `holder` — the coincidence notice's pair. */
+function recordsOn(lines: string[], holder: string, id: string, seed: number): void {
+  const v = decideSubmit(lines[lines.length - 1], lines.slice(0, -1), seed);
+  expect(v.kind, `«${lines[lines.length - 1]}» at seed ${seed}`).toBe('record');
+  if (v.kind === 'record') expect(coincidencesOf(derive([...lines.slice(0, -1), v.line], v.configuration ?? seed))).toEqual([[holder, id]]);
 }
 
 function recordsApart(lines: string[], id: string, seed: number): void {
@@ -128,10 +136,11 @@ describe('#1924 — the controls keep their crossing', () => {
     for (let seed = 0; seed < 6; seed++) recordsApart([...FREE, 'AP חותך את המעגל בנקודה E'], 'E', seed);
   });
 
-  it('#1917’s line through the centre: E is the antipode; «הקטע AP» keeps its refusal', () => {
+  it('#1917’s line through the centre: E is the antipode; «הקטע AP» records E on A, with the notice', () => {
     recordsApart(['x^2+y^2=25', 'A(3,4)', 'P(0,0)', 'AP חותך את המעגל בנקודה E'], 'E', 0);
-    const error = lastRefused(['x^2+y^2=25', 'A(3,4)', 'P(0,0)', 'הקטע AP חותך את המעגל בנקודה E'], 0);
-    expect(error.key).toBe('crossing-already-named');
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): the segment reaches the circle only
+    // at A, so E is forced onto A — recorded with «A ו-E נפלו על אותה נקודה.» (was `crossing-already-named`).
+    recordsOn(['x^2+y^2=25', 'A(3,4)', 'P(0,0)', 'הקטע AP חותך את המעגל בנקודה E'], 'A', 'E', 0);
   });
 });
 

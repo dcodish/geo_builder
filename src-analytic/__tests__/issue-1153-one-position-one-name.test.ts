@@ -29,6 +29,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { decideSubmit } from '../app/submit';
 import { sameDerivation } from '../engine/sameDerivation';
 import { analyticI18n } from '../i18n';
@@ -69,15 +70,18 @@ describe('#1153 — naming something that already has a name is refused', () => 
     expect(ids([CIRCLE, 'P מרכז המעגל I', 'P מרכז המעגל I'])).toEqual(['P']);
   });
 
-  it('the check is the FAMILY’s, not the centre rule’s', () => {
-    // A midpoint named twice is the same defect, and was equally silent.
-    expect(faults(['A(0,0)', 'B(4,0)', 'M אמצע AB', 'N אמצע AB']).map((x) => x.code)).toEqual([
-      'already-named',
-    ]);
-    // ...including when the second naming writes the pair the other way round.
-    expect(faults(['A(0,0)', 'B(4,0)', 'M אמצע AB', 'N אמצע BA']).map((x) => x.code)).toEqual([
-      'already-named',
-    ]);
+  it('a point built FROM POINTS named twice is recorded, with the notice — the centre keeps the refusal (#1595)', () => {
+    /*
+     * ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"). A second letter for
+     * a midpoint is a new letter its definition forces onto M: 2-D records «M אמצע AB» · «N אמצע AB» with «M ו-N נפלו
+     * על אותה נקודה.», and so does this tree. A curve's centre named twice (above) is one object with a second name
+     * — 2-D answers it as a rename — and stays refused.
+     */
+    for (const second of ['N אמצע AB', 'N אמצע BA']) {
+      const d = derive(['A(0,0)', 'B(4,0)', 'M אמצע AB', second], 0);
+      expect(d.faults, second).toEqual([]);
+      expect(coincidencesOf(d), second).toEqual([['M', 'N']]);
+    }
   });
 
   it('a DIFFERENT point is still nameable — no false positive', () => {

@@ -247,7 +247,6 @@
     "mismatch": "The figure may not match what you described:",
     "noValidConfig": "No configuration satisfies all the requirements together — the shown drawing may be degenerate (e.g. coinciding points). Check the last given you entered.",
     "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own.",
-    "converge": "{{a}} and {{b}} have landed at the same point.",
     "offArcNotice": "{{point}} necessarily lies on the part of {{circle}} that is not drawn — the construction forces it there.",
     "degenerate": "{{object}} has collapsed onto a line — the givens force it: {{statements}}.",
     "v": {

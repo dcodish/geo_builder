@@ -48,7 +48,7 @@ async function play(lines: string[], lang: 'he' | 'en' = 'he') {
 const d = (p: Vec, q: Vec) => Math.hypot(p.x - q.x, p.y - q.y);
 const labels = (seed = st().seed) => [...replay(st().facts, seed).positions.keys()].filter((k) => /^[A-Z]\d*$/.test(k)).sort();
 const banner = (seed = st().seed) =>
-  visibleCoincidences(replay(st().facts, seed).coincidences).map(([a, b]) => i18n.getFixedT('he')('figure.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
+  visibleCoincidences(replay(st().facts, seed).coincidences).map(([a, b]) => i18n.getFixedT('he')('suite.notice.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
 
 /** X is the one touch point at seeds 0–3: on both circles, no second letter, no pair, no red row. */
 function onlyX(X = 'X') {

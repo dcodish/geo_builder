@@ -4231,6 +4231,8 @@ this is the fourth escape of one class. Analytic lane 1147.
 
 ## ADR-AG-075 — A pair of curves has only so many crossings, and the bound is structural (#1114)
 
+> **⚠ Superseded in part** 2026-11-02 by [ADR-AG-372](#adr-ag-372): two straights meet once, so a second name for their crossing is that point named again — recorded with the notice, no longer `unsatisfiable`. The line × conic and conic × conic caps are unchanged.
+
 **Requirements:** none (internal). **Design:** none (internal).
 
 Split out of #1113 while fixing it. That issue made the two crossings of one line × conic pair land on
@@ -5024,6 +5026,8 @@ That is a false refusal on a satisfiable statement, and it is a **regression in 
 `issue-1201-point-line-residual.test.ts` (6) — **proven to fail without the fix**: restoring the three-argument call turns 5 of the 6 red. Analytic lane 89 files / 1397 tests green.
 
 ## ADR-AG-092 — One position, one name: the invariant lives at the FIGURE (#1153)
+
+> **⚠ Superseded in part** 2026-11-02 by [ADR-AG-372](#adr-ag-372) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): a second letter for a point built FROM POINTS (midpoint, a triangle's centres, the diagonals' meet, a foot, a regular-polygon vertex) is recorded with the notice. A curve's feature (centre, focus, ellipse point, touch points) named twice keeps this refusal (`namesCurveFeature`).
 
 **Requirements:** [02c](02c-requirements-analytic.md) **R98** (new). **Design:** [04c](04c-design-analytic.md) — *naming paths and the shared check*. **LADDER stage:** fact application, before the object is minted; no solve, display or gate change.
 
@@ -6701,6 +6705,8 @@ and, three rows above it in the same panel, `AD: (אין שיפוע) אנכי`. 
 **A visible side effect, and it is the honest one.** After two clicks on that figure the third ring is gone: both drawn crossings now carry points. Before, the first click threw its point to the far root and left the near crossing unclaimed, so the canvas kept offering a ring for a crossing that already had a letter somewhere else.
 
 ## ADR-AG-125 — analytic: a crossing that lands on an existing point BY POSITION (#1254)
+
+> **⚠ Superseded** 2026-11-02 by [ADR-AG-372](#adr-ag-372) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): a crossing the givens force onto a named point is recorded with the notice; the positional arm is retired. The structural member (#1175, two straights through a shared letter) is unchanged.
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1254 (bug, P2, `analytic`) · round #1280 · the analytic half of [ADR-W-066](06w-decisions-workspace.md#adr-w-066)
 **Requirements:** [02c](02c-requirements-analytic.md) · **Design:** [04c](04c-design-analytic.md)
@@ -11730,6 +11736,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Consequences.** `src-analytic/engine/apply.ts` (`oppositeRingEdges`, `ringParallelBase`, the `cevian-of` arm); `src-analytic/parser/catalogAnalytic.ts`; the lock; the two parity rows; docs 02c R103d, 04c. **Found, reported not fixed:** 2-D's `oppositeParallelBase` reads the figure's whole parallel list, so «משולש ABC» · «AB מקביל ל-DE» · «AF גובה» drops the triangle's height onto DE; and 2-D's «טרפז ABCD» · «E על BC» · «AE גובה» draws E on top of C and reports it green. (Both fixed in 2-D by [ADR-665](06-decisions.md#adr-665), which ports this ADR's ring bound and order.)
 ## ADR-AG-254 — A crossing forced onto a point the figure already has is refused whatever else is free: the PAIR's own freedom decides (#1938)
 
+> **⚠ Superseded** 2026-11-02 by [ADR-AG-372](#adr-ag-372): the verdict this ADR made independent of unrelated freedom is now "recorded, with the notice", still the same in every order; the arm that refused is retired.
+
 **Date:** 2026-10-10 · **Status:** accepted · P2, fix round #1959 (stream E); branch `fix/1938-crossing-gate`. **Amends** [ADR-AG-125](#adr-ag-125) / [ADR-AG-140](#adr-ag-140) (the positional coincidence arm's gate), the same amendment [ADR-AG-249](#adr-ag-249) made to the ring arm.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R60 (the crossing row: the pair's freedom decides, the forcing line is refused too, a separable crossing still records). · **Design:** [04c](04c-design-analytic.md), "A forced coincidence is refused; a configuration-dependent one is not".
@@ -14565,6 +14573,45 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 **Locks.** `src-analytic/__tests__/issue-2621a-tangent-ref.test.ts` (every spelling; ∥, the sign, a line through a point; none / two tangents refused without a tool id; four naming spellings, one line, the ask unchanged; a second name; the named statement with no tangent; the `line-exists` offer recording; a named line the figure has; p4-24 ג). Fixture `ellipse-book-p4-24c-2621`. `issue-2553-unnamed-common-tangent.test.ts`'s refusal case rewritten (above). Catalog: 3 rows (He + En).
 
 **Behaviour change for a student:** in analytic, «שיפוע המשיק …», «נסמן את המשיק ב-l» and «l הוא המשיק למעגל בנקודה A» act on the drawn tangent; a refusal about «המשיק» with two tangents no longer shows «tangent-A».
+
+## ADR-AG-366 — Two letters the drawing puts on one dot get 2-D's notice (#1595, #2401)
+
+> **Amended** 2026-11-02 by [ADR-AG-372](#adr-ag-372): the "kept refusal" of a NEW name defined onto a point already there (#1254, #1153) is now the same notice, per the 2026-11-02 ruling.
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (P2, analytic), fix round #2665 stream T, branch `feat/1595-coincidence-notice`. Operator ruling 2026-09-30 (#1595, playing round #1571 T23 in this tree). Covers #2401 (merged into #1595, 2026-11-01). The cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176). LADDER stage: none (a read of the drawn figure).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R214 (new) · **Design:** [04c](04c-design-analytic.md) § "The configuration search: validity, then preference" (the notice after it).
+
+**Context.** Measured at `17f35282` (`decideSubmit` → `derive`): #1571 T23 «V(0,0) · X(4,0) · Y נמצאת על הישר y=x · שיעור ה-x של Y הוא 0» records Y on V; #2401 «N1(1,1) · N2(1,1) · קטע N1N2» draws a zero-length segment; «משולש ABC · AB=4 · D על AB · AD=4» puts D on B. No message in any. «N אמצע AB» after «M אמצע AB» is refused `already-named` (the #1254 rule) and stays so.
+
+**Decision.** `app/coincidences.ts` `coincidencesOf(d)`: the pairs of `d.figure.points` at one place, at `crossings.apart` (the identity tolerance `pointAt` uses, ADR-AG-021), through `shell/converge`. Not `stackedPairs` (the 1% display ruler of #1526): that one asks "would a student see them stacked", and the sentence says they ARE one point. The App memoises it on the drawn derivation and renders `convergeText` as an ⓘ `Banner kind="notice"` after the narrowing notes. The separation preference (#1526, ADR-AG-181) runs first, so an unforced pair is drawn apart and gets nothing.
+
+**Sibling audit.** 2-D is the reference (ADR-123). 3-D and complex: same item, ADR-3D-404 and ADR-CX-086.
+
+**Behaviour change for a student:** a line whose givens put two letters on one dot still records, and «V ו-Y נפלו על אותה נקודה.» now shows while the drawing has the pair.
+
+## ADR-AG-372 — A new letter its definition forces onto a named point records, with the notice (#1595, #2631)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic) · PR #2666, branch `feat/1595-coincidence-notice` · operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"* · cross-builder record [ADR-W-177](06w-decisions-workspace.md#adr-w-177) · **Supersedes** [ADR-AG-125](#adr-ag-125), [ADR-AG-254](#adr-ag-254) · **Supersedes in part** [ADR-AG-092](#adr-ag-092), [ADR-AG-075](#adr-ag-075) · **Amends** [ADR-AG-366](#adr-ag-366). LADDER stage: none (verdict arms in M1 and `derive`; two START/preference changes in `evaluate`, no new solve).
+**Requirements:** [02c](02c-requirements-analytic.md) R60 (rewritten), R98 (rewritten), R214 (extended) · **Design:** [04c](04c-design-analytic.md) § *A forced coincidence is recorded with the notice*, the line-by-line start, *The configuration search* (`wholeSpread`) and the notice's floor.
+
+**Context.** Measured at the merge of `origin/main` (`decideSubmit` → `derive`, seeds 0–23): four refusals of one class, each a new letter forced onto a named point that 2-D accepts with its notice (ADR-W-177's table): the #1153 arm (`already-named`: «N אמצע AB», a second centroid / orthocentre / incentre / circumcentre / diagonals' meet); the #1254 arm (`crossing-already-named`: #2631, the medians' H on G, «P נקודת החיתוך של הישר AE עם הישר BC» on B, a second «הראשונה»); #1114's count (`unsatisfiable` for a second name of a straight × straight crossing); and #1113's sibling rule (`crossing-distinct` demanding the other root of a pair that has one).
+
+**Decision.**
+1. **`apply.ts`, the #1153 arm:** a same-derivation holder refuses only when `namesCurveFeature(rule)` (`sameDerivation.ts`, exhaustive): circle-centre, parabola-focus, ellipse-point, touch-point, side-touch. Every rule built from points mints its own point. The #2583 helper rename is unchanged.
+2. **`derive.ts`, the #1254 positional arm is retired** (not bypassed). The parser's structural `crossing-already-named` (#1175) and ADR-AG-349's one-line pair stay.
+3. **`apply.ts`, the crossing cap:** `maxCrossings` 1 (two straights) no longer refuses; the line × conic and conic × conic caps stand (#1893's sentence).
+4. **`evaluate.ts` `crossingPartners`:** a straight × straight crossing has no partner, so `crossing-distinct` holds on a second name of it.
+5. **Stability, measured and kept (standing rule: adding a constraint never makes the figure jump).** With 1–4 alone #2631 recorded but moved the triangle (A by 8.6 at seed 0, 6.4 at seed 3). Two causes, both in the old arm's shadow: `fitLineByLine` never took a fit ON another point ("the coincidence the verdict owns"), so the joint solve spread E's correction onto the triangle; and `drawableAt`, finding no separated candidate, fell to the first whole one and dropped the spread preference that had chosen the drawing. Now an on-point fit is kept and taken when no start gives one apart — only for a group whose incidences are all straights (a line touching a conic there is a double root, and starting on it blinded the rank read #1932's tangent arm judges by: «P על הישר l1» lost its refusal at seed 1) — and a `wholeSpread` tier sits between the separated tiers and `wholeFallback`. A separated configuration still wins wherever one exists (ADR-W-072 unchanged). Measured after: A, B, C, M unmoved at seeds 0–23.
+6. **`app/coincidences.ts`:** the identity ruler is floored at `SOLVE_TOL · 10` (the retired arm's own floor, #1276), so «A(0,0)» · two equation lines through it · their crossing P — a figure with no span — is said.
+
+**Measured after.** Each row above records with the notice at seeds 0–23 where run; «AB ו-BC נחתכים בנקודה D» and «P נקודת החיתוך של הישר AB עם הישר BC» still refused naming B; «P מרכז המעגל I» · «O מרכז המעגל I» still refused naming P.
+
+**Locks (re-read and flipped, each citing the ruling).** `issue-1114-crossing-cap`, `issue-1153-one-position-one-name`, `issue-1254-positional-coincidence`, `issue-1268-crossing-ordinal`, `issue-1416-conic-root-order`, `issue-1423-reused-letter`, `issue-1620-perpendiculars`, `issue-1620-tool-letters`, `issue-1715-meet-frame` (#2631's exact lines: records, «M ו-E נפלו על אותה נקודה.», the triangle unmoved and not isosceles), `issue-1727-perpendicular-builds`, `issue-1917-other-crossing`, `issue-1924-tangent-no-second-crossing`, `issue-1932-tangent-conics`, `issue-1938-coincidence-own-freedom`, `issue-2583-2584-restated-lines`, `converge-1595` (the ruling's rows, and the two kept refusals).
+
+**Found, not decided.** 2-D renames a TOOL letter to the student's («תיכון מ-A …» · «D אמצע BC»); analytic keeps M and says «M ו-D נפלו על אותה נקודה.». Reported on #1595.
+
+**Behaviour change for a student:** in analytic, «N אמצע AB» after «M אמצע AB», a crossing the givens put on a named point (#2631: «… נפגשים בנקודה E» on M), and a second name for one crossing of two lines are accepted with «M ו-N נפלו על אותה נקודה.» instead of refused.
 
 ## ADR-AG-371 — The book's «מעבירים ישר l1 ש…» is taught as the named-line sentence; «הן נקודות על … בהתאמה» is the location sentence (#2620 C)
 

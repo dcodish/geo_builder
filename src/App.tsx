@@ -91,6 +91,7 @@ import { figureStatus, figureStatusParams } from '@/app/figureStatus';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
+import { convergeText } from '../shell/converge';
 import { valueRowText } from '@/render/valueRowText';
 import { offArcNoticeText, violationText } from '@/i18n/violationText';
 import { circleMenuTitle } from '@/i18n/circleText';
@@ -1537,7 +1538,7 @@ export default function App() {
                   shown at all — the notice explains why two points the STUDENT KNOWS merged. What
                   remains is student-named, so `describePoint` is a no-op here today; it stays as the
                   ADR-447 seam should a described anonymous pair ever be ruled back in. */}
-              ⓘ {visibleCoincidences(coincidences).map(([a, b]) => t('figure.converge', { a: describePoint(a), b: describePoint(b) })).join(' ')}
+              ⓘ {convergeText(visibleCoincidences(coincidences), t, describePoint) /* #1595 (ADR-W-176): the suite key, `suite.notice.converge` */}
             </div>
           )}
 

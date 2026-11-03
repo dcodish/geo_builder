@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { derive, type Derivation } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { parseLine } from '../parser/parseAnalytic';
 import { decideSubmit } from '../app/submit';
 import { decideRename } from '../app/rename';
@@ -116,15 +117,17 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
     }
   });
 
-  it('a perpendicular stated twice is one foot; a later NAME for the tool-lettered foot is #1153’s already-named', () => {
+  it('a perpendicular stated twice is one foot; a later NAME for the tool-lettered foot records on it, with the notice', () => {
     const twice = clean(derive(['משולש ABC', 'האנך מ-B לצלע AC', 'האנך מהנקודה B לצלע AC'], 0));
     expect(twice.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'H']);
     expect(twice.outcomes[2]).toBe('known');
     const named = derive(['משולש ABC', 'D רגל האנך מ-B ל-AC', 'האנך מ-B לצלע AC'], 0);
     expect(named.faults).toEqual([]);
     expect(named.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message") (was #1153's `already-named`, naming H)
     const later = derive(['משולש ABC', 'האנך מ-B לצלע AC', 'D רגל האנך מ-B ל-AC'], 0);
-    expect(later.faults[0]).toMatchObject({ index: 2, code: 'already-named', holder: 'H' });
+    expect(later.faults).toEqual([]);
+    expect(coincidencesOf(later)).toEqual([['H', 'D']]);
   });
 
   it('the tool letter can be renamed — the sentence is rewritten to name the foot', () => {

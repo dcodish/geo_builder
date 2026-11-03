@@ -21,7 +21,7 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
 import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
-import { sameDerivation } from './sameDerivation';
+import { namesCurveFeature, sameDerivation } from './sameDerivation';
 import { isHelperId } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
@@ -3196,6 +3196,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           if (other === arriving) continue;
           const cap = maxCrossings(carrierKind(c, other), carrierKind(c, arriving));
           if (cap === null) continue;
+          // #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message"): two straights meet ONCE, so a second
+          // letter for their crossing is not an impossible extra crossing but the same point named again — forced onto
+          // the first. 2-D records it with «O ו-E נפלו על אותה נקודה.»; so does this tree (`app/coincidences.ts`). The
+          // count still refuses a line × conic's third crossing, which has its own ruled sentence (#1893).
+          if (cap === 1) continue;
           const named = c.objects.filter((o) => {
             if (o.id === subject) return false;
             const on = carriersOfPoint(c, o.id);
@@ -5728,7 +5733,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             },
           };
         }
-        if (holder) {
+        /*
+         * #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message") — a second letter for a point
+         * built FROM POINTS («N אמצע AB» after «M אמצע AB», a second centroid, orthocentre, diagonals' meet) is a new
+         * letter its definition forces onto a named point: 2-D records it, and the drawn figure says «M ו-N נפלו על אותה
+         * נקודה.» (`app/coincidences.ts`). It is minted as its own point, so the two letters sit on one dot and the
+         * notice reads them. A FEATURE OF A CURVE named twice (its centre, focus, a vertex of an ellipse, a touch point)
+         * is not that: it is one object with a second name, which 2-D answers as a rename (`centreAlreadyNamed`), so it
+         * keeps the refusal.
+         */
+        if (holder && namesCurveFeature(f.rule)) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(holder.id) } };
         }
       }

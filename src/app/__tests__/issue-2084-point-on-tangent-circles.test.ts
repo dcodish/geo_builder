@@ -49,7 +49,7 @@ async function play(lines: string[], lang: 'he' | 'en' = 'he') {
 }
 
 const d = (p: Vec, q: Vec) => Math.hypot(p.x - q.x, p.y - q.y);
-const banner = (pairs: [string, string][]) => visibleCoincidences(pairs).map(([a, b]) => i18n.getFixedT('he')('figure.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
+const banner = (pairs: [string, string][]) => visibleCoincidences(pairs).map(([a, b]) => i18n.getFixedT('he')('suite.notice.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
 
 /** X is the touch point at every seed 0–3: on both circles, exactly on `touch` (the pair recorded) — or, when `touch`
  *  is null, the engine's touch letter yielded to X (#2122): no M drawn and no pair. No red row either way. */

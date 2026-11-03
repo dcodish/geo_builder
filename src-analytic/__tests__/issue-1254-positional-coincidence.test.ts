@@ -14,24 +14,32 @@
  * **The two branches are the ruling's own.** Refuse when no configuration can separate them; stay silent
  * while the figure can still move — another configuration may, and #1273 is what will prefer it. The
  * predicate is the vacancy pass's, one block above in `derive`, for exactly the same reason.
+ *
+ * ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"), which reverses the
+ * first branch: a crossing its givens FORCE onto a named point is recorded, and the drawn figure says «B ו-P נפלו על
+ * אותה נקודה.», as 2-D does. The structural member (#1175) and the separation preference (#1273) are unchanged.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 
 const faultsOf = (lines: string[], seed = 0) => derive(lines, seed).faults;
 const pointsOf = (lines: string[], seed = 0) => derive(lines, seed).figure.points;
 
-describe('#1254 — a forced coincidence is refused, naming the point that is already there', () => {
+describe('#1254 — a forced coincidence is recorded, and the notice names the point that is already there (#1595)', () => {
   it('the operator’s own T18 figure: the crossing of AB and CD lands on B', () => {
     // AB is y = x/3, CD is y = 8 − x; they meet at (6, 2), which is B.
     const lines = ['A(0,0)', 'B(6,2)', 'C(1,7)', 'D(7,1)', 'P נקודת החיתוך של הישר AB עם הישר CD'];
-    expect(faultsOf(lines)).toMatchObject([{ index: 4, code: 'crossing-already-named', holder: 'B' }]);
-    expect(pointsOf(lines).some((p) => p.id === 'P' && Math.hypot(p.x - 6, p.y - 2) < 1e-6 && false)).toBe(false);
+    expect(faultsOf(lines)).toEqual([]);
+    const p = pointsOf(lines).find((q) => q.id === 'P');
+    expect(p && Math.hypot(p.x - 6, p.y - 2)).toBeLessThan(1e-6);
+    expect(coincidencesOf(derive(lines, 0))).toEqual([['B', 'P']]);
   });
 
   it('#1254’s own case: two lines given by EQUATIONS crossing where a point already sits', () => {
     const lines = ['A(0,0)', 'משוואת הישר l1 היא y=x', 'משוואת הישר l2 היא y=-x', 'P נקודת החיתוך של הישר l1 עם הישר l2'];
-    expect(faultsOf(lines)).toMatchObject([{ index: 3, code: 'crossing-already-named', holder: 'A' }]);
+    expect(faultsOf(lines)).toEqual([]);
+    expect(coincidencesOf(derive(lines, 0))).toEqual([['A', 'P']]);
   });
 
   it('the CONTROL — a crossing clear of every named point still builds', () => {

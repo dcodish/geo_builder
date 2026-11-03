@@ -54,6 +54,8 @@ import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
+import { coincidencesOf } from './app/coincidences';
+import { convergeText } from '../shell/converge';
 import { narrowingKey, narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -625,6 +627,8 @@ export function App() {
    * parallelogram: deleting or muting the forcing line, or another configuration, clears it.
    */
   const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
+  // #1595 (ADR-AG-366): the letters the drawn figure puts on one dot — the suite notice reads them, per render
+  const coincidences = useMemo(() => coincidencesOf(d), [d]);
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
   /**
@@ -1437,6 +1441,18 @@ export function App() {
                 </Banner>
               </div>
             ))}
+            {/*
+              #1595 (ADR-AG-366, ADR-W-176) — two letters on one dot are accepted, and the page always says so: 2-D's
+              ADR-123 sentence through the suite key. Read from the drawn figure, so it holds while the drawing has the pair.
+            */}
+            {coincidences.length > 0 && (
+              <div style={{ marginTop: 8 }} data-testid="analytic-converge-note">
+                <Banner kind="notice">
+                  <span aria-hidden="true">ⓘ </span>
+                  {convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}
+                </Banner>
+              </div>
+            )}
           </div>
         }
         factsZone={

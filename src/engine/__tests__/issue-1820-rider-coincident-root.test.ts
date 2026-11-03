@@ -40,7 +40,7 @@ async function play(lines: string[]): Promise<V[]> {
 }
 const d = (p: Vec, q: Vec) => Math.hypot(p.x - q.x, p.y - q.y);
 const banner = () =>
-  visibleCoincidences(replay(st().facts, st().seed).coincidences).map(([a, b]) => i18n.getFixedT('he')('figure.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
+  visibleCoincidences(replay(st().facts, st().seed).coincidences).map(([a, b]) => i18n.getFixedT('he')('suite.notice.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
 
 beforeEach(() => llmParseMock.mockReset());
 
