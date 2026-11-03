@@ -1143,6 +1143,24 @@
       "chosen": true,
       "at": "2026-11-03T07:54:37.942Z",
       "status": "pending"
+    },
+    {
+      "id": "q-2623",
+      "question": "A found locus as a host («P על המקום הגיאומטרי», «מלבן ABCD חסום במקום הגיאומטרי»): make it an object, or refuse and teach reading the equation from the data panel?",
+      "class": "locus-as-object",
+      "verdict": "escalate",
+      "reason": "#2389 (2026-10-20: 'the locus equation part is found through the data panel') conflicts with sr-04 (2026-11-02: build what an exercise needs); only session text applies sr-04 here.",
+      "at": "2026-11-03T08:09:56.831Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2377",
+      "question": "Should «הבסיס העליון / התחתון» also name the bases of other right prisms and of a cylinder?",
+      "class": "feature-scope-or-priority",
+      "verdict": "escalate",
+      "reason": "His d10 A (2026-10-23) defines it on a box only; extending to prisms and cylinders is feature scope. No corpus exercise uses it on them (checked docs/sample questions, 2026-11-03).",
+      "at": "2026-11-03T08:09:56.831Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
