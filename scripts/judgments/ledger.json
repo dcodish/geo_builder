@@ -1103,6 +1103,46 @@
       "reason": "'reject this as we do with all cases where we state the same thing twice' (2026-10-29) conflicts with sr-19 (2026-11-02: an undecided statement is a given that shapes the figure); sr-10 sends conflicts to him.",
       "at": "2026-11-03T07:38:03.299Z",
       "status": "escalated"
+    },
+    {
+      "id": "chose-2364-side-vertex-refusal",
+      "kind": "text",
+      "issue": "#2364",
+      "what": "refusal for a side or vertex named by its screen position (\"the left side is 5\", «הצלע השמאלית היא 5»), 2-D/3-D/analytic",
+      "choice": "he: «צלעות וקודקודים מגדירים לפי שמות הנקודות.» · en: \"Sides and vertices are named by their points' letters.\"",
+      "chosen": true,
+      "at": "2026-11-03T07:41:35.824Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2628-unnamed-locus",
+      "kind": "text",
+      "issue": "#2628",
+      "what": "analytic locus row when the curve is drawn but outside the named family (no kind, no equation)",
+      "choice": "he: «עקומה (הכלי עדיין לא מזהה את סוגה)» · two components: «שתי עקומות (הכלי עדיין לא מזהה את סוגן)» · en: \"a curve (the tool cannot name its kind yet)\" / \"two curves (the tool cannot name their kind yet)\"",
+      "chosen": true,
+      "at": "2026-11-03T07:42:36.053Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2644-split-no-rows",
+      "kind": "text",
+      "issue": "#2644",
+      "what": "one-given-per-row teaching for a compound line whose pieces the tool cannot list as rows (all builders, suite key)",
+      "choice": "he: «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו כל נתון של המשפט בשורה משלו.» · en: \"One given per line — that way the tool can build and verify each one separately. Write each given of this sentence on its own line.\"",
+      "chosen": true,
+      "at": "2026-11-03T07:48:13.013Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2442-no-common-tangents",
+      "kind": "text",
+      "issue": "#2442",
+      "what": "notice when «כל המשיקים המשותפים» is asked and the configuration on screen has one circle inside the other (2-D + analytic)",
+      "choice": "he: «בתצורה הזאת מעגל אחד נמצא בתוך השני, ולכן אין להם משיקים משותפים. «הציגו תצורה אחרת» מראה מצבים אחרים של המעגלים.» · en: \"In this configuration one circle lies inside the other, so they have no common tangents. «Show another configuration» shows the circles in other positions.\"",
+      "chosen": true,
+      "at": "2026-11-03T07:54:37.942Z",
+      "status": "pending"
     }
   ],
   "demoted": {
