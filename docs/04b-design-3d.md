@@ -802,6 +802,16 @@ carrier cannot be counted yet undrivable (the ADR-052 smell): `on-plane`, `on-li
 `partial` riders enroll in the drive. Plane/line riders enroll as offsets from their sampled seat;
 not-drivable rows: a side-point's height and riders of free planes/lines (#557).
 
+**The circle rider** (`on-circle3`, #2611, [ADR-3D-410](06b-decisions-3d.md#adr-3d-410)). The on-line rider's circle
+twin: one sampled angle in the circle's own frame (`seatOnCircleRider3`, key `oncircle-th-<id>`, stepped clear of
+placed points as the plane rider is). The point pass resolves the circle on the spot (`circleGeom3`, the one circle
+resolver the post-pivot circle pass also calls); a circle whose carrier resolves only after the pass seats its rider
+after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`) makes its rider a gauge-frame point
+and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The
+`point-on-circle3` arm creates a new letter as the rider, re-homes a `free3` letter onto the circle unless the circle
+is built from it (`builtFrom3`), re-ordering the points parents-first (`parentsFirst3`), and leaves every placed
+point a check. The store's status pass stays the arbiter on final coordinates.
+
 **A host bound is restored, not only enforced** (#1735, ADR-3D-306). `offHost` (in `degenerate()`) rejects a
 converged candidate outside `[lo, hi]`; when the pool is otherwise empty, an acceptance site re-seats the
 discarded off-host riders (`reseatOffHost`) and re-solves the rest, judged by the site's own acceptance —

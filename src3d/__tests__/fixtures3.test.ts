@@ -496,6 +496,9 @@ const SEEDED: SeededCorpus = {
   'face-diagonals-blank-2610.geo3.json': ['O מפגש האלכסונים של הפאה ABCD'],
   'plane-cut-four-letters-blank-2610.geo3.json': ["ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'"],
   'projection-on-four-letter-plane-blank-2610.geo3.json': ['BE היטל הישר TB על המישור ABCD'],
+  // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
+  // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
+  'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
