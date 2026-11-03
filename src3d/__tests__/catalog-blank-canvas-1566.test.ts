@@ -19,28 +19,19 @@ import { guideTryLines3 } from '../app/guideTry3';
 
 /** Each remaining failure, keyed by its Hebrew spelling (the English spelling of the same entry shares it). */
 const STILL_FAILS: Record<string, string> = {
-  // #2609 — a point created on a blank canvas is never placed: a relation over free points does not place them (C2)
-  'אורך AS שווה לאורך AB': '#2609',
+  // #2609 (ADR-3D-408) healed the drive: a relation over created points places them. These rows still fail on the
+  // measured build for a reason that is not the drive, each named on #2609 (2026-11-03):
+  // an equality of two volumes and a collinearity have no pivot pin, so the claim is judged on the sample
   'נפח הפירמידה SENB שווה לנפח הפירמידה CENB': '#2609',
-  '∠SAB = ∠SAD': '#2609',
-  'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD': '#2609',
-  'המישור ACD מקביל ל-AB': '#2609',
-  'AB∥ACD': '#2609',
-  "הישר A'C חותך את המישור BC'D בנקודה K": '#2609',
-  'SM מאונך ל-DB': '#2609',
   "E, C, A' על ישר אחד": '#2609',
-  'שטח המשולש ABC = 4.5': '#2609',
-  'המישור KBC: x + 2y + 3z - 26 = 0': '#2609',
-  'EF מקביל למישור ABC': '#2609',
+  // a mutual or plane–plane relation's pin does not move created points to a solution (the pivot finds none, or the
+  // segments' meeting is the requirement's gate, never solved)
   'AC ו-BD נחתכים': '#2609',
   'AB מתלכד עם CD': '#2609',
   "המישור ABC מקביל למישור A'B'C'": '#2609',
-  'קוסינוס הזווית ACB = 3/4': '#2609',
-  'AE יוצר זוויות שוות עם AB ו-AD': '#2609',
-  "הזווית בין הישר AC' לבין המישור ABCD היא 30": '#2609',
+  // a crossing placed off the segment, and the right-pyramid point's own no-solution: not a drive decision
+  "הישר A'C חותך את המישור BC'D בנקודה K": '#2609',
   'T על הקטע SC כך ש-TABCD היא פירמידה ישרה': '#2609',
-  'אורך AB=BC': '#2609',
-  'זווית SAB = זווית SAD': '#2609',
   // #2610 — a face or plane named by four letters creates four points that are not in one plane (C3)
   'O מפגש האלכסונים של הפאה ABCD': '#2610',
   "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'": '#2610',

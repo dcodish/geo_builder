@@ -1,5 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef } from './types';
-import { freeCoordKey } from './types';
+import { freeCoordKey, hasFreePoint3 } from './types';
 
 /**
  * #1498 — THE SAMPLED-CARRIER TABLE: one enumeration of every free point-DOF the sampler owns.
@@ -171,13 +171,14 @@ function pointParents3(c: Construction3, def: PointDef): Id[] {
  * refused «בדקו את החישוב» (docs/17 §2.2). #1311 (ADR-3D-260) widened that proxy by one carrier kind
  * (`free3`); this reads the whole table.
  *
- * Read only where the figure has a SOLID, the rigid-solid reach this ADR is about. A solid-free figure keeps
- * exactly the routing it had: #1311's own clause (a statement that NAMES a `free3` point drives) stays at the
- * claim arm, and a solid-free rider (coordinates + «D על AB · AD = 1», #1816) has no pivot to run on — the
- * successor issue's lane, not this one.
+ * #2609 (ADR-3D-408): read wherever the PIVOT RUNS — a figure with a solid, or one holding a never-positioned
+ * (`free3`) point, the pivot's own entry gate (`resolve3`). On an empty canvas the points a line creates are `free3`,
+ * so «שטח המשולש ABC = 4.5» or «AB∥ACD» reaches their coordinates and drives them instead of being judged against
+ * the sample. A figure with neither — coordinates and a rider on them, «D על AB · AD = 1» (#1816) — has no pivot to
+ * run on, so a statement there reaches nothing the drive can move and stays the claim it was.
  */
 export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boolean {
-  if (c.solids.length === 0) return false;
+  if (c.solids.length === 0 && !hasFreePoint3(c)) return false;
   const seen = new Set<Id>();
   const stack = [...ids];
   while (stack.length > 0) {
