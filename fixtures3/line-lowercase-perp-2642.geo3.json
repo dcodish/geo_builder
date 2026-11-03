@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T11:06:07.733Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ישר ℓ1",
+      "cmds": [
+        {
+          "type": "free-line",
+          "name": "ℓ1"
+        }
+      ]
+    },
+    {
+      "utterance": "ישר ℓ2",
+      "cmds": [
+        {
+          "type": "free-line",
+          "name": "ℓ2"
+        }
+      ]
+    },
+    {
+      "utterance": "ישר d",
+      "cmds": [
+        {
+          "type": "free-line",
+          "name": "d"
+        }
+      ]
+    },
+    {
+      "utterance": "d מאונך ל-ℓ1",
+      "cmds": [
+        {
+          "type": "line-rel",
+          "rel": "perp",
+          "op": {
+            "kind": "vector",
+            "name": "d"
+          },
+          "line": "ℓ1"
+        }
+      ]
+    },
+    {
+      "utterance": "d מאונך ל-ℓ2",
+      "cmds": [
+        {
+          "type": "line-rel",
+          "rel": "perp",
+          "op": {
+            "kind": "vector",
+            "name": "d"
+          },
+          "line": "ℓ2"
+        }
+      ]
+    }
+  ]
+}

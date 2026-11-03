@@ -36,7 +36,6 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'ambiguous-vector-length': [{ a1: 'A', b1: 'B', a2: 'P', b2: 'Q', c: 3 }, {}],
   'unknown-point': [{ id: 'P' }],
   'unknown-vector': [{ id: 'AB' }],
-  'free-vector-metric': [{ id: 'u', sentence: '|u| = 5' }, { id: 'u' }],
   'free-vector-coupling': [{ id: 'p', sentence: 'AB = p + q' }, { id: 'p' }],
   'free-vector-conflict': [{ id: 'u' }],
   'unknown-plane': [{ id: 'π1' }, { id: 'base' }],

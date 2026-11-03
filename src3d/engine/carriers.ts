@@ -1,5 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef } from './types';
-import { freeCoordKey } from './types';
+import { freeCoordKey, hasFreePoint3, ringCircle3 } from './types';
 
 /**
  * #1498 — THE SAMPLED-CARRIER TABLE: one enumeration of every free point-DOF the sampler owns.
@@ -85,6 +85,12 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
       const free = c.lines.get(def.line)?.kind === 'free';
       return [{ key: id, lo: -Infinity, hi: Infinity, spread: false, t0: 'zero', drivable: !free, solvable: !free }];
     }
+    case 'on-circle3': {
+      // #2611 (ADR-3D-410): one turn from the sampled seat along the circle (unbounded: an angle wraps). Drivable for a
+      // polygon's circle, whose ring always precedes the rider in the point pass; a circle carried by a line or a plane
+      // may resolve only after the pass, where the pivot's override cannot reach — it still counts.
+      return [{ key: id, lo: -Infinity, hi: Infinity, spread: false, t0: 'zero', drivable: ringCircle3(c, def.circle), solvable: false }];
+    }
     case 'bisector-ray':
       // #343: the DISTANCE along the bisector ray — a half-line, so the parameter is the absolute
       // distance from the apex (positive; a rider at or behind the apex is not on the ray).
@@ -100,7 +106,7 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
  * later is a compile error here rather than a point whose reach silently stops (src3d/CLAUDE.md: an
  * enumeration of the drivable cases is not a rule; the walk over what a definition READS is).
  */
-function pointParents3(c: Construction3, def: PointDef): Id[] {
+export function pointParents3(c: Construction3, def: PointDef): Id[] {
   const carrierPts = (o: unknown): Id[] => {
     const out: Id[] = [];
     const walk = (v: unknown, depth: number): void => {
@@ -149,6 +155,8 @@ function pointParents3(c: Construction3, def: PointDef): Id[] {
       return carrierPts({ ...def, line: undefined }).concat(carrierPts(def.line));
     case 'line-plane':
       return carrierPts(def.line).concat(carrierPts(def.plane));
+    case 'on-circle3':
+      return carrierPts(c.circles3.find((k) => k.id === def.circle)?.def);
     case 'vec-defined':
       return carrierPts(c.vecDefs[def.def]);
     case 'vec-pair':
@@ -158,6 +166,24 @@ function pointParents3(c: Construction3, def: PointDef): Id[] {
       return never;
     }
   }
+}
+
+/**
+ * #2611 (ADR-3D-410) — IS `target` AMONG THE POINTS `ids` ARE BUILT FROM (transitively, {@link pointParents3})? A point
+ * re-homed onto a carrier built from itself would be a cycle.
+ */
+export function builtFrom3(c: Construction3, ids: readonly Id[], target: Id): boolean {
+  const seen = new Set<Id>();
+  const stack = [...ids];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (id === target) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const def = c.points.get(id);
+    if (def) stack.push(...pointParents3(c, def));
+  }
+  return false;
 }
 
 /**
@@ -171,13 +197,14 @@ function pointParents3(c: Construction3, def: PointDef): Id[] {
  * refused «בדקו את החישוב» (docs/17 §2.2). #1311 (ADR-3D-260) widened that proxy by one carrier kind
  * (`free3`); this reads the whole table.
  *
- * Read only where the figure has a SOLID, the rigid-solid reach this ADR is about. A solid-free figure keeps
- * exactly the routing it had: #1311's own clause (a statement that NAMES a `free3` point drives) stays at the
- * claim arm, and a solid-free rider (coordinates + «D על AB · AD = 1», #1816) has no pivot to run on — the
- * successor issue's lane, not this one.
+ * #2609 (ADR-3D-408): read wherever the PIVOT RUNS — a figure with a solid, or one holding a never-positioned
+ * (`free3`) point, the pivot's own entry gate (`resolve3`). On an empty canvas the points a line creates are `free3`,
+ * so «שטח המשולש ABC = 4.5» or «AB∥ACD» reaches their coordinates and drives them instead of being judged against
+ * the sample. A figure with neither — coordinates and a rider on them, «D על AB · AD = 1» (#1816) — has no pivot to
+ * run on, so a statement there reaches nothing the drive can move and stays the claim it was.
  */
 export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boolean {
-  if (c.solids.length === 0) return false;
+  if (c.solids.length === 0 && !hasFreePoint3(c)) return false;
   const seen = new Set<Id>();
   const stack = [...ids];
   while (stack.length > 0) {

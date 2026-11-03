@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T10:58:16.753Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "AB∥ACD",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "D",
+          "b": "A"
+        },
+        {
+          "type": "seg-plane-rel",
+          "rel": "parallel",
+          "a": "A",
+          "b": "B",
+          "plane": [
+            "A",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}

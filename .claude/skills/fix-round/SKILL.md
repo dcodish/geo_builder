@@ -68,6 +68,11 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   2. the issues in `plan/current.pulled` for the current week (the operator pulled them in);
   3. the **next week's** plan items, in the plan's workstream order.
 
+  **Within each step, armed bugs fill first** ([ADR-W-178](../../../docs/06w-decisions-workspace.md#adr-w-178),
+  operator 2026-11-03, card d7 A): `wrong-answer` bugs, then P2 bugs, then P3 bugs; features and debt
+  fill the slots that are left, by priority. **One exception:** a feature tied to a lesson he dated
+  (ADR-W-174 §2, e.g. the 14 Nov ellipse work) keeps its slot ahead of the bugs. Bug-first orders a step's
+  items; it never pulls a later step's bug ahead of an earlier step's feature (rule A stands).
   A week later than the next is never pulled ahead, and an issue outside the plan is never composed,
   whatever its priority. Name it as a **pull candidate** in the announcement instead (one line: why it
   looks urgent), so the operator can pull it on the page. An unarmed plan item is named as **holding
@@ -342,13 +347,30 @@ Final body, in order:
   different ports. The numbering still runs **continuously across every section**, and an empty
   section is omitted rather than printed as an empty heading.
   ([ADR-W-028](../../../docs/06w-decisions-workspace.md))
+- **The headline: what changed, and what closes on his approval**
+  ([ADR-W-178](../../../docs/06w-decisions-workspace.md#adr-w-178), operator 2026-11-03: *"I want to also
+  know how many issues will be closed if all tests are approved"*). Run
+  `node scripts/round-metrics.mjs --headline <R> --found <N>` (add `--table 12,34` for items closed into
+  the parity table) once the batch is on `main` and the PRs are open, and paste its lines **at the top of
+  the ledger, under the report URL**, in this order:
+  1. **Changes on main: N** — items closed *completed* by a commit or merged PR in this round. The headline.
+  2. **Will close on your approval: N** — the issues the round's open PRs close once his 🎮 cases and PRs
+     pass, with the PR numbers.
+  3. **Housekeeping: N**, on its own line — merged into a family, parked (`icebox`), closed into the
+     parity table, already fixed at re-measure. Never counted in the headline.
+  4. **Net (filed − closed)**, secondary.
+
+  The same lines open the published report (Step 5b) and the final chat message.
 - **Queue effect**, one machine-greppable line beside the stats line
-  ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)):
-  `queue: closed=N filed=N filed-open=N found-in-round=N`. Here `filed` counts every issue this round
-  filed, `filed-open` how many of those are still open, and `found-in-round` how many found cases it
-  fixed in place. A round whose `closed` is not above `filed-open` says why in the Heads-up.
-  Beside it, the operator's load, as `npm run playsheet:close` prints it: `operator: play=N audits=N`.
-  `scripts/round-metrics.mjs` reads both lines for the roadmap page's "Fix rounds" panel (ADR-W-169).
+  ([ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168), extended by ADR-W-178): `--headline`
+  prints it —
+  `queue: closed=N filed=N filed-open=N found-in-round=N on-main=N on-approval=N merged=N parked=N table=N already-fixed=N`.
+  The first four fields are unchanged: `closed` is every item closed (on main plus housekeeping), `filed`
+  every issue this round filed, `filed-open` how many of those are still open, and `found-in-round` how
+  many found cases it fixed in place. A round whose `on-main` is not above `filed-open` says why in the
+  Heads-up. Beside it, the operator's load, as `npm run playsheet:close` prints it:
+  `operator: play=N audits=N`. `scripts/round-metrics.mjs` reads both lines for the roadmap page's
+  "Fix rounds" panel (ADR-W-169); a line without the new fields still reads, its headline estimated.
 - **Questions** — the found cases that need a ruling (Step 2, 4c), one line each. They are also posted
   on the roadmap page's decisions panel.
 - **The published report's URL** (Step 5b), on its own line near the top — the artifact is the
@@ -378,7 +400,8 @@ verdict store below — do not hand-roll either.
 
 The page carries two halves, in this order:
 
-1. **The round report** — per item: issue → route → commit SHA or PR# · ADR id(s) · the one-line gate
+1. **The round report** — first the headline lines (Step 5: changes on main, will close on your approval,
+   housekeeping, net); then per item: issue → route → commit SHA or PR# · ADR id(s) · the one-line gate
    record · the **deviations from plan** line; then **Escalated**, **Skipped**, and the `stats:` line.
    The ledger made readable, not new information.
 2. **The play sheet** — the numbered cases **exactly as standing rule 5 specifies them**, `T1…Tn`

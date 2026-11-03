@@ -484,6 +484,25 @@ const SEEDED: SeededCorpus = {
   'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
   'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
   'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
+
+  // #2609 (ADR-3D-408) — a relation over points the line created places them on a figure with no solid (before: both
+  // refused «point-not-determined»). The stated value at seeds 0–23, the contradiction and the controls are asserted
+  // in blank-canvas-drive-2609.test.ts.
+  'blank-area-triangle-2609.geo3.json': ['שטח המשולש ABC = 4.5'],
+  'blank-line-parallel-plane-2609.geo3.json': ['AB∥ACD'],
+  // #2610 (ADR-3D-409) — a face, or a plane named by four letters, over letters a blank canvas lacks: created in one
+  // plane (before: refused «segments-do-not-meet» / «not-coplanar»). The coplanarity, the notice and the controls are
+  // asserted in coplanar-mint-2610.test.ts.
+  'face-diagonals-blank-2610.geo3.json': ['O מפגש האלכסונים של הפאה ABCD'],
+  'plane-cut-four-letters-blank-2610.geo3.json': ["ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'"],
+  'projection-on-four-letter-plane-blank-2610.geo3.json': ['BE היטל הישר TB על המישור ABCD'],
+  // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
+  // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
+  'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2642 (ADR-3D-411) — the issue's split rows (one given per row, ADR-W-167): a line declared by a lowercase letter
+  // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
+  // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
+  'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

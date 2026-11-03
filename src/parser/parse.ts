@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -36,7 +36,7 @@ import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
-import { nameAccounting } from '../../shell/llm/honestyCore';
+import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm } from '../../shell/llm/honestyCore';
 import { resolvePairRoles } from './pairRoles';
 import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
@@ -2200,8 +2200,9 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // — the crossing lies BEYOND the 2nd letter, ADR-054), or a "הישר"/infinite line (unconstrained). The old
   // code computed extension/line words UTTERANCE-GLOBALLY, so "המשך FO חותך את AC בנקודה E" stripped the
   // on-segment default from the BARE operand AC too — E landed past C, silently green.
-  const EXT_RE = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i;
-  const LINE_RE = /\bline\b|הישר|הקו|\bray\b|קרן/i;
+  // #2533 (ADR-774): both reference words come from the lexicon — the inline spelling missed every plural line noun.
+  const EXT_RE = rx(EXTENSION_REF);
+  const LINE_RE = rx(LINE_NOUN);
   const semOf = (span: string): 'bare' | 'ext' | 'line' =>
     EXT_RE.test(span) ? 'ext' : LINE_RE.test(span) ? 'line' : 'bare';
   // The text immediately BEFORE each operand pair (where its reference words live), located by walking the
@@ -13799,18 +13800,10 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // A radical's radicand may be a BARE number (`√32`) or a PARENTHESISED value (`√(2/3)`, `√(2)` — the ADR-298
   // Am. explicit grouping the √ button produces); `evalTerm` computes both, and the standalone pass below
   // accounts a radical that isn't part of a top-level fraction (`√(2/3)`, whose only division is inside the root).
-  const RAD = String.raw`√\s*(?:\(\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?\s*\)|\d+(?:\.\d+)?)`;
-  // a TERM tolerates an OUTER paren pair `(5√2)` (the ADR-298 Am. explicit grouping) around the `[coef]√rad`
-  // or plain number.
-  const TERM = String.raw`\(?\s*(?:(?:\d+(?:\.\d+)?\s*[*·]?\s*)?${RAD}|\d+(?:\.\d+)?)\s*\)?`;
-  const evalTerm = (raw: string): number => {
-    const t = raw.trim().replace(/^\(([\s\S]*)\)$/, '$1'); // strip an outer paren pair, keep an inner √(…)
-    const r = t.match(/^(?:(\d+(?:\.\d+)?)\s*[*·]?\s*)?√\s*(?:\(\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*\)|(\d+(?:\.\d+)?))$/);
-    if (!r) return parseFloat(t);
-    const rn = r[2] ?? r[4];
-    const radicand = r[3] !== undefined ? parseFloat(rn!) / parseFloat(r[3]) : parseFloat(rn!);
-    return (r[1] ? parseFloat(r[1]) : 1) * Math.sqrt(radicand);
-  };
+  // #2646 (ADR-777): the term grammar and its evaluator are the shell's ONE radical atom (`shell/llm/honestyCore`
+  // `radicalTerm` / `evalRadicalTerm`), which analytic's model-lane gate reads too; 2-D reads the √ glyph spelling.
+  const TERM = radicalTerm(RADICAL);
+  const evalTerm = evalRadicalTerm;
   // One pass over each VALUE expression `TERM [ / TERM ]` (longest match wins, so `35/√(32)` and `√(2/3)` are
   // each consumed WHOLE — never re-read as an inner `2/3`). Only a match that actually carries a √ or a top-
   // level `/` is accounted here; a lone plain number falls through to the digit loop below, which owns the

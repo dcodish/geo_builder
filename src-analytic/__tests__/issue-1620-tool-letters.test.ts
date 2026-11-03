@@ -94,13 +94,14 @@ describe('one point, one name (#1153), and stable letters', () => {
     expect(verdictKey(['משולש ABC', 'גובה מ-A במשולש ABC', 'גובה מנקודה A'])).toBe('already-known');
   });
 
-  it('a later NAME for the tool’s point is recorded on it, and the notice names the tool’s letter (#1595)', () => {
-    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): D is forced onto M, so the
-    // line records with «M ו-D נפלו על אותה נקודה.» (was #1153's `already-named`). 2-D instead hands the tool's letter
-    // over to D (an auto-rename); that drawing difference is reported on #1595, not decided here.
+  it('a later NAME for the tool’s point takes the tool’s letter over: one point D, no notice (#2674)', () => {
+    // ⚠ FLIPPED again by #2674 (ADR-AG-387; operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the
+    // student's, no message (2-D's way, in every builder)"). Was #1595's «M ו-D נפלו על אותה נקודה.» (ADR-AG-372), and
+    // before that #1153's `already-named`.
     const d = derive(['משולש ABC', 'תיכון מ-A במשולש ABC', 'D אמצע BC'], 0);
     expect(d.faults).toEqual([]);
-    expect(coincidencesOf(d)).toEqual([['M', 'D']]);
+    expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
+    expect(coincidencesOf(d)).toEqual([]);
   });
 
   it('a later line that uses the letter refers to the tool’s point, and never re-letters it', () => {

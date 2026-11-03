@@ -37,7 +37,7 @@ import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
-import { declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
+import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -46,17 +46,17 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
-import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
+import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, parse3, parseRewrite3, solidDeclaration3 } from '../parser/parse3';
+import { isBareAltitude3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -584,6 +584,13 @@ function vectorsNamedBy3(k: Command3): string[] {
   if (k.type === 'declare-vector') return [...k.names];
   if (k.type === 'vec-rel') return named(k.terms);
   if (k.type === 'claim' && k.claim.type === 'vec-eq') return [...named(k.claim.lhs), ...named(k.claim.rhs)];
+  // #1188 step 4 (ADR-3D-406): the metric givens a free vector can carry
+  if (k.type === 'vec-mag') return [k.name];
+  if (k.type === 'dot-given') return [k.v1, k.v2];
+  if (k.type === 'mag-val') return named(k.e);
+  if (k.type === 'mag-rel') return [...named(k.e1), ...named(k.e2)];
+  if (k.type === 'cos-angle') return named([{ atom: k.u }, { atom: k.v }]);
+  if (k.type === 'mutual-rel') return [k.a, k.b].flatMap((o) => (o.kind === 'vector' ? [o.name] : []));
   return [];
 }
 
@@ -642,6 +649,9 @@ function deriveCore3(
   mustStayOk?: readonly string[],
   /** #1310: where the refold reports which of {@link mustStayOk} its fold broke (read by the pass, never a reader). */
   foldOut?: { broken: string[] },
+  /** #2610 (ADR-3D-409): the created points that RIDE the plane their row names by 4+ letters — point id → plane name.
+   *  Placed with the free points before the fold (the row that names the plane declares it, in list order). */
+  preriders?: Readonly<Record<string, string>>,
 ): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
@@ -660,6 +670,7 @@ function deriveCore3(
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
   let c: Construction3 = premint ? mintFree(emptyConstruction3(), Object.values(premint).flat()) : emptyConstruction3();
+  for (const [id, plane] of Object.entries(preriders ?? {})) if (c.points.get(id)?.kind === 'free3') c.points.set(id, { kind: 'on-plane', plane });
   for (const name of Object.values(prelines ?? {}).flat()) {
     const made = applyCommand3(c, { type: 'free-line', name });
     if (made.ok) c = made.next;
@@ -940,6 +951,26 @@ function deriveCore3(
   const planesBy: Record<string, string[]> = preplanes ? Object.fromEntries(Object.entries(preplanes).map(([k, v]) => [k, [...v]])) : {};
   /** #1566 (ADR-3D-399): every solid the pass created, by row (its points ARE in the notice — #2048 ruling A, S2(c)). */
   const solidsBy: Record<string, MintedSolid3> = presolids ? { ...presolids } : {};
+  /** #2610 (ADR-3D-409): every created point that rides its row's named plane (point id → plane), across rows. */
+  const ridersOf: Record<string, string> = preriders ? { ...preriders } : {};
+  /**
+   * #2610: do the run's `members` that `base` holds already fix a plane — three of them, not collinear? Read off the
+   * figure's own evaluation (a stated collinear triple is collinear at every seed; free points never are).
+   */
+  const spansPlane3 = (base: Construction3, members: readonly string[]): boolean => {
+    const held = members.filter((q) => base.points.has(q));
+    if (held.length < 3) return false;
+    const pos = evaluate3(base, seed);
+    const pts = held.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+    for (let i = 0; i < pts.length; i++)
+      for (let j = i + 1; j < pts.length; j++)
+        for (let k = j + 1; k < pts.length; k++) {
+          const u = sub3(pts[j], pts[i]);
+          const v = sub3(pts[k], pts[i]);
+          if (norm3(cross3(u, v)) > 1e-6 * (1 + norm3(u) * norm3(v))) return true;
+        }
+    return false;
+  };
   const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
     let probe = base;
     const exp = expandFact(base, f);
@@ -982,13 +1013,19 @@ function deriveCore3(
       const lineIds: string[] = [];
       const planeIds: string[] = [];
       let solidMade: MintedSolid3 | null = null;
+      const riders: Record<string, string> = {};
       for (let m = missingOf(st, probe, f), n = 0; m !== null && n < 24; m = missingOf(st, probe, f), n++) {
-        if (m.kind === 'solid') {
+        // #2610 (ADR-3D-409): a missing point in a FACE or POLYGON run («הפאה ABCD», «המרובע ABCD») is created by the
+        // polygon's own declaration («מרובע ABCD»), atomically — the ADR-3D-399 solid shape, polygon edition
+        const run = m.kind === 'point' ? assertedRunOf3(f.cmds, m.id) : null;
+        const polygonCmds: Command3[] | null = run?.polygon && !solidMade ? polygonDeclaration3(run.ids) : null;
+        if (m.kind === 'solid' || polygonCmds) {
+          const declCmds: readonly Command3[] = m.kind === 'solid' ? m.cmds : polygonCmds!;
           // #1566 (ADR-3D-399): the declaration's own clash rules are inherited, and its refusal is the line's (atomic)
           if (solidMade) break; // one solid per line: a second «no such solid» after the first is the line's own reason
           let made = probe;
           let refused: FactStatus3 | null = null;
-          for (const cmd of m.cmds) {
+          for (const cmd of declCmds) {
             const r = applyCommand3(made, seated(cmd));
             if (!r.ok) {
               refused = r.error;
@@ -1001,14 +1038,21 @@ function deriveCore3(
             break;
           }
           const before = probe;
-          solidMade = { cmds: m.cmds, ids: [...made.points.keys()].filter((k) => !before.points.has(k)) };
+          solidMade = { cmds: declCmds, ids: [...made.points.keys()].filter((k) => !before.points.has(k)) };
           probe = made;
           st = dryRunOn(probe, f);
           continue;
         }
         if (m.kind === 'point') {
           ids.push(m.id);
+          // #2610 (ADR-3D-409): a missing member of a plane NAMED by 4+ letters, once three members fix the plane, rides
+          // it (`on-plane`, 2 sampled DOFs) — four independent free points would make «המישור ABCD» false at every seed
+          const plane = run && !run.polygon && run.plane !== undefined && spansPlane3(probe, run.ids.filter((q) => q !== m.id)) ? run.plane : null;
           probe = mintFree(probe, [m.id]);
+          if (plane !== null) {
+            probe.points.set(m.id, { kind: 'on-plane', plane });
+            riders[m.id] = plane;
+          }
           st = dryRunOn(probe, f);
           continue;
         }
@@ -1031,6 +1075,7 @@ function deriveCore3(
       // clash is real in list order). Every other post-mint reason is the row's own and is final here, as before.
       if (st !== null && typeof st === 'object' && st.code === 'already-defined' && (ids.length > 0 || lineIds.length > 0) && !solidMade) {
         mintedBy[f.id] = ids;
+        Object.assign(ridersOf, riders);
         if (lineIds.length) linesBy[f.id] = lineIds;
         failedAfterMint[f.id] = restatedAgainst(f, st);
         status[f.id] = failedAfterMint[f.id];
@@ -1045,6 +1090,7 @@ function deriveCore3(
       status[f.id] = restatedAgainst(f, applyFact(f));
       if (status[f.id] === 'ok') {
         mintedBy[f.id] = ids;
+        Object.assign(ridersOf, riders);
         if (lineIds.length) linesBy[f.id] = lineIds;
         if (planeIds.length) planesBy[f.id] = planeIds;
         if (solidMade) solidsBy[f.id] = solidMade;
@@ -1078,7 +1124,7 @@ function deriveCore3(
     const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
     for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
       const out = { broken: [] as string[] };
-      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, keepSolids, okBeforePass, out);
+      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, keepSolids, okBeforePass, out, ridersOf);
       /**
        * #1566 (ADR-3D-399): a row that is green in the fold of the rows UP TO IT failed only because a LATER row
        * contradicts it — two statements in conflict, which the declared-first figure reports as a conflict on both. It
@@ -1090,7 +1136,7 @@ function deriveCore3(
         if (at < 0 || at === factsIn.length - 1) return true;
         const upTo = new Set(factsIn.slice(0, at + 1).map((f) => f.id));
         const pick = <V,>(r: Record<string, V>): Record<string, V> => Object.fromEntries(Object.entries(r).filter(([k]) => upTo.has(k)));
-        const alone = deriveCore3(factsIn.slice(0, at + 1), seed, false, pick(keep), pick(keepLines), pick(reasons), pick(keepPlanes), pick(keepSolids));
+        const alone = deriveCore3(factsIn.slice(0, at + 1), seed, false, pick(keep), pick(keepLines), pick(reasons), pick(keepPlanes), pick(keepSolids), undefined, undefined, ridersOf);
         return alone.status[id] !== 'ok';
       };
       let failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok' && ownFailure(id));
@@ -1109,7 +1155,7 @@ function deriveCore3(
         const before = <V,>(rec: Record<string, V>) => Object.fromEntries(Object.entries(rec).filter(([k]) => order(k) < order(id)));
         if (Object.keys(keep).every((k) => order(k) < order(id))) return false;
         const probe = { broken: [] as string[] };
-        deriveCore3(factsIn, seed, false, before(keep), before(keepLines), reasons, before(keepPlanes), before(keepSolids), [id], probe);
+        deriveCore3(factsIn, seed, false, before(keep), before(keepLines), reasons, before(keepPlanes), before(keepSolids), [id], probe, ridersOf);
         return probe.broken.length === 0;
       };
       if (failed.length === 0 && out.broken.some(readsLater)) {
@@ -1939,7 +1985,7 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-metric' || st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
       // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
       const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];

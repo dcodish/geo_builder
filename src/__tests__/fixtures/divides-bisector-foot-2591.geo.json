@@ -1,0 +1,97 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-03T12:00:00.000Z",
+  "name": "divides-bisector-foot-2591",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AD חוצה זווית A",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-BAC",
+        "vertex": "A",
+        "p": "B",
+        "q": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "AD חוצה זווית A",
+      "group": "g1",
+      "cmd": {
+        "type": "line-through",
+        "id": "line-BC",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "AD חוצה זווית A",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "D",
+        "line1": "bis-BAC",
+        "line2": "line-BC"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "AD חוצה זווית A",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.5",
+      "utterance": "D מחלקת את BC ביחס 1:2",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.6",
+      "utterance": "D מחלקת את BC ביחס 1:2",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "B",
+        "b": "C",
+        "t": 0.3333333333333333
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

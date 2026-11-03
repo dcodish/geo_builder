@@ -169,9 +169,6 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
-    // #1188 (ADR-3D-386): the free-vector «not yet» refusals — the tool's limit, named with the student's line
-    case 'free-vector-metric':
-      return err.sentence ? t('err.freeVectorMetric', { sentence: err.sentence, id: err.id }) : t('err.freeVectorMetricAlone', { id: err.id });
     // #1188 step 2 (ADR-3D-390): a free vector the figure would have to be solved jointly with — the tool's limit
     case 'free-vector-coupling':
       return err.sentence ? t('err.freeVectorCoupling', { sentence: err.sentence, id: err.id }) : t('err.freeVectorCouplingAlone', { id: err.id });

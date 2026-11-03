@@ -318,7 +318,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   spelling, is still answered as already in the figure.
   A circle draws no plane of its own (#2126, operator 2026-10-15): no patch, no label and no «מישורים» row, as a
   triangle draws none and as in 2-D; a plane is drawn only when the student names it («מישור ABC», «π1»), and then once.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126.
+  **A point stated on the circle is placed on it** (#2611, as in 2-D): after «משולש ABC חסום במעגל», «D על המעגל» /
+  "D is on the circle" puts a new D on the circle (any of the figure's one circle: through a polygon, inside it, or
+  tangent to a line), free to move along it, and «הציגו תצורה אחרת» moves it. A letter an earlier line created as a
+  free point is placed on the circle the same way. A point the figure already places (a vertex, a midpoint) is
+  checked, and refused (today with «D אינה על הישר», the line wording) when it is not on it. With two circles,
+  «המעגל» names neither, as before.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350, ADR-3D-410; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126, #2611.
 - **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's
@@ -432,9 +438,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   true on a cube and drives a parallelogram on a figure free to become one. **Not yet** (refused honestly as the tool's
   limit, naming the statement — never «בדקו את החישוב» and never "u is not declared"): a statement that would make the
   figure and a free vector one joint solve, undecidable without solving both together («AE = t·p»; a span point over
-  a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
-  product on a free vector («|u| = 5», «u ⟂ v»), #1188 step 4.
-  - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
+  a free vector), #2603 — and so is a magnitude, angle, ⟂, ∥ or dot product between a free vector and the figure
+  («p ⟂ AB», «|AB| = |p|»). **Metric givens** ([ADR-3D-406](06b-decisions-3d.md#adr-3d-406)): a magnitude («|u| = 5»,
+  «|u + v| = 3»), a ratio of magnitudes («|u| = |v|», «|w+u| = |w-u|»), a dot product («u·v = 3»), an angle
+  («הזווית בין u ל-v היא 60»), ⟂ and ∥ over free vectors hold at every configuration, whatever order they come in;
+  what they leave free still moves with «הציגו תצורה אחרת», and stating one moves no vector it does not name. Givens
+  that cannot all hold («|u| = 1», «|v| = 1», «|u + v| = 3»; «u = (1,2,3)» with «|u| = 5») are refused naming the
+  lines. The data panel lists each such given («|u| = 5», «u ⟂ v», «∠(u, v) = 60°») and prints |u| once it is the
+  same in every configuration, even while the direction moves.
+  - Sources: ADR-052, ADR-3D-386, ADR-3D-387, ADR-3D-390, ADR-3D-406; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a
@@ -750,7 +762,18 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   every solid noun whose declaration the grammar reads (cube, box, tetrahedron, a four-letter pyramid). On a figure, new letters create their solid the same way, with the notice. «נפח הגוף
   ABCDE» names no family and stays refused. A later line that contradicts the created solid is refused as the
   contradiction, never «no such solid».
-  - Sources: ADR-3D-382, ADR-3D-399, ADR-W-162; #1467, #2048, #1566.
+  **The created points are placed so the line holds** (#2609): «שטח המשולש ABC = 4.5», «AB∥ACD», «∠SAB = ∠SAD»,
+  «אורך AB=BC», «קוסינוס הזווית ACB = 3/4» on an empty canvas build with the stated value true on the drawing, and
+  «הציגו תצורה אחרת» varies everything the line did not state. Two lines that cannot both hold («AB∥ACD» then «AB ⊥
+  ACD») are refused as the contradiction, naming the earlier line.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-408, ADR-W-162; #1467, #2048, #1566, #2609.
+  **A plane, face or polygon named by four or more letters is created in one plane** (#2610): «O מפגש האלכסונים של
+  הפאה ABCD» or «… של המרובע ABCD» on an empty canvas creates quadrilateral ABCD as «מרובע ABCD» declares it (a flat
+  convex polygon in the order written, free sizes) and then O, as 2-D does; «המישור BCC'B'», «E על המישור ABCD», a
+  projection onto «המישור ABCD» create the plane's missing letters so that all of them lie in it (the fourth and later
+  ones ride the plane through the first three). Letters already on the figure stay where they are; four existing
+  points that are not in one plane, named as a plane, are still refused.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-W-162; #1467, #2048, #1566, #2610.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two
@@ -758,7 +781,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   declaration refuses (a vector's) is refused as the declaration refuses it. No notice: the new row is the signal.
   This holds in every slot that names a line, the common perpendicular's two included: «הישר d מאונך לישר ℓ1 ולישר
   ℓ2» on an empty canvas creates ℓ1 and ℓ2 and draws d (#1566).
-  - Sources: ADR-3D-383, ADR-3D-399, ADR-W-163; #2489, #1566.
+  **A declared line is that line, with or without its noun** (#2642): after «ישר d», a bare letter in a relation reads
+  as the line the figure has, so «d מאונך ל-ℓ1», «d ⊥ ℓ1», «d ∥ ℓ1», «ℓ1 מאונך ל-d», «d מאונך למישור ABC», «u ⊥ v» over
+  two declared lines and «הזווית בין u ל-v היא 60» build exactly as their noun-led twins («הישר d מאונך לישר ℓ1») do.
+  A plural noun covers each name in its list («הישרים d ו-ℓ1 מאונכים», «… מצטלבים»). A letter declared as a vector keeps
+  the vector reading, and an undeclared letter with no noun is still refused «הווקטור «d» לא הוגדר».
+  - Sources: ADR-3D-383, ADR-3D-399, ADR-3D-411, ADR-W-163, ADR-W-167, ADR-W-175; #2489, #1566, #2642.
 - **FR-SP-27 (Must)** — **Every guide example builds on an empty canvas.** A click on a guide example submits it; when
   the canvas is empty and the example has nothing it could create — a free-vector line («|u|=|v|=1»), a role noun
   («גובה הפירמידה», «המנסרה ישרה»), a value for a letter («α = 70»), a solid's own element («אלכסון BD'») or a cone's
