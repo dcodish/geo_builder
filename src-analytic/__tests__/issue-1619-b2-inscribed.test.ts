@@ -165,6 +165,8 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
           { t: 'constraint', k: { t: 'on-curve', id: 'D', curve: 'circle-thru-ABC' } },
         ],
         about: onAll(['A', 'B', 'C', 'D'], SENT),
+        // #2130/#2376 (ADR-AG-386): the undescribed circle carries its ring, so M1 can apply 2-D's binding rule.
+        ring: { vertices: ['A', 'B', 'C', 'D'] },
       },
     ]);
   });

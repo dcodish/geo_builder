@@ -291,7 +291,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
-  '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
   '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
 
   '#2223': 'open', // #2219 (ADR-744): analytic and 3-D do not read a relation stated to a list of objects («AF מאונך ל-BC ול-DE»)
@@ -305,7 +304,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
   '#2365': 'open', // was #2342, merged into #2365 by the #2654 family sweep 2026-11-01: #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30») · was #2356, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane · was #2357, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): analytic sends the same spellings to the model
-  '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
   '#2409': 'open', // was #2448, merged into #2409 by the #2654 family sweep 2026-11-01: #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
@@ -1587,7 +1585,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2125 (ADR-3D-342): the circle through the vertices and the circle inside are two circles — both build, in either order ──
   { id: 'circum-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'], expect: 'builds', note: "the operator's sequence: 3-D refused the incircle «ABC כבר מוגדר» before ADR-3D-342 (both unnamed circles were circle-ABC)" },
-  { id: 'incircle-then-circum-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'מעגל חוסם את ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2130' }], note: 'analytic refuses the circumcircle unsatisfiable in this order (found by round #2128)' },
+  { id: 'incircle-then-circum-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'מעגל חוסם את ABC'], expect: 'builds', note: 'analytic refused the circumcircle unsatisfiable in this order before ADR-AG-386 (#2130: it bound the one circle, the incircle)' },
+  // ── #2130 + #2376 (ADR-AG-386): an undescribed inscription over drawn vertices binds only a circle that carries them all ──
+  { id: 'inscribed-beside-named-circle-2130', family: 'inscribed', steps: ['מעגל O', 'משולש ABC', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a new circle through A, B, C beside O; analytic moved the triangle onto O before ADR-AG-386' },
+  { id: 'circumcircle-binds-new-vertices-2130', family: 'inscribed', steps: ['מעגל O', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: 'control: new vertices go on the one circle, in both builders' },
   { id: 'circum-passive-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC'], expect: 'builds' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
@@ -1798,10 +1799,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2398 (ADR-747): a circle's centre given a second letter is refused in both builders ──
   { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D answers errors.unknownCircle as a clarify note (asks); analytic refuses unknown-reference O' },
   { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D names the holder (input.centreAlreadyNamed, a clarify note: asks); analytic refuses with unknown-reference O — the port is #2449' },
-  // The report's last line («F אמצע הקשת BC במעגל O») cannot be a row for analytic while the gap sits in its context: analytic
-  // records it on a figure that lost the second circle, so the row would pass vacuously. The gap row ends where analytic differs;
-  // 2-D's last line is locked by the fixture src/__tests__/fixtures/arc-on-minted-circle-name-2362.geo.json.
-  { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses «משולש ABC חסום במעגל» third-crossing (line CD meets ONE circle at C, D and A: it reads the second unnamed circle as the first); measured at 37800b85, 8a5372be and the round tip' },
+  // The fifth line, the one analytic refused before ADR-AG-386; the report line is the next row.
+  { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: 'analytic refused «משולש ABC חסום במעגל» (third-crossing, then polygon-collapsed) before ADR-AG-386: it read the second unnamed circle as the first' },
+  // The report line itself, now that analytic draws the second circle (ADR-AG-386): O names the drawn circle through B and C.
+  { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', note: "#2376: analytic drew a second circle O (or asked which circle) before ADR-AG-386; 2-D's ADR-748 §5 names the circle by use" },
   // ── #2211 + #2219 (ADR-744): a relation stated to a LIST of objects holds for each — the distributor's object-list shape ──
   { id: 'circle-tangent-to-two-circles-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגל O ולמעגל P'], expect: 'builds', exception: 'X8', note: '2-D committed Q tangent to O with P dropped before ADR-744 (then escalated after ADR-735); analytic already distributes it' },
   { id: 'circle-tangent-to-pair-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: '2-D drew O and P tangent with Q dropped before ADR-735; analytic answers not-handled' },

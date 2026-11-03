@@ -1046,7 +1046,19 @@ function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undef
 function theCircle(
   c: Construction,
   match: { centre: Id } | { eq: Expr } | { inscribed: Id[] } | undefined,
+  ring?: { vertices: Id[]; held?: true },
 ): { t: 'bind'; host: GeoObject } | { t: 'create' } | { t: 'ambiguous'; circles: GeoObject[] } {
+  /*
+   * AN UNDESCRIBED INSCRIPTION OVER VERTICES THE FIGURE ALREADY HAD (#2130/#2376, ADR-AG-386) — 2-D's rule, ported as
+   * one predicate: `boundInscribeCircle` binds an existing circle only when some vertex is NEW (`ringAllExist` false),
+   * and `reusedInscribeCircle` (ADR-156) reuses one only when every vertex already RIDES it. So over held vertices the
+   * circle that carries them all is this one (re-inscribing never mints a twin), and with none the sentence states its
+   * own circle through them — never the incircle, nor a circle the ring is not on, pulled onto the vertices.
+   */
+  if (!match && ring?.held) {
+    const carrier = c.objects.find((o) => curveKindOf(o) === 'circle' && ring.vertices.every((v) => onCurveByConstruction(c, o, v)));
+    return carrier ? { t: 'bind', host: carrier } : { t: 'create' };
+  }
   if (match && 'inscribed' in match) {
     // The circle already stated tangent to every side of the ring (ADR-AG-198) — exactly one binds, else create.
     const ring = match.inscribed;
@@ -1342,16 +1354,39 @@ function unhidden(c: Construction, id: Id): Construction {
  * named circle the figure lacks, ADR-AG-210, which re-applies the fact against it), the ONE circle for the contextual
  * reading; none or several of those is the contextual refusal every circle reference gives.
  */
-function arcHost(c: Construction, name: string | undefined, f: Fact): { o: GeoObject } | { outcome: ApplyOutcome } {
+function arcHost(c: Construction, name: string | undefined, f: Fact, ends: readonly Id[]): { o: GeoObject } | { outcome: ApplyOutcome } {
   if (name !== undefined) {
     const named = circleByName(c, name);
-    if (!named) return { outcome: statingNamedCircle(c, name, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', name)) } };
+    if (!named) {
+      const byUse = arcNamesByUse(c, name, f, ends);
+      if (byUse) return { outcome: byUse };
+      return { outcome: statingNamedCircle(c, name, f) ?? { ok: false, error: unknownRef(c, numeralCurveId('circle', name)) } };
+    }
     if (curveKindOf(named) !== 'circle') return { outcome: { ok: false, error: unknownRef(c, numeralCurveId('circle', name)) } };
     return { o: named };
   }
   const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
   if (circles.length !== 1) return { outcome: { ok: false, error: noHost(f.src, 'circle', circles) } };
   return { o: circles[0] };
+}
+
+/**
+ * THE ARC NAMES THE DRAWN CIRCLE BY USE (#2376, ADR-AG-386; 2-D's ADR-748 §5, FR-IN-13; the operator's 2026-10-20 ruling
+ * on #2362: a centre the student did not define, and cannot see, dictates nothing). «F אמצע הקשת BC במעגל O» with a
+ * letter no circle carries and no point holds, beside an UNNAMED circle (its centre has no letter) that already carries
+ * both ends of the arc: O names that circle — its centre becomes O (`namingByOrder`, ADR-AG-219's device) and the
+ * sentence is re-applied on it, so no second circle is drawn. The candidates are the INTERSECTION of the ends' circles
+ * (ADR-748 §6): one → it; several → «which circle?» (`noHost`); none → `null`, and the caller keeps today's reading (a
+ * new circle O, ADR-AG-210).
+ */
+function arcNamesByUse(c: Construction, name: string, f: Fact, ends: readonly Id[]): ApplyOutcome | null {
+  if (!POINT_LETTER.test(name) || isNumeralName(name) || objectById(c, name) || ends.length === 0) return null;
+  const held = c.objects.filter(
+    (o) => curveKindOf(o) === 'circle' && centreRuleOf(o) !== null && centreIdOf(c, o) === null && ends.every((p) => onCurveByConstruction(c, o, p)),
+  );
+  if (held.length === 0) return null;
+  if (held.length > 1) return { ok: false, error: noHost(f.src, 'circle', held) };
+  return namingByOrder(c, held[0], name, f);
 }
 
 /** «each of these is ON the circle» — skipping a point the circle already carries (a defining point, a stated incidence, its centre). */
@@ -3589,7 +3624,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!o || !isPositional(o)) return { ok: false, error: unknownRef(c, id) };
       }
       if (f.terms.some((t) => t.a === t.b)) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
-      const host = arcHost(c, f.circle, f);
+      const host = arcHost(c, f.circle, f, ends);
       if ('outcome' in host) return host.outcome;
       return applyAll(c, [
         ...onCircle(c, host.o, ends, f.src),
@@ -3605,7 +3640,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'arc-mid': {
       if (f.a === f.b || f.id === f.a || f.id === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
-      const host = arcHost(c, f.circle, f);
+      const host = arcHost(c, f.circle, f, [f.a, f.b]);
       if ('outcome' in host) return host.outcome;
       const num = (value: number): Expr => ({ kind: 'num', value });
       const declares = [f.a, f.b, f.id].map((id): Fact => ({ t: 'declare', id, src: f.src }));
@@ -4005,7 +4040,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'the-circle': {
-      const bound = theCircle(c, f.match);
+      const bound = theCircle(c, f.match, f.ring);
       if (bound.t === 'ambiguous') return { ok: false, error: noHost(f.src, 'circle', bound.circles) };
       if (bound.t === 'create') return applyAll(c, f.create);
       const about = JSON.parse(JSON.stringify(f.about).split(CIRCLE_SENTINEL).join(bound.host.id)) as Fact[];
@@ -6460,13 +6495,26 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
    */
   const restated = new Set<number>();
   const lineOfFact = (i: number) => (group ? group[i] : i);
+  /*
+   * WHETHER AN INSCRIPTION'S VERTICES PREDATE ITS LINE (#2130/#2376, ADR-AG-386) — 2-D's `ringAllExist`, asked of the
+   * fold's own provenance (`objectFact`): a vertex is held when an EARLIER-committed fact of another line brought it in.
+   * A vertex this line creates (its noun, or the mint pass) is new, so the inscription binds the one circle as before.
+   */
+  const aged = (f: Fact, i: number): Fact => {
+    if (f.t !== 'the-circle' || !f.ring) return f;
+    const held = f.ring.vertices.every((v) => {
+      const k = objectFact.get(v);
+      return k !== undefined && lineOfFact(k) !== lineOfFact(i);
+    });
+    return held ? { ...f, ring: { vertices: f.ring.vertices, held: true } } : f;
+  };
   facts.forEach((f, i) => {
     if (!include(i)) return;
     if (restated.has(lineOfFact(i)) && f.t === 'constraint' && f.definition) {
       commit(i, c, 'known');
       return;
     }
-    const out = applyFact(c, f);
+    const out = applyFact(c, aged(f, i));
     if (out.ok) {
       commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
       if (out.restates) restated.add(lineOfFact(i));
@@ -6482,7 +6530,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
       facts.forEach((f, i) => {
         if (!include(i) || !errors[i]) return;
         if (failedOn.get(i) === c) return;
-        const out = applyFact(c, f);
+        const out = applyFact(c, aged(f, i));
         if (out.ok) {
           commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
           progressed = true;
@@ -6561,7 +6609,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         let at = next;
         let refused: ApplyError | null = null;
         for (const { f, j } of failing) {
-          const out = applyFact(at, f);
+          const out = applyFact(at, aged(f, j));
           if (!out.ok) {
             refused = out.error;
             break;

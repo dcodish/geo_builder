@@ -495,7 +495,11 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R133 — «המעגל» is the circle the figure has**. *(Operator: "The student stated ONE circle twice.")* With two or more circles «המעגל» is refused as ambiguous.
 - «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» → one circle, M at (3,1)
-- Sources: ADR-AG-196, #1633, #1619.
+- **An inscription with no description of its circle** («ABC חסום במעגל», «מעגל חוסם את ABC») binds the drawn circle only when one of its vertices is new, or when that circle already passes through every vertex; over vertices already drawn it otherwise draws its own circle through them, as 2-D does. «משולש ABC» · «מעגל חסום במשולש ABC» · «מעגל חוסם את ABC» → the incircle and the circle through A, B, C; «מעגל O» · «משולש ABC» · «משולש ABC חסום במעגל» → a new circle beside O; «מעגל O» · «משולש ABC חסום במעגל» → A, B, C on O.
+- Sources: ADR-AG-196, ADR-AG-386, #1633, #1619, #2130, #2376.
+
+**R229 — an arc's new circle letter names the drawn circle through its ends**. *(Operator, 2026-10-20 on #2362: a centre the student did not define, and cannot see, dictates nothing; 2-D's FR-IN-13.)* «F אמצע הקשת BC במעגל O» (and "F is the midpoint of arc BC in circle O", «קשת BC במעגל O היא 100») with a letter no circle and no point has, beside an unnamed drawn circle through B and C, makes O that circle's centre and puts F on it: no second circle is drawn. Two such circles → the tool asks which circle; none → a new circle O, as before. A circle the student named is never renamed this way.
+- Sources: ADR-AG-386, ADR-748 (2-D), #2376.
 
 **R139 — every circle can be named in a sentence, a diameter works on every circle, and the data panel never shows the tool's own symbols**. A computed circle by its role or centre; an open equation shows «—», never an internal symbol.
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
