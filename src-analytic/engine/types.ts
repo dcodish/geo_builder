@@ -1416,7 +1416,18 @@ export type Quantity =
    * concentric pair kept apart); `cross`: |AB| − |rₐ − r_b|, positive when neither lies inside the other and they are not
    * one circle («שני מעגלים נחתכים» — two crossings of two DIFFERENT circles). Regions, so selectors: they consume no freedom.
    */
-  | { k: 'circles'; a: Id; b: Id; rel: 'apart' | 'inside' | 'larger' | 'cross' }
+  | {
+      k: 'circles';
+      a: Id;
+      b: Id;
+      rel: 'apart' | 'inside' | 'larger' | 'cross';
+      /**
+       * The region a letter-named common tangent's SLOT needs on a pair the givens leave unsettled (#2408, ADR-AG-385):
+       * `cross` for an external family (neither circle inside the other), `apart` for an internal one. Judged like
+       * any region, but never read back as a position the student stated (`pairPositionOf`).
+       */
+      slot?: true;
+    }
   /**
    * WHICH SIDE OF A COMMON TANGENT THE CENTRES ARE ON (#1622 E3, ADR-AG-219) — the product of the two centres' signed
    * sides of the line `p``q`: positive for an EXTERNAL common tangent (both on one side), negative for an internal one.

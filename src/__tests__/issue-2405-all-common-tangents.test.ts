@@ -115,7 +115,7 @@ describe('#2405 — every common tangent of a pair whose position is stated', ()
     it(`one circle inside the other · «${line}» → the existing «no common tangent» refusal`, async () => {
       const { v } = await play([...CONTAINED, line]);
       expect(v.kind).toBe('refuse');
-      expect(noteKey(v)).toBe('input.tangentsExhaustedContained');
+      expect(noteKey(v)).toBe('suite.refusal.tangentsExhaustedContained');
     });
 
   it('the tangents are named by auto touch letters AB, CD, EF, GH (the «שני המשיקים המשותפים» convention)', async () => {
@@ -139,7 +139,7 @@ describe('#2405 — every common tangent of a pair whose position is stated', ()
   it('a repeated «כל…» has nothing left to draw → the existing «all four are drawn» refusal', async () => {
     const { v } = await play([...APART, SPELLINGS[0], SPELLINGS[0]]);
     expect(v.kind).toBe('refuse');
-    expect(noteKey(v)).toBe('input.tangentsExhaustedAny');
+    expect(noteKey(v)).toBe('suite.refusal.tangentsExhaustedAny');
   });
 
   it('stability: the circles and T do not move across the line', async () => {
@@ -208,11 +208,11 @@ describe('#2405 / #2447 — a set with a kind stated is every tangent of that ki
     });
 
   const REFUSED: [string, string[], string, string][] = [
-    ['crossing, internal: there is none', CROSSING, INT_SET, 'input.tangentsExhaustedNoInternal'],
-    ['touching from inside, internal: there is none', INT, INT_SET, 'input.tangentsExhaustedNoInternal'],
-    ['one inside the other, external', CONTAINED, EXT_SET, 'input.tangentsExhaustedContained'],
-    ['apart, both externals already drawn', [...APART, EXT_SET], EXT_SET, 'input.tangentsExhaustedExternal'],
-    ['touching from outside, the line at T already drawn', [...EXT, INT_SET], INT_SET, 'input.tangentsExhaustedTouchTaken'],
+    ['crossing, internal: there is none', CROSSING, INT_SET, 'suite.refusal.tangentsExhaustedNoInternal'],
+    ['touching from inside, internal: there is none', INT, INT_SET, 'suite.refusal.tangentsExhaustedNoInternal'],
+    ['one inside the other, external', CONTAINED, EXT_SET, 'suite.refusal.tangentsExhaustedContained'],
+    ['apart, both externals already drawn', [...APART, EXT_SET], EXT_SET, 'suite.refusal.tangentsExhaustedExternal'],
+    ['touching from outside, the line at T already drawn', [...EXT, INT_SET], INT_SET, 'suite.refusal.tangentsExhaustedTouchTaken'],
     ['position never stated', UNSTATED, EXT_SET, 'input.ambiguousConstruct'],
   ];
   for (const [name, prefix, line, key] of REFUSED)

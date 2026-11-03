@@ -18,7 +18,7 @@
 import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
-import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
+import { FAMILIES_OF, positionOfCircles, reversedFamily, type PairPosition } from './commonTangents';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
 import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
 import { namesCurveFeature, sameDerivation } from './sameDerivation';
@@ -62,6 +62,7 @@ import {
   type Fact,
   type Selector,
   type ArcDef,
+  type CommonTangentFamily,
   type GeoObject,
   type Id,
   type PointObject,
@@ -271,7 +272,11 @@ export type ApplyErrorCode =
   /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
    *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
   | 'radius-contradicts'
-  /** #2390 (ADR-AG-314): «כל המשיקים המשותפים» about a circle inside the other — 2-D's `tangentsExhaustedContained`. */
+  /**
+   * #2390 (ADR-AG-314): «כל המשיקים המשותפים» about a circle inside the other — 2-D's `tangentsExhaustedContained`; and
+   * (#2408 / #2411, ADR-AG-385) a letter-named common tangent the pair has no free slot for, `tangents` naming which of
+   * 2-D's sentences.
+   */
   | 'no-common-tangent'
   /**
    * #2388 (ADR-AG-307; operator ruling 2026-10-20, *"Detect the clash and refuse, naming both readings"*): the radius
@@ -323,6 +328,8 @@ export interface ApplyError {
    * A TOKEN, never a sentence: the engine stays language-free, and He/En render it in `App.tsx`.
    */
   existing?: ExistingKind;
+  /** For `no-common-tangent` (#2408 / #2411, ADR-AG-385): WHICH of 2-D's tangentsExhausted* sentences — absent is `Contained`. */
+  tangents?: TangentsExhausted;
   /**
    * WHAT KIND of object the statement expected to find (#1179).
    *
@@ -2060,7 +2067,8 @@ function lineOverPair(c: Construction, a: Id, b: Id): GeoObject | undefined {
 function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
   const pair = (a: Id, b: Id) => (a === c1 && b === c2) || (a === c2 && b === c1);
   for (const s of c.selectors) {
-    if (s.kind !== 'sign' || s.q.k !== 'circles' || !s.positive || !pair(s.q.a, s.q.b)) continue;
+    // A common-tangent slot's region (ADR-AG-385) is what a drawn tangent needs, never a position the student stated.
+    if (s.kind !== 'sign' || s.q.k !== 'circles' || s.q.slot || !s.positive || !pair(s.q.a, s.q.b)) continue;
     if (s.q.rel === 'apart' || s.q.rel === 'cross' || s.q.rel === 'inside') return s.q.rel;
   }
   const o1 = objectById(c, c1);
@@ -2079,6 +2087,161 @@ function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
     !!u && [u.cx - v.cx, u.cy - v.cy, u.r - v.r].every((d) => Math.abs(d) <= 1e-9 * Math.max(1, Math.abs(v.cx), Math.abs(v.cy), v.r));
   if (!at.every(([p, q]) => same(p, p0) && same(q, q0))) return null;
   return positionOfCircles(p0, q0);
+}
+
+/** 2-D's tangentsExhausted* sentence, by its suffix (`src/i18n/humanizeError.ts` `tangentsExhaustedKey`) — ADR-AG-385. */
+export type TangentsExhausted =
+  | 'Any' | 'External' | 'Internal' | 'ExtTangent' | 'Intersecting' | 'IntTangent' | 'TouchTaken' | 'NoInternal' | 'Contained';
+
+/** 2-D's mapping, one for one (`tangentsExhaustedKey`): the pair's position and the kind the sentence asked for. */
+export function tangentsExhaustedOf(kind: 'external' | 'internal' | undefined, position: PairPosition | null): TangentsExhausted {
+  if (position === 'inside') return 'Contained';
+  if (position === 'int-tangent') return kind === 'internal' ? 'NoInternal' : 'IntTangent';
+  if (position === 'cross') return kind === 'internal' ? 'NoInternal' : 'Intersecting';
+  if (position === 'ext-tangent') return kind === 'external' ? 'External' : kind === 'internal' ? 'TouchTaken' : 'ExtTangent';
+  return kind === 'external' ? 'External' : kind === 'internal' ? 'Internal' : 'Any';
+}
+
+/**
+ * The pair's TWO-TOUCH families by position (2-D's capacity rule: a tangent pair's third tangent is the one at T), in the
+ * order a letter-named tangent offers them: 2-D's (external before internal) in ADR-AG-314's naming order.
+ */
+const TWO_TOUCH_OF: Readonly<Record<PairPosition, readonly CommonTangentFamily[]>> = {
+  apart: FAMILIES_OF.apart,
+  'ext-tangent': ['ext-a', 'ext-b'],
+  cross: ['ext-a', 'ext-b'],
+  'int-tangent': [],
+  inside: [],
+};
+
+/** One letter-named common tangent of a pair, read off its `common-touch` conditions (#2408, ADR-AG-385). */
+interface PairTangent {
+  /** Its touch on the pair's FIRST circle (as this pair is named). */
+  touch: Id;
+  /** Its stated kind, read off the families it may be: all external, all internal, or either (`undefined`). */
+  kind?: 'external' | 'internal';
+}
+
+/**
+ * THE PAIR c1→c2'S COMMON TANGENTS THE FIGURE ALREADY HOLDS (#2408, ADR-AG-385): every letter-named one (its
+ * `common-touch` conditions, possibly a choice of families) and the families «כל המשיקים המשותפים» drew as lines, each
+ * read in this pair's order (`reversedFamily` when it was named the other way round). Read off the construction.
+ */
+function pairCommonTangents(c: Construction, c1: Id, c2: Id): { letters: PairTangent[]; lines: Set<CommonTangentFamily> } {
+  const lines = new Set<CommonTangentFamily>();
+  const ours = (circles: readonly [Id, Id]) => (circles[0] === c1 && circles[1] === c2 ? 1 : circles[0] === c2 && circles[1] === c1 ? -1 : 0);
+  for (const o of c.objects) {
+    if (o.kind !== 'common-tangent') continue;
+    const dir = ours(o.circles);
+    if (dir !== 0) lines.add(dir === 1 ? o.family : reversedFamily(o.family));
+  }
+  const byTouch = new Map<Id, Set<CommonTangentFamily>>();
+  const visit = (k: Constraint): void => {
+    if (k.t === 'choice') return k.options.forEach(visit);
+    if (k.t === 'all') return k.of.forEach(visit);
+    if (k.t !== 'derived-at' || k.rule.t !== 'common-touch') return;
+    const dir = ours(k.rule.circles);
+    if (dir === 0 || (dir === 1 ? k.rule.on !== 0 : k.rule.on !== 1)) return;
+    const set = byTouch.get(k.id) ?? new Set<CommonTangentFamily>();
+    set.add(dir === 1 ? k.rule.family : reversedFamily(k.rule.family));
+    byTouch.set(k.id, set);
+  };
+  c.constraints.forEach(visit);
+  const letters = [...byTouch].map(([touch, families]): PairTangent => {
+    const all = [...families];
+    const kind = all.every((g) => g.startsWith('ext')) ? 'external' : all.every((g) => g.startsWith('int')) ? 'internal' : undefined;
+    return kind ? { touch, kind } : { touch };
+  });
+  return { letters, lines };
+}
+
+/**
+ * WHERE A LETTER-NAMED COMMON TANGENT TOUCHES, BY CONSTRUCTION (#2408, ADR-AG-385) — for the point `q`: the circle it
+ * touches, the tangent's other touch, and the index of the constraint that says so. A slot is a `common-touch` pair of
+ * `derived-at` rows, or a `choice` of them over families; in every option `q` touches the same circle and the line
+ * through `q` and its partner is that family's tangent — so the line is tangent to the circle at `q` in every
+ * configuration. `null` when `q` is no such touch.
+ */
+export function commonTouchOf(c: Construction, q: Id): { circle: Id; partner: Id; index: number } | null {
+  const pairOf = (k: Constraint): { circle: Id; partner: Id } | null => {
+    if (k.t !== 'all' || k.of.length !== 2) return null;
+    const [u, v] = k.of;
+    if (u.t !== 'derived-at' || v.t !== 'derived-at' || u.rule.t !== 'common-touch' || v.rule.t !== 'common-touch') return null;
+    if (u.rule.family !== v.rule.family || u.rule.circles.join() !== v.rule.circles.join() || u.rule.on === v.rule.on) return null;
+    const mine = u.id === q ? u : v.id === q ? v : null;
+    if (!mine || mine.rule.t !== 'common-touch') return null;
+    return { circle: mine.rule.circles[mine.rule.on], partner: mine === u ? v.id : u.id };
+  };
+  for (let i = 0; i < c.constraints.length; i++) {
+    const k = c.constraints[i];
+    const options = k.t === 'choice' ? k.options : [];
+    if (options.length > 0) {
+      const each = options.map(pairOf);
+      const first = each[0];
+      if (first && each.every((e) => e && e.circle === first.circle && e.partner === first.partner)) return { ...first, index: i };
+      continue;
+    }
+    // One family: its two rows stand side by side at the top level.
+    if (k.t === 'derived-at' && k.id === q && k.rule.t === 'common-touch') {
+      const rule = k.rule;
+      const j = c.constraints.findIndex(
+        (m) => m.t === 'derived-at' && m.id !== q && m.rule.t === 'common-touch' && m.rule.family === rule.family && m.rule.circles.join() === rule.circles.join() && m.rule.on !== rule.on,
+      );
+      if (j >= 0) return { circle: rule.circles[rule.on], partner: (c.constraints[j] as { id: Id }).id, index: Math.max(i, j) };
+    }
+  }
+  return null;
+}
+
+/** Is the tangent at the circles' touch point `t` already drawn — a line stated perpendicular to the radius there? */
+function touchTangentDrawn(c: Construction, t: Id): boolean {
+  return (
+    c.constraints.some((k) => k.t === 'relation' && k.rel === 'perpendicular' && k.u.k === 'radius' && k.u.at === t) ||
+    c.objects.some((o) => o.kind === 'line-at' && o.perp && o.through === t && o.dir.k === 'radius')
+  );
+}
+
+type Slot =
+  | { families: CommonTangentFamily[]; apartFrom: Id[]; needs?: 'cross' | 'apart' }
+  | { touch: Id }
+  | { known: true }
+  | { error: ApplyError };
+
+/**
+ * WHICH OF THE PAIR'S COMMON TANGENTS A LETTER-NAMED ONE MAY BE (#2408 / #2411, ADR-AG-385) — 2-D's capacity rule
+ * (`src/parser/parse.ts` #197 Am. 4: `priorOfKind + 1 > capacity`) over the families of ADR-AG-314. The two-touch
+ * families the position has, of the stated kind, minus the lines «כל המשיקים המשותפים» drew, offered from the k-th on
+ * (k earlier tangents of that kind), so the first configuration draws 2-D's order; a pair the givens leave unsettled
+ * (`position` null) has all four, with the region that many tangents need. None left: on a pair touching from outside
+ * with its touch point named and the line there not yet drawn, the tangent at it (2-D builds it); otherwise 2-D's
+ * refusal for the position.
+ */
+function commonTangentSlot(
+  c: Construction,
+  f: Extract<Fact, { t: 'common-tangent' }>,
+  position: PairPosition | null,
+  touch: Id | null,
+): Slot {
+  const [c1, c2] = f.circles;
+  const refuse = (): Slot => ({ error: { code: 'no-common-tangent', detail: f.src, tangents: tangentsExhaustedOf(f.kind, position) } });
+  if (position === 'inside') return refuse();
+  const { letters, lines } = pairCommonTangents(c, c1, c2);
+  // The same tangent stated again (its touch on the first circle already one of the pair's): known, never a second slot.
+  if (letters.some((e) => e.touch === f.a)) return { known: true };
+  const prior = letters;
+  const families = TWO_TOUCH_OF[position ?? 'apart']
+    .filter((g) => !f.kind || (f.kind === 'external') === g.startsWith('ext'))
+    .filter((g) => !lines.has(g));
+  const priorOfKind = f.kind ? prior.filter((e) => e.kind === f.kind).length : prior.length;
+  if (priorOfKind < families.length) {
+    const k = priorOfKind;
+    const rotated = [...families.slice(k), ...families.slice(0, k)];
+    const total = prior.length + lines.size + 1;
+    const needs = position !== null ? undefined : f.kind === 'internal' || total > 2 ? ('apart' as const) : ('cross' as const);
+    return { families: rotated, apartFrom: prior.map((e) => e.touch), ...(needs ? { needs } : {}) };
+  }
+  if (position === 'ext-tangent' && f.kind !== 'external' && touch !== null && !touchTangentDrawn(c, touch)) return { touch };
+  return refuse();
 }
 
 /**
@@ -4462,7 +4625,38 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
               { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
             ];
-      const touched = applyAll(c, touches);
+      /*
+       * A SLOT OF THE PAIR, NOT TWO FREE TANGENCIES (#2408 / #2411, ADR-AG-385). Away from the touch arms above, the line
+       * is ONE OF THE PAIR'S COMMON-TANGENT FAMILIES (ADR-AG-314's closed form): its letters are that family's touches
+       * (`derived-at` a `common-touch`), so no circle is moved to fit it (the stability rule). WHICH family is the
+       * unstated choice it always was (ADR-052: a later given — «… חותך את ציר ה-y מתחת לציר ה-x» — picks it, «הציגו
+       * תצורה אחרת» cycles it), over the families the pair has, of the stated kind; the k-th tangent of the pair offers
+       * them from the k-th on, so the configuration drawn first is 2-D's order (external a, external b, internal a,
+       * internal b), and its touch on the first circle is kept apart from every earlier one's: two names never share a
+       * line. One past the pair's count is refused with 2-D's sentence for the position.
+       */
+      const slot = figureSays || linesSay ? null : commonTangentSlot(c, f, position ?? pairPositionOf(c, c1, c2), touch);
+      if (slot && 'error' in slot) return { ok: false, error: slot.error };
+      if (slot && 'known' in slot) return { ok: true, effect: 'known', next: c };
+      let placed: Fact[] = touches;
+      if (slot && 'touch' in slot) {
+        placed = [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: slot.touch, src: f.src }];
+      } else if (slot) {
+        const at = (id: Id, family: CommonTangentFamily, on: 0 | 1): Constraint => ({ t: 'derived-at', id, rule: { t: 'common-touch', circles: [c1, c2], family, on } });
+        const options: Constraint[] = slot.families.map((g) => ({ t: 'all', of: [at(f.a, g, 0), at(f.b, g, 1)] }));
+        placed = [
+          ...(options.length === 1
+            ? [at(f.a, slot.families[0], 0), at(f.b, slot.families[0], 1)].map((k): Fact => ({ t: 'constraint', k, src: f.src }))
+            : [{ t: 'constraint' as const, k: { t: 'choice' as const, options }, src: f.src }]),
+          ...(slot.apartFrom.length > 0 ? [{ t: 'selector' as const, sel: { kind: 'distinct' as const, ids: [f.a, ...slot.apartFrom] }, src: f.src }] : []),
+          // An unsettled pair (free circles): the configuration must HAVE that many tangents — up to two need neither
+          // circle inside the other, a third (or an internal one) needs them apart. A region: it consumes no freedom.
+          ...(slot.needs
+            ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'circles' as const, a: c1, b: c2, rel: slot.needs, slot: true as const }, positive: true }, src: f.src }]
+            : []),
+        ];
+      }
+      const touched = applyAll(c, placed);
       if (!touched.ok) return touched;
       const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
       return drawn.ok ? { ...drawn, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) } : drawn;
@@ -5527,7 +5721,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const o = objectById(c, curveRef);
         // A centre names an equation curve; a touch point names two circles of any construction (#1504), and
         // a side's touch point one circle of any construction (#1619 B2).
-        const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch');
+        const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch' || f.rule.t === 'common-touch');
         // A foot is dropped onto any LINE object — stated by its equation, constructed, a tangent (#1620, ADR-AG-207).
         const anyLine = f.t === 'derived' && f.rule.t === 'foot';
         const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : anyLine ? !!o && curveKindOf(o) === 'line' : !!o && o.kind === 'curve';

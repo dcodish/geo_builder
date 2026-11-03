@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
-import { curveParentsOf } from './derived';
+import { curveParentsOf, parentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
@@ -2350,8 +2350,22 @@ function lineGroupsOf(c: Construction): LineGroups {
    * radius `r_O`, a line's free direction `θ_l4`, a parameter in a stated equation)? The symbol is in the solve vector
    * as much as the points are, wherever the row reads it (`carrierSystem` solves every `paramRegister` symbol).
    */
+  /*
+   * …except a CLOSED FORM OF THE EARLIER FIGURE about a vertex this line introduced (#2408, ADR-AG-385): a `derived-at`
+   * whose subject is a free vertex of a LATER line than every parent of its rule says where that vertex is, given the
+   * figure as it stood, and the vertex alone meets it (two coordinates, two rows). The symbols its parents are read
+   * through (a free circle's radius) are the earlier figure's, so its group fits the vertex and the circle stays put.
+   */
+  const subjectLed = (k: Constraint): boolean => {
+    if (k.t !== 'derived-at') return false;
+    const own = lines[k.id];
+    const subject = c.objects.find((o) => o.id === k.id);
+    if (own === undefined || !subject || !isFree(subject)) return false;
+    const parents = [...parentsOf(k.rule), ...curveParentsOf(k.rule)];
+    return parents.length > 0 && parents.every((p) => lines[p] !== undefined && lines[p] < own);
+  };
   const throughSymbol = (k: Constraint): boolean =>
-    constraintSymbols([k]).length > 0 || [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0);
+    constraintSymbols([k]).length > 0 || (!subjectLed(k) && [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0));
   let unknownLine = false;
   /** The free vertices `value` is placed from, its latest line, and that line's vertices — null for none. */
   const topOf = (value: unknown): { all: Set<Id>; line: number; ids: Id[] } | null => {

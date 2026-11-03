@@ -292,8 +292,8 @@ export function errorText(error: InputError, t: Translate): string {
       : error.key === 'radius-letter-taken' && error.declared ? 'errRadiusLetterIsPoint' : 'errRadiusLetterIsPointAlone',
     // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
     'forced-collinear': 'errForcedCollinear',
-    // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte
-    'no-common-tangent': 'errNoCommonTangent',
+    // #2390 (ADR-AG-314), #2408 / #2411 (ADR-AG-385) — 2-D's tangentsExhausted* sentences, one suite key each
+    'no-common-tangent': `suite.refusal.tangentsExhausted${(error.key === 'no-common-tangent' && error.tangents) || 'Contained'}`,
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',

@@ -49,6 +49,7 @@ function ruleLines(r: DerivedRule): Array<[Id, Id]> {
     case 'parabola-focus':
     case 'ellipse-point':
     case 'touch-point':
+    case 'common-touch':
     case 'regular-vertex':
       return [];
     default: {

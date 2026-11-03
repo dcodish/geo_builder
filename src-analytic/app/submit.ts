@@ -480,6 +480,7 @@ function decideOnce(
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
         ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
+        ...(fault.tangents ? { tangents: fault.tangents } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),
@@ -686,6 +687,7 @@ export function decideToggle(
       error: {
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
         ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
+        ...(fault.tangents ? { tangents: fault.tangents } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),

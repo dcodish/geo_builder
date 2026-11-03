@@ -58,6 +58,27 @@ export function commonTangentLine(p: Circle, q: Circle, family: CommonTangentFam
   return n ? { kind: 'line', ...n } : null;
 }
 
+/**
+ * THE SAME TANGENT, READ WITH THE PAIR REVERSED (#2408, ADR-AG-385). Family `a` / `b` is the side of the DIRECTED line
+ * of centres, so naming the circles the other way round swaps the external pair's letters (both centres keep their
+ * side of the line, the direction flips). An internal tangent's normal flips WITH the direction (the first centre is
+ * always on its +n side), so its letter is kept; the touch tangent has no letter.
+ */
+export function reversedFamily(f: CommonTangentFamily): CommonTangentFamily {
+  return f === 'ext-a' ? 'ext-b' : f === 'ext-b' ? 'ext-a' : f;
+}
+
+/**
+ * HOW FAR TWO CIRCLES ARE FROM HAVING A FAMILY (#2408, ADR-AG-385) — positive when the configuration lacks it: the
+ * external pair needs the centres farther apart than |r₁ − r₂| (neither circle inside the other), the internal pair
+ * farther than r₁ + r₂ (the circles apart). Zero or negative when the family exists. The touch tangent is not a slot.
+ */
+export function familyGap(p: Circle, q: Circle, family: CommonTangentFamily): number {
+  const d = Math.hypot(q.cx - p.cx, q.cy - p.cy);
+  if (family === 'touch') return 0;
+  return (family.startsWith('ext') ? Math.abs(p.r - q.r) : p.r + q.r) - d;
+}
+
 /** How two circles sit — the answer `pairPositionOf` (M1) reads off the construction. */
 export type PairPosition = 'apart' | 'ext-tangent' | 'cross' | 'int-tangent' | 'inside';
 

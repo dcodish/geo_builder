@@ -29,7 +29,16 @@
       "emptyTitle": "What are we building today?"
     },
     "refusal": {
-      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples."
+      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples.",
+      "tangentsExhaustedAny": "All four common tangents are already drawn — two circles have no fifth common tangent.",
+      "tangentsExhaustedExternal": "Both external common tangents are already drawn — two circles have no third external tangent.",
+      "tangentsExhaustedInternal": "Both internal common tangents are already drawn — two circles have no third internal tangent.",
+      "tangentsExhaustedExtTangent": "All three common tangents are already drawn — externally tangent circles have exactly three: two separate and one at the touch point.",
+      "tangentsExhaustedIntersecting": "Both common tangents are already drawn — intersecting circles have exactly two (external).",
+      "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point.",
+      "tangentsExhaustedTouchTaken": "The only internal tangent — the one at the touch point — is already drawn.",
+      "tangentsExhaustedNoInternal": "Circles in this configuration have no internal common tangent.",
+      "tangentsExhaustedContained": "A circle contained inside another has no common tangent at all."
     },
     "notice": {
       "alreadyDrawn": "That's already on the figure — nothing to add.",

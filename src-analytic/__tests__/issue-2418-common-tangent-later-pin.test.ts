@@ -193,11 +193,13 @@ describe('#2418 — refusals kept', () => {
 });
 
 describe('#2418 — controls', () => {
-  it('(g) Q2 + T + «AB משיק משותף …» alone keeps the two touches A(3, −2.83), B(11, −5.66)', () => {
+  // #2408 (ADR-AG-385): the line is a slot of the pair, drawn first as ADR-AG-314's `ext-a` (left of M→N, so above the
+  // x-axis); which external it is stays the unstated choice, the other at y < 0. Before, the joint solve drew the lower.
+  it('(g) Q2 + T + «AB משיק משותף …» alone keeps the two touches A(3, ±2.83), B(11, ±5.66)', () => {
     const pts = built([...Q2, 'המעגלים משיקים בנקודה T', TANGENT]);
     expect(at(pts, 'A').x).toBeCloseTo(3, 5);
-    expect(at(pts, 'A').y).toBeCloseTo(-2 * Math.SQRT2, 5);
+    expect(Math.abs(at(pts, 'A').y)).toBeCloseTo(2 * Math.SQRT2, 5);
     expect(at(pts, 'B').x).toBeCloseTo(11, 5);
-    expect(at(pts, 'B').y).toBeCloseTo(-4 * Math.SQRT2, 5);
+    expect(at(pts, 'B').y / at(pts, 'A').y).toBeCloseTo(2, 5);
   });
 });

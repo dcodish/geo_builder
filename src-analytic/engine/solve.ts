@@ -37,6 +37,7 @@ import {
   type LengthExpr,
 } from './lengths';
 import { curveParentsOf, evalRule, parentsOf, type DerivedRule, type Pt } from './derived';
+import { familyGap } from './commonTangents';
 import type { Expr } from './expr';
 
 /**
@@ -686,6 +687,8 @@ function describeRule(r: DerivedRule): string {
       return `מרכז ${r.curve}`;
     case 'touch-point':
       return `נקודת ההשקה של ${r.a} ו-${r.b}`;
+    case 'common-touch':
+      return `נקודת ההשקה של המשיק המשותף על ${r.circles[r.on]}`;
     case 'side-touch':
       return `נקודת ההשקה של ${r.circle} עם ${r.a}${r.b}`;
     case 'foot':
@@ -1360,6 +1363,20 @@ export function residualRows(
        * exactly as `derived.ts` answers for the object form.
        */
       const target = evalRule(k.rule, at, curveAt);
+      /*
+       * A COMMON TANGENT'S FAMILY THE CONFIGURATION LACKS (#2408, ADR-AG-385) is not "cannot be judged": the option the
+       * choice took needs the family to exist, so its residual is how far the circles are from having it — the solve may
+       * move circles the same line placed, and a configuration that keeps them is unsatisfied, never drawn green.
+       */
+      if (!target && k.rule.t === 'common-touch') {
+        const p = curveAt?.(k.rule.circles[0]);
+        const q = curveAt?.(k.rule.circles[1]);
+        if (p?.kind !== 'circle' || q?.kind !== 'circle') return null;
+        // Never zero while the family is missing: at the boundary (a tangent pair) the family is a hair from existing and
+        // its touches would coincide, so the row asks for a margin past it, met where the closed form exists.
+        const gap = Math.max(0, familyGap(p, q, k.rule.family)) / Math.max(1, p.r, q.r) + 1e-3;
+        return { eq: [gap, gap] };
+      }
       if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return null;
       // Per component (a norm would have rank 1 at the solution — the midpoint arm's own lesson), and
       // scaled to the parents' spread so a figure in thousands converges like one in units.
