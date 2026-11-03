@@ -26,8 +26,9 @@
  * form needs no position is PURE and can be resolved before the pivot (a figure point defined by it, «AE = p»).
  */
 import { sample } from './rng';
-import { norm3, v3, type Vec3 } from './vec3';
-import type { Construction3, FreeVec3, Id, SymComp, VecAtom, VecExpr } from './types';
+import { leastSquares } from './solve3';
+import { cross3, dot3, norm3, v3, type Vec3 } from './vec3';
+import type { Construction3, FreeVec3, FreeVecMetric3, Id, SymComp, VecAtom, VecExpr } from './types';
 import { freeVecSymsOf, symbolValueOf } from './types';
 import { namedVector3 } from './vecExpr';
 
@@ -64,7 +65,11 @@ export interface FreeSystem3 {
   rows: Aff[];
   /** a letter that a free vector raises to a power — the linear system cannot carry it */
   nonLinear: string | null;
+  /** #1188 step 4 (ADR-3D-406): the METRIC givens, each operand as its form; `null` when a name does not resolve */
+  metrics: MetricForm[] | null;
 }
+
+type MetricForm = { m: FreeVecMetric3; f1: [Aff, Aff, Aff]; f2: [Aff, Aff, Aff] | null };
 
 const memo = new WeakMap<object, FreeSystem3>();
 
@@ -192,7 +197,18 @@ function buildSystem(c: Construction3): FreeSystem3 {
     if (!f) continue;
     rows.push(diff(f[AXES.indexOf(b.axis)], symForm(b.sym)));
   }
-  return { unknowns, forms, rows, nonLinear };
+  // #1188 step 4 (ADR-3D-406): the metric givens' operands, as forms over the same unknowns
+  let metrics: MetricForm[] | null = [];
+  for (const m of c.freeVecMetrics) {
+    const f1 = exprForm(m.kind === 'mag' ? m.e : m.e1);
+    const f2 = m.kind === 'mag' ? null : exprForm(m.e2);
+    if (!f1 || (m.kind !== 'mag' && !f2)) {
+      metrics = null;
+      break;
+    }
+    metrics.push({ m, f1, f2 });
+  }
+  return { unknowns, forms, rows, nonLinear, metrics };
 }
 
 // ---------------------------------------------------------------------------
@@ -256,16 +272,210 @@ export function freeVecSystemVerdict3(c: Construction3): FreeVecVerdict3 {
   if (c.freeVectors.size === 0) return { ok: true };
   const sys = freeVecSystem3(c);
   if (sys.nonLinear) return { ok: false, kind: 'non-linear' };
-  if ([...sys.forms.values()].some((f) => f === null)) return { ok: false, kind: 'unresolved' };
+  if ([...sys.forms.values()].some((f) => f === null) || sys.metrics === null) return { ok: false, kind: 'unresolved' };
   const { leftover } = orthogonalise(sys);
-  return leftover ? { ok: false, kind: leftover.kind } : { ok: true };
+  if (leftover) return { ok: false, kind: leftover.kind };
+  if (sys.metrics.length === 0) return { ok: true };
+  // #1188 step 4 (ADR-3D-406): a metric given is about the free vectors ALONE, or it is a joint solve (#2603); and the
+  // metric givens together must be able to hold
+  const mc = metricCheck3(c);
+  if (!mc.pure) return { ok: false, kind: 'coupling' };
+  return mc.solution ? { ok: true } : { ok: false, kind: 'conflict' };
 }
 
 /** How many of the system's unknowns the equations leave free — the DOF the cue counts (structural: rank only). */
 export function freeVecDofCount3(c: Construction3): number {
   if (c.freeVectors.size === 0) return 0;
   const sys = freeVecSystem3(c);
-  return sys.unknowns.length - orthogonalise(sys).basis.length;
+  const { basis } = orthogonalise(sys);
+  const linear = sys.unknowns.length - basis.length;
+  if (!sys.metrics || sys.metrics.length === 0) return linear;
+  // #1188 step 4 (ADR-3D-406): a metric given consumes what its gradient adds to the linear rows' span, measured at a
+  // solution (a generic point: the seeded one the check found) — «|u| = 5» leaves 2 of u's 3, «u ∥ v» 4 of 6
+  const mc = metricCheck3(c);
+  if (!mc.solution) return linear;
+  return Math.max(0, linear - metricRank(sys, mc.solution, basis.map((b) => b.u)));
+}
+
+// ---------------------------------------------------------------------------
+// #1188 step 4 (ADR-3D-406) — METRIC givens: nonlinear rows over the free unknowns, solved after the linear system
+// ---------------------------------------------------------------------------
+
+/** The first phase's pull toward the seeded start: what the givens leave free stays the sample's (ADR-052). */
+const METRIC_MU = 0.05;
+/** How many seeded starts the apply-time check tries before it calls a set of metric givens unsatisfiable. */
+const METRIC_STARTS = 8;
+const METRIC_TOL = 1e-8;
+
+const evalPure = (f: Aff, x: readonly number[]): number => {
+  let v = f.c;
+  for (const [j, a] of f.x) v += a * x[j];
+  return v;
+};
+const vecOf = (f: [Aff, Aff, Aff], x: readonly number[]): Vec3 => v3(evalPure(f[0], x), evalPure(f[1], x), evalPure(f[2], x));
+
+/** One metric given's residuals at `x` (all zero when it holds). A direction (∥, an angle) is scale-free, so it is
+ *  measured on unit vectors; on a zero operand it is far from holding — a zero vector has no direction. */
+function metricResiduals(e: MetricForm, x: readonly number[]): number[] {
+  const a = vecOf(e.f1, x);
+  const b = e.f2 ? vecOf(e.f2, x) : v3(0, 0, 0);
+  const m = e.m;
+  switch (m.kind) {
+    case 'mag':
+      return [norm3(a) - m.value];
+    case 'mag-rel':
+      return [norm3(a) - m.c * norm3(b)];
+    case 'dot':
+      return [dot3(a, b) - m.value];
+    case 'cos': {
+      const nn = norm3(a) * norm3(b);
+      return nn < 1e-12 ? [1] : [dot3(a, b) / nn - m.cos];
+    }
+    case 'par': {
+      const nn = norm3(a) * norm3(b);
+      if (nn < 1e-12) return [1, 1, 1];
+      const k = cross3(a, b);
+      return [k.x / nn, k.y / nn, k.z / nn];
+    }
+  }
+}
+
+/** The unknowns the metric givens reach, closed under the linear rows that share an unknown with them. */
+function metricVars(sys: FreeSystem3): { vars: number[]; rows: Aff[] } {
+  const reach = new Set<number>();
+  for (const e of sys.metrics ?? []) for (const f of [...e.f1, ...(e.f2 ?? [])]) for (const j of f.x.keys()) reach.add(j);
+  const rows: Aff[] = [];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const row of sys.rows) {
+      if (rows.includes(row) || ![...row.x.keys()].some((j) => reach.has(j))) continue;
+      rows.push(row);
+      for (const j of row.x.keys()) {
+        if (!reach.has(j)) {
+          reach.add(j);
+          grew = true;
+        }
+      }
+    }
+  }
+  return { vars: [...reach].sort((p, q) => p - q), rows };
+}
+
+/**
+ * Solve the metric givens from `start` (a seeded sample, already projected onto the linear rows): first near the
+ * start (a small pull toward it), then exactly (the pull released) — so what the givens leave free stays close to the
+ * sample and moves with the seed, and the givens hold. The linear rows those unknowns share ride along as residuals.
+ */
+function solveMetrics(sys: FreeSystem3, start: readonly number[]): { x: number[]; ok: boolean } {
+  const { vars, rows } = metricVars(sys);
+  const put = (y: readonly number[]): number[] => {
+    const z = [...start];
+    vars.forEach((j, i) => (z[j] = y[i]));
+    return z;
+  };
+  if (vars.length === 0) return { x: [...start], ok: metricsHold(sys, start) };
+  const res = (y: readonly number[]): number[] => {
+    const z = put(y);
+    const out: number[] = [];
+    for (const e of sys.metrics ?? []) out.push(...metricResiduals(e, z));
+    for (const row of rows) out.push(evalPure(row, z));
+    return out;
+  };
+  const y0 = vars.map((j) => start[j]);
+  const near = leastSquares((y) => [...res(y), ...y.map((v, i) => METRIC_MU * (v - y0[i]))], y0, 80).x;
+  const z = put(leastSquares(res, near, 80).x);
+  return { x: z, ok: metricsHold(sys, z) };
+}
+
+function metricsHold(sys: FreeSystem3, x: readonly number[]): boolean {
+  for (const e of sys.metrics ?? []) {
+    const scale = Math.max(1, Math.abs(e.m.kind === 'mag' || e.m.kind === 'dot' ? e.m.value : 0));
+    if (metricResiduals(e, x).some((r) => !(Math.abs(r) <= METRIC_TOL * scale))) return false;
+  }
+  const { rows } = metricVars(sys);
+  for (const row of rows) if (!(Math.abs(evalPure(row, x)) <= METRIC_TOL * Math.max(1, Math.abs(row.c)))) return false;
+  return true;
+}
+
+/** The rank the metric givens add to the linear rows' span `lin` (orthonormal), at `x` — central differences. */
+function metricRank(sys: FreeSystem3, x: readonly number[], lin: readonly number[][]): number {
+  const n = x.length;
+  const grads: number[][] = [];
+  for (const e of sys.metrics ?? []) {
+    const cols: number[][] = [];
+    for (let j = 0; j < n; j++) {
+      const h = 1e-6 * Math.max(1, Math.abs(x[j]));
+      const xp = [...x];
+      const xm = [...x];
+      xp[j] += h;
+      xm[j] -= h;
+      const rp = metricResiduals(e, xp);
+      const rm = metricResiduals(e, xm);
+      cols.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
+    }
+    const m = cols[0]?.length ?? 0;
+    for (let i = 0; i < m; i++) grads.push(cols.map((col) => col[i]));
+  }
+  const basis = lin.map((u) => [...u]);
+  let rank = 0;
+  for (const g0 of grads) {
+    const g = [...g0];
+    const scale = Math.hypot(...g);
+    if (scale < 1e-9) continue;
+    for (let pass = 0; pass < 2; pass++) {
+      for (const b of basis) {
+        let d = 0;
+        for (let j = 0; j < n; j++) d += g[j] * b[j];
+        for (let j = 0; j < n; j++) g[j] -= d * b[j];
+      }
+    }
+    const len = Math.hypot(...g);
+    if (len <= 1e-6 * scale) continue;
+    basis.push(g.map((v) => v / len));
+    rank++;
+  }
+  return rank;
+}
+
+interface MetricCheck3 {
+  /** every metric operand is a combination of free vectors that no anchored arrow reaches */
+  pure: boolean;
+  /** a point where every row holds, from the first seeded start that converges — null: none did (unsatisfiable) */
+  solution: number[] | null;
+}
+const metricMemo = new WeakMap<object, MetricCheck3>();
+
+/**
+ * STRUCTURE for the metric givens (at apply): are they about the free vectors alone, and can they all hold together?
+ * Decided over the free unknowns only — no figure, no drawing — from up to {@link METRIC_STARTS} seeded starts, so a
+ * satisfiable given is never refuted against a sample of the figure (ADR-052).
+ */
+function metricCheck3(c: Construction3): MetricCheck3 {
+  const hit = metricMemo.get(c);
+  if (hit) return hit;
+  const sys = freeVecSystem3(c);
+  const tainted = anchoredUnknowns(sys);
+  const pure = (sys.metrics ?? []).every((e) => [...e.f1, ...(e.f2 ?? [])].every((f) => f.g.size === 0 && ![...f.x.keys()].some((j) => tainted.has(j))));
+  let solution: number[] | null = null;
+  for (let s = 0; pure && s < METRIC_STARTS && !solution; s++) {
+    const r = solveMetrics(sys, projectedSample(c, sys, s, tainted));
+    if (r.ok) solution = r.x;
+  }
+  const out = { pure, solution };
+  metricMemo.set(c, out);
+  return out;
+}
+
+/** The seeded sample projected onto the PURE linear rows — where every metric solve starts. */
+function projectedSample(c: Construction3, sys: FreeSystem3, seed: number, tainted: ReadonlySet<number>): number[] {
+  const pureRow = (ri: number): boolean => sys.rows[ri].g.size === 0 && ![...sys.rows[ri].x.keys()].some((j) => tainted.has(j));
+  const { basis } = orthogonalise(sys, pureRow);
+  const x = sampleUnknowns(c, sys, seed);
+  const corr = basis.map((b) => b.u.reduce((acc, u, j) => acc + u * x[j], 0) - b.beta);
+  basis.forEach((b, k) => {
+    for (let j = 0; j < x.length; j++) x[j] -= b.u[j] * corr[k];
+  });
+  return x;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +574,18 @@ export function solveFreeVectors3(c: Construction3, seed: number, positions?: Re
     basis.forEach((b, k) => {
       for (let j = 0; j < x.length; j++) x[j] -= b.u[j] * corr[k];
     });
+  }
+  // #1188 step 4 (ADR-3D-406): the metric givens, solved from this seed's projected sample — so a branch («u ∥ v» with
+  // |u| = |v|: v = ±u) and what the givens leave free both follow the seed. Their unknowns are pure (the apply check),
+  // so the pre-pivot and post-pivot passes solve the same block from the same start. A start that does not converge
+  // falls back to the check's solution: the givens hold at every seed.
+  if (sys.metrics && sys.metrics.length > 0) {
+    const mc = metricCheck3(c);
+    if (mc.pure && mc.solution) {
+      let r = solveMetrics(sys, x);
+      if (!r.ok) r = { x: mc.solution, ok: true };
+      for (const j of metricVars(sys).vars) x[j] = r.x[j];
+    }
   }
   const evalAff = (f: Aff): number => {
     let v = f.c;

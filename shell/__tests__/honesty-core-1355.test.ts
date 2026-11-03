@@ -58,9 +58,9 @@ describe('nameAccounting — the set difference, both ways', () => {
 describe('scanNumbers / unionByMax / LATIN_FILLER', () => {
   it('is unsigned, reads a fraction as one occurrence, and honours the caller’s blanks', () => {
     expect(scanNumbers('C(-3,5) slope 1/2 F1', [/(?<=[A-Za-z])\d+/g])).toEqual([
-      { raw: '3', value: 3 },
-      { raw: '5', value: 5 },
-      { raw: '1/2', value: 0.5 },
+      { raw: '3', value: 3, at: 3 },
+      { raw: '5', value: 5, at: 5 },
+      { raw: '1/2', value: 0.5, at: 14 },
     ]);
   });
   it('a blanked exponent is not a magnitude', () => {

@@ -754,7 +754,19 @@ export type Fact =
    * states TANGENT TO EVERY SIDE of that ring (the touch sentence typed first created it) is this circle; with
    * none, the sentence states the computed incircle as before.
    */
-  | (FactBase & { t: 'the-circle'; create: Fact[]; about: Fact[]; match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] } })
+  /*
+   * `ring` (#2130/#2376, ADR-AG-386; 2-D's `boundInscribeCircle` + `reusedInscribeCircle`, ADR-156) — an UNDESCRIBED
+   * inscription («ABC חסום במעגל», «מעגל חוסם את ABC»): the ring whose vertices the sentence puts on the circle. When
+   * every vertex was in the figure before the sentence (`held`, written by the fold, never by the parser), the
+   * contextual circle is bound only if it already carries every vertex; otherwise the sentence states its own circle.
+   */
+  | (FactBase & {
+      t: 'the-circle';
+      create: Fact[];
+      about: Fact[];
+      match?: { centre: Id } | { eq: Expr } | { inscribed: Id[] };
+      ring?: { vertices: Id[]; held?: true };
+    })
   /**
    * «משוואת המעגל היא …» about a circle the figure ALREADY HAS (#1633, ADR-AG-196) — a statement about it,
    * never a second circle: an equation circle must be this equation (else `conflicting-restatement`), a circle
@@ -949,7 +961,12 @@ export type GeoObject =
    * `helper` (#2583, ADR-AG-345) — a point the tool needs and nobody drew (a perpendicular bisector's midpoint): placed
    * for what is built through it, never drawn, lettered or listed. Its id is `toolLetters.helperId`, the one source.
    */
-  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true }
+  /**
+   * `tool` (#2674, ADR-AG-387) — the letter is the TOOL's (a median's M, an altitude's H, a canonical centre's O) and no
+   * sentence since has typed it. A student's fresh letter deriving the same point takes it over (M1, ONE POSITION, ONE
+   * NAME); the first sentence that types the letter makes it the student's (`foldPass`), and the mark is dropped.
+   */
+  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding; helper?: true; tool?: true }
   /**
    * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
    *

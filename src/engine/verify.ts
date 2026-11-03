@@ -39,6 +39,19 @@ export interface GivenViolation {
   circleSlots?: Record<string, Id>;
 }
 
+/** #2591 (ADR-773): the position a `point-on-segment` STATES — a `t` strictly inside the span on a non-extension
+ *  rider. An extension's t (1.3) is an unstated default (ADR-073), never a statement. */
+export function statedSegmentT(cmd: Command): number | undefined {
+  if (cmd.type !== 'point-on-segment' || cmd.extension || cmd.t === undefined) return undefined;
+  return cmd.t > 0 && cmd.t < 1 ? cmd.t : undefined;
+}
+
+/** #2591 (ADR-773): the length ratio |a·id| : |id·b| a stated t asserts — t/(1−t), rounded off float noise so a
+ *  stated 1:2 reads 0.5 wherever it is named. */
+export function statedSegmentRatio(t: number): number {
+  return Number((t / (1 - t)).toPrecision(12));
+}
+
 /**
  * Re-derive the metric / incidence RELATIONS a command stream asserts — independent of how the engine
  * built each object — as plain {@link Constraint}s, so they can be checked against the final coordinates.
@@ -750,6 +763,18 @@ export function checkGivens(
         messageKey: 'figure.v.onSegment',
         params: { point: cmd.id, seg },
       });
+    } else {
+      // #2591 (ADR-773): a STATED position is part of the membership — the class guard for every lowering that
+      // drops a stated t (a re-homed point, a derived one, any future path): the ratio it states, checked as the
+      // colon form's `set-ratio` is, with the same message and key.
+      const st = statedSegmentT(cmd);
+      if (st !== undefined) {
+        const con: Constraint = { type: 'ratio', a: cmd.a, b: cmd.id, c: cmd.id, d: cmd.b, k: statedSegmentRatio(st) };
+        const get = (id: Id) => positions.get(id)!;
+        if (Number.isFinite(residual(con, get)) && !isSatisfied(con, get)) {
+          violations.push({ relation: con.type, ids: constraintRefs(con), message: `${describeConstraint(con)} does not hold in the final figure`, messageKey: 'figure.v.constraint', params: { desc: describeConstraint(con) } });
+        }
+      }
     }
   }
 

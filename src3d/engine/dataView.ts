@@ -22,7 +22,7 @@ import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
-import type { Construction3, FreeVec3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
+import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
 type VecDef = Construction3['vecDefs'][number];
@@ -899,9 +899,17 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   for (const name of c.freeVectors.keys()) {
     const vals = resolved.map((r) => r.freeVectors.get(name));
     const v0 = vals[0];
-    if (!v0 || !vals.every((v) => v && sameVec(v, v0))) continue;
+    if (!v0 || !vals.every((v): v is Vec3 => !!v)) continue;
     const m = norm3(v0);
-    entries.push({ label: name, decomp: null, coords: coordStr(v0), mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+    if (vals.every((v) => sameVec(v, v0))) {
+      entries.push({ label: name, decomp: null, coords: coordStr(v0), mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+      continue;
+    }
+    // #1188 step 4 (ADR-3D-406): a stated magnitude («|u| = 5») is knowledge while the direction is not — |u| prints
+    // when it agrees across the configurations, the components do not
+    if (vals.every((v) => Math.abs(norm3(v) - m) < 1e-6 * Math.max(1, m))) {
+      entries.push({ label: name, decomp: null, coords: null, mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+    }
   }
   for (const [a, b] of c.segments) addEntry(`${a}${b}`, a, b, false);
 
@@ -1552,6 +1560,7 @@ export function statedVectorRows(
     /** #1188 (ADR-3D-386): free vectors — a stated tuple prints as typed, a never-stated one as `u = (?, ?, ?)` */
     freeVectors?: ReadonlyMap<string, FreeVec3>;
     freeVecEqs?: readonly { lhs: VecTermLike[]; rhs: VecTermLike[] }[];
+    freeVecMetrics?: readonly FreeVecMetric3[];
     claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[]; stated?: { lhs: VecTermLike[]; rhs: VecTermLike[] } }[];
     pairPins?: readonly StatedPin[];
     vectorPins?: readonly StatedPin[];
@@ -1588,6 +1597,8 @@ export function statedVectorRows(
   // #1188 step 2 (ADR-3D-390): a free vector's definition and the free-vector equations, in the same notation
   for (const [name, fv] of c.freeVectors ?? []) if (fv.def) rows.push(`${name} = ${vecSide(fv.def)}`);
   for (const eq of c.freeVecEqs ?? []) rows.push(`${vecSide(eq.lhs)} = ${vecSide(eq.rhs)}`);
+  // #1188 step 4 (ADR-3D-406): a metric given over free vectors, in the same notation
+  for (const m of c.freeVecMetrics ?? []) rows.push(freeMetricRow(m));
   return rows;
 }
 
@@ -1642,6 +1653,25 @@ function statedLetterText(c: Construction3, id: Id, i: number): string | null {
 
 /** One side of a vector equation: `3u`, `DC⃗`, `2AB⃗ + v`. */
 type VecTermLike = { coeff: number; atom: { kind: string; name?: string; from?: string; to?: string } };
+
+/** #1188 step 4 (ADR-3D-406): a metric given over free vectors as a stated row — «|u| = 5», «u ⟂ v», «∠(u, v) = 60°». */
+function freeMetricRow(m: FreeVecMetric3): string {
+  const mag = (e: readonly VecTermLike[]) => `|${vecSide(e)}|`;
+  const side = (e: readonly VecTermLike[]) => (e.length > 1 ? `(${vecSide(e)})` : vecSide(e));
+  switch (m.kind) {
+    case 'mag':
+      return `${mag(m.e)} = ${cleanMag(m.value)}`;
+    case 'mag-rel':
+      return `${mag(m.e1)} = ${m.c === 1 ? '' : cleanCoeff(m.c)}${mag(m.e2)}`;
+    case 'dot':
+      return `${side(m.e1)} · ${side(m.e2)} = ${cleanNum(m.value)}`;
+    case 'par':
+      return `${side(m.e1)} ∥ ${side(m.e2)}`;
+    case 'cos':
+      if (Math.abs(m.cos) < 1e-12) return `${side(m.e1)} ⟂ ${side(m.e2)}`;
+      return `∠(${vecSide(m.e1)}, ${vecSide(m.e2)}) = ${cleanNum((Math.acos(Math.max(-1, Math.min(1, m.cos))) * 180) / Math.PI, 1e-6)}°`;
+  }
+}
 
 function vecSide(terms: readonly VecTermLike[]): string {
   return terms

@@ -6614,6 +6614,8 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 
 ## ADR-W-169 — Every round is measured by what it did to the queue, and what nobody hit is parked where a later hit reopens it (#2654 ideas 1 and 4)
 
+> **Amended** 2026-11-03 by [ADR-W-178](#adr-w-178): a round's headline is its changes on main, then what closes on the operator's approval; merges, parks, parity-table closes and already-fixed items are housekeeping on their own line, and net filed − closed (§1) becomes a secondary number. The `queue:` line gains six fields after its four.
+
 **Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · builds [ADR-W-168](#adr-w-168) ideas 1 and 4 · keeps [ADR-W-119](#adr-w-119) (closing an owning issue parks its gaps)
 
 **Operator:** 2026-11-01, approving the #2654 ideas: 1 *"ok"* (a round is measured by net queue change and operator minutes, both on the roadmap page; a round that does not shrink the queue is flagged); 4 *"ok - i assume known issues dont go away and if we ever run into them again, we move them back the que and not create new ones. eventually we might reach them"*. 2026-11-02: *"2654:go ahead with the approved items"*.
@@ -6895,3 +6897,28 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 **Not decided here (reported on #1595).** 2-D hands a TOOL letter over to the student's («תיכון מ-A …» · «D אמצע BC»: M becomes D, no notice); analytic now keeps M and shows «M ו-D נפלו על אותה נקודה.». Same verdict (accepted), different drawing — a parity cell for the operator.
 
 **Behaviour change for a student:** in 3-D and analytic, a new letter whose definition puts it exactly on a point that already has a name («N אמצע AB» after «M אמצע AB», #2631's «… נפגשים בנקודה E» on M) is now accepted and the page says «M ו-N נפלו על אותה נקודה.»; it used to be refused. 2-D and complex unchanged.
+
+## ADR-W-178 — A round fills with armed bugs first, and its headline counts changes on main and what will close on the operator's approval (#2675)
+
+**Status:** accepted · 2026-11-03 · operator ruling · process (workspace) · amends [ADR-W-169](#adr-w-169) (the round's measure) and [ADR-W-165](#adr-w-165)'s composition (the order inside each step; rule A stands) · keeps [ADR-W-168](#adr-w-168)'s `queue:` line and the `stats:` line
+
+**Operator:** 2026-11-03, the decisions page, card d7, option **A**: *"Both: armed bugs first, and the headline counts only changes landed on main"*, with his note: *"when a round finishes and reports what was done, I want to also know how many issues will be closed if all tests are approved. I think this was missing last time."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — `scripts/round-metrics.mjs` (`--headline`, `closeKind`, `closedByCommit`), the fix-round skill Steps 1, 5 and 5b, the roadmap-refresh skill step 3b, docs/22 §2 and §2d.
+
+**Context.** Round #2665 reported "17 closed". 14 of those were parks at compose (13 that the composition's parser sees) and 2 were already fixed at re-measure; two changed anything on main. ADR-W-169 measured a round by net = filed − closed, which counts a merge or a park as progress.
+
+**Decision.**
+1. **Composition: armed bugs first.** Inside each of rule A's three steps, a round fills with `wrong-answer` bugs, then P2 bugs, then P3 bugs; features and debt take the slots left, by priority, value density breaking ties. A feature tied to a lesson he dated (ADR-W-174 §2) keeps its slot. The plan's order is not reordered: a later step's bug never jumps an earlier step's feature.
+2. **The headline**, in this order, at the top of the ledger, the report page and the chat message:
+   - **Changes on main**: items closed *completed* by a commit or a merged PR in the round. The closer is read from the issue's REST timeline: the last close carries a `commit_id`, or a commit reference lands within a minute of it (a PR merge). A lock commit that only names an issue closed by hand is not its closer.
+   - **Will close on your approval**: the issues the round's open PRs close by keyword once his 🎮 cases and PRs pass.
+   - **Housekeeping**, its own line: merged into a family (closed not planned or duplicate), parked (`icebox`), closed into the parity table (named with `--table`, since GitHub cannot tell it from a merge), already fixed at re-measure (closed completed with no closer).
+   - **Net** filed − closed, secondary.
+3. **The ledger line** keeps ADR-W-168's four fields first and unchanged and adds six: `queue: closed=N filed=N filed-open=N found-in-round=N on-main=N on-approval=N merged=N parked=N table=N already-fixed=N`. `closed` is still every item closed. A reader of the old line still matches it; `round-metrics` reads a line without the new fields and estimates its headline. `stats:` is unchanged.
+4. **The window opens 6 hours before the round issue**, so a park or a re-measure close done while composing counts as the round's.
+5. **`node scripts/round-metrics.mjs --headline <R>`** prints the four lines and the `queue:` line, measured from GitHub, for the round's Step 5. The roadmap rows gain `onMain`, `onApproval` (ledger only: a closed round's open PRs are no longer what it hands him) and `housekeeping`.
+
+**Measured (2026-11-03, 32 closed rounds since 1 Oct).** 471 closed: 376 changes on main, 95 housekeeping. Round #2665: 2 on main, 15 housekeeping (13 parked, 2 already fixed). A refresh reads its timelines eight at a time: 1 min 48 s, where one at a time took 5 min 44 s.
+
+**Consequences.** The number the operator reads first is what a student can now see change, and the second is what his sitting will close. Parks still shrink the queue, on their own line. Not built: the roadmap page's "Fix rounds" panel shows the new row fields only when the page is next republished.

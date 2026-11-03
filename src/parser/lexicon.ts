@@ -287,6 +287,23 @@ export const PARALLEL_KW = String.raw`(?:${wordForm('מקביל', 'parallel')})`
  */
 export const MEET_KW = String.raw`intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b`;
 /**
+ * #2533 ([ADR-774](../../docs/06-decisions.md#adr-774)) — THE LINE-KIND NOUN of a crossing operand, singular AND plural:
+ * «הישר / הישרים», «הקו / הקווים», «קרן / הקרן / קרניים / הקרניים», "line(s)", "ray(s)". A span carrying it reads its
+ * operand as the unbounded line (no within-segment default), and a plural standing before the first pair of a
+ * conjunction covers both (the crossing rule's `distribute`).
+ *
+ * The defect it closes: the crossing rule spelled this inline as `\bline\b|הישר|הקו|\bray\b|קרן`, so "lines", "rays"
+ * and «הקרניים» (MEDIAL nun — `קרן` is never its substring) fell back to bare segments and the crossing was held inside
+ * both: «מרובע ABCD» · "M is the intersection of lines AB and CD" re-seated the quadrilateral into a crossed one, green.
+ * «הישרים» worked only because «הישר» is its prefix. The English and the ray stems are word-bounded ({@link enWord},
+ * {@link heWord}); «הישר» / «הקו» keep the definite-article requirement they had (a bare «ישר» is also the
+ * right-angled adjective, {@link RIGHT_ANGLED}).
+ */
+export const LINE_NOUN = String.raw`${enWord('line|ray')}|הישר|הקו|${heWord('קרן|קרנ')}`;
+/** The EXTENSION reference of a crossing operand («המשך», «המשכי», "extension", "extended") — the twin of
+ *  {@link LINE_NOUN}, moved from the crossing rule bit-identical (#2533): it reads the operand as directional (ADR-054). */
+export const EXTENSION_REF = String.raw`המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended`;
+/**
  * «בהתאמה» / "respectively" — the word that PAIRS a label run with a list in order (#2185,
  * [ADR-735](docs/06-decisions.md#adr-735)). One spelling, bounded both ways: the incidence-list distributor reads it as
  * the pairing, and the clause splitter's operand guard reads «A ו-C בהתאמה» as the closing half of a pairing, never a

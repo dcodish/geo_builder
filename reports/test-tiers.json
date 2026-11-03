@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-11-02",
+  "updatedAt": "2026-11-03",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
     "src-analytic/__tests__/issue-1177-locus-chip.test.ts",
@@ -95,6 +95,7 @@
     "src/store/__tests__/issue-938-structural-edit-seed.test.ts",
     "src/theorems/__tests__/b-corpus.test.ts",
     "src3d/__tests__/adr-3d-032.test.ts",
+    "src3d/__tests__/blank-canvas-drive-2609.test.ts",
     "src3d/__tests__/book-coordinate-givens.test.ts",
     "src3d/__tests__/catalog-blank-canvas-1566.test.ts",
     "src3d/__tests__/decide-submit3-parity-1394.test.ts",
@@ -115,6 +116,7 @@
     "src3d/__tests__/issue-863-sample-hoist.test.ts",
     "src3d/__tests__/member-drive.test.ts",
     "src3d/__tests__/narrowing-note-1996.test.ts",
+    "src3d/__tests__/plane-two-forms-2367.test.ts",
     "src3d/__tests__/quad-noun-pairs-2169.test.ts",
     "src3d/__tests__/right-apex.test.ts",
     "src3d/__tests__/sibling-phrasings.test.ts",

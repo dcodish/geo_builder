@@ -329,9 +329,12 @@ unstated run, one that picks a spelling the student left ambiguous) and asserts 
 ### The honesty accounting core ([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280))
 
 `shell/llm/honestyCore.ts` is the algebra of the faithfulness gates, with no product vocabulary:
-`spendAccounts` (the multiset: one account pays one occurrence, 2-D #437), `nameAccounting` (stated vs written,
+`spendAccounts` (the multiset: one account pays one occurrence, 2-D #437; an `Account` may carry a tag, paid only by a candidate with the same tag), `nameAccounting` (stated vs written,
 case-blind on the stated side, `existing` exempting invented by default and dropped only on request),
-`scanNumbers` (unsigned occurrences after the caller's blanks; `a/b` is one), `unionByMax` (one statement read
+`scanNumbers` (unsigned occurrences after the caller's blanks, each with its start `at`; a value `term [/ term]` is one,
+so `a/b`, «√2», «5√2», «2/√3» are each one occurrence valued as they evaluate), the radical term `RADICAL` /
+`RADICAL_SPELLED` / `radicalTerm` / `evalRadicalTerm` (the one spelling of a root, which 2-D's `droppedGivenNumbers`
+imports too, [ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)), `unionByMax` (one statement read
 from two sources pays once) and `LATIN_FILLER`. What a name or a number is stays in the product. Analytic is its
 first consumer (`faithfulnessAnalytic`); 2-D's and 3-D's own copies move onto it in a follow-up, behaviour-identical.
 Lock: `shell/__tests__/honesty-core-1355.test.ts`.

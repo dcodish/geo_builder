@@ -1193,6 +1193,86 @@
       "status": "pending"
     },
     {
+      "id": "chose-2673-locus-pointer",
+      "kind": "text",
+      "issue": "#2673",
+      "what": "the pointer a typed locus question answers",
+      "choice": "«את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים.» / A locus is shown with the «Show locus» button beside the point in the givens list.",
+      "chosen": true,
+      "at": "2026-11-03T12:47:21.457Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2673-guide-row",
+      "kind": "text",
+      "issue": "#2673",
+      "what": "the guide row for the locus chip",
+      "choice": "«הקלידו את הנתונים {{lines}}, ואז לחצו על הכפתור בשורה של {{point}}.» / Type the givens {{lines}}, then press the button on the row of {{point}}.",
+      "chosen": true,
+      "at": "2026-11-03T12:47:21.457Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-mag",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated magnitude on free vectors",
+      "choice": "«|u| = 5» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-perp",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated ⟂ on free vectors",
+      "choice": "«u ⟂ v» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-par",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated ∥ on free vectors",
+      "choice": "«u ∥ v» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-dot",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated dot product on free vectors",
+      "choice": "«u · v = 3» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-angle",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated angle on free vectors",
+      "choice": "«∠(u, v) = 60°» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1188-panel-magRel",
+      "kind": "text",
+      "issue": "#1188",
+      "what": "3-D data-panel row for a stated magnitude ratio on free vectors",
+      "choice": "«|u| = |v| / |u| = 2|v|» (same in English)",
+      "chosen": true,
+      "at": "2026-11-03T15:35:36.191Z",
+      "status": "pending"
+    },
+    {
       "id": "t-1863-parabola-chip",
       "kind": "text",
       "issue": "#1863",

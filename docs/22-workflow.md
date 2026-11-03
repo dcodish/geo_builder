@@ -96,6 +96,11 @@ workstream in weeks.
   1. the current week's plan items;
   2. the issues the operator pulled into the current week;
   3. the next week's plan items, in plan order.
+
+  Within each step **armed bugs fill first** ([ADR-W-178](06w-decisions-workspace.md#adr-w-178),
+  operator 2026-11-03): `wrong-answer`, then P2, then P3; features and debt fill what is left. A
+  feature tied to a lesson he dated ([ADR-W-174](06w-decisions-workspace.md#adr-w-174) §2) keeps its
+  slot. A later step's bug never jumps an earlier step's feature.
   A P1 still preempts, announced first. A later week's items are never pulled ahead of the next week's.
 - **An unplanned issue a session thinks is urgent** is shown to the operator as a pull candidate, never
   composed.
@@ -235,8 +240,8 @@ awaiting play, rounds in flight, rounds awaiting validation.
 - **Spot audits keep that honest.** About one auto-closed case in ten goes into the operator's next sitting. A failed audit returns that kind of case to 🎮 until three clean audits.
 - **His sitting is the 🎮 cases only, about ten at most**, ranked by risk. A bug he reported is 👁 at most, in a skim digest that closes unless he objects within a day.
 - **A round with no 🎮 case and no feature PR deploys itself** (§5) and closes its own round issue; it never takes `awaiting-play`. A round with any 🎮 case or PR waits for his play, as before.
-- **A round's report counts its effect on the queue:** items closed, issues it filed, and how many of those are still open.
-- **Every round is measured on the roadmap page** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)): `scripts/round-metrics.mjs` writes one row per round (closed, filed, net, the operator's cases and estimated minutes) to its "Fix rounds" panel at every refresh. A round whose net is zero or more is flagged ⚑. It reads the round's own `queue:` and `operator:` ledger lines; rounds before 1 Nov are estimated from GitHub.
+- **A round's report counts its effect on the queue:** items closed, issues it filed, and how many of those are still open. **Since [ADR-W-178](06w-decisions-workspace.md#adr-w-178) its headline is the changes on main** (items closed completed by a commit or merged PR), then **how many will close on his approval** (what its open PRs close once the 🎮 cases pass); merges, parks, parity-table closes and already-fixed items are **housekeeping, on their own line**, and net filed − closed is secondary. `node scripts/round-metrics.mjs --headline <R>` prints the lines.
+- **Every round is measured on the roadmap page** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)): `scripts/round-metrics.mjs` writes one row per round (on main, housekeeping, closed, filed, net, the operator's cases and estimated minutes) to its "Fix rounds" panel at every refresh. A round whose net is zero or more is flagged ⚑. It reads the round's own `queue:` and `operator:` ledger lines; rounds before 1 Nov are estimated from GitHub.
 - **What nobody hit is parked, not kept open** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)). When it composes, a round runs `node scripts/known-gaps.mjs --apply --plan <plan/current.json>`. It parks every P3 feature or debt item a session found that no student and not the operator hit, idle 30 days and outside the plan: `icebox`, closed, listed in [known-gaps.md](known-gaps.md), with any parity gap it owns parked in the same batch. Bugs, `reported`, `wrong-answer`, `needs-operator` and plan items are never parked. A later hit **reopens** the original issue with `--reopen <N>`, never a new one.
 
 **Gating and landing (ADR-W-034, operator ruling 2026-08-30; per-item gate amended by ADR-W-113):** each
