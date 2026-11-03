@@ -23,6 +23,7 @@ import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr'
 import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
+import { TANGENT_LENGTH_SOURCE, TANGENT_WORD } from '../parser/tangentLengthWords';
 import type { Id } from './types';
 
 /**
@@ -396,10 +397,7 @@ const DISTANCE_NOUN = new RegExp(
  * ADR-AG-383) — consumed before the distance frames and the length noun, so «אורך» never strips into a pair. The circle
  * may carry a name or its centre's letter («למעגל II», «למעגל M»), as «מחוץ למעגל M» does.
  */
-const TANGENT_LENGTH = new RegExp(
-  String.raw`(?:ה?אורך\s+ה?משיק\s+(?:היוצא\s+)?מ(?:ן\s+|-?\s*)(?:ה?נקודה\s+)?([A-Z][0-9₀-₉]?)\s+(?:א?ל-?\s*)?ה?מעגל|(?:the\s+)?length\s+of\s+the\s+tangent\s+from\s+(?:the\s+)?(?:point\s+)?([A-Z][0-9₀-₉]?)\s+to\s+the\s+circle)(?:\s+(?:ש?מרכזו\s+)?((?:[A-Z][0-9₀-₉]?|I{1,3}|IV|V|[1-9])(?![A-Za-z0-9₀-₉])))?`,
-  'g',
-);
+const TANGENT_LENGTH = new RegExp(TANGENT_LENGTH_SOURCE, 'g');
 
 function readLength(src: string, named?: Set<number>, lines?: readonly LineEquation[]): LengthExpr | null {
   const terms: MeasureTerm[] = [];
@@ -661,7 +659,7 @@ export function describeLengthExpr(le: LengthExpr): string {
         : t.kind === 'point-line'
           ? `מרחק ${t.p}-${t.line}`
           : t.kind === 'tangent'
-            ? `משיק ${t.p}`
+            ? `${TANGENT_WORD} ${t.p}`
           : t.kind === 'line-line'
             ? `מרחק ${t.u}-${t.v}`
             : t.kind === 'ellipse-dist'
