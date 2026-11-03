@@ -1,0 +1,76 @@
+{
+ "name": "prod-2026-11-03",
+ "title": "Prod smoke, prod/2026-11-03: round #2665 PRs #2666, #2667, #2668",
+ "cases": [
+  {
+   "id": "P1",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 1595,
+   "class": "verified",
+   "title": "The vector reading puts K on D, and the page says so (was T5)",
+   "lines": ["מקבילון ABCDA'B'C'D'", "AK = AD"],
+   "expect": ["D ו-K נפלו על אותה נקודה"],
+   "lookFor": "Start: press «נקה הכל». The line records and the notice «D ו-K נפלו על אותה נקודה.» shows.",
+   "before": "K was drawn on D with no message."
+  },
+  {
+   "id": "P2",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "section": "prod",
+   "issue": 1595,
+   "class": "verified",
+   "title": "A second midpoint of AB records with the notice",
+   "lines": ["A(0,0,0)", "B(2,0,0)", "M אמצע AB", "N אמצע AB"],
+   "expect": ["M ו-N נפלו על אותה נקודה"],
+   "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»",
+   "before": "Refused."
+  },
+  {
+   "id": "P3",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "prod",
+   "issue": 2631,
+   "class": "verified",
+   "title": "A crossing that lands on M records with the notice (#2631)",
+   "lines": ["משולש ABC", "M אמצע BC", "האנך מ-C ל-AB", "האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E"],
+   "expect": ["M ו-E נפלו על אותה נקודה"],
+   "lookFor": "Start: press «נקה הכל». The last line records, with «M ו-E נפלו על אותה נקודה.»",
+   "before": "Refused."
+  },
+  {
+   "id": "P4",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "section": "prod",
+   "issue": 1595,
+   "class": "verified",
+   "title": "2-D reference unchanged: a second midpoint gets the notice",
+   "lines": ["משולש ABC", "M אמצע AB", "N אמצע AB"],
+   "expect": ["M ו-N נפלו על אותה נקודה"],
+   "lookFor": "Start: press «נקה הכל». The notice shows.",
+   "before": "unchanged"
+  },
+  {
+   "id": "P5",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "section": "prod",
+   "issue": 2620,
+   "class": "verified",
+   "title": "The book's «הן נקודות על … בהתאמה» builds (#2620 C)",
+   "lines": ["A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה"],
+   "expectFigure": ["A", "B"],
+   "lookFor": "Start: press «נקה הכל». A is drawn on the x-axis and B on the y-axis.",
+   "before": "Not understood."
+  }
+ ]
+}

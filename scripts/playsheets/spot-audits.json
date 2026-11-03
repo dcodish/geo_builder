@@ -1,5 +1,22 @@
 {
-  "pending": [],
+  "pending": [
+    {
+      "sheet": "prod-2026-11-03",
+      "id": "P2",
+      "kind": "3d:assertion",
+      "queued": "2026-11-03",
+      "product": "3d",
+      "base": "https://themathbible.com",
+      "path": "/3d-builder/",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,0,0)",
+        "M אמצע AB",
+        "N אמצע AB"
+      ],
+      "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»"
+    }
+  ],
   "results": [
     {
       "sheet": "round-2665",
