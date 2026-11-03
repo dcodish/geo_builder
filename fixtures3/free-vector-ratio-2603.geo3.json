@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T10:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור p",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "AE = t·p",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "named",
+                "name": "p"
+              }
+            }
+          ],
+          "symbol": "t"
+        }
+      ]
+    }
+  ]
+}

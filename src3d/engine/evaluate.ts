@@ -42,8 +42,8 @@ import {
 } from './operands';
 import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
-import { decompose3 } from './vecExpr';
-import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3 } from './freeVecSystem';
+import { decompose3, namedVector3 } from './vecExpr';
+import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
@@ -3987,16 +3987,24 @@ function resolveFreeLines3(
 }
 
 /** The declared basis in a stable order, or null if not exactly 3 / endpoints unplaced. */
-function basisVectors(c: Construction3, pos: Positions3): { names: string[]; vecs: Vec3[] } | null {
-  if (c.vectors.size !== 3) return null;
+function basisVectors(c: Construction3, pos: Positions3, span: readonly string[]): { names: string[]; vecs: Vec3[] } | null {
+  // #2603 b1 (ADR-3D-407): the anchored vectors plus a free vector the span names that the figure defines — one accessor
+  const basis = spanBasis3(c, span);
+  if (basis.length !== 3) return null;
   const names: string[] = [];
   const vecs: Vec3[] = [];
-  for (const [name, def] of c.vectors) {
-    const a = pos.get(def.from);
-    const b = pos.get(def.to);
-    if (!a || !b) return null;
+  for (const { name, expr } of basis) {
+    let v = v3(0, 0, 0);
+    for (const t of expr) {
+      const nv = t.atom.kind === 'named' ? namedVector3(c, t.atom.name) : undefined;
+      const ends = t.atom.kind === 'pair' ? t.atom : nv?.kind === 'anchored' ? nv : undefined;
+      const a = ends && pos.get(ends.from);
+      const b = ends && pos.get(ends.to);
+      if (!a || !b) return null;
+      v = add3(v, scale3(sub3(b, a), t.coeff));
+    }
     names.push(name);
-    vecs.push(sub3(b, a));
+    vecs.push(v);
   }
   return { names, vecs };
 }
@@ -4013,7 +4021,7 @@ function inSpanPosition(c: Construction3, def: Extract<PointDef, { kind: 'in-spa
   const b = pos.get(def.b)!;
   const k = pos.get(def.vecFrom)!;
   const fallback = lerp3(a, b, 0.5);
-  const basis = basisVectors(c, pos);
+  const basis = basisVectors(c, pos, def.span);
   if (!basis) return fallback;
   const compIndex = basis.names.findIndex((n) => !def.span.includes(n));
   if (compIndex < 0) return fallback;
@@ -4042,7 +4050,7 @@ export function checkInSpan(
   const a = pos.get(def.a);
   const b = pos.get(def.b);
   const k = pos.get(def.vecFrom);
-  const basis = basisVectors(c, pos);
+  const basis = basisVectors(c, pos, def.span);
   if (!p || !a || !b || !k || !basis) return 'no-solution';
   const compIndex = basis.names.findIndex((n) => !def.span.includes(n));
   const d = decompose3(sub3(p, k), basis.vecs[0], basis.vecs[1], basis.vecs[2]);

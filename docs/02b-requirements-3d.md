@@ -413,8 +413,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or «u = (?, ?, ?)» when nothing is stated) and prints its components and |u| only when they are the same in every
   configuration; the ask lane answers «u» and «|u|» on the same terms. A name means one thing: a free vector's name
   cannot also name an anchored vector («נסמן: AB = u»), a line or a plane, in either order; a component restated
-  with another number is refused naming both lines. A free vector is never part of the named basis (`need-basis`
-  counts the anchored vectors only). **Combinations** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390)): a linear
+  with another number is refused naming both lines. A free vector nothing defines is never part of the named basis
+  (`need-basis` counts the anchored vectors); one the figure defines («וקטור u · KB = u») IS that arrow and counts
+  exactly as «נסמן: KB = u» does ([ADR-3D-407](06b-decisions-3d.md#adr-3d-407), operator 2026-11-02). **Combinations** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390)): a linear
   combination DEFINES a new vector («w = u + v», «w = 2u - 3v», «u + v = w», «p = ½u»), and an equation among existing
   vectors is a given the tool solves («u = (k,1,2)», «v = (1,1,1)», «w = (3,2,3)», «w = u + v» gives k = 2),
   whatever order the givens come in once the vectors are declared; a component may be an expression in a letter («u = (k-1, 2, k)»), which «k = 3» then values. Stating a
@@ -429,10 +430,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   vectors** ([ADR-3D-390](06b-decisions-3d.md#adr-3d-390) Am. 1, operator ruling 2026-10-30): with the free vector
   eliminated, what remains is a relation on the figure, answered exactly as that relation written directly — «וקטור p ·
   AB = p · AD = p» on a cube is refused as a contradiction naming «AD = p» and «AB = p»; «AB = p · DC = p» is already
-  true on a cube and drives a parallelogram on a figure free to become one. **Not yet** (refused honestly as the tool's
+  true on a cube and drives a parallelogram on a figure free to become one. **A free vector the figure defines is that
+  arrow** in every statement (ADR-3D-407, #2603): «AB = p» then «AD = k·p» gets the answer «AD = k·AB» gets, and «AB = p» then «|p| = 2» the answer «|AB| = 2» gets. **A free
+  letter may scale a free vector** that needs no figure («וקטור p · A(0,0,0) · AE = t·p»): E = A + t·p, and both t and p
+  move with «הציגו תצורה אחרת» until a given values t. **Not yet** (refused honestly as the tool's
   limit, naming the statement — never «בדקו את החישוב» and never "u is not declared"): a statement that would make the
-  figure and a free vector one joint solve, undecidable without solving both together («AE = t·p»; a span point over
-  a free vector), #2603 — and so is a magnitude, angle, ⟂, ∥ or dot product between a free vector and the figure
+  figure and a free vector one joint solve, undecidable without solving both together (a letter on an existing
+  pair over a free vector, «AD = k·p»; a point the figure must turn the free vector for, «E על AC' כך ש-AE = t·p»; a
+  span point over a free vector nothing defines; a letter another lane already owns), #2603 stage b3 — and so is a magnitude, angle, ⟂, ∥ or dot product between a free vector and the figure
   («p ⟂ AB», «|AB| = |p|»). **Metric givens** ([ADR-3D-406](06b-decisions-3d.md#adr-3d-406)): a magnitude («|u| = 5»,
   «|u + v| = 3»), a ratio of magnitudes («|u| = |v|», «|w+u| = |w-u|»), a dot product («u·v = 3»), an angle
   («הזווית בין u ל-v היא 60»), ⟂ and ∥ over free vectors hold at every configuration, whatever order they come in;
@@ -440,7 +445,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   that cannot all hold («|u| = 1», «|v| = 1», «|u + v| = 3»; «u = (1,2,3)» with «|u| = 5») are refused naming the
   lines. The data panel lists each such given («|u| = 5», «u ⟂ v», «∠(u, v) = 60°») and prints |u| once it is the
   same in every configuration, even while the direction moves.
-  - Sources: ADR-052, ADR-3D-386, ADR-3D-387, ADR-3D-390, ADR-3D-406; #1184 arm 2, #1188.
+  - Sources: ADR-052, ADR-3D-386, ADR-3D-387, ADR-3D-390, ADR-3D-406, ADR-3D-407; #1184 arm 2, #1188, #2603.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a

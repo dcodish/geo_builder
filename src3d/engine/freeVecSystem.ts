@@ -644,6 +644,47 @@ export function constantVec3(c: Construction3, e: VecExpr): Vec3 | null {
   return v3(acc[0], acc[1], acc[2]);
 }
 
+/**
+ * #2603 b1 ([ADR-3D-407](../../docs/06b-decisions-3d.md#adr-3d-407)) — THE ONE INLINER. A combination with every
+ * DEFINED free vector replaced by its definition, recursively (a definition only names earlier vectors, so this ends;
+ * the depth guard is belt and braces). A free vector nothing defines stays as it is. A definition holds by
+ * construction, so the result says exactly what the line says: «AB = p» then «AD = k·p» is «AD = k·AB». The three
+ * readers that must see through a definition — a figure relation over a new point, one over existing points, and a span
+ * point's basis — all ask here (docs/17 M3: one reader).
+ */
+export function inlineDefinedFreeVectors3(c: Pick<Construction3, 'freeVectors'>, e: VecExpr, depth = 0): VecExpr {
+  if (depth > 32) return e;
+  return e.flatMap((t) => {
+    const fv = t.atom.kind === 'named' ? c.freeVectors.get(t.atom.name) : undefined;
+    if (!fv?.def) return [t];
+    return inlineDefinedFreeVectors3(c, fv.def, depth + 1).map((d) => ({ coeff: t.coeff * d.coeff, atom: d.atom }));
+  });
+}
+
+/** #2603 b1 (ADR-3D-407): the free vector `name` is DEFINED by the figure alone — its inlined definition names only
+ *  point pairs and anchored arrows. Such a vector IS that combination of the figure's arrows («וקטור u · KB = u»). */
+export function figureDefinedFreeVector3(c: Construction3, name: string): VecExpr | null {
+  const fv = c.freeVectors.get(name);
+  if (!fv?.def || fv.symComps || fv.comps.some((x) => x !== null)) return null;
+  const e = inlineDefinedFreeVectors3(c, fv.def);
+  return e.every((t) => t.atom.kind === 'pair' || namedVector3(c, t.atom.name)?.kind === 'anchored') ? e : null;
+}
+
+/**
+ * #2603 b1 (ADR-3D-407; operator 2026-11-02, ADR-W-175 sr-06): THE NAMED BASIS a span point decomposes over — the
+ * anchored vectors, plus each free vector the span names that the figure DEFINES («וקטור u · KB = u»: u IS KB, exactly
+ * as «נסמן: KB = u» says). An undefined free vector («וקטור p») never counts (FR-VC-1d). Each member is a combination
+ * of figure atoms, evaluated at the positions by its reader.
+ */
+export function spanBasis3(c: Construction3, span: readonly string[]): { name: string; expr: VecExpr }[] {
+  const out: { name: string; expr: VecExpr }[] = [...c.vectors].map(([name, d]) => ({ name, expr: [{ coeff: 1, atom: { kind: 'pair', from: d.from, to: d.to } }] }));
+  for (const name of new Set(span)) {
+    const e = figureDefinedFreeVector3(c, name);
+    if (e) out.push({ name, expr: e });
+  }
+  return out;
+}
+
 /** The free vectors a combination names, transitively through definitions (for the render and the refusals). */
 export function freeNamesIn3(c: Pick<Construction3, 'freeVectors'>, e: VecExpr): string[] {
   const out: string[] = [];

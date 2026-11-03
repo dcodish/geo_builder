@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T10:11:04.857Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מנסרה ישרה משולשת ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "prism3",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "A'",
+            "B'",
+            "C'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "M אמצע B'C'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "M",
+          "a": "B'",
+          "b": "C'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "K על AA' כך ש-AK = 2KA'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "K",
+          "a": "A",
+          "b": "A'",
+          "t": 0.6666666666666666
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AA' = w, KC = v",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "A'"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "A'"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "C"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "K",
+          "to": "C"
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור u",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "u"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "KB = u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "K",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "P על AM כך ש-KP = αu + βv",
+      "cmds": [
+        {
+          "type": "point-in-span",
+          "id": "P",
+          "a": "A",
+          "b": "M",
+          "vecFrom": "K",
+          "span": [
+            "u",
+            "v"
+          ]
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "M"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "P"
+        }
+      ]
+    }
+  ]
+}
