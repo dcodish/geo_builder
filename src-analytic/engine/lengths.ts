@@ -23,6 +23,7 @@ import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr'
 import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
+import { TANGENT_LENGTH_SOURCE, TANGENT_WORD } from '../parser/tangentLengthWords';
 import type { Id } from './types';
 
 /**
@@ -84,7 +85,14 @@ export type MeasureTerm =
    * end is an unlettered role (`via-ellipse-role`); each end is a point or a role of `curve` (`ellipseRolePoint`, the one
    * closed form). Nothing is drawn for an unlettered end (operator ruling 2026-10-30, Q1 → A).
    */
-  | { kind: 'ellipse-dist'; u: RoleEnd; v: RoleEnd; curve: Id };
+  | { kind: 'ellipse-dist'; u: RoleEnd; v: RoleEnd; curve: Id }
+  /**
+   * «אורך המשיק מ-P למעגל» — the length of the tangent from a POINT to a CIRCLE (#2620 A4, ADR-AG-383): √(|PC|² − r²).
+   * A measure exactly as a distance is, so «אורך המשיק מ-P למעגל קטן פי 3 מהמרחק של P מהישר x=9» is one `length-eq`.
+   * `circle` is the circle AS WRITTEN ('' = the figure's one circle); M1 resolves it to `curve` and states, beside the
+   * equation, that P is OUTSIDE the circle (the power's sign selector), because the tangent exists only there.
+   */
+  | { kind: 'tangent'; p: Id; circle: string; curve?: Id };
 
 /** One end of an `ellipse-dist` term: a point, or a role point of the term's ellipse. */
 export type RoleEnd = { p: Id } | { role: EllipseRole };
@@ -384,6 +392,13 @@ const DISTANCE_NOUN = new RegExp(
   'g',
 );
 
+/**
+ * «אורך המשיק מ-P למעגל (I)?» · «אורך המשיק מנקודה P למעגל» · "the length of the tangent from P to the circle" (#2620 A4,
+ * ADR-AG-383) — consumed before the distance frames and the length noun, so «אורך» never strips into a pair. The circle
+ * may carry a name or its centre's letter («למעגל II», «למעגל M»), as «מחוץ למעגל M» does.
+ */
+const TANGENT_LENGTH = new RegExp(TANGENT_LENGTH_SOURCE, 'g');
+
 function readLength(src: string, named?: Set<number>, lines?: readonly LineEquation[]): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
@@ -398,6 +413,13 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
   // The symbolic notations become the worded question first, so the frames below decide the roles
   // for every spelling at once (#1128).
   let withPL = SYMBOLIC_DISTANCE.reduce((s, [re, to]) => s.replace(re, to), normalizeMath(areaNotation(src)));
+  // The tangent length first (#2620 A4): its «אורך» would otherwise be stripped as a length noun.
+  withPL = withPL.replace(TANGENT_LENGTH, (_m, pHe: string | undefined, pEn: string | undefined, circle: string | undefined) => {
+    const p = (pHe ?? pEn)!;
+    const key = `${p}|${circle ?? ''}`;
+    const at = terms.findIndex((t) => t.kind === 'tangent' && `${t.p}|${t.circle}` === key);
+    return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push({ kind: 'tangent', p, circle: circle ?? '' }) - 1));
+  });
   for (const f of DISTANCE_FRAMES) {
     withPL = withPL.replace(f, (_m, x: string, y: string) => {
       const push = (t: MeasureTerm, same: (u: MeasureTerm) => boolean) => {
@@ -425,7 +447,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
       // «AB» are one question with one answer instead of a point-line term naming a line called «B».
       if (IS_POINT.test(x) && IS_POINT.test(y)) {
         if (x === y) return _m; // a degenerate statement, as LENGTH_TOKEN also refuses
-        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === x && t.b === y);
+        return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.kind !== 'tangent' && t.a === x && t.b === y);
       }
       // Exactly one point: the other operand is the line, whichever side it was written on.
       const p = IS_POINT.test(x) ? x : IS_POINT.test(y) ? y : null;
@@ -451,7 +473,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
   // A DISTANCE noun in front of a bare pair is a distance, not a named pair (#1652).
   const withDistances = withPL.replace(DISTANCE_NOUN, (_m, a: string, b: string) => {
     if (a === b) return _m;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.kind !== 'tangent' && t.a === a && t.b === b);
     return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push({ a, b }) - 1));
   });
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
@@ -467,7 +489,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
     // Identical endpoints have zero length always; they are a degenerate statement rather than a
     // term, and admitting them would let `AA = 5` look satisfiable-but-failing instead of wrong.
     if (a === b) return `${a}${b}`;
-    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.a === a && t.b === b);
+    const at = terms.findIndex((t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.kind !== 'tangent' && t.a === a && t.b === b);
     const i = at >= 0 ? at : terms.push({ a, b }) - 1;
     named?.add(i); // the pair token itself reached this term: the student NAMED the segment (#1652)
     return String.fromCharCode(PLACEHOLDER_BASE + i);
@@ -539,8 +561,8 @@ export function evalLengthExpr(
    * against.
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
-  /** Resolve a curve by id — an ellipse's role points need it (#2616); absent, such a term cannot be judged. */
-  curveAt?: (id: Id) => { kind: string; a?: number; b?: number } | null,
+  /** Resolve a curve by id — an ellipse's role points (#2616) and a tangent's circle (#2620) need it; absent, such a term cannot be judged. */
+  curveAt?: (id: Id) => { kind: string; a?: number; b?: number; cx?: number; cy?: number; r?: number } | null,
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {
@@ -584,6 +606,18 @@ export function evalLengthExpr(
       const q = roleEndAt(term.v, at, e);
       if (!p || !q) return null;
       value = Math.hypot(q.x - p.x, q.y - p.y);
+    } else if (term.kind === 'tangent') {
+      /**
+       * √(|PC|² − r²) — the POWER of P with respect to the circle, under the root (#2620 A4, ADR-AG-383). Inside the circle
+       * there is no tangent: M1 states «P outside the circle» beside every equation that holds this term, and that selector
+       * is what refuses a figure forcing P inside. Here the value continues as −√(r² − |PC|²) so the descent still has a
+       * gradient pointing out of the circle; it is never clamped to 0, which would let an inside P read as touching.
+       */
+      const p = at(term.p);
+      const k = term.curve !== undefined ? curveAt?.(term.curve) ?? null : null;
+      if (!p || !k || k.kind !== 'circle' || typeof k.cx !== 'number' || typeof k.cy !== 'number' || typeof k.r !== 'number') return null;
+      const power = (p.x - k.cx) ** 2 + (p.y - k.cy) ** 2 - k.r ** 2;
+      value = Math.sign(power) * Math.sqrt(Math.abs(power));
     } else if (term.kind === 'point-line') {
       const p = at(term.p);
       // A line resolved at M1 is read by its id (#2429): a rename cannot strand the term.
@@ -609,7 +643,7 @@ export function evalLengthExpr(
 export function lengthRefs(le: LengthExpr): Id[] {
   // A point-to-line term references the POINT only: the line is named, and whether that name is a
   // curve or a pair of vertices is the caller's question, not the solver's.
-  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' ? [] : t.kind === 'ellipse-dist' ? roleEndPoints(t) : [t.a, t.b]));
+  return le.terms.flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' || t.kind === 'tangent' ? [t.p] : t.kind === 'line-line' ? [] : t.kind === 'ellipse-dist' ? roleEndPoints(t) : [t.a, t.b]));
 }
 
 /** The lettered points an `ellipse-dist` term measures from (#2616) — a role end is the curve's, not a point. */
@@ -624,6 +658,8 @@ export function describeLengthExpr(le: LengthExpr): string {
         ? `שטח ${t.ids.join('')}`
         : t.kind === 'point-line'
           ? `מרחק ${t.p}-${t.line}`
+          : t.kind === 'tangent'
+            ? `${TANGENT_WORD} ${t.p}`
           : t.kind === 'line-line'
             ? `מרחק ${t.u}-${t.v}`
             : t.kind === 'ellipse-dist'

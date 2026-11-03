@@ -1,0 +1,89 @@
+{
+  "name": "pr-2685",
+  "title": "PR #2685 — #2620 A: the textbook's locus conditions in its own words (analytic)",
+  "cases": [
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "id": "T18",
+      "title": "A distance from a written point, and «ממרחקה», give the ellipse",
+      "lines": [
+        "נקודה P",
+        "המרחק של P מהנקודה (2,0) קטן פי 2 ממרחקה מהישר x=8"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "16"
+      ],
+      "lookFor": "Start from a clear canvas. Both lines build. Press «הצג מקום גאומטרי» on P's row: an ellipse x²/16 + y²/12 = 1 is named and drawn.",
+      "before": "Prod refuses the second line (not understood)."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "id": "T19",
+      "title": "The sum of squared distances gives the ellipse",
+      "lines": [
+        "נקודה P",
+        "סכום ריבועי המרחקים של P מהישר y=-2 ומהנקודה (0,2) הוא 16"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "8"
+      ],
+      "lookFor": "Start from a clear canvas. Both lines build. Press «הצג מקום גאומטרי» on P's row: an ellipse x²/8 + y²/4 = 1 is named and drawn.",
+      "before": "Prod refuses the second line."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "id": "T20",
+      "title": "The tangent length from P to a circle gives the ellipse",
+      "lines": [
+        "נתון מעגל שמרכזו בנקודה (1,0) ורדיוסו √8",
+        "נקודה P",
+        "אורך המשיק מ-P למעגל קטן פי 3 מהמרחק של P מהישר x=9"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "18"
+      ],
+      "lookFor": "Start from a clear canvas. All three lines build. Press «הצג מקום גאומטרי» on P's row: an ellipse x²/18 + y²/16 = 1 is named and drawn.",
+      "before": "Prod refuses the third line."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "id": "T21",
+      "title": "REFUSAL — a tangent length from a point inside the circle",
+      "lines": [
+        "נתון מעגל שמרכזו בנקודה (1,0) ורדיוסו √8",
+        "P(1,1)",
+        "אורך המשיק מ-P למעגל הוא 3"
+      ],
+      "expectRefusal": "לא נמצאה תצורה שבה מתקיים: «אורך המשיק מ-P למעגל הוא 3»",
+      "lookFor": "Start from a clear canvas. The third line is refused with «לא נמצאה תצורה שבה מתקיים: «אורך המשיק מ-P למעגל הוא 3»» (P(1,1) is inside the circle, so no tangent leaves it), and the figure keeps the circle and P.",
+      "before": "Prod refuses it as not understood."
+    }
+  ]
+}

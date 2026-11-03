@@ -14890,3 +14890,33 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 **Locks.** `src-analytic/__tests__/issue-2673-locus-chip-only.test.ts` (every typed wording → the pointer, the chip unchanged, the two records apart, the conditional built as givens then its chip, the guide row); fixture `issue-2673-conditional-locus-givens`; the locus test files and exams migrated to the chip's entry point.
 
 **Behaviour change for a student:** in analytic, typing «המקום הגיאומטרי של P» (or any locus wording) in the ask box no longer draws or answers the locus; it answers «את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים.». The chip is unchanged, and the guide's locus row now teaches the chip.
+
+## ADR-AG-383 — The textbook's locus conditions are read in its own words: a coordinate operand, «ממרחקה», the sum of squared distances, the tangent length (#2620 A)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (analytic), fix round #2678 stream P, branch `feat/2620-measures-express` (stacked on #2672's). #2620 work item A. LADDER stage: none for A1–A3 (parser rewrites onto existing terms); A4 is a residual term (`solve.ts` `length-eq`), like `d_{Pl}`, plus a sign selector that already exists.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R228 (new). · **Design:** [04c](04c-design-analytic.md) § "The book's locus measures".
+
+**Operator rulings.** 2026-10-30 on #2620: *"now we need to build all capabilities"*. That makes the book's sentences `[asked]`. Q2 of the same pass: *"2d will have no need for this so its a anaytic tool only"*, so these spellings are analytic-only by design, not a 2-D gap. The tool-named point that a coordinate creates follows #1263.
+
+**Re-measured at pickup** (`24bce5fb`, `decideSubmit` → `derive` → `askSettled`). Every book sentence below was `not-handled`, and every formula twin built and answered: «A(2,0)» · «… מהנקודה A קטן פי 2 מהמרחק של P מהישר x=8» gave `x²/16 + y²/12 = 1`; «PA² + d_{Pl}² = 16» gave `x²/8 + y²/4 = 1`.
+
+**Decision.**
+1. **A1, a coordinate operand.** `parseDistanceCoordinate` runs in the rule chain just before `parseConstraint`. In a distance or tangent sentence, ONE coordinate pair after «(ה)נקודה» or straight after a distance preposition goes through `pointSlot` → `viaCanonical`, the #1263 mint, and the sentence is re-read with the tool's letter in its place. Two coordinate operands are left unread: the mint has a single stand-in letter.
+2. **A2, «ממרחקה».** `resolveAnaphor` (`asEquation`, `ratioAsEquation`) rewrites a second operand «מרחק(ה|ו|ן|ם) מ…», «המרחק של(ה|ו|ן|הן|הם) מ…» or "its distance from …" to the first distance's subject. If the first side is not a distance with one lettered subject, the sentence is left as it was.
+3. **A3, the sum of squared distances.** `sumOfSquares` rewrites «סכום ריבועי המרחקים / מרחקי …» into `(d₁)^2 + (d₂)^2 = k`. It reads three shapes, each enumerated: one subject and two operands («מ<O1> ומ<O2>»), one subject and a point list («מהנקודות A ו-B»), and two subjects and one operand («של A ו-B מ<O>»). English is read too. It runs after `liftDistanceLines`, so a line given by its equation is an operand as in any distance.
+4. **A4, the tangent length.** It is a new `MeasureTerm`, `tangent {p, circle, curve?}`, with value √(|PC|² − r²). M1 resolves the circle as `circle-region` does (a name, a centre letter, or the figure's one circle) and states the power's sign selector (P outside) beside the equation. A figure that forces P inside is refused by that selector. Inside the circle the value continues as −√(r² − |PC|²), so the descent has a gradient. It is never clamped to 0, which would read an inside P as touching. Asked, a tangent term is not read (`ask.ts`): the ruling opened it as a given.
+
+**Not built: item D** (a letter list in «הביעו באמצעות a ו-b את …»). `EXPRESS_IN` is read only before a locus question, and the 2026-11-02 ruling withdraws the typed locus question (#2673). D is therefore B's case, a widening of a lane that is closing. It was escalated on #2620. Its ADR text is not written.
+
+**Parity (ADR-W-108).** The equation and coordinate spellings are X1/X2 (topic families). The plane spellings («סכום ריבועי המרחקים של P מהנקודות A ו-B», «אורך המשיק מ-P למעגל» on a lettered circle, «ממרחקה» between letters) are analytic-only by ruling. They need an `EXCEPTIONS` family, which is an ADR-W decision. This item does not take that decision; it is a question for the round.
+
+**Locks.** Fixtures `ellipse-book-p9-5-2620`, `ellipse-book-p9-6-2620`, `ellipse-book-p9-7-sum-2620` (one given per line, with #2672's spelling of l1 and l2), and `ellipse-book-p10-8-2620`, each answering the book's equation. Unit test `src-analytic/__tests__/issue-2620-book-measures.test.ts`:
+- each spelling equals its formula twin, in constraint and in locus;
+- the tangent length is measured off the figure at 8 seeds;
+- the inside, no-circle and asked refusals;
+- the anti-widening cases.
+
+Three catalog rows (F17).
+
+**Behaviour change for a student:** in analytic, the book's sentences «המרחק של P מהנקודה (2,0) קטן פי 2 ממרחקה מהישר x=8», «סכום ריבועי המרחקים של P מהישר y=-2 ומהנקודה (0,2) הוא 16», «סכום ריבועי המרחקים של A ו-B מהישר y=1/2x הוא 4» and «אורך המשיק מ-P למעגל קטן פי 3 מהמרחק של P מהישר x=9» build, and their locus answers as the formula sentences' does.

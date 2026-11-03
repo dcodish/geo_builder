@@ -314,6 +314,13 @@ From the «lines and points» corpus (§8), numbered onward.
 - **Scope (R187, ADR-AG-319):** only a curve that holds a POINT is a carrier. A curve the sentence is about («הישר <eq> משיק …», «הישר <eq> עובר דרך A») is drawn.
 - Sources: ADR-AG-032.
 
+**R228 — the textbook's locus conditions are read in its own words**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities"; analytic-only by design, the same day: "2d will have no need for this so its a anaytic tool only".)* Each sentence states exactly what its formula twin states:
+- a point given by its coordinates inside a distance takes the tool's name, as «הנקודה (3,1) …» does (#1263): «המרחק של P מהנקודה (2,0) קטן פי 2 מהמרחק של P מהישר x=8»;
+- the possessive of the second distance refers to the first's subject: «… קטן פי 2 ממרחקה מהישר x=8» ≡ «… מהמרחק של P מהישר x=8»;
+- «סכום ריבועי המרחקים של P מהישר l ומהנקודה A הוא 16» ≡ «d_{Pl}² + PA² = 16», and also «… של A ו-B מהישר l …», «… של P מהנקודות A ו-B …»;
+- «אורך המשיק מ-P למעגל» is √(PC² − r²). It exists only for P outside the circle, so a figure that forces P inside is refused. It is a given; asked, it is not read.
+- Sources: ADR-AG-383, #2620.
+
 **R80 — a line can be CONSTRUCTED through a point**. The direction is copied from AB, a named line, a line given by its equation (R195) or an axis; no freedom is added, and a missing anchor is introduced with its DOF.
 - «דרך P עובר ישר מקביל ל AB»
 - Sources: ADR-AG-057, ADR-052.

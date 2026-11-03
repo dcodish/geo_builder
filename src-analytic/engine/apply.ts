@@ -3072,6 +3072,39 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return mintedEffect(applyFact(cur, { ...f, k }), minted);
       }
       /*
+       * THE TANGENT LENGTH FROM A POINT (#2620 A4, ADR-AG-383): each term's circle is resolved as «P מחוץ למעגל» resolves
+       * it (named, centre letter, or the figure's one circle), the term then holds that circle's id, and the equation is
+       * stated together with «P outside the circle» — the power's sign selector — because the tangent exists only there.
+       * A figure that forces P inside is refused by that selector, never answered with a clamped length.
+       */
+      if (f.k.t === 'length-eq' && [...f.k.left.terms, ...f.k.right.terms].some((t) => t.kind === 'tangent' && t.curve === undefined)) {
+        const outside: Fact[] = [];
+        const sides: LengthExpr[] = [];
+        for (const le of [f.k.left, f.k.right]) {
+          const terms: MeasureTerm[] = [];
+          for (const t of le.terms) {
+            if (t.kind !== 'tangent' || t.curve !== undefined) {
+              terms.push(t);
+              continue;
+            }
+            let host: GeoObject | undefined;
+            if (t.circle !== '') {
+              host = circleByName(c, t.circle);
+              if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', t.circle)) };
+            } else {
+              const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+              if (circles.length !== 1) return { ok: false, error: noHost(f.src, 'circle', circles) };
+              host = circles[0];
+            }
+            terms.push({ ...t, curve: host.id });
+            const sel: Fact = { t: 'selector', sel: { kind: 'sign', q: { k: 'power', p: t.p, circle: host.id }, positive: true }, src: f.src };
+            if (!outside.some((o) => JSON.stringify(o) === JSON.stringify(sel))) outside.push(sel);
+          }
+          sides.push({ ...le, terms });
+        }
+        return applyAll(c, [{ ...f, k: { ...f.k, left: sides[0], right: sides[1] } }, ...outside]);
+      }
+      /*
        * A DISTANCE GIVEN TO A LINE GIVEN BY ITS EQUATION (#2429, ADR-AG-328): the term's line is resolved like any line
        * operand, and the term then holds that curve's id (`curve`), its equation stripped.
        */
