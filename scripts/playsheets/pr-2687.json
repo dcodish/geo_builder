@@ -1,0 +1,64 @@
+{
+  "name": "pr-2687",
+  "title": "PR #2687 — #2603 b1 + b2: a free vector the figure defines, a free letter scaling a free vector (3-D)",
+  "cases": [
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5178",
+      "path": "/3d.html",
+      "id": "T35",
+      "title": "A free letter scales a free vector",
+      "lines": [
+        "וקטור p",
+        "A(0,0,0)",
+        "AE = t·p"
+      ],
+      "cycles": 1,
+      "expectConfigsDiffer": true,
+      "expectFigure": [
+        "E"
+      ],
+      "lookFor": "Start with «נקה הכל». All three lines build; E is drawn on the line through A along p. Press «הציגו תצורה אחרת»: both p and E move.",
+      "before": "Prod refuses «AE = t·p»."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5178",
+      "path": "/3d.html",
+      "id": "T36",
+      "title": "A free vector the figure defines spans a point",
+      "lines": [
+        "מנסרה ישרה משולשת ABC",
+        "M אמצע B'C'",
+        "K על AA' כך ש-AK = 2KA'",
+        "נסמן: AA' = w, KC = v",
+        "וקטור u",
+        "KB = u",
+        "P על AM כך ש-KP = αu + βv"
+      ],
+      "expectFigure": [
+        "P"
+      ],
+      "lookFor": "Start with «נקה הכל». Every line builds and P is drawn on AM where KB crosses it, the same place as when the vectors are named with «נסמן: AA' = w, KC = v, KB = u».",
+      "before": "Prod refuses the last line."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5178",
+      "path": "/3d.html",
+      "id": "T37",
+      "title": "REFUSAL — a cube edge as a multiple of an undefined vector",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "וקטור p",
+        "AD = k·p"
+      ],
+      "expectRefusal": "AD = k·p",
+      "lookFor": "Start with «נקה הכל». «AD = k·p» is refused as the tool's limit (an undefined free vector cannot carry a cube edge yet; stage b3, #2684).",
+      "before": "Unchanged."
+    }
+  ]
+}

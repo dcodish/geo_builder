@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames, namedVector3 } from './vecExpr';
-import { constantVec3, figureRelationOf3, freeNamesIn3, freeVecSystemVerdict3, isPureFreeVector3 } from './freeVecSystem';
+import { constantVec3, figureDefinedFreeVector3, figureRelationOf3, freeNamesIn3, freeVecSystemVerdict3, inlineDefinedFreeVectors3, isPureFreeVector3, spanBasis3 } from './freeVecSystem';
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
@@ -861,15 +861,30 @@ function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs:
  *    stated vector is drawn (the V1 auto-draw convention the claim arm keeps).
  *  - One point is new: it is DEFINED by the relation, as today, with each DEFINED free vector replaced by its
  *    combination (exact: a definition holds by construction). A free vector nothing defines stays a term the point
- *    pass reads — admitted only while it is PURE (resolvable without the figure, `settleFreeVectors3`) and without
- *    a ratio letter, whose root-find is a joint solve.
+ *    pass reads — admitted only while it is PURE (resolvable without the figure, `settleFreeVectors3`).
+ *
+ * #2603 b1 / b2 ([ADR-3D-407](../../docs/06b-decisions-3d.md#adr-3d-407)) — a RATIO LETTER («AD = k·p», «AE = t·p»):
+ *  - every defined free vector is inlined FIRST, on both branches (`inlineDefinedFreeVectors3`): when no free vector
+ *    is left, the line is its anchored twin («AB = p» · «AD = k·p» is «AD = k·AB») and the anchored lane answers it;
+ *  - a new point over a PURE free vector with a letter nothing else owns is defined like «AE = p»: E = A + t·p, with t
+ *    a free sampled scalar (ADR-052) beside p's own sampled components (b2);
+ *  - what is left — a letter on an existing pair over a free vector, or a letter another lane owns — needs the joint
+ *    pivot ↔ free solve and stays `free-vector-coupling` (b3, `later`).
  */
 function freeVecRel3(c: Construction3, cmd: Extract<Command3, { type: 'vec-rel' }>): ApplyResult3 {
   const flat = (terms: import('./types').SymTerm[]): import('./types').VecExpr => terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom }));
   const firstFree = (terms: import('./types').SymTerm[]): string => freeNamesIn3(c, flat(terms))[0] ?? '?';
+  // inline every DEFINED free vector by its combination — the one inliner (#2603 b1), with the letter's part carried
+  const expand = (terms: import('./types').SymTerm[]): import('./types').SymTerm[] =>
+    terms.flatMap((t) => inlineDefinedFreeVectors3(c, [{ coeff: 1, atom: t.atom }]).map((d) => ({ coeff: { k: t.coeff.k * d.coeff, p: t.coeff.p * d.coeff }, atom: d.atom })));
+  const terms = expand(cmd.terms);
+  const freeLeft = terms.filter((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name));
+  const ratio = !!cmd.symbol || terms.some((t) => t.coeff.p !== 0);
+  // b1: nothing free is left once the definitions are inlined — the line IS its anchored twin
+  if (ratio && freeLeft.length === 0) return applyCommand3(c, { ...cmd, terms });
   const unknownPts = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
   if (unknownPts.length === 0) {
-    if (cmd.symbol || cmd.terms.some((t) => t.coeff.p !== 0)) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+    if (ratio) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
     const r = freeVecEquation3(c, [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], flat(cmd.terms));
     if (!r || !r.ok) return r ?? { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
     if (hasSegment(r.next, cmd.from, cmd.to)) return r;
@@ -878,16 +893,14 @@ function freeVecRel3(c: Construction3, cmd: Extract<Command3, { type: 'vec-rel' 
     return { ok: true, next: withSeg };
   }
   if (unknownPts.length > 1) return { ok: false, error: { code: 'two-unknowns', id: unknownPts[1] } };
-  // inline every DEFINED free vector by its combination, recursively (definitions only reference earlier names)
-  const expand = (terms: import('./types').SymTerm[]): import('./types').SymTerm[] =>
-    terms.flatMap((t) => {
-      const fv = t.atom.kind === 'named' ? c.freeVectors.get(t.atom.name) : undefined;
-      if (!fv?.def) return [t];
-      return expand(fv.def.map((d) => ({ coeff: { k: t.coeff.k * d.coeff, p: t.coeff.p * d.coeff }, atom: d.atom })));
-    });
-  const terms = expand(cmd.terms);
-  const freeLeft = terms.filter((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name));
-  if (freeLeft.length > 0 && (cmd.symbol || terms.some((t) => t.coeff.p !== 0))) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+  // b2: a letter on a PURE free vector is a free scalar of the new point — unless the letter already means something
+  // (another lane would have to solve it jointly with the free vector: b3)
+  if (freeLeft.length > 0 && ratio) {
+    const letter = cmd.symbol ?? null;
+    const owned = letter !== null && symbolOwnersOf(c, letter).length > 0;
+    const pure = freeLeft.every((t) => t.atom.kind === 'named' && isPureFreeVector3(c, t.atom.name));
+    if (letter === null || owned || !pure) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree(cmd.terms) } };
+  }
   const unknown = unknownPts[0];
   const next = clone(c);
   const defIndex = next.vecDefs.length;
@@ -943,6 +956,38 @@ function freeVecMetricOf3(c: Construction3, cmd: Command3): FreeVecMetric3 | nul
  * the tool's limit (`free-vector-coupling`, #2603). Whether the givens can hold together, and whether a free vector
  * in it is tied to the figure through an equation, is judged once by `settleFreeVectors3`.
  */
+/**
+ * #2603 b1 (ADR-3D-407) — the anchored command a metric given IS once every free vector in it is inlined by its
+ * definition, or `null` when a free vector survives or the anchored lanes have no spelling for the result (a dot
+ * product or an angle over a combination of several arrows): that stays the joint solve's (#2684).
+ */
+function anchoredMetricTwin3(c: Construction3, m: FreeVecMetric3): Command3 | null {
+  const inl = (e: VecExpr) => inlineDefinedFreeVectors3(c, e);
+  const sides = m.kind === 'mag' ? [inl(m.e)] : [inl(m.e1), inl(m.e2)];
+  if (sides.some((e) => e.length === 0 || e.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)))) return null;
+  const single = (e: VecExpr) => (e.length === 1 && e[0].coeff !== 0 ? e[0] : null);
+  const operand = (a: VecAtom): Operand3 => (a.kind === 'pair' ? { kind: 'segment', a: a.from, b: a.to } : { kind: 'vector', name: a.name });
+  switch (m.kind) {
+    case 'mag':
+      return { type: 'mag-val', e: sides[0], value: m.value };
+    case 'mag-rel':
+      return { type: 'mag-rel', e1: sides[0], e2: sides[1], c: m.c };
+    case 'cos': {
+      const [a, b] = [single(sides[0]), single(sides[1])];
+      return a && b ? { type: 'cos-angle', u: a.atom, v: b.atom, cos: m.cos * Math.sign(a.coeff) * Math.sign(b.coeff) } : null;
+    }
+    case 'par': {
+      const [a, b] = [single(sides[0]), single(sides[1])];
+      return a && b ? { type: 'mutual-rel', rel: 'parallel', a: operand(a.atom), b: operand(b.atom) } : null;
+    }
+    case 'dot': {
+      const [a, b] = [single(sides[0]), single(sides[1])];
+      if (!a || !b || a.atom.kind !== 'named' || b.atom.kind !== 'named') return null;
+      return { type: 'dot-given', v1: a.atom.name, v2: b.atom.name, value: m.value / (a.coeff * b.coeff) };
+    }
+  }
+}
+
 function freeVecMetric3(c: Construction3, m: FreeVecMetric3): ApplyResult3 {
   const all = m.kind === 'mag' ? m.e : [...m.e1, ...m.e2];
   const missing = missingPoint(c, exprPointIds(all));
@@ -951,6 +996,10 @@ function freeVecMetric3(c: Construction3, m: FreeVecMetric3): ApplyResult3 {
   const unknown = names.find((n) => namedVector3(c, n) === undefined);
   if (unknown !== undefined) return { ok: false, error: { code: 'unknown-vector', id: unknown } };
   const firstFree = names.find((n) => c.freeVectors.has(n))!;
+  // #2603 b1 (ADR-3D-407): a free vector the figure defines is that arrow — once inlined, a metric over defined vectors
+  // alone is its anchored twin («וקטור p · AB = p · |p| = 2» is «|AB| = 2»), answered by the anchored lane
+  const twin = anchoredMetricTwin3(c, m);
+  if (twin) return applyCommand3(c, twin);
   if (all.some((t) => t.atom.kind === 'pair' || !c.freeVectors.has(t.atom.name))) return { ok: false, error: { code: 'free-vector-coupling', id: firstFree } };
   // «u ∥ u» says nothing — the anchored lane's `sameOperand` refusal, kept (an angle of u with itself is a given that
   // can be false, so it is a row like any other)
@@ -2621,10 +2670,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       const missing = missingPoint(c, [cmd.a, cmd.b, cmd.vecFrom]);
       if (missing) return { ok: false, error: missing };
-      const spanErr = vectorRefsError3(c, cmd.span); // #1188: a span point over a free vector is a joint solve
+      // #1188: a span point over an UNDEFINED free vector is a joint solve (#2603 b3). #2603 b1 (ADR-3D-407): one the
+      // figure defines («וקטור u · KB = u») is that arrow, and counts toward the basis exactly as «נסמן: KB = u» does
+      const spanErr = vectorRefsError3(c, cmd.span.filter((n) => !figureDefinedFreeVector3(c, n)));
       if (spanErr) return { ok: false, error: spanErr };
       // the closed-form drive needs a full declared basis with a 1-dim complement (docs/20 §6.2)
-      if (c.vectors.size !== 3 || new Set(cmd.span).size !== 2) return { ok: false, error: { code: 'need-basis' } };
+      if (spanBasis3(c, cmd.span).length !== 3 || new Set(cmd.span).size !== 2) return { ok: false, error: { code: 'need-basis' } };
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'in-span', a: cmd.a, b: cmd.b, vecFrom: cmd.vecFrom, span: cmd.span });
       return { ok: true, next };

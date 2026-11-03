@@ -608,7 +608,16 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   from `…#k` (the norm floor: never a dot). A sign on a free component is honoured here, so the pivot's sign readers
   ask `positionalComponentSigns3` and never see it. `freeDofCount3` adds the unstated components.
 - **Need-basis (Q5).** `point-in-span` counts `c.vectors` only — a floating p beside the cube's u, v, w must not turn a
-  buildable span point into `need-basis`.
+  buildable span point into `need-basis`. #2603 b1 ([ADR-3D-407](06b-decisions-3d.md#adr-3d-407)): the basis is
+  `spanBasis3(c, span)` — the anchored vectors plus each free vector the SPAN names that the figure defines
+  (`figureDefinedFreeVector3`: its inlined `def` names only pairs and anchored arrows); `apply` and `inSpanPosition` /
+  `checkInSpan` read the same accessor, so «וקטור u · KB = u» is «נסמן: KB = u».
+- **Seeing through a definition (#2603 b1/b2, ADR-3D-407).** `inlineDefinedFreeVectors3` (`freeVecSystem.ts`) is the
+  one inliner: `freeVecRel3` (both branches, the letter's part carried), `figureDefinedFreeVector3` and the metric door's `anchoredMetricTwin3` (a metric given over defined vectors alone is re-applied as its anchored command) read it. A
+  ratio-letter relation with nothing free left after inlining is re-applied as its anchored twin («AB = p · AD = k·p»
+  → «AD = k·AB»). A new point over a PURE free vector with a letter `symbolOwnersOf` does not know is a `vec-defined`
+  point like «AE = p», its letter the vec-def lane's free sampled ratio (b2). A letter on an existing pair over a free
+  vector, an owned letter, or an impure vector stays `free-vector-coupling` (b3).
 - **Panel and ask.** `statedVectorRows` prints a stated tuple as typed and a never-stated free vector as
   `u = (?, ?, ?)`; the measures rows carry `u = (1, 2, 3)`, `|u|`, `u²` only when the value agrees across
   `knowledgeSamples3`. A free vector's value is absolute, so no frame or scale gate applies to it. The ask lane's
