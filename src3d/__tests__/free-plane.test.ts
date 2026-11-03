@@ -109,11 +109,20 @@ describe('#487 ruling 1 — a membership on an UNDECLARED plane creates it', () 
     expect(auto).toEqual(declared);
   });
 
-  it('a MISTYPED point-run name still refuses — only π-style names auto-create', () => {
+  it('a MISTYPED point-run name is never a free plane — only π-style names auto-create one', () => {
     state().clear();
     submit('קובייה ABCD');
     submit('E על המישור ABCX'); // X is not a cube vertex — a typo, not a plane declaration
-    expect(state().facts).toHaveLength(1); // refused, kept prior
+    // ⚠ Re-based by #2610 (ADR-3D-409; the "create everywhere + notice" ruling of 2026-09-27, ADR-W-162): the run
+    // stays a point-run plane, never a free π-plane; its missing letter X is created IN the plane its other three
+    // letters fix, and the created notice names X (its ✕ is the typo path). Before, X was created free, off the plane,
+    // and the line was refused «not-coplanar» — a statement the student never made.
+    expect(state().lastError).toBeNull();
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastCreated?.ids).toEqual(['X']);
+    const c = derived().construction;
+    expect(c.planes.has('ABCX')).toBe(false);
+    expect(c.pointPlanes.get('ABCX')).toEqual(['A', 'B', 'C', 'X']);
   });
 });
 

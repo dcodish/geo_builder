@@ -44,8 +44,10 @@ const SWEEP: ReadonlyArray<{ why: string; session: string; now: Now; detail: str
   { why: 'a line that records with nothing positioned yet is BUILT (the App records it)', session: 'המישור π1: z = 1', now: 'built', detail: 'plane3' },
   { why: '#353: the lowercase nudge', session: 'פירמידה sabcd', now: 'guided', detail: 'scope:lowercase-labels' },
   { why: 'ADR-3D-040: the guidance register', session: 'פירמידה', now: 'guided', detail: 'scope:bare-solid' },
-  // #1467 (ADR-3D-382): A, B, C are created; a ⟂ claim over free points the drive cannot pin is refused with its true code
-  { why: 'a reasoned refusal is not a gap', session: 'AB ⊥ AC', now: 'refused', detail: 'point-not-determined' },
+  // #1467 (ADR-3D-382): a refusal with its true code is not a gap. #2609 (ADR-3D-408): «AB ⊥ AC» alone now BUILDS on a
+  // blank canvas (the created points are placed), so the reasoned refusal is two givens that cannot both hold
+  { why: 'a reasoned refusal is not a gap', session: 'AB∥ACD ⏎ AB ⊥ ACD', now: 'refused', detail: 'givens-contradict' },
+  { why: '#2609: a relation over created points builds on a blank canvas', session: 'AB ⊥ AC', now: 'built', detail: 'cos-angle' },
   { why: 'a genuine gap STAYS a live gap', session: 'משולש ABC ⏎ AB מתעופף מעל הקשת', now: 'not-handled', detail: 'not-understood' },
 ];
 

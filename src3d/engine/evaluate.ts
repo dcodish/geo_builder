@@ -3039,52 +3039,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // and every plane surface (patch, label, «מישורים» row, crossing offer) reads it (#2126, ADR-3D-350).
   const circles3: Resolved3['circles3'] = [];
   for (const k of c.circles3) {
-    let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
-    // #442: a POLYGON's circle — the centre is DERIVED from the ring, not a named point, and the
-    // circle lives in the ring's OWN plane (so a flat polygon and a solid's face resolve alike).
-    if (k.def.kind === 'circum' || k.def.kind === 'incircle') {
-      const got = k.def.ring.map((id) => pos.get(id));
-      if (got.some((p) => !p)) continue; // a vertex isn't placed yet — a different failure mode
-      const vs = got as Vec3[];
-      const nn = newellNormal(vs);
-      if (norm3(nn) < 1e-12) continue; // collinear ring — no plane, no circle
-      const solved =
-        k.def.kind === 'circum'
-          ? (() => {
-              const cc = ringCircumcentre3(vs);
-              return cc ? { center: cc, radius: norm3(sub3(vs[0], cc)) } : null;
-            })()
-          : triangleIncircle3(vs);
-      if (!solved) continue;
-      normal = normalize3(nn);
-      const seedC = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
-      e1 = normalize3(cross3(normal, seedC));
-      e2 = cross3(normal, e1);
-      circles3.push({ id: k.id, center: solved.center, normal, radius: solved.radius, e1, e2 });
-      continue;
-    }
-    const center = pos.get(k.def.center);
-    if (!center) continue;
-    if (k.def.kind === 'tangent-line') {
-      const ln = lines.get(k.def.line);
-      if (!ln) continue;
-      const foot = footOnLine(center, ln); // the tangent point (radius ⟂ line)
-      const radial = sub3(foot, center);
-      radius = norm3(radial);
-      if (radius < 1e-9 || norm3(ln.dir) < 1e-9) continue; // centre on the line → degenerate
-      e1 = normalize3(radial);
-      e2 = normalize3(sub3(ln.dir, scale3(e1, dot3(ln.dir, e1)))); // tangent dir, orthonormalised
-      normal = normalize3(cross3(e1, e2));
-    } else {
-      const pl = planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
-      if (!pl) continue;
-      normal = normalize3(pl.n);
-      const seed0 = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
-      e1 = normalize3(cross3(normal, seed0));
-      e2 = cross3(normal, e1);
-      radius = k.def.radius;
-    }
-    circles3.push({ id: k.id, center, normal, radius, e1, e2 });
+    const g = circleGeom3(c, k, pos, planes, lines);
+    if (g) circles3.push(g);
+  }
+  // #2611 (ADR-3D-410): an on-circle rider its circle could not yet resolve inside the point pass (a circle whose
+  // carrier line or plane resolves only from final positions) is seated now, on the circle as resolved.
+  for (const [id, def] of c.points) {
+    if (def.kind !== 'on-circle3' || pos.has(id)) continue;
+    const g = circles3.find((k) => k.id === def.circle);
+    if (g) seatOnCircleRider3(seed, pos, g, id);
   }
 
   // ---- a FINAL fill for foot-line points whose named line only resolved late (a through-line
@@ -3471,6 +3434,12 @@ function evaluateSolidsAndPoints(
       pos.set(id, v3(comp3('x'), comp3('y'), comp3('z')));
     } else if (def.kind === 'on-line') {
       seatOnLineRider(seed, pos, lines, id, def, riderTOverride);
+    } else if (def.kind === 'on-circle3') {
+      // #2611 (ADR-3D-410): the circle's own points precede the rider, so it resolves here; when its carrier line or
+      // plane resolves only later the rider is seated after the circle pass instead
+      const k = c.circles3.find((x) => x.id === def.circle);
+      const g = k && circleGeom3(c, k, pos, planes, lines);
+      if (g) seatOnCircleRider3(seed, pos, g, id, riderTOverride);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
@@ -3837,6 +3806,102 @@ function seatOnPlaneRider(
   pos.set(id, p);
 }
 
+/**
+ * One circle of the figure, resolved from the current positions, lines and planes (V8-i). A circle carries its plane in
+ * its own record (centre + normal) and NEVER in `planes`: that map is the student's planes (#2126, ADR-3D-350). Shared by
+ * the post-pivot circle pass and the point pass, where an on-circle rider (#2611) reads its circle as soon as the
+ * circle's own points are placed. A through-line not yet in `lines` is read from its two points.
+ */
+function circleGeom3(
+  c: Construction3,
+  k: Construction3['circles3'][number],
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  lines: Map<string, ResolvedLine>,
+): Resolved3['circles3'][number] | null {
+  let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
+  // #442: a POLYGON's circle — the centre is DERIVED from the ring, not a named point, and the
+  // circle lives in the ring's OWN plane (so a flat polygon and a solid's face resolve alike).
+  if (k.def.kind === 'circum' || k.def.kind === 'incircle') {
+    const got = k.def.ring.map((id) => pos.get(id));
+    if (got.some((p) => !p)) return null; // a vertex isn't placed yet — a different failure mode
+    const vs = got as Vec3[];
+    const nn = newellNormal(vs);
+    if (norm3(nn) < 1e-12) return null; // collinear ring — no plane, no circle
+    const solved =
+      k.def.kind === 'circum'
+        ? (() => {
+            const cc = ringCircumcentre3(vs);
+            return cc ? { center: cc, radius: norm3(sub3(vs[0], cc)) } : null;
+          })()
+        : triangleIncircle3(vs);
+    if (!solved) return null;
+    normal = normalize3(nn);
+    const seedC = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+    e1 = normalize3(cross3(normal, seedC));
+    e2 = cross3(normal, e1);
+    return { id: k.id, center: solved.center, normal, radius: solved.radius, e1, e2 };
+  }
+  const center = pos.get(k.def.center);
+  if (!center) return null;
+  if (k.def.kind === 'tangent-line') {
+    const through = c.pointLines.get(k.def.line);
+    const pa = through && pos.get(through.a);
+    const pb = through && pos.get(through.b);
+    const ln = lines.get(k.def.line) ?? (pa && pb && dist3(pa, pb) > 1e-12 ? { anchor: pa, dir: sub3(pb, pa) } : undefined);
+    if (!ln) return null;
+    const foot = footOnLine(center, ln); // the tangent point (radius ⟂ line)
+    const radial = sub3(foot, center);
+    radius = norm3(radial);
+    if (radius < 1e-9 || norm3(ln.dir) < 1e-9) return null; // centre on the line → degenerate
+    e1 = normalize3(radial);
+    e2 = normalize3(sub3(ln.dir, scale3(e1, dot3(ln.dir, e1)))); // tangent dir, orthonormalised
+    normal = normalize3(cross3(e1, e2));
+  } else {
+    const pl = planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
+    if (!pl) return null;
+    normal = normalize3(pl.n);
+    const seed0 = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+    e1 = normalize3(cross3(normal, seed0));
+    e2 = cross3(normal, e1);
+    radius = k.def.radius;
+  }
+  return { id: k.id, center, normal, radius, e1, e2 };
+}
+
+/**
+ * #2611 ([ADR-3D-410](../../docs/06b-decisions-3d.md#adr-3d-410)) — a point riding a circle, the on-line rider's circle
+ * twin: ONE sampled DOF, the angle in the circle's own frame (ADR-052 — resampled by «הציגו תצורה אחרת»), read from the
+ * circle as resolved, so it follows the circle whatever defines it. A sampled angle that parks the rider next to an
+ * existing point steps deterministically to a clear spot (ADR-3D-080's general-position rule; k = 0 keeps the first key).
+ * A DRIVEN rider (the carrier table's entry) turns from its sampled seat by the solved offset; 0 is the seat itself.
+ */
+function seatOnCircleRider3(
+  seed: number,
+  pos: Positions3,
+  k: Resolved3['circles3'][number],
+  id: Id,
+  riderTOverride?: ReadonlyMap<Id, number>,
+): void {
+  if (!(k.radius > 1e-9)) return;
+  const placed = [...pos].filter(([q]) => q !== id).map(([, p]) => p);
+  const at = (th: number): Vec3 => add3(k.center, add3(scale3(k.e1, k.radius * Math.cos(th)), scale3(k.e2, k.radius * Math.sin(th))));
+  const angle = (n: number): number => sample(seed, n === 0 ? `oncircle-th-${id}` : `oncircle-th-${id}-${n}`, 0, 2 * Math.PI);
+  const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
+  const minSep = 0.35 * k.radius;
+  let th = angle(0);
+  let best = sepOf(at(th));
+  for (let n = 1; n <= 11 && best < minSep; n++) {
+    const t = angle(n);
+    const s = sepOf(at(t));
+    if (s > best) {
+      th = t;
+      best = s;
+    }
+  }
+  pos.set(id, at(th + (riderTOverride?.get(id) ?? 0)));
+}
+
 /** A free point riding a named line (ADR-3D-031, the on-plane rider's line edition): sampled t along
  *  the unit direction around the figure centroid's ⟂ projection onto the line, spread-scaled.
  *  Module-level for the same #557 reason as {@link seatOnPlaneRider}. */
@@ -3893,7 +3958,13 @@ function reresolveFreeObjects3(
   for (const [id, def] of c.points) {
     if (def.kind === 'on-plane' && freePlane(def.plane)) seatOnPlaneRider(c, seed, pos, planes, id, def);
     else if (def.kind === 'on-line' && isFreeLine3(c, def.line)) seatOnLineRider(seed, pos, lines, id, def);
-    else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
+    else if (def.kind === 'on-circle3') {
+      // #2611: a rider of a circle carried by a free plane or a free line follows the re-resolved carrier
+      const k = c.circles3.find((x) => x.id === def.circle);
+      const free = k && ((k.def.kind === 'center-plane-radius' && freePlane(k.def.plane)) || (k.def.kind === 'tangent-line' && isFreeLine3(c, k.def.line)));
+      const g = free ? circleGeom3(c, k, pos, planes, lines) : null;
+      if (g) seatOnCircleRider3(seed, pos, g, id);
+    } else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
       const from = pos.get(def.from);
       const pl = planes.get(def.plane);
       if (from && pl) pos.set(id, footOnPlane(from, pl));

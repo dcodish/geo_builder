@@ -94,8 +94,11 @@ const nounKind = (word: string): OperandNoun =>
  * Classify one raw operand token (a side of a relation, already split off the connective).
  * Null when the text is not a single operand — the caller's rule then simply does not match,
  * exactly as a hand-written regex would have failed.
+ *
+ * `headNoun` (#2642, ADR-3D-411): the noun a PLURAL head stated for the whole list («הישרים d ו-ℓ1»). It breaks the
+ * lowercase-letter tie exactly as the token's own noun would, so a plural distributes to each operand.
  */
-export function readOperand(raw: string): ReadOperand | null {
+export function readOperand(raw: string, headNoun?: OperandNoun): ReadOperand | null {
   let t = raw.trim();
   let noun: OperandNoun | undefined;
   const nm = t.match(NOUN);
@@ -119,7 +122,7 @@ export function readOperand(raw: string): ReadOperand | null {
   // so here — and ONLY here — the stated noun breaks the tie. This does not touch the ADR-3D-100
   // mechanism: a noun still never OVERRIDES a decisive shape (l1, π2, ACD, AB…); it decides only
   // where shape is genuinely ambiguous, which is the student stating the kind, not the tool guessing.
-  if (noun === 'line' && VECTOR.test(t)) return { op: { kind: 'line', name: t }, noun };
+  if ((noun ?? headNoun) === 'line' && VECTOR.test(t)) return { op: { kind: 'line', name: t }, noun };
   if (VECTOR.test(t)) return { op: { kind: 'vector', name: t }, noun };
   // #512 — the absolute-frame operands, LAST so nothing above changes hands: a point label is
   // uppercase and a named vector is `[a-w]`, so neither can be read as an axis (`x`/`y`/`z` are
@@ -158,8 +161,8 @@ export function readOperandList(raw: string): [ReadOperand, ReadOperand] | null 
   const rest = t.slice(nm[0].length).trim();
   const cut = rest.match(CONJ);
   if (!cut || cut.index === undefined) return null;
-  const first = readOperand(rest.slice(0, cut.index));
-  const second = readOperand(rest.slice(cut.index + cut[0].length));
+  const first = readOperand(rest.slice(0, cut.index), noun);
+  const second = readOperand(rest.slice(cut.index + cut[0].length), noun);
   if (!first || !second) return null;
   return [
     { op: first.op, noun: first.noun ?? noun },

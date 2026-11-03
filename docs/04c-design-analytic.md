@@ -308,7 +308,12 @@ counts are blanked before numbers are read. A trip is `{ kind: 'unfaithful', dro
 `result: 'unfaithful'` and every refusal's whole answer. A name the model writes that the figure holds but the
 sentence never wrote is `inventedExisting` ([ADR-AG-281](06c-decisions-analytic.md#adr-ag-281)), refused as
 `llm-invented-existing`, which names it (the figure shows it). The algebra is `shell/llm/honestyCore.ts`
-([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)).
+([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)). A root is ONE number, its value, on both sides: «√2» is 1.414…, «5√2» 7.07…, in the text
+(the shell's radical term) and in the parsed facts (a constant expression with a root is evaluated). A square or a
+root pays only ACROSS an equation: each account is tagged by whether its line is an equation (`=` with x or y, or facts
+that mention them), each stated number by its own stretch of the sentence, and v² or √v is offered only against the
+other tag, so a radius r pays an equation's r² and «AB = 3» is not paid by «AB = 9»
+([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)).
 
 *Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
@@ -992,7 +997,11 @@ constraint, `circle-conic { circle: CircleSide, curve, rel }`:
 `the-circle { create, about, match? }` is the one contextual-circle fact; M1's `theCircle(c, match)` binds, creates or
 refuses; `circle-eq { circleId, eq }` states an equation about it.
 
-*Identifiers:* `CIRCLE_SENTINEL` · `match.centre` · `match.eq` · `applyAll` · `resolveCurve` · `point(centre, cx, cy)` · `radius-of(circleId, r)` · `factsWithin(f)` · `submit` · `tangent-of { at }`
+**The inscription predicate ([ADR-AG-386](06c-decisions-analytic.md#adr-ag-386), #2130, #2376; 2-D's `boundInscribeCircle` + `reusedInscribeCircle`).** `cyclicFacts` gives an undescribed inscription's `the-circle` a `ring { vertices }`; `foldPass` (`aged`) marks it `held` when every vertex was brought in by another line's committed fact (`objectFact`). `theCircle(c, match, ring)` over held vertices binds the circle that carries every vertex (`onCurveByConstruction`) and otherwise creates; with a new vertex the one/none/several rule stands. `nameCanonicalCentres`' static `willCreate` mirrors it on the fact list.
+
+**The arc names the drawn circle by use (ADR-AG-386; 2-D's ADR-748 §5).** `arcHost(c, name, f, ends)` asks `arcNamesByUse` before `statingNamedCircle`: a fresh point letter, beside the unnamed circles (`centreIdOf` null) carrying every end, names the one such circle by its centre (`namingByOrder`); several → `noHost`; none → the circle is stated as before.
+
+*Identifiers:* `CIRCLE_SENTINEL` · `match.centre` · `match.eq` · `applyAll` · `resolveCurve` · `point(centre, cx, cy)` · `radius-of(circleId, r)` · `factsWithin(f)` · `submit` · `tangent-of { at }` · `ring.held` · `arcNamesByUse`
 
 ### A circle named by its ring; a diameter on any circle; the panel prints no tool symbol ([ADR-AG-203](06c-decisions-analytic.md#adr-ag-203), #1659, #1665, #1663)
 
@@ -1410,6 +1419,14 @@ point and touch points refused), that the givens force onto a named point record
 straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name for their crossing, and `crossingPartners`
 returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
 refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
+
+**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), #2674). A derived point the
+tool lettered is applied with `auto`, and its object carries `tool`. That covers a fresh mint in `resolveToolLetters`,
+a `toolFoot` cevian and the canonical centre. `foldPass` drops the mark when a fact's sentence types the letter
+(`typedLetters`). ONE POSITION, ONE NAME then treats a `tool` holder as it treats a helper: a student's derivation of
+the same point renames it (`renamePoint`, segments re-keyed), with effect `narrowed`. A student-named cevian foot over
+a `tool` point is lowered to that derived foot, so the same arm renames it. A holder the student lettered still mints
+the second point, and the notice reads the pair.
 
 A crossing on an existing point was refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
@@ -1831,6 +1848,20 @@ CAS: measure → snap → verify on a ratio. The kind itself is read by `kindCon
 `(x − 16a)² + y² = (25a)²`.
 
 *Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic`
+
+#### Drawn is not named: an unnamed set is still drawn ([ADR-AG-380](06c-decisions-analytic.md#adr-ag-380), #2628)
+
+`askOne`'s locus lane splits DRAWABLE from NAMED. `locusOf` returns components whenever the walk traced a set; a
+component's `shape` is the gate's verdict and may be `null` (the fit is outside `classify`'s family: a translated or
+y-axis parabola, a translated ellipse, a hyperbola, a tilted conic; or the families differ between configurations).
+When every component has a shape the row is `kind · equation` as below. Otherwise, after the point-set checks
+(ADR-AG-136), the row is `kindWord('unnamed', n)` (`locus.unnamed`, `locus.unnamed.2`) and every component is drawn
+(`drawnComponents`, the one builder of `Answer.locus`). When the shown component does not measure, `locusOf` returns
+every discovered component unnamed, so the drawing is the whole set. A walk that never leaves its start (`moves`) is no
+component: the point named does not move, and `locusOf` answers `null`. `classify` stays the INPUT gate, untouched.
+#2664's wider family names what reaches `'unnamed'` today, through the same `kindWord` seam.
+
+*Identifiers:* `locus.unnamed` · `drawnComponents` · `moves` · `LocusKindWord`
 
 #### The set can be a UNION, and the tracer covers every component ([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166), #1500)
 

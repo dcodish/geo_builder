@@ -16,7 +16,7 @@ import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '..
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
-import { carrierParams3, reachesFreeCarrier3, readCoordGiven } from './carriers';
+import { builtFrom3, carrierParams3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
@@ -401,6 +401,32 @@ function resolveQuadRing(c: Construction3, face: Id[], errId: Id): { ok: true; f
   return { ok: true, face: ring };
 }
 
+/** #2611: the points a circle of the figure is built from (its ring, its centre, its carrier line's or plane's points). */
+const circleParentIds3 = (c: Construction3, circle: string): Id[] => pointParents3(c, { kind: 'on-circle3', circle });
+
+/**
+ * #2611 (ADR-3D-410) — THE POINT ORDER, PARENTS FIRST. The point pass evaluates in insertion order, so a point re-defined
+ * in place (a minted letter re-homed onto a circle drawn after it) must move behind what it now reads, and every point
+ * built from it behind it in turn. A stable topological order: a figure already in order is returned unchanged.
+ */
+function parentsFirst3(c: Construction3): Construction3 {
+  const order = [...c.points.keys()];
+  const out = new Map<Id, PointDef>();
+  const visiting = new Set<Id>();
+  const visit = (id: Id): boolean => {
+    if (out.has(id)) return true;
+    if (visiting.has(id)) return false; // a cycle — keep the order as it was
+    visiting.add(id);
+    const def = c.points.get(id)!;
+    for (const p of pointParents3(c, def)) if (p !== id && c.points.has(p) && !visit(p)) return false;
+    visiting.delete(id);
+    out.set(id, def);
+    return true;
+  };
+  for (const id of order) if (!visit(id)) return c;
+  return { ...c, points: out };
+}
+
 function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
   for (const id of ids) if (!c.points.has(id)) return { code: 'unknown-point', id };
   return null;
@@ -440,6 +466,86 @@ function vectorRefsError3(c: Construction3, names: Iterable<string>): EngineErro
   if (free !== undefined) return { code: 'free-vector-coupling', id: free };
   const unknown = list.find((n) => !c.vectors.has(n));
   return unknown !== undefined ? { code: 'unknown-vector', id: unknown } : null;
+}
+
+/**
+ * #2642 ([ADR-3D-411](../../docs/06b-decisions-3d.md#adr-3d-411)) — A BARE LOWERCASE LETTER BINDS THE OBJECT THE FIGURE
+ * HAS BY THAT NAME. A single letter `[a-w]` is both a vector's name and a free line's name; the parser has no figure,
+ * so with no noun before it (`readOperand`) it reads `{kind: 'vector'}`. Here the figure breaks the tie: a name the
+ * construction declares as a LINE, and as no vector (anchored or free), is that line. A declared vector keeps the
+ * vector reading and an undeclared name keeps today's `unknown-vector` — this reads the construction, never hidden
+ * state, so it is deterministic on replay. The sr-12 reading (ADR-W-175): a name binds the drawn object of its kind.
+ */
+const isLineName3 = (c: Construction3, name: string): boolean =>
+  (c.lines.has(name) || c.pointLines.has(name)) && namedVector3(c, name) === undefined;
+
+export function resolveNamedOperand3(c: Construction3, op: Operand3): Operand3 {
+  return op.kind === 'vector' && isLineName3(c, op.name) ? { kind: 'line', name: op.name } : op;
+}
+
+/** The operand a cos-angle ARM names, once its name is resolved (a pair is a segment, a name a vector or a line). */
+const atomOperand3 = (c: Construction3, atom: VecAtom): Operand3 =>
+  atom.kind === 'pair' ? { kind: 'segment', a: atom.from, b: atom.to } : resolveNamedOperand3(c, { kind: 'vector', name: atom.name });
+
+/**
+ * #2642 — THE ONE NAME-RESOLUTION PASS over every command that takes an operand: `line-rel`, `mutual-rel`,
+ * `plane-rel`, `distance-rel` (an `Operand3`) and `cos-angle` (a named arm). Returns the command itself when no name
+ * resolves, so a command that names no line is untouched. Where a name resolves, the command is the one the noun-led
+ * spelling of the same sentence already reads («הישר d מאונך לישר ℓ1» → `line-rel`), so it needs no lowering of its own:
+ *  - a ∥ between two operands with a line side is the `line-rel` ∥ (the parser routes the noun-led form there too);
+ *  - an angle or ⊥ between two arms, one a line, is the `line-rel` angle / ⊥ over the other arm;
+ *  - a plane relation with a line side is `plane-line-perp` (⊥ a point run), `line-perp-plane` (⊥ a named plane) or the
+ *    `line-rel` ∥ / angle / ⊂ — the parser's routing of «ℓ1 מאונך למישור ABC», «ℓ1 ⊥ π1», «ℓ1 ∥ ABC».
+ */
+function resolveLineNames3(c: Construction3, cmd: Command3): Command3 {
+  switch (cmd.type) {
+    case 'line-rel': {
+      const op = resolveNamedOperand3(c, cmd.op);
+      return op === cmd.op ? cmd : { ...cmd, op };
+    }
+    case 'mutual-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      if (a === cmd.a && b === cmd.b) return cmd;
+      if (cmd.rel === 'parallel' && cmd.origin === undefined && (a.kind === 'line' || b.kind === 'line')) {
+        const [line, op] = a.kind === 'line' ? [a, b] : [b as Extract<Operand3, { kind: 'line' }>, a];
+        return { type: 'line-rel', rel: 'parallel', op, line: line.name };
+      }
+      return { ...cmd, a, b };
+    }
+    case 'plane-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      if (a === cmd.a && b === cmd.b) return cmd;
+      const lineSide = a.kind === 'line' ? a : b.kind === 'line' ? b : null;
+      const other = lineSide === a ? b : a;
+      if (lineSide === null || lineSide.kind !== 'line' || other.kind === 'line' || cmd.rel === 'coincident') return { ...cmd, a, b };
+      // the parser's own routing of a line-shaped side («ℓ1 מאונך למישור ABC», «ℓ1 ∥ π1», «הזווית בין ℓ1 ל-ABC»)
+      if (cmd.rel === 'perp' && other.kind === 'plane-run') return { type: 'plane-line-perp', ids: other.ids, line: lineSide.name };
+      if (cmd.rel === 'perp' && other.kind === 'plane-named') return { type: 'line-perp-plane', line: lineSide.name, plane: other.name };
+      return {
+        type: 'line-rel', rel: cmd.rel, op: other, line: lineSide.name,
+        ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
+        ...(cmd.label !== undefined ? { label: cmd.label } : {}),
+      };
+    }
+    case 'distance-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      return a === cmd.a && b === cmd.b ? cmd : { ...cmd, a, b };
+    }
+    case 'cos-angle': {
+      if (cmd.origin !== undefined || cmd.ring !== undefined || cmd.soft) return cmd; // a shape's own corner, not a sentence
+      const u = atomOperand3(c, cmd.u);
+      const v = atomOperand3(c, cmd.v);
+      const [line, op] = u.kind === 'line' ? [u, v] : v.kind === 'line' ? [v, u] : [null, null];
+      if (line === null || line.kind !== 'line') return cmd;
+      const deg = Math.round((Math.acos(Math.max(-1, Math.min(1, cmd.cos))) * 180) / Math.PI * 1e9) / 1e9;
+      return Math.abs(cmd.cos) < 1e-9 ? { type: 'line-rel', rel: 'perp', op, line: line.name } : { type: 'line-rel', rel: 'angle', deg, op, line: line.name };
+    }
+    default:
+      return cmd;
+  }
 }
 
 /** Validate a VecAtom operand (V8-f): a named vector must be declared; a pair's points must exist. Every VecAtom
@@ -1710,6 +1816,9 @@ export function expandShapeRefs3(c: Construction3, cmds: readonly Command3[]): {
 }
 
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
+  // #2642 (ADR-3D-411): a bare letter the figure declares as a line is that line, in every relation that takes it
+  const named = resolveLineNames3(c, cmd);
+  if (named !== cmd) return applyCommand3(c, named);
   /**
    * «AA'=3BC» ON EXISTING POINTS IS AMBIGUOUS, AND IS ASKED ABOUT — never refuted (#1156).
    *
@@ -2367,7 +2476,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (prior) {
           const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
           const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
-          if (statementReachesFreeDof3(c, [a, b, cc, d]) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
+          if (statementReachesFreeDof3(c, [a, b, cc, d])) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
           else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
         }
       }
@@ -2695,8 +2804,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // magnitude would read refuted. Such a statement stays with the claim arbiter below.
         const symbolDefined = claimPointIds(c, cmd.claim).some((id) => c.vecDefs.some((vd) => vd.symbol && vd.unknown === id));
         const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
-        // #1782 (ADR-3D-393): free dims, or a free carrier of a solid figure in reach (the solid-free `free3` clause
-        // keeps its own length arm below, byte-preserved)
+        // #1782 (ADR-3D-393): free dims, or a free carrier in reach — #2609 (ADR-3D-408): on any figure the pivot runs
+        // on, a solid-free one of created points included (the `free3` clause keeps its own length arm below)
         if (mag && reaches) {
           if (c.scaleGivens.length > 0) {
             next.scaleGivens = [];
@@ -2809,8 +2918,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // `injection-unsatisfiable`. The claim record is KEPT (fall through): points the
       // pivot cannot place (symbol-defined, resolved post-pivot) skip the residual, so
       // the final claim verification is what guarantees EVERY named point. A coord-only
-      // figure (no solid, nothing to drive) is the plain verified claim.
-      if (cmd.claim.type === 'plane-eq' && c.solids.length > 0) {
+      // figure (no solid, nothing to drive) is the plain verified claim. #2609 (ADR-3D-408): a
+      // solid-free figure whose named points the statement's reach can move («המישור KBC: …» over
+      // created points) drives too — the one predicate, not a solid count.
+      if (cmd.claim.type === 'plane-eq' && (c.solids.length > 0 || statementReachesFreeDof3(c, cmd.claim))) {
         next.planePins.push({ ids: [...cmd.claim.ids], cx: cmd.claim.cx, cy: cmd.claim.cy, cz: cmd.claim.cz, d: cmd.claim.d });
       }
       // #584 (ADR-3D-148): a claim naming an explicit plane RUN («המישור ABS: x=0») references a
@@ -3727,7 +3838,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           }
         }
       }
-      if (freeDims(next) > 0) {
+      // #2609 (ADR-3D-408): the statement's reach, as at every sibling drive site — this arm still asked `freeDims`, so
+      // «אורך AS שווה לאורך AB» over created points (and a rider's ratio on a rigid cube) was judged on the sample
+      if (statementReachesFreeDof3(next, [cmd.a1, cmd.b1, ...pair2])) {
         next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
         recordPinGiven(next, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }); // #1567 (ADR-3D-285)
         return { ok: true, next };
@@ -4015,13 +4128,30 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
-    // V8-i: `A נמצאת על המעגל` — a verified membership (checked in the store vs the resolved circle).
+    // V8-i: `A נמצאת על המעגל` — a membership, checked in the store against the resolved circle (the arbiter on final
+    // coordinates, whatever the arm below did).
     case 'point-on-circle3': {
-      const missing = missingPoint(c, [cmd.point]);
-      if (missing) return { ok: false, error: missing };
       // '' = the single circle (ADR-029 implicit-reference); a named id must exist
       if (cmd.circle === '' ? c.circles3.length !== 1 : !c.circles3.some((k) => k.id === cmd.circle)) {
         return { ok: false, error: { code: 'unknown-line', id: cmd.circle || 'circle' } };
+      }
+      const circle = cmd.circle === '' ? c.circles3[0] : c.circles3.find((k) => k.id === cmd.circle)!;
+      // #2611 (ADR-3D-410) — the on-line rider's circle twin (ADR-3D-031). A NEW id stated onto the circle is CREATED
+      // riding it (1 sampled DOF); before, the statement was only checked, so the fold's mint pass made the letter a free
+      // point and the check refused a true statement `not-on-line`.
+      if (!c.points.has(cmd.point)) {
+        const next = clone(c);
+        next.points.set(cmd.point, { kind: 'on-circle3', circle: circle.id });
+        return { ok: true, next };
+      }
+      // An EXISTING point the figure leaves free (a letter an earlier line minted) re-homes onto the circle — M1: a
+      // statement about an existing object lowers to a constraint on it, never to a check against a guess. Not when
+      // the circle is built from the point itself (a cycle): the claim stays a claim. A placed point (a vertex, a
+      // midpoint, a coordinate point) keeps its owner, and its membership is the check's.
+      if (c.points.get(cmd.point)?.kind === 'free3' && !builtFrom3(c, circleParentIds3(c, circle.id), cmd.point)) {
+        const next = clone(c);
+        next.points.set(cmd.point, { kind: 'on-circle3', circle: circle.id });
+        return { ok: true, next: parentsFirst3(next) };
       }
       return { ok: true, next: c };
     }
@@ -4057,7 +4187,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: true, next };
         }
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
       return { ok: true, next };
     }
@@ -4087,7 +4217,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of [...cmd.e1, ...cmd.e2]) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       else next.claims.push({ type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       return { ok: true, next };
     }
@@ -4106,7 +4236,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of cmd.e) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
       else next.claims.push({ type: 'mag-val', e: cmd.e, value: cmd.value });
       return { ok: true, next };
     }
@@ -4119,7 +4249,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (miss) return { ok: false, error: miss };
       if (cmd.ids.length !== 4) return { ok: false, error: { code: 'bad-solid', kind: 'pyramidQuadR' } };
       const next = clone(c);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
       else next.claims.push({ type: 'concyclic', ids: cmd.ids });
       return { ok: true, next };
     }
@@ -4134,7 +4264,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         drawAtom(next, a);
         drawAtom(next, b);
       }
-      const drive = statementReachesFreeDof3(c, cmd) && c.solids.length > 0;
+      const drive = statementReachesFreeDof3(c, cmd);
       for (let i = 1; i < cmd.ops.length; i++) {
         const [a, b] = cmd.ops[i - 1];
         const [cc, d] = cmd.ops[i];
@@ -4152,7 +4282,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.base);
       drawAtom(next, cmd.a);
       drawAtom(next, cmd.b);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       return { ok: true, next };
     }
@@ -4192,7 +4322,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       const next = clone(c);
       for (const at of [cmd.a, cmd.b, cmd.c, cmd.d]) drawAtom(next, at);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       return { ok: true, next };
     }
@@ -4238,7 +4368,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
         const next = clone(c);
         const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
-        if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
+        if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
         else next.claims.push({ type: 'bisector-dir', ...pin });
         if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
         return { ok: true, next };
@@ -4288,7 +4418,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       const deg = cmd.deg!;
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0)
+      if (statementReachesFreeDof3(c, cmd))
         next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       return { ok: true, next };

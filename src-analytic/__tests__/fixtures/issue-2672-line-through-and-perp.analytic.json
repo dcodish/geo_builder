@@ -1,0 +1,15 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "A נקודה על ציר ה-x",
+    "B נקודה על ציר ה-y",
+    "הישר l: y=1/2x",
+    "d_{Al}^2 + d_{Bl}^2 = 4",
+    "ישר l1 עובר דרך A ומאונך לציר x",
+    "ישר l2 עובר דרך B ומאונך לציר y",
+    "P נקודת החיתוך של l1 ו-l2"
+  ],
+  "seed": 0,
+  "name": "#2672 — the operator's T14 flow: «ישר l1 עובר דרך A ומאונך לציר x», then l2 through B, then their crossing P (locus: x²/20 + y²/5 = 1)"
+}

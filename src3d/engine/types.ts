@@ -1352,6 +1352,9 @@ export type PointDef =
   // a free point riding a named line (1 sampled DOF) — the on-plane rider, line edition
   // (ADR-3D-031: `משוואת הישר AB היא (0,7,6)+t(0,2,1)` creates A,B as riders on the line)
   | { kind: 'on-line'; line: string }
+  // #2611 (ADR-3D-410): a free point riding a circle (1 sampled DOF, the angle in the circle's own frame) — the on-line
+  // rider's circle twin: «D על המעגל» places a new D on the circle. `circle` is the circle's id in `circles3`.
+  | { kind: 'on-circle3'; circle: string }
   // ADR-3D-032: `M(k,1,3)` — typed coordinates carrying the figure's SINGLE symbolic
   // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
   // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
@@ -1636,8 +1639,17 @@ export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'seg-cross', '
  * figure will be in.
  */
 export function gaugeFramePoint3(c: Construction3, def: PointDef | undefined): boolean {
-  return !!def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+  return !!def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)) || (def.kind === 'on-circle3' && ringCircle3(c, def.circle)));
 }
+
+/**
+ * #2611 (ADR-3D-410): is the circle a POLYGON's (through or inside a ring)? Its rider is then a figure point, riding the
+ * gauge with the ring — the on-plane rider's point-run rule, circle edition — and drivable by the pivot.
+ */
+export const ringCircle3 = (c: Construction3, circle: string): boolean => {
+  const k = c.circles3.find((x) => x.id === circle)?.def.kind;
+  return k === 'circum' || k === 'incircle';
+};
 
 export const freeCoordKey = (id: Id, axis: 'x' | 'y' | 'z'): string => `${id}@${axis}`;
 

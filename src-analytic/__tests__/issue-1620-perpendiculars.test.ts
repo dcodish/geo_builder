@@ -117,17 +117,19 @@ describe('the perpendicular from a point — the foot, the piece, the tool lette
     }
   });
 
-  it('a perpendicular stated twice is one foot; a later NAME for the tool-lettered foot records on it, with the notice', () => {
+  it('a perpendicular stated twice is one foot; a later NAME for the tool-lettered foot takes the letter over (#2674)', () => {
     const twice = clean(derive(['משולש ABC', 'האנך מ-B לצלע AC', 'האנך מהנקודה B לצלע AC'], 0));
     expect(twice.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'H']);
     expect(twice.outcomes[2]).toBe('known');
     const named = derive(['משולש ABC', 'D רגל האנך מ-B ל-AC', 'האנך מ-B לצלע AC'], 0);
     expect(named.faults).toEqual([]);
     expect(named.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
-    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message") (was #1153's `already-named`, naming H)
+    // ⚠ FLIPPED by #2674 (ADR-AG-387; operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no
+    // message"). Was #1595's notice «H ו-D נפלו על אותה נקודה.» (ADR-AG-372), before that #1153's `already-named`.
     const later = derive(['משולש ABC', 'האנך מ-B לצלע AC', 'D רגל האנך מ-B ל-AC'], 0);
     expect(later.faults).toEqual([]);
-    expect(coincidencesOf(later)).toEqual([['H', 'D']]);
+    expect(later.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
+    expect(coincidencesOf(later)).toEqual([]);
   });
 
   it('the tool letter can be renamed — the sentence is rewritten to name the foot', () => {

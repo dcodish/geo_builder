@@ -4703,9 +4703,14 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
     ...(maker?.t === 'curve' ? [{ t: 'circle-eq' as const, circleId: CIRCLE_SENTINEL, eq: maker.curve.eq, src: line }] : []),
     ...shape.vertices.map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: CIRCLE_SENTINEL }, src: line })),
   ];
+  /*
+   * An UNDESCRIBED circle (no tail) carries its ring (#2130/#2376, ADR-AG-386): M1 binds the figure's one circle only
+   * when a vertex is new, or when that circle already carries every vertex — 2-D's rule (ADR-156) — and otherwise
+   * takes the creation. The definite «המעגל» sentences (ADR-AG-196 (a)/(c)/(d)) carry no ring and keep their binding.
+   */
   return made([
     ...ringFacts,
-    { t: 'the-circle', create: created, about, ...(match ? { match } : {}), src: line },
+    { t: 'the-circle', create: created, about, ...(match ? { match } : { ring: { vertices: [...shape.vertices] } }), src: line },
   ]);
 }
 
@@ -7230,8 +7235,16 @@ const RELATION_SYM = new RegExp(`^${HE_GIVEN}(.+?)\\s*(${REL_PARALLEL_SYM}|${REL
  */
 /** A line's own name — `l4`, `ℓ`, a numeral (#1319); never a two-point run. */
 const FREE_LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL})`;
+/**
+ * THE RELATION CLAUSE of a line constructed through a point — «מאונך», «ומאונך», «המאונך», «והמאונך», «והוא מאונך»
+ * (#2672, ADR-AG-382). ONE atom for every frame below, so the conjunction «ו» and the article «ה» are each admitted
+ * on their own and together, in every clause order. The bare «ו» («ישר l1 עובר דרך A ומאונך לציר x») was admitted
+ * only with an article after it, so the most natural spelling fell through to «לא הבנתי» while 2-D read it.
+ * One capture: the relation word.
+ */
+const THROUGH_REL = `(?:ו?(?:הוא|היא)\\s+)?ו?ה?(${PARALLEL_WORDS}|${PERP_WORDS})`;
 const THROUGH_HE = new RegExp(
-  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  `^${HE_GIVEN}דרך\\s+${HE_POINT}(${NAME})\\s+(?:עובר(?:ת)?\\s+)?ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+${THROUGH_REL}\\s+ל-?\\s*(.+)$`,
 );
 const THROUGH_EN = new RegExp(
   `^(?:a\\s+|the\\s+)?line(?:\\s+([ℓl][0-9]?))?\\s+(?:passes\\s+)?through\\s+(?:point\\s+)?(${NAME})\\s+(?:and\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+)$`,
@@ -7243,7 +7256,26 @@ const THROUGH_EN = new RegExp(
  * ADR-AG-207). The relation word may carry its own article or clitic («והמקביל»).
  */
 const THROUGH_LINE_FIRST_HE = new RegExp(
-  `^${HE_GIVEN}ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})\\s+(?:ו?(?:הוא|היא)\\s+)?(?:ו?ה)?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+ל-?\\s*(.+)$`,
+  `^${HE_GIVEN}ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})\\s+${THROUGH_REL}\\s+ל-?\\s*(.+)$`,
+);
+/**
+ * THE RELATION BEFORE THE POINT — the two clause orders 2-D reads and this tree had no frame for (#2672, ADR-AG-382).
+ * RELATION FIRST «l1 מאונך לציר ה-x ועובר דרך A»: the line's name is the subject, so it is required, and «עובר דרך»
+ * must follow, so «l1 מאונך לציר ה-x» alone stays the relation rule's. THROUGH LAST «ישר l1 מאונך לציר ה-x דרך A»,
+ * «ישר המקביל ל-AB ועובר דרך C». The same construction as «דרך A עובר ישר l1 מאונך …», read by the same handler and
+ * lowered to the same `line-at`: a word order, never a second rule. The direction operand is lazy and anchored by the
+ * closing «דרך <point>», so it is exactly the text between the relation word and the through-clause.
+ */
+const THROUGH_REL_FIRST_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?(?:ישר|קו)\\s+)?(${FREE_LINE_NAME})\\s+${THROUGH_REL}\\s+ל-?\\s*(.+?)\\s*,?\\s+ו?(?:ה|ש)?עובר(?:ת)?\\s+דרך\\s+${HE_POINT}(${NAME})$`,
+);
+const THROUGH_LAST_HE = new RegExp(
+  `^${HE_GIVEN}ה?(?:ישר|קו)(?:\\s+(${FREE_LINE_NAME}))?\\s+${THROUGH_REL}\\s+ל-?\\s*(.+?)\\s*,?\\s+(?:ו?(?:ה|ש)?עובר(?:ת)?\\s+)?דרך\\s+${HE_POINT}(${NAME})$`,
+);
+/** The same two orders in English — «line l1 perpendicular to the x-axis through A», «l1 is perpendicular to … and passes through A». */
+const THROUGH_LAST_EN = new RegExp(
+  `^(?:(?:a\\s+|the\\s+)?line(?:\\s+([ℓl][0-9]?))?|([ℓl][0-9]?))\\s+(?:that\\s+is\\s+|which\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+(.+?)\\s*,?\\s+(?:and\\s+)?(?:passes\\s+|passing\\s+|goes\\s+|going\\s+)?through\\s+(?:point\\s+)?(${NAME})$`,
+  'i',
 );
 /**
  * …AND WHERE IT CUTS A SIDE — «… מקביל לציר ה-y וחותך את הצלע AB בנקודה F», «… the y-axis and cuts side AB at F»
@@ -7626,16 +7658,27 @@ function parseThroughLine(line: string): RuleOutcome {
   const first = THROUGH_HE.exec(line);
   const lineFirst = first ? null : THROUGH_LINE_FIRST_HE.exec(line);
   const enT = first || lineFirst ? null : THROUGH_EN.exec(line);
+  // The relation before the point (#2672, ADR-AG-382): the same four slots, in the other two clause orders.
+  const relFirst = first || lineFirst || enT ? null : THROUGH_REL_FIRST_HE.exec(line);
+  const last = first || lineFirst || enT || relFirst ? null : THROUGH_LAST_HE.exec(line);
+  const lastEn = first || lineFirst || enT || relFirst || last ? null : THROUGH_LAST_EN.exec(line);
   const m = first
     ? [first[1], first[2], first[3], first[4]]
     : lineFirst
       ? [lineFirst[2], lineFirst[1], lineFirst[3], lineFirst[4]]
       : enT
         ? [enT[2], enT[1], enT[3], enT[4]]
-        : null;
+        : relFirst
+          ? [relFirst[4], relFirst[1], relFirst[2], relFirst[3]]
+          : last
+            ? [last[4], last[1], last[2], last[3]]
+            : lastEn
+              ? [lastEn[5], lastEn[1] ?? lastEn[2], lastEn[3], lastEn[4]]
+              : null;
   if (!m) return null;
+  const english = !!(enT || lastEn);
   const [through, token, word, tail] = m;
-  const lineName = token ? lineNameOf(token, enT ? 'en' : 'he') : undefined;
+  const lineName = token ? lineNameOf(token, english ? 'en' : 'he') : undefined;
   const cut = THROUGH_CUT_HE.exec(tail) ?? THROUGH_CUT_EN.exec(tail);
   const dirSrc = cut ? cut[1] : tail;
   const claims: ClaimSink = { out: [], src: line };
