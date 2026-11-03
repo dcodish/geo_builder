@@ -6204,6 +6204,20 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'divides-existing-point-2591',
+    title: '#2591: «נקודה D» · «D מחלקת את AB ביחס 1:2» puts D at AD:DB = 1:2, and «D אמצע AB» · «D מחלקת …» is refused naming the ratio (ADR-773)',
+    guards:
+      "#2591 (P2, wrong answer): a stated position on a segment given to a point that already exists was dropped by the M1 lowering. Measured at 3225756c through factsOf → replay: «נקודה D» · «D מחלקת את AB ביחס 1:2» drew AD/DB = 0.14, green; «משולש ABC» · «D אמצע AB» · «D מחלקת את AB ביחס 1:2» committed green with D left at the midpoint. Root cause (ADR-773): `reinterpretAsCollinear` re-homed a free point at its projection (free, sliding) and lowered a derived one to a bare collinear, never reading the command's t; the verifier checked membership only. Fix: the free branch builds the blank-page rider at the stated t; every other branch follows the membership with the colon form's own set-ratio as its own step; the verifier checks a stated t. The class matrix (the prose form, a rider, a rectangle side, a bisector foot, the controls) is src/engine/__tests__/existing-point-stated-t-2591.test.ts; the fixtures are divides-existing-point-2591 and divides-bisector-foot-2591.",
+    steps: ['נקודה D', 'D מחלקת את AB ביחס 1:2'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'D')) / dist(at(fig, 'D'), at(fig, 'B')), 'AD:DB = 1:2').toBeCloseTo(0.5, 3);
+      const v = gateVerdict(factsOf(['משולש ABC', 'D אמצע AB']), 'D מחלקת את AB ביחס 1:2');
+      expect(v.kind === 'refused' && v.reason, 'a midpoint cannot divide 1:2: refused, never green').toBe('error');
+      expect(v.kind === 'refused' ? (v.detail ?? '') : '', 'naming the ratio, as «AD:DB = 1:2» does').toMatch(/^over-constrained: |AD| = 0.5·|DB| cannot hold/);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T10:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "וקטור u",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "u"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור v",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "v"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "u ⟂ v",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "named",
+            "name": "u"
+          },
+          "v": {
+            "kind": "named",
+            "name": "v"
+          },
+          "cos": 0
+        }
+      ]
+    }
+  ]
+}

@@ -291,7 +291,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
-  '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
   '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
 
   '#2223': 'open', // #2219 (ADR-744): analytic and 3-D do not read a relation stated to a list of objects («AF מאונך ל-BC ול-DE»)
@@ -305,7 +304,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
 
   '#2365': 'open', // was #2342, merged into #2365 by the #2654 family sweep 2026-11-01: #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30») · was #2356, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane · was #2357, merged into #2365 by the #2654 family sweep 2026-11-01: #2234 (ADR-737): analytic sends the same spellings to the model
-  '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
   '#2409': 'open', // was #2448, merged into #2409 by the #2654 family sweep 2026-11-01: #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
@@ -1587,7 +1585,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2125 (ADR-3D-342): the circle through the vertices and the circle inside are two circles — both build, in either order ──
   { id: 'circum-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'], expect: 'builds', note: "the operator's sequence: 3-D refused the incircle «ABC כבר מוגדר» before ADR-3D-342 (both unnamed circles were circle-ABC)" },
-  { id: 'incircle-then-circum-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'מעגל חוסם את ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2130' }], note: 'analytic refuses the circumcircle unsatisfiable in this order (found by round #2128)' },
+  { id: 'incircle-then-circum-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'מעגל חוסם את ABC'], expect: 'builds', note: 'analytic refused the circumcircle unsatisfiable in this order before ADR-AG-386 (#2130: it bound the one circle, the incircle)' },
+  // ── #2130 + #2376 (ADR-AG-386): an undescribed inscription over drawn vertices binds only a circle that carries them all ──
+  { id: 'inscribed-beside-named-circle-2130', family: 'inscribed', steps: ['מעגל O', 'משולש ABC', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: '2-D draws a new circle through A, B, C beside O; analytic moved the triangle onto O before ADR-AG-386' },
+  { id: 'circumcircle-binds-new-vertices-2130', family: 'inscribed', steps: ['מעגל O', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: 'control: new vertices go on the one circle, in both builders' },
   { id: 'circum-passive-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC'], expect: 'builds' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
@@ -1798,10 +1799,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2398 (ADR-747): a circle's centre given a second letter is refused in both builders ──
   { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D answers errors.unknownCircle as a clarify note (asks); analytic refuses unknown-reference O' },
   { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D names the holder (input.centreAlreadyNamed, a clarify note: asks); analytic refuses with unknown-reference O — the port is #2449' },
-  // The report's last line («F אמצע הקשת BC במעגל O») cannot be a row for analytic while the gap sits in its context: analytic
-  // records it on a figure that lost the second circle, so the row would pass vacuously. The gap row ends where analytic differs;
-  // 2-D's last line is locked by the fixture src/__tests__/fixtures/arc-on-minted-circle-name-2362.geo.json.
-  { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses «משולש ABC חסום במעגל» third-crossing (line CD meets ONE circle at C, D and A: it reads the second unnamed circle as the first); measured at 37800b85, 8a5372be and the round tip' },
+  // The fifth line, the one analytic refused before ADR-AG-386; the report line is the next row.
+  { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', note: 'analytic refused «משולש ABC חסום במעגל» (third-crossing, then polygon-collapsed) before ADR-AG-386: it read the second unnamed circle as the first' },
+  // The report line itself, now that analytic draws the second circle (ADR-AG-386): O names the drawn circle through B and C.
+  { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', note: "#2376: analytic drew a second circle O (or asked which circle) before ADR-AG-386; 2-D's ADR-748 §5 names the circle by use" },
   // ── #2211 + #2219 (ADR-744): a relation stated to a LIST of objects holds for each — the distributor's object-list shape ──
   { id: 'circle-tangent-to-two-circles-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגל O ולמעגל P'], expect: 'builds', exception: 'X8', note: '2-D committed Q tangent to O with P dropped before ADR-744 (then escalated after ADR-735); analytic already distributes it' },
   { id: 'circle-tangent-to-pair-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: '2-D drew O and P tangent with Q dropped before ADR-735; analytic answers not-handled' },
@@ -1853,7 +1854,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2618 (ADR-AG-355): the inscribed sentence said through the vertices; the conic hosts are X2 ──
   { id: 'vertices-on-circle-2618', family: 'inscribed', steps: ['קודקודי המעוין ABCD נמצאים על המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2629' }], note: 'analytic reads it as «מעוין ABCD חסום במעגל» since ADR-AG-355; 2-D hands it to the model' },
   // ── #2620 C (ADR-AG-371): the book's copula with its noun, «… הן נקודות על … בהתאמה»; 2-D built it already (measured 17f35282) ──
+  // ── #2591 (ADR-773): a stated ratio on a point that cannot take it is refused, never committed green; analytic refused it already (measured) ──
+  { id: 'midpoint-divides-refused-2591', family: 'midpoint-ratio', steps: ['משולש ABC', 'D אמצע AB', 'D מחלקת את AB ביחס 1:2'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D committed it green with D at the midpoint before ADR-773; analytic refuses the redefinition of D; 3-D has no «מחלקת … ביחס» reader (#1679, parked)' },
   { id: 'respectively-copula-2620', family: 'points-incidence', steps: ['משולש ABC', 'D ו-E הן נקודות על AB ועל AC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic did not read «הן נקודות» before ADR-AG-371; 3-D does not read the copula «הן נקודות על» (not-handled, measured)' },
+  // ── #2672 (ADR-AG-382): a line through a point, its relation joined by a bare «ו» or written before the point. 2-D's gate builds every clause order anonymous (decideDeterministic2D, 24bce5fb); a NAMED line is X4 (2-D refuses lowercase labels), so the named spellings are analytic-only rows ──
+  { id: 'through-conj-anon-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'ישר העובר דרך P ומאונך ל-AB'], expect: 'builds', exception: 'X9', note: 'analytic read «ומאונך» only with an article («והמאונך») before ADR-AG-382' },
+  { id: 'through-conj-par-anon-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'הישר העובר דרך P ומקביל ל-AB'], expect: 'builds', exception: 'X9' },
+  { id: 'through-relation-first-anon-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'ישר מאונך ל-AB ועובר דרך P'], expect: 'builds', exception: 'X9' },
+  { id: 'through-last-anon-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'ישר מקביל ל-AB דרך P'], expect: 'builds', exception: 'X9' },
+  { id: 'through-conj-named-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'הישר l1 עובר דרך P ומאונך ל-AB'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'the operator’s T14 spelling; refused not-handled before ADR-AG-382' },
+  { id: 'through-relation-first-named-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'l1 מאונך ל-AB ועובר דרך P'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'refused as a relation with a bad operand before ADR-AG-382' },
+  { id: 'through-last-named-2672', family: 'parallel-perpendicular', steps: ['משולש ABC', 'נקודה P', 'ישר l1 מאונך ל-AB דרך P'], expect: 'builds', exception: 'X4', only: ['analytic'] },
+  // ── #2533 (ADR-774): a plural line noun reads both crossing operands as lines; 2-D held the crossing inside the segments ──
+  { id: 'plural-lines-crossing-2533', family: 'intersections', steps: ['מרובע ABCD', 'M is the intersection of lines AB and CD'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D read "lines" as the segments (onSeg) and re-seated the quadrilateral into a crossed one before ADR-774 (the line reading is locked in src/parser/__tests__/plural-line-operands-2533.test.ts). Analytic cell: after an uncoordinated «מרובע ABCD» it refuses the crossing of the side lines AB and CD in every spelling, singular and plural (ring-contradicts-noun, measured 2142a8d1); on coordinate points it records the plural' },
+  { id: 'plural-lines-meet-he-2533', family: 'intersections', steps: ['מרובע ABCD', 'הישרים AB ו-CD נחתכים בנקודה M'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '«הישרים» read as lines in 2-D before ADR-774 too (its prefix «הישר»); analytic: the side-line crossing refusal of plural-lines-crossing-2533' },
+  { id: 'plural-rays-crossing-2533', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של הקרניים AB ו-CD'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D read «הקרניים» as the segments before ADR-774; analytic has no ray operand and refuses it (bad-operand on coordinate points, measured)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

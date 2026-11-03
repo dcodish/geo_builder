@@ -1,0 +1,10 @@
+{
+ "name": "pr-2683",
+ "title": "PR #2683: metric givens on free vectors (#1188 step 4)",
+ "cases": [
+  { "id": "T1", "product": "3d", "base": "http://localhost:5175", "path": "/3d.html", "class": "play", "title": "A free vector with a stated length", "lines": ["וקטור u", "|u| = 5"], "cycles": 1, "lookFor": "u floats at length 5; «הציגו תצורה אחרת» turns it but it stays length 5; the panel shows |u| = 5.", "before": "Refused as a tool limit." },
+  { "id": "T2", "product": "3d", "base": "http://localhost:5175", "path": "/3d.html", "class": "play", "title": "Two perpendicular free vectors", "lines": ["וקטור u", "וקטור v", "u ⟂ v"], "cycles": 1, "lookFor": "The two arrows are perpendicular in every configuration.", "before": "Refused as a tool limit." },
+  { "id": "T3", "product": "3d", "base": "http://localhost:5175", "path": "/3d.html", "class": "play", "title": "REFUSAL: impossible lengths", "lines": ["וקטור u", "וקטור v", "|u| = 1", "|v| = 1", "|u + v| = 3"], "expectRefusal": "סותרים", "lookFor": "The last line is refused with «הנתונים סותרים זה את זה», naming |u| = 1 and |v| = 1.", "before": "Refused as a tool limit." },
+  { "id": "T4", "product": "3d", "base": "http://localhost:5175", "path": "/3d.html", "class": "play", "title": "REFUSAL: a free vector against the figure stays the tool's limit", "lines": ["קובייה ABCDA'B'C'D'", "וקטור p", "p ⟂ AB"], "expectRefusal": "מגבלה של הכלי", "lookFor": "The last line is refused as the tool's limit, quoting «p ⟂ AB».", "before": "Refused, with the older metric wording." }
+ ]
+}

@@ -43,6 +43,14 @@ export const LATIN_FILLER: ReadonlySet<string> = new Set([
 export const quantize = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 /**
+ * One account: a value, or a value TAGGED with where it came from (#2646: analytic tags an equation's numbers, so a
+ * square or a root may pay only across an equation). A tagged account is paid only by a candidate with its tag.
+ */
+export type Account = number | { readonly value: number; readonly tag: string };
+const accountValue = (a: Account): number => (typeof a === 'number' ? a : a.value);
+const accountKey = (a: Account): number | string => (typeof a === 'number' ? quantize(a) : `${a.tag}:${quantize(a.value)}`);
+
+/**
  * THE MULTISET (2-D #437, 3-D #457 — the same loop written twice). Each stated item is paid by the first
  * of its candidate values that still has an unspent account; the account is then SPENT. Returns the stated
  * items nothing paid for, in their original order.
@@ -52,21 +60,21 @@ export const quantize = (n: number): number => Math.round(n * 1e6) / 1e6;
  */
 export function spendAccounts<T>(
   stated: readonly T[],
-  accounts: Iterable<number>,
-  candidates: (item: T) => readonly number[],
+  accounts: Iterable<Account>,
+  candidates: (item: T) => readonly Account[],
 ): T[] {
-  const left = new Map<number, number>();
+  const left = new Map<number | string, number>();
   for (const a of accounts) {
-    if (!Number.isFinite(a)) continue;
-    const k = quantize(a);
+    if (!Number.isFinite(accountValue(a))) continue;
+    const k = accountKey(a);
     left.set(k, (left.get(k) ?? 0) + 1);
   }
   const unpaid: T[] = [];
   for (const item of stated) {
     let paid = false;
     for (const c of candidates(item)) {
-      if (!Number.isFinite(c)) continue;
-      const k = quantize(c);
+      if (!Number.isFinite(accountValue(c))) continue;
+      const k = accountKey(c);
       const n = left.get(k) ?? 0;
       if (n > 0) {
         left.set(k, n - 1);
@@ -134,10 +142,52 @@ export function nameAccounting(o: NameAccountingInput): { dropped: string[]; inv
   return { dropped, invented };
 }
 
-/** One number occurrence in a text: as written, and its value (a fraction `a/b` is one occurrence). */
+/**
+ * THE RADICAL TERM (#2646, [ADR-AG-384](../../docs/06c-decisions-analytic.md#adr-ag-384); 2-D's ADR-700 grammar, moved
+ * here so there is ONE spelling of "a root"). A value term is a plain number, a root, or a coefficient times a root:
+ * «5», «√2», «5√2», «5·√2», «√(3/4)», optionally inside one outer pair of parentheses «(5√2)». A value is a term with
+ * an optional «/ term»: «2/√3», «√32/5», «3/4». It is ONE occurrence, valued as it evaluates (√2 is 1.414…, never its
+ * radicand 2; 5√2 is 7.07…, never a 5 and a 2).
+ *
+ * {@link RADICAL} is the √ glyph only (2-D's notation: its gate reads the glyph). {@link RADICAL_SPELLED} also reads
+ * the spelled forms a typed or model line may carry: «sqrt(2)», «sqrt 2» and LaTeX «\sqrt{2}».
+ */
+const DEC = String.raw`\d+(?:\.\d+)?`;
+export const RADICAL = String.raw`√\s*(?:\(\s*${DEC}(?:\s*\/\s*${DEC})?\s*\)|${DEC})`;
+export const RADICAL_SPELLED = String.raw`(?:√|\\sqrt|sqrt)\s*(?:[({]\s*${DEC}(?:\s*\/\s*${DEC})?\s*[)}]|${DEC})`;
+/**
+ * One value term over a radical spelling: `[coef [*·]] root` or a plain number, optionally inside ONE PAIRED outer
+ * parenthesis «(5√2)». Never an unpaired one: in «(√2, 1)» the parenthesis is the coordinate's, and in «(4-0)/(3-0)» the
+ * «0)/(3» is two groups, not a fraction.
+ */
+export const radicalTerm = (rad: string = RADICAL): string => {
+  const core = String.raw`(?:(?:${DEC}\s*[*·]?\s*)?${rad}|${DEC})`;
+  return String.raw`(?:\(\s*${core}\s*\)|${core})`;
+};
+
+const TERM_VALUE = new RegExp(
+  String.raw`^(?:(${DEC})\s*[*·]?\s*)?(?:√|\\sqrt|sqrt)\s*(?:[({]\s*(${DEC})(?:\s*\/\s*(${DEC}))?\s*[)}]|(${DEC}))$`,
+);
+
+/**
+ * The value of one term ({@link radicalTerm}, any spelling): `[coef ·] √ n`, `√(a/b)`, or a plain number, an outer
+ * parenthesis pair stripped («√(2)» keeps its own). 2-D's `evalTerm` (ADR-700), unchanged.
+ */
+export function evalRadicalTerm(raw: string): number {
+  const t = raw.trim().replace(/^\(([\s\S]*)\)$/, '$1').trim();
+  const r = TERM_VALUE.exec(t);
+  if (!r) return parseFloat(t);
+  const rn = r[2] ?? r[4];
+  const radicand = r[3] !== undefined ? parseFloat(rn!) / parseFloat(r[3]) : parseFloat(rn!);
+  return (r[1] ? parseFloat(r[1]) : 1) * Math.sqrt(radicand);
+}
+
+/** One number occurrence in a text: as written, its value, and where it starts. A fraction or a root is one occurrence. */
 export interface NumberOccurrence {
   raw: string;
   value: number;
+  /** where the occurrence starts in the scanned text (blanking preserves positions) */
+  at: number;
 }
 
 /**
@@ -146,17 +196,19 @@ export interface NumberOccurrence {
  * subscript digit, an exponent, a count, a numeral name.
  *
  * UNSIGNED by design: an equation's binary minus has no sign context ((x+2)² states the centre −2), so a
- * sign is never part of an occurrence. A fraction `a/b` is one occurrence valued a/b.
+ * sign is never part of an occurrence. A value `term [/ term]` ({@link radicalTerm}, every radical spelling) is ONE
+ * occurrence, valued as it evaluates: «3/4» is 0.75, «√2» is 1.414…, «5√2» is 7.07…, «2/√3» is 1.1547… (#2646).
  */
 export function scanNumbers(text: string, blank: readonly RegExp[] = []): NumberOccurrence[] {
   let s = text;
   for (const re of blank) s = s.replace(re, (m) => ' '.repeat(m.length));
+  const term = radicalTerm(RADICAL_SPELLED);
   const out: NumberOccurrence[] = [];
-  for (const m of s.matchAll(/\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?/g)) {
-    const raw = m[0].replace(/\s+/g, '');
-    const [a, b] = raw.split('/');
-    const value = b !== undefined ? parseFloat(a) / parseFloat(b) : parseFloat(a);
-    if (Number.isFinite(value)) out.push({ raw, value });
+  for (const m of s.matchAll(new RegExp(String.raw`(${term})(?:\s*\/\s*(${term}))?`, 'g'))) {
+    const num = evalRadicalTerm(m[1]);
+    const den = m[2] !== undefined ? evalRadicalTerm(m[2]) : 1;
+    const value = num / den;
+    if (Number.isFinite(value)) out.push({ raw: m[0].replace(/\s+/g, ''), value, at: m.index! });
   }
   return out;
 }

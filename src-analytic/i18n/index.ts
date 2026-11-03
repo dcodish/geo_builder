@@ -270,6 +270,9 @@ const he = {
   'locus.circle.2': 'שני מעגלים',
   'locus.parabola.2': 'שתי פרבולות',
   'locus.ellipse.2': 'שתי אליפסות',
+  // #2628 (ADR-AG-380) — a locus the walk drew whose family the tool does not name (sr-26, ADR-W-175): drawn, not named.
+  'locus.unnamed': 'עקומה (הכלי עדיין לא מזהה את סוגה)',
+  'locus.unnamed.2': 'שתי עקומות (הכלי עדיין לא מזהה את סוגן)',
   // #1737 (ADR-AG-265) — 2-D's sentences (`src/i18n/locales/he.json`, diagonalIsSide / diagonalNoneHere /
   // ambiguousConstruct / shapeNotFound), so one plane sentence reads the same in both builders (ADR-W-118 B1).
   errDiagonalIsSide: '{{pair}} אינו אלכסון של {{polygon}} — הוא צלע שלו. אלכסון מחבר שני קדקודים שאינם סמוכים.',
@@ -857,6 +860,8 @@ const en: typeof he = {
   'locus.circle.2': 'two circles',
   'locus.parabola.2': 'two parabolas',
   'locus.ellipse.2': 'two ellipses',
+  'locus.unnamed': 'a curve (the tool cannot name its kind yet)',
+  'locus.unnamed.2': 'two curves (the tool cannot name their kind yet)',
   // #1737 (ADR-AG-265) — 2-D's sentences (`src/i18n/locales/en.json`, diagonalIsSide / diagonalNoneHere /
   // ambiguousConstruct / shapeNotFound), so one plane sentence reads the same in both builders (ADR-W-118 B1).
   errDiagonalIsSide: '{{pair}} is not a diagonal of {{polygon}} — it is a side of it. A diagonal joins two corners that are not next to each other.',

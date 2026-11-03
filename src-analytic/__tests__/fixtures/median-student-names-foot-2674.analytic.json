@@ -1,0 +1,10 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "תיכון מ-A במשולש ABC",
+    "D אמצע BC"
+  ],
+  "seed": 0,
+  "name": "#2674 — the student's letter takes the median's foot"
+}

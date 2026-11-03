@@ -386,6 +386,30 @@ export function pinOperandPairs3(c: Construction3, pin: ScalarPin): PinPair3[] {
   return (PIN_OPERAND_PAIRS[pin.kind] as (c: Construction3, p: ScalarPin) => PinPair3[])(c, pin);
 }
 
+/**
+ * #2609 ([ADR-3D-408](../../docs/06b-decisions-3d.md#adr-3d-408)) — THE PLANE OPERANDS A DRIVING RELATION READS A NORMAL
+ * FROM: the point runs of a ⟂ / ∥ / angle to a plane, and the plane-run sides of a plane or mutual relation. #2503's pair
+ * table says where a relation can hold only by a SEGMENT operand meeting itself; a plane operand degenerates when its
+ * points fall on one line, where its normal vanishes and any ⟂ and ∥ to it hold at once («AB∥ACD · AB ⊥ ACD» with A, C
+ * and D on a line). On a solid that run is a face and cannot fold; on a figure of created points it can. A run whose
+ * letters are not all points (a named or equation plane) has no points to fold, so it reads none.
+ */
+const runOf3 = (c: Construction3, ids: readonly Id[]): Id[][] => (ids.length >= 3 && ids.every((id) => c.points.has(id)) ? [[...ids]] : []);
+const operandRun3 = (c: Construction3, o: Operand3): Id[][] => (o.kind === 'plane-run' ? runOf3(c, o.ids) : []);
+export function pinOperandPlanes3(c: Construction3, pin: ScalarPin): Id[][] {
+  switch (pin.kind) {
+    case 'seg-perp-plane':
+    case 'seg-par-plane':
+    case 'line-plane-angle':
+      return runOf3(c, pin.plane);
+    case 'mutual':
+    case 'plane-rel':
+      return [...operandRun3(c, pin.a), ...operandRun3(c, pin.b)];
+    default:
+      return [];
+  }
+}
+
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
   return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind]);
@@ -1958,17 +1982,26 @@ export function solvePivot(
     }
     return m;
   };
+  // #2609 (ADR-3D-408): …and the plane operands, a run's openness (0 = its points on one line) beside a pair's
+  const operandPlanes = c.scalarPins.flatMap((p) => pinOperandPlanes3(c, p));
+  const planeOpenness = (pos: Positions3): number =>
+    Math.min(Infinity, ...operandPlanes.map((run) => ringOpenness3(run.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p))));
+  const operandOpenness = (pos: Positions3): number => Math.min(pairOpenness(pos, operandPairs), planeOpenness(pos));
   const pairMemo = new WeakMap<PivotResult, boolean>();
   const pairSliver = (r: PivotResult): boolean => {
-    if (coupled || r.x.length !== fullLen || operandPairs.length === 0) return false;
+    if (coupled || r.x.length !== fullLen || (operandPairs.length === 0 && operandPlanes.length === 0)) return false;
     const memo = pairMemo.get(r);
     if (memo !== undefined) return memo;
-    const before = pairOpenness(solidPosAt(r.dims, r.riderTs), operandPairs);
+    const before = operandOpenness(solidPosAt(r.dims, r.riderTs));
     let out = false;
     if (before < SLIVER_BAND) {
       const { x, err } = tightResolve(r);
       const released = solidPosAt(x.slice(7, 7 + nDims), ridersOf(x));
-      out = limitRoot(err, before, pairOpenness(released, operandPairs)) || pairOpenness(released, operandPairs.filter((p) => p.arm)) <= 1e-4;
+      // a plane operand carries a direction (its normal), so a run folded onto a line is an emptied angle like an arm
+      out =
+        limitRoot(err, before, operandOpenness(released)) ||
+        pairOpenness(released, operandPairs.filter((p) => p.arm)) <= 1e-4 ||
+        planeOpenness(released) <= 1e-4;
     }
     pairMemo.set(r, out);
     return out;
@@ -1991,7 +2024,7 @@ export function solvePivot(
   };
   const settleFlatRings = (rs: PivotResult[]): PivotPool => {
     if (rs.length === 0 || probe) return [];
-    if (c.solids.length === 0) return [];
+    // #2609 (ADR-3D-408): no solid precondition — a figure of created points has operands that can fold too (#2503)
     const open = rs.filter((r) => !closedFigure(r));
     if (open.length === rs.length) return [];
     if (open.length > 0) return open; // a collapsed member is not a configuration to cycle to
