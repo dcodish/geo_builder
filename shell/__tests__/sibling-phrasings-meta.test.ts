@@ -49,6 +49,10 @@ describe('#2654 — the sibling-phrasing operators write real spellings, and onl
     ['bidi-marks', 'הקטע AB', 'הקטע ‎AB‎'],
     ['double-space', 'משולש ABC', 'משולש  ABC'],
     ['geresh-prime', "AA' = 5", 'AA׳ = 5'],
+    ['conj-relation', 'ישר דרך P מאונך ל-AB', 'ישר דרך P ומאונך ל-AB'],
+    ['conj-relation', 'דרך A עובר ישר l1 המקביל לציר ה-x', null], // no through-point clause before it
+    ['conj-relation', 'ישר l1 עובר דרך הנקודה A המקביל לציר ה-x', 'ישר l1 עובר דרך הנקודה A והמקביל לציר ה-x'],
+    ['conj-relation', 'ישר l1 עובר דרך A ומאונך לציר x', null], // already joined
   ])('%s: «%s» → «%s»', (id, line, want) => {
     expect(op(id)(line)).toBe(want);
   });

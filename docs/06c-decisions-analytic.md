@@ -14636,3 +14636,28 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
 
+## ADR-AG-382 — A line through a point is read in every clause order 2-D reads, its relation joined by a bare «ו» (#2672)
+
+**Date:** 2026-11-03 · **Status:** accepted · bug (analytic), fix round #2678 stream P, branch `fix/2672-subject-first-line`. LADDER stage: parser (no solve stage; the lowering is ADR-AG-057's `line-at`, unchanged).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R227 (new). · **Design:** none (internal) — the same handler (`parseThroughLine`) and the same object.
+
+**Operator.** 2026-11-02, playing round #2665 T14: *"Trying to insert the commands like ישר l1 עובר דרך A ומאונך לציר x was rejected"* — `[asked]`.
+
+**Re-measured at pickup** (`2142a8d1`, `decideSubmit`, after `A נקודה על ציר ה-x` · `B נקודה על ציר ה-y` · `הישר l: y=1/2x` · `d_{Al}^2 + d_{Bl}^2 = 4`): his line, «… ומקביל לציר ה-y», the anonymous «ישר העובר דרך A ומאונך …», «דרך A עובר ישר l1 ומאונך …» and «ישר l1 העובר דרך A ומאונך …» were refused `not-handled`; «l1 מאונך לציר ה-x ועובר דרך A» and «ישר l1 מאונך לציר ה-x דרך A» were refused (a relation with a bad operand); «… דרך A מאונך …» (no «ו») and «… והמאונך …» built. "line l1 perpendicular to the x-axis through A" and "l1 is perpendicular to the x-axis and passes through A" were refused. The catalog spelling «דרך A עובר ישר l1 מאונך לציר ה-x» · «… l2 … לציר ה-y» · «P נקודת החיתוך של l1 ו-l2» answered «המקום הגיאומטרי של P» with `ellipse · x²/20 + y²/5 = 1`. 2-D (`run-sequence --app 2d`, `3225756c` in the plan, re-run here) builds «הישר l1 עובר דרך A ומאונך ל-BC», «l1 מאונך ל-BC ועובר דרך A», «ישר העובר דרך A ומקביל ל-BC», «ישר l1 מאונך ל-BC דרך A», «ישר מאונך ל-BC ועובר דרך A».
+
+**Root cause (class).** A line constructed through a point, whose relation clause is joined to it by a bare conjunction «ו», or written before the through-clause, was not read by analytic's construction grammar while 2-D reads it. The relation atom of both existing frames was `(?:ו?ה)?(מקביל|מאונך…)`: «ו» only with an article after it. And there was no frame for the relation before the point.
+
+**Decision.**
+1. **One relation-clause atom**, `THROUGH_REL = (?:ו?(?:הוא|היא)\s+)?ו?ה?(<parallel>|<perp>)` (`parseAnalytic.ts`), used by every through-line frame: the conjunction and the article are each admitted on their own and together. No frame re-spells it.
+2. **The two missing clause orders**, read by the same handler and lowered to the same `line-at`, so there is no second lowering. RELATION FIRST, `THROUGH_REL_FIRST_HE`: «(ה)(ישר) l1 מאונך ל-… (ו)(ה|ש)עובר דרך A». The name is required (it is the subject), and so is «עובר דרך», so «l1 מאונך לציר ה-x» alone still reaches the relation rule. THROUGH LAST, `THROUGH_LAST_HE`: «ישר (l1) מאונך ל-… ((ו)(ה|ש)עובר) דרך A», named or anonymous. English, `THROUGH_LAST_EN`: "line l1 perpendicular to … through A", "l1 is perpendicular to … and passes through A". All of them run where `parseThroughLine` runs, before `RELATION_HE`. The direction operand still goes through `direction()`.
+3. **A name the figure already holds is not re-created (M1).** The parser is context-free, so the relation-first order meets an existing `l1` exactly as the catalog order does. With `הישר l1: y=2x+1` both orders are refused with the same key (`name-kind-clash`). Before this change the relation-first order was refused with `bad-operand`; the refusal now matches the catalog order's.
+
+**Not built (found, not ruled).** The NOUN-LESS subject-first order «l2 עובר דרך E ומקביל לציר x» (2 prod utterances) stays unread. 2-D refuses «l1 עובר דרך A ומאונך ל-BC» (measured, `refused-pre-commit`), so there is no 2-D reference and no ruling. It is a question for the operator.
+
+**Ports (ADR-W-157).** 2-D is the reference; nothing to do. 3-D has no one-line «line through a point, parallel/perpendicular to …» construction (its rows form is ADR-W-167's): not a port, unchanged.
+
+**Locks.** Fixture `issue-2672-line-through-and-perp` (his T14 flow). Unit test `src-analytic/__tests__/through-line-2672.test.ts`: every spelling records the catalog form's `line-at`; the flow ends in the ellipse locus; the relation-alone and existing-name controls. Parity rows `through-*-2672` (2-D and analytic agree). The sibling-phrasing generator gains `conj-relation` («דרך P מאונך» → «דרך P ומאונך»; 3 prod utterances), green in all four builders with no new known row.
+
+**Behaviour change for a student:** in analytic, «ישר l1 עובר דרך A ומאונך לציר x», «l1 מאונך לציר ה-x ועובר דרך A», «ישר l1 מאונך לציר ה-x דרך A» and the anonymous and «ומקביל» spellings build the line, as «דרך A עובר ישר l1 מאונך לציר ה-x» does.
+

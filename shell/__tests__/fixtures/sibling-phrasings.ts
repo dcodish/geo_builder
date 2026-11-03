@@ -44,7 +44,8 @@ export type OperatorId =
   | 'rename-letters'
   | 'bidi-marks'
   | 'double-space'
-  | 'geresh-prime';
+  | 'geresh-prime'
+  | 'conj-relation';
 
 export interface Operator {
   id: OperatorId;
@@ -75,6 +76,9 @@ const FEMININE = new Set(['מקבילית', 'נקודה', 'צלע', 'זווית'
  * sentence the article can change the reading: «משולש קהה זווית ABC» is not «קהה הזווית».
  */
 const DEFINITE = new RegExp(`^(\\s*)(${NOUNS.join('|')})(?=\\s+[A-Z])`);
+
+/** the relation word straight after a through-point clause, «דרך P מאונך …» / «דרך הנקודה P המקביל …» (#2672) */
+const CONJ_RELATION = /(דרך\s+(?:ה?(?:נקודה|קו?דקוד)\s+)?[A-Z][0-9]?['′]?\s+)(ה?(?:מקביל|מאונכ|מאונך|ניצב))/;
 
 /** words that make a sentence a RELATION, not a declaration of an object */
 const RELATION = /(^|\s)(ה?(מקביל|מקבילה|מאונך|מאונכת|ניצב|ניצבת|אנך|חותך|חותכת|משיק|משיקה|משיקים|נמצא|נמצאת|נמצאות|גדול|גדולה|קטן|קטנה|היא|הוא|מתלכד|מוכל|מוכלת|ישרה|עובר|עוברת|יוצר|נפגשים|מורידים|מעבירים|שווה|שווים|בין|שבין|לבין))(\s|$)|[=<>⊥⟂∥]/;
@@ -192,6 +196,11 @@ export const OPERATORS: readonly Operator[] = [
     id: 'geresh-prime',
     why: 'the Hebrew geresh ׳ as the prime, «A׳» for «A\'» (1)',
     apply: (l) => changed(l, l.replace(/([A-Z])'/g, '$1׳')),
+  },
+  {
+    id: 'conj-relation',
+    why: 'the conjunction «ו» before the relation of a line or plane through a point, «עובר דרך E ומקביל לציר x» for «… מקביל …» (3: «ישר l2 עובר דרך E ומקביל לציר x», «מישור π דרך F וניצב ל-SC»; #2672)',
+    apply: (l) => changed(l, l.replace(CONJ_RELATION, '$1ו$2')),
   },
 ];
 
