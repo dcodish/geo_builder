@@ -145,6 +145,38 @@
         "z = 3 + 4i"
       ],
       "lookFor": "z is plotted at (3, 4)."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T18",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "a הוא פרמטר שונה מאפס",
+        "A(a,0)",
+        "במשולש ישר זווית ABC (∢BAC = 90°)",
+        "שיעור ה-x של הקדקוד B הוא -a",
+        "הצלע BC מקבילה לציר ה-x",
+        "הנקודה M היא אמצע הצלע BC"
+      ],
+      "lookFor": "A does not move, so its row has no «הצג מקום גאומטרי» chip and no curve is drawn for A."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T21",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "l1 מאונך לציר ה-x ועובר דרך A"
+      ],
+      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A."
     }
   ],
   "results": [
