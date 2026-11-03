@@ -140,8 +140,14 @@ const DRAG_SLOP = 4;
  */
 const CANVAS_FALLBACK = { w: 720, h: 720 };
 /** #2688 — the canvas switches' labels, by key, and their look (2-D's display-toggle label, from the shared tokens). */
-const DISPLAY_LABEL = { grid: 'displayGrid', numbers: 'displayNumbers', values: 'displayValues' } as const;
-const displayToggleStyle: CSSProperties = { display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: fs.small, color: color.muted, cursor: 'pointer' };
+/** #2688 — each switch's button label says what a PRESS will do (operator 2026-09-19: "label shows what is next"). */
+const DISPLAY_LABEL = {
+  grid: { hide: 'hideGrid', show: 'showGrid' },
+  numbers: { hide: 'hideNumbers', show: 'showNumbers' },
+  values: { hide: 'hideValues', show: 'showValues' },
+} as const;
+/** A switch whose item is HIDDEN is drawn lighter — still a live button (unlike `rowSubtleOffStyle`, which is disabled). */
+const rowSubtleMutedStyle: CSSProperties = { ...rowSubtleStyle, opacity: 0.6 };
 /** Never build a scene smaller than this — below it the tick labels collide. Mirrors 2-D's floor. */
 const CANVAS_MIN = 320;
 
@@ -1792,26 +1798,28 @@ export function App() {
             )}
 
             {/*
-              #2688 (ADR-AG-388) — THE CANVAS SWITCHES, a product extra on the canvas's own row: the grid, the axis
-              numbers, every value written on the figure. All ticked by default (today's canvas). The scene reads them, so «הורידו
-              תמונה» and «הורידו שאלה», which rasterise the drawn <svg>, print exactly what is ticked.
+              #2688 (ADR-AG-388) — THE CANVAS SWITCHES, product extras on the canvas's own row beside «הצג בנייה», in its
+              chrome: the grid, the axis numbers, every value written on the figure. All shown by default (today's canvas).
+              Toggle BUTTONS (operator, playing #2690: "having buttons might be better looking"), each labelled with what a
+              press does; a hidden item's button is lighter and `aria-pressed`. The scene reads them, so «הורידו תמונה» and
+              «הורידו שאלה», which rasterise the drawn <svg>, print exactly what is shown.
             */}
-            <span data-testid="canvas-display" style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              {DISPLAY_KEYS.map((k) => (
-                <label key={k} style={displayToggleStyle}>
-                  <input
-                    type="checkbox"
-                    data-display={k}
-                    checked={display[k]}
-                    onChange={(e) => {
-                      logAnalytic({ kind: 'action', action: 'display', detail: `${k}=${e.target.checked ? 'on' : 'off'}` });
-                      setDisplay(k, e.target.checked);
-                    }}
-                  />
-                  {t(DISPLAY_LABEL[k])}
-                </label>
-              ))}
-            </span>
+            {DISPLAY_KEYS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                data-display={k}
+                aria-pressed={!display[k]}
+                style={display[k] ? rowSubtleStyle : rowSubtleMutedStyle}
+                onClick={() => {
+                  const next = !display[k];
+                  logAnalytic({ kind: 'action', action: 'display', detail: `${k}=${next ? 'on' : 'off'}` });
+                  setDisplay(k, next);
+                }}
+              >
+                {t(display[k] ? DISPLAY_LABEL[k].hide : DISPLAY_LABEL[k].show)}
+              </button>
+            ))}
 
             <span style={rowSpacerStyle} />
 

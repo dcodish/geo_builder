@@ -1712,7 +1712,7 @@ empty with the numbers off (the label furniture shrinks to O's box), with the va
 stays, and `pointLabelBox` measures the letter-only boxes. Both exports rasterise the drawn
 `<svg>`, so they follow without a change in `shell/export/`.
 
-*Identifiers:* `render/canvasDisplay.ts` · `knows.display` · `axes.gridX` · `setDisplay` · `data-testid="canvas-display"`
+*Identifiers:* `render/canvasDisplay.ts` · `knows.display` · `axes.gridX` · `setDisplay` · `data-display` · `aria-pressed` · `rowSubtleMutedStyle`
 
 ### One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)
 
