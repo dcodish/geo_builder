@@ -993,6 +993,12 @@ a sentence the tool parsed.
 - «A(0,0)» · «B(4,0)» · «M אמצע AB» · «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
 - Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401.
 
+**R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
+- «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message
+- «גובה מ-A במשולש ABC» · «AD גובה במשולש ABC» → one point D
+- «תיכון מ-A במשולש ABC» · «AM = 3» · «D אמצע BC» → recorded, «M ו-D נפלו על אותה נקודה.»
+- Sources: ADR-AG-387, #2674, sr-07 (ADR-W-175).
+
 **R184 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
 - «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)
 - «המעגלים N1 ו-N2 שונים» → two circles; «הישרים l1 ו-l2 שונים», «l1 ≠ l2» → two lines

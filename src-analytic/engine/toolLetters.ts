@@ -79,6 +79,18 @@ export const HELPER_ROLES: ReadonlySet<ToolPointRole> = new Set(['bisector-mid']
 export const helperId = (key: string): Id => `~${key}`;
 export const isHelperId = (id: Id): boolean => id.startsWith('~');
 
+/**
+ * THE LETTERS A SENTENCE TYPES (#2674, ADR-AG-387) — 2-D's `autoNamedLabels` reads a letter as the student's once any
+ * fact's utterance contains it. Here the sentence is a fact's `src`: its point letters are its runs of capitals that are
+ * not the start of a word («AM = 3» types A and M; «The midpoint …» types none), each split into letters with their
+ * subscripts.
+ */
+export function typedLetters(src: string): Set<string> {
+  const out = new Set<string>();
+  for (const run of src.match(/(?<![A-Za-z])(?:[A-Z][0-9₀-₉']*)+(?![a-z])/g) ?? []) for (const l of run.match(/[A-Z][0-9₀-₉']*/g) ?? []) out.add(l);
+  return out;
+}
+
 /** 2-D's `freeLabel` pool, minus nothing: it holds no F. */
 const POOL = 'MNPQRSTUVWXYZKLGHIJ';
 
@@ -116,6 +128,8 @@ export function resolveToolLetters(
     // and which side each is only M1 knows; its key says the role, never the side, so it belongs to its line too.
     const nameKey = (ph: string): string =>
       ph.startsWith(`${TOOL_PREFIX}vertex|`) || ROLE_SIDE_SENTINELS.some((z) => ph.includes(z)) ? `${owner[i]}#${ph}` : ph;
+    /** The letter this fact's own derived point was given by the TOOL, fresh here (#2674): the fact carries `auto`. */
+    let toolNamed = false;
     for (const ph of new Set(text.match(PLACEHOLDER) ?? [])) {
       if (names.has(nameKey(ph))) continue;
       const role = ph.slice(TOOL_PREFIX.length).split('|')[0] as ToolPointRole;
@@ -141,10 +155,14 @@ export function resolveToolLetters(
       }
       names.set(nameKey(ph), name);
       used.add(name);
-      if (!own) minted.push({ index: owner[i], id: name });
+      if (!own) {
+        minted.push({ index: owner[i], id: name });
+        if (f0.t === 'derived' && f0.id === ph) toolNamed = true;
+      }
     }
     text = text.replace(PLACEHOLDER, (ph) => names.get(nameKey(ph)) ?? ph);
     let f = JSON.parse(text) as Fact;
+    if (toolNamed && f.t === 'derived') f = { ...f, auto: true };
     if (f.t === 'segment') f = { ...f, id: f0.t === 'segment' && !f0.id.includes(TOOL_PREFIX) ? f0.id : segId(f.a, f.b) };
     // A ring the TOOL lettered is re-keyed from its resolved vertices, as a segment is (#1622).
     if (f.t === 'polygon') f = { ...f, id: f0.t === 'polygon' && !f0.id.includes(TOOL_PREFIX) ? f0.id : polyId(f.vertices) };
