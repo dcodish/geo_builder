@@ -14636,3 +14636,29 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
 
+## ADR-AG-384 — A stated root is paid by its value; a square or a root pays only across an equation (#2646)
+
+**Date:** 2026-11-03 · **Status:** accepted · bug (P2, analytic, wrong-answer) · fix round #2678 stream H, branch `fix/2646-radical-honesty`. LADDER stage: none (the model-lane honesty gate). Ports [ADR-700](06-decisions.md#adr-700) (2-D).
+
+**Requirements:** none (internal) — the honesty invariant (no stated magnitude silently dropped) already promises it. · **Design:** [04c](04c-design-analytic.md) § "The LLM lane's faithfulness gates"; [04w](04w-design-shell.md) § "The honesty accounting core".
+
+**Measured before** (`origin/main` 2142a8d1, `faithfulnessAnalytic(utterance, [answer], ∅)`): «AB = √2» answered «AB = 2» or «AB = 4», «AB = 3» answered «AB = 9» or «AB = √3», and «A(√2, 1)» answered «A(2, 1)» each dropped nothing, so the answer committed green; «AB = 5√2» answered «AB = 5» and «AB = 2√3» answered «AB = 3» each named «2», not the student's value. 2-D (ADR-700) flags each of them.
+
+**Class.** *A stated magnitude is paid by a value that is not the magnitude.* Two defects, one outcome: `scanNumbers` had no radical term, so «√2» was its radicand 2 and «5√2» two unrelated numbers (the facts walk did the same to a parsed `sqrt` node); and the square/root candidates, which exist for one lowering (a radius r written as r² in a circle's equation, or the converse), were offered against every account.
+
+**Decision.**
+1. **One radical atom in the shell.** `shell/llm/honestyCore.ts` owns `RADICAL` (the √ glyph), `RADICAL_SPELLED` (also «sqrt(2)», «\sqrt{2}»), `radicalTerm` and `evalRadicalTerm`: 2-D's ADR-700 grammar, moved, its optional outer parenthesis now paired. `scanNumbers` reads `term [/ term]` as ONE occurrence valued as it evaluates, and records where it starts. 2-D's `droppedGivenNumbers` imports the atom ([ADR-777](06-decisions.md#adr-777)).
+2. **The facts read a root the same way.** In `factAccounts`, a constant expression with a root in it is one account, its value: the facts of «AB = 5√2» carry 7.07…, never 5 and 2.
+3. **Squares and roots only across an equation.** Every account is tagged with whether its line is an equation (its text holds `=` with x or y in one stretch of math, or its parsed facts mention x or y); every stated number is tagged the same way from its own stretch of the sentence. A stated number is paid by its value from any line, and by its square or its root only from a line on the other side of that divide. `spendAccounts` takes tagged accounts (`Account`).
+4. The refusal is unchanged (`llm-dropped`); it now names «√2», «5√2» as typed, a shown value (ADR-W-096).
+
+**The sweep** (the ADR-700 bar). Old and new verdicts were run side by side behind a temporary env flag over `test:fast` and the analytic slice (`src-analytic/`, `shell/`, `server/`), 1654 gate calls in all; the exam corpus (green) makes no model-lane call. Six verdicts changed, every one a row of this issue's own lock (`AB = √2` → 2 and → 4, `AB = 3` → 9 and → √3, `A(√2, 1)` → `A(2, 1)`, and `AB = 5` → `AB = 5√2`); none elsewhere. The harness was removed before the commit.
+
+**Found, not this class.** «מעגל שמרכזו (0,0) ורדיוסו 3» answered «x^2 + y^2 = 9» still flags «0», «0»: a centred equation states the origin by having no linear terms, and nothing in it is an account for a zero. That is a correct answer refused (it escalates), the opposite direction; no answer in the sweep hit it. Reported on #2646 for a ruling.
+
+**Ports (ADR-W-157).** 2-D is the reference and only re-imports. 3-D: #2285 (armed), a different predicate in `honesty3.ts`. Complex: no number gate of this shape.
+
+**Locks.** `src-analytic/parser/__tests__/honesty-radical-2646.test.ts` (the rows, the controls, the mocked model lane end to end); `shell/__tests__/honesty-core-radical.test.ts` (the scanner on every spelling); `shell/__tests__/honesty-core-1355.test.ts` (occurrences now carry `at`).
+
+**Behaviour change for a student:** in analytic, an AI answer that replaces a stated root or number («AB = √2» answered «AB = 2», «AB = 3» answered «AB = 9») is refused with the existing dropped-given sentence naming the student's value as typed; before, it committed green.
+
