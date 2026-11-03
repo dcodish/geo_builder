@@ -215,6 +215,12 @@ branch (last).
 
 *Identifiers:* `A·B` · `|PQ|` · `AB + BC = 10`
 
+### The book's locus measures: words for terms the grammar already has, and the tangent length ([ADR-AG-383](06c-decisions-analytic.md#adr-ag-383), #2620 A)
+
+Three of the four are REWRITES, the comparison discipline (#1075): `resolveAnaphor` turns a comparison's second operand «מרחקה מ…» / «המרחק שלה מ…» into «המרחק של <the first distance's subject> מ…» (in `asEquation` and `ratioAsEquation`); `sumOfSquares` turns «סכום ריבועי המרחקים של …» into `(d₁)^2 + (d₂)^2 = k` after `liftDistanceLines`, so a line given by its equation is already a token; `parseDistanceCoordinate` (in the rule chain, before `parseConstraint`) gives one coordinate operand the tool's name through `viaCanonical`, the #1263 mint, and re-reads the sentence with that letter. The fourth is a TERM: `tangent {p, circle, curve?}` (`engine/lengths.ts`, `TANGENT_LENGTH`), √(power of P), evaluated through `curveAt`. M1 (`apply.ts`, the `length-eq` arm) resolves its circle as `circle-region` does and states the power's sign selector beside the equation, so an inside P is refused by the selector. The value continues as −√(−power) inside, so the descent keeps a gradient. It is never clamped. Asked, a tangent term is not read (`ask.ts`).
+
+*Identifiers:* `resolveAnaphor` · `sumOfSquares` · `parseDistanceCoordinate` · `TANGENT_LENGTH` · `tangent` · `power`
+
 ### Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1, [ADR-AG-332](06c-decisions-analytic.md#adr-ag-332))
 
 `readRoleRef` (`parser/parseAnalytic.ts`) reads a role once: the given is `<role> <copula>? <value>` (`roleSplits`),

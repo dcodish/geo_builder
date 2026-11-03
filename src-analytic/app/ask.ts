@@ -811,7 +811,8 @@ function askOne(
 
   // --- anything else: a measure expression, through the one grammar ---
   const measure = parseLengthExpr(text);
-  if (!measure) return { question, value: null, unreadable: true };
+  // The tangent length is a GIVEN (#2620 A4, ADR-AG-383); asked, it is not read — as before it was a measure at all.
+  if (!measure || measure.terms.some((t) => t.kind === 'tangent')) return { question, value: null, unreadable: true };
   /**
    * EVERY operand must resolve — including the LINE (#1151).
    *
@@ -822,7 +823,7 @@ function askOne(
    */
   const missingPoint = measure.terms
     // #1205: a line-line term names no POINT — both its operands are lines, checked just below.
-    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' || t.kind === 'ellipse-dist' ? [] : [t.a, t.b]))
+    .flatMap((t) => (t.kind === 'area' ? t.ids : t.kind === 'point-line' ? [t.p] : t.kind === 'line-line' || t.kind === 'ellipse-dist' || t.kind === 'tangent' ? [] : [t.a, t.b]))
     .find((id: Id) => !objectById(d.construction, id));
   if (missingPoint !== undefined)
     return { question, value: null, missing: { name: missingPoint, kind: 'point' } };
@@ -876,7 +877,7 @@ function askOne(
    * it. The trace explains a row; it does not narrate a calculation.
    */
   const one = measure.terms.length === 1 ? measure.terms[0] : null;
-  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' && one.kind !== 'line-line' && one.kind !== 'ellipse-dist' ? one : null;
+  const plain = one && one.kind !== 'area' && one.kind !== 'point-line' && one.kind !== 'line-line' && one.kind !== 'ellipse-dist' && one.kind !== 'tangent' ? one : null;
   let trace: string | undefined;
   let mark: Answer['mark'];
   /**

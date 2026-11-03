@@ -1431,6 +1431,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: 'AD = 12√a', en: 'AD = 12√a' },
   { category: 'relations', family: 'F17', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD = 3', needs: ['טרפז ABCD'] },
   { category: 'relations', family: 'F17', he: 'המרחק של A מהישר 3x+4y=25 הוא 5', en: 'the distance from A to the line 3x+4y=25 = 5', needs: ['נקודה A'] },
+  /*
+   * The textbook's locus conditions in its own words (#2620 A, ADR-AG-383): a point by its coordinates inside a distance, the
+   * second distance's possessive («ממרחקה»), the sum of the squared distances and the tangent length. Each is the formula
+   * sentence a student could already type («A(2,0)» · «2·PA = d_{Pl}», «PA² + d_{Pl}² = 16»), read as that.
+   */
+  { category: 'relations', family: 'F17', he: 'המרחק של P מהנקודה (2,0) קטן פי 2 ממרחקה מהישר x=8', en: 'the distance of P from the line x=8 is 2 times its distance from the point (2,0)', needs: ['נקודה P'] },
+  { category: 'relations', family: 'F17', he: 'סכום ריבועי המרחקים של P מהישר y=-2 ומהנקודה (0,2) הוא 16', en: 'the sum of the squares of the distances of P from the line y=-2 and from the point (0,2) is 16', needs: ['נקודה P'] },
+  { category: 'relations', family: 'F17', he: 'אורך המשיק מ-P למעגל קטן פי 3 מהמרחק של P מהישר x=9', en: 'the distance of P from the line x=9 is 3 times the length of the tangent from P to the circle', needs: ['נתון מעגל שמרכזו בנקודה (1,0) ורדיוסו √8', 'נקודה P'] },
   { category: 'lines', family: 'F17', he: 'CD חוצה את AB', en: 'CD bisects AB' },
   { category: 'lines', family: 'F17', he: 'CD חותך את AB', en: 'CD cuts AB' },
   { category: 'lines', family: 'F17', he: 'AC ו-BD נחתכים', en: 'AC and BD intersect', needs: ['מרובע ABCD'] },

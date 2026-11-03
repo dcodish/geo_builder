@@ -8023,7 +8023,8 @@ function ratioAsEquation(line: string): string | null {
   const [, pair, value] = m;
   for (const j of pair.matchAll(RATIO_JOIN)) {
     const x = measureSide(pair.slice(0, j.index));
-    const y = measureSide(pair.slice(j.index! + j[0].length));
+    // «… למרחקה מ-…» — the second distance's possessive refers to the first's subject (#2620 A2).
+    const y = resolveAnaphor(x, measureSide(pair.slice(j.index! + j[0].length)));
     if (!x || !y || !parseLengthExpr(x) || !parseLengthExpr(y)) continue;
     const pq = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(value.trim());
     return pq ? `(${pq[2]})*(${x}) = (${pq[1]})*(${y})` : `${x} = (${trim(value)})*(${y})`;
@@ -8056,13 +8057,100 @@ function liftDistanceLines(line: string): { text: string; lines: LineEquation[] 
   return lines.length > 0 ? { text, lines } : null;
 }
 
+/**
+ * THE POSSESSIVE ANAPHOR of a comparison's second distance — «המרחק של P מ-A קטן פי 2 ממרחקה מהישר x=8», «… מהמרחק שלה
+ * מ-…», "… is 2 times its distance from …" (#2620 A2, ADR-AG-383). The suffix refers to the FIRST distance's subject, so
+ * the second operand is rewritten to «המרחק של <subject> מ-…» and the comparison reads as its explicit twin. ENUMERATED
+ * (#1301): the four suffixes and «של» with its pronoun; a first side that is not a distance with one lettered subject
+ * leaves the sentence untouched, so it declines as before.
+ */
+const DIST_SUBJECT = new RegExp(`^(?:ה?מרחק\\s+(?:של\\s+)?|(?:the\\s+)?distance\\s+of\\s+)(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?(${NAME})\\s+(?:מ|from\\s)`, 'i');
+const DIST_ANAPHOR = /^(?:ה?מרחק(?:ה|ו|ן|ם)|ה?מרחק\s+של(?:ה|ו|ן|הן|הם))\s+(?=מ)|^its\s+distance\s+(?=from\s)/i;
+function resolveAnaphor(first: string, second: string): string {
+  const subject = DIST_SUBJECT.exec(first);
+  const anaphor = DIST_ANAPHOR.exec(second);
+  if (!subject || !anaphor) return second;
+  const english = /^its/i.test(anaphor[0]);
+  return `${english ? `the distance of ${subject[1]} ` : `המרחק של ${subject[1]} `}${second.slice(anaphor[0].length)}`;
+}
+
+/**
+ * THE SUM OF THE SQUARED DISTANCES, SPELLED OUT (#2620 A3, ADR-AG-383) — «סכום ריבועי המרחקים של P מהישר l ומהנקודה A
+ * הוא 16», «… של A ו-B מהישר l …», «… של P מהנקודות A ו-B …», «סכום ריבועי מרחקי P מ-A ומ-B …», "the sum of the
+ * squares of the distances of P from l and from A is 16". The exam's words for `d₁² + d₂²`, which the length grammar
+ * already lowers, so the sentence is REWRITTEN into it (vocabulary, not mechanism, as the comparisons are) and the two
+ * distances are read by the distance frames like any other: every operand they read (a point, a named line, a line
+ * lifted from its equation, a tool-named coordinate point) is read here. A subject or operand list outside these three
+ * shapes leaves the sentence untouched.
+ */
+const SUM_SQ_HE = new RegExp(
+  `^${HE_GIVEN}(?:כי\\s+)?ה?סכום\\s+(?:ה?ריבועים\\s+של\\s+ה?מרחקים|ריבועי\\s+(?:ה?מרחקים(?:\\s+של)?|מרחקי))\\s+(?:ה?נקודות\\s+|ה?נקודה\\s+)?(${NAME}(?:\\s+ו-?\\s*${NAME})?)\\s+(.+?)\\s*(${COPULA_WORDS}|=)\\s*(\\S.*)$`,
+);
+const SUM_SQ_EN = new RegExp(
+  `^(?:the\\s+)?sum\\s+of\\s+the\\s+squares\\s+of\\s+the\\s+distances\\s+of\\s+(?:the\\s+points?\\s+)?(${NAME}(?:\\s+and\\s+${NAME})?)\\s+(from\\s+.+?)\\s+(is|=|equals)\\s+(\\S.*)$`,
+  'i',
+);
+function sumOfSquares(line: string): string | null {
+  const he = SUM_SQ_HE.exec(line);
+  const en = he ? null : SUM_SQ_EN.exec(line);
+  const m = he ?? en;
+  if (!m) return null;
+  const [, subjectSrc, from, , value] = m;
+  const subjects = subjectSrc.split(he ? /\s+ו-?\s*/ : /\s+and\s+/i);
+  const dist = (subject: string, op: string) => (he ? `(המרחק של ${subject} ${op})^2` : `(the distance of ${subject} ${op})^2`);
+  let terms: string[] | null = null;
+  if (he) {
+    // «מ<O1> ומ<O2>» — one subject, two operands; «מהנקודות A ו-B» — the operands as a list; «מ<O>» — two subjects.
+    const two = /^(מ.+?)\s+ו(מ.+)$/.exec(from);
+    const list = new RegExp(`^מ-?ה?נקודות\\s+(${NAME})\\s+ו-?\\s*(${NAME})$`).exec(from);
+    if (subjects.length === 1 && list) terms = [dist(subjects[0], `מ-${list[1]}`), dist(subjects[0], `מ-${list[2]}`)];
+    else if (subjects.length === 1 && two) terms = [dist(subjects[0], two[1]), dist(subjects[0], two[2])];
+    else if (subjects.length === 2 && /^מ/.test(from) && !two) terms = subjects.map((x) => dist(x, from));
+  } else {
+    const two = /^(from\s+.+?)\s+and\s+(?:from\s+)?(.+)$/i.exec(from);
+    const list = new RegExp(`^from\\s+(?:the\\s+)?points\\s+(${NAME})\\s+and\\s+(${NAME})$`, 'i').exec(from);
+    if (subjects.length === 1 && list) terms = [dist(subjects[0], `from ${list[1]}`), dist(subjects[0], `from ${list[2]}`)];
+    else if (subjects.length === 1 && two) terms = [dist(subjects[0], two[1]), dist(subjects[0], /^from\s/i.test(two[2]) ? two[2] : `from ${two[2]}`)];
+    else if (subjects.length === 2 && !two) terms = subjects.map((x) => dist(x, from));
+  }
+  return terms ? `${terms.join(' + ')} = ${trim(value)}` : null;
+}
+
+/**
+ * A POINT GIVEN BY ITS COORDINATES AS A DISTANCE OPERAND — «המרחק של P מהנקודה (2,0) קטן פי 2 מהמרחק של P מהישר x=8»,
+ * «סכום ריבועי המרחקים של P מהישר y=-2 ומהנקודה (0,2) הוא 16», "the distance of P from the point (2,0) …" (#2620 A1,
+ * ADR-AG-383). The measure grammar reads a LETTER, so the point takes the tool's name (the #1263 mint, `viaCanonical`, as
+ * «הנקודה (3,1) נמצאת על האליפסה» does) and the sentence is read with that letter in its place, by every rule that reads
+ * it with a letter. The operand is a coordinate pair after «(ה)נקודה» or straight after a distance preposition (מ / ל /
+ * בין / של, from / to / between / of). ONE such operand per sentence: the mint has one stand-in letter, so a sentence with
+ * two coordinate points is left untouched and declines as before.
+ */
+// Built on first use: `COORD_PAIR` is declared further down this module.
+let distCoordOperand: RegExp | null = null;
+const DIST_COORD_OPERAND = (): RegExp =>
+  (distCoordOperand ??= new RegExp(
+    `(?:ה?נקודה\\s+|(?:^|(?<=\\s))(?:[מל]-?\\s*|בין\\s+|של\\s+)|\\b(?:from|to|between|of)\\s+(?:the\\s+)?(?:point\\s+)?)(${COORD_PAIR})`,
+    'g',
+  ));
+const DIST_COORD_SENTENCE = /(?:מרחק|[Dd]istance|אורך\s+ה?משיק|tangent)/;
+function parseDistanceCoordinate(line: string): RuleOutcome {
+  if (!DIST_COORD_SENTENCE.test(line)) return null;
+  const found = [...line.matchAll(DIST_COORD_OPERAND())];
+  if (found.length !== 1) return null;
+  const coords = found[0][1];
+  const slot = pointSlot(coords);
+  if (!slot || 'name' in slot) return null;
+  const at = found[0].index! + found[0][0].length - coords.length;
+  return viaCanonical(line, slot, (q) => [`${line.slice(0, at)}${q}${line.slice(at + coords.length)}`]);
+}
+
 /** The line as an EQUATION, when it was written as a comparison. `null` leaves it untouched. */
 function asEquation(line: string): string | null {
   const ratio = ratioAsEquation(line);
   if (ratio) return ratio;
   for (const c of COMPARISONS) {
     const m = c.re.exec(line);
-    if (m) return c.eq(trim(m[1]), trim(m[2]), trim(m[3]));
+    if (m) return c.eq(trim(m[1]), trim(m[2]), resolveAnaphor(trim(m[1]), trim(m[3])));
   }
   return null;
 }
@@ -8202,7 +8290,9 @@ function parseConstraint(raw: string): RuleOutcome {
   const areaGivenValue = areaGiven ? valueExpr(areaGiven[3]) : null;
   // A distance to a line given by its EQUATION is lifted out before the split on «=» (#2429, ADR-AG-328).
   const lifted = liftDistanceLines(line);
-  const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(lifted?.text ?? line);
+  // «סכום ריבועי המרחקים של P מ-l ומ-A הוא 16» is the spelled-out `d_{Pl}² + PA² = 16` (#2620 A3, ADR-AG-383).
+  const summed = sumOfSquares(lifted?.text ?? line);
+  const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(summed ?? lifted?.text ?? line);
   if (lengthEq) {
     // A role noun in front of a pair («אורך השוק BC», «המיתר BC») states its claim and leaves the pair (#1651).
     const roles: ClaimSink = { out: [], src: line };
@@ -10094,7 +10184,7 @@ function parseClauseRules(raw: string): ParseResult {
     // `meetFrame` BEFORE `parsePerpendicular` (#1715): «האנך מ-A ל-BC וחוצה זוית C נפגשים בנקודה E» starts like a
     // perpendicular, whose rule would take everything after «ל-» as its line and refuse it. The frame answers `null`
     // for a subject it cannot split into two operands, so a sentence that is a perpendicular is untouched.
-    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseRoleLength(line) ?? parseShapeHeight(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseRoleLength(line) ?? parseShapeHeight(line) ?? parseDistanceCoordinate(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

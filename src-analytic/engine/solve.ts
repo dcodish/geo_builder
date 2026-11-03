@@ -816,7 +816,7 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return curveParentsOf(k.rule);
     // An ellipse's role point measured (#2616, ADR-AG-353) names its ellipse.
     case 'length-eq':
-      return [...new Set([...k.left.terms, ...k.right.terms].flatMap((t) => (t.kind === 'ellipse-dist' ? [t.curve] : [])))];
+      return [...new Set([...k.left.terms, ...k.right.terms].flatMap((t) => (t.kind === 'ellipse-dist' ? [t.curve] : t.kind === 'tangent' && t.curve !== undefined ? [t.curve] : [])))];
     case 'arc-sum':
       return [...new Set(k.terms.map((t) => t.circle))];
     case 'radius-ratio':
