@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { solveLM } from '../engine/solve';
-import { ask } from '../app/ask';
+import { askLocus } from '../app/locusChip';
 import { fmtAnalytic } from '../format';
 import operatorFixture from './fixtures/issue-1182-free-point-near-figure.analytic.json';
 import thinFixture from './fixtures/issue-1733-thin-legible-triangle.analytic.json';
@@ -106,9 +106,10 @@ describe('#1182 — the operator\'s figure, «A(0,0) · B(6,8) · נקודה M �
     }
   });
 
+  // round #2678: the locus is reached by its chip only (#2673, ADR-AG-381), so the chip's entry point asks it
   it('the locus of M is one answer at every configuration', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
-    const answers = new Set(SEEDS.map((s) => ask(ds[s], 'המקום הגיאומטרי של M', fmtAnalytic, kind).value));
+    const answers = new Set(SEEDS.map((s) => askLocus(ds[s], 'M', fmtAnalytic, kind).value));
     expect([...answers]).toEqual(['ישר · 3x + 4y - 25 = 0']);
   });
 });
