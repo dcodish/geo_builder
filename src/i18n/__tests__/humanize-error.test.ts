@@ -16,11 +16,11 @@ const t: Translate = (k, o) => i18n.t(k, o) as string;
 const hasHebrew = (s: string) => /[֐-׿]/.test(s);
 
 describe('humanizeError', () => {
-  for (const { raw, contains } of CASES) {
+  for (const { raw, contains, said } of CASES) {
     it(`humanises: ${raw.slice(0, 50)}…`, () => {
-      const out = humanizeError(raw, t);
+      const out = humanizeError(raw, t, said);
       expect(out).not.toBe(raw); // it was actually translated, not passed through
-      expect(humanizeErrorOutcome(raw, t).floor, 'a known message must render its own key, not the #2028 floor').toBe(false);
+      expect(humanizeErrorOutcome(raw, t, said).floor, 'a known message must render its own key, not the #2028 floor').toBe(false);
       expect(hasHebrew(out)).toBe(true); // …into Hebrew
       expect(out).not.toContain('errors.'); // the i18n key resolved (no missing-key leak)
       for (const frag of contains) expect(out).toContain(frag); // dynamic data preserved

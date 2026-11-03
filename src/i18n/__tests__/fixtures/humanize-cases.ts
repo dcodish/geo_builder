@@ -30,7 +30,8 @@ const RESERVED_ONE_SIZED = [
  * must humanise to a Hebrew message that still carries its dynamic data. If a new error
  * site is added to the engine, add its raw shape here so coverage stays complete.
  */
-export const CASES: { raw: string; contains: string[] }[] = [
+/** `said`: the student's sentence, for a wording that names only it (`saidOnly`, #2591) — it has nothing to say without one. */
+export const CASES: { raw: string; contains: string[]; said?: string }[] = [
   // lower.ts reservedAmbiguity (#2177, ADR-733) — the reserved r on a figure with several circles, BOTH wordings (two sized
   // circles; one sized beside an unsized one). Built by the engine's own function, never re-spelled here.
   { raw: reservedAmbiguity(RESERVED_TWO_SIZED, 2, new Map())!, contains: ['O, P', 'שרדיוסם נתון', 'הוא הרדיוס', 'רדיוס מעגל'] },
@@ -91,6 +92,8 @@ export const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
+  // step.ts (#2591, ADR-778): an over-constraint that names no constraint — the ruled reason-less frame, naming the sentence
+  { raw: 'over-constrained', contains: ['מחלקת את', 'ביחס', 'סותר נתון קודם'], said: 'D מחלקת את AB ביחס 1:2' },
   // #2165 + #2119 (ADR-681): a second size for a stated circle — the ruled frame without a reason clause
   { raw: 'over-constrained: radius of circle-O = 4 cannot hold', contains: ['רדיוס המעגל', 'O = 4'] },
   // radiusFeasibility.ts equalNestedPair (#2206, ADR-713) — built by the engine's own function, each relation's reason.

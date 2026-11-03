@@ -228,6 +228,17 @@ export interface Wording {
    * the provenance check, like {@link circleParams}.
    */
   circleListParams?: readonly string[];
+  /**
+   * #2591 ([ADR-778](../../docs/06-decisions.md#adr-778)) — this wording names the student's sentence and nothing else, so
+   * it renders only when the sentence is known: with no `said` there is no statement to name, and the message is the floor.
+   */
+  saidOnly?: true;
+  /**
+   * #2591 (ADR-778) — the wording to fall back to when this one's REASON clause fails the provenance check (c) (an
+   * untyped coefficient, «0.5·» for a stated «1:2»; a label the student never saw): the frame still names the student's
+   * statements, and the reason the tool worked out is dropped, never the whole message.
+   */
+  withoutReason?: string;
 }
 
 /** The wording table — one entry per sentence family the student can read. Exported for the coverage gate (#983). */
@@ -273,7 +284,11 @@ export const WORDINGS = {
   // lower.ts letterSystem (#2165 + #2119, ADR-681): the over-constrained frame WITHOUT a reason clause (2026-10-15).
   restatedSize: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, circleParams: ['circle'] },
   // evaluate.ts — `over-constrained: |AC| = 9 cannot hold`, with the fold's optional `[vs #i]` (#943 half B)
-  overConstrained: { key: 'errors.overConstrained', saysSubject: true, namesOther: true },
+  overConstrained: { key: 'errors.overConstrained', saysSubject: true, namesOther: true, withoutReason: 'overConstrainedBare' },
+  // #2591 (ADR-778): the over-constrained frame with NO reason clause — the ruled `restatedSize_said` / `_said_vs` sentences
+  // (2026-10-15), which name only the student's statements. Reached by a bare `over-constrained` (no constraint named) and
+  // by an over-constrained reason the provenance check refuses to show; never without the student's sentence.
+  overConstrainedBare: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, saidOnly: true },
   // replay/core.ts (#855, ADR-476): the SAMPLED-VALUE degradation — the conflict is with a placement the tool invented.
   notDetermined: { key: 'errors.notDeterminedHere' },
   notDeterminedBare: { key: 'errors.notDeterminedHereBare' },
@@ -386,6 +401,8 @@ export function wordingOf(e: EngineError): Worded | null {
       return one('restatedSize', { params: { circle: e.circle, value: e.value } });
     case 'over-constrained':
       return one('overConstrained', { params: { what: e.what } });
+    case 'over-constrained-unnamed':
+      return one('overConstrainedBare');
     case 'not-determined':
       return e.who ? one('notDetermined', { params: { who: joined(e.who), what: e.what } }) : one('notDeterminedBare', { params: { what: e.what } });
     case 'third-crossing':
@@ -427,7 +444,6 @@ export function wordingOf(e: EngineError): Worded | null {
     case 'degenerate-collinear':
       return one('degenerateCollinear', { params: { id: e.id } });
     // No ruled sentence says these honestly (none ever had one): the floor (#2028, ADR-W-130).
-    case 'over-constrained-unnamed':
     case 'circles-tangent-only':
     case 'line-misses-circle':
     case 'distance-circles-miss':
@@ -550,6 +566,8 @@ function render(worded: Worded, t: Translate, said: string | undefined, other: s
   // is byte-identical to today, so a fact with no recorded utterance never yields an empty «».
   const sub = said?.trim();
   const oth = other?.trim();
+  // #2591 (ADR-778): a wording that names only the student's sentence has nothing to say without it
+  if (w.saidOnly && !sub) return null;
   const done = (text: string): Humanized => ({ text, floor: false, ...(w.nextStep ? { nextStep: true } : {}) });
   // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
   if (w.namesOther && sub && oth) return done(t(`${key}_said_vs`, { ...translated, said: sub, other: oth }));
@@ -644,6 +662,8 @@ function provenance(e: EngineError, worded: Worded, vocab: StudentVocabulary, t:
     }
   }
   if (!failed.length) return worded;
+  // #2591 (ADR-778): only the REASON clause failed — keep the frame that names the student's statements, drop the reason
+  if (w.withoutReason && failed.every((x) => x.check === 'c')) return one(w.withoutReason as WordingId);
   // (c′) the unknown-point frame is a true sentence: keep it, and name the missing points (each typed by the student)
   if (e.code === 'unknown-point' && failed.every((x) => x.check === 'c')) {
     const missing = [...new Set(labelsIn(sanitizeIds(e.what)).filter((l) => !names.has(l)))];

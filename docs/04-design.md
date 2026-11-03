@@ -294,6 +294,10 @@ Seams recorded against the layout:
   `parseEngineError` is the one inverse, `withAttribution` the one writer of the `[vs #i]` tail, and `PARAM_KINDS` declares
   each field's kind (`id`, `composite`, `fragment`, …). `humanizeError`'s `wordingOf` is a `switch (e.code)` over a static
   `WORDINGS` table; a variant with no ruled sentence is the floor. Locks: `humanize-golden.test.ts`, `engine-error-total.test.ts`.
+  **The over-constrained frame never floors for its reason (ADR-778, #2591).** `overConstrainedBare` is the frame with no
+  reason clause (the ruled `errors.restatedSize_said` / `_said_vs` sentences), `saidOnly`: it renders only with the student's
+  sentence. A bare `over-constrained` (`over-constrained-unnamed`) reaches it, and so does an `over-constrained` whose reason
+  fails the provenance check (c) (`withoutReason`): «|AD| = 0.5·|DB|» for a stated «1:2» drops the reason, never the message.
 - **Which row owns a refusal (ADR-492, #956).** `computeFold`'s attribution pass moves a refusal from the row that
   shaped a constraint to a later row that valued its symbol — attribution only. `symbolsConsumedBy`
   (`engine/lower.ts`) is derived from `lowerOne`'s own call sites.

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { humanizeErrorOutcome, type Translate } from '@/i18n/humanizeError';
+import { humanizeErrorOutcome, WORDINGS, type Translate, type Wording } from '@/i18n/humanizeError';
 import { internalTextViolations, labelsIn, numbersIn, type StudentVocabulary } from '../../../shell/studentText';
 
 const he: Translate = (k, o) => i18n.getFixedT('he')(k, o) as string;
@@ -45,10 +45,28 @@ describe('(c) a fragment’s coefficients and labels are the student’s', () =>
     expect(plain(run('|OR| = 1·R references an unknown point', 'OR=r', V('מעגל O ברדיוס r', ['O'])).text)).toContain('(R)');
   });
   it('a typed coefficient → unchanged («AB = 2 AD»)', () => same('|AB| = 2·|AD| references an unknown point', 'AB = 2 AD', V('', [])));
-  it('an untyped coefficient on any other frame → the floor; a typed one → unchanged', () => {
+  it('an untyped coefficient on an over-constrained reason → the frame names the sentences, the reason is dropped (#2591); a typed one → unchanged', () => {
     const fig = V('מעגל O', ['O', 'B', 'C'], ['O', 'B', 'C']);
-    expect(run('over-constrained: |OB| = 1.0583005244258363·|OC| cannot hold', 'OB = OC', fig).floor).toBe(true);
+    const out = run('over-constrained: |OB| = 1.0583005244258363·|OC| cannot hold', 'OB = OC', fig);
+    expect(out.floor).toBe(false);
+    expect(plain(out.text)).toBe(plain(he('errors.restatedSize_said', { said: 'OB = OC' })));
+    expect(plain(run('over-constrained: |AD| = 0.5·|DB| cannot hold [vs #1]', 'D מחלקת את AB ביחס 1:2', V('', ['A', 'B', 'C', 'D'])).text)).toBe(plain(he('errors.restatedSize_said', { said: 'D מחלקת את AB ביחס 1:2' })));
+    // a label the student never saw is the same class: the reason goes, the frame stays
+    expect(plain(run('over-constrained: |AX| = |XB| cannot hold', 'AB = 5', V('AB = 5', ['A', 'B'])).text)).toBe(plain(he('errors.restatedSize_said', { said: 'AB = 5' })));
+    // an untyped coefficient on any other frame is still the floor
+    expect(run('not determined: |OB| = 1.0583005244258363·|OC| cannot be judged in this configuration', 'OB = OC', fig).floor).toBe(true);
     same('over-constrained: ∠DOE = 2·∠COE cannot hold', '∠DOE = 2∠COE', V('', ['D', 'O', 'E', 'C']));
+  });
+  it('#2591: every reason-less fallback is a wording that names the student’s sentence only', () => {
+    const table = WORDINGS as Record<string, Wording>;
+    const fallbacks = Object.values(table).filter((w) => w.withoutReason);
+    expect(fallbacks.length).toBeGreaterThan(0);
+    for (const w of fallbacks) {
+      const to = table[w.withoutReason!];
+      expect(to, w.withoutReason).toBeDefined();
+      expect(to.saidOnly && to.saysSubject).toBe(true);
+      expect(!!to.namesOther).toBe(!!w.namesOther);
+    }
   });
   it('with no sentence known, (b) and (c) do not judge', () => same('over-constrained: ∠DOE = 2·∠COE cannot hold', undefined, V('', [])));
 });

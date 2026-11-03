@@ -11,6 +11,37 @@ import { driveThroughGate } from '../../__tests__/submit-gate';
 import { replay } from '@/store/geoStore';
 import { checkGivens } from '../verify';
 import type { Command, Vec } from '../types';
+import i18n from '@/i18n';
+import { figureExplainer } from '@/app/studentVocabulary';
+import { otherUtteranceForError } from '@/app/errorSubject';
+import type { Translate } from '@/i18n/humanizeError';
+
+const he: Translate = (k, o) => i18n.getFixedT('he')(k, o) as string;
+const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
+const FLOOR = plain(he('errors.floor'));
+
+/**
+ * What the STUDENT READS for a refused line — the submit pipeline's own composition (`figureExplainer` over the displayed
+ * figure, the refused sentence as `said`, the fold's `[vs #i]` resolved by `otherUtteranceForError`), never `verdict.detail`.
+ * The first lock asserted the detail only, and the rendered text was the floor sentence (round #2678's pre-play).
+ */
+const renderedRefusal = (steps: string[]): string => {
+  const { refused, facts } = driveThroughGate(steps);
+  expect(refused.map((r) => r.index)).toEqual([steps.length - 1]);
+  const v = refused[0].verdict;
+  const detail = v.kind === 'refused' ? v.detail : undefined;
+  const fig = replay(facts, 0);
+  return plain(figureExplainer(he, fig.construction, facts)(detail, refused[0].utterance, otherUtteranceForError(facts, detail)));
+};
+/** What a committed red row reads (its tooltip and the banner): the same explainer over the row's status. */
+const renderedRow = (steps: string[]): string => {
+  const facts = factsOf(steps);
+  const fig = replay(facts, 0);
+  const f = facts[facts.length - 1];
+  const st = fig.status[f.id] as string;
+  expect(st).not.toBe('ok');
+  return plain(figureExplainer(he, fig.construction, facts)(st, f.utterance, otherUtteranceForError(facts, st)));
+};
 
 const ratioAt = (steps: string[], a: string, m: string, b: string, seed: number): { r: number; ok: boolean; clean: boolean } => {
   const fig = replay(factsOf(steps), seed);
@@ -47,6 +78,41 @@ describe('#2591 — a stated ratio on an existing point is kept', () => {
     expect(v.kind === 'refused' && v.detail).toMatch(/\|AD\| = 0\.5·\|DB\| cannot hold/);
     const colon = replay(factsOf(['משולש ABC', 'D אמצע AB', 'AD:DB = 1:2']), 0);
     expect(Object.values(colon.status).some((s) => /\|AD\| = 0\.5·\|DB\| cannot hold/.test(s))).toBe(true);
+  });
+
+  /**
+   * Round #2678's pre-play: the line was refused, and the student read the FLOOR sentence. The reason clause
+   * «|AD| = 0.5·|DB|» carries a coefficient the student never typed (they typed 1:2), so the provenance check refused to
+   * show it — and took the whole message with it. ADR-778: the frame names the student's statements and drops the reason.
+   */
+  describe('#2591 found in round — the refusal the student READS names the statements, never the floor', () => {
+    const cases: [string, string[], string, string | undefined][] = [
+      ['the reported line: a midpoint stated to divide 1:2', ['משולש ABC', 'D אמצע AB', 'D מחלקת את AB ביחס 1:2'], 'D מחלקת את AB ביחס 1:2', 'D אמצע AB'],
+      ['the prose spelling', ['משולש ABC', 'D אמצע AB', 'היחס בין AD ל-DB הוא 1:2'], 'היחס בין AD ל-DB הוא 1:2', 'D אמצע AB'],
+      ['another ratio (3:2 → 1.5·)', ['משולש ABC', 'D אמצע AB', 'D מחלקת את AB ביחס 3:2'], 'D מחלקת את AB ביחס 3:2', 'D אמצע AB'],
+      ['a repeating coefficient (1:3 → 0.333…·) on a square side', ['ריבוע ABCD', 'E אמצע AB', 'E מחלקת את AB ביחס 1:3'], 'E מחלקת את AB ביחס 1:3', 'E אמצע AB'],
+    ];
+    for (const [name, steps, said, other] of cases) {
+      it(name, () => {
+        const text = renderedRefusal(steps);
+        expect(text).not.toBe(FLOOR);
+        expect(text).toBe(plain(`${he('errors.restatedSize_said_vs', { said, other })} ${he('errors.retryHint')}`));
+        expect(text).not.toMatch(/\d·/); // the tool's arithmetic is never shown
+      });
+    }
+    it('the colon form’s red row reads the same frame (it carries no other side)', () => {
+      const text = renderedRow(['משולש ABC', 'D אמצע AB', 'AD:DB = 1:2']);
+      expect(text).not.toBe(FLOOR);
+      expect(text).toBe(plain(`${he('errors.restatedSize_said', { said: 'AD:DB = 1:2' })} ${he('errors.retryHint')}`));
+    });
+    it('the rider-with-ratio spelling’s red row names both statements', () => {
+      const text = renderedRow(['משולש ABC', 'D אמצע AB', 'D על AB כך ש-AD:DB = 1:2']);
+      expect(text).toBe(plain(`${he('errors.restatedSize_said_vs', { said: 'D על AB כך ש-AD:DB = 1:2', other: 'D אמצע AB' })} ${he('errors.retryHint')}`));
+    });
+    it('control: a coefficient the student typed keeps its reason clause', () => {
+      const text = renderedRefusal(['משולש ABC', 'AB = 5', 'AC = 5', 'AB = 2AC']);
+      expect(text).toContain('הסיבה: |AB| = 2·|AC|');
+    });
   });
 
   it('the verifier flags a rider whose t is not the t its command states (the class guard)', () => {

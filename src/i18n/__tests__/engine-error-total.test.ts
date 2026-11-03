@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import i18n from '@/i18n';
 import { engineErrorDebugText, parseEngineError, PARAM_KINDS, type EngineError, type EngineErrorCode } from '@/engine/errors';
-import { humanizeErrorOutcome, wordingOf, type Translate } from '@/i18n/humanizeError';
+import { humanizeErrorOutcome, wordingOf, WORDINGS, type Translate, type Wording } from '@/i18n/humanizeError';
 import { parseSource, sourceFiles } from '../../../shell/__tests__/fixtures/ts-literals';
 
 const he: Translate = (k, o) => i18n.getFixedT('he')(k, o) as string;
@@ -83,7 +83,7 @@ const SAMPLES: { [C in EngineErrorCode]: Extract<EngineError, { code: C }> } = {
 
 /** The variants no ruled sentence says (the floor, before and after phase 3a). */
 const FLOOR_CODES: ReadonlySet<EngineErrorCode> = new Set<EngineErrorCode>([
-  'over-constrained-unnamed', 'circles-tangent-only', 'line-misses-circle', 'distance-circles-miss', 'lines-parallel', 'perp-foot-coincide',
+  'circles-tangent-only', 'line-misses-circle', 'distance-circles-miss', 'lines-parallel', 'perp-foot-coincide',
   'line-points-coincide', 'bisect-opposite', 'radius-not-positive', 'radius-point-at-centre', 'cant-build-yet', 'degenerate-length', 'raw',
 ]);
 
@@ -117,8 +117,11 @@ describe('#2201 phase 3a — every variant is worded (the switch is total)', () 
         return;
       }
       expect(w).not.toBeNull();
+      // #2591 (ADR-778): a wording that names only the student's sentence floors without one, and renders with one
+      const saidOnly = !!(WORDINGS[w!.wording] as Wording).saidOnly;
+      if (saidOnly) expect(humanizeErrorOutcome(engineErrorDebugText(e), he).floor).toBe(true);
       for (const t of [he, en]) {
-        const out = humanizeErrorOutcome(engineErrorDebugText(e), t);
+        const out = humanizeErrorOutcome(engineErrorDebugText(e), t, saidOnly ? 'D מחלקת את AB ביחס 1:2' : undefined);
         expect(out.text).not.toContain('errors.');
         // a sample whose value is an engine token still floors by ADR-W-130's guard; every other renders its key
         if (!/[~@]/.test(engineErrorDebugText(e))) expect(out.floor, `${e.code} fell to the floor`).toBe(false);

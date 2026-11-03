@@ -1796,16 +1796,16 @@
    "source": "floor",
    "raw": "over-constrained",
    "said": "המשפט שהתלמיד הקליד",
-   "he": "משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.",
-   "en": "Something went wrong building this line. Try wording it differently, or split it into two steps."
+   "he": "לא ניתן: «המשפט שהתלמיד הקליד» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
+   "en": "⁦Can't do that⁩: «המשפט שהתלמיד הקליד» ⁦contradicts an earlier given — they can't both hold⁩. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
   },
   {
    "source": "floor",
    "raw": "over-constrained",
    "said": "המשפט שהתלמיד הקליד",
    "other": "השורה הקודמת",
-   "he": "משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.",
-   "en": "Something went wrong building this line. Try wording it differently, or split it into two steps."
+   "he": "לא ניתן: «המשפט שהתלמיד הקליד» סותר את «השורה הקודמת» — אי אפשר לקיים את שניהם יחד. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.",
+   "en": "⁦Can't do that⁩: «המשפט שהתלמיד הקליד» ⁦contradicts⁩ «השורה הקודמת» — ⁦they can't both hold⁩. You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
   },
   {
    "source": "floor",

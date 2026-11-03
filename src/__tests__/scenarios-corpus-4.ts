@@ -53,6 +53,7 @@ import i18n from '@/i18n';
 import { circleResolver, humanizeError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError } from '@/app/errorSubject';
+import { figureExplainer } from '@/app/studentVocabulary';
 import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
@@ -6215,7 +6216,16 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'A'), at(fig, 'D')) / dist(at(fig, 'D'), at(fig, 'B')), 'AD:DB = 1:2').toBeCloseTo(0.5, 3);
       const v = gateVerdict(factsOf(['משולש ABC', 'D אמצע AB']), 'D מחלקת את AB ביחס 1:2');
       expect(v.kind === 'refused' && v.reason, 'a midpoint cannot divide 1:2: refused, never green').toBe('error');
-      expect(v.kind === 'refused' ? (v.detail ?? '') : '', 'naming the ratio, as «AD:DB = 1:2» does').toMatch(/^over-constrained: |AD| = 0.5·|DB| cannot hold/);
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'the colon form’s over-constraint').toMatch(/^over-constrained: \|AD\| = 0\.5·\|DB\| cannot hold/);
+      // #2591 found in round (ADR-778): what the student READS — the submit note's own composition — names both statements.
+      // The detail alone was locked before, and the rendered text was the floor sentence.
+      const prior = factsOf(['משולש ABC', 'D אמצע AB']);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      const text = bare(figureExplainer(he, replay(prior, 0).construction, prior)(detail, 'D מחלקת את AB ביחס 1:2', otherUtteranceForError(prior, detail)));
+      expect(text, 'never the floor sentence').not.toBe(bare(he('errors.floor')));
+      expect(text).toBe(bare(`${he('errors.restatedSize_said_vs', { said: 'D מחלקת את AB ביחס 1:2', other: 'D אמצע AB' })} ${he('errors.retryHint')}`));
     },
   },
 ];
