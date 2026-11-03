@@ -1202,6 +1202,14 @@ export interface Construction {
    * jointly from its seeded starts, as before. Pure over the lines, like the rest of the construction; never saved.
    */
   objectLine?: Readonly<Record<Id, number>>;
+  /**
+   * WHICH LINE STATED EACH ROW (#2039 step 2, [ADR-AG-378](../../docs/06c-decisions-analytic.md#adr-ag-378)) — keyed by the
+   * constraint itself (and every option nested in a choice), written by the fold beside `objectLine`. «משולש ABC» · «AB = 5»
+   * puts the triangle's points on line 0 and the row «AB = 5» on line 1: a row stated on a later line than every point it
+   * names is placed ON the figure as it stood, and moves the points drawn latest first (`evaluate.ts` `fitLineByLine`).
+   * Absent on a construction built without a fold. Pure over the lines; never saved.
+   */
+  rowLine?: ReadonlyMap<Constraint, number>;
 }
 
 /**

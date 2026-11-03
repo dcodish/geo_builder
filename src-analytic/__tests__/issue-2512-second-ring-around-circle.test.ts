@@ -73,10 +73,15 @@ describe('#2512 analytic — a second ring around a circle builds, tangent and d
      * The square and DEF start configurations change with it (the inscribed ABC is now fitted vertex by vertex, as
      * three «X על המעגל» lines are). Still the lock's point: #2512's dual start is for a SECOND
      * ring only, and never touches these.
+     *
+     * RE-BASED by round #2678 (ADR-AG-359's anchored step bounded by sr-25, ADR-AG-378), measured at seed 0: the triangle
+     * row is unchanged (O stays exactly where the circle alone draws it — #1687's promise, sr-27). The square and DEF rows
+     * are opening configurations the display walk chose: at main the square walked to configuration 6 (its O moved there
+     * too) and now walks to 3; DEF walked to 17 and now to 1. Each is whole, tangent and distinct (the tests above).
      */
     [['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O'], { A: [-12.395431, -3.503007], B: [-0.107452, -6.45159], C: [-1.022111, 2.020167], O: [-3.547089, -2.541066] }],
-    [['מעגל O ברדיוס 3', 'ריבוע ABCD חוסם את מעגל O'], { A: [-3.89946, -1.137603], B: [1.924106, -2.581929], C: [0.47978, -8.405495], D: [-5.343786, -6.961169] }],
-    [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'משולש DEF חוסם את מעגל O'], { D: [-0.378594, -2.01532], E: [12.709113, -0.575194], F: [1.347761, 6.122901] }],
+    [['מעגל O ברדיוס 3', 'ריבוע ABCD חוסם את מעגל O'], { A: [2.671179, 1.264435], B: [-2.452912, -1.857054], C: [0.668576, -6.981145], D: [5.792667, -3.859657] }],
+    [['מעגל O ברדיוס 3', 'משולש ABC חסום במעגל O', 'משולש DEF חוסם את מעגל O'], { D: [-0.378546, -5.630457], E: [-9.203877, 1.974606], F: [-0.962842, 5.823918] }],
   ];
   for (const [lines, want] of HEAD) {
     it(`a ring with no ring around its circle before it keeps its start: «${lines.at(-1)}» draws as at 045a8546, re-measured under #1687 (seed 0)`, () => {

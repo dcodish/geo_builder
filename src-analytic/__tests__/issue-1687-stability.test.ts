@@ -152,7 +152,14 @@ describe('#1687 — a row through a free symbol stays the joint solve’s, read 
   const at = (lines: string[], seed: number) =>
     derive(lines, seed).figure.points.map((p) => `${p.id}:${p.x.toFixed(6)},${p.y.toFixed(6)}`).sort().join(' ');
   it('«A על מעגל O» and «מעגל O» · «A על המעגל» are one drawing at every seed', () => {
-    for (const seed of [0, 1, 2, 5, 11]) expect(at(['מעגל O', 'A על המעגל'], seed), `seed ${seed}`).toBe(at(['A על מעגל O'], seed));
+    // within 1e-3 since #1182 (ADR-AG-359): the line fit and stage one now both anchor, and finish 8.5e-5 apart at seed 0
+    const pts = (lines: string[], seed: number) => new Map(derive(lines, seed).figure.points.map((p) => [p.id, p] as const));
+    for (const seed of [0, 1, 2, 5, 11]) {
+      const one = pts(['A על מעגל O'], seed);
+      const two = pts(['מעגל O', 'A על המעגל'], seed);
+      expect([...two.keys()].sort(), `seed ${seed}`).toEqual([...one.keys()].sort());
+      for (const [id, p] of one) expect(Math.hypot(p.x - two.get(id)!.x, p.y - two.get(id)!.y), `seed ${seed}: ${id}`).toBeLessThan(1e-3);
+    }
   });
   it('the tangents meeting at D: the circle on its own line draws the one-sentence figure', () => {
     for (const seed of [0, 2, 7]) {

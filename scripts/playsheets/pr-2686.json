@@ -1,0 +1,236 @@
+{
+  "name": "pr-2686",
+  "title": "PR #2686 — #1182 + #2039 step 2: the anchored step, latest points move, the button never repeats (analytic)",
+  "cases": [
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T22",
+      "title": "A thin 10° triangle is readable at every configuration",
+      "lines": [
+        "משולש ABC",
+        "∢ABC = 10"
+      ],
+      "cycles": 6,
+      "expectConfigsDiffer": true,
+      "expectFigure": [
+        "10°"
+      ],
+      "lookFor": "Start with «נקה הכל». Press «הציגו תצורה אחרת» six times. The arc at B reads 10° every time; every drawing is a thin but readable triangle, no two vertices nearly on top of each other. (Right after «∢ABC = 10» the triangle is redrawn as a different one, because meeting 10° in place would leave a 5.9° corner.)",
+      "before": "Prod opens on a triangle with a 5.9° corner, and two of 24 configurations have a corner past 165°."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T23",
+      "title": "«הציגו תצורה אחרת» never repeats the picture",
+      "lines": [
+        "α < 30",
+        "משולש ABC",
+        "∢ABC = α"
+      ],
+      "cycles": 12,
+      "expectConfigsDiffer": true,
+      "lookFor": "Start with «נקה הכל». Press «הציגו תצורה אחרת» twelve times: every press changes the picture.",
+      "before": "Two presses could show the same drawing."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T24",
+      "title": "The circle stays put when a triangle is drawn around it",
+      "lines": [
+        "מעגל O ברדיוס 3",
+        "משולש ABC חוסם את מעגל O"
+      ],
+      "lookFor": "Start with «נקה הכל». After the second line the circle does not move; the triangle appears around it.",
+      "before": "Unchanged on prod."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T25",
+      "title": "A given length moves only the last point",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "expectFigure": [
+        "5"
+      ],
+      "lookFor": "Start with «נקה הכל». After «AB = 5», A and C stay exactly where they were; only B moves.",
+      "before": "A and B both move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T26",
+      "title": "An equal side moves only C",
+      "lines": [
+        "משולש ABC",
+        "AB = AC"
+      ],
+      "lookFor": "Start with «נקה הכל». After «AB = AC», A and B stay; C moves.",
+      "before": "All three move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T27",
+      "title": "A stated angle turns only C",
+      "lines": [
+        "משולש ABC",
+        "זווית A = 50"
+      ],
+      "expectFigure": [
+        "50°"
+      ],
+      "lookFor": "Start with «נקה הכל». After «זווית A = 50», A stays; C turns about A (B moves only if the triangle would otherwise be a sliver).",
+      "before": "All three move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T28",
+      "title": "A rectangle keeps its first corner",
+      "lines": [
+        "מלבן ABCD",
+        "AB = 6"
+      ],
+      "expectFigure": [
+        "6"
+      ],
+      "lookFor": "Start with «נקה הכל». After «AB = 6», A stays; the rectangle stretches from A.",
+      "before": "Every corner moves, at some configurations by a lot."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T29",
+      "title": "A sector keeps O and A and turns B",
+      "lines": [
+        "גזרה AOB",
+        "זווית AOB = 60"
+      ],
+      "expectFigure": [
+        "60°"
+      ],
+      "lookFor": "Start with «נקה הכל». After «זווית AOB = 60», O and A stay; B turns about O.",
+      "before": "All three move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T30",
+      "title": "Points placed by a stated length stay put",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "זווית A = 50"
+      ],
+      "expectFigure": [
+        "5",
+        "50°"
+      ],
+      "lookFor": "Start with «נקה הכל». After the third line, A and B stay exactly; only C turns.",
+      "before": "All three move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T31",
+      "title": "A point on a side keeps its place along the side",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AB = 5"
+      ],
+      "expectFigure": [
+        "D"
+      ],
+      "lookFor": "Start with «נקה הכל». After «AB = 5», A and C stay; B moves; D stays at the same place along BC.",
+      "before": "A, B and D move."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T32",
+      "title": "A free point is drawn near the figure",
+      "lines": [
+        "A(0,0)",
+        "B(6,8)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "cycles": 3,
+      "expect": [
+        "3x + 4y - 25 = 0"
+      ],
+      "lookFor": "Start with «נקה הכל». A and B fill most of the view (M opens on the midpoint of AB). Press «הצג מקום גאומטרי» on M's row: «המקום הגיאומטרי של M: ישר · 3x + 4y - 25 = 0», with the line drawn dashed (the view widens to hold it). Press «הציגו תצורה אחרת» a few times: M moves along that line, and A and B never shrink to a corner.",
+      "before": "At the opening configuration A and B take 39 % of the view, and the locus withholds its equation."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T33",
+      "title": "REFUSAL — a contradicting length is still refused",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "AB = 7"
+      ],
+      "expectRefusal": "סותר את «AB = 5»",
+      "lookFor": "Start with «נקה הכל». «AB = 7» is refused: «לא ניתן: «AB = 7» סותר את «AB = 5» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 7.», and the triangle is unchanged.",
+      "before": "Unchanged."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5177",
+      "path": "/analytic.html",
+      "id": "T34",
+      "title": "A fixed triangle has no other configuration",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "C(0,3)",
+        "משולש ABC"
+      ],
+      "cycles": 1,
+      "expect": [
+        "זו התצורה היחידה שמצאתי"
+      ],
+      "lookFor": "Start with «נקה הכל». Press «הציגו תצורה אחרת»: the tool says «זו התצורה היחידה שמצאתי — הנתונים שכתבתם קובעים את השרטוט.», and the triangle does not move.",
+      "before": "Unchanged."
+    }
+  ]
+}

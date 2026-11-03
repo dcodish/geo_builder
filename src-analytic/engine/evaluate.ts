@@ -21,8 +21,8 @@ import { evalLengthExpr, type LengthExpr } from './lengths';
 import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
 import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
+import { cornerKey, legibilityFaults, ringFaultsOf, thinRingsOf, type RingFault } from './rings';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt } from './discreteAxes';
@@ -2239,6 +2239,54 @@ export function admissibleAt(c: Construction, pos: Map<Id, Pt>, env: Env): boole
 }
 
 /**
+ * The corners a given STATES (sr-25: *"a stated value is always drawn as stated"*) — every angle a row names by its three
+ * points («∢ABC = 10», «∢ABC = α», a ratio of two angles), and a right angle stated as two perpendicular segments sharing
+ * an end. Read structurally off the rows (every option of a choice included), memoized per construction.
+ */
+const statedCornersCache = new WeakMap<Construction, ReadonlySet<string>>();
+function statedCornersOf(c: Construction): ReadonlySet<string> {
+  const hit = statedCornersCache.get(c);
+  if (hit) return hit;
+  const out = new Set<string>();
+  const shared = (p: [Id, Id], q: [Id, Id]): void => {
+    for (const v of p) if (q.includes(v)) out.add(cornerKey(v, p[0] === v ? p[1] : p[0], q[0] === v ? q[1] : q[0]));
+  };
+  const walk = (x: unknown): void => {
+    if (Array.isArray(x)) for (const w of x) walk(w);
+    else if (x && typeof x === 'object') {
+      const o = x as Record<string, unknown>;
+      if (typeof o.v === 'string' && typeof o.a === 'string' && typeof o.b === 'string') out.add(cornerKey(o.v, o.a, o.b));
+      if (o.t === 'perpendicular' && typeof o.a === 'string') shared([o.a as Id, o.b as Id], [o.c as Id, o.d as Id]);
+      if (o.t === 'relation' && o.rel === 'perpendicular') {
+        const u = o.u as Direction;
+        const v = o.v as Direction;
+        if (u.k === 'points' && v.k === 'points') shared([u.a, u.b], [v.a, v.b]);
+      }
+      for (const w of Object.values(o)) walk(w);
+    }
+  };
+  walk(c.constraints);
+  statedCornersCache.set(c, out);
+  return out;
+}
+
+/**
+ * IS THIS DRAWING LEGIBLE (ADR-W-175 sr-25, [ADR-AG-359](../../docs/06c-decisions-analytic.md#adr-ag-359)) — no free
+ * corner of a declared ring outside [SPREAD_MIN_DEG, 165°], no two of its vertices closer than 5 % of the figure
+ * (`legibilityFaults`). One predicate for the display walk's preference (`drawableAt`), the anchored solve's keep-test
+ * (stage one) and a later line's fit (`fitLineByLine`), so "legible" is decided once. The third limit — no stacked
+ * points while a separated view exists — is the separation preference (`stackedPairs`), applied beside it.
+ */
+export function legibleAt(c: Construction, at: (id: Id) => Pt | undefined, extent: number): boolean {
+  const fixed = new Set(c.objects.filter((o) => o.kind === 'point').map((o) => o.id));
+  return legibilityFaults(c, at, statedCornersOf(c), fixed, extent).length === 0;
+}
+/** `legibleAt` over a position map, its extent the map's own. */
+function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
+  return legibleAt(c, (id) => pos.get(id), spanOf(pos));
+}
+
+/**
  * A SHAPE THE TOOL CREATED IS FITTED TO THE FIGURE IT JOINS before the figure is solved (#1647, ADR-AG-202).
  *
  * A tangency sentence with no circle creates one (ADR-AG-198 ruling b): an equation circle whose centre and
@@ -2309,6 +2357,11 @@ interface LineGroup {
   selectors: Selector[];
   /** Does a row of this line name a free vertex of an earlier line — is this line placed ON the figure as it stood? */
   onEarlier: boolean;
+  /**
+   * #2039 step 2 (ADR-AG-378): this line's rows name ONLY earlier vertices («AB = 5» after «משולש ABC») — the line
+   * introduces nothing, so it is met by moving the figure as it stood, latest-drawn points first (`fitLater`).
+   */
+  later?: true;
 }
 interface LineGroups {
   /** In line order; only the lines that own a row. Empty when the stage is off. */
@@ -2316,8 +2369,27 @@ interface LineGroups {
   /** The free vertices some row moves (they are among that row's latest-line vertices). */
   moved: ReadonlySet<Id>;
   on: boolean;
+  /**
+   * #2039 step 2 (ADR-AG-378, sr-27): per free vertex, the first line at which a row placed it BY VALUE — a stated length,
+   * angle, area, slope or coordinate names it. A later line moves such a vertex only when nothing else can meet it.
+   */
+  valuedAt: ReadonlyMap<Id, number>;
+  /** The vertices a row through a free symbol reaches — the joint solve's; no fit moves them. */
+  joint: ReadonlySet<Id>;
 }
-const NO_GROUPS: LineGroups = { groups: [], moved: new Set(), on: false };
+const NO_GROUPS: LineGroups = { groups: [], moved: new Set(), on: false, valuedAt: new Map(), joint: new Set() };
+
+/**
+ * Does this row place what it names BY VALUE (ADR-W-175 sr-27: *"coordinates or a stated length, angle or other
+ * magnitude"*)? A stated angle, area, slope, arc sum or coordinate; a length equation one side of which names no point
+ * («AB = 5», never «AB = AC»). A relation (∥, ⊥, «AB = AC», «M אמצע AB») places nothing by value.
+ */
+function placesByValue(c: Construction, k: Constraint): boolean {
+  if (k.t === 'angle' || k.t === 'area' || k.t === 'slope' || k.t === 'arc-sum' || k.t === 'coord') return true;
+  if (k.t !== 'length-eq') return false;
+  const known = new Set(c.objects.map((o) => o.id));
+  return !mentionsAny(k.left, known) || !mentionsAny(k.right, known);
+}
 const lineGroupsCache = new WeakMap<Construction, LineGroups>();
 function lineGroupsOf(c: Construction): LineGroups {
   const lines = c.objectLine;
@@ -2374,6 +2446,9 @@ function lineGroupsOf(c: Construction): LineGroups {
   };
   /** Per line, its rows with the vertices each moves, and whether it names an earlier line. */
   const byLine = new Map<number, Array<{ k: Constraint; ids: Id[]; onEarlier: boolean }>>();
+  /** #2039 step 2 (ADR-AG-378): per stating line, its rows that name only earlier vertices. */
+  const laterRows = new Map<number, Array<{ k: Constraint; all: Set<Id> }>>();
+  const valuedAt = new Map<Id, number>();
   const moved = new Set<Id>();
   /** The vertices a row through a symbol would move (its latest line's): the joint solve places them, so no group fits them. */
   const joint = new Set<Id>();
@@ -2388,6 +2463,20 @@ function lineGroupsOf(c: Construction): LineGroups {
       // provenance does not say which: it stays the joint solve's, and reaches every vertex it names, as before.
       for (const v of top.all) moved.add(v);
       for (const v of top.ids) joint.add(v);
+      continue;
+    }
+    const statedOn = c.rowLine?.get(k);
+    const byValue = placesByValue(c, k);
+    if (byValue) for (const v of top.all) valuedAt.set(v, Math.min(valuedAt.get(v) ?? Number.POSITIVE_INFINITY, statedOn ?? top.line));
+    if (statedOn !== undefined && statedOn > top.line) {
+      /*
+       * A ROW STATED AFTER EVERY POINT IT NAMES (#2039 step 2, ADR-AG-378): «AB = 5» after «משולש ABC». It is placed on
+       * the figure as it stood, by its own line. A relation reaches its points for ADR-AG-324's box as before; a VALUE
+       * does not (escalation point 3, 2026-10-31): the box a vertex was sampled in is kept when a later line adds a
+       * number, so the start does not move before any solve.
+       */
+      if (!byValue) for (const v of top.all) moved.add(v);
+      laterRows.set(statedOn, [...(laterRows.get(statedOn) ?? []), { k, all: top.all }]);
       continue;
     }
     for (const v of top.ids) moved.add(v);
@@ -2433,6 +2522,12 @@ function lineGroupsOf(c: Construction): LineGroups {
       for (const v of g.ids) groupOf.set(v, g);
     }
   }
+  // …and each line that names only earlier vertices, after that line's own new points (ADR-AG-378).
+  for (const [line, rows] of laterRows) {
+    const g: LineGroup = { line, ids: [], rows: rows.map((r) => r.k), selectors: [], onEarlier: true, later: true };
+    const at = groups.findIndex((q) => q.line > line);
+    groups.splice(at < 0 ? groups.length : at, 0, g);
+  }
   // A selector is judged with the last-fitted group among the points it moves.
   for (const sel of c.selectors) {
     const top = topOf(sel);
@@ -2441,7 +2536,7 @@ function lineGroupsOf(c: Construction): LineGroups {
     if (owners.length > 0) owners.reduce((p, q) => (groups.indexOf(q) > groups.indexOf(p) ? q : p)).selectors.push(sel);
   }
   const on = groups.some((g) => g.onEarlier);
-  const out: LineGroups = { groups: on ? groups : [], moved, on };
+  const out: LineGroups = { groups: on ? groups : [], moved, on, valuedAt, joint };
   lineGroupsCache.set(c, out);
   return out;
 }
@@ -2472,15 +2567,31 @@ function lineGroupsOf(c: Construction): LineGroups {
  * A start, never a verdict: the joint solve and the judge keep the last word.
  */
 function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
-  const { groups, on } = lineGroupsOf(c);
+  const lg = lineGroupsOf(c);
+  const { groups, on } = lg;
   if (!on) return;
   const scale = residualScale(c, env);
   // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
   const budget = openSymbols(c).length > 0 ? 40 : 120;
-  for (const g of groups) {
+  /** Once the figure as it stood cannot be replayed with its symbols held, no later line is fitted: the joint solve owns it. */
+  let laterOn = true;
+  for (const [gi, g] of groups.entries()) {
+    if (g.later) {
+      if (laterOn) laterOn = fitLater(c, env, seeded, lg, gi, scale, budget);
+      continue;
+    }
+    /*
+     * The unknowns: a line placed on the earlier figure moves its own points; a line that REPLAYS the earlier figure's
+     * solve (no row of it names an earlier line) is solved over the same vector stage one uses — every free vertex, the
+     * ones its rows do not reach held by zero columns — so the anchored step (#1182, ADR-AG-359) takes the same path and
+     * lands where the earlier figure's own stage one landed. That figure's vector holds the free vertices of the lines
+     * before the first line placed on it, so this one does too (a later point's start would change the step's scale).
+     */
+    const firstPlaced = Math.min(...groups.filter((q) => q.onEarlier).map((q) => q.line));
+    const unknowns = g.onEarlier ? g.ids : freeIds(c).filter((id) => g.ids.includes(id) || (c.objectLine?.[id] ?? Number.POSITIVE_INFINITY) < firstPlaced);
     const asMap = (x: number[]): Map<Id, Pt> => {
       const m = new Map(seeded);
-      g.ids.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      unknowns.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
       return m;
     };
     const residualsAt = (x: number[]): number[] => {
@@ -2555,10 +2666,32 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       // precision the figure is drawn at (measured: at the loop tolerance corpus 471's 2/4 drew F 6e-7 off E's x, where the
       // joint descent's overshoot had given 8e-9). The earlier figure's own solve, replayed here, is therefore finished a
       // little further than that figure ran it: it can differ by the loop tolerance (≤ 2.2e-7 measured), never visibly.
-      const x0 = g.ids.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
+      const x0 = unknowns.flatMap((id) => [m0.get(id)!.x, m0.get(id)!.y]);
       const iters = g.ids.length === 1 ? 60 : budget;
-      const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
+      // Anchored at the start as stage one is (#1182, ADR-AG-359): a line's replayed solve must land where the earlier
+      // figure's own stage one landed, and a new point lands on the member of its set nearest where it was seeded.
+      const tight = (anchored: number) => {
+        const solve = () => solveLM(x0, residualsAt, iters, anchored);
+        return g.onEarlier ? withToleranceFactor(TIGHT_TOLERANCE_FACTOR, solve) : solve();
+      };
+      let r = tight(x0.length);
+      /*
+       * STAGE ONE'S KEEP-TEST, at every fit (ADR-AG-359, ADR-W-175 sr-25): the anchored solution is kept only when it is
+       * admissible and legible; otherwise the plain step from the same start is the fit, as it was before the anchored step
+       * — so a replay lands where the earlier figure's stage one did, and a ring around a drawn circle is fitted to it
+       * instead of collapsing (#2512's «משולש ABC חוסם את מעגל O»: the nearest solution was a collapsed ring, and the joint
+       * solve then moved the circle).
+       */
+      const keeps = (q: SolveResult) => {
+        const pos = place(c, env, asMap(q.values));
+        return q.ok && admissible(pos) && legiblePositions(c, pos);
+      };
+      if (!keeps(r)) {
+        const plain = tight(0);
+        if (plain.ok && (!r.ok || keeps(plain) || !admissible(place(c, env, asMap(r.values))))) r = plain;
+      }
       if (!r.ok) continue;
+      if (g.onEarlier) r = finished(r, residualsAt);
       const m = asMap(r.values);
       if (!admissible(place(c, env, m))) {
         if (!onPoint && admissible(place(c, env, m), true)) onPoint = m;
@@ -2570,6 +2703,255 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
     }
     if (!took && onPoint && straightsOnly) for (const id of g.ids) seeded.set(id, onPoint.get(id)!);
   }
+}
+
+/**
+ * A LINE THAT NAMES ONLY THE FIGURE AS IT STOOD MOVES THE POINTS DRAWN LATEST (#2039 step 2,
+ * [ADR-AG-378](../../docs/06c-decisions-analytic.md#adr-ag-378); ADR-W-175 sr-27, operator 2026-11-02: *"an object placed
+ * by value stays exactly put; a free one moves as little as possible"*).
+ *
+ * «משולש ABC» · «AB = 5»: the row names A and B, both of line 0. Solved jointly it spread its correction over A and B
+ * (and through any relation, over every vertex); 2-D keeps the points it placed first and moves the last (measured at
+ * `63b3c117`: «AB = 5» moves B only, «זווית A = 50» and «AB = AC» move C only, «מלבן ABCD» + «AB = 6» keeps A).
+ *
+ * A LEXICOGRAPHIC fit, never a weighting (a weighted projection was measured ill-conditioned at "exactly put"'s ratio:
+ * the rectangle jumped 217, round #2645). The earlier free vertices are ordered latest-drawn first — by their line
+ * (`objectLine`), then by declaration order within it — with the vertices a row already placed BY VALUE last of all.
+ * The tiers are the prefixes of that order; the first tried is the narrowest that holds a point of every row the line
+ * leaves unmet (so «AB = 5» starts at {C, B}: C has no column in the row and stays exactly). Each tier is the anchored
+ * solve (ADR-AG-359) over its points, every other vertex held where the figure stood, every row fitted so far kept; the
+ * first that converges, keeps the selectors and rings, and is legible (sr-25) is taken. A wider tier runs only when the
+ * narrower one fails, so the common case is one solve, as the joint solve it replaces. With none, the line is left to
+ * the joint solve and the judge, which keep the last word (a contradiction is refused as before).
+ */
+/**
+ * A fit placed on the earlier figure is FINISHED past the tight tolerance (ADR-AG-378): the joint solve starts on it and stops at
+ * once, and the joint descent's own overshoot used to carry a determined figure far below the loop's bar (corpus 471's 5/5
+ * drew E at 1.4999995 instead of 1.5; «AB מקביל לציר ה-x» read a slope of −1e-9). A few plain steps from a point already on
+ * the set: they cannot move it by more than the tolerance it already met.
+ */
+function finished(r: SolveResult, residuals: (x: number[]) => number[]): SolveResult {
+  if (!r.ok) return r;
+  const p = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(r.values, residuals, 8)));
+  const cost = (x: number[]) => residuals(x).reduce((t, v) => t + v * v, 0);
+  return p.ok && cost(p.values) < cost(r.values) ? { ...r, values: p.values, worst: p.worst } : r;
+}
+
+function fitLater(
+  c: Construction,
+  env: Env,
+  seeded: Map<Id, Pt>,
+  lg: LineGroups,
+  gi: number,
+  scale: number,
+  budget: number,
+): boolean {
+  const g = lg.groups[gi];
+  const lines = c.objectLine ?? {};
+  const order = new Map(freeIds(c).map((id, i) => [id, i] as const));
+  const valued = (v: Id) => (lg.valuedAt.get(v) ?? Number.POSITIVE_INFINITY) < g.line;
+  const candidates = freeIds(c)
+    .filter((v) => (lines[v] ?? Number.POSITIVE_INFINITY) < g.line && seeded.has(v))
+    .sort((p, q) => Number(valued(p)) - Number(valued(q)) || lines[q] - lines[p] || order.get(q)! - order.get(p)!);
+  if (candidates.length === 0) return true;
+  // every row stated up to this line (a row through a symbol too, its symbol held at its sample as stage one holds it): a
+  // tier may move a point an earlier line placed, and that line's rows must still hold. A row naming a measure the figure
+  // has is its symbol's to meet (#2632), never a point's.
+  const labels = new Set(settledLabels(c).values());
+  const rows = c.constraints.filter((k) => !labels.has(k) && (c.rowLine?.get(k) ?? Number.NEGATIVE_INFINITY) <= g.line);
+  /*
+   * Every selector about the figure as it stood — all of whose free points an earlier line drew — judges a tier, whichever
+   * line stated it: a region names which root the student means («A מעל O» on corpus 471's 23/5), and a tier that lands on
+   * the other root hands the joint solve a start it cannot leave (its selector preference has no restart with parameters).
+   */
+  const knownIds = new Set(c.objects.map((o) => o.id));
+  const drawnBefore = (sel: Selector): boolean => {
+    let ok = true;
+    const walk = (x: unknown): void => {
+      if (!ok) return;
+      if (typeof x === 'string') {
+        if (knownIds.has(x)) for (const v of freeVerticesOf(c, x)) if (!((lines[v] ?? Number.POSITIVE_INFINITY) < g.line)) ok = false;
+      } else if (Array.isArray(x)) x.forEach(walk);
+      else if (x && typeof x === 'object') Object.values(x as Record<string, unknown>).forEach(walk);
+    };
+    walk(sel);
+    return ok;
+  };
+  const selectors = [...new Set([...lg.groups.slice(0, gi + 1).flatMap((q) => q.selectors), ...c.selectors.filter(drawnBefore)])];
+  const rowsAt = (ks: readonly Constraint[], m: Map<Id, Pt>): number[] => {
+    const pos = place(c, env, m);
+    const at = (id: Id) => pos.get(id) ?? null;
+    return ks.flatMap((k) => residual(k, at, env, curveAtOf(c, env, at), lineAtOf(c, env, at), scale) ?? [0]);
+  };
+  const tol = SOLVE_TOL;
+  const known = new Set(c.objects.map((o) => o.id));
+  const namesOf = (k: Constraint): Set<Id> => {
+    const out = new Set<Id>();
+    const walk = (x: unknown): void => {
+      if (typeof x === 'string') {
+        if (known.has(x)) for (const v of freeVerticesOf(c, x)) out.add(v);
+      } else if (Array.isArray(x)) x.forEach(walk);
+      else if (x && typeof x === 'object') Object.values(x as Record<string, unknown>).forEach(walk);
+    };
+    walk(k);
+    return out;
+  };
+  /*
+   * THE FIGURE AS IT STOOD is where the tiers start. Where an earlier line's rows were not fitted line by line (a row
+   * through a symbol is the joint solve's — a sector's arms on its circle of free radius), the start is not yet that
+   * figure: it is replayed first, as that figure's own stage one solved it — every earlier free vertex in the vector,
+   * anchored, its symbols held — so the tiers move the drawing the student saw, not the sample under it.
+   */
+  const earlier = rows.filter((k) => (c.rowLine?.get(k) ?? Number.NEGATIVE_INFINITY) < g.line);
+  const before = freeIds(c).filter((v) => (lines[v] ?? Number.POSITIVE_INFINITY) < g.line && seeded.has(v));
+  /** Stage one's own solve of `ks` over every earlier vertex: anchored, and the plain step where the bound rejects it. */
+  const replay = (ks: readonly Constraint[]): boolean => {
+    const asMap = (x: number[]): Map<Id, Pt> => {
+      const m = new Map(seeded);
+      before.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      return m;
+    };
+    const x0 = before.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
+    // at the TIGHT tolerance, as every fit placed on the figure (ADR-AG-348): the joint solve then starts on it and stops at
+    // once, so this is the precision the figure is drawn at
+    const solve = (anchored: number) => withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, (x) => rowsAt(ks, asMap(x)), budget, anchored));
+    let r = solve(x0.length);
+    // stage one's keep-test, as a replay group's (above)
+    if (r.ok && !legiblePositions(c, place(c, env, asMap(r.values)))) r = solve(0);
+    r = finished(r, (x) => rowsAt(ks, asMap(x)));
+    if (!r.ok) return false;
+    const m = asMap(r.values);
+    // a replay that collapses or crosses a ring is no figure the earlier lines drew: the joint solve keeps its own start
+    const pos = place(c, env, m);
+    if (ringFaultsOf(c, (id) => pos.get(id)).some(isHardRingFault)) return false;
+    for (const id of before) seeded.set(id, m.get(id)!);
+    return true;
+  };
+  /** A line fit either holds or leaves the start exactly as it found it — a half-done replay is no figure anyone drew. */
+  const before0 = new Map(seeded);
+  const undo = (): false => {
+    for (const [id, p] of before0) seeded.set(id, p);
+    return false;
+  };
+  // the figure as it stood cannot be drawn with its symbols held (stage two moved one): nothing later is fitted
+  if (rowsAt(earlier, seeded).some((r) => Math.abs(r) > tol) && !replay(earlier)) return undo();
+  const unmet = g.rows.filter((k) => rowsAt([k], seeded).some((r) => Math.abs(r) > tol));
+  if (unmet.length === 0) return true;
+  const reach = unmet.map(namesOf);
+  /*
+   * A RIDER FOLLOWS ITS CARRIER (2-D's point-on-object, ADR-AG-348's own rule): a point a line put on the segment or line
+   * through two earlier points («D על BC»), and that this line does not name, is no unknown of the tiers. It keeps its
+   * place ALONG the carrier — the same parameter t — wherever the tier moves the carrier's ends, exactly as 2-D
+   * evaluates a point-on-object after its parents; solved instead, a least-squares step spreads the line's correction
+   * over the rider's carrier (C moved for «AB = 5» on «משולש ABC · D על BC»). Its own row holds by construction.
+   */
+  const named = new Set(reach.flatMap((n) => [...n]));
+  const riders = new Map<Id, { k: Extract<Constraint, { t: 'on-line-2pt' }>; t: number }>();
+  const startPos = place(c, env, seeded);
+  for (const q of lg.groups.slice(0, gi)) {
+    if (q.later || !q.onEarlier || q.ids.length !== 1 || q.rows.length !== 1) continue;
+    const v = q.ids[0];
+    const k = q.rows[0];
+    if (k.t !== 'on-line-2pt' || k.id !== v || named.has(v)) continue;
+    const pa = startPos.get(k.a);
+    const pb = startPos.get(k.b);
+    const pv = startPos.get(v);
+    if (!pa || !pb || !pv) continue;
+    const len2 = (pb.x - pa.x) ** 2 + (pb.y - pa.y) ** 2;
+    if (!(len2 > 1e-12)) continue;
+    riders.set(v, { k, t: ((pv.x - pa.x) * (pb.x - pa.x) + (pv.y - pa.y) * (pb.y - pa.y)) / len2 });
+  }
+  const tierCandidates = candidates.filter((v) => !riders.has(v));
+  const tierRows = rows.filter((k) => !(k.t === 'on-line-2pt' && riders.get(k.id)?.k === k));
+  const follow = (m: Map<Id, Pt>): Map<Id, Pt> => {
+    if (riders.size === 0) return m;
+    for (const [v, { k, t }] of riders) {
+      const pos = place(c, env, m);
+      const pa = pos.get(k.a);
+      const pb = pos.get(k.b);
+      if (pa && pb) m.set(v, { x: pa.x + t * (pb.x - pa.x), y: pa.y + t * (pb.y - pa.y) });
+    }
+    return m;
+  };
+  let k0 = 1;
+  while (k0 < tierCandidates.length && !reach.every((names) => tierCandidates.slice(0, k0).some((v) => names.has(v)))) k0 += 1;
+  /** One tier's fit, solved once: its positions, or null when it does not converge, keep its rows or keep the selectors and rings. */
+  const fits = new Map<number, { m: Map<Id, Pt>; legible: boolean } | null>();
+  const tier = (k: number) => {
+    if (fits.has(k)) return fits.get(k)!;
+    const unknowns = tierCandidates.slice(0, k);
+    const asMap = (x: number[]): Map<Id, Pt> => {
+      const m = new Map(seeded);
+      unknowns.forEach((id, i) => m.set(id, { x: x[2 * i], y: x[2 * i + 1] }));
+      return m;
+    };
+    const x0 = unknowns.flatMap((id) => [seeded.get(id)!.x, seeded.get(id)!.y]);
+    const r = finished(withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, (x) => rowsAt(tierRows, asMap(x)), budget, x0.length)), (x) => rowsAt(tierRows, asMap(x)));
+    let out: { m: Map<Id, Pt>; legible: boolean } | null = null;
+    if (r.ok) {
+      const m = follow(asMap(r.values));
+      const pos = place(c, env, m);
+      // a rider re-placed on its carrier holds its own row; any OTHER row naming it must still hold
+      const holds = riders.size === 0 || !rowsAt(rows, m).some((x) => Math.abs(x) > tol);
+      if (
+        holds &&
+        !ringFaultsOf(c, (id) => pos.get(id)).some(isHardRingFault) &&
+        (selectors.length === 0 || failingSelectors({ ...c, selectors }, pos, env).length === 0)
+      )
+        out = { m, legible: legiblePositions(c, pos) };
+    }
+    fits.set(k, out);
+    return out;
+  };
+  /*
+   * The passes, in the order the rulings rank them: the free tiers whose drawing is legible (sr-25); then the free tiers
+   * as drawn, legible or not — a point placed by value is never moved for legibility (sr-25: "a stated value is always
+   * drawn as stated"; sr-27: it "stays exactly put"); only then the tiers that move a point placed by value.
+   */
+  const free = tierCandidates.filter((v) => !valued(v)).length;
+  const passes: Array<[number, number, boolean]> = [
+    [k0, free, true],
+    [k0, free, false],
+    [Math.max(k0, free + 1), tierCandidates.length, true],
+    [Math.max(k0, free + 1), tierCandidates.length, false],
+  ];
+  for (const [from, to, legibleOnly] of passes) {
+    for (let k = from; k <= to; k += 1) {
+      const f = tier(k);
+      if (!f || (legibleOnly && !f.legible)) continue;
+      for (const id of [...tierCandidates.slice(0, k), ...riders.keys()]) seeded.set(id, f.m.get(id)!);
+      return true;
+    }
+  }
+  /*
+   * No tier meets the line: it is solved as the joint solve would have solved it (its stage one, replayed), so the lines
+   * after it are fitted to the figure this one is drawn as — never to a sample no solve kept.
+   */
+  return replay(rows) || undo();
+}
+
+/** The free vertices an object is placed from (itself when free), through its parents — `lineGroupsOf`'s `deps`. */
+const freeVerticesCache = new WeakMap<Construction, Map<Id, Set<Id>>>();
+function freeVerticesOf(c: Construction, id: Id): ReadonlySet<Id> {
+  let deps = freeVerticesCache.get(c);
+  if (!deps) {
+    deps = new Map();
+    const known = new Set(c.objects.map((o) => o.id));
+    const idsIn = (value: unknown, out: Set<Id>): Set<Id> => {
+      if (typeof value === 'string') {
+        if (known.has(value)) out.add(value);
+      } else if (Array.isArray(value)) for (const v of value) idsIn(v, out);
+      else if (value && typeof value === 'object') for (const v of Object.values(value as Record<string, unknown>)) idsIn(v, out);
+      return out;
+    };
+    for (const o of c.objects) {
+      const mine = new Set<Id>(isFree(o) ? [o.id] : []);
+      for (const p of new Set([...objectDeps(o), ...idsIn({ ...o, id: '' }, new Set())])) for (const v of deps.get(p) ?? []) mine.add(v);
+      deps.set(o.id, mine);
+    }
+    freeVerticesCache.set(c, deps);
+  }
+  return deps.get(id) ?? new Set();
 }
 
 /**
@@ -2958,11 +3340,34 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * it does not solve C — so C keeps its box: otherwise the sentence moved C by changing where C starts.
    */
   const reachedIds = wideSpan !== span ? reachedByLine(c) : null;
+  /*
+   * #2039 step 2 (ADR-AG-378; the round-#2645 escalation's point 3): A VERTEX KEEPS THE BOX IT WAS DRAWN IN when a later
+   * line adds a number. The wide box is sized by the numbers stated up to the vertex's OWN line (`objectLine`, `rowLine`),
+   * so «PQ = 5» after «A(0,0) · B(12,0) · משולש PQR» does not re-seed R before any solve; a row stated later by VALUE
+   * does not count as reaching it either (`lineGroupsOf`). Without line provenance the box is the whole figure's, as before.
+   */
+  const lineOf = c.objectLine;
+  const rowLineOf = c.rowLine;
+  const boxAt = new Map<number, Span>();
+  const wideBoxOf = (id: Id): Span => {
+    const L = lineOf?.[id];
+    if (L === undefined || !rowLineOf) return wideSpan;
+    let box = boxAt.get(L);
+    if (!box) {
+      const upTo = 1.5 * statedScale(
+        c.objects.filter((o) => (lineOf?.[o.id] ?? Number.POSITIVE_INFINITY) <= L),
+        c.constraints.filter((k) => (rowLineOf.get(k) ?? Number.POSITIVE_INFINITY) <= L),
+      );
+      box = upTo > 6 ? searchSpan(c, env, Math.min(stated, upTo)) : span;
+      boxAt.set(L, box);
+    }
+    return box;
+  };
   const seeded = new Map<Id, Pt>(
     // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
     ids.map((id) => {
       const name = c.seedNames?.[id] ?? id;
-      const box = reachedIds && !reachedIds.has(id) ? wideSpan : span;
+      const box = reachedIds && !reachedIds.has(id) ? wideBoxOf(id) : span;
       return [id, { x: freeCoord(seed, name, 0, box), y: freeCoord(seed, name, 1, box) }];
     }),
   );
@@ -3428,6 +3833,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * solution found, the fallback is today's figure and the post-hoc judge still has the last word.
    */
   const ownFree = new Set(ids);
+  /** The free vertices lead the vector (`carrierSystem`); the parameters after them stay on the plain step (#1182). */
+  const anchorAt = (system: CarrierSystem): number => 2 * system.ids.length;
   const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
     c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
@@ -3574,16 +3981,29 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const open = solved.syms.filter((sym) => !named.labelled.has(sym)).length;
       const budget = open > 0 ? 40 : 120;
       const vertexStarts = open > 0 ? [starts[0]] : starts;
-      const first = solvePreferring(
-        vertexStarts.map((m) => stageOne.toVec(m)),
-        stageOne.residualsAt,
-        budget,
-        () => true,
-        (x) => selectorsHoldAt(stageOne, x),
-        // With parameters, stage one is only a question (see below) and stage two — where a parameter can
-        // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
-        (x) => (open > 0 ? [] : separatedFrom(stageOne, x)),
-      );
+      const near = solveLM(stageOne.toVec(starts[0]), stageOne.residualsAt, budget, anchorAt(stageOne));
+      // A start the anchored step could not bring home is still tried on the plain step (the multi-start below
+      // re-solves it first), so the anchored solve can never cost a figure the convergence it had.
+      // …and LEGIBLE (ADR-W-175 sr-25): the nearest solution to a random start can be a sliver — the cheapest way to make
+      // ∢ABC = 10° is to slide a vertex toward the apex (round #2645's pictures) — so a nearest solution the bound
+      // rejects is not drawn, and the solve the figure had before the anchored step is taken instead.
+      const kept = near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env) && legiblePositions(c, place(c, env, stageOne.positionsAt(near.values)));
+      // A start the anchored solve did not anchor (no free direction) and could not bring home is not re-run: the plain
+      // step from it is the same computation (#1874, "we cannot slow down anything"); its failure still counts as one.
+      const rest = !kept && !near.ok && near.anchored === false ? vertexStarts.slice(1) : vertexStarts;
+      const plain = kept || rest.length === 0
+        ? null
+        : solvePreferring(
+            rest.map((m) => stageOne.toVec(m)),
+            stageOne.residualsAt,
+            budget,
+            () => true,
+            (x) => selectorsHoldAt(stageOne, x),
+            // With parameters, stage one is only a question (see below) and stage two — where a parameter can
+            // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
+            (x) => (open > 0 ? [] : separatedFrom(stageOne, x)),
+          );
+      const first = kept || !plain ? near : !plain.ok && rest !== vertexStarts && near.worst < plain.worst ? { ...near, ok: false } : plain;
       firstEffort = stageOne.asMap(first.values);
       // …and each name nothing else reads is measured on the figure stage one found (#2632, ADR-AG-365).
       // A name whose measure there cannot be read (a collapsed side) leaves its row unmet: stage one is then no answer.
@@ -3881,9 +4301,29 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         const v = evalLengthExpr(le, atT, envT, lineAtT, curveAtOf(c, envT, atT));
         return v !== null && Math.abs(v) <= SATISFIED_EPS * Math.max(1, span) ** dim;
       };
+      /*
+       * …and an ANGLE whose arm has no length on the flat figure is not read there either (round #2678, the same rule as
+       * `vanishes` below): «משולש ישר-זווית ABC» · «זווית C ישרה» · «תיכון ליתר AC» flattens with B on C, where «∢C = 90°»
+       * has no ray CB, so its zero residual measures nothing — whether it then read as "held" depended on which start the
+       * solve came from.
+       */
+      const armless = (k: Constraint): boolean => {
+        const len = (u: Id, v: Id) => {
+          const p = atT(u);
+          const q = atT(v);
+          return p && q ? Math.hypot(p.x - q.x, p.y - q.y) : Number.POSITIVE_INFINITY;
+        };
+        // an arm shorter than the eye can see (the stacking ruler) carries no direction to measure the angle by
+        const floor = VISIBLE_FRACTION * Math.max(1, span);
+        if (k.t === 'perpendicular') return len(k.a, k.b) <= floor || len(k.c, k.d) <= floor;
+        if (k.t === 'angle') return len(k.at.v, k.at.a) <= floor || len(k.at.v, k.at.b) <= floor;
+        if (k.t === 'relation') return [k.u, k.v].some((d) => d.k === 'points' && len(d.a, d.b) <= floor);
+        return false;
+      };
       const heldFlat = c.constraints.every((k) => {
         const r = residual(k, atT, envT, curveAtOf(c, envT, atT), lineAtT, scaleT);
         if (r === null || !r.every((v) => Number.isFinite(v) && Math.abs(v) <= SATISFIED_EPS)) return false;
+        if (armless(k)) return false;
         if (k.t !== 'length-eq') return true;
         const dim = [...k.left.terms, ...k.right.terms].some((t) => t.kind === 'area') ? 2 : 1;
         return !(vanishes(k.left, dim) && vanishes(k.right, dim));
@@ -4400,11 +4840,19 @@ export function drawableAt(
    * givens genuinely force a tight wedge is still drawn (ADR-052 — a valid configuration must stay
    * reachable). It only decides which of several equally valid drawings is opened on.
    */
-  const spread = (f: Figure) =>
-    minInteriorAngleOf(c, (id) => {
+  /*
+   * …measured by sr-25's one legibility bound (ADR-W-175, operator 2026-11-02; ADR-AG-359): a FREE corner in
+   * [SPREAD_MIN_DEG, 165°] and no two vertices of a ring closer than 5 % of the figure. A corner the givens state is
+   * drawn as stated and not judged — so «∢ABC = 10» no longer makes every candidate "narrow", and the walk can still
+   * prefer the drawing whose free corners and sides read (#1733's configurations 2, 5 and 6).
+   */
+  const spread = (f: Figure) => {
+    const b = viewBox(f, 0);
+    return legibleAt(c, (id) => {
       const p = f.points.find((q) => q.id === id);
       return p ? { x: p.x, y: p.y } : undefined;
-    }) >= SPREAD_MIN_DEG;
+    }, Math.max(b.maxX - b.minX, b.maxY - b.minY));
+  };
   /**
    * …and, for the display callers, TWO DISTINCT NAMED POINTS ARE NEVER OPENED ON TOP OF EACH OTHER
    * (#1273, ADR-W-072 / ADR-AG-138 — operator ruling, 2026-09-20, T18: *"even if they do fall on the same
@@ -4732,6 +5180,40 @@ export function sameConfiguration(a: Figure, b: Figure): boolean {
       const x = pa[i].values[j];
       const y = pb[i].values[j];
       if (!(Math.abs(x - y) <= SAME_VALUE_EPS * Math.max(1, Math.abs(x), Math.abs(y)))) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * DO THESE TWO DRAWINGS READ AS ONE (ADR-W-175 sr-30, operator 2026-11-02: *"«הציגו תצורה אחרת» never repeats the
+ * drawing on screen while another valid one exists. A repeat is a bug. A numeric variety bar is the session's
+ * mechanism"*; [ADR-AG-379](../../docs/06c-decisions-analytic.md#adr-ag-379)).
+ *
+ * {@link sameConfiguration} asks whether two configurations are one SOLUTION (to the solver's noise); a student asks
+ * whether they are one PICTURE. The bar is where seeing stops — {@link VISIBLE_FRACTION} of the frame the drawing is
+ * shown in, the ruler that already decides when two points are drawn on top of each other (#1273, ADR-AG-181): every
+ * named point, every circle's centre and radius, every line's offset and every conic's size within it, every line's
+ * direction within the same fraction of a radian, and every parameter the figure uses within it relatively. Two figures
+ * that differ by more anywhere are two pictures. Only the button asks this; the knowledge gates keep
+ * `sameConfiguration` (a value that varies below the eye is still not known).
+ */
+export function looksTheSame(a: Figure, b: Figure): boolean {
+  const pa = signatureParts(a);
+  const pb = signatureParts(b);
+  if (pa.length !== pb.length) return false;
+  const box = viewBox(a, 0);
+  const near = Math.max(box.maxX - box.minX, box.maxY - box.minY, 1e-9) * VISIBLE_FRACTION;
+  for (let i = 0; i < pa.length; i += 1) {
+    const { label, values } = pa[i];
+    if (label !== pb[i].label || values.length !== pb[i].values.length) return false;
+    const line = label.endsWith(':line ');
+    const sym = label.endsWith('=');
+    for (let j = 0; j < values.length; j += 1) {
+      const x = values[j];
+      const y = pb[i].values[j];
+      const bar = sym ? VISIBLE_FRACTION * Math.max(1, Math.abs(x), Math.abs(y)) : line && j < 2 ? VISIBLE_FRACTION : near;
+      if (!(Math.abs(x - y) <= bar)) return false;
     }
   }
   return true;
