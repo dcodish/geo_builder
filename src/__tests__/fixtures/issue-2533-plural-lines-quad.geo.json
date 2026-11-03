@@ -1,0 +1,95 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-03T12:00:00.000Z",
+  "name": "issue-2533-plural-lines-quad",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מרובע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "M is the intersection of lines AB and CD",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "A",
+        "x": 0,
+        "y": 0,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "M is the intersection of lines AB and CD",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "B",
+        "x": 4,
+        "y": 3,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "M is the intersection of lines AB and CD",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "C",
+        "x": 4,
+        "y": 0,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "M is the intersection of lines AB and CD",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "D",
+        "x": 0,
+        "y": 3,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.5",
+      "utterance": "M is the intersection of lines AB and CD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-line-intersection",
+        "id": "M",
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    }
+  ]
+}

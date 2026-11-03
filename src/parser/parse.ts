@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -2200,8 +2200,9 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // — the crossing lies BEYOND the 2nd letter, ADR-054), or a "הישר"/infinite line (unconstrained). The old
   // code computed extension/line words UTTERANCE-GLOBALLY, so "המשך FO חותך את AC בנקודה E" stripped the
   // on-segment default from the BARE operand AC too — E landed past C, silently green.
-  const EXT_RE = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i;
-  const LINE_RE = /\bline\b|הישר|הקו|\bray\b|קרן/i;
+  // #2533 (ADR-774): both reference words come from the lexicon — the inline spelling missed every plural line noun.
+  const EXT_RE = rx(EXTENSION_REF);
+  const LINE_RE = rx(LINE_NOUN);
   const semOf = (span: string): 'bare' | 'ext' | 'line' =>
     EXT_RE.test(span) ? 'ext' : LINE_RE.test(span) ? 'line' : 'bare';
   // The text immediately BEFORE each operand pair (where its reference words live), located by walking the
