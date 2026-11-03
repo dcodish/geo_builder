@@ -18,6 +18,9 @@
  */
 import type { Id } from './types';
 
+/** The tool's own free symbol for one part of an object — `θ_<object>.<part>` (re-exported by `carriers.ts`, which documents it). */
+export const toolSymbol = (objectId: Id, part: string): string => `θ_${objectId}.${part}`;
+
 /** What a refusal may call an object — the noun family the locale renders (#1179). */
 export type RefKind = 'point' | 'line' | 'circle' | 'parabola' | 'ellipse' | 'curve';
 

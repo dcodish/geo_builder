@@ -45,7 +45,8 @@ function circleOf(pts: readonly { x: number; y: number }[]) {
 /** The locus as the ASK LANE computes it — the path the canvas actually draws from. */
 function tracedFor(lines: string[], seed: number, id: string) {
   const d = derive(lines, seed);
-  const res = locusOf(d.construction, id, [d.seed, d.seed + 1], d.box);
+  // #2039 (ADR-AG-358): the configuration DRAWN, as the ask lane traces it — a walk may have drawn a later one than `seed`
+  const res = locusOf(d.construction, id, [d.configuration, d.configuration.seed + 1], d.box);
   const pt = d.figure.points.find((q) => q.id === id);
   return { d, res, pt };
 }

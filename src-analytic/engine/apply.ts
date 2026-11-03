@@ -21,14 +21,14 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
 import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
-import { sameDerivation } from './sameDerivation';
+import { namesCurveFeature, sameDerivation } from './sameDerivation';
 import { isHelperId } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
-import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols } from './carriers';
+import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
@@ -51,6 +51,8 @@ import {
   namesObject,
   objectById,
   tangentLineId,
+  FIGURE_TANGENT_ID,
+  directionLineFacts,
   type ConicHost,
   type Construction,
   type Curve,
@@ -299,6 +301,11 @@ export interface HostRef {
    * sentence with a name in it («P על הפרבולה I»).
    */
   candidates?: string[];
+  /**
+   * Each candidate's OWN kind, parallel to `candidates`, when they differ (#2619 D, ADR-AG-362): «היא» on a figure with
+   * an ellipse and a parabola names each by its noun («האליפסה …, הפרבולה …»), never both by the host's.
+   */
+  kinds?: Array<'circle' | 'parabola' | 'ellipse'>;
 }
 
 export interface ApplyError {
@@ -422,7 +429,8 @@ function callable(o: GeoObject): string {
   if (o.kind === 'curve' && o.id.startsWith('curve-')) return o.label.eqSrc ?? '';
   if (o.kind === 'circle-thru' && o.name) return o.name;
   // A line built through a point (#1138): its name, or nothing a student could type for an unnamed one.
-  if (o.kind === 'line-at') return o.name ?? (o.id.startsWith('curve-') ? '' : statedName(o.id));
+  // An unnamed tangent's id (`tangent-A`) is the tool's address for it, not a name a student types (#2621 A, ADR-AG-368).
+  if (o.kind === 'line-at') return o.name ?? (o.id.startsWith('curve-') || isTangentObject(o) ? '' : statedName(o.id));
   return statedName(o.id);
 }
 
@@ -848,6 +856,9 @@ const PROBE_ENVS: Env[] = [
  * Lifted out of `on-kind` when «BD קוטר במעגל» needed the same question (#1324): a second copy that read
  * the declaration only missed «(x-3)^2+(y-4)^2=9» — measured — and treated the figure as circle-less.
  */
+/** The curves the feminine pronoun «היא» can stand for (#2619 D, ADR-AG-362): «אליפסה» and «פרבולה» are feminine nouns. */
+const FEM_CURVE_KINDS: ReadonlySet<string> = new Set(['ellipse', 'parabola']);
+
 export function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'circle-at' || o.kind === 'circle-thru') return 'circle';
   // A line CONSTRUCTED through a point is a line, however it was stated (#1501; the `on-curve`
@@ -2500,6 +2511,20 @@ function resolveLineRefs(c: Construction, f: Fact): Fact {
   return own === undefined ? out : ({ ...out, id: own } as Fact);
 }
 
+/**
+ * «המשיק» WITH NO TOUCH POINT, IN A SLOT THAT TAKES A LINE (#2621 A, [ADR-AG-368](../../docs/06c-decisions-analytic.md#adr-ag-368))
+ * — «שיפוע המשיק הוא -16/9», «נסמן את המשיק ב-l». The parser is context-free, so the operand reaches M1 as
+ * {@link FIGURE_TANGENT_ID}; here, once for every fact, it becomes the figure's ONE tangent object (the line built at a touch
+ * point, `isTangentObject` — the `on-kind` «המשיק» reading). None or several is that reading's refusal, never a pick.
+ */
+function resolveFigureTangent(c: Construction, f: Fact): { fact: Fact } | { error: ApplyError } {
+  const text = JSON.stringify(f);
+  if (!text.includes(FIGURE_TANGENT_ID)) return { fact: f };
+  const tangents = c.objects.filter(isTangentObject);
+  if (tangents.length !== 1) return { error: noHost(f.src, 'line', tangents) };
+  return { fact: JSON.parse(text.split(FIGURE_TANGENT_ID).join(tangents[0].id)) as Fact };
+}
+
 export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
   /*
    * A BOUND LETTER READS ITS VALUE (#2521, ADR-AG-332), in every fact and both orders: «רדיוס מעגל P הוא 9» · «R > r»
@@ -2507,7 +2532,9 @@ export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
    */
   const boundValue = f0.t === 'param' ? c.bound?.[f0.sym] : undefined;
   if (f0.t === 'param' && boundValue !== undefined) return judgeBoundParam(c, f0, boundValue);
-  const f = resolveLineRefs(c, readBound(c, f0));
+  const tangent = resolveFigureTangent(c, f0);
+  if ('error' in tangent) return { ok: false, error: tangent.error };
+  const f = resolveLineRefs(c, readBound(c, tangent.fact));
   const out = applyStatement(c, f);
   if (!out.ok || out.effect === 'known') return out;
   // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
@@ -3169,6 +3196,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           if (other === arriving) continue;
           const cap = maxCrossings(carrierKind(c, other), carrierKind(c, arriving));
           if (cap === null) continue;
+          // #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message"): two straights meet ONCE, so a second
+          // letter for their crossing is not an impossible extra crossing but the same point named again — forced onto
+          // the first. 2-D records it with «O ו-E נפלו על אותה נקודה.»; so does this tree (`app/coincidences.ts`). The
+          // count still refuses a line × conic's third crossing, which has its own ruled sentence (#1893).
+          if (cap === 1) continue;
           const named = c.objects.filter((o) => {
             if (o.id === subject) return false;
             const on = carriersOfPoint(c, o.id);
@@ -3433,6 +3465,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (prior) {
         if (prior.kind !== 'line-at') {
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+        }
+        /*
+         * A NAME FOR A LINE STATED AGAIN BY ITS OWN ID (#2621 A, ADR-AG-368): the tangent at A is `tangent-A` however it is
+         * named, so «l הוא המשיק למעגל בנקודה A» after the unnamed «המשיק למעגל בנקודה A» reaches here, not the twin arm
+         * below. The same verdict (`restatedLine`, ADR-AG-346): a new name for a drawn line is `line-exists`, a second name
+         * `already-named` — never a name silently dropped as «כבר ידוע».
+         */
+        if (f.name && f.name !== prior.name) {
+          const verdict = restatedLine(prior.name, false, prior.drawn !== false, f.name);
+          if (verdict === 'already-named') return { ok: false, error: { code: 'already-named', detail: f.src, holder: prior.name, holderKind: 'line' } };
+          if (verdict === 'line-exists') return { ok: false, error: { code: 'line-exists', detail: f.src, twin: prior.id, lineName: f.name } };
         }
         // A carrier line (`drawn: false`) stated AS A LINE is now drawn (#1620, ADR-AG-207) — the same object, upgraded.
         if (prior.drawn === false && f.drawn !== false) {
@@ -3851,7 +3894,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: lines[0].id }, src: f.src });
       }
       // «המשיק» — the one tangent OBJECT (#1619 B3): a line built at a touch point, never any line.
-      const matches = c.objects.filter((o) => (f.kind === 'tangent' ? isTangentObject(o) : curveKindOf(o) === f.kind));
+      const matches = c.objects.filter((o) =>
+        f.kind === 'tangent' ? isTangentObject(o) : f.pronoun ? FEM_CURVE_KINDS.has(curveKindOf(o) ?? '') : curveKindOf(o) === f.kind,
+      );
+      // «היא» (#2619 D, ADR-AG-362): several of ONE kind is that noun's refusal; of two kinds, each candidate keeps its noun.
+      if (f.pronoun && matches.length !== 1) {
+        const kinds = [...new Set(matches.map((o) => curveKindOf(o) as 'ellipse' | 'parabola'))];
+        if (kinds.length < 2) return { ok: false, error: noHost(f.src, kinds[0] ?? 'ellipse', matches) };
+        const error = noHost(f.src, 'ellipse', matches);
+        if (error.code === 'ambiguous-shape' && error.host?.candidates) error.host.kinds = matches.flatMap((o) => (callable(o) ? [curveKindOf(o) as 'ellipse' | 'parabola'] : []));
+        return { ok: false, error };
+      }
       /*
        * A POINT ON «המעגל» WITH NO CIRCLE: THE SENTENCE STATES IT (#1669 for a chord's end, ADR-AG-204; #1670 for every
        * incidence, ADR-AG-210 — operator 2026-10-02, "analytic should mimic 2d"). The tangency's create path (ADR-AG-198
@@ -4257,6 +4310,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return out.ok && minted && out.effect === 'known' ? { ...out, effect: 'created' } : out;
       }
       const tangentLines = (f.lines ?? []) as TangentLineRef[];
+      /*
+       * A NAMED LINE THE FIGURE DOES NOT HAVE, TANGENT AT A NAMED POINT (#2621 A, [ADR-AG-368](../../docs/06c-decisions-analytic.md#adr-ag-368))
+       * — «הישר l משיק למעגל בנקודה A» with no l: the sentence states the tangent AT A, named l (M1: new object vs existing).
+       * It was `unknown-reference` l. With l in the figure the sentence stays the statement about l, below.
+       */
+      const named = tangentLines.length === 1 && f.axes.length === 0 && f.at !== undefined && f.circleId === undefined ? tangentLines[0] : undefined;
+      if (named?.kind === 'curve' && named.id === lineIdOf(named.label) && !objectById(c, named.id) && !curveByName(c, named.label)) {
+        return applyFact(c, {
+          t: 'tangent-line-at',
+          at: f.at!,
+          ...(f.circle !== undefined ? { circle: f.circle } : {}),
+          ...(f.host ? { host: f.host } : {}),
+          name: named.label,
+          src: f.src,
+        });
+      }
       let host: GeoObject | undefined;
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
@@ -4484,7 +4553,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const lineAt = f.operand.find((g): g is Extract<Fact, { t: 'line-at' }> => g.t === 'line-at');
       const target = objectById(built.next, f.line) ?? (lineAt ? lineAtTwin(built.next, lineAt) : undefined);
       if (!target || target.kind !== 'line-at') return { ok: false, error: { code: 'not-handled', detail: f.src } };
-      const id = lineIdOf(f.name);
+      /*
+       * The tangent at A keeps its id (#2621 A, ADR-AG-368): `tangent-A` is how every tangent-noun reader addresses it («P על
+       * המשיק בנקודה A», «שיפוע המשיק בנקודה A», the ask lane), so only its name changes, and the name resolves by name
+       * (ADR-AG-317). Any other constructed line takes the name's id, as before.
+       */
+      const id = target.id === tangentLineId(target.through) ? target.id : lineIdOf(f.name);
       if (target.name === f.name) return built.effect === 'known' ? { ok: true, effect: 'known', next: c } : built;
       if (target.name) return { ok: false, error: { code: 'already-named', detail: f.src, holder: target.name, holderKind: 'line' } };
       const holder = curveByName(built.next, f.name) ?? objectById(built.next, id);
@@ -4503,6 +4577,20 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     /**
+     * «ישר המקביל לציר ה-x», «נתון ישר l המאונך לציר ה-x» — A LINE GIVEN BY ITS DIRECTION ALONE (#2621 B,
+     * [ADR-AG-367](../../docs/06c-decisions-analytic.md#adr-ag-367)). M1 decides new vs existing: a NAMED line the figure
+     * already has is the relation about it, exactly the sentence «הישר l מאונך לציר ה-x» was before. Otherwise the line
+     * is `x = c` or `y = c` over the tool's offset symbol — one free DOF the sampler moves (ADR-052) and a later given pins.
+     */
+    case 'direction-line': {
+      const held = objectById(c, f.id) ?? (f.name ? curveByName(c, f.name) : undefined);
+      if (held) {
+        return applyFact(c, { t: 'constraint', k: { t: 'relation', rel: f.rel, u: { k: 'curve', id: held.id }, v: { k: 'axis', axis: f.axis } }, src: f.src });
+      }
+      return applyAll(c, directionLineFacts(f));
+    }
+
+    /**
      * «המשיק למעגל בנקודה A» — the tangent line as an OBJECT (#1619 B3, ADR-AG-195). The circle is
      * resolved by the `tangent-of` chain; A lies on it, and the line through A is perpendicular to the
      * radius there — a `line-at` on the radius direction turned a quarter, 0 DOF, closed form.
@@ -4515,7 +4603,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!host.ok) return host;
       return applyAll(c, [
         { t: 'constraint', k: { t: 'on-curve', id: f.at, curve: host.o.id }, src: f.src },
-        { t: 'line-at', id: tangentLineId(f.at), through: f.at, dir: touchNormal(host.o, f.at), perp: true, src: f.src },
+        { t: 'line-at', id: tangentLineId(f.at), through: f.at, dir: touchNormal(host.o, f.at), perp: true, ...(f.name ? { name: f.name } : {}), src: f.src },
       ]);
     }
 
@@ -4808,6 +4896,43 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(c, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), ...(f.host ? { host: f.host } : {}), src: f.src });
       }
       return applyAll(c, f.facts);
+    }
+
+    /**
+     * A CIRCLE AND A CONIC (#2618 PR 2, ADR-AG-360 / ADR-AG-361). The circle arrives resolved (`circles-about` wrote its
+     * id over the slot: bound, stated on its letter, or drawn); the conic is the figure's one of that kind (`curveHost`).
+     */
+    case 'circle-conic': {
+      const circle = objectById(c, f.circle);
+      if (!circle || curveKindOf(circle) !== 'circle') return { ok: false, error: unknownRef(c, f.circle) };
+      const conic = curveHost(c, f.host, undefined, f.src);
+      if (!conic.ok) return conic;
+      /*
+       * THE TOUCH POINTS NAMED — «… בנקודה B», «… בנקודות B ו-D»: each point on both curves, the circle's radius there
+       * parallel to the conic's normal there (three rows `applyTouchAt` already reads, `touchNormal` on each curve). A
+       * point the figure already puts on a curve is not restated on it.
+       */
+      if (f.ats) {
+        const facts: Fact[] = f.ats.flatMap((at): Fact[] => [
+          ...[circle, conic.o].flatMap((o): Fact[] => (onCurveByConstruction(c, o, at) ? [] : [{ t: 'constraint', k: { t: 'on-curve', id: at, curve: o.id }, src: f.src }])),
+          { t: 'constraint', k: { t: 'relation', rel: 'parallel', u: touchNormal(circle, at), v: touchNormal(conic.o, at) }, src: f.src },
+        ]);
+        return applyAll(c, facts);
+      }
+      // The circle as a side of the relation — `tangent-circles`' reading: a centre point and its radius, or an equation.
+      const side: CircleSide | null = circle.kind === 'circle-at' ? { centre: circle.centre, r: circle.r } : circle.kind === 'curve' ? { circle: circle.id } : null;
+      if (!side) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      // The concentric circle is the ellipse's alone (ruling Q1); the parser reads it about no other conic.
+      if (f.fit && f.host !== 'ellipse') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      /*
+       * The touch parameter is the tool's own `θ_` symbol (ADR-AG-198's family: free, never a parameter row) spelled with
+       * no part, as a free line's direction is: it is an angle-like parameter on the conic, not a part of a created shape,
+       * so the created-shape fit (#1647) does not read it and the sampler draws it in angle units.
+       */
+      const rel: Extract<Constraint, { t: 'circle-conic' }>['rel'] = f.fit
+        ? { k: f.fit }
+        : { k: 'touch', s: { kind: 'sym', name: directionSymbol(`${circle.id}~touch~${conic.o.id}`) } };
+      return applyFact(c, { t: 'constraint', k: { t: 'circle-conic', circle: side, curve: conic.o.id, rel }, src: f.src });
     }
 
     case 'tangent-circles': {
@@ -5608,7 +5733,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
             },
           };
         }
-        if (holder) {
+        /*
+         * #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message") — a second letter for a point
+         * built FROM POINTS («N אמצע AB» after «M אמצע AB», a second centroid, orthocentre, diagonals' meet) is a new
+         * letter its definition forces onto a named point: 2-D records it, and the drawn figure says «M ו-N נפלו על אותה
+         * נקודה.» (`app/coincidences.ts`). It is minted as its own point, so the two letters sit on one dot and the
+         * notice reads them. A FEATURE OF A CURVE named twice (its centre, focus, a vertex of an ellipse, a touch point)
+         * is not that: it is one object with a second name, which 2-D answers as a rename (`centreAlreadyNamed`), so it
+         * keeps the refusal.
+         */
+        if (holder && namesCurveFeature(f.rule)) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(holder.id) } };
         }
       }

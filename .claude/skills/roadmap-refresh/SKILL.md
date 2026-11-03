@@ -37,6 +37,9 @@ or delete it.** A second refresh on the same day replaces that day's snapshot (p
 3. **Write.** One `batch`: `set` `state/issues` from `issues.json` (pinned to the version step 1's
    listing or an earlier read showed; read it if you have not) and `set` `snapshots/<date>` from
    `snapshot.json` (no pin when the doc is new), and `set` `history/open` from `history.json` (pinned to the version you read).
+3b. **Rounds.** `node scripts/round-metrics.mjs <scratch out-dir>` (about a minute), then `set`
+   `history/rounds` from its `rounds.json`, pinned. It feeds the "Fix rounds" panel: each round's
+   net change to the queue and the operator's time ([ADR-W-169](../../../docs/06w-decisions-workspace.md#adr-w-169)).
 4. **Transcribe answers.** `list` `decisions`. For each `status: "answered"`: post the ruling to its
    issue (`gh issue comment`, quoting his choice and his `note` verbatim, dated, saying it came from the
    page), then `update` the doc to `status: "recorded"` with `answer.github` = the comment URL. This

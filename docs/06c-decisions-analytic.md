@@ -4231,6 +4231,8 @@ this is the fourth escape of one class. Analytic lane 1147.
 
 ## ADR-AG-075 — A pair of curves has only so many crossings, and the bound is structural (#1114)
 
+> **⚠ Superseded in part** 2026-11-02 by [ADR-AG-372](#adr-ag-372): two straights meet once, so a second name for their crossing is that point named again — recorded with the notice, no longer `unsatisfiable`. The line × conic and conic × conic caps are unchanged.
+
 **Requirements:** none (internal). **Design:** none (internal).
 
 Split out of #1113 while fixing it. That issue made the two crossings of one line × conic pair land on
@@ -5024,6 +5026,8 @@ That is a false refusal on a satisfiable statement, and it is a **regression in 
 `issue-1201-point-line-residual.test.ts` (6) — **proven to fail without the fix**: restoring the three-argument call turns 5 of the 6 red. Analytic lane 89 files / 1397 tests green.
 
 ## ADR-AG-092 — One position, one name: the invariant lives at the FIGURE (#1153)
+
+> **⚠ Superseded in part** 2026-11-02 by [ADR-AG-372](#adr-ag-372) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): a second letter for a point built FROM POINTS (midpoint, a triangle's centres, the diagonals' meet, a foot, a regular-polygon vertex) is recorded with the notice. A curve's feature (centre, focus, ellipse point, touch points) named twice keeps this refusal (`namesCurveFeature`).
 
 **Requirements:** [02c](02c-requirements-analytic.md) **R98** (new). **Design:** [04c](04c-design-analytic.md) — *naming paths and the shared check*. **LADDER stage:** fact application, before the object is minted; no solve, display or gate change.
 
@@ -6701,6 +6705,8 @@ and, three rows above it in the same panel, `AD: (אין שיפוע) אנכי`. 
 **A visible side effect, and it is the honest one.** After two clicks on that figure the third ring is gone: both drawn crossings now carry points. Before, the first click threw its point to the far root and left the near crossing unclaimed, so the canvas kept offering a ring for a crossing that already had a letter somewhere else.
 
 ## ADR-AG-125 — analytic: a crossing that lands on an existing point BY POSITION (#1254)
+
+> **⚠ Superseded** 2026-11-02 by [ADR-AG-372](#adr-ag-372) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): a crossing the givens force onto a named point is recorded with the notice; the positional arm is retired. The structural member (#1175, two straights through a shared letter) is unchanged.
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1254 (bug, P2, `analytic`) · round #1280 · the analytic half of [ADR-W-066](06w-decisions-workspace.md#adr-w-066)
 **Requirements:** [02c](02c-requirements-analytic.md) · **Design:** [04c](04c-design-analytic.md)
@@ -11730,6 +11736,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Consequences.** `src-analytic/engine/apply.ts` (`oppositeRingEdges`, `ringParallelBase`, the `cevian-of` arm); `src-analytic/parser/catalogAnalytic.ts`; the lock; the two parity rows; docs 02c R103d, 04c. **Found, reported not fixed:** 2-D's `oppositeParallelBase` reads the figure's whole parallel list, so «משולש ABC» · «AB מקביל ל-DE» · «AF גובה» drops the triangle's height onto DE; and 2-D's «טרפז ABCD» · «E על BC» · «AE גובה» draws E on top of C and reports it green. (Both fixed in 2-D by [ADR-665](06-decisions.md#adr-665), which ports this ADR's ring bound and order.)
 ## ADR-AG-254 — A crossing forced onto a point the figure already has is refused whatever else is free: the PAIR's own freedom decides (#1938)
 
+> **⚠ Superseded** 2026-11-02 by [ADR-AG-372](#adr-ag-372): the verdict this ADR made independent of unrelated freedom is now "recorded, with the notice", still the same in every order; the arm that refused is retired.
+
 **Date:** 2026-10-10 · **Status:** accepted · P2, fix round #1959 (stream E); branch `fix/1938-crossing-gate`. **Amends** [ADR-AG-125](#adr-ag-125) / [ADR-AG-140](#adr-ag-140) (the positional coincidence arm's gate), the same amendment [ADR-AG-249](#adr-ag-249) made to the ring arm.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R60 (the crossing row: the pair's freedom decides, the forcing line is refused too, a separable crossing still records). · **Design:** [04c](04c-design-analytic.md), "A forced coincidence is refused; a configuration-dependent one is not".
@@ -14104,7 +14112,7 @@ Distinct triangles after «D על BC»: 17, as for the bare triangle. «מעגל
 - Fixture `issue-1687-point-on-side.analytic.json`.
 - Re-based, each measured: `issue-1999` (the altitude's line, as 2-D); `issue-2018` (the construction compared apart from `objectLine`); `issue-2512` (the seed-0 snapshot); `issue-1158-1166` (the 0 → 1 offer pair named as #2633's known gap).
 
-**Overlap.** #1182 (ADR-AG-347) anchors `solveLM` at its start, and is stacked on this branch: its anchored stage-one solve and this stage's group fits must solve the earlier figure the same way. #2039 (a given that constrains the drawn figure) builds its weighted anchoring on `objectLine`.
+**Overlap.** #1182 (its anchored step; escalated, branch `wip/1182-anchored-step-r2645`) anchors `solveLM` at its start, and is stacked on this branch: its anchored stage-one solve and this stage's group fits must solve the earlier figure the same way. #2039 (a given that constrains the drawn figure) builds its weighted anchoring on `objectLine`.
 
 ## ADR-AG-349 — Two lines that are one line in the figure have no crossing: the figure refuses the sentence and the locus walk ends there (#2613)
 
@@ -14353,7 +14361,7 @@ The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.tes
 5. **A line tangent to a conic, no touch point:** `tangent-curve` may name an ellipse or a parabola; its row is `conicTangencyRows`, the double-root condition of the straight's substitution, `(B² − 4AC)·|d|² / (A²·size²)` — signed, scale-free (the squared chord over the conic's squared size). `lineQuadratic` and `conicSize` move to a leaf module (`engine/lineQuadratic.ts`), re-exported by `crossing-order.ts`, so the solver reads the one substitution `conicMeet` and `touchPointOf` share without an import cycle. A straight parallel to a parabola's axis is a unit miss (ADR-AG-292: never a touch); a bounded segment keeps `t* = −B/2A` in [0, 1] as two hinge rows (#1503's rule). The freedom consumed is the line's, so «דרך P עובר משיק לאליפסה» is the free-direction line plus this row.
 6. **Diameter of the ellipse:** the existing general lowering (both ends on the curve, `distinct`, AB ∥ `radius(A)`), with `radius` on an ellipse read as its ray from the centre (the origin; canonical only). A's position stays a free DOF, so the diameter turns under «הציגו תצורה אחרת» (ruling Q3). The parabola's diameter sentence is left exactly as it was (`not-handled`, #2625).
 
-**Not this ADR:** a circle touching a conic and the circle inscribed in / around the ellipse (PR 2, ruling Q1 = A); the crossing dot at a touch (ADR-AG-356).
+**Not this ADR:** a circle touching a conic and the circle inscribed in / around the ellipse (PR 2, ruling Q1 = A: [ADR-AG-360](#adr-ag-360), [ADR-AG-361](#adr-ag-361)); the crossing dot at a touch (ADR-AG-356).
 
 **2-D (ADR-W-157):** conics are analytic-only (EXCEPTIONS X2). The one plane sentence added, «קודקודי … נמצאים על המעגל», is `not-handled` in 2-D; see Locks. 3-D: circles are X8.
 
@@ -14378,3 +14386,253 @@ The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.tes
 **Locks.** `issue-2618-conic-relations.test.ts`: one dot, no ordinal, at the touch point on the circle, the ellipse (p8-1, p8-3, p8-6) and the parabola, its sentence building at seeds 0–5, and after a tangency pinned k (p8-7); fixtures `ellipse-book-p8-1`, `-p8-3`, `-p8-6` (the student's own touch sentence records the point, within the solve's resolution of it). `conic-rings.test.ts`'s "a TANGENT offers nothing" becomes "a TANGENT offers ONE ring, whose click builds".
 
 **Behaviour change for a student:** a line that touches a circle, an ellipse or a parabola now shows one dot at the touch point; clicking it adds «A נקודת החיתוך של הישר … עם …».
+
+## ADR-AG-358 — The configuration drawn is the configuration recorded: a configuration names its box, the next line is solved from it, and «הציגו תצורה אחרת» never re-offers its sample (#2039 step 1, #2633, #1182)
+
+**Status:** accepted · 2026-10-31 · feature (P2, analytic) · fix round #2645 stream A · branch `feat/2039-1182-drawn-configuration` (PR #2650) · operator rulings: 2026-10-13 on #2039 (*"the outcome follows 2-D"*: a given that constrains the drawn figure resizes it in place), 2026-10-31 on #1182 (*"fix it"*: carry the DRAWN configuration in `Derivation`, the same root as #2039 step 1), #1166 (*"we need to give the user different options and not similar options"*, #2633's arming) · LADDER stage 6 (the configuration walk and its record; the analytic store's commit seams)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R206 (new) · **Design:** [04c](04c-design-analytic.md) § "The configuration drawn is the configuration recorded"
+
+**Re-measured at pickup** (`fb94d176`, `derive`, seeds 0–23, same seed before and after). #2039's table reproduces exactly: «משולש ABC» + «AB = 5» moved an earlier point by a median 1.17 / max 3.71 at the 16 seeds whose figure the display walk did not move, and by 10.05 / **16.93** at the 8 it did; «זווית A = 50» 9.07 / 12.88, «AB = AC» 8.10 / 15.03, «מלבן ABCD» + «AB = 6» 23.20 / 26.16. Solving the new line from the configuration the walk had landed on brought every walked row down to the unwalked range (0.56 / 1.97 for «AB = 5»).
+
+**Class.** *The configuration on the screen is not the configuration the session records.* `drawableAt` (display mode) walks from the stored seed s to the first configuration whose figure is whole, spread and separated; the store kept s. So the next line was solved from s — a configuration the student never saw — and a different triangle replaced the one on the screen. The same root, read by other consumers:
+- **#1176's promise through a walk** (#1182's round-#2627 escalation): the ask lane traced «המקום הגיאומטרי של P» at `Derivation.seed`, while the canvas drew the walk's landing — a circle that did not contain P.
+- **#2633**: a configuration is not a seed alone. ADR-AG-324 evaluates configuration 0's walk NARROW and every other configuration WIDE, so configuration 0 can draw raw seed 3 narrow and configuration 1 draws raw seed 3 wide: the first «הציגו תצורה אחרת» re-showed the triangle on the screen, bigger. And a store that adopted "seed 3" as a bare number would re-derive it wide and change the picture on the next line — the jump this removes (#2633's measured warning).
+
+**Decision.**
+1. **A configuration is `(seed, reach, wide)`** (`Configuration`, `Seed = number | Configuration`, `engine/evaluate.ts`). A number is that seed's canonical configuration (reach 1, wide iff not 0), which every caller named before. `evaluate` records which configuration each figure it computes is.
+2. **`drawableAt` reports the configuration it drew** (`drawnConfiguration`): the landed figure's own configuration when the walk landed on a PREFERRED figure — asked there, that figure is evaluated first and taken at once, so it is a fixed point — and otherwise the requested configuration, which draws the same figure by purity. A fallback tier the walk settled for is not adopted: re-asked from it, the walk would look further and could draw something else. No extra solve: the walk has already run.
+3. **`derive(lines, at)` takes a `Seed`** and carries `Derivation.configuration`. `Derivation.seed` stays the number asked for.
+4. **The submit chokepoint solves from the configuration drawn.** `decideSubmit`'s trial is `derive([...lines, line], current.configuration)`, and its `record` verdict carries the trial's configuration. `recordLine` / `recordLlmLines` record it in the same set as the line (one undo entry); `runFallback` chains it step by step. `anotherConfiguration` returns the configuration its candidate drew, and `goToSeed` records it. `restore` loads the saved one: `serialize` writes it, as a plain number whenever it is canonical (so every existing save and the undo slice hold exactly what they held), and `cleanSeed` accepts a number or a `{ seed, reach, wide }` with reach ∈ {1, 4, 16, 64}, else 0. Seams that keep the seed (a row deleted or edited, a mute, a rename) are declared `exempt` in the seam registry (ADR-W-053, `shell/__tests__/seam-registry.test.ts` §1b): the next commit solves from `current.configuration` whatever seed they left.
+5. **Questions read the configuration drawn**: `locusOf` takes `[Seed, number]`; the ask lane's locus and set-former trial, the locus chip and `unstatedChoices` read `d.configuration`.
+6. **#2633 — the same sample is the same configuration.** `drawnSampleOf(figure)` is the raw seed it sampled, its choice seed and its root, not its box or reach. `anotherConfiguration` skips a candidate that draws the sample on the screen before it compares pictures. No extra solves: the candidates were already derived.
+
+**Measured after** (same rows, the next line solved from `d.configuration`, seeds 0–23, this branch). Re-deriving at the drawn configuration is a fixed point at every seed of every row (0 failures). The walked seeds now jump no more than the unwalked ones — the configuration swap is gone, and what remains is the joint solve's own spread (layer 2): «משולש ABC» + «AB = 5» max 3.71 (was 16.93; C unmoved at 24/24, A and B both move), «AB = AC» 2.60 (15.03), «זווית A = 50» 2.42 (12.88), «D על BC» + «AB = 5» 3.71 (16.93), «גזרה AOB» + «זווית AOB = 60» 2.88 (6.16), «גזרה AOB» + «OA = 6» 4.80 (4.80), «מלבן ABCD» + «AB = 6» 47.35 (the unwalked seeds' own max at main). #2633: «משולש ABC · A(2,-5)»'s first press now goes to a triangle of another shape; seed 0's first picture is unchanged (B(0.46, −10.72), raw seed 3 narrow). #1176's lock is green again (P on its own circle at every seed).
+
+**Not done here.** (1) **#2039 step 2** (earlier points stay exactly put; escalated on #2039): built, measured and taken out — weights in the anchored step alone barely move the result, a post-convergence weighted projection costs Jacobians on every multi-vertex solve and made «מלבן ABCD» + «AB = 6» jump up to 217, and «זווית A = 50» and the sectors move earlier points because the new line's number widens ADR-AG-324's box (the START moves, outside the solve). (2) **#1182's anchored step** (the free point nearest its start) is NOT in this change: it changes #1733, #1622 E5, #2512 and #1463 in ways the operator has not seen, and waits on his picture ruling — branch `wip/1182-anchored-step-r2645`, escalation on #1182. So of #2039's *What the student will see*, the first line (no configuration swap) is delivered and the points-stay-put lines are not.
+
+**Locks.** `src-analytic/__tests__/issue-2039-drawn-configuration.test.ts` (fixed point at 24 seeds × #2039's rows, He and En; the box rides with the configuration; a walked seed jumps no more than an unwalked one; the operator's sector example; the record verdict and the store commit, one undo entry, undo / redo / save / load show the same picture; `cleanSeed`; #2633's class rows: no two successive offers share a sample, #1166's bar on the first press, seed 0's first picture unchanged). `issue-1158-1166-polygon-noun-validity.test.ts`: #2633's known gap dropped. `shell/__tests__/seam-registry.test.ts` §1b. Fixtures `issue-2039-sector-resize.analytic.json`, `issue-2633-same-sample-offer.analytic.json`. Re-typed for `Seed` (no assertion changed): the `anotherConfiguration` callers in eleven locks; `toMatchObject` for the five exact `lines`/`record` shapes that gained `configuration`; #1176's lock traces at `d.configuration` as the ask lane does.
+
+## ADR-AG-365 — A letter a row gives a measure the figure already has starts at that measure: naming a measure never moves the figure (#2632)
+
+**Status:** accepted · 2026-10-31 · bug (P2, analytic) · fix round #2645 · branch `fix/2632-letter-seed`, stacked on `feat/2039-1182-drawn-configuration` (PR #2650, ADR-AG-358) · plan armed 2026-10-31 (every *What the student will see* line `[2-D]`, measured at `fb94d176`) · amends [ADR-AG-144](#adr-ag-144) ("every parameter held at its sample") · LADDER: the solve's seeding, before stage one (ADR-AG-324's stage)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R213 (new) · **Design:** [04c](04c-design-analytic.md) § "A letter that names a measure starts at the measure"
+
+**Re-measured at pickup** (`a5eaf9e9`, PR #2650's tip; `derive`, seeds 0–23, the new line solved both at the same seed and from the configuration the earlier figure drew). Unchanged by PR #2650: «משולש ABC · נקודה M על BC» + «נסמן זוית BAM כ-A1» (and «כ-α») moved an earlier point at 24/24 seeds, worst 13.24 either way; «משולש ABC» + «נסמן זוית BAC כ-α» / «זווית A = α» 24/24, worst 15.86 (6.59 from the drawn configuration); «AB = a» 24/24, worst 8.66, He and En. 2-D at `fb94d176`: 0/24 on every row (the plan's measurement; 2-D is untouched by the stack).
+
+**Class and root cause.** Any row that equates a measure the figure already has with a symbol nothing has read before — «נסמן … כ-», «AB = a», «זווית A = α», «שטח המשולש ABC הוא S». The lowering is right (`∠BAM = ∠A1`, `|AB| = a`: a later row may use the letter). The seeding was wrong: `sampleEnv` sampled the symbol independently of the figure, stage one held it at that sample, and the vertices were moved until the measure equalled a random number. The row adds one unknown and one equation, so the figure is exactly as free; the solution that moves nothing existed, but the symbol did not start on it. Two neighbours of the same start made it worse and are part of the class: #1687's line fit left every vertex such a row names to the joint solve («M על BC» was no longer fitted to BC), and stage one's policy (one start, budget 40, no deflation) switched on merely because a symbol existed.
+
+**Decision.**
+1. **`labelRows(c)`** (`carriers.ts`): a symbol's first row is a NAME when that row reads only this symbol, no object reads it (`A(a,0)` is shaped by the value), no earlier row reads it, and its value is the bare symbol — an angle's value (degrees, tan, cos or sin), an area's value, or one side of a length equation whose other side is measures alone. Structural and memoized.
+2. **`labelsFromFigure`** (`evaluate.ts`, after the line fit and the created-shape fit, before stage one): each name's symbol takes its row's measure on the seeded figure; the row then holds before any solve. **A stated range wins**: a value outside the symbol's domain (the declaration narrowed by `impliedRange`), or one a stated comparison rejects («α < 30» is a selector), keeps the sample and the row is a real given, as before. A measure that cannot be read, or that does not make the row hold, keeps the sample too. One measure per symbol, no solve.
+3. **A name nothing else reads is not asked of stage one.** «משולש ABC · AB = 5» + «זווית A = α»: the seeded triangle does not yet hold AB = 5, so stage one solves the figure without the name's row — exactly the solve the figure without the name ran — and the symbol is measured on what it found. A letter another row reads («AB = a» · «AC = a») keeps its seeded measure and its row: the later row is a real given and is solved as before.
+4. **The structural stages read a name as met** (`settledLabels`: names whose symbol has no stated range): #1687's `lineGroupsOf` skips its row (it moves no vertex, so the line fit and ADR-AG-324's box are what they were without it), and the line fit's and stage one's budget/start policy counts only the symbols still open. A bounded symbol keeps the old structural treatment, because whether its row is a name is decided by the value.
+
+**Measured after** (this branch, the same rows, 24 seeds, from the drawn configuration): every row of the plan's table 0/24, earlier points move 0 (≤ 1e-9); with givens before the name — «AB = 5» + «זווית A = α», «AB = 5 · AC = 7» + «BC = a», «זווית A = 40» + «AB = a», «D על BC» + «AD = a», «מרובע ABCD · M מפגש AC ו-BD» + «נסמן זוית AMB כ-α», «שטח המשולש ABC הוא S» — 0/24 (all moved 24/24 before, worst 8.0–12.0). The letter equals the drawn measure at every seed. «הציגו תצורה אחרת» reaches at least as many configurations as the figure without the name, and the letter's value changes with them (ADR-052). Unchanged by design: «AB = a · AC = a» (the second row is a given) and #1622 E5 «α < 30 · משולש ABC · ∢ABC = α» (α stays under 30; the lock is green).
+
+**Siblings.** 2-D is the reference (0/24). 3-D: its length letter is a tie to a number the figure already owns (ADR-3D-384), not a sampled symbol, so there is no independent sample to seed; not ported. Complex: no coordinate-parameter sampler (ADR-AG-324's audit).
+
+**Locks.** `src-analytic/__tests__/issue-2632-symbol-from-figure.test.ts` (the table and the givens-prior rows, He + En, 24 seeds: earlier points ≤ 1e-9 and the letter equal to the measure; the button still varies the figure and the letter; «AB = a · AC = a» holds both rows; E5's stated range wins). Fixture `issue-2632-label-keeps-figure.analytic.json` (the operator's exact sequence). Green by path: #1622 E1–E5, #1176, #2426, #1687, #2039, #1473 perf budget, #1621 D2 / ratios-areas, #1343, #1733, #2031, #1888.
+
+## ADR-AG-360 — A circle touching the ellipse or the parabola: named touch points are three existing rows, an unnamed one is the tool's touch parameter on the conic (#2618 PR 2)
+
+**Status:** accepted · 2026-10-31 · feature (analytic) · fix round #2645 (stream B) · branch `feat/2618-ellipse-relations` · PR 2 of #2618 (PR 1: [ADR-AG-355](#adr-ag-355), [ADR-AG-356](#adr-ag-356)) · LADDER stage: none (a parse lowering plus one residual arm in the joint solve)
+
+**Operator:** 2026-10-30 in chat, on the ellipse sweep: *"now we need to build all capabilities"*. The plan's line "«המעגל משיק לאליפסה» and «המעגל משיק לאליפסה בנקודה B / בנקודות B ו-D» draw a circle touching the ellipse. With no point named, where it touches cycles under «הציגו תצורה אחרת»" is `[asked]`; its parabola twin is the class sibling, `[asked]` under the same ruling.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R208 (new) · **Design:** [04c](04c-design-analytic.md) § "A circle and a conic"
+
+**Re-measured at pickup** (`fb94d176`, after PR 1 merged; `parseLine` → `derive`, no model): «המעגל משיק לאליפסה», «המעגל משיק לאליפסה בנקודה B», «המעגל משיק לאליפסה בנקודות B ו-D», "the circle is tangent to the ellipse", «המעגל משיק לפרבולה» were each `not-handled`, as the plan's table said.
+
+**Root cause (the class).** The plan's: a relation between a CIRCLE and a curve was read only when the curve was a circle. PR 1 widened the line and polygon relations. The circle subject before a conic object fell through `parseCircleAt`'s conic branch (a circle subject is no line target), and no apply arm or residual related a circle to a conic.
+
+**Decision.**
+1. **Parse.** In `parseCircleAt`'s conic branch, a ONE-circle subject (contextual «המעגל», a centre letter, a numeral; no size, position or branch word) lowers to `circle-conic { circle: SLOT1, host, ats? }` inside `circles-about` over `oneCircleSlot`. That is the one resolver for «המעגל» / «מעגל M»: it binds the figure's one circle, states the circle on the letter, draws one when there is none, and asks when there are several (ADR-AG-196 / ADR-AG-198 / ADR-AG-219). Touch points the sentence names are declared; one named twice is `repeated-vertex`.
+2. **Named touch points** lower to three rows each, all existing: T on the circle, T on the conic (each skipped when T is on it by construction — p5-26's B and D are the ellipse's y-axis crossings), and the circle's radius at T ∥ the conic's normal at T (`touchNormal` on both curves, ADR-AG-355's direction).
+3. **No touch point** is a new constraint kind `circle-conic { circle: CircleSide, curve, rel: { k: 'touch', s } }`. `s` is the tool's own touch parameter (`θ_<circle>~touch~<conic>`, ADR-AG-198's family). It is spelled with no part, like a free line's direction, so the created-shape fit does not read it and it samples in angle units. P(s) is the conic's parametrisation: ellipse (a·cos s, b·sin s), parabola y² = 2px (p·s²/2, p·s). The rows are |C − P(s)| = r and (C − P(s)) ∥ the normal at P(s), each over the conic's size. Net −1 DOF; where it touches and from which side stay free (ADR-052).
+4. **Worst-case multiplier (docs/17 M3):** one extra symbol per sentence and two rows; no search, no choice.
+
+**Not this ADR:** the concentric circle (ADR-AG-361). A circle touching a conic with a branch word («מבחוץ»), a size tail («מעגל שרדיוסו 3 משיק לאליפסה») or two circle subjects is left `not-handled`, as it was: not asked.
+
+**2-D (ADR-W-157):** conics are analytic-only (EXCEPTIONS X2). 3-D: circles are X8.
+
+**Measured after.** Every pickup sentence records.
+- p5-26 ב typed line by line («B ו-D נקודות החיתוך של האליפסה עם ציר ה-y» · «נתון מעגל M» · «המעגל משיק לאליפסה בנקודות B ו-D») draws x²+y²=9 at seeds 0–5.
+- With no point named, the circle touches the ellipse and the parabola at every seed 0–5 (judged by an independent scan of the conic's normals), and the figure is whole at 24 of 24 seeds on both (the lock's floor is 20, ADR-AG-144).
+- **Perf (docs/17 §7)**, mean warm `derive` over seeds 0–5: p5-26 ב 7.4 ms; the free touch 1.2 ms (ellipse), 1.0 ms (parabola); p8-7 unchanged at 1.8 ms.
+
+**Locks.** `src-analytic/__tests__/issue-2618-circle-conic.test.ts`:
+- the readings (He and En, contextual and named, both conics);
+- the touch with no point on both conics in three spellings at seeds 0–5, moving between configurations, and the 24-seed whole-rate;
+- named points on both conics (on both curves, radius ∥ normal) and p5-26 ב's centre and radius;
+- the refusals (a point named twice; no ellipse is the existing contextual refusal); a size tail and a branch word stay `not-handled`.
+
+Fixture `src-analytic/__tests__/fixtures/ellipse-book-p5-26b.analytic.json` (typed line by line, every line records). Catalog: 3 rows (He + En), not featured.
+
+**Behaviour change for a student:** in analytic, «המעגל משיק לאליפסה» (or «לפרבולה») now draws a circle touching the curve. It touches at the points the sentence names or, with none named, somewhere that «הציגו תצורה אחרת» moves.
+
+## ADR-AG-361 — A circle inscribed in the ellipse, or around it, is the textbook's concentric circle (#2618 PR 2, ruling Q1 → A)
+
+**Status:** accepted · 2026-10-31 · feature (analytic) · fix round #2645 (stream B) · branch `feat/2618-ellipse-relations` · PR 2 of #2618 · LADDER stage: none
+
+**Operator:** ruling 2026-10-30 on #2618, Q1 → A: *«מעגל חסום באליפסה» / «האליפסה חסומה במעגל» / «המעגל חוסם את האליפסה» draw the textbook's figure: the concentric circle through the minor-axis vertices (inside) or the major-axis vertices (around).*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R209 (new) · **Design:** [04c](04c-design-analytic.md) § "A circle and a conic"
+
+**Re-measured at pickup** (`fb94d176`): «מעגל חסום באליפסה», «המעגל חסום באליפסה», «האליפסה חסומה במעגל», «המעגל חוסם את האליפסה», "the ellipse is inscribed in the circle" and "a circle is inscribed in the ellipse" were each `not-handled`.
+
+**Decision.**
+1. **Parse** (`parseCircleEllipseFit`, the last reader of `parseConicInscribed`). Each spelling is `circle-conic { circle: SLOT1, host: 'ellipse', fit }` over the one circle slot, as in ADR-AG-360. That is the plan's "created when no circle exists … otherwise bound to the one circle", with several circles asked about.
+   - Inside: «(נתון) (ה)מעגל (M) חסום באליפסה», «באליפסה חסום מעגל», «האליפסה חוסמת את המעגל», "a circle is inscribed in the ellipse", "the ellipse circumscribes the circle".
+   - Around: «האליפסה חסומה במעגל (M)», «במעגל חסומה האליפסה», «(ה)מעגל חוסם את האליפסה», "the ellipse is inscribed in a circle", "the circle circumscribes the ellipse".
+2. **The constraint** is `circle-conic { rel: { k: 'inscribed' | 'circumscribed' } }`: the centre at the ellipse's centre (the origin, canonical only) and r = the smaller / larger of |a|, |b|, as three rows over the ellipse's size. A tall ellipse (major axis on y) is handled by the same rows, and a parametric one gives r = min(a, b) in every configuration. A circle the figure already has of another size is `unsatisfiable` on the line.
+3. **The parabola has no centre:** «מעגל חסום בפרבולה» is not read (`not-handled`, as before). The apply arm refuses a fit on any conic but the ellipse by name.
+
+**Locks.** `issue-2618-circle-conic.test.ts`:
+- every spelling is one lowering per direction;
+- x²/25+y²/9=1 → r = 3 inside and 5 around, centred at the origin, seeds 0–5; x²/9+y²/16=1 → 3 and 4;
+- «נתון מעגל M» binds (M at the origin, r = 5); the parametric ellipse;
+- the refusals (a circle of another size; two circles; no ellipse).
+
+Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog: 2 rows (He + En), not featured. Perf: 1.0 ms per warm `derive`.
+
+**Behaviour change for a student:** in analytic, «מעגל חסום באליפסה» draws the circle through the ellipse's minor-axis vertices, and «האליפסה חסומה במעגל» the one through its major-axis vertices.
+
+## ADR-AG-362 — «היא» as the subject of the through-sentence is the figure's one ellipse or parabola; #2619's compound lines are scoped back by ADR-W-167 (#2619 parts C and D)
+
+**Date:** 2026-10-31 · **Status:** accepted · feature (analytic), fix round #2645 stream C, branch `feat/2619-ellipse-clauses`. Closes #2619 (parts A and B were [ADR-AG-354](#adr-ag-354)). LADDER stage: none (a parse lowering and M1's contextual resolver).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R210 (new); R203's sources line. · **Design:** [04c](04c-design-analytic.md) § "An ellipse's roles and sizes; the canonical curve with no equation" (the pronoun subject).
+
+**Operator rulings.** 2026-10-30 on #2619: *"now we need to build all capabilities"*. 2026-10-31, [ADR-W-167](06w-decisions-workspace.md#adr-w-167): *"moving forward we do not support cases of 2 inputs in a line and we teach this everytime the user tries"* — a plan that proposes reading a compound sentence is scoped back to its one-given rows.
+
+**Re-measured at pickup** (`fb94d176`, `decideSubmit` → `derive` → `ask`, no model). A and B had landed (ADR-AG-354). Still `not-handled`: «היא עוברת דרך הנקודה (3,√2)» after any ellipse (and after a parabola); every through-list («היא / האליפסה עוברת דרך הנקודות (3,√2) ו-(√6,-2)», «… דרך A ו-B», «המעגל עובר דרך הנקודות (3,4) ו-(0,5)»); every curve introduced inside a relation («הנקודה (3,1) נמצאת על אליפסה שציריה הם צירי השיעורים», «מעגל קנוני חותך את האליפסה בנקודה A …», «נתונה אליפסה קנונית שעוברת דרך B ו-D», p2-11's one-sentence form). Each of those compound lines' one-given rows already records («נתונה אליפסה שציריה הם צירי השיעורים» / «הנקודה (3,1) נמצאת על האליפסה»; «נתון מעגל קנוני» / «המעגל חותך את האליפסה בנקודה A» / «A ברביע הראשון»; «האליפסה עוברת דרך B» / «… D»).
+
+**Decision.**
+1. **The pronoun.** The through-converse reads «היא» as its subject and lowers «היא עוברת דרך P» onto «P על האליפסה», its `on-kind` fact marked `pronoun: 'fem'`. M1 resolves it as it resolves the noun, over the feminine curves (ellipse, parabola): one binds; none, or several of one kind, is that noun's refusal (`errHost.none.ellipse`, `errHost.named` / `errHost.many.*`); an ellipse and a parabola together are refused with `errHost.named`, each candidate under its own noun (`HostRef.kinds`). A circle is not a candidate. No new wording.
+2. **Not built, per ADR-W-167:** the through-list (plan class D's `POINT_LIST`) and the curve introduced inside a relation (plan class C's clause splitter). Both read two or more givens in one line. Their rows build, and are locked. Teaching the rows when a student types the compound line is [#2644](https://github.com/dcodish/geo_builder/issues/2644).
+3. **Not built, a narrowing of the plan:** «הוא» (a circle) and English "it". «הוא» competes with every line in the figure («ישר» is masculine too), and a line through two points is not an object M1's kind resolver counts, so «הוא» beside a line could bind the circle the student did not mean. "it" has no gender at all. Both wait for the operator (asked on #2619).
+
+**2-D (ADR-W-157 / ADR-W-118 B1):** conics are analytic-only (EXCEPTIONS X1/X2); the pronoun is read only about a conic. No parity row (the plan's row was for the through-list, not built).
+
+**Measured after.** p1-8 in the book's words, one point per row, answers x²/12 + y²/8 = 1; p2-11 answers x²/20 + y²/40 = 1; «היא» and «האליפסה» give the same ellipse at seeds 0–3; a parabola reads; a circle beside the ellipse does not compete; none / two ellipses / an ellipse and a parabola are refused as above; the compound lines stay `not-handled`.
+
+**Locks.** `src-analytic/__tests__/issue-2619-pronoun-subject.test.ts`; fixtures `ellipse-book-p1-8-2619`, `ellipse-book-p2-11-2619` (the book's «היא», one point per row), `ellipse-book-p4-24-2619` (p4-24 ג one given per row).
+
+**Behaviour change for a student:** in analytic, «היא עוברת דרך הנקודה …» after an ellipse or a parabola adds the point on it, as «האליפסה עוברת דרך …» does.
+
+## ADR-AG-367 — A line given by its direction alone is drawn with its offset free; the book's compound sentences are its rows (#2621 B)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream N, branch `feat/2621-line-tangent` (one PR with [ADR-AG-368](#adr-ag-368)). LADDER stage: none (a parse lowering and an M1 new-vs-existing arm; no solver change — the offset is one more free symbol in the register).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R216 (new). · **Design:** [04c](04c-design-analytic.md) § "A line given by its direction alone".
+
+**Operator rulings.** 2026-10-30 on #2621: *"now we need to build all capabilities"* (the ellipse sweep, items 2 and 3; plan 2621-B armed on his Q1/Q2 answers the same day). 2026-10-31, [ADR-W-167](06w-decisions-workspace.md#adr-w-167): *"moving forward we do not support cases of 2 inputs in a line and we teach this everytime the user tries"* — newer than the plan, and it scopes the plan's compound book lines back to their rows (below).
+
+**Re-measured at pickup** (`17f35282`, `decideSubmit` → `derive` → `ask`, no model). Exactly the plan's table: «ישר מאונך לציר ה-x», «ישר מקביל לציר ה-y», «ישר המקביל לציר ה-x חותך את האליפסה בנקודות P ו-Q», «ישר המקביל ל-AB חותך את המעגל בנקודות P ו-Q», «ישר l מקביל לציר ה-x וחותך את המעגל בנקודות P ו-Q» `bad-operand`; «נתון ישר l המאונך לציר ה-x», «נתון ישר l המקביל לציר ה-y» `not-handled`; «ישר l מאונך לציר ה-x» `unknown-reference` l; «הישר x=t» · «t > 0» records. **2-D, measured (not as the plan says):** «מעגל O» · «קטע AB» · «ישר המקביל ל-AB חותך את המעגל בנקודות P ו-Q» builds in 2-D at `17f35282`, but as `line-through sec-AB (A, B)` with P and Q on the line AB itself: 2-D drops «המקביל ל-» and draws no parallel. It is no template for a direction-only line, and analytic does not follow it there (the round's question; a 2-D finding).
+
+**Class.** A line stated by its DIRECTION alone (∥ or ⊥ to an axis, no point, no equation) has one free DOF, its offset, and no reader minted it: every line reader needed a point or an equation.
+
+**Decision.**
+1. **One fact, `direction-line { id, name?, rel, axis }`** (`parseDirectionLine`, ahead of the relation rule, which read «ישר» as an operand and answered «לא זיהיתי את אחד האגפים»). Hebrew «(נתון) ישר (l) (ה|ש)מקביל/מאונך לציר ה-x/y», English "a line / line l parallel/perpendicular to the x-axis". Unnamed only when indefinite: «הישר המקביל» stays the role reference (ADR-AG-341).
+2. **M1 decides new vs existing.** A named line the figure already has (by id or by name) gets the `relation` the sentence always lowered to — «נתון ישר l: y=3» · «ישר l מקביל לציר ה-x» is still known, and against y=2x+1 still `unsatisfiable`. Otherwise `directionLineFacts` states the `curve` `y - c` (∥ x, ⊥ y) or `x - c` over the tool's offset symbol `toolSymbol(id, 'c')`: a free DOF by use (the #1014 register), sampled (ADR-052, «הציגו תצורה אחרת» moves it), pinned by a later given; the panel prints no tool symbol (`readsToolSymbol`, #1659). `toolSymbol` moved to `names.ts` (re-exported by `carriers.ts`) so `types.ts` can lower the fact for `factsWithin` without an import cycle. An anonymous id hashes the sentence: two sentences are two lines.
+3. **One given per row (ADR-W-167), a narrowing of the plan.** The plan read the crossing tail («… חותך את האליפסה בנקודות P ו-Q») and the side clause («…, שעובר מימין לראשית הצירים») with the line. Each is a second given, so anything after the direction declines the sentence (it keeps today's answer). The rows already record and are locked: «נתון ישר l המקביל לציר ה-x» · «הישר l חותך את האליפסה בנקודות P ו-Q» (R85), and the side as «הישר l חותך את ציר ה-x בנקודה הנמצאת מימין לציר ה-y» (ADR-AG-313). Teaching the rows when the compound line is typed is #2644.
+4. **Not built: a direction given by a LINE** («ישר המקביל ל-AB …»). 2-D reads that sentence as AB itself (decision 1's measurement), so analytic drawing a parallel would differ from 2-D: a ruling, asked.
+
+**Sibling audit (docs/17 §1).** Grepped analytic's line readers (`THROUGH_*`, `RELATION_*`, `matchCurve`, `lineObject`): each needs a point or an equation; the free-direction line through a point (#1319) is the dual (point given, direction free). 3-D: lines are given by points or vectors, and there are no coordinate axes as operands in its line grammar — class not present. 2-D: no axes; its «ישר המקביל ל-AB» drops the relation (finding). Complex: no lines of this kind.
+
+**Measured after.** Every spelling records and draws one line, vertical or horizontal as stated at seeds 0–7, its offset different between seeds. The p2-15 rows answer what the two-point form answered (x²/64 + y²/48 = 1, or the y-major twin), 24/24 seeds. p6-2 ב's rows on illustrative curves (x²/25+y²/9=1, x²+y²=16, AB = 2√7): l is x − 3 = 0 and CD = 24/5, 24/24 seeds. **Perf (docs/17 §7)**, mean `derive` over seeds 0–5: p2-15 rows 99.5 ms against 68.1 ms for the two-point form; p6-2 ב rows 90.8 ms without the side row against 125.7 ms for «נתון ישר l: x=t» · «t > 0», and 466.8 ms with the axis-side row against 296.5 ms for that row on «x=t» (the selector's existing cost; no new sampling loop, M3 unchanged).
+
+**Locks.** `src-analytic/__tests__/issue-2621b-direction-line.test.ts` (every spelling He and En at 8 seeds; the crossing row; two sentences two lines; the side row and a contradicting given refused naming it; the compound lines not read; a named line's relation unchanged; the pinned offset; p2-15; «ישר המקביל ל-AB» left refused). Fixtures `ellipse-book-p2-15-2621` (the book's p2-15, one given per row) and `direction-line-p6-2b-2621` (p6-2 ב's rows on illustrative curves). Catalog: 2 rows (He + En).
+
+**Behaviour change for a student:** in analytic, «ישר המקביל לציר ה-x» and «נתון ישר l המאונך לציר ה-x» draw a line in a free position that «הציגו תצורה אחרת» moves; the crossings and the side are their own rows.
+
+## ADR-AG-368 — The drawn tangent is read in every slot that takes a line, and it can be named (#2621 A)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream N, branch `feat/2621-line-tangent` (one PR with [ADR-AG-367](#adr-ag-367)). LADDER stage: none (the parser's direction resolver, and the M1 boundary: a reference resolved at `applyFact`, `tangent-of`, `line-at`, `name-line-object`).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R217 (new). · **Design:** [04c](04c-design-analytic.md) § "The tangent as an operand, and named".
+
+**Operator rulings.** 2026-10-30 on #2621: *"now we need to build all capabilities"* (item 1, the book's p4-24 ג). T32, 2026-10-27 ([ADR-AG-346](#adr-ag-346)): a new name for a drawn line is refused with the naming sentence offered — it governs «l הוא המשיק …» after the unnamed tangent (the plan said "names"; the dated ruling wins).
+
+**Re-measured at pickup** (`17f35282`, no model). As the plan: «המשיק למעגל בנקודה A» records and the ask lane answers its equation; «שיפוע המשיק למעגל בנקודה A הוא …» and «שיפוע המשיק הוא …» `bad-operand`; «נסמן את המשיק ב-l» and «l הוא המשיק למעגל בנקודה A» `not-handled`; «הישר l משיק למעגל בנקודה A» with no l `unknown-reference` l.
+
+**Class.** A noun the ask lane resolves (the tangent, through `readTangentNoun`) was read by no fact rule's line slot: `direction()` — the one resolver for ∥, ⊥, the slope, its sign, a line through a point and the position words — never called it. One noun, two resolvers (#1148's class). And no sentence named a tangent.
+
+**Decision.**
+1. **`direction()` reads the tangent noun** through `readTangentNoun`. At a point it is the `tangentLineId(at)` curve, built by the sentence that names it, idempotently (the crossing rule's #1619 B3 precedent): the build rides `ClaimSink.lead`, which `claimed()` puts AHEAD of the statement. Bare, it is `FIGURE_TANGENT_ID`, which `resolveFigureTangent` (top of `applyFact`, once for every fact) replaces with the figure's one tangent object; none or several is the `on-kind` «המשיק» refusal (`noHost`). A bare noun narrowed by a circle or a conic, with no point, is not a direction.
+2. **Naming.** `parseNameLineObject` names the tangent («נסמן את המשיק (…) ב-l», «נסמן ב-l את המשיק», "denote the tangent by l"). `name-line-object` keeps the id `tangentLineId(through)` — every tangent-noun reader addresses the tangent by its point — and only the name changes; `l` resolves by name (`resolveLineRefs`, ADR-AG-317). A second name is `already-named`.
+3. **«l הוא המשיק למעגל בנקודה A»** (`parseNamedAsTangent`) is read as «הישר l משיק למעגל בנקודה A». In `tangent-of`, a named line the figure lacks with a touch point states `tangent-line-at { name }` — the tangent at A, named l. With l in the figure it stays the statement about l. This changes [ADR-AG-337](#adr-ag-337)'s refusal (a session decision, not a ruling): «l2 משיק למעגל O_1 בנקודה P» and its inverse «P נקודת ההשקה של l2 עם מעגל O_1» with no l2 were `unknown-reference` and now draw the tangent at P named l2; the #2553 lock is rewritten to that. After the unnamed tangent, `line-at` restated under its own id with a new name takes `restatedLine`'s verdict (`line-exists`), and `lineDescription` writes the tangent as «המשיק בנקודה A», so the offer «נסמן את המשיק בנקודה A ב-l» is pre-filled and records.
+4. **Found in round, same chokepoint:** with two tangents, the refusal listed the tool's ids («הישר tangent-A, הישר tangent-B») — for «P על המשיק» before this change too. `callable` now gives an unnamed tangent no name (as an anonymous line), so the refusal is the existing nameless wording. No new text.
+
+**Sibling audit.** Grepped every `direction(` caller (9) and every `readTangentNoun` caller: `footLineOf` and `incidenceOn` read the noun first (unchanged); the bisector caller needs a pair. 2-D: tangents are lines through named points and the slope sentence does not exist there — no parity row; 3-D and complex have no tangent noun.
+
+**Measured after.** On x²+y²=25 with A on the circle, «שיפוע המשיק למעגל בנקודה A הוא -3/4» puts A where the tangent's slope is −3/4 at seeds 0–7. The five spellings (at the point, bare, «בנקודה A», English, «שיפוע l» after naming) give one `slope` on `tangent-A`. p4-24 ג (the #2619 rows plus «שיפוע המשיק למעגל בנקודה A הוא -16/9») answers A = (16/5, 9/5), 24/24 seeds, mean `derive` 23.2 ms (seeds 0–5) against 48.1 ms for the rows without the slope (the slope fixes A, so the solve has less to search).
+
+**Locks.** `src-analytic/__tests__/issue-2621a-tangent-ref.test.ts` (every spelling; ∥, the sign, a line through a point; none / two tangents refused without a tool id; four naming spellings, one line, the ask unchanged; a second name; the named statement with no tangent; the `line-exists` offer recording; a named line the figure has; p4-24 ג). Fixture `ellipse-book-p4-24c-2621`. `issue-2553-unnamed-common-tangent.test.ts`'s refusal case rewritten (above). Catalog: 3 rows (He + En).
+
+**Behaviour change for a student:** in analytic, «שיפוע המשיק …», «נסמן את המשיק ב-l» and «l הוא המשיק למעגל בנקודה A» act on the drawn tangent; a refusal about «המשיק» with two tangents no longer shows «tangent-A».
+
+## ADR-AG-366 — Two letters the drawing puts on one dot get 2-D's notice (#1595, #2401)
+
+> **Amended** 2026-11-02 by [ADR-AG-372](#adr-ag-372): the "kept refusal" of a NEW name defined onto a point already there (#1254, #1153) is now the same notice, per the 2026-11-02 ruling.
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (P2, analytic), fix round #2665 stream T, branch `feat/1595-coincidence-notice`. Operator ruling 2026-09-30 (#1595, playing round #1571 T23 in this tree). Covers #2401 (merged into #1595, 2026-11-01). The cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176). LADDER stage: none (a read of the drawn figure).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R214 (new) · **Design:** [04c](04c-design-analytic.md) § "The configuration search: validity, then preference" (the notice after it).
+
+**Context.** Measured at `17f35282` (`decideSubmit` → `derive`): #1571 T23 «V(0,0) · X(4,0) · Y נמצאת על הישר y=x · שיעור ה-x של Y הוא 0» records Y on V; #2401 «N1(1,1) · N2(1,1) · קטע N1N2» draws a zero-length segment; «משולש ABC · AB=4 · D על AB · AD=4» puts D on B. No message in any. «N אמצע AB» after «M אמצע AB» is refused `already-named` (the #1254 rule) and stays so.
+
+**Decision.** `app/coincidences.ts` `coincidencesOf(d)`: the pairs of `d.figure.points` at one place, at `crossings.apart` (the identity tolerance `pointAt` uses, ADR-AG-021), through `shell/converge`. Not `stackedPairs` (the 1% display ruler of #1526): that one asks "would a student see them stacked", and the sentence says they ARE one point. The App memoises it on the drawn derivation and renders `convergeText` as an ⓘ `Banner kind="notice"` after the narrowing notes. The separation preference (#1526, ADR-AG-181) runs first, so an unforced pair is drawn apart and gets nothing.
+
+**Sibling audit.** 2-D is the reference (ADR-123). 3-D and complex: same item, ADR-3D-404 and ADR-CX-086.
+
+**Behaviour change for a student:** a line whose givens put two letters on one dot still records, and «V ו-Y נפלו על אותה נקודה.» now shows while the drawing has the pair.
+
+## ADR-AG-372 — A new letter its definition forces onto a named point records, with the notice (#1595, #2631)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic) · PR #2666, branch `feat/1595-coincidence-notice` · operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"* · cross-builder record [ADR-W-177](06w-decisions-workspace.md#adr-w-177) · **Supersedes** [ADR-AG-125](#adr-ag-125), [ADR-AG-254](#adr-ag-254) · **Supersedes in part** [ADR-AG-092](#adr-ag-092), [ADR-AG-075](#adr-ag-075) · **Amends** [ADR-AG-366](#adr-ag-366). LADDER stage: none (verdict arms in M1 and `derive`; two START/preference changes in `evaluate`, no new solve).
+**Requirements:** [02c](02c-requirements-analytic.md) R60 (rewritten), R98 (rewritten), R214 (extended) · **Design:** [04c](04c-design-analytic.md) § *A forced coincidence is recorded with the notice*, the line-by-line start, *The configuration search* (`wholeSpread`) and the notice's floor.
+
+**Context.** Measured at the merge of `origin/main` (`decideSubmit` → `derive`, seeds 0–23): four refusals of one class, each a new letter forced onto a named point that 2-D accepts with its notice (ADR-W-177's table): the #1153 arm (`already-named`: «N אמצע AB», a second centroid / orthocentre / incentre / circumcentre / diagonals' meet); the #1254 arm (`crossing-already-named`: #2631, the medians' H on G, «P נקודת החיתוך של הישר AE עם הישר BC» on B, a second «הראשונה»); #1114's count (`unsatisfiable` for a second name of a straight × straight crossing); and #1113's sibling rule (`crossing-distinct` demanding the other root of a pair that has one).
+
+**Decision.**
+1. **`apply.ts`, the #1153 arm:** a same-derivation holder refuses only when `namesCurveFeature(rule)` (`sameDerivation.ts`, exhaustive): circle-centre, parabola-focus, ellipse-point, touch-point, side-touch. Every rule built from points mints its own point. The #2583 helper rename is unchanged.
+2. **`derive.ts`, the #1254 positional arm is retired** (not bypassed). The parser's structural `crossing-already-named` (#1175) and ADR-AG-349's one-line pair stay.
+3. **`apply.ts`, the crossing cap:** `maxCrossings` 1 (two straights) no longer refuses; the line × conic and conic × conic caps stand (#1893's sentence).
+4. **`evaluate.ts` `crossingPartners`:** a straight × straight crossing has no partner, so `crossing-distinct` holds on a second name of it.
+5. **Stability, measured and kept (standing rule: adding a constraint never makes the figure jump).** With 1–4 alone #2631 recorded but moved the triangle (A by 8.6 at seed 0, 6.4 at seed 3). Two causes, both in the old arm's shadow: `fitLineByLine` never took a fit ON another point ("the coincidence the verdict owns"), so the joint solve spread E's correction onto the triangle; and `drawableAt`, finding no separated candidate, fell to the first whole one and dropped the spread preference that had chosen the drawing. Now an on-point fit is kept and taken when no start gives one apart — only for a group whose incidences are all straights (a line touching a conic there is a double root, and starting on it blinded the rank read #1932's tangent arm judges by: «P על הישר l1» lost its refusal at seed 1) — and a `wholeSpread` tier sits between the separated tiers and `wholeFallback`. A separated configuration still wins wherever one exists (ADR-W-072 unchanged). Measured after: A, B, C, M unmoved at seeds 0–23.
+6. **`app/coincidences.ts`:** the identity ruler is floored at `SOLVE_TOL · 10` (the retired arm's own floor, #1276), so «A(0,0)» · two equation lines through it · their crossing P — a figure with no span — is said.
+
+**Measured after.** Each row above records with the notice at seeds 0–23 where run; «AB ו-BC נחתכים בנקודה D» and «P נקודת החיתוך של הישר AB עם הישר BC» still refused naming B; «P מרכז המעגל I» · «O מרכז המעגל I» still refused naming P.
+
+**Locks (re-read and flipped, each citing the ruling).** `issue-1114-crossing-cap`, `issue-1153-one-position-one-name`, `issue-1254-positional-coincidence`, `issue-1268-crossing-ordinal`, `issue-1416-conic-root-order`, `issue-1423-reused-letter`, `issue-1620-perpendiculars`, `issue-1620-tool-letters`, `issue-1715-meet-frame` (#2631's exact lines: records, «M ו-E נפלו על אותה נקודה.», the triangle unmoved and not isosceles), `issue-1727-perpendicular-builds`, `issue-1917-other-crossing`, `issue-1924-tangent-no-second-crossing`, `issue-1932-tangent-conics`, `issue-1938-coincidence-own-freedom`, `issue-2583-2584-restated-lines`, `converge-1595` (the ruling's rows, and the two kept refusals).
+
+**Found, not decided.** 2-D renames a TOOL letter to the student's («תיכון מ-A …» · «D אמצע BC»); analytic keeps M and says «M ו-D נפלו על אותה נקודה.». Reported on #1595.
+
+**Behaviour change for a student:** in analytic, «N אמצע AB» after «M אמצע AB», a crossing the givens put on a named point (#2631: «… נפגשים בנקודה E» on M), and a second name for one crossing of two lines are accepted with «M ו-N נפלו על אותה נקודה.» instead of refused.
+
+## ADR-AG-371 — The book's «מעבירים ישר l1 ש…» is taught as the named-line sentence; «הן נקודות על … בהתאמה» is the location sentence (#2620 C)
+
+**Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream K, branch `feat/2620-book-locus-ask`. #2620 work item C. LADDER stage: none (the construction register and a parse lowering).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R219 (new). · **Design:** [04c](04c-design-analytic.md) § "The exam's construction register".
+
+**Operator ruling.** 2026-10-30 on #2620: *"now we need to build all capabilities"*: «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (the existing teach card), and «A ו-B הן נקודות על … בהתאמה» builds — both `[asked]`.
+
+**Re-measured at pickup** (`17f35282`): «דרך N מעבירים ישר l1 שמקביל ל-PO», «דרך P מעבירים ישר l2 שמקביל לציר ה-x» and «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» were `not-handled`; their plan workarounds recorded. 2-D (`run-sequence --app 2d`) builds «D ו-E הן נקודות על AB ועל AC בהתאמה» and «דרך C מעבירים ישר שמקביל ל-AB».
+
+**Decision.**
+1. **The «ש» relative clause.** `constructionCandidates`' `predicate` reads «ש» + a participle at the HEAD of the object's rest as «ה» + the participle (`SHE_RELATIVE`, the same closed list). Only at the head: the perpendicular's «… לציר ה-x שחותך אותו בנקודה N» keeps its taught sentence.
+2. **A line's own name.** After «ישר» the register reads a line name (`l`/`ℓ` and one digit, `LINE_LABEL_AFTER_NOUN`). Through a point, the lesson is the named-line sentence «דרך N עובר ישר l1 <predicate>», the anchor as the student wrote it («דרך הנקודה P …» stays). The verbs are the register's own (`מעבירים`, `העבירו`, …); none is added.
+3. **The copula with its noun.** `distributeClauses` reads «הן / הם» and «נקודות» before «על» as the location sentence («A ו-B (הן) נקודות על … בהתאמה» ≡ «A ו-B נמצאות על … בהתאמה»), and "A and B are points on … respectively" in English.
+
+**2-D (ADR-W-157 / ADR-W-118 B1):** 2-D already builds the copula sentence; parity row `respectively-copula-2620`. 3-D does not read it (`not-handled`): an unscheduled cell (ADR-W-170), not ported here because the plan did not judge the 3-D port. The named-line lesson is X4 (2-D names no line). That analytic TEACHES the exam's imperatives where 2-D builds them is ADR-AG-206's, unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-2620-book-construction.test.ts`; fixture `ellipse-book-p9-7-2620` (p9-7's construction in the book's «… הן נקודות על … בהתאמה»).
+
+**Item B withdrawn before merge.** This PR first also carried #2620 B, a locus subject described inside the ask («המקום הגיאומטרי של מפגש הישרים l1 ו-l2», «… של כל הנקודות ש…»). The operator ruled it out on 2026-11-02: *"we should not have these long sentences because they will easily break with slight syntax changes"* and *"we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."* (the typed-ask withdrawal is #2673). B never shipped; its ADR number (370) and requirement (R218) are unused.
+
+**Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
+

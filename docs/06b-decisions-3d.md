@@ -5744,6 +5744,8 @@ suppressed), both controls, the no-flood cube, the adjacent non-⟂ pair, the ve
 
 ## ADR-3D-183 — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED: affirm the geometry, refuse the name (#769; operator ruling 2026-08-25)
 
+> **⚠ Superseded in part** 2026-11-02 by [ADR-3D-405](#adr-3d-405) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): a derived letter its definition forces onto a named point now RECORDS, with the «X ו-Y נפלו על אותה נקודה.» notice («F אמצע AB» after «E אמצע AB», a foot on a vertex). `point-coincides` keeps only 2-D's structural member — a crossing whose two carriers are written through the point, which is this ADR's own «G נקודת חיתוך של AC' עם מישור ADE».
+
 **2026-08-30 · round #822.** Surfaced while building #755/#756: «תיבה ABCDA'B'C'D'», «E אמצע BB'»,
 «מישור ADE», then the operator's own line «G נקודת חיתוך של AC' עם מישור ADE» — built green and placed
 G at (0,0,0), on top of A. A is one of the three points that DEFINE plane ADE, so the crossing of AC'
@@ -14253,3 +14255,31 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/issue-2630-solid-floor.test.ts`: the six measured rows at seeds 0, 1, 2, 3 and 7. Each asserts base[0] at the origin, the first edge on +x, the base at z = 0, the apex or top above, the stated lengths exact, and that the shape still varies. Two more cases: the component given with no solid, and the #794 prism keeping AB = (1,2,3). `issue-1421-gauge.test.ts` is green, unchanged except one test title, which claimed solids were never normalised.
 
 **Consequences.** `src3d/engine/evaluate.ts` (`solidFloorFrame3`, `orientationStated3`, the gate, `Resolve3Opts.solvedFrame`, `knowledgeSamples3`), `src3d/engine/baseShapes.ts` (`baseRingOf`, moved from `apply.ts`).
+
+## ADR-3D-404 — Two letters the drawing puts on one dot get 2-D's notice (#1595)
+
+> **Amended** 2026-11-02 by [ADR-3D-405](#adr-3d-405): the "unchanged refusal" of a NEW derived letter on an existing point is narrowed to the structural member; the rest records with this notice.
+
+**Status:** accepted · 2026-11-02 · feature (P2, 3-D) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · operator rulings 2026-09-30 (#1595) and 2026-10-30 (PR #2605 T34) · the cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-17 (new) · **Design:** [04b](04b-design-3d.md) § *A declared shape the drawing no longer is* (the «same point» notice) · **LADDER stage:** none (a read of the drawn figure).
+
+**Context.** Measured at `17f35282` (`decideDeterministic3` → `derive3`): «A(0,0,0) · B(2,0,0) · M אמצע AB · N(1,0,0)» records with N on M; the T34 row «מקבילון ABCDA'B'C'D' · AK = AD» records K by the vector equation (`vec-defined`) on D at seeds 0–7; «משולש ABC · D על AB · AD = AB» puts D on B. No message in any. ADR-3D-399's table left T34 "building silently until #1595".
+
+**Decision.** `samePlace3(p, q)` (crossings3.ts) is the identity test `namedPointAt` already asked (`NAMED_TOL` relative to the point's magnitude), now a predicate both call. `coincidences3(c, positions)` lists every pair of `c.points` (every one is labelled on the canvas) at one place, in placement order, through `shell/converge`'s `coincidentPairs`. `derive3` returns it as `coincidences`; `App3` renders `convergeText` in the blue notice strip (`role="note"`) under the build notices, while `!busy`. `point-coincides` (a NEW derived letter on an existing point, ADR-3D-183) stays a refusal.
+
+**Sibling audit.** 2-D is the reference (ADR-123). Analytic and complex: same item, ADR-AG-366 and ADR-CX-086.
+
+**Behaviour change for a student:** a line whose givens put two letters on one dot still records, and a notice «D ו-K נפלו על אותה נקודה.» now shows while the drawing has the pair.
+
+## ADR-3D-405 — A derived letter its definition forces onto a named point records, with the notice; only a crossing written through the point is refused (#1595)
+
+**Status:** accepted · 2026-11-03 · feature (P2, 3-D) · PR #2666, branch `feat/1595-coincidence-notice` · operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"* · cross-builder record [ADR-W-177](06w-decisions-workspace.md#adr-w-177) · **Supersedes in part** [ADR-3D-183](#adr-3d-183) · **Amends** [ADR-3D-404](#adr-3d-404)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-17 (extended) · **Design:** [04b](04b-design-3d.md) § *Two letters on one dot* (*The mint judgement, narrowed*) · **LADDER stage:** none (a verdict at the fold's verify pass).
+
+**Context.** Measured at the merge of `origin/main` into this branch (`useGeo3.submit` → `derive3`): «A(0,0,0) · B(2,0,0) · M אמצע AB · N אמצע AB» and «משולש ABC · M אמצע AB · N אמצע AB» refused `point-coincides` naming M; «קובייה ABCDA'B'C'D'» · «A'H גובה לפאה ABCD» refused naming A; «תיבה ABCDA'B'C'D' · E אמצע BB' · מישור ADE · G נקודת חיתוך של AC' עם מישור ADE» refused naming A. 2-D accepts the first three kinds with its notice and refuses the fourth's 2-D form («D חיתוך AB ו-BC», #1274) — ADR-W-177's table.
+
+**Decision.** The ADR-3D-183 pass in `deriveCore3` keeps its judgement (`namedPointAt` over every 0-DOF derived kind) and sets `point-coincides` only when `writtenOnto3(c, def, holder)`: a `plane-cut` whose segment has the holder as an end and whose plane's letters (`pointPlanes`) include it; a `seg-cross` whose two segments share it; a `line-plane` whose named line (`pointLines`) and plane both pass through it; a foot (`foot-plane`, `foot-line`, `foot-face`, `foot-seg`) dropped FROM the holder onto a carrier through it. Read from letters, never positions. Every other landing records, and ADR-3D-404's `coincidences3` shows «X ו-Y נפלו על אותה נקודה.». The click-offer (`openCrossings3`) is untouched: it offers no dot on a named point.
+
+**Locks.** `src3d/__tests__/converge-1595.test.ts` (the ruling's rows record with the notice; AC' ∩ ADE still refused); `src3d/__tests__/issue-769.test.ts` (the midpoint and the foot flipped, citing the ruling; AC' ∩ ADE, BB' ∩ ABCD and the CC' control unchanged).
+
+**Behaviour change for a student:** «N אמצע AB» after «M אמצע AB», or a height that lands on a vertex, is accepted with «M ו-N נפלו על אותה נקודה.» instead of refused; «G נקודת חיתוך של AC' עם מישור ADE» is still refused naming A.

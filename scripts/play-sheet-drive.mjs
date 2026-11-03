@@ -24,6 +24,7 @@ import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { APPS, auditImages, dismissModal, judgeCapture, refusals, waitForSettle } from './visual-smoke.mjs';
 import { caseVerdict, renderReport, validateSheet } from './lib/play-sheet-core.mjs';
+import { closureOf, reviewPacket, REVIEW_BRIEF } from './lib/case-closure.mjs';
 
 /** Where each product's ASK box lives — a distinctive substring of its placeholder, like
  *  `APPS[*].inputHint`. Read from the locales on 2026-09-28; a copy change fails loudly. */
@@ -60,6 +61,32 @@ function parseArgs(argv) {
   return out;
 }
 
+/**
+ * #2654 (ADR-W-168) — what the FIGURE says: the largest SVG on the page (every builder draws its
+ * figure as one; icons are small), its labels' text and a hash of its markup, so a check can read a
+ * label and tell whether «הציגו תצורה אחרת» changed the drawing.
+ */
+async function readFigure(page) {
+  return page
+    .evaluate(() => {
+      let best = null;
+      let area = 0;
+      for (const svg of document.querySelectorAll('svg')) {
+        const r = svg.getBoundingClientRect();
+        if (r.width * r.height > area) {
+          area = r.width * r.height;
+          best = svg;
+        }
+      }
+      if (!best) return { text: '', hash: '' };
+      const text = [...best.querySelectorAll('text')].map((t) => t.textContent ?? '').join(' | ');
+      let h = 0x811c9dc5;
+      for (const ch of best.outerHTML) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+      return { text, hash: h.toString(16) };
+    })
+    .catch(() => ({ text: '', hash: '' }));
+}
+
 /** Drive ONE case; returns everything `caseVerdict` measures plus the shots taken. */
 async function driveCase(browser, spec, outDir, prefix) {
   const product = PRODUCTS[spec.product];
@@ -70,6 +97,8 @@ async function driveCase(browser, spec, outDir, prefix) {
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
   const shots = [];
+  const configHashes = [];
+  let figureText = '';
   let n = 0;
   const shoot = async (label) => {
     const file = `${prefix}-${String(++n).padStart(2, '0')}-${label.replace(/[^\w-]+/g, '_')}.png`;
@@ -114,6 +143,9 @@ async function driveCase(browser, spec, outDir, prefix) {
       };
       for (const line of spec.lines) await typeLine(line);
       await shoot('built');
+      const built = await readFigure(page);
+      figureText = built.text;
+      configHashes.push(built.hash);
 
       /**
        * #1548 — steps AFTER the lines: a fact-list row's checkbox (1-based, the shared chrome's
@@ -161,6 +193,7 @@ async function driveCase(browser, spec, outDir, prefix) {
         await btn.click();
         await waitForSettle(page);
         await shoot(`config-${k}`);
+        configHashes.push((await readFigure(page)).hash);
       }
     }
   } catch (e) {
@@ -168,10 +201,14 @@ async function driveCase(browser, spec, outDir, prefix) {
   }
 
   const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
+  // The givens list, row by row: the shared FactList marks each statement `data-fact-text`.
+  const rowTexts = await page
+    .evaluate(() => [...document.querySelectorAll('[data-fact-text]')].map((e) => e.textContent ?? ''))
+    .catch(() => []);
   const model = { calls: [...page.modelLedger.calls], leaks: [...page.modelLedger.leaks] };
   await page.close();
   const modelProblems = ledgerProblems(model, spec.llm);
-  return { steps, askSteps, bodyText, pageErrors, shots, model, modelProblems };
+  return { steps, askSteps, bodyText, pageErrors, shots, model, modelProblems, figureText, rowTexts, configHashes };
 }
 
 async function run() {
@@ -220,20 +257,40 @@ model lane: ${modelTotals.calls} /api/parse request(s), all answered by the harn
       `${modelTotals.leaks} reached the network.`,
   );
 
+  // #2654 (ADR-W-168): how each case closes. A 👁/✅ case with no check the driver decides goes to a
+  // BLIND reviewer; its packet carries only the lines, the Look-for and the screenshots.
+  for (const r of results) r.closure = closureOf(sheet.cases.find((c) => c.id === r.id), r.problems);
+  const packets = results
+    .filter((r) => r.closure.state === 'awaiting-review')
+    .map((r) => reviewPacket(sheet.cases.find((c) => c.id === r.id), r.shots.map((s) => path.join(outDir, s.file))));
+  await writeFile(path.join(outDir, 'review.json'), JSON.stringify({ sheet: sheet.name, brief: REVIEW_BRIEF, cases: packets }, null, 2));
+
   const generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
   await writeFile(path.join(outDir, 'report.html'), renderReport({ sheet, results, generatedAt }));
   await writeFile(
     path.join(outDir, 'manifest.json'),
-    JSON.stringify({ sheet: sheet.name, generatedAt, results: results.map((r) => ({ id: r.id, problems: r.problems })) }, null, 2),
+    JSON.stringify(
+      { sheet: sheet.name, generatedAt, results: results.map((r) => ({ id: r.id, problems: r.problems, closure: r.closure, shots: r.shots })) },
+      null,
+      2,
+    ),
   );
 
   const failed = results.filter((r) => r.problems.length > 0);
-  console.log(`\nwrote ${path.relative(repoRoot, path.join(outDir, 'report.html')).replace(/\\/g, '/')}`);
+  const count = (st) => results.filter((r) => r.closure.state === st).length;
+  console.log(
+    `\nclosure: ${count('operator')} for the operator (🎮) · ${count('closed')} closed on assertion · ` +
+      `${count('awaiting-review')} awaiting a blind review (review.json) · ${count('red')} red`,
+  );
+  console.log(`wrote ${path.relative(repoRoot, path.join(outDir, 'report.html')).replace(/\\/g, '/')}`);
   if (failed.length) {
     console.error(`PLAY-SHEET DRIVE FAILED — ${failed.length} case(s) failed mechanically. Fix them; the operator never sees a red sheet.`);
     process.exit(1);
   }
-  console.log('PLAY-SHEET DRIVE PASSED — now READ the screenshots (the gate proves they are real, not that they are right), then publish the report.');
+  console.log(
+    'PLAY-SHEET DRIVE PASSED — now READ the screenshots, run the blind review on review.json, then ' +
+      '`npm run playsheet:close -- --sheet <spec>` (ADR-W-168) before publishing.',
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

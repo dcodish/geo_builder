@@ -155,9 +155,16 @@ describe('#2553 — «P נקודת ההשקה של l2 עם מעגל O_1» names 
     for (const seed of SEEDS) expect(at(built([...ALL, line], seed), 'P'), `seed ${seed}`).toEqual([0, -3]);
   });
 
-  it('REFUSAL: a line the figure does not have is refused naming it (unknown-reference), as «l2 משיק למעגל O_1 בנקודה P» is', () => {
-    expect(record([...EXAM, 'P נקודת ההשקה של l2 עם מעגל O_1'])).toMatchObject({ ok: false, kind: 'refused', key: 'unknown-reference' });
-    expect(record([...EXAM, 'l2 משיק למעגל O_1 בנקודה P'])).toMatchObject({ ok: false, kind: 'refused', key: 'unknown-reference' });
+  /*
+   * #2621 A (ADR-AG-368, operator 2026-10-30 "now we need to build all capabilities"): a named line the figure does NOT have,
+   * tangent at a named point, is the tangent AT that point, named — M1's new-vs-existing decision. Was `unknown-reference`.
+   */
+  it('a line the figure does not have is the tangent at P, named l2, as «l2 משיק למעגל O_1 בנקודה P» is', () => {
+    for (const line of ['P נקודת ההשקה של l2 עם מעגל O_1', 'l2 משיק למעגל O_1 בנקודה P']) {
+      const r = record([...EXAM, line]);
+      expect(r.ok, line).toBe(true);
+      if (r.ok) expect(r.d.construction.objects.filter((o) => o.kind === 'line-at' && o.name === 'l2'), line).toHaveLength(1);
+    }
   });
 
   it('REFUSAL: a touch the figure already letters is not given a second letter (the tangency’s own refusal)', () => {

@@ -4459,3 +4459,17 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Performance (docs/17 §7).** Two anchored regex tests per line that reaches the rule; one object per marker line.
 
 **Locks.** `src-complex/__tests__/origin-marker-2021.test.tsx`: fourteen spellings through `submitLine` (a given, not a question; one mark labelled O at (0,0)) and through `parseLineV2` (an origin object, nothing declared); no point added; first line of an empty figure; twice → one dot; muting hides it; «o ממשי» still `reserved-constant`; a polygon through O draws no marker; the canvas renders the dot and one «O», and the axis letter alone without a marker. `parser/__tests__/rules.test.ts`: the rule order. Fixture `fixtures/origin-marked-2021.complex.json` («z1 = 3+4i» · «w = z1*i» · «O ראשית הצירים»). The catalog row («O ראשית הצירים»).
+
+## ADR-CX-086 — Two named numbers on one dot get 2-D's notice (#1595)
+
+**Status:** accepted, 2026-11-02 · **Issue:** [#1595](https://github.com/dcodish/geo_builder/issues/1595) (feature, `P2`, all builders) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · operator ruling 2026-09-30 · the cross-builder decision is [ADR-W-176](06w-decisions-workspace.md#adr-w-176)
+**Requirements:** [02d](02d-requirements-complex.md) FR-GP-9 (new) ·
+**Design:** [04d](04d-design-complex.md), "Two named numbers on one dot are said" ·
+
+**Context.** Measured at `17f35282` (`decideSubmitCx` → `deriveLines`): «z1 = 2+3i · z2 = 2+3i» and «z1 = 2+3i · z2 = z1» record, one dot carrying two names, no message.
+
+**Decision.** `app/coincidences.ts` `coincidencesCx(d)`: the pairs of `d.points` (every one plotted and labelled) whose values are one point at the solver's `TOL` relative to their size, named by `display` («z₁»), through `shell/converge`. A letter BOUND to a number («A = z1») is already one point with a dual label (#791) and never forms a pair. The App memoises it on `derived2` and renders `convergeText` as a `Banner kind="notice"` under the input.
+
+**Sibling audit.** 2-D is the reference (ADR-123). 3-D and analytic: same item, ADR-3D-404 and ADR-AG-366.
+
+**Behaviour change for a student:** two named numbers with one value now show «z₁ ו-z₂ נפלו על אותה נקודה.» while both are on the figure.

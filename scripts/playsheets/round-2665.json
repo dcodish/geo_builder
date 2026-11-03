@@ -1,0 +1,444 @@
+{
+  "name": "round-2665",
+  "title": "Fix round #2665 — 2 Nov 2026",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "Analytic: the perpendicular bisector of BC and AM are refused, naming M",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": [
+        "משולש ABC",
+        "M אמצע BC",
+        "האנך מ-C ל-AB",
+        "האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E"
+      ],
+      "expectRefusal": "נפגשים ב-M",
+      "lookFor": "A refusal saying the lines already meet at M, a point that already has a name. No E is drawn, and the triangle does not move.",
+      "before": "unchanged since the 30 Oct deploy (locked now)",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T2",
+      "title": "Analytic: the same sentence with the lines in the other order, the same refusal",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "lines": [
+        "משולש ABC",
+        "M אמצע BC",
+        "האנך מ-C ל-AB",
+        "הישר AM והאנך האמצעי לצלע BC נפגשים בנקודה E"
+      ],
+      "expectRefusal": "נפגשים ב-M",
+      "lookFor": "The same refusal naming M, and the triangle unchanged.",
+      "before": "unchanged",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T3",
+      "title": "3-D: a vector from a known point creates its end point",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "A(0,0,0)",
+        "AB = (1,2,3)"
+      ],
+      "expect": [
+        "נוצרה נקודה חדשה"
+      ],
+      "expectFigure": [
+        "B"
+      ],
+      "lookFor": "B is drawn at (1,2,3), and the notice «נוצרה נקודה חדשה» names B.",
+      "before": "unchanged since #1467 (locked now)",
+      "path": "/3d.html"
+    },
+    {
+      "id": "T4",
+      "title": "3-D: a vector with no position is drawn floating",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "נתון: v = (10,-5,0)"
+      ],
+      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+      "before": "unchanged since #1188 step 1",
+      "expectFigure": [
+        "v"
+      ],
+      "expect": [
+        "5√5"
+      ],
+      "path": "/3d.html"
+    },
+    {
+      "id": "T5",
+      "title": "3-D: K forced onto D is accepted, with a message",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "lines": [
+        "מקבילון ABCDA'B'C'D'",
+        "AK = AD"
+      ],
+      "expect": [
+        "D ו-K נפלו על אותה נקודה."
+      ],
+      "lookFor": "Both rows are green, and the blue strip says «D ו-K נפלו על אותה נקודה.».",
+      "before": "K drawn on D, no message",
+      "path": "/3d.html"
+    },
+    {
+      "id": "T6",
+      "title": "Analytic: Y forced onto V is accepted, with a message",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "lines": [
+        "V(0,0)",
+        "X(4,0)",
+        "Y נמצאת על הישר y=x",
+        "שיעור ה-x של Y הוא 0"
+      ],
+      "expect": [
+        "V ו-Y נפלו על אותה נקודה."
+      ],
+      "lookFor": "All rows record, and the ⓘ notice says «V ו-Y נפלו על אותה נקודה.».",
+      "before": "recorded, no message",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T7",
+      "title": "Analytic: a segment between two points at one place is said",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "lines": [
+        "N1(1,1)",
+        "N2(1,1)",
+        "קטע N1N2"
+      ],
+      "expect": [
+        "N1 ו-N2 נפלו על אותה נקודה."
+      ],
+      "lookFor": "The ⓘ notice «N1 ו-N2 נפלו על אותה נקודה.».",
+      "before": "a zero-length segment, no message",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T8",
+      "title": "Complex: two numbers with one value are said",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5174",
+      "lines": [
+        "z1 = 2+3i",
+        "z2 = 2+3i"
+      ],
+      "expect": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "The notice «z₁ ו-z₂ נפלו על אותה נקודה.».",
+      "before": "one dot with two names, no message",
+      "path": "/complex.html"
+    },
+    {
+      "id": "T9",
+      "title": "3-D: a new name defined onto an existing point is still refused",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,0,0)",
+        "M אמצע AB",
+        "N אמצע AB"
+      ],
+      "expectRefusal": "M",
+      "lookFor": "The last line is refused, naming M; no notice.",
+      "before": "unchanged (the question on #1595 decides whether this changes)",
+      "path": "/3d.html"
+    },
+    {
+      "id": "T10",
+      "title": "2-D: the message is unchanged after the move to the shared text",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5174",
+      "lines": [
+        "משולש ABC",
+        "AB=4",
+        "נקודה D על AB",
+        "AD=4"
+      ],
+      "expect": [
+        "B ו-D נפלו על אותה נקודה."
+      ],
+      "lookFor": "«B ו-D נפלו על אותה נקודה.».",
+      "before": "unchanged",
+      "path": "/"
+    },
+    {
+      "id": "T11",
+      "title": "Analytic: a point the givens leave free gets no message",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "lines": [
+        "V(0,0)",
+        "X(4,0)",
+        "Y נמצאת על הישר y=x"
+      ],
+      "expectAbsent": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "Y is drawn away from V, with no message.",
+      "before": "unchanged",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T12",
+      "title": "Analytic: the locus of the meet of two lines, book p10-9",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "נתונה אליפסה שמשוואתה b^2x^2+a^2y^2=a^2b^2",
+        "P נקודה על האליפסה",
+        "O ראשית הצירים",
+        "N נקודה על ציר ה-x",
+        "PN מאונך לציר ה-x",
+        "דרך N עובר ישר l1 מקביל ל-PO",
+        "דרך P עובר ישר l2 מקביל לציר ה-x"
+      ],
+      "asks": [
+        "מצא את המקום הגיאומטרי של מפגש הישרים l1 ו-l2"
+      ],
+      "expect": [
+        "x²/(4a²) + y²/b² = 1"
+      ],
+      "lookFor": "The locus row reads «אליפסה · x²/(4a²) + y²/b² = 1», the curve is drawn, and no extra letter appears.",
+      "before": "«אין בשרטוט נקודה בשם מפגש הישרים l1 ו-l2»",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T13",
+      "title": "Analytic: «דרך N מעבירים ישר…» is taught the book's form",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "O(0,0)",
+        "P(2,3)",
+        "N(4,0)",
+        "דרך N מעבירים ישר l1 שמקביל ל-PO"
+      ],
+      "expect": [
+        "דרך N עובר ישר l1 מקביל ל-PO"
+      ],
+      "lookFor": "A teach card offering «דרך N עובר ישר l1 מקביל ל-PO»; confirm it, and l1 is drawn through N parallel to PO.",
+      "before": "not understood",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T14",
+      "title": "Analytic: «A ו-B הן נקודות על… בהתאמה», then the locus of the meet of described lines (p9-7)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה",
+        "הישר l: y=1/2x",
+        "d_{Al}^2 + d_{Bl}^2 = 4"
+      ],
+      "asks": [
+        "מצא את המקום הגיאומטרי של מפגש הישר העובר דרך A והמאונך לציר ה-x עם הישר העובר דרך B והמאונך לציר ה-y"
+      ],
+      "expect": [
+        "x²/20 + y²/5 = 1"
+      ],
+      "lookFor": "Line 1 builds, and the answer is «אליפסה · x²/20 + y²/5 = 1».",
+      "before": "line 1 not understood; the question was a missing point",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T15",
+      "title": "Analytic: «כל הנקודות ש…» answers the circle",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "A(2,0)"
+      ],
+      "asks": [
+        "מצא את המקום הגיאומטרי של כל הנקודות שמרחקן מ-A הוא 5"
+      ],
+      "expect": [
+        "(x − 2)² + y² = 5²"
+      ],
+      "lookFor": "«מעגל · (x − 2)² + y² = 5²».",
+      "before": "«אין בשרטוט נקודה בשם כל הנקודות …»",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T16",
+      "title": "Analytic: a description the tool cannot read says so honestly",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "A(2,0)"
+      ],
+      "asks": [
+        "מצא את המקום הגיאומטרי של כל הנקודות שמרחקן מהנקודה (2,0) קטן פי 2 ממרחקן מהישר x=8"
+      ],
+      "expect": [
+        "לא הבנתי"
+      ],
+      "lookFor": "«לא הבנתי את הבקשה…» quoting the student's words; no helper letter. (A real answer once item A lands.)",
+      "before": "«אין בשרטוט נקודה בשם …»",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T17",
+      "title": "Analytic: a line parallel to the x-axis, which «הציגו תצורה אחרת» moves",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/16+y^2/12=1",
+        "נתון ישר l המקביל לציר ה-x",
+        "הישר l חותך את האליפסה בנקודות P ו-Q"
+      ],
+      "cycles": 2,
+      "expectConfigsDiffer": true,
+      "lookFor": "A horizontal line l with P and Q on the ellipse. «הציגו תצורה אחרת» moves it up or down, and no θ appears in the panel.",
+      "before": "line 2 not understood",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T18",
+      "title": "Analytic: a vertical line pinned by a chord length gives CD",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1",
+        "נתון מעגל שמשוואתו x^2+y^2=16",
+        "נתון ישר l המאונך לציר ה-x",
+        "הישר l חותך את ציר ה-x בנקודה הנמצאת מימין לציר ה-y",
+        "הישר l חותך את המעגל בנקודות A ו-B",
+        "הישר l חותך את האליפסה בנקודות C ו-D",
+        "AB = 2√7"
+      ],
+      "asks": [
+        "CD"
+      ],
+      "expect": [
+        "x - 3 = 0"
+      ],
+      "lookFor": "CD = 24/5; l: x − 3 = 0.",
+      "before": "line 3 not understood",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T19",
+      "title": "Analytic: the tangent's slope places A (book p4-24 ג)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/16+y^2/9=1",
+        "נתון מעגל קנוני",
+        "המעגל חותך את האליפסה בנקודה A",
+        "A ברביע הראשון",
+        "שיפוע המשיק למעגל בנקודה A הוא -16/9"
+      ],
+      "lookFor": "The tangent is drawn at A = (16/5, 9/5).",
+      "before": "the last line failed with bad-operand",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T20",
+      "title": "Analytic: name the drawn tangent",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתון מעגל x^2+y^2=25",
+        "A(3,4)",
+        "המשיק למעגל בנקודה A",
+        "נסמן את המשיק ב-l",
+        "שיפוע l הוא -3/4"
+      ],
+      "expect": [
+        "l: 3x + 4y - 25 = 0",
+        "כבר קיים"
+      ],
+      "lookFor": "One tangent line; the panel names it «l: 3x + 4y − 25 = 0», and the last line is «כבר קיים». (Analytic shows line names in the panel, not on the drawing — as on main.)",
+      "before": "line 4 not understood",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T21",
+      "title": "Analytic: renaming the drawn tangent offers the naming sentence (refusal)",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתון מעגל x^2+y^2=25",
+        "A(3,4)",
+        "המשיק למעגל בנקודה A",
+        "l הוא המשיק למעגל בנקודה A"
+      ],
+      "expectRefusal": "כבר קיים",
+      "lookFor": "The «הישר הזה כבר קיים באיור…» refusal, with «נסמן את המשיק בנקודה A ב-l» pre-filled in the box.",
+      "before": "not understood",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T22",
+      "title": "Analytic: «המשיק» with two tangents asks which, with no tool id shown (found in round)",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתון מעגל x^2+y^2=25",
+        "A(3,4)",
+        "B(-3,4)",
+        "המשיק למעגל בנקודה A",
+        "המשיק למעגל בנקודה B",
+        "P על המשיק"
+      ],
+      "expectRefusal": "יותר מישר אחד",
+      "expectAbsent": [
+        "tangent-A"
+      ],
+      "lookFor": "The ambiguity refusal, without «tangent-A».",
+      "before": "the refusal listed «הישר tangent-A, הישר tangent-B»",
+      "path": "/analytic.html"
+    },
+    {
+      "id": "T23",
+      "title": "Analytic: «l2 משיק למעגל בנקודה P» draws a tangent named l2 (behaviour change)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "lines": [
+        "נתון מעגל x^2+y^2=25",
+        "P נקודה על המעגל",
+        "l2 משיק למעגל בנקודה P"
+      ],
+      "lookFor": "The tangent at P is drawn and the panel lists it as l2. (Analytic shows line names in the panel, not on the drawing — as on main.)",
+      "before": "refused: unknown reference l2",
+      "expect": [
+        "l2:"
+      ],
+      "path": "/analytic.html"
+    }
+  ]
+}

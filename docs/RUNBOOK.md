@@ -57,6 +57,8 @@ names any builder the config cannot reach.
 
 Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
 
+**When:** as soon as nothing needs the operator: no 🎮 case and no feature PR (operator 2026-11-01, [ADR-W-168](06w-decisions-workspace.md#adr-w-168); docs/22 §5). Otherwise, after his play.
+
 **A session runs the deploy itself and never hands it back** (operator, 2026-08-19: *"never ask me to
 deploy. you have the permissions and tools for that"*). The commands are allowlisted in
 `.claude/settings.json`; a denial is retried in its canonical minimal form, more than once. The one

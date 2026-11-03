@@ -1,0 +1,66 @@
+{
+  "name": "closure-2654-demo",
+  "title": "Closing ✅/👁 without the operator — first contact (#2654)",
+  "cases": [
+    {
+      "id": "C1",
+      "title": "The circle touching the ellipse at B and D",
+      "class": "look",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "lines": ["נתונה אליפסה שמשוואתה x^2/25+y^2/9=1", "B ו-D נקודות החיתוך של האליפסה עם ציר ה-y", "נתון מעגל M", "המעגל משיק לאליפסה בנקודות B ו-D"],
+      "lookFor": "The circle x²+y²=9 with M at (0,0), touching the ellipse at B and D.",
+      "before": "unchanged",
+      "expectFigure": ["B", "D", "M"],
+      "expectRows": ["נתון מעגל M"]
+    },
+    {
+      "id": "C2",
+      "title": "Another configuration changes the triangle",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5176",
+      "path": "/analytic.html",
+      "lines": ["משולש ABC", "AB = 5"],
+      "lookFor": "Each «הציגו תצורה אחרת» shows a different triangle with AB = 5.",
+      "before": "unchanged",
+      "cycles": 2,
+      "expectConfigsDiffer": true
+    },
+    {
+      "id": "C3",
+      "title": "A box in 3-D",
+      "class": "verified",
+      "product": "3d",
+      "base": "http://localhost:5176",
+      "path": "/3d.html",
+      "lines": ["תיבה ABCDA'B'C'D'"],
+      "lookFor": "A box with all eight corners lettered.",
+      "before": "unchanged",
+      "expectFigure": ["A", "C", "D'"]
+    },
+    {
+      "id": "C4",
+      "title": "A triangle in 2-D",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5176",
+      "path": "/",
+      "lines": ["משולש ABC"],
+      "lookFor": "One triangle, its three vertices lettered A, B and C.",
+      "before": "unchanged"
+    },
+    {
+      "id": "C5",
+      "title": "The point z in complex",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5176",
+      "path": "/complex.html",
+      "lines": ["z = 3+4i"],
+      "lookFor": "The point z at 3+4i.",
+      "before": "unchanged"
+    }
+  ]
+}

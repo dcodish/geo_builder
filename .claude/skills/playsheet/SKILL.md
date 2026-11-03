@@ -41,10 +41,14 @@ A case is a claim about the product, so it is measured before it goes on the she
   and read the string (`[role="status"]` texts), because a line refused before commit never becomes a fact
   and fact-keyed wiring never fires (#943). Enumerate the surfaces by how far the input got: refused at
   parse, refused before commit, committed then failed.
-- **A new or rewritten refusal or status sentence is shown IN FULL** in its case (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)): his play of it is the approval, so the sheet quotes the whole Hebrew sentence, never a paraphrase.
-- **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (he judges the embedded screenshot)
-  · ✅ verified (record only). **Anything beyond what he asked for is always 🎮** and is named in the
-  Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)).
+- **New text is shown IN FULL** in its case, never paraphrased, but it is **not a 🎮 case by itself** and holds nothing: it ships, and it is recorded with `node scripts/judgments.mjs chose` for his after-the-fact review (operator 2026-11-02, [ADR-W-174](../../../docs/06w-decisions-workspace.md#adr-w-174); amends ADR-W-154).
+- **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (judged from the screenshot) ·
+  ✅ verified (an assertion decides it). **Since [ADR-W-168](../../../docs/06w-decisions-workspace.md#adr-w-168)
+  he plays only 🎮**: you close ✅ and 👁 yourself (§3b).
+  - **Always 🎮:** anything beyond what he asked for, named in the Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)); every feature PR's cases.
+  - **👁 at most:** a case for a bug he reported. It goes in the skim digest (§3b).
+  - **Prefer a check the driver decides** (§3b lists them: page text, a refusal, a drawn label, a givens row, a changed configuration) over a Look-for only an eye can check.
+  - **Cap his sitting at about ten 🎮 cases**, ranked by risk; the rest move to the next sitting.
 - **His screenshot shows the whole run.** Before diagnosing a reported case from one, re-run the case's own
   lines on a clear canvas and read his run in the dev log (docs/17 §5 step 1); earlier cases' marks are in
   the frame (#1116 T32).
@@ -116,6 +120,47 @@ believing a red, and never change the product to satisfy them.
 Verify such a case with a timed probe built on the driver's helpers (`APPS`, `refusals`, `dismissModal`)
 that waits for «חושב» to disappear, on the branch AND on `main`, and record it as verified-by-probe with
 the timings. A probe reporting ~3 ms per line never waited.
+
+## 3b. Close ✅ and 👁 without him (ADR-W-168)
+
+Operator, 2026-11-01: *"all look and verified items can be closed automatically without me spenmding time on them."*
+
+How a ✅/👁 case closes is decided by its spec (`scripts/lib/case-closure.mjs`):
+
+- **On assertion**, when it carries a check the driver decides. This is the default; write one wherever the Look-for can be said as one:
+  - `expect` / `expectAbsent`: text on the page;
+  - `expectRefusal`: a refusal containing this text;
+  - `expectFigure: ["x²+y²=9", "M"]`: labels DRAWN on the figure (the page's largest SVG, all four builders);
+  - `expectRows: ["נתון מעגל M"]`: a row of the givens list reads this;
+  - `expectConfigsDiffer: true` with `cycles` ≥ 1: «הציגו תצורה אחרת» changes the drawing.
+
+  The matcher ignores bidi marks, and «'» matches the drawn prime «′».
+- **On blind review**, when no check can say it (a shape, a placement, a colour). The driver writes `reports/playsheets/<name>/review.json`: the brief, then per case only its lines, its Look-for and its screenshot paths. Never its title, issue, notes or Before.
+  - Spawn ONE subagent per sheet whose prompt is only "read this file, follow its brief, write `[{id, pass, saw}]` to <path>". Never add the fix, the plan or your expectation.
+  - A fail is a red case and goes back to the fix.
+
+Then close the sheet:
+
+```sh
+npm run playsheet:close -- --sheet scripts/playsheets/<name>.json --reviews <verdicts.json>
+```
+
+It folds the verdicts in and re-renders the report. The report shows 🎮 first, then the pending spot audits, then the closed cases with how each closed. It **exits non-zero while any case is red or unreviewed**. Its last line says `NOTHING FOR THE OPERATOR` (the round may deploy itself, fix-round Step 7) or `WAITS FOR HIS PLAY`.
+
+**Spot audits** are picked by the close step, not by you, deterministically by sheet and case id:
+- about one closed case in ten, at least one;
+- **every** closed case of a demoted kind (builder × how it closed).
+
+They queue in `scripts/playsheets/spot-audits.json` (tracked, commit it) and appear in every report until he answers:
+
+```sh
+npm run playsheet:close -- --pending                                # what his next sitting holds
+npm run playsheet:close -- --audit <sheet>:<id> pass|fail --note "<his words>"
+```
+
+A fail demotes its kind; three clean audits of the kind restore it. Record a demotion on #2654.
+
+- **The reported-bug digest.** A case for a bug he reported goes in a short list at the top of the report: his own sentence, the screenshot, one line on what changed. It closes unless he objects within a day.
 
 ## 4. Publish it
 

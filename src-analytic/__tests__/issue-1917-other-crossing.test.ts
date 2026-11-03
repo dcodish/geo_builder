@@ -111,25 +111,32 @@ describe('#1917 (b) — every spelling of that sentence reaches the same root', 
   });
 });
 
-describe('#1917 (c) — a refusal that is TRUE stays refused', () => {
+describe('#1917 (c) — the piece reaches the circle only at a named point', () => {
   /**
    * The SEGMENT reaches the circle only at A: P is the centre, so the other root is past P and is not on
-   * the piece the student named. #1254's ruling (ADR-AG-125) is untouched here.
+   * the piece the student named. ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with
+   * message"), which reverses #1254's ruling (ADR-AG-125) for a forced coincidence: E is forced onto A, so the line
+   * records, E is drawn on A, and the notice says «A ו-E נפלו על אותה נקודה.» (was `crossing-already-named`).
    */
+  const onA = (b: Built) => {
+    expect(b.ok).toBe(true);
+    if (!b.ok) return;
+    expect(b.faults).toEqual([]);
+    const [a, e] = [b.at('A'), b.at('E')];
+    expect(a && e && Math.hypot(a.x - e.x, a.y - e.y)).toBeLessThan(1e-6);
+  };
   it.each(SEEDS)('«הקטע AP חותך את המעגל» — the other root is off the piece, seed %i', (seed) => {
-    const b = build([...CIRCLE, 'P(0,0)', 'הקטע AP חותך את המעגל בנקודה E'], seed);
-    expect(b).toMatchObject({ ok: false, key: 'crossing-already-named', holder: 'A' });
+    onA(build([...CIRCLE, 'P(0,0)', 'הקטע AP חותך את המעגל בנקודה E'], seed));
   });
 
   /**
    * A BARE PAIR is the segment, as in 2-D ([ADR-AG-248](../../docs/06c-decisions-analytic.md#adr-ag-248),
    * #1892) — so «E על AP» names the same piece as «E על הקטע AP» and its refusal is true too. #1917's plan
    * listed this spelling among those that should record; it was measured before ADR-AG-248 landed, when a
-   * bare pair was still the LINE. The line spelling is locked in (b) above.
+   * bare pair was still the LINE. The line spelling is locked in (b) above. Recorded on A since #1595, as above.
    */
   it.each(SEEDS)('«E על AP · E על המעגל» — a bare pair is the segment, seed %i', (seed) => {
-    const b = build([...CIRCLE, 'P(0,0)', 'E על AP', 'E על המעגל'], seed);
-    expect(b).toMatchObject({ ok: false, key: 'crossing-already-named', holder: 'A' });
+    onA(build([...CIRCLE, 'P(0,0)', 'E על AP', 'E על המעגל'], seed));
   });
 
   /** A CHORD whose both roots are named: nothing is left for E, whichever arm is live. */

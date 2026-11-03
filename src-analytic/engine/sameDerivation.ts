@@ -90,3 +90,38 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
     }
   }
 }
+
+/**
+ * #1595 (ADR-AG-372) — does this rule name a FEATURE OF A CURVE (its centre, focus, an ellipse's vertex or focus, where
+ * two circles or a circle and a side touch) rather than build a point FROM POINTS?
+ *
+ * The split decides what a second letter for the same derivation is. Built from points («N אמצע AB» after «M אמצע AB»,
+ * a second centroid), it is a new letter its definition forces onto a named point: recorded, with the coincidence notice
+ * (the 2026-11-02 ruling, 2-D's verdict). A curve's feature is one object; a second letter for it is a rename, which 2-D
+ * answers as one (`centreAlreadyNamed`), so it stays the `already-named` refusal. Exhaustive, like `sameDerivation`: a
+ * new rule must answer.
+ */
+export function namesCurveFeature(rule: DerivedRule): boolean {
+  switch (rule.t) {
+    case 'circle-centre':
+    case 'parabola-focus':
+    case 'ellipse-point':
+    case 'touch-point':
+    case 'side-touch':
+      return true;
+    case 'midpoint':
+    case 'centroid':
+    case 'incentre':
+    case 'orthocentre':
+    case 'circumcentre':
+    case 'diagonals':
+    case 'incircle-centre':
+    case 'foot':
+    case 'regular-vertex':
+      return false;
+    default: {
+      const undecided: never = rule;
+      throw new Error(`derived rule has no curve-feature answer: ${JSON.stringify(undecided)}`);
+    }
+  }
+}

@@ -18,6 +18,7 @@ import {
   UNCOVERED_CEILING,
   catalogCoverageFaults,
   coveredSentences,
+  gapState,
   parityFaults,
   roleOf,
   rowFaults,
@@ -134,6 +135,41 @@ describe('#1861 — a known gap names an open issue, or is parked', () => {
     const faults = rowFaults(stripped);
     expect(faults).toHaveLength(parked);
     for (const f of faults) expect(f).toMatch(/mark the gap `parked: true`/);
+  });
+});
+
+/**
+ * ADR-W-170 (#2654 idea 2): A GAP IS A CELL, NOT AN ISSUE. A known gap may name no issue: an unscheduled
+ * cell, recorded and locked by the table alone. The ratchet is unchanged (a healed unscheduled cell still
+ * fails with "move it to the parity rows"); parking still needs the issue that records the decision.
+ */
+describe('ADR-W-170 — an unscheduled known gap is a cell with no issue', () => {
+  const gapRow = (gap: Record<string, unknown>) =>
+    ({ id: 'u', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds', knownGap: [{ product: 'analytic', ...gap }] }) as unknown as ParityRow;
+
+  it('a gap with no issue is well formed, needs no GAP_ISSUES line, and reads as unscheduled', () => {
+    const row = gapRow({});
+    expect(rowFaults([row], {})).toEqual([]);
+    expect(gapState(row.knownGap![0])).toBe('unscheduled');
+    expect(gapState({ product: 'analytic', issue: '#5' })).toBe('scheduled');
+    expect(gapState({ product: 'analytic', issue: '#5', parked: true })).toBe('parked');
+  });
+
+  it('a parked gap that names no issue is a fault (parking is a decision with a record)', () => {
+    expect(rowFaults([gapRow({ parked: true })], {})).toEqual([expect.stringMatching(/is parked but names no issue/)]);
+  });
+
+  it('a placeholder issue is still rejected, and the message offers the unscheduled cell', () => {
+    expect(rowFaults([gapRow({ issue: 'to-file' })], {})).toEqual([expect.stringMatching(/names no filed issue .* drop `issue` for an unscheduled cell/)]);
+  });
+
+  it('the ratchet holds for an unscheduled cell: a builder that starts agreeing fails with "move it to the parity rows"', async () => {
+    const row = gapRow({});
+    const healed: StepRunner = (steps) => steps.map(() => ({ verdict: 'builds' as const }));
+    const faults = await parityFaults({ analytic: healed }, [row]);
+    expect(faults).toEqual([expect.stringMatching(/^\[u\] analytic: .* — move it to the parity rows \(drop the known gap, unscheduled\)$/)]);
+    const stillGap: StepRunner = (steps) => steps.map((_, i) => ({ verdict: i === steps.length - 1 ? ('not-handled' as const) : ('builds' as const) }));
+    expect(await parityFaults({ analytic: stillGap }, [row])).toEqual([]);
   });
 });
 

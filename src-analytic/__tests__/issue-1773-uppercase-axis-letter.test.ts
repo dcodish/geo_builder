@@ -90,7 +90,7 @@ describe('#1773 — the fold, at the one boundary every rule reads', () => {
 
   it('records the line the student typed, not the folded one', () => {
     const v = decideSubmit('X_B=3', [], 0) as { kind: string; line?: string };
-    expect(v).toEqual({ kind: 'record', line: 'X_B=3' });
+    expect(v).toMatchObject({ kind: 'record', line: 'X_B=3' });
   });
 
   it('a refusal quotes the student’s own spelling', () => {

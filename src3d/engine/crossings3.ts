@@ -16,6 +16,7 @@
 
 import { openParamProbes3, paramConfigValues3, resolve3, type Resolved3 } from './evaluate';
 import type { Construction3, Id } from './types';
+import { coincidentPairs } from '../../shell/converge';
 import { add3, dist3, dot3, norm3, scale3, sub3, type Vec3 } from './vec3';
 
 export interface Crossing3 {
@@ -57,9 +58,32 @@ const NAMED_TOL = 1e-6;
  * iterated in insertion order, so the EARLIER point is the one named.
  */
 export function namedPointAt(point: Vec3, placed: Iterable<[Id, Vec3]>): Id | null {
-  const scale = Math.max(1, norm3(point));
-  for (const [id, p] of placed) if (dist3(p, point) <= NAMED_TOL * scale) return id;
+  for (const [id, p] of placed) if (samePlace3(point, p)) return id;
   return null;
+}
+
+/**
+ * The identity test {@link namedPointAt} asks, as a predicate: `q` IS `p` at the figure's distinctness tolerance,
+ * relative to `p`'s own magnitude. One judgement for "a crossing here is that point" and for "these two letters are
+ * on one dot" (#1595, ADR-3D-404), so the click-offer, the mint refusal and the notice cannot disagree.
+ */
+export function samePlace3(p: Vec3, q: Vec3): boolean {
+  return dist3(p, q) <= NAMED_TOL * Math.max(1, norm3(p));
+}
+
+/**
+ * #1595 (ADR-3D-404, ADR-W-176) — every pair of LETTERED points the drawing puts on one dot, in the order the figure
+ * placed them. Every point of `c.points` is labelled on the canvas (`buildScene3`), so every one counts. Read from the
+ * DRAWN positions on every render, as 2-D's ADR-123 notice is: it shows while the drawing has the coincidence, and a
+ * mute, an edit or another configuration that separates the pair clears it.
+ */
+export function coincidences3(c: Construction3, positions: ReadonlyMap<Id, Vec3>): [Id, Id][] {
+  const placed: [Id, Vec3][] = [];
+  for (const id of c.points.keys()) {
+    const p = positions.get(id);
+    if (p) placed.push([id, p]);
+  }
+  return coincidentPairs(placed, samePlace3);
 }
 
 /**

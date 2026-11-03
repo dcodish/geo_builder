@@ -1,0 +1,205 @@
+[
+  {
+    "builder": "2d",
+    "base": "40 < זווית ABC < 60",
+    "variant": "40 < זווית ABC < 60.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "5 < AB < 9",
+    "variant": "5 < AB < 9.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "אמצע AB",
+    "variant": "אמצע AB.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "גובה הטרפז ABCD הוא 4",
+    "variant": "גובה הטרפז ABCD הוא 4.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "האלכסון AC = 8",
+    "variant": "האלכסון AC = 8.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (dropped)"
+  },
+  {
+    "builder": "2d",
+    "base": "היקף המשולש ABC = 20",
+    "variant": "היקף המשולש ABC = 20.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "זווית ABC גדולה מ-40",
+    "variant": "זווית ABC גדולה מ-40.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "ישר החותך את המעגל בשתי נקודות",
+    "variant": "ישר החותך את המעגל בשתי נקודות.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "ישר ABE",
+    "variant": "נתון ישר ABE",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "ישר ABE",
+    "variant": "ישר ABE.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "מעגל חוסם את המחומש ABCDE",
+    "variant": "נתון מעגל חוסם את המחומש ABCDE",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "מעגל חוסם את המחומש ABCDE",
+    "variant": "מעגל חוסם את המחומש ABCDE.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "מרכז המעגל",
+    "variant": "מרכז המעגל.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "משיק למעגל",
+    "variant": "משיק למעגל.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "נסמן את שטח ABCD ב-S",
+    "variant": "נסמן את שטח ABCD ב-S.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "נקודה A",
+    "variant": "נתונה נקודה A",
+    "operator": "given-lead",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "נקודה A",
+    "variant": "נקודה A.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "נקודות F, G, H על AB, AC, CB",
+    "variant": "נקודות ‎F‎, ‎G‎, ‎H‎ על ‎AB‎, ‎AC‎, ‎CB‎",
+    "operator": "bidi-marks",
+    "differs": "builds → refused (input.scope.split-statements)"
+  },
+  {
+    "builder": "2d",
+    "base": "נתון מעגל",
+    "variant": "נתון מעגל.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "קו ועליו נקודה A",
+    "variant": "קו ועליו נקודה A.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "קשת AB = 40 במעגל O",
+    "variant": "קשת AB = 40 במעגל O.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "שטח המשולש ABC הוא 13",
+    "variant": "שטח המשולש ABC הוא 13.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "AB = 3x",
+    "variant": "AB = 3x.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "AB = 6",
+    "variant": "AB = 6.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "AD = 12√x",
+    "variant": "AD = 12√x.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "D על AB במרחק 3 מ-A",
+    "variant": "D על AB במרחק 3 מ-A.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (dropped)"
+  },
+  {
+    "builder": "2d",
+    "base": "DM*ME = BM*DR",
+    "variant": "DM*ME = BM*DR.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "O מפגש חוצי הזוויות במשולש ABC",
+    "variant": "O מפגש חוצי הזויות במשולש ABC",
+    "operator": "ktiv-haser",
+    "differs": "builds → not-handled (not-handled)"
+  },
+  {
+    "builder": "2d",
+    "base": "α < β",
+    "variant": "α < β.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled (not-handled)"
+  }
+]

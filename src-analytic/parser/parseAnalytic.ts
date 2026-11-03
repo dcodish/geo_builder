@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, lineEqToken, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr, type LineEquation } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type ConicHost, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, FIGURE_TANGENT_ID, type ConicHost, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -460,7 +460,13 @@ function equationClaimFacts(row: StraightNoun | undefined, a: Id, b: Id, src: st
   return claimFacts(row, a, b, src);
 }
 /** A sink a resolver states a role noun's claim into — absent, the resolver does not read a claiming noun. */
-type ClaimSink = { out: Fact[]; src: string };
+/**
+ * `lead` (#2621 A, ADR-AG-368): facts that BUILD an operand the statement then refers to — the tangent a phrase names by its
+ * touch point («שיפוע המשיק למעגל בנקודה A») — so they go AHEAD of the statement, where `out`'s claims ride after it.
+ */
+type ClaimSink = { out: Fact[]; src: string; lead?: Fact[] };
+/** The statement with its operand's claims: the builds first, the claims after (#2621 A). */
+const claimed = (claims: ClaimSink, facts: Fact[]): Fact[] => [...(claims.lead ?? []), ...facts, ...claims.out];
 /** The claim of the noun in front of a pair, into the sink; `false` when it cannot be stated there. */
 function stateClaim(row: StraightNoun | undefined, a: Id, b: Id, sink: ClaimSink | undefined): boolean {
   if (!row?.claim) return true;
@@ -4156,6 +4162,22 @@ function parseCircleAt(line: string): RuleOutcome {
     new RegExp(`^(?:the\\s+)?(${CONIC_NOUN_EN})$`, 'i').exec(trim(objectText));
   if (conicObject) {
     const host = conicHostOf(conicObject[1])!;
+    /*
+     * A CIRCLE SUBJECT (#2618 PR 2, ADR-AG-360) — «המעגל משיק לאליפסה», «מעגל M משיק לפרבולה בנקודה B», «המעגל משיק
+     * לאליפסה בנקודות B ו-D», "the circle is tangent to the ellipse at B": ONE circle, contextual or named (a centre
+     * letter, a numeral), resolved by the one circle slot (bind, state on the letter, or draw); the touch points named or
+     * the tool's. A size or position tail, a branch word or «זה לזה» is not this reading.
+     */
+    if (subject?.kind === 'one') {
+      if (subject.radius !== undefined || subject.placed !== undefined || subject.coords !== undefined) return null;
+      if (mods.branch || mods.reciprocal) return null;
+      const ats = mods.ats ?? (mods.at !== undefined ? [mods.at] : undefined);
+      if (ats && new Set(ats).size !== ats.length) return refuse('repeated-vertex', line);
+      return aboutCircles([oneCircleSlot(subject.name)], [
+        ...declareAll(ats ?? [], line),
+        { t: 'circle-conic', circle: SLOT1, host, ...(ats ? { ats } : {}), src: line },
+      ], line);
+    }
     const targets = tangentTargets(subjectText);
     if (!targets || targets.circles.length > 0 || mods.branch || mods.reciprocal) return null;
     if (touchApplies(targets, mods)) {
@@ -4547,6 +4569,40 @@ function parseConicInscribed(line: string): RuleOutcome {
   if (vEn) {
     const [, noun, run, conic] = vEn;
     return conic ? conicInscribedFacts(noun, run, conicHostOf(conic)!, line, true) : cyclicFacts(noun, run, undefined, line, true);
+  }
+  return parseCircleEllipseFit(line);
+}
+
+/*
+ * A CIRCLE INSCRIBED IN THE ELLIPSE, OR AROUND IT (#2618 PR 2, ADR-AG-361; operator ruling 2026-10-30, Q1 → A): the
+ * textbook's figure — the concentric circle through the minor-axis vertices («מעגל חסום באליפסה») or through the
+ * major-axis vertices («האליפסה חסומה במעגל»). The circle is ONE circle, contextual or named, resolved by the one circle
+ * slot: the figure's circle is bound, none draws it, several ask which. The ellipse only: a parabola has no centre.
+ */
+const FIT_CIRCLE_HE = `ה?מעגל(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const FIT_CIRCLE_EN = `(?:the\\s+|a\\s+)?circle(?:\\s+(${NAME}|${CIRCLE_NUMERALS}))?`;
+const FIT_ELLIPSE_EN = '(?:the\\s+|an\\s+)?ellipse';
+const CIRCLE_ELLIPSE_FIT: ReadonlyArray<{ re: RegExp; fit: 'inscribed' | 'circumscribed' }> = [
+  // «(נתון) מעגל חסום באליפסה» · «באליפסה חסום מעגל» · «האליפסה חוסמת את המעגל»
+  { re: new RegExp(`^${HE_GIVEN}${FIT_CIRCLE_HE}\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?אליפסה$`), fit: 'inscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ב(?:ה)?אליפסה\\s+${INSCRIBED_VERB_HE}\\s+${FIT_CIRCLE_HE}$`), fit: 'inscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ה?אליפסה\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?${FIT_CIRCLE_HE}$`), fit: 'inscribed' },
+  // «האליפסה חסומה במעגל» · «במעגל חסומה האליפסה» · «המעגל חוסם את האליפסה»
+  { re: new RegExp(`^${HE_GIVEN}ה?אליפסה\\s+${INSCRIBED_VERB_HE}\\s+ב(?:ה)?${FIT_CIRCLE_HE.replace(/^ה\?/, '')}$`), fit: 'circumscribed' },
+  { re: new RegExp(`^${HE_GIVEN}ב(?:ה)?${FIT_CIRCLE_HE.replace(/^ה\?/, '')}\\s+${INSCRIBED_VERB_HE}\\s+ה?אליפסה$`), fit: 'circumscribed' },
+  { re: new RegExp(`^${HE_GIVEN}${FIT_CIRCLE_HE}\\s+${CIRCUMSCRIBING_VERB_HE}\\s+(?:את\\s+)?ה?אליפסה$`), fit: 'circumscribed' },
+  // "a circle is inscribed in the ellipse" · "the ellipse circumscribes the circle"
+  { re: new RegExp(`^${FIT_CIRCLE_EN}\\s+is\\s+inscribed\\s+in\\s+${FIT_ELLIPSE_EN}$`, 'i'), fit: 'inscribed' },
+  { re: new RegExp(`^${FIT_ELLIPSE_EN}\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+${FIT_CIRCLE_EN}$`, 'i'), fit: 'inscribed' },
+  // "the ellipse is inscribed in a circle" · "the circle circumscribes the ellipse"
+  { re: new RegExp(`^${FIT_ELLIPSE_EN}\\s+is\\s+inscribed\\s+in\\s+${FIT_CIRCLE_EN}$`, 'i'), fit: 'circumscribed' },
+  { re: new RegExp(`^${FIT_CIRCLE_EN}\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+${FIT_ELLIPSE_EN}$`, 'i'), fit: 'circumscribed' },
+];
+
+function parseCircleEllipseFit(line: string): RuleOutcome {
+  for (const { re, fit } of CIRCLE_ELLIPSE_FIT) {
+    const m = re.exec(line);
+    if (m) return aboutCircles([oneCircleSlot(m[1])], [{ t: 'circle-conic', circle: SLOT1, host: 'ellipse', fit, src: line }], line);
   }
   return null;
 }
@@ -5159,7 +5215,7 @@ function parseCompare(line: string): RuleOutcome {
     const id = against[1];
     if (u.k === 'points' && (u.a === id || u.b === id)) return refuse('repeated-vertex', line);
     const { axis, greater } = positionMeaning(against[2]);
-    return made([{ t: 'selector', sel: { kind: 'line-compare', id, line: u, axis, greater }, src: line }, ...claims.out]);
+    return made(claimed(claims, [{ t: 'selector', sel: { kind: 'line-compare', id, line: u, axis, greater }, src: line }]));
   }
   const symbolic = compareSymbolic(line);
   if (symbolic) return symbolic;
@@ -7042,6 +7098,19 @@ const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$|^(
  */
 function direction(phrase: string, claims?: ClaimSink, eqs?: EqSink): Direction | null {
   const p = trim(phrase);
+  /*
+   * «המשיק למעגל בנקודה A» · «המשיק» — THE TANGENT, by the parser's one noun reader (#2621 A, ADR-AG-368), so every slot
+   * that takes a line (∥, ⊥, the slope, its sign, a line through a point, the position words) reads it as the ask lane
+   * does. Named by its touch point it is the tangent there, BUILT by the sentence that names it, idempotently (#1619 B3);
+   * bare, it is the figure's one tangent, which M1 resolves (`FIGURE_TANGENT_ID`). A bare noun narrowed by a circle or a
+   * conic and no point names no one tangent the parser can address — not a direction.
+   */
+  const tangent = readTangentNoun(p);
+  if (tangent) {
+    if (!tangent.at) return tangent.circle !== undefined || tangent.host ? null : { k: 'curve', id: FIGURE_TANGENT_ID };
+    if (claims) (claims.lead ??= []).push(...tangentObjectFacts(p, claims.src));
+    return { k: 'curve', id: tangentLineId(tangent.at) };
+  }
   // A line given by its EQUATION — only for a caller that reads one (#2429, ADR-AG-328).
   if (eqs) {
     const op = lineEquationOperand(p);
@@ -7206,6 +7275,65 @@ const THROUGH_FREE_EN = new RegExp(
 );
 
 /**
+ * A LINE GIVEN BY ITS DIRECTION ALONE (#2621 B, [ADR-AG-367](../../docs/06c-decisions-analytic.md#adr-ag-367)) — «ישר המקביל
+ * לציר ה-x», «נתון ישר l המאונך לציר ה-x», «ישר l מאונך לציר ה-x», "a line parallel to the x-axis", "line l perpendicular
+ * to the x-axis" (the ellipse book, p2-15 and p6-2 ב, one given per row).
+ *
+ * Every other line reader needs a point or an equation; a direction alone is a line with ONE free DOF, its offset, and
+ * nothing minted it. It lowers to `direction-line`: M1 draws `x = c` / `y = c` over the tool's offset symbol (ADR-052:
+ * «הציגו תצורה אחרת» moves it), or — for a NAMED line the figure already has — states the relation about that line, the
+ * sentence it always was.
+ *
+ * ONE GIVEN PER ROW ([ADR-W-167](../../docs/06w-decisions-workspace.md#adr-w-167), operator 2026-10-31): the book's compound
+ * forms («ישר המקביל לציר ה-x חותך את האליפסה בנקודות P ו-Q», «…, שעובר מימין לראשית הצירים, …») are NOT read whole —
+ * anything after the direction declines the sentence. Their rows already record: «הישר l חותך את האליפסה בנקודות P ו-Q»,
+ * «הישר l חותך את ציר ה-x בנקודה הנמצאת מימין לציר ה-y».
+ *
+ * Indefinite only when unnamed: «הישר המקביל» is the ROLE reference to a line the figure has (`roleLineRef`, ADR-AG-341).
+ * A direction given by a line rather than an axis («ישר המקביל ל-AB») is not read here: 2-D reads that sentence as the
+ * line AB itself (measured), so it waits for a ruling.
+ */
+const DIR_AXIS_HE = `ל-?\\s*ציר\\s+(?:ה\\s*-?\\s*)?([xy])(?![A-Za-z0-9])`;
+const DIR_LINE_HE = new RegExp(
+  `^${HE_GIVEN}(?:(?:ישר|קו)|ה?(?:ישר|קו)\\s+(${FREE_LINE_NAME}))\\s*,?\\s+(?:ו?(?:ה|ש))?(${PARALLEL_WORDS}|${PERP_WORDS})\\s+${DIR_AXIS_HE}\\s*(.*)$`,
+);
+const DIR_LINE_EN = new RegExp(
+  `^(?:(?:it\\s+is\\s+)?given\\s+(?:that\\s+)?)?(?:[Aa]\\s+line|(?:[Tt]he\\s+)?[Ll]ine\\s+(${FREE_LINE_NAME}))\\s*,?\\s+(?:that\\s+is\\s+|which\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+the\\s+([xy])[- ]axis(?![A-Za-z0-9])\\s*(.*)$`,
+);
+function parseDirectionLine(line: string): RuleOutcome {
+  const he = DIR_LINE_HE.exec(line);
+  const en = he ? null : DIR_LINE_EN.exec(line);
+  const m = he ?? en;
+  if (!m) return null;
+  const [, token, word, axisRaw, tailRaw] = m;
+  const lang = he ? 'he' : 'en';
+  const rel = new RegExp(`^(?:${PERP_WORDS})$|^perpendicular$`, 'i').test(word) ? 'perpendicular' : 'parallel';
+  const axis = axisRaw.toLowerCase() === 'x' ? 'x' : 'y';
+  // A second given after the direction is not read with it (ADR-W-167): the sentence is declined, never half-read.
+  if (trim(tailRaw)) return null;
+  // An unnamed line's id hashes its sentence: two sentences are two lines, the same sentence again is the same line.
+  const id = token ? lineIdOf(token) : `curve-${anonIndex(`direction-line:${line}`)}`;
+  return made([{ t: 'direction-line', id, ...(token ? { name: lineNameOf(token, lang) } : {}), rel, axis, src: line }]);
+}
+
+/**
+ * «l הוא המשיק למעגל בנקודה A» · «הישר l הוא המשיק לאליפסה בנקודה A» · "l is the tangent to the circle at A" — A LINE NAMED
+ * AS THE TANGENT AT A POINT (#2621 A, [ADR-AG-368](../../docs/06c-decisions-analytic.md#adr-ag-368)). The same statement as
+ * «הישר l משיק למעגל בנקודה A», and read as it: about l when the figure has l, else the tangent at A named l (M1), and a
+ * new name for a tangent already drawn is ADR-AG-346's `line-exists`, offering «נסמן את המשיק בנקודה A ב-l».
+ */
+const NAMED_AS_TANGENT_HE = new RegExp(`^(?:ה?ישר\\s+)?(${FREE_LINE_NAME})\\s+(?:הוא|היא)\\s+(ה?משיק\\s+.+)$`);
+const NAMED_AS_TANGENT_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:[Ll]ine\\s+)?(${FREE_LINE_NAME})\\s+is\\s+((?:[Tt]he\\s+)?[Tt]angent\\s+.+)$`);
+function parseNamedAsTangent(line: string): RuleOutcome {
+  const m = NAMED_AS_TANGENT_HE.exec(line) ?? NAMED_AS_TANGENT_EN.exec(line);
+  if (!m) return null;
+  const t = readTangentNoun(trim(m[2]));
+  if (!t?.at) return null;
+  const host = t.circle !== undefined ? `למעגל ${t.circle}` : t.host === 'ellipse' ? 'לאליפסה' : t.host === 'parabola' ? 'לפרבולה' : 'למעגל';
+  return viaCanonical(line, null, () => [`הישר ${m[1]} משיק ${host} בנקודה ${t.at}`]);
+}
+
+/**
  * «הישר l משיק (לשני )?(ה)?מעגלים N1 ו-N2 בנקודות P ו-Q (בהתאמה)?» · «הישר l משיק למעגל N1 בנקודה P ולמעגל N2 בנקודה Q» ·
  * "the line l is tangent to (the) circles N1 and N2 at P and Q (respectively)" — A COMMON TANGENT NAMED BY ITS LINE (#2392,
  * ADR-AG-313; the exam's Q3 ג). The same `common-tangent` as «PQ משיק משותף למעגלים N1 ו-N2», P on the first circle and Q
@@ -7352,6 +7480,17 @@ function parseNameLineObject(line: string): RuleOutcome {
   const m = first ? [first[2], first[1]] : (NAME_OBJECT_HE.exec(line) ?? NAME_OBJECT_EN.exec(line))?.slice(1, 3);
   if (!m) return null;
   const [operand, name] = m;
+  /*
+   * «נסמן את המשיק ב-l» · «נסמן את המשיק למעגל בנקודה A ב-l» · "denote the tangent at A by l" — THE TANGENT NAMED (#2621 A,
+   * ADR-AG-368), by the one noun reader: at a named point it is built or restated there and that line takes the name; bare,
+   * it is the figure's one tangent (`FIGURE_TANGENT_ID`, resolved at M1 — none or several is the «המשיק» refusal).
+   */
+  const tangent = readTangentNoun(trim(operand));
+  if (tangent) {
+    if (!tangent.at && (tangent.circle !== undefined || tangent.host)) return null;
+    const build = tangentObjectFacts(trim(operand), line);
+    return made([{ t: 'name-line-object', operand: build, line: tangent.at ? tangentLineId(tangent.at) : FIGURE_TANGENT_ID, name, src: line }]);
+  }
   const r = parseClause(trim(operand));
   if (!r.ok) return null;
   const lines = r.facts.filter((f) => f.t === 'line-at');
@@ -7524,11 +7663,10 @@ function parseThroughLine(line: string): RuleOutcome {
    * mentioning the thing it is measured against.
    */
   if (!cut) {
-    return made([
+    return made(claimed(claims, [
       { t: 'declare', id: through, src: line },
       { t: 'line-at', id, through, dir, perp, ...named, src: line },
-      ...claims.out,
-    ]);
+    ]));
   }
   // The crossing — the crossing rule's own lowering, over the line just built and the object it cuts.
   const [, , targetSrc, at] = cut;
@@ -7543,13 +7681,12 @@ function parseThroughLine(line: string): RuleOutcome {
     [],
   );
   if (!crossing || !crossing.ok) return crossing;
-  return made([
+  return made(claimed(claims, [
     { t: 'declare', id: through, src: line },
     { t: 'line-at', id, through, dir, perp, drawn: false, ...named, src: line },
     ...crossing.facts,
     { t: 'segment', id: segmentId(through, at), a: through, b: at, ref: true, src: line },
-    ...claims.out,
-  ]);
+  ]));
 }
 
 // ---------------------------------------------------------------------------
@@ -7965,12 +8102,11 @@ function parseConstraint(raw: string): RuleOutcome {
         ? [d.a, d.b].map((id): Fact => ({ t: 'declare', id, src: line }))
         : [],
     );
-    return made([
+    return made(claimed(claims, [
       ...named,
       { t: 'constraint', k: { t: 'relation', rel: parallel ? 'parallel' : 'perpendicular', u, v }, src: line },
       ...drawn,
-      ...claims.out,
-    ]);
+    ]));
   }
 
   /**
@@ -7994,7 +8130,7 @@ function parseConstraint(raw: string): RuleOutcome {
     const u = direction(sign[1], claims);
     if (!u) return refuse('bad-operand', line);
     const positive = /חיובי|גדול|>|positive|greater/i.test(sign[2]);
-    return made([{ t: 'selector', sel: { kind: 'sign', q: { k: 'slope', u }, positive }, src: line }, ...claims.out]);
+    return made(claimed(claims, [{ t: 'selector', sel: { kind: 'sign', q: { k: 'slope', u }, positive }, src: line }]));
   }
 
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
@@ -8005,7 +8141,7 @@ function parseConstraint(raw: string): RuleOutcome {
     if (!u) return refuse('bad-operand', line);
     const value = valueExpr(slope[2]);
     if (!value) return unreadable(trim(slope[2]));
-    return made([{ t: 'constraint', k: { t: 'slope', u, value }, src: line }, ...claims.out]);
+    return made(claimed(claims, [{ t: 'constraint', k: { t: 'slope', u, value }, src: line }]));
   }
 
 
@@ -9677,6 +9813,10 @@ function parseClauseRules(raw: string): ParseResult {
   if (centres) return centres;
   // The tangent as an object and chords (#1619 B3) — before `parseCircleAt`, whose verb split would
   // read «משוואת המשיק …» as a subject «משוואת» before the verb «המשיק».
+  // A line given by its direction alone, and a line named as the tangent at a point (#2621, ADR-AG-367/368) — before the
+  // relation rule, which would read «ישר מאונך לציר ה-x» as a relation about a line called «ישר».
+  const directionLine = parseDirectionLine(line) ?? parseNamedAsTangent(line);
+  if (directionLine) return directionLine;
   const tangentObject = parseTangentObject(line) ?? parseChord(line);
   if (tangentObject) return tangentObject;
 
@@ -10243,6 +10383,8 @@ function lineObject(raw: string): LineObject | null {
 /** «הישר CD עובר דרך P» · «CD מכיל את P» · «ישר 3 עובר בנקודה N» · "the line CD passes through P". */
 const CONVERSE_HE = new RegExp(`^${HE_GIVEN}(.+?)\\s+(?:עובר(?:ת)?\\s+(?:דרך|ב-?)\\s*|מכיל(?:ה)?\\s+את\\s+)(.+)$`);
 const CONVERSE_EN = /^(.+?)\s+(?:passes\s+through|goes\s+through|contains)\s+(.+)$/i;
+/** «היא» as the subject (#2619 D): the feminine pronoun, which only a feminine curve (an ellipse, a parabola) takes. */
+const PRONOUN_FEM = /^היא$/;
 
 /** «הצלע BC נמצאת על …» · «האלכסון BD מונח על …» · "the side BC lies on …" — a SIDE as the subject (#1495). */
 const SIDE_ON_HE = new RegExp(
@@ -10314,6 +10456,18 @@ function parseIncidence(line: string): RuleOutcome {
 
   const conv = CONVERSE_HE.exec(line) ?? CONVERSE_EN.exec(line);
   if (conv) {
+    /**
+     * «היא עוברת דרך הנקודה (3,√2)» — the book's sentence about the curve the exercise just gave (#2619 D, ADR-AG-362).
+     * The pronoun is a CONTEXTUAL reference, like «האליפסה»: lowered onto «P על האליפסה», whose `on-kind` fact carries
+     * the pronoun so M1 widens "which curve" to the figure's one curve of that gender (`pronoun: 'fem'` — an ellipse or
+     * a parabola). One point per row (ADR-W-167); a point list stays unread.
+     */
+    if (PRONOUN_FEM.test(trim(conv[1]))) {
+      const slot = pointSlot(conv[2]);
+      if (!slot) return null;
+      const r = viaCanonical(line, slot, (p) => [`${p} על האליפסה`]);
+      return r?.ok ? made(r.facts.map((f) => (f.t === 'on-kind' ? { ...f, pronoun: 'fem' as const } : f))) : r;
+    }
     const obj = lineObject(conv[1]);
     /**
      * «CD עובר דרך מרכז המעגל» (#1619 B1) — the centre by its ROLE, as the point. The same sentence with the

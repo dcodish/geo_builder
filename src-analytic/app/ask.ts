@@ -468,7 +468,7 @@ function askOne(
        * the same set as asking without it. A condition the figure refuses is answered with the input's own refusal of it.
        */
       if (condition && d.lines && objectById(d.construction, name)) {
-        const trial = derive([...d.lines, condition], d.seed, d.construction.seedNames ?? {});
+        const trial = derive([...d.lines, condition], d.configuration, d.construction.seedNames ?? {});
         const fault = trial.faults.find((f) => f.index === d.lines!.length);
         if (fault) return { question, value: null, refused: { key: fault.code, detail: condition } };
         return { ...askOne(trial, `המקום הגיאומטרי של ${name}`, fmt, kindWord), question };
@@ -490,7 +490,7 @@ function askOne(
      * *different* configuration — `seed + 1` rather than a constant, or the comparison would drift
      * back to describing a figure nobody is looking at.
      */
-    const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box);
+    const res = locusOf(d.construction, name, [d.configuration, d.configuration.seed + 1], d.box);
     // Every component must carry a gated shape, or nothing honest is known about the set — the
     // pre-#1500 `!res.shape` rule, over the union.
     const shapes = res && res.components.every((cp) => cp.shape !== null) ? res.components.map((cp) => cp.shape!) : null;

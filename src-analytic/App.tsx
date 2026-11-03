@@ -45,7 +45,7 @@ import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
-import { configurationPool, knownCurve, settled } from './engine/evaluate';
+import { configurationPool, knownCurve, settled, type Seed } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
 import { SYMBOLS } from './ui/symbols';
@@ -54,6 +54,8 @@ import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
+import { coincidencesOf } from './app/coincidences';
+import { convergeText } from '../shell/converge';
 import { narrowingKey, narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
@@ -625,6 +627,8 @@ export function App() {
    * parallelogram: deleting or muting the forcing line, or another configuration, clears it.
    */
   const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
+  // #1595 (ADR-AG-366): the letters the drawn figure puts on one dot — the suite notice reads them, per render
+  const coincidences = useMemo(() => coincidencesOf(d), [d]);
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
   /**
@@ -974,7 +978,7 @@ export function App() {
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
-  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: number): Promise<boolean> => {
+  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: Seed): Promise<boolean> => {
     setThinking(true);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
@@ -1009,7 +1013,7 @@ export function App() {
       if (out.kind === 'lines') {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
-        recordLlmLines(raw, out.lines, noticeText(out.notice, t));
+        recordLlmLines(raw, out.lines, noticeText(out.notice, t), out.configuration);
         return true;
       }
       /**
@@ -1437,6 +1441,18 @@ export function App() {
                 </Banner>
               </div>
             ))}
+            {/*
+              #1595 (ADR-AG-366, ADR-W-176) — two letters on one dot are accepted, and the page always says so: 2-D's
+              ADR-123 sentence through the suite key. Read from the drawn figure, so it holds while the drawing has the pair.
+            */}
+            {coincidences.length > 0 && (
+              <div style={{ marginTop: 8 }} data-testid="analytic-converge-note">
+                <Banner kind="notice">
+                  <span aria-hidden="true">ⓘ </span>
+                  {convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}
+                </Banner>
+              </div>
+            )}
           </div>
         }
         factsZone={

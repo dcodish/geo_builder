@@ -3669,6 +3669,8 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 
 ## ADR-W-072 — Two distinct named points are never OPENED on top of each other, in every builder (#1273; cross-product ruling of 2026-09-20)
 
+> **Amended** 2026-11-02 by [ADR-W-177](#adr-w-177): the table's first column changes for 3-D and analytic — a NEW letter its definition forces onto a named point is ACCEPTED with the «X ו-Y נפלו על אותה נקודה.» notice (2-D's verdict); only the structural member (two carriers written through the point) stays refused. The second column — the separation preference — is unchanged.
+
 **Status:** accepted, 2026-09-21 · **Issue:** #1273 (bug, P2, `analytic` — the display half; #1254 is the naming half) · operator, 2026-09-20 (T18): *"even if they do fall on the same point by chance, but not necessarily because there is a degree of freedom, the system should not show them on top of each other. It should automatically look for a different config and show them differently"* — and, the same day: *"the 2d and 3d tools should follow the same logic about points being on the same location"* · round #1332
 **Requirements:** [02](02-requirements.md) FR-ALT-2 / [02c](02c-requirements-analytic.md) R61 · **Design:** per product — [04](04-design.md) `firstSatisfyingSeed`, [04c](04c-design-analytic.md) the configuration search
 
@@ -3679,8 +3681,8 @@ A sweep for the remaining `readFileSync(App…)` tests found no others touching 
 | tree | a NEW letter named where a point already is | two EXISTING points that fall together by chance |
 | --- | --- | --- |
 | 2-D | notice only → #1274 | a separating configuration is preferred first — `firstSatisfyingSeed` ranks with `separatedView`/`pointsDistinct`, a coincident one remembered and used only if nothing else turns up ([ADR-486](06-decisions.md#adr-486), #942) ✔ |
-| 3-D | refused — `point-coincides` ([ADR-3D-183](06b-decisions-3d.md#adr-3d-183)) ✔ | — |
-| analytic | structural refused (#1175); positional → #1254 | **this round: [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)** — the 2-D ranking ported into `drawableAt` ✔ |
+| 3-D | refused — `point-coincides` ([ADR-3D-183](06b-decisions-3d.md#adr-3d-183)) ✔ · **since 2026-11-02:** accepted with the notice; refused only when both carriers are written through the point ([ADR-3D-405](06b-decisions-3d.md#adr-3d-405)) | — |
+| analytic | structural refused (#1175); positional → #1254 · **since 2026-11-02:** positional accepted with the notice ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)) | **this round: [ADR-AG-138](06c-decisions-analytic.md#adr-ag-138)** — the 2-D ranking ported into `drawableAt` ✔ |
 
 **One deviation from #1273's own lock list, recorded.** Its fourth lock said «הציגו תצורה אחרת» *"keeps offering every configuration, including stacked ones — the student asked"*. That is the filing session's inference; the operator's sentence is *"the system should not show them on top of each other"*, and the walk shows configurations through the same search the opening does. So a stacked configuration is not offered while a separated one exists within the budget; it remains admissible to every knowledge gate (the preference is display-only, like spread — ADR-AG-128). Flagged reversible on the play sheet: if he wants the stacked one reachable on request, the walk gets a "raw" mode, not the opening.
 
@@ -5674,7 +5676,7 @@ The precedent, for every later parity case: **B1 asks for one verdict per plane-
 2. **Requirement ids are unique.** A definition is `**` + the id + ` (` or ` —`. The old tier-only form saw 83 of the 104 definitions in docs/02. The check now also covers each doc's own id family (`frIds.localIds`: 02c's `R<n>`). Measured duplicates: FR-IN-7d and FR-IN-9 (02); R59, R60 (×3), R61 (×3), R92, R122 (02c). They are grandfathered EXACT, id → count: renumbering breaks citations in shipped ADRs, and the spec rewrite (#1861 step 4) empties the list. The citation check now uses the same definition reader (measured: the same defined set).
 3. **A cited ladder lists the ADR.** From each log's contract cut-over, a Design, LADDER stage, Ladder or Stage field that names `LADDER.md`, `docs/LADDER` or `LADDER-CX.md` (not starting "none") obliges that file to contain the id. Measured: 27 citations, 3 missing, all placed in docs/LADDER.md after reading the code. ADR-551 is row 0i, between 0g and 0g′, where `applyStep` calls `obtuseSideImpossibility`. ADR-542 is a stage-5 paragraph, `impliedByPrior` at the submit gate. ADR-489 is the shared-endpoint exemption inside `meetsRequirements` (stage 6). Row 0d moved to the end of the stage-0 table: `applyStep` calls `normalizeShapeComposition` after every prover. *Noticed, not changed:* the table has no row for `diagonalClaimRefusal` (`role:diagonal-refuse`), which runs between 0g′ and 0d.
 4. **Instruction files point at live docs.** Every orientation file and every `.md` under `.claude/skills`, `.claude/agents` and `.claude/memory`: each link and `docs/…/*.md` path must exist and must not lead into `docs/archive/`. A deleted doc fails the existence half, so no list of deleted names is kept. Fixed: src3d/CLAUDE.md and src-analytic/CLAUDE.md (their archived build plans) and the log-triage skill (two archived audit paths).
-5. **A parity gap names open work, or is parked.** `KnownGap` gains `parked?: true`, and the fixture gains `GAP_ISSUES`, the state of each of the 21 owning issues from `gh issue view` (2026-10-07). `rowFaults` checks both directions: a gap on a closed or iceboxed issue is parked; a parked gap's issue is not open; every gap's issue is listed; every listed issue owns a gap. 258 of 305 gap entries are parked: #1679 ×203, #1677 ×45, #1448 ×6, #1777 ×2, #1726 ×2. A parked gap is still a gap: the thin locks still assert the builder differs. **Limit:** a test cannot see an issue close, so closing or iceboxing an owning issue updates `GAP_ISSUES` and parks its gaps in the same commit (docs/22 §10). #1448 closed as completed for the pyramid height. Its six 3-D rows (trapezoid and triangle heights) still differ, so they are parked with it and have no successor issue yet.
+5. **A parity gap names open work, or is parked.** `KnownGap` gains `parked?: true`, and the fixture gains `GAP_ISSUES`, the state of each of the 21 owning issues from `gh issue view` (2026-10-07). `rowFaults` checks both directions: a gap on a closed or iceboxed issue is parked; a parked gap's issue is not open; every gap's issue is listed; every listed issue owns a gap. 258 of 305 gap entries are parked: #1679 ×203, #1677 ×45, #1448 ×6, #1777 ×2, #1726 ×2. A parked gap is still a gap: the thin locks still assert the builder differs. **Limit:** a test cannot see an issue close, so closing or iceboxing an owning issue updates `GAP_ISSUES` and parks its gaps in the same commit (docs/22 §10). #1448 closed as completed for the pyramid height. Its six 3-D rows (trapezoid and triangle heights) still differ, so they are parked with it and have no successor issue yet. *(Amended by [ADR-W-170](#adr-w-170): a gap may also name no issue, an unscheduled cell; a parked gap still names its issue.)*
 6. **MEMORY.md has a ceiling:** 1,300 B against 1,075 B today, in `orientationFiles`, with a `$raiseLog` row ([ADR-W-042](#adr-w-042)).
 
 **Not built: "an operator ruling never says Requirements: none".** Measured over the four product logs from their cut-overs: 485 headings, 96 with "Requirements: none", and 8 of those carry an operator-ruling marker (ADR-523, 546, 584; ADR-3D-226, 258, 304, 306; ADR-AG-074). At most three rule on what a student sees (3D-226, 3D-304, 3D-306, each arguing an existing FR already covers it). The rest are rulings on process or mechanism (*"Rework first, then all four"*, *"a fixed amount of work, never the clock"*), a ruling cited from another ADR, or an operator report. A text marker cannot tell a ruling on what a student sees from one on how the tool is built, so the guard would fire mostly on correct entries; a guard that does that gets relaxed (ADR-W-042). The precise signal is rule 7's `What the student will see` line ([ADR-W-117](#adr-w-117)): a `[ruled]` or `[asked]` line is a student-visible change and cannot sit beside "Requirements: none". ADRs do not carry those lines today; whether they should is the operator's decision.
@@ -6264,6 +6266,8 @@ The operator accepted both on 2026-10-16: *"The English versions of today's word
 **Status:** accepted · 2026-10-23 · debt (workspace) · fix round #2466, stream C · branch `fix/2201-p2-1995-s5-ratchets` · **Operator rulings** 2026-10-13 (#1995, ballot card 18, answer B) and **2026-10-15** (#1995, ballot card 3b, answer A: *"I accepted all recommendations"*) · **Discharges** the entry [ADR-W-130](#adr-w-130) recorded as "owed on #1995" · **Builds on** [ADR-W-153](#adr-w-153) (the shared walker) and ADR-W-130 (the floor locks' payload tables)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-5 (a refusal gives one next step or says there is none) · **Design:** [04w](04w-design-shell.md) § *Student-facing text* (the refusal-style lock); [08](08-testing-strategy.md) § *i18n*
 
+> **Amended by [ADR-W-174](#adr-w-174)** (operator 2026-11-02): new text no longer waits for his play. It ships and is listed for his review afterwards.
+
 **The rulings.** 2026-10-13 (card 18 B): *"Name the student's statement and give one next step, or say plainly there is none."* 2026-10-15 (card 3b A): the rule **covers NEW refusal and status sentences too**, not only rewrites. A session writes a new sentence under the rule; the sentence is shown in full on the play sheet, and the operator's play is the approval. No ballot card per new sentence. Docs/22 §2b and §2d and the `/playsheet` and `/decisions` skills cite it.
 
 **Context.** Nothing enforced the rule: a refusal was reviewed only when someone read it, so the audit's 26 strings were written one PR at a time, each green. The class is *a student-facing refusal added or edited with no machine check of the house style*.
@@ -6559,3 +6563,333 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 3. **Compound forms that work today are not removed by this entry.** Whether they keep building silently is #2644's question 1.
 
 **Consequences.** Triage of a "the tool does not read this sentence" report first asks whether the sentence holds more than one given. If it does, the fix is the teaching answer (#2644), not a new grammar row. A failure of the split rows themselves (#2642) is an ordinary bug.
+
+## ADR-W-168 — A round shrinks the queue: found work is fixed in the round, the operator plays only 🎮, a new issue is checked against the queue first, and a round with nothing for him deploys itself (#2654)
+
+**Status:** accepted · 2026-11-01 · operator ruling · process (workspace) · amends [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544) (the round's validation signal), [ADR-W-068](#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054) and [ADR-W-092](#adr-w-092) (who plays which class), [ADR-W-117](#adr-w-117) Am. 1 (found work is filed)
+
+**Operator:** 2026-11-01, in chat, after seeing that the six rounds of 24 Oct – 1 Nov closed 52 issues and filed 47: *"if the ratio was not reasonable, something is completely wrong with this methodology"*. Then: *"1 - option 1 - issues found during a round are fixed immediately are the test case of the round tests them. 2 - i want to have more automated testing and not have so much work go through me. all look and verified items can be closed automatically without me spenmding time on them. … 3 - review all open issues and we need to see what are the same families and can be combined. 4 - new issues are first checked to see where they can be placed within existing issues and only if its a new issue completely, we create an issue."* On the proposed guards: *"other items 1-2-4 im ok with"*. On the bigger ideas: 1 ok, 2 ok, 3 yes, 4 ok (*"known issues dont go away and if we ever run into them again, we move them back the que and not create new ones"*), 5 yes, 6 ok (*"just need to make sure this doesnt create a very long test everytime"*), 7 ok, 8 ok. On deploy: *"if nothing needs my attention, you should deploy automatically."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §1, §2d and §5, docs/RUNBOOK.md, CLAUDE.md rules 5 and 7 and the workflow section, the fix-round and playsheet skills, `scripts/issue-create-guard.mjs` (a PreToolUse hook in `.claude/settings.json`).
+
+**Measured (#2654).** The six rounds #2543, #2561, #2585, #2602, #2627 and #2645 composed 67 items and closed 52. Issues naming those rounds: 47 filed, 32 still open, so the rounds took 20 issues off the queue in a week. Over the same nine days the queue took 144 new issues and closed 76; 22 of the 144 carry `reported`. In the four weeks to 1 Nov, 815 issues were opened, almost all filed by sessions: sibling phrasings, cross-builder ports, audits and splits.
+
+**Decision.**
+1. **Found work is fixed in the round (R1).** A case found while fixing an item, with the same cause and the same chokepoint, is fixed inside that item, and the round's play sheet gets its own case for it, marked *found in round*. A finding that is not the same cause is a checklist line or comment on its parent issue (R4), not a new issue. A found case whose student-visible outcome nobody ruled on still needs a ruling (rule 7). The round collects those in ONE list in its report and posts them to the roadmap page's decisions panel (idea 7), and it never files one issue per question.
+2. **The operator plays only 🎮 (R2).** ✅ verified and 👁 look cases are closed by the session.
+   - A 👁 case closes on an assertion that replaces the look: page text, a measured distance, a row status, a count read from the rendered panel. Where no assertion can say it, it closes on a **blind review**: a subagent that receives only the case's student-facing description (lines, Look for) and its screenshots, never the fix, the plan or the session's expectation, and answers pass or fail with what it saw. A fail goes back to the fix, as a red case does today.
+   - **Spot audit:** about one auto-closed case in ten, picked at random, is added to the operator's next 🎮 session. A failed audit returns that kind of case (its product and what it checks) to 🎮 until three clean audits.
+   - A case for a bug **he reported** is 👁 at most, and goes into a short digest (his sentence and the screenshot) that closes unless he objects within a day.
+   - **Anything beyond what he asked for stays 🎮** ([ADR-W-117](#adr-w-117)), as do a new refusal or status sentence shown in full ([ADR-W-154](#adr-w-154)) and every feature PR.
+   - **His session is capped at about ten 🎮 cases**, ranked by risk (idea 8). More than that splits into the next session, never into a longer one.
+3. **Families (R3).** All open issues are swept into families (parent, children, why), and the operator approves each family whole. Exact duplicates merge without asking. A merged child closes "not planned" with a link to its parent, so nothing is lost and a merge can be undone.
+4. **Check before filing (R4).** Every new issue's body says where it was looked for: `Searched: <queries> — no parent`, or `Parent: #N` for a child filed on purpose. `scripts/issue-create-guard.mjs` refuses `gh issue create` without one of these lines. A finding that fits an existing issue goes there as a comment or checklist line. A closed or parked issue hit again is **reopened**, never filed fresh.
+5. **A round with nothing for the operator deploys itself.** A round whose sheet has no 🎮 case and which opened no feature PR deploys per docs/RUNBOOK.md on: the batch's full suite green, every ✅/👁 case closed under §2, and the post-deploy prod smoke green. It then closes its own round issue, which skips `awaiting-play`, and reports with the deploy tag and the spot-audit cases. A round with any 🎮 case or PR waits for his play, as before. Every deploy is tagged, so a rollback is one step.
+6. **Approved, built as their own items under #2654:**
+   - (1) each round's net queue change and his minutes, on the roadmap page; a round that does not shrink the queue is flagged;
+   - (2) one cross-builder parity table, where a gap is a cell, not an issue;
+   - (3) a deterministic sibling-phrasing generator through the real parser, whose failing variants are tests, not issues;
+   - (4) a session-found P3 that no user or operator ever hit, idle 30 days, moves to a known-gaps list and closes, and is reopened on a hit;
+   - (5) a standing-rulings list, so most `[proposed]` lines resolve by precedent;
+   - (6) the exam corpus replays in the batch's full suite only, with its cost measured before it becomes a gate;
+   - (7) rulings a round needs go to the decisions panel while it carries on;
+   - (8) the ~10-case cap in §2.
+
+**Consequences.**
+- A round's report counts what it closed and what it left open.
+- A round with nothing for the operator now reaches students without his play. The spot audits are what keep that honest.
+- The play sheet still lists every case (rule 5), but only its 🎮 section is his sitting.
+- The rule-7 boundary is unchanged: a found case outside what he asked for is still a question, not a fix.
+
+**Amendment 1 (2026-11-01, #2654 step 3) — §2 built: how ✅/👁 close.** Operator, the same day: *"Starr with 3"*.
+- **Measured before building.** The 72 tracked sheets hold 1863 cases: 703 🎮, 711 👁 and 449 ✅. 881 of them already carried a driver check, and 415 👁 cases carried none. So the gain is in turning a Look-for into a check, and the blind review is for the rest.
+- **New driver checks:** `expectFigure` (labels drawn on the figure: the page's largest SVG, which is the figure in all four builders), `expectRows` (a row of the shared givens list, `[data-fact-text]`) and `expectConfigsDiffer` (the drawing's markup hash changes on «הציגו תצורה אחרת»). The text matcher now also folds the drawn prime «′» to the typed «'»: on first contact a 3-D box's «D'» failed against a figure that draws «D′».
+- **A row's status (green, amber, red) is not a check yet.** Each builder draws it differently, and analytic and complex draw none, so it needs a product change to expose.
+- **`scripts/lib/case-closure.mjs`** decides how a case closes (operator / assertion / blind-review), builds the blind packet (lines, Look-for and screenshots, never the title, issue, notes or Before), picks spot audits deterministically, and keeps the ledger.
+- **A demoted kind is audited in full, not reclassed 🎮.** Reclassing would leave nothing of the kind to audit, so it could never be restored. Every closed case of the kind goes to the operator, and three clean audits restore it.
+- **`npm run playsheet:close`** folds the blind verdicts in, queues the audits in the tracked `scripts/playsheets/spot-audits.json`, re-renders the report (🎮, then pending audits, then closed cases with how each closed) and prints `NOTHING FOR THE OPERATOR` or `WAITS FOR HIS PLAY`, the line the §5 deploy reads.
+- **First contact:** `scripts/playsheets/closure-2654-demo.json`, five real cases on all four builders. The run closed three on checks and one on blind review, and left one 🎮. The blind reviewer was given a control: the same 2-D screenshot with a false Look-for («a circle through A, B and C»). It failed the control and passed the true case.
+
+## ADR-W-169 — Every round is measured by what it did to the queue, and what nobody hit is parked where a later hit reopens it (#2654 ideas 1 and 4)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · builds [ADR-W-168](#adr-w-168) ideas 1 and 4 · keeps [ADR-W-119](#adr-w-119) (closing an owning issue parks its gaps)
+
+**Operator:** 2026-11-01, approving the #2654 ideas: 1 *"ok"* (a round is measured by net queue change and operator minutes, both on the roadmap page; a round that does not shrink the queue is flagged); 4 *"ok - i assume known issues dont go away and if we ever run into them again, we move them back the que and not create new ones. eventually we might reach them"*. 2026-11-02: *"2654:go ahead with the approved items"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — `scripts/round-metrics.mjs`, `scripts/known-gaps.mjs`, `docs/known-gaps.md`, docs/22 §2d, the fix-round, roadmap-refresh and log-triage skills, the roadmap page's "Fix rounds" panel (db doc `history/rounds`).
+
+**Decision.**
+1. **Each round has a row on the roadmap page.** The row shows:
+   - **closed**: the round's items closed by the day after it ended;
+   - **filed**: issues opened during the round that name it (`round #R`);
+   - **net** = filed − closed, flagged ⚑ when it is zero or more;
+   - **the operator's cases** and an estimate of his minutes. The estimate is labelled as one: 3 per 🎮, 1 per 👁 or spot audit, ½ per ✅. Before ADR-W-168 every case went through him.
+
+   A round from 1 Nov writes `queue: …` and `operator: play=N audits=N` in its ledger; `npm run playsheet:close` prints the second line. The script reads those lines. Older rounds are estimated from their composition section and the GitHub record. The roadmap-refresh skill (step 3b) rewrites the doc at every refresh. The script uses REST only, so the daily cloud routine can run it too.
+2. **What nobody hit is parked.** A round runs `known-gaps.mjs --apply` when it composes. It parks every P3 feature or debt item that a session found, that no student and not the operator hit, that has been idle 30 days and that the plan does not name. Parking means:
+   - a comment, then `icebox`, then closed "not planned", with `auto-ok` removed;
+   - a row in `docs/known-gaps.md`;
+   - any parity gap the issue owns is parked in the same batch (ADR-W-119).
+
+   **Bugs are never parked**, whatever their label. docs/22 §2 never parks something that shows something false: a wrong figure, a false «contradicts», a guide sentence that fails. Labels cannot tell those apart from other bugs. `reported`, `wrong-answer`, `needs-operator`, P1/P2 and plan items stay too.
+3. **A later hit reopens the original issue**, under its own number: `known-gaps.mjs --reopen <N> --note …`. It removes the row and un-parks the issue's gaps. `/log-triage` reopens the same way. The issue-create guard's refusal now names the icebox and the known-gaps list.
+4. **The guard fires on a filing, not a mention.** It blanks quoted strings and heredoc bodies, then looks for the filing command at a command position. The first version refused a clean-up command, and an edit script, for only containing the words.
+
+**Found in the same pass.** The family sweep of 2026-11-01 closed eight children that still owned parity gaps in `GAP_ISSUES`. Their gaps now name the parents:
+
+| Children | Parent |
+|---|---|
+| #1171 | #2226 |
+| #1842 | #2644 |
+| #1903 | #1908 |
+| #2342, #2356, #2357 | #2365 |
+| #2448 | #2409 |
+| #2041 (superseded) | #2174 |
+
+Two closed issues, #1888 and #1839, were fixed in 2-D without their port. Their gaps are now parked. Parking by script makes this repair automatic from now on; a manual merge still has to do it by hand.
+
+**Measured (2026-11-02).**
+- **Rounds since 1 Oct:** 31.
+  - Estimated: 447 closed, 345 filed, net −102.
+  - 10 of the 31 did not shrink the queue.
+  - Last five: 52 closed, 42 filed.
+- **Cross-check.** For the six rounds ADR-W-168 counted by hand (52 closed, 47 filed), the script gives 59 closed and 48 filed.
+- **Parking.** 321 open P3s. 15 are idle features or debt items that nobody hit and would park today, before the plan exclusion.
+
+**Consequences.** The ratio the operator questioned is now on the page and in every round's ledger, rather than a one-off measurement. The queue loses issues that stay untouched for a month without losing them: each one is reopened, never filed again.
+
+## ADR-W-170 — A cross-builder parity gap is a cell in the parity table, not a GitHub issue (#2654 idea 2)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · amends [ADR-W-108](#adr-w-108) and [ADR-W-157](#adr-w-157) (docs/22 §10's "a known-gap row naming its issue") and [ADR-W-119](#adr-w-119) §5 (ruling C4's "every parity gap names an open issue")
+
+**Operator:** 2026-11-01, on #2654: of the bigger ideas he approved idea 2, recorded in [ADR-W-168](#adr-w-168) §6 as "one cross-builder parity table, where a gap is a cell, not an issue".
+
+**Requirements:** none (internal): no builder reads, refuses or draws anything differently. · **Design:** [04w](04w-design-shell.md) "Geometry-input parity" (`KnownGap.issue` optional, `gapState`, the table view); [docs/22 §10](22-workflow.md); `scripts/parity-table.mjs`; the fix-round skill's per-item port gate.
+
+**Context.** The parity rows (`shell/__tests__/fixtures/geo-input-parity.ts`) already measure every cross-builder disparity and lock it with a ratchet, but `rowFaults` required every known gap to name a filed issue. So each port a session left out, or found, became its own GitHub issue: at this ADR 61 issues own gaps in `GAP_ISSUES`, and the queue holds dozens more whose whole content is "builder Y does not read sentence X, builder Z does". Measured with `npm run parity-table` at 43b42a27: 1044 rows × 3 builders = 3132 cells, of which 2193 agree, 140 are scheduled gaps (14 in 2-D, 93 analytic, 33 3-D), 289 parked (44 2-D, 245 3-D), 71 exception refusals and 439 unchecked.
+
+**Decision.**
+1. **A gap is a cell.** `KnownGap.issue` is optional. A gap with no issue is an **unscheduled cell**: measured, held by the thin locks exactly like any gap (it must still differ; when it starts agreeing, the row fails with "move it to the parity rows (drop the known gap, unscheduled)"), and recorded by the table alone. The three cell states are `scheduled` (names an open issue), `unscheduled` (names none) and `parked` (names the closed or iceboxed issue that parked it); `gapState` reads them.
+2. **A newly found port gap is an unscheduled cell, never a new issue.** This covers a port an item leaves out under [ADR-W-157](#adr-w-157) (the plan still names the missing prerequisite, now in the row's `note`) and a sibling builder found differing while fixing. A gap names an issue only when an open issue already owns the port.
+3. **Parking keeps its record.** `parked` still needs the closed or iceboxed issue that parked it (a parked gap with no issue is a fault), so ruling B15's "3-D's core plane parity is parked" stays traceable. An issue closed as a decision not to port parks its gaps (ADR-W-119, unchanged). An issue whose whole content was the port is instead closed **into the table**: its gaps drop `issue` and its `GAP_ISSUES` line goes, in the same commit. An issue carrying `reported` or `wrong-answer`, an open question, or anything beyond the verdict (a drawing, a label, a message's wording) is never closed into a cell: the table measures verdicts only.
+4. **The view.** `npm run parity-table` prints the counts per state and builder and every gap cell; `--product <p> --state unscheduled` is a port item's pick list, `--all` the full sentence × builder table, `--html` writes `reports/parity-table.html`. It is a pure read of the rows; the thin locks remain the only thing that asserts a cell.
+5. **Port rounds take their work from the table.** ADR-W-157 §4's "the backlog is cleared by dedicated rounds" now reads the unscheduled cells; the round still composes only from the plan ([ADR-W-165](#adr-w-165)), so a port item is a plan item naming a builder and a family.
+
+**Consequences.**
+- The queue stops growing by one issue per port, and existing pure-port issues can be closed into cells (the audit list is in this ADR's PR description; the operator or a session acts on it, never this ADR).
+- The C4 promise "a gap names open work" becomes "a gap names open work, names none, or names the issue that parked it". An unscheduled cell claims no schedule, so it cannot claim work nobody is doing, which was C4's point.
+- Not built: a cell carries no priority. A port that a student hit stays an issue (`reported`), and its gap cell names it.
+
+## ADR-W-171 — Sibling phrasings are generated and run through the real parsers; a failing one is a row of a shrinking list, never an issue (#2654 idea 3)
+
+**Status:** accepted · 2026-11-02 · operator-approved idea · process and tests (workspace) · builds idea 3 of [ADR-W-168](#adr-w-168) §6.
+
+**Operator:** 2026-11-01, on the ideas of #2654: *"3 yes"*. The idea as approved: *"A deterministic sibling-phrasing generator runs variants through the real parser (no AI calls); a failing variant is a test, not an issue."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §10a, docs/17 §1; `shell/__tests__/fixtures/sibling-phrasings.ts`, `sibling-phrasings-io.ts`, `sibling-phrasings/known-<builder>.json`; one `__tests__/sibling-phrasings.test.ts` in each of `src/`, `src-analytic/`, `src3d/`, `src-complex/`; the meta-lock `shell/__tests__/sibling-phrasings-meta.test.ts`.
+
+**Context.** docs/17's class rule names "the same wrong outcome in another spelling". Sessions found such spellings one at a time and filed one issue each, which is part of why rounds grew the queue (ADR-W-168, measured).
+
+**Decision.**
+1. **A generator, not a session, finds spelling siblings.** For every catalog sentence of every builder (2-D: supported entries; analytic: the construction lane; 3-D: not `rewrite`; complex: all), typed on the figure of the first parity row (`geo-input-parity.ts`) that contains it, the generator writes at most one variant per operator. It is pure string rewriting, seeded (`SEED`, the letter-renaming target), with no network and no model.
+2. **The operators are measured, not imagined.** Measured over the 1,102 distinct utterances of the four production event logs (2026-09-24 → 10-25): prefix letter with a space «ל AC» (23), hyphen-space «ל- BG» (2), maqaf «ש־AD» (1), «ישר זווית» ↔ «ישר-זווית» (29 / 1), «זוית» (24), spacing around = ⊥ ⟂ ∥ (134 spaced / 161 tight), ⊥ ↔ ⟂ (14 / 3), the degree sign (5 / 9), a trailing period (10), a «נתון/נתונה…» lead-in, always on a noun-first declaration (35), the opening noun's article «המשולש ABC» (153 / 242), left-to-right marks around names (7), a doubled space (8), the geresh as a prime (1), and consistent renaming of point letters (12 of 60 named polygons are not lettered AB…). **Dropped, 0 in prod:** a glued prefix «בA», a space after ∠, the prime ′, gershayim or ASCII quotes inside Hebrew, the reversed equality «5 = AB». Letters that are not point names are never renamed (I/II, R, S; analytic's O), and complex is never renamed (z, w, u name kinds of number, ADR-CX-047).
+3. **The comparison runs the real decision.** Each builder's test types the context through the submit function its parity lock drives (`decideDeterministic2D` + `commitVerdict`, `decideSubmit`, `decideSubmit3`, `decideSubmitCx`), then DECIDES the base and every variant against that figure without recording. A variant differs when its verdict or code differs, or it builds something else (2-D commands, analytic parsed facts, 3-D commands; complex compares verdict and code only). Fingerprints ignore the typed text, spacing inside strings and text-derived ids; a renamed variant is compared with its letters made anonymous.
+4. **The ratchet.** The known failing variants are rows of `known-<builder>.json` (builder, base, variant, operator, what differs). The test fails on an unlisted failing variant and on a listed one that now agrees. `SIBLING_PHRASINGS_WRITE=1` rewrites a list after a fix; its diff must only delete rows.
+5. **The rule (docs/22 §10a):** a spelling the generator covers is a row of the list, never an issue; a missing spelling class is a new operator, with its prod count.
+
+**Measured at seeding (2026-11-02).** Bases: 2-D 162, analytic 370, 3-D 241, complex 43. Failing variants: 2-D 29, analytic 14, 3-D 21, complex 46 (110 in all). By operator: trailing-period 66, given-lead 20, prefix-space 6, rename-letters 8, definite-article 3, ktiv-haser 3, prefix-hyphen-space 2, bidi-marks 1, prefix-maqaf 1. Runtime, each file alone on one machine: 2-D 29 s, analytic 10 s, 3-D 81 s (a handful of 3-D sentences take ~5 s per decision), complex 0.7 s. The tier split is measured (docs/08), so the heavy files join the slow tier by themselves; the test is not a `test:fast` file by design.
+
+**Consequences.**
+- The 110 rows are findings, not issues. Which are fixed, and in which item, is the queue's business; each fix deletes rows.
+- A new catalog sentence is covered on arrival, and a parser change that breaks a spelling that used to work fails the suite.
+- The rows hold the decision of today's parsers, including ones that may be by design (analytic's «V» is not read as a circle centre). A row that turns out to be intended is answered by removing or narrowing the operator, never by a row that stays forever.
+
+## ADR-W-172 — The exam corpus is named and replayable on its own: the batch gate stays `test:full`, which already runs it, and an item replays the exams of the builders it touches (#2654 idea 6)
+
+**Status:** accepted · 2026-11-02 · operator approval of idea 6 in [ADR-W-168](#adr-w-168) · process (workspace)
+
+**Operator:** 2026-11-01, on idea 6 (*"The exam corpus replays as the batch gate (full suite only); an item's quick check replays only the exams it touches. Cost measured and reported before it becomes a gate."*): *"just need to make sure this doesnt create a very long test everytime"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — docs/22 §2d (item gates, "The exam corpus"), docs/08 tier table, the fix-round skill's item gate, `scripts/lib/exam-corpus.mjs`, `scripts/test-exams.mjs`, `src-analytic/__tests__/fixtures.test.ts`.
+
+**Context — measured before building.** "The exam corpus" was not one thing. Every sequence the suite replays from a real exam or textbook question already ran through its builder's real parse → replay → verify path, scattered over these nets:
+
+| Builder | Members | Where they replay | In `test:full` before this ADR |
+|---|---|---|---|
+| 2-D | ~35 bagrut scenarios (of 506), 1 exam fixture (`2022-summer-a-issue59`), the theorem corpus (Q5–Q7 and the 22 B-series booklet questions) | `scenarios-e2e-1..8` (slow tier), `fixtures.test.ts` (slow tier), `src/theorems/__tests__/{corpus,b-corpus}.test.ts` | yes, all |
+| 3-D | the exam GATE files (2019, 2020, 2022, 2023, 2024 Q2; 2026 קיץ ב Q2; the תיבה exam) and 4 exam fixtures (`*-20xx-q2`) | `scenarios3`, `exam-2026-2`, `adr-3d-032`, `fixtures3.test.ts` | yes, all |
+| analytic | the 471 corpus (46 questions, 361 lines), 71 exam/textbook fixtures (of 99: `exam-*`, `ellipse-book-*`, and fixtures whose name cites the exam) | `issue-1618-corpus471-ratchet` (slow tier), `issue-2391-exam-fixtures`, `issue-2393-exam-asks`, and each fixture's own issue test | the ratchet and the issue tests, yes. **The fixtures: only as far as each one's issue test asserts**, and 3 fixtures no test imported |
+| complex | 3 exam fixtures (`exam-*`) | `fixtures.test.ts` | yes |
+
+So the batch half of the idea **was already true**, with one gap: analytic, alone of the four builders, had no fixtures net (docs/22 §9 names its folder, and the other three each run theirs through one zero-authoring net). What was missing everywhere was the ability to *name* the corpus and replay only it.
+
+**Measured cost** (this machine, through the suite lock, while sibling sessions' full suites ran on the same machine, so an upper bound): `npm run test:exams` over all four builders took **88.6 s wall** (247 s of summed test time on parallel workers): 2-D 61 exam units, 120 tests, 152.4 s test time · 3-D 65 units, 73 tests, 59.0 s · analytic 132 units, 274 tests, 35.5 s · complex 3 units, 9 tests, 0.1 s. One builder alone: analytic **30.8 s** (the 471 ratchet is 23.6 s of it), 3-D **45.3 s**, complex **1.3 s**, 2-D **84.4 s** (61 units, 146.9 s test time: the 8 scenario shards each collect the whole 506-scenario corpus, and each bagrut scenario runs its full oracle set, seed sweep included; the slowest is 16.7 s). The new analytic net alone: 99 fixtures, 296 tests, **7.2 s** wall; a probe replaying every analytic fixture twice took 3.1 s, one fixture (`exam-2379-q3-route-2392`) 2.3 s of it. All green.
+
+**Decision.**
+1. **The batch gate stays `npm run test:full`.** Every member already runs in it, so a separate exam stage would replay the corpus twice for nothing. The one addition to `test:full` is the analytic fixtures net (2), **~7 s**: the operator's condition holds.
+2. **Analytic gets its fixtures net** (`src-analytic/__tests__/fixtures.test.ts`), with the 2-D contract: every saved line still parses (drift), the real load path (`loadAnalyticSession`) reports nothing failed, and `derive` at the saved seed has no fault. The two fixtures saved to lock a refusal (`issue-1963-…`, `issue-2115-…`) are listed with the refusal code they must produce, and only those. Its tier is measured like every file's (ADR-394), not pinned: at ~7 s it will sit in the fast tier, as the complex net does.
+3. **The corpus is defined in `scripts/lib/exam-corpus.mjs`**, as files that are exam gates whole plus each builder's general nets filtered by an exam mark in the test's name (`EXAM_NAME`: `bagrut`, `בגרות`, `exam`, `מבחן`, `בחינה`, `קיץ`, `חורף`, `summer`, `winter`, `ellipse-book`, `ספר האליפסה`, `20xx-qN`, `QN`). An exam joins by being named for its exam; no registry to keep.
+4. **`npm run test:exams`** replays it (`--builder X`, `--list`), under the suite lock, and writes `reports/exam-run.json` (gitignored). **`--changed [base]`** (default `origin/main`; committed, uncommitted and untracked files) replays only the builders the diff touches: a builder's own tree or extra root (`fixtures3/`), or a tree it imports by `BOUNDARIES.json`'s allowed edges (today every builder imports `shell/`, so a shell change replays all four), or the toolchain (`package.json`, `tsconfig*`, `vite*`/`vitest*` config). A docs, scripts or server-only diff replays nothing.
+5. **An item's quick check adds `npm run test:exams -- --changed`** after `test:fast` (docs/22 §2d, the fix-round skill's item gate). A typical item touches one builder: complex ~1 s, analytic ~31 s, 3-D ~45 s, 2-D ~84 s; a `shell/` or toolchain change replays all four (~89 s).
+
+**Not built: selecting exams finer than by builder.** A map from each exam to the parser rules and chokepoints it exercises, intersected with the rules a diff changes, would cut an item's replay further. It was not built because the inputs are not there. Import-graph selection (`vitest related`) was measured in ADR-W-113 at 85–110 % of a lane, since nearly every test imports the parser and the engine. A rule-level map needs each parse to report the rule that read each line in all four parsers, plus a hunk-to-rule map for the diff. Cost estimate: the map itself is cheap (it needs a parse, not a replay, and the full replay of all 99 analytic fixtures measured 3.1 s), but the hunk-to-rule step is a parser-wide refactor of four parsers to expose rule identity, and a missed edge silently skips an exam the change broke. Per builder, the replay is already at most ~84 s (2-D) and the batch's full suite still catches anything a narrow selection would miss, so the saving does not pay for that risk today.
+
+**Consequences.**
+- A round's items see an exam regression in their own builder before the batch, at 1–84 s each, and the batch costs ~7 s more.
+- **2-D is the expensive case (84 s).** A lighter 2-D exam replay (replay + verifier only, without the scenario oracles) would be cheaper per item but would replay those scenarios a second time inside `test:full`; it is not built, and is the lever if 84 s per 2-D item proves too long.
+- An exam whose fixture or scenario is not named for its exam is not in `test:exams` (it is still in `test:full`). The 3 analytic fixtures no test imported are now covered by the net.
+- `test:exams` duplicates work that `test:full` also does; that is the price of a quick check and is paid only per item, never at the batch.
+
+## ADR-W-173 — A judge agent rules on the operator's behalf from his own dated words, and sends back everything else (#2661)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · amends [ADR-W-117](#adr-w-117) (a `[judged]` outcome arms like `[ruled]`) · builds on [ADR-W-168](#adr-w-168) idea 5 (standing rulings)
+
+**Operator:** 2026-11-02, in chat, shown the 31 drafted standing rulings: *"Out if these 31, do you really need me?"*, then *"I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave"*. On the proposed design (a daily digest that stands unless he objects within a day; an overrule is precedent and sends its class back to him until three judgments in a row stand; the reserved list): *"Go ahead. Build this now"*.
+
+**Requirements:** none (internal) · **Design:** none (internal) — `.claude/agents/judge.md`, `scripts/precedents.mjs`, `scripts/judgments.mjs` with its tracked ledger `scripts/judgments/ledger.json`, docs/22 §2b and §2e, CLAUDE.md rule 7, the decisions and fix-round skills.
+
+**Context.** Rule 7 sends every student-visible outcome to the operator. The idea-5 research found that most of the questions reaching him are already answered by something he said earlier. Nothing applied his precedent on his behalf, so every plan line waited for him, case by case.
+
+**Decision.**
+1. **The judge** is an agent that receives a question and its options. It never receives the session's recommendation or the fix, so it cannot rubber-stamp them.
+   - It searches the record: `scripts/precedents.mjs`, built from every issue comment that reads as a ruling or quotes him with a date, every ADR that carries his words, and its own judgments that stood or were overruled.
+   - It rules only when his dated words cover the question, and it quotes them, dated and linked. Otherwise it escalates. "He would probably want" is an escalation.
+2. **Never judged:**
+   - reversing a shipped promise;
+   - what he kept for himself;
+   - a feature's scope or priority;
+   - anything with no precedent, or with conflicting precedent no later ruling settles;
+   - a class he took back.
+3. **Recording.** `judgments.mjs record` refuses a ruling without a quoted, dated, linked precedent. A ruling is posted on its issue under `## Judged on the operator's behalf — <date>`, and its plan line takes the new tag `[judged]`, which arms like `[ruled]`. An escalation stays `[proposed]`, `needs-operator`.
+4. **Oversight.**
+   - A ruling appears in his digest with the quote it rests on. It stands after 24 hours unless he objects.
+   - His overrule is recorded in his words and becomes precedent. Its class goes back to him until three judgments of it in a row stand.
+
+**Measured — first use, 2026-11-02.** Four judges took the 31 standing-ruling cards blind, with the recommendations and the drafter's precedents stripped.
+- **14 ruled.** 10 at high confidence, 4 at medium (a general rule from several consistent one-off rulings).
+  - Three rulings chose an outcome no card offered, because his words did not match any option: sr-02, sr-11 and sr-24.
+- **17 escalated.**
+  - **Reserved, as feature scope or priority:** sr-04, sr-06 and sr-31.
+  - **Kept by him:** sr-30, the #1182 pictures.
+  - **Precedents in conflict:** sr-05, sr-19 and sr-22. sr-22 also found that every option assumed two decimals, while his 2026-10-16 rule is at most three.
+  - **No precedent:** the rest.
+- **Precedent index:** 2,579 ruling comments and 781 ADRs with his words, built in about 30 s, refreshed incrementally.
+
+His review of the 14 and his answers to the 17 are on the standing-rulings page. Nothing is armed from them until he has seen them, per his 2026-11-02 ruling on #2661.
+
+**Consequences.** A product question no longer waits for him when he has already answered it. The ones that reach him are the ones only he can answer, each with the reason it came back. A judge that over-reaches is caught by his digest, and corrected by demotion, not by trust.
+
+## ADR-W-174 — What does not have to wait for the operator does not: new text, a construct an exercise needs, and a known construct in another wording are decided by the session and listed for his review (#2663)
+
+**Status:** accepted · 2026-11-02 · operator ruling · process (workspace) · amends [ADR-W-154](#adr-w-154) (new text no longer waits for his play) and [ADR-W-117](#adr-w-117) (wording leaves the list of product decisions that need his ruling first) · builds on [ADR-W-173](#adr-w-173) (the digest) and [ADR-W-168](#adr-w-168) idea 5 (standing rulings, cards sr-01, sr-04, sr-06)
+
+**Operator:** 2026-11-02, in chat, answering the standing-rulings page:
+- **sr-01** (who writes new text): *"I want you to build all text. If there is a new text that we need, you can go ahead and build it. … And then we have this mechanism where you after the fact tell me, okay, here are things that we need to decide, or things that I decided for you and I just want you to review. … If I want to change wording, that's not a big change. We can always go back and fix it. In any case, wrong wording or wording I wouldn't want is not a critical issue for a student. So I don't want anything to wait for me that doesn't have to wait for me."*
+- **sr-04** (a construct a textbook or bagrut exercise needs): *"this is a real issue that we need to be able to build so if you ask me should we build it, i will say yes. so why ask if we know the answer. re P3 - I dont know if its p3 or p2."*
+- **sr-06** (a construct the tool reads, written another way): *"I would go with the recommendation you have option A"*, and *"there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right."*
+
+**Requirements:** none (internal) · **Design:** none (internal) — `scripts/judgments.mjs chose`, docs/22 §2e, CLAUDE.md rule 7, the decisions, fix-round and playsheet skills, the judge agent.
+
+**Decision.**
+1. **New text is the session's.** That covers every new student-facing string: refusal, note, chip, row label, English twin, spelling choice.
+   - The session writes it under the pedagogy style rule (name the student's statement, one next step, the book's word).
+   - It ships. It is shown in full on the sheet, but it is not a 🎮 case by itself and holds no deploy.
+2. **A construct a corpus exercise needs is built without a card.** This applies to a textbook or bagrut exercise in a builder meant to cover it.
+   - Its priority is the session's: P2 when the exercise is in the exam corpus (`npm run test:exams`) or in a lesson he dated, P3 otherwise. He left this open ("I dont know if its p3 or p2"); the split is the session's proposal and is itself on his review list.
+   - A construct with no exercise behind it is still a found feature for him.
+3. **A construct the tool already reads, in another wording, is read (sr-06 A).** This covers word order, active voice, a synonym, or a typo with no other reading. It is P3 and gets no card, but only when the wording means exactly what the canonical form means. A wording with a second meaning still comes to him.
+   - **The LLM fallback is the net, so these are never urgent.** A wording the parser misses escalates to the fallback, which will usually read it. A sibling-phrasing failure ([ADR-W-171](#adr-w-171)) is a P3 reading at most.
+   - It rises above P3 only when the fallback is measured to fail on it too. Measuring means acting as the oracle under rule 2, never a live call.
+   - Not every variant is worth building. The ones worth building are textbook forms and forms seen in the prod logs.
+4. **Listed afterwards.** The plan line is tagged `[ruled]` with this ADR.
+   - The session records it with `node scripts/judgments.mjs chose` (kinds `text` and `corpus-priority`), and the digest lists it under *Decided for you — review*.
+   - His change to one is an ordinary fix. It demotes nothing and sends nothing back to him.
+
+**Consequences.** Five open lines stop waiting: #2628 Q2, #2625, #1863, #2335 and #2286's wording half, plus #2623 and #2069 for sr-04. The cost is text he may not have chosen, live until his review. He ruled that this is not critical for a student.
+
+## ADR-W-175 — Standing rulings, first set: the operator's answers to the standing-rulings cards of 2026-11-02 (#2654 idea 5)
+
+**Status:** accepted · 2026-11-02 · operator rulings · product (every builder) · builds on [ADR-W-168](#adr-w-168) idea 5 and [ADR-W-173](#adr-w-173) (these were the 17 cards the judge sent back) · sr-01, sr-04 and sr-06 are [ADR-W-174](#adr-w-174)
+
+**Operator:** 2026-11-02, on the standing-rulings page (https://claude.ai/artifact/MjkSamdi7PYXbeGTQtfGnW), taps between 15:09 and 15:20 UTC, his pasted list of all answers, and chat for sr-16, sr-22 and sr-26. Where his chat words and his tap differ, his words win, because they are the more specific of the two (decisions skill, step 3).
+
+**Requirements:** owed per builder by the item that first applies each rule. The rows are named in each line below. · **Design:** none (internal). These are rules a plan cites; the mechanism is each item's own.
+
+**The rulings.** Each is a standing rule: a later plan line that it covers is tagged `[ruled]` with this ADR.
+- **sr-05, A: a ruling applies to every builder by default.** A ruling on a plane-geometry or display behaviour applies to every builder that has that element, unless he names one builder. The ports are tracked as parity-table cells (ADR-W-170).
+- **sr-07, A: 2-D's next-free-letter rule everywhere.** A tool label never repeats a letter the student used. A letter the student put on the object wins. If the book's letter (for example a focus's F) is taken, the mark shows with no letter, never with an invented one.
+- **sr-10, A: a newer ruling's effect on a case he already passed is a Heads-up line, not a question.** This holds when the newer ruling covers the case on its face. The change is a 🎮 case marked changed. A real conflict between two rulings still goes to him (docs/17 §9).
+- **sr-12, A: a definite noun binds the drawn object of its kind.** This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created. A pronoun binds only to a kind that can be its subject.
+- **sr-15, A: a helper appears only when a stated object is measured in it, or the student asked for it.** Axes appear only with a coordinate, equation or parametric object. A note appears only when something changed. In his words: *"clean canvas always"* (2026-09-06).
+- **sr-16, A, with his words** (chat): *"An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees. For vectors, we said that if the tool can understand if it's a length or a vector, … the tool can decide what it is, and of course writes a correct input text, or format, and if not, it asks. So I would say in general, if you don't know ask, it's always better to ask and tell the user how to write each specific item. … for an angle, we agreed that it's a Latin letter and not like the letter B"*. The rule:
+  - Where the book or an earlier ruling fixes a reading, the tool takes it and shows the form it read. Examples: a bare number on an arc is degrees; a length or a vector is read from the context, per PR #2605's rulings of 2026-10-30; the angle-letter conventions already ruled, such as complex #2030, where the angle is a Greek letter and a Latin one is refused.
+  - Where nothing fixes it, the tool **asks**, and teaches how to write each reading. It never guesses silently.
+  - These were recorded rules, and the card wrongly called them open. The judge's precedent index holds them.
+- **sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure.** «הוכיחו» is refused in every builder. No ✓ "verified" ever appears on a given.
+- **sr-22: computed in full, shown to two decimals when needed; a value within a thousandth of a whole number shows as that number.** He tapped C. His chat words, given afterwards, are more specific: *"the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8. … if 3 decimals are .999 or .001 or something like that, we would round it."* So «AC = 7.9999» shows «8», and the canvas and the panel show the same text (#2361). Typed and computed values follow the same rule.
+- **sr-25, A: one legibility bound for every free sample, in every builder.** These limits apply:
+  - no free corner above 165°, or below a minimum;
+  - no two vertices closer than a fixed share of the figure;
+  - no stacked points while a separated view exists.
+
+  A stated value is always drawn as stated, however extreme.
+- **sr-26: inputs and answers share one curve family.** He tapped B: an answer outside the family draws the curve without naming it. In chat he added: *"the tool itself should be able to support non-canonical forms. If it doesn't right now, we should add it as a future feature"*. So the shared family is to grow: #2664 (P3 feature). Until then, the locus of #2628 is drawn, not named.
+- **sr-27, C: an object placed by value stays exactly put; a free one moves as little as possible.** Placed by value means coordinates or a stated length, angle or other magnitude. When a student adds a line, those objects do not move at all, and free objects move minimally.
+- **sr-29, A: dashed for every extension, directrix or helper.** A line is solid only when the student stated it as a segment or a shape. One style rule across the builders.
+- **sr-30, A: «הציגו תצורה אחרת» never repeats the drawing on screen while another valid one exists.** A repeat is a bug. A numeric variety bar is the session's mechanism.
+- **sr-31, A: a session sets the priority of a found feature that extends one he asked for or ruled.** P3 is the default, and the report says so; he can overrule any priority there. A new capability is still his to prioritise.
+
+**Consequences.** Each rule is cited by the plans of the issues named in its transcription comment. The cards no longer exist as questions.
+
+## ADR-W-176 — Two letters on one dot are accepted, and every builder says so in 2-D's sentence, one suite key (#1595)
+
+> **⚠ Superseded in part** 2026-11-02 by [ADR-W-177](#adr-w-177) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): the first bullet of *How the rulings fit together* — a NEW letter whose definition puts it on a point already there is refused — no longer holds for a coincidence the definition FORCES; that is accepted with this ADR's notice in every builder.
+
+**Status:** accepted · 2026-11-02 · feature (P2, all four builders) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · **Operator rulings:** 2026-09-30 (#1595, playing round #1571 T23: *"when 2 dots are on top of each other we should accept but always give a message about it. this is correct for all tools"*); 2026-10-30 (PR #2605 T34: *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user. this needs to happen here too"*) · plan of 2026-10-07 (#1595), armed `auto-ok` 2026-10-04 · **Extends:** [ADR-W-148](#adr-w-148) (a notice joins the suite text), [ADR-W-152](#adr-w-152)'s shape · per-product: 2-D unchanged (ADR-123, ADR-447 Am. 1), [ADR-3D-404](06b-decisions-3d.md#adr-3d-404), [ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), [ADR-CX-086](06d-decisions-complex.md#adr-cx-086)
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder row *Two letters on one dot the givens force* (new, **Same**); [02](02-requirements.md) FR-EN-20 (the sentence is the suite's); [02b](02b-requirements-3d.md) FR-RD-17 (new); [02c](02c-requirements-analytic.md) R214 (new); [02d](02d-requirements-complex.md) FR-GP-9 (new) · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* (*The «same point» notice*)
+
+**Context.** Measured at pickup (`17f35282`, each builder's own submit door, model mocked). 2-D already accepts a forced coincidence with the ADR-123 notice «{{a}} ו-{{b}} נפלו על אותה נקודה.», derived from the drawn figure on every render (the 2026-10-07 plan update's correction of the issue body). The other three record silently: 3-D «A(0,0,0) · B(2,0,0) · M אמצע AB · N(1,0,0)» and the operator's T34 «מקבילון ABCDA'B'C'D' · AK = AD» (K on D, the vector reading, at every seed); analytic #1571 T23 «V(0,0) · X(4,0) · Y נמצאת על הישר y=x · שיעור ה-x של Y הוא 0» (Y on V), #2401 «N1(1,1) · N2(1,1) · קטע N1N2», and «משולש ABC · AB=4 · D על AB · AD=4» (D on B); complex «z1 = 2+3i · z2 = 2+3i» and «z2 = z1». #1820, the 2-D arm the plan named, landed as ADR-725.
+
+**How the rulings fit together.** Three rulings speak about two letters on one place, and they cover different cases, so none overrides another:
+- a NEW letter whose definition puts it on a point that is already there is **refused, naming the holder** (2026-09-20, #1254/#1274; 3-D `point-coincides`, ADR-3D-183; analytic `already-named`; 2-D `crossing-already-named`). The #1595 body carves these out by name. Unchanged here.
+- two letters that only HAPPEN to fall together are **separated by another configuration** where one exists (2026-09-20, #1273; ADR-W-175 sr-25). That is the configuration search's job, unchanged here.
+- two letters the givens put on one dot and that **no configuration separates** are **accepted with a notice** (2026-09-30, 2026-10-30). This ADR.
+
+**Decision.**
+1. **One suite key, `suite.notice.converge`**, in `shell/locales/{he,en}.json`: 2-D's sentence verbatim, Hebrew «{{a}} ו-{{b}} נפלו על אותה נקודה.» and English "{{a}} and {{b}} have landed at the same point." (ADR-W-118 B1). 2-D's `figure.converge` is deleted in both languages.
+2. **`shell/converge.ts`** holds the shared half: `CONVERGE_KEY`, `coincidentPairs(points, same)` (every pair of distinct names at one place, in the caller's order) and `convergeText(pairs, t, name?)` (one sentence per pair, space-joined, as 2-D's banner reads). Each builder keeps the engine half: which points its canvas labels, and its own identity tolerance: 2-D `LEN_EPS` with its forcedness split and ADR-447's machinery filter (unchanged), 3-D `samePlace3` (`NAMED_TOL`, the test `namedPointAt` already used), analytic `crossings.apart` (ADR-AG-021's relative identity rule, not the 1% `stackedPairs` display ruler, because the sentence says they ARE one point), complex the solver's `TOL` relative to the numbers' size.
+3. **Read from the DRAWN figure on every render**, in every builder (2-D's behaviour, the plan update's correction 2): the notice holds while the drawing has the pair, survives every commit, and clears on the mute, edit, delete or configuration that separates it. Not "said once on the line that caused it", and not a sweep over configurations: the configuration search has already preferred a separated drawing where one exists.
+4. **`errors.sameSpot`** (2-D, the composition path's default collision) is unchanged: no reaching sequence shows givens forcing that stack (plan update, correction 4).
+
+**Not in this ADR.** 2-D writes a merged label «B=D» on the canvas for such a pair (scene.ts); the other builders draw the two labels on one dot. That is a parity cell for the canvas label, not part of the notice.
+
+**Locks.** `shell/__tests__/converge-1595.test.ts` (the pair reader, the text, the suite file). `<tree>/__tests__/converge-1595.test.ts` in each of the four trees (shared assertions `shell/__tests__/fixtures/converge-1595.ts`): each drives the measured rows through its own door and reads the notice from the derivation its App renders, a control with no notice, the kept refusal (3-D, analytic), the mute/without-the-line clearing (3-D, analytic), and its i18n instance and App source.
+
+**Behaviour change for a student:** in 3-D, analytic and complex, when the givens put two letters on one dot, the line is accepted as before and a notice now says so: 2-D's «{{a}} ו-{{b}} נפלו על אותה נקודה.». 2-D unchanged.
+
+## ADR-W-177 — A new letter its definition forces onto a named point is accepted, with the notice, in every builder (#1595)
+
+**Status:** accepted · 2026-11-03 · feature (P2, all builders) · PR #2666, branch `feat/1595-coincidence-notice` · **Operator ruling:** 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the question of the same day (*"1955 - accept with message"*, read as #1595): option **B** · **Amends:** [ADR-W-176](#adr-w-176) (its first bullet), [ADR-W-072](#adr-w-072) (the table's first column) · per-product: [ADR-3D-405](06b-decisions-3d.md#adr-3d-405), [ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-17 (extended); [02c](02c-requirements-analytic.md) R60, R98, R214 (rewritten / extended) · **Design:** [04b](04b-design-3d.md) § *Two letters on one dot* (the mint judgement, narrowed); [04c](04c-design-analytic.md) § *A forced coincidence is recorded with the notice* and the line-by-line start / configuration-search tiers
+
+**Context.** The operator's two earlier rulings pointed opposite ways: 2026-09-20 (#1254/#1273) *"if P and B must be on the same location … it should be refused"*, and 2026-10-30 (PR #2605 T34) *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user"*. He ruled B on 2026-11-02: accepted, with the message, in every builder, as 2-D already does. A coincidence the givens do NOT force stays ADR-W-072's (prefer a separating configuration); unchanged.
+
+**2-D measured at this branch's HEAD** (`driveThroughGate` and `decideDeterministic2D`, model mocked) — the reference ([2-D] rule):
+
+| kind | 2-D sequence | 2-D verdict |
+| --- | --- | --- |
+| positional: a second letter for a point built from points | «משולש ABC» · «M אמצע AB» · «N אמצע AB»; a second «מפגש התיכונים / הגבהים / חוצי הזוויות / האנכים האמצעיים», «מפגש האלכסונים» | accepted, «M ו-N נפלו על אותה נקודה.» |
+| positional: a magnitude or a foot forcing it | «AB=4 · D על AB · AD=4»; «∠B = 90° · AD גובה לצלע BC» | accepted, notice |
+| crossing named onto a point by the geometry | «ריבוע ABCD · AC ו-BD נחתכים בנקודה O · … בנקודה E»; the medians' concurrency (G, H) | accepted, notice |
+| crossing of two carriers WRITTEN through one shared letter | «משולש ABC · D חיתוך AB ו-BC», «AB ו-BC נחתכים בנקודה D» | **refused** `crossingAlreadyNamed` (#1274, ADR-W-066) |
+| a curve's centre named again | «מעגל שמרכזו O · P מרכז המעגל» | a rename (`store-op`), no coincidence |
+| a tool-lettered point named | «תיכון מ-A במשולש ABC · D אמצע BC» | accepted, the tool's M **renamed** to D (auto-bind) |
+
+**Decision.** Each sibling gives 2-D's verdict per kind, at its existing chokepoint, and the existing notice (ADR-W-176) says it — no second detection:
+1. **Accepted with the notice:** every positional kind and every crossing the geometry forces (3-D: `point-coincides` narrowed, ADR-3D-405; analytic: the #1254 arm retired, the #1153 arm, the two-straights cap and the crossing-distinct sibling rule opened, ADR-AG-372). #2631's «האנך האמצעי לצלע BC והישר AM נפגשים בנקודה E» records with «M ו-E נפלו על אותה נקודה.», which overrules the judge's q-2631 "refuse" (the ledger is left to the operator's session).
+2. **Still refused, as 2-D refuses it:** a crossing whose two carriers are written through the point (analytic's parser #1175; 3-D's `writtenOnto3`, which keeps ADR-3D-183's own AC' ∩ ADE).
+3. **Out of this class, unchanged:** a curve's feature named twice (analytic `already-named`; 2-D answers it as a rename), the third crossing of a line and a conic (#1893) and a tangent's second crossing (#1924), which carry their own ruled sentences.
+
+**Not decided here (reported on #1595).** 2-D hands a TOOL letter over to the student's («תיכון מ-A …» · «D אמצע BC»: M becomes D, no notice); analytic now keeps M and shows «M ו-D נפלו על אותה נקודה.». Same verdict (accepted), different drawing — a parity cell for the operator.
+
+**Behaviour change for a student:** in 3-D and analytic, a new letter whose definition puts it exactly on a point that already has a name («N אמצע AB» after «M אמצע AB», #2631's «… נפגשים בנקודה E» on M) is now accepted and the page says «M ו-N נפלו על אותה נקודה.»; it used to be refused. 2-D and complex unchanged.

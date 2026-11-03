@@ -65,6 +65,17 @@ unreached; a solved parameter or vertex keeps the old start. Configuration 0 nev
 wide)` carries the flag through the choice walk, the created-shape fit, the restarts and `drawableAt`'s walk from 0.
 `residualScale` keeps the ruled span.
 
+**A letter that names a measure starts at the measure** ([ADR-AG-365](06c-decisions-analytic.md#adr-ag-365), #2632):
+`carriers.ts` `labelRows` finds each symbol whose first row is a NAME — it reads that symbol alone, no object and no
+earlier row reads it, and its value is the bare symbol (an angle's value in any measure, an area's value, one side of a
+length equation whose other side is measures). `evaluate.ts` `labelsFromFigure` runs after the line fit and the
+created-shape fit: the symbol takes its row's measure on the seeded figure, unless the value falls outside the symbol's
+domain or a selector that reads it rejects it (a stated range wins: the sample is kept and the row is a given). A name
+nothing else reads is left out of stage one's system and measured again on stage one's solution, so a figure with
+givens before the name solves exactly as it did without it. `settledLabels` (names of symbols with no stated range) are
+read as met by the structural stages: `lineGroupsOf` skips their rows, and the line fit's and stage one's budget/start
+policy counts only the open symbols (`openSymbols`).
+
 **The freedom count has one rank** ([ADR-AG-309](06c-decisions-analytic.md#adr-ag-309), #2383): `solve.ts`
 `jacobianRank` — the central-difference Jacobian, rows equilibrated to unit length, a one-sided Jacobi SVD, a singular
 value counted above `RANK_REL_TOL · σ_max` (`10 · SOLVE_TOL`, the residue a dependent row keeps at an accepted solve).
@@ -222,7 +233,7 @@ resolves a noun-only perimeter.
 
 *Identifiers:* `engine/apply.ts`
 
-### An ellipse's roles and sizes; the canonical curve with no equation ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), [ADR-AG-354](06c-decisions-analytic.md#adr-ag-354), #2616, #2617, #2619)
+### An ellipse's roles and sizes; the canonical curve with no equation ([ADR-AG-353](06c-decisions-analytic.md#adr-ag-353), [ADR-AG-354](06c-decisions-analytic.md#adr-ag-354), [ADR-AG-362](06c-decisions-analytic.md#adr-ag-362), #2616, #2617, #2619)
 
 **One closed form.** `ellipseRolePoint(e, role)` (`engine/derived.ts`) is what a focus, a vertex, or an end of the major or
 minor axis IS over the resolved semi-axes (a on x, b on y). A focus counts along the MAJOR axis (`which` 0 is its
@@ -259,6 +270,8 @@ moves one resolved semi-axis, as |t| — `even` — or as √t — `linear`) the
 x^2/a^2+y^2/b^2=1» with `fresh: true` on its `curve` fact — M1 (`freshLetters`, `renameSym`) moves a letter the figure
 already uses to the next free one, in the equation and its label; a canonical circle is read as «נתון מעגל שמרכזו
 בראשית הצירים ורדיוסו R». The axis clause is stripped off the declaration and lowered to `major-axis-of`.
+
+**The pronoun subject** ([ADR-AG-362](06c-decisions-analytic.md#adr-ag-362), #2619 D). The through-converse (`parseIncidence`) reads «היא» as its subject before `lineObject`, lowers it onto «P על האליפסה» through `viaCanonical`, and marks the `on-kind` fact `pronoun: 'fem'`. M1's `on-kind` arm widens its candidates to `FEM_CURVE_KINDS` (ellipse, parabola) — one binds; none or several of one kind is that noun's `noHost`; several of two kinds carry `HostRef.kinds`, which `errorText` uses to put each candidate's own noun before its name in `errHost.named`. No point list (ADR-W-167).
 
 *Identifiers:* `ellipseRolePoint` · `EllipseRole` · `EllipseSide` · `sameEllipseRole` · `ellipse-point` · `ellipse-dist` · `RoleEnd` · `roleEndAt` · `major-axis` · `foldMajorAxis` · `focus-of` · `foci-of` · `vertex-of` · `major-axis-of` · `via-ellipse-role` · `ELLIPSE_ROLE_SENTINELS` · `nameEllipseRole` · `theEllipse` · `withOpenOrientation` · `parseEllipseMeasures` · `parseCanonicalConic` · `onePinValue` · `semiAxisLetters` · `freshLetters` · `ellipseRoleAnswer` · `CONIC_ROLE_WORDS`
 
@@ -364,6 +377,9 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 
 `constructionCandidates` (`parser/scopeAnalytic.ts`) reads the closed grammar `ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST`
 (`CONSTRUCTION_VERBS_HE`); its candidates are flagged `exam` and kept only when parser and fold accept them.
+A relative clause written with «ש» at the head of the rest («ישר l1 שמקביל ל-PO») is read as the «ה» clause
+(`SHE_RELATIVE`, in `predicate`), and «ישר» takes a line's own name (`LINE_LABEL_AFTER_NOUN`): through a point it is
+taught as «דרך N עובר ישר l1 …» ([ADR-AG-371](06c-decisions-analytic.md#adr-ag-371), #2620 C).
 `confirmTaught(lines, seed)` (`app/submit.ts`) is what the 471 ratchet calls.
 
 *Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`
@@ -657,6 +673,32 @@ capped by `residualScale`; `completingStatement` is the drop-one blame for the w
 
 *Identifiers:* `unsatisfiable` · `AngleName` · `right-angle` · `example` · `DE` · `הצלע AB` · `ℓ1` · `הישר l1` · `ax + by + c = 0` · `ציר ה-x` · `(.+)`
 
+#### A line given by its direction alone ([ADR-AG-367](06c-decisions-analytic.md#adr-ag-367), #2621 B)
+
+`parseDirectionLine` reads «(נתון) ישר (l) (ה|ש)מקביל/מאונך לציר ה-x/y» and its English twin before the relation rule
+(which read «ישר» as an operand), and lowers it to one `direction-line { id, name?, rel, axis }` fact. M1 decides new vs
+existing: a named line the figure has is the `relation` about it, exactly as before; otherwise `directionLineFacts`
+(`types.ts`, so `factsWithin` sees the curve it builds) states the `curve` `x - c` or `y - c` over the tool's offset
+symbol `toolSymbol(id, 'c')` (spelled in `names.ts`, re-exported by `carriers.ts`), a free DOF the register finds by
+use; the panel prints no tool symbol (`readsToolSymbol`). An anonymous id hashes the sentence, so two sentences are two
+lines. Anything after the direction declines the sentence (one given per row, ADR-W-167).
+
+*Identifiers:* `parseDirectionLine` · `direction-line` · `directionLineFacts` · `toolSymbol` · `readsToolSymbol`
+
+#### The tangent as an operand, and named ([ADR-AG-368](06c-decisions-analytic.md#adr-ag-368), #2621 A)
+
+`direction()` reads the tangent noun through `readTangentNoun` (the ask lane's reader): at a point it is the
+`tangentLineId(at)` curve, and its build (`tangentObjectFacts`) rides `ClaimSink.lead` so `claimed()` puts it ahead
+of the statement; bare it is `FIGURE_TANGENT_ID`, which `resolveFigureTangent` (top of `applyFact`) replaces with the
+figure's one tangent object or refuses with `noHost`. `parseNameLineObject` names the tangent the same way, and
+`name-line-object` keeps the id `tangentLineId(through)` (only the name changes; references by name go through
+`resolveLineRefs`). «l הוא המשיק …» (`parseNamedAsTangent`) is «הישר l משיק …», and `tangent-of` with an unknown named
+line and a touch point states `tangent-line-at { name }`; a `line-at` restated under its own id with a new name takes
+`restatedLine`'s verdict, and `lineDescription` writes the tangent as «המשיק בנקודה A» for the offer. `callable` gives
+an unnamed tangent no name, so a refusal never lists `tangent-A`.
+
+*Identifiers:* `readTangentNoun` · `ClaimSink.lead` · `claimed` · `FIGURE_TANGENT_ID` · `resolveFigureTangent` · `parseNamedAsTangent` · `restatedLine` · `lineDescription` · `callable`
+
 #### The relation rule's notations ([ADR-AG-093](06c-decisions-analytic.md#adr-ag-093))
 
 `RELATION_HE`, `RELATION_EN` and `RELATION_SYM` («AB ∥ DC», «AB ⊥ DC») share one handler through `direction()`;
@@ -924,6 +966,27 @@ bounded segment keeps `t* = −B/2A` within [0, 1] as two hinge rows.
 
 *Identifiers:* `ConicHost` · `conicHostOf` · `curveHost` · `touchNormal` · `conicTangencyRows` · `parseConicInscribed` · `conicInscribedFacts`
 
+### A circle and a conic ([ADR-AG-360](06c-decisions-analytic.md#adr-ag-360), [ADR-AG-361](06c-decisions-analytic.md#adr-ag-361), #2618 PR 2)
+
+**Parse.** A circle SUBJECT before the curve-host atom in `parseCircleAt`'s conic branch («המעגל משיק לאליפסה», «מעגל M
+משיק לפרבולה בנקודה B», «… בנקודות B ו-D») and the concentric readings appended to `parseConicInscribed`
+(`parseCircleEllipseFit`: «מעגל חסום באליפסה», «באליפסה חסום מעגל», «האליפסה חוסמת את המעגל» inside; «האליפסה חסומה
+במעגל», «במעגל חסומה האליפסה», «המעגל חוסם את האליפסה» around; the English twins; the ellipse only) all lower to ONE
+fact, `circle-conic { circle, host, ats?, fit? }`, inside `circles-about` over one slot (`oneCircleSlot`): the figure's
+one circle binds, none draws one (ADR-AG-198's created circle), a letter states the circle on it, several ask.
+
+**Apply.** The circle arrives by id; the conic is `curveHost`'s. Named touch points lower to three rows each, all
+existing: on the circle, on the conic (each skipped when the point is on it by construction), and
+`relation parallel (touchNormal(circle, T), touchNormal(conic, T))` — the radius ∥ the conic's normal. Otherwise one
+constraint, `circle-conic { circle: CircleSide, curve, rel }`:
+- `rel: { k: 'touch', s }` — `s` is the tool's touch parameter, a `θ_` symbol with no part (`directionSymbol`, so the
+  created-shape fit leaves it alone and the sampler draws it in angle units). The conic's point is P(s): ellipse
+  `(a·cos s, b·sin s)`, parabola y² = 2px `(p·s²/2, p·s)`; the rows are `(|C − P| − r)/size` and the sine between
+  `C − P` and the conic's normal at P. Net −1 DOF.
+- `rel: { k: 'inscribed' | 'circumscribed' }` — `(cx, cy, r − min/max(|a|, |b|)) / size`: the concentric circle.
+
+*Identifiers:* `circle-conic` (fact and constraint) · `parseCircleEllipseFit` · `CIRCLE_ELLIPSE_FIT` · `CIRCLE_CONIC_WORDS`
+
 ### The contextual circle: one binding for every sentence about «המעגל» ([ADR-AG-196](06c-decisions-analytic.md#adr-ag-196), #1633, #1619)
 
 `the-circle { create, about, match? }` is the one contextual-circle fact; M1's `theCircle(c, match)` binds, creates or
@@ -1150,7 +1213,9 @@ figure's own solve from the same starts, so each later line is fitted to the fig
 try the region-seeded start, a seed-varied point in 0.2–0.8 of each bounded piece or `between`, the quarter points of
 each two-point carrier unless a `beyond` names the vertex, and the hashed seed; larger groups their seeded start. A fit is
 taken only if it converged, its bounded pieces and the group's selectors hold, no ring of its points has a hard fault, and no group vertex sits on another point
-(2·`apartOf`: that coincidence is the verdict's, the crossing-already-named family). Otherwise the starts are unchanged.
+(2·`apartOf`). A fit that fails only that last test is kept as `onPoint` and taken when no start gives one apart, for a group whose incidences are all straights
+([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372), #1595: a coincidence the givens force is recorded with the notice,
+and without its start the joint solve redrew the earlier figure). Otherwise the starts are unchanged.
 A start, never a verdict.
 
 **The box.** ADR-AG-324's wide seeding box reads `reachedByLine`: a free vertex counts as reached only by a row that
@@ -1219,7 +1284,15 @@ and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisi
 `separationMoves`, 2-D's `solutionAccepted` in `multiStartSolve`). The walk compares candidates' discrete assignments
 (`choiceOptions`, the `assignmentAt` key): a preference never crosses one (ADR-AG-227), except that a whole first figure
 which stacks two named points may open on a whole, separated candidate of another assignment (`crossSeparated`, below
-the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)).
+the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)). When nothing in the walk is
+separated (a coincidence the givens force), a whole SPREAD candidate (`wholeSpread`) wins before the first whole one, so the
+pair cannot cost the drawing its spread preference ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372)).
+
+**After the search: two letters it could not separate are said ([ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), #1595).**
+`app/coincidences.ts` `coincidencesOf(d)` reads the drawn figure's points at `crossings.apart` (identity, not the
+`stackedPairs` display ruler), floored at `SOLVE_TOL · 10` (a figure whose points all sit on the one dot has no span;
+ADR-AG-372), through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) as an ⓘ
+notice after the narrowing notes, per render.
 
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
@@ -1329,9 +1402,16 @@ order. Search first is kept by the predicate, not by a budget: a dart-capable pa
 
 *Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `convexWhenSimple` · `ringOrderFault` · `InputError`
 
-### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
+### A forced coincidence is recorded with the notice; a structural one is refused ([ADR-AG-372](06c-decisions-analytic.md#adr-ag-372), was [ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
 
-A crossing on an existing point is refused by position only when no configuration separates them. Structurally, in
+**Since #1595 (ADR-AG-372, operator ruling 2026-11-02) the positional arm below is retired:** a crossing, or a second
+letter for a point built from points (`apply.ts`'s #1153 arm; `namesCurveFeature` keeps a curve's centre, focus, ellipse
+point and touch points refused), that the givens force onto a named point records, and `coincidencesOf` says so. Two
+straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name for their crossing, and `crossingPartners`
+returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
+refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
+
+A crossing on an existing point was refused by position only when no configuration separates them. Structurally, in
 `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
 `self-crossing`. **Positionally** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613): `crossingHasNoPoint`
@@ -1398,6 +1478,22 @@ nature: a conic has no radius, and analytic has no conic-tangency sentence.
 `isKnowledge` and by «הציגו תצורה אחרת».
 
 *Identifiers:* `normalizedLine`
+
+#### The configuration drawn is the configuration recorded ([ADR-AG-358](06c-decisions-analytic.md#adr-ag-358), #2039, #2633)
+
+A configuration is `(seed, reach, wide)` (`Configuration`, `engine/evaluate.ts`): `evaluate` is pure over the three, and
+`drawableAt`'s walk from configuration 0 evaluates later seeds NARROW (ADR-AG-324) and its ring search at a widened reach.
+`Seed = number | Configuration` — a number is that seed's canonical configuration. `drawableAt` records, per requested
+configuration, the one it DREW (`drawnConfiguration`): the landed figure's own configuration when the walk landed on a
+preferred figure (asked there, it is taken at once: a fixed point), else the requested one. `derive(lines, at)` carries it
+as `Derivation.configuration`. The submit path solves the trial from `current.configuration` and its `record` verdict carries
+the trial's; `recordLine` / `recordLlmLines` / `goToSeed` write it into `seed` in the same set (`canonicalSeed`: a plain
+number whenever canonical, so saves and the undo slice are unchanged for them; `cleanSeed` validates a loaded one). The
+ask lane (`locusOf` takes `[Seed, number]`), the locus chip and `unstatedChoices` read `d.configuration`.
+`anotherConfiguration` returns the configuration its candidate drew and skips a candidate whose `drawnSampleOf` (raw seed,
+choice seed, root) is the one on the screen (#2633).
+
+*Identifiers:* `Configuration` · `Seed` · `configurationOf` · `seedNumber` · `canonicalSeed` · `sameSeed` · `drawnConfiguration` · `drawnSampleOf` · `cleanSeed`
 
 #### One configuration pool, completed after the render ([ADR-AG-180](06c-decisions-analytic.md#adr-ag-180), #1473)
 

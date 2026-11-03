@@ -37,6 +37,7 @@ import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 import { INDEXED_NAME_RE } from '../../shell/indexedName';
 import { resolveCurve } from './curves';
+import { toolSymbol } from './names';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -640,6 +641,51 @@ export function constraintSymbols(constraints: Construction['constraints']): str
 }
 
 /**
+ * THE ROWS THAT NAME A MEASURE THE FIGURE ALREADY HAS (#2632, [ADR-AG-365](../../docs/06c-decisions-analytic.md#adr-ag-365))
+ * — `symbol → its first row`, for every symbol whose first reader equates a measure to the BARE symbol: «נסמן זוית BAM
+ * כ-A1» (`∠BAM = ∠A1`), «AB = a», «זווית A = α», «שטח המשולש ABC הוא S».
+ *
+ * Such a row brings a symbol in and takes its one degree of freedom back, so the figure is exactly as free as before. 2-D
+ * reads it as a NAME for the measure (`measure-*` with a variable, `angle-alias`): the figure stays where it is and the
+ * letter takes the value it shows. Here the symbol is a solve unknown like any other, and it starts at the figure's
+ * measure (`evaluate.ts` `labelsFromFigure`), so the row already holds and nothing is moved for it.
+ *
+ * Structural, like {@link reachedByGivens}: the row reads ONE symbol, which no object reads (an object that reads it —
+ * `A(a,0)` — is shaped by its value, so the value is not the figure's to give) and no earlier row reads (that row
+ * already constrains it: «AB = a» · «AC = a» — the second is a real given). Its value is the bare symbol: an angle's
+ * value (degrees, tan, cos or sin), an area's value, or one side of a length equation whose other side is measures
+ * alone. Memoized on the construction, which is immutable.
+ */
+type AnyConstraint = Construction['constraints'][number];
+const labelCache = new WeakMap<Construction, ReadonlyMap<string, AnyConstraint>>();
+export function labelRows(c: Construction): ReadonlyMap<string, AnyConstraint> {
+  const hit = labelCache.get(c);
+  if (hit) return hit;
+  const out = new Map<string, AnyConstraint>();
+  const byObjects = new Set<string>();
+  for (const o of c.objects) for (const s of symbolDeps(o)) byObjects.add(s);
+  const bare = (e: Expr): string | null => (e.kind === 'sym' ? e.name : null);
+  const seen = new Set<string>();
+  for (const k of c.constraints) {
+    const syms = constraintSymbols([k]);
+    if (syms.length === 1 && !seen.has(syms[0]) && !byObjects.has(syms[0])) {
+      const s = syms[0];
+      let value: string | null = null;
+      if (k.t === 'angle' || k.t === 'area') value = bare(k.value);
+      else if (k.t === 'length-eq') {
+        // one side the bare symbol and nothing else, the other side measures alone (the symbol is in only one side)
+        if (k.left.terms.length === 0) value = bare(k.left.expr);
+        else if (k.right.terms.length === 0) value = bare(k.right.expr);
+      }
+      if (value === s) out.set(s, k);
+    }
+    for (const s of syms) seen.add(s);
+  }
+  labelCache.set(c, out);
+  return out;
+}
+
+/**
  * THE RANGE A SYMBOL'S USE IMPLIES, for SAMPLING only (#1621, ADR-AG-215).
  *
  * «∢ABC = α» names an angle by a symbol, and the angle it names is unsigned — 0° to 180° — so α can only ever
@@ -747,7 +793,8 @@ export const directionSymbol = (lineId: Id): string => `θ_${lineId}`;
  * Spelled under the same prefix so every surface that already keeps the free direction out of the givens' rows
  * keeps these out by the same test.
  */
-export const toolSymbol = (objectId: Id, part: string): string => `θ_${objectId}.${part}`;
+// Spelled in `names.ts` (#2621, ADR-AG-367) so `types.ts` can lower a direction line without an import cycle.
+export { toolSymbol };
 export const isDirectionSymbol = (sym: string): boolean => sym.startsWith('θ_');
 /**
  * The object a SHAPE symbol shapes — `θ_<object>.<part>`, made by {@link toolSymbol} — or `null` for any other

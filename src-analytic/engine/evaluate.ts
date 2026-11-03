@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
@@ -1292,6 +1292,14 @@ function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): I
   const mine = declaredAt.get(id) ?? Number.POSITIVE_INFINITY;
   const atFn = (q: Id) => at.get(q) ?? null;
   const curveAt = curveAtOf(c, env, atFn);
+  /*
+   * #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message") — TWO STRAIGHTS MEET ONCE. A second letter
+   * for their crossing («AC ו-BD נחתכים בנקודה O» · «… בנקודה E») is forced onto the first: there is no other root
+   * to keep it apart on, so demanding one judged every configuration false and refused the line `unsatisfiable`. 2-D
+   * records it with «O ו-E נפלו על אותה נקודה.», and so does this tree now (`app/coincidences.ts`). A pair with two
+   * roots (a line and a circle) keeps #1113's rule: its second crossing is the OTHER root.
+   */
+  if (pair.every((k) => straightCarrierOf(k, atFn, curveAt) !== null)) return [];
   const lineAt = lineAtOf(c, env, atFn);
   const scale = residualScale(c, env);
   const onBoth = (q: Id) =>
@@ -2093,6 +2101,8 @@ export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !==
   if (hit) return hit;
   const out = evaluateTryingChoices(raw, seed, reach, wide);
   perSeed.set(key, out);
+  // #2039 (ADR-AG-358): which configuration this figure is — first writer wins, so a figure two keys share keeps one name
+  if (!evaluatedAt.has(out)) evaluatedAt.set(out, { seed, reach, wide });
   return out;
 }
 
@@ -2367,7 +2377,10 @@ function lineGroupsOf(c: Construction): LineGroups {
   const moved = new Set<Id>();
   /** The vertices a row through a symbol would move (its latest line's): the joint solve places them, so no group fits them. */
   const joint = new Set<Id>();
+  const labels = new Set(settledLabels(c).values());
   for (const k of c.constraints) {
+    // A row naming a measure the figure has (#2632, ADR-AG-365): its symbol meets it, so it moves no vertex.
+    if (labels.has(k)) continue;
     const top = topOf(k);
     if (!top) continue;
     if (throughSymbol(k)) {
@@ -2454,8 +2467,8 @@ function lineGroupsOf(c: Construction): LineGroups {
  * (a carrier start ignores the extension's region — measured, it broke every «E על המשך …»); the hashed seed. A line
  * that introduced several starts where they were seeded. The first fit that converges, keeps the line's selectors and
  * bounded pieces, and puts no new vertex on another point is taken; with none, the line's starts are left as they were.
- * A fit ON another point is never taken: that is the coincidence the verdict owns (the crossing-already-named family,
- * ADR-AG-213; the stacked pair, #1273), and the joint solve and the judge decide it exactly as before.
+ * A fit ON another point is taken only when no start gives one apart (#1595: a coincidence the givens force is
+ * recorded with the notice; the stacked pair's preference, #1273, still picks a separated fit first).
  * A start, never a verdict: the joint solve and the judge keep the last word.
  */
 function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: ReadonlyMap<Id, Pt>, seed: number): void {
@@ -2463,7 +2476,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
   if (!on) return;
   const scale = residualScale(c, env);
   // the joint solve's own stage-one budget: 40 with parameters in the figure, 120 without
-  const budget = paramRegister(c).length > 0 ? 40 : 120;
+  const budget = openSymbols(c).length > 0 ? 40 : 120;
   for (const g of groups) {
     const asMap = (x: number[]): Map<Id, Pt> => {
       const m = new Map(seeded);
@@ -2499,7 +2512,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       const h = hashed.get(v);
       if (h) starts.push(new Map(seeded).set(v, h));
     }
-    const admissible = (pos: Map<Id, Pt>): boolean => {
+    const admissible = (pos: Map<Id, Pt>, stacked = false): boolean => {
       for (const k of bounded) {
         const pa = pos.get(k.a);
         const pb = pos.get(k.b);
@@ -2507,7 +2520,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
         if (pa && pb && p && !withinSegment(pa, pb, p)) return false;
       }
       const near = 2 * apartOf(pos);
-      for (const v of g.ids) {
+      for (const v of stacked ? [] : g.ids) {
         const p = pos.get(v);
         if (p && [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near)) return false;
       }
@@ -2517,6 +2530,25 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       if (hard.some((r) => { const o = objectById(c, r.id); return o?.kind === 'polygon' && o.vertices.some((v) => g.ids.includes(v)); })) return false;
       return g.selectors.length === 0 || failingSelectors({ ...c, selectors: g.selectors }, pos, env).length === 0;
     };
+    /*
+     * #1595 (ADR-AG-372; operator ruling 2026-11-02, "accept with message"): a fit ON another point is taken LAST, when no
+     * start gives one apart. It used to be never taken, because the coincidence was the refusal's to report; that
+     * refusal is gone for a coincidence the givens force (#2631: E on M), and without this start the joint solve spread
+     * the crossing's correction over the triangle again — A moved 8.6 at seed 0. A separated fit still wins whenever
+     * one exists (ADR-W-072's preference), and only a crossing of straights takes it (below).
+     */
+    let onPoint: Map<Id, Pt> | null = null;
+    let took = false;
+    // Only where the group's incidences are all STRAIGHTS: two lines cross transversally, so a fit on the point is a clean
+    // root. A line touching a conic there is a double root, and starting on it blinds the rank reads the tangent and
+    // third-crossing arms judge by (#1924, #1932 — measured: «P על הישר l1» on the tangent lost its refusal at seed 1).
+    const straightsOnly = g.rows
+      .filter((k) => (k.t === 'on-line-2pt' || k.t === 'on-line' || k.t === 'on-curve') && g.ids.includes((k as { id: Id }).id))
+      .every((k) => {
+        const pos = place(c, env, seeded);
+        const at = (id: Id) => pos.get(id) ?? null;
+        return straightCarrierOf(k, at, curveAtOf(c, env, at)) !== null;
+      });
     for (const m0 of starts) {
       if (!m0) continue;
       // At the TIGHT tolerance (ADR-AG-143's factor): the joint solve starts on the fit and stops at once, so the fit is the
@@ -2528,10 +2560,15 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
       const r = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, residualsAt, iters));
       if (!r.ok) continue;
       const m = asMap(r.values);
-      if (!admissible(place(c, env, m))) continue;
+      if (!admissible(place(c, env, m))) {
+        if (!onPoint && admissible(place(c, env, m), true)) onPoint = m;
+        continue;
+      }
       for (const id of g.ids) seeded.set(id, m.get(id)!);
+      took = true;
       break;
     }
+    if (!took && onPoint && straightsOnly) for (const id of g.ids) seeded.set(id, onPoint.get(id)!);
   }
 }
 
@@ -2767,6 +2804,97 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
     env,
   );
   return { env: out, pins };
+}
+
+/**
+ * The names (`labelRows`) whose symbol carries no STATED range — a name whatever the figure measures, so the structural
+ * stages (which vertices a row moves, the fit's budget) can treat its row as met before any value is read (#2632). A
+ * symbol the student bounded («α < 30» · «∢ABC = α») is a name only where the figure's measure lies inside the range:
+ * those stages keep its row as a given, as before, and the value is decided in `labelsFromFigure`.
+ */
+function settledLabels(c: Construction): ReadonlyMap<string, Constraint> {
+  const labels = labelRows(c);
+  // a range is stated as a declaration's domain, or as a comparison («α < 30» is a selector the judge holds)
+  const bounded = [
+    ...c.params.filter((p) => p.domain.min !== undefined || p.domain.max !== undefined).map((p) => p.sym),
+    ...constraintSymbols(c.selectors as never),
+  ];
+  return bounded.some((sym) => labels.has(sym)) ? new Map([...labels].filter(([sym]) => !bounded.includes(sym))) : labels;
+}
+
+/** The register's symbols no row NAMES from the figure (`labelRows`, #2632) — the ones the solve has to find. */
+function openSymbols(c: Construction): string[] {
+  const labels = settledLabels(c);
+  return paramRegister(c)
+    .map((p) => p.sym)
+    .filter((s) => !labels.has(s));
+}
+
+/**
+ * A SYMBOL A ROW NAMES STARTS AT THE FIGURE'S OWN MEASURE (#2632, [ADR-AG-365](../../docs/06c-decisions-analytic.md#adr-ag-365),
+ * amending ADR-AG-144's "every parameter held at its sample").
+ *
+ * «משולש ABC» · «נקודה M על BC» · «נסמן זוית BAM כ-A1»: `∠A1` was sampled independently of the figure (47.31° at seed 0),
+ * and stage one, holding it there, moved the triangle until ∠BAM was 47.31° — the figure redrew at every seed (13.2 at
+ * worst), for a sentence that only gave a measure a name. 2-D reads the same sentence as a name (`measure-*` with a
+ * variable, `angle-alias`) and moves nothing. So each symbol `labelRows` finds takes the value its row measures on the
+ * figure as it stood — the seeded vertices, after every earlier line was fitted — and the row holds before any solve.
+ *
+ * A STATED RANGE WINS: a value outside the symbol's domain (its declaration narrowed by the range its use implies, the
+ * sampler's own domain), or one a stated comparison rejects («α < 30» is a selector), keeps the sample, and the row is
+ * then a real given, solved as before (measured on #1622 E5). A measure that cannot be
+ * read (a ray of no length) or does not make the row hold (a sin row on the other root) keeps the sample too. One
+ * measure per symbol, no solve. Returns the symbols set, which stage one does not count as unknowns.
+ */
+function labelsFromFigure(
+  c: Construction,
+  env: Env,
+  seeded: ReadonlyMap<Id, Pt>,
+  only?: ReadonlySet<string>,
+): { env: Env; labelled: ReadonlySet<string> } {
+  const labels = only ? new Map([...labelRows(c)].filter(([sym]) => only.has(sym))) : labelRows(c);
+  if (labels.size === 0) return { env, labelled: new Set() };
+  const domains = new Map(paramRegister(c).map((p) => [p.sym, p.domain] as const));
+  const pos = place(c, env, new Map(seeded));
+  const at = (id: Id) => pos.get(id) ?? null;
+  const curveAt = curveAtOf(c, env, at);
+  const lineAt = lineAtOf(c, env, at);
+  const scale = residualScale(c, env);
+  const out: Record<string, number> = { ...env };
+  const labelled = new Set<string>();
+  for (const [sym, k] of labels) {
+    let v: number | null = null;
+    if (k.t === 'angle') {
+      const [pv, pa, pb] = [at(k.at.v), at(k.at.a), at(k.at.b)];
+      const theta = pv && pa && pb ? angleAt(pv, pa, pb) : null;
+      if (theta !== null) {
+        v = k.measure === 'tan' ? Math.tan(theta) : k.measure === 'cos' ? Math.cos(theta) : k.measure === 'sin' ? Math.sin(theta) : (theta * 180) / Math.PI;
+      }
+    } else if (k.t === 'area') {
+      const ps = k.ids.map(at);
+      if (ps.every((p): p is Pt => p !== null)) {
+        let s = 0;
+        ps.forEach((p, i) => {
+          const q = ps[(i + 1) % ps.length];
+          s += p.x * q.y - q.x * p.y;
+        });
+        v = Math.abs(s) / 2;
+      }
+    } else if (k.t === 'length-eq') {
+      v = evalLengthExpr(k.left.terms.length === 0 ? k.right : k.left, at, env, lineAt, curveAt);
+    }
+    if (v === null || !Number.isFinite(v)) continue;
+    if (!inDomain(narrowedDomain(domains.get(sym) ?? {}, impliedRange(c, sym)), v)) continue;
+    const trial = { ...out, [sym]: v };
+    // …a range stated as a comparison («α < 30», a selector) wins the same way
+    const ranges = c.selectors.filter((s) => constraintSymbols([s] as never).includes(sym));
+    if (ranges.length > 0 && failingSelectors({ ...c, selectors: ranges }, pos, trial).length > 0) continue;
+    const r = residual(k, at, trial, curveAt, lineAt, scale);
+    if (!r || r.some((e) => !(Math.abs(e) < 1e-9))) continue;
+    out[sym] = v;
+    labelled.add(sym);
+  }
+  return { env: out, labelled };
 }
 
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1, wide = seed !== 0): Figure {
@@ -3238,6 +3366,10 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     for (const [id, p] of fitted.seeded) seeded.set(id, p);
   }
 
+  // A symbol a row names from the figure starts at the figure's own measure (#2632, ADR-AG-365): the row already holds.
+  const named = labelsFromFigure(c, env, seeded);
+  env = named.env;
+
   const unsatisfied: Constraint[] = [];
   /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
   const collapsedRings: Id[] = [];
@@ -3263,7 +3395,21 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * old solve could never reach — a given that DETERMINES a parameter — and it is the only case in
    * which moving one is honest.
    */
-  const stageOne = carrierSystem(c, env, { params: 'fixed' });
+  /*
+   * A NAME NOTHING ELSE READS is not asked of stage one (#2632, ADR-AG-365): «משולש ABC» · «AB = 5» · «זווית A = α» — the
+   * seeded triangle does not yet hold AB = 5, so α measured there would make stage one solve a triangle the figure
+   * without the name never drew. Stage one solves the figure without such rows, exactly as it did before the name, and
+   * the symbol is measured on what it found. A symbol another row reads («AB = a» · «AC = a») keeps its seeded measure
+   * and its row: the later row is a real given.
+   */
+  const pureNames = new Set(
+    [...named.labelled].filter((sym) => {
+      const own = labelRows(c).get(sym);
+      return !c.constraints.some((k) => k !== own && constraintSymbols([k]).includes(sym)) && !constraintSymbols(c.selectors as never).includes(sym);
+    }),
+  );
+  const pureRows = new Set([...pureNames].map((sym) => labelRows(c).get(sym)));
+  const stageOne = carrierSystem(pureRows.size > 0 ? { ...c, constraints: c.constraints.filter((k) => !pureRows.has(k)) } : c, env, { params: 'fixed' });
   let converged = false;
 
   /**
@@ -3423,8 +3569,11 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       // …and asked from the SEEDED start alone when parameters exist: the restarts (a bounded crossing's
       // quarter points, the seed pushed off itself) are stage two's attempts, walked in the student's order.
       // A figure with no parameters keeps the multi-start as it always was.
-      const budget = solved.syms.length > 0 ? 40 : 120;
-      const vertexStarts = solved.syms.length > 0 ? [starts[0]] : starts;
+      // A symbol a row names from the figure (#2632, ADR-AG-365) already holds its row: it is no unknown the question
+      // asks about, so a figure whose only symbols are such names keeps the multi-start the figure without them ran.
+      const open = solved.syms.filter((sym) => !named.labelled.has(sym)).length;
+      const budget = open > 0 ? 40 : 120;
+      const vertexStarts = open > 0 ? [starts[0]] : starts;
       const first = solvePreferring(
         vertexStarts.map((m) => stageOne.toVec(m)),
         stageOne.residualsAt,
@@ -3433,16 +3582,24 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         (x) => selectorsHoldAt(stageOne, x),
         // With parameters, stage one is only a question (see below) and stage two — where a parameter can
         // move to fit the other root — does the deflation; paying for it twice cost the page 10× (#1463).
-        (x) => (solved.syms.length > 0 ? [] : separatedFrom(stageOne, x)),
+        (x) => (open > 0 ? [] : separatedFrom(stageOne, x)),
       );
       firstEffort = stageOne.asMap(first.values);
+      // …and each name nothing else reads is measured on the figure stage one found (#2632, ADR-AG-365).
+      // A name whose measure there cannot be read (a collapsed side) leaves its row unmet: stage one is then no answer.
+      let pureUnmet = false;
+      if (pureNames.size > 0) {
+        const re = labelsFromFigure(c, env, firstEffort, pureNames);
+        env = re.env;
+        pureUnmet = [...pureNames].some((sym) => !re.labelled.has(sym));
+      }
       // A converged stage one the selectors reject is not the answer while a parameter could still move
       // (#1463): at the seed's radius only the COLLAPSED kite fits the circle, and the configuration the
       // selectors accept needs the radius to change. Stage two is tried with the parameters free, and this
       // solution is its fallback — so a figure no configuration rescues draws exactly what it drew.
-      const stageOneRejected = first.ok && solved.syms.length > 0 && !selectorsHoldAt(stageOne, first.values);
+      const stageOneRejected = first.ok && open > 0 && !selectorsHoldAt(stageOne, first.values);
       if (stageOneRejected) stageOneFallback = { ...first, values: solved.toVec(firstEffort, env) };
-      if ((first.ok && !stageOneRejected) || solved.syms.length === 0) {
+      if ((first.ok && !stageOneRejected && !pureUnmet) || solved.syms.length === 0) {
         converged = true;
         free = firstEffort;
         solvedVec = solved.toVec(free, env);
@@ -4078,6 +4235,73 @@ const RING_REACH_TRIES = 8;
 const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
 
 /**
+ * WHICH CONFIGURATION IS DRAWN (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)).
+ *
+ * A configuration is not a seed alone: `evaluate` is pure over `(seed, reach, wide)`, and `drawableAt`'s walk from
+ * configuration 0 evaluates the seeds after it NARROW (`wide` false, ADR-AG-324) and its ring search at a widened
+ * `reach` (ADR-AG-256). So the configuration a walk LANDED on is named by all three — the seed number alone would
+ * re-derive a different figure. A plain number is the canonical configuration of that seed (`reach` 1, `wide` iff the
+ * seed is not 0), which is every configuration a caller names today.
+ */
+export interface Configuration {
+  seed: number;
+  reach: number;
+  wide: boolean;
+}
+/** A seed, or a configuration the walk landed on — what `derive`, `drawableAt` and the session store take. */
+export type Seed = number | Configuration;
+/** The configuration a seed names (the canonical one for a plain number). */
+export const configurationOf = (at: Seed): Configuration =>
+  typeof at === 'number' ? { seed: at, reach: 1, wide: at !== 0 } : at;
+/** The seed number of a configuration — what «הציגו תצורה אחרת» counts on from, and the choice odometer reads. */
+export const seedNumber = (at: Seed): number => (typeof at === 'number' ? at : at.seed);
+/** The SHORTEST spelling of a configuration: a plain number whenever it is that seed's canonical one (a save file and
+ *  the undo slice then hold exactly what they held before this existed). */
+export const canonicalSeed = (at: Seed): Seed => {
+  const k = configurationOf(at);
+  return k.reach === 1 && k.wide === (k.seed !== 0) ? k.seed : { seed: k.seed, reach: k.reach, wide: k.wide };
+};
+/** Do two seeds name the same configuration? */
+export const sameSeed = (a: Seed, b: Seed): boolean => {
+  const x = configurationOf(a);
+  const y = configurationOf(b);
+  return x.seed === y.seed && x.reach === y.reach && x.wide === y.wide;
+};
+/** Every figure `evaluate` computed, with the configuration it is the figure OF — read back by `drawnConfiguration`. */
+const evaluatedAt = new WeakMap<Figure, Configuration>();
+/**
+ * WHICH SAMPLE A FIGURE DRAWS (#2633, ADR-AG-358): the raw seed its free quantities were sampled at and the discrete options
+ * it took — but not the box (`wide`) or the reach. ADR-AG-324's two boxes make one hashed sample reachable twice
+ * (configuration 0's walk draws raw seed 3 narrow, configuration 1's draws it wide), and the second is the first re-scaled:
+ * the same configuration to a student. `undefined` for a figure `evaluate` did not compute (a hand-built one).
+ */
+export function drawnSampleOf(f: Figure): string | undefined {
+  const k = evaluatedAt.get(f);
+  return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
+}
+/** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
+const drawnCache = new WeakMap<Construction, Map<string, Configuration>>();
+
+/**
+ * THE CONFIGURATION `drawableAt` DREW, as a value that draws it again (#2039 step 1, ADR-AG-358): `drawableAt(c, drawn)`
+ * returns the same figure as `drawableAt(c, at)`. When the walk landed on a PREFERRED figure that is its own configuration —
+ * re-asked there, it is the first figure evaluated and is taken at once. Any other outcome (no walk, or a fallback tier the
+ * walk settled for) is the requested configuration itself, which by purity draws it again. So the session can record what
+ * is on the screen, and the next line is solved from there instead of from a configuration the student never saw.
+ */
+export function drawnConfiguration(c: Construction, at: Seed, preferSpread = false): Configuration {
+  const key = drawableKey(at, preferSpread);
+  const hit = drawnCache.get(c)?.get(key);
+  if (hit) return hit;
+  drawableAt(c, at, preferSpread);
+  return drawnCache.get(c)?.get(key) ?? configurationOf(at);
+}
+const drawableKey = (at: Seed, preferSpread: boolean): string => {
+  const k = configurationOf(at);
+  return `${k.seed}:${k.reach}:${k.wide ? 1 : 0}:${preferSpread ? 1 : 0}`;
+};
+
+/**
  * The figure the tool would SHOW at this seed (#1083).
  *
  * Operator, 2026-09-15: *"on this shape, point C should be able to be positioned"* — on a figure
@@ -4098,7 +4322,7 @@ const drawableCache = new WeakMap<Construction, Map<string, Figure>>();
  */
 export function drawableAt(
   c: Construction,
-  seed: number,
+  at: Seed,
   /**
    * Prefer a WELL-SPREAD configuration among the valid ones (#1174).
    *
@@ -4118,9 +4342,11 @@ export function drawableAt(
     perSeed = new Map();
     drawableCache.set(c, perSeed);
   }
-  const key = `${seed}:${preferSpread ? 1 : 0}`;
+  const key = drawableKey(at, preferSpread);
   const hit = perSeed.get(key);
   if (hit) return hit;
+  // #2039 (ADR-AG-358): the requested configuration — a seed's canonical one, or one a walk landed on and the session recorded
+  const { seed, reach: atReach, wide } = configurationOf(at);
 
   /**
    * A figure is drawable when its selectors hold AND every object the student NAMED is in it.
@@ -4219,12 +4445,19 @@ export function drawableAt(
   const wholeOn = (f: Figure) => whole(f) && meetsOnDiagonals(f);
   const preferred = (f: Figure) => wholeOn(f) && (!preferSpread || (spread(f) && separated(f)));
 
-  const first = evaluate(c, seed);
+  const first = evaluate(c, seed, atReach, wide);
   let chosen = first;
   // The tiers, weakest last: a whole SEPARATED figure beats a whole stacked one, which is merely narrow
   // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
   let wholeSeparated: Figure | null = wholeOn(first) && (!preferSpread || separated(first)) ? first : null;
   let wholeFallback: Figure | null = wholeOn(first) ? first : null;
+  /*
+   * #1595 (ADR-AG-372): a whole SPREAD figure that stacks — the tier a coincidence the givens FORCE lands in. Such a
+   * figure has no separated candidate at all, and taking the first whole one (`wholeFallback`) dropped the spread
+   * preference with it: #2631's «… נפגשים בנקודה E» (E forced onto M) redrew the triangle the student was looking at,
+   * whose drawing the walk had chosen for its spread. Below every separated tier, so ADR-W-072's preference is unchanged.
+   */
+  let wholeSpread: Figure | null = wholeOn(first) && (!preferSpread || spread(first)) ? first : null;
   // #1937: whole, but a diagonal meet sits on the diagonals' extension — drawn only if no crossing figure turns up.
   let wholeExtended: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
@@ -4287,7 +4520,7 @@ export function drawableAt(
   let crossSeparated: Figure | null = null;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
-      const candidate = evaluate(c, seed + extra, 1, seed !== 0);
+      const candidate = evaluate(c, seed + extra, 1, wide);
       if (!sameChoices(candidate, seed + extra)) {
         if (mayCross && !crossSeparated && wholeOn(candidate) && separated(candidate)) crossSeparated = candidate;
         continue;
@@ -4302,13 +4535,14 @@ export function drawableAt(
         break;
       }
       if (!wholeSeparated && wholeOn(candidate) && (!preferSpread || separated(candidate))) wholeSeparated = candidate;
+      if (!wholeSpread && wholeOn(candidate) && (!preferSpread || spread(candidate))) wholeSpread = candidate;
       if (!wholeFallback && wholeOn(candidate)) wholeFallback = candidate;
       if (!wholeExtended && whole(candidate)) wholeExtended = candidate;
       // Second best: the selectors hold and something the student named is missing. Remembered, so a
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!preferred(chosen)) chosen = wholeSeparated ?? crossSeparated ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
+    if (!preferred(chosen)) chosen = wholeSeparated ?? crossSeparated ?? wholeSpread ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
     /**
      * SEARCH FIRST, REFUSE LAST (#1927 / #1939, ADR-AG-256; the operator's ruling of 2026-10-09: *"When a letter in the
      * sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the
@@ -4329,7 +4563,7 @@ export function drawableAt(
       if (unproven.length > 0 && paramRegister(c).length > 0) {
         search: for (const reach of RING_REACHES) {
           for (let extra = 0; extra < RING_REACH_TRIES; extra += 1) {
-            const candidate = evaluate(c, seed + extra, reach, seed !== 0);
+            const candidate = evaluate(c, seed + extra, reach, wide);
             noteRings(candidate);
             if (whole(candidate)) {
               chosen = candidate;
@@ -4353,6 +4587,15 @@ export function drawableAt(
     }
   }
   perSeed.set(key, chosen);
+  let drawn = drawnCache.get(c);
+  if (!drawn) {
+    drawn = new Map();
+    drawnCache.set(c, drawn);
+  }
+  // #2039 (ADR-AG-358): a walk that landed on a PREFERRED figure is recorded as that figure's own configuration (asked
+  // there, it is taken at once); anything else is the requested configuration, which draws the same figure by purity.
+  const landed = chosen !== first && preferred(chosen) ? evaluatedAt.get(chosen) : undefined;
+  drawn.set(key, landed ?? configurationOf(at));
   return chosen;
 }
 /**
@@ -4609,7 +4852,7 @@ class Pool implements ConfigurationPool {
   private done = false;
   constructor(private readonly c: Construction) {}
   private has(seed: number): boolean {
-    return drawableCache.get(this.c)?.has(`${seed}:0`) ?? false;
+    return drawableCache.get(this.c)?.has(drawableKey(seed, false)) ?? false;
   }
   ready(): number[] {
     const out: number[] = [];

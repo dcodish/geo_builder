@@ -13,11 +13,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { crossingsOf, offersOf } from '../engine/crossings';
 import { conicMeet, walkOfCoefficients, walkThrough } from '../engine/crossing-order';
 import { anotherConfiguration } from '../app/another';
 import { parseLine } from '../parser/parseAnalytic';
 import type { NumCurve } from '../engine/types';
+import type { Seed } from '../engine/evaluate';
 
 type P = { x: number; y: number };
 const CIRCLE = 'x^2+y^2=16';
@@ -27,7 +29,7 @@ const NTH = ['הראשונה', 'השנייה'] as const;
 const cross = (name: string, nth: 0 | 1 | null, straight: string) =>
   `${name} נקודת החיתוך${nth === null ? '' : ` ${NTH[nth]}`} של ${straight} עם המעגל ${CIRCLE}`;
 
-const pt = (lines: string[], id: string, seed = 0) => derive(lines, seed).figure.points.find((p) => p.id === id);
+const pt = (lines: string[], id: string, seed: Seed = 0) => derive(lines, seed).figure.points.find((p) => p.id === id);
 const near = (p: P | undefined, q: P) => p !== undefined && Math.hypot(p.x - q.x, p.y - q.y) < 1e-4;
 
 /** The circle as the figure resolved it. */
@@ -125,19 +127,20 @@ describe('#1268 — the pair, and «הציגו תצורה אחרת»', () => {
     expect(near(pt(lines, 'Q'), roots[0])).toBe(true);
   });
 
-  it('REFUSED: the same ordinal twice names a point that already has a name', () => {
+  it('the same ordinal twice names the point that already has a name — recorded, with the notice', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): Q is forced onto P, so the
+    // line records and the drawn figure says «P ו-Q נפלו על אותה נקודה.» (was `crossing-already-named`).
     const second = cross('Q', 0, 'הקטע AB');
     const d = derive([...CHORD, cross('P', 0, 'הקטע AB'), second], 0);
-    expect(d.faults).toHaveLength(1);
-    expect(d.faults[0].detail).toBe(second);
-    expect(d.faults[0].code).toBe('crossing-already-named');
+    expect(d.faults).toEqual([]);
+    expect(coincidencesOf(d)).toEqual([['P', 'Q']]);
   });
 
   it('cycling configurations never swaps an ordinal-named crossing', () => {
     // A free point K gives the figure other configurations to cycle through; P's sentence named its root.
     const lines = [...CHORD, 'נקודה K', cross('P', 1, 'הקטע AB')];
     const roots = rootsThrough(CHORD, 'A', 'B');
-    let seed = 0;
+    let seed: Seed = 0;
     let moved = 0;
     for (let press = 0; press < 6; press += 1) {
       const next = anotherConfiguration(lines, seed);

@@ -18,10 +18,11 @@ import { reachedByGivens } from '../engine/carriers';
 import { panelKnowledge } from '../app/panelRows';
 import { statedScale } from '../engine/pinRoots';
 import tangents from './fixtures/exam-2379-q2-two-tangents-2395.analytic.json';
+import type { Seed } from '../engine/evaluate';
 
 /** The values of `sym` over `n` presses of «הציגו תצורה אחרת» from seed 0. */
 function presses(lines: readonly string[], sym: string, n = 30): number[] {
-  let seed = 0;
+  let seed: Seed = 0;
   const out: number[] = [];
   for (let i = 0; i < n; i += 1) {
     seed = anotherConfiguration(lines, seed).seed;

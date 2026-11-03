@@ -41,7 +41,8 @@ export function stripBidi(s) {
 
 /** Does `haystack` contain `needle`, ignoring bidi marks and collapsing whitespace? */
 export function textIncludes(haystack, needle) {
-  const norm = (s) => stripBidi(s).replace(/\s+/g, ' ').trim();
+  // #2654: a sheet is written as the student TYPES («D'»), and the figure draws the prime («D′»).
+  const norm = (s) => stripBidi(s).replace(/[′’]/g, "'").replace(/\s+/g, ' ').trim();
   return norm(haystack).includes(norm(needle));
 }
 
@@ -83,6 +84,15 @@ export function validateSheet(sheet, products) {
           if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> } or { "type": "<utterance>" }`);
         });
     }
+    // #2654 (ADR-W-168): the checks that let a 👁 case close without the operator.
+    for (const k of ['expectFigure', 'expectRows']) {
+      if (c[k] !== undefined && (!Array.isArray(c[k]) || c[k].some((t) => typeof t !== 'string' || !t.trim())))
+        problems.push(`${at}: \`${k}\` must be a list of non-empty strings`);
+    }
+    if (c.expectConfigsDiffer !== undefined) {
+      if (c.expectConfigsDiffer !== true) problems.push(`${at}: \`expectConfigsDiffer\` is true or absent`);
+      else if (!(c.cycles >= 1)) problems.push(`${at}: \`expectConfigsDiffer\` needs \`cycles\` ≥ 1, or there is nothing to compare`);
+    }
   }
   return problems;
 }
@@ -91,7 +101,9 @@ export function validateSheet(sheet, products) {
  * The MECHANICAL verdict on one driven case — pure over what the driver measured.
  *
  * `drive` carries: steps [{line, refusals: []}], askSteps [{ask, unread}], bodyText, pageErrors,
- * captureProblems (from judgeCapture, already strings). A refusal case (`expectRefusal`) PASSES
+ * captureProblems (from judgeCapture, already strings), and since #2654 figureText (every SVG
+ * label's text), rowTexts (each givens row) and configHashes (one per drawing, the built figure
+ * then each cycle). A refusal case (`expectRefusal`) PASSES
  * exactly when some step was refused with matching text — the easiest thing to leave untested has
  * its polarity flipped on purpose.
  */
@@ -112,6 +124,17 @@ export function caseVerdict(spec, drive) {
   }
   for (const t of spec.expectAbsent ?? []) {
     if (textIncludes(drive.bodyText, t)) problems.push(`text «${t}» must NOT be on the page, and is`);
+  }
+  // #2654 (ADR-W-168): what is DRAWN, what the givens list says, and whether cycling changes anything.
+  for (const t of spec.expectFigure ?? []) {
+    if (!textIncludes(drive.figureText ?? '', t)) problems.push(`expected «${t}» drawn on the figure, and it is not among its labels`);
+  }
+  for (const t of spec.expectRows ?? []) {
+    if (!(drive.rowTexts ?? []).some((r) => textIncludes(r, t))) problems.push(`expected a givens row reading «${t}», and no row matches`);
+  }
+  if (spec.expectConfigsDiffer) {
+    const all = drive.configHashes ?? [];
+    if (new Set(all).size < 2) problems.push(`«הציגו תצורה אחרת» left the figure unchanged (${all.length} drawing(s), ${new Set(all).size} distinct)`);
   }
   if (drive.pageErrors?.length) problems.push(`${drive.pageErrors.length} uncaught page error(s) — first: ${drive.pageErrors[0]}`);
   for (const p of drive.captureProblems ?? []) problems.push(p);
@@ -143,7 +166,16 @@ const esc = (s) =>
  * publish carries them as files. Cases are grouped by class, the operator's work FIRST, and the
  * 🎮 utterances stay copy-pasteable lines in a code block (the rule-5 contract, kept).
  */
-export function renderReport({ sheet, results, generatedAt }) {
+/** #2654 (ADR-W-168): how a passing case was closed, in the report's words. */
+function closureLine(c, r) {
+  const cl = r?.closure;
+  if (c.class === 'play' || !cl) return '✓ נבדק מכנית וויזואלית על ידי הכלי';
+  if (cl.state === 'awaiting-review') return '⧗ ממתין לסקירה עיוורת';
+  const how = cl.method === 'blind-review' ? `סקירה עיוורת: ${esc(cl.saw ?? '')}` : 'בדיקה אוטומטית';
+  return `✓ נסגר על ידי הכלי — ${how}${cl.audit ? ' · נבחר לבדיקת מדגם' : ''}`;
+}
+
+export function renderReport({ sheet, results, generatedAt, audits }) {
   const byClass = new Map(CASE_CLASSES.map((k) => [k, []]));
   for (const c of sheet.cases) byClass.get(c.class).push(c);
   const resultOf = (id) => results.find((r) => r.id === id);
@@ -161,7 +193,7 @@ export function renderReport({ sheet, results, generatedAt }) {
 <pre class="lines" dir="rtl">${esc([...c.lines, ...(c.asks ?? [])].join('\n'))}</pre>
 ${afterSteps(c.after)}<p><strong>מה בודקים:</strong> ${esc(c.lookFor)}</p>
 ${c.before ? `<p class="before"><strong>לפני:</strong> ${esc(c.before)}</p>` : ''}
-<p class="verdict">${ok ? '✓ נבדק מכנית וויזואלית על ידי הכלי' : `✗ ${esc(r ? r.problems.join(' · ') : 'לא הורץ')}`}</p>
+<p class="verdict">${ok ? closureLine(c, r) : `✗ ${esc(r ? r.problems.join(' · ') : 'לא הורץ')}`}</p>
 ${shots ? `<div class="shots">${shots}</div>` : ''}
 </article>`;
   };
@@ -170,9 +202,23 @@ ${shots ? `<div class="shots">${shots}</div>` : ''}
     const cases = byClass.get(cls);
     if (cases.length === 0) return '';
     return `<section><h2>${CLASS_META[cls].icon} ${
-      cls === 'play' ? 'לשחק — נדרש שיפוט שלך' : cls === 'look' ? 'להסתכל — צילום מסך מספיק' : 'אומת — לתיעוד בלבד'
+      cls === 'play' ? 'לשחק — נדרש שיפוט שלך' : cls === 'look' ? 'להסתכל — נסגר על ידי הכלי' : 'אומת — נסגר על ידי הכלי'
     } (${cases.length})</h2>${cases.map(caseHtml).join('\n')}</section>`;
   };
+
+  // #2654 (ADR-W-168): the spot audits waiting for his sitting, right after his own 🎮 cases.
+  const auditSection = (audits ?? []).length
+    ? `<section><h2>🔍 בדיקת מדגם — מקרים שהכלי סגר, לבדיקתך (${audits.length})</h2>${audits
+        .map(
+          (a) => `<article class="case" id="audit-${esc(a.sheet)}-${esc(a.id)}">
+<h3><span class="badge play">🔍 מדגם</span> ${esc(a.sheet)} · ${esc(a.id)}</h3>
+<p class="server">שרת: <a href="${esc(a.base)}${esc(a.path ?? '')}" target="_blank" rel="noopener">${esc(a.base)}${esc(a.path ?? '')}</a></p>
+<pre class="lines" dir="rtl">${esc(a.lines.join('\n'))}</pre>
+<p><strong>מה בודקים:</strong> ${esc(a.lookFor)}</p>
+</article>`,
+        )
+        .join('\n')}</section>`
+    : '';
 
   return `<title>${esc(sheet.title ?? sheet.name)}</title>
 <style>
@@ -217,6 +263,9 @@ border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 <li>🎮 ${byClass.get('play').length}</li><li>👁 ${byClass.get('look').length}</li><li>✅ ${byClass.get('verified').length}</li>
 ${failures.length ? `<li class="fail">✗ ${failures.length} מקרים נכשלו מכנית — לא לשחק לפני תיקון</li>` : '<li>כל המקרים עברו את הבדיקה המכנית</li>'}
 </ul>
-${CASE_CLASSES.map(section).join('\n')}
+${section('play')}
+${auditSection}
+${section('look')}
+${section('verified')}
 </main>`;
 }

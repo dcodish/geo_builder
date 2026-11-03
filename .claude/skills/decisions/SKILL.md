@@ -24,7 +24,7 @@ rulings, never the goal: a pass that arms plans he has not seen has failed (CLAU
 
 - **Not a fix session.** It rules and it plans; it never implements. Fixes go to `/fix-round` after.
 - **Not triage.** It does not file new issues from operator reports — that is standing rule 3's job.
-- **Not a wording ballot for single sentences.** A new refusal or status sentence written under the one-next-step rule gets no card: it is approved by his play of the sheet (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)). A sentence that cannot follow the rule does come here.
+- **Never a wording ballot.** Every new student-facing string (refusal, note, chip, row label, English twin, spelling) is the session's: written under the pedagogy style rule, shipped, and recorded with `node scripts/judgments.mjs chose` for his review afterwards (operator 2026-11-02, [ADR-W-174](../../../docs/06w-decisions-workspace.md#adr-w-174)). Nor a card for whether to build a construct a textbook or bagrut exercise needs, or its priority: same ADR.
 - **Not a status report.** `/status-update` describes the queue; this one *empties the blocking half* of it.
 
 ---
@@ -64,7 +64,7 @@ frees none — the point of this pass is throughput after it ends. Break ties wi
 
 An issue that merely *lacks* a plan is **not** automatically blocking. If the plan is writable from the
 code and the rulings already on record, **write it** — and arm it only if every line of its
-`## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7). Do not spend an
+`## What the student will see` is `[asked]`, `[ruled]`, `[2-D]` or `[judged]` (CLAUDE.md rule 7). Do not spend an
 operator question on mechanism the session can work out. Bring them only what is genuinely theirs: product behaviour, pedagogy, UX,
 scope, a **feature's** priority, and anything that reverses a shipped promise. A bug's priority is never a card: the session sets it
 and says so in the report (ADR-W-117 Am. 1). Likewise a 2-D plane-geometry change's analytic port is never a card, and neither
@@ -94,6 +94,14 @@ have been measured at HEAD, not assumed. A dossier built on a guess wastes a rul
 is worse than no ruling, because it gets recorded and then built.
 
 ---
+
+## Step 2b — the judge goes first ([ADR-W-173](../../../docs/06w-decisions-workspace.md#adr-w-173), #2661)
+
+Before a card reaches him, give each question and its options to the `judge` agent: never your
+recommendation, never the fix. Record what it returns with `node scripts/judgments.mjs record`. A
+**ruled** question gets no card: transcribe it under `## Judged on the operator's behalf — <date>`,
+quoting its precedent, tag the line `[judged]`, and list it in his digest
+(`node scripts/judgments.mjs digest --md`, docs/22 §2e). Only the **escalated** questions become cards.
 
 ## Step 3 — ask in an HTML artifact, never in the chat
 

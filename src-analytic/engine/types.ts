@@ -30,7 +30,7 @@ import type { DerivedRule, EllipseRole, EllipseSide, FootLine } from './derived'
 import type { AngleName, AngleRef, Constraint, Direction, TangentLineRef } from './solve';
 import type { Expr } from './expr';
 import type { LengthExpr } from './lengths';
-import { lineIdOf, numeralCurveId } from './names';
+import { lineIdOf, numeralCurveId, toolSymbol } from './names';
 
 export type Id = string;
 
@@ -540,7 +540,19 @@ export type Fact =
    * the circle and lowers it to A on the circle plus a `line-at` whose direction is that radius turned a
    * quarter — a derived line, 0 DOF, id {@link tangentLineId}.
    */
-  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string; host?: ConicHost })
+  /*
+   * `name` (#2621 A, ADR-AG-368): the line's own name — «הישר l משיק למעגל בנקודה A» / «l הוא המשיק למעגל בנקודה A» with no
+   * l in the figure states the tangent AT A named l. Its id stays {@link tangentLineId}: every tangent-noun reader addresses
+   * the tangent by its touch point, and the name resolves by name (ADR-AG-317).
+   */
+  | (FactBase & { t: 'tangent-line-at'; at: Id; circle?: string; host?: ConicHost; name?: string })
+  /**
+   * «ישר המקביל לציר ה-x», «נתון ישר l המאונך לציר ה-x», «… שעובר מימין לראשית הצירים» — A LINE GIVEN BY ITS DIRECTION
+   * ALONE (#2621 B, ADR-AG-367). `rel` and `axis` are the sentence's own; the line is `x = c` or `y = c` over the tool's
+   * offset symbol (`toolSymbol(id, 'c')`), a free DOF (ADR-052). M1 decides new vs existing: a NAMED line the figure
+   * already has is the relation about it, as before.
+   */
+  | (FactBase & { t: 'direction-line'; id: Id; name?: string; rel: 'parallel' | 'perpendicular'; axis: 'x' | 'y' })
   /**
    * «משוואת המשיק היא 4x+3y=40» — the equation of «THE tangent», with no touch point named (#1619 B3).
    * WHICH tangent is M1's question: the one tangent object the figure holds (the equation is then a
@@ -607,6 +619,17 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; circles?: [Id, Id]; branch?: 'external' | 'internal'; at?: Id })
   /**
+   * A CIRCLE AND A CONIC (#2618 PR 2, ADR-AG-360 / ADR-AG-361) — «המעגל משיק לאליפסה (בנקודה B / בנקודות B ו-D)», «מעגל
+   * חסום באליפסה», «האליפסה חסומה במעגל». `circle` is the circle's id, written over a circle-slot sentinel inside
+   * `circles-about` (the one resolver for «המעגל» / «מעגל M»: bind, state, or ask); `host` the figure's one conic of
+   * that kind (`curveHost`). Exactly one reading:
+   * - `ats` — the touch points named: each on both curves, the circle's radius there ∥ the conic's normal there;
+   * - `fit` — the textbook's concentric circle (operator ruling Q1 → A): through the minor-axis vertices
+   *   (`inscribed`) or the major-axis vertices (`circumscribed`), the ellipse only;
+   * - neither — a touch the sentence does not place: the tool's own touch parameter on the conic.
+   */
+  | (FactBase & { t: 'circle-conic'; circle: Id; host: ConicHost; ats?: Id[]; fit?: 'inscribed' | 'circumscribed' })
+  /**
    * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
    * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
    * unnamed ones are an unstated order — a `choice` over both (R14, ADR-052).
@@ -630,7 +653,12 @@ export type Fact =
    * means is a question about the construction, so M1 answers it, and refuses where the figure
    * holds none or several of that kind.
    */
-  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef })
+  | (FactBase & { t: 'on-kind'; id: Id; kind: CurveKind | 'tangent' | 'perpendicular' | 'parallel' | 'perp-bisector'; circle?: string; line?: string; foot?: PerpRef; pronoun?: 'fem' })
+  /*
+   * `pronoun: 'fem'` (#2619 D, ADR-AG-362) — «היא עוברת דרך …»: the subject is the feminine pronoun, so "which curve" is
+   * the figure's one curve that takes it — an ellipse or a parabola — rather than the one of `kind`. None or several is
+   * the refusal the noun gets; several of different kinds name each with its own noun.
+   */
   /*
    * `kind: 'parallel'` / `'perp-bisector'` (#1138, ADR-AG-341) — «הישר המקביל», «האנך האמצעי»: the one line the figure
    * built through a point parallel to something (a `line-at`, not perpendicular, with a stated direction), the one
@@ -848,8 +876,22 @@ export const CIRCLE_SENTINEL = '⟨the-circle⟩';
  * passes that read the fact list before M1 (which line names an object): they must see a creation the
  * sentence may make, whichever branch M1 takes.
  */
+/**
+ * THE LINE A DIRECTION ALONE STATES (#2621 B, ADR-AG-367): parallel to the x-axis (or perpendicular to the y-axis) it is
+ * `y = c`, else `x = c`, over the tool's own offset symbol `θ_<id>.c` — never a letter the student could have typed, so
+ * it can never couple with one of theirs.
+ */
+export function directionLineFacts(f: Extract<Fact, { t: 'direction-line' }>): Fact[] {
+  const horizontal = (f.rel === 'parallel') === (f.axis === 'x');
+  const sym = toolSymbol(f.id, 'c');
+  const eq: Expr = { kind: 'sub', a: { kind: 'sym', name: horizontal ? 'y' : 'x' }, b: { kind: 'sym', name: sym } };
+  return [{ t: 'curve', id: f.id, label: { name: f.name ?? '', kind: 'line' }, curve: { kind: 'line', eq }, stated: true, src: f.src }];
+}
+
 export const factsWithin = (f: Fact): Fact[] =>
-  f.t === 'the-circle'
+  f.t === 'direction-line'
+    ? [f, ...directionLineFacts(f)]
+    : f.t === 'the-circle'
     ? [f, ...f.create.flatMap(factsWithin)]
     : f.t === 'circles-about'
       ? [f, ...f.about.flatMap(factsWithin)]
@@ -1074,6 +1116,12 @@ export const namesObject = (f: Fact): f is NamingFact =>
  */
 /** The id of the tangent line AT a point (#1619 B3) — one formula for the parser and M1. */
 export const tangentLineId = (at: Id): Id => `tangent-${at}`;
+/**
+ * «המשיק» with no touch point, in a slot that takes a line (#2621 A, ADR-AG-368) — the figure's ONE tangent object, resolved at
+ * M1 (`resolveFigureTangent`); none or several is the «המשיק» refusal. `◌` is the figure-reference mark (`RING_OF_FIGURE`),
+ * never typed by a student.
+ */
+export const FIGURE_TANGENT_ID: Id = tangentLineId('◌');
 
 export const diameterCircleId = (a: Id, b: Id): Id => `circle-diam-${[a, b].sort().join('')}`;
 export const isDerived = (o: GeoObject): o is DerivedObject => o.kind === 'derived';

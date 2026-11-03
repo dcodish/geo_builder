@@ -994,8 +994,13 @@ export function distributeClauses(line: string): string[] | null {
    * exactly as «A על המעגל» is «A נמצאת על המעגל». Without «על» the verb stays required — a bare list and
    * anything else is not this reading, so «A ו-B סימטריות» (a relation BETWEEN the subjects) never distributes.
    */
+  /*
+   * #2620 C (ADR-AG-371) — the COPULA with its noun, the book's p9-7: «A ו-B **הן נקודות** על ציר ה-x ועל ציר ה-y בהתאמה» is
+   * «A ו-B נמצאות על …»: «הן / הם» and «נקודות» are optional before «על», as the verb is (#1641). The English twin, "A and
+   * B are points on …", is below.
+   */
   const loc = new RegExp(
-    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:(?:נמצא(?:ות|ים)|מונח(?:ות|ים))\\s+(.+)|(על\\s.+))$`,
+    `^(?:ה?(?:נקודות|קדקודים)\\s+)?${NAME_LIST}\\s+(?:(?:נמצא(?:ות|ים)|מונח(?:ות|ים))\\s+(.+)|(?:(?:הן|הם)\\s+)?(?:נקודות\\s+)?(על\\s.+))$`,
   ).exec(line);
   if (loc) {
     const names = namesOf(loc[1]);
@@ -1026,7 +1031,7 @@ export function distributeClauses(line: string): string[] | null {
    * distributes only over a list of carriers.
    */
   const locEn = new RegExp(
-    `^(?:(?:the\\s+)?(?:points?|vertices)\\s+)?((?:${NAME})(?:(?:\\s*,\\s*${NAME})*,?\\s+and\\s+${NAME})?)\\s+(?:(?:are|lie|is|lies)\\s+)?(on\\s+.+?)(\\s+respectively)?$`,
+    `^(?:(?:the\\s+)?(?:points?|vertices)\\s+)?((?:${NAME})(?:(?:\\s*,\\s*${NAME})*,?\\s+and\\s+${NAME})?)\\s+(?:(?:are|lie|is|lies)\\s+)?(?:(?:the\\s+)?points?\\s+)?(on\\s+.+?)(\\s+respectively)?$`,
     'i',
   ).exec(line);
   if (locEn) {

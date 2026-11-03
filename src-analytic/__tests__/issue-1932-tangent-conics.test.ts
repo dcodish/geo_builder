@@ -12,6 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
+import { coincidencesOf } from '../app/coincidences';
 import { decideSubmit } from '../app/submit';
 import { errorText, type Translate } from '../app/errorText';
 import { analyticI18n } from '../i18n';
@@ -32,6 +33,13 @@ function lastRefused(lines: string[], seed: number): InputError {
   const v = decideSubmit(lines[lines.length - 1], lines.slice(0, -1), seed);
   expect(v.kind, `«${lines[lines.length - 1]}» at seed ${seed}`).toBe('refused');
   return (v as { error: InputError }).error;
+}
+
+/** #1595: the last line records, and the drawn figure puts `id` on `holder` — the coincidence notice's pair. */
+function recordsOn(lines: string[], holder: string, id: string, seed: number): void {
+  const v = decideSubmit(lines[lines.length - 1], lines.slice(0, -1), seed);
+  expect(v.kind, `«${lines[lines.length - 1]}» at seed ${seed}`).toBe('record');
+  if (v.kind === 'record') expect(coincidencesOf(derive([...lines.slice(0, -1), v.line], v.configuration ?? seed))).toEqual([[holder, id]]);
 }
 
 function recordsApart(lines: string[], id: string, seed: number): void {
@@ -113,7 +121,9 @@ describe('#1932 — the controls', () => {
     for (const seed of SEEDS) {
       const lines = ['y^2=4x', 'A(1,2)', 'P(5,2)', 'AP חותך את הפרבולה בנקודה E'];
       expect(derive(lines, seed).faults.filter((f) => f.code === 'tangent-no-second-crossing')).toEqual([]);
-      expect(lastRefused(lines, seed).key).toBe('crossing-already-named');
+      // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): the line meets the parabola only at A,
+      // so E is forced onto A — recorded with the notice (was `crossing-already-named`)
+      recordsOn(lines, 'A', 'E', seed);
     }
   });
 

@@ -1,0 +1,39 @@
+{
+  "pending": [
+    {
+      "sheet": "prod-2026-11-03",
+      "id": "P2",
+      "kind": "3d:assertion",
+      "queued": "2026-11-03",
+      "product": "3d",
+      "base": "https://themathbible.com",
+      "path": "/3d-builder/",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,0,0)",
+        "M אמצע AB",
+        "N אמצע AB"
+      ],
+      "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»"
+    }
+  ],
+  "results": [
+    {
+      "sheet": "round-2665",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-02",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "נתון: v = (10,-5,0)"
+      ],
+      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+      "pass": true,
+      "date": "2026-11-02",
+      "note": "operator 2026-11-02: all the rest of the tests pass"
+    }
+  ],
+  "demoted": {}
+}

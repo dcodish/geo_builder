@@ -237,7 +237,7 @@ describe('#1817 lock 8 — an unrestricted locus is unchanged: one stroke, the w
         const d = derive([...lines], seed);
         const a = ask(d, `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord);
         expect(a.value).toBe(row);
-        const res = locusOf(d.construction, name, [d.seed, d.seed + 1], d.box)!;
+        const res = locusOf(d.construction, name, [d.configuration, d.configuration.seed + 1], d.box)!; // as the ask lane traces (ADR-AG-358)
         for (const [i, cp] of res.components.entries()) {
           // The drawing IS the walk — same points, same closure — exactly as before the clip existed.
           expect(cp.trace.pieces).toEqual([{ points: cp.trace.points, closed: cp.trace.closed }]);

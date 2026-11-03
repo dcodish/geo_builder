@@ -15,6 +15,7 @@ import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
+import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -34,7 +35,9 @@ export interface SavedAnalyticSession {
   app: string;
   version: number;
   lines: string[];
-  seed: number;
+  /** The configuration on the screen (#2039, ADR-AG-358): a seed, or — when the display walk landed on a configuration a
+   *  seed number does not name — that configuration. A file from before it holds a number, which loads unchanged. */
+  seed: Seed;
   name?: string;
   /** Per line INDEX: the student's own sentence, where the line was built by the AI fallback
    *  (#1297). The stored line stays the machine spelling — replay is pure over the lines — and
@@ -193,7 +196,7 @@ export type InputError =
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */
   | { key: 'ambiguous-angle'; detail: string; example?: string; options?: string[] }
   /** A shape named by its noun alone, where the figure has no such shape or several (#1049). */
-  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[] } }
+  | { key: 'ambiguous-shape'; detail: string; host?: { kind: string; found: number; need?: number; candidates?: string[]; kinds?: Array<'circle' | 'parabola' | 'ellipse'> } }
   /** «ישר I» where the figure's line is «ישר 1» (ruling 2026-09-29): typed numeral, the one in use, the kind. */
   | { key: 'numeral-notation'; detail: string; holder?: string; expected?: RefKind }
   /** #1432 am. 1 — a stated value outside its symbol's domain («רדיוס המעגל הוא -3»), with the bound. */
@@ -309,8 +312,15 @@ interface AnalyticState {
   name: string;
   /** What a LOAD did, when it refused or changed something — the banner's content (#1087). */
   loadAudit: LoadAudit | null;
-  /** Which sampled configuration is drawn — «הציגו תצורה אחרת» advances it (ADR-052). */
-  seed: number;
+  /**
+   * Which sampled configuration is drawn — «הציגו תצורה אחרת» advances it (ADR-052).
+   *
+   * **The configuration ON THE SCREEN** (#2039 step 1, #1182, [ADR-AG-358](../../docs/06c-decisions-analytic.md#adr-ag-358)): a
+   * commit, «הציגו תצורה אחרת» and a load record the configuration the derivation DREW (`Derivation.configuration`), in
+   * the same set as the lines — so one undo entry, and the next line is solved from what the student is looking at, never
+   * from a configuration the display walk stepped past. A plain number for every seed's own configuration.
+   */
+  seed: Seed;
   error: InputError | null;
   /**
    * An informational answer, not a refusal (#1045) — the student restated something the figure
@@ -330,7 +340,8 @@ interface AnalyticState {
    * transient surfaces, so a notice earned by the line it rides on must travel with it, never be set
    * before it.
    */
-  recordLine: (line: string, notice?: string | null) => void;
+  /** `at` (#2039, ADR-AG-358): the configuration the decision drew the new figure in — recorded in the same set. */
+  recordLine: (line: string, notice?: string | null, at?: Seed) => void;
   removeLine: (index: number) => void;
   replaceLine: (index: number, next: string) => void;
   /** #1548 — record the muted set the submit path decided on. */
@@ -385,7 +396,7 @@ interface AnalyticState {
    * means — and it does not have the figure to decide it with. Finding a seed whose figure actually
    * differs needs the derivation, so the submit layer picks and this records.
    */
-  goToSeed: (seed: number) => void;
+  goToSeed: (seed: Seed) => void;
   /**
    * UNDO / REDO (#1098) — the row member this builder was missing.
    *
@@ -413,10 +424,10 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: number; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown }) => void;
+  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
-  recordLlmLines: (spoken: string, lines: string[], notice?: string | null) => void;
+  recordLlmLines: (spoken: string, lines: string[], notice?: string | null, at?: Seed) => void;
   setNotice: (n: string | null) => void;
 }
 
@@ -450,6 +461,19 @@ const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveSty
 });
 
 /** A loaded seed-name map, kept only as letter → letter strings (a hand-edited file cannot inject anything else). */
+/**
+ * A LOADED SEED (#2039, ADR-AG-358): a finite integer, or a configuration `{ seed, reach, wide }` the store wrote — anything
+ * else in a hand-edited file loads as configuration 0, as a missing seed always has.
+ */
+export function cleanSeed(raw: unknown): Seed {
+  if (typeof raw === 'number') return Number.isInteger(raw) && raw >= 0 ? raw : 0;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 0;
+  const { seed, reach, wide } = raw as Record<string, unknown>;
+  if (typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0) return 0;
+  if (typeof reach !== 'number' || ![1, 4, 16, 64].includes(reach) || typeof wide !== 'boolean') return seed;
+  return canonicalSeed({ seed, reach, wide });
+}
+
 function cleanSeedNames(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const NAME = /^[A-Z][0-9₀-₉]?$/;
@@ -491,14 +515,16 @@ export const useAnalyticStore = create<AnalyticState>()(
   queries: [],
 
   // #1348 (ADR-W-095): the store-side ingest (ADR-W-029) — every line this store records passes it
-  recordLine: (line, notice = null) => set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice })),
-  recordLlmLines: (spoken, ls, notice = null) =>
+  // #2039 (ADR-AG-358): the drawn configuration rides IN the commit, so the undo entry is one and holds what was shown
+  recordLine: (line, notice = null, at) =>
+    set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice, ...(at === undefined ? {} : { seed: canonicalSeed(at) }) })),
+  recordLlmLines: (spoken, ls, notice = null, at) =>
     set((s) => {
       const spokenFor = { ...s.spokenFor };
       ls.forEach((_, k) => {
         spokenFor[s.lines.length + k] = spokenPart(spoken, k, ls.length);
       });
-      return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice };
+      return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice, ...(at === undefined ? {} : { seed: canonicalSeed(at) }) };
     }),
   removeLine: (index) =>
     set((s) => {
@@ -539,7 +565,7 @@ export const useAnalyticStore = create<AnalyticState>()(
    * cannot cost a solve, which ADR-AG-067 had to assert and this shape makes structural.
    */
   setQueries: (next) => set({ queries: next }),
-  goToSeed: (seed) => set({ seed, error: null, notice: null }),
+  goToSeed: (seed) => set({ seed: canonicalSeed(seed), error: null, notice: null }),
 
   /**
    * The temporal wrappers. They clear the transient surfaces too: an error or notice is about the
@@ -585,7 +611,7 @@ export const useAnalyticStore = create<AnalyticState>()(
       seedNames: cleanSeedNames(seedNames),
       // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
       disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),
-      seed: seed ?? 0,
+      seed: cleanSeed(seed ?? 0),
       name: name ?? '',
       error: null,
       notice: null,
@@ -617,7 +643,7 @@ export const useAnalyticStore = create<AnalyticState>()(
         ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
       equality: (a, b) =>
-        a.lines === b.lines && a.seed === b.seed && a.queries === b.queries && a.disabled === b.disabled &&
+        a.lines === b.lines && sameSeed(a.seed, b.seed) && a.queries === b.queries && a.disabled === b.disabled &&
         a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle,
       limit: 100,
     },

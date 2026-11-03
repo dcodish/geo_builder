@@ -109,8 +109,10 @@ describe('#1727 — a perpendicular crossed with its own line meets it at its fo
       expect(dist(pt(d, 'E'), footOn(pt(d, 'A'), pt(d, 'B'), pt(d, 'C'))!) / scaleOf(d)).toBeLessThan(1e-6);
     }
   });
-  it('after the perpendicular is drawn, that sentence is the second-name refusal, naming the foot', () => {
-    expect(verdict([TRI, 'האנך מ-A ל-BC', 'E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC'])).toBe('refused:already-named');
+  it('after the perpendicular is drawn, that sentence is a second name for the foot — recorded (#1595)', () => {
+    // ⚠ FLIPPED by #1595 (ADR-AG-372, ADR-W-177; operator ruling 2026-11-02, "accept with message"): E is forced onto the foot H,
+    // so the line records and the notice says «H ו-E נפלו על אותה נקודה.» (was the second-name refusal).
+    expect(verdict([TRI, 'האנך מ-A ל-BC', 'E נקודת החיתוך של האנך מ-A ל-BC עם הישר BC'])).toBe('record');
   });
 });
 

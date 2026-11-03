@@ -1,0 +1,100 @@
+[
+  {
+    "builder": "analytic",
+    "base": "גובה הטרפז ABCD הוא 4",
+    "variant": "גובה הטרפז GHJK הוא 4",
+    "operator": "rename-letters",
+    "differs": "builds → refused (degenerate-role)"
+  },
+  {
+    "builder": "analytic",
+    "base": "גובה מ-A במשולש ABC",
+    "variant": "גובה מ A במשולש ABC",
+    "operator": "prefix-space",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "גזרה AOB בזווית 80",
+    "variant": "גזרה AOB בזוית 80",
+    "operator": "ktiv-haser",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "הגובה מ-A והתיכון מ-B נפגשים בנקודה E",
+    "variant": "הגובה מ A והתיכון מ B נפגשים בנקודה E",
+    "operator": "prefix-space",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה",
+    "variant": "הצלעות AB, BC ו CA משיקות למעגל בנקודות D, E ו F בהתאמה",
+    "operator": "prefix-space",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "מעגל M משיק לישרים l1 ו-l2",
+    "variant": "מעגל M משיק לישרים l1 ו l2",
+    "operator": "prefix-space",
+    "differs": "refused (unknown-reference) → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "מעגל M משיק למעגל K",
+    "variant": "מעגל V משיק למעגל U",
+    "operator": "rename-letters",
+    "differs": "builds → refused (unknown-reference)"
+  },
+  {
+    "builder": "analytic",
+    "base": "מעגל M משיק לצלעות AB, BC, CD ו-DA",
+    "variant": "מעגל M משיק לצלעות AB, BC, CD ו DA",
+    "operator": "prefix-space",
+    "differs": "builds → refused (split-statements)"
+  },
+  {
+    "builder": "analytic",
+    "base": "מעגל P מוכל בתוך מעגל O",
+    "variant": "המעגל P מוכל בתוך מעגל O",
+    "operator": "definite-article",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "נסמן זוית BAM כ-A1",
+    "variant": "נסמן זוית BAM כ-A1.",
+    "operator": "trailing-period",
+    "differs": "builds → not-handled"
+  },
+  {
+    "builder": "analytic",
+    "base": "A על המעגל שמרכזו M",
+    "variant": "U על המעגל שמרכזו V",
+    "operator": "rename-letters",
+    "differs": "builds → refused (unknown-reference)"
+  },
+  {
+    "builder": "analytic",
+    "base": "A על מעגל M",
+    "variant": "U על מעגל V",
+    "operator": "rename-letters",
+    "differs": "builds → refused (unknown-reference)"
+  },
+  {
+    "builder": "analytic",
+    "base": "A על מעגל O ועל מעגל P",
+    "variant": "U על מעגל O ועל מעגל V",
+    "operator": "rename-letters",
+    "differs": "builds → refused (unknown-reference)"
+  },
+  {
+    "builder": "analytic",
+    "base": "AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה",
+    "variant": "AB ו BC משיקים למעגל בנקודות A ו C בהתאמה",
+    "operator": "prefix-space",
+    "differs": "builds → not-handled"
+  }
+]

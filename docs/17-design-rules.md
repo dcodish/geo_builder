@@ -37,6 +37,9 @@ the exemplar). A true class fix usually closes bugs nobody reported yet. If your
 close an unreported sibling, it is a patch. **A sibling has the same wrong outcome** — in another
 spelling, rule, seed or builder. A behaviour the report did not describe is not a sibling: it is a
 `[proposed]` line for the operator, never part of the fix (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
+**Spelling siblings are found by a machine:** for a sentence the guide teaches, the sibling-phrasing
+ratchet already sends its other spellings through every builder's real parser, and a failing one is a
+row of its list, not a new issue (docs/22 §10a, [ADR-W-171](06w-decisions-workspace.md#adr-w-171)).
 
 **Search the SIBLING PRODUCT too** (ADR-W-004). The products copy patterns by design, so they copy
 *defects* by design: ADR-3D-110 is "the ADR-3D-069 shape verbatim", ADR-3D-093 is "the ADR-167 shape",
@@ -44,7 +47,7 @@ ADR-424 is the 2-D twin of ADR-3D-070. Each was found months later, by accident,
 routine asked. Your class sentence names categories, not files — so it is already product-neutral, and
 the question "do the other builders have this same class?" is one grep away. **State the answer in
 the ADR either way.** If a sibling has it: a plane-geometry input or display change lands in every
-builder that should have it, or adds a known-gap row naming its issue (docs/22 §10, ADR-W-108,
+builder that should have it, or adds a known-gap cell to the parity table, not an issue (docs/22 §10, ADR-W-108, ADR-W-170,
 ADR-W-118); anything else is filed against that product: a bug with the priority the session judges,
 a feature as `needs-operator` with a proposed priority (CLAUDE.md rule 7, ADR-W-117 Am. 1). Note that no amount of code
 sharing would prevent this: these classes live in the `engine` layer, which is copied on purpose
@@ -250,7 +253,7 @@ statement is asserting a given the student never gave.
   constraint, escalates, or errors — it never vanishes); every stated **value** is visible on the figure
   (length, angle, area, letter, right-angle knee) and a stated **relation** is in the givens list, drawn
   only in an opt-in relations layer, never as a mark at rest ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2); error messages name the conflicting *statement*, not internal state.
-- **Nothing the operator did not ask for**: every student-visible change is `[asked]`, `[ruled]` or `[2-D]`
+- **Nothing the operator did not ask for**: every student-visible change is `[asked]`, `[ruled]`, `[2-D]` or `[judged]`
   in the plan's `## What the student will see` (CLAUDE.md rule 7).
 - **ADR names the class**, the mechanism, and the root cause in one paragraph; the commit message
   states the root cause (CLAUDE.md rule 1).

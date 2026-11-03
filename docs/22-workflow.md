@@ -28,16 +28,23 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
+**Check before filing ([ADR-W-168](06w-decisions-workspace.md#adr-w-168), #2654).** Before filing, search the open issues, and the closed ones of the same product, for the family the finding belongs to.
+- **It fits an existing issue:** add it there as a comment or a checklist line. Do not file.
+- **It fits a closed or parked one:** reopen that issue.
+- **It is genuinely new:** the body carries a line `Searched: <the queries you ran> — no parent`, or `Parent: #N` for a child filed on purpose.
+
+A PreToolUse hook (`scripts/issue-create-guard.mjs`) refuses `gh issue create` without one of those lines. In the four weeks to 1 Nov, sessions filed 815 issues, most of them siblings of an issue already open.
+
 **The title leads with his words.** Its first clause is the sentence the operator typed, in Hebrew «guillemets»; the class name goes after the dash. He finds his reports by scanning titles for his own words, and re-reports one he cannot see (#1323).
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3` | `later` (§2); the severity marks `wrong-answer` and `reported` where they apply (§2); one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]`/`[judged]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **What each type means** (#1763). The type is decided by what the STUDENT experiences, not by the size of the change:
 - **`bug`** — the product does something wrong for a student: a wrong figure, a dropped or misread given, a false refusal, a crash, a misleading message. Route: a fix on `main` (§3).
 - **`feature`** — the product cannot do something it should: a sentence it does not read, a capability or surface that does not exist. A "bug" diagnosed as a missing capability is relabelled `feature`. Route: always a PR, played and approved (§4).
 - **`debt`** — the product is right for the student, but the code makes the next change harder, slower or riskier. Nothing a student sees or can do changes. Examples: duplicated mechanisms to hoist into `shell/`, machinery to retire or tidy, performance nobody sees, audits and conformance checks, follow-up bookkeeping, umbrella hardening programmes. Route: straight to `main` like a bug (no PR, no play gate — there is nothing for the operator to judge); its gates are the same tests. Priority: **P3 by default**; **P2 when it blocks other scheduled work** (e.g. a hoist that stops a fourth copy from being written). The moment a debt item would change what a student sees, it is not debt — split that part out as a `bug` or `feature`.
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **A found bug is queued; a found feature is proposed** (CLAUDE.md rule 7, ADR-W-117 Am. 1), **after the check above, and outside a round**. Inside a round, a same-cause finding is fixed in the item (§2d, ADR-W-168): a session files a bug it finds with the priority it judges by this taxonomy (a P1 is announced at once), and arms it once its plan's outcome lines are all `[asked]`/`[ruled]`/`[2-D]`/`[judged]`. A feature it finds is filed `needs-operator` with a proposed priority, because only the operator classifies features. A `[proposed]` outcome line waits for him either way. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
 
 **`icebox` is parked, not dead.** A parked issue is closed "not planned" with a comment saying it is reopened when a student hits it or the operator asks; `/log-triage` reopens one when the prod logs show a student hitting it (#1804). Nothing that shows something false is ever parked: a wrong figure, a false "contradicts", a silent misread, a guide sentence that fails.
 
@@ -104,7 +111,7 @@ The operator raises issues **while testing**, often several per pass. If the rep
 
 1. **File the issue** (§1) with type + priority + app labels, and **`reported`**: the operator hit it. Add **`wrong-answer`** if it is one, which makes it P1 (§2).
 2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
-3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit, and **not itself an open bug**: search the queue first, [ADR-W-158](06w-decisions-workspace.md#adr-w-158)) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
+3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit, and **not itself an open bug**: search the queue first, [ADR-W-158](06w-decisions-workspace.md#adr-w-158)), `[judged]` (the judge agent ruled it from the operator's own dated words — link its recorded judgment, [ADR-W-173](06w-decisions-workspace.md#adr-w-173), §2e) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
 **A plan that adds or rewrites a refusal or status sentence writes it under the one-next-step rule** (operator rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)): name the student's statement and give one next step, or say plainly there is none. No ballot card per sentence: the sentence is shown in full on the play sheet, and his play is the approval.
@@ -178,9 +185,9 @@ opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-w
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
 is fixed **at the root, per its plan**, in its own worktree under the item gates (ADR + rule-4
-regression lock + `tsc` + build + `test:fast`; the full suite runs once per batch, see "Gating and landing" below).
+regression lock + `tsc` + build + `test:fast` + `test:exams -- --changed`; the full suite runs once per batch, see "Gating and landing" below).
 A plan armed before 2026-10-07 has no outcome section: the round writes it at pickup from the issue
-thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]` escalates. **A round never takes a default
+thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]`/`[judged]` escalates. **A round never takes a default
 on an open question** — the item waits for the operator; a P1 session may
 ship only an honest refusal that reuses an existing message, flagged in the Heads-up. **Each ledger item
 carries a `beyond the request:` line**, which should read "none" ([ADR-W-117](06w-decisions-workspace.md#adr-w-117)). Bugs land on `main` (`Fixes #NN` + `round #RR`, §3)
@@ -204,7 +211,7 @@ in the artifact database for a later session to read with `read_db` — and reco
 issue ([ADR-W-068](06w-decisions-workspace.md#adr-w-068--every-fix-round-ends-with-a-published-html-report-and-play-sheet-1291-completes-adr-w-054), universalising
 [ADR-W-054](06w-decisions-workspace.md)'s overnight-only clause). The artifact is the operator's surface;
 the issue stays the durable ledger, all three copies carry the same case list, and the operator plays the
-batch in one sitting and **closes the round issue as the validation signal**. Open P1s or a stale `in-round` issue stop a
+batch's 🎮 cases in one sitting and **closes the round issue as the validation signal**. A round with no 🎮 case closes it itself (ADR-W-168, below). Open P1s or a stale `in-round` issue stop a
 round before it starts — a P1 is never taken silently, and there is never a second live round.
 
 **Since [ADR-W-092](06w-decisions-workspace.md#adr-w-092) the sheet is PRE-PLAYED.** The round writes a
@@ -222,11 +229,29 @@ which answers `/api/parse` itself. A case that exercises the AI lane declares th
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
 
+**Since [ADR-W-168](06w-decisions-workspace.md#adr-w-168) (operator ruling 2026-11-01, #2654) a round shrinks the queue, and the operator plays only 🎮.**
+- **Found work is fixed in the round.** A case found while fixing an item, with the same cause and the same chokepoint, is fixed inside that item and gets its own case on the sheet, marked *found in round*. Anything else is a line on its parent issue (§1). A found case whose student-visible outcome nobody ruled on is a question: the round lists those in its report and on the roadmap page's decisions panel, never as one issue each.
+- **The session closes ✅ and 👁.** A 👁 case closes on an assertion that replaces the look (page text, a measured distance, a row status). Where no assertion can say it, it closes on a **blind review**: a subagent given only the case's lines, its Look-for and its screenshots, never the fix or the plan.
+- **Spot audits keep that honest.** About one auto-closed case in ten goes into the operator's next sitting. A failed audit returns that kind of case to 🎮 until three clean audits.
+- **His sitting is the 🎮 cases only, about ten at most**, ranked by risk. A bug he reported is 👁 at most, in a skim digest that closes unless he objects within a day.
+- **A round with no 🎮 case and no feature PR deploys itself** (§5) and closes its own round issue; it never takes `awaiting-play`. A round with any 🎮 case or PR waits for his play, as before.
+- **A round's report counts its effect on the queue:** items closed, issues it filed, and how many of those are still open.
+- **Every round is measured on the roadmap page** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)): `scripts/round-metrics.mjs` writes one row per round (closed, filed, net, the operator's cases and estimated minutes) to its "Fix rounds" panel at every refresh. A round whose net is zero or more is flagged ⚑. It reads the round's own `queue:` and `operator:` ledger lines; rounds before 1 Nov are estimated from GitHub.
+- **What nobody hit is parked, not kept open** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)). When it composes, a round runs `node scripts/known-gaps.mjs --apply --plan <plan/current.json>`. It parks every P3 feature or debt item a session found that no student and not the operator hit, idle 30 days and outside the plan: `icebox`, closed, listed in [known-gaps.md](known-gaps.md), with any parity gap it owns parked in the same batch. Bugs, `reported`, `wrong-answer`, `needs-operator` and plan items are never parked. A later hit **reopens** the original issue with `--reopen <N>`, never a new one.
+
 **Gating and landing (ADR-W-034, operator ruling 2026-08-30; per-item gate amended by ADR-W-113):** each
 item is gated on `tsc`, build, `npm run test:fast` (every product) and its own new or changed test files
 run by path, not on its product lane; the FULL suite runs once per batch, on the merged staging tip, and
 the batch lands on `main` in ONE push. Round #822 measured the per-item full-suite alternative at ~5 hours
 for 8 items, and round #1776 spent ≥170 min on 47 per-item lane runs (#1813).
+
+**The exam corpus ([ADR-W-172](06w-decisions-workspace.md#adr-w-172), #2654 idea 6).** Every sequence the suite
+replays from a real exam or textbook question (the bagrut scenarios, the exam fixtures, the 471 corpus, the 3-D
+exam GATE files, the ellipse book) is in the batch's `test:full` already, so the **batch gate is unchanged**. An
+item's quick check adds **`npm run test:exams -- --changed`**: it replays only the exams of the builders the
+item's diff touches (its tree, or a tree it imports per `BOUNDARIES.json`; a docs/scripts/server-only diff
+replays nothing). Measured cost and membership are in the ADR; `scripts/lib/exam-corpus.mjs` defines the corpus,
+and an exam joins it by its name (`exam-…`, `ellipse-book-…`, «קיץ 2024», «bagrut Q4»), with no registry edit.
 
 **Execution (ADR-W-114):** items run in PARALLEL, one background agent per chokepoint stream, each in its
 own worktree. Items sharing a chokepoint are stacked in one stream. Test runs queue on the shared suite lock
@@ -250,6 +275,38 @@ fold's summary. A single-issue fix session can use the same recipe with its own 
 a human at the keyboard, so unattended running remains a separate risk argument.
 
 **A round item that adds or rewrites a student-facing refusal or status sentence** writes it under the one-next-step rule (rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)); the refusal-style ratchet checks it, and the batch play sheet shows the sentence in full: his play is its approval, with no ballot card per sentence.
+
+## 2e. The judge: rulings from the operator's own precedent ([ADR-W-173](06w-decisions-workspace.md#adr-w-173), #2661)
+
+Operator, 2026-11-02: *"I think need a judgment agent that can make decisions on my behalf based on historic decisions and guidelines I gave"*; on the design, *"Go ahead. Build this now"*.
+
+**Before a product question goes to the operator, the judge sees it.** That covers a `[proposed]` line, a decisions card, or a found case's question in a round.
+
+- **Who: the `judge` agent** (`.claude/agents/judge.md`).
+  - It gets the question and its options. It never gets the session's recommendation or the fix.
+  - It searches `node scripts/precedents.mjs search …`. That index holds every ruling comment, every ADR with his words, and the judge's own judgments that stood.
+  - It rules only when his dated words cover the question, and it quotes them. Otherwise it escalates.
+- **Never judged:**
+  - reversing a shipped promise;
+  - anything he kept for himself;
+  - a feature's scope or priority;
+  - anything with no precedent;
+  - a class he took back.
+- **Recording.** The session records every verdict with `node scripts/judgments.mjs record <file>`. The script refuses a ruling without a quoted, dated, linked precedent. It then:
+  - writes the ruling on the issue as `## Judged on the operator's behalf — <date>`, quoting the precedent;
+  - tags the plan line `[judged]` with that comment's link.
+
+  A `[judged]` line arms like `[ruled]`. An escalation stays a question for him, `needs-operator`.
+- **His oversight.**
+  - `node scripts/judgments.mjs digest --md` is his skim list: one line per ruling, with the quote it rests on. It goes in the round report, or on its own. A ruling stands after 24 hours unless he objects (`settle`).
+  - When he objects: `overrule <id> --note "<his words>"`, and the issue's plan follows his words. That kind of question goes back to him until three judgments of it in a row stand. His overrule is itself precedent from then on.
+- **Decided, not asked** ([ADR-W-174](06w-decisions-workspace.md#adr-w-174), #2663). Operator, 2026-11-02: *"I don't want anything to wait for me that doesn't have to wait for me."* Three kinds skip both the judge and him:
+  - **new student-facing text**: refusal, note, chip, row label, English twin, spelling. The session writes it under the pedagogy style rule, and it ships. It is not a 🎮 case by itself.
+  - **a construct a textbook or bagrut exercise needs**, in a builder meant to cover that exercise: it is built. Its priority is the session's: P2 when the exercise is in the exam corpus (`npm run test:exams`) or a lesson he dated, P3 otherwise. A construct with no exercise behind it is still a found feature for him.
+
+  - **a construct the tool already reads, in another wording** (word order, a synonym, a typo with no other reading) that means exactly the same: read it, at P3. The LLM fallback is the net for the rest, so such a gap rises above P3 only when the fallback is measured (as oracle, rule 2) to fail too. A wording with a second meaning still goes to him.
+
+  Its plan line is tagged `[ruled]` with ADR-W-174. The session records it with `node scripts/judgments.mjs chose <file>` (`{id, kind: text|corpus-priority, issue: "#N", what, choice}`), and the digest lists it under *Decided for you — review*. When he changes one, that is an ordinary fix; nothing goes back to him.
 
 ## 3. The bug route (operator reports something broken)
 
@@ -304,7 +361,7 @@ Both routes carry it, because the contract was the one artifact with **no home a
 Applies to feature requests **and** bug reports reclassified as capability gaps. Steps 1–2 run in the reporting session; building (steps 3–7) starts **only in a dedicated session on operator go** (§2b).
 
 1. **File the issue** labeled `feature` + priority.
-2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20). An armed feature plan counts as scoped only if every line of its `## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7).
+2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20). An armed feature plan counts as scoped only if every line of its `## What the student will see` is `[asked]`, `[ruled]`, `[2-D]` or `[judged]` (CLAUDE.md rule 7).
 3. **Branch:** `feat/<issue#>-<slug>` (fixes that go the PR route: `fix/<issue#>-<slug>`). Prefer a **git worktree** when the shared tree carries another session's work — created **outside the repo tree** under `"$TMPDIR"/claude/geo-wt/<branch>` (§7).
 4. **Build** under the normal gates (ADR, tests, scenario/fixture, suite + `tsc` + build green).
    **If the change touches a UI surface, the visual smoke is part of those gates**
@@ -330,6 +387,9 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 ## 5. Main, deploys, and the deploy log
 
 - **`main` is the trunk** — always green (CI), always deployable. `rebuild-foundation` is retired; sessions work on `main` + topic branches. *(Migrated 2026-07-10: main fast-forwarded to the rebuild-foundation head.)*
+- **When a deploy happens** ([ADR-W-168](06w-decisions-workspace.md#adr-w-168), operator 2026-11-01: *"if nothing needs my attention, you should deploy automatically"*):
+  - **Nothing for him:** a round or fix with no 🎮 case and no feature PR deploys as soon as the full suite is green and every ✅/👁 case is closed (§2d). It is then checked on prod with a playsheet smoke.
+  - **Something for him:** anything with a 🎮 case deploys after his play, and a feature after he approves its PR.
 - **Deploy only committed state** from `main`, following **[RUNBOOK.md](RUNBOOK.md)**. The old habit of deploying an uncommitted working tree is retired — commit (or PR-merge) first, so every prod bundle is reconstructable.
 - **Every deploy gets:** a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit, **and** an entry in **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (date, tag, commit, which app(s), bundle hash, one-line what-changed). The deploy log is canonical; its bottom table holds the untagged deploys made before adoption.
 - Why it matters here specifically: log-triage re-runs prod utterances against HEAD, silently assuming prod ≈ HEAD; the tag + log make "what is actually live?" answerable (the ADR-115 "stale dev server" class, prod edition).
@@ -450,18 +510,33 @@ All four builders are deployed. `products.json` is the only record of deploy sta
 
 ## 10. One plane-geometry sentence, one verdict, one drawing in every builder ([ADR-W-108](06w-decisions-workspace.md#adr-w-108), [ADR-W-118](06w-decisions-workspace.md#adr-w-118))
 
-**A plane-geometry input change lands in every builder that should read it, or adds a known-gap row naming its issue; an exception needs a family in `EXCEPTIONS`.**
+**A plane-geometry input change lands in every builder that should read it, or adds a known-gap cell to the parity table; an exception needs a family in `EXCEPTIONS`. A gap is a cell, not an issue ([ADR-W-170](06w-decisions-workspace.md#adr-w-170)).**
 
-- **Same item, not later** ([ADR-W-157](06w-decisions-workspace.md#adr-w-157), operator 2026-10-24): a 2-D change ports to **analytic in the same work item**, with an analytic case on its play sheet. A known-gap row is allowed only when analytic lacks a prerequisite the port depends on, and the plan names it. **3-D by judgement:** the plan says whether the 3-D port is in or out and why. It is in when the construct exists in 3-D, no `EXCEPTIONS` family covers it, and the port is a small reading or wording change; it is out when it needs new 3-D geometry or a mechanism 3-D lacks. Existing analytic gaps are cleared by dedicated rounds.
+- **Same item, not later** ([ADR-W-157](06w-decisions-workspace.md#adr-w-157), operator 2026-10-24): a 2-D change ports to **analytic in the same work item**, with an analytic case on its play sheet. A known-gap row is allowed only when analytic lacks a prerequisite the port depends on, and the plan names it. **3-D by judgement:** the plan says whether the 3-D port is in or out and why. It is in when the construct exists in 3-D, no `EXCEPTIONS` family covers it, and the port is a small reading or wording change; it is out when it needs new 3-D geometry or a mechanism 3-D lacks. Existing analytic gaps are cleared by dedicated rounds, which take their work from the table's unscheduled cells (below).
 
 - **2-D's verdict is the reference** (operator ruling on #1649, 2026-10-02: *"analytics and 2d should have same user experience"*). A plane sentence that 2-D builds, refuses or asks about gets the same answer in the analytic builder, and in 3-D for the core plane families (polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, area).
 - **The rows live once:** `shell/__tests__/fixtures/geo-input-parity.ts`. Each tree's thin lock (`src/`, `src-analytic/`, `src3d/` → `__tests__/geo-input-parity.test.ts`) runs them through its real submit decision.
 - **Adding or changing a sentence form in one builder** means one of:
   - a parity row, where every builder already agrees;
-  - a known-gap row naming the issue that ports it (`knownGap: [{ product, issue: '#NNNN' }]`), with that issue's state recorded in `GAP_ISSUES`. When the port lands the row fails with "move it to the parity rows", so the list only shrinks. A gap whose issue is closed or iceboxed is `parked: true` (ruling B15, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)): still checked, but no longer claiming scheduled work. Closing or iceboxing an owning issue parks its gaps in the same commit ([ADR-W-119](06w-decisions-workspace.md#adr-w-119));
+  - a known-gap row, one **cell** per builder that differs. When the port lands the row fails with "move it to the parity rows", so the list only shrinks. A cell is in one of three states:
+    - **unscheduled** (`knownGap: [{ product }]`): the default for a newly found port gap, and **no issue is filed for it** ([ADR-W-170](06w-decisions-workspace.md#adr-w-170)). The row's `note` says what the builder lacks when that is known. The table is its record, and port rounds pick their work from these cells;
+    - **scheduled** (`knownGap: [{ product, issue: '#NNNN' }]`): an existing open issue already owns the port (it is in a plan, or it carries more than the port, e.g. a `reported` case or an open question). Its state is recorded in `GAP_ISSUES`;
+    - **parked** (`parked: true`, with the closed or iceboxed issue that parked it): still checked, but nobody is scheduled to close it (ruling B15, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)). Closing or iceboxing an owning issue **as a decision not to port** parks its gaps in the same commit ([ADR-W-119](06w-decisions-workspace.md#adr-w-119)). An issue whose whole content was the port is instead closed **into the table**: its gaps drop `issue` (unscheduled) and its `GAP_ISSUES` line goes, in the same commit. An issue carrying `reported` or `wrong-answer` is never closed into a cell.
+
+    **The view:** `npm run parity-table` prints the counts per state and builder and every gap cell; `-- --product analytic --state unscheduled` is a port round's pick list, `-- --all` the whole sentence × builder table, `-- --html` writes `reports/parity-table.html`.
   - an `EXCEPTIONS` family, X1–X12: coordinates (X1 includes the position words between points and, since ADR-AG-310, against a line), equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D, x or y as a length in analytic (ADR-W-109), a capital letter as a size in analytic (ADR-AG-325, operator ruling 2026-10-20 on #2427), a bare segment equation whose two readings both hold and differ asking length-or-vector in 3-D (ADR-3D-391 and its Am. 1, the ADR-W-108 amendment, operator rulings 2026-10-04 and 2026-10-13 on #1680 and 2026-10-30 on PR #2605). A new family is an ADR-W decision, never a quiet edit. **Vectors (X7) are 3-D only by design:** they belong to the space unit, so 2-D has none, and a vector is never ported to `src/` or filed as a parity gap (operator, 2026-09-18, #1184).
 - **The catalog check** makes this reach every guide sentence. Each builder's catalog sentence is a step of some row, belongs to a topic exception, or sits on `UNCOVERED_CATALOG`. That allowlist is a ratchet: it may shrink, never grow.
 - **Display follows 2-D too** (ruling B1, 2026-10-07, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)): for plane geometry, marks, labels, label text and status wording follow 2-D. A display behaviour 2-D lacks lands in 2-D first or needs an operator ruling; a recorded exception names its ruling. There is no display lock yet, so this rule is checked by reading: before building anything a student sees in a non-2-D builder, measure what 2-D does.
 - **Warn both ways** ([ADR-W-117](06w-decisions-workspace.md#adr-w-117) §8): when the operator asks a non-2-D builder for behaviour that differs from 2-D, say so before building; when a 2-D change would change what the other builders should do, ask whether it applies to them.
 - **A refusal in another builder is measured against 2-D first.** Run the identical sequence through 2-D (`factsOf` → `replayFacts`, or the real submit) and read what it produced. If 2-D builds it, the work is "port 2-D's mechanism", with that mechanism written into the plan as the template, and not a scope question for the operator (#985). A claim about what 2-D does is measured too, before it is cited: 2-D may refuse the same form, or mean something different by the same mark (#1240, #1241).
 - **Canvas = inputs, panel = computed** ([ADR-W-047](06w-decisions-workspace.md#adr-w-047), every builder; the recorded exceptions are ADR-W-118 B6/B7). This is settled: a canvas label that differs from the panel only because the panel shows a derived value is the rule working, never a question to file (re-affirmed 2026-09-29, #1563).
+
+## 10a. A failing sibling phrasing is a row of the list, never a new issue ([ADR-W-171](06w-decisions-workspace.md#adr-w-171))
+
+**Another spelling of a sentence the guide already teaches — «ל AB» for «ל-AB», «זוית», a trailing period, «נתונה …», other letters — is found by the generator, not filed by a session.**
+
+- **The generator** (`shell/__tests__/fixtures/sibling-phrasings.ts`) rewrites every catalog sentence of every builder by small operators that keep its meaning, each one a spelling measured in the production logs. Each builder's `__tests__/sibling-phrasings.test.ts` sends the sentence and its siblings through the builder's real submit decision (the one its `geo-input-parity` lock drives) on the same figure. No model is called.
+- **A sibling whose outcome differs from its sentence's** (verdict, code, or what it would build) is a failing variant. The known ones are rows of `shell/__tests__/fixtures/sibling-phrasings/known-<builder>.json`: builder, base, variant, operator, what differs. The test fails on a failing variant not listed, and on a listed one that now agrees. The list only shrinks.
+- **A spelling the generator covers is never filed as an issue.** A session that meets one checks the list: a listed row is already recorded (fix it there, under the issue that owns the spelling's mechanism, and delete the row). An unlisted spelling of the same shape means an operator is missing; add the operator (with its prod count) rather than an issue.
+- **Fixing one shrinks the list:** after a parser fix, `SIBLING_PHRASINGS_WRITE=1 npx vitest run <the builder's sibling-phrasings test>` rewrites that builder's list; the diff must only delete rows. A new row is added on purpose only, when the variation is real and its fix is not this session's.
+- **An operator must keep meaning.** A variant that changes what the sentence says is a defect of the generator, fixed there, never a row. `shell/__tests__/sibling-phrasings-meta.test.ts` locks what each operator writes.
