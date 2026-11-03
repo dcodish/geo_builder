@@ -113,11 +113,11 @@ describe('#1176 — the point lies on its own locus', () => {
     const kind = ((k: string) => HE[k] ?? k) as never;
     for (const seed of [0, 1, 3, 4, 5]) {
       expect(
-        ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], seed), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value,
+        ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], seed), 'המקום הגיאומטרי של M', fmtAnalytic, kind, 'chip').value,
         `bisector at seed ${seed}`,
       ).toBe('ישר · x - 4 = 0');
       expect(
-        ask(derive(['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'], seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind).value,
+        ask(derive(['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'], seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind, 'chip').value,
         `חורף 25 at seed ${seed}`,
       ).toBe('מעגל · (x − 16)² + y² = 25²'); // #1187
     }
@@ -134,7 +134,7 @@ describe('#1176 — the point lies on its own locus', () => {
   it('a measurable configuration is not poisoned by an unmeasurable NEIGHBOUR', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
     expect(
-      ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 1), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value,
+      ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 1), 'המקום הגיאומטרי של M', fmtAnalytic, kind, 'chip').value,
     ).toBe('ישר · x - 4 = 0');
   });
 
@@ -160,7 +160,7 @@ describe('#1176 — the point lies on its own locus', () => {
    */
   it('an ill-conditioned configuration still reaches its TRUE equation (#1224)', () => {
     const kind = ((k: string) => (k === 'line' ? 'ישר' : k)) as never;
-    const v = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 2), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value;
+    const v = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 2), 'המקום הגיאומטרי של M', fmtAnalytic, kind, 'chip').value;
     expect(v).toBe('ישר · x - 4 = 0');
   });
 
@@ -183,7 +183,7 @@ describe('#1176 — the point lies on its own locus', () => {
     const kind = ((k: string) => (k === 'circle' ? 'מעגל' : k)) as never;
     for (const seed of [0, 1, 2, 3]) {
       expect(
-        ask(derive(PARAM_CIRCLE, seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind).value,
+        ask(derive(PARAM_CIRCLE, seed), 'המקום הגיאומטרי של P', fmtAnalytic, kind, 'chip').value,
         `seed ${seed}`,
       ).toBe('מעגל · (x − 16a)² + y² = (25a)²');
     }

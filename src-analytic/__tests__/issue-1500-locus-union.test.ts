@@ -30,7 +30,7 @@ const SEEDS = 24;
 const kindWord = ((k: string, n: number) =>
   n > 1 ? ({ line: 'שני ישרים', circle: 'שני מעגלים' } as Record<string, string>)[k] : ({ line: 'ישר', circle: 'מעגל' } as Record<string, string>)[k]) as never;
 
-const answer = (lines: string[], seed: number) => ask(derive(lines, seed), 'המקום הגיאומטרי של G', fmtAnalytic, kindWord);
+const answer = (lines: string[], seed: number) => ask(derive(lines, seed), 'המקום הגיאומטרי של G', fmtAnalytic, kindWord, 'chip');
 
 const onY0 = (p: { x: number; y: number }) => Math.abs(p.y) < 0.02 * Math.max(1, Math.abs(p.x));
 const onL2 = (p: { x: number; y: number }) => Math.abs(3 * p.x + 4 * p.y) < 0.05 * Math.max(1, Math.hypot(p.x, p.y));
@@ -102,7 +102,7 @@ describe('#1500 — the honesty rule is untouched: a parameterised union refuses
 
 describe('#1500 — single-component answers are byte-identical (the counter-lock)', () => {
   it('the bisector still answers «ישר · x - 4 = 0», one drawn curve, labelled by the whole row', () => {
-    const a = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0), 'המקום הגיאומטרי של M', fmtAnalytic, kindWord);
+    const a = ask(derive(['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 0), 'המקום הגיאומטרי של M', fmtAnalytic, kindWord, 'chip');
     expect(a.value).toBe('ישר · x - 4 = 0');
     expect(a.locus?.components).toHaveLength(1);
     expect(drawnLoci([a])[0].label).toBe('ישר · x - 4 = 0');

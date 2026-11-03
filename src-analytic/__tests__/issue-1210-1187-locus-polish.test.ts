@@ -29,7 +29,7 @@ const kind = ((k: string) => HE[k] ?? k) as never;
 const BISECTOR = ['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'];
 /** חורף 25 — a real bagrut figure, and the one the operator played. */
 const CIRCLE = ['A(-9,0)', 'B(41,0)', 'נקודה P', 'PA מאונך ל-PB'];
-const askOn = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic, kind);
+const askOn = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic, kind, 'chip');
 
 describe('#1210 — the question is understood however the student spells it', () => {
   it('the spelling that was REFUSED now answers, identically to the one that worked', () => {

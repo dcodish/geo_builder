@@ -32,7 +32,7 @@ const kindWord = ((k: string, n: number) =>
     : ({ line: 'ישר', circle: 'מעגל', parabola: 'פרבולה', ellipse: 'אליפסה' } as Record<string, string>)[k]) as never;
 
 const answer = (lines: readonly string[], name: string, seed: number) =>
-  ask(derive([...lines], seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord);
+  ask(derive([...lines], seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord, 'chip');
 
 const Q1 = saved.lines.slice(0, 9);
 const AREA = saved.lines;

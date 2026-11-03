@@ -3944,6 +3944,8 @@ merge of the copy cannot re-collapse them. Analytic lane 70 files / 1110 tests.
 ## ADR-AG-072 — A locus is a point with one degree of freedom, and the tool DRAWS it, NAMES it and SOLVES it (#1136, #1137, #1138)
 
 > **⚠ Superseded in part** by [ADR-AG-352](#adr-ag-352) (#1177, 2026-10-30): §2, the ask lane as the only surface. The locus also has a chip beside its point and a guide row, and the ask lane stays its one grammar.
+>
+> **⚠ Superseded in part** 2026-11-03 by [ADR-AG-381](#adr-ag-381) (#2673, operator ruling 2026-11-02): the TYPED question. A locus question typed in the ask box answers a pointer to the chip; the chip is the only way in, and its answers are this ADR's, unchanged.
 
 **Status:** accepted, 2026-09-16 · **Amends [ADR-AG-001](#adr-ag-001) D1** (the verify half of the
 charter is withdrawn) · **closes** the [ADR-AG-005](#adr-ag-005) open item *"whether an answer is
@@ -13144,6 +13146,8 @@ No other sequence moved.
 
 ## ADR-AG-316 — The ask lane reads the exam's questions: coordinates, a parameter, a curve by centre, by «THE» noun and by tangent noun, conjunctions, the set-former (#2393)
 
+> **⚠ Superseded in part** 2026-11-03 by [ADR-AG-381](#adr-ag-381) (#2673): R10, the set-former's condition traced on a trial derivation. «המקום הגיאומטרי של כל הנקודות M המקיימות S» answers the pointer to the chip; the condition is stated as givens. `SET_FORMER` and `Answer.refused` are retired.
+
 **Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2393-analytic-ask-lane`, stacked on `feat/2391-analytic-exam-sentences` (ADR-AG-315). **Phase R only.** Phase Y (yes/no questions) is dropped by the operator's ruling of 2026-10-20 on #2393: *«the tool doesnt answer such questions. its a drawing tool and not a solver per se»*. Such a question keeps the lane's existing «לא הבנתי את השאלה». It also takes #2389's honesty item («שיפוע המקום הגיאומטרי של M»), per the ruling on #2389. LADDER stage: none (the ask lane; no solver change).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R69a (new: the exam's own questions are askable). · **Design:** [04c](04c-design-analytic.md), «The ask lane» → «The exam's questions».
@@ -13976,6 +13980,8 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 
 ## ADR-AG-341 — The exam's locus questions read as the locus question, and the auxiliary lines can be named and referred to by their role (#1138)
 
+> **⚠ Superseded in part** 2026-11-03 by [ADR-AG-381](#adr-ag-381) (#2673): the exam's typed locus wordings still READ as the locus question, and are answered with the pointer to the chip. The named auxiliary lines are unchanged.
+
 **Date:** 2026-10-27 · **Status:** accepted · **⚠ Partly superseded by [ADR-AG-346](#adr-ag-346) (2026-10-28, operator ruling of 2026-10-27 on #2584):** decision 4's rename-in-place is withdrawn — a named restatement of a drawn line is refused with the naming sentence offered. · feature #1138, fix round #2561 stream G, branch `feat/1138-construction-locus`. The plan's PR-2 and PR-3. LADDER stage: none — the ask lane, the parser and the M1 boundary (`on-kind`).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R87 (the locus question however the exam words it; the קיץ ב' 2024 chain). · **Design:** [04c](04c-design-analytic.md), "The locus lane" → "The exam's own questions, and its named lines".
@@ -14246,6 +14252,8 @@ The sign stays attached (`y² = -2.5x`, `y² = -5/3x`). The parser reads the pri
 **Consequences.** `engine/locusFit.ts` (`kindConic`, `parametricShape`, `verifySymbolic`, `LocusShape.symbolic`), `engine/locus.ts` (the gate loop), `engine/carriers.ts` (`isRadiusSymbol`), `app/curveText.ts` (`symbolicLocusEquation`); docs 02c R87/R199, 04c. The book's p10-9 (`x²/a² + y²/b² = 1` · P on it · …) also needs #2613 (the spurious `y = 0` component); once that lands, the single ellipse answers in `a`, `b`.
 
 ## ADR-AG-352 — The locus has a way in: a chip beside a point that has one, and a guide row; the one-line point is taught as its two lines (#1177)
+
+> **⚠ Superseded in part** 2026-11-03 by [ADR-AG-381](#adr-ag-381) (#2673): the chip is the ONLY way in, and the guide row teaches the chip rather than the question. The chip itself (which points, which row, its labels and lifetime) is unchanged.
 
 **Status:** accepted · 2026-10-30 · feature (analytic) · fix round #2627 (stream D) · branch `feat/1177-locus-chip` · **supersedes [ADR-AG-072](#adr-ag-072) §2** (the ask lane as *the* surface) · LADDER stage: none (an affordance over `hasLocus` and the ask lane; no solver change)
 
@@ -14636,3 +14644,27 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
 
+## ADR-AG-381 — The locus is reached by its chip only: a typed locus question answers a pointer to the chip (#2673)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (a withdrawal; P2, analytic) · fix round #2678 stream N · branch `feat/2673-locus-chip-only` · **Supersedes in part** [ADR-AG-072](#adr-ag-072) (the typed question), [ADR-AG-341](#adr-ag-341) (its wordings answer the pointer), [ADR-AG-316](#adr-ag-316) R10 (the set-former's condition trial), [ADR-AG-352](#adr-ag-352) (the guide row). LADDER stage: none (an ask-lane gate and a record field; no solve).
+**Requirements:** [02c](02c-requirements-analytic.md) F13, R87, R200 (rewritten), R60 and R69a (examples), R226 (new) · **Design:** [04c](04c-design-analytic.md) § *The way in: the chip and the guide row*, § *The exam's questions*.
+
+**Operator rulings.** 2026-11-02 on #2673, after PR #2667: *"we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."* 2026-11-03, on the conditional locus: *"what you suggest for point M is exaclty how i want this built. a student should see what he is placing the point and this is part of the pedagogy of the builder."* Every student-visible line of the plan is `[asked]`.
+
+**Re-measured at pickup** (`origin/main` 2142a8d1, `decideSubmit` → `derive` → `ask`): «המקום הגיאומטרי של M», «משוואת …», «הראו כי … הוא ישר» and the set-former all answered «ישר · x - 2 = 0» and drew, on «A(0,0)» · «B(4,0)» · «נקודה M» · «MA = MB». The conditional builds as the ruling asks: «M נקודה» · «MA = MB» both record, and `locusChips` puts M's chip on the «M נקודה» row, whose ask answers «ישר · x - 2 = 0». Nothing needed building for it. (The set-former typed with no M on the figure never built M: it answered `missing`.)
+
+**Decision.**
+1. **One gate, where the grammar reads the question.** `askOne` answers `Answer.chipOnly` as soon as `LOCUS_OF` matches (after the `SHOW_THAT_LOCUS` / `EXPRESS_IN` rewrites, before the point is looked up), unless the record came `via: 'chip'`. Every wording the locus grammar reads is closed together, on every figure; no wording is enumerated a second time. A chip-only whole is split by `splitAsk` exactly as a `missing` one was, so a conjoined question keeps its other parts.
+2. **The way in is part of the record.** `AskedQuestion.via?: 'chip'`; the page answers `askSettled(d, sentence, fmt, kindWord, q.via)`. A record is identified by its sentence and its `via` (`isQuery` in `app/answers.ts`), so the chip's «המקום הגיאומטרי של M» and the same words typed are two rows and never toggle each other. Queries are not saved (the envelope holds lines), so nothing older needs migrating.
+3. **The chip's state is named.** `chipState` (`'off' | 'drawn' | 'hidden'`) and `pressChip`, an exhaustive switch over it: #2623's third press is a new member and a new arm, not a second boolean. Today every arm is `toggleDrawn(…, 'chip')`, so the chip's answers, row, drawing, labels and ✕ are byte-for-byte unchanged.
+4. **The guide teaches the chip.** The catalog's `lane: 'ask'` becomes `lane: 'chip'`: the row's example is the chip's label (locked equal to `locusChipShow`), its `needs` the givens it appears after, `point` the row it sits on, and its description `guideLocusChip`. It has no «try». The construction lane is still `!e.lane` everywhere.
+5. **Retired:** `SET_FORMER`, the set-former's condition trial on `derive([...d.lines, S])`, and `Answer.refused` (its only producer). `LOCUS_OF` reads the set-former itself, and the pointer needs no name.
+6. **Tests and exams move to the chip's entry point**, `askLocus(d, id, fmt, kindWord)` (`app/locusChip.ts`), or pass `'chip'`; a test about a typed wording now asserts the pointer.
+
+**New text (the session's, ADR-W-174):** `askLocusByChip` «את המקום הגאומטרי מציגים בכפתור «{{chip}}» שליד הנקודה ברשימת הנתונים.» / "A locus is shown with the «{{chip}}» button beside the point in the givens list." (`{{chip}}` is `locusChipShow`); `guideLocusChip` «הקלידו את הנתונים {{lines}}, ואז לחצו על הכפתור בשורה של {{point}}.» / "Type the givens {{lines}}, then press the button on the row of {{point}}."
+
+**Cross-builder.** Only analytic answers a locus; 2-D, 3-D and complex have no locus lane, so there is nothing to port (ADR-W-157) and no parity cell.
+
+**Locks.** `src-analytic/__tests__/issue-2673-locus-chip-only.test.ts` (every typed wording → the pointer, the chip unchanged, the two records apart, the conditional built as givens then its chip, the guide row); fixture `issue-2673-conditional-locus-givens`; the locus test files and exams migrated to the chip's entry point.
+
+**Behaviour change for a student:** in analytic, typing «המקום הגיאומטרי של P» (or any locus wording) in the ask box no longer draws or answers the locus; it answers «את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים.». The chip is unchanged, and the guide's locus row now teaches the chip.

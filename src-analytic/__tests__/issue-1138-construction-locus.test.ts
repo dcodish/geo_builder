@@ -43,7 +43,9 @@ function lastVerdict(seq: readonly string[]) {
   return decideSubmit(seq[seq.length - 1], lines, 0, derive(lines, 0));
 }
 
-const locus = (lines: readonly string[], name: string, seed = 0, q = `המקום הגיאומטרי של ${name}`) => ask(derive(lines, seed), q, fmtAnalytic);
+// #2673 (ADR-AG-381): the locus is asked by its chip (`'chip'`); a TYPED wording is `typed`, answered with the pointer.
+const locus = (lines: readonly string[], name: string, seed = 0) => ask(derive(lines, seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, undefined, 'chip');
+const typed = (lines: readonly string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic);
 const drawn = (a: ReturnType<typeof locus>): P[] => (a.locus?.components ?? []).flatMap((c) => c.points);
 const strokes = (a: ReturnType<typeof locus>): number => (a.locus?.components ?? []).reduce((n, c) => n + 1 + (c.starts?.length ?? 0), 0);
 
@@ -156,36 +158,33 @@ describe('#1138 — the carrier sentence «A נקודה (כלשהי) על …» 
   });
 });
 
-describe('#1138 lock 5 — the exam’s locus questions answer the locus row', () => {
+/**
+ * #2673 (ADR-AG-381) — the exam's locus wordings still READ as the locus question, and typed they answer the pointer to the
+ * chip; the chip answers the locus row these wordings used to answer.
+ */
+describe('#1138 lock 5 — the exam’s locus questions are the locus question: typed, the pointer; the chip, the row', () => {
   it('«משוואת המקום הגיאומטרי שעליו נמצאות כל הנקודות M» on חורף 2024 (a = 2), and «הביעו באמצעות a את …»', () => {
     for (const q of [
       'משוואת המקום הגיאומטרי שעליו נמצאות כל הנקודות M',
       'הביעו באמצעות a את משוואת המקום הגיאומטרי שעליו נמצאות כל הנקודות M',
       'המקום הגיאומטרי שעליו נמצאים כל הנקודות M',
-    ]) {
-      const a = locus(winter.lines, 'M', 0, q);
-      expect(a.value, q).toBe('parabola · y² = 8x');
-      expect(a.missing, q).toBeUndefined();
-    }
+    ]) expect(typed(winter.lines, q), q).toEqual({ question: q, value: null, chipOnly: true });
+    expect(locus(winter.lines, 'M').value).toBe('parabola · y² = 8x');
   });
-  it('with the parameter a, «הביעו באמצעות a את …» answers in a (#1186, ADR-AG-351)', () => {
-    const plain = locus(winterParam.lines, 'M');
-    const expressed = locus(winterParam.lines, 'M', 0, 'הביעו באמצעות a את משוואת המקום הגיאומטרי שעליו נמצאות כל הנקודות M');
-    expect(expressed.value).toBe('parabola · y² = 4ax');
-    expect({ ...expressed, question: '' }).toEqual({ ...plain, question: '' });
+  it('with the parameter a, the chip answers in a (#1186, ADR-AG-351)', () => {
+    expect(locus(winterParam.lines, 'M').value).toBe('parabola · y² = 4ax');
   });
   it("«הראו כי המקום הגיאומטרי של כל הנקודות G הוא פרבולה ומצאו את משוואתו» on the קיץ ב' 24 property figure", () => {
     const lines = built(['K(1,0)', 'נקודה E', 'E על הישר x = -1', 'נקודה G', 'GE = GK', 'GE מקביל לציר x']);
     for (const q of [
       'הראו כי המקום הגיאומטרי של כל הנקודות G הוא פרבולה ומצאו את משוואתו',
       'הראו כי המקום הגיאומטרי של כל הנקודות G נמצא על פרבולה, ומצאו את משוואתה',
-    ]) expect(locus(lines, 'G', 0, q).value, q).toBe('parabola · y² = 4x');
-  });
-  it('the stated kind is not verified: «הראו כי … הוא מעגל» answers the parabola it is', () => {
-    expect(locus(winter.lines, 'M', 0, 'הראו כי המקום הגיאומטרי של כל הנקודות M הוא מעגל').value).toBe('parabola · y² = 8x');
+      'הראו כי המקום הגיאומטרי של כל הנקודות G הוא מעגל',
+    ]) expect(typed(lines, q).chipOnly, q).toBe(true);
+    expect(locus(lines, 'G').value).toBe('parabola · y² = 4x');
   });
   it('«הביעו באמצעות a את» before a question that is not the locus keeps that question’s own reading', () => {
-    expect(locus(winter.lines, 'M', 0, 'הביעו באמצעות a את שיעורי M').unreadable).toBe(true);
+    expect(typed(winter.lines, 'הביעו באמצעות a את שיעורי M').unreadable).toBe(true);
   });
 });
 

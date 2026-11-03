@@ -69,7 +69,7 @@ import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
-import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
+import { askOnceAnswer, chipState, drawnLoci, drawnMarks, isDrawn, pressChip, removeAnswerAt, toggleDrawn } from './app/answers';
 import { measurablesOf, type Measurable } from './app/measurable';
 import { dispatchRename, dispatchSwap, letterRenameOf, letterTargetOf } from './app/rename';
 import { LetterPopover } from '../shell/frame/LetterPopover';
@@ -706,7 +706,8 @@ export function App() {
   const answers = useMemo<Answer[]>(
     // #1212 removed `describeCurve` (imported now); #1137's `locusKind` stays — it is locale.
     // #1473: `askSettled` — an answer whose gates still wait for the pool is «בודק…», never a value.
-    () => queries.map((q) => ({ ...askSettled(d, q.sentence, fmt, locusKind), shown: q.shown })),
+    // #2673 (ADR-AG-381): `q.via` is the way in — only the chip's record is answered with the locus.
+    () => queries.map((q) => ({ ...askSettled(d, q.sentence, fmt, locusKind, q.via), shown: q.shown })),
     // poolTick: the pool completed, re-read the gates
     [queries, d, fmt, locusKind, poolTick],
   );
@@ -1097,8 +1098,9 @@ export function App() {
    * worded by the input's own refusal text, and a question the tool understands but does not answer by `errOutOfScope`.
    */
   const answerBody = (a: Answer) =>
-    a.refused ? (
-      `${a.question} — ${errorTextOf({ key: a.refused.key, detail: a.refused.detail } as Parameters<typeof errorTextOf>[0], t as unknown as Translate)}`
+    a.chipOnly ? (
+      /* #2673 (ADR-AG-381) — a typed locus question: the pointer to the chip, naming the chip by its own label */
+      `${a.question} — ${t('askLocusByChip', { chip: t('locusChipShow') })}`
     ) : a.unsupported ? (
       t('errOutOfScope', { detail: a.question })
     ) : a.missing ? (
@@ -1513,14 +1515,15 @@ export function App() {
                  * #1177 (ADR-AG-352) — the LOCUS CHIP, in the shared row's `trail` slot (3-D's plane chips' seat). Its
                  * label names the NEXT action (the 2026-10-06 rule; words ruled 2026-10-30): «הצג» while the locus is not
                  * drawn, «הסתר» while it is. The click asks the sentence through the ask lane's own lifetime (ADR-AG-067):
-                 * ask → row + drawing · again → drawing hidden, row kept · ✕ on the row → both go.
+                 * ask → row + drawing · again → drawing hidden, row kept · ✕ on the row → both go. Since #2673 (ADR-AG-381)
+                 * the chip is the locus's ONLY way in: its record carries `via: 'chip'`, read by `chipState` / `pressChip`.
                  */
                 ...(chips.some((c) => rows[c.line] === i)
                   ? {
                       trail: chips
                         .filter((c) => rows[c.line] === i)
                         .map((c) => {
-                          const on = isDrawn(queries, c.sentence);
+                          const on = chipState(queries, c.sentence) === 'drawn';
                           return (
                             <button
                               key={c.id}
@@ -1528,7 +1531,7 @@ export function App() {
                               data-testid="locus-chip"
                               aria-pressed={on}
                               title={c.sentence}
-                              onClick={() => toggleAsk(c.sentence)}
+                              onClick={() => setQueries(pressChip(queries, c.sentence))}
                               style={on ? { ...locusChipStyle, ...locusChipOn } : locusChipStyle}
                             >
                               {t(on ? 'locusChipHide' : 'locusChipShow')}
@@ -2392,18 +2395,19 @@ export function App() {
               example: analyticBidi.isolateLtrRuns(raw),
               dir: analyticBidi.textDir(raw) as 'rtl' | 'ltr',
               featured: e.featured,
-              // #1177 — the setup lines an ASK row stands on, shown under it (the ruling: «with its two setup lines»).
-              ...(e.lane === 'ask' && e.needs ? { description: <span dir="auto">{(e.needs ?? []).join(' · ')}</span> } : {}),
-              onTry: () => {
-                setManualOpen(false);
-                // #1177 — a QUESTION goes to the ask box, never the givens box: it is not a given (ADR-AG-072 §1).
-                if (e.lane === 'ask') {
-                  setAskText(raw);
-                  askRef.current?.focus();
-                  return;
-                }
-                submit(raw);
-              },
+              /*
+                #2673 (ADR-AG-381) — a CHIP row teaches the locus chip: its example is the chip's label, its description the
+                givens the chip appears after («with its two setup lines», 2026-09-27). It is a button to press, not a sentence
+                to send, so it has no «try».
+              */
+              ...(e.lane === 'chip'
+                ? { description: <span dir="auto">{analyticBidi.isolateLtrRuns(t('guideLocusChip', { lines: (e.needs ?? []).join(' · '), point: e.point }))}</span> }
+                : {
+                    onTry: () => {
+                      setManualOpen(false);
+                      submit(raw);
+                    },
+                  }),
             };
           }),
         })).filter((s) => s.entries.length > 0)}

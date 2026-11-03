@@ -204,10 +204,12 @@ export interface Answer {
    */
   parts?: Answer[];
   /**
-   * THE QUESTION NAMES ITS OWN CONDITION AND THE FIGURE REFUSES IT (#2393 R10) — «המקום הגיאומטרי של כל הנקודות M המקיימות
-   * S» where S cannot hold: the refusal the input gives S, worded by the input's own text (`errorText`), never a new one.
+   * THE LOCUS IS REACHED BY ITS CHIP (#2673, ADR-AG-381). A locus question that arrives by the ask box — typed, in any wording
+   * the locus grammar reads — is answered with a pointer to the chip, never with the locus. Operator, 2026-11-02: *"we should
+   * drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."* A token: this module
+   * holds no locale.
    */
-  refused?: { key: string; detail: string };
+  chipOnly?: true;
   /**
    * UNDERSTOOD, NOT SUPPORTED (#2389 → #2393, ADR-AG-316) — «שיפוע המקום הגיאומטרי של M»: the locus is an answer, not an
    * object (operator ruling 2026-10-20 on #2389), so a measure of it is not a question this tool answers. Worded with the
@@ -289,14 +291,6 @@ const LOCUS_OF =
   /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of|[Ee]quation\s+of)\s+)?(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
 
 /**
- * THE SET-FORMER (#2393 R10, ADR-AG-316) — «(המקום הגיאומטרי של) כל הנקודות M (המקיימות S)», "all the points M such that
- * S": the exam's own phrasing of «המקום הגיאומטרי של M», whose noun phrase used to be read as a POINT's name («אין בשרטוט
- * נקודה בשם כל הנקודות M …»). The condition's joiners are enumerated.
- */
-const SET_FORMER =
-  /^(?:ש(?:עליו|בו)\s+(?:נמצאות|נמצאים|מונחות|מונחים)\s+)?(?:(?:כל\s+)?ה?נקודות\s+|(?:all\s+)?(?:the\s+)?points\s+)([A-Z][0-9₀-₉]?)(?:\s+(?:ה?מקיימות|ה?מקיימים|ש-?|such\s+that|satisfying|that\s+satisfy)\s*(.+))?$/;
-
-/**
  * THE EXAM'S LOCUS QUESTIONS, HOWEVER THEY ARE WORDED (#1138, ADR-AG-341) — ADR-AG-141 made the locus question one
  * question however it opens; these are its other two openings, each rewritten to the plain locus phrase before it is read,
  * so they can never answer differently from it. ENUMERATED, never `.*` (the #1301 anti-widening rule).
@@ -308,7 +302,10 @@ const SET_FORMER =
  * - «הראו כי <the locus phrase> הוא / נמצא על <kind> (ומצאו את משוואתו)»: the same row. The kind the sentence states is
  *   not checked: the tool answers, it does not verify (ADR-AG-072 §6).
  *
- * The relative-clause closing «… שעליו נמצאות כל הנקודות M» is `SET_FORMER`'s optional lead.
+ *
+ * Since #2673 (ADR-AG-381) these readers decide only THAT a question is the locus question: typed, it is answered with the
+ * pointer to the chip. The set-former «(המקום הגיאומטרי של) כל הנקודות M (המקיימות S)» and the relative closing «… שעליו
+ * נמצאות כל הנקודות M» need no reader of their own: `LOCUS_OF` matches them, and the pointer needs no name.
  */
 const EXPRESS_IN = /^(?:הביעו|הביעי|הבע|בטאו|בטא|בטאי)\s+(?:באמצעות|בעזרת)\s+[a-z]\s+את\s+(.+)$/;
 const SHOW_THAT_LOCUS =
@@ -363,6 +360,9 @@ const THE_CURVE_KIND: Readonly<Record<string, 'circle' | 'parabola' | 'ellipse'>
  * waiting for the configuration pool. Wrapped once HERE rather than per arm, so an arm added later cannot
  * forget it — every gate reports pending to the `settled` probe.
  */
+/** The way in that is not the ask box (#2673): only the locus chip, today. */
+export type AskVia = 'chip';
+
 export function askSettled(...args: Parameters<typeof ask>): Answer {
   const s = settled(() => ask(...args));
   return s.pending ? { question: args[1], value: null, pending: true } : s.value;
@@ -375,17 +375,24 @@ export function ask(
   // `count` joined the seam for #1500 — a union answer pluralises the kind («שני ישרים»), and the
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
+  /**
+   * WHICH WAY IN the question came (#2673, ADR-AG-381): `'chip'` is the locus chip (`AskedQuestion.via`), and only it is
+   * answered with the locus. Absent is the ask box (and the measure menu), where a locus question answers `chipOnly`.
+   */
+  via?: AskVia,
 ): Answer {
-  const whole = askOne(d, question, fmt, kindWord);
+  const whole = askOne(d, question, fmt, kindWord, via);
   /*
    * #2393 R9 (ADR-AG-316) — A CONJUNCTION OF QUESTIONS, read only when the whole did not read as one question: a question
    * that answers (or names what is missing) is never split. The parts must each read, except that a whole the lane could
-   * not read at all is split as soon as one part reads («מצאו את m ואת z»: m's value, and z unread).
+   * not read at all is split as soon as one part reads («מצאו את m ואת z»: m's value, and z unread). The chip pointer
+   * (#2673) is decided before the locus's name is looked up, so it stands where `missing` stood: «המקום הגיאומטרי של M
+   * ואת AB» is still the pointer and AB's length.
    */
-  if (!whole.unreadable && !whole.missing) return whole;
+  if (!whole.unreadable && !whole.missing && !whole.chipOnly) return whole;
   const pieces = splitAsk(question);
   if (!pieces) return whole;
-  const parts = pieces.map((p) => askOne(d, p, fmt, kindWord));
+  const parts = pieces.map((p) => askOne(d, p, fmt, kindWord, via));
   const ok = whole.unreadable ? parts.some((p) => !p.unreadable) : parts.every((p) => !p.unreadable);
   return ok ? { question, value: null, parts } : whole;
 }
@@ -411,6 +418,7 @@ function askOne(
   question: string,
   fmt: (v: number) => string,
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
+  via?: AskVia,
 ): Answer {
   // The wrapper a student puts round a question («מהו …», «מצא את …», «…?») is not the question (#1432 am. 1).
   let text = normaliseAsk(question);
@@ -457,23 +465,14 @@ function askOne(
   if (expressed && LOCUS_OF.test(expressed[1])) text = expressed[1];
   const loc = LOCUS_OF.exec(text);
   if (loc) {
-    let name = loc[1].trim();
-    const set = SET_FORMER.exec(name);
-    if (set) {
-      name = set[1];
-      const condition = set[2]?.trim();
-      /*
-       * THE QUESTION'S OWN CONDITION (#2393 R10): the set it names is M under S. Traced on THIS figure plus S — the trial
-       * derivation, discarded after (02c R24) — so the trace is the trial's own; a condition the figure already holds draws
-       * the same set as asking without it. A condition the figure refuses is answered with the input's own refusal of it.
-       */
-      if (condition && d.lines && objectById(d.construction, name)) {
-        const trial = derive([...d.lines, condition], d.configuration, d.construction.seedNames ?? {});
-        const fault = trial.faults.find((f) => f.index === d.lines!.length);
-        if (fault) return { question, value: null, refused: { key: fault.code, detail: condition } };
-        return { ...askOne(trial, `המקום הגיאומטרי של ${name}`, fmt, kindWord), question };
-      }
-    }
+    /*
+     * THE LOCUS IS REACHED BY ITS CHIP (#2673, ADR-AG-381) — the one gate, here where the locus grammar has read the question,
+     * so every wording it reads (the plain question, «משוואת …», «הראו כי …», «הביעו באמצעות a את …», the set-former, a part
+     * of a conjoined question) is closed together. The chip asks the same sentence with `via: 'chip'` and is answered below,
+     * unchanged. The point the question names is not looked up: the pointer is true of every figure.
+     */
+    if (via !== 'chip') return { question, value: null, chipOnly: true };
+    const name = loc[1].trim();
     const o = objectById(d.construction, name);
     if (!o) return { question, value: null, missing: { name, kind: 'point' } };
     /**

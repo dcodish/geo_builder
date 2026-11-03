@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ask, type Answer } from '../app/ask';
-import { isDrawn, removeAnswerAt, toggleDrawn } from '../app/answers';
+import { chipState, pressChip, removeAnswerAt } from '../app/answers';
 import { errorText } from '../app/errorText';
 import { locusChips, locusSentence } from '../app/locusChip';
 import { decideSubmit, type SubmitVerdict } from '../app/submit';
@@ -23,7 +23,8 @@ import { PROMPT_SPEC_ANALYTIC } from '../parser/llmSharedAnalytic';
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
 const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל', parabola: 'פרבולה', ellipse: 'אליפסה' };
 const kind = ((k: string) => HE[k] ?? k) as never;
-const asked = (lines: readonly string[], q: string, seed = 0): Answer => ask(derive(lines, seed), q, fmt, kind);
+// #2673 (ADR-AG-381): the locus is asked by its chip — `'chip'`, the chip's entry point.
+const asked = (lines: readonly string[], q: string, seed = 0): Answer => ask(derive(lines, seed), q, fmt, kind, 'chip');
 /** The ask answers with a CURVE: a value and a drawing. */
 const isCurve = (a: Answer) => a.value !== null && a.locus !== undefined;
 
@@ -96,7 +97,7 @@ describe('#1177 — the chip and the ask agree', () => {
       const d = derive(lines, seed);
       const chips = new Set(locusChips(d).map((c) => c.id));
       for (const p of d.figure.points) {
-        const a = ask(d, locusSentence(p.id), fmt, kind);
+        const a = ask(d, locusSentence(p.id), fmt, kind, 'chip');
         // the chip's sentence always round-trips through the ask lane's reader
         expect(a.unreadable, `${p.id}: unreadable`).toBeFalsy();
         expect(a.missing, `${p.id}: missing`).toBeFalsy();
@@ -111,14 +112,14 @@ describe('#1177 — the chip and the ask agree', () => {
 describe('#1177 — the chip uses the ask lane\'s lifetime (ADR-AG-067)', () => {
   it('ask → row + drawing · again → drawing hidden, row kept · again → drawn · ✕ → both go', () => {
     const s = locusSentence('M');
-    let qs = toggleDrawn([], s);
-    expect(qs).toEqual([{ sentence: s, shown: true }]);
-    expect(isDrawn(qs, s)).toBe(true); // the label reads «הסתר מקום גאומטרי»
-    qs = toggleDrawn(qs, s);
-    expect(qs).toEqual([{ sentence: s, shown: false }]);
-    expect(isDrawn(qs, s)).toBe(false); // the label reads «הצג מקום גאומטרי»
-    qs = toggleDrawn(qs, s);
-    expect(isDrawn(qs, s)).toBe(true);
+    let qs = pressChip([], s);
+    expect(qs).toEqual([{ sentence: s, shown: true, via: 'chip' }]);
+    expect(chipState(qs, s)).toBe('drawn'); // the label reads «הסתר מקום גאומטרי»
+    qs = pressChip(qs, s);
+    expect(qs).toEqual([{ sentence: s, shown: false, via: 'chip' }]);
+    expect(chipState(qs, s)).toBe('hidden'); // the label reads «הצג מקום גאומטרי»
+    qs = pressChip(qs, s);
+    expect(chipState(qs, s)).toBe('drawn');
     expect(removeAnswerAt(qs, 0)).toEqual([]);
   });
 
@@ -129,8 +130,9 @@ describe('#1177 — the chip uses the ask lane\'s lifetime (ADR-AG-067)', () => 
   });
 });
 
-describe('#1177 — the guide\'s ask row (ruling 2026-09-27)', () => {
-  const row = COMMAND_CATALOG_ANALYTIC.find((e) => e.lane === 'ask' && e.he === 'המקום הגיאומטרי של M');
+// #2673 (ADR-AG-381): the guide's row teaches the CHIP — `lane: 'chip'`, the chip's label, the same two setup lines.
+describe('#1177 — the guide\'s locus row (ruling 2026-09-27; the chip since #2673)', () => {
+  const row = COMMAND_CATALOG_ANALYTIC.find((e) => e.lane === 'chip' && e.category === 'locus');
 
   it('is featured, in the locus section, with the two setup lines', () => {
     expect(row).toBeDefined();
@@ -139,9 +141,10 @@ describe('#1177 — the guide\'s ask row (ruling 2026-09-27)', () => {
     expect(row!.needs).toEqual(['A(0,0)', 'B(4,0)', 'נקודה M', 'MA = MB']);
   });
 
-  it('its needs plus its question answer the bisector, in both languages', () => {
-    expect(asked(row!.needs!, row!.he).value).toBe('ישר · x - 2 = 0');
-    expect(asked(row!.needs!, row!.en).value).toBe('ישר · x - 2 = 0');
+  it('its needs give its point a chip, and the chip answers the bisector', () => {
+    const d = derive(row!.needs!, 0);
+    expect(locusChips(d).map((c) => c.id)).toContain(row!.point);
+    expect(asked(row!.needs!, locusSentence(row!.point!)).value).toBe('ישר · x - 2 = 0');
   });
 
   it('is never taught to the model', () => {

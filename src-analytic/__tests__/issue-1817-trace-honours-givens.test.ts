@@ -29,7 +29,7 @@ const kindWord = ((k: string, n: number) =>
     : ({ line: 'ישר', circle: 'מעגל', parabola: 'פרבולה', ellipse: 'אליפסה' } as Record<string, string>)[k]) as never;
 
 const answer = (lines: string[], name: string, seed = 0) =>
-  ask(derive(lines, seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord);
+  ask(derive(lines, seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord, 'chip');
 
 /** Every drawn position of the answer's locus, all components and strokes. */
 const drawn = (a: ReturnType<typeof answer>): P[] => (a.locus?.components ?? []).flatMap((c) => c.points);
@@ -61,7 +61,7 @@ describe('#1817 lock 1 — a coordinate range on a line: the trace is the segmen
   ] as const) {
     it(`${label}: every drawn point has 1 < x < 3, one stroke, ends at x = 1 and x = 3, row unchanged`, () => {
       const d = derive([...seq], 0);
-      const a = ask(d, 'המקום הגיאומטרי של B', fmtAnalytic, kindWord);
+      const a = ask(d, 'המקום הגיאומטרי של B', fmtAnalytic, kindWord, 'chip');
       expect(a.value).toBe('ישר · x - y = 0');
       const comps = a.locus?.components ?? [];
       expect(comps).toHaveLength(1);
@@ -235,7 +235,7 @@ describe('#1817 lock 8 — an unrestricted locus is unchanged: one stroke, the w
     it(`${lines.join(' · ')}`, () => {
       for (const seed of [0, 1, 2]) {
         const d = derive([...lines], seed);
-        const a = ask(d, `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord);
+        const a = ask(d, `המקום הגיאומטרי של ${name}`, fmtAnalytic, kindWord, 'chip');
         expect(a.value).toBe(row);
         const res = locusOf(d.construction, name, [d.configuration, d.configuration.seed + 1], d.box)!; // as the ask lane traces (ADR-AG-358)
         for (const [i, cp] of res.components.entries()) {

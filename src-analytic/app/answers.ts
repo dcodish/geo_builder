@@ -51,22 +51,52 @@ import type { AskedQuestion } from '../store/useAnalyticStore';
 /** How many rows the lane holds. Older questions fall off the end rather than growing without bound. */
 export const ASK_LIMIT = 8;
 
+/**
+ * A RECORD IS ITS SENTENCE AND ITS WAY IN (#2673, ADR-AG-381). The locus chip's «המקום הגיאומטרי של M» and the same words
+ * typed are different questions — the chip's answers the locus, the typed one the pointer to the chip — so every gesture
+ * below matches on both. Absent `via` is the ask box and the measure menu, as before.
+ */
+const isQuery = (q: AskedQuestion, sentence: string, via: AskedQuestion['via']): boolean => q.sentence === sentence && q.via === via;
+const record = (sentence: string, via: AskedQuestion['via']): AskedQuestion => (via ? { sentence, shown: true, via } : { sentence, shown: true });
+
 /** Is this measurement's drawing on the canvas right now? */
-export const isDrawn = (qs: readonly AskedQuestion[], sentence: string): boolean =>
-  qs.some((q) => q.sentence === sentence && q.shown);
+export const isDrawn = (qs: readonly AskedQuestion[], sentence: string, via?: AskedQuestion['via']): boolean =>
+  qs.some((q) => isQuery(q, sentence, via) && q.shown);
 
 /** Is the lane holding this question at all, drawn or not? */
-export const isAsked = (qs: readonly AskedQuestion[], sentence: string): boolean =>
-  qs.some((q) => q.sentence === sentence);
+export const isAsked = (qs: readonly AskedQuestion[], sentence: string, via?: AskedQuestion['via']): boolean =>
+  qs.some((q) => isQuery(q, sentence, via));
 
 /**
  * A menu entry's gesture: ask it if it has not been asked, otherwise flip whether it is DRAWN.
  *
  * The row is never removed here — that is the operator's ruling (ADR-AG-067).
  */
-export function toggleDrawn(qs: readonly AskedQuestion[], sentence: string): AskedQuestion[] {
-  if (!isAsked(qs, sentence)) return [{ sentence, shown: true }, ...qs].slice(0, ASK_LIMIT);
-  return qs.map((q) => (q.sentence === sentence ? { ...q, shown: !q.shown } : q));
+export function toggleDrawn(qs: readonly AskedQuestion[], sentence: string, via?: AskedQuestion['via']): AskedQuestion[] {
+  if (!isAsked(qs, sentence, via)) return [record(sentence, via), ...qs].slice(0, ASK_LIMIT);
+  return qs.map((q) => (isQuery(q, sentence, via) ? { ...q, shown: !q.shown } : q));
+}
+
+/**
+ * THE LOCUS CHIP'S STATE, read from the record (#1177, #2673). `'off'`: not asked; `'drawn'`: its row and its curve;
+ * `'hidden'`: its row, the curve hidden. Named states rather than `isDrawn`, so the chip's next state (#2623, a press that
+ * commits the locus as a given) is a new member and a new arm of `pressChip`, not a second boolean.
+ */
+export type ChipState = 'off' | 'drawn' | 'hidden';
+
+export function chipState(qs: readonly AskedQuestion[], sentence: string): ChipState {
+  const q = qs.find((x) => isQuery(x, sentence, 'chip'));
+  return !q ? 'off' : q.shown ? 'drawn' : 'hidden';
+}
+
+/** A press of the locus chip: off → drawn → hidden → drawn (ADR-AG-067's lifetime, ADR-AG-352). The row's ✕ is `removeAnswerAt`. */
+export function pressChip(qs: readonly AskedQuestion[], sentence: string): AskedQuestion[] {
+  switch (chipState(qs, sentence)) {
+    case 'off':
+    case 'drawn':
+    case 'hidden':
+      return toggleDrawn(qs, sentence, 'chip');
+  }
 }
 
 /**
@@ -77,7 +107,7 @@ export function toggleDrawn(qs: readonly AskedQuestion[], sentence: string): Ask
  * this*, and answering that by hiding the answer would be the opposite of what was asked.
  */
 export function askOnceAnswer(qs: readonly AskedQuestion[], sentence: string): AskedQuestion[] {
-  return [{ sentence, shown: true }, ...qs.filter((q) => q.sentence !== sentence)].slice(0, ASK_LIMIT);
+  return [record(sentence, undefined), ...qs.filter((q) => !isQuery(q, sentence, undefined))].slice(0, ASK_LIMIT);
 }
 
 /** Retire the entry at `index` — the ✕ on the row. Its drawing goes with it. Out-of-range is a no-op. */

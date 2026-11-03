@@ -44,7 +44,7 @@ const SEEDS = [0, 1, 2, 3, 4, 5];
 /** One configuration: its trace, and the frame the canvas would actually use for it. */
 function frameAt(seed: number, shown = true) {
   const d = derive(LINES, seed);
-  const a = ask(d, LOCUS_Q, (v) => String(+v.toFixed(4)), (k) => k);
+  const a = ask(d, LOCUS_Q, (v) => String(+v.toFixed(4)), (k) => k, 'chip');
   const answers = [{ shown, locus: a.locus }];
   return { d, trace: a.locus?.components[0]?.points ?? [], box: drawnBox(d.figure, d.box, answers) };
 }

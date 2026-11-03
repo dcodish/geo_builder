@@ -79,6 +79,12 @@ export interface AskedQuestion {
   sentence: string;
   /** Is this measurement's drawing on the canvas right now? */
   shown: boolean;
+  /**
+   * WHICH WAY IN it was asked (#2673, ADR-AG-381): `'chip'` for the locus chip, absent for the ask box and the measure menu.
+   * Part of the record's identity with `sentence`: the chip's «המקום הגיאומטרי של M» answers the locus, the same words
+   * typed answer the pointer to the chip, and the two are different rows.
+   */
+  via?: 'chip';
 }
 
 export type InputError =

@@ -174,7 +174,7 @@ describe('#2391 found work — a tangent through a point ON the circle is the ta
     expect(decideSubmit('המשיקים נפגשים בנקודה M', lines, 0).kind).toBe('record');
     const d = derive([...lines, 'המשיקים נפגשים בנקודה M', 'MA = MB'], 0);
     expect(d.faults).toEqual([]);
-    expect(ask(d, 'המקום הגיאומטרי של M', fmtAnalytic).value).toBe('line · 4x + y + 3 = 0');
+    expect(ask(d, 'המקום הגיאומטרי של M', fmtAnalytic, undefined, 'chip').value).toBe('line · 4x + y + 3 = 0');
   });
 
   it('control — through a point OFF the circle it is still the tangent FROM it (two roots, a free direction)', () => {

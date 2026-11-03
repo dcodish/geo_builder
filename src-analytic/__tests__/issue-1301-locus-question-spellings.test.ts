@@ -20,7 +20,7 @@ const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל' };
 const kind = ((k: string) => HE[k] ?? k) as never;
 /** The operator's own figure: B one segment-length from a pinned A — a circle. */
 const FIG = ['A(0,0)', 'נקודה B', 'אורך הקטע AB הוא 10'];
-const askOn = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic, kind);
+const askOn = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic, kind, 'chip');
 const BARE = 'המקום הגיאומטרי של B';
 
 describe('#1301 — every spelling of the locus question is the same question', () => {

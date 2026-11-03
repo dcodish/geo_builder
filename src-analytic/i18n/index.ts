@@ -110,6 +110,10 @@ const he = {
   askLinesCross:
     'הישרים נחתכים, ולכן אין ביניהם מרחק אחד — הוא אפס בנקודת החיתוך וגדל ככל שמתרחקים ממנה. מרחק מוגדר רק בין ישרים מקבילים. אפשר לשאול על המרחק מנקודה לישר, למשל «המרחק מ-A לישר l1», או לסמן את נקודת החיתוך עצמה.',
   askUnreadable: 'לא הבנתי את השאלה',
+  // #2673 (ADR-AG-381) — a typed locus question points at the chip (the session's words, ADR-W-174)
+  askLocusByChip: 'את המקום הגאומטרי מציגים בכפתור «{{chip}}» שליד הנקודה ברשימת הנתונים.',
+  // #2673 — the guide's locus row teaches the chip: the givens it appears after, and where to press it
+  guideLocusChip: 'הקלידו את הנתונים {{lines}}, ואז לחצו על הכפתור בשורה של {{point}}.',
   // #1431 — the contextual distance could not resolve; name which noun to letter
   askContextualPoint: 'יש {{points}} נקודות בציור — כתבו את שם הנקודה (למשל «המרחק של A מהישר»)',
   askContextualLine: 'יש {{lines}} ישרים בציור — כתבו את שם הישר (למשל «המרחק של הנקודה מהישר l1»)',
@@ -732,6 +736,8 @@ const en: typeof he = {
   askLinesCross:
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
   askUnreadable: 'I did not understand the question',
+  askLocusByChip: 'A locus is shown with the «{{chip}}» button beside the point in the givens list.',
+  guideLocusChip: 'Type the givens {{lines}}, then press the button on the row of {{point}}.',
   askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
   askContextualLine: 'the figure has {{lines}} lines — name the line (e.g. "המרחק של הנקודה מהישר l1")',
   askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',

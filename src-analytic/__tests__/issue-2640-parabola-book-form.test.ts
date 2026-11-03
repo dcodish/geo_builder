@@ -29,7 +29,7 @@ const build = (lines: string[]) => {
   expect(d.faults, lines.join(' · ')).toEqual([]);
   return d;
 };
-const answer = (lines: string[], question: string) => ask(build(lines), question, fmtAnalytic, t);
+const answer = (lines: string[], question: string) => ask(build(lines), question, fmtAnalytic, t, 'chip');
 const parabolaOf = (lines: string[]): NumCurve => {
   const c = build(lines).figure.curves.find((k) => k.curve.kind === 'parabola');
   expect(c, 'a parabola is drawn').toBeDefined();

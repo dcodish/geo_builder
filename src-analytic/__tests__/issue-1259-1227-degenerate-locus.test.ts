@@ -63,7 +63,7 @@ describe('#1259 — the tangential figure is ONE point, not four cases', () => {
 
 describe('#1227 — the locus of a determined point is that point, or that finite set', () => {
   const fmt = (v: number) => String(Math.round(v * 1000) / 1000);
-  const locus = (lines: string[]) => ask(derive(lines, 0), 'המקום הגיאומטרי של M', fmt);
+  const locus = (lines: string[]) => ask(derive(lines, 0), 'המקום הגיאומטרי של M', fmt, undefined, 'chip');
 
   it('«MA = 5»: the two positions, as a fact about the figure — never «cannot be computed»', () => {
     const a = locus([...BASE, 'MA = 5']);
@@ -96,7 +96,7 @@ describe('#1227 — the locus of a determined point is that point, or that finit
 
   it('the panel and the answer row never disagree about where M is', () => {
     const d = derive([...BASE, 'MA = 5'], 0);
-    const a = ask(d, 'המקום הגיאומטרי של M', fmt);
+    const a = ask(d, 'המקום הגיאומטרי של M', fmt, undefined, 'chip');
     const opts = knownOptions(d.construction, readM)!;
     expect(a.points!.map((p) => [p.x, p.y])).toEqual(opts);
   });

@@ -8,10 +8,16 @@
  *
  * ## The chip is an AFFORDANCE, not a second mechanism
  *
- * It carries the sentence it would ask — «המקום הגיאומטרי של M», exactly what a student could type — and the
- * component hands that sentence to the ask lane's own `toggleDrawn`, the ADR-AG-067 lifetime the measure menu uses.
- * This module answers nothing: two surfaces, one grammar (ADR-AG-048), so the chip and the typed question cannot
- * disagree about what M's locus is.
+ * It carries the sentence it asks — «המקום הגיאומטרי של M» — and the component hands that sentence to the ask lane through
+ * `pressChip`, the ADR-AG-067 lifetime the measure menu uses, with the record marked `via: 'chip'`. This module answers
+ * nothing: the ask lane does, with the one grammar it has (ADR-AG-048).
+ *
+ * ## The chip is the ONLY way in (#2673, ADR-AG-381)
+ *
+ * Operator, 2026-11-02: *"we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the
+ * chips."* The same words typed in the ask box answer a pointer to this chip (`Answer.chipOnly`); only a record asked
+ * `via: 'chip'` is answered with the locus. A conditional locus is built as givens — «נקודה M» · «MA = MB» — and then its
+ * chip (ruling 2026-11-03: *"a student should see what he is placing the point and this is part of the pedagogy"*).
  *
  * ## Which points get one: `hasLocus`, never a second predicate
  *
@@ -28,14 +34,28 @@
  * reference and a tool-named centre each land on the row the student reads it was introduced on. One record serves
  * the solve's fit and this chip (ADR-AG-352 Am. 1).
  */
+import { ask, type Answer } from './ask';
 import type { Derivation } from '../engine/derive';
 import { drawableAt } from '../engine/evaluate';
 import { hasLocus } from '../engine/locus';
 import { isFree, type Id } from '../engine/types';
 import { locusSentence } from '../parser/locusPhrases';
 
-/** The question a chip asks — the ask lane's own spelling (`LOCUS_OF`), the one the guide's featured row teaches. */
+/** The question a chip asks — the ask lane's own spelling (`LOCUS_OF`). */
 export { locusSentence };
+
+/**
+ * THE CHIP'S ENTRY POINT, as the page answers a chip's record (`askSettled(d, sentence, fmt, kindWord, 'chip')`) — the
+ * one call a test or a corpus check makes to read a point's locus (#2673). Typing the sentence is `ask` without `via`.
+ */
+export function askLocus(
+  d: Derivation,
+  id: Id,
+  fmt: (v: number) => string,
+  kindWord?: Parameters<typeof ask>[3],
+): Answer {
+  return ask(d, locusSentence(id), fmt, kindWord, 'chip');
+}
 
 export interface LocusChip {
   /** The ACTIVE line (the derivation's index) that introduced the point — the component maps it to its row. */

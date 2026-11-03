@@ -50,7 +50,7 @@ import { fmtAnalytic } from '../format';
 const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל' };
 const kind = ((k: string) => HE[k] ?? k) as never;
 const bisector = (b: string) =>
-  ask(derive(['A(0,0)', b, 'נקודה M', 'MA = MB'], 0), 'המקום הגיאומטרי של M', fmtAnalytic, kind).value;
+  ask(derive(['A(0,0)', b, 'נקודה M', 'MA = MB'], 0), 'המקום הגיאומטרי של M', fmtAnalytic, kind, 'chip').value;
 
 describe('#1224 — a locus states its equation whatever its slope or scale', () => {
   it('a SLANTED bisector prints one — the case the feature is for', () => {
@@ -76,6 +76,7 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
       'המקום הגיאומטרי של P',
       fmtAnalytic,
       kind,
+      'chip',
     ).value;
     expect(v).toBe('מעגל · (x − 16)² + y² = 25²'); // right-hand side by #1187; #1224 changed neither side
   });
@@ -95,6 +96,7 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
           'המקום הגיאומטרי של P',
           fmtAnalytic,
           kind,
+          'chip',
         ).value,
         `seed ${seed}`,
       ).toBe('מעגל · (x − 16a)² + y² = (25a)²');

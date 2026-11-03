@@ -148,28 +148,27 @@ describe('#2393 R8/R9 — options and conjunctions: each part is its own row', (
   });
 });
 
-describe('#2393 R10 — the set-former: the locus the question names', () => {
+/**
+ * #2393 R10, superseded in part by #2673 (ADR-AG-381): the set-former is the locus question, so typed it answers the pointer
+ * to the chip. Its condition is no longer traced on a trial figure: it is stated as a given, and the chip answers (ruling
+ * 2026-11-03: *"a student should see what he is placing the point"*).
+ */
+describe('#2393 R10 → #2673 — the set-former: typed, the pointer to the chip; the condition stated, the chip answers', () => {
   const LOCUS = 'line · 4x + y + 3 = 0';
   it.each([
     'מצאו את משוואת המקום הגיאומטרי של כל הנקודות M המקיימות MA = MB',
     'המקום הגיאומטרי של כל הנקודות M',
     'המקום הגיאומטרי של הנקודות M',
     'the locus of all the points M such that MA = MB',
-  ])('Q1 (MA = MB stated) «%s» ≡ «המקום הגיאומטרי של M»', (q) => {
-    expect(answer(Q1, q)).toEqual(answer(Q1, 'המקום הגיאומטרי של M'));
-    expect(value(Q1, q)).toBe(LOCUS);
+    'המקום הגיאומטרי של כל הנקודות M המקיימות ML = MK',
+    'המקום הגיאומטרי של כל הנקודות Q המקיימות QA = QB',
+  ])('«%s» → the pointer, on the head and on the whole figure', (q) => {
+    expect(answer(Q1, q)).toEqual({ value: null, chipOnly: true });
+    expect(answer(Q1_HEAD, q)).toEqual({ value: null, chipOnly: true });
   });
-  it('the condition not yet stated: the locus under it, traced on the figure plus the condition — and the figure is untouched', () => {
-    const before = JSON.stringify(fig(Q1_HEAD).construction);
-    expect(value(Q1_HEAD, 'מצאו את משוואת המקום הגיאומטרי של כל הנקודות M המקיימות MA = MB')).toBe(LOCUS);
-    expect(value(Q1_HEAD, 'המקום הגיאומטרי של M')).toBeNull();
-    expect(JSON.stringify(fig(Q1_HEAD).construction)).toBe(before);
-  });
-  it('a condition the figure refuses is the input’s own refusal of it', () => {
-    expect(answer(Q1, 'המקום הגיאומטרי של כל הנקודות M המקיימות ML = MK')).toEqual({ value: null, refused: { key: 'unsatisfiable', detail: 'ML = MK' } });
-  });
-  it('a point the figure lacks is the missing point — named, never «כל הנקודות Q …»', () => {
-    expect(answer(Q1_HEAD, 'המקום הגיאומטרי של כל הנקודות Q המקיימות QA = QB')).toEqual({ value: null, missing: { name: 'Q', kind: 'point' } });
+  it('the condition stated as a given: the chip answers the locus; on the head alone it has none', () => {
+    expect(ask(fig(Q1), 'המקום הגיאומטרי של M', fmtAnalytic, undefined, 'chip').value).toBe(LOCUS);
+    expect(ask(fig(Q1_HEAD), 'המקום הגיאומטרי של M', fmtAnalytic, undefined, 'chip').value).toBeNull();
   });
 });
 
