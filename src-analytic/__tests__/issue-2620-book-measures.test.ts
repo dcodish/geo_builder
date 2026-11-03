@@ -10,6 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { askSettled } from '../app/ask';
+import { locusSentence } from '../app/locusChip';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
@@ -19,7 +20,8 @@ import p97 from './fixtures/ellipse-book-p9-7-sum-2620.analytic.json';
 import p108 from './fixtures/ellipse-book-p10-8-2620.analytic.json';
 
 const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
-const locus = (lines: readonly string[], of = 'P', seed = 0) => askSettled(derive([...lines], seed), `המקום הגיאומטרי של ${of}`, fmt).value;
+// round #2678: the locus is reached by its chip only (#2673, ADR-AG-381), so the answer is asked as the chip asks it
+const locus = (lines: readonly string[], of = 'P', seed = 0) => askSettled(derive([...lines], seed), locusSentence(of), fmt, undefined, 'chip').value;
 const records = (lines: readonly string[]) => {
   for (let i = 0; i < lines.length; i += 1) expect(decideSubmit(lines[i], lines.slice(0, i), 0).kind, lines[i]).toBe('record');
   expect(derive([...lines], 0).faults).toEqual([]);
