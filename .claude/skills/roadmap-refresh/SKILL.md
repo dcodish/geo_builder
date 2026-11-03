@@ -21,6 +21,7 @@ the session scratchpad, never in the repo.
 | `plan/current` | the weeks and the workstreams, each with its issue numbers; `pulled` = `[{issue, week, at}]`, the issues the operator pulled into a week (ADR-W-165) | a session, when the plan changes or a pull is recorded |
 | `state/issues` | each plan issue's title, state, labels, `closedAt`, plus `asOf`; `outside` = the open P1/P2 issues in a Now or Next tool that no workstream names | this skill |
 | `pulls/<issue>` | a pull into a week: `pulled` (he clicked on the page) → `recorded` | the page, then this skill |
+| `history/open` | open issues per day since the first issue, total and per group (2-D, 3-D, analytic, complex, infrastructure), and opened/closed per week, rebuilt from GitHub every refresh (ADR-W-159 Am. 1, #2652) | this skill |
 | `snapshots/<YYYY-MM-DD>` | counts: open total, by phase, by tool × priority × type, per workstream | this skill, one per day |
 | `decisions/<id>` | a plan decision: `open` → `answered` (he clicked on the page) → `recorded` | the page, then this skill |
 | `tools/snapshot` | a pointer to `scripts/roadmap-snapshot.mjs` | — |
@@ -35,7 +36,7 @@ or delete it.** A second refresh on the same day replaces that day's snapshot (p
    prints the date, the plan week and the open total.
 3. **Write.** One `batch`: `set` `state/issues` from `issues.json` (pinned to the version step 1's
    listing or an earlier read showed; read it if you have not) and `set` `snapshots/<date>` from
-   `snapshot.json` (no pin when the doc is new).
+   `snapshot.json` (no pin when the doc is new), and `set` `history/open` from `history.json` (pinned to the version you read).
 3b. **Rounds.** `node scripts/round-metrics.mjs <scratch out-dir>` (about a minute), then `set`
    `history/rounds` from its `rounds.json`, pinned. It feeds the "Fix rounds" panel: each round's
    net change to the queue and the operator's time ([ADR-W-169](../../../docs/06w-decisions-workspace.md#adr-w-169)).
