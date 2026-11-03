@@ -313,7 +313,9 @@ sentence never wrote is `inventedExisting` ([ADR-AG-281](06c-decisions-analytic.
 root pays only ACROSS an equation: each account is tagged by whether its line is an equation (`=` with x or y, or facts
 that mention them), each stated number by its own stretch of the sentence, and v² or √v is offered only against the
 other tag, so a radius r pays an equation's r² and «AB = 3» is not paid by «AB = 9»
-([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)).
+([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)). A count is a BARE integer before a plural noun that is not a
+unit word (`UNIT_WORD`: «יחידות», «מטרים», «מעלות», "units", "degrees" and the singular and abbreviated units), so
+«√2 יחידות» and «30 מעלות» keep their stated values (ADR-AG-384 amendment 1).
 
 *Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
