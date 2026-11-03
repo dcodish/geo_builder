@@ -17,7 +17,7 @@ import { directrixText, roleLineText } from '../app/curveText';
 import { analyticI18n } from '../i18n';
 
 const dof = (d: ReturnType<typeof derive>) => reportedDof(d.construction, d.figure.carrierDof);
-const answer = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic);
+const answer = (lines: string[], q: string) => ask(derive(lines, 0), q, fmtAnalytic, undefined, 'chip');
 
 describe('#1432 — the radius as a GIVEN', () => {
   it.each([

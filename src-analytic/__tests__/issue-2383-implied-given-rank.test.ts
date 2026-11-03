@@ -38,7 +38,7 @@ function step(before: readonly string[], line: string, seed: number) {
   return { kind: v.kind, before: derive([...before], seed).figure.carrierDof, after: derive(after, seed).figure.carrierDof, lines: after };
 }
 const locus = (lines: readonly string[], seed: number) =>
-  ask(derive([...lines], seed), 'המקום הגיאומטרי של M', fmtAnalytic, kindWord).value;
+  ask(derive([...lines], seed), 'המקום הגיאומטרי של M', fmtAnalytic, kindWord, 'chip').value;
 
 describe('#2383 — the exam figure keeps its one degree of freedom', () => {
   it('both saved figures record line by line', () => {

@@ -1,0 +1,157 @@
+{
+  "name": "pr-2682",
+  "title": "PR #2682 — #2673: the locus is reached by its chip only (analytic)",
+  "cases": [
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T12",
+      "title": "Typing a locus question points to the chip",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "asks": [
+        "המקום הגיאומטרי של M"
+      ],
+      "expect": [
+        "את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים."
+      ],
+      "expectAbsent": [
+        "x - 2 = 0"
+      ],
+      "lookFor": "Start from a clear canvas. Ask in the ask box «המקום הגיאומטרי של M». The answer row says «את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים.», and nothing is drawn.",
+      "before": "Prod answers «ישר · x - 2 = 0» and draws the line."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T13",
+      "title": "An exam wording gets the same pointer",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "asks": [
+        "הראו כי המקום הגיאומטרי של כל הנקודות M הוא ישר"
+      ],
+      "expect": [
+        "את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים."
+      ],
+      "expectAbsent": [
+        "x - 2 = 0"
+      ],
+      "lookFor": "Start from a clear canvas. The same pointer, with nothing drawn.",
+      "before": "Prod answers the locus and draws it."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T14",
+      "title": "The locus chip still shows the locus",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "x - 2 = 0",
+        "הסתר מקום גאומטרי"
+      ],
+      "lookFor": "Start from a clear canvas. Press «הצג מקום גאומטרי» on the «נקודה M» row: the row «המקום הגיאומטרי של M: ישר · x - 2 = 0» appears, the line x = 2 is drawn, and the chip now reads «הסתר מקום גאומטרי».",
+      "before": "Unchanged."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T15",
+      "title": "A second press hides the drawing and keeps the answer",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        },
+        {
+          "click": "הסתר מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "x - 2 = 0",
+        "הצג מקום גאומטרי"
+      ],
+      "lookFor": "Continue from T14 (or start clear and press the chip once). Press «הסתר מקום גאומטרי»: the line x = 2 disappears from the figure, the answer row stays, and the chip reads «הצג מקום גאומטרי» again.",
+      "before": "Unchanged."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T16",
+      "title": "The conditional locus, built from givens",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "M נקודה",
+        "MA = MB"
+      ],
+      "after": [
+        {
+          "click": "הצג מקום גאומטרי"
+        }
+      ],
+      "expect": [
+        "x - 2 = 0"
+      ],
+      "lookFor": "Start from a clear canvas. Press the chip on the «M נקודה» row: «ישר · x - 2 = 0», and the line x = 2 is drawn.",
+      "before": "Unchanged (prod builds it too)."
+    },
+    {
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "id": "T17",
+      "title": "The guide teaches the chip",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB"
+      ],
+      "after": [
+        {
+          "click": "מדריך"
+        }
+      ],
+      "expect": [
+        "הקלידו את הנתונים A(0,0) · B(4,0) · נקודה M · MA = MB, ואז לחצו על הכפתור בשורה של M."
+      ],
+      "lookFor": "Open «מדריך» and find the «מקום גאומטרי» section. The row reads «הצג מקום גאומטרי», with «הקלידו את הנתונים A(0,0) · B(4,0) · נקודה M · MA = MB, ואז לחצו על הכפתור בשורה של M.» under it. Clicking that row does nothing.",
+      "before": "Prod's row reads «המקום הגיאומטרי של M», and clicking it fills the ask box."
+    }
+  ]
+}

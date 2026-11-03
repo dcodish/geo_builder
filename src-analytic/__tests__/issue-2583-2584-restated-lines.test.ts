@@ -70,7 +70,7 @@ describe('#2583 — a perpendicular bisector draws only its line (ADR-AG-345)', 
     const d = derive(lines, 0);
     expect(d.figure.points.map((p) => p.id).sort()).toEqual(['E', 'G', 'K', 'M']);
     expect(d.minted).toEqual([]);
-    expect(ask(d, 'המקום הגיאומטרי של G', fmtAnalytic).value).toBe('parabola · y² = 4x');
+    expect(ask(d, 'המקום הגיאומטרי של G', fmtAnalytic, undefined, 'chip').value).toBe('parabola · y² = 4x');
   });
 
   it('«P אמצע EK» after the line names its midpoint: P is drawn, the line runs through it, nothing else changes', () => {
@@ -138,7 +138,7 @@ describe('#2584 — a line stated again: one verdict in every spelling (ADR-AG-3
     const named = lineAts(lines).filter((o) => o.kind === 'line-at' && o.name === 'l2');
     expect(named).toHaveLength(1);
     expect(lineAts(lines)).toHaveLength(2);
-    expect(ask(derive(lines, 0), 'המקום הגיאומטרי של G', fmtAnalytic).value).toBe('parabola · y² = 4x');
+    expect(ask(derive(lines, 0), 'המקום הגיאומטרי של G', fmtAnalytic, undefined, 'chip').value).toBe('parabola · y² = 4x');
   });
 
   it('the parallel through a point: refused, and its offer records', () => {

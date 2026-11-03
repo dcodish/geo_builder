@@ -21,7 +21,7 @@ export type CatalogCategory =
   | 'shapes'
   | 'derived'
   | 'relations'
-  /** #1177 (ADR-AG-352): QUESTIONS about the figure, not givens — every row is `lane: 'ask'`. */
+  /** #1177 (ADR-AG-352), #2673 (ADR-AG-381): the locus CHIP, not a given — every row is `lane: 'chip'`. */
   | 'locus';
 
 export interface CatalogEntryAnalytic {
@@ -65,14 +65,16 @@ export interface CatalogEntryAnalytic {
    * is never taught to the LLM: the fallback adds givens, and a model line that rewrites the student's
    * history is rejected. Every consumer reads THIS field rather than learning about rename separately.
    *
-   * `'ask'` (#1177, ADR-AG-352) = a QUESTION the ask lane answers («המקום הגיאומטרי של M»), not a given: `ask`
-   * (app/ask.ts) reads it, `parseLine` never does. Listed so the guide can teach the most-asked construct; never
-   * taught to the LLM, whose lane adds givens. A guide click puts it in the ASK box, never the givens box.
+   * `'chip'` (#2673, ADR-AG-381; was `'ask'`, #1177) = the LOCUS CHIP, the locus's only way in: `he`/`en` are the chip's
+   * label, `needs` the givens after which it appears, `point` the point whose row carries it. Not a sentence: `parseLine`
+   * never reads it, the guide offers no «try», and it is never taught to the LLM, whose lane adds givens.
    *
    * **The construction lane is `!e.lane`** — a consumer that wants givens filters on the field's absence, never on
    * `lane !== 'rewrite'`, so the next lane added cannot leak into the LLM vocabulary or the build guards.
    */
-  lane?: 'rewrite' | 'ask';
+  lane?: 'rewrite' | 'chip';
+  /** A `'chip'` row's point: the row of the given that introduced it carries the chip (`locusChips`). */
+  point?: string;
 }
 
 export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
@@ -1539,19 +1541,21 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F17', he: 'ישר ABE', en: 'line ABE', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: '5 < AB < 9', en: '5 < AB < 9' },
 
-  // --- F13 · the locus — ASKED, not stated (ADR-AG-072 §1); the guide's way in (#1177, ADR-AG-352) ---
+  // --- F13 · the locus — not stated (ADR-AG-072 §1), reached by its CHIP (#1177 ADR-AG-352, #2673 ADR-AG-381) ---
   /**
-   * The operator's ruling of 2026-09-27 (#1177): the guide carries «המקום הגיאומטרי של M» as a FEATURED row with its
-   * two setup lines — `נקודה M` and the property — so the two-line form the tool reads is the form it teaches. The
-   * needs are the reported figure's (A and B to state the property against); the guard asks the question after them.
+   * The operator's ruling of 2026-09-27 (#1177): the guide's featured locus row carries its two setup lines — `נקודה M` and
+   * the property — so the two-line form the tool reads is the form it teaches. Since 2026-11-02 (#2673: *"we should drop the
+   * ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips"*) the row teaches the CHIP: its
+   * label is the chip's (`locusChipShow`, locked equal), and the guard builds the needs and finds the chip on `point`'s row.
    */
   {
     featured: true,
     category: 'locus',
     family: 'F13',
-    lane: 'ask',
-    he: 'המקום הגיאומטרי של M',
-    en: 'the locus of M',
+    lane: 'chip',
+    he: 'הצג מקום גאומטרי',
+    en: 'Show locus',
+    point: 'M',
     needs: ['A(0,0)', 'B(4,0)', 'נקודה M', 'MA = MB'],
   },
 ];

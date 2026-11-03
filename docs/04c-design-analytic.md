@@ -1825,9 +1825,9 @@ Every arm that resolves a curve object answers through `curveAnswer` → `curveE
 
 `ask` wraps `askOne`. A question that did not read whole is split by `splitAsk` (enumerated joiners, and a plural noun over named members) into `Answer.parts`. `App.tsx` renders each part through the extracted `answerBody`.
 
-`SET_FORMER` reads «כל הנקודות M (המקיימות S)». With S, the trial `derive([...d.lines, S])` is traced (`Derivation.lines`, carried like `seed`), and a fault there is `Answer.refused`, worded by `errorText`. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
+A locus question typed in the ask box, in any wording `LOCUS_OF` reads (the set-former «כל הנקודות M (המקיימות S)» included), is `Answer.chipOnly` ([ADR-AG-381](06c-decisions-analytic.md#adr-ag-381)); the set-former's condition trial and `Answer.refused` are retired. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
 
-*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported`
+*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.chipOnly` · `Answer.unsupported`
 
 ### Measuring by clicking
 
@@ -1940,16 +1940,17 @@ range tail read here only when it is selectors (any other tail is the condition 
 
 *Identifiers:* `coordSide` · `closed`
 
-#### The way in: the chip and the guide row ([ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), #1177)
+#### The way in: the chip and the guide row ([ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), #1177; the only way in since [ADR-AG-381](06c-decisions-analytic.md#adr-ag-381), #2673)
 
-`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start). It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`, and a click is `toggleAsk`, the measure menu's ADR-AG-067 lifetime. Its label follows `isDrawn`. The guide's ask rows are `lane: 'ask'` in category `locus`. The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
+`locusChips(d)` (`app/locusChip.ts`) returns one chip per figure point for which the engine's `hasLocus` holds at `d.seed`, started from `drawableAt`'s free positions (`locusOf`'s start). It sits on the line `Construction.objectLine` names — #1687's line provenance (ADR-AG-348), the fold's per-object attribution (the first commit whose construction holds the id, mapped to its line); one record serves the solve's fit and the chip (ADR-AG-352 Am. 1). The chip carries the sentence «המקום הגיאומטרי של X». `App.tsx` renders it in `FactRow.trail`; a click is `pressChip` (`app/answers.ts`), the measure menu's ADR-AG-067 lifetime (`toggleDrawn`) over a record marked `AskedQuestion.via: 'chip'`, and its label follows `chipState` (`'off' | 'drawn' | 'hidden'`; a later state is a new member and a new arm). A record is identified by its sentence AND its `via` (`isQuery`), so the chip's question and the same words typed are two rows. The page answers a record by `askSettled(d, sentence, fmt, kindWord, q.via)`, and `askOne`'s one gate, where `LOCUS_OF` has matched and before the name is looked up, answers every record not `via: 'chip'` with `Answer.chipOnly`, worded `askLocusByChip` (the chip named by `locusChipShow`). `askLocus(d, id, …)` (`app/locusChip.ts`) is the chip's entry point for tests and corpus checks. A chip-only whole is split like a `missing` one (`splitAsk`), so a conjoined question keeps its other parts. The guide's locus row is `lane: 'chip'` in category `locus`: its example is the chip's label, its description (`guideLocusChip`) its `needs` and its `point`, and it has no «try». The construction lane is `!e.lane` in every consumer: the LLM vocabulary, the parse and build guards, and the corpus. The one-line point is arm 4 of the lost-part refusal (`declinedPointProperty`): taught only when both parts record.
 
-*Identifiers:* `locusChips` · `objectLine` · `declinedPointProperty` · `lane: 'ask'`
+*Identifiers:* `locusChips` · `objectLine` · `declinedPointProperty` · `pressChip` · `chipState` · `askLocus` · `lane: 'chip'`
 
 #### The exam's own questions, and its named lines ([ADR-AG-341](06c-decisions-analytic.md#adr-ag-341), #1138)
 
-The ask lane rewrites «… שעליו נמצאות כל הנקודות X», «הביעו באמצעות a את …» and «הראו כי … הוא <kind> …» to the
-locus phrase before reading it (`EXPRESS_IN`, `SHOW_THAT_LOCUS`, `SET_FORMER`). A line through a point and a
+The ask lane rewrites «הביעו באמצעות a את …» and «הראו כי … הוא <kind> …» to the locus phrase before reading it
+(`EXPRESS_IN`, `SHOW_THAT_LOCUS`); `LOCUS_OF` reads «… שעליו נמצאות כל הנקודות X» itself. Since ADR-AG-381 they
+decide only that a typed question is the locus question, answered `chipOnly`. A line through a point and a
 perpendicular bisector take an optional line name (the name is the id, `lineIdOf`); «הישר המקביל» / «האנך האמצעי»
 are `on-kind` references M1 resolves to the one such `line-at` (`isParallelLine`, `isPerpBisector`), refusing none
 or several.

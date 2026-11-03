@@ -27,7 +27,7 @@ const kindWord = ((k: string, n: number) =>
     ? ({ line: 'שני ישרים', circle: 'שני מעגלים' } as Record<string, string>)[k]
     : ({ line: 'ישר', circle: 'מעגל', parabola: 'פרבולה', ellipse: 'אליפסה' } as Record<string, string>)[k]) as never;
 
-const answer = (lines: readonly string[], q: string, seed: number) => ask(derive([...lines], seed), q, fmtAnalytic, kindWord);
+const answer = (lines: readonly string[], q: string, seed: number) => ask(derive([...lines], seed), q, fmtAnalytic, kindWord, 'chip');
 
 const BOOK = saved.lines;
 const REST = BOOK.slice(1);

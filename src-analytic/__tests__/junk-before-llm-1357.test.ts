@@ -33,7 +33,8 @@ describe('#1357 — analytic junk keeps its refusal and never escalates', () => 
   );
 
   it('no catalog line, in either language, is below the signal floor', () => {
-    const brushed = COMMAND_CATALOG_ANALYTIC.flatMap((c) => [c.he, c.en]).filter(
+    // #2673: a `chip` row is the locus chip's LABEL, a button and not a sentence a student types.
+    const brushed = COMMAND_CATALOG_ANALYTIC.filter((c) => c.lane !== 'chip').flatMap((c) => [c.he, c.en]).filter(
       (u) => !reachesFallback({ kind: 'refused', error: { key: 'not-handled', detail: u } }),
     );
     expect(brushed).toEqual([]);

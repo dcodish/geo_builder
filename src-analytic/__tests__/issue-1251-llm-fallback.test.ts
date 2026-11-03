@@ -63,11 +63,11 @@ describe('#1251 — the system prompt carries the catalogue and the rules that m
   it('renders every catalogue entry as vocabulary', () => {
     expect(COMMAND_CATALOG_ANALYTIC.length).toBeGreaterThan(20);
     // #1154 — every CONSTRUCTION entry; a `rewrite` entry (rename) is never taught to the model, nor (#1177) an
-    // `ask` entry — a question is not a given, and the model's lane adds givens.
+    // `ask` entry — a question is not a given, and the model's lane adds givens (a `chip` entry since #2673).
     const taught = COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane);
     for (const e of taught.slice(0, 40)) expect(prompt).toContain(e.he);
     const lanes = COMMAND_CATALOG_ANALYTIC.filter((x) => x.lane);
-    expect(lanes.some((x) => x.lane === 'ask'), 'the guard must see an ask row').toBe(true);
+    expect(lanes.some((x) => x.lane === 'chip'), 'the guard must see a chip row').toBe(true);
     for (const e of lanes) expect(prompt).not.toContain(e.he);
   });
 

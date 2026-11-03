@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
 import { decideSessionEdit, parseSessionEdit } from '../app/rename';
-import { ask } from '../app/ask';
+import { askLocus, locusChips } from '../app/locusChip';
 import { fold } from '../engine/apply';
 import { evaluate } from '../engine/evaluate';
 import { derive } from '../engine/derive';
@@ -26,14 +26,11 @@ describe('catalog — every entry parses, in BOTH languages', () => {
         expect(parseSessionEdit(entry.he)).not.toBeNull();
         return;
       }
-      // #1177 — an `ask` entry is a QUESTION: the ask lane reads it in both languages, and `parseLine` never does.
-      if (entry.lane === 'ask') {
+      // #2673 (ADR-AG-381; was #1177's `ask` row) — a `chip` entry is the locus CHIP: its needs give its point a chip,
+      // and `parseLine` never reads it (its words are the chip's label, locked in issue-2673-locus-chip-only).
+      if (entry.lane === 'chip') {
         const d = derive(entry.needs ?? []);
-        for (const q of [entry.he, entry.en]) {
-          const a = ask(d, q, String, ((k: string) => k) as never);
-          expect(a.unreadable, `the ask lane did not read: ${q}`).toBeFalsy();
-          expect(a.missing, `the ask lane found no object for: ${q}`).toBeFalsy();
-        }
+        expect(locusChips(d).map((c) => c.id), `no chip on ${entry.point}`).toContain(entry.point);
         return;
       }
       const he = parseLine(entry.he);
@@ -70,11 +67,11 @@ describe('catalog — every entry PRODUCES something, or says why not', () => {
         expect(decideSessionEdit(r, { lines: entry.needs ?? [], disabled: [], queries: [], spokenFor: {}, seed: 0 }).kind).toBe('apply');
         return;
       }
-      // #1177 — an `ask` entry must ANSWER in its declared context: a value, never «open» or «cannot compute».
-      if (entry.lane === 'ask') {
+      // #2673 — a `chip` entry's chip must ANSWER in its declared context: a value, never «open» or «cannot compute».
+      if (entry.lane === 'chip') {
         const d = derive(entry.needs ?? []);
-        expect(d.faults, `an ask entry's context must not fault: ${entry.he}`).toEqual([]);
-        expect(ask(d, entry.he, String, ((k: string) => k) as never).value, `an ask entry must answer: ${entry.he}`).not.toBeNull();
+        expect(d.faults, `a chip entry's context must not fault: ${entry.he}`).toEqual([]);
+        expect(askLocus(d, entry.point!, String, ((k: string) => k) as never).value, `a chip entry must answer: ${entry.he}`).not.toBeNull();
         return;
       }
       const d = derive([...(entry.needs ?? []), entry.he]);

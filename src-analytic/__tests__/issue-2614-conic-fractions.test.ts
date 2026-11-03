@@ -28,7 +28,7 @@ const answer = (lines: string[], question: string) => {
   lines.forEach((l, i) => expect(decideSubmit(l, lines.slice(0, i), 0).kind, l).toBe('record'));
   const d = derive(lines, 0);
   expect(d.faults, lines.join(' · ')).toEqual([]);
-  return ask(d, question, fmtAnalytic, t);
+  return ask(d, question, fmtAnalytic, t, 'chip');
 };
 const MIDPOINT = (given: string, host: string) => [given, 'O(0,0)', `נקודה P על ה${host}`, 'M אמצע OP'];
 

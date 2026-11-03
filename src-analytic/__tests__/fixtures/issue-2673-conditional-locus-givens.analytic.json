@@ -1,0 +1,12 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "M נקודה",
+    "MA = MB"
+  ],
+  "seed": 0,
+  "name": "#2673 — the conditional locus stated as givens: «M נקודה» · «MA = MB», then the chip on «M נקודה» (ישר · x - 2 = 0)"
+}

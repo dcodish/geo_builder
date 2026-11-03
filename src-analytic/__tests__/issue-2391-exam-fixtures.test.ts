@@ -33,7 +33,7 @@ describe('#2391 — the exam fixtures build from the exam’s own sentences', ()
     for (const seed of [0, 1]) {
       const d = derive(q1.lines, seed);
       expect(d.faults).toEqual([]);
-      expect(ask(d, 'המקום הגיאומטרי של M', fmtAnalytic).value).toBe('line · 4x + y + 3 = 0');
+      expect(ask(d, 'המקום הגיאומטרי של M', fmtAnalytic, undefined, 'chip').value).toBe('line · 4x + y + 3 = 0');
       expect(ask(d, 'K', fmtAnalytic).value).toBe('(3, 4)');
       expect(ask(d, 'L', fmtAnalytic).value).toBe('(-5, 2)');
     }

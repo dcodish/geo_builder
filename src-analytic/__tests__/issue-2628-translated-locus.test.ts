@@ -25,7 +25,8 @@ const kindWordFor = (lng: 'he' | 'en'): LocusKindWord => {
 };
 const Q = { he: (p: string) => `המקום הגיאומטרי של ${p}`, en: (p: string) => `locus of ${p}` };
 const asked = (lines: readonly string[], p: string, seed: number, lng: 'he' | 'en'): Answer =>
-  ask(derive(lines, seed), Q[lng](p), fmt, kindWordFor(lng));
+  // #2673 (ADR-AG-381): the locus is reached by its chip only — `'chip'`, the chip's entry point.
+  ask(derive(lines, seed), Q[lng](p), fmt, kindWordFor(lng), 'chip');
 
 const UNNAMED = { he: 'עקומה (הכלי עדיין לא מזהה את סוגה)', en: 'a curve (the tool cannot name its kind yet)' };
 

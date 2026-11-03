@@ -33,7 +33,7 @@ describe('#2672 — the operator\'s T14 flow', () => {
   });
 
   it('«המקום הגיאומטרי של P» answers the ellipse', () => {
-    expect(askSettled(derive(operator.lines, operator.seed), 'המקום הגיאומטרי של P', fmt).value).toBe('ellipse · x²/20 + y²/5 = 1');
+    expect(askSettled(derive(operator.lines, operator.seed), 'המקום הגיאומטרי של P', fmt, undefined, 'chip').value).toBe('ellipse · x²/20 + y²/5 = 1');
   });
 });
 

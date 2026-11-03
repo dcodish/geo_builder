@@ -28,7 +28,7 @@ import winter25InA from './fixtures/issue-1186-winter25-in-a.analytic.json';
 const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל', ellipse: 'אליפסה', parabola: 'פרבולה' };
 const kind = ((k: string) => HE[k] ?? k) as never;
 const locusAt = (lines: string[], name: string, seed: number) =>
-  ask(derive(lines, seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kind).value;
+  ask(derive(lines, seed), `המקום הגיאומטרי של ${name}`, fmtAnalytic, kind, 'chip').value;
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
 

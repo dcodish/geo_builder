@@ -132,7 +132,7 @@ catalog carries it.
 | **F10** | Metric given | `AB = 4√5` · `שטח המשולש KLM הוא 9` | `the ratio of the radii is 1:2` |
 | **F11** | Parameter declaration (a domain, not a constraint) | `a הוא פרמטר חיובי` · `0<k<6` | `a is a positive parameter` |
 | **F12** | Curve edit (affine) | `מזיזים את המעגל ב-9 יחידות ימינה ו-12 יחידות למטה` | `translate the circle 9 right and 12 down` |
-| **F13** | Locus: **asked, not stated**; reached by typing, by the chip beside its point, or by the guide row (R87, R200, [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072), [ADR-AG-352](06c-decisions-analytic.md#adr-ag-352)) | `המקום הגיאומטרי של P` · `משוואת המקום הגיאומטרי של P` | `the locus of P` |
+| **F13** | Locus: **not stated, reached by the chip** on the row that introduced its point; a typed locus question answers a pointer to the chip (R87, R200, R226, [ADR-AG-072](06c-decisions-analytic.md#adr-ag-072), [ADR-AG-352](06c-decisions-analytic.md#adr-ag-352), [ADR-AG-381](06c-decisions-analytic.md#adr-ag-381)) | the chip «הצג מקום גאומטרי» | the chip "Show locus" |
 | **F14** | Branch selector / sweep range | `שיעור ה-y של B קטן מ-6` | `the y-coordinate of B is less than 6` |
 | **F15** | Ask (the data panel's lane, R23) | `משוואת BD` · `\|AB\|` · `שטח ABC` | `equation of BD` |
 
@@ -970,7 +970,7 @@ a sentence the tool parsed.
 - **two lines that are ONE LINE in the figure drawn have no crossing, whatever their spelling** ([ADR-AG-349](06c-decisions-analytic.md#adr-ag-349), #2613; operator ruling 2026-10-30, Q1 → A): the crossing sentence is refused with the same sentence as a line written twice («שני הישרים במשפט «…» הם אותו ישר…»). A configuration where they coincide is never a position of the figure: the solve does not choose it, and a locus never draws it.
   - «נתונה אליפסה שמשוואתה x^2/16+y^2/12=1» · «P(4,0)» · «האנך מ-P לציר ה-x חותך אותו בנקודה N» · «O ראשית הצירים» · «דרך N עובר ישר l1 מקביל ל-PO» · «דרך P עובר ישר l2 מקביל לציר ה-x» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused
   - «P נקודה על האליפסה» · «דרך P עובר ישר l2 מקביל לציר ה-y» · «דרך O עובר ישר l1 מקביל לציר ה-y» · «M נקודת החיתוך של הישר l1 עם הישר l2» → refused (P is never moved onto the vertex to make them meet)
-  - with «P נקודה על האליפסה», the same construction records, and «המקום הגיאומטרי של M» is «אליפסה · x²/64 + y²/12 = 1» alone (R87)
+  - with «P נקודה על האליפסה», the same construction records, and M's locus chip answers «אליפסה · x²/64 + y²/12 = 1» alone (R87)
 - **a third crossing asked of a line through two points already on the circle is refused, in the ruled sentence** ([ADR-AG-271](06c-decisions-analytic.md#adr-ag-271), #1893; #1834's ruling): «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.», with the student's letters. The two points are on the circle by construction (a stated incidence, a defining point of a computed circle — never an incircle's ring vertex) or are fixed points on a fixed circle. **The same for a parabola and an ellipse** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909; the 2026-10-08 ruling *"Yes, same sentence"*), with the curve's noun: «AC כבר חותך את הפרבולה ב-A וב-C — לישר אין נקודת חיתוך שלישית עם הפרבולה.» (likewise «…האליפסה…»).
   - «מעגל O» · «A על מעגל O» · «C על מעגל O» · «AC חותך את המעגל בנקודה E» → refused, at every configuration
   - every spelling: «הישר / המיתר / המשך AC», «בנקודות A ו-E», «AB קוטר», an inscribed triangle, the circle through A, B and C, an existing D, «P על AC» · «P על מעגל O» in either order; in the other order the line refused is the one that completes it («C על מעגל O»)
@@ -987,7 +987,7 @@ a sentence the tool parsed.
 - Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924, ADR-AG-349, #2613.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
-- «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»
+- the locus of a determined M (asked by the chip) → «נקודה · (4, 0)»
 - Sources: ADR-AG-136, #1259, #1227.
 
 **R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**. A value the student GAVE stays known; a determined figure keeps reporting. A pinned parameter with two admissible roots is never known: both are configurations (#2380).
@@ -1192,7 +1192,7 @@ a sentence the tool parsed.
 - «משוואת המשיק (בנקודה T)»
 - «משוואת l1» → the two options the panel row lists
 - «מצאו את m ואת n», and «… ואת שתי האפשרויות ל…» → one answer per part
-- «המקום הגיאומטרי של כל הנקודות M המקיימות MA = MB» → the locus of M under that condition, a condition the figure refuses being the input's own refusal
+- «המקום הגיאומטרי של כל הנקודות M המקיימות MA = MB» → the pointer to the chip (R226); the condition is stated as givens, «נקודה M» · «MA = MB», and the chip then answers
 - «שיפוע המקום הגיאומטרי של M» → understood, not supported (the locus is read from the panel: ruling 2026-10-20 on #2389)
 - A yes/no question («האם …») is not answered (ruling 2026-10-20 on #2393: «the tool doesnt answer such questions»).
 - Sources: ADR-AG-316, #2393, #2389.
@@ -1219,10 +1219,10 @@ a sentence the tool parsed.
 - clicking a point → its coordinates and its distance to each named line, drawn as a perpendicular
 - Sources: ADR-AG-066, ADR-AG-067.
 
-**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is asked, not stated**: there are two ways in and one grammar, the typed question and the chip beside the point (R200). The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). The locus question is **one question however the exam words it** — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» answer the same row (ADR-AG-341). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
-- «נקודה P» · «PA מאונך ל-PB» · «המקום הגיאומטרי של P» → trace, kind, equation
+**R87 — a point the givens leave one degree of freedom has a מקום גיאומטרי, and the tool draws it, names it and prints its equation when it can determine it**. **It is not stated, and it is reached by the chip** on the row that introduced the point (R200); typing a locus question in the ask box answers a pointer to the chip (R226). The trace draws whenever the point has one free DOF; the kind is named when invariant; the equation prints only when the set is; every component is drawn, and only where the givens allow. **The tool never grades** (ADR-AG-072 §6, amending ADR-AG-001 D1). A **range** on a free point («-1.5 ≤ y_A ≤ 1.5», «y_A ≤ 1.5», «A היא נקודה כלשהי על מעגל II כך ש-…») bounds the trace, never the point's freedom; a range that leaves nothing is refused naming its line (ADR-AG-340). Every wording of the exam's locus question — «… שעליו נמצאות כל הנקודות M», «הביעו באמצעות a את …», «הראו כי … הוא פרבולה ומצאו את משוואתו» — is the same question, so typed it answers the same pointer (ADR-AG-341, ADR-AG-381). The swept point may sit upstream of the traced one through **named or role-referenced auxiliary lines** («דרך E עובר ישר l1 מקביל לציר ה-x» · «l2 אנך אמצעי ל-EK» · «G נקודת החיתוך של הישר l1 עם הישר l2», or «… של הישר המקביל עם האנך האמצעי» when the figure holds one of each).
+- «נקודה P» · «PA מאונך ל-PB», then the chip on «נקודה P» → trace, kind, equation
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
-- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138, ADR-AG-352.
+- Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138, ADR-AG-352, ADR-AG-381, #2673.
 - **Amended by R199 (ADR-AG-351):** the equation also prints when the set varies with the student's letters in a way the tool can state and verify.
 - **Amended by R225 (ADR-AG-380):** a traced set whose family the tool does not name is still drawn, with a row that says so.
 
@@ -1239,12 +1239,20 @@ a sentence the tool parsed.
 - «A(a,b)» · «נקודה M» · «MA = 3» → «מעגל · (x − a)² + (y − b)² = 3²»
 - Sources: ADR-AG-351, #1186, #2608.
 
-**R200 — a point that has a locus offers it: a chip on the row that introduced it, and the guide teaches the question**. *(Operator, 2026-09-17: "I want to have a chip next to points in the input panel that can show their locus. This will only be available for points that are not fully defined."; rulings 2026-09-27 "No, teach the two lines", D2–D4 of 2026-10-26, and 1A/2A of 2026-10-30.)*
+**R200 — a point that has a locus offers it: a chip on the row that introduced it, and the guide teaches the chip**. *(Operator, 2026-09-17: "I want to have a chip next to points in the input panel that can show their locus. This will only be available for points that are not fully defined."; rulings 2026-09-27 "No, teach the two lines", D2–D4 of 2026-10-26, 1A/2A of 2026-10-30, and 2026-11-02 / 2026-11-03 on #2673.)*
 - A point with a one-dimensional locus at the configuration shown has a chip on the row that introduced it: «הצג מקום גאומטרי» while its locus is not drawn, and «הסתר מקום גאומטרי» while it is. A point with two degrees of freedom, a point that is fully determined, and a point whose freedom is not one-dimensional (two independent movers) have no chip. When one row introduced two such points, each chip ends with its letter.
-- A click does exactly what typing «המקום הגיאומטרי של M» does: the answer row and the drawing. A second click hides the drawing and keeps the row. The row's ✕ removes both. Nothing is drawn until it is asked for (D3). A click on a point on the figure offers no locus (D2).
-- The guide has a «מקום גאומטרי» section whose featured row is «המקום הגיאומטרי של M», shown with its setup lines «A(0,0) · B(4,0) · נקודה M · MA = MB». A click puts the question in the ask box. It is never offered to the AI as a given.
+- A click asks M's locus: the answer row «המקום הגיאומטרי של M» and the drawing. It is the locus's only way in (R226). A second click hides the drawing and keeps the row. The row's ✕ removes both. Nothing is drawn until it is asked for (D3). A click on a point on the figure offers no locus (D2).
+- The guide has a «מקום גאומטרי» section whose featured row is the chip «הצג מקום גאומטרי», with «הקלידו את הנתונים A(0,0) · B(4,0) · נקודה M · MA = MB, ואז לחצו על הכפתור בשורה של M.» under it. It is a button to press, so the row has no «try». It is never offered to the AI as a given.
 - «M נקודה המקיימת MA = MB» (also «M היא נקודה …», «נקודה M המקיימת …», «… שמקיימת …») is refused with the one-given-per-line message listing «(1) נקודה M  (2) MA = MB», but only when both lines would be accepted in that order. «המקום הגיאומטרי של הנקודות ש…» typed as a given is not read yet; it awaits the operator.
-- Sources: ADR-AG-352, #1177, ADR-AG-067, #2628.
+- Sources: ADR-AG-352, #1177, ADR-AG-067, #2628, ADR-AG-381, #2673.
+
+**R226 — the locus is reached by its chip only; a locus question typed in the ask box answers a pointer to the chip**. *(Operator, 2026-11-02 on #2673: "we should drop the ability to ask for המקום הגיאומטרי through the ask box. this is why we have the chips."; 2026-11-03: "what you suggest for point M is exactly how i want this built. a student should see what he is placing the point and this is part of the pedagogy of the builder.")*
+- «המקום הגיאומטרי של P» typed in the ask box, and every wording the locus grammar reads («משוואת המקום הגאומטרי של P», «the locus of P», «הראו כי המקום הגיאומטרי של P הוא ישר», «הביעו באמצעות a את …», «… שעליו נמצאות כל הנקודות P», «המקום הגיאומטרי של כל הנקודות P המקיימות …»), draws nothing and answers «את המקום הגאומטרי מציגים בכפתור «הצג מקום גאומטרי» שליד הנקודה ברשימת הנתונים.», whatever the figure holds
+- a conjoined question keeps its other parts: «המקום הגיאומטרי של M ואת AB» → the pointer, and AB's length
+- the chip, its answer row, its drawing and the row's ✕ are unchanged (R200); the chip's row and a typed row of the same words are two rows
+- a conditional locus is stated as givens and then its chip: «A(0,0)» · «B(4,0)» · «נקודה M» · «MA = MB» → the chip on «נקודה M» → «ישר · x - 2 = 0»
+- «שיפוע המקום הגיאומטרי של M» stays understood, not supported (R69a)
+- Sources: ADR-AG-381, #2673.
 
 ---
 
