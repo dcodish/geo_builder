@@ -157,8 +157,6 @@ async function driveCase(browser, spec, outDir, prefix) {
           await typeLine(st.type);
           continue;
         }
-        // #1863 — press a button by its visible label (a chip, «בטל»): the label is the check, so a chip that
-        // does not read what the case says it reads fails as a missing button.
         // #1863 — click an element by CSS selector (an SVG offer: a centre ring), or type into one and press Enter
         // (the letter popover's input). A selector that matches nothing fails the case.
         if (st.clickOn !== undefined || st.typeInto !== undefined) {
@@ -180,17 +178,50 @@ async function driveCase(browser, spec, outDir, prefix) {
           await shoot(`step-${steps.length}`);
           continue;
         }
+        // #1863 / #2688 — press a control by its visible text. An EXACT button name first (a conic chip, a display
+        // button, «בטל»): the label is the check, and «הסתר» must never land on «הסתר רשת». Then a checkbox's <label>.
+        // A case whose control does not read what it says fails as a missing control.
         if (st.click !== undefined) {
           const btn = page.getByRole('button', { name: st.click, exact: true }).first();
-          if ((await btn.count()) === 0) {
-            steps.push({ line: `(press «${st.click}»)`, refusals: [`no button labelled «${st.click}»`] });
+          const label = page.locator('label', { hasText: st.click }).first();
+          const target = (await btn.count()) ? btn : (await label.count()) ? label : null;
+          if (!target) {
+            steps.push({ line: `(press «${st.click}»)`, refusals: [`no control reading «${st.click}»`] });
             break;
           }
-          await btn.click();
+          await target.click();
           await waitForSettle(page);
-          const fresh = await freshRefusals();
-          steps.push({ line: `(press «${st.click}»)`, refusals: fresh });
+          steps.push({ line: `(press «${st.click}»)`, refusals: await freshRefusals() });
           await shoot(`press-${steps.length}`);
+          continue;
+        }
+        // #2688: a reload — the stored session is offered back; take it («המשך»)
+        if (st.reload) {
+          await page.reload({ waitUntil: 'networkidle' });
+          await waitForSettle(page);
+          await dismissModal(page);
+          const resume = page.getByRole('button', { name: /^המשך/ }).first();
+          if (await resume.count()) {
+            await resume.click();
+            await waitForSettle(page);
+          }
+          steps.push({ line: '(reload)', refusals: [] });
+          await shoot('reload');
+          continue;
+        }
+        // #2688: a download (the PNG of «הורידו תמונה»), saved beside the shots so the report shows the FILE
+        if (st.download !== undefined) {
+          const btn = page.getByRole('button', { name: st.download }).first();
+          if ((await btn.count()) === 0) {
+            steps.push({ line: `(download «${st.download}»)`, refusals: [`no button reading «${st.download}»`] });
+            break;
+          }
+          const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), btn.click()]);
+          const ext = path.extname(dl.suggestedFilename()) || '.bin';
+          const file = `${prefix}-${String(++n).padStart(2, '0')}-download${ext}`;
+          await dl.saveAs(path.join(outDir, file));
+          shots.push({ file, label: `downloaded ${dl.suggestedFilename()}` });
+          steps.push({ line: `(download «${st.download}»)`, refusals: [] });
           continue;
         }
         const box = page.locator('li > input[type="checkbox"]').nth(st.toggle - 1);

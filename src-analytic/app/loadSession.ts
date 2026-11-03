@@ -45,6 +45,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     curveStyle: envelope.curveStyle,
     // #1863 (ADR-AG-375) — the annotation channel (the conic chip's state); the store keeps only known facets
     annotations: envelope.annotations,
+    // #2688 — the canvas switches (grid / axis numbers / coordinates); absent = all shown
+    display: envelope.display,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:

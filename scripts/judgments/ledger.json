@@ -1301,6 +1301,16 @@
       "chosen": true,
       "at": "2026-11-03T08:45:03.398Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-2688-display-labels",
+      "kind": "text",
+      "issue": "#2688",
+      "what": "the three analytic canvas toggle-button labels (grid / axis numbers / values on the figure), each saying what a press does; replaced the checkboxes at the operator's request on #2690",
+      "choice": "«הסתר רשת» ⇄ «הצג רשת» · «הסתר מספרים» ⇄ «הצג מספרים» · «הסתר ערכים» ⇄ «הצג ערכים» (en: \"Hide grid\" / \"Show grid\" · \"Hide numbers\" / \"Show numbers\" · \"Hide values\" / \"Show values\")",
+      "chosen": true,
+      "at": "2026-11-03T18:55:50.589Z",
+      "status": "pending"
     }
   ],
   "demoted": {

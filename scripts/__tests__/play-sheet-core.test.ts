@@ -66,6 +66,14 @@ describe('#1509 — sheet validation', () => {
     }
   });
 
+  it('#2688 — after-steps may also click a control by its text, download from a button, or reload', () => {
+    const ok = { ...CASE, after: [{ click: 'רשת' }, { download: 'הורידו תמונה' }, { reload: true }] };
+    expect(validateSheet({ name: 'x', cases: [ok] }, PRODUCTS)).toEqual([]);
+    for (const bad of [[{ click: '' }], [{ reload: false }], [{ download: 'x', click: 'y' }]]) {
+      expect(validateSheet({ name: 'x', cases: [{ ...CASE, after: bad }] }, PRODUCTS).length, JSON.stringify(bad)).toBe(1);
+    }
+  });
+
   it('#1548 — the report shows a toggle as an instruction and a typed step as its own paste block', () => {
     const html = renderReport({
       sheet: { name: 'a', title: 't', cases: [{ ...CASE, after: [{ toggle: 2 }, { type: 'B(0,3)' }] }] },

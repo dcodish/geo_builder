@@ -39,9 +39,12 @@ export interface ConicChip {
   next: ConicState;
 }
 
-/** A mark to draw, in WORLD coordinates. `label` is absent when nothing may be written there. */
+/**
+ * A mark to draw, in WORLD coordinates. `label` is absent when nothing may be written there; `labelNoValues` is what
+ * may be written with the values switch off (#2688, ADR-AG-388): a focus's letter alone, a directrix nothing.
+ */
 export type ConicMark =
-  | { kind: 'focus'; curve: string; x: number; y: number; label?: string }
+  | { kind: 'focus'; curve: string; x: number; y: number; label?: string; labelNoValues?: string }
   | { kind: 'directrix'; curve: string; line: NumCurve & { kind: 'line' }; label?: string };
 
 /** The locale key of a chip's label: what the NEXT press does, in the curve's number (one focus, or two). */
@@ -109,7 +112,7 @@ export function conicMarksOf(d: Derivation, annotations: AnnotationMap, hidden: 
         }
         const letter = taken.has(plain(bookLetter(c.kind, k))) ? '' : bookLetter(c.kind, k);
         const label = known ? `${letter}(${v(f.x)}, ${v(f.y)})` : letter;
-        out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}) });
+        out.push({ kind: 'focus', curve: c.id, x: f.x, y: f.y, ...(label ? { label } : {}), ...(letter ? { labelNoValues: letter } : {}) });
       });
     }
     if (showsDirectrix(state)) {

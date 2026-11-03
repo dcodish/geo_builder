@@ -1802,6 +1802,19 @@ point's `on-line-2pt`/`on-curve` + `between`) omitted unless a later kept given 
 are every string a fact carries ∩ the active figure's object ids, so an over-read keeps a line and never drops one.
 The App computes it once (`questionGivens`) for the button's gate and the document alike.
 
+### The canvas switches ([ADR-AG-388](06c-decisions-analytic.md#adr-ag-388), #2688)
+
+`render/canvasDisplay.ts` holds `CanvasDisplay { grid, numbers, values }` (`ALL_SHOWN`, `cleanCanvasDisplay`, `displayForSave`). The store
+keeps it as `display` beside `curveStyle`: `setDisplay(key, shown)`, the undo slice, `serialize` (only the hidden keys, omitted when
+all are shown), `restore` and `loadAnalyticSession` (absent or malformed = all shown), and the persist trigger. App hands it to
+`buildScene` as `knows.display`, the one reader: `axes.gridX`/`gridY` carry the grid apart from the tick numbers, `xTicks`/`yTicks`
+empty with the numbers off (the label furniture shrinks to O's box), with the values off every value label goes (`ScenePoint.coords`, a centre's
+`label`, a segment's `label`, the stated layer's requests, construction ratios, a measure's and a locus's label) while every mark
+stays, and `pointLabelBox` measures the letter-only boxes. Both exports rasterise the drawn
+`<svg>`, so they follow without a change in `shell/export/`.
+
+*Identifiers:* `render/canvasDisplay.ts` · `knows.display` · `axes.gridX` · `setDisplay` · `data-display` · `aria-pressed` · `rowSubtleMutedStyle`
+
 ### One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)
 
 The App's box effect (keyed on the drawn box and the seed) makes one call, `viewAfterChange(from, view, to,

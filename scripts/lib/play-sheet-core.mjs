@@ -81,11 +81,18 @@ export function validateSheet(sheet, products) {
           const ok =
             (st && Number.isInteger(st.toggle) && st.toggle >= 1 && Object.keys(st).length === 1) ||
             (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1) ||
-            // #1863: press a button by its exact label (a chip, «בטל»)
+            // #1863 / #2688: press a control by its visible text (a chip, a display button, «בטל», a checkbox's label)
             (st && typeof st.click === 'string' && st.click.trim() !== '' && Object.keys(st).length === 1) ||
+            // #1863: click an element by CSS selector, or type into one and press Enter
             (st && typeof st.clickOn === 'string' && st.clickOn.trim() !== '' && typeof st.say === 'string' && st.say.trim() !== '' && Object.keys(st).length === 2) ||
-            (st && typeof st.typeInto === 'string' && st.typeInto.trim() !== '' && typeof st.text === 'string' && st.text.trim() !== '' && Object.keys(st).length === 2);
-          if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> }, { "type": "<utterance>" } { "click": "<button label>" }, { "clickOn": "<css>", "say": "<instruction>" } or { "typeInto": "<css>", "text": "…" }`);
+            (st && typeof st.typeInto === 'string' && st.typeInto.trim() !== '' && typeof st.text === 'string' && st.text.trim() !== '' && Object.keys(st).length === 2) ||
+            // #2688: a download, a reload
+            (st && typeof st.download === 'string' && st.download.trim() !== '' && Object.keys(st).length === 1) ||
+            (st && st.reload === true && Object.keys(st).length === 1);
+          if (!ok)
+            problems.push(
+              `${at}: after[${k}] must be { "toggle": <row, 1-based> }, { "type": "<utterance>" }, { "click": "<visible text>" }, { "clickOn": "<css>", "say": "<instruction>" }, { "typeInto": "<css>", "text": "…" }, { "download": "<button text>" } or { "reload": true }`,
+            );
         });
     }
     // #2654 (ADR-W-168): the checks that let a 👁 case close without the operator.
@@ -160,10 +167,14 @@ const afterSteps = (after) =>
         : st.click !== undefined
           ? `<p class="step">👆 לחצו על «${esc(st.click)}»</p>`
           : st.clickOn !== undefined
-          ? `<p class="step">👆 ${esc(st.say)}</p>`
-          : st.typeInto !== undefined
-          ? `<p class="step">⌨ הקלידו ${esc(st.text)} ולחצו Enter</p>`
-          : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
+            ? `<p class="step">👆 ${esc(st.say)}</p>`
+            : st.typeInto !== undefined
+              ? `<p class="step">⌨ הקלידו ${esc(st.text)} ולחצו Enter</p>`
+              : st.download !== undefined
+                ? `<p class="step">☐ לחצו על «${esc(st.download)}» ופתחו את הקובץ שירד</p>`
+                : st.reload
+                  ? `<p class="step">☐ רעננו את הדף (F5) ובחרו «המשך»</p>`
+                  : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
     )
     .join('\n');
 

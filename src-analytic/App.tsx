@@ -67,6 +67,7 @@ import { analyticBidi } from './i18n';
 import { questionLines } from './app/questionLines';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
+import { DISPLAY_KEYS } from './render/canvasDisplay';
 import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, chipState, drawnLoci, drawnMarks, isDrawn, pressChip, removeAnswerAt, toggleDrawn } from './app/answers';
@@ -140,6 +141,15 @@ const DRAG_SLOP = 4;
  * the CARD and stopped at its edge, so what the surface did inside it drifted unmeasured.
  */
 const CANVAS_FALLBACK = { w: 720, h: 720 };
+/** #2688 — the canvas switches' labels, by key, and their look (2-D's display-toggle label, from the shared tokens). */
+/** #2688 — each switch's button label says what a PRESS will do (operator 2026-09-19: "label shows what is next"). */
+const DISPLAY_LABEL = {
+  grid: { hide: 'hideGrid', show: 'showGrid' },
+  numbers: { hide: 'hideNumbers', show: 'showNumbers' },
+  values: { hide: 'hideValues', show: 'showValues' },
+} as const;
+/** A switch whose item is HIDDEN is drawn lighter — still a live button (unlike `rowSubtleOffStyle`, which is disabled). */
+const rowSubtleMutedStyle: CSSProperties = { ...rowSubtleStyle, opacity: 0.6 };
 /** Never build a scene smaller than this — below it the tick labels collide. Mirrors 2-D's floor. */
 const CANVAS_MIN = 320;
 
@@ -166,6 +176,8 @@ export function App() {
     toggleSegHidden,
     toggleSegDashed,
     curveStyle,
+    display,
+    setDisplay,
     toggleCurveHidden,
     toggleCurveDashed,
     annotations,
@@ -1102,9 +1114,11 @@ export function App() {
       // #1863 — the conic role marks the chips asked for (ADR-AG-376), and the ellipses that are circles (ADR-AG-377)
       roleMarks,
       circleShaped: (id) => isCircleShaped(d.construction, id),
+      // #2688 (ADR-AG-388) — the grid / axis numbers / coordinates switches; the exports rasterise this same scene
+      display,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks, display]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -1850,6 +1864,30 @@ export function App() {
                 {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
               </button>
             )}
+
+            {/*
+              #2688 (ADR-AG-388) — THE CANVAS SWITCHES, product extras on the canvas's own row beside «הצג בנייה», in its
+              chrome: the grid, the axis numbers, every value written on the figure. All shown by default (today's canvas).
+              Toggle BUTTONS (operator, playing #2690: "having buttons might be better looking"), each labelled with what a
+              press does; a hidden item's button is lighter and `aria-pressed`. The scene reads them, so «הורידו תמונה» and
+              «הורידו שאלה», which rasterise the drawn <svg>, print exactly what is shown.
+            */}
+            {DISPLAY_KEYS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                data-display={k}
+                aria-pressed={!display[k]}
+                style={display[k] ? rowSubtleStyle : rowSubtleMutedStyle}
+                onClick={() => {
+                  const next = !display[k];
+                  logAnalytic({ kind: 'action', action: 'display', detail: `${k}=${next ? 'on' : 'off'}` });
+                  setDisplay(k, next);
+                }}
+              >
+                {t(display[k] ? DISPLAY_LABEL[k].hide : DISPLAY_LABEL[k].show)}
+              </button>
+            ))}
 
             <span style={rowSpacerStyle} />
 
