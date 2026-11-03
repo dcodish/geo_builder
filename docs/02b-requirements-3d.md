@@ -619,7 +619,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   stay a vector equation.
   - Sources: ADR-3D-392, #1680; the 2-D twin is `measureSum` → `set-measure-sum`.
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
-  ([FR-SU-5](02w-requirements-workspace.md)).
+  ([FR-SU-5](02w-requirements-workspace.md)). **The figure, likewise, names an object as the student wrote it**
+  (#2610): a plane written by its letters («BE היטל הישר TB על המישור ABCD») shows as «ABCD» on the canvas, in the
+  planes list and in the data panel, and it is the same plane as «F על המישור ABCD»; no label, list row, notice or
+  refusal carries an internal id.
+  - Sources: ADR-3D-412, #2610.
 - **FR-CL-4 (Must)** — **A measure the student can STATE, they can ASK.** Every angle between objects
   (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
   solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is

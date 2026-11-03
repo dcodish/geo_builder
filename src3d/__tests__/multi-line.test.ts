@@ -87,8 +87,8 @@ describe('#69 — parse: digit-indexed line names canonicalize to ℓ<digits>', 
     ]);
     expect(cmd('BE היטל הישר TB על המישור ABCD')).toMatchObject([
       { type: 'line-through', name: 'TB' },
-      { type: 'plane-through', name: 'plane-ABCD' },
-      { type: 'line-projection', name: 'BE', line: 'TB', plane: 'plane-ABCD' },
+      { type: 'plane-through', name: 'ABCD' },
+      { type: 'line-projection', name: 'BE', line: 'TB', plane: 'ABCD' },
     ]);
   });
 });
