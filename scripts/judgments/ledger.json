@@ -1161,6 +1161,36 @@
       "reason": "His d10 A (2026-10-23) defines it on a box only; extending to prisms and cylinders is feature scope. No corpus exercise uses it on them (checked docs/sample questions, 2026-11-03).",
       "at": "2026-11-03T08:09:56.831Z",
       "status": "escalated"
+    },
+    {
+      "id": "chose-2402-unknown-symbol",
+      "kind": "text",
+      "issue": "#2402",
+      "what": "analytic refusal for an order over a letter nothing defines (replaces «הנקודה s עדיין לא הוגדרה»)",
+      "choice": "«האות {{detail}} אינה מוגדרת באף משפט. הגדירו אותה קודם — למשל AB = {{detail}} — ואז אפשר להשוות אליה.» / The letter {{detail}} is not defined by any statement. Define it first — e.g. AB = {{detail}} — then you can compare it.",
+      "chosen": true,
+      "at": "2026-11-03T08:45:58.162Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2664-vertex-form",
+      "kind": "text",
+      "issue": "#2664",
+      "what": "printed equation of a translated or y-axis conic (inputs and locus answers)",
+      "choice": "the textbook vertex form: «(x − 3)²/25 + (y + 1)²/9 = 1», «(y − 1)² = 4(x − 2)», «x² = 8y»; a curve at the origin prints exactly as today",
+      "chosen": true,
+      "at": "2026-11-03T08:55:14.513Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2664-canonical-mismatch",
+      "kind": "text",
+      "issue": "#2664",
+      "what": "refusal when «פרבולה/אליפסה קנונית» is given a translated equation",
+      "choice": "«המשוואה «{{detail}}» אינה של {{noun}} קנונית: {{noun}} זו אינה בראשית הצירים. הסירו את המילה «קנונית» כדי לבנות אותה.» / «{{detail}}» is not the equation of a canonical {{noun}}: this {{noun}} is not at the origin. Remove the word «canonical» to build it.",
+      "chosen": true,
+      "at": "2026-11-03T08:55:14.513Z",
+      "status": "pending"
     }
   ],
   "demoted": {
