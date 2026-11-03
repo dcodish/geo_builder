@@ -933,6 +933,12 @@ diagonals of «האלכסונים נפגשים בנקודה M» as plain segment
 `cross(…, 'point')`, a role meet with a noun head — inks nothing and ensures the endpoints as `ifAbsent` free
 points. Analytic reads the same rule (ADR-AG-241).
 
+**A plural line noun covers the list** ([ADR-774](06-decisions.md#adr-774), #2533). Each operand's reference word
+(bare segment, extension, line) is read from the span before it through the lexicon's `LINE_NOUN` / `EXTENSION_REF`
+atoms, singular and plural («הישרים», «הקרניים», "lines", "rays"). In a conjunction a word before the first pair
+distributes to an unmarked second pair (`distribute`), so «הקרניים AB ו-CD» reads both as lines; a word before the
+second pair marks only it (issue #22).
+
 **A tangent has no second crossing** ([ADR-640](06-decisions.md#adr-640), #1931). `tangentAt(line, circle, Q)` (`evaluate.ts`) is
 the one test: Q on both, and |cos∠(line, radius)| ≤ `TANGENT_COS` = 10 × `DIRECTION_EPS` — an angle held to the ⟂
 tolerance, never to `LEN_EPS`, which a relation-held tangency can game. `tangentTouch` asks it of every placed point.
@@ -1592,7 +1598,12 @@ one; the first two points keep their places. A declared polygon that a step's so
 free vertices (no constraint, no directive, not pinned), tries the sampler's positions for those vertices before the
 refusal (`freeVertexRestart`, LADDER 2h″); forced flatness is refused earlier (0h) and incidence-forced flatness
 finds no start.
-`reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`.
+`reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`. A **stated** position survives the
+lowering in every branch ([ADR-773](06-decisions.md#adr-773), #2591): a free point is re-homed as the fixed rider the same
+command builds on a blank page (`t` as stated, not `free`), and any other point gets the membership and then the colon
+form's `set-ratio` as its own step (`statedRatioTail`), so one encoding of a ratio serves both spellings. The verifier's
+`point-on-segment` row checks a stated `t` (`statedSegmentT`, strictly inside the span, never an extension's default)
+as that ratio, so a lowering that drops it reads amber, never green.
 
 ### A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
 

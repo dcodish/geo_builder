@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T09:14:22.028Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "O מפגש האלכסונים של הפאה ABCD",
+      "cmds": [
+        {
+          "type": "diag-intersection",
+          "id": "O",
+          "face": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -25,8 +25,8 @@ const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל', parabol
 const kind = ((k: string) => HE[k] ?? k) as never;
 // #2673 (ADR-AG-381): the locus is asked by its chip — `'chip'`, the chip's entry point.
 const asked = (lines: readonly string[], q: string, seed = 0): Answer => ask(derive(lines, seed), q, fmt, kind, 'chip');
-/** The ask answers with a CURVE: a value and a drawing. */
-const isCurve = (a: Answer) => a.value !== null && a.locus !== undefined;
+/** The ask answers with a CURVE: a drawing — named or not (#2628: a curve outside the named family is drawn, unnamed). */
+const isCurve = (a: Answer) => a.locus !== undefined;
 
 const FIX = path.join(__dirname, 'fixtures');
 const fixture = (name: string): string[] => JSON.parse(readFileSync(path.join(FIX, `${name}.analytic.json`), 'utf8')).lines;
@@ -64,15 +64,10 @@ describe('#1177 — which points get a chip: the engine\'s `hasLocus`, on the ro
 });
 
 /**
- * THE AGREEMENT LOCK. A chip appears exactly where the ask has a locus to answer. Completeness is strict: no point the
- * ask answers with a curve may lack a chip. The converse holds everywhere except one known ask-lane gap, #2628 (a
- * translated parabola whose shape the fit does not gate, so the ask draws nothing). That gap is the ask's, not the
- * chip's: the chip asks exactly what typing asks.
+ * THE AGREEMENT LOCK. A chip appears exactly where the ask has a locus to answer, both ways and strictly: no point the
+ * ask answers with a curve may lack a chip, and every chip's ask draws a curve. The one gap this lock used to list,
+ * #2628 (חורף 2024's C, a translated parabola the ask drew nothing for), is closed: an unnamed curve is drawn (ADR-AG-380).
  */
-const ASK_GAPS: Record<string, string[]> = {
-  'exam-2024w-locus-1138': ['C'], // #2628
-  'exam-2024w-locus-param-1138': ['C'], // #2628
-};
 const LOCUS_FIXTURES = [
   'exam-2024sB-locus-1138',
   'exam-2024w-locus-1138',
@@ -89,11 +84,11 @@ describe('#1177 — the chip and the ask agree', () => {
     ['chain', CHAIN, []],
     ['two-dof', TWO_DOF, []],
     ['two-movers', TWO_MOVERS, []],
-    ...LOCUS_FIXTURES.map((n): [string, string[], string[]] => [n, fixture(n), ASK_GAPS[n] ?? []]),
+    ...LOCUS_FIXTURES.map((n): [string, string[], string[]] => [n, fixture(n), []]),
   ];
-  it.each(cases.flatMap(([n, lines, gaps]) => [0, 1, 2].map((seed) => [n, seed, lines, gaps] as const)))(
+  it.each(cases.flatMap(([n, lines]) => [0, 1, 2].map((seed) => [n, seed, lines] as const)))(
     '%s, seed %i',
-    (_n, seed, lines, gaps) => {
+    (_n, seed, lines) => {
       const d = derive(lines, seed);
       const chips = new Set(locusChips(d).map((c) => c.id));
       for (const p of d.figure.points) {
@@ -102,7 +97,7 @@ describe('#1177 — the chip and the ask agree', () => {
         expect(a.unreadable, `${p.id}: unreadable`).toBeFalsy();
         expect(a.missing, `${p.id}: missing`).toBeFalsy();
         if (isCurve(a)) expect(chips.has(p.id), `${p.id} answers a curve and has no chip`).toBe(true);
-        else if (chips.has(p.id)) expect(gaps, `${p.id} has a chip and its ask draws nothing`).toContain(p.id);
+        else expect(chips.has(p.id), `${p.id} has a chip and its ask draws nothing`).toBe(false);
       }
     },
     60_000,

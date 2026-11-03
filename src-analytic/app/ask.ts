@@ -23,7 +23,7 @@ import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve, knownOptions, knownValue, settled, type Figure } from '../engine/evaluate';
-import { locusOf } from '../engine/locus';
+import { locusOf, type LocusResult } from '../engine/locus';
 import { fmtCoefficient } from '../format';
 
 import { curveByName, objectById, tangentLineId, type Id } from '../engine/types';
@@ -368,13 +368,20 @@ export function askSettled(...args: Parameters<typeof ask>): Answer {
   return s.pending ? { question: args[1], value: null, pending: true } : s.value;
 }
 
+/**
+ * The locus row's noun, injected because it is locale (ADR-AG-085): a family the gate named, or `'unnamed'` — a curve the
+ * walk drew whose family the tool does not name (#2628, ADR-AG-380; sr-26, ADR-W-175). The unnamed noun is the one place
+ * #2664's wider family replaces, by naming what reaches it today; the seam is the kind, never a second argument.
+ */
+export type LocusKindWord = (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'] | 'unnamed', count: number) => string;
+
 export function ask(
   d: Derivation,
   question: string,
   fmt: (v: number) => string,
   // `count` joined the seam for #1500 — a union answer pluralises the kind («שני ישרים»), and the
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
-  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
+  kindWord: LocusKindWord = (k) => k,
   /**
    * WHICH WAY IN the question came (#2673, ADR-AG-381): `'chip'` is the locus chip (`AskedQuestion.via`), and only it is
    * answered with the locus. Absent is the ask box (and the measure menu), where a locus question answers `chipOnly`.
@@ -413,11 +420,30 @@ function splitAsk(question: string): string[] | null {
   return parts.length > 1 ? parts : null;
 }
 
+/**
+ * THE DRAWN COMPONENTS of a locus answer — named or not (#2628), one place. The allowed pieces are drawn, never the walk
+ * (#1817, ADR-AG-245); `label(i)`, when given, says which part of a union each drawn curve is.
+ */
+function drawnComponents(res: LocusResult, label: ((i: number) => string) | null): NonNullable<Answer['locus']> {
+  return {
+    components: res.components.map((cp, i) => {
+      const pieces = cp.trace.pieces;
+      const starts = pieces.slice(1).map((_, k) => pieces.slice(0, k + 1).reduce((n, pc) => n + pc.points.length, 0));
+      return {
+        points: pieces.flatMap((pc) => pc.points),
+        closed: pieces.length === 1 && pieces[0].closed,
+        ...(starts.length > 0 ? { starts } : {}),
+        ...(label ? { label: label(i) } : {}),
+      };
+    }),
+  };
+}
+
 function askOne(
   d: Derivation,
   question: string,
   fmt: (v: number) => string,
-  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
+  kindWord: LocusKindWord = (k) => k,
   via?: AskVia,
 ): Answer {
   // The wrapper a student puts round a question («מהו …», «מצא את …», «…?») is not the question (#1432 am. 1).
@@ -490,8 +516,8 @@ function askOne(
      * back to describing a figure nobody is looking at.
      */
     const res = locusOf(d.construction, name, [d.configuration, d.configuration.seed + 1], d.box);
-    // Every component must carry a gated shape, or nothing honest is known about the set — the
-    // pre-#1500 `!res.shape` rule, over the union.
+    // Every component must carry a gated shape for the row to NAME the set — the pre-#1500 `!res.shape` rule, over the
+    // union. Drawing it does not wait on the name (#2628): an unnamed set is drawn below, after the point-set checks.
     const shapes = res && res.components.every((cp) => cp.shape !== null) ? res.components.map((cp) => cp.shape!) : null;
     if (!res || !shapes) {
       /**
@@ -518,6 +544,22 @@ function askOne(
       const kx = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === name)?.x ?? null);
       const ky = isKnowledge(d.construction, (f) => f.points.find((q) => q.id === name)?.y ?? null);
       if (kx.known && ky.known) return { question, value: null, fact: 'points', points: [{ x: kx.value, y: ky.value }] };
+      /**
+       * DRAWN, NOT NAMED (#2628, ADR-AG-380; 02c R87): the point has a one-dimensional set and the walk traced it, but
+       * the set's family is not one the gate names — a parabola off the origin or on the y-axis, a translated ellipse, a
+       * hyperbola, a tilted conic, or a family that changes between the configurations. *"The trace draws whenever the
+       * point has one free DOF; the kind is named when invariant"*: the trace is drawn, and the row says the tool cannot
+       * name it (sr-26, ADR-W-175: inputs and answers share one family until #2664 widens it). No partial equation: a
+       * union with any unnamed component is unnamed as a whole.
+       */
+      if (res) {
+        const n = res.components.length;
+        return {
+          question,
+          value: kindWord('unnamed', n),
+          locus: drawnComponents(res, n > 1 ? () => kindWord('unnamed', 1) : null),
+        };
+      }
       // No locus is a TRUE answer about the figure, not a failure to understand: the point's freedom is
       // not a curve, or the figure is still open. `value: null` is the lane's own way of saying «the
       // figure does not determine this», and it is the honest one here too.
@@ -553,19 +595,8 @@ function askOne(
        * it cuts the configuration. The row above is the CARRIER's (the walk's fit) and prints no extent — a piece's
        * ends are positions of the configuration being shown, and printing them would be a claim about one seed.
        */
-      locus: {
-        components: res.components.map((cp, i) => {
-          const pieces = cp.trace.pieces;
-          const starts = pieces.slice(1).map((_, k) => pieces.slice(0, k + 1).reduce((n, pc) => n + pc.points.length, 0));
-          return {
-            points: pieces.flatMap((pc) => pc.points),
-            closed: pieces.length === 1 && pieces[0].closed,
-            ...(starts.length > 0 ? { starts } : {}),
-            // On a union, each drawn curve says which part of the answer it is.
-            ...(res.components.length > 1 ? { label: parts[i].eq ?? kindWord(parts[i].kind, 1) } : {}),
-          };
-        }),
-      },
+      // On a union, each drawn curve says which part of the answer it is.
+      locus: drawnComponents(res, res.components.length > 1 ? (i) => parts[i].eq ?? kindWord(parts[i].kind, 1) : null),
     };
   }
 

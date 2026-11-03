@@ -518,6 +518,18 @@ commands in `expandFact`, so it applies at the row, in list order. Its new point
 because of a LATER row keeps what it created:** the refold drops a minted row only if it also fails in the fold of the
 rows up to it (`ownFailure`), so a contradiction between two statements is reported as one, never as a missing object.
 
+**The operand's assertion travels with the missing point** ([ADR-3D-409](06b-decisions-3d.md#adr-3d-409), #2610):
+before minting a point, the pass asks `assertedRunOf3(f.cmds, id)` (`engine/mintable.ts`) what the line says about it
+— a structural walk over the fields that hold a run of 4+ letters. A **polygon run** (a `face` field, a `plane-run`
+with `face: true`) is created by the polygon's declaration, `polygonDeclaration3(ids)` (`parser/parse3.ts`, the parser
+reading «מרובע ABCD» / «מחומש ABCDE»), applied atomically through the solid channel (`presolids`, ADR-3D-399): its
+clash rules are inherited and its refusal is the line's. A **named plane run** (a `plane-through` declaration's ids)
+mints a missing member `free3` until three members the figure holds are non-collinear (`spansPlane3`, read off
+`evaluate3`); each further missing member is minted as an `on-plane` rider of the run's own plane (the plane that
+names it, 2 sampled DOFs; `planeFromPointRun` seats it from the members already placed). Riders are carried to the
+refold by `preriders` (point → plane), applied over the `premint` points. An **anonymous plane run** (a `plane-run`
+operand or a `plane` / `p1` / `p2` field holding letters) names no plane a rider could ride, and is minted free as before.
+
 ### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
 
 `CatalogEntry3.needs?: { he: string[]; en: string[] }` holds the lines an example needs on an empty canvas.
@@ -543,10 +555,10 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   name is declared with the tuple; a free one has each component SET (was free) or VERIFIED (equal: redundant;
   different: `free-vector-conflict`, which `derive3` reports as `givens-contradict` naming both lines). A bare letter
   names a free component through #814's `partialNames`; an affine component is recorded in `symComps` (step 2). On an
-  anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names,
-  use)`: every command that names a vector states its use — `'metric'` (magnitude, angle, ⟂, ∥, dot: refused
-  `free-vector-metric` on a free name until step 4) or `'figure'` (a span point: `free-vector-coupling`). A free name
-  is checked before an unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
+  anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names)`,
+  asked by every anchored-lane relation that names a vector: a free name still there is in a relation with the figure
+  (a span point, «|AB| = |u|», «p ∥ AB», a distance) — `free-vector-coupling`, #2603. A free name is checked before an
+  unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
 - **Combinations (step 2, [ADR-3D-390](06b-decisions-3d.md#adr-3d-390)).** `freeVecEquation3` takes every `vec-eq`
   claim and every `vec-rel` that names a free vector or introduces a name (M1): one new name on a side → `def`; one
   free vector nothing has been said about → OWNED (`def`, M2 law (i)); one anchored arrow = a constant → that arrow's
@@ -573,6 +585,22 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   `solveVecDef` reads it from `pureFreeVectors3(c, seed)` (the pre-pivot block of the same solve, memoised).
   `Resolved3.freeSyms` carries each free letter's value for the panel's params row. The ask lane's `combo` query
   evaluates Σ k·atom per knowledge sample.
+- **Metric givens (step 4, [ADR-3D-406](06b-decisions-3d.md#adr-3d-406)).** `freeVecMetricOf3` reads one
+  `FreeVecMetric3` (`mag`, `mag-rel`, `dot`, `cos`, `par`) off `vec-mag`, `mag-val`, `mag-rel`, `dot-given`,
+  `cos-angle` (⟂ and angles) and a vector–vector `mutual-rel` ∥, at the one entry of `applyCommand3Inner`, whenever it
+  names a free vector; `freeVecMetric3` records it in `c.freeVecMetrics` when every operand is a combination of free
+  vectors (a pair or an anchored arrow: `free-vector-coupling`). The system carries each as a NONLINEAR row over the
+  same unknowns (`FreeSystem3.metrics`). `settleFreeVectors3` asks `metricCheck3` (memoised per construction):
+  **pure** — no operand's form reaches an anchored point or an unknown an anchored equation taints, else
+  `free-vector-coupling`; **satisfiable** — `solveMetrics` converges from one of 8 seeded starts (the projected samples
+  of seeds 0–7), over the free unknowns only, else `free-vector-conflict` (`givens-contradict` naming the lines). At
+  resolve, after the linear projection, `solveMetrics` runs from THIS seed's projected sample: `leastSquares` first
+  with a 0.05 pull toward the start, then exactly; the variables are the unknowns the metrics reach, closed under the
+  linear rows sharing them (which ride along as residuals). A start that does not converge takes the check's solution.
+  Directions (∥, angles) are measured on unit vectors, so a zero operand never satisfies them. `freeVecDofCount3`
+  subtracts the rank the metric gradients add to the linear rows' span at the check's solution. The panel prints
+  `|u|` alone when the magnitude, not the value, agrees across the knowledge samples, and lists each given
+  (`freeMetricRow`: «|u| = 5», «u · v = 3», «u ⟂ v», «u ∥ v», «∠(u, v) = 60°»).
 - **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
   reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
   unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a
@@ -603,6 +631,20 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   display only — the angle-mark / draw-arrow precedents — in no engine structure, never knowledge, never a DOF.
 - **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
   free vectors from the lines that stated them.
+
+### A bare lowercase name: the noun breaks the tie in the parser, the figure in the engine ([ADR-3D-411](06b-decisions-3d.md#adr-3d-411), #2642)
+
+A single letter `[a-w]` is both a vector's name and a free line's name. `readOperand` (`parser/operandToken.ts`) has no
+figure, so it settles the tie by the stated noun alone: «הישר d» is `{kind: 'line'}`, a bare «d» is `{kind: 'vector'}`. A
+plural head distributes its noun to each operand (`readOperand(raw, headNoun)`, from `readOperandList` and the
+mutual-position plural form). The rest of the tie is the engine's: `resolveLineNames3` (`engine/apply.ts`) runs once at
+the top of `applyCommand3` and rewrites a `vector` operand, or a `cos-angle` named arm, whose name is in `c.lines` /
+`c.pointLines` and in neither `c.vectors` nor `c.freeVectors` (`resolveNamedOperand3`). The rewritten command is the
+one the parser emits for a line-shaped side, so no arm gains a second lowering: `line-rel` and `distance-rel` keep their
+type; a `mutual-rel` ∥ and a `cos-angle` with a line arm become `line-rel` (∥, ⟂, or the angle `acos(cos)`); a
+`plane-rel` with a line side becomes `plane-line-perp` (⟂ a point run), `line-perp-plane` (⟂ a named plane) or
+`line-rel` (∥, an angle, ⊂). It reads the construction only, so a replay resolves the same way; a declared vector and an
+undeclared name are untouched (`unknown-vector` as before).
 
 ### Free objects: one operand seam ([ADR-3D-388](06b-decisions-3d.md#adr-3d-388), #2484)
 
@@ -741,11 +783,16 @@ driven coordinate, and the pivot runs on a solid-less figure that holds one (`ha
 fork drives a scalar statement when **its reach includes a free DOF** (`statementReachesFreeDof3`, [ADR-3D-393](06b-decisions-3d.md#adr-3d-393)):
 the solids have free dims, or a point it names — or a point one of those is built from (`pointParents3`, a total
 switch over `PointDef`) — carries a `drivable` entry of the carrier table (`reachesFreeCarrier3`, `carriers.ts`). The
-carrier reach is read only on a figure with a solid; on a solid-free figure #1311's clause (a NAMED `free3` point)
-stays the claim arm's second condition. Every
-drive-or-claim site in `apply.ts` asks it (the claim arm and its magnitude demotion, `cos-angle`, `mag-rel`,
-`mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane);
-`freeDims` stays a count. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
+carrier reach is read wherever the pivot runs — a figure with a solid, or one holding a `free3` point (the pivot's own
+entry gate, [ADR-3D-408](06b-decisions-3d.md#adr-3d-408)) — so on an empty canvas the points a line creates are driven
+by it, with no solid frame: the gauge is the sample, and «הציגו תצורה אחרת» re-samples it. A figure with neither
+(coordinates and a rider on them, #1816) reaches nothing the drive can move. Every
+drive-or-claim site in `apply.ts` asks it alone, with no solid count beside it (the claim arm and its magnitude
+demotion, the plane-equation pin, `length-rel`, `cos-angle`, `mag-rel`, `mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the
+angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane); `freeDims` stays a count. The pivot's
+admissibility (`settleFlatRings`) runs on a solid-free figure too, and #2503's degenerate-operand check reads a
+relation's PLANE operands beside its pairs (`pinOperandPlanes3`): a solution where a ⟂ / ∥ / angle-to-plane holds only
+because the plane's points fell on one line is not a configuration, so «AB∥ACD» · «AB ⊥ ACD» is a contradiction. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
 that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
 arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
 that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).
@@ -784,6 +831,16 @@ bounds, anchor seeding, drivability — and both `freeDofCount3` and the pivot's
 carrier cannot be counted yet undrivable (the ADR-052 smell): `on-plane`, `on-line`, `bisector-ray` and
 `partial` riders enroll in the drive. Plane/line riders enroll as offsets from their sampled seat;
 not-drivable rows: a side-point's height and riders of free planes/lines (#557).
+
+**The circle rider** (`on-circle3`, #2611, [ADR-3D-410](06b-decisions-3d.md#adr-3d-410)). The on-line rider's circle
+twin: one sampled angle in the circle's own frame (`seatOnCircleRider3`, key `oncircle-th-<id>`, stepped clear of
+placed points as the plane rider is). The point pass resolves the circle on the spot (`circleGeom3`, the one circle
+resolver the post-pivot circle pass also calls); a circle whose carrier resolves only after the pass seats its rider
+after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`) makes its rider a gauge-frame point
+and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The
+`point-on-circle3` arm creates a new letter as the rider, re-homes a `free3` letter onto the circle unless the circle
+is built from it (`builtFrom3`), re-ordering the points parents-first (`parentsFirst3`), and leaves every placed
+point a check. The store's status pass stays the arbiter on final coordinates.
 
 **A host bound is restored, not only enforced** (#1735, ADR-3D-306). `offHost` (in `degenerate()`) rejects a
 converged candidate outside `[lo, hi]`; when the pool is otherwise empty, an acceptance site re-seats the

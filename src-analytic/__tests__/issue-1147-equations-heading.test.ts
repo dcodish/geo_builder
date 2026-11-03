@@ -40,9 +40,17 @@ describe('#1147 — the equations section says «משוואות»', () => {
      * tree lives, so the class is closed rather than the instance.
      */
     const locale = readFileSync(join(import.meta.dirname, '..', 'i18n', 'index.ts'), 'utf8');
+    /**
+     * The one key family that may say «עקומה» (#2628, ADR-AG-380): the locus row for a DRAWN curve the tool cannot name
+     * and prints NO equation for (`chose-2628-unnamed-locus`, ADR-W-174). It is not an equation called a curve — the
+     * defect this sweep closes — but a curve with no equation, which is exactly where the word is the student's.
+     * Listed by key, so any other string saying «עקום» still fails.
+     */
+    const CURVE_NOT_EQUATION = /^\s*'locus\.unnamed(?:\.2)?':/;
     const offenders = locale
       .split('\n')
-      .filter((l) => /עקו[מם]/.test(l) && !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'));
+      .filter((l) => /עקו[מם]/.test(l) && !l.trimStart().startsWith('*') && !l.trimStart().startsWith('//'))
+      .filter((l) => !CURVE_NOT_EQUATION.test(l));
     expect(offenders, `these locale strings still say «עקום»:\n${offenders.join('\n')}`).toEqual([]);
   });
 

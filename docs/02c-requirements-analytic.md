@@ -53,7 +53,7 @@ expected by heart. No hyperbola appears in twenty sampled exams.
 **R173 — NO CAS** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1; operator authority). The equation layer parses and evaluates, never simplifies, solves or manipulates symbolically; pinning a parameter is a numeric root-find of one or two degrees of freedom. A value that moves with a parameter is never written as an expression in it: «הביעו באמצעות k» is not answered.
 - Sources: ADR-AG-001, ADR-AG-072.
 
-**R174 — The curve family is closed: the line, the circle, the canonical parabola `y² = 2px` and the canonical ellipse `x²/a² + y²/b² = 1`.** Each other curve (a hyperbola, a rotated or translated conic, a parabola on the y-axis) is refused by name; adding one is a decision, not a fix. A figure may hold as many parabolas and ellipses as the question does.
+**R174 — The curve family is closed: the line, the circle, the canonical parabola `y² = 2px` and the canonical ellipse `x²/a² + y²/b² = 1`.** Each other curve (a hyperbola, a rotated or translated conic, a parabola on the y-axis) is refused by name; adding one is a decision, not a fix. A LOCUS that is one of those curves is drawn without a name (R225). A figure may hold as many parabolas and ellipses as the question does.
 - Sources: ADR-AG-018.
 
 **What the tool shows, and what it never shows.**
@@ -318,6 +318,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - «דרך P עובר ישר מקביל ל AB»
 - Sources: ADR-AG-057, ADR-052.
 
+**R227 — the line through a point is read in every clause order 2-D reads, its relation joined with or without «ו»**. *(Operator, 2026-11-02 on #2672: "Trying to insert the commands like ישר l1 עובר דרך A ומאונך לציר x was rejected".)* The relation word takes the conjunction, the article, both or neither («מאונך», «ומאונך», «המאונך», «והמאונך»), the line may come first, last or in the middle, named or not, and every spelling is R80's one line. «l1 מאונך לציר ה-x» alone is still a relation on l1; a name the figure already holds is refused as R80's order refuses it, never re-created.
+- «ישר l1 עובר דרך A ומאונך לציר x» ≡ «l1 מאונך לציר ה-x ועובר דרך A» ≡ «ישר l1 מאונך לציר ה-x דרך A» ≡ «דרך A עובר ישר l1 מאונך לציר ה-x»
+- «ישר העובר דרך A ומקביל לציר ה-y» ≡ «ישר מקביל לציר ה-y ועובר דרך A»; "line l1 perpendicular to the x-axis through A", "l1 is perpendicular to the x-axis and passes through A"
+- Sources: ADR-AG-382, #2672.
+
 **R95 — a name that denotes a line denotes it to every question, and to every surface**. Its equation, slope and the distance from a point to it can all be asked, whether it was drawn as a line, a segment or a side. The distance to a line given by its equation is a given only (R196).
 - Sources: #1148, #1139.
 
@@ -490,7 +495,11 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R133 — «המעגל» is the circle the figure has**. *(Operator: "The student stated ONE circle twice.")* With two or more circles «המעגל» is refused as ambiguous.
 - «נתון מעגל שמרכזו M» then «משוואת המעגל היא (x−3)²+(y−1)²=10» → one circle, M at (3,1)
-- Sources: ADR-AG-196, #1633, #1619.
+- **An inscription with no description of its circle** («ABC חסום במעגל», «מעגל חוסם את ABC») binds the drawn circle only when one of its vertices is new, or when that circle already passes through every vertex; over vertices already drawn it otherwise draws its own circle through them, as 2-D does. «משולש ABC» · «מעגל חסום במשולש ABC» · «מעגל חוסם את ABC» → the incircle and the circle through A, B, C; «מעגל O» · «משולש ABC» · «משולש ABC חסום במעגל» → a new circle beside O; «מעגל O» · «משולש ABC חסום במעגל» → A, B, C on O.
+- Sources: ADR-AG-196, ADR-AG-386, #1633, #1619, #2130, #2376.
+
+**R229 — an arc's new circle letter names the drawn circle through its ends**. *(Operator, 2026-10-20 on #2362: a centre the student did not define, and cannot see, dictates nothing; 2-D's FR-IN-13.)* «F אמצע הקשת BC במעגל O» (and "F is the midpoint of arc BC in circle O", «קשת BC במעגל O היא 100») with a letter no circle and no point has, beside an unnamed drawn circle through B and C, makes O that circle's centre and puts F on it: no second circle is drawn. Two such circles → the tool asks which circle; none → a new circle O, as before. A circle the student named is never renamed this way.
+- Sources: ADR-AG-386, ADR-748 (2-D), #2376.
 
 **R139 — every circle can be named in a sentence, a diameter works on every circle, and the data panel never shows the tool's own symbols**. A computed circle by its role or centre; an open equation shows «—», never an internal symbol.
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
@@ -993,6 +1002,12 @@ a sentence the tool parsed.
 - «A(0,0)» · «B(4,0)» · «M אמצע AB» · «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
 - Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401.
 
+**R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
+- «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message
+- «גובה מ-A במשולש ABC» · «AD גובה במשולש ABC» → one point D
+- «תיכון מ-A במשולש ABC» · «AM = 3» · «D אמצע BC» → recorded, «M ו-D נפלו על אותה נקודה.»
+- Sources: ADR-AG-387, #2674, sr-07 (ADR-W-175).
+
 **R184 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
 - «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)
 - «המעגלים N1 ו-N2 שונים» → two circles; «הישרים l1 ו-l2 שונים», «l1 ≠ l2» → two lines
@@ -1198,6 +1213,13 @@ a sentence the tool parsed.
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
 - Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138, ADR-AG-352, ADR-AG-381, #2673.
 - **Amended by R199 (ADR-AG-351):** the equation also prints when the set varies with the student's letters in a way the tool can state and verify.
+- **Amended by R225 (ADR-AG-380):** a traced set whose family the tool does not name is still drawn, with a row that says so.
+
+**R225 — a locus outside the named family is drawn, not named**. *(Operator, sr-26, 2026-11-02 (ADR-W-175): inputs and answers share one curve family, and "an answer outside the family draws the curve without naming it"; R87's "the trace draws whenever the point has one free DOF".)* When a point has a one-dimensional locus whose family is not one R174 names — a parabola off the origin or on the y-axis, a translated ellipse, a hyperbola, a tilted conic, or a set whose family changes between configurations — the whole set is drawn and the row reads «עקומה (הכלי עדיין לא מזהה את סוגה)» ("a curve (the tool cannot name its kind yet)"), or «שתי עקומות (הכלי עדיין לא מזהה את סוגן)» for two components. No kind and no equation are printed, not even for part of a union. A point the givens leave free but that does not itself move draws nothing. A curve the student STATES stays inside R174's family. Widening the family for both is #2664.
+- חורף 2024 (`exam-2024w-locus-1138`): «המקום הגיאומטרי של C» → C's curve drawn, «עקומה (הכלי עדיין לא מזהה את סוגה)»; M and B read as before
+- «A(2,0)» · «B(6,0)» · «נקודה P» · «PA + PB = 10» → the ellipse drawn, unnamed
+- «A(0,2)» · «l: y = -2» · «נקודה X» · «XA = d_{Xl}» → the parabola x² = 8y drawn, unnamed
+- Sources: ADR-AG-380, #2628, ADR-W-175 (sr-26), #2664.
 
 **R199 — a locus that moves with the student's letters is written in those letters**. *(Operator, round #1181 T26: "the shape still doesnt have the a shown"; PR #1341 T16: "it would be nice if the locus would show x-4a=0"; ruling 11A, 2026-10-30: two letters, so the book's p10-9 answers x²/(4a²) + y²/b² = 1.)* When a single-component locus is the same family at every configuration and each of its canonical parameters (a line's coefficients, a circle's centre and r², a parabola's 2p, an ellipse's a² and b²) is a constant times a power of at most two of the student's letters (total degree ≤ 2), the row prints that equation in the letters, the same at every «הציגו תצורה אחרת» — after the tool has checked it against the traced curve at every configuration it sampled. Anything else (a dependence like `a + 1`, three letters, a union) keeps the kind alone. The kind of such a locus is named at every configuration, never at some and not others (#2608).
 - «A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB» → «מעגל · (x − 16a)² + y² = (25a)²»

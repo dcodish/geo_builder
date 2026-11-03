@@ -103,6 +103,41 @@ export function planeSlotNames3(cmds: readonly Command3[]): Set<string> {
 }
 
 /**
+ * #2610 ([ADR-3D-409](../../docs/06b-decisions-3d.md#adr-3d-409)) — WHAT A LINE ASSERTS ABOUT A POINT IT NAMES IN A RUN
+ * OF FOUR OR MORE LETTERS. A run that names a plane («המישור BCC'B'») asserts its points are coplanar; a run that names
+ * a face or polygon («הפאה ABCD», «המרובע ABCD») asserts that too, and that they are its vertices in order. The mint
+ * pass reads this so a missing letter is created as the statement says, never as an independent free point that makes
+ * the very statement false at every seed.
+ *
+ * Read structurally, by the field that holds the run — never a list of claim kinds:
+ * - a `face` field, or a `{kind: 'plane-run', face: true}` operand → a polygon run (`polygon: true`);
+ * - a `plane-through` declaration's `ids` → a NAMED plane run (`plane` is its name: the pass rides the point on it);
+ * - a `{kind: 'plane-run'}` operand or a {@link PLANE_SLOT_KEYS3} field holding letters → an anonymous plane run, which
+ *   names no plane a rider could ride, so it reports `plane: undefined` (the pass creates such a letter free, as before).
+ * A polygon run wins when the point sits in both.
+ */
+export type AssertedRun3 = { ids: string[]; polygon: boolean; plane?: string };
+export function assertedRunOf3(cmds: readonly Command3[], id: string): AssertedRun3 | null {
+  const runs: AssertedRun3[] = [];
+  const letters = (x: unknown): x is string[] => Array.isArray(x) && x.length >= 4 && x.every((q) => typeof q === 'string' && POINT_LABEL3.test(q));
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'plane-run' && letters(o.ids)) runs.push({ ids: [...o.ids], polygon: o.face === true });
+    if (o.type === 'plane-through' && typeof o.name === 'string' && letters(o.ids)) runs.push({ ids: [...o.ids], polygon: false, plane: o.name });
+    for (const [k, x] of Object.entries(o)) {
+      if (k === 'face' && letters(x)) runs.push({ ids: [...x], polygon: true });
+      else if (PLANE_KEYS.has(k) && letters(x)) runs.push({ ids: [...x], polygon: false });
+      else if (typeof x === 'object' && k !== 'ids') walk(x);
+    }
+  };
+  walk(cmds);
+  const mine = runs.filter((r) => r.ids.includes(id));
+  return mine.find((r) => r.polygon) ?? mine.find((r) => r.plane !== undefined) ?? mine[0] ?? null;
+}
+
+/**
  * May the mint pass create the plane `name` for a line made of `cmds` on `c`? A π-token (`π`, `π3` — the named-plane
  * convention, ADR-3D-124) in one of the line's plane slots that names nothing in the figure. A missing point-run name
  * («ABC») is mistyped letters and stays the point lane's (its letters are minted, never a plane).
