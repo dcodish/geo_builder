@@ -1031,6 +1031,78 @@
       "limits": "Not how #2669 is fixed; once 2-D is fixed and differs, it goes back to him. A cross-tool divergence: named in the Heads-up.",
       "at": "2026-11-02T17:16:49.501Z",
       "status": "pending"
+    },
+    {
+      "id": "q-1595-toolletter",
+      "question": "After «תיכון מ-A במשולש ABC», «D אמצע BC»: rename the tool's M to D with no notice (2-D), or keep both letters with «M ו-D נפלו על אותה נקודה.» (analytic)?",
+      "class": "new-name-on-forced-coincident-point",
+      "verdict": "escalate",
+      "reason": "Demoted class (q-2631 overruled 2026-11-02). 'accept with message' settles acceptance, not whether a tool letter is handed over; sr-07 rules on tool labels, not coincidences. ADR-W-177 records it as not decided.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2286",
+      "question": "Analytic reads «A(2 3, 1)» / «x = 2 3» as 6: refuse naming the line, pass to the AI, or leave?",
+      "class": "juxtaposed-numbers",
+      "verdict": "escalate",
+      "reason": "Leaving it breaks the honesty invariant. Refuse vs AI: complex's 'Any number space number is refused' (2026-10-16, #2247) + sr-05 vs 2-D (the reference, ADR-W-118 B1) sending «AB = 2 3» to the model; #2248 covers «2 1/2» only. Conflict.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-1863-sequence",
+      "question": "Conic annotation: one PR with the design ADR plus the first surface (focus/directrix chip), or a design-only PR first?",
+      "class": "design-review-sequencing",
+      "verdict": "escalate",
+      "reason": "The design review is his own reserved step; trading it against the 14 Nov ellipse lessons is scope/priority. His 2026-10-06 words only chose 'run the design session now'.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-1863-circle",
+      "question": "Ellipse with a = b (foci at the centre, no directrix): focus-only chip, all four states with empty directrix states, or no chip?",
+      "class": "conic-annotation-chip",
+      "verdict": "escalate",
+      "reason": "No precedent covers the degenerate ellipse; 'elippse has fewer states' (2026-09-19) and the four-state cycle (2026-10-14) address a real ellipse only.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-process-rounds",
+      "question": "Rounds fill first with armed bugs, and the headline counts issues closed by merged code (merges/parks separate)?",
+      "class": "round-composition-and-metrics",
+      "verdict": "escalate",
+      "reason": "Round composition is priority; the headline redefines ADR-W-169's metric he approved 2026-11-01.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-pr-2653",
+      "question": "Merge PR #2653 (roadmap history chart) after rebase?",
+      "class": "pr-merge-approval",
+      "verdict": "escalate",
+      "reason": "A feature PR merges on his play-and-approve (ADR-W-007); no recorded approval.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-shared-letter-crossing",
+      "question": "A crossing written through a letter both carriers share («D חיתוך AB ו-BC»; 3-D «G נקודת חיתוך של AC' עם מישור ADE»): refuse everywhere, accept with the notice everywhere, or accept in 3-D only?",
+      "class": "new-name-on-forced-coincident-point",
+      "verdict": "escalate",
+      "reason": "Demoted class. 'accept with message' (2026-11-02) on its face reaches it; the ADR-W-177 carve-out and the ADR-3D-183 / #1274 refusals are session readings. Conflict.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2595",
+      "question": "«π1 מתלכד עם π2» after two free planes: refuse as a restatement, accept and place π2 on π1 with a notice, or keep 'plane not determined'?",
+      "class": "restatement-vs-given",
+      "verdict": "escalate",
+      "reason": "'reject this as we do with all cases where we state the same thing twice' (2026-10-29) conflicts with sr-19 (2026-11-02: an undecided statement is a given that shapes the figure); sr-10 sends conflicts to him.",
+      "at": "2026-11-03T07:38:03.299Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
