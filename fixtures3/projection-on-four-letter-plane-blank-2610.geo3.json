@@ -15,7 +15,7 @@
         },
         {
           "type": "plane-through",
-          "name": "plane-ABCD",
+          "name": "ABCD",
           "ids": [
             "A",
             "B",
@@ -27,7 +27,7 @@
           "type": "line-projection",
           "name": "BE",
           "line": "TB",
-          "plane": "plane-ABCD"
+          "plane": "ABCD"
         }
       ]
     }

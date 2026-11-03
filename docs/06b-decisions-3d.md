@@ -14385,6 +14385,26 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/line-name-as-vector-2642.test.ts` (every measured row records and holds at seeds 0–3; the plane row matches the noun form; the plural mutual position; the controls); fixture `fixtures3/line-lowercase-perp-2642.geo3.json` (the report split one given per row, then «d מאונך ל-ℓ2»).
 
 **Behaviour change for a student:** after «ישר d», «d מאונך ל-ℓ1» (and its ⊥ / ∥ / angle / plane / plural spellings) builds as «הישר d מאונך לישר ℓ1» does, instead of «הווקטור «d» לא הוגדר».
+## ADR-3D-412 — A point-run plane is named by its letters, by every reader; no shown name carries an internal id (#2610, found in round)
+
+**Status:** accepted · 2026-11-03 · bug (3-D) · fix round #2678, found work in #2610's area (ADR-W-168) · branch `fix/2610-plane-label` · extends [ADR-W-096](06w-decisions-workspace.md#adr-w-096) (the student-text check) from refusals to what the figure shows
+**Requirements:** [02b](02b-requirements-3d.md) FR-CL-3 (extended: the figure names an object as the student wrote it) · **Design:** [04b](04b-design-3d.md) § *Rendering* (*A name is its own display text*) · **LADDER stage:** none (parser naming; no solve change).
+
+**Measured before** (HEAD `bed5c606`, `useGeo3.submit`, empty store). «BE היטל הישר TB על המישור ABCD» builds, and its plane is labelled «plane-ABCD» on the canvas and in the planes list: `parse3` lowers it to `plane-through {name: 'plane-ABCD'}` and `line-projection {plane: 'plane-ABCD'}`. The sibling «ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'» lowers its planes as `BC'D` / `BCC'B'` and shows them so. «BE היטל …» followed by «F על המישור ABCD» drew two planes, `plane-ABCD` and `ABCD`, for one plane the student named twice.
+
+**Class (docs/17 §1).** *An object the student named by its letters gets a kind-prefixed id as its name, and in 3-D the name is the display text.* A plane's, a line's and a vector's construction key is exactly what the canvas label, the planes list, the data panel and any refusal print; there is no separate display name to fall back on. Audit of every `plane-through` emitter in `parse3.ts` (`pointRelPlane`, `intersectionLine`, the line∩plane crossing cell, the containment cell, the bare declaration, and the projection): only `lineProjection` prefixed. No line, segment or vector name is built with a prefix; circle ids (`circle-O`, ADR-029) are never a label. The #1455 guard could not see it: it judges refusals only, and it takes every plane key as "a name the figure shows", so an id that was itself a name passed.
+
+**Decision.**
+1. `lineProjection` names its point-run plane by its letters (`ids.join('')`), as every other point-run reader does. The same run now lowers to the same plane whichever sentence names it.
+2. **The lock is over what the figure shows, not over one rule.** `shownNames3` (`src3d/__tests__/shownNames3.ts`) lists every shown name by surface: the planes list, drawn lines and vectors and the created notice after every line; the canvas's plane, line and point labels and the data panel's rows at each sequence's end. The `student-text-1455.test.ts` corpus replay (every sequence the 3-D suite states, now plus every saved fixture) holds each to the shared `hasEngineToken` shape. One replay serves both checks.
+
+**What the student sees.** `[ruled]` (the honesty invariant, CLAUDE.md and [ADR-W-096](06w-decisions-workspace.md#adr-w-096): what the student sees names their statement, never internal state; the round brief of #2678 reports the label as the defect): «BE היטל הישר TB על המישור ABCD» shows the plane as «ABCD» on the canvas and in the planes list, as «ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'» already shows its planes; stated again («F על המישור ABCD») it is the same one plane, where two were drawn.
+
+**Ports (ADR-W-157).** 3-D only: 2-D and analytic have no point-run planes; complex has no planes.
+
+**Locks.** `src3d/__tests__/shown-names-2610.test.ts` (the lowering, Hebrew and English, primed; the operator's line on an empty canvas shows «ABCD»; one plane when restated; the check can fail); the corpus sweep in `student-text-1455.test.ts`; fixture `fixtures3/projection-on-four-letter-plane-blank-2610.geo3.json` re-recorded to the new plane name (its utterance unchanged); `multi-line.test.ts`'s V8-h pair row re-based.
+
+**Behaviour change for a student:** the projection's plane is labelled by its letters («ABCD») instead of «plane-ABCD», and naming it again does not draw a second plane.
 ## ADR-3D-406 — Metric givens on free vectors: a magnitude, an angle, ⟂, ∥ and a dot product hold at every configuration (#1188 step 4)
 
 **Status:** accepted · 2026-11-03 · feature (3d) · fix round #2678, stream V · branch `feat/1188-free-vector-metric` · step 4 of the #1188 design plan (2026-10-06); builds on [ADR-3D-386](#adr-3d-386) and [ADR-3D-390](#adr-3d-390)

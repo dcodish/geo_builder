@@ -1112,6 +1112,13 @@ Orthographic orbit, hidden edges dashed by **numeric outward normals**, not a pa
 `scene3.ts` is pure and React-free; `Figure3.tsx` mounts it. Vector notation is `notation.ts`; math text is
 the shared [`shell/math.tsx`](04w-design-shell.md). **Every annotation is sized in pixels.**
 
+**A name is its own display text ([ADR-3D-412](06b-decisions-3d.md#adr-3d-412), #2610).** A plane's, a line's and a
+vector's construction key is what the canvas label, the planes list, the data panel and a refusal print; there is no
+separate display name. So every reader that declares an object names it as the student wrote it: a point-run plane by
+its letters (`ABCD`, `BCC'B'`), whichever rule reads it, never a kind-prefixed id. Internal ids (`circle-O`, `seg-AB`)
+belong only to objects that carry no label. The lock is the `student-text-1455.test.ts` corpus sweep (`shownNames3`):
+every shown name, after every line of every suite sequence and fixture, is held to the shared `hasEngineToken`.
+
 **The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222),
 [ADR-3D-227](06b-decisions-3d.md#adr-3d-227)).**
 Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray DIRECTIONS, matched order-free within

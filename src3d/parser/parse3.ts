@@ -2968,8 +2968,11 @@ const lineProjection: Rule = (s) => {
   let planeName: string;
   if (/^(?:π|pi)/i.test(planeRaw)) planeName = canonicalPlane(planeRaw);
   else {
+    // #2610 (ADR-3D-412): a point-run plane is NAMED by its letters, as every other point-run reader names it
+    // (`pointRelPlane`, `intersectionLine`, the crossing cell). The name is what the canvas label, the planes list
+    // and a refusal show, so a kind-prefixed id («plane-ABCD») reached the student.
     const ids = planeRaw.match(/[A-Z]\d*'?/g)!;
-    planeName = `plane-${ids.join('')}`;
+    planeName = ids.join('');
     cmds.push({ type: 'plane-through', name: planeName, ids });
   }
   cmds.push({ type: 'line-projection', name: resName, line: srcLine, plane: planeName });
