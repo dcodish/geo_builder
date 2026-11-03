@@ -318,6 +318,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - «דרך P עובר ישר מקביל ל AB»
 - Sources: ADR-AG-057, ADR-052.
 
+**R227 — the line through a point is read in every clause order 2-D reads, its relation joined with or without «ו»**. *(Operator, 2026-11-02 on #2672: "Trying to insert the commands like ישר l1 עובר דרך A ומאונך לציר x was rejected".)* The relation word takes the conjunction, the article, both or neither («מאונך», «ומאונך», «המאונך», «והמאונך»), the line may come first, last or in the middle, named or not, and every spelling is R80's one line. «l1 מאונך לציר ה-x» alone is still a relation on l1; a name the figure already holds is refused as R80's order refuses it, never re-created.
+- «ישר l1 עובר דרך A ומאונך לציר x» ≡ «l1 מאונך לציר ה-x ועובר דרך A» ≡ «ישר l1 מאונך לציר ה-x דרך A» ≡ «דרך A עובר ישר l1 מאונך לציר ה-x»
+- «ישר העובר דרך A ומקביל לציר ה-y» ≡ «ישר מקביל לציר ה-y ועובר דרך A»; "line l1 perpendicular to the x-axis through A", "l1 is perpendicular to the x-axis and passes through A"
+- Sources: ADR-AG-382, #2672.
+
 **R95 — a name that denotes a line denotes it to every question, and to every surface**. Its equation, slope and the distance from a point to it can all be asked, whether it was drawn as a line, a segment or a side. The distance to a line given by its equation is a given only (R196).
 - Sources: #1148, #1139.
 
