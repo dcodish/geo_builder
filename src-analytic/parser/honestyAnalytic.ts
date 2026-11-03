@@ -176,15 +176,29 @@ function namesOf(raw: string): NameToken[] {
 }
 
 /**
+ * A UNIT word after a value (#2646 am. 1, ADR-AG-384): «√2 יחידות», «5 מטרים», «30 מעלות», "√2 units", "30 degrees".
+ * A unit MEASURES the number before it; it never counts it. Its plural spellings end like a counted noun («…ות»,
+ * «…ים», "…s"), so without this list the count blank below read «2 יחידות» as "two units" and blanked the stated
+ * value. The singular and abbreviated units («יחידה», «יח'», «ס"מ», «מ'», "cm") are listed too, for the reader's
+ * sake: they never matched a plural. Every unit any builder's grammar reads (2-D's `VALUE_UNIT`, this frame's
+ * length units, the angle rules' degrees), plus their metric siblings.
+ */
+const UNIT_WORD = String.raw`(?:ה?(?:יחידות|יחידה|יח['׳]|ס["״]?מ|סמ['׳]|מ["״]מ|מ['׳]|מטרים|מטר|סנטימטרים|סנטימטר|מילימטרים|מילימטר|קילומטרים|מעלות|מעלה|רדיאנים|רדיאן)(?![א-ת])|(?:units?|cm|mm|m|(?:centi|milli|kilo)?met(?:er|re)s?|degrees?|radians?)\b)`;
+
+/**
  * The spans that are NOT magnitudes, blanked before numbers are read: a numeral NAME (its numeral), a
  * letter-glued subscript (`F1`, `l2`, `x_1`), an exponent (`^2` is form, not magnitude), and a COUNT — a bare
  * integer before a plural noun, «2 משיקים» / "3 circles" (2-D #160: a count is consumed by structure).
+ *
+ * A count is a BARE integer (#2646 am. 1): never one term of a root, a fraction or a decimal («√2», «3/4», «1.5»), and
+ * never a value before a {@link UNIT_WORD}.
  */
+const COUNT_DIGITS = String.raw`(?<![\d.,√/])\d+`;
 const NUMBER_BLANKS: readonly RegExp[] = [
   /(?<=[A-Za-z_])\d+/g,
   /\^\s*\(?\s*\d+(?:\.\d+)?\s*\)?/g,
-  /\d+(?=\s+[א-ת]+(?:ים|ות)(?![א-ת]))/g,
-  /\d+(?=\s+[a-z]+s\b)/g,
+  new RegExp(String.raw`${COUNT_DIGITS}(?=\s+(?!${UNIT_WORD})[א-ת]+(?:ים|ות)(?![א-ת]))`, 'g'),
+  new RegExp(String.raw`${COUNT_DIGITS}(?=\s+(?!${UNIT_WORD})[a-z]+s\b)`, 'g'),
 ];
 /** One stated or written number, and whether it stands in an EQUATION (#2646: a square or a root pays only across one). */
 interface StatedNumber extends NumberOccurrence {
