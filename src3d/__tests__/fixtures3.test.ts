@@ -484,6 +484,11 @@ const SEEDED: SeededCorpus = {
   'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
   'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
   'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
+
+  // #2642 (ADR-3D-411) — the issue's split rows (one given per row, ADR-W-167): a line declared by a lowercase letter
+  // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
+  // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
+  'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

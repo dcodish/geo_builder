@@ -758,7 +758,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   declaration refuses (a vector's) is refused as the declaration refuses it. No notice: the new row is the signal.
   This holds in every slot that names a line, the common perpendicular's two included: «הישר d מאונך לישר ℓ1 ולישר
   ℓ2» on an empty canvas creates ℓ1 and ℓ2 and draws d (#1566).
-  - Sources: ADR-3D-383, ADR-3D-399, ADR-W-163; #2489, #1566.
+  **A declared line is that line, with or without its noun** (#2642): after «ישר d», a bare letter in a relation reads
+  as the line the figure has, so «d מאונך ל-ℓ1», «d ⊥ ℓ1», «d ∥ ℓ1», «ℓ1 מאונך ל-d», «d מאונך למישור ABC», «u ⊥ v» over
+  two declared lines and «הזווית בין u ל-v היא 60» build exactly as their noun-led twins («הישר d מאונך לישר ℓ1») do.
+  A plural noun covers each name in its list («הישרים d ו-ℓ1 מאונכים», «… מצטלבים»). A letter declared as a vector keeps
+  the vector reading, and an undeclared letter with no noun is still refused «הווקטור «d» לא הוגדר».
+  - Sources: ADR-3D-383, ADR-3D-399, ADR-3D-411, ADR-W-163, ADR-W-167, ADR-W-175; #2489, #1566, #2642.
 - **FR-SP-27 (Must)** — **Every guide example builds on an empty canvas.** A click on a guide example submits it; when
   the canvas is empty and the example has nothing it could create — a free-vector line («|u|=|v|=1»), a role noun
   («גובה הפירמידה», «המנסרה ישרה»), a value for a letter («α = 70»), a solid's own element («אלכסון BD'») or a cone's

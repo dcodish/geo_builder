@@ -4439,8 +4439,10 @@ const mutualPositionClaim: Rule = (s0) => {
       : bParts && bParts.length === 2 ? bParts
       : null;
     if (!pair) continue;
-    const o1 = readOperand(pair[0]);
-    const o2 = readOperand(pair[1]);
+    // #2642 (ADR-3D-411): the plural head «הישרים» / «lines» distributes to each operand, as a singular noun would
+    const head = a && /^(?:ה?ישרים|lines)\s/i.test(s) ? ('line' as const) : undefined;
+    const o1 = readOperand(pair[0], head);
+    const o2 = readOperand(pair[1], head);
     if (!o1 || !o2) continue;
     const [x, y] = [o1.op, o2.op];
     if (sameOperand(x, y)) return null; // says nothing — let it escalate rather than record a vacuous truth
