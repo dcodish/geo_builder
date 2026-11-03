@@ -1173,6 +1173,10 @@ a sentence the tool parsed.
 - «משולש ABC» · … · «שטח ABC הוא 18» · «הסתר ערכים» → no «S=18»
 - Sources: ADR-AG-388, #2688.
 
+**R233 — a point's letter sits next to its point, never on a line**. *(Operator, 2026-11-03: "points C and D are not located correctly and are on the line instead of next to it".)* The letter (with its stated coordinates) is written on the open side of the point, away from the segments and lines at it, as in the 2-D tool, and moves off any drawn segment, line, curve, other point or other letter that would cover it. The values are written after, clear of the letters. It holds with every canvas switch on or off.
+- «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · … · «AD תיכון» → C and D beside side BC, not on it
+- Sources: ADR-AG-389, #2691.
+
 ---
 
 ## The ask lane and the locus
