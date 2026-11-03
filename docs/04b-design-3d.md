@@ -555,10 +555,10 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   name is declared with the tuple; a free one has each component SET (was free) or VERIFIED (equal: redundant;
   different: `free-vector-conflict`, which `derive3` reports as `givens-contradict` naming both lines). A bare letter
   names a free component through #814's `partialNames`; an affine component is recorded in `symComps` (step 2). On an
-  anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names,
-  use)`: every command that names a vector states its use — `'metric'` (magnitude, angle, ⟂, ∥, dot: refused
-  `free-vector-metric` on a free name until step 4) or `'figure'` (a span point: `free-vector-coupling`). A free name
-  is checked before an unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
+  anchored name it is the pivot pin, unchanged. **The reference check** is ONE function, `vectorRefsError3(c, names)`,
+  asked by every anchored-lane relation that names a vector: a free name still there is in a relation with the figure
+  (a span point, «|AB| = |u|», «p ∥ AB», a distance) — `free-vector-coupling`, #2603. A free name is checked before an
+  unknown one, so a refusal is the honest "not yet", never `unknown-vector` about a declared u.
 - **Combinations (step 2, [ADR-3D-390](06b-decisions-3d.md#adr-3d-390)).** `freeVecEquation3` takes every `vec-eq`
   claim and every `vec-rel` that names a free vector or introduces a name (M1): one new name on a side → `def`; one
   free vector nothing has been said about → OWNED (`def`, M2 law (i)); one anchored arrow = a constant → that arrow's
@@ -585,6 +585,22 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   `solveVecDef` reads it from `pureFreeVectors3(c, seed)` (the pre-pivot block of the same solve, memoised).
   `Resolved3.freeSyms` carries each free letter's value for the panel's params row. The ask lane's `combo` query
   evaluates Σ k·atom per knowledge sample.
+- **Metric givens (step 4, [ADR-3D-406](06b-decisions-3d.md#adr-3d-406)).** `freeVecMetricOf3` reads one
+  `FreeVecMetric3` (`mag`, `mag-rel`, `dot`, `cos`, `par`) off `vec-mag`, `mag-val`, `mag-rel`, `dot-given`,
+  `cos-angle` (⟂ and angles) and a vector–vector `mutual-rel` ∥, at the one entry of `applyCommand3Inner`, whenever it
+  names a free vector; `freeVecMetric3` records it in `c.freeVecMetrics` when every operand is a combination of free
+  vectors (a pair or an anchored arrow: `free-vector-coupling`). The system carries each as a NONLINEAR row over the
+  same unknowns (`FreeSystem3.metrics`). `settleFreeVectors3` asks `metricCheck3` (memoised per construction):
+  **pure** — no operand's form reaches an anchored point or an unknown an anchored equation taints, else
+  `free-vector-coupling`; **satisfiable** — `solveMetrics` converges from one of 8 seeded starts (the projected samples
+  of seeds 0–7), over the free unknowns only, else `free-vector-conflict` (`givens-contradict` naming the lines). At
+  resolve, after the linear projection, `solveMetrics` runs from THIS seed's projected sample: `leastSquares` first
+  with a 0.05 pull toward the start, then exactly; the variables are the unknowns the metrics reach, closed under the
+  linear rows sharing them (which ride along as residuals). A start that does not converge takes the check's solution.
+  Directions (∥, angles) are measured on unit vectors, so a zero operand never satisfies them. `freeVecDofCount3`
+  subtracts the rank the metric gradients add to the linear rows' span at the check's solution. The panel prints
+  `|u|` alone when the magnitude, not the value, agrees across the knowledge samples, and lists each given
+  (`freeMetricRow`: «|u| = 5», «u · v = 3», «u ⟂ v», «u ∥ v», «∠(u, v) = 60°»).
 - **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
   reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
   unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a

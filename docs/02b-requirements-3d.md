@@ -438,9 +438,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   true on a cube and drives a parallelogram on a figure free to become one. **Not yet** (refused honestly as the tool's
   limit, naming the statement — never «בדקו את החישוב» and never "u is not declared"): a statement that would make the
   figure and a free vector one joint solve, undecidable without solving both together («AE = t·p»; a span point over
-  a free vector), #2603; a magnitude, angle, ⟂, ∥ or dot
-  product on a free vector («|u| = 5», «u ⟂ v»), #1188 step 4.
-  - Sources: ADR-052, ADR-3D-386, ADR-3D-387; #1184 arm 2, #1188.
+  a free vector), #2603 — and so is a magnitude, angle, ⟂, ∥ or dot product between a free vector and the figure
+  («p ⟂ AB», «|AB| = |p|»). **Metric givens** ([ADR-3D-406](06b-decisions-3d.md#adr-3d-406)): a magnitude («|u| = 5»,
+  «|u + v| = 3»), a ratio of magnitudes («|u| = |v|», «|w+u| = |w-u|»), a dot product («u·v = 3»), an angle
+  («הזווית בין u ל-v היא 60»), ⟂ and ∥ over free vectors hold at every configuration, whatever order they come in;
+  what they leave free still moves with «הציגו תצורה אחרת», and stating one moves no vector it does not name. Givens
+  that cannot all hold («|u| = 1», «|v| = 1», «|u + v| = 3»; «u = (1,2,3)» with «|u| = 5») are refused naming the
+  lines. The data panel lists each such given («|u| = 5», «u ⟂ v», «∠(u, v) = 60°») and prints |u| once it is the
+  same in every configuration, even while the direction moves.
+  - Sources: ADR-052, ADR-3D-386, ADR-3D-387, ADR-3D-390, ADR-3D-406; #1184 arm 2, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
   them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a

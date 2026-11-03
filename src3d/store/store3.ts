@@ -584,6 +584,13 @@ function vectorsNamedBy3(k: Command3): string[] {
   if (k.type === 'declare-vector') return [...k.names];
   if (k.type === 'vec-rel') return named(k.terms);
   if (k.type === 'claim' && k.claim.type === 'vec-eq') return [...named(k.claim.lhs), ...named(k.claim.rhs)];
+  // #1188 step 4 (ADR-3D-406): the metric givens a free vector can carry
+  if (k.type === 'vec-mag') return [k.name];
+  if (k.type === 'dot-given') return [k.v1, k.v2];
+  if (k.type === 'mag-val') return named(k.e);
+  if (k.type === 'mag-rel') return [...named(k.e1), ...named(k.e2)];
+  if (k.type === 'cos-angle') return named([{ atom: k.u }, { atom: k.v }]);
+  if (k.type === 'mutual-rel') return [k.a, k.b].flatMap((o) => (o.kind === 'vector' ? [o.name] : []));
   return [];
 }
 
@@ -1978,7 +1985,7 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-metric' || st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
       // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
       const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];
