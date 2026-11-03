@@ -1,0 +1,152 @@
+{
+ "name": "prod-2026-11-03b",
+ "title": "Prod smoke, prod/2026-11-03-2: round #2678's second batch",
+ "cases": [
+  {
+   "id": "P1",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "class": "verified",
+   "title": "Display buttons hide grid, numbers and values (#2688)",
+   "lines": [
+    "A(2,3)",
+    "B(6,1)",
+    "קטע AB"
+   ],
+   "after": [
+    {
+     "click": "הסתר רשת"
+    },
+    {
+     "click": "הסתר מספרים"
+    },
+    {
+     "click": "הסתר ערכים"
+    }
+   ],
+   "expect": [
+    "הצג רשת",
+    "הצג מספרים",
+    "הצג ערכים"
+   ],
+   "lookFor": "After the three presses the buttons read «הצג …»; no grid, no axis numbers, letters only.",
+   "before": "No buttons."
+  },
+  {
+   "id": "P2",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "class": "look",
+   "title": "Point letters sit beside the lines (#2691)",
+   "lines": [
+    "משולש ABC",
+    "A(8,-2)",
+    "משוואת הצלע BC היא x-y+2=0",
+    "P מפגש תיכונים",
+    "שיעור ה- x של P הוא 3",
+    "AD תיכון",
+    "AE גובה",
+    "שטח ABC הוא 18"
+   ],
+   "lookFor": "C and D are written beside side BC, not on it.",
+   "before": "C and D sat on side BC."
+  },
+  {
+   "id": "P3",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "class": "verified",
+   "title": "A parabola's focus and directrix chip (#1863)",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=54x"
+   ],
+   "after": [
+    {
+     "click": "הצג מדריך"
+    }
+   ],
+   "expect": [
+    "הצג מוקד"
+   ],
+   "lookFor": "The chip reads «הצג מדריך»; after one press the directrix x = -27/2 is drawn and the chip reads «הצג מוקד».",
+   "before": "No chip."
+  },
+  {
+   "id": "P4",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "class": "verified",
+   "title": "REFUSAL: the needle triangle keeps the flattened reason (#1182 fix, #1334)",
+   "lines": [
+    "משולש ABC",
+    "AB = AC",
+    "∠ABC = 90"
+   ],
+   "lookFor": "The last line is refused as a flattened triangle, not «לא נמצאה תצורה».",
+   "before": "Unchanged.",
+   "expectRefusal": "משטיח"
+  },
+  {
+   "id": "P5",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "class": "verified",
+   "title": "REFUSAL: a midpoint stated 1:2 names both lines (#2591)",
+   "lines": [
+    "משולש ABC",
+    "D אמצע AB",
+    "D מחלקת את AB ביחס 1:2"
+   ],
+   "expectRefusal": "סותר את «D אמצע AB»",
+   "lookFor": "Refused: «לא ניתן: «D מחלקת את AB ביחס 1:2» סותר את «D אמצע AB» — אי אפשר לקיים את שניהם יחד.»",
+   "before": "Committed green with D left at the midpoint."
+  },
+  {
+   "id": "P6",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "class": "verified",
+   "title": "A projection's plane is named ABCD (#2610)",
+   "lines": [
+    "BE היטל הישר TB על המישור ABCD"
+   ],
+   "expectAbsent": [
+    "plane-ABCD"
+   ],
+   "lookFor": "The plane is labelled ABCD; no «plane-ABCD» anywhere.",
+   "before": "Refused (four points not in one plane)."
+  },
+  {
+   "id": "P7",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "class": "verified",
+   "title": "A triangle's area builds on an empty canvas (#2609)",
+   "lines": [
+    "שטח המשולש ABC = 4.5"
+   ],
+   "lookFor": "Triangle ABC is drawn and the row is green.",
+   "before": "Refused «point-not-determined»."
+  },
+  {
+   "id": "P8",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "class": "verified",
+   "title": "Complex builder loads and builds",
+   "lines": [
+    "z = 3 + 4i"
+   ],
+   "lookFor": "z is plotted at (3, 4).",
+   "before": "Unchanged."
+  }
+ ]
+}

@@ -40,6 +40,111 @@
         "הישר l1 מאונך ל-KL"
       ],
       "lookFor": "K, L, A, B, M כתובות ליד הנקודות, לא על מעגל, משיק או ישר"
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T29",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש CDE",
+        "A על CD",
+        "B על CE",
+        "מרובע ABED חסום במעגל",
+        "משולש ABC חסום במעגל",
+        "F אמצע הקשת BC במעגל O"
+      ],
+      "lookFor": "Still two circles, no third. O is drawn at the centre of the circle through A, B and C, and F sits on that circle, midway along arc BC."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T28",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש CDE",
+        "A על CD",
+        "B על CE",
+        "מרובע ABED חסום במעגל",
+        "משולש ABC חסום במעגל"
+      ],
+      "lookFor": "Two circles are drawn: one through A, B, E and D, and a second through A, B and C. The equations panel lists «⊙ABE» and «⊙ABC»."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T9",
+      "kind": "2d:blind-review",
+      "queued": "2026-11-03",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מרובע ABCD",
+        "הקרניים AB ו-CD נחתכים בנקודה M"
+      ],
+      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T8",
+      "kind": "2d:blind-review",
+      "queued": "2026-11-03",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מרובע ABCD",
+        "M נקודת החיתוך של הקרניים AB ו-CD"
+      ],
+      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T23",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "הישר l1: y=2x+1",
+        "l1 מאונך לציר ה-x ועובר דרך A"
+      ],
+      "lookFor": "The last line is refused with «השם הזה כבר תפוס בשרטוט — הוא ישר…», and l1 stays the line y = 2x + 1."
+    },
+    {
+      "sheet": "round-2678",
+      "id": "T22",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-03",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(1,2)",
+        "ישר l1 מאונך לציר ה-x דרך A"
+      ],
+      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A."
+    },
+    {
+      "sheet": "prod-2026-11-03b",
+      "id": "P8",
+      "kind": "complex:blind-review",
+      "queued": "2026-11-03",
+      "product": "complex",
+      "base": "https://themathbible.com",
+      "path": "/complex-builder/",
+      "lines": [
+        "z = 3 + 4i"
+      ],
+      "lookFor": "z is plotted at (3, 4)."
     }
   ],
   "results": [
