@@ -933,6 +933,12 @@ diagonals of «האלכסונים נפגשים בנקודה M» as plain segment
 `cross(…, 'point')`, a role meet with a noun head — inks nothing and ensures the endpoints as `ifAbsent` free
 points. Analytic reads the same rule (ADR-AG-241).
 
+**A plural line noun covers the list** ([ADR-774](06-decisions.md#adr-774), #2533). Each operand's reference word
+(bare segment, extension, line) is read from the span before it through the lexicon's `LINE_NOUN` / `EXTENSION_REF`
+atoms, singular and plural («הישרים», «הקרניים», "lines", "rays"). In a conjunction a word before the first pair
+distributes to an unmarked second pair (`distribute`), so «הקרניים AB ו-CD» reads both as lines; a word before the
+second pair marks only it (issue #22).
+
 **A tangent has no second crossing** ([ADR-640](06-decisions.md#adr-640), #1931). `tangentAt(line, circle, Q)` (`evaluate.ts`) is
 the one test: Q on both, and |cos∠(line, radius)| ≤ `TANGENT_COS` = 10 × `DIRECTION_EPS` — an angle held to the ⟂
 tolerance, never to `LEN_EPS`, which a relation-held tangency can game. `tangentTouch` asks it of every placed point.
