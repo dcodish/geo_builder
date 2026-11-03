@@ -435,6 +435,14 @@ export interface Scene {
    * arc and inside a stated area. A stated length rides its segment's `label` instead, where it always has.
    */
   stated: SceneStated;
+  /** #1863 (ADR-AG-376) — the conic role marks the chip asked for, projected, labels placed. Decoration: no id. */
+  roles: SceneRoles;
+}
+
+/** The conic role marks in screen space (#1863): foci (dots) and directrices (dashed lines), each with its placed label. */
+export interface SceneRoles {
+  foci: Array<{ cx: number; cy: number; label?: { text: string; x: number; y: number } }>;
+  directrices: Array<{ x1: number; y1: number; x2: number; y2: number; label?: { text: string; x: number; y: number } }>;
 }
 
 /** The stated-measure layer in screen space (#1714). Geometry from `shell/marks`, the planar kit 2-D draws with. */
@@ -544,6 +552,20 @@ export interface SceneKnowledge {
    * knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
    */
   stated?: StatedMeasures;
+  /**
+   * #1863 (ADR-AG-376) — THE CONIC ROLE MARKS the student's chip asked for, in WORLD coordinates: a focus (a dot) and a
+   * directrix (a line, drawn across the view), each with the label the caller decided may be written (absent = none).
+   * The caller owns them for the reason it owns `marks`: what the chip asked and what is knowledge are not the figure's.
+   */
+  roleMarks?: Array<
+    | { kind: 'focus'; x: number; y: number; label?: string }
+    | { kind: 'directrix'; line: { a: number; b: number; c: number }; label?: string }
+  >;
+  /**
+   * #1863 (ADR-AG-377) — is this ELLIPSE a circle (a = b in every configuration)? Then its centre is marked as a
+   * circle's is — the cross, labelled when known (operator, 2026-11-03: *"its the circle center"*).
+   */
+  circleShaped?: (id: string) => boolean;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -619,10 +641,11 @@ export function buildScene(
        */
       // #2238: a HIDDEN circle's centre cross goes with it — the cross is a feature of the curve, not a point (a
       // point the student named there is drawn as every point is, and stays)
-      centre: c.curve.kind === 'circle' && ink !== 'none'
+      // #1863 (ADR-AG-377): an ellipse the givens make a circle has a circle's centre — at the origin (canonical only)
+      centre: (c.curve.kind === 'circle' || (c.curve.kind === 'ellipse' && knows.circleShaped?.(c.id))) && ink !== 'none' && ink !== 'ghost'
         ? {
-            cx: t.sx(c.curve.cx),
-            cy: t.sy(c.curve.cy),
+            cx: t.sx(c.curve.kind === 'circle' ? c.curve.cx : 0),
+            cy: t.sy(c.curve.kind === 'circle' ? c.curve.cy : 0),
             /**
              * The label is the mark's only when NO point stands there (#1086).
              *
@@ -636,8 +659,8 @@ export function buildScene(
              */
             label:
               knows.curveKnown?.(c.id) &&
-              !hasPointAt(fig, c.curve.cx, c.curve.cy)
-                ? lbl(`(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`)
+              !hasPointAt(fig, c.curve.kind === 'circle' ? c.curve.cx : 0, c.curve.kind === 'circle' ? c.curve.cy : 0)
+                ? lbl(c.curve.kind === 'circle' ? `(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})` : '(0, 0)')
                 : undefined,
           }
         : undefined,
@@ -766,12 +789,20 @@ export function buildScene(
   // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
   // one placement keeps every stated value clear of every other (#1717's rule, one path).
   const statedDraft = statedScene(fig, t, knows.stated, projected);
+  // #1863: the role marks and their label requests — placed in the SAME call, so a focus's «F(27/2, 0)» and a
+  // directrix's equation keep clear of every point label, tick row, length and stated value (one placement, #1717)
+  const roleDraft = roleScene(knows.roleMarks ?? [], box, t);
   const placed = placeSceneLabels(
-    [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests],
+    [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests, ...roleDraft.requests.map((r) => r.req)],
     points,
     furniture,
     projected.filter((s) => s.ink !== 'ghost'),
   );
+  const roleBase = labelled.length + statedDraft.requests.length;
+  const roles: SceneRoles = {
+    foci: roleDraft.foci.map((f) => ({ cx: f.cx, cy: f.cy, ...(f.req !== undefined ? { label: { text: roleDraft.requests[f.req].req.text, ...placed[roleBase + f.req] } } : {}) })),
+    directrices: roleDraft.directrices.map((l) => ({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, ...(l.req !== undefined ? { label: { text: roleDraft.requests[l.req].req.text, ...placed[roleBase + l.req] } } : {}) })),
+  };
   const placedOf = new Map(labelled.map((s, i) => [s, placed[i]] as const));
   const segments: SceneSegment[] = projected.map((s) => {
     const at = placedOf.get(s);
@@ -854,7 +885,52 @@ export function buildScene(
     crossings,
     measures,
     loci,
+    roles,
   };
+}
+
+/**
+ * #1863 (ADR-AG-376) — THE CONIC ROLE MARKS, projected: a focus is a dot, a directrix the segment of its line inside
+ * the view. Their labels are REQUESTS for the one placement: a focus's beside its dot, up and right as a point's label
+ * sits, stepping outward; a directrix's beside its line near the bottom (a vertical one) or the left end (a horizontal
+ * one), stepping away from the line on either side.
+ */
+function roleScene(
+  marks: NonNullable<SceneKnowledge['roleMarks']>,
+  box: Box,
+  t: Transform,
+): {
+  foci: Array<{ cx: number; cy: number; req?: number }>;
+  directrices: Array<{ x1: number; y1: number; x2: number; y2: number; req?: number }>;
+  requests: Array<{ req: LabelRequest }>;
+} {
+  const out = { foci: [] as Array<{ cx: number; cy: number; req?: number }>, directrices: [] as Array<{ x1: number; y1: number; x2: number; y2: number; req?: number }>, requests: [] as Array<{ req: LabelRequest }> };
+  const ask = (req: LabelRequest): number => out.requests.push({ req }) - 1;
+  for (const m of marks) {
+    if (m.kind === 'focus') {
+      const cx = t.sx(m.x);
+      const cy = t.sy(m.y);
+      const n = { x: Math.SQRT1_2, y: -Math.SQRT1_2 };
+      out.foci.push({ cx, cy, ...(m.label ? { req: ask({ mid: { x: cx, y: cy }, n, text: lbl(m.label), both: true, priority: 2 }) } : {}) });
+      continue;
+    }
+    const seg = polylines({ kind: 'line', ...m.line }, box)[0];
+    if (!seg || seg.length < 2) continue;
+    const [[ax, ay], [bx, by]] = seg;
+    const x1 = t.sx(ax);
+    const y1 = t.sy(ay);
+    const x2 = t.sx(bx);
+    const y2 = t.sy(by);
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    // the end nearer the BOTTOM (screen y larger: the canvas's zoom controls sit over its top corner) or, for a
+    // horizontal line, the left end — 18px in from it
+    const [sx0, sy0, sx1, sy1] = y1 > y2 + 0.5 || (Math.abs(y1 - y2) <= 0.5 && x1 < x2) ? [x1, y1, x2, y2] : [x2, y2, x1, y1];
+    const along = { x: (sx1 - sx0) / len, y: (sy1 - sy0) / len };
+    const mid = { x: sx0 + along.x * 18, y: sy0 + along.y * 18 };
+    const n = { x: -along.y, y: along.x };
+    out.directrices.push({ x1, y1, x2, y2, ...(m.label ? { req: ask({ mid, n: n.x < 0 || (n.x === 0 && n.y > 0) ? { x: -n.x, y: -n.y } : n, text: lbl(m.label), both: true, priority: 2 }) } : {}) });
+  }
+  return out;
 }
 
 /** Screen points as SVG path data, at the scene's two-decimal precision. */

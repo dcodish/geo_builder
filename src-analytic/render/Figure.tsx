@@ -338,6 +338,30 @@ export function Figure({
       </g>
 
       {/*
+        #1863 (ADR-AG-376) — THE CONIC ROLE MARKS the curve's chip asked for. A directrix is a thin DASHED line across the
+        view (sr-29, 2026-11-02: "dashed for every extension, directrix or helper"); a focus is a dot ("we put the dot",
+        #1752) in the curve's blue, so it does not read as one of the student's own black points. Each label is written
+        where the scene placed it, clear of every other label. Decoration: no id, no hit target.
+      */}
+      <g data-testid="analytic-roles" pointerEvents="none">
+        {(scene.roles?.directrices ?? []).map((l, i) => (
+          <line key={`dx${i}`} data-role="directrix" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={CURVE} strokeWidth={1.25} strokeDasharray="6 5" />
+        ))}
+        {(scene.roles?.foci ?? []).map((p, i) => (
+          <circle key={`fc${i}`} data-role="focus" cx={p.cx} cy={p.cy} r={3.5} fill={CURVE} />
+        ))}
+        <g fontSize={LENGTH_LABEL_FONT} fill={INK} textAnchor="middle" paintOrder="stroke" stroke="#fff" strokeWidth={3} style={{ direction: 'ltr', unicodeBidi: 'isolate' }}>
+          {[...(scene.roles?.directrices ?? []), ...(scene.roles?.foci ?? [])].map((m, i) =>
+            m.label ? (
+              <text key={`rl${i}`} data-role-label="1" x={m.label.x} y={m.label.y} dy="0.35em">
+                {m.label.text}
+              </text>
+            ) : null,
+          )}
+        </g>
+      </g>
+
+      {/*
         CROSSINGS the student may promote (#1025) — operator: "we need to see the dashed circle
         allowing us to create that point".
 

@@ -1,0 +1,15 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "F(1,1)",
+    "נתונה פרבולה שמשוואתה y^2=8x"
+  ],
+  "seed": 0,
+  "name": "#1863 — F של התלמיד: מוקד הפרבולה מסומן בלי אות",
+  "annotations": {
+    "curve-anonca1whc": {
+      "conic": "focus"
+    }
+  }
+}

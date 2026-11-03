@@ -444,6 +444,11 @@ const at = (nameAt: NameAt | undefined, x: number, y: number, coords: string): s
 /** Who sits at a position, if anyone — `pointAt(figure, …)`, supplied by the caller. */
 export type NameAt = (x: number, y: number) => string | null;
 
+/** #1863 (ADR-AG-376) — any role line (a directrix) in the one role-line wording, from the line itself. */
+export function roleLineOf(l: NumCurve): string {
+  return l.kind === 'line' ? roleLineText(l.a, l.b, l.c) : '';
+}
+
 /** A parabola's directrix, in the one role-line wording — shared by the panel row and the ask. */
 export function directrixText(c: NumCurve & { kind: 'parabola' }): string {
   const d = parabolaDirectrix(c);

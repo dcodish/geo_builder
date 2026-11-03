@@ -1039,8 +1039,8 @@ a sentence the tool parsed.
 ### 4a — Data entry and what the canvas shows
 
 **R20 — The canvas carries what the student's givens state; what is DERIVED from the figure is in the data panel.** *(Operator: "Anything that is derived from the figure should stay in the data panel".)* The canvas is the question, the panel the answer. Recorded exception (ADR-W-118 B7): a computed circle centre's coordinates, when the givens determine them.
-- **⚠ Ruled to change (2026-10-07, ADR-W-118 B7 · #1863):** a parabola's focus and directrix and an ellipse's foci are marked on the canvas, with their values when determined. Until that ships, the canvas marks none of them.
-- Sources: #1563, ADR-AG-016, ADR-W-118, ADR-AG-036, #1863.
+- A parabola's focus and directrix, and an ellipse's foci and directrices, are drawn when the student asks for them with the curve's chip (R221), with their values only when the givens determine them (R222). The 2026-10-07 "always marked" line was replaced by the 2026-10-14 ruling (ADR-W-118 Am. 4).
+- Sources: #1563, ADR-AG-016, ADR-W-118, ADR-AG-036, #1863, ADR-AG-376.
 
 **R21 — A derived equation IS often the exam's answer, and showing it — in the data panel (R20) — is correct.** *(Operator ruling: "for a student the answer is meaningless without the way".)* The panel's equation is a CHECK on the student's own working (precedent: ADR-3D-032).
 - Sources: ADR-AG-016, ADR-3D-032.
@@ -1121,6 +1121,17 @@ a sentence the tool parsed.
 **R176 — a construction point off the drawn ink gets its line extended, dashed, to meet it, as in the 2-D tool**. *(Operator rulings 2026-10-09 and 2026-10-10: "Lines, and show why".)* A point the construction puts on a line through two named points (a height's foot, a diagonal meet, a crossing) that lands beyond the drawn piece gets that line drawn on, dashed, from the end of the ink out to it. A point on the drawn piece gets nothing.
 - «טרפז ABCD» · «AE גובה» with E past D → DC extended, dashed, from D to E
 - Sources: ADR-AG-255, ADR-W-124, #1937, #1971.
+
+**R221 — a parabola or an ellipse carries a chip that shows its focus and directrix, starting from nothing**. *(Operator, 2026-10-09, confirmed 2026-10-14: «כלום → רק מדריך → רק מוקד → מוקד ומדריך»; "the NEXT ACTION, always"; the ellipse gets "the SAME four-state cycle as the parabola".)* The chip sits on the curve's row in the givens list. Each press advances nothing → directrix → focus → focus and directrix → nothing, and the chip names what the next press shows: «הצג מדריך» · «הצג מוקד» · «הצג מוקד ומדריך» · «הסתר» (an ellipse: «הצג מדריכים» · «הצג מוקדים» · «הצג מוקדים ומדריכים» · «הסתר»). An ellipse draws both foci and both directrices. A focus is a dot; a directrix is a thin dashed line across the view (sr-29). The choice is undone by «בטל», saved with the figure, kept by «הציגו תצורה אחרת», and is never a given: «נתונים» and the given count are unchanged.
+- «נתונה פרבולה שמשוואתה y^2=54x» → chip «הצג מדריך»; three presses → the focus and the directrix; a fourth → nothing
+- Sources: ADR-AG-375, ADR-AG-376, #1218, #1863.
+
+**R222 — a focus and a directrix carry their values only when the givens determine them, and never the student's letter**. *(Operator, #1863: "with their values when the givens determine them"; 2026-10-09 answer 5: «F», «F₁»/«F₂», a directrix by its equation; sr-07: "A letter the student put on the object wins".)* A known curve writes «F(27/2, 0)» beside the focus and «x = -27/2» beside the directrix (the panel's own strings); an ellipse's foci are «F₁» (right or upper) and «F₂». A parameterised curve («y^2=2px») shows the mark «F» with no coordinates and a directrix with no equation. A point the student put at the focus keeps its own label and the mark adds none; when the student's letter F (or F1, F2) is elsewhere, the mark drops the letter and keeps its coordinates.
+- «F(1,1)» · «y^2=8x», focus shown → «(2, 0)»
+- Sources: ADR-AG-376, #1863, ADR-W-175.
+
+**R223 — an ellipse the givens make a circle is said to be one, and its centre is a circle's centre**. *(Operator, 2026-11-03, card d2: "we should have a comment saying that the shape is now a circle … as for the focus, we dont show it as focus its the circle center.")* When a = b in every configuration — by its equation («x^2/9+y^2/9=1») or by a later given («x^2/a^2+y^2/9=1» · «a=3») — the ellipse gets no chip, no focus and no directrix; its centre is marked with the circle's centre cross, with «(0, 0)» when known, and a notice in the narrowing note's voice names the givens that do it: «בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.» It names no letter O at the centre (R123 is a typed circle's; open question on #1863).
+- Sources: ADR-AG-377, #1863, #2676.
 
 **R25a — the object the student asked for is ON SCREEN**. A collapsed trace does not widen the frame, and the frame stays put across «הציגו תצורה אחרת» (ADR-AG-137).
 - *"fit once, then the frame is the student's"*

@@ -111,6 +111,26 @@ export function ellipseFoci(
   ];
 }
 
+/**
+ * Ellipse directrices (#1863, ADR-AG-376) — `x = ±a²/c` for an x-major ellipse, `y = ±b²/c` for a y-major one, where
+ * `c` is the focal distance `ellipseFoci` uses. Same orientation rule and the same `[right, left]` (`[top, bottom]`)
+ * order, so directrix k belongs to focus k. `null` when a = b: the curve is a circle, whose foci meet at the centre
+ * and which has no directrix (ADR-AG-377).
+ */
+export function ellipseDirectrices(
+  c: NumCurve & { kind: 'ellipse' },
+): [NumCurve & { kind: 'line' }, NumCurve & { kind: 'line' }] | null {
+  const xMajor = c.a >= c.b;
+  const big = xMajor ? c.a : c.b;
+  const f = Math.sqrt(Math.abs(c.a * c.a - c.b * c.b));
+  if (f <= TOL * Math.max(1, big)) return null;
+  const d = (big * big) / f;
+  // x = d  ⇔  1·x + 0·y − d = 0 ; y = d  ⇔  0·x + 1·y − d = 0
+  return xMajor
+    ? [{ kind: 'line', a: 1, b: 0, c: -d }, { kind: 'line', a: 1, b: 0, c: d }]
+    : [{ kind: 'line', a: 0, b: 1, c: -d }, { kind: 'line', a: 0, b: 1, c: d }];
+}
+
 // ---------------------------------------------------------------------------
 // Extent and rendering
 // ---------------------------------------------------------------------------

@@ -97,6 +97,8 @@ import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { unstatedChoices } from './engine/unstatedChoices';
 import { unstatedChoiceText } from './app/unstatedChoice';
 import { locusChips } from './app/locusChip';
+import { circleNoteText, circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
+import { withConic } from './app/annotations';
 
 
 declare const __BUILD__: string;
@@ -166,6 +168,8 @@ export function App() {
     curveStyle,
     toggleCurveHidden,
     toggleCurveDashed,
+    annotations,
+    setAnnotations,
     removeLine,
     replaceLine,
     clearAll,
@@ -632,6 +636,12 @@ export function App() {
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
   /**
+   * #1863 (ADR-AG-376) — THE CONIC CHIPS: one per stated parabola or ellipse (not one the givens make a circle), on the
+   * row that introduced it. A press records the next state on the annotation channel (ADR-AG-375); nothing is submitted.
+   */
+  // poolTick: the circle test reads the configuration pool
+  const conics = useMemo(() => conicChips(d, annotations), [d, annotations, poolTick]);
+  /**
    * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
    * that opened it and gathered beside «הציגו תצורה אחרת», for as long as it is unstated. 2-D's two surfaces.
    * #2233 (ADR-AG-290): "unstated" is judged on the configuration pool too; while it is incomplete the note stays as
@@ -657,6 +667,18 @@ export function App() {
     // poolTick: the pool completed, read it again
   }, [active, d, poolTick]);
   const narrowings = narrowed?.d === d ? narrowed.notes : [];
+  /**
+   * #1863 (ADR-AG-377, operator 2026-11-03 card d2) — AN ELLIPSE THE GIVENS MAKE A CIRCLE, said in the narrowing note's
+   * channel and voice. After paint, like the narrowing note: its cause re-derives the lines, which a figure with no
+   * such ellipse never pays.
+   */
+  const [rounded, setRounded] = useState<{ d: typeof d; notes: CircleNote[] } | null>(null);
+  useEffect(() => {
+    const notes = circleNotesOf(active, d, (ls) => derive(ls, seed, seedNames));
+    setRounded({ d, notes });
+    // poolTick: the pool completed, read it again
+  }, [active, d, poolTick, seed, seedNames]);
+  const circleNotes = rounded?.d === d ? rounded.notes : [];
 
   /**
    * THE FIGURE SNAPSHOT (#1300) — the sibling effect, over this product's own source of truth.
@@ -736,7 +758,9 @@ export function App() {
    * every press. That half is a product ruling about what «הציגו תצורה אחרת» should feel like —
    * fit once and keep it, normalise by the parameter, or clamp the movement — and the issue says so.
    */
-  const drawnBox = useMemo(() => composeDrawnBox(d.figure, d.box, answers), [answers, d]);
+  /** #1863 (ADR-AG-376) — the conic role marks the chips asked for: drawn by the scene, framed by the box. */
+  const roleMarks = useMemo(() => conicMarksOf(d, annotations, (id) => !!curveStyle[id]?.hidden), [d, annotations, curveStyle]);
+  const drawnBox = useMemo(() => composeDrawnBox(d.figure, d.box, answers, markAnchors(roleMarks)), [answers, d, roleMarks]);
 
   /**
    * The box and the view in REFS as well as in state (#1094): the wheel listener below is registered
@@ -975,6 +999,7 @@ export function App() {
     seedNames: live.seedNames,
     segStyle: live.segStyle,
     curveStyle: live.curveStyle,
+    annotations: live.annotations,
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
@@ -1073,9 +1098,12 @@ export function App() {
       curveStyle,
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
+      // #1863 — the conic role marks the chips asked for (ADR-AG-376), and the ellipses that are circles (ADR-AG-377)
+      roleMarks,
+      circleShaped: (id) => isCircleShaped(d.construction, id),
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -1442,6 +1470,21 @@ export function App() {
               </div>
             ))}
             {/*
+              #1863 (ADR-AG-377) — an ellipse the givens make a circle: the narrowing note's ⓘ, naming the givens that do it.
+            */}
+            {circleNotes.map((n) => (
+              <div key={`round-note:${n.curve}`} style={{ marginTop: 8 }} data-testid="analytic-conic-circle-note">
+                <Banner kind="notice">
+                  <span aria-hidden="true">ⓘ </span>
+                  {circleNoteText(
+                    n,
+                    (k, o) => t(k, o) as string,
+                    (i) => analyticBidi.isolateLtrRuns(rowShownText(active[i] ?? '', spokenFor[rows[i]])),
+                  )}
+                </Banner>
+              </div>
+            ))}
+            {/*
               #1595 (ADR-AG-366, ADR-W-176) — two letters on one dot are accepted, and the page always says so: 2-D's
               ADR-123 sentence through the suite key. Read from the drawn figure, so it holds while the drawing has the pair.
             */}
@@ -1515,9 +1558,10 @@ export function App() {
                  * drawn, «הסתר» while it is. The click asks the sentence through the ask lane's own lifetime (ADR-AG-067):
                  * ask → row + drawing · again → drawing hidden, row kept · ✕ on the row → both go.
                  */
-                ...(chips.some((c) => rows[c.line] === i)
+                ...(chips.some((c) => rows[c.line] === i) || conics.some((c) => rows[c.line] === i)
                   ? {
-                      trail: chips
+                      trail: [
+                        ...chips
                         .filter((c) => rows[c.line] === i)
                         .map((c) => {
                           const on = isDrawn(queries, c.sentence);
@@ -1536,6 +1580,27 @@ export function App() {
                             </button>
                           );
                         }),
+                        /*
+                          #1863 (ADR-AG-376) — THE CONIC CHIP, in the same seat: its label names the NEXT press (2026-10-09);
+                          a press writes the annotation channel (`withConic`), one undo step, never a given.
+                        */
+                        ...conics
+                          .filter((c) => rows[c.line] === i)
+                          .map((c) => (
+                            <button
+                              key={`conic-${c.id}`}
+                              type="button"
+                              data-testid="conic-chip"
+                              data-state={c.state}
+                              aria-pressed={c.state !== 'none'}
+                              onClick={() => setAnnotations(withConic(annotations, c.id, c.next))}
+                              style={c.state !== 'none' ? { ...locusChipStyle, ...locusChipOn } : locusChipStyle}
+                            >
+                              {t(conicChipKey(c.kind, c.next))}
+                              {conics.filter((k) => rows[k.line] === i).length > 1 && c.name && ` ${c.name}`}
+                            </button>
+                          )),
+                      ],
                     }
                   : {}),
                 // #1548: a derivation indexes the ACTIVE lines; a muted row is not in it and carries no fault
@@ -2230,7 +2295,7 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle };
+          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle, annotations };
           const letter = pick.letter;
           const onRename = (from: string, to: string): LetterRenameResult => {
             // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
@@ -2334,7 +2399,7 @@ export function App() {
         taken letter quotes its holder and offers the swap, like every LetterPopover.
       */}
       {centrePick && (() => {
-        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle };
+        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle, annotations };
         const ops = centrePopoverOps(
           centrePick.offerId,
           state,

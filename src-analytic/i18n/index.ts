@@ -632,6 +632,15 @@ const he = {
   // #1177 (ADR-AG-352) — the locus chip names its next action (operator ruling 2A, 2026-10-30)
   locusChipShow: 'הצג מקום גאומטרי',
   locusChipHide: 'הסתר מקום גאומטרי',
+  // #1863 (ADR-AG-376) — the conic chip names its NEXT action (operator, 2026-10-09): directrix → focus → both → hide.
+  // The words are the session's (ADR-W-174); the ellipse's are plural, two foci and two directrices.
+  conicChip: {
+    parabola: { directrix: 'הצג מדריך', focus: 'הצג מוקד', both: 'הצג מוקד ומדריך', none: 'הסתר' },
+    ellipse: { directrix: 'הצג מדריכים', focus: 'הצג מוקדים', both: 'הצג מוקדים ומדריכים', none: 'הסתר' },
+  },
+  // #1863 (ADR-AG-377) — an ellipse the givens make a circle, said in the narrowing note's voice (cause first, ADR-W-129)
+  conicCircle: '{{cause}}, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.',
+  conicCircleNamed: '{{cause}}, האליפסה {{name}} היא כעת מעגל — מעגל הוא סוג של אליפסה.',
   // A load says what it RESTORED and, separately, what it could not — a line that no longer builds
   // is named, never dropped in silence (ADR-242, and the reason a save holds lines and not points).
   loadRestored: 'טענתי את השרטוט — {{total}} נתונים.',
@@ -1172,6 +1181,12 @@ const en: typeof he = {
   manualLocus: 'Locus',
   locusChipShow: 'Show locus',
   locusChipHide: 'Hide locus',
+  conicChip: {
+    parabola: { directrix: 'Show directrix', focus: 'Show focus', both: 'Show focus and directrix', none: 'Hide' },
+    ellipse: { directrix: 'Show directrices', focus: 'Show foci', both: 'Show foci and directrices', none: 'Hide' },
+  },
+  conicCircle: '{{cause}}, the ellipse is now a circle — a circle is a kind of ellipse.',
+  conicCircleNamed: '{{cause}}, the ellipse {{name}} is now a circle — a circle is a kind of ellipse.',
   loadRestored: 'Figure loaded — {{total}} givens.',
   loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
   errLoadForeign: 'The file «{{detail}}» belongs to another builder in the suite — open it there.',

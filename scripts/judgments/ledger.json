@@ -1161,6 +1161,36 @@
       "reason": "His d10 A (2026-10-23) defines it on a box only; extending to prisms and cylinders is feature scope. No corpus exercise uses it on them (checked docs/sample questions, 2026-11-03).",
       "at": "2026-11-03T08:09:56.831Z",
       "status": "escalated"
+    },
+    {
+      "id": "t-1863-parabola-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the parabola chip's four labels (each names the next press)",
+      "choice": "הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר (Show directrix · Show focus · Show focus and directrix · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-ellipse-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the ellipse chip's four labels, plural (two foci, two directrices)",
+      "choice": "הצג מדריכים · הצג מוקדים · הצג מוקדים ומדריכים · הסתר (Show directrices · Show foci · Show foci and directrices · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-circle-notice",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the notice when an ellipse's givens make it a circle (the narrowing note's voice, cause first)",
+      "choice": "בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה. (Because of the given …, the ellipse is now a circle — a circle is a kind of ellipse.)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
     }
   ],
   "demoted": {

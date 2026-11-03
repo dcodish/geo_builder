@@ -14287,6 +14287,8 @@ The catalog guards are updated in `parser.test.ts`, `issue-1251-llm-fallback.tes
 
 ## ADR-AG-353 — An ellipse's foci, vertices and sizes are role points and role measures; a one-letter equation pins its letter; an ellipse's semi-axis letters are positive (#2616, #2617)
 
+> **Amended** 2026-11-03 by [ADR-AG-376](#adr-ag-376): an unlettered focus is drawn when the student presses the curve's chip (the marks this ADR left to #1218/#1863).
+
 **Date:** 2026-10-30 · **Status:** accepted · feature (analytic), fix round #2627 stream E · branch `feat/2616-ellipse-roles`, for the operator's play-and-approve. **Supersedes** [ADR-AG-169](#adr-ag-169) Am. 1's "deliberately not built" paragraph for the ellipse focus and for «R=5» / «r=5» (stamped there). LADDER stage: none — the parser, analytic's fold and M1, a region selector judged inside validity and seeded, and the existing discrete-axis walk; no new solver stage.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R201 (roles), R202 (sizes, the one-letter pin, positive semi-axes); R180 amended; F6, F7. · **Design:** [04c](04c-design-analytic.md) § "An ellipse's roles and sizes; the canonical curve with no equation".
@@ -14636,3 +14638,85 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **Behaviour change for a student:** in analytic, «דרך N מעבירים ישר l1 שמקביל ל-PO» offers the card «דרך N עובר ישר l1 מקביל ל-PO»; «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» builds.
 
+
+## ADR-AG-375 — One annotation channel for what a student asks to see on the figure (#1863, #1218; for #1211, #1121, #1752)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`, one PR with [ADR-AG-376](#adr-ag-376) and [ADR-AG-377](#adr-ag-377). LADDER stage: none (display state; no fold, solve or sampling change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221 (new), R20 (its ⚠ line rewritten). · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
+
+**Operator rulings.**
+- 2026-09-21 (#1218): *"the numbers draw where the figure is, not off to the side, each with a tick to hide it"* — one design pass over the canvas annotation model.
+- 2026-10-09 (#1218, the five answers, ADR-W-122): *"One annotation channel, reached from both the click menu and the control, living beside `queries` — replayable, undoable, saved with the session, and **never** in «נתונים» (it is not a given)."* Answer 4: *"A chosen measurement on a line → BESIDE the name, not instead of it."*
+- 2026-11-03 (#1863, card d1, option A): *"Together: one PR with the design write-up and the first button"*. #1211, #1121 and #1752 follow as their own PRs on the same channel.
+
+**Context.** Measured at `3225756c` (`derive` → `buildScene`, seed 0): nothing in `src-analytic/render/` draws a focus or a directrix; `y^2=54x`, `x^2/25+y^2/9=1` and its y-major twin build a scene with no role mark; the ellipse's directrices are computed nowhere. The ask lane (`queries`) is the wrong carrier for a chosen display: it is a figure-wide sentence (refused with two ellipses), it answers `null` for a parameterised conic where #1863 still wants the mark, and it adds panel rows.
+
+**Class.** A student's choice to SHOW a derived feature on the figure had no home: each surface would have grown its own list (the #1107 mistake), and the canvas had no channel for anything but stated values and asked answers.
+
+**Decision.**
+1. **The record.** `app/annotations.ts`: `AnnotationMap = Record<objectId, Annotation>`. One record per object; each surface is a FACET of it — `conic` (this PR), later `coords` (#1211), `line` (#1121). A press writes the map whole through `setAnnotations`; the store decides nothing.
+2. **Where it lives.** Beside `curveStyle` in `store/useAnalyticStore.ts`, and everywhere that map goes: the undo slice (one press is one «בטל»), `clearAll`, the save envelope (an optional `annotations` field; an old file loads with nothing shown), the restore offer, the share link and a letter change (re-keyed by curve id, `relabelCurveStyle`). A key whose object is gone is kept and ignored.
+3. **Never a given.** The fold never reads it: «נתונים», the given count, the DOF and every knowledge gate are unchanged.
+4. **The renderer stays a consumer.** Each facet is projected to world-space marks by an `app/` module and handed to `buildScene` through `SceneKnowledge`, like `marks` and `loci`; labels go through the one `placeSceneLabels` call and `lbl`.
+5. **How the siblings plug in.** #1211: a `coords` facet on a point, written by the point's click menu, drawn as the point's coordinates beside its letter. #1121: a `line` facet (equation, slope) on a line, written by the line's click menu, drawn BESIDE the line's name (answer 4), the crowding solved in the placement. #1752: a click on the focus mark (this PR's) names it, recording the sentence a student could type through `decideSubmit`, as the circle-centre offer does. Each adds a facet, its reader in `cleanAnnotations` and a projection; no store or envelope field.
+
+**Sibling audit (docs/17 §1).** `shell/` third-copy check (2026-10-06 ruling): 2-D and 3-D draw no chosen on-canvas annotation of this kind (2-D's relations layer is a figure-wide toggle; 3-D's panel coordinates are ADR-3D-014's), so the model stays in `src-analytic/`. The chip seat is `FactList`'s shared `trail`.
+
+**Locks.** `src-analytic/__tests__/issue-1863-conic-marks.test.ts` (undo/redo, «נקה הכל», save → load, an old file, a hand-edited map, a letter change, another configuration, the derivation unchanged).
+
+**Behaviour change for a student:** none by itself; its first surface is ADR-AG-376.
+
+## ADR-AG-376 — The conic chip: nothing → directrix → focus → both, values only when the givens determine them (#1863, #1218)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. **Amends** [ADR-AG-353](#adr-ag-353) (the unlettered focus it left undrawn is now drawn on request). LADDER stage: none.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R221, R222 (new), R20. · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip".
+
+**Operator rulings, verbatim.**
+- 2026-09-19 (#1218): *"yes. there is an off state. label shows what is next. elippse has fewer states."* Its "fewer states" (two, foci only) was **replaced** on 2026-10-09: *"The ellipse → the SAME four-state cycle as the parabola. (He chose this over the two-state foci-only option the session recommended.)"*, confirmed 2026-10-14 (card `d14-1218-focus`): *"the 9 October four-state control wins"*. So both conics cycle «כלום → רק מדריך → רק מוקד → מוקד ומדריך», and an ellipse draws both foci and both directrices. No conflict remains.
+- 2026-10-09, answer 2: *"the NEXT ACTION, always"* («הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר»). Answer 5: *"`F` for a parabola's focus, `F₁` / `F₂` for an ellipse's, with the directrix labelled by its equation."*
+- #1863's title (2026-10-07): mark them *"with their values when the givens determine them"* — not changed by 10-14.
+- #1752 (2026-10-04): *"we put the dot"*.
+- sr-07 (2026-11-02, ADR-W-175): *"A letter the student put on the object wins. If the book's letter (for example a focus's F) is taken, the mark shows with no letter, never with an invented one."*
+- sr-29 (2026-11-02): *"dashed for every extension, directrix or helper"*.
+- sr-01 (2026-11-02, ADR-W-174): the chip's words are the session's.
+
+**Decision.**
+1. **The chip** (`app/conicMarks.ts` `conicChips`): one per stated parabola or ellipse that is not a circle (ADR-AG-377), on its `objectLine` row, in the `trail` seat after the locus chip. Its label is the next state's key `conicChip.<kind>.<next>`; with two conics on one row it carries the curve's name.
+2. **The marks** (`conicMarksOf`): foci from `parabolaFocus` / `ellipseFoci` (F₁ right or upper, ADR-AG-353's order), directrices from `parabolaDirectrix` and the new `ellipseDirectrices` (`engine/curves.ts`: `x = ±a²/c`, `y = ±b²/c`, null when a = b). A focus is a blue dot; a directrix a 1.25px dashed line across the view.
+3. **Values** only when `knownCurve` holds: «F(27/2, 0)» (`fmtAnalytic`, the panel's `(x, y)`) and «x = -27/2» (`roleLineOf` → `roleLineText`, the panel's printer). Otherwise the letter alone and an unlabelled directrix.
+4. **Letters** (sr-07): a student's point at the focus keeps the place and the mark writes nothing; the book's letter held elsewhere (`F1` ≡ `F₁`) is dropped and the coordinates stay.
+5. **The marks are in the frame** (R25a, R127): `markAnchors` (a focus; a directrix's crossing with its axis) joins `drawnBox`'s extra geometry, as a traced locus does. Found at pre-play: «y^2=54x»'s F(27/2, 0) and x = -27/2 fell outside the fitted −10..10 view. A vertical directrix's label sits near its bottom end, clear of the zoom controls over the canvas's top corner.
+6. **A hidden curve (#2238) draws no marks**, as its centre cross goes with a hidden circle; the chip keeps its state. **Session choice, not ruled**: the judge escalated it (no precedent), so it is a question to the operator on the PR.
+
+**Sibling audit.** 2-D and 3-D have no conics (exception family X2; parity rows `conic-parabola-chip-1863` and `conic-ellipse-chip-1863` record that analytic builds them and 2-D refuses). Nothing ports.
+
+**Measured after.** `y^2=54x`: F(27/2, 0), `x = -27/2`; `y^2=2px` at seeds 0–3: «F», no equation; `x^2/25+y^2/9=1`: F₁(4, 0), F₂(-4, 0), `x = ±25/4`; the y-major twin on y. Labels placed in the one placement.
+
+**Locks.** `issue-1863-conic-marks.test.ts`; fixtures `issue-1863-parabola`, `issue-1863-ellipse`, `issue-1863-student-f` (each carries its chip state). Play sheet `scripts/playsheets/pr-1863.json`.
+
+**Behaviour change for a student:** a parabola's and an ellipse's row carry a chip «הצג מדריך» / «הצג מדריכים»; pressing it cycles the directrix, the focus and both onto the figure, and back to nothing.
+
+## ADR-AG-377 — An ellipse the givens make a circle is said to be one; its centre is a circle's (#1863, #2676)
+
+**Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. The conic → circle family of #2676's generic rule. LADDER stage: none (a knowledge read and a display).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R223 (new). · **Design:** [04c](04c-design-analytic.md) § "The annotation channel, and its first surface: the conic chip" (the circle case).
+
+**Operator ruling, 2026-11-03 (card d2, option A):** *"we should have a comment saying that the shape is now a circle. we have such messages when a quad becomes a specific quad or a triangle becomes a right triangle. so this ruling is a generic ruling. as for the focus, we dont show it as focus its the circle center."*
+
+**Measured.** «נתונה אליפסה שמשוואתה x^2/9+y^2/9=1» keeps the ellipse kind (the noun wins, ADR-AG-170 Am. 2), draws the round curve with no centre mark, and the ask answers foci `(0, 0), (0, 0)`. The same equation typed bare is a circle with its centre O (ADR-AG-184). The channel 2-D's special-case notes use is the narrowing note (ADR-W-129; analytic ADR-AG-276): ⓘ, `Banner kind="notice"`, the cause first — «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.», and the merge form «… הוא כעת ריבוע …».
+
+**Decision.**
+1. **The test** (`isCircleShaped`): `(a − b)/max(1, a, b)` is knowledge with value 0 (`isKnowledge`, the one gate), so a parameterised ellipse round at one sample is not one, and «x^2/a^2+y^2/9=1» · «a=3» is.
+2. **No chip and no marks** for it: no focus, no directrix states.
+3. **Its centre is a circle's**: `SceneKnowledge.circleShaped` gives it the circle's centre cross at the origin, labelled «(0, 0)» under the circle's own knowledge rule (deferring to a point there).
+4. **The notice**, in the narrowing note's channel and voice, cause first: «בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.» (`conicCircle`; the cause keys are `narrowed.cause.*`). The cause is every other line whose removal stops it being round, else the ellipse's own line. Computed after paint, like the narrowing note.
+5. **Not decided: the letter O.** A typed canonical circle's centre is the real point O (R123); ADR-AG-184 scopes that to circles and says an ellipse noun over a circle's equation mints nothing. That is unchanged here. Whether an ellipse-noun circle gets O is a question to the operator (the judge escalated it).
+
+**Sibling audit.** 2-D and 3-D have no conics. The generic rule's other families (2-D's quadrilateral and triangle notes, in 3-D and analytic) are #2676.
+
+**Locks.** `issue-1863-conic-marks.test.ts` (no chip, the centre, the notice He/En with its cause, the later-given cause, the closed form); fixture `issue-1863-circle-ellipse`.
+
+**Behaviour change for a student:** an ellipse whose axes are equal shows no focus chip, gets a centre cross with «(0, 0)», and a notice that it is now a circle.

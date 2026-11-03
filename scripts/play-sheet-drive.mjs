@@ -157,6 +157,21 @@ async function driveCase(browser, spec, outDir, prefix) {
           await typeLine(st.type);
           continue;
         }
+        // #1863 — press a button by its visible label (a chip, «בטל»): the label is the check, so a chip that
+        // does not read what the case says it reads fails as a missing button.
+        if (st.click !== undefined) {
+          const btn = page.getByRole('button', { name: st.click, exact: true }).first();
+          if ((await btn.count()) === 0) {
+            steps.push({ line: `(press «${st.click}»)`, refusals: [`no button labelled «${st.click}»`] });
+            break;
+          }
+          await btn.click();
+          await waitForSettle(page);
+          const fresh = await freshRefusals();
+          steps.push({ line: `(press «${st.click}»)`, refusals: fresh });
+          await shoot(`press-${steps.length}`);
+          continue;
+        }
         const box = page.locator('li > input[type="checkbox"]').nth(st.toggle - 1);
         if ((await box.count()) === 0) {
           steps.push({ line: `(toggle row ${st.toggle})`, refusals: [`no checkbox on fact-list row ${st.toggle}`] });
@@ -167,6 +182,14 @@ async function driveCase(browser, spec, outDir, prefix) {
         const fresh = await freshRefusals();
         steps.push({ line: `(toggle row ${st.toggle})`, refusals: fresh });
         await shoot(`toggle-row-${st.toggle}`);
+      }
+
+      // #1863: the figure the `after` steps leave is the one the case's checks are about (a chip press draws on it),
+      // and the configuration «הציגו תצורה אחרת» is compared against.
+      if ((spec.after ?? []).length) {
+        const now = await readFigure(page);
+        figureText = now.text;
+        configHashes[0] = now.hash;
       }
 
       for (const ask of spec.asks ?? []) {

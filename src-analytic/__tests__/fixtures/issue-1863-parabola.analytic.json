@@ -1,0 +1,14 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "נתונה פרבולה שמשוואתה y^2=54x"
+  ],
+  "seed": 0,
+  "name": "#1863 — פרבולה: מוקד ומדריך מוצגים (F(27/2, 0), x = -27/2)",
+  "annotations": {
+    "curve-anonpi2st3": {
+      "conic": "both"
+    }
+  }
+}
