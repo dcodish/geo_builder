@@ -20,10 +20,12 @@
  * gate, an invented-number gate (ADR-AG-279 "Not built").
  */
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
-import { nameAccounting, scanNumbers, spendAccounts, unionByMax, LATIN_FILLER, type NumberOccurrence } from '../../shell/llm/honestyCore';
+import { nameAccounting, scanNumbers, spendAccounts, unionByMax, LATIN_FILLER, type Account, type NumberOccurrence } from '../../shell/llm/honestyCore';
 import { LETTER_LINE_NAME_ATOM, POINT_NAME_ATOM, parseLine } from './parseAnalytic';
 import { HE_NUM_UNITS } from './frameAnalytic';
 import { NUMERAL_ALT, asRoman, numeralKey } from '../engine/names';
+import { evalExpr, symbolsOf, type Expr } from '../engine/expr';
+import { RESERVED_SYMBOLS } from '../engine/carriers';
 import type { Construction } from '../engine/types';
 
 /**
@@ -184,32 +186,69 @@ const NUMBER_BLANKS: readonly RegExp[] = [
   /\d+(?=\s+[א-ת]+(?:ים|ות)(?![א-ת]))/g,
   /\d+(?=\s+[a-z]+s\b)/g,
 ];
-const numbersOf = (text: string): NumberOccurrence[] =>
-  scanNumbers(takeNumeralNames(normalise(text)), NUMBER_BLANKS);
+/** One stated or written number, and whether it stands in an EQUATION (#2646: a square or a root pays only across one). */
+interface StatedNumber extends NumberOccurrence {
+  eq: boolean;
+}
+
+/**
+ * Does the occurrence at `at` stand in an equation? Its stretch of math is the run around it that no Hebrew word, no
+ * Latin word of three letters or more (other than `sqrt`), and no `,` `;` `:` breaks; it is an equation when that run
+ * holds `=` and an axis letter x or y («x^2+y^2=9», «y = 2x + 3»). «AB = 3», «A(√2, 1)» and «ברדיוס 3» are not.
+ */
+function inEquation(text: string, at: number): boolean {
+  const masked = text.replace(/[א-ת]+|[,;:]|[A-Za-z]{3,}/g, (m) => (m.toLowerCase() === 'sqrt' ? ' '.repeat(m.length) : '|'.repeat(m.length)));
+  const from = masked.lastIndexOf('|', at) + 1;
+  const stop = masked.indexOf('|', at);
+  const run = masked.slice(from, stop < 0 ? masked.length : stop);
+  return run.includes('=') && /[xy]/.test(run);
+}
+
+const numbersOf = (text: string): StatedNumber[] => {
+  const t = takeNumeralNames(normalise(text));
+  return scanNumbers(t, NUMBER_BLANKS).map((o) => ({ ...o, eq: inEquation(t, o.at) }));
+};
+
+const EXPR_KINDS = new Set(['num', 'sym', 'neg', 'add', 'sub', 'mul', 'div', 'pow', 'sqrt']);
+const isExpr = (o: Record<string, unknown>): boolean =>
+  typeof o.kind === 'string' && EXPR_KINDS.has(o.kind) && (o.kind === 'num' ? typeof o.value === 'number' : o.kind === 'sym' ? typeof o.name === 'string' : !!o.a && typeof o.a === 'object');
+const hasRoot = (e: Expr): boolean =>
+  e.kind === 'sqrt' || ('a' in e && hasRoot(e.a)) || ('b' in e && hasRoot(e.b));
 
 /** A line that states a right angle: the account for a stated 90 («∠ABC = 90» → «AB מאונכת ל-BC»). */
 const PERPENDICULAR = /⊥|מאונ[ךכ]|ניצב|ישרה|perpendicular|right/i;
 
-/** Every number and name a line's PARSED FACTS carry: the generous half of the accounting (2-D's payload walk). */
-function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean } {
+/**
+ * Every number and name a line's PARSED FACTS carry: the generous half of the accounting (2-D's payload walk). A
+ * constant expression with a root in it is ONE number, its value (#2646): the facts of «AB = 5√2» carry 7.07…, never
+ * a 5 and a 2, exactly as the line's text reads. `plane`: some expression mentions x or y (the line is an equation).
+ */
+function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean; plane: boolean } {
   const r = parseLine(line);
-  if (!r.ok) return { names: [], numbers: [], perp: false };
+  if (!r.ok) return { names: [], numbers: [], perp: false, plane: false };
   const names: string[] = [];
   const numbers: number[] = [];
+  let plane = false;
   const walk = (v: unknown, key: string): void => {
     if (key === 'src') return;
     if (typeof v === 'number') numbers.push(v);
     else if (typeof v === 'string') for (const n of namesOf(v.replace(/[-_]/g, ' '))) names.push(n.key);
     else if (Array.isArray(v)) v.forEach((x) => walk(x, key));
     else if (v && typeof v === 'object') {
-      // An exponent is FORM, not magnitude (blanked from the text too): x^2 must not pay for a stated 2.
       const o = v as Record<string, unknown>;
+      if (isExpr(o)) {
+        const e = o as unknown as Expr;
+        const syms = symbolsOf(e);
+        if (syms.some((s) => RESERVED_SYMBOLS.has(s))) plane = true;
+        if (syms.length === 0 && hasRoot(e)) return void numbers.push(Math.abs(evalExpr(e)));
+      }
+      // An exponent is FORM, not magnitude (blanked from the text too): x^2 must not pay for a stated 2.
       if (o.kind === 'pow') return walk(o.a, 'a');
       for (const [k, x] of Object.entries(o)) walk(x, k);
     }
   };
   walk(r.facts, '');
-  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)) };
+  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)), plane };
 }
 
 /**
@@ -278,12 +317,28 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
   const newly = new Set(names.invented);
   const inventedExisting = widened.invented.filter((k) => !newly.has(k));
 
-  const accounts: number[] = [];
+  // #2646 (ADR-AG-384): every account is tagged with whether its line is an EQUATION (its text or its parsed facts
+  // mention x or y). A stated number is paid by its own value from any line; by its square or its root only ACROSS an
+  // equation (a radius stated as r, written as r² in a circle's equation, or the converse). «AB = 3» answered
+  // «AB = 9» is not paid.
+  const EQ = 'eq';
+  const PLAIN = 'plain';
+  const accounts: Account[] = [];
   modelLines.forEach((line, i) => {
-    accounts.push(...unionByMax(numbersOf(line).map((o) => o.value), facts[i].numbers));
-    if (facts[i].perp || PERPENDICULAR.test(line)) accounts.push(90);
+    const occ = numbersOf(line);
+    const tag = facts[i].plane || occ.some((o) => o.eq) ? EQ : PLAIN;
+    for (const value of unionByMax(occ.map((o) => o.value), facts[i].numbers)) accounts.push({ value, tag });
+    if (facts[i].perp || PERPENDICULAR.test(line)) accounts.push({ value: 90, tag });
   });
-  const droppedNumbers = spendAccounts(numbersOf(utterance), accounts, (o) => [o.value, o.value * o.value, Math.sqrt(o.value)]);
+  const droppedNumbers = spendAccounts(numbersOf(utterance), accounts, (o) => {
+    const across = o.eq ? PLAIN : EQ;
+    return [
+      { value: o.value, tag: EQ },
+      { value: o.value, tag: PLAIN },
+      { value: o.value * o.value, tag: across },
+      { value: Math.sqrt(o.value), tag: across },
+    ];
+  });
 
   return {
     dropped: [...names.dropped.map((k) => shownOf.get(k) ?? k), ...droppedNumbers.map((o) => o.raw)],

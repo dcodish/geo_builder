@@ -20041,3 +20041,14 @@ The controls that bound correctly (C1, C2, C8, Y9, Y10) did so only because the 
 **Locks.** Unit `src/parser/__tests__/plural-line-operands-2533.test.ts` (every row above in both frames, the controls, a plural on the second operand only, the atom's word bounds, and the reported figure convex with M on the extensions). Fixture `src/__tests__/fixtures/issue-2533-plural-lines-quad.geo.json` (its parser-drift check fails at 2142a8d1).
 
 **Behaviour change for a student:** "lines AB and CD", "rays AB and CD" and «הקרניים AB ו-CD», in a crossing sentence, mean the lines, so the crossing point may lie beyond the segments and the figure is no longer reshaped to make the segments cross — the reading «הישרים AB ו-CD» and "line AB and line CD" already had.
+## ADR-777 — 2-D's number gate reads a root with the shell's one radical atom (#2646)
+
+**Status:** accepted · 2026-11-03 · bug (P2, analytic, wrong-answer; 2-D re-import) · fix round #2678 stream H · branch `fix/2646-radical-honesty`
+
+**Requirements:** none (internal) · **Design:** none (internal) — [04w](04w-design-shell.md) § "The honesty accounting core" names the atom · **LADDER stage:** none (the commit-boundary honesty gate)
+
+**Decision.** `droppedGivenNumbers`' `RAD` / `TERM` / `evalTerm` (ADR-700) moved to `shell/llm/honestyCore.ts` as `RADICAL`, `radicalTerm` and `evalRadicalTerm`, so analytic's model-lane gate ([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)) and 2-D read one spelling of a root (docs/17 tripwire 8: no third copy). 2-D passes the √-glyph spelling. One change in the move: a term's optional outer parenthesis must now be PAIRED. Before, the term could take a coordinate's «(» («E=(√2,1)» read the term «(√2») or join two groups («(4-0)/(3-0)» read «0)/(3» as a fraction), and each evaluated to NaN, a drop nothing could pay. Now «√2» is read alone and the groups' digits are read one by one. No 2-D lock changed; `test:fast` green.
+
+**Locks.** ADR-700's (`dropped-given-fraction-parts.test.ts`), unchanged and green; `shell/__tests__/honesty-core-radical.test.ts` locks the atom.
+
+**Behaviour change for a student:** none intended. A 2-D answer stating a root inside a coordinate's parentheses is no longer reported as a dropped NaN given (2-D's grammar reads no such coordinate today).

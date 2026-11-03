@@ -308,7 +308,12 @@ counts are blanked before numbers are read. A trip is `{ kind: 'unfaithful', dro
 `result: 'unfaithful'` and every refusal's whole answer. A name the model writes that the figure holds but the
 sentence never wrote is `inventedExisting` ([ADR-AG-281](06c-decisions-analytic.md#adr-ag-281)), refused as
 `llm-invented-existing`, which names it (the figure shows it). The algebra is `shell/llm/honestyCore.ts`
-([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)).
+([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)). A root is ONE number, its value, on both sides: «√2» is 1.414…, «5√2» 7.07…, in the text
+(the shell's radical term) and in the parsed facts (a constant expression with a root is evaluated). A square or a
+root pays only ACROSS an equation: each account is tagged by whether its line is an equation (`=` with x or y, or facts
+that mention them), each stated number by its own stretch of the sentence, and v² or √v is offered only against the
+other tag, so a radius r pays an equation's r² and «AB = 3» is not paid by «AB = 9»
+([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)).
 
 *Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
