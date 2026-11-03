@@ -359,7 +359,7 @@ export interface CurveParts {
  * THE LABELS A DETAIL LINE CAN CARRY (#1597, ADR-AG-232) — locale KEYS, because this module holds no
  * locale (ADR-AG-085). The caller resolves them with `t()`.
  */
-export type DetailLabelKey = 'curveCentreLabel' | 'curveFocusLabel' | 'curveDirectrixLabel' | 'curveFociLabel';
+export type DetailLabelKey = 'curveCentreLabel' | 'curveFocusLabel' | 'curveDirectrixLabel' | 'curveFociLabel' | 'curveRoundCentreLabel';
 
 /**
  * ONE LINE OF A CURVE'S FOLDED DETAILS (#1597).
@@ -553,6 +553,20 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
     }
     case 'ellipse': {
       const [f1, f2] = ellipseFoci(c);
+      /**
+       * #1863 (ADR-AG-377) — AN ELLIPSE WITH a = b IS A CIRCLE: its row lists the centre, not two coincident foci.
+       * Operator, 2026-11-03 (PR #2679): *"Yes: the panel shows «מרכז: (0, 0)» instead of the foci"*. This printer
+       * is handed a KNOWN curve (`knownCurve`), so equal numbers here are equal in every configuration.
+       */
+      if (Math.abs(c.a - c.b) <= 1e-9 * Math.max(1, c.a, c.b)) {
+        return {
+          equation: ellipseEquationText(c.a * c.a, c.b * c.b),
+          details: [
+            { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
+            { label: 'curveRoundCentreLabel', text: at(nameAt, 0, 0, '0, 0') },
+          ],
+        };
+      }
       return {
         equation: ellipseEquationText(c.a * c.a, c.b * c.b),
         details: [

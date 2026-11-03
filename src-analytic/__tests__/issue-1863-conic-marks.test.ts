@@ -20,6 +20,9 @@ import { cleanAnnotations, CONIC_CYCLE, nextConic, withConic, type AnnotationMap
 import { circleNoteText, circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors } from '../app/conicMarks';
 import { drawnBox } from '../app/drawnBox';
 import { curveParts } from '../app/curveText';
+import { decideCentreName } from '../app/centreName';
+import { ask } from '../app/ask';
+import { offersOf } from '../engine/crossings';
 import { loadAnalyticSession } from '../app/loadSession';
 import { relabelCurveStyle } from '../app/rename';
 import { buildScene } from '../render/scene';
@@ -194,6 +197,47 @@ describe('#1863 — the ellipse with a = b is a circle (ADR-AG-377, card d2)', (
     const open = derive(lines.slice(0, 1), 0);
     expect(circleNotesOf(lines.slice(0, 1), open, (ls) => derive(ls, 0))).toEqual([]);
     expect(conicChips(open, {})).toHaveLength(1);
+  });
+
+  // Operator, 2026-11-03 (PR #2679): "no letter but a clickable center" — the circle centre's click path, reused
+  it('its centre is offered as a circle\'s is: a letter popover that records «<letter> מרכז האליפסה»', () => {
+    const d = derive(ROUND, 0);
+    const id = curveId(d);
+    expect(d.figure.points).toEqual([]); // no automatic O
+    const offer = offersOf(d.figure, d.construction).find((o) => o.centreOf === id);
+    expect(offer).toMatchObject({ id: `centre-${id}`, x: 0, y: 0 });
+    expect(offer!.sentence).toMatch(/^[A-Z] מרכז האליפסה$/);
+    const state = { lines: [...ROUND], disabled: [], queries: [], spokenFor: {}, seed: 0 };
+    const v = decideCentreName(offer!.id, 'K', state, d);
+    expect(v.kind).toBe('record');
+    if (v.kind !== 'record') return;
+    expect(v.verdict.line).toBe('K מרכז האליפסה');
+    const after = derive([...ROUND, v.verdict.line], 0);
+    expect(after.faults).toEqual([]);
+    expect(after.figure.points.map((p) => [p.id, Math.abs(p.x) < 1e-9, Math.abs(p.y) < 1e-9])).toEqual([['K', true, true]]);
+    // named, the offer is gone (the circle centre's rule)
+    expect(offersOf(after.figure, after.construction).some((o) => o.centreOf === id)).toBe(false);
+  });
+
+  it('a non-round ellipse offers no centre; the typed sentence names any ellipse\'s centre, He and En, and the ask reads it', () => {
+    const d = derive(ELLIPSE, 0);
+    expect(offersOf(d.figure, d.construction).some((o) => o.centreOf)).toBe(false);
+    for (const s of ['O מרכז האליפסה', 'O is the centre of the ellipse']) {
+      const after = derive([...ELLIPSE, s], 0);
+      expect(after.faults, s).toEqual([]);
+      expect(after.figure.points.map((p) => p.id), s).toEqual(['O']);
+    }
+    expect(ask(d, 'מרכז האליפסה', (v) => String(v)).value).toBe('(0, 0)');
+  });
+
+  // Operator, 2026-11-03 (PR #2679): "Yes: the panel shows «מרכז: (0, 0)» instead of the foci"
+  it('the panel lists the centre, not two coincident foci', () => {
+    const d = derive(ROUND, 0);
+    const parts = curveParts(knownCurve(d.construction, curveId(d))!);
+    expect(parts.details).toEqual([{ text: 'a = 3, b = 3' }, { label: 'curveRoundCentreLabel', text: '(0, 0)' }]);
+    expect(tHe('curveRoundCentreLabel')).toBe('מרכז');
+    // a non-round ellipse keeps its foci
+    expect(curveParts(knownCurve(derive(ELLIPSE, 0).construction, curveId(derive(ELLIPSE, 0)))!).details![1].label).toBe('curveFociLabel');
   });
 
   it('the closed form: no directrix when a = b', () => {

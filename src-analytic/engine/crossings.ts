@@ -15,10 +15,11 @@
  * use — an anonymous conic — has no sentence, so it gets no dot rather than a dot that cannot be
  * acted on. A real limit, and the honest place for it is here rather than in the click handler.
  */
-import type { Figure } from './evaluate';
+import { isKnowledge, type Figure } from './evaluate';
 import type { Construction, CurveKind, Id, NumCurve } from './types';
 import type { Constraint } from './solve';
 import { objectById } from './types';
+import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { numeralKey, refKindOf, statedName } from './names';
 import { isPolygonSide, withinSegment } from './extent';
 import { conicMeet, conicTouchOf, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
@@ -550,8 +551,36 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
  * one the grammar reads back (ADR-AG-048). Null when that circle offers no centre (already named, or no
  * sentence can name it).
  */
-export function centreSentenceOf(figure: Figure, offerId: string, letter: string): string | null {
-  return centresOf(figure, letter).find((o) => o.id === offerId)?.sentence ?? null;
+/**
+ * IS THIS ELLIPSE A CIRCLE? (ADR-AG-377) — a = b in EVERY configuration, read through the one knowledge gate
+ * (`isKnowledge`), so a parameterised ellipse that only happens to be round at one sample is not one, and a size the
+ * givens leave free with its axes equal («x²/a² + y²/a² = 1») is. Pending (the deferred pool) reads as not yet.
+ */
+export function isRoundEllipse(c: Construction, id: string): boolean {
+  const k = isKnowledge(c, (f) => {
+    const q = f.curves.find((x) => x.id === id)?.curve;
+    return q && q.kind === 'ellipse' ? (q.a - q.b) / Math.max(1, q.a, q.b) : null;
+  });
+  return k.known && Math.abs(k.value) < 1e-9;
+}
+
+/**
+ * #1863 (ADR-AG-377) — THE CENTRE OF AN ELLIPSE THE GIVENS MAKE A CIRCLE, offered as a circle's is. Operator,
+ * 2026-11-03 (PR #2679): *"no letter but a clickable center"*. Its sentence is «P מרכז האליפסה» (the ellipse's
+ * centre role, read back by the grammar), offered only when the figure has ONE ellipse (the sentence binds to it) and
+ * no point already stands at the origin.
+ */
+export function roundEllipseCentresOf(figure: Figure, c: Construction, letter: string): Namable[] {
+  const ellipses = figure.curves.filter((cu) => cu.curve.kind === 'ellipse');
+  if (ellipses.length !== 1) return [];
+  const e = ellipses[0];
+  if (!e.stated || !isRoundEllipse(c, e.id) || pointAt(figure, 0, 0) !== null) return [];
+  return [{ id: `centre-${e.id}`, x: 0, y: 0, sentence: `${letter} ${CONIC_ROLE_WORDS.ellipseCentre}`, centreOf: e.id }];
+}
+
+export function centreSentenceOf(figure: Figure, offerId: string, letter: string, c?: Construction): string | null {
+  const offers = [...centresOf(figure, letter), ...(c ? roundEllipseCentresOf(figure, c, letter) : [])];
+  return offers.find((o) => o.id === offerId)?.sentence ?? null;
 }
 
 /**
@@ -568,5 +597,6 @@ export function offersOf(figure: Figure, c: Construction): Namable[] {
   return [
     ...crossingsOf(figure, c).map((k) => ({ id: k.id, x: k.x, y: k.y, sentence: crossingSentence(k, letter) })),
     ...centresOf(figure, letter),
+    ...roundEllipseCentresOf(figure, c, letter),
   ];
 }

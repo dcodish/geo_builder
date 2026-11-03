@@ -123,7 +123,9 @@ export type EllipseRole =
   | { k: 'focus'; which: 0 | 1 }
   | { k: 'vertex'; side: EllipseSide }
   | { k: 'major-end'; which: 0 | 1 }
-  | { k: 'minor-end'; which: 0 | 1 };
+  | { k: 'minor-end'; which: 0 | 1 }
+  /** #1863 (ADR-AG-377) — the centre: the origin, the ellipse being canonical. «P מרכז האליפסה» names it. */
+  | { k: 'centre' };
 
 export function ellipseRolePoint(e: { a: number; b: number }, role: EllipseRole): Pt | null {
   const { a, b } = e;
@@ -141,6 +143,8 @@ export function ellipseRolePoint(e: { a: number; b: number }, role: EllipseRole)
       return xMajor ? { x: a * sign(role.which), y: 0 } : { x: 0, y: b * sign(role.which) };
     case 'minor-end':
       return xMajor ? { x: 0, y: b * sign(role.which) } : { x: a * sign(role.which), y: 0 };
+    case 'centre':
+      return { x: 0, y: 0 };
   }
 }
 

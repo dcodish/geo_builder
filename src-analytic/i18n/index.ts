@@ -92,6 +92,8 @@ const he = {
   curveFocusLabel: 'מוקד',
   curveDirectrixLabel: 'מדריך',
   curveFociLabel: 'מוקדים',
+  // #1863 (ADR-AG-377) — an ellipse with a = b lists its centre (operator, 2026-11-03: «מרכז: (0, 0)»)
+  curveRoundCentreLabel: 'מרכז',
   askRemove: 'הסירו את המדידה',
   // Three different answers, because they are three different situations.
   askOpen: 'עדיין לא נקבע מהנתונים',
@@ -731,6 +733,7 @@ const en: typeof he = {
   curveFocusLabel: 'focus',
   curveDirectrixLabel: 'directrix',
   curveFociLabel: 'foci',
+  curveRoundCentreLabel: 'centre',
   askRemove: 'Remove this measurement',
   askOpen: 'not fixed by the givens yet',
   askNoValue: 'cannot be computed from the givens',

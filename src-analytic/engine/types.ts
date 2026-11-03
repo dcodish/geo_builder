@@ -587,6 +587,8 @@ export type Fact =
    * sentence named the axis it ends («הקצה … של הציר הגדול»), which a side word on it then orients; no side is a choice.
    */
   | (FactBase & { t: 'vertex-of'; id: Id; side?: EllipseSide; axis?: 'major' | 'minor' })
+  /** «P מרכז האליפסה» · "P is the centre of the ellipse" (#1863, ADR-AG-377) — THE ellipse's centre, named. */
+  | (FactBase & { t: 'ellipse-centre-of'; id: Id })
   /**
    * «שהציר הגדול שלה על ציר ה-y» · «הציר הגדול של האליפסה על ציר ה-x» (#2619, ADR-AG-354) — the major axis's
    * direction, stated; M1 resolves THE ellipse and records the `major-axis` selector.

@@ -1703,7 +1703,7 @@ configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleS
 at the origin, labelled `(0, 0)` under the circle's own rule. `circleNotesOf(lines, d, rederive)` finds the cause as
 the narrowing note does — every other line whose removal stops it being round, else its own line — and `App.tsx`
 computes it in a passive effect after paint and renders it as an ⓘ `Banner kind="notice"` after the narrowing notes
-(`circleNoteText`, the narrowing note's `cause` keys and voice).
+(`circleNoteText`, the narrowing note's `cause` keys and voice). `isCircleShaped` is the engine's `isRoundEllipse` (`engine/crossings.ts`), so the offer list reads it too: `roundEllipseCentresOf` offers the centre on the circle centre's path (`offersOf` → the letter popover → `decideCentreName` → `centreSentenceOf(…, construction)`), recording «<letter> מרכז האליפסה» — the `centre` role of `readRoleRef`, lowered (`ellipse-centre-of`) by `nameEllipseRole` to `ellipse-point` `{ k: 'centre' }`. `curveParts` prints such an ellipse's row with «מרכז: (0, 0)» (`curveRoundCentreLabel`) instead of its foci.
 
 ### The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))
 

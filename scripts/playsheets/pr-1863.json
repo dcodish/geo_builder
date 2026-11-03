@@ -9,10 +9,27 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה פרבולה שמשוואתה y^2=54x"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "הצג מוקד" }, { "click": "הצג מוקד ומדריך" }],
-      "expectFigure": ["F(27/2, 0)", "x = -27/2"],
-      "expect": ["הסתר"],
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=54x"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "הצג מוקד"
+        },
+        {
+          "click": "הצג מוקד ומדריך"
+        }
+      ],
+      "expectFigure": [
+        "F(27/2, 0)",
+        "x = -27/2"
+      ],
+      "expect": [
+        "הסתר"
+      ],
       "lookFor": "The row carries a chip «הצג מדריך». Press 1: a thin dashed line x = -27/2 appears, chip «הצג מוקד». Press 2: the line goes and a blue dot F(27/2, 0) appears, chip «הצג מוקד ומדריך». Press 3: both are drawn, chip «הסתר».",
       "before": "Prod draws no focus and no directrix, and there is no chip."
     },
@@ -23,9 +40,26 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה פרבולה שמשוואתה y^2=54x"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "הצג מוקד" }, { "click": "הצג מוקד ומדריך" }, { "click": "הסתר" }],
-      "expect": ["הצג מדריך"],
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=54x"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "הצג מוקד"
+        },
+        {
+          "click": "הצג מוקד ומדריך"
+        },
+        {
+          "click": "הסתר"
+        }
+      ],
+      "expect": [
+        "הצג מדריך"
+      ],
       "lookFor": "After the fourth press «הסתר» the figure is the bare parabola again and the chip reads «הצג מדריך».",
       "before": "No chip on prod."
     },
@@ -36,10 +70,29 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"],
-      "after": [{ "click": "הצג מדריכים" }, { "click": "הצג מוקדים" }, { "click": "הצג מוקדים ומדריכים" }],
-      "expectFigure": ["F₁(4, 0)", "F₂(-4, 0)", "x = 25/4", "x = -25/4"],
-      "expect": ["הסתר"],
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/25+y^2/9=1"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריכים"
+        },
+        {
+          "click": "הצג מוקדים"
+        },
+        {
+          "click": "הצג מוקדים ומדריכים"
+        }
+      ],
+      "expectFigure": [
+        "F₁(4, 0)",
+        "F₂(-4, 0)",
+        "x = 25/4",
+        "x = -25/4"
+      ],
+      "expect": [
+        "הסתר"
+      ],
       "lookFor": "Press 1: two dashed lines x = 25/4 and x = -25/4. Press 2: two blue dots F₁(4, 0) and F₂(-4, 0), lines gone. Press 3: all four, chip «הסתר».",
       "before": "Prod draws no foci and no directrices; the ellipse's directrices are computed nowhere."
     },
@@ -50,25 +103,50 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה פרבולה שמשוואתה y^2=2px"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "הצג מוקד" }, { "click": "הצג מוקד ומדריך" }],
-      "expectFigure": ["F"],
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=2px"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "הצג מוקד"
+        },
+        {
+          "click": "הצג מוקד ומדריך"
+        }
+      ],
+      "expectFigure": [
+        "F"
+      ],
       "lookFor": "The focus dot is labelled F alone (no coordinates) and the dashed directrix has no equation, because p is not given.",
       "before": "Nothing drawn on prod."
     },
     {
       "id": "T5",
-      "title": "An ellipse with equal axes is a circle: no chip, its centre marked, and a notice",
+      "title": "An ellipse with equal axes is a circle: no chip, its centre marked, the panel lists the centre, and a notice",
       "class": "play",
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה אליפסה שמשוואתה x^2/9+y^2/9=1"],
-      "expect": ["האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה"],
-      "expectAbsent": ["הצג מדריכים", "הצג מוקדים"],
-      "expectFigure": ["(0, 0)"],
-      "lookFor": "No chip on the row. The circle's centre cross at the origin, labelled (0, 0). Notice: «בגלל הנתון נתונה אליפסה שמשוואתה x^2/9+y^2/9=1, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.»",
-      "before": "Prod draws the round curve with no centre mark and no notice."
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/9+y^2/9=1"
+      ],
+      "expect": [
+        "האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה",
+        "מרכז: (0, 0)"
+      ],
+      "expectAbsent": [
+        "הצג מדריכים",
+        "הצג מוקדים",
+        "מוקדים:"
+      ],
+      "expectFigure": [
+        "(0, 0)"
+      ],
+      "lookFor": "No chip on the row. The circle's centre cross at the origin, labelled (0, 0). The data panel's row reads «מרכז: (0, 0)», not «מוקדים». Notice: «בגלל הנתון נתונה אליפסה שמשוואתה x^2/9+y^2/9=1, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.»",
+      "before": "Prod draws the round curve with no centre mark and no notice, and the panel lists «מוקדים: (0, 0), (0, 0)»."
     },
     {
       "id": "T6",
@@ -77,9 +155,18 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה אליפסה שמשוואתה x^2/a^2+y^2/9=1", "a=3"],
-      "expect": ["בגלל הנתון", "a=3", "האליפסה היא כעת מעגל"],
-      "expectAbsent": ["הצג מדריכים"],
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/a^2+y^2/9=1",
+        "a=3"
+      ],
+      "expect": [
+        "בגלל הנתון",
+        "a=3",
+        "האליפסה היא כעת מעגל"
+      ],
+      "expectAbsent": [
+        "הצג מדריכים"
+      ],
       "lookFor": "After «a=3» the chip leaves the ellipse's row and the notice names «a=3» as the cause.",
       "before": "No notice on prod."
     },
@@ -90,9 +177,21 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["F(1,1)", "נתונה פרבולה שמשוואתה y^2=8x"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "הצג מוקד" }],
-      "expectFigure": ["(2, 0)"],
+      "lines": [
+        "F(1,1)",
+        "נתונה פרבולה שמשוואתה y^2=8x"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "הצג מוקד"
+        }
+      ],
+      "expectFigure": [
+        "(2, 0)"
+      ],
       "lookFor": "The student's F(1,1) stays F. The focus dot at (2, 0) is labelled (2, 0) with no letter.",
       "before": "No focus mark on prod."
     },
@@ -103,10 +202,23 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה פרבולה שמשוואתה y^2=54x"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "בטל" }],
-      "expect": ["הצג מדריך"],
-      "expectAbsent": ["הצג מוקד"],
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=54x"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "בטל"
+        }
+      ],
+      "expect": [
+        "הצג מדריך"
+      ],
+      "expectAbsent": [
+        "הצג מוקד"
+      ],
       "lookFor": "After «בטל» the directrix is gone, the chip reads «הצג מדריך» again, and the parabola's row is still there.",
       "before": "No chip on prod."
     },
@@ -117,10 +229,24 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתונה פרבולה שמשוואתה y^2=2px"],
-      "after": [{ "click": "הצג מדריך" }, { "click": "הצג מוקד" }, { "click": "הצג מוקד ומדריך" }],
+      "lines": [
+        "נתונה פרבולה שמשוואתה y^2=2px"
+      ],
+      "after": [
+        {
+          "click": "הצג מדריך"
+        },
+        {
+          "click": "הצג מוקד"
+        },
+        {
+          "click": "הצג מוקד ומדריך"
+        }
+      ],
       "cycles": 1,
-      "expect": ["הסתר"],
+      "expect": [
+        "הסתר"
+      ],
       "expectConfigsDiffer": true,
       "lookFor": "Another configuration redraws the parabola wider or narrower; the focus dot and the dashed directrix move with it and the chip still reads «הסתר».",
       "before": "No chip on prod."
@@ -132,10 +258,44 @@
       "product": "analytic",
       "base": "http://localhost:5174",
       "path": "/analytic.html",
-      "lines": ["נתון מעגל שמשוואתו x^2+y^2=9"],
-      "expectAbsent": ["הצג מדריך", "הצג מוקד"],
+      "lines": [
+        "נתון מעגל שמשוואתו x^2+y^2=9"
+      ],
+      "expectAbsent": [
+        "הצג מדריך",
+        "הצג מוקד"
+      ],
       "lookFor": "The circle draws as before, with its centre O; no chip on its row. (Next line to try: «נתונה פרבולה שמשוואתה y^2=8x» — its row gets «הצג מדריך».)",
       "before": "Unchanged."
+    },
+    {
+      "id": "T11",
+      "title": "The centre of an ellipse with equal axes is clickable, as a circle's centre is",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "נתונה אליפסה שמשוואתה x^2/9+y^2/9=1"
+      ],
+      "after": [
+        {
+          "clickOn": "[data-centre-offer]",
+          "say": "לחצו על סימון המרכז בראשית הצירים"
+        },
+        {
+          "typeInto": "input[placeholder=\"אות\"]",
+          "text": "K"
+        }
+      ],
+      "expectRows": [
+        "K מרכז האליפסה"
+      ],
+      "expectFigure": [
+        "K"
+      ],
+      "lookFor": "The centre has the dashed offer ring a circle's centre has. Clicking it opens the letter box; typing K records the row «K מרכז האליפסה» and the point K sits at the origin.",
+      "before": "Prod draws no centre and nothing to click."
     }
   ]
 }

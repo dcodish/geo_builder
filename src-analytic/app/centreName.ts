@@ -29,7 +29,7 @@ const currentOf = (state: RenameState): Derivation => derive(activeOf(state.line
 
 /** The sentence the gate accepted, or why not — the one path both the name and the swap go through. */
 function recordable(offerId: string, letter: string, state: RenameState, current: Derivation): CentreNameVerdict {
-  const sentence = centreSentenceOf(current.figure, offerId, letter);
+  const sentence = centreSentenceOf(current.figure, offerId, letter, current.construction);
   // the offer went stale under the popover (the centre was named meanwhile) — say so, never guess a circle
   if (!sentence) return { kind: 'refused', error: { key: 'already-named', detail: letter } };
   const v = decideSubmit(sentence, activeOf(state.lines, state.disabled), state.seed, current);

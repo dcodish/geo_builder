@@ -159,6 +159,27 @@ async function driveCase(browser, spec, outDir, prefix) {
         }
         // #1863 — press a button by its visible label (a chip, «בטל»): the label is the check, so a chip that
         // does not read what the case says it reads fails as a missing button.
+        // #1863 — click an element by CSS selector (an SVG offer: a centre ring), or type into one and press Enter
+        // (the letter popover's input). A selector that matches nothing fails the case.
+        if (st.clickOn !== undefined || st.typeInto !== undefined) {
+          const sel = st.clickOn ?? st.typeInto;
+          const el = page.locator(sel).first();
+          const what = st.clickOn !== undefined ? `(click ${sel})` : `(type «${st.text}» into ${sel})`;
+          if ((await el.count()) === 0) {
+            steps.push({ line: what, refusals: [`nothing matches ${sel}`] });
+            break;
+          }
+          if (st.clickOn !== undefined) await el.click({ force: true });
+          else {
+            await el.fill(st.text);
+            await el.press('Enter');
+          }
+          await waitForSettle(page);
+          const fresh = await freshRefusals();
+          steps.push({ line: what, refusals: fresh });
+          await shoot(`step-${steps.length}`);
+          continue;
+        }
         if (st.click !== undefined) {
           const btn = page.getByRole('button', { name: st.click, exact: true }).first();
           if ((await btn.count()) === 0) {

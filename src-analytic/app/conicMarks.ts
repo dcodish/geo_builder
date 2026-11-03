@@ -19,8 +19,8 @@
  */
 import type { Derivation } from '../engine/derive';
 import { ellipseDirectrices, ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
-import { isKnowledge, knownCurve, type Figure } from '../engine/evaluate';
-import type { Construction, NumCurve } from '../engine/types';
+import { knownCurve, type Figure } from '../engine/evaluate';
+import type { NumCurve } from '../engine/types';
 import { fmtAnalytic } from '../format';
 import { conicStateOf, nextConic, showsDirectrix, showsFocus, type AnnotationMap, type ConicState } from './annotations';
 import { roleLineOf } from './curveText';
@@ -49,18 +49,9 @@ export function conicChipKey(kind: ConicKind, next: ConicState): string {
   return `conicChip.${kind}.${next}`;
 }
 
-/**
- * IS THIS ELLIPSE A CIRCLE? (ADR-AG-377) — a = b in EVERY configuration, read through the one knowledge gate
- * (`isKnowledge`), so a parameterised ellipse that only happens to be round at one sample is not one, and a size the
- * givens leave free with its axes equal («x²/a² + y²/a² = 1») is. Pending (the deferred pool) reads as not yet.
- */
-export function isCircleShaped(c: Construction, id: string): boolean {
-  const k = isKnowledge(c, (f) => {
-    const q = f.curves.find((x) => x.id === id)?.curve;
-    return q && q.kind === 'ellipse' ? (q.a - q.b) / Math.max(1, q.a, q.b) : null;
-  });
-  return k.known && Math.abs(k.value) < 1e-9;
-}
+/** IS THIS ELLIPSE A CIRCLE? (ADR-AG-377) — the engine's one predicate (`engine/crossings.ts`), which the centre offer reads too. */
+export { isRoundEllipse as isCircleShaped } from '../engine/crossings';
+import { isRoundEllipse as isCircleShaped } from '../engine/crossings';
 
 /** The stated conics a chip can drive: parabolas and ellipses the student stated, minus the ellipses that are circles. */
 function stated(d: Derivation): Array<{ id: string; kind: ConicKind; name: string; curve: NumCurve }> {

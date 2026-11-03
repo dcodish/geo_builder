@@ -86,7 +86,7 @@ A case is a claim about the product, so it is measured before it goes on the she
 ## 3. Pre-play it
 
 - **Write the spec** `scripts/playsheets/<name>.json` (tracked):
-  `{ "name", "title", "cases": [{ "id": "T1", "title", "class": "play|look|verified", "product": "2d|3d|complex|analytic", "base": "http://localhost:5173", "path"?, "lines": [...], "lookFor", "before", "expect"?: [...], "expectAbsent"?: [...], "expectRefusal"?, "asks"?: [...], "cycles"?: N, "after"?: [{ "toggle": row } | { "type": "…" } | { "click": "<a button's exact label>" }], "llm"?: { "<utterance>": ["canonical line", …] } }] }`.
+  `{ "name", "title", "cases": [{ "id": "T1", "title", "class": "play|look|verified", "product": "2d|3d|complex|analytic", "base": "http://localhost:5173", "path"?, "lines": [...], "lookFor", "before", "expect"?: [...], "expectAbsent"?: [...], "expectRefusal"?, "asks"?: [...], "cycles"?: N, "after"?: [{ "toggle": row } | { "type": "…" } | { "click": "<a button's exact label>" } | { "clickOn": "<css selector>", "say": "<Hebrew instruction>" } | { "typeInto": "<css selector>", "text": "…" }], "llm"?: { "<utterance>": ["canonical line", …] } }] }`.
   `expectRefusal` flips the case: it passes only when a refusal containing that text appears.
   **Never set `expect` / `expectRefusal` to a known bug's output** ([ADR-W-158](../../../docs/06w-decisions-workspace.md#adr-w-158), round #2501 T30):
   write the CORRECT outcome, let the case run red, and list it in the Heads-up as approved-but-not-delivered with its issue.

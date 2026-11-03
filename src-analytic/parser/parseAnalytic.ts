@@ -2666,6 +2666,8 @@ export type RoleRef =
   | { role: 'vertex'; side?: EllipseSide; axis?: 'major' | 'minor' }
   /** «קודקודי האליפסה» — the ask (#2616). */
   | { role: 'vertices' }
+  /** «מרכז האליפסה» — the ellipse's centre (#1863, ADR-AG-377). */
+  | { role: 'centre' }
   /** «(אורך) הציר הגדול/הראשי/הקטן/המשני (של האליפסה|שלה)» — a size of the ellipse (#2617, ADR-AG-353). */
   | { role: 'axis'; which: 'major' | 'minor' }
   /** «הצירים שלה» · «צירי האליפסה» — both sizes, «… הם 12 ו-8» (#2617). */
@@ -2706,6 +2708,9 @@ const ROLE_VERTEX_SIDE_HE = new RegExp(`^(?:ה?שיעורי\\s+)?ה?קו?דקו�
 const ROLE_VERTEX_SIDE_EN = new RegExp(`^(?:the\\s+)?(?:coordinates\\s+of\\s+(?:the\\s+)?)?${SIDE_EN}\\s+vertex${OF_ELLIPSE_EN}$`, 'i');
 const ROLE_VERTEX_ANY_HE = /^(?:ה?שיעורי\s+)?ה?קו?דקוד\s+(?:של\s+)?ה?אליפסה$/;
 const ROLE_VERTEX_ANY_EN = /^(?:a\s+|the\s+)?vertex\s+of\s+(?:the\s+)?ellipse$/i;
+// #1863 (ADR-AG-377): «מרכז האליפסה» — the book's own noun («מיתר העובר דרך מרכז האליפסה נקרא קוטר»)
+const ROLE_ELLIPSE_CENTRE_HE = /^(?:ה?שיעורי\s+)?(?:ה?נקודת\s+)?מרכז\s+(?:של\s+)?ה?אליפסה$/;
+const ROLE_ELLIPSE_CENTRE_EN = /^(?:the\s+)?cent(?:re|er)\s+of\s+(?:the\s+)?ellipse$/i;
 const ELLIPSE_AXIS_WORD_HE = '(גדול|ראשי|קטן|משני)';
 const ROLE_AXIS_END_HE = new RegExp(`^(?:ה?שיעורי\\s+)?(?:ה?קצה|ה?קו?דקוד)(?:\\s+ה?${SIDE_HE})?\\s+(?:של\\s+)?ה?ציר\\s+ה?${ELLIPSE_AXIS_WORD_HE}${OF_ELLIPSE_HE}$`);
 const ROLE_AXIS_END_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:${SIDE_EN}\\s+)?(?:end|vertex)\\s+of\\s+the\\s+(major|minor)\\s+axis${OF_ELLIPSE_EN}$`, 'i');
@@ -2742,6 +2747,7 @@ export function readRoleRef(raw: string): RoleRef | null {
   const vertexSide = ROLE_VERTEX_SIDE_HE.exec(text) ?? ROLE_VERTEX_SIDE_EN.exec(text);
   if (vertexSide) return { role: 'vertex', side: ellipseSideOf(vertexSide[1]) };
   if (ROLE_VERTEX_ANY_HE.test(text) || ROLE_VERTEX_ANY_EN.test(text)) return { role: 'vertex' };
+  if (ROLE_ELLIPSE_CENTRE_HE.test(text) || ROLE_ELLIPSE_CENTRE_EN.test(text)) return { role: 'centre' };
   const axisEnd = ROLE_AXIS_END_HE.exec(text) ?? ROLE_AXIS_END_EN.exec(text);
   if (axisEnd) return { role: 'vertex', axis: axisWhich(axisEnd[2]), ...(axisEnd[1] ? { side: ellipseSideOf(axisEnd[1]) } : {}) };
   if (ROLE_VERTICES_HE.test(text) || ROLE_VERTICES_EN.test(text)) return { role: 'vertices' };
@@ -2860,6 +2866,13 @@ function parseMeasureRoles(line: string): RuleOutcome {
         // «מוקד הפרבולה הוא (2,0)» · «המוקד הימני של האליפסה הוא (√10,0)»: the coordinates become a point (the tool
         // names it, #1263) that IS the focus — a fixed conic judges it, a parameterised one is pinned by it (M1).
         return withMint(line, slot, facts);
+      }
+      case 'centre': {
+        // #1863 (ADR-AG-377): the ellipse's centre, NAMED — what the centre cross's click records, as «P מרכז המעגל» does
+        const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));
+        if (!slot) continue;
+        const facts = (id: Id): Fact[] => [{ t: 'ellipse-centre-of', id, src: line }];
+        return 'name' in slot ? made(facts(slot.name)) : withMint(line, slot, facts);
       }
       case 'vertex': {
         const slot = pointSlot(value.replace(/^ב(?=ה?נקודה\s)/, ''));

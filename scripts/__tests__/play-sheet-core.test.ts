@@ -58,9 +58,9 @@ describe('#1509 — sheet validation', () => {
   });
 
   it('#1548 — after-steps are a row toggle (1-based) or one more utterance, nothing else', () => {
-    const ok = { ...CASE, after: [{ toggle: 2 }, { type: 'B(0,3)' }, { click: 'הצג מדריך' }] };
+    const ok = { ...CASE, after: [{ toggle: 2 }, { type: 'B(0,3)' }, { click: 'הצג מדריך' }, { clickOn: '[data-centre-offer]', say: 'לחצו על המרכז' }, { typeInto: 'input', text: 'K' }] };
     expect(validateSheet({ name: 'x', cases: [ok] }, PRODUCTS)).toEqual([]);
-    for (const bad of [[{ toggle: 0 }], [{ toggle: 1.5 }], [{ type: '' }], [{ toggle: 1, type: 'x' }], [{ click: 1 }], [{ click: '' }], [{ click: 'a', type: 'b' }], 'x']) {
+    for (const bad of [[{ toggle: 0 }], [{ toggle: 1.5 }], [{ type: '' }], [{ toggle: 1, type: 'x' }], [{ click: 1 }], [{ click: '' }], [{ click: 'a', type: 'b' }], [{ clickOn: 'x' }], [{ typeInto: 'x' }], 'x']) {
       const problems = validateSheet({ name: 'x', cases: [{ ...CASE, after: bad }] }, PRODUCTS);
       expect(problems.length, JSON.stringify(bad)).toBe(1);
     }
