@@ -14364,3 +14364,24 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Consequences.** `src3d/engine/types.ts` (`on-circle3`, `ringCircle3`, `gaugeFramePoint3`), `src3d/engine/carriers.ts` (the carrier row, `pointParents3` exported, `builtFrom3`), `src3d/engine/evaluate.ts` (`circleGeom3`, `seatOnCircleRider3`, the point-pass arm, the late seat, the #557 re-seat), `src3d/engine/apply.ts` (the arm, `parentsFirst3`).
 
 **Behaviour change for a student:** after a circle is drawn, «D על המעגל» places D on it, and «הציגו תצורה אחרת» moves D along it. Before, it was refused «D אינה על הישר».
+## ADR-3D-411 — A declared line named by a lowercase letter is that line in every relation, with or without its noun (#2642)
+
+**Status:** accepted · 2026-11-03 · bug (P2, 3-D) · fix round #2678, stream D · branch `fix/2642-lowercase-line-name` · rulings: [ADR-W-167](06w-decisions-workspace.md#adr-w-167) (operator 2026-10-31, one given per row; its Consequences name this split failure an ordinary bug) and [ADR-W-175](06w-decisions-workspace.md#adr-w-175) sr-12 (2026-11-02: a name binds the drawn object of its kind)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-26 (extended) · **Design:** [04b](04b-design-3d.md) § *A bare lowercase name: the noun breaks the tie in the parser, the figure in the engine* · **LADDER stage:** reference resolution (apply-time, before every arm's reference check).
+
+**Measured before** (HEAD `2142a8d1`, `useGeo3.submit`): «ישר ℓ1 · ישר ℓ2 · ישר d · d מאונך ל-ℓ1» refused `unknown-vector d`; so did «d ⊥ ℓ1», «d ∥ ℓ1», «k מאונך ל-ℓ1», «u מקביל ל-ℓ1», «ℓ1 מאונך ל-d», «הישרים d ו-ℓ1 מאונכים», «u ⊥ v», «u ∥ v», «הזווית בין u ל-v היא 60», «הזווית בין d ל-ℓ1 היא 30» and, in a cube, «d מאונך למישור ABC». «הישרים d ו-ℓ1 מצטלבים» was not understood. The noun-led twins («הישר d מאונך לישר ℓ1») recorded.
+
+**Class (docs/17 §1).** *A single lowercase letter that the figure declares as a line is read as a vector in every relation, unless a singular noun stands right before it.* `readOperand` settles the vector-or-line tie by the noun alone (it has no figure); the engine's reference check then finds no such vector although `c.lines` holds the name. A plural noun was not distributed to its list's operands.
+
+**Decision.**
+1. `resolveLineNames3` (`src3d/engine/apply.ts`), once at the top of `applyCommand3`, resolves every operand-taking command (`line-rel`, `mutual-rel`, `plane-rel`, `distance-rel`, `cos-angle`) against the figure: a `vector` name the construction declares as a line (`lines` / `pointLines`) and as no vector (`vectors` / `freeVectors`) is that line (`resolveNamedOperand3`). Where that changes the command's shape, it becomes the command the parser already emits for a line-shaped side (`ℓ1`): ∥ and the angle / ⟂ between arms → `line-rel`; ⟂ a point-run plane → `plane-line-perp`; ⟂ a named plane → `line-perp-plane`; ∥ / angle / ⊂ a plane → `line-rel`. No new lowering. A shape's own corner (`cos-angle` with `origin` / `ring` / `soft`) is never touched.
+2. A plural head noun distributes: `readOperand(raw, headNoun)` from `readOperandList` and from `mutualPositionClaim`'s plural form, so «הישרים d ו-ℓ1 …» reads d as a line before the figure is consulted (and creates it per ADR-3D-383 when undeclared).
+3. No chokepoint entry: this is the 3-D reference-resolution reader (docs/17 §3, `unknown-…`), widened by kind.
+
+**Unchanged.** A declared vector keeps the vector reading («u = (1,2,3)» · «u ⊥ ℓ1»); an undeclared bare letter keeps `unknown-vector`; the noun-led spellings lower exactly as before.
+
+**Ports (ADR-W-157).** 3-D only: 2-D and analytic have no named vectors, so a lowercase line name has no second reading there; complex has no lines.
+
+**Locks.** `src3d/__tests__/line-name-as-vector-2642.test.ts` (every measured row records and holds at seeds 0–3; the plane row matches the noun form; the plural mutual position; the controls); fixture `fixtures3/line-lowercase-perp-2642.geo3.json` (the report split one given per row, then «d מאונך ל-ℓ2»).
+
+**Behaviour change for a student:** after «ישר d», «d מאונך ל-ℓ1» (and its ⊥ / ∥ / angle / plane / plural spellings) builds as «הישר d מאונך לישר ℓ1» does, instead of «הווקטור «d» לא הוגדר».

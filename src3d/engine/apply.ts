@@ -468,6 +468,86 @@ function vectorRefsError3(c: Construction3, names: Iterable<string>, use: 'metri
   return unknown !== undefined ? { code: 'unknown-vector', id: unknown } : null;
 }
 
+/**
+ * #2642 ([ADR-3D-411](../../docs/06b-decisions-3d.md#adr-3d-411)) — A BARE LOWERCASE LETTER BINDS THE OBJECT THE FIGURE
+ * HAS BY THAT NAME. A single letter `[a-w]` is both a vector's name and a free line's name; the parser has no figure,
+ * so with no noun before it (`readOperand`) it reads `{kind: 'vector'}`. Here the figure breaks the tie: a name the
+ * construction declares as a LINE, and as no vector (anchored or free), is that line. A declared vector keeps the
+ * vector reading and an undeclared name keeps today's `unknown-vector` — this reads the construction, never hidden
+ * state, so it is deterministic on replay. The sr-12 reading (ADR-W-175): a name binds the drawn object of its kind.
+ */
+const isLineName3 = (c: Construction3, name: string): boolean =>
+  (c.lines.has(name) || c.pointLines.has(name)) && namedVector3(c, name) === undefined;
+
+export function resolveNamedOperand3(c: Construction3, op: Operand3): Operand3 {
+  return op.kind === 'vector' && isLineName3(c, op.name) ? { kind: 'line', name: op.name } : op;
+}
+
+/** The operand a cos-angle ARM names, once its name is resolved (a pair is a segment, a name a vector or a line). */
+const atomOperand3 = (c: Construction3, atom: VecAtom): Operand3 =>
+  atom.kind === 'pair' ? { kind: 'segment', a: atom.from, b: atom.to } : resolveNamedOperand3(c, { kind: 'vector', name: atom.name });
+
+/**
+ * #2642 — THE ONE NAME-RESOLUTION PASS over every command that takes an operand: `line-rel`, `mutual-rel`,
+ * `plane-rel`, `distance-rel` (an `Operand3`) and `cos-angle` (a named arm). Returns the command itself when no name
+ * resolves, so a command that names no line is untouched. Where a name resolves, the command is the one the noun-led
+ * spelling of the same sentence already reads («הישר d מאונך לישר ℓ1» → `line-rel`), so it needs no lowering of its own:
+ *  - a ∥ between two operands with a line side is the `line-rel` ∥ (the parser routes the noun-led form there too);
+ *  - an angle or ⊥ between two arms, one a line, is the `line-rel` angle / ⊥ over the other arm;
+ *  - a plane relation with a line side is `plane-line-perp` (⊥ a point run), `line-perp-plane` (⊥ a named plane) or the
+ *    `line-rel` ∥ / angle / ⊂ — the parser's routing of «ℓ1 מאונך למישור ABC», «ℓ1 ⊥ π1», «ℓ1 ∥ ABC».
+ */
+function resolveLineNames3(c: Construction3, cmd: Command3): Command3 {
+  switch (cmd.type) {
+    case 'line-rel': {
+      const op = resolveNamedOperand3(c, cmd.op);
+      return op === cmd.op ? cmd : { ...cmd, op };
+    }
+    case 'mutual-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      if (a === cmd.a && b === cmd.b) return cmd;
+      if (cmd.rel === 'parallel' && cmd.origin === undefined && (a.kind === 'line' || b.kind === 'line')) {
+        const [line, op] = a.kind === 'line' ? [a, b] : [b as Extract<Operand3, { kind: 'line' }>, a];
+        return { type: 'line-rel', rel: 'parallel', op, line: line.name };
+      }
+      return { ...cmd, a, b };
+    }
+    case 'plane-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      if (a === cmd.a && b === cmd.b) return cmd;
+      const lineSide = a.kind === 'line' ? a : b.kind === 'line' ? b : null;
+      const other = lineSide === a ? b : a;
+      if (lineSide === null || lineSide.kind !== 'line' || other.kind === 'line' || cmd.rel === 'coincident') return { ...cmd, a, b };
+      // the parser's own routing of a line-shaped side («ℓ1 מאונך למישור ABC», «ℓ1 ∥ π1», «הזווית בין ℓ1 ל-ABC»)
+      if (cmd.rel === 'perp' && other.kind === 'plane-run') return { type: 'plane-line-perp', ids: other.ids, line: lineSide.name };
+      if (cmd.rel === 'perp' && other.kind === 'plane-named') return { type: 'line-perp-plane', line: lineSide.name, plane: other.name };
+      return {
+        type: 'line-rel', rel: cmd.rel, op: other, line: lineSide.name,
+        ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
+        ...(cmd.label !== undefined ? { label: cmd.label } : {}),
+      };
+    }
+    case 'distance-rel': {
+      const a = resolveNamedOperand3(c, cmd.a);
+      const b = resolveNamedOperand3(c, cmd.b);
+      return a === cmd.a && b === cmd.b ? cmd : { ...cmd, a, b };
+    }
+    case 'cos-angle': {
+      if (cmd.origin !== undefined || cmd.ring !== undefined || cmd.soft) return cmd; // a shape's own corner, not a sentence
+      const u = atomOperand3(c, cmd.u);
+      const v = atomOperand3(c, cmd.v);
+      const [line, op] = u.kind === 'line' ? [u, v] : v.kind === 'line' ? [v, u] : [null, null];
+      if (line === null || line.kind !== 'line') return cmd;
+      const deg = Math.round((Math.acos(Math.max(-1, Math.min(1, cmd.cos))) * 180) / Math.PI * 1e9) / 1e9;
+      return Math.abs(cmd.cos) < 1e-9 ? { type: 'line-rel', rel: 'perp', op, line: line.name } : { type: 'line-rel', rel: 'angle', deg, op, line: line.name };
+    }
+    default:
+      return cmd;
+  }
+}
+
 /** Validate a VecAtom operand (V8-f): a named vector must be declared; a pair's points must exist. Every VecAtom
  *  reader (cos, dot, angle-equality chains) states a METRIC relation. */
 function atomRefError(c: Construction3, atom: import('./types').VecAtom): EngineError3 | null {
@@ -1621,6 +1701,9 @@ export function expandShapeRefs3(c: Construction3, cmds: readonly Command3[]): {
 }
 
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
+  // #2642 (ADR-3D-411): a bare letter the figure declares as a line is that line, in every relation that takes it
+  const named = resolveLineNames3(c, cmd);
+  if (named !== cmd) return applyCommand3(c, named);
   /**
    * «AA'=3BC» ON EXISTING POINTS IS AMBIGUOUS, AND IS ASKED ABOUT — never refuted (#1156).
    *

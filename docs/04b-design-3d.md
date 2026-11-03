@@ -616,6 +616,20 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
 - **Save/load.** `declare-vector` is a saveable command; the store holds facts only, so a reload re-derives the
   free vectors from the lines that stated them.
 
+### A bare lowercase name: the noun breaks the tie in the parser, the figure in the engine ([ADR-3D-411](06b-decisions-3d.md#adr-3d-411), #2642)
+
+A single letter `[a-w]` is both a vector's name and a free line's name. `readOperand` (`parser/operandToken.ts`) has no
+figure, so it settles the tie by the stated noun alone: «הישר d» is `{kind: 'line'}`, a bare «d» is `{kind: 'vector'}`. A
+plural head distributes its noun to each operand (`readOperand(raw, headNoun)`, from `readOperandList` and the
+mutual-position plural form). The rest of the tie is the engine's: `resolveLineNames3` (`engine/apply.ts`) runs once at
+the top of `applyCommand3` and rewrites a `vector` operand, or a `cos-angle` named arm, whose name is in `c.lines` /
+`c.pointLines` and in neither `c.vectors` nor `c.freeVectors` (`resolveNamedOperand3`). The rewritten command is the
+one the parser emits for a line-shaped side, so no arm gains a second lowering: `line-rel` and `distance-rel` keep their
+type; a `mutual-rel` ∥ and a `cos-angle` with a line arm become `line-rel` (∥, ⟂, or the angle `acos(cos)`); a
+`plane-rel` with a line side becomes `plane-line-perp` (⟂ a point run), `line-perp-plane` (⟂ a named plane) or
+`line-rel` (∥, an angle, ⊂). It reads the construction only, so a replay resolves the same way; a declared vector and an
+undeclared name are untouched (`unknown-vector` as before).
+
 ### Free objects: one operand seam ([ADR-3D-388](06b-decisions-3d.md#adr-3d-388), #2484)
 
 A free line (`resolveFreeLine`) and a free plane (`resolveFreePlane`) read the operand a relation names through the same

@@ -499,6 +499,10 @@ const SEEDED: SeededCorpus = {
   // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
   // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
   'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2642 (ADR-3D-411) — the issue's split rows (one given per row, ADR-W-167): a line declared by a lowercase letter
+  // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
+  // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
+  'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
