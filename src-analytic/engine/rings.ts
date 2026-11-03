@@ -334,3 +334,71 @@ export function minInteriorAngleOf(c: Construction, at: (id: Id) => RingPt | und
  * needs to; it is a bar for "not a sliver", not an aesthetic optimum.
  */
 export const SPREAD_MIN_DEG = 15;
+
+/**
+ * THE LEGIBILITY BOUND (ADR-W-175 sr-25, operator 2026-11-02; [ADR-AG-359](../../docs/06c-decisions-analytic.md#adr-ag-359))
+ * — *"one legibility bound for every free sample: no free corner above 165° or below a minimum; no two vertices closer
+ * than a fixed share of the figure; no stacked points while a separated view exists. A stated value is always drawn as
+ * stated, however extreme."*
+ *
+ * The widest a FREE corner of a declared ring may open (sr-25's number). A corner the givens state, or one whose three
+ * points are all placed by coordinates, is drawn as stated and never judged.
+ */
+export const FREE_CORNER_MAX_DEG = 165;
+/**
+ * The closest two vertices of one declared ring may sit, as a share of the figure's extent (sr-25's "fixed share").
+ * 5 %: measured on «משולש ABC» · «∢ABC = 10» over seeds 0–23 at `2142a8d1`, every drawing the operator saw as a thin
+ * but readable triangle keeps its vertices ≥ 12.8 % of the figure apart; the slivers the anchored solve produced
+ * (round #2645's pictures) sat at 1.4–2.8 %. Five times the stacking ruler (`VISIBLE_FRACTION`, 1 %).
+ */
+export const VERTEX_SHARE = 0.05;
+
+/** A corner's key, order-free in its two arms: `v|a|b` with `a < b`. */
+export const cornerKey = (v: Id, a: Id, b: Id): string => (a < b ? `${v}|${a}|${b}` : `${v}|${b}|${a}`);
+
+/**
+ * What makes this drawing ILLEGIBLE under sr-25, as readable reasons (empty: legible). `at` reads a point's position,
+ * `stated` holds the corners a given states (`cornerKey`), `fixed` the points placed by coordinates. Only the two
+ * position-level limits are judged here; the third (stacked points) is the separation preference each caller already
+ * applies (`stackedPairs`, ADR-AG-181), so it is decided by one ruler.
+ *
+ * A PREFERENCE, never validity: a figure whose givens leave no legible drawing is still drawn (ADR-052) — every caller
+ * falls through to the drawing it had.
+ */
+export function legibilityFaults(
+  c: Construction,
+  at: (id: Id) => RingPt | undefined,
+  stated: ReadonlySet<string>,
+  fixed: ReadonlySet<Id>,
+  extent: number,
+): string[] {
+  const out: string[] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const pts = o.vertices.map(at);
+    if (pts.some((p) => !p) || pts.length < 3) continue;
+    const ring = pts as RingPt[];
+    const n = ring.length;
+    for (let i = 0; i < n; i += 1) {
+      const v = o.vertices[i];
+      const a = o.vertices[(i + n - 1) % n];
+      const b = o.vertices[(i + 1) % n];
+      for (let j = i + 1; j < n; j += 1) {
+        const d = Math.hypot(ring[i].x - ring[j].x, ring[i].y - ring[j].y);
+        if (d < VERTEX_SHARE * extent) out.push(`${v}${o.vertices[j]} ${(d / extent).toFixed(3)} of the figure`);
+      }
+      if (stated.has(cornerKey(v, a, b)) || (fixed.has(v) && fixed.has(a) && fixed.has(b))) continue;
+      const here = ring[i];
+      const ux = ring[(i + n - 1) % n].x - here.x;
+      const uy = ring[(i + n - 1) % n].y - here.y;
+      const vx = ring[(i + 1) % n].x - here.x;
+      const vy = ring[(i + 1) % n].y - here.y;
+      const nu = Math.hypot(ux, uy);
+      const nv = Math.hypot(vx, vy);
+      if (nu === 0 || nv === 0) continue;
+      const deg = (Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (nu * nv)))) * 180) / Math.PI;
+      if (deg < SPREAD_MIN_DEG || deg > FREE_CORNER_MAX_DEG) out.push(`∠${a}${v}${b} ${deg.toFixed(1)}°`);
+    }
+  }
+  return out;
+}

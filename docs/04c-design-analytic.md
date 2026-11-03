@@ -1185,6 +1185,64 @@ curves and `line-at`s.
 
 *ADRs:* ADR-AG-047.
 
+### The anchored step: a free point lands nearest its start ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), #1182)
+
+`solveLM(x0, residuals, maxIter, anchored)` (`engine/solve.ts`): the leading `anchored` coordinates (stage one passes its free
+vertices, `2 · ids.length`; parameters stay on the plain step) are ANCHORED at `x0`. In the Newton regime (the last plain step
+cut the cost fourfold, λ at or below its start) the step lands on the point of the linearised set nearest `x0`:
+`x' = x + a + δ'`, `a = x0 − x`, `(JᵀJ + λI) δ' = −Jᵀ(r + J a)` — one more elimination, no extra Jacobian. On a curved set
+the pull halves down to a quarter and may raise the cost at most twice (never above the last three accepted costs). A
+start with `freeRank` 0 is not anchored (the result says so: `SolveResult.anchored`); every anchored solve is finished by
+plain steps at the tight tolerance. Stage one tries the anchored solve from the seeded start first and keeps it only when
+it converged, `admissibleAt` holds and the drawing is legible (`legibleAt`, below); else the multi-start runs as before,
+minus the seeded start when the solve there did not anchor and did not converge (the same computation). `fitLineByLine`
+(ADR-AG-348) anchors its fits the same way and keeps the same test — a fit the test rejects is the plain step from the same
+start — over stage one's own vector when a line replays the earlier figure. Direct `solveLM` sites elsewhere (the locus
+trace, repairs) pass no anchor.
+
+*Identifiers:* `ANCHOR_LAMBDA` · `ANCHOR_WINDOW` · `NEWTON_RATIO` · `ANCHOR_MIN_PULL` · `ANCHOR_RAISES` · `POLISH_ITER`
+
+### The legibility bound (sr-25) ([ADR-AG-359](06c-decisions-analytic.md#adr-ag-359), ADR-W-175)
+
+One predicate, `legibleAt(c, at, extent)` (`engine/evaluate.ts`, over `rings.ts` `legibilityFaults`): every FREE corner of a
+declared polygon in [`SPREAD_MIN_DEG`, `FREE_CORNER_MAX_DEG`] = [15°, 165°], and no two of its vertices closer than
+`VERTEX_SHARE` (5 %) of the figure's extent. A corner a row states (`statedCornersOf`: any `{v, a, b}` angle a row names, every
+option of a choice included, and two perpendicular segments sharing an end) or whose three points are placed by coordinates is
+not judged. The third limit, no stacked points, is the separation preference (`stackedPairs`), applied beside it. Three
+readers: stage one's keep-test for the anchored solve, every line fit's keep-test, and the display walk's spread preference
+(`drawableAt`'s `spread`, which it replaces — so a stated small angle no longer makes every candidate narrow). A preference,
+never validity: a figure with no legible drawing is still drawn. The constants stay in analytic until a second builder reads
+them (`shell/` is seeded by surfaces implemented twice).
+
+**«הציגו תצורה אחרת» compares pictures** ([ADR-AG-379](06c-decisions-analytic.md#adr-ag-379), sr-30). `anotherConfiguration`
+skips a candidate that `looksTheSame` as the drawing on the screen: the same labelled parts (`signatureParts`), every point,
+circle centre and radius, line offset and conic size within `VISIBLE_FRACTION` of the frame, every line direction within that
+fraction of a radian, every used parameter within it relatively. The knowledge gates keep `sameConfiguration`.
+
+### A later line moves the figure latest-first ([ADR-AG-378](06c-decisions-analytic.md#adr-ag-378), #2039)
+
+**Row provenance.** `withObjectLines` (`engine/apply.ts`) also writes `Construction.rowLine`: the line that stated each row,
+keyed by the constraint and every option nested in it, off the fold's `constraintFact`. In `lineGroupsOf` a row stated on a
+later line than every vertex it names is a LATER row; each stating line's later rows form one group (`later: true`, no
+`ids`), placed after that line's new-point groups. `valuedAt` records, per free vertex, the first line at which a row placed
+it by value (`placesByValue`).
+
+**The fit** (`fitLater`, called from `fitLineByLine` in group order). Candidates: the free vertices of earlier lines, latest
+first (`objectLine`, then declaration order), those placed by value before this line last. A rider (a one-vertex group whose
+one row is `on-line-2pt` and which this line does not name) is no candidate: it keeps its parameter t on its carrier
+(`follow`). The rows: every row stated up to this line but the label rows, symbols held at their sample. If the earlier rows do
+not hold at the start, they are replayed first (`replay`: stage one's solve over the earlier vertices, anchored, the plain step
+where the bound rejects it); a replay that cannot converge turns the later fits off for the figure. The first tier is the
+narrowest prefix of the candidates that holds a vertex of every row the line leaves unmet; each tier is solved once (anchored,
+tight tolerance) and kept when it converges, its riders' other rows hold, and no ring faults and no selector of the groups so
+far fails. Passes: free tiers that are legible → free tiers → tiers with placed-by-value vertices, legible first. No tier:
+`replay` of all the rows, so the following lines are fitted to the figure this line is drawn as; the joint solve follows as
+before.
+
+**The kept box.** `evaluateUncached` sizes a vertex's wide box (ADR-AG-324) by `statedScale` over the objects and rows of
+lines up to the vertex's own (`wideBoxOf`), and `lineGroupsOf` does not count a later row that places by value as reaching
+its vertices (`moved`), so a later number does not re-seed a vertex before any solve.
+
 ### The figure line by line: line provenance and the per-line fit ([ADR-AG-348](06c-decisions-analytic.md#adr-ag-348), #1687)
 
 **Provenance.** `foldPass` records, in `commit`, the first fact that brought each object into the construction

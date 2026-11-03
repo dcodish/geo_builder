@@ -19,7 +19,7 @@
  * pressing the button on it should not quietly redraw the same picture for ever.
  */
 import { derive } from '../engine/derive';
-import { canonicalSeed, drawnSampleOf, sameConfiguration, seedNumber, type Seed } from '../engine/evaluate';
+import { canonicalSeed, drawnSampleOf, looksTheSame, seedNumber, type Seed } from '../engine/evaluate';
 
 /** How far to look. The same budget the drawable search uses, for the same reason. */
 const TRIES = 24;
@@ -69,7 +69,12 @@ export function anotherConfiguration(
   for (let step = 1; step <= tries; step += 1) {
     const next = derivedAt(lines, from + step, seedNames);
     if (shownSample !== undefined && drawnSampleOf(next.figure) === shownSample) continue;
-    if (!sameConfiguration(next.figure, current)) return { seed: canonicalSeed(next.configuration), found: true };
+    /*
+     * …AND THE SAME PICTURE IS NOT ANOTHER ONE (ADR-W-175 sr-30, ADR-AG-379): a candidate that differs from the drawing on
+     * the screen by less than the eye can see (`looksTheSame`, the stacking ruler) is skipped while the walk can still
+     * find one that differs. With none inside the budget the answer stays the honest "nothing else" (`found: false`).
+     */
+    if (!looksTheSame(next.figure, current)) return { seed: canonicalSeed(next.configuration), found: true };
   }
   return { seed, found: false };
 }

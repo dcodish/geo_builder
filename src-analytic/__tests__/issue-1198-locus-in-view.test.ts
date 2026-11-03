@@ -69,7 +69,10 @@ describe('ADR-AG-120 — the traced locus is inside the view (#1198)', () => {
       const { d, trace } = frameAt(seed);
       return !contains(d.box, trace);
     });
-    expect(cut.length, 'the pre-fix frame should still be the clipping one').toBeGreaterThanOrEqual(3);
+    // RE-BASED by #1182 (ADR-AG-359), measured: the free point now lands nearest its start, so even the figure-only box holds
+    // the trace at every seed (0 clipped; 3+ at fb94d176). The clipping this baseline measured is gone at its source; the
+    // in-view locks above are what the student sees, and they still hold.
+    expect(cut.length, 'the figure-only frame clips nothing since the anchored step').toBe(0);
   });
 
   /**

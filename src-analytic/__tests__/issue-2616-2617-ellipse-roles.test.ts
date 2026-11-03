@@ -82,7 +82,11 @@ describe('#2616 — the book exercises build and answer the book (fixtures)', ()
 
   it('p2-14: PF2 = PF1 + 16/3 puts P at (4, ±10/3)', () => {
     recordsLineByLine(p214);
-    expect(answer(p214.lines, 'P')).toMatch(/\(4, 10\/3\).*\(4, -10\/3\)/);
+    // Both roots, in either order: the bracketed one is the configuration drawn first, the figure's free choice (re-based
+    // by round #2678, ADR-AG-378 — the later line's fit lands P on the root nearest its sample, (4, −10/3) at configuration 0).
+    const a = answer(p214.lines, 'P');
+    expect(a).toMatch(/\(4, 10\/3\)/);
+    expect(a).toMatch(/\(4, -10\/3\)/);
   });
 
   it('p2-15: F1 and F2 named, AB = 8 on a horizontal chord — x²/64 + y²/48 = 1 is among the answers (its y-major twin too)', () => {

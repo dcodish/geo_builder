@@ -5943,7 +5943,7 @@ function symbolNodes(x: unknown, out: Set<string> = new Set()): Set<string> {
 }
 
 /** The construction's fields that are not expressions over the figure's symbols — never substituted into. */
-const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound', 'objectLine']);
+const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound', 'objectLine', 'rowLine']);
 
 /**
  * THE ONE PLACE A STATED VALUE REPLACES A FREE SYMBOL (#2521, ADR-AG-332).
@@ -6398,7 +6398,22 @@ function withObjectLines(r: FoldResult, group: readonly number[]): FoldResult {
     const i = byFact.get(o.id);
     if (i !== undefined) objectLine[o.id] = group[i];
   }
-  return { ...r, construction: { ...r.construction, objectLine } };
+  /*
+   * #2039 step 2 (ADR-AG-378): the line each ROW came from, off the same record (`constraintFact`), keyed by the row itself
+   * and by every option nested in it — a configuration resolves a choice to one of its options by identity
+   * (`resolveConstraintChoices`), so the resolved row still names its line.
+   */
+  const rowLine = new Map<Constraint, number>();
+  const mark = (k: Constraint, line: number): void => {
+    if (!rowLine.has(k)) rowLine.set(k, line);
+    if (k.t === 'choice') for (const o of k.options) mark(o, line);
+    else if (k.t === 'all') for (const o of k.of) mark(o, line);
+  };
+  r.construction.constraints.forEach((k, at) => {
+    const f = r.constraintFact[at];
+    if (f !== undefined) mark(k, group[f]);
+  });
+  return { ...r, construction: { ...r.construction, objectLine, rowLine } };
 }
 
 /** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */

@@ -57,7 +57,9 @@ const slope = (lines: string[], a: string, b: string): string => {
     const v = read(f);
     return v === null || Math.abs(v.dx) < 1e-12 ? null : v.dy / v.dx;
   });
-  return k.known ? k.value.toFixed(3) : 'open';
+  // zero has one spelling (ADR-AG-197's `zeroFree`): a line fit finished at the tight tolerance can leave −1e-12 (ADR-AG-378),
+  // and the panel itself prints «0» for it
+  return k.known ? k.value.toFixed(3).replace(/^-(0\.0+)$/, '$1') : 'open';
 };
 
 describe('#1078 — a carrier is not a curve row', () => {
