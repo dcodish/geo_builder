@@ -195,33 +195,11 @@ describe('#1188 — need-basis: a free vector never joins the basis (Q5)', () =>
 });
 
 /**
- * THE HONEST INTERIM REFUSALS — the known gaps of step 1, each naming the #1188 step that closes it. A row here
- * that starts to BUILD is that step landing: move the row into its step's own lock, never just delete it.
+ * THE HONEST INTERIM REFUSALS of step 1 are all retired: #1188 step 2 (ADR-3D-390) built the four
+ * `free-vector-combination` rows (now in issue-1188-free-vector-step2.test.ts), and step 4 (ADR-3D-406) built the five
+ * `free-vector-metric` rows («|u| = 5», «u ⟂ v», «u·v = 0», «|u| = |v|», the angle) — now in
+ * issue-1188-free-vector-metric.test.ts, where each must HOLD at every seed. Both codes are gone.
  */
-// #1188 step 2 (ADR-3D-390) built the four `free-vector-combination` rows («w = u + v», «w = 2u - 3v», the cube's «p = 2u»,
-// «u = (k-1, 2, k)»): they moved into issue-1188-free-vector-step2.test.ts, and the code is retired.
-const KNOWN_GAPS_1188: { lines: string[]; code: 'free-vector-metric'; step: number }[] = [
-  { lines: ['וקטור u', '|u| = 5'], code: 'free-vector-metric', step: 4 },
-  { lines: ['וקטור u', 'וקטור v', 'u ⟂ v'], code: 'free-vector-metric', step: 4 },
-  { lines: ['וקטור u', 'וקטור v', 'u·v = 0'], code: 'free-vector-metric', step: 4 },
-  { lines: ['וקטור u', 'וקטור v', '|u| = |v|'], code: 'free-vector-metric', step: 4 },
-  { lines: ['וקטור u', 'וקטור v', 'הזווית בין u ל-v היא 60'], code: 'free-vector-metric', step: 4 },
-];
-
-describe('#1188 — a given on a free vector that step 1 cannot build is refused honestly', () => {
-  it.each(KNOWN_GAPS_1188.map((g) => [g.lines.join(' · '), g] as const))('«%s» (step %#)', (_label, g) => {
-    const errs = run(g.lines);
-    expect(errs.slice(0, -1).every((e) => e === null)).toBe(true);
-    expect(errs[errs.length - 1]).toBe(g.code);
-    // never «check the computation» about a satisfiable given, never "u is not declared" about a declared u
-    expect(errs).not.toContain('claim-refuted');
-    expect(errs).not.toContain('unknown-vector');
-    // the text names the student's statement and says it is the tool's limit
-    const line = g.lines[g.lines.length - 1];
-    expect(text()).toContain(`«${line}»`);
-    expect(text()).toContain('מגבלה של הכלי');
-  });
-});
 
 describe('#1188 — the data panel', () => {
   const panel = () => dataView(built().construction, st().seed);

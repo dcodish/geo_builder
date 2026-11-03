@@ -715,6 +715,20 @@ export interface FreeVecEq3 {
   rhs: VecExpr;
 }
 
+/**
+ * #1188 step 4 (ADR-3D-406): a METRIC given over free vectors alone — a magnitude («|u| = 5», «|u + v| = 3»), a ratio
+ * of magnitudes («|u| = |v|», «|w+u| = |w-u|»), a dot product («u·v = 3»), an angle («u ⟂ v», «הזווית בין u ל-v היא
+ * 60»: its cosine) or parallelism («u ∥ v»). A nonlinear row of the free-vector system (`freeVecSystem.ts`), solved
+ * after the linear one; every operand is a combination of free vectors (a pair or an anchored arrow is a joint
+ * figure ↔ free solve, refused `free-vector-coupling`, #2603).
+ */
+export type FreeVecMetric3 =
+  | { kind: 'mag'; e: VecExpr; value: number }
+  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { kind: 'dot'; e1: VecExpr; e2: VecExpr; value: number }
+  | { kind: 'cos'; e1: VecExpr; e2: VecExpr; cos: number }
+  | { kind: 'par'; e1: VecExpr; e2: VecExpr };
+
 /** The distinct symbols an affine component names, in first-written order. */
 export const symsOfAffine = (e: SymAffine): string[] => {
   const out: string[] = [];
@@ -1426,6 +1440,8 @@ export interface Construction3 {
   freeVectors: Map<string, FreeVec3>;
   /** #1188 step 2 (ADR-3D-390): the free-vector system's EQUATIONS — vec-eqs with a free vector that define no name. */
   freeVecEqs: FreeVecEq3[];
+  /** #1188 step 4 (ADR-3D-406): the free-vector system's METRIC givens, in statement order. */
+  freeVecMetrics: FreeVecMetric3[];
   /** #72: UNNAMED ink arrows (`חץ A'C`) — rendered like a named vector, no label, never a basis member. */
   arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
@@ -1660,6 +1676,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   vectors: new Map(),
   freeVectors: new Map(),
   freeVecEqs: [],
+  freeVecMetrics: [],
   arrows: [],
   segments: [],
   angleMarks: [],
@@ -1987,9 +2004,6 @@ export type EngineError3 =
   | { code: 'ambiguous-vector-length' }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
-  /** #1188 (ADR-3D-386): a MAGNITUDE / angle / ⟂ / ∥ / dot given on a FREE vector — not built until #1188 step 4.
-   *  `sentence` is the refused line (filled by the store). Never `claim-refuted`, never `unknown-vector`. */
-  | { code: 'free-vector-metric'; id: string; sentence?: string }
   /** #1188 step 2 (ADR-3D-390): a free vector in a statement that would make the FIGURE and the free vectors one
    *  joint solve («AB = p + q» on two free vectors; a span point over a free vector; a ratio letter on one) — the
    *  tool's limit, named with the line. `sentence` is the refused line (filled by the store). */
