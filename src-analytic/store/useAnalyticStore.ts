@@ -16,6 +16,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
 import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
+import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -55,6 +56,9 @@ export interface SavedAnalyticSession {
   /** #2238 — the per-CURVE display choices (hidden; dashed for a line or a conic other than a circle), keyed by
    *  the curve's object id. Omitted when none, so every save from before it loads unchanged. */
   curveStyle?: SegDisplayMap;
+  /** #2688 (ADR-AG-388) — the canvas switches the student turned OFF (`{ grid: false }`). Omitted when all are shown,
+   *  so every save from before it loads unchanged, as all shown. */
+  display?: Partial<CanvasDisplay>;
 }
 
 /**
@@ -383,6 +387,12 @@ interface AnalyticState {
   /** Flip one curve's hidden / dashed flag — the same shared `toggleSegFlag`. */
   toggleCurveHidden: (id: string) => void;
   toggleCurveDashed: (id: string) => void;
+  /**
+   * #2688 (ADR-AG-388) — THE CANVAS SWITCHES: the grid, the axis numbers, the point coordinates. A display
+   * preference, not a given — saved with the figure and undoable, exactly as `curveStyle` is.
+   */
+  display: CanvasDisplay;
+  setDisplay: (key: keyof CanvasDisplay, shown: boolean) => void;
   clearAll: () => void;
   /**
    * Replace the question list. The GESTURES are decided in `app/answers.ts` and this records the
@@ -424,7 +434,7 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown }) => void;
+  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown; display?: unknown }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
   recordLlmLines: (spoken: string, lines: string[], notice?: string | null, at?: Seed) => void;
@@ -506,6 +516,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   seedNames: {},
   segStyle: {},
   curveStyle: {},
+  display: ALL_SHOWN,
   seed: 0,
   name: '',
   loadAudit: null,
@@ -551,6 +562,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   toggleSegDashed: (key) => set((s) => ({ segStyle: toggleSegFlag(s.segStyle, key, 'dashed') })),
   toggleCurveHidden: (id) => set((s) => ({ curveStyle: toggleSegFlag(s.curveStyle, id, 'hidden') })),
   toggleCurveDashed: (id) => set((s) => ({ curveStyle: toggleSegFlag(s.curveStyle, id, 'dashed') })),
+  setDisplay: (key, shown) => set((s) => (s.display[key] === shown ? {} : { display: cleanCanvasDisplay({ ...s.display, [key]: shown }) })),
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
@@ -585,7 +597,8 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle } = get();
+    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, display } = get();
+    const hidden = displayForSave(display);
     return {
       app: ANALYTIC_APP,
       version: ANALYTIC_SAVE_VERSION,
@@ -597,11 +610,14 @@ export const useAnalyticStore = create<AnalyticState>()(
       ...(Object.keys(seedNames).length ? { seedNames: { ...seedNames } } : {}),
       ...(Object.keys(segStyle).length ? { segStyle: JSON.parse(JSON.stringify(segStyle)) as SegDisplayMap } : {}),
       ...(Object.keys(curveStyle).length ? { curveStyle: JSON.parse(JSON.stringify(curveStyle)) as SegDisplayMap } : {}),
+      ...(hidden ? { display: hidden } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle }) =>
+  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, display }) =>
     set({
+      // #2688 — the canvas switches; absent (every older file) or malformed is all shown
+      display: cleanCanvasDisplay(display),
       // #1653 — the segment display map, kept only as key → {hidden?, dashed?: true}
       segStyle: cleanSegDisplay(segStyle),
       // #2238 — the curve display map, the same shape and the same cleaning
@@ -639,12 +655,13 @@ export const useAnalyticStore = create<AnalyticState>()(
       // #1653: the segment display map rides along — a hide is a step the student took on the canvas, and the
       // operator's lock is «one «בטל» restores it» (the ask lane's `shown` is the same kind of choice, and is here).
       // #2238: the curve display map rides along for the same reason.
+      // #2688: so do the canvas switches (grid / axis numbers / coordinates) — one «בטל» puts a switch back.
       partialize: (s) =>
-        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle }) as AnalyticState,
+        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle, display: s.display }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
       equality: (a, b) =>
         a.lines === b.lines && sameSeed(a.seed, b.seed) && a.queries === b.queries && a.disabled === b.disabled &&
-        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle,
+        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle && a.display === b.display,
       limit: 100,
     },
   ),

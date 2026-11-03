@@ -17,6 +17,7 @@ import { tickStep } from '../../shell/ticks';
 import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
 import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
+import { ALL_SHOWN, type CanvasDisplay } from './canvasDisplay';
 
 /**
  * THE KEY A SEGMENT'S DISPLAY IS FILED UNDER (#1653) — its two endpoint letters, unordered.
@@ -58,8 +59,16 @@ export interface SceneAxes {
   /** Screen coordinate of the world x-axis (y = 0) and y-axis (x = 0). */
   xAxisY: number;
   yAxisX: number;
+  /** The axis NUMBERS (#2688: empty when the student unticked «מספרים על הצירים»). */
   xTicks: AxisTick[];
   yTicks: AxisTick[];
+  /**
+   * #2688 (ADR-AG-388) — the grid lines' screen positions: vertical lines at `gridX`, horizontal at `gridY`. The
+   * same nice steps as the numbers, but their own field, so the grid and the numbers are switched apart. Empty when
+   * the grid is off.
+   */
+  gridX: number[];
+  gridY: number[];
 }
 
 export interface SceneCurve {
@@ -544,6 +553,8 @@ export interface SceneKnowledge {
    * knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
    */
   stated?: StatedMeasures;
+  /** #2688 (ADR-AG-388) — the grid / axis numbers / point coordinates switches. Absent = all shown (today's canvas). */
+  display?: CanvasDisplay;
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -593,6 +604,7 @@ export function buildScene(
   knows: SceneKnowledge = {},
 ): Scene {
   const t = makeTransform(box, width, height);
+  const display = knows.display ?? ALL_SHOWN;
 
   /**
    * A CARRIER is not drawn (#1076). The engine keeps it — it is what `on-curve` is solved
@@ -619,6 +631,7 @@ export function buildScene(
        */
       // #2238: a HIDDEN circle's centre cross goes with it — the cross is a feature of the curve, not a point (a
       // point the student named there is drawn as every point is, and stays)
+      // #2688: with the values switched off, the centre's coordinate label goes too — the cross stays
       centre: c.curve.kind === 'circle' && ink !== 'none'
         ? {
             cx: t.sx(c.curve.cx),
@@ -635,6 +648,7 @@ export function buildScene(
              * place could only ever repeat it or contradict it.
              */
             label:
+              display.values &&
               knows.curveKnown?.(c.id) &&
               !hasPointAt(fig, c.curve.cx, c.curve.cy)
                 ? lbl(`(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`)
@@ -665,7 +679,8 @@ export function buildScene(
       ink: segInk(knows.segStyle?.[key]),
       // Formatting is a DISPLAY concern, so it happens here and not in the engine — and it goes
       // through the shared formatter, never a local rounder (the #723 chokepoint, and #1029).
-      label: statedLength.has(key)
+      // #2688: a stated length is a VALUE on the figure — gone with «ערכים על הסרטוט» unticked
+      label: display.values && statedLength.has(key)
         ? { text: lbl(valueText(statedLength.get(key)!)), x: (x1 + x2) / 2, y: (y1 + y2) / 2 }
         : undefined,
     };
@@ -697,7 +712,8 @@ export function buildScene(
   const construction: SceneConstruction[] = fig.construction.map((c) => ({
     id: c.id,
     lines: c.lines.map((l) => ({ x1: t.sx(l.a.x), y1: t.sy(l.a.y), x2: t.sx(l.b.x), y2: t.sy(l.b.y) })),
-    labels: c.lines.flatMap((l) =>
+    // #2688: the 2x / x ratios are values written on the figure
+    labels: !display.values ? [] : c.lines.flatMap((l) =>
       (l.marks ?? []).map((m) => {
         const at = markPoint(l, m.at);
         return { x: t.sx(at.x), y: t.sy(at.y), text: lbl(m.text) };
@@ -737,7 +753,8 @@ export function buildScene(
       cx: t.sx(p.x),
       cy: t.sy(p.y),
       label: p.id,
-      coords: any ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined,
+      // #2688: «ערכים על הסרטוט» unticked → the letter alone; every label box below is measured from this
+      coords: any && display.values ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined,
     };
   });
 
@@ -751,21 +768,34 @@ export function buildScene(
    */
   const xAxisY = t.sy(0);
   const yAxisX = t.sx(0);
-  const xTicks = ticks(box.minX, box.maxX, t.sx);
-  const yTicks = ticks(box.minY, box.maxY, t.sy);
+  const allX = ticks(box.minX, box.maxX, t.sx);
+  const allY = ticks(box.minY, box.maxY, t.sy);
+  // #2688 (ADR-AG-388): the grid and the numbers are two switches over one set of nice steps
+  const xTicks = display.numbers ? allX : [];
+  const yTicks = display.numbers ? allY : [];
+  const gridX = display.grid ? allX.map((k) => k.pos) : [];
+  const gridY = display.grid ? allY.map((k) => k.pos) : [];
   const tf = TICK_LABEL.font;
   const FAR = 1e6;
   const rowY = xAxisY + TICK_LABEL.below;
   const colR = yAxisX - TICK_LABEL.left;
   const colW = Math.max(1, ...yTicks.map((k) => k.label.length));
-  const furniture: LabelBox[] = [
-    { x0: -FAR, y0: rowY - tf * 0.8, x1: FAR, y1: rowY + tf * 0.25 },
-    { x0: colR - textWidth(colW, tf), y0: -FAR, x1: colR, y1: FAR },
-  ];
+  // #2688: with the numbers off there is no row or column to keep clear — only the O marker, which always stays
+  const furniture: LabelBox[] = display.numbers
+    ? [
+        { x0: -FAR, y0: rowY - tf * 0.8, x1: FAR, y1: rowY + tf * 0.25 },
+        { x0: colR - textWidth(colW, tf), y0: -FAR, x1: colR, y1: FAR },
+      ]
+    : [{ x0: colR - textWidth(1, tf), y0: rowY - tf * 0.8, x1: colR, y1: rowY + tf * 0.25 }];
   const labelled = projected.filter((s) => s.label);
   // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
   // one placement keeps every stated value clear of every other (#1717's rule, one path).
   const statedDraft = statedScene(fig, t, knows.stated, projected);
+  // #2688 (ADR-AG-388): «ערכים על הסרטוט» unticked → the stated layer keeps its MARKS (arcs, knees, ticks) and writes no value
+  if (!display.values) {
+    statedDraft.requests = [];
+    statedDraft.kinds = [];
+  }
   const placed = placeSceneLabels(
     [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests],
     points,
@@ -803,7 +833,7 @@ export function buildScene(
       x1, y1, x2, y2,
       // Drawn only when the foot is far enough from the point for a tick to read at all.
       tick: len > RIGHT_ANGLE * 2 ? pathOf(rightAngleKnee({ x: x2, y: y2 }, { x: x1, y: y1 }, along, RIGHT_ANGLE)) : null,
-      label: m.label ? { text: lbl(m.label), x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
+      label: m.label && display.values ? { text: lbl(m.label), x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
     };
   });
 
@@ -827,7 +857,7 @@ export function buildScene(
         pts.map(([x, y], i) => `${i === 0 || lift.has(i) ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
         (l.closed ? 'Z' : '');
       const mid = pts[Math.floor(pts.length / 2)];
-      return { d, closed: l.closed, label: l.label ? { text: lbl(l.label), x: mid[0], y: mid[1] } : null };
+      return { d, closed: l.closed, label: l.label && display.values ? { text: lbl(l.label), x: mid[0], y: mid[1] } : null };
     });
 
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
@@ -844,7 +874,7 @@ export function buildScene(
     width,
     height,
     stated,
-    axes: { xAxisY, yAxisX, xTicks, yTicks },
+    axes: { xAxisY, yAxisX, xTicks, yTicks, gridX, gridY },
     curves,
     segments,
     arcs,

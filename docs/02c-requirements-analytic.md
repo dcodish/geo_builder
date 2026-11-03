@@ -1150,6 +1150,11 @@ a sentence the tool parsed.
 **R101 — a figure the student opens is visible**. A stale view is never carried over: a loaded save that looks empty reads as data loss.
 - Sources: #1209.
 
+**R232 — the grid, the axis numbers and the values on the figure can each be hidden, for a textbook-style print**. *(Operator, 2026-11-03: "an option to remove the grid and numbers from the axis and an option to show/hide the coordinates of the points … the save to image/word needs to also follow this"; defaults "All shown, as today"; "Saved with the figure"; then "שיעורי הנקודות should also remove the S= and any other data that is added".)* Three checkboxes on the canvas row, all ticked at first: «רשת», «מספרים על הצירים», «ערכים על הסרטוט». With the numbers hidden the axis lines and O stay. With the values hidden every value written on the figure goes: a point label is its letter alone («A(2, 3)» → «A»), and a centre's coordinates, stated lengths, angle sizes, «S=…», a median's 2x / x and an answer's value go; the letters and the marks (the centre cross, the knee, the ticks, the arcs) stay. The givens list and the data panel are unchanged. «הורידו תמונה» and «הורידו שאלה» print what is ticked; the choice is saved in the file and the share link, undoable, and an older file opens all shown.
+- «A(2,3)» · «נתון מעגל I שמשוואתו (x+3)^2+(y-4)^2=9» · untick all three → the circle, A and its cross on bare axes with O
+- «משולש ABC» · … · «שטח ABC הוא 18» · untick «ערכים על הסרטוט» → no «S=18»
+- Sources: ADR-AG-388, #2688.
+
 ---
 
 ## The ask lane and the locus

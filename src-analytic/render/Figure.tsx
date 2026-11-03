@@ -71,13 +71,13 @@ export function Figure({
       // silently lying about its own coordinates, which is the worst class of bug this tool can have.
       style={{ display: 'block', background: '#fff', direction: 'ltr' }}
     >
-      {/* grid */}
-      <g stroke={GRID} strokeWidth={1}>
-        {axes.xTicks.map((t) => (
-          <line key={`gx${t.label}`} x1={t.pos} y1={0} x2={t.pos} y2={height} />
+      {/* grid — its own positions (#2688), so «רשת» and «מספרים על הצירים» switch apart */}
+      <g stroke={GRID} strokeWidth={1} data-testid="analytic-grid">
+        {axes.gridX.map((x, i) => (
+          <line key={`gx${i}`} x1={x} y1={0} x2={x} y2={height} />
         ))}
-        {axes.yTicks.map((t) => (
-          <line key={`gy${t.label}`} x1={0} y1={t.pos} x2={width} y2={t.pos} />
+        {axes.gridY.map((y, i) => (
+          <line key={`gy${i}`} x1={0} y1={y} x2={width} y2={y} />
         ))}
       </g>
 
@@ -86,7 +86,7 @@ export function Figure({
         <line x1={0} y1={axes.xAxisY} x2={width} y2={axes.xAxisY} />
         <line x1={axes.yAxisX} y1={0} x2={axes.yAxisX} y2={height} />
       </g>
-      <g fill={AXIS} fontSize={TICK_LABEL.font} fontFamily="system-ui, sans-serif">
+      <g fill={AXIS} fontSize={TICK_LABEL.font} fontFamily="system-ui, sans-serif" data-testid="analytic-axis-numbers">
         {axes.xTicks.map((t) => (
           <text key={`tx${t.label}`} x={t.pos} y={axes.xAxisY + TICK_LABEL.below} textAnchor="middle">
             {t.label}

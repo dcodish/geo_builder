@@ -67,6 +67,7 @@ import { analyticBidi } from './i18n';
 import { questionLines } from './app/questionLines';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
+import { DISPLAY_KEYS } from './render/canvasDisplay';
 import { AskLane } from '../shell/frame/AskLane';
 import { askSettled, figureIsOpen, type Answer } from './app/ask';
 import { askOnceAnswer, drawnLoci, drawnMarks, isDrawn, removeAnswerAt, toggleDrawn } from './app/answers';
@@ -138,6 +139,9 @@ const DRAG_SLOP = 4;
  * the CARD and stopped at its edge, so what the surface did inside it drifted unmeasured.
  */
 const CANVAS_FALLBACK = { w: 720, h: 720 };
+/** #2688 — the canvas switches' labels, by key, and their look (2-D's display-toggle label, from the shared tokens). */
+const DISPLAY_LABEL = { grid: 'displayGrid', numbers: 'displayNumbers', values: 'displayValues' } as const;
+const displayToggleStyle: CSSProperties = { display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: fs.small, color: color.muted, cursor: 'pointer' };
 /** Never build a scene smaller than this — below it the tick labels collide. Mirrors 2-D's floor. */
 const CANVAS_MIN = 320;
 
@@ -164,6 +168,8 @@ export function App() {
     toggleSegHidden,
     toggleSegDashed,
     curveStyle,
+    display,
+    setDisplay,
     toggleCurveHidden,
     toggleCurveDashed,
     removeLine,
@@ -1073,9 +1079,11 @@ export function App() {
       curveStyle,
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
+      // #2688 (ADR-AG-388) — the grid / axis numbers / coordinates switches; the exports rasterise this same scene
+      display,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, display]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -1782,6 +1790,28 @@ export function App() {
                 {t(showConstruction ? 'hideConstruction' : 'showConstruction')}
               </button>
             )}
+
+            {/*
+              #2688 (ADR-AG-388) — THE CANVAS SWITCHES, a product extra on the canvas's own row: the grid, the axis
+              numbers, every value written on the figure. All ticked by default (today's canvas). The scene reads them, so «הורידו
+              תמונה» and «הורידו שאלה», which rasterise the drawn <svg>, print exactly what is ticked.
+            */}
+            <span data-testid="canvas-display" style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {DISPLAY_KEYS.map((k) => (
+                <label key={k} style={displayToggleStyle}>
+                  <input
+                    type="checkbox"
+                    data-display={k}
+                    checked={display[k]}
+                    onChange={(e) => {
+                      logAnalytic({ kind: 'action', action: 'display', detail: `${k}=${e.target.checked ? 'on' : 'off'}` });
+                      setDisplay(k, e.target.checked);
+                    }}
+                  />
+                  {t(DISPLAY_LABEL[k])}
+                </label>
+              ))}
+            </span>
 
             <span style={rowSpacerStyle} />
 

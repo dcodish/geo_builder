@@ -157,6 +157,49 @@ async function driveCase(browser, spec, outDir, prefix) {
           await typeLine(st.type);
           continue;
         }
+        // #2688: a control by its visible text — a checkbox's <label>, or a button
+        if (st.click !== undefined) {
+          const label = page.locator('label', { hasText: st.click }).first();
+          const target = (await label.count()) ? label : page.getByRole('button', { name: st.click }).first();
+          if ((await target.count()) === 0) {
+            steps.push({ line: `(click «${st.click}»)`, refusals: [`no control reading «${st.click}»`] });
+            break;
+          }
+          await target.click();
+          await waitForSettle(page);
+          steps.push({ line: `(click «${st.click}»)`, refusals: await freshRefusals() });
+          await shoot(`click-${steps.length}`);
+          continue;
+        }
+        // #2688: a reload — the stored session is offered back; take it («המשך»)
+        if (st.reload) {
+          await page.reload({ waitUntil: 'networkidle' });
+          await waitForSettle(page);
+          await dismissModal(page);
+          const resume = page.getByRole('button', { name: /^המשך/ }).first();
+          if (await resume.count()) {
+            await resume.click();
+            await waitForSettle(page);
+          }
+          steps.push({ line: '(reload)', refusals: [] });
+          await shoot('reload');
+          continue;
+        }
+        // #2688: a download (the PNG of «הורידו תמונה»), saved beside the shots so the report shows the FILE
+        if (st.download !== undefined) {
+          const btn = page.getByRole('button', { name: st.download }).first();
+          if ((await btn.count()) === 0) {
+            steps.push({ line: `(download «${st.download}»)`, refusals: [`no button reading «${st.download}»`] });
+            break;
+          }
+          const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), btn.click()]);
+          const ext = path.extname(dl.suggestedFilename()) || '.bin';
+          const file = `${prefix}-${String(++n).padStart(2, '0')}-download${ext}`;
+          await dl.saveAs(path.join(outDir, file));
+          shots.push({ file, label: `downloaded ${dl.suggestedFilename()}` });
+          steps.push({ line: `(download «${st.download}»)`, refusals: [] });
+          continue;
+        }
         const box = page.locator('li > input[type="checkbox"]').nth(st.toggle - 1);
         if ((await box.count()) === 0) {
           steps.push({ line: `(toggle row ${st.toggle})`, refusals: [`no checkbox on fact-list row ${st.toggle}`] });

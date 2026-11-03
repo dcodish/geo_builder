@@ -80,8 +80,15 @@ export function validateSheet(sheet, products) {
         c.after.forEach((st, k) => {
           const ok =
             (st && Number.isInteger(st.toggle) && st.toggle >= 1 && Object.keys(st).length === 1) ||
-            (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1);
-          if (!ok) problems.push(`${at}: after[${k}] must be { "toggle": <row, 1-based> } or { "type": "<utterance>" }`);
+            (st && typeof st.type === 'string' && st.type.trim() !== '' && Object.keys(st).length === 1) ||
+            // #2688: a control on the page by its visible text (a checkbox's label, a button), a reload, a download
+            (st && typeof st.click === 'string' && st.click.trim() !== '' && Object.keys(st).length === 1) ||
+            (st && typeof st.download === 'string' && st.download.trim() !== '' && Object.keys(st).length === 1) ||
+            (st && st.reload === true && Object.keys(st).length === 1);
+          if (!ok)
+            problems.push(
+              `${at}: after[${k}] must be { "toggle": <row, 1-based> }, { "type": "<utterance>" }, { "click": "<visible text>" }, { "download": "<button text>" } or { "reload": true }`,
+            );
         });
     }
     // #2654 (ADR-W-168): the checks that let a 👁 case close without the operator.
@@ -153,7 +160,13 @@ const afterSteps = (after) =>
     .map((st) =>
       st.toggle !== undefined
         ? `<p class="step">☐ לחצו על תיבת הסימון בשורה ${esc(st.toggle)} ברשימת הנתונים</p>`
-        : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
+        : st.click !== undefined
+          ? `<p class="step">☐ לחצו על «${esc(st.click)}»</p>`
+          : st.download !== undefined
+            ? `<p class="step">☐ לחצו על «${esc(st.download)}» ופתחו את הקובץ שירד</p>`
+            : st.reload
+              ? `<p class="step">☐ רעננו את הדף (F5) ובחרו «המשך»</p>`
+              : `<pre class="lines" dir="rtl">${esc(st.type)}</pre>`,
     )
     .join('\n');
 

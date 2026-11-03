@@ -1271,6 +1271,16 @@
       "chosen": true,
       "at": "2026-11-03T15:35:36.191Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-2688-display-labels",
+      "kind": "text",
+      "issue": "#2688",
+      "what": "the three analytic canvas checkbox labels (grid / axis numbers / values on the figure; widened by the operator 2026-11-03)",
+      "choice": "«רשת» · «מספרים על הצירים» · «ערכים על הסרטוט» (en: \"Grid\" · \"Axis numbers\" · \"Values on the figure\")",
+      "chosen": true,
+      "at": "2026-11-03T17:39:42.131Z",
+      "status": "pending"
     }
   ],
   "demoted": {

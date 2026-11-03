@@ -43,6 +43,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     segStyle: envelope.segStyle,
     // #2238 — the curve display choices, cleaned by the store the same way
     curveStyle: envelope.curveStyle,
+    // #2688 — the canvas switches (grid / axis numbers / coordinates); absent = all shown
+    display: envelope.display,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:
