@@ -741,11 +741,16 @@ driven coordinate, and the pivot runs on a solid-less figure that holds one (`ha
 fork drives a scalar statement when **its reach includes a free DOF** (`statementReachesFreeDof3`, [ADR-3D-393](06b-decisions-3d.md#adr-3d-393)):
 the solids have free dims, or a point it names — or a point one of those is built from (`pointParents3`, a total
 switch over `PointDef`) — carries a `drivable` entry of the carrier table (`reachesFreeCarrier3`, `carriers.ts`). The
-carrier reach is read only on a figure with a solid; on a solid-free figure #1311's clause (a NAMED `free3` point)
-stays the claim arm's second condition. Every
-drive-or-claim site in `apply.ts` asks it (the claim arm and its magnitude demotion, `cos-angle`, `mag-rel`,
-`mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane);
-`freeDims` stays a count. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
+carrier reach is read wherever the pivot runs — a figure with a solid, or one holding a `free3` point (the pivot's own
+entry gate, [ADR-3D-408](06b-decisions-3d.md#adr-3d-408)) — so on an empty canvas the points a line creates are driven
+by it, with no solid frame: the gauge is the sample, and «הציגו תצורה אחרת» re-samples it. A figure with neither
+(coordinates and a rider on them, #1816) reaches nothing the drive can move. Every
+drive-or-claim site in `apply.ts` asks it alone, with no solid count beside it (the claim arm and its magnitude
+demotion, the plane-equation pin, `length-rel`, `cos-angle`, `mag-rel`, `mag-val`, `concyclic`, `dot-eq`, `cos-eq`, the
+angle-letter pair, `bisector-dir`, `line-plane-angle`, ⟂/∥-to-plane); `freeDims` stays a count. The pivot's
+admissibility (`settleFlatRings`) runs on a solid-free figure too, and #2503's degenerate-operand check reads a
+relation's PLANE operands beside its pairs (`pinOperandPlanes3`): a solution where a ⟂ / ∥ / angle-to-plane holds only
+because the plane's points fell on one line is not a configuration, so «AB∥ACD» · «AB ⊥ ACD» is a contradiction. On a rigid figure the FIRST magnitude is still the #754 scale given; a later magnitude
 that reads a free carrier, or arrives while the scale given does, **demotes** it to a pin recorded as its own
 arbiter (`given: true`), and its fact joins the pin owners so a later contradiction names it. A later magnitude
 that reads no free carrier is then checked exactly (`magnitudeSizeStated3`, `scaleGiven.ts`).

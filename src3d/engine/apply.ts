@@ -2249,7 +2249,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (prior) {
           const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
           const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
-          if (statementReachesFreeDof3(c, [a, b, cc, d]) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
+          if (statementReachesFreeDof3(c, [a, b, cc, d])) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
           else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
         }
       }
@@ -2575,8 +2575,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // magnitude would read refuted. Such a statement stays with the claim arbiter below.
         const symbolDefined = claimPointIds(c, cmd.claim).some((id) => c.vecDefs.some((vd) => vd.symbol && vd.unknown === id));
         const mag = symbolDefined ? null : magnitudeScalarPin(cmd.claim);
-        // #1782 (ADR-3D-393): free dims, or a free carrier of a solid figure in reach (the solid-free `free3` clause
-        // keeps its own length arm below, byte-preserved)
+        // #1782 (ADR-3D-393): free dims, or a free carrier in reach — #2609 (ADR-3D-408): on any figure the pivot runs
+        // on, a solid-free one of created points included (the `free3` clause keeps its own length arm below)
         if (mag && reaches) {
           if (c.scaleGivens.length > 0) {
             next.scaleGivens = [];
@@ -2689,8 +2689,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // `injection-unsatisfiable`. The claim record is KEPT (fall through): points the
       // pivot cannot place (symbol-defined, resolved post-pivot) skip the residual, so
       // the final claim verification is what guarantees EVERY named point. A coord-only
-      // figure (no solid, nothing to drive) is the plain verified claim.
-      if (cmd.claim.type === 'plane-eq' && c.solids.length > 0) {
+      // figure (no solid, nothing to drive) is the plain verified claim. #2609 (ADR-3D-408): a
+      // solid-free figure whose named points the statement's reach can move («המישור KBC: …» over
+      // created points) drives too — the one predicate, not a solid count.
+      if (cmd.claim.type === 'plane-eq' && (c.solids.length > 0 || statementReachesFreeDof3(c, cmd.claim))) {
         next.planePins.push({ ids: [...cmd.claim.ids], cx: cmd.claim.cx, cy: cmd.claim.cy, cz: cmd.claim.cz, d: cmd.claim.d });
       }
       // #584 (ADR-3D-148): a claim naming an explicit plane RUN («המישור ABS: x=0») references a
@@ -3607,7 +3609,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           }
         }
       }
-      if (freeDims(next) > 0) {
+      // #2609 (ADR-3D-408): the statement's reach, as at every sibling drive site — this arm still asked `freeDims`, so
+      // «אורך AS שווה לאורך AB» over created points (and a rider's ratio on a rigid cube) was judged on the sample
+      if (statementReachesFreeDof3(next, [cmd.a1, cmd.b1, ...pair2])) {
         next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
         recordPinGiven(next, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }); // #1567 (ADR-3D-285)
         return { ok: true, next };
@@ -3937,7 +3941,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: true, next };
         }
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
       return { ok: true, next };
     }
@@ -3967,7 +3971,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of [...cmd.e1, ...cmd.e2]) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       else next.claims.push({ type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
       return { ok: true, next };
     }
@@ -3986,7 +3990,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of cmd.e) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
       else next.claims.push({ type: 'mag-val', e: cmd.e, value: cmd.value });
       return { ok: true, next };
     }
@@ -3999,7 +4003,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (miss) return { ok: false, error: miss };
       if (cmd.ids.length !== 4) return { ok: false, error: { code: 'bad-solid', kind: 'pyramidQuadR' } };
       const next = clone(c);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
       else next.claims.push({ type: 'concyclic', ids: cmd.ids });
       return { ok: true, next };
     }
@@ -4014,7 +4018,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         drawAtom(next, a);
         drawAtom(next, b);
       }
-      const drive = statementReachesFreeDof3(c, cmd) && c.solids.length > 0;
+      const drive = statementReachesFreeDof3(c, cmd);
       for (let i = 1; i < cmd.ops.length; i++) {
         const [a, b] = cmd.ops[i - 1];
         const [cc, d] = cmd.ops[i];
@@ -4032,7 +4036,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.base);
       drawAtom(next, cmd.a);
       drawAtom(next, cmd.b);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       return { ok: true, next };
     }
@@ -4072,7 +4076,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       const next = clone(c);
       for (const at of [cmd.a, cmd.b, cmd.c, cmd.d]) drawAtom(next, at);
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       return { ok: true, next };
     }
@@ -4118,7 +4122,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
         const next = clone(c);
         const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
-        if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
+        if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
         else next.claims.push({ type: 'bisector-dir', ...pin });
         if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
         return { ok: true, next };
@@ -4168,7 +4172,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       const deg = cmd.deg!;
-      if (statementReachesFreeDof3(c, cmd) && c.solids.length > 0)
+      if (statementReachesFreeDof3(c, cmd))
         next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       return { ok: true, next };

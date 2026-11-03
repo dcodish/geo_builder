@@ -750,7 +750,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   every solid noun whose declaration the grammar reads (cube, box, tetrahedron, a four-letter pyramid). On a figure, new letters create their solid the same way, with the notice. «נפח הגוף
   ABCDE» names no family and stays refused. A later line that contradicts the created solid is refused as the
   contradiction, never «no such solid».
-  - Sources: ADR-3D-382, ADR-3D-399, ADR-W-162; #1467, #2048, #1566.
+  **The created points are placed so the line holds** (#2609): «שטח המשולש ABC = 4.5», «AB∥ACD», «∠SAB = ∠SAD»,
+  «אורך AB=BC», «קוסינוס הזווית ACB = 3/4» on an empty canvas build with the stated value true on the drawing, and
+  «הציגו תצורה אחרת» varies everything the line did not state. Two lines that cannot both hold («AB∥ACD» then «AB ⊥
+  ACD») are refused as the contradiction, naming the earlier line.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-408, ADR-W-162; #1467, #2048, #1566, #2609.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two

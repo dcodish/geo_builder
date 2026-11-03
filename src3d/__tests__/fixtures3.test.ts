@@ -484,6 +484,12 @@ const SEEDED: SeededCorpus = {
   'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
   'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
   'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
+
+  // #2609 (ADR-3D-408) — a relation over points the line created places them on a figure with no solid (before: both
+  // refused «point-not-determined»). The stated value at seeds 0–23, the contradiction and the controls are asserted
+  // in blank-canvas-drive-2609.test.ts.
+  'blank-area-triangle-2609.geo3.json': ['שטח המשולש ABC = 4.5'],
+  'blank-line-parallel-plane-2609.geo3.json': ['AB∥ACD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
