@@ -541,8 +541,26 @@ export function locusOf(
 ): LocusResult | null {
   const walked = walkedLocusOf(c, id, seeds, bounds);
   if (!walked) return null;
-  const components = walked.components.filter((cp) => cp.trace.pieces.length > 0);
+  const components = walked.components.filter((cp) => cp.trace.pieces.length > 0 && moves(cp.trace));
   return components.length > 0 ? { components } : null;
+}
+
+/**
+ * A WALK THAT NEVER LEAVES ITS START IS NOT A CURVE (#2628, ADR-AG-380). The figure can be free in a way that leaves the
+ * named point where it is («A(a,0)» with `a` held: the walk moves B and C, and A stays put) — `hasLocus`'s own "does THIS
+ * point move" test, applied to the walk. Such a trace used to fall out as an unmeasurable shape and answer nothing; now
+ * that an unnamed shape is DRAWN, it must be filtered here, where `null` already means "the point named does not move".
+ */
+function moves(trace: LocusTrace): boolean {
+  const pts = trace.points;
+  if (pts.length < 2) return false;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  const scale = 1 + Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minY), Math.abs(maxY));
+  return Math.hypot(maxX - minX, maxY - minY) > 1e-6 * scale;
 }
 
 function walkedLocusOf(
@@ -775,11 +793,13 @@ function walkedLocusOf(
   const primary = componentsAt(seeds[0]);
   if (!primary) return null;
 
-  // The shown point's own component must measure or there is nothing honest to say (the pre-#1500
+  // The shown point's own component must measure or there is nothing honest to NAME (the pre-#1500
   // rule, unchanged); an EXTRA component that will not measure is dropped rather than poisoning the
   // whole answer — the result degrades to what the tracer answered before discovery existed.
+  // When the shown component itself does not measure, the set is drawn unnamed (#2628, ADR-AG-380), and
+  // drawn WHOLE: every component discovery found, so an unnamed answer is never half of the set (#1500).
   const primaryShape = shapeOfTrace(primary[0].points);
-  if (!primaryShape) return { components: [{ trace: primary[0], shape: null }] };
+  if (!primaryShape) return { components: primary.map((trace) => ({ trace, shape: null })) };
   const held: Array<{ trace: LocusTrace; shape: LocusShape }> = [{ trace: primary[0], shape: primaryShape }];
   for (const t of primary.slice(1)) {
     const s = shapeOfTrace(t.points);

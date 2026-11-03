@@ -1832,6 +1832,20 @@ CAS: measure → snap → verify on a ratio. The kind itself is read by `kindCon
 
 *Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic`
 
+#### Drawn is not named: an unnamed set is still drawn ([ADR-AG-380](06c-decisions-analytic.md#adr-ag-380), #2628)
+
+`askOne`'s locus lane splits DRAWABLE from NAMED. `locusOf` returns components whenever the walk traced a set; a
+component's `shape` is the gate's verdict and may be `null` (the fit is outside `classify`'s family: a translated or
+y-axis parabola, a translated ellipse, a hyperbola, a tilted conic; or the families differ between configurations).
+When every component has a shape the row is `kind · equation` as below. Otherwise, after the point-set checks
+(ADR-AG-136), the row is `kindWord('unnamed', n)` (`locus.unnamed`, `locus.unnamed.2`) and every component is drawn
+(`drawnComponents`, the one builder of `Answer.locus`). When the shown component does not measure, `locusOf` returns
+every discovered component unnamed, so the drawing is the whole set. A walk that never leaves its start (`moves`) is no
+component: the point named does not move, and `locusOf` answers `null`. `classify` stays the INPUT gate, untouched.
+#2664's wider family names what reaches `'unnamed'` today, through the same `kindWord` seam.
+
+*Identifiers:* `locus.unnamed` · `drawnComponents` · `moves` · `LocusKindWord`
+
 #### The set can be a UNION, and the tracer covers every component ([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166), #1500)
 
 `locusOf` discovers every component in CARRIER space, never only through the sampler

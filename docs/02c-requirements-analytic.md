@@ -53,7 +53,7 @@ expected by heart. No hyperbola appears in twenty sampled exams.
 **R173 — NO CAS** ([ADR-AG-001](06c-decisions-analytic.md#adr-ag-001) D1; operator authority). The equation layer parses and evaluates, never simplifies, solves or manipulates symbolically; pinning a parameter is a numeric root-find of one or two degrees of freedom. A value that moves with a parameter is never written as an expression in it: «הביעו באמצעות k» is not answered.
 - Sources: ADR-AG-001, ADR-AG-072.
 
-**R174 — The curve family is closed: the line, the circle, the canonical parabola `y² = 2px` and the canonical ellipse `x²/a² + y²/b² = 1`.** Each other curve (a hyperbola, a rotated or translated conic, a parabola on the y-axis) is refused by name; adding one is a decision, not a fix. A figure may hold as many parabolas and ellipses as the question does.
+**R174 — The curve family is closed: the line, the circle, the canonical parabola `y² = 2px` and the canonical ellipse `x²/a² + y²/b² = 1`.** Each other curve (a hyperbola, a rotated or translated conic, a parabola on the y-axis) is refused by name; adding one is a decision, not a fix. A LOCUS that is one of those curves is drawn without a name (R225). A figure may hold as many parabolas and ellipses as the question does.
 - Sources: ADR-AG-018.
 
 **What the tool shows, and what it never shows.**
@@ -1198,6 +1198,13 @@ a sentence the tool parsed.
 - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"*
 - Sources: ADR-AG-072, #1301, ADR-AG-141, ADR-052, ADR-AG-166, #1500, #1508, ADR-AG-245, #1817, ADR-AG-340, ADR-AG-341, #1138, ADR-AG-352.
 - **Amended by R199 (ADR-AG-351):** the equation also prints when the set varies with the student's letters in a way the tool can state and verify.
+- **Amended by R225 (ADR-AG-380):** a traced set whose family the tool does not name is still drawn, with a row that says so.
+
+**R225 — a locus outside the named family is drawn, not named**. *(Operator, sr-26, 2026-11-02 (ADR-W-175): inputs and answers share one curve family, and "an answer outside the family draws the curve without naming it"; R87's "the trace draws whenever the point has one free DOF".)* When a point has a one-dimensional locus whose family is not one R174 names — a parabola off the origin or on the y-axis, a translated ellipse, a hyperbola, a tilted conic, or a set whose family changes between configurations — the whole set is drawn and the row reads «עקומה (הכלי עדיין לא מזהה את סוגה)» ("a curve (the tool cannot name its kind yet)"), or «שתי עקומות (הכלי עדיין לא מזהה את סוגן)» for two components. No kind and no equation are printed, not even for part of a union. A point the givens leave free but that does not itself move draws nothing. A curve the student STATES stays inside R174's family. Widening the family for both is #2664.
+- חורף 2024 (`exam-2024w-locus-1138`): «המקום הגיאומטרי של C» → C's curve drawn, «עקומה (הכלי עדיין לא מזהה את סוגה)»; M and B read as before
+- «A(2,0)» · «B(6,0)» · «נקודה P» · «PA + PB = 10» → the ellipse drawn, unnamed
+- «A(0,2)» · «l: y = -2» · «נקודה X» · «XA = d_{Xl}» → the parabola x² = 8y drawn, unnamed
+- Sources: ADR-AG-380, #2628, ADR-W-175 (sr-26), #2664.
 
 **R199 — a locus that moves with the student's letters is written in those letters**. *(Operator, round #1181 T26: "the shape still doesnt have the a shown"; PR #1341 T16: "it would be nice if the locus would show x-4a=0"; ruling 11A, 2026-10-30: two letters, so the book's p10-9 answers x²/(4a²) + y²/b² = 1.)* When a single-component locus is the same family at every configuration and each of its canonical parameters (a line's coefficients, a circle's centre and r², a parabola's 2p, an ellipse's a² and b²) is a constant times a power of at most two of the student's letters (total degree ≤ 2), the row prints that equation in the letters, the same at every «הציגו תצורה אחרת» — after the tool has checked it against the traced curve at every configuration it sampled. Anything else (a dependence like `a + 1`, three letters, a union) keeps the kind alone. The kind of such a locus is named at every configuration, never at some and not others (#2608).
 - «A(-9a,0)» · «B(41a,0)» · «נקודה P» · «PA מאונך ל-PB» → «מעגל · (x − 16a)² + y² = (25a)²»
