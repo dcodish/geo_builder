@@ -484,6 +484,13 @@ const SEEDED: SeededCorpus = {
   'guide-needs-height-1566.geo3.json': ['פירמידה ABCDS', 'גובה הפירמידה'],
   'common-perp-created-1566.geo3.json': ['הישר d מאונך לישר ℓ1 ולישר ℓ2'],
   'pyramid-volume-created-1566.geo3.json': ['נפח הפירמידה ABCDS = 11'],
+
+  // #2610 (ADR-3D-409) — a face, or a plane named by four letters, over letters a blank canvas lacks: created in one
+  // plane (before: refused «segments-do-not-meet» / «not-coplanar»). The coplanarity, the notice and the controls are
+  // asserted in coplanar-mint-2610.test.ts.
+  'face-diagonals-blank-2610.geo3.json': ['O מפגש האלכסונים של הפאה ABCD'],
+  'plane-cut-four-letters-blank-2610.geo3.json': ["ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'"],
+  'projection-on-four-letter-plane-blank-2610.geo3.json': ['BE היטל הישר TB על המישור ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

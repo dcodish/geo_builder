@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-03T09:14:22.035Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "BE היטל הישר TB על המישור ABCD",
+      "cmds": [
+        {
+          "type": "line-through",
+          "name": "TB",
+          "a": "T",
+          "b": "B"
+        },
+        {
+          "type": "plane-through",
+          "name": "plane-ABCD",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "line-projection",
+          "name": "BE",
+          "line": "TB",
+          "plane": "plane-ABCD"
+        }
+      ]
+    }
+  ]
+}

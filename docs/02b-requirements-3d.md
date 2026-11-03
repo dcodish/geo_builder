@@ -750,7 +750,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   every solid noun whose declaration the grammar reads (cube, box, tetrahedron, a four-letter pyramid). On a figure, new letters create their solid the same way, with the notice. «נפח הגוף
   ABCDE» names no family and stays refused. A later line that contradicts the created solid is refused as the
   contradiction, never «no such solid».
-  - Sources: ADR-3D-382, ADR-3D-399, ADR-W-162; #1467, #2048, #1566.
+  **A plane, face or polygon named by four or more letters is created in one plane** (#2610): «O מפגש האלכסונים של
+  הפאה ABCD» or «… של המרובע ABCD» on an empty canvas creates quadrilateral ABCD as «מרובע ABCD» declares it (a flat
+  convex polygon in the order written, free sizes) and then O, as 2-D does; «המישור BCC'B'», «E על המישור ABCD», a
+  projection onto «המישור ABCD» create the plane's missing letters so that all of them lie in it (the fourth and later
+  ones ride the plane through the first three). Letters already on the figure stay where they are; four existing
+  points that are not in one plane, named as a plane, are still refused.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-W-162; #1467, #2048, #1566, #2610.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two

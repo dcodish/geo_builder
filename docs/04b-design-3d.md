@@ -518,6 +518,18 @@ commands in `expandFact`, so it applies at the row, in list order. Its new point
 because of a LATER row keeps what it created:** the refold drops a minted row only if it also fails in the fold of the
 rows up to it (`ownFailure`), so a contradiction between two statements is reported as one, never as a missing object.
 
+**The operand's assertion travels with the missing point** ([ADR-3D-409](06b-decisions-3d.md#adr-3d-409), #2610):
+before minting a point, the pass asks `assertedRunOf3(f.cmds, id)` (`engine/mintable.ts`) what the line says about it
+— a structural walk over the fields that hold a run of 4+ letters. A **polygon run** (a `face` field, a `plane-run`
+with `face: true`) is created by the polygon's declaration, `polygonDeclaration3(ids)` (`parser/parse3.ts`, the parser
+reading «מרובע ABCD» / «מחומש ABCDE»), applied atomically through the solid channel (`presolids`, ADR-3D-399): its
+clash rules are inherited and its refusal is the line's. A **named plane run** (a `plane-through` declaration's ids)
+mints a missing member `free3` until three members the figure holds are non-collinear (`spansPlane3`, read off
+`evaluate3`); each further missing member is minted as an `on-plane` rider of the run's own plane (the plane that
+names it, 2 sampled DOFs; `planeFromPointRun` seats it from the members already placed). Riders are carried to the
+refold by `preriders` (point → plane), applied over the `premint` points. An **anonymous plane run** (a `plane-run`
+operand or a `plane` / `p1` / `p2` field holding letters) names no plane a rider could ride, and is minted free as before.
+
 ### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
 
 `CatalogEntry3.needs?: { he: string[]; en: string[] }` holds the lines an example needs on an empty canvas.
