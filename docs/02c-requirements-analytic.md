@@ -1008,7 +1008,9 @@ a sentence the tool parsed.
 - «V(0,0)» · «X(4,0)» · «Y נמצאת על הישר y=x» · «שיעור ה-x של Y הוא 0» → recorded, «V ו-Y נפלו על אותה נקודה.»
 - «N1(1,1)» · «N2(1,1)» · «קטע N1N2» → recorded, «N1 ו-N2 נפלו על אותה נקודה.»
 - «A(0,0)» · «B(4,0)» · «M אמצע AB» · «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
-- Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401.
+- **On the canvas the two letters are ONE label, «C=E», as 2-D writes it** (operator ruling 2026-11-04, card q5 = A; [ADR-AG-393](06c-decisions-analytic.md#adr-ag-393), #2696): the letters in alphabetical order joined by «=», written once, with the stated coordinates of the dot when it has any («V=Y(0, 0)»). Both points stay.
+  - «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18» → E falls on C: «C=E», never «CE»
+- Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401, ADR-AG-393, #2696.
 
 **R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
 - «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message

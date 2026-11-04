@@ -1742,6 +1742,13 @@ beside each of up to 32 points along its own trace (`alongTrace`, the midpoint f
 its own curve (`LabelRequest.avoid`), and it yields to every stated value (priority 2). `Figure.tsx` centres it on the
 returned position, as every placed label.
 
+#### Two letters on one dot are one label ([ADR-AG-393](06c-decisions-analytic.md#adr-ag-393), #2696)
+
+`App.tsx` hands `buildScene` the pairs R214's notice reads (`coincidencesOf`, as `SceneKnowledge.coincidences`);
+`buildScene` joins them with 2-D's rule, `shell/converge` `mergedLabels` (2-D's `src/render/scene.ts` calls the same
+function): the alphabetically first id carries «C=E», the others carry `''` (`hasLetter` false — no letter placed, no
+label box). The carrier writes its own stated coordinates, else the first member's that has any.
+
 #### Where a point's letter is written ([ADR-AG-389](06c-decisions-analytic.md#adr-ag-389), #2691)
 
 `placePointLetters` runs in `buildScene` before `placeSceneLabels`: 2-D's seed (`outwardDir`, the widest gap between the

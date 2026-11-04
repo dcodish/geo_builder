@@ -13,6 +13,7 @@ import { fmtAnalytic } from '../format';
 import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
+import { mergedLabels } from '../../shell/converge';
 import { tickStep } from '../../shell/ticks';
 import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
@@ -215,6 +216,9 @@ export function pointLabelAnchor(p: ScenePoint): { x: number; y: number } {
   return p.at ?? { x: p.cx + POINT_LABEL.dx, y: p.cy + POINT_LABEL.dy };
 }
 
+/** #2696: does this point write a label? A merged label's non-carrier members («C=E»'s E) write none. */
+export const hasLetter = (p: ScenePoint): boolean => p.label !== '' || p.coords !== undefined;
+
 /** A point label's width, and whether a subscript deepens it. */
 function pointLabelSize(p: ScenePoint): { w: number; sub: boolean } {
   const f = POINT_LABEL.font;
@@ -339,6 +343,8 @@ export function placePointLetters(
   const dots = points.map((p) => ({ p, box: { x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 } }));
   const order = [...points].sort((a, b) => a.cx - b.cx || a.cy - b.cy);
   for (const p of order) {
+    // #2696: a member of a merged label («C=E») writes no letter — its carrier writes the group's
+    if (!hasLetter(p)) continue;
     const { w, sub } = pointLabelSize(p);
     const h = f * 1.05 + (sub ? 3 : 0);
     const reachOf = Math.hypot(w, h) + LETTER_RING2 + 4;
@@ -512,12 +518,12 @@ export function placeSceneLabels(
   view?: { width: number; height: number },
 ): Array<{ x: number; y: number }> {
   const obstacles: LabelBox[] = [
-    ...points.map(pointLabelBox),
+    ...points.filter(hasLetter).map(pointLabelBox),
     ...points.map((p) => ({ x0: p.cx - 4, y0: p.cy - 4, x1: p.cx + 4, y1: p.cy + 4 })),
     ...furniture,
   ];
   /** A point's label and dot — the one thing a label may never cover, whatever its priority. */
-  const hard = obstacles.slice(0, points.length * 2);
+  const hard = obstacles.slice(0, points.filter(hasLetter).length + points.length);
   // #1733: a higher-priority label is placed first, so a lower one yields to it (2-D's rule at a crowded vertex: the
   // angle value stays at its angle, and the length moves).
   const order = reqs.map((_, i) => i).sort((a, b) => (reqs[a].priority ?? 1) - (reqs[b].priority ?? 1) || a - b);
@@ -801,6 +807,11 @@ export interface SceneKnowledge {
   circleShaped?: (id: string) => boolean;
   /** #2688 (ADR-AG-388) — the grid / axis numbers / point coordinates switches. Absent = all shown (today's canvas). */
   display?: CanvasDisplay;
+  /**
+   * #2696 (ADR-AG-393) — the pairs of letters drawn at one place (`app/coincidences` `coincidencesOf`, the same pairs
+   * R214's notice reads). Each group is written as ONE label, «C=E», by 2-D's rule (`shell/converge` `mergedLabels`).
+   */
+  coincidences?: readonly (readonly [string, string])[];
 }
 
 /** Does a drawn point stand here? The centre mark's label defers to it (#1086). */
@@ -981,8 +992,10 @@ export function buildScene(
     feet: c.feet.map((f) => ({ cx: t.sx(f.x), cy: t.sy(f.y) })),
   }));
 
-  const bare: ScenePoint[] = fig.points.map((p) => {
-    const prov = fig.provenance[p.id];
+  // #2696 (ADR-AG-393): two letters on one dot are ONE label, «C=E» — 2-D's join (ADR-486), read from shell
+  const merged = mergedLabels(knows.coincidences ?? []);
+  const coordsOf = (id: string): ScenePoint['coords'] => {
+    const prov = fig.provenance[id];
     /**
      * A STATED EXPRESSION BEATS THE INVENTED SYMBOL (#1230).
      *
@@ -1002,19 +1015,27 @@ export function buildScene(
         ? { text: fmtAnalytic(comp.value as number) }
         : comp?.expr
           ? { text: comp.expr }
-          : { text: axis, sub: p.id };
+          : { text: axis, sub: id };
     // Shown when the givens said SOMETHING about this point — a number OR an expression the student
     // wrote. A point described by nothing, or only by a constraint shared with others, carries its
     // name alone.
     const any = prov && (prov.x.known || prov.y.known || !!prov.x.expr || !!prov.y.expr);
-    return {
-      id: p.id,
-      cx: t.sx(p.x),
-      cy: t.sy(p.y),
-      label: p.id,
-      // #2688: «ערכים על הסרטוט» unticked → the letter alone; every label box below is measured from this
-      coords: any && display.values ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined,
-    };
+    // #2688: «ערכים על הסרטוט» unticked → the letter alone; every label box below is measured from this
+    return any && display.values ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined;
+  };
+  const bare: ScenePoint[] = fig.points.map((p) => {
+    const label = merged.get(p.id) ?? p.id;
+    /**
+     * A merged label's carrier writes the stated coordinates of the dot: its own, else the first member's that has any
+     * (the members ARE one point, so any member's stated coordinates describe it — a stated value stays visible).
+     */
+    const coords =
+      label === ''
+        ? undefined
+        : merged.has(p.id)
+          ? label.split('=').map(coordsOf).find((c) => c !== undefined)
+          : coordsOf(p.id);
+    return { id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label, coords };
   });
 
   /**

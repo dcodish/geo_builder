@@ -15036,7 +15036,7 @@ The one moving point now carries the whole change, so its own move is larger tha
 
 It reads the scene as drawn, so it holds with every #2688 switch on or off (a letter-only box is placed with the values off). With #1863 (round #2678) the conic chip's marks are ink too: `buildScene` builds the role marks before the letters, each directrix joins the hard ink and each focus dot is a dot no letter may cover (`placePointLetters`' `marks`); the sweep runs every figure again with every stated conic's chip on «both».
 
-**Unchanged.** The figure, every point's position, every mark and value rule, the panel, the exports' path (they rasterise this scene). Two letters on one dot are still two letters, now side by side (2-D's «B=E» merge, ADR-486, is not ported here: not asked).
+**Unchanged.** The figure, every point's position, every mark and value rule, the panel, the exports' path (they rasterise this scene). Two letters on one dot are still two letters, now side by side (2-D's «B=E» merge, ADR-486, is not ported here: not asked). **⚠ Amended by [ADR-AG-393](#adr-ag-393)** (operator ruling 2026-11-04): they are now one label, «C=E».
 
 **Measured after.** The same sweep: **0 crossings of ink, 0 letter overlaps, 0 dots covered**. Scene build over the 110 fixtures 29.6 → 34.8 ms in all; the worst fixture +8.6 % of its derive + scene (0.28 ms), under the 10 % bar.
 
@@ -15065,3 +15065,20 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Locks.** `src-analytic/__tests__/issue-2689-answer-label-in-view.test.ts` — the five figures × four seeds × three canvases (the canvas label equals the panel's value and its box is inside), the bound on a length and on a candidate-bound value at the edge, no bound without a view, and the height's value inside the view.
 
 **Behaviour change for a student:** a locus equation (and a height's value) is written whole inside the canvas; at the edge it moves along its curve to where it fits, and it no longer sits on a point's letter or a stated value. Before, it could be cut off at the edge.
+
+## ADR-AG-393 — Two letters on one dot are written as one label, «C=E», by 2-D's join rule, now shared in shell (#2696)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P3, analytic) · round #2697 · branch `fix/2696-coincident-letters-join` (stacked on `fix/2689-locus-label-edge`) · amends [ADR-AG-389](#adr-ag-389)'s "two letters, side by side"
+**Requirements:** [02c](02c-requirements-analytic.md) R214 (amended: on the canvas the pair is one label) · **Design:** [04c](04c-design-analytic.md) § *Two letters on one dot are one label* (new).
+
+**Context.** On the operator's #2691 figure («משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18») the altitude's foot E lands on C (seeds 0, 3) or on B (seeds 1, 2). Measured at `52fefb5f`: `coincidencesOf` has the pair, R214's notice says so, and the canvas placed two letter boxes side by side — the student read «CE». 2-D writes one label «C=E» (ADR-486). **Operator ruling 2026-11-04 (card q5 = A): match 2-D.**
+
+**The class.** *A coincidence the builder already knows (the notice's pairs) never reached its canvas* — every pair, every figure; analytic's scene had no merge at all.
+
+**Decision.** 2-D's join (the union-find over the pairs, alphabetically first id carries the members sorted and joined by «=», the others `''`) moves verbatim from `src/render/scene.ts` to `shell/converge.ts` `mergedLabels`, beside the notice's `coincidentPairs` it pairs with; 2-D's `buildScene` calls it (no 2-D behaviour change — `issue-942-coincident-views.test.ts` re-run green). Analytic's `buildScene` takes `SceneKnowledge.coincidences` — `App.tsx` passes `coincidencesOf(d)`, the same pairs the notice reads, so the canvas and the notice agree — and writes the carrier's label from `mergedLabels`. A silent member (`hasLetter` false) gets no letter placed and no label box. The carrier writes the dot's stated coordinates: its own, else the first member's that has any (the members are one point; a stated value stays visible).
+
+**Sibling audit.** 2-D: the reference, now reading the shared function. 3-D and complex: no label merge (grep `coincid` in `src3d/render`, `src-complex/render`: none) — not ported (the ruling names analytic); raised as a question in the round report.
+
+**Locks.** `src-analytic/__tests__/issue-2696-coincident-letters-joined.test.ts` — his figure at seeds 0–3 (one «X=E» label, E silent, every other letter untouched), the caller-hands-none control, «V=Y» keeping V's (0, 0), and the shared rule (a pair, a chain, two pairs, none).
+
+**Behaviour change for a student:** two letters on one dot read «C=E» on the canvas, as in the 2-D tool; before, «CE».
