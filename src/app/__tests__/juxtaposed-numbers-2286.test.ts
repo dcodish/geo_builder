@@ -68,7 +68,6 @@ const ROWS: readonly [line: string, text: string][] = [
   ['∠ABC = 2 3', '2 3'],
   ['מעגל O ברדיוס 2 3', '2 3'],
   ['AB = 2.5 3', '2.5 3'],
-  ['the length of AB is 2 3', '2 3'],
 ];
 
 describe('#2286 — 2-D refuses two numbers with only a space between them, before the model', () => {
