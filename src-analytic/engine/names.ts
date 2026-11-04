@@ -113,7 +113,7 @@ export function numeralCurveId(kind: NumeralKind, numeral: string): Id {
  */
 export type DescribedCircle = { role: 'circum' | 'in'; pts: Id[]; arity?: number };
 const DESCRIBED_MARK = { circum: '⊙', in: '○' } as const;
-const POINT_TOKEN = '[A-Z][0-9₀-₉]?';
+const POINT_TOKEN = '[A-Z][0-9₀-₉]*';
 /**
  * #2545 ([ADR-AG-335](../../docs/06c-decisions-analytic.md#adr-ag-335)) — the LETTERLESS described circle, «המעגל החוסם
  * [את המשולש]» / "the circumcircle": no ring is typed, so the ring is the figure's ONE polygon (of the noun's size when

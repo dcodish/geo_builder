@@ -153,7 +153,7 @@ export const isTermPlaceholder = (sym: string): boolean => sym.length === 1 && s
  * inside the match. A run of three or more capitals (`ABC`) now yields nothing here, which is right:
  * it is a polygon, and the area frame that owns it already runs first.
  */
-const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])/g;
+const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)(?![A-Za-z])/g;
 
 /**
  * `AB + BC` → an expression over placeholders, plus the pairs they stand for.
@@ -299,7 +299,7 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
   // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
   [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
   // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
-  [new RegExp(String.raw`\|\s*([A-Z][0-9₀-₉]?)\s*([A-Z][0-9₀-₉]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+  [new RegExp(String.raw`\|\s*([A-Z][0-9₀-₉]*)\s*([A-Z][0-9₀-₉]*)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
 ];
 
 /**
@@ -316,7 +316,7 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
  * A RUN OF THREE OR MORE vertices only: `S_1` or `S_A` is a subscripted name, not a polygon, and is left
  * alone. Bounded on letters so a word ending in `S` (`AS_…`) is never cut.
  */
-const AREA_NOTATION = /(?<![A-Za-z0-9])S\s*_\s*(?:\{\s*((?:[A-Z][0-9₀-₉]?){3,})\s*\}|((?:[A-Z][0-9₀-₉]?){3,})(?![A-Za-z0-9₀-₉]))/g;
+const AREA_NOTATION = /(?<![A-Za-z0-9])S\s*_\s*(?:\{\s*((?:[A-Z][0-9₀-₉]*){3,})\s*\}|((?:[A-Z][0-9₀-₉]*){3,})(?![A-Za-z0-9₀-₉]))/g;
 
 /** `S_{ABC}` / `S_ABC` → «שטח ABC», everywhere in `s` (#1621). */
 export const areaNotation = (s: string): string => s.replace(AREA_NOTATION, (_m, braced?: string, bare?: string) => `שטח ${braced ?? bare}`);
@@ -337,7 +337,7 @@ export const areaNotation = (s: string): string => s.replace(AREA_NOTATION, (_m,
  * the area token: a noun stripped too early would leave «בין A ל-B» with no frame left to read it.
  */
 const LENGTH_NOUN = new RegExp(
-  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)`,
+  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*\b)`,
   'g',
 );
 
@@ -355,11 +355,11 @@ const LENGTH_NOUN = new RegExp(
  */
 const PARALLEL_SINE = 1e-6;
 
-const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
+const IS_POINT = /^[A-Z][0-9₀-₉]*$/;
 
 // The English ARTICLE is part of the measure (#1621): «the area of triangle ABC = 45» otherwise left «the» to be
 // multiplied as t·h·e — the #1321 trap the distance noun already closes for «the distance».
-const AREA_TOKEN = /(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
+const AREA_TOKEN = /(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]*){3,})/g;
 
 export function parseLengthExpr(src: string, lines?: readonly LineEquation[]): LengthExpr | null {
   return readLength(src, undefined, lines);
@@ -389,7 +389,7 @@ export function namedLengthPairs(src: string): Array<{ a: Id; b: Id }> {
  * but a distance, so it is consumed here, before `LENGTH_NOUN` would strip the noun and leave the pair to look named.
  */
 const DISTANCE_NOUN = new RegExp(
-  String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])`,
+  String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?<![A-Za-z])([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)(?![A-Za-z])`,
   'g',
 );
 
@@ -480,7 +480,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
   const withNouns = withDistances.replace(LENGTH_NOUN, '');
   const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
-    const ids = run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
+    const ids = run.match(/[A-Z][0-9₀-₉]*/g) ?? [];
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
     const i = at >= 0 ? at : terms.push({ kind: 'area', ids }) - 1;

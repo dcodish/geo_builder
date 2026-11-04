@@ -176,7 +176,7 @@ export function resolveToolLetters(
         helperPh.delete(held.id);
       }
     }
-    for (const m of text.match(/"[A-Z][0-9₀-₉]?"/g) ?? []) used.add(m.slice(1, -1));
+    for (const m of text.match(/"[A-Z][0-9₀-₉]*"/g) ?? []) used.add(m.slice(1, -1));
     out.push(f);
   });
   return { facts: out, minted };

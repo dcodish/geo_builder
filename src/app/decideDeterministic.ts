@@ -77,6 +77,7 @@ import {
 import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { findNumberPair, teachPair, type NumberPair } from '../../shell/juxtaposedNumbers';
 import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
 import { tangentsExhaustedKey } from '@/i18n/humanizeError';
@@ -301,6 +302,14 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   if (findRadianAngle(utterance)) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:radian-angle' }], note: { key: 'input.scope.radian-angle' } };
   }
+  // TWO NUMBERS WITH ONLY A SPACE BETWEEN THEM (#2286, ADR-AG-397; operator ruling 2026-11-03 *"Refuse it, naming the line,
+  // in every builder"*) — «AB = 2 3» is 2.3, 23 or 2·3, and the grammar cannot tell which, so it went to the model.
+  // Refused here, PRE-parse and `guided`, with the suite's sentence (`shell/juxtaposedNumbers`). The mixed number
+  // «2 1/2» is not this shape (#2248).
+  const pair = findNumberPair(utterance);
+  if (pair) {
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:juxtaposed-numbers' }], note: juxtaposedPairNote(utterance, pair) };
+  }
   // A letter this tool cannot read (#1919, ADR-626) — «משולש ДЖФ» COMMITTED triangle A, B, C, because a
   // letter outside the label alphabet is invisible to every gate that counts labels, so the shape read as
   // unlabelled and the noun's default names were drawn with a green ✓. The student's three letters
@@ -320,6 +329,20 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:negation' }], note: { key: 'input.scope.negation', params: { word: negated } } };
   }
   return null;
+}
+
+/**
+ * #2286 (ADR-AG-397) — the note for two numbers with only a space between them, ONE spelling for the submit and the edit
+ * seam: the suite's sentence (every builder's), each reading kept only when the grammar reads the line with it in place
+ * (`teachPair`, #1156) — this grammar reads no `*`, so the product is taught as its value.
+ */
+export function juxtaposedPairNote(utterance: string, pair: NumberPair): { key: string; params: Record<string, string> } {
+  // `'value'`: the gate does not read «AB = 2*3» or «∠ABC = 2*3» (they escalate, measured), though a bare `parse` may
+  const teach = teachPair(utterance, pair, (l) => parse(l).ok, 'value');
+  if (teach.kind === 'comma') return { key: 'suite.refusal.juxtaposedNumbersComma', params: { detail: pair.text, comma: teach.comma } };
+  return teach.decimal
+    ? { key: 'suite.refusal.juxtaposedNumbers', params: { detail: pair.text, decimal: teach.decimal, joined: teach.joined ?? '', product: teach.product } }
+    : { key: 'suite.refusal.juxtaposedNumbersProduct', params: { detail: pair.text, product: teach.product } };
 }
 
 /** The categories answered with guidance BEFORE the model (ADR-289; #1357 added `unrelated`). */

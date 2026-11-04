@@ -115,6 +115,8 @@ export type InputError =
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
   | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
+  /** #2286 (ADR-AG-397) — any other number–space–number «2 3», refused with its readings (`shell/juxtaposedNumbers`). */
+  | { key: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /**
@@ -507,7 +509,7 @@ export function cleanSeed(raw: unknown): Seed {
 
 function cleanSeedNames(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const NAME = /^[A-Z][0-9₀-₉]?$/;
+  const NAME = /^[A-Z][0-9₀-₉]*$/;
   return Object.fromEntries(
     Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => NAME.test(e[0]) && typeof e[1] === 'string' && NAME.test(e[1])),
   );

@@ -33,8 +33,8 @@ import type { Construction, NumCurve } from '../engine/types';
  * A point label in this product: a capital letter with an optional digit subscript — `A`, `B`, `F1`.
  * Exactly what the system prompt tells the model to emit, so the two cannot drift apart silently.
  */
-const LABEL = () => /[A-Z]\d*/g;
-const RUN = () => /(?<![A-Za-z])(?:[A-Z]\d*){3,}(?![a-z\d])/g;
+const LABEL = () => /[A-Z][0-9₀-₉]*/g;
+const RUN = () => /(?<![A-Za-z])(?:[A-Z][0-9₀-₉]*){3,}(?![a-z\d])/g;
 
 /**
  * Restore any point run the model respelled, before the lines are re-parsed.
@@ -92,8 +92,8 @@ const NUMERAL_NAME = (): RegExp =>
  */
 const NUMERAL_WORD = (): RegExp =>
   new RegExp(`(?:ישר|קו|מעגל|פרבולה|אליפסה)\\s+(${Object.keys(HE_NUM_UNITS).sort((a, b) => b.length - a.length).join('|')})(?![\u05D0-\u05EA])`, 'g');
-/** The grammar's point atom, with its subscript widened to any digit run once `normalise` folded ₁ to 1. */
-const POINT_ATOM = POINT_NAME_ATOM.replace('[0-9₀-₉]?', '[0-9]*');
+/** The grammar's point atom — a digit run of either kind since #2075 (ADR-AG-398), so `normalise`'s ₁ → 1 needs no widening. */
+const POINT_ATOM = POINT_NAME_ATOM;
 const POINT_RUN = new RegExp(`^(?:${POINT_ATOM})+$`);
 const POINT_ONE = (): RegExp => new RegExp(POINT_ATOM, 'g');
 const LETTER_LINE = new RegExp(`^${LETTER_LINE_NAME_ATOM}$`);
@@ -298,7 +298,7 @@ function curveParameters(c: NumCurve): number[] {
 export function existingNamesAnalytic(c: Pick<Construction, 'objects' | 'params'>): Set<string> {
   const out = new Set<string>();
   for (const o of c.objects) {
-    if (/^[A-Z]\d*$/.test(o.id)) out.add(o.id);
+    if (/^[A-Z][0-9₀-₉]*$/.test(o.id)) out.add(o.id);
     const num = numeralKey(o.id);
     if (num) out.add(`#${num.slice(num.indexOf('-') + 1)}`);
     const line = /^line-(.+)$/.exec(o.id);

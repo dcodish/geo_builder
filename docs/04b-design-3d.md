@@ -81,6 +81,8 @@ own line, `revolutionSizeLine` (after the volume/area claim rules) reads «<size
 volume/area claim on a free-size solid is apply's same size refusal; `free-size-claim` is retired. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
+**Two numbers with only a space between them are refused** (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). `readStatement3` asks `shell/juxtaposedNumbers.findNumberPair` right after the radian check and answers `{ code: 'juxtaposed-numbers', detail, … }` — `guided`, worded by the suite keys `suite.refusal.juxtaposedNumbers*`, each reading read back through `parse3` (`teachPair`) — so «AB = 2 3» and «A(2 3, 1, 0)» never reach the model.
+
 **An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
 
 **A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).

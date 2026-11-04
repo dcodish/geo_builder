@@ -114,7 +114,7 @@ describe('#2552 — «מרכז המעגל הראשון / השני הוא X(a,b)�
   });
 
   it('the subscript spellings and the Unicode minus are the same sentence', () => {
-    for (const [line, id] of [['מרכז המעגל הראשון הוא O_1(−3,1)', 'O₁'], ['מרכז המעגל הראשון הוא O₁(-3, 1)', 'O₁'], ['מרכז המעגל הראשון הוא O1(−3, 1)', 'O1']]) {
+    for (const [line, id] of [['מרכז המעגל הראשון הוא O_1(−3,1)', 'O₁'], ['מרכז המעגל הראשון הוא O₁(-3, 1)', 'O₁'], ['מרכז המעגל הראשון הוא O1(−3, 1)', 'O₁']]) {
       expect(at(built([PAIR, line]), id), line).toEqual([-3, 1]);
     }
   });

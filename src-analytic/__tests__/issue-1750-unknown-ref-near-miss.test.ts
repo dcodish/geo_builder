@@ -73,11 +73,9 @@ describe('#1750 — the class: every near-miss shape, and both directions', () =
     expect(error).toMatchObject({ detail: 'ℓ1', nearMiss: { suggest: 'l1' } });
   });
 
-  it('a POINT near miss: «A₁» when the figure has A1 — singular noun', () => {
-    const { error, lines } = refusal(['A1(-1,2)'], 'שיעור ה-x של A₁ הוא שלילי');
-    expect(error).toMatchObject({ detail: 'A₁', expected: 'point', nearMiss: { suggest: 'A1', existing: ['A1'] } });
-    expect(plain(errorText(error, he))).toContain('באיור יש את הנקודה A1. התכוונתם ל-A1?');
-    expect(errorText(error, en)).toContain('The figure has the point A1. Did you mean A1?');
+  it('«A₁» when the figure has A1 is no near miss since #2075 (ADR-AG-398): it is the same point, and records', () => {
+    const lines = ['A1(-1,2)'];
+    expect(decideSubmit('שיעור ה-x של A₁ הוא שלילי', lines, 0).kind).toBe('record');
     expect(decideSubmit('שיעור ה-x של A1 הוא שלילי', lines, 0).kind).toBe('record');
   });
 });

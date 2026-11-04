@@ -112,7 +112,7 @@ export function unreadPart(line: string, facts: readonly Fact[], figureLabels: r
 
 /** The labels a set of facts carries — every capital-letter token anywhere in them. */
 const carriedLabels = (facts: readonly Fact[]): Set<string> =>
-  new Set(loweringKey(facts).match(/[A-Z]\d*/g) ?? []);
+  new Set(loweringKey(facts).match(/[A-Z][0-9₀-₉]*/g) ?? []);
 
 /** Is `rest` a lost part — labels `carried` already has, and particles with no construction signal? */
 function isLostPart(rest: string, carried: ReadonlySet<string>): boolean {
@@ -241,7 +241,7 @@ export function declinedThrough(line: string, records: (piece: string, before: r
  * property in the figure it makes — a taught remedy is one the next Enter accepts (ADR-W-030's promise). Anything else
  * returns null and the line keeps the path it had.
  */
-const POINT_PROPERTY = /^(?:ה?נקודה\s+([A-Z][0-9]?)|([A-Z][0-9]?)\s+(?:היא\s+|הינה\s+)?נקודה)\s*,?\s+(?:ה?מקיימת|שמקיימת)\s+(.+?)\s*[.]?$/;
+const POINT_PROPERTY = /^(?:ה?נקודה\s+([A-Z][0-9₀-₉]*)|([A-Z][0-9₀-₉]*)\s+(?:היא\s+|הינה\s+)?נקודה)\s*,?\s+(?:ה?מקיימת|שמקיימת)\s+(.+?)\s*[.]?$/;
 
 export function declinedPointProperty(line: string, records: (piece: string, before: readonly string[]) => boolean): LostPart | null {
   const m = POINT_PROPERTY.exec(line.trim());

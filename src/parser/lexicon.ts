@@ -124,7 +124,7 @@ export function readWordFraction(s: string): { p: number; q: number; at: number;
  *  begin. Shared with analytic through `shell/indexedName` (the third-copy rule): a guard that keeps a value
  *  out of a name composes `UNGLUED`, and is never re-spelled per reader (the Latin-only `(?<![A-Za-z])` of
  *  #267 is how «∠ABC = α1» read as 1°). Only the atoms the grammar consumes are re-exported (#361). */
-export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from '../../shell/indexedName';
+export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName } from '../../shell/indexedName';
 
 // ── Circle roles (ADR-244, #2459 ADR-754) ─────────────────────────────────────────────────────────
 /**

@@ -1282,7 +1282,7 @@ function stateCircleOn(c: Construction, centre: Id, id: Id, src: string, hidden?
 }
 
 /** A name a student writes for a POINT (a capital letter, an optional index) that is not a circle numeral («I», «II»). */
-const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
+const POINT_LETTER = /^[A-Z][0-9₀-₉]*$/;
 
 /**
  * A NAMED CIRCLE THE FIGURE DOES NOT HAVE YET: THE REFERENCE STATES IT (#1670, ADR-AG-210; operator 2026-10-02 — follow
@@ -6774,7 +6774,7 @@ function areaLabelRing(f: Fact): Id[] | null {
 const polygonIdOf = (ring: readonly Id[]): Id => `poly-${ring.join('')}`;
 
 /** #1467: a point LETTER as the parser canonicalises it — what the mint pass may create (never a curve or a symbol). */
-const isPointLabel = (id: Id): boolean => /^[A-Z]d*'*$/.test(id);
+const isPointLabel = (id: Id): boolean => /^[A-Z][0-9₀-₉]*'*$/.test(id);
 
 /**
  * A domain in comparable form — see the `narrowed` vs `known` decision in `applyFact`.
@@ -6801,7 +6801,7 @@ function normalizeDomain(d: Domain): Record<string, unknown> {
  * happens to be — so the endpoints are compared, never the string.
  */
 function segmentOverSameEnds(c: Construction, curveId: Id): boolean {
-  const m = /^line-([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/.exec(curveId);
+  const m = /^line-([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)$/.exec(curveId);
   if (!m) return false;
   const [, a, b] = m;
   return c.objects.some(

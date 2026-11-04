@@ -177,7 +177,8 @@ Its atom grammar has exactly one function, `√`, and `normalizeMath` maps `sqrt
 | 1 letter before `(` | kept | `k(x+1)` is a product, and the corpus writes it |
 | ≥3 letters NOT space-delimited | kept | `x²+y²-2abc=0` — juxtaposed parameters, ruled legal by #1068 |
 | a letter (Latin or Greek) IMMEDIATELY before a digit, `_` or a subscript digit | refused — an indexed name ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244), #1785) | «S1», «a2», «α1» are ONE name each; juxtaposition read `S·1`, so «S1» and «S2» shared one parameter and asserted a 1 : 2 ratio. Number-then-letter (`2a`) is unchanged |
-| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
+| any other number, whitespace, number («2 3», «2.5 3») | refused — a bare pair ([ADR-AG-397](06c-decisions-analytic.md#adr-ag-397), #2286) | ambiguous as written (2.3, 23 or 2·3); the tokenizer refuses it and `parseLine` answers `juxtaposed-numbers` before every rule and the model, teaching only the readings that read in place (`teachPair`). The detector is the suite's, `shell/juxtaposedNumbers.ts` |
+| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` (now in `shell/juxtaposedNumbers.ts`, ADR-AG-397) is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
 | the private-use range | never a run | `lengths.ts` encodes a length term (`AB`) as one character; it cannot appear in student input |
 
 The noun must be consumed by the rule that claims it: `DISTANCE` spells its English article as `NOUN` does
@@ -340,6 +341,8 @@ A letter the tool cannot read is
 (`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
 reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
 look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
+**An indexed point name is folded to one id** (#2075, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)): `orthography` calls `shell/indexedName.foldIndexedName(line, 'glyph')`, so «X_1», «X_{1}», «X1» and «X₁» are all the id `X₁` (a digit run too: `X₁₂`) — the glyph the tool letters and every surface already print. Every copy of the point-name atom reads a digit run (`[A-Z][0-9₀-₉]*`); the parser's internal stand-ins are two-digit forms with a leading zero (`Y₀₀`…, `Z₀₀`…), so no student spelling reaches them.
+
 An angle measure written in radians is `radian-angle` (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)): `findRadianAngle` (`shell/radianAngle.ts`) is asked right after the proof target, before every rule and the model, worded from `errRadianAngle` (2-D's sentence); `detail` is the π value. The angle readers it covers are the ones analytic has — the angle given and the sector's «בזווית»; measured at b0e9dbea, an inclination, an angle between two lines and a trig argument are not read even in degrees.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's

@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -13003,9 +13003,10 @@ const normalizeAreaSubscript = (s: string): string =>
  * Scoped to a letter + `_` + DIGITS, so it can't touch the area marker's `S_{ABC}` (uppercase LETTERS).
  * #1814 (ADR-600): any NAME letter, Greek too, so «α_1» ≡ «α1» (one sentence, one verdict). Latin-only, the
  * underscore form slipped past every guard that knows «α1» and read as 1°.
+ * #2075 (ADR-AG-398): the fold is the suite's (`shell/indexedName.foldIndexedName`, `'glued'`), which analytic calls
+ * with its own canonical form — the third copy moved to the shared atom.
  */
-const POINT_SUBSCRIPT = new RegExp(String.raw`(${NAME_LETTER})_\{?(\d+)\}?`, 'g');
-const normalizePointSubscript = (s: string): string => s.replace(POINT_SUBSCRIPT, '$1$2');
+const normalizePointSubscript = (s: string): string => foldIndexedName(s, 'glued');
 
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>

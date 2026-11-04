@@ -194,6 +194,8 @@ From the «lines and points» corpus (§8), numbered onward.
 **R10 — Anaphora.** «למעגל זה», «המעגל» resolve to an object introduced without a name.
 
 **R11 — Notation.** Primes (`A'`, `F₁'`) and subscripts (`F₁`, `l1`).
+- An indexed point name is ONE name in every spelling, drawn with its index lowered *(operator, 2026-10-13: "X_1(2,3) or X1 should create a 1 in subscript"; 2026-11-01: "they are the same")*: «X_1(2,3)», «X_{1}(2,3)», «X1(2,3)» and «X₁(2,3)» build the one point X₁; typing two of them never makes two points. A digit run follows 2-D: «X12», «X_{12}» are X₁₂ (ruled 2026-10-14).
+- Sources: ADR-AG-315, #2391, ADR-AG-398, #2075.
 
 **R11a — the PALETTE offers only what the grammar reads**. A chip the parser refuses is worse than no chip. The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `α` `β` `γ` `δ` `θ` `<` `S_{}` `⌢{}`, each driven through the real grammar under a totality guard; a chip never changes how a Hebrew line isolates.
 - Sources: ADR-AG-122, #1129, #511, ADR-AG-212, #1696, ADR-AG-215, ADR-AG-216, ADR-AG-214, ADR-AG-220, #1622.
@@ -791,7 +793,8 @@ a sentence the tool parsed.
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
 - «5 1/2» typed with a space, in any number → refused, teaching 5.5, 5+1/2 or 5*1/2; never 5·½. The symbol «5½» reads 5.5
-- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222.
+- «A(2 3, 1)», «x = 2 3», «AB = 2 3» — two numbers with only a space between them, in any number → refused, teaching 2.3, 23 or 2*3 (or the comma, «A(2 3)» → «A(2, 3)»); never 6 *(operator, 2026-11-03: "Refuse it, naming the line, in every builder")*
+- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222, ADR-AG-397, #2286.
 
 **R171 — a condition on x or y is never taken for a parameter; until a curve can be drawn in part, it is refused and says so**. Nothing of the line is recorded; a condition on another letter is a domain. Drawing part of a curve is #1846.
 - «y = 2x + 1, x > 0», «x הוא פרמטר» → refused, saying why

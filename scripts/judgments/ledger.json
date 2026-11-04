@@ -1331,6 +1331,36 @@
       "chosen": true,
       "at": "2026-11-04T06:35:27.642Z",
       "status": "pending"
+    },
+    {
+      "id": "2286-juxtaposed-numbers-sentence",
+      "kind": "text",
+      "issue": "#2286",
+      "what": "The refusal for two numbers with only a space between them («A(2 3, 1)», «AB = 2 3»), in 2-D, 3-D and analytic (suite key suite.refusal.juxtaposedNumbers). It names the pair the student typed, not the whole line. The product is spelled 2*3 where the grammar reads it (analytic) and as its value 6 where it does not (2-D, 3-D).",
+      "choice": "he: «לא ברור מה פירוש «2 3». כתבו 2.3 (מספר עשרוני), 23 (מספר אחד) או 2*3 (מכפלה).» · en: «It is not clear what «2 3» means. Write 2.3 (a decimal), 23 (one number) or 2*3 (a product).»",
+      "chosen": true,
+      "at": "2026-11-04T06:01:11.897Z",
+      "status": "pending"
+    },
+    {
+      "id": "2286-juxtaposed-numbers-product-sentence",
+      "kind": "text",
+      "issue": "#2286",
+      "what": "The same refusal when one of the numbers has a decimal point («A(2.5 3, 1)»), so neither 2.53 nor «2.5.3» is a reading (suite.refusal.juxtaposedNumbersProduct).",
+      "choice": "he: «לא ברור מה פירוש «2.5 3». אם הכוונה למכפלה, כתבו 2.5*3.» · en: «It is not clear what «2.5 3» means. If you mean a product, write 2.5*3.»",
+      "chosen": true,
+      "at": "2026-11-04T06:01:11.897Z",
+      "status": "pending"
+    },
+    {
+      "id": "2286-juxtaposed-numbers-comma-sentence",
+      "kind": "text",
+      "issue": "#2286",
+      "what": "The same refusal when no single number fits the slot but two do, e.g. a point with its comma missing «A(2 3)» (suite.refusal.juxtaposedNumbersComma). 2.3, 23 or 6 would not read there, so teaching them would be a false remedy (#1156).",
+      "choice": "he: «לא ברור מה פירוש «2 3». אם אלה שני מספרים, הפרידו ביניהם בפסיק: 2, 3.» · en: «It is not clear what «2 3» means. If these are two numbers, separate them with a comma: 2, 3.»",
+      "chosen": true,
+      "at": "2026-11-04T06:01:11.897Z",
+      "status": "pending"
     }
   ],
   "demoted": {

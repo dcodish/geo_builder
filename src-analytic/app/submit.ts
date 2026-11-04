@@ -216,7 +216,7 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
 };
 
 /** The figure's letters — never a stand-in for a substituted label (`shell/readExtent.ts`). */
-const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter((id) => /^[A-Z]d*$/.test(id));
+const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter((id) => /^[A-Z][0-9₀-₉]*$/.test(id));
 
 /** #1888 / #1889 (ADR-AG-251) — the refusal a lost part gets: the whole line, with its parts in the student's words. */
 const lostPartRefusal = (line: string, lost: LostPart): SubmitVerdict => ({
@@ -716,7 +716,7 @@ export function decideEdit(
   const parsed = parseLine(next.trim());
   if (!parsed.ok) return false;
   // the other rows' letters keep the probe's stand-in fresh (no fold needed: they are only excluded)
-  const letters = lines.flatMap((l, j) => (j === index ? [] : (l.match(/[A-Z]d*/g) ?? [])));
+  const letters = lines.flatMap((l, j) => (j === index ? [] : (l.match(/[A-Z][0-9₀-₉]*/g) ?? [])));
   if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return false;
   if (disabled.includes(index)) return true;
   const edited = lines.map((l, j) => (j === index ? next : l));

@@ -19,6 +19,7 @@
  * number at all. Asking «AB» on a figure that has not fixed it gets the open answer — which is
  * itself worth knowing, and is the truthful one.
  */
+import { foldIndexedName } from '../../shell/indexedName';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
@@ -224,10 +225,10 @@ export interface Answer {
  * A compound expression is arithmetic the student assembled, not one named move, and the technique
  * table has nothing honest to say about it. The trace explains a ROW; it does not narrate a sum.
  */
-const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/;
+const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*$/;
 
 /** A single point's name, which is a question about its coordinates. */
-const POINT_ONLY = /^[A-Z][0-9₀-₉]?$/;
+const POINT_ONLY = /^[A-Z][0-9₀-₉]*$/;
 
 /**
  * «שיפוע הישר l1» — the third thing the operator named for a line (#1048).
@@ -316,14 +317,14 @@ const LOCUS_PHRASE = /^(?:ה?מקום\s+ה?גי?אומטרי|(?:[Tt]he\s+)?locus
 
 /** «שיעורי (הנקודה) M», «הקואורדינטות של M», "the coordinates of (point) M" (#2393 R1). */
 const COORDS_OF =
-  /^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z][0-9₀-₉]?)$/;
+  /^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z][0-9₀-₉]*)$/;
 
 /** «(הערך של) a», "the value of a" — a parameter by its symbol (#2393 R2); taken only for a symbol the register holds. */
 const PARAM_ASK = /^(?:ה?ערך\s+(?:של\s+)?|(?:the\s+)?value\s+of\s+)?([a-zα-ω](?:_\w+)?)$/;
 
 /** «(משוואת) המעגל שמרכזו N», "the circle centred at N" — a circle by its centre (#2393 R3). */
 const CIRCLE_CENTRED_AT =
-  /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+)?(?:ה?מעגל\s+ש(?:ה)?מרכזו\s+(?:(?:הוא|היא)\s+)?(?:ב?ה?נקודה\s+)?|(?:the\s+|a\s+)?circle\s+(?:cent(?:red|ered)\s+at|with\s+(?:its\s+)?cent(?:re|er)(?:\s+at)?|whose\s+cent(?:re|er)\s+is)\s+(?:the\s+point\s+)?)([A-Z][0-9₀-₉]?)$/;
+  /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+)?(?:ה?מעגל\s+ש(?:ה)?מרכזו\s+(?:(?:הוא|היא)\s+)?(?:ב?ה?נקודה\s+)?|(?:the\s+|a\s+)?circle\s+(?:cent(?:red|ered)\s+at|with\s+(?:its\s+)?cent(?:re|er)(?:\s+at)?|whose\s+cent(?:re|er)\s+is)\s+(?:the\s+point\s+)?)([A-Z][0-9₀-₉]*)$/;
 
 /** «משוואת המעגל / הפרבולה / האליפסה», "the equation of the circle" — THE curve of that kind (#2393 R4). */
 const THE_CURVE = /^(?:ה?משוואת\s+ה(מעגל|פרבולה|אליפסה)|[Tt]he\s+equation\s+of\s+the\s+(circle|parabola|ellipse))$/;
@@ -968,7 +969,8 @@ const ASK_CLOSER = /\s*(?:=\s*)?[?？]\s*$|\s*=\s*$/;
 const OPTIONS_OPENER = /^(?:את\s+)?(?:שתי|כל)\s+ה?אפשרויות\s+ל-?(?=[א-ת])/;
 const OPTIONS_HINT = /\s*\(\s*(?:שתי|כל\s+ה?)\s*אפשרויות\s*\)\s*$/;
 export function normaliseAsk(question: string): string {
-  let t = question.trim().replace(ASK_CLOSER, '').trim().replace(OPTIONS_HINT, '').replace(ASK_CLOSER, '').trim();
+  // #2075 (ADR-AG-398): a point's index in any spelling is the glyph the figure's ids carry («A1» asks about A₁)
+  let t = foldIndexedName(question.trim(), 'glyph').replace(ASK_CLOSER, '').trim().replace(OPTIONS_HINT, '').replace(ASK_CLOSER, '').trim();
   const open = ASK_OPENER.exec(t);
   if (open && open[0].length < t.length) t = t.slice(open[0].length).trim();
   const options = OPTIONS_OPENER.exec(t);

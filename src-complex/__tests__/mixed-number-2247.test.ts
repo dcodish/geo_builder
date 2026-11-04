@@ -17,6 +17,7 @@ import { errorText } from '../app/errorText';
 import { activeLines, submitLine } from '../app/submit';
 import { complexI18n } from '../i18n';
 import { findJuxtaposedNumbers, parseExpr } from '../parser/exprParse';
+import { findJuxtaposedNumbers as sharedFind } from '../../shell/juxtaposedNumbers';
 import { normalize } from '../parser/normalize';
 import { parseLineV2 } from '../parser/rules';
 import { type InputError, useComplexStore } from '../store/useComplexStore';
@@ -172,10 +173,10 @@ describe('#2247 — the cross-product text lock: complex says what analytic says
   const analyticI18n = readFileSync(new URL('../../src-analytic/i18n/index.ts', import.meta.url), 'utf8');
   const complexI18nText = readFileSync(new URL('../i18n/index.ts', import.meta.url), 'utf8');
 
-  it('the mixed-number detector is analytic’s, character for character', () => {
-    const re = (src: string) => src.match(/const MIXED_NUMBER_RE = (.*);/)?.[1];
-    expect(re(complexExpr)).toBeDefined();
-    expect(re(complexExpr)).toBe(re(analyticExpr));
+  it('the detector is analytic’s: one shared copy (`shell/juxtaposedNumbers`, #2286 / ADR-AG-397), no private regex left', () => {
+    expect(findJuxtaposedNumbers).toBe(sharedFind);
+    expect(analyticExpr).toContain("from '../../shell/juxtaposedNumbers'");
+    for (const src of [complexExpr, analyticExpr]) expect(src).not.toMatch(/const (MIXED|JUXTAPOSED)_NUMBERS?_RE =/);
   });
 
   it('the four sentences (he + en, with and without a decimal) are analytic’s, byte for byte', () => {

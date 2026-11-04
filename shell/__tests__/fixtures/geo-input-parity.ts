@@ -274,6 +274,7 @@ export function gapState(g: KnownGap): GapState {
  * 3-D, so they are parked with it until someone files the 3-D plane-height port.
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
+  '#2458': 'open', // 3-D reading «A_1» and the glyph (#2075's sibling half)
   '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1448': 'closed',
   '#1677': 'icebox',
@@ -1878,6 +1879,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ext-tangent-then-contained-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבחוץ', 'מעגל P מוכל בתוך מעגל O'], expect: 'refused', exception: 'X8', note: '2-D built it before ADR-779' },
   { id: 'crossing-then-contained-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P נחתכים בנקודות X ו-Y', 'מעגל P מוכל בתוך מעגל O'], expect: 'refused', exception: 'X8', note: '2-D built it before ADR-779' },
   { id: 'contained-then-int-tangent-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבפנים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2302' }], note: 'the ADR-704 control: containment with internal tangency still builds in 2-D; analytic refuses it unsatisfiable (its containment is strict, #2302)' },
+  // ── #2075 (ADR-AG-398): an indexed name in its LaTeX spelling is the glued name; 2-D folds it (ADR-228), analytic since ADR-AG-398 ──
+  { id: 'indexed-name-underscore-2075', family: 'points-incidence', steps: ['נקודה A_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }], note: '3-D does not read «A_1» (not-understood, measured ebacadd1) — #2458' },
+  { id: 'indexed-name-polygon-2075', family: 'polygons', steps: ['משולש A_1B_1C_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }] },
+  { id: 'indexed-name-multidigit-2075', family: 'points-incidence', steps: ['נקודה X12'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic refused a two-digit index before ADR-AG-398; 3-D does not read «נקודה X12» (not-handled, measured), though «X12(1,2,3)» records' },
+  // ── #2286 (ADR-AG-397, ruled 2026-11-03 «Refuse it, naming the line, in every builder»): two numbers with only a space between them ──
+  { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
+  { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
+  { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

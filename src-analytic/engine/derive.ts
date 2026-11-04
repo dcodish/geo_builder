@@ -1087,7 +1087,7 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
 function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
   const text = JSON.stringify(facts);
   if (!text.includes(MINT_PREFIX)) return { facts, minted: [] };
-  const used = new Set<string>(text.match(/"[A-Z][0-9₀-₉]?"/g)?.map((q) => q.slice(1, -1)) ?? []);
+  const used = new Set<string>(text.match(/"[A-Z][0-9₀-₉]*"/g)?.map((q) => q.slice(1, -1)) ?? []);
   const numeric = (f: Fact): [number, number] | null => {
     if (f.t !== 'point') return null;
     const x = evalExpr(f.x, {});

@@ -125,8 +125,8 @@ describe('#1785 — must not change', () => {
     expect(play(lines).every((x) => x === 'record')).toBe(true);
   });
 
-  it('«נסמן ∠CAB = A1» keeps the ∠A1 label (ADR-AG-221)', () => {
-    expect(paramsOf(['משולש ABC', 'נסמן ∠CAB = A1'])).toContain('∠A1');
+  it('«נסמן ∠CAB = A1» keeps its label, ∠A₁ since #2075 (ADR-AG-221, ADR-AG-398)', () => {
+    expect(paramsOf(['משולש ABC', 'נסמן ∠CAB = A1'])).toContain('∠A₁');
   });
 
   it('a named line keeps its slope sentence: «שיפוע l1 הוא 2» on «l1: y = 2x» is not refused', () => {
