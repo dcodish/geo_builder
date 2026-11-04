@@ -844,7 +844,8 @@ a sentence the tool parsed.
 **R105 — a given set that holds only in a degenerate limit is REFUSED, never drawn as a needle**. Thinness is never the test; an exact solution is.
 - «משולש ABC» · «AB = AC» · «∠ABC = 90» → refused at every configuration
 - a stated 1° apex → drawn
-- Sources: ADR-AG-143, #1334, ADR-537.
+- two named points meeting, declared ring or not, refused naming both statements: «נקודה A» · «נקודה B» · «נקודה C» · «AB = BC» · «AC ⊥ BC» → refused at «AC ⊥ BC» with 2-D's sentence «… סותר את «AB = BC» …»; «AB = 10» · «BC = 9.9999» · «AC ⊥ BC» → drawn (ADR-AG-399, #2506)
+- Sources: ADR-AG-143, #1334, ADR-537, ADR-AG-399.
 
 **R172 — givens that force a declared polygon flat are refused, and the refusal says why**. *(Operator, ADR-W-115: "a flat line is not a triangle".)* Never «לא נמצאה תצורה», never drawn flat; amends R105's message and R64's pinned arm (ADR-AG-129).
 - «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» → refused, naming the polygon

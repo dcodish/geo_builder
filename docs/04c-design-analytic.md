@@ -1352,7 +1352,11 @@ the other root, and a ring is offered only on the piece, its sentence saying «�
 `SPREAD_MIN_DEG` open, no stacked names — `separated`, `stackedPairs(f)`, `VISIBLE_FRACTION` of the `viewBox`,
 ADR-AG-181), **whole** (selectors hold, nothing vacant, `ringViolation` clean, every given holds, and a thin ring
 (`thinRingsOf`, `THIN_SIN_TOL`) survives a re-solve under `withToleranceFactor(TIGHT_TOLERANCE_FACTOR)` —
-[ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), ADR-537), **second best**, **fallback**. The top tier is opt-in
+[ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), ADR-537; and so does an operand pair of any constraint closer than
+`THIN_SIN_TOL` of the extent (`constraintOperandPairs`, a `Record` over every kind in `engine/rings.ts`): it must
+meet the tight bar and stay over the `COLLAPSED_SIN_TOL` floor, or the givens hold only where two named points meet,
+recorded as `Figure.metPairs` and refused by `derive` as `measure-contradicts` naming the completing line and its
+`partnerStatement` — [ADR-AG-399](06c-decisions-analytic.md#adr-ag-399)), **second best**, **fallback**. The top tier is opt-in
 (only `derive`), so `isKnowledge` and `knownOptions` read what the tool would admit; `minInteriorAngleOf` decides
 nothing. The best effort stays inside the domains ([ADR-AG-162](06c-decisions-analytic.md#adr-ag-162), `admissible`),
 and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisions-analytic.md#adr-ag-159):

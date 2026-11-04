@@ -1311,6 +1311,16 @@
       "chosen": true,
       "at": "2026-11-03T18:55:50.589Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-2506-reason-clause",
+      "kind": "text",
+      "issue": "#2506",
+      "what": "the reason clause («הסיבה: …») of analytic's two-points-meet refusal: the completing line as the student typed it (2-D renders its own command, e.g. «AC ⟂ BC», «∠ACB = 90°»; analytic has no student-safe renderer for a relation)",
+      "choice": "«לא ניתן: «AC ⊥ BC» סותר את «AB = BC» — אי אפשר לקיים את שניהם יחד. הסיבה: AC ⊥ BC.» (the existing errMeasureContradicts frame; what = the typed line)",
+      "chosen": true,
+      "at": "2026-11-04T06:11:02.623Z",
+      "status": "pending"
     }
   ],
   "demoted": {

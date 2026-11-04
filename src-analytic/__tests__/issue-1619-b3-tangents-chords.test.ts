@@ -148,9 +148,10 @@ describe('#1619 B3 — a tangency AT A NAMED POINT', () => {
   it('refusals: a tangent from INSIDE the circle, and a degenerate touch at the line’s own end', () => {
     const inside = derive(['נתון מעגל x^2+y^2=25', 'P(1,1)', 'PA משיק למעגל בנקודה A'], 0);
     expect(inside.faults.map((f) => [f.index, f.code])).toEqual([[2, 'unsatisfiable']]);
-    // P ON the circle: the only "touch" is A = P, which names no line PA.
+    // P ON the circle: the only "touch" is A = P, which names no line PA — a pair-only meeting (#2506, ADR-AG-399; 2-D's
+    // ADR-764 rule: a pair-only failure is the statement's over-constraint), so the refusal names the pinning statement.
     const onIt = derive(['נתון מעגל x^2+y^2=25', 'P(3,4)', 'PA משיק למעגל בנקודה A'], 0);
-    expect(onIt.faults.map((f) => [f.index, f.code])).toEqual([[2, 'unsatisfiable']]);
+    expect(onIt.faults.map((f) => [f.index, f.code, f.declared])).toEqual([[2, 'measure-contradicts', 'P(3,4)']]);
   });
 });
 
