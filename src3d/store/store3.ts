@@ -1884,7 +1884,7 @@ function deriveCore3(
           Math.abs(norm3(sub3(p, k.center)) - k.radius) <= 1e-5 * Math.max(k.radius, 1) &&
           Math.abs(dot3(sub3(p, k.center), k.normal)) <= 1e-5 * Math.max(k.radius, 1);
         if (!holds) {
-          status[f.id] = { code: 'not-on-line', id: cmd.point };
+          status[f.id] = { code: 'not-on-circle', id: cmd.point }; // #2611 (ADR-3D-414): the circle's own wording
           break;
         }
       } else if (cmd.type === 'right-pyramid-point') {

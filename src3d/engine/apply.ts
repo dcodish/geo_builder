@@ -4132,8 +4132,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     // coordinates, whatever the arm below did).
     case 'point-on-circle3': {
       // '' = the single circle (ADR-029 implicit-reference); a named id must exist
-      if (cmd.circle === '' ? c.circles3.length !== 1 : !c.circles3.some((k) => k.id === cmd.circle)) {
-        return { ok: false, error: { code: 'unknown-line', id: cmd.circle || 'circle' } };
+      // #2611 (ADR-3D-414): the refusal speaks of the circle in the student's words — the letter he named it by, or
+      // what «המעגל» could not name — never the line wording and never an id («הישר «circle»»).
+      if (cmd.circle !== '' && !c.circles3.some((k) => k.id === cmd.circle)) {
+        return { ok: false, error: cmd.name !== undefined ? { code: 'unknown-circle', name: cmd.name } : { code: 'unknown-circle' } };
+      }
+      if (cmd.circle === '' && c.circles3.length !== 1) {
+        if (c.circles3.length === 0) return { ok: false, error: { code: 'unknown-circle' } };
+        // a circle «המעגל X» can name: one built on a centre the student lettered (`circle-<centre>`, ADR-029)
+        const centre = c.circles3.map((k) => ('center' in k.def && k.id === `circle-${k.def.center}` ? k.def.center : null)).find((x) => x !== null);
+        return { ok: false, error: centre ? { code: 'unknown-circle', several: true, centre, point: cmd.point } : { code: 'unknown-circle', several: true } };
       }
       const circle = cmd.circle === '' ? c.circles3[0] : c.circles3.find((k) => k.id === cmd.circle)!;
       // #2611 (ADR-3D-410) — the on-line rider's circle twin (ADR-3D-031). A NEW id stated onto the circle is CREATED

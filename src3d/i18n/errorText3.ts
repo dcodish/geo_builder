@@ -258,6 +258,17 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.wrongSideOfPlane', { id: err.id });
     case 'not-on-line':
       return t('err.notOnLine', { id: err.id });
+    // #2611 (ADR-3D-414): a circle reference or membership in the circle's own words
+    case 'not-on-circle':
+      return t('err.notOnCircle', { id: err.id });
+    case 'unknown-circle':
+      return err.name !== undefined
+        ? t('err.unknownCircle', { name: err.name })
+        : err.several
+          ? err.centre !== undefined && err.point !== undefined
+            ? t('err.severalCirclesByCentre', { centre: err.centre, point: err.point })
+            : t('err.severalCircles')
+          : t('err.noCircle');
     case 'point-coincides':
       return t('err.pointCoincides', { id: err.id, with: err.with });
     case 'line-misses-plane':

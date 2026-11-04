@@ -138,6 +138,39 @@ export function assertedRunOf3(cmds: readonly Command3[], id: string): AssertedR
 }
 
 /**
+ * #2681 ([ADR-3D-413](../../docs/06b-decisions-3d.md#adr-3d-413)) — EVERY PLANE A LINE NAMES BY FOUR OR MORE LETTERS IN AN
+ * OPERAND POSITION, in reading order, each run once. A plane written by its letters asserts that its points lie in one
+ * plane wherever it stands: alone («המישור ABCD», a `plane-through`) or as a side of a relation («המישור ABCD מקביל
+ * למישור EFGH», «EF מאונך למישור ABCD», «המרחק בין E למישור ABCD הוא 2»). Read structurally, by the shape that holds
+ * the run — never a list of relation kinds:
+ * - a `{kind: 'plane-run'}` operand (a face's run included: a face is flat too);
+ * - a {@link PLANE_SLOT_KEYS3} field holding letters (`seg-plane-rel`, `line-plane-angle` …);
+ * - `plane-line-perp`'s `ids`: the one command that stores a stated plane operand flattened into `ids` (its other
+ *   `ids`-holders — `coord-plane-rel`, the `plane-eq` claim — already verify every named point on the stated plane).
+ * Runs of three are not read: three points always span a plane, or are a collapse the relation's own gate refuses.
+ */
+export function statedPlaneRuns3(cmds: readonly Command3[]): string[][] {
+  const runs: string[][] = [];
+  const add = (ids: readonly string[]) => {
+    if (!runs.some((r) => r.join(',') === ids.join(','))) runs.push([...ids]);
+  };
+  const letters = (x: unknown): x is string[] => Array.isArray(x) && x.length >= 4 && x.every((q) => typeof q === 'string' && POINT_LABEL3.test(q));
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'plane-run' && letters(o.ids)) add(o.ids);
+    if (o.type === 'plane-line-perp' && letters(o.ids)) add(o.ids);
+    for (const [k, x] of Object.entries(o)) {
+      if (PLANE_KEYS.has(k) && letters(x)) add(x);
+      else if (typeof x === 'object' && k !== 'ids') walk(x);
+    }
+  };
+  walk(cmds);
+  return runs;
+}
+
+/**
  * May the mint pass create the plane `name` for a line made of `cmds` on `c`? A π-token (`π`, `π3` — the named-plane
  * convention, ADR-3D-124) in one of the line's plane slots that names nothing in the figure. A missing point-run name
  * («ABC») is mistyped letters and stays the point lane's (its letters are minted, never a plane).

@@ -52,8 +52,10 @@ describe('issue #14 — parsing: ⟂ between two segments / named vectors', () =
     // pinning a silent drop: the rule matched an optional 4th label and then discarded it, so a stated
     // box FACE committed as a triangle, green. (What kept that invisible was apply's own `length === 3`
     // gate, which turned the honest 4-point form into `no-solution`; both halves are fixed together.)
-    expect(cmd('MO ⊥ABCD').at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O', plane: ['A', 'B', 'C', 'D'] });
-    expect(cmd('MO⊥ABCD').at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O' });
+    expect(cmd('MO ⊥ABCD').find((c) => c.type === 'seg-plane-rel')).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O', plane: ['A', 'B', 'C', 'D'] });
+    expect(cmd('MO⊥ABCD').find((c) => c.type === 'seg-plane-rel')).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O' });
+    // #2681 (ADR-3D-413): the 4-letter run is declared as its plane after the relation
+    expect(cmd('MO ⊥ABCD').at(-1)).toEqual({ type: 'plane-through', name: 'ABCD', ids: ['A', 'B', 'C', 'D'] });
     expect(cmd("AS ⊥ BC'D").at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', plane: ['B', "C'", 'D'] });
   });
   it('no theft: the existing ⟂ rules are unchanged', () => {

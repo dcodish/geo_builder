@@ -527,8 +527,12 @@ clash rules are inherited and its refusal is the line's. A **named plane run** (
 mints a missing member `free3` until three members the figure holds are non-collinear (`spansPlane3`, read off
 `evaluate3`); each further missing member is minted as an `on-plane` rider of the run's own plane (the plane that
 names it, 2 sampled DOFs; `planeFromPointRun` seats it from the members already placed). Riders are carried to the
-refold by `preriders` (point → plane), applied over the `premint` points. An **anonymous plane run** (a `plane-run`
-operand or a `plane` / `p1` / `p2` field holding letters) names no plane a rider could ride, and is minted free as before.
+refold by `preriders` (point → plane), applied over the `premint` points. **There is no anonymous plane run**
+([ADR-3D-413](06b-decisions-3d.md#adr-3d-413), #2681): a run of 4+ letters in an operand position (a `plane-run`
+operand, a `plane` / `p1` / `p2` field holding letters, `plane-line-perp`'s `ids`) is declared by the parser as its
+own `plane-through` after the line's commands (`declareStatedPlanes3`, `parse3`'s one exit, read by
+`statedPlaneRuns3`), so a relation's plane is minted as a named run here and checked coplanar by the status pass
+exactly as «המישור ABCD» alone is.
 
 ### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
 
@@ -849,7 +853,10 @@ after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`)
 and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The
 `point-on-circle3` arm creates a new letter as the rider, re-homes a `free3` letter onto the circle unless the circle
 is built from it (`builtFrom3`), re-ordering the points parents-first (`parentsFirst3`), and leaves every placed
-point a check. The store's status pass stays the arbiter on final coordinates.
+point a check. The store's status pass stays the arbiter on final coordinates. A circle reference the arm cannot resolve is refused
+`unknown-circle` (the letter the student named it by — the parser carries it as the command's `name` — or `several`,
+with a centre-lettered circle as the next step, or no circle at all), and a failed membership is `not-on-circle`: a
+circle is never refused in the line's vocabulary or by its id ([ADR-3D-414](06b-decisions-3d.md#adr-3d-414)).
 
 **A host bound is restored, not only enforced** (#1735, ADR-3D-306). `offHost` (in `degenerate()`) rejects a
 converged candidate outside `[lo, hi]`; when the pool is otherwise empty, an acceptance site re-seats the

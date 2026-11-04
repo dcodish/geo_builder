@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-04T06:02:40.948Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "המישור ABCD מאונך לישר EF",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "D",
+          "b": "A"
+        },
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "E",
+          "b": "F",
+          "plane": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "plane-through",
+          "name": "ABCD",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}

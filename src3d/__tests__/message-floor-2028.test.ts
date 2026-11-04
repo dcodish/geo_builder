@@ -53,6 +53,8 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'plane-side-undefined': [{ id: 'π1' }],
   'wrong-side-of-plane': [{ id: 'P' }],
   'not-on-line': [{ id: 'P' }],
+  'not-on-circle': [{ id: 'P' }],
+  'unknown-circle': [{ name: 'O' }, {}, { several: true }, { several: true, centre: 'O', point: 'D' }],
   'point-coincides': [{ id: 'P', with: 'A' }],
   'line-misses-plane': [{ id: 'P' }],
   'crossing-off-segment': [{ id: 'P' }],
