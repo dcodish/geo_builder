@@ -503,6 +503,11 @@ const SEEDED: SeededCorpus = {
   // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
   // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
   'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
+  // #1986 (ADR-3D-418) — the issue's two reported rows: a second ring a dart saves, and a trapezoid a coordinate letter
+  // saves past its default window. Both rings drawn simple, k > 4 and the seeds are asserted in
+  // issue-1986-ring-search.test.ts; these are the build + drift net.
+  'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
+  'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

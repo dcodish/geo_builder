@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -1718,13 +1718,8 @@ function oppositeParallelBase3(c: Construction3, apex: Id): [Id, Id] | null {
   return cands.length === 1 ? cands[0] : null;
 }
 
-/** A ring's identity up to where its cycle starts and which way round it is read (#1927, 2-D's `ringKey`). */
-export function ringKeyIds3(ids: readonly Id[]): string {
-  const n = ids.length;
-  const rots: string[] = [];
-  for (const seq of [[...ids], [...ids].reverse()]) for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
-  return rots.sort()[0];
-}
+/** A ring's identity up to where its cycle starts and which way round it is read — lives in baseShapes (#1986). */
+export { ringKeyIds3 } from './baseShapes';
 
 function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
   const id = (cmd as { id?: unknown }).id;

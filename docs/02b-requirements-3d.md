@@ -679,9 +679,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
   SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
   first, «מרובע ABDC · מלבן ABCD»): when the ring crosses at every claim sample and no configuration branch can save
-  it, the line that completed it is refused with the same words. A ring a dart could save («דלתון ABCD · מרובע ABDC»)
-  is never refused (the operator's "search first, refuse last", 2026-10-09). A ring with a free vertex is
-  drawn simple by choice of configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
+  it, the line that completed it is refused with the same words. **A ring a configuration or a coordinate letter can
+  make simple is drawn simple** (#1986, ADR-3D-418; the operator's "search first, refuse last", 2026-10-09):
+  «דלתון ABCD · מרובע ABDC» is drawn as a dart, «מרובע ABCD · מרובע ABDC» as a concave quadrilateral, and
+  «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» as a genuine trapezoid (k > 4) — never crossed and green, and
+  «הציגו תצורה אחרת» keeps every declared ring simple. A ring over a coordinate letter is refused, in the same words,
+  only when the widened search finds no simple drawing. A ring with a free vertex is drawn simple by choice of
+  configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the
