@@ -456,7 +456,15 @@ export interface LabelRequest {
   priority?: number;
   /** A drawn line this label may cross — an angle value over its OWN arms, as 2-D writes it (the white halo keeps it legible). */
   mayCross?: (l: ScreenLine) => boolean;
+  /** #2689 (ADR-AG-392): the label's font size (default {@link LENGTH_LABEL_FONT}) and weight — its box is measured at them. */
+  font?: number;
+  bold?: boolean;
+  /** #2689: drawn lines THIS label keeps off besides the shared ones — an answer's label off its own traced curve. */
+  avoid?: readonly ScreenLine[];
 }
+
+/** #2689: a bold glyph is wider than the 0.6 em estimate; the answer labels (a locus, a height) are written bold. */
+const BOLD_WIDTH = 1.1;
 
 /** A stated length's request: its midpoint, stepping along the OUTWARD normal (#1717's rule, unchanged). */
 function lengthRequests(
@@ -496,6 +504,12 @@ export function placeSceneLabels(
   points: readonly ScenePoint[],
   furniture: readonly LabelBox[] = [],
   lines: readonly ScreenLine[] = [],
+  /**
+   * #2689 (ADR-AG-392): THE CANVAS IS A HARD BOUND. A position whose box leaves the view is never "clear", and the
+   * position finally taken is moved inward until its box is inside — a label written past the edge is a value the
+   * student cannot read («אליפסה · x²/16 + y²/12 =» with the «1» cut off). Absent: no bound (a unit caller).
+   */
+  view?: { width: number; height: number },
 ): Array<{ x: number; y: number }> {
   const obstacles: LabelBox[] = [
     ...points.map(pointLabelBox),
@@ -513,14 +527,25 @@ export function placeSceneLabels(
 
   function placeOne(r: LabelRequest): { x: number; y: number } {
     const { mid, n, tie = false } = r;
+    const font = r.font ?? LENGTH_LABEL_FONT;
     // the bidi isolates (`lbl`) are invisible, so they take no width
-    const hw = textWidth(r.text.replace(/[\u2066-\u2069]/g, '').length, LENGTH_LABEL_FONT) / 2;
-    const hh = LENGTH_LABEL_FONT / 2;
+    const hw = (textWidth(r.text.replace(/[\u2066-\u2069]/g, '').length, font) * (r.bold ? BOLD_WIDTH : 1)) / 2;
+    const hh = font / 2;
+    const own = r.avoid ?? [];
     // the box's own half-extent along the normal, so the first position clears the anchor whatever its slope
     const reach = r.reach ?? hw * Math.abs(n.x) + hh * Math.abs(n.y) + LENGTH_GAP;
     // the box the glyphs actually ink: Figure.tsx writes the text 0.35em below the centre, so a cap reaches 0.45em above
     // it and a descender 0.6em below (the 0.8/0.25 em split every label box here uses)
-    const boxAt = (c: { x: number; y: number }): LabelBox => ({ x0: c.x - hw, y0: c.y - 0.45 * LENGTH_LABEL_FONT, x1: c.x + hw, y1: c.y + 0.6 * LENGTH_LABEL_FONT });
+    const boxAt = (c: { x: number; y: number }): LabelBox => ({ x0: c.x - hw, y0: c.y - 0.45 * font, x1: c.x + hw, y1: c.y + 0.6 * font });
+    const inView = (b: LabelBox) => !view || (b.x0 >= 0 && b.y0 >= 0 && b.x1 <= view.width && b.y1 <= view.height);
+    /** The centre moved inward just enough that its box is inside the view (left/top win when it is wider than the view). */
+    const intoView = (c: { x: number; y: number }): { x: number; y: number } => {
+      if (!view) return c;
+      const b = boxAt(c);
+      const dx = b.x0 < 0 ? -b.x0 : b.x1 > view.width ? Math.max(view.width - b.x1, -b.x0) : 0;
+      const dy = b.y0 < 0 ? -b.y0 : b.y1 > view.height ? Math.max(view.height - b.y1, -b.y0) : 0;
+      return { x: c.x + dx, y: c.y + dy };
+    };
     const at = (side: 1 | -1, k: number) => {
       const d = (reach + k * LENGTH_STEP) * side;
       return { x: mid.x + n.x * d, y: mid.y + n.y * d };
@@ -529,24 +554,28 @@ export function placeSceneLabels(
       for (let k = 0; k <= LENGTH_MAX_STEPS; k += 1) {
         const c = at(side, k);
         const b = boxAt(c);
-        if (!obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => crosses(l, b))) return { k, c };
+        if (inView(b) && !obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => crosses(l, b)) && !own.some((l) => crosses(l, b))) return { k, c };
       }
       return null;
     };
     if (r.candidates && r.candidates.length > 0) {
       const clear = (c: { x: number; y: number }) => {
         const b = boxAt(c);
-        return !obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => !r.mayCross?.(l) && crosses(l, b));
+        return inView(b) && !obstacles.some((o) => overlaps(o, b)) && !lines.some((l) => !r.mayCross?.(l) && crosses(l, b)) && !own.some((l) => crosses(l, b));
       };
-      const pos =
-        r.candidates.find(clear) ?? r.candidates.find((c) => !hard.some((o) => overlaps(o, boxAt(c)))) ?? r.candidates[0];
+      const pos = intoView(
+        r.candidates.find(clear) ??
+          r.candidates.find((c) => inView(boxAt(c)) && !hard.some((o) => overlaps(o, boxAt(c)))) ??
+          r.candidates.find((c) => !hard.some((o) => overlaps(o, boxAt(c)))) ??
+          r.candidates[0],
+      );
       obstacles.push(boxAt(pos));
       return pos;
     }
     const outward = firstClear(1);
     const inward = r.both && (!outward || tie) ? firstClear(-1) : null;
     const best = outward && (!inward || !tie || outward.k <= inward.k) ? outward : inward;
-    const pos = best ? best.c : at(1, 0);
+    const pos = best ? best.c : intoView(at(1, 0));
     obstacles.push(boxAt(pos));
     return pos;
   }
@@ -636,6 +665,50 @@ export interface SceneLocus {
   /** A closed trace (circle, ellipse) is stroked as a loop; an open one stops where it stops. */
   closed: boolean;
   label: { text: string; x: number; y: number } | null;
+}
+
+/** #2689 (ADR-AG-392): an ANSWER's label — a traced locus's equation, a height's length — is written at 14px bold. */
+export const ANSWER_LABEL_FONT = 14;
+/** Where an answer label's text used to start from its anchor (Figure.tsx's old `dx`/`dy`): its first try still sits there. */
+const ANSWER_LABEL_LIFT = { locus: { dx: 6, dy: 6 }, measure: { dx: 6, dy: 4 } } as const;
+/** How many spots along a trace its label may try. */
+const TRACE_LABEL_SPOTS = 32;
+
+/**
+ * #2689 (ADR-AG-392) — an answer's label as a request for the one placement. Each anchor offers four spots: beside it
+ * up and right (where the label always sat), up-left, down-right, down-left — each as a CENTRE, since the renderer
+ * centres every placed label on the position it is handed. The first anchor's up-right spot is the first try.
+ */
+function answerLabelRequest(
+  text: string,
+  anchors: ReadonlyArray<readonly [number, number]>,
+  own: readonly ScreenLine[],
+  lift: { dx: number; dy: number },
+): LabelRequest {
+  const f = ANSWER_LABEL_FONT;
+  const hw = (textWidth(text.replace(/[⁦-⁩]/g, '').length, f) * BOLD_WIDTH) / 2;
+  const up = -lift.dy - 0.35 * f;
+  const down = lift.dy + 0.45 * f;
+  const candidates = anchors.flatMap(([x, y]) => [
+    { x: x + lift.dx + hw, y: y + up },
+    { x: x - lift.dx - hw, y: y + up },
+    { x: x + lift.dx + hw, y: y + down },
+    { x: x - lift.dx - hw, y: y + down },
+  ]);
+  const [mx, my] = anchors[0];
+  return { mid: { x: mx, y: my }, n: { x: 0, y: -1 }, text, candidates, font: f, bold: true, avoid: own, priority: 2 };
+}
+
+/** The spots along a trace a label may try: its midpoint first, then outward from it both ways, evenly spaced. */
+function alongTrace(pts: ReadonlyArray<readonly [number, number]>): Array<readonly [number, number]> {
+  const mid = Math.floor(pts.length / 2);
+  const step = Math.max(1, Math.round(pts.length / TRACE_LABEL_SPOTS));
+  const out: Array<readonly [number, number]> = [pts[mid]];
+  for (let k = step; k <= pts.length; k += step) {
+    if (mid + k < pts.length) out.push(pts[mid + k]);
+    if (mid - k >= 0) out.push(pts[mid - k]);
+  }
+  return out;
 }
 
 export interface SceneCrossing {
@@ -1022,11 +1095,65 @@ export function buildScene(
     statedDraft.requests = [];
     statedDraft.kinds = [];
   }
+  /**
+   * The perpendicular, projected (#1048). The RIGHT-ANGLE tick is built here rather than in the
+   * renderer because it is geometry — two short legs of equal screen length along the foot's own two
+   * directions — and building it from screen vectors keeps it square at every zoom, which a
+   * world-space square would not be.
+   */
+  const measureDraft = (knows.marks ?? []).map((m) => {
+    const x1 = t.sx(m.from.x);
+    const y1 = t.sy(m.from.y);
+    const x2 = t.sx(m.foot.x);
+    const y2 = t.sy(m.foot.y);
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    const len = Math.hypot(dx, dy) || 1;
+    // Along the perpendicular, and along the line itself — the knee's two rays (`shell/marks`, #1714).
+    const along = { x: x2 - dy / len, y: y2 + dx / len };
+    const text = m.label && display.values ? lbl(m.label) : null;
+    return {
+      x1, y1, x2, y2,
+      // Drawn only when the foot is far enough from the point for a tick to read at all.
+      tick: len > RIGHT_ANGLE * 2 ? pathOf(rightAngleKnee({ x: x2, y: y2 }, { x: x1, y: y1 }, along, RIGHT_ANGLE)) : null,
+      req: text === null ? null : answerLabelRequest(text, [[(x1 + x2) / 2, (y1 + y2) / 2]], [{ x1, y1, x2, y2 }], ANSWER_LABEL_LIFT.measure),
+    };
+  });
+
+  /**
+   * The traced loci, projected (#1137).
+   *
+   * Nothing is decided here — which points, and whether the curve closed, were both settled by the
+   * tracer against the CONSTRUCTION, which this module cannot see. Projecting them is all it does,
+   * exactly as with `measures` and `crossings`.
+   *
+   * #2689 (ADR-AG-392): WHERE the equation is written is the one placement's decision, like every other value on the
+   * canvas. Its first try is where it always sat — beside the trace's midpoint (an open locus runs off the view, and a
+   * label pinned to an off-screen end is a label nobody reads) — and from there it moves ALONG the trace, to a spot
+   * whose whole box is on the canvas and clear of the figure's labels and of the curve itself.
+   */
+  const lociDraft = (knows.loci ?? [])
+    .filter((l) => l.points.length >= 2)
+    .map((l) => {
+      const pts = l.points.map((p) => [t.sx(p.x), t.sy(p.y)] as const);
+      // A stroke begins at 0 and at every `starts` index: the pen lifts across a stretch the givens exclude (#1817).
+      const lift = new Set(l.starts ?? []);
+      const d =
+        pts.map(([x, y], i) => `${i === 0 || lift.has(i) ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
+        (l.closed ? 'Z' : '');
+      const ink: ScreenLine[] = [];
+      for (let i = 1; i < pts.length; i += 1) if (!lift.has(i)) ink.push({ x1: pts[i - 1][0], y1: pts[i - 1][1], x2: pts[i][0], y2: pts[i][1] });
+      const text = l.label && display.values ? lbl(l.label) : null;
+      return { d, closed: l.closed, req: text === null ? null : answerLabelRequest(text, alongTrace(pts), ink, ANSWER_LABEL_LIFT.locus) };
+    });
+  const answerReqs = [...measureDraft, ...lociDraft].flatMap((a) => (a.req ? [a.req] : []));
+
   const placed = placeSceneLabels(
-    [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests, ...roleDraft.requests.map((r) => r.req)],
+    [...lengthRequests(labelled.map((s) => ({ x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, text: s.label!.text })), points), ...statedDraft.requests, ...roleDraft.requests.map((r) => r.req), ...answerReqs],
     points,
     furniture,
     projected.filter((s) => s.ink !== 'ghost'),
+    { width, height },
   );
   const roleBase = labelled.length + statedDraft.requests.length;
   const roles: SceneRoles = {
@@ -1043,53 +1170,11 @@ export function buildScene(
     ticks: statedDraft.ticks,
     labels: statedDraft.requests.map((r, i) => ({ kind: statedDraft.kinds[i], text: r.text, ...placed[labelled.length + i] })),
   };
-
-  /**
-   * The perpendicular, projected (#1048). The RIGHT-ANGLE tick is built here rather than in the
-   * renderer because it is geometry — two short legs of equal screen length along the foot's own two
-   * directions — and building it from screen vectors keeps it square at every zoom, which a
-   * world-space square would not be.
-   */
-  const measures: SceneMeasure[] = (knows.marks ?? []).map((m) => {
-    const x1 = t.sx(m.from.x);
-    const y1 = t.sy(m.from.y);
-    const x2 = t.sx(m.foot.x);
-    const y2 = t.sy(m.foot.y);
-    const dx = x1 - x2;
-    const dy = y1 - y2;
-    const len = Math.hypot(dx, dy) || 1;
-    // Along the perpendicular, and along the line itself — the knee's two rays (`shell/marks`, #1714).
-    const along = { x: x2 - dy / len, y: y2 + dx / len };
-    return {
-      x1, y1, x2, y2,
-      // Drawn only when the foot is far enough from the point for a tick to read at all.
-      tick: len > RIGHT_ANGLE * 2 ? pathOf(rightAngleKnee({ x: x2, y: y2 }, { x: x1, y: y1 }, along, RIGHT_ANGLE)) : null,
-      label: m.label && display.values ? { text: lbl(m.label), x: (x1 + x2) / 2, y: (y1 + y2) / 2 } : null,
-    };
-  });
-
-  /**
-   * The traced loci, projected (#1137).
-   *
-   * Nothing is decided here — which points, and whether the curve closed, were both settled by the
-   * tracer against the CONSTRUCTION, which this module cannot see. Projecting them is all it does,
-   * exactly as with `measures` and `crossings`.
-   *
-   * The label sits at the trace's midpoint rather than its end: an open locus runs off the view, and
-   * a label pinned to a point that is off-screen is a label nobody reads.
-   */
-  const loci: SceneLocus[] = (knows.loci ?? [])
-    .filter((l) => l.points.length >= 2)
-    .map((l) => {
-      const pts = l.points.map((p) => [t.sx(p.x), t.sy(p.y)] as const);
-      // A stroke begins at 0 and at every `starts` index: the pen lifts across a stretch the givens exclude (#1817).
-      const lift = new Set(l.starts ?? []);
-      const d =
-        pts.map(([x, y], i) => `${i === 0 || lift.has(i) ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
-        (l.closed ? 'Z' : '');
-      const mid = pts[Math.floor(pts.length / 2)];
-      return { d, closed: l.closed, label: l.label && display.values ? { text: lbl(l.label), x: mid[0], y: mid[1] } : null };
-    });
+  // the answer labels come back in the order they were asked for, after every other request
+  let answerAt = labelled.length + statedDraft.requests.length + roleDraft.requests.length;
+  const answerLabel = (req: LabelRequest | null) => (req ? { text: req.text, ...placed[answerAt++] } : null);
+  const measures: SceneMeasure[] = measureDraft.map(({ req, ...m }) => ({ ...m, label: answerLabel(req) }));
+  const loci: SceneLocus[] = lociDraft.map(({ req, ...l }) => ({ ...l, label: answerLabel(req) }));
 
   const crossings: SceneCrossing[] = (knows.crossings ?? []).map((k) => ({
     id: k.id,

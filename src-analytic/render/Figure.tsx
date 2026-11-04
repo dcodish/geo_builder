@@ -6,7 +6,7 @@
  * plane cannot be mirrored by the RTL page around it (the #118 bidi lesson has no purchase here —
  * and `dir` is not an SVG attribute, so asserting it would only have been decoration).
  */
-import { LENGTH_LABEL_FONT, POINT_LABEL, TICK_LABEL, pointLabelAnchor, type Scene } from './scene';
+import { ANSWER_LABEL_FONT, LENGTH_LABEL_FONT, POINT_LABEL, TICK_LABEL, pointLabelAnchor, type Scene } from './scene';
 
 const AXIS = '#64748b';
 const GRID = '#e2e8f0';
@@ -406,14 +406,15 @@ export function Figure({
               <text
                 x={l.label.x}
                 y={l.label.y}
-                dx={6}
-                dy={-6}
+                dy="0.35em"
+                textAnchor="middle"
+                data-locus-label="1"
                 fill={SCAFFOLD_TEXT}
                 stroke="#fff"
                 strokeWidth={4}
                 strokeLinejoin="round"
                 paintOrder="stroke"
-                fontSize={14}
+                fontSize={ANSWER_LABEL_FONT}
                 fontWeight={700}
               >
                 {l.label.text}
@@ -439,14 +440,15 @@ export function Figure({
               <text
                 x={m.label.x}
                 y={m.label.y}
-                dx={6}
-                dy={-4}
+                dy="0.35em"
+                textAnchor="middle"
+                data-measure-label="1"
                 fill={SCAFFOLD_TEXT}
                 stroke="#fff"
                 strokeWidth={4}
                 strokeLinejoin="round"
                 paintOrder="stroke"
-                fontSize={14}
+                fontSize={ANSWER_LABEL_FONT}
                 fontWeight={700}
               >
                 {m.label.text}

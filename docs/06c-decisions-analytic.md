@@ -15043,3 +15043,25 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Locks.** `src-analytic/__tests__/issue-2691-point-letters.test.ts` (his figure at seeds 0–3 under five switch settings: C and D clear of every segment, no letter on ink, a dot or a letter; no value over a letter; the 2-D seed rule on a lone point, a vertex and a midpoint; two letters on one dot); the sweep `issue-2691-letter-sweep.test.ts` (asserts zero); fixture `operator-letters-on-side-2691`.
 
 **Behaviour change for a student:** every point's letter is written beside its point, on the open side away from its lines, and moves off any line, dot or other letter that would cover it; before, it always sat up-right of the dot, often on a side.
+
+## ADR-AG-392 — Every canvas label is placed inside the canvas; an answer's label joins the one placement and moves along its curve (#2689)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P2, analytic, session-found) · round #2697 · branch `fix/2689-locus-label-edge`
+**Requirements:** [02c](02c-requirements-analytic.md) R166 (amended: every value on the canvas is written whole, inside it) · **Design:** [04c](04c-design-analytic.md) § *Every label is placed inside the canvas* (new, under *Where a stated length is written*).
+
+**Context.** Found by round #2678's pre-play: «A(-3,0)» · «B(3,0)» · «נקודה P» · «PA + PB = 10», then «הצג מקום גאומטרי» on P. Measured at `ebacadd1` through the student's path (derive → ask by the chip → `drawnLoci` → `drawnBox` → `viewBox` → `buildScene`) at the app's 720×720 fallback canvas, seed 0: the ellipse's label started at x = 631 and ran ~215px, past the 720 edge — the student read «אליפסה · x²/25 + y²/16 =» with no «1». `Figure.tsx` wrote it at a fixed `dx 6 / dy −6` from the trace's midpoint; the height's value (`measures[].label`, #1048) the same way at `dx 6 / dy −4` from its perpendicular's midpoint. Neither went through `placeSceneLabels`, and `placeSceneLabels` itself had no notion of the view: a length or an angle value at the edge could step out of it too.
+
+**The class.** *A value written on the canvas is positioned with no knowledge of the canvas bound* — every answer label (never placed at all) and every placed label (placed, but unbounded). One wrong outcome: a value the student cannot read whole.
+
+**Decision.**
+1. `placeSceneLabels` takes the canvas size (`view`). A position whose box leaves the view is never clear; the position finally taken (no clear spot) is moved inward until its box fits (`intoView`). Without `view` (a unit caller) nothing is bounded.
+2. An answer's label is a `LabelRequest` in the same call (`answerLabelRequest`): its candidates are four spots — up-right (where it always sat), up-left, down-right, down-left — beside each of up to 32 points along its own trace (`alongTrace`, midpoint first, then outward both ways); a height's label has its perpendicular's midpoint as its one anchor. It keeps off its own curve (`LabelRequest.avoid`), is measured at its own 14px bold (`font`, `bold`), and has priority 2, so it yields to every stated value.
+3. `Figure.tsx` centres both answer labels on the returned position (`textAnchor="middle"`, `dy 0.35em`), as every placed label is.
+
+**Sibling audit.** 2-D: its canvas is re-fitted to the scene with a reserved inset (`src/render/transform.ts` "kept clear on every side so labels/marks aren't clipped"), and it draws no locus label — class not present. 3-D and complex: no traced-curve label; their labels are projected inside the fitted frame — not touched. In analytic, the other unplaced labels are the construction's 2x/x ratio marks and a circle centre's coordinate label, both anchored on ink that is inside the frame by construction; not changed (no report).
+
+**Measured after.** The reported ellipse, an ellipse x²/16 + y²/12, the bisector `MA = MB` (an open trace running off the view), a parabola y² = 8x and a translated circle, seeds 0–3, at 720×720, 900×600 and 420×600: every label's box inside the canvas (it was outside on the reported case at 720×720 and 900×600).
+
+**Locks.** `src-analytic/__tests__/issue-2689-answer-label-in-view.test.ts` — the five figures × four seeds × three canvases (the canvas label equals the panel's value and its box is inside), the bound on a length and on a candidate-bound value at the edge, no bound without a view, and the height's value inside the view.
+
+**Behaviour change for a student:** a locus equation (and a height's value) is written whole inside the canvas; at the edge it moves along its curve to where it fits, and it no longer sits on a point's letter or a stated value. Before, it could be cut off at the edge.

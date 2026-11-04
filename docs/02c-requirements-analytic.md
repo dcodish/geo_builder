@@ -1133,7 +1133,9 @@ a sentence the tool parsed.
 
 **R166 — a stated length is written where it can be read**. Away from the figure, in its blue, never over a label, point, side or the axis numbers; stable across «הציגו תצורה אחרת».
 - «AO = 3» → «3» beside AO
-- Sources: ADR-AG-223, #1717.
+- **Every value written on the canvas is written whole, inside it** ([ADR-AG-392](06c-decisions-analytic.md#adr-ag-392), #2689): a stated length, an angle, an area, a focus's or directrix's label, a traced locus's equation and a height's value never run past the canvas edge. A locus's equation moves along its own curve to a spot where it fits.
+  - «A(-3,0)» · «B(3,0)» · «נקודה P» · «PA + PB = 10», then «הצג מקום גאומטרי» on P → «אליפסה · x²/25 + y²/16 = 1» whole, never «… =» cut at the right edge
+- Sources: ADR-AG-223, #1717, ADR-AG-392, #2689.
 
 **R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**. *(Operator ruling: the canvas shows the inputs, the panel the computed values — ADR-W-047.)* A stated right angle is a knee, never «90°»; an area writes «S=13» inside (ADR-W-118 B9) however it was stated — «שטח ABC = 12» writes «S=12» — and a value that is one letter writes the letter alone: «נסמן את שטח ABC ב-S» writes «S» (ADR-AG-273); an area stated twice is one label; each value sits at its mark (ADR-AG-228); a computed value is never written. Known gap: #1806.
 - «∢ABC = 30» → «30°»; «tan∢BAO = 2» → «63.43°»
