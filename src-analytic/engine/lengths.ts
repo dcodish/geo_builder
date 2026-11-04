@@ -25,6 +25,7 @@ import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { TANGENT_LENGTH_SOURCE, TANGENT_WORD } from '../parser/tangentLengthWords';
 import type { Id } from './types';
+import { POINT_NAME, isPointName, splitPointNames, withPointName } from './pointName';
 
 /**
  * One MEASURE in an expression — what a placeholder stands for (#1075).
@@ -152,7 +153,7 @@ export const isTermPlaceholder = (sym: string): boolean => sym.length === 1 && s
  * inside the match. A run of three or more capitals (`ABC`) now yields nothing here, which is right:
  * it is a polygon, and the area frame that owns it already runs first.
  */
-const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])/g;
+const LENGTH_TOKEN = new RegExp(String.raw`(?<![A-Za-z])(${POINT_NAME})(${POINT_NAME})(?![A-Za-z])`, 'g');
 
 /**
  * `AB + BC` → an expression over placeholders, plus the pairs they stand for.
@@ -235,9 +236,9 @@ const LINE_EQ_BASE = 0xe900;
 export const lineEqToken = (i: number): string => String.fromCharCode(LINE_EQ_BASE + i);
 const lineEqIndex = (s: string): number | null => (s.length === 1 && s.charCodeAt(0) >= LINE_EQ_BASE && s.charCodeAt(0) < LINE_EQ_BASE + 0x100 ? s.charCodeAt(0) - LINE_EQ_BASE : null);
 
-// A point name carries its index in either spelling — «N1», «N₁» (#2391, ADR-AG-315: `IS_POINT` below already did).
+// A point name carries its index in either spelling — «N1», «N₁» (#2391, ADR-AG-315: `isPointName` below already did).
 // A lifted line equation is one token (#2429).
-const OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?|[\uE900-\uE9FF]`;
+const OPERAND = String.raw`(?:${POINT_NAME}){1,2}|[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?|[\uE900-\uE9FF]`;
 /** An optional noun before either operand -- «המרחק מ-C לישר AB». */
 // #1431: the POINT nouns join the slot — «המרחק של הנקודה A מהישר l1» is the same sentence with
 // the optional subject noun (`הנקודה A ≡ A`, the #1134/#1151 shape), for the ask and the given alike.
@@ -291,14 +292,14 @@ const DISTANCE_FRAMES: RegExp[] = [
  * `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and
  * answer a DIFFERENT measurement — the exact honesty failure #1151 records for the English form.
  */
-const SYM_OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
+const SYM_OPERAND = String.raw`(?:${POINT_NAME}){1,2}|[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
 const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
   // d_{AB} · d_{A,B} · d_{A,l1}
   [new RegExp(String.raw`\bd\s*_\s*\{\s*(${SYM_OPERAND})\s*,?\s*(${SYM_OPERAND})\s*\}`, 'g'), 'המרחק בין $1 ל-$2'],
   // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
   [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
   // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
-  [new RegExp(String.raw`\|\s*([A-Z][0-9₀-₉]?)\s*([A-Z][0-9₀-₉]?)\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+  [new RegExp(String.raw`\|\s*(${POINT_NAME})\s*(${POINT_NAME})\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
 ];
 
 /**
@@ -315,7 +316,7 @@ const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
  * A RUN OF THREE OR MORE vertices only: `S_1` or `S_A` is a subscripted name, not a polygon, and is left
  * alone. Bounded on letters so a word ending in `S` (`AS_…`) is never cut.
  */
-const AREA_NOTATION = /(?<![A-Za-z0-9])S\s*_\s*(?:\{\s*((?:[A-Z][0-9₀-₉]?){3,})\s*\}|((?:[A-Z][0-9₀-₉]?){3,})(?![A-Za-z0-9₀-₉]))/g;
+const AREA_NOTATION = new RegExp(String.raw`(?<![A-Za-z0-9])S\s*_\s*(?:\{\s*((?:${POINT_NAME}){3,})\s*\}|((?:${POINT_NAME}){3,})(?![A-Za-z0-9₀-₉]))`, 'g');
 
 /** `S_{ABC}` / `S_ABC` → «שטח ABC», everywhere in `s` (#1621). */
 export const areaNotation = (s: string): string => s.replace(AREA_NOTATION, (_m, braced?: string, bare?: string) => `שטח ${braced ?? bare}`);
@@ -336,7 +337,7 @@ export const areaNotation = (s: string): string => s.replace(AREA_NOTATION, (_m,
  * the area token: a noun stripped too early would leave «בין A ל-B» with no frame left to read it.
  */
 const LENGTH_NOUN = new RegExp(
-  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?\b)`,
+  String.raw`(?:ה?אורך|ה?מרחק|[Ll]ength(?:\s+of)?|[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?=${POINT_NAME}${POINT_NAME}(?![A-Za-z0-9_]))|(?:ה?(?:קטע|צלע)|[Ss]egment|[Ss]ide)\s+(?=${POINT_NAME}${POINT_NAME}(?![A-Za-z0-9_]))`,
   'g',
 );
 
@@ -354,11 +355,10 @@ const LENGTH_NOUN = new RegExp(
  */
 const PARALLEL_SINE = 1e-6;
 
-const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
 
 // The English ARTICLE is part of the measure (#1621): «the area of triangle ABC = 45» otherwise left «the» to be
 // multiplied as t·h·e — the #1321 trap the distance noun already closes for «the distance».
-const AREA_TOKEN = /(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
+const AREA_TOKEN = withPointName(/(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:ℕ){3,})/g);
 
 export function parseLengthExpr(src: string, lines?: readonly LineEquation[]): LengthExpr | null {
   return readLength(src, undefined, lines);
@@ -388,7 +388,7 @@ export function namedLengthPairs(src: string): Array<{ a: Id; b: Id }> {
  * but a distance, so it is consumed here, before `LENGTH_NOUN` would strip the noun and leave the pair to look named.
  */
 const DISTANCE_NOUN = new RegExp(
-  String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A-Za-z])`,
+  String.raw`(?:ה?מרחק|(?:the\s+)?[Dd]istance)\s+(?:ה?(?:קטע|צלע|ישר)\s+)?(?<![A-Za-z])(${POINT_NAME})(${POINT_NAME})(?![A-Za-z])`,
   'g',
 );
 
@@ -436,7 +436,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
       if (xi !== null || yi !== null) {
         const pt = xi === null ? x : yi === null ? y : null;
         const op = lines?.[(xi ?? yi)!];
-        if (!pt || !IS_POINT.test(pt) || !op) return _m;
+        if (!pt || !isPointName(pt) || !op) return _m;
         const key = `${pt}|${op.id}`;
         return push(
           { kind: 'point-line', p: pt, line: op.eqSrc, eq: op.eq, curve: op.id },
@@ -445,12 +445,12 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
       }
       // Two points are a plain distance -- the SAME term «AB» produces, so «המרחק בין A ל-B» and
       // «AB» are one question with one answer instead of a point-line term naming a line called «B».
-      if (IS_POINT.test(x) && IS_POINT.test(y)) {
+      if (isPointName(x) && isPointName(y)) {
         if (x === y) return _m; // a degenerate statement, as LENGTH_TOKEN also refuses
         return push({ a: x, b: y }, (t) => t.kind !== 'area' && t.kind !== 'point-line' && t.kind !== 'line-line' && t.kind !== 'ellipse-dist' && t.kind !== 'tangent' && t.a === x && t.b === y);
       }
       // Exactly one point: the other operand is the line, whichever side it was written on.
-      const p = IS_POINT.test(x) ? x : IS_POINT.test(y) ? y : null;
+      const p = isPointName(x) ? x : isPointName(y) ? y : null;
       const line = p === x ? y : p === y ? x : null;
       // Neither is a point: two LINES — the capability #1151 named and left (#1205). Consumed here
       // now, so the ask lane can answer it; whether the pair is actually parallel is a question about
@@ -479,7 +479,7 @@ function readLength(src: string, named?: Set<number>, lines?: readonly LineEquat
   // A length noun in front of a bare pair adds nothing to it — «אורך AB» IS «AB» (#1128).
   const withNouns = withDistances.replace(LENGTH_NOUN, '');
   const withAreas = withNouns.replace(AREA_TOKEN, (_m, run: string) => {
-    const ids = run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
+    const ids = splitPointNames(run);
     const key = ids.join();
     const at = terms.findIndex((t) => t.kind === 'area' && t.ids.join() === key);
     const i = at >= 0 ? at : terms.push({ kind: 'area', ids }) - 1;

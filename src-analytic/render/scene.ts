@@ -18,6 +18,7 @@ import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
 import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
 import { ALL_SHOWN, type CanvasDisplay } from './canvasDisplay';
+import { displayPointName } from '../engine/pointName';
 
 /**
  * THE KEY A SEGMENT'S DISPLAY IS FILED UNDER (#1653) — its two endpoint letters, unordered.
@@ -938,7 +939,8 @@ export function buildScene(
       id: p.id,
       cx: t.sx(p.x),
       cy: t.sy(p.y),
-      label: p.id,
+      // #2621 C (ADR-AG-395): a primed name is DRAWN with the typographic prime, A′ (3-D's glyph).
+      label: displayPointName(p.id),
       // #2688: «ערכים על הסרטוט» unticked → the letter alone; every label box below is measured from this
       coords: any && display.values ? ([part(prov.x, 'x'), part(prov.y, 'y')] as [ScenePart, ScenePart]) : undefined,
     };

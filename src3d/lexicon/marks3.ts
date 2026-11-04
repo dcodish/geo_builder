@@ -12,13 +12,14 @@
  * same gate maintained in two files, each copy fixed alone while the other silently stayed behind.
  * A fifth spelling added here reaches the grammar and the display together, or not at all.
  *
- * **It imports NOTHING**, which is the property that lets `parser/`, `engine/` and `render/` all depend
+ * **It imports nothing but the shared `shell/primes` set**, which is the property that lets `parser/`, `engine/` and `render/` all depend
  * on it without depending on each other. Nothing here decides what a marking MEANS — that the vector
  * reading is honoured is `apply`'s business (ADR-3D-250). This module knows only how it is SPELLED.
  *
  * Sibling of `nouns3.ts`, deliberately not folded into it: that module is emphatic about being the
  * vocabulary of words that NAME SHAPES, and a notation mark is a different kind of thing.
  */
+import { PRIME_GLYPHS, foldPrimes } from '../../shell/primes';
 
 /**
  * THE COMBINING ARROW, `U+20D7` — the one that renders OVER the preceding letters, and the one a
@@ -88,11 +89,8 @@ export function isVectorMarked3(s: string): boolean {
  * (the sequence gate matches on the folded line and emits by the same indices). «״» (gershayim) is a
  * quotation mark, not a prime, and stays out.
  */
-export const PRIME_GLYPHS3 = '′’‘`´׳ʹʼ';
-
-const PRIME_FOLD_RE = new RegExp(`[${PRIME_GLYPHS3}]`, 'g');
+// #2621 C (ADR-AG-395): the set and the fold moved to `shell/primes` when analytic became their second reader.
+export const PRIME_GLYPHS3 = PRIME_GLYPHS;
 
 /** Canonicalise every prime glyph to ASCII `'` — the ONE prime fold; every reader calls this. */
-export function foldPrimes3(s: string): string {
-  return s.replace(PRIME_FOLD_RE, "'");
-}
+export const foldPrimes3 = foldPrimes;

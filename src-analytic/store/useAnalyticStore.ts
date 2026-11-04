@@ -18,6 +18,7 @@ import type { RefKind } from '../engine/names';
 import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
+import { isPointName } from '../engine/pointName';
 
 /**
  * WHOSE save file this is, and which format (#1087).
@@ -507,7 +508,7 @@ export function cleanSeed(raw: unknown): Seed {
 
 function cleanSeedNames(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const NAME = /^[A-Z][0-9₀-₉]?$/;
+  const NAME = { test: isPointName };
   return Object.fromEntries(
     Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => NAME.test(e[0]) && typeof e[1] === 'string' && NAME.test(e[1])),
   );

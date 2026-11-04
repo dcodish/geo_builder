@@ -65,10 +65,12 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { arcRunRoles } from '../../shell/arcRun';
+import { POINT_NAME, splitPointNames } from '../engine/pointName';
 import {
   centreClauses,
   centresRespectivelyClauses,
   circleCentreClauses,
+  distributedCrossingClauses,
   describedCircles,
   namedCirclesClauses,
   satisfiesClause,
@@ -400,7 +402,7 @@ const extentOfNoun = (noun: string | undefined): 'line' | 'segment' | undefined 
   return hit ? (hit.bounded ? 'segment' : 'line') : undefined;
 };
 /** «<noun>? XY» — a named pair and the registry row of the noun in front of it (absent for a bare pair). */
-const PIECE_PHRASE = new RegExp(`^(?:(${PIECE_NOUN})\\s+)?(${'[A-Z][0-9₀-₉]?'})(${'[A-Z][0-9₀-₉]?'})$`);
+const PIECE_PHRASE = new RegExp(`^(?:(${PIECE_NOUN})\\s+)?(${POINT_NAME})(${POINT_NAME})$`);
 function readPiece(text: string): { a: Id; b: Id; noun?: string; row?: StraightNoun } | null {
   const m = PIECE_PHRASE.exec(trim(text));
   if (!m || m[2] === m[3]) return null;
@@ -495,8 +497,8 @@ const COPULA_WORDS = 'הוא|היא|הם|הן|הינו|הינה|הינם|הינ�
 /** A copula as an OPTIONAL suffix of a noun phrase — the long-standing spelling, now sourced from the set. */
 const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
-/** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
-const NAME = '[A-Z][0-9₀-₉]?';
+/** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`) and an optional prime (`A'`) — the one atom (#2621 C, ADR-AG-395). */
+const NAME = POINT_NAME;
 /** #1355 — the point-name atom, exported so the LLM seam's honesty gates read a name exactly as the grammar does. */
 export const POINT_NAME_ATOM = NAME;
 /**
@@ -525,13 +527,13 @@ const LINE_NUMERAL_RE = new RegExp(`^${LINE_NUMERAL}$`);
  */
 /** #1355 — the letter line-name atom (`l`, `ℓ1`), exported for the honesty gates (the lexical-atoms rule, docs/17 §3). */
 export const LETTER_LINE_NAME_ATOM = '[ℓl][0-9]?';
-const LINE_NAME = `(?:${LETTER_LINE_NAME_ATOM}|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+const LINE_NAME = `(?:${LETTER_LINE_NAME_ATOM}|${LINE_NUMERAL}(?=[\\s:,]|$)|${NAME}${NAME})`;
 /**
  * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
  * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
  * below owns it. A numeral names a LINE only where the student wrote the line noun.
  */
-const LINE_NAME_PLAIN = `(?:${LETTER_LINE_NAME_ATOM}|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+const LINE_NAME_PLAIN = `(?:${LETTER_LINE_NAME_ATOM}|${NAME}${NAME})`;
 
 // How a numeral-named line is CALLED («ישר 1» / «line 1») is `lineNameOf` in engine/names.ts (#1350), so
 // `nameReading` inverts it from the same table.
@@ -1070,7 +1072,7 @@ const NAME_RUN = `(?:${NAME})+`;
 /** The English shape nouns, longest first — DERIVED from the registry (read by the concurrency and measure roles). */
 const ROLE_SHAPE_EN = [...Object.keys(EN_SHAPE), 'polygon'].sort((a, b) => b.length - a.length).join('|');
 
-const splitNames = (run: string): string[] => run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
+const splitNames = splitPointNames;
 
 /**
  * The concurrency points, keyed by the role noun the corpus uses.
@@ -2004,7 +2006,7 @@ function distributedLines(phrase: string): [string, string] | null {
 
 function withLineNoun(s: string): string {
   const t = trim(s);
-  return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/.test(t) ? `הישר ${t}` : t;
+  return /^[ℓl][0-9]?$/.test(t) || TWO_POINT_NAME.test(t) ? `הישר ${t}` : t;
 }
 
 /**
@@ -5490,7 +5492,86 @@ function parseMidsegment(line: string): RuleOutcome {
   ]);
 }
 
+/**
+ * THE DIAGONALS AND SIDES OF A SHAPE BY THEIR ROLE (#2621 E, [ADR-AG-396](../../docs/06c-decisions-analytic.md#adr-ag-396); the
+ * ellipse book, p4-24, p5-26 א, p5-28), one given per row (ADR-W-167):
+ *
+ * - «אלכסוני המעוין (נמצאים) על הצירים» · "the diagonals of the rhombus lie on the axes" — each diagonal on one axis; which
+ *   on which is unstated, so it is a choice «הציגו תצורה אחרת» cycles (operator ruling 2026-10-30, Q1 → A).
+ * - «האלכסון הגדול של המעוין הוא AC» · «האלכסון הקטן …» · "the longer diagonal of the rhombus is AC" — AC is a diagonal and
+ *   it is the longer (shorter) one: the segment, and the order between the two diagonals, a region (D7 kind 2).
+ * - «האלכסון הגדול של המעוין נמצא על ציר ה-x» — the longer diagonal lies on that axis: which diagonal it is, is the same
+ *   unstated choice, and the order rides each option.
+ * - «צלעות המשולש (ABC) הן 13, 14 ו-15» · «אורכי צלעות המשולש הם …» · "the sides of the triangle are 13, 14 and 15" — the
+ *   three lengths, and which side has which is unstated: a choice over the assignments (Q1 → A).
+ *
+ * The ring is M1's contextual question («המעוין», or the letters), as every shape-noun sentence's is.
+ */
+const PART_NOUN_HE = '([א-ת]+(?:[- ][א-ת]+){0,2}?)';
+const DIAGONALS_ON_AXES_HE = new RegExp(`^(?:ו?ש?)ה?אלכסוני\\s+ה${PART_NOUN_HE}(?:\\s+(${NAME_RUN}))?\\s+(?:(?:נמצאים|מונחים|הם|נמצאות|מונחות)\\s+)?על\\s+ה?צירים$`);
+const DIAGONALS_ON_AXES_EN = new RegExp(`^(?:the\\s+)?diagonals\\s+of\\s+(?:the\\s+)?(${ROLE_SHAPE_EN})(?:\\s+(${NAME_RUN}))?\\s+(?:lie|are)\\s+on\\s+the\\s+(?:coordinate\\s+)?axes$`, 'i');
+const DIAGONAL_ROLE_HE = new RegExp(
+  `^ה?אלכסון\\s+ה(גדול|קטן|ארוך|קצר)\\s+(?:של\\s+|ב)ה?${PART_NOUN_HE}(?:\\s+(${NAME_RUN}))?\\s+(?:(?:הוא|היא)\\s+(?:ה?אלכסון\\s+)?(${NAME})(${NAME})|(?:נמצא|מונח|הוא)\\s+על\\s+ציר\\s+(?:ה\\s*-?\\s*)?([xy]))$`,
+);
+const DIAGONAL_ROLE_EN = new RegExp(
+  `^(?:the\\s+)?(longer|shorter|long|short|larger|smaller)\\s+diagonal\\s+of\\s+(?:the\\s+)?(${ROLE_SHAPE_EN})(?:\\s+(${NAME_RUN}))?\\s+(?:is\\s+(?:diagonal\\s+)?(${NAME})(${NAME})|lies\\s+on\\s+the\\s+([xy])[- ]axis)$`,
+  'i',
+);
+const SIDE_VALUE = '([^,\\s]+)';
+const SIDE_LENGTHS_HE = new RegExp(`^(?:אורכי\\s+)?ה?צלעות\\s+(?:של\\s+)?ה(משולש)(?:\\s+(${NAME_RUN}))?\\s+(?:הם|הן)\\s+${SIDE_VALUE}\\s*,\\s*${SIDE_VALUE}\\s*,?\\s+ו-?\\s*${SIDE_VALUE}$`);
+const SIDE_LENGTHS_EN = new RegExp(`^(?:the\\s+)?(?:lengths\\s+of\\s+the\\s+)?sides\\s+of\\s+(?:the\\s+)?(triangle)(?:\\s+(${NAME_RUN}))?\\s+are\\s+${SIDE_VALUE}\\s*,\\s*${SIDE_VALUE}\\s*,?\\s+and\\s+${SIDE_VALUE}$`, 'i');
+const LONG_WORD = /^(?:גדול|ארוך|longer|long|larger)$/i;
+
+/** The noun a part sentence names, as the registry spells it — null when the word is no shape noun. */
+function partNoun(raw: string): string | null {
+  const noun = EN_SHAPE[normalizeShapeNoun(raw).toLowerCase()] ?? normalizeShapeNoun(raw);
+  return shapeRow(noun) ? noun : null;
+}
+
+function parseShapeParts(line: string): RuleOutcome {
+  const axes = DIAGONALS_ON_AXES_HE.exec(line) ?? DIAGONALS_ON_AXES_EN.exec(line);
+  if (axes) {
+    const noun = partNoun(axes[1]);
+    if (!noun) return null;
+    const ring = axes[2] ? splitNames(axes[2]) : undefined;
+    if (ring && ring.length !== 4) return refuse('bad-arity', line);
+    return made([{ t: 'diagonal-role', ...(noun ? { noun } : {}), ...(ring ? { ring } : {}), both: true, src: line }]);
+  }
+  const role = DIAGONAL_ROLE_HE.exec(line) ?? DIAGONAL_ROLE_EN.exec(line);
+  if (role) {
+    const [, size, nounRaw, run, a, b, axisRaw] = role;
+    const noun = partNoun(nounRaw);
+    if (!noun) return null;
+    const ring = run ? splitNames(run) : undefined;
+    if (ring && ring.length !== 4) return refuse('bad-arity', line);
+    if (a !== undefined && a === b) return refuse('repeated-vertex', line);
+    return made([
+      {
+        t: 'diagonal-role',
+        noun,
+        ...(ring ? { ring } : {}),
+        long: LONG_WORD.test(size),
+        ...(a !== undefined ? { ids: [a, b] as [Id, Id] } : {}),
+        ...(axisRaw ? { axis: axisRaw.toLowerCase() as 'x' | 'y' } : {}),
+        src: line,
+      },
+    ]);
+  }
+  const sides = SIDE_LENGTHS_HE.exec(line) ?? SIDE_LENGTHS_EN.exec(line);
+  if (sides) {
+    const ring = sides[2] ? splitNames(sides[2]) : undefined;
+    if (ring && ring.length !== 3) return refuse('bad-arity', line);
+    if (ring && hasRepeat(ring)) return refuse('repeated-vertex', line);
+    const values = [sides[3], sides[4], sides[5]].map((v) => constantLengthExpr(v));
+    if (values.some((v) => !v)) return null;
+    return made([{ t: 'side-lengths', ...(ring ? { ring } : {}), values: values.map((v) => v!.expr), src: line }]);
+  }
+  return null;
+}
+
 function parseShape(line: string): RuleOutcome {
+  const parts = parseShapeParts(line);
+  if (parts) return parts;
   const midsegment = parseMidsegment(line);
   if (midsegment) return midsegment;
   const onAxes = parseVerticesOnAxes(line);
@@ -6028,15 +6109,16 @@ function parseRoleLength(line: string): RuleOutcome {
  * A HEIGHT STATED AS A MAGNITUDE, WITH NO SEGMENT NAMED (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה הטרפז 4», «גובה
  * הטרפז ABCD הוא 4», «הגובה הוא 4», "the height of the trapezoid is 4". Which height is the shape's to answer, so the
  * sentence lowers to `height-of` and M1 reads the figure (`applyHeightOf`): a trapezoid's is drawn, a parallelogram's
- * or a triangle's is asked. Only these three nouns, as in 2-D; a rectangle's height stays not understood.
+ * or a triangle's is asked. Only these nouns: 2-D's three, and the RHOMBUS (#2621 E, [ADR-AG-396](../../docs/06c-decisions-analytic.md#adr-ag-396);
+ * the ellipse book's «גובה המעוין הוא 4.8», p5-26 א), whose heights are all one length; a rectangle's height stays not understood.
  */
 const HEIGHT_SHAPE_HE = new RegExp(
-  `^${HE_GIVEN}(?:אורך\\s+)?ה?גובה(?:\\s+(?:של\\s+)?ב?ה?(טרפז|מקבילית|משולש)(?:\\s+((?:${NAME}){3,4}))?)?${ROLE_CONN}(.+)$`,
+  `^${HE_GIVEN}(?:אורך\\s+)?ה?גובה(?:\\s+(?:של\\s+)?ב?ה?(טרפז|מקבילית|משולש|מעוין)(?:\\s+((?:${NAME}){3,4}))?)?${ROLE_CONN}(.+)$`,
 );
 const HEIGHT_SHAPE_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?[Hh]eight(?:\\s+(?:of|in)\\s+(?:the\\s+)?(trapezoid|parallelogram|triangle)(?:\\s+((?:${NAME}){3,4}))?)?\\s*(?:=|is(?:\\s+equal\\s+to)?|equals)?\\s*(?=[√\\d(])(.+)$`,
+  `^(?:[Tt]he\\s+)?[Hh]eight(?:\\s+(?:of|in)\\s+(?:the\\s+)?(trapezoid|parallelogram|triangle|rhombus)(?:\\s+((?:${NAME}){3,4}))?)?\\s*(?:=|is(?:\\s+equal\\s+to)?|equals)?\\s*(?=[√\\d(])(.+)$`,
 );
-const HEIGHT_NOUN: Readonly<Record<string, string>> = { trapezoid: 'טרפז', parallelogram: 'מקבילית', triangle: 'משולש' };
+const HEIGHT_NOUN: Readonly<Record<string, string>> = { trapezoid: 'טרפז', parallelogram: 'מקבילית', triangle: 'משולש', rhombus: 'מעוין' };
 
 function parseShapeHeight(line: string): RuleOutcome {
   const he = HEIGHT_SHAPE_HE.exec(line);
@@ -7345,7 +7427,29 @@ const DIR_LINE_HE = new RegExp(
 const DIR_LINE_EN = new RegExp(
   `^(?:(?:it\\s+is\\s+)?given\\s+(?:that\\s+)?)?(?:[Aa]\\s+line|(?:[Tt]he\\s+)?[Ll]ine\\s+(${FREE_LINE_NAME}))\\s*,?\\s+(?:that\\s+is\\s+|which\\s+is\\s+|is\\s+)?(parallel|perpendicular)\\s+to\\s+the\\s+([xy])[- ]axis(?![A-Za-z0-9])\\s*(.*)$`,
 );
+/**
+ * «ישר המקביל ל-AB» · «נתון ישר l המקביל ל-AB» · «ישר l מקביל לקטע AB» · "a line parallel to AB" — PARALLEL TO A LINE THROUGH
+ * TWO POINTS, the offset free (#2621, [ADR-AG-367](../../docs/06c-decisions-analytic.md#adr-ag-367) Am. 1; judged q-2621-parallel,
+ * 2026-11-02: a TRUE parallel to AB at a free offset, deliberately not 2-D's reading, which drops the relation, #2669). One
+ * given per row (ADR-W-167): «… חותך את המעגל בנקודות P ו-Q» is the next row, «הישר l חותך את המעגל בנקודות P ו-Q».
+ * Parallel only: the ruling is about the parallel, and a perpendicular to AB with no point stays unread.
+ */
+const DIR_PAIR_HE = new RegExp(
+  `^${HE_GIVEN}(?:(?:ישר|קו)|ה?(?:ישר|קו)\\s+(${FREE_LINE_NAME}))\\s*,?\\s+(?:ו?(?:ה|ש))?(${PARALLEL_WORDS})\\s+ל-?\\s*(?:ה?(?:ישר|קטע|צלע)\\s+)?(${NAME})(${NAME})$`,
+);
+const DIR_PAIR_EN = new RegExp(
+  `^(?:(?:it\\s+is\\s+)?given\\s+(?:that\\s+)?)?(?:[Aa]\\s+line|(?:[Tt]he\\s+)?[Ll]ine\\s+(${FREE_LINE_NAME}))\\s*,?\\s+(?:that\\s+is\\s+|which\\s+is\\s+|is\\s+)?(parallel)\\s+to\\s+(?:(?:the\\s+)?(?:line|segment|side)\\s+)?(${NAME})(${NAME})$`,
+);
+
 function parseDirectionLine(line: string): RuleOutcome {
+  const pair = DIR_PAIR_HE.exec(line) ?? DIR_PAIR_EN.exec(line);
+  if (pair) {
+    const [, token, , a, b] = pair;
+    if (a === b) return refuse('repeated-vertex', line);
+    const id = token ? lineIdOf(token) : `curve-${anonIndex(`direction-line:${line}`)}`;
+    const lang = DIR_PAIR_HE.test(line) ? 'he' : 'en';
+    return made([{ t: 'direction-line', id, ...(token ? { name: lineNameOf(token, lang) } : {}), rel: 'parallel', axis: 'x', to: [a, b], src: line }]);
+  }
   const he = DIR_LINE_HE.exec(line);
   const en = he ? null : DIR_LINE_EN.exec(line);
   const m = he ?? en;
@@ -7575,6 +7679,32 @@ function axisCutLine(name: string): Direction {
   const pair = new RegExp(`^(${NAME})(${NAME})$`).exec(name);
   return pair ? { k: 'points', a: pair[1], b: pair[2] } : { k: 'curve', id: lineIdOf(name) };
 }
+/**
+ * «הישר l עובר מימין לראשית הצירים» · «… משמאל / מעל / מתחת לראשית הצירים» · "line l passes to the right of the origin" —
+ * WHICH SIDE OF THE ORIGIN AN AXIS-PARALLEL LINE PASSES (#2621, the book's p6-2 ב row; a session's choice under ADR-W-174,
+ * `chose-2621-side`, recorded in [ADR-AG-367](../../docs/06c-decisions-analytic.md#adr-ag-367) Am. 1). Read ONLY for a line
+ * that is ⊥ or ∥ to an axis: the side of its one axis crossing, the same `axis-cut` region «הישר l חותך את ציר ה-x בנקודה
+ * הנמצאת מימין לציר ה-y» states. Which crossing that is depends on the line's direction, which only the figure knows, so the
+ * sentence lowers to `origin-side` and M1 resolves it (a slanted line, or a side its direction has no crossing for, is refused).
+ */
+const ORIGIN_SIDE_HE = new RegExp(
+  `^ה?ישר\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:(?:ה|ש)?(?:עובר|נמצא)\\s+)?(מימין|משמאל|מעל|מתחת)\\s+(?:ל-?\\s*)?ראשית\\s+(?:ה)?צירים$`,
+);
+const ORIGIN_SIDE_EN = new RegExp(
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:passes|lies|is)\\s+(?:to\\s+the\\s+)?(right|left|above|below)(?:\\s+of)?\\s+the\\s+origin$`,
+  'i',
+);
+const ORIGIN_SIDE_WORD: Readonly<Record<string, 'right' | 'left' | 'above' | 'below'>> = {
+  מימין: 'right', משמאל: 'left', מעל: 'above', מתחת: 'below', right: 'right', left: 'left', above: 'above', below: 'below',
+};
+function parseOriginSide(line: string): RuleOutcome {
+  const m = ORIGIN_SIDE_HE.exec(line) ?? ORIGIN_SIDE_EN.exec(line);
+  if (!m) return null;
+  const [, name, sideRaw] = m;
+  if (name.length === 2 && name[0] === name[1]) return refuse('repeated-vertex', line);
+  return made([{ t: 'origin-side', line: axisCutLine(name) as Extract<Direction, { k: 'points' | 'curve' }>, side: ORIGIN_SIDE_WORD[sideRaw.toLowerCase()], src: line }]);
+}
+
 function parseAxisCut(line: string): RuleOutcome {
   const part = AXIS_PART_HE.exec(line) ?? AXIS_PART_EN.exec(line);
   if (part) {
@@ -8337,7 +8467,7 @@ function parseConstraint(raw: string): RuleOutcome {
      * only) and has no value until the lines are parallel, so the solve could never reach it.
      */
     const only = left && left.terms.length === 1 && left.expr.kind === 'sym' ? left.terms[0] : null;
-    const pairOf = (n: string) => /^([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/.exec(n);
+    const pairOf = (n: string) => TWO_POINT_NAME.exec(n);
     if (only && only.kind === 'line-line' && right && right.terms.length === 0) {
       const u = pairOf(only.u);
       const v = pairOf(only.v);
@@ -8798,7 +8928,7 @@ const ratioFact = (
 function parseRatioColon(line: string): Fact[] | null {
   const m = line.match(
     new RegExp(
-      String.raw`^\s*([A-Z]\d?)\s*([A-Z]\d?)\s*:\s*([A-Z]\d?)\s*([A-Z]\d?)\s*=\s*` + RATIO_PQ + RATIO_END,
+      String.raw`^\s*(${NAME})\s*(${NAME})\s*:\s*(${NAME})\s*(${NAME})\s*=\s*` + RATIO_PQ + RATIO_END,
     ),
   );
   if (!m) return null;
@@ -8832,7 +8962,7 @@ function parseDividesInRatio(line: string): Fact[] | null {
   // (a) divider-first — the one-liner that makes this worth having.
   const div = line.match(
     new RegExp(
-      String.raw`([A-Z]\d?)\s+(?:מחלק[הת]?|divides?)\s+(?:את\s+)?(?:ה?(?:קטע|צלע)\s+)?([A-Z]\d?)\s*([A-Z]\d?)[\s\S]*?(?:ביחס|יחס|ratio)\D*?` +
+      String.raw`(${NAME})\s+(?:מחלק[הת]?|divides?)\s+(?:את\s+)?(?:ה?(?:קטע|צלע)\s+)?(${NAME})\s*(${NAME})[\s\S]*?(?:ביחס|יחס|ratio)\D*?` +
         RATIO_PQ,
       'i',
     ),
@@ -8852,7 +8982,7 @@ function parseDividesInRatio(line: string): Fact[] | null {
    */
   const two = line.match(
     new RegExp(
-      String.raw`(?:ה?יחס|ratio)[\s\S]*?([A-Z]\d?)([A-Z]\d?)\s*(?::|\/|ל-?|to|and|ו-?|,)\s*([A-Z]\d?)([A-Z]\d?)[\s\S]*?` +
+      String.raw`(?:ה?יחס|ratio)[\s\S]*?(${NAME})(${NAME})\s*(?::|\/|ל-?|to|and|ו-?|,)\s*(${NAME})(${NAME})[\s\S]*?` +
         RATIO_PQ,
       'i',
     ),
@@ -8967,6 +9097,8 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
       // The exam's circle-and-centre sentences (#2391, ADR-AG-315): each the twin's own text.
       circleCentreClauses(s),
       centresRespectivelyClauses(s),
+      // #2621 C (ADR-AG-395): «A ו-A' הן נקודות החיתוך של האליפסה עם החלק החיובי ועם החלק השלילי של ציר ה-x».
+      distributedCrossingClauses(s),
       namedCirclesClauses(s),
       sharedSubjectClauses(s),
       elidedSubjectClauses(s),
@@ -10190,7 +10322,7 @@ function parseClauseRules(raw: string): ParseResult {
    * gets the last word, rather than having its refusal overwritten by `not-handled` downstream.
    */
   // «נסמן את הישר PQ ב-l», and where a line crosses an axis with no point named (#2392, ADR-AG-313).
-  const lineNamed = parseNameLine(line) ?? parseNameLineObject(line) ?? parseAxisCut(line);
+  const lineNamed = parseNameLine(line) ?? parseNameLineObject(line) ?? parseAxisCut(line) ?? parseOriginSide(line);
   if (lineNamed) return lineNamed;
 
   const matched =

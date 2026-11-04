@@ -105,6 +105,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #1303 / #1631 — swap two letters: every line and ask row that names either is rewritten at once.
   // A session edit (`lane: 'rewrite'`), not a given. Not featured.
   { category: 'points', family: 'F1', lane: 'rewrite', needs: ['נתונה הנקודה A(2,6)', 'נתונה הנקודה B(8,2)'], he: 'החלף בין A ל-B', en: 'swap A and B' },
+  // #2621 C (ADR-AG-395): a primed point name, its own point (the book's p10-9 ב).
+  { category: 'points', family: 'F1', he: "A'(3,4)", en: "A'(3,4)", needs: ['A(0,0)'] },
 
   // --- F3 · lines by equation ---
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
@@ -113,6 +115,9 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // #2621 B (ADR-AG-367): a line given by its direction alone, its offset a free DOF (book p2-15, p6-2 ב, one given per row).
   { category: 'lines', family: 'F3', he: 'נתון ישר l המאונך לציר ה-x', en: 'line l perpendicular to the x-axis' },
   { category: 'lines', family: 'F3', he: 'ישר המקביל לציר ה-x', en: 'a line parallel to the x-axis' },
+  // #2621 (ADR-AG-367 Am. 1): the side of the origin an axis-parallel line passes; a parallel to AB with its offset free.
+  { category: 'lines', family: 'F3', he: 'הישר l עובר מימין לראשית הצירים', en: 'line l passes to the right of the origin', needs: ['נתון ישר l המאונך לציר ה-x'] },
+  { category: 'lines', family: 'F3', he: 'ישר l המקביל ל-AB', en: 'line l parallel to AB', needs: ['A(0,0)', 'B(1,2)'] },
   // A side named by its ROLE alone (#1807, ADR-AG-266): the base the figure says — stated, or cycled while the apex is open.
   { category: 'lines', family: 'F3', he: 'משוואת הבסיס היא x-2y+6=0', en: 'the base lies on the line x-2y+6=0', needs: ['משולש שווה שוקיים ABC'] },
   // The LINE through two named points, drawn (#1639, ADR-AG-198) — «הישר AB» the line, where «הקטע AB» is the segment.
@@ -694,6 +699,12 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   // Only the nouns that carry no constraint of their own. «מקבילית» / «טרפז» / «ריבוע» each carry a
   // given this slice cannot honour, so they are refused by name rather than taught here.
   { featured: true, category: 'shapes', family: 'F17', he: 'הקטע AB', en: 'segment AB', needs: ['A(0,0)', 'B(4,3)'] },
+  // #2621 E (ADR-AG-396): a shape's height, diagonals and sides by their role, one given per row (the book's p4-24, p5-26 א, p5-28).
+  { category: 'shapes', family: 'F17', he: 'גובה המעוין הוא 4.8', en: 'the height of the rhombus is 4.8', needs: ['נתון מעוין ABCD', 'AB = 5'] },
+  { category: 'shapes', family: 'F17', he: 'אלכסוני המעוין על הצירים', en: 'the diagonals of the rhombus lie on the axes', needs: ['נתון מעוין ABCD'] },
+  { category: 'shapes', family: 'F17', he: 'האלכסון הגדול של המעוין הוא AC', en: 'the longer diagonal of the rhombus is AC', needs: ['נתון מעוין ABCD'] },
+  { category: 'shapes', family: 'F17', he: 'האלכסון הגדול של המעוין נמצא על ציר ה-x', en: 'the longer diagonal of the rhombus lies on the x-axis', needs: ['נתון מעוין ABCD', 'AB = 5'] },
+  { category: 'shapes', family: 'F17', he: 'צלעות המשולש הן 13, 14 ו-15', en: 'the sides of the triangle are 13, 14 and 15', needs: ['נתון משולש ABC'] },
   // --- F19 · the DISTANCE, in the spellings a student actually writes (#1128) ---
   // Three rows walking the three FAMILIES of spelling — the plain Hebrew noun, the textbook
   // subscript, the absolute-value bars — rather than all thirteen, which are one term and are

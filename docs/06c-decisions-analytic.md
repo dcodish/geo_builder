@@ -14559,6 +14559,11 @@ Fixtures `ellipse-book-p5-26b-inscribed`, `ellipse-book-p5-26b-around`. Catalog:
 
 **Behaviour change for a student:** in analytic, «ישר המקביל לציר ה-x» and «נתון ישר l המאונך לציר ה-x» draw a line in a free position that «הציגו תצורה אחרת» moves; the crossings and the side are their own rows.
 
+**Amendment 1 — 2026-11-04 (#2621, fix round #2697, branch `feat/2621-primes-shape-measures`).** Two rows the round left on #2621, each one given (ADR-W-167):
+1. **«הישר l עובר מימין / משמאל / מעל / מתחת לראשית הצירים»** (the book's p6-2 ב as its own row; the session's choice `chose-2621-side`, ADR-W-174) → `origin-side`, resolved at M1 for a line that is ⊥ or ∥ to an axis BY ITS STATEMENT (no y in a vertical line's equation, or an axis-direction `line-at`): the `axis-cut` region of its one axis crossing. A slanted line, or a side its direction has no crossing for («מעל» a vertical line), is refused `out-of-scope` naming the sentence.
+2. **«ישר המקביל ל-AB» · «נתון ישר l המקביל ל-AB» · "line l parallel to AB"** (judged q-2621-parallel, 2026-11-02, decision 4's ruling): a TRUE parallel to AB, offset free. `direction-line` gains `to: [A, B]`; a new line is `a·x + b·y = c` over three tool symbols with a² + b² = 1 (`param-rel`) and the parallel relation to AB stated, so the offset is the one free DOF (sampled; «הציגו תצורה אחרת» moves it) and a vertical AB has a vertical parallel. A named line the figure has gets the relation, as before. Parallel only: a perpendicular to AB with no point stays unread (not ruled). **Deliberately differs from 2-D**, which drops the parallel (#2669); the crossing is its own row, «הישר l חותך את המעגל בנקודות P ו-Q».
+Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`, `parallel-to-ab-2621`. **Requirements:** R216 amended. **Design:** 04c § "A line given by its direction alone" amended.
+
 ## ADR-AG-368 — The drawn tangent is read in every slot that takes a line, and it can be named (#2621 A)
 
 **Date:** 2026-11-02 · **Status:** accepted · feature (analytic), fix round #2665 stream N, branch `feat/2621-line-tangent` (one PR with [ADR-AG-367](#adr-ag-367)). LADDER stage: none (the parser's direction resolver, and the M1 boundary: a reference resolved at `applyFact`, `tangent-of`, `line-at`, `name-line-object`).
@@ -15043,3 +15048,52 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Locks.** `src-analytic/__tests__/issue-2691-point-letters.test.ts` (his figure at seeds 0–3 under five switch settings: C and D clear of every segment, no letter on ink, a dot or a letter; no value over a letter; the 2-D seed rule on a lone point, a vertex and a midpoint; two letters on one dot); the sweep `issue-2691-letter-sweep.test.ts` (asserts zero); fixture `operator-letters-on-side-2691`.
 
 **Behaviour change for a student:** every point's letter is written beside its point, on the open side away from its lines, and moves off any line, dot or other letter that would cover it; before, it always sat up-right of the dot, often on a side.
+
+## ADR-AG-395 — A point name may carry a prime: one point-name atom, the prime folded at the boundary (#2621 C)
+
+**Date:** 2026-11-04 · **Status:** accepted · feature (analytic), fix round #2697 stream S8, branch `feat/2621-primes-shape-measures` (one PR with [ADR-AG-396](#adr-ag-396) and [ADR-AG-367](#adr-ag-367) Am. 1). LADDER stage: none (the parse boundary and the name atom; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R234 (new). · **Design:** [04c](04c-design-analytic.md) § "The point-name atom".
+
+**Operator ruling.** 2026-10-30 on #2621: *"now we need to build all capabilities"* (the ellipse sweep, item 5; plan 2621-C armed on his answers the same day).
+
+**Re-measured at pickup** (`ebacadd1`, `decideSubmit`, no model). As the plan's table: «A'(1,2)», «נקודה A'», «A'B=5», «AA' = 8», «A'P = √45» and the book's «A ו-A' הן נקודות החיתוך של האליפסה עם החלק החיובי ועם החלק השלילי של ציר ה-x» are `not-handled`. Also measured: the last sentence is `bad-operand` with plain letters too («A ו-B הן …») — the distributed «עם … ועם …» is read nowhere, a second gap on the same book line.
+
+**Class.** The point-name atom `[A-Z][0-9₀-₉]?` was spelled inline about thirty times across `src-analytic/` (the grammar's `NAME`, the length tokenizer's pair, the area token, the rename dialog's `POINT_NAME`, the ask lane, the store, the id parsers) — docs/17 §3's "inline lexical fragments" chokepoint, the #267 lesson. A prime had to be taught to every copy, and a copy that missed it would read «A'B» as A and B.
+
+**Decision.**
+1. **One atom, `engine/pointName.ts`**: `POINT_NAME` = a capital, an optional index digit, an optional prime `'` not followed by a lowercase letter (so «A's» is never a prime); `isPointName`, `splitPointNames`, `withPointName` (a regex literal with `ℕ` for the atom, so a pattern carrying Hebrew stays a literal under the inline-Hebrew ratchet) and `displayPointName`. Every reader that spelled the atom composes it: the grammar's `NAME` (so every rule built on it), `LINE_NAME`, `PIECE_PHRASE`, the ratio rules, the length tokenizer (`LENGTH_TOKEN`, `LENGTH_NOUN`, `DISTANCE_NOUN`, `AREA_TOKEN`, `AREA_NOTATION`, the operand atoms), `tangentLengthWords`, the frame, the scope register, the lost-part reader, the ask lane, the rename dialog (`normalizePointName`, `MINTED_RUN`), the store's seed names, `apply`/`crossings`/`derive`/`lines`/`names`/`toolLetters`. The honesty gate's label pattern takes the prime too. A ratchet (`analytic-name-atom-ratchet.test.ts`) counts the inline copies left (an axis subscript, two circle letters, comments) and may only go down.
+2. **The prime is folded at the boundary.** `orthography` calls `foldPrimes` first: every prime glyph (′ ’ ‘ ` ´ ׳ ʹ ʼ) is ASCII `'`. The set and the fold moved from 3-D's `lexicon/marks3` to `shell/primes`, its second reader (3-D re-exports it unchanged).
+3. **A primed point is drawn A′**: the canvas label and the data panel's point row use `displayPointName` (U+2032, 3-D's glyph); the canvas is LTR already (#1209), so the prime cannot mirror.
+4. **The book's distributed crossing reads** (`distributedCrossingClauses`, the frame): «P ו-Q הן נקודות החיתוך של X עם Y1 ועם Y2 (בהתאמה)?» is the two one-point crossing sentences, the i-th point with the i-th carrier; a head the first carrier elides («החלק החיובי ‹של ציר ה-x›») takes the second's «של …» tail. Each clause is the existing sentence, so the pair cannot lower differently.
+
+**Sibling audit (docs/17 §1).** 3-D reads primes (ADR-3D-300's one fold, now shared). 2-D does not: «נקודה A'» and «A'B = 3» parse-fail, and «A' על המעגל» builds a point named A, a silently dropped prime (the plan's finding; a 2-D issue, left to the batch). Complex: no point names of this kind.
+
+**Measured after.** Every spelling records as its own point; ′ ’ ׳ ` ʹ fold to one name; «A'(1,1)», «B(3,4)», «A'B = 5» is refused `unsatisfiable` and «A'B = √13» records; rename A' → B rewrites only the primed point. The book line p10-9 ב (fixture, with the figure's «P על האליפסה» as its own row): A = (4, 0), A' = (−4, 0), P = (2, 3), the ellipse x²/16 + y²/12 = 1 at seeds 0–3. `test:fast` showed no other change.
+
+**Locks.** `issue-2621c-prime-names.test.ts`, `analytic-name-atom-ratchet.test.ts`, fixture `prime-names-p10-9b-2621`.
+
+**Behaviour change for a student:** in analytic, «A'» is a point name wherever a letter is, drawn A′; «A ו-A' הן נקודות החיתוך של … עם … ועם …» draws both points.
+
+## ADR-AG-396 — A shape's height, diagonals and sides in the book's words, one given per row (#2621 E)
+
+**Date:** 2026-11-04 · **Status:** accepted · feature (analytic), fix round #2697 stream S8, branch `feat/2621-primes-shape-measures` (one PR with [ADR-AG-395](#adr-ag-395)). LADDER stage: D7 kinds 1 and 2 (a discrete choice over options, a region selector), no new solver stage.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R235 (new). · **Design:** [04c](04c-design-analytic.md) § "A shape's parts by their role".
+
+**Operator rulings.** 2026-10-30 on #2621: *"now we need to build all capabilities"*; Q1 → A: *"which side and which diagonal get which value is an unstated choice that «הציגו תצורה אחרת» cycles"*; Q2 → A: the shape clauses land in analytic now, the 2-D gap gets its own issue. 2026-10-31, [ADR-W-167](06w-decisions-workspace.md#adr-w-167): *"moving forward we do not support cases of 2 inputs in a line"* — newer than the plan, it scopes the plan's compound clauses («מעוין ABCD שצלעו 5, גובהו 4.8 ואלכסוניו על הצירים», «… שהיקפו 20 ושטחו 24», «נתון משולש ABC שצלעותיו 13, 14 ו-15») back to their rows, as ADR-AG-367 did for item B.
+
+**Re-measured at pickup** (`ebacadd1`). As the plan: «גובה המעוין הוא 4.8», «הגובה במעוין הוא 4.8», «אלכסוני המעוין על הצירים», «האלכסון הגדול של המעוין נמצא על ציר ה-x», «האלכסון הגדול של המעוין הוא AC», the compound clauses: `not-handled`. «היקף/שטח המעוין», «AC על ציר ה-x», «AB=13 …» record. **2-D, measured (not as the plan says):** «מעוין ABCD» · «האלכסון הגדול של המעוין הוא AC» builds in 2-D as the segment AC alone; «הגדול» is dropped, so it is no template for the order (the same shape as #2669's dropped parallel; a 2-D finding).
+
+**Decision.**
+1. **The rhombus height** — `parseShapeHeight` takes «מעוין» / "rhombus"; `applyHeightOf` reads a rhombus's height as gauge (every height is area ÷ side), drawn as a trapezoid's is: from the vertex before a side onto it (D onto AB), the tool's foot letter, the stated length on it — a stated value is visible on the figure.
+2. **`diagonal-role`** (`parseShapeParts`, before the shape rules): «אלכסוני המעוין (נמצאים) על הצירים» → ONE constraint `choice` of the two assignments (AC on x and BD on y, or the reverse), each the conjunction of four incidences; «האלכסון הגדול/הקטן של המעוין הוא AC» → the segment AC (2-D's drawing) and the ORDER `AC > BD` (or `<`), a region; «האלכסון הגדול של המעוין נמצא על ציר ה-x» → the choice of which diagonal lies on the axis, and the sign of a new quantity `extent` (the ring's x-extent less its y-extent), so the option whose axis diagonal is the shorter has no figure. Any quadrilateral noun; the ring is M1's (letters, else the noun's one ring); a side named as a diagonal is `not-a-diagonal`.
+3. **`side-lengths`**: «צלעות המשולש (ABC) הן 13, 14 ו-15» · «אורכי צלעות המשולש הם …» · English → ONE choice over the distinct assignments of the three values to AB, BC, CA (Q1 → A); a later «BC = 14» narrows it as any stated option does.
+
+**Not built here (ADR-W-167):** the compound clauses read whole. Their rows build (fixtures p5-26 א, p4-24 א, p5-28).
+
+**Measured after.** Height 4.8 = area ÷ side at seeds 0–7; the diagonals on the axes, both assignments reached across seeds; p4-24 א's rows: the 8-diagonal on the x-axis and the 6 off it, 8/8 seeds; the three sides {13, 14, 15} at 12 seeds with more than one assignment drawn; «BC = 14» pins BC.
+
+**Locks.** `issue-2621e-shape-parts.test.ts`; fixtures `rhombus-height-p5-26a-2621`, `rhombus-long-diagonal-p4-24a-2621`, `triangle-sides-p5-28-2621`.
+
+**Behaviour change for a student:** in analytic, «גובה המעוין הוא 4.8», «אלכסוני המעוין על הצירים», «האלכסון הגדול של המעוין הוא AC / נמצא על ציר ה-x» and «צלעות המשולש הן 13, 14 ו-15» build; which diagonal or side gets which value is drawn one way and «הציגו תצורה אחרת» shows the others.

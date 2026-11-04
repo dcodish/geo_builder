@@ -1637,6 +1637,15 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
         if (q === null) return true; // an operand not placed judges nothing, as below
         return signHolds(s, q);
       }
+      // #2621 E (ADR-AG-396): a point set wider than tall — its x-extent less its y-extent, at the solver's resolution.
+      if (s.q.k === 'extent') {
+        const pts = s.q.ids.map(atFn);
+        if (pts.some((p) => !p)) return true; // an operand not placed judges nothing, as below
+        const xs = pts.map((p) => p!.x);
+        const ys = pts.map((p) => p!.y);
+        const v = Math.max(...xs) - Math.min(...xs) - (Math.max(...ys) - Math.min(...ys));
+        return sideOfBound(v, 0, Math.max(1, Math.abs(v))) === (s.positive ? 1 : -1);
+      }
       if (s.q.k !== 'slope') {
         const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below

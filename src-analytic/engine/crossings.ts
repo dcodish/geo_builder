@@ -23,6 +23,7 @@ import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 import { numeralKey, refKindOf, statedName } from './names';
 import { isPolygonSide, withinSegment } from './extent';
 import { conicMeet, conicTouchOf, walkOfCoefficients, walkThrough, type Walk } from './crossing-order';
+import { splitPointNames } from './pointName';
 
 export interface Crossing {
   /** Where, in world coordinates. */
@@ -497,7 +498,7 @@ export function centresOf(figure: Figure, letter: string): Namable[] {
      * grammar reads both back (the frame's described-circle fold, `circleByName`), so the ring the contextual form
      * could not offer is offered with this one. A quadrilateral's incircle has no centre rule, so no ring.
      */
-    const ring = (prefix: string) => (cu.id.startsWith(prefix) ? cu.id.slice(prefix.length).match(/[A-Z][0-9₀-₉]?/g) ?? [] : []);
+    const ring = (prefix: string) => (cu.id.startsWith(prefix) ? splitPointNames(cu.id.slice(prefix.length)) : []);
     const thru = ring('circle-thru-');
     const inner = ring('circle-in-');
     if (!numeralKey(cu.id) && (thru.length === 3 || inner.length === 3)) {

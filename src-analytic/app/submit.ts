@@ -34,6 +34,7 @@ import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type 
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
+import { isPointName } from '../engine/pointName';
 
 /** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
 const typedAt = (line: string, id: string): number => {
@@ -216,7 +217,7 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
 };
 
 /** The figure's letters — never a stand-in for a substituted label (`shell/readExtent.ts`). */
-const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter((id) => /^[A-Z]d*$/.test(id));
+const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter(isPointName);
 
 /** #1888 / #1889 (ADR-AG-251) — the refusal a lost part gets: the whole line, with its parts in the student's words. */
 const lostPartRefusal = (line: string, lost: LostPart): SubmitVerdict => ({

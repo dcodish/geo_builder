@@ -32,8 +32,9 @@ import type { Construction } from '../engine/types';
  * A point label in this product: a capital letter with an optional digit subscript — `A`, `B`, `F1`.
  * Exactly what the system prompt tells the model to emit, so the two cannot drift apart silently.
  */
-const LABEL = () => /[A-Z]\d*/g;
-const RUN = () => /(?<![A-Za-z])(?:[A-Z]\d*){3,}(?![a-z\d])/g;
+// #2621 C (ADR-AG-395): a label may carry a PRIME («A'»), as the grammar's point-name atom does.
+const LABEL = () => /[A-Z]\d*(?:'(?![a-z]))?/g;
+const RUN = () => /(?<![A-Za-z])(?:[A-Z]\d*(?:'(?![a-z]))?){3,}(?![a-z\d])/g;
 
 /**
  * Restore any point run the model respelled, before the lines are re-parsed.

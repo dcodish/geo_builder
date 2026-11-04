@@ -27,6 +27,8 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { areaNotation } from '../engine/lengths';
+import { foldPrimes } from '../../shell/primes';
+import { POINT_NAME } from '../engine/pointName';
 
 /**
  * A triangle's ANGLE adjective after its noun — «חד זוויות», «קהה זווית» (and their hyphenated / gendered spellings) —
@@ -73,7 +75,9 @@ const subscriptOf = (digits: string): string => [...digits].map((d) => SUBSCRIPT
  */
 export function orthography(raw: string): string {
   // `S_{ABC}` / `S_ABC` is the notation for «שטח ABC» (#1621, ADR-AG-214) — one spelling for every rule.
-  return areaNotation(stripFormatControls(raw))
+  // #2621 C ([ADR-AG-395](../../docs/06c-decisions-analytic.md#adr-ag-395)): every prime glyph («A′», «A’», «A׳») is the
+  // ASCII `'` the point-name atom reads — the shared fold 3-D's boundary calls. Length-preserving, so it runs first.
+  return areaNotation(stripFormatControls(foldPrimes(raw)))
     .replace(/^\s*(?:[·•∙*]|-(?=\s))\s*/, '')
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
@@ -246,7 +250,7 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   // Length units — «MO = 8 ס"מ». Units carry no geometry here: every length is in the plane's units.
   [/(\d)\s*(?:ס"מ|ס״מ|סמ'|cm)(?![א-תA-Za-z])/g, '$1'],
   // «O – מרכז המעגל», «O - ראשית הצירים»: a dash between a name and its description.
-  [/^([A-Z][0-9₀-₉]?)\s+[–—-]\s+(?=[א-ת])/, '$1 '],
+  [new RegExp(String.raw`^(${POINT_NAME})\s+[–—-]\s+(?=[א-ת])`), '$1 '],
   // «משוואת המעגל הנתון היא …», «הישר הנתון», «הנקודה הנתונה» (#1619 B1) — «הנתון» after a definite noun is
   // the given-prefix as an ADJECTIVE: "the given circle" is the circle. Written out per inflection (final ן).
   [/(?<=(?:^|\s)ה[א-ת]+)\s+הנתו(?:ן|נה|נים|נות)(?=\s|:|,|$)/g, ''],
@@ -284,7 +288,7 @@ function dropShapeQualifier(s: string): string {
 // The origin — «O ראשית הצירים» is O(0,0) (#1612)
 // ---------------------------------------------------------------------------
 
-const NAME = '[A-Z][0-9₀-₉]?';
+const NAME = POINT_NAME;
 /**
  * A CIRCLE's name in a reference slot (#2391, ADR-AG-315) — a numeral first («II» before «I», `NUMERAL_ALT` is longest
  * first; «מעגל II» is never the point I), else a centre letter. Case-sensitive on purpose (the [IVX] trap).
@@ -763,6 +767,25 @@ export function centresRespectivelyClauses(line: string): string[] | null {
 }
 
 /**
+ * TWO CROSSINGS DISTRIBUTED OVER TWO CARRIERS (#2621 C, [ADR-AG-395](../../docs/06c-decisions-analytic.md#adr-ag-395); the
+ * book's p10-9 ב) — «A ו-A' הן נקודות החיתוך של האליפסה עם החלק החיובי ועם החלק השלילי של ציר ה-x»: the i-th point is
+ * the crossing of the curve with the i-th carrier, which is «בהתאמה» left unsaid (a trailing «בהתאמה» reads the same).
+ * A head the first carrier elides («החלק החיובי ‹של ציר ה-x›») takes the second carrier's «של …» tail, as the sentence
+ * means. Each clause is the one-point crossing sentence the grammar already reads, so the pair cannot lower differently.
+ */
+export function distributedCrossingClauses(line: string): string[] | null {
+  const m = new RegExp(
+    `^(${NAME})\\s+ו-?\\s*(${NAME})\\s+(?:(?:הן|הם)\\s+)?(?:ה)?נקודות\\s+ה?חיתוך\\s+של\\s+(.+?)\\s+עם\\s+(.+?)\\s+ו(?:עם\\s+|-?)(.+?)(?:\\s+בהתאמה)?$`,
+  ).exec(line);
+  if (!m) return null;
+  const [, p, q, curve, first, second] = m;
+  const tail = /\s(של\s+.+)$/.exec(second);
+  const firstCarrier = !/\sשל\s/.test(` ${first} `) && tail ? `${first} ${tail[1]}` : first;
+  const pairs = respectively([p, q], [firstCarrier, second]);
+  return pairs && pairs.map(([pt, carrier]) => `${pt} היא נקודת החיתוך של ${curve} עם ${carrier}`);
+}
+
+/**
  * «M מקיימת MA = MB», «הנקודה M מקיימת …», "M satisfies MA = MB" (#2391 A6, 2-D's reading) — the statement, with the
  * point as its subject. The caller takes it only when the statement's facts MENTION the point, so «M מקיימת AB = CD»
  * is not this sentence and M is never silently dropped.
@@ -1103,7 +1126,7 @@ export function segmentsOf(line: string): Segment[] {
     else if (depth === 0 && ch === ' ') {
       // «A משמאל ל-O ו-C מימין ל-O» (#1706 follow-up, ADR-AG-222): «ו-» before a point's name may join two sentences.
       // The joint is kept as the separator, so a reading that merges the pieces gets the line back unchanged.
-      const joint = /^ ו-?(?=[A-Z][0-9₀-₉]?\s)/.exec(line.slice(i));
+      const joint = new RegExp(String.raw`^ ו-?(?=${POINT_NAME}\s)`).exec(line.slice(i));
       if (joint) {
         cut(i, joint[0], joint[0].length);
         i += joint[0].length - 1;
