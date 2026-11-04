@@ -697,7 +697,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)
   and a stated angle (a labelled arc) but not for the commonest kind of all. Stated only, and drawn on a hidden
   edge too.
-  - Sources: ADR-3D-235, #918.
+  - **One text, two decimals when needed** (#2361, operator ruling sr-22 / ADR-W-175, 2026-11-02). The label on the
+    edge and the `|AB| = …` row in the data panel print the same text. A value written as a decimal reads in at most
+    two decimals and is computed with the full value («AC = 7.9999» reads «8», «AC = 4.005» reads «4.01»), and is
+    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. An integer, a fraction or a root
+    keeps its exact form («9/2», «2√3»; «√20» reads «2√5»). The same holds for a free vector's stated «|u| = 2.5».
+  - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
   on the canvas are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated

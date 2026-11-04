@@ -63,7 +63,7 @@ are the lexical half and the reader of `evalRadical`, defined side by side, so a
 one the reader values. Never `+m[n]`: the decimal-only `NUM`/`UNUM` in a magnitude slot is how «AD = √7»
 refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to `√`, so the atom only ever sees
 the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
-`evalRadical`, and keeps a radicand's own parentheses. The distance slot (`distanceGiven`) matches `MAG` and
+`evalRadical`, and keeps a radicand's own parentheses. A fraction is accounted by its value or by its numerator and denominator together (ADR-3D-340); a lone radical («√2», «5√2») by its value only, never by the implied /1 (#2285, [ADR-3D-417](06b-decisions-3d.md#adr-3d-417), 2-D's ADR-700). The distance slot (`distanceGiven`) matches `MAG` and
 reads it with `magValue` too, and the `A = (…)` claim (`coordsClaim`) composes from the tuple-component atom
 `VAL` and reads it with `literalValue`, the pair `A(…)` reads with (#2081,
 [ADR-3D-362](06b-decisions-3d.md#adr-3d-362)). The ratio and solid-size slots still take decimals until the
@@ -1224,6 +1224,14 @@ The lengths come from `statedLengths` (`engine/dataView.ts`), shared with the pa
 unordered pair; not gated by `showWitnesses` or by edge visibility. A **length letter** (`lengthMarks`, «|AB| = k»,
 ADR-3D-381) draws in the same lane with its text (`lengthMarkText`: «k», «2k») until a value is stated on the pair,
 when the value wins.
+
+**One text per stated length** (#2361, [ADR-3D-416](06b-decisions-3d.md#adr-3d-416)). Each `statedLengths` entry is
+`{ value, text }`; the canvas label and the panel's `|AB| =` row both print `text` (the canvas's own 3-place `fmt`
+no longer touches a stated length). `text` is `statedMagText(value, decimal)`: `fmtNum` (the house two decimals)
+when the student wrote a decimal numeral, else `cleanMag`'s exact tiers. The parser's `typedDecimal` sets
+`decimal` on the `length-eq` claim (and on `vec-mag` / unit-coefficient `mag-val` / `perp-to-base`'s `lenDecimal`,
+which apply carries onto the claim); a length driving pin is always recorded with its claim, so the claim supplies it.
+A free vector's stated `mag` metric carries it to both of its panel rows. The squared row stays computed (`cleanNum`).
 
 **A bare vector naming is said aloud** (ADR-3D-381). `vec-rel`'s bare arm (`AB = <new letter>`, no «נסמן») lowers to
 `name-vector` with `bare: true`; the flag rides the vector record, and `buildNotices3` emits `vector-named-bare` for
