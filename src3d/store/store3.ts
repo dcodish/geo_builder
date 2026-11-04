@@ -40,13 +40,13 @@ import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
-import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -283,7 +283,8 @@ function seedForRequirements(facts: Fact3[], from: number): number | null {
   // preference nothing has to state, so the sweep must be consulted whenever the figure has solids.
   // Judged first on the resolution we ALREADY have, so the common (non-degenerate) case still returns
   // `from` without a single extra solve.
-  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions)) return from;
+  // #1986 (ADR-3D-418): ...and a declared ring drawn crossed asks the sweep too (its preference tier), judged the same way.
+  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions) && !declaredRingCrossed3(construction, d.positions)) return from;
   return firstSatisfyingSeed3(construction, from);
 }
 
@@ -1601,21 +1602,7 @@ function deriveCore3(
    * (created, or bound over existing points) and a stated quad shape (`declaredQuads3`; a pyramid's base is
    * generated simple, so it carries no declaration of its own).
    */
-  const declaredRings3: Id[][] = (() => {
-    const all: Id[][] = [
-      ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
-      ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
-      ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
-    ];
-    const seenRings = new Set<string>();
-    const out: Id[][] = [];
-    for (const ring of all) {
-      if (seenRings.has(ring.join())) continue;
-      seenRings.add(ring.join());
-      out.push(ring);
-    }
-    return out;
-  })();
+  const declaredRings3: Id[][] = declaredRingsOf3(c); // #1986: the one enumeration, shared with the seed search
   const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
   const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
     ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring));
@@ -1739,6 +1726,31 @@ function deriveCore3(
         break;
       }
       f.forEach((x) => by.add(x));
+    }
+    /**
+     * #1986 (ADR-3D-418) — REFUSE LAST for a coordinate letter: every vertex fixed by coordinates or placed by the free
+     * letter («A(k,0,0)»). The resolve already drew the letter past its default window wherever that uncrosses the
+     * ring (`ringReachValue3`), so a ring still crossed at EVERY claim sample is one the search found no simple
+     * drawing for — the ruled refusal, in ADR-3D-322's words. A sample the pivot left unplaced is skipped; with none
+     * placed the check fails open.
+     */
+    const letterVertex = (id: Id) => c.points.get(id)?.kind === 'coord-sym';
+    if (!fixed && ring.some(letterVertex) && ring.every((id) => letterVertex(id) || coordinateFixers3(c, facts, id))) {
+      by.clear();
+      for (const id of ring) {
+        const f = letterVertex(id) ? placementFixers3(c, facts, id, false) ?? new Set(facts.filter((x) => x.enabled && x.cmds.some((k) => 'id' in k && k.id === id)).map((x) => x.id)) : coordinateFixers3(c, facts, id)!;
+        f.forEach((x) => by.add(x));
+      }
+      let placed = 0;
+      let saved = false;
+      for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
+        if (r.pivot !== null && r.pivot.solutions === 0) continue; // not a figure (ADR-3D-284)
+        placed++;
+        const at = ring.map((id) => r.positions.get(id));
+        if (at.some((q) => !q) || !ringSelfCrossing3(at as Vec3[])) { saved = true; break; }
+      }
+      if (placed === 0 || saved) continue; // fail open: a simple drawing exists, or there is no figure to judge
+      fixed = true;
     }
     if (!fixed) {
       // #1927 — the shape-placed scope, read over the claim samples

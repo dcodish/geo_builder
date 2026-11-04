@@ -514,6 +514,11 @@ const SEEDED: SeededCorpus = {
   // needed) and carries its typed-decimal mark. The labels on both surfaces are asserted in
   // issue-2361-stated-value-text.test.ts; this is the build + drift net.
   'stated-length-7-9999-2361.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9999'],
+  // #1986 (ADR-3D-418) — the issue's two reported rows: a second ring a dart saves, and a trapezoid a coordinate letter
+  // saves past its default window. Both rings drawn simple, k > 4 and the seeds are asserted in
+  // issue-1986-ring-search.test.ts; these are the build + drift net.
+  'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
+  'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

@@ -13,7 +13,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3 } from '../engine/evaluate';
-import { dist3 } from '../engine/vec3';
+import { dist3, ringSelfCrossing3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
 import { dataView, panelIsEmpty } from '../engine/dataView';
 
@@ -636,5 +636,21 @@ describe('#117 — generalized prism bases + parallelepiped', () => {
     expect(dof()).toBe(5); // dx, dy + the free lateral vector w=(wx,wy,wz)
     submit('|AB| = 3');
     expect(state().lastError).toBeNull(); // the size is accepted (verifies), never refused
+  });
+});
+
+// crossed-ring-search-1986 (#1986, ADR-3D-418) — the operator-ruled pairs (#1987's ruling of 2026-10-10: "a scenario with
+// the operator-ruled kite pair and this pair"): a second ring a dart saves is drawn as the dart, never crossed and green.
+describe('crossed-ring-search-1986 — the ruled kite and quadrilateral pairs draw both rings simple', () => {
+  beforeEach(reset);
+  const crossed = (ids: string) => {
+    const pos = derived().positions;
+    return ringSelfCrossing3([...ids].map((id) => pos.get(id)!));
+  };
+  it.each([[['דלתון ABCD', 'מרובע ABDC']], [['מרובע ABCD', 'מרובע ABDC']]])('%j', (lines) => {
+    for (const l of lines) submit(l);
+    expectAllOk();
+    expect(crossed('ABCD')).toBe(false);
+    expect(crossed('ABDC')).toBe(false);
   });
 });

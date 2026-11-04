@@ -563,6 +563,68 @@ export interface DeclaredQuad3 {
   /** #2171: the kind a later noun narrowed the ring to (the meet of every noun stated over it), when one did */
   readonly kind?: NarrowKind;
 }
+/** A ring's identity up to where its cycle starts and which way round it is read (#1927, 2-D's `ringKey`). */
+export function ringKeyIds3(ids: readonly Id[]): string {
+  const n = ids.length;
+  const rots: string[] = [];
+  for (const seq of [[...ids], [...ids].reverse()]) for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
+  return rots.sort()[0];
+}
+
+/**
+ * THE DECLARED RINGS (#1927 ADR-3D-322; moved here by #1986, ADR-3D-418, so the store's ring checks and the display
+ * seed search read ONE enumeration — docs/17 M3). A ring is DECLARED when the student named a flat shape over named
+ * letters, in that order: a flat polygon (created, or bound over existing points) and a stated quad shape
+ * (`declaredQuads3`; a pyramid's base is generated simple, so it carries no declaration of its own). Deduplicated
+ * by the exact sequence, never by `ringKeyIds3`: the store's checks blame each spelling.
+ */
+export function declaredRings3(c: Pick<Construction3, 'quadShapes' | 'solids' | 'claims'>): Id[][] {
+  const all: Id[][] = [
+    ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
+    ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
+    ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
+  ];
+  const seen = new Set<string>();
+  const out: Id[][] = [];
+  for (const ring of all) {
+    if (seen.has(ring.join())) continue;
+    seen.add(ring.join());
+    out.push(ring);
+  }
+  return out;
+}
+
+/**
+ * #1986 (ADR-3D-418) — THE YIELD CONDITION of the concave seat: does another declared ring over exactly these letters
+ * order them DIFFERENTLY? Four points in convex position make one cyclic order simple and the others crossed, so
+ * two orders over one letter set can both be drawn only on a non-convex seat (2-D's ADR-622, one product over).
+ */
+export function ringReordered3(c: Pick<Construction3, 'quadShapes' | 'solids' | 'claims'>, ids: readonly Id[]): boolean {
+  const letters = [...ids].sort().join();
+  const own = ringKeyIds3(ids);
+  return declaredRings3(c).some((r) => r.length === ids.length && [...r].sort().join() === letters && ringKeyIds3(r) !== own);
+}
+
+/**
+ * #1986 (ADR-3D-418) — WHICH VERTICES of a reordered flat quadrilateral may be its reflex corner, as indices into
+ * `ids`; null when no concave seat is registered. Read off the shapes stated over the same letters, never off a list
+ * of inputs: a shape CONVEX WHENEVER SIMPLE (`convexWhenSimple`: the parallelogram family, the trapezoid) has no
+ * concave drawing at all, so the reorder is ADR-3D-322's refusal and the seat stays convex; a kite can be a dart only
+ * about its axis (its 1st and 3rd letters — B and D are mirror images, so neither can sit inside the other three),
+ * and a kite with an adjective (the right kite) is convex. Every other vertex of a general quadrilateral may be reflex.
+ */
+export function concaveSeatVertices3(c: Pick<Construction3, 'quadShapes' | 'solids' | 'claims'>, ids: readonly Id[]): number[] | null {
+  if (ids.length !== 4 || !ringReordered3(c, ids)) return null;
+  const letters = [...ids].sort().join();
+  let allowed = [0, 1, 2, 3];
+  for (const q of c.quadShapes) {
+    if ([...q.ids].sort().join() !== letters) continue;
+    if (convexWhenSimple(q.base) || (q.base === 'kite' && q.adj)) return null;
+    if (q.base === 'kite') allowed = allowed.filter((i) => ids[i] === q.ids[0] || ids[i] === q.ids[2]);
+  }
+  return allowed.length > 0 ? allowed : null;
+}
+
 export function declaredQuads3(c: Pick<Construction3, 'quadShapes' | 'solids'>): DeclaredQuad3[] {
   const out: DeclaredQuad3[] = c.quadShapes.map((q) => ({ base: q.base, ids: q.ids, ...(q.adj ? { adj: q.adj } : {}), ...(q.kind ? { kind: q.kind } : {}) }));
   c.solids.forEach((sld, i) => {

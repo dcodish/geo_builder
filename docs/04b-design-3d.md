@@ -960,8 +960,16 @@ When some vertex is not coordinate-fixed, the same loop widens the scope to `pla
 sample (`knowledgeSamples3(c, claimSeeds(seed))`, unplaced samples skipped, none placed fails open), and every OTHER
 declared ring over a superset of its letters that orders them differently (the "partner" whose convexity forces the
 crossing) is a quadrilateral with a pair of opposite sides parallel at every sample — convex whenever simple. A partner
-that could be a dart (a kite, a general quadrilateral) fails the check open: a valid drawing exists that 3-D does not
-draw. The blame is the latest of the ring's ordered declaration, its placers and its partners' declarations, so the
+that could be a dart (a kite, a general quadrilateral) fails the check open, and since #1986
+([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
+letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
+the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
+`meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
+**The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
+4×, 16×, 64× its window (`ringReachValue3`, four draws each, analytic's ADR-AG-256), inside `resolve3` so the figure
+is pure over `(facts, seed)`; a ring still crossed at every claim sample after that is refused `ring-crossed`. The blame is the latest of the ring's ordered declaration, its placers and its partners' declarations, so the
 ring-first order refuses the shape line. **One ring is one cyclic order** (`ringKeyIds3`, apply.ts): a polygon bound
 over existing points, `recordShape` and `knownQuadShape` all match rings by cyclic order, never by letter set — a
 square's letters in another order are another ring.

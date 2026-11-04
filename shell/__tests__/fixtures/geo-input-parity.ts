@@ -1419,7 +1419,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1927's 2026-10-09 ruling, "search first, refuse last" (ADR-W-121 Am. 2026-10-10; ADR-613, ADR-3D-322, ADR-AG-256):
   // a kite may be a dart, on which ABDC is simple, so no builder refuses it; a trapezoid's other orders can never be
   // simple, whatever its free ratio, so every builder refuses them.
-  { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (2-D and analytic draw the dart)' },
+  { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (every builder draws the dart; 3-D since #1986)' },
   { id: 'crossed-ring-1927-09', family: 'polygons', steps: ['טרפז ABCD', 'מרובע ACBD'], expect: 'refused', note: 'a trapezoid’s free ratio cannot save the ring' },
   { id: 'crossed-ring-1927-10', family: 'polygons', steps: ['מרובע ACBD', 'טרפז ABCD'], expect: 'refused', note: 'the ring first' },
   // #1991 (ADR-3D-327, ADR-AG-261; operator ruling 2026-10-10, option A): the same ring, declared with a SPECIFIC
@@ -1432,9 +1432,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
-  // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too. 3-D records the row
-  // as well, but draws the second ring CROSSED: that is a DRAWING gap, not a verdict one, and it is #1986.
-  { id: 'crossed-ring-1927-11', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a concave quadrilateral saves both rings: search first, never refused (3-D still draws it crossed — #1986)' },
+  // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)
+  // 3-D draws it as well (the concave seat). The drawing is locked in src3d/__tests__/issue-1986-ring-search.test.ts.
+  { id: 'crossed-ring-1927-11', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a concave quadrilateral saves both rings: search first, never refused, drawn concave in every builder' },
   { id: 'crossed-ring-1927-12', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ACBD'], expect: 'builds', note: 'the class, not the letters: any other order of the same four free points' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
