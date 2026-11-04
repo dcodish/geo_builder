@@ -152,7 +152,7 @@ describe('#2385 — unchanged: letters that are not the touch point are still th
 
   it.each(SEEDS)('fresh letters on fixed circles: P(−10,−4) and Q(6,8) or the other external tangent, at seed %i', (seed) => {
     const b = built(['נתון מעגל שמרכזו N1(-4,-12) ורדיוסו 10', 'נתון מעגל שמרכזו N2(12,0) ורדיוסו 10', 'PQ משיק משותף למעגלים N1 ו-N2'], seed);
-    const [N1, N2, P, Q] = ['N1', 'N2', 'P', 'Q'].map((id) => at(b, id));
+    const [N1, N2, P, Q] = ['N₁', 'N₂', 'P', 'Q'].map((id) => at(b, id));
     expect(dist(N1, P)).toBeCloseTo(10, 6);
     expect(dist(N2, Q)).toBeCloseTo(10, 6);
     expect(toLine(N1, P, Q)).toBeCloseTo(10, 6);

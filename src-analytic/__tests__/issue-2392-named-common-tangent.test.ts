@@ -62,7 +62,7 @@ describe('#2392 — the saved question (Q3 ג, fixed centres, the exam’s own s
     const d = built(saved.lines, saved.seed);
     expect(answer(d, 'משוואת הישר l')).toBe('3x - 4y + 14 = 0');
     expect([at(d, 'P').x, at(d, 'P').y, at(d, 'Q').x, at(d, 'Q').y].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([-10, -4, 6, 8]);
-    expect((d.figure.points as Pt[]).map((p) => p.id).sort()).toEqual(['N1', 'N2', 'P', 'Q']);
+    expect((d.figure.points as Pt[]).map((p) => p.id).sort()).toEqual(['N₁', 'N₂', 'P', 'Q']);
     expect(asTriple(row(d, 'line-l')!.known)).toEqual(L14);
   });
 
@@ -87,7 +87,7 @@ describe('#2392 — every spelling of the named common tangent is the same tange
   for (const s of spellings) {
     it(`«${s}»: P on N1, Q on N2, line-l drawn and listed with its two options`, () => {
       const d = built([...Q3F, s]);
-      const [N1, N2, P, Q] = ['N1', 'N2', 'P', 'Q'].map((id) => at(d, id));
+      const [N1, N2, P, Q] = ['N₁', 'N₂', 'P', 'Q'].map((id) => at(d, id));
       expect(Math.hypot(P.x - N1.x, P.y - N1.y)).toBeCloseTo(10, 6);
       expect(Math.hypot(Q.x - N2.x, Q.y - N2.y)).toBeCloseTo(10, 6);
       const drawn = d.figure.curves.find((c) => c.id === 'line-l');
