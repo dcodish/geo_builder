@@ -6228,6 +6228,49 @@ export const SCENARIOS_4: Scenario[] = [
       expect(text).toBe(bare(`${he('errors.restatedSize_said_vs', { said: 'D מחלקת את AB ביחס 1:2', other: 'D אמצע AB' })} ${he('errors.retryHint')}`));
     },
   },
+  {
+    id: 'contained-pair-relations-2677',
+    title: '#2677: after «מעגל P מוכל בתוך מעגל O», «משיקים מבחוץ» and «נחתכים בנקודות X ו-Y» are refused naming the containment; internal tangency still builds (ADR-779)',
+    guards:
+      "#2677 (P2, wrong answer): a circle pair's stated position that an earlier statement excludes was built. Measured at ebacadd1 through decideDeterministic2D: after «מעגל P מוכל בתוך מעגל O», «המעגלים O ו-P משיקים מבחוץ» and «המעגלים O ו-P נחתכים בנקודות X ו-Y» committed with every row ok while the verifier flagged circle-contained; the reverse orders and «זרים» against a crossing or a tangency the same. Root cause (ADR-779): the tangency and the crossing are constructs over free centres and radii, and the containment / disjointness only a requirement the drive never reconciled, so nothing compared the two statements before commit. Fix: stage 0a's pairPositionConflict refuses the statement that completes an exclusion, either order, and the fold names the other statement by provenance. The class matrix is src/app/__tests__/issue-2677-pair-position-conflict.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבפנים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'containment with internal tangency builds clean (ADR-704)').toEqual([]);
+      const prior = factsOf(['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O']);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      for (const [line, why] of [
+        ['המעגלים O ו-P משיקים מבחוץ', 'contained-ext-tangent'],
+        ['המעגלים O ו-P נחתכים בנקודות X ו-Y', 'contained-crossing'],
+      ] as const) {
+        const v = gateVerdict(prior, line);
+        expect(v.kind === 'refused' && v.reason, line + ': refused before it becomes a fact').toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        const text = bare(figureExplainer(he, replay(prior, 0).construction, prior)(detail, line, otherUtteranceForError(prior, detail)));
+        const reason = he('errors.pairPositionReason.' + why);
+        expect(text).toBe(bare(he('errors.overConstrained_said_vs', { said: line, other: 'מעגל P מוכל בתוך מעגל O', what: reason }) + ' ' + he('errors.retryHint')));
+      }
+    },
+  },
+  {
+    id: 'extension-shared-endpoint-past-second-2518',
+    title: '#2518: «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R» draws R beyond O (O seated inside circle P), A–O–R in order (ADR-780)',
+    guards:
+      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, the either-side control) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts; ADR-142's and ADR-267's scenarios lock the either-side tier.",
+    steps: ['מעגל שמרכזו O', 'מעגל שמרכזו P', 'נקודה A על מעגל P', 'המשך AO חותך את מעגל P בנקודה R'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const O = at(fig, 'O');
+      const R = at(fig, 'R');
+      const t = ((R.x - A.x) * (O.x - A.x) + (R.y - A.y) * (O.y - A.y)) / ((O.x - A.x) ** 2 + (O.y - A.y) ** 2);
+      expect(t, 'A–O–R in order: R beyond O').toBeGreaterThan(1);
+      const P = fig.circles.get('circle-P')!;
+      expect(Math.abs(dist(R, P.center) - P.r), 'R on circle P').toBeLessThan(1e-6);
+      expect(dist(O, P.center), 'O inside circle P').toBeLessThan(P.r);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

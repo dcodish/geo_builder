@@ -1042,6 +1042,19 @@ carries the kind (`~touch-M-ext` / `~touch-M-int`), so a second line stating the
 its own device and the existing over-constrained path refuses it before commit; a restated kind (or an unkinded line
 the fold resolves to the same kind) reuses the device.
 
+### A shared-endpoint extension seats its other end on the stated side ([ADR-780](06-decisions.md#adr-780))
+
+`extend-onto-circle`'s shared-endpoint branch (`engine/apply.ts`, one end already on the target circle) builds the
+point as the deterministic second crossing (`line-circle`, `avoid` the shared end) and states no constraint. Which
+side of the second letter that crossing falls on depends on where the other end is: «המשך AO» (A on the circle) puts R
+beyond O exactly when O is inside the circle; «המשך OA» puts R beyond A exactly when O is outside and A is the crossing
+the ray from O meets first. `seatExtensionBeyond` (LADDER stage 2a) moves the other end's SEED there when it is a
+movable free point that no constraint references and the side does not already hold: inside, at `0.45·r` from the
+centre along its own direction, or outside, at `0.8·r` along the outward normal at the shared end. A default only
+(M4): seeds still sample it, the configuration search's strict tier (ADR-267) keeps a configuration on the stated side
+whenever one exists, and a pinned, derived or constrained other end is never moved, so the ADR-142 either-side
+acceptance answers exactly as before.
+
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 
 Every circle-pair relation's apply-time seat (LADDER stage 2a) asks one chooser, `seatMover(objects, a, b)` in

@@ -198,9 +198,13 @@ describe('#2210 — controls', () => {
     expect(k.r.violations).toEqual([]);
     expect(k.r.positions.has('M') && !k.r.positions.has('T')).toBe(true);
   });
-  it('K6: «…מוכל…» · «…משיקים מבחוץ» stays red (an explicit kind is never overridden)', async () => {
-    await playAll([...PAIR, 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבחוץ']);
-    expect(kindOf().r.violations.map((v) => v.relation)).toContain('circle-contained');
+  // #2677 (ADR-779): an explicit kind is still never overridden, and the line that contradicts the containment is now
+  // refused before it becomes a fact (it was drawn with the containment row red), so the containment stands alone
+  it('K6: «…מוכל…» · «…משיקים מבחוץ» is never read internal: the tangency is refused and the containment holds', async () => {
+    await playAll([...PAIR, 'מעגל P מוכל בתוך מעגל O']);
+    expect((await submit('המעגלים O ו-P משיקים מבחוץ')).kind).toBe('refuse');
+    expect(st().facts.some((f) => f.cmd.type === 'circles-tangent')).toBe(false);
+    expect(replay(st().facts, st().seed).violations).toEqual([]);
   });
   it('a lone tangency stays external by default', async () => {
     await playAll([...PAIR, 'המעגלים O ו-P משיקים']);

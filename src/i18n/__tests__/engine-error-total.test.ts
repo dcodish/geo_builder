@@ -44,6 +44,7 @@ const SAMPLES: { [C in EngineErrorCode]: Extract<EngineError, { code: C }> } = {
   'shape-excluded': { code: 'shape-excluded', actual: 'parallelogram', stated: 'trapezoid' },
   'name-taken': { code: 'name-taken', measure: 'angle', name: 'ABC', symbol: 'α' },
   'equal-nested': { code: 'equal-nested', circle: 'circle-P', relation: 'int-tangent' },
+  'pair-position-conflict': { code: 'pair-position-conflict', a: 'circle-O', b: 'circle-P', position: 'contained', other: 'ext-tangent' },
   'tangents-exhausted': { code: 'tangents-exhausted', pair: 'AB', kind: 'any', position: 'int-tangent' },
   'restated-size': { code: 'restated-size', circle: 'circle-O', value: '4' },
   'over-constrained': { code: 'over-constrained', what: '|AC| = 9' },
