@@ -1,102 +1,5 @@
 {
-  "pending": [
-    {
-      "sheet": "round-2697",
-      "id": "T4",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P זרים"
-      ],
-      "lookFor": "Refused, naming the containment."
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T6",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P משיקים מבפנים"
-      ],
-      "lookFor": "Builds; no refusal."
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T7",
-      "kind": "2d:blind-review",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל שמרכזו O",
-        "מעגל שמרכזו P",
-        "נקודה A על מעגל P",
-        "המשך AO חותך את מעגל P בנקודה R"
-      ],
-      "lookFor": "Along the line: A, then O, then R; O inside circle P. Still so after «הציגו תצורה אחרת»."
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T1",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P משיקים מבחוץ"
-      ],
-      "lookFor": "The last line is refused, naming «מעגל P מוכל בתוך מעגל O»."
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T2",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P נחתכים בנקודות X ו-Y"
-      ],
-      "lookFor": "The last line is refused, naming the containment; no X or Y drawn."
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T3",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "המעגלים O ו-P משיקים מבחוץ",
-        "מעגל P מוכל בתוך מעגל O"
-      ],
-      "lookFor": "The containment line is refused, naming the tangency."
-    }
-  ],
+  "pending": [],
   "results": [
     {
       "sheet": "round-2665",
@@ -324,6 +227,120 @@
       "pass": true,
       "date": "2026-11-04",
       "note": "operator 2026-11-04: all tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T1",
+      "kind": "2d:assertion",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "מעגל P מוכל בתוך מעגל O",
+        "המעגלים O ו-P משיקים מבחוץ"
+      ],
+      "lookFor": "The last line is refused, naming «מעגל P מוכל בתוך מעגל O».",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T2",
+      "kind": "2d:assertion",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "מעגל P מוכל בתוך מעגל O",
+        "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+      ],
+      "lookFor": "The last line is refused, naming the containment; no X or Y drawn.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T3",
+      "kind": "2d:assertion",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "המעגלים O ו-P משיקים מבחוץ",
+        "מעגל P מוכל בתוך מעגל O"
+      ],
+      "lookFor": "The containment line is refused, naming the tangency.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T4",
+      "kind": "2d:assertion",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "מעגל P מוכל בתוך מעגל O",
+        "המעגלים O ו-P זרים"
+      ],
+      "lookFor": "Refused, naming the containment.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T6",
+      "kind": "2d:assertion",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "מעגל P מוכל בתוך מעגל O",
+        "המעגלים O ו-P משיקים מבפנים"
+      ],
+      "lookFor": "Builds; no refusal.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2697",
+      "id": "T7",
+      "kind": "2d:blind-review",
+      "queued": "2026-11-04",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעגל שמרכזו O",
+        "מעגל שמרכזו P",
+        "נקודה A על מעגל P",
+        "המשך AO חותך את מעגל P בנקודה R"
+      ],
+      "lookFor": "Along the line: A, then O, then R; O inside circle P. Still so after «הציגו תצורה אחרת».",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "all other tests pass"
     }
   ],
   "demoted": {}
