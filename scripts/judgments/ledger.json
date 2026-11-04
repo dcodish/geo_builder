@@ -1371,6 +1371,252 @@
       "chosen": true,
       "at": "2026-11-04T06:11:02.623Z",
       "status": "pending"
+    },
+    {
+      "id": "q-2677-disjoint",
+      "question": "2-D: after «המעגלים O ו-P זרים», the line «המעגלים O ו-P נחתכים בנקודות X ו-Y» (or «משיקים») is accepted and drawn with the «זרים» row flagged red. A refuse it naming «זרים»; B keep today's.",
+      "class": "contradicting-given-refused-not-flagged",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A given that contradicts an earlier given is refused at once, naming the earlier statement; it is never accepted with a row that turns red and can never clear.",
+      "precedents": [
+        {
+          "quote": "the idea of order is not relevant since the diagram should either respect all input or refuse to build",
+          "date": "2026-09-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/1242#issuecomment-5743471435"
+        },
+        {
+          "quote": "All three tools refuse immediately, naming both statements. A pending row that can never clear is not really pending.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Disjointness then crossing/tangency, either order; not the two-rider common point.",
+      "reason": "His general rule and the 2026-10-09 parity ruling cover it on their face.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2518-mechanism",
+      "question": "2-D «המשך AO חותך את מעגל P בנקודה R»: a cheap placement that misses figures where only another quantity gives the side (A), or a full drive making two bagrut figures 18–40× slower (B)?",
+      "class": "correctness-vs-solve-cost",
+      "verdict": "escalate",
+      "reason": "His 2026-11-04 ruling points to B, his 2026-10-08 no-slowdown rule to A; slowdowns have been his scoped exceptions (#2499, #2538); docs/17 §7 needs his sign-off.",
+      "nearest": [
+        {
+          "quote": "I'm ok with the recommendation but we cannot slow down anything so we dont implement a change that will slow down the solving",
+          "date": "2026-10-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/1874#issuecomment-6055900532"
+        }
+      ],
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2680-computed",
+      "question": "analytic AI-answer honesty: accept a correct answer that computes a stated value (B), or keep refusing (A)?",
+      "class": "llm-answer-honesty-computed-value",
+      "verdict": "escalate",
+      "reason": "B reverses ADR-AG-279's deliberate refusal (02c R104a); no later ruling orders it.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2692-unitword",
+      "question": "2-D and analytic: should the grammar read «AB = 5 סנטימטרים» / \"AB = 5 meters\" (A), or keep sending it to the AI (B)?",
+      "class": "known-construct-other-wording",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A value followed by a unit word means exactly what the bare value means, so the grammar reads it the same way, at P3.",
+      "precedents": [
+        {
+          "quote": "I would go with the recommendation you have option A",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Only where the unit word adds no second meaning; which unit words and the priority are the session's.",
+      "reason": "sr-06 A: a construct the tool reads, in another wording with the same meaning, is read.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-1986-pyramid",
+      "question": "3-D: «פירמידה SABCD שבסיסה דלתון» then «מרובע ABDC» is refused ring-crossed though a dart base exists. A draw the dart base; B keep refusing.",
+      "class": "crossed-ring-search-first",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "Search first, refuse last: a kite base a configuration branch (the dart) can make simple under the reordered ring is drawn that way; ring-crossed fires only when none saves it.",
+      "precedents": [
+        {
+          "quote": "When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        },
+        {
+          "quote": "P2, with 2-D and 3-D fixed together",
+          "date": "2026-10-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/1986#issuecomment-6100924104"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The kite base; the bare pyramid follows via #1987.",
+      "reason": "#1927 defines a configuration branch as a quantity to search; #1986's ruling applies it to this ring.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2674-reversed2d",
+      "question": "2-D: «אמצע BC» then «D אמצע CB» keeps both M and D. A rename for the reversed spelling too; B keep.",
+      "class": "new-name-on-forced-coincident-point",
+      "verdict": "escalate",
+      "reason": "Demoted class (new-name-on-forced-coincident-point); ADR-W-177 records the tool-letter handover as not decided.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2361-decimals",
+      "question": "3-D: a dot product or letter value typed as a decimal prints as «5/2». A print every typed decimal as typed; B keep.",
+      "class": "typed-number-display",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A number the student types keeps the format he typed it in, in every builder: a typed «2.5» prints «2.5», never «5/2».",
+      "precedents": [
+        {
+          "quote": "in 3d tool - data was entered as 2/3 and datapanel shows 0.666 - we need to keep the format of entry",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497"
+        },
+        {
+          "quote": "should apply to all tools",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497#issuecomment-5865099634"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The typed given itself; not values derived from k.",
+      "reason": "#1497's keep-the-format rule is general.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2491-rightangle",
+      "question": "analytic: «∢ABC = 90» on a square answers «זה כבר קיים באיור» with no row and no knee. A record row and knee, ⟂ stays no-op; B both no-ops.",
+      "class": "restated-value-shown",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A restated given that carries a value is kept and its value shown: «∢ABC = 90» records its row and draws the knee; «AB ⟂ BC» keeps today's answer.",
+      "precedents": [
+        {
+          "quote": "In this case, the AB=4 does add value. not for the data which we know but the tool can draw 4 on the segment",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/issues/2491"
+        },
+        {
+          "quote": "Show the area too. Like the 4 on AB: the line is kept and the area 6 is shown. 2-D already does this.",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/issues/2491#issuecomment-6380596968"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not decide a restated ⟂ at a named vertex.",
+      "reason": "Two rulings on this issue: a restated value adds its label; 2-D draws 90° here.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2057-order",
+      "question": "analytic #2057 depends on #2006 (unbuilt): A build #2006 first; B standalone composer; C fold into #2006's PR.",
+      "class": "build-sequencing",
+      "verdict": "escalate",
+      "reason": "Build order and scope, not a student-visible outcome; nothing he said orders these items.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2032-arc",
+      "question": "analytic «קשת AB = 4π» read as degrees; no arc-length reader. A build it; B honest refusal now then A; C leave.",
+      "class": "feature-build-timing",
+      "verdict": "escalate",
+      "reason": "The outcome is ruled; whether and when to build the reader, and an unruled interim refusal, are his (P2, not P1).",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2611-twocircles",
+      "question": "3-D: with two tool-lettered circles, «D על המעגל» silently picks one. A always refuse/ask; B keep.",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A definite «המעגל» binds the one drawn circle; with two or more the tool asks which with the existing question, whoever created the letters; it never silently picks.",
+      "precedents": [
+        {
+          "quote": "sr-12, A: a definite noun binds the drawn object of its kind. This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Not stage B, not the touch-letter or English findings.",
+      "reason": "sr-12 states the two-object case directly.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2696-otherbuilders",
+      "question": "Two letters on one dot: 3-D and complex also write «C=E» (A), or keep (B)?",
+      "class": "sr-05",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A display ruling applies to every builder that has the element unless he names one: «C=E» in 3-D and complex too.",
+      "precedents": [
+        {
+          "quote": "A — Write «C=E», as 2-D does",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2691#issuecomment-6623359763"
+        },
+        {
+          "quote": "sr-05, A: a ruling applies to every builder by default. A ruling on a plane-geometry or display behaviour applies to every builder that has that element, unless he names one builder.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The canvas label only; ports are parity cells.",
+      "reason": "q5 named no builder; sr-05 extends it.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2621-perp",
+      "question": "analytic: read «ישר l המאונך ל-AB» with no point as a perpendicular at a free offset? A yes; B keep unread.",
+      "class": "new-construct-reading",
+      "verdict": "escalate",
+      "reason": "No precedent; no book line cited and 2-D unmeasured.",
+      "at": "2026-11-04T12:01:20.743Z",
+      "status": "escalated"
+    },
+    {
+      "id": "chose-2286-product-teaching",
+      "kind": "text",
+      "issue": "#2286",
+      "what": "how the 2-D and 3-D «2 3» refusal teaches the product reading (their grammars do not read «2*3»)",
+      "choice": "«… או 6 (מכפלה).» — the product's value, the one form those grammars read; analytic teaches «2*3»",
+      "chosen": true,
+      "at": "2026-11-04T12:01:20.801Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2621-respectively-priority",
+      "kind": "corpus-priority",
+      "issue": "#2621",
+      "what": "«…הם √20 ו-4 בהתאמה» («respectively» value lists, book p1-10) — build and priority",
+      "choice": "build it in analytic, P2 (the ellipse lesson he dated, 14 Nov)",
+      "chosen": true,
+      "at": "2026-11-04T12:01:20.801Z",
+      "status": "pending"
     }
   ],
   "demoted": {
