@@ -214,6 +214,27 @@ export function scanNumbers(text: string, blank: readonly RegExp[] = []): Number
 }
 
 /**
+ * A UNIT word after a value (#2646 am. 1, [ADR-AG-384](../../docs/06c-decisions-analytic.md#adr-ag-384); shared with
+ * 2-D by #2692, [ADR-781](../../docs/06-decisions.md#adr-781)): «√2 יחידות», «5 מטרים», «5 סנטימטרים», «30 מעלות»,
+ * "√2 units", "5 meters", "30 degrees". A unit MEASURES the number before it; it never counts it. Its plural spellings
+ * end like a counted noun («…ות», «…ים», "…s"), so a count blank that does not exclude it reads «2 יחידות» as "two
+ * units" and blanks the stated value. The singular and abbreviated units («יחידה», «יח'», «ס"מ», «מ'», "cm") are
+ * listed too, for the reader's sake: they never matched a plural. Every unit any builder's grammar reads (2-D's
+ * `VALUE_UNIT`, analytic's length units, the angle rules' degrees), plus their metric siblings, with a definite «ה».
+ *
+ * ONE list for every builder's number gate: it is a lookahead atom, composed into each builder's count blank.
+ */
+export const UNIT_WORD = String.raw`(?:ה?(?:יחידות|יחידה|יח['׳]|ס["״]?מ|סמ['׳]|מ["״]מ|מ['׳]|מטרים|מטר|סנטימטרים|סנטימטר|מילימטרים|מילימטר|קילומטרים|מעלות|מעלה|רדיאנים|רדיאן)(?![א-ת])|(?:units?|cm|mm|m|(?:centi|milli|kilo)?met(?:er|re)s?|degrees?|radians?)\b)`;
+
+/**
+ * The digits of a COUNT (2-D #160: «2 משיקים», "3 circles" state how many objects, which the rule's structure consumes,
+ * never a magnitude): a BARE integer, never one term of a root, a fraction or a decimal («√2», «3/4», «1.5») (#2646
+ * am. 1). Each builder's count blank composes this atom and `(?!UNIT_WORD)` before its plural-noun lookahead, so a
+ * value before a unit word is never a count.
+ */
+export const COUNT_DIGITS = String.raw`(?<![\d.,√/])\d+`;
+
+/**
  * The per-line union of two account sources (a line's text and its parsed facts): a value counts as many
  * times as the RICHER source carries it, never the sum — one statement read twice must not pay twice.
  */

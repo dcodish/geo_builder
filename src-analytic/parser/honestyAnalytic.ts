@@ -20,13 +20,14 @@
  * gate, an invented-number gate (ADR-AG-279 "Not built").
  */
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
-import { nameAccounting, scanNumbers, spendAccounts, unionByMax, LATIN_FILLER, type Account, type NumberOccurrence } from '../../shell/llm/honestyCore';
+import { nameAccounting, scanNumbers, spendAccounts, unionByMax, COUNT_DIGITS, LATIN_FILLER, UNIT_WORD, type Account, type NumberOccurrence } from '../../shell/llm/honestyCore';
 import { LETTER_LINE_NAME_ATOM, POINT_NAME_ATOM, parseLine } from './parseAnalytic';
 import { HE_NUM_UNITS } from './frameAnalytic';
 import { NUMERAL_ALT, asRoman, numeralKey } from '../engine/names';
 import { evalExpr, symbolsOf, type Expr } from '../engine/expr';
+import { curveFromEquation } from '../engine/conic';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
-import type { Construction } from '../engine/types';
+import type { Construction, NumCurve } from '../engine/types';
 
 /**
  * A point label in this product: a capital letter with an optional digit subscript — `A`, `B`, `F1`.
@@ -176,24 +177,14 @@ function namesOf(raw: string): NameToken[] {
 }
 
 /**
- * A UNIT word after a value (#2646 am. 1, ADR-AG-384): «√2 יחידות», «5 מטרים», «30 מעלות», "√2 units", "30 degrees".
- * A unit MEASURES the number before it; it never counts it. Its plural spellings end like a counted noun («…ות»,
- * «…ים», "…s"), so without this list the count blank below read «2 יחידות» as "two units" and blanked the stated
- * value. The singular and abbreviated units («יחידה», «יח'», «ס"מ», «מ'», "cm") are listed too, for the reader's
- * sake: they never matched a plural. Every unit any builder's grammar reads (2-D's `VALUE_UNIT`, this frame's
- * length units, the angle rules' degrees), plus their metric siblings.
- */
-const UNIT_WORD = String.raw`(?:ה?(?:יחידות|יחידה|יח['׳]|ס["״]?מ|סמ['׳]|מ["״]מ|מ['׳]|מטרים|מטר|סנטימטרים|סנטימטר|מילימטרים|מילימטר|קילומטרים|מעלות|מעלה|רדיאנים|רדיאן)(?![א-ת])|(?:units?|cm|mm|m|(?:centi|milli|kilo)?met(?:er|re)s?|degrees?|radians?)\b)`;
-
-/**
  * The spans that are NOT magnitudes, blanked before numbers are read: a numeral NAME (its numeral), a
  * letter-glued subscript (`F1`, `l2`, `x_1`), an exponent (`^2` is form, not magnitude), and a COUNT — a bare
  * integer before a plural noun, «2 משיקים» / "3 circles" (2-D #160: a count is consumed by structure).
  *
  * A count is a BARE integer (#2646 am. 1): never one term of a root, a fraction or a decimal («√2», «3/4», «1.5»), and
- * never a value before a {@link UNIT_WORD}.
+ * never a value before a `UNIT_WORD`. Both atoms are the shell's (`honestyCore.ts`), shared with 2-D's count blank
+ * (#2692, [ADR-781](../../docs/06-decisions.md#adr-781)).
  */
-const COUNT_DIGITS = String.raw`(?<![\d.,√/])\d+`;
 const NUMBER_BLANKS: readonly RegExp[] = [
   /(?<=[A-Za-z_])\d+/g,
   /\^\s*\(?\s*\d+(?:\.\d+)?\s*\)?/g,
@@ -237,11 +228,12 @@ const PERPENDICULAR = /⊥|מאונ[ךכ]|ניצב|ישרה|perpendicular|right/
  * constant expression with a root in it is ONE number, its value (#2646): the facts of «AB = 5√2» carry 7.07…, never
  * a 5 and a 2, exactly as the line's text reads. `plane`: some expression mentions x or y (the line is an equation).
  */
-function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean; plane: boolean } {
+function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean; plane: boolean; curves: NumCurve[] } {
   const r = parseLine(line);
-  if (!r.ok) return { names: [], numbers: [], perp: false, plane: false };
+  if (!r.ok) return { names: [], numbers: [], perp: false, plane: false, curves: [] };
   const names: string[] = [];
   const numbers: number[] = [];
+  const curves: NumCurve[] = [];
   let plane = false;
   const walk = (v: unknown, key: string): void => {
     if (key === 'src') return;
@@ -255,6 +247,11 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
         const syms = symbolsOf(e);
         if (syms.some((s) => RESERVED_SYMBOLS.has(s))) plane = true;
         if (syms.length === 0 && hasRoot(e)) return void numbers.push(Math.abs(evalExpr(e)));
+        // #2680: an EQUATION with no parameter is a curve the answer drew: keep it, read as the engine reads it
+        if (key === 'eq' && syms.length > 0 && syms.every((s) => s === 'x' || s === 'y')) {
+          const c = curveFromEquation(e, {});
+          if (c.ok) curves.push(c.curve);
+        }
       }
       // An exponent is FORM, not magnitude (blanked from the text too): x^2 must not pay for a stated 2.
       if (o.kind === 'pow') return walk(o.a, 'a');
@@ -262,7 +259,36 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
     }
   };
   walk(r.facts, '');
-  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)), plane };
+  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)), plane, curves };
+}
+
+/**
+ * #2680 ([ADR-AG-391](../../docs/06c-decisions-analytic.md#adr-ag-391)) — THE VALUES A CURVE'S CANONICAL FORM LEAVES
+ * IMPLICIT. A canonical equation does not spell every parameter it has: «x^2 + y^2 = 9» has its centre at (0, 0),
+ * «y = x + 3» has slope 1, «y = 2x» has intercept 0, «x^2 - 2x + y^2 - 4y - 4 = 0» is the circle about (1, 2) of radius
+ * 3. The text pays none of those, so a correct answer was refused for a value it never dropped. They are the PARSED
+ * curve's own parameters, read off the engine's fit (`curveFromEquation`), never a digit-0 exemption: the answer pays a
+ * stated centre only when its curve has that centre.
+ *
+ * The parameters of each canonical form, and nothing computed from them (a diameter, a focus, a point the curve passes
+ * through: a value the student would have to compute is ADR-AG-279's `y=4x-5`, refused for the copying form):
+ * - a line `y = mx + n`: m and n; a vertical `x = k`: k;
+ * - a circle `(x−a)² + (y−b)² = r²`: a, b, r;
+ * - a canonical ellipse `x²/a² + y²/b² = 1`: its centre (0, 0), a, b;
+ * - a canonical parabola `y² = 2px`: its vertex (0, 0), p.
+ * Unsigned, like every account (the scanner is unsigned).
+ */
+function curveParameters(c: NumCurve): number[] {
+  switch (c.kind) {
+    case 'line':
+      return Math.abs(c.b) > 1e-12 ? [-c.a / c.b, -c.c / c.b] : [-c.c / c.a];
+    case 'circle':
+      return [c.cx, c.cy, c.r];
+    case 'parabola':
+      return [0, 0, c.p];
+    case 'ellipse':
+      return [0, 0, c.a, c.b];
+  }
 }
 
 /**
@@ -338,10 +364,14 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
   const EQ = 'eq';
   const PLAIN = 'plain';
   const accounts: Account[] = [];
+  // #2680 (ADR-AG-391): the answer's curves pay the parameters their canonical form leaves implicit (a centre at the
+  // origin, a slope of 1, an intercept of 0, an expanded circle's centre and radius). A further SOURCE of the union, so a
+  // parameter the text already spells («(x-1)^2» and the centre's 1) pays once, never twice.
   modelLines.forEach((line, i) => {
     const occ = numbersOf(line);
     const tag = facts[i].plane || occ.some((o) => o.eq) ? EQ : PLAIN;
-    for (const value of unionByMax(occ.map((o) => o.value), facts[i].numbers)) accounts.push({ value, tag });
+    const params = facts[i].curves.flatMap(curveParameters).map(Math.abs);
+    for (const value of unionByMax(occ.map((o) => o.value), facts[i].numbers, params)) accounts.push({ value, tag });
     if (facts[i].perp || PERPENDICULAR.test(line)) accounts.push({ value: 90, tag });
   });
   const droppedNumbers = spendAccounts(numbersOf(utterance), accounts, (o) => {
