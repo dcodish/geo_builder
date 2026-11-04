@@ -15043,3 +15043,30 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Locks.** `src-analytic/__tests__/issue-2691-point-letters.test.ts` (his figure at seeds 0–3 under five switch settings: C and D clear of every segment, no letter on ink, a dot or a letter; no value over a letter; the 2-D seed rule on a lone point, a vertex and a midpoint; two letters on one dot); the sweep `issue-2691-letter-sweep.test.ts` (asserts zero); fixture `operator-letters-on-side-2691`.
 
 **Behaviour change for a student:** every point's letter is written beside its point, on the open side away from its lines, and moves off any line, dot or other letter that would cover it; before, it always sat up-right of the dot, often on a side.
+
+## ADR-AG-391 — An answer's curve pays the parameters its canonical form leaves implicit: «x^2 + y^2 = 9» keeps a stated centre (0,0) (#2680)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P3, analytic) · fix round #2697 stream S2, branch `fix/2680-implicit-curve-values` (stacked on #2692's) · plan: the #2680 body (option 2 of #2646's list), auto-ok 2026-11-04. LADDER stage: none (the model-lane honesty gate). **Amends** [ADR-AG-384](#adr-ag-384) (its "Found, not this class" line is decided here).
+
+**Requirements:** none (internal) — the honesty invariants (a given is never silently dropped, and a correct answer is never refused for one it did not drop) already promise it. · **Design:** [04c](04c-design-analytic.md) § "The LLM lane's faithfulness gates".
+
+**Measured before** (`0d5525a3`, `runFallback` with the model mocked, and `faithfulnessAnalytic`). «מעגל שמרכזו (0,0) ורדיוסו 3» answered with the correct «x^2 + y^2 = 9» was `unfaithful`, dropped «0», «0»; the translated «(1,2)» answered «(x-1)^2 + (y-2)^2 = 9» committed. The same class, every row a correct answer refused: «(0,2)» answered «x^2 + (y-2)^2 = 9» and «(1,0)» answered «(x-1)^2 + y^2 = 9» (dropped «0»); the expanded «x^2 - 2x + y^2 - 4y - 4 = 0» for centre (1,2) and radius 3 (dropped «1», «3»); «ישר ששיפועו 1 וחותך את ציר y ב-3» answered «y = x + 3» (dropped «1»); a centred ellipse «x^2/25 + y^2/9 = 1» and a parabola «y^2 = 4x» stated with their (0,0) (dropped «0», «0»).
+
+**Class (docs/17 §1).** *A stated value that the answer's canonical form makes implicit* is paid by nothing. The accounting found a stated number only in the answer's text or its parsed facts' payload (or its square or root across an equation, ADR-AG-384). A canonical equation does not spell a centre at the origin, a slope of 1, an intercept of 0, or an expanded circle's centre and radius.
+
+**Decision.** Pay them from the PARSED curve, never from the digit:
+1. `factAccounts` keeps every parameter-free equation in a model line's facts as the curve the engine fits (`curveFromEquation`, the fit the figure is drawn from).
+2. `curveParameters` lists that curve's canonical parameters: a line's m and n in `y = mx + n` (or k in `x = k`), a circle's centre coordinates and radius, a canonical ellipse's centre (0,0) and semi-axes, a canonical parabola's vertex (0,0) and p.
+3. They are one more source of the line's `unionByMax`, so a parameter the text already spells («(x-1)^2» and the centre's 1) pays once, never twice. Unsigned, like every account, with the line's tag.
+
+Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answer centred elsewhere still drops the stated centre. Nothing COMPUTED from the parameters pays: a diameter, a focus or a focal distance, an axis length 2a, or a stated point the curve passes through. Paying those would accept ADR-AG-279's computed `y=4x-5` for «(2,3), slope 4», which that ADR refuses on purpose (the prompt asks for the copying point-slope form); a first version did, and `issue-1355-llm-honesty.test.ts` row O2b caught it. Those members are listed for a ruling on #2680.
+
+**The sweep** (the ADR-AG-384 bar). Old and new accounting ran side by side behind a temporary env flag over `test:fast` (all products): 904 gate calls, 845 distinct. The narrowed rule was then re-run over the same 845 logged calls. Every changed verdict is a row of this ADR's lock: the correct answers above now pay, and the refused controls name fewer values for the same answer (a changed radius now names «3» alone, not «0», «0», «3»). Nothing changed elsewhere; `issue-1355-llm-honesty.test.ts` (O1, O2b) is unchanged. The exam corpus makes no model-lane call. The harness was removed before the commit.
+
+**Limit, unchanged.** The number gate is a multiset and does not check which role a value plays: «A(1,2)» answered «A(2,1)» passes, before and after. A canonical ellipse or parabola always has its (0,0), so its centre pays two stated 0s from any such answer. Both are the gate's existing generosity (a false account only suppresses a warning).
+
+**Ports (ADR-W-157).** 2-D, 3-D and complex have no equation answers: 2-D's grammar draws no curve from an equation, 3-D's number gate is #2285, and complex has no gate of this shape. None.
+
+**Locks.** `src-analytic/parser/__tests__/honesty-implicit-curve-values-2680.test.ts`: the rows above (drop nothing); answers that really change a value (a moved centre, a changed radius, a parameter paid once, a changed slope or intercept), each naming it; the mocked model lane end to end (the centred and the translated circle commit; a circle centred elsewhere is refused with `llm-dropped`, naming «0», «0»). `honesty-radical-2646.test.ts` and `issue-1355-llm-honesty.test.ts` are unchanged and green.
+
+**Behaviour change for a student:** in analytic, a correct AI answer written in canonical form is no longer refused for a parameter the form leaves implicit: «מעגל שמרכזו (0,0) ורדיוסו 3» answered «x^2 + y^2 = 9», an expanded circle equation, a line of slope 1 written «y = x + 3». An answer that really moves a stated centre or changes a slope is still refused with the existing dropped-given sentence.
