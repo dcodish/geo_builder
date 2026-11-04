@@ -2255,3 +2255,7 @@ over all four (ADR-041).
 ### `contained-pair-relations-2677` — «מעגל P מוכל בתוך מעגל O» · «משיקים מבחוץ» / «נחתכים בנקודות X ו-Y»: refused naming the containment; «משיקים מבפנים» builds (#2677, ADR-779)
 
 **Guards against:** a tangency from outside or a crossing of a pair stated contained, committed with every row green while the verifier flagged the containment. **Asserts** containment plus internal tangency builds clean (ADR-704); after the containment, each of the two report lines is refused before it becomes a fact, and the student reads «לא ניתן: «…» סותר את «מעגל P מוכל בתוך מעגל O» …» with the exclusion's reason. The class matrix (reverse orders, «זרים» against the containment, a containment stated both ways) is `src/app/__tests__/issue-2677-pair-position-conflict.test.ts`.
+
+### `extension-shared-endpoint-past-second-2518` — «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R»: R beyond O (#2518, ADR-780)
+
+**Guards against:** a shared-endpoint extension drawn on the wrong side of its second letter (R between A and O, or beyond A) while every row was green, although putting O inside circle P gives the stated side. **Asserts** every step green, A–O–R in order, R on circle P, O inside circle P. The matrix is `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`; ADR-142's and ADR-267's scenarios lock the either-side tier.

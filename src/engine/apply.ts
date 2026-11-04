@@ -1568,6 +1568,51 @@ function convexInOrder(pts: Vec[]): boolean {
   return Math.abs(Math.abs(wind) - 2 * Math.PI) < 1e-6;
 }
 
+/**
+ * #2518 ([ADR-780](../../docs/06-decisions.md#adr-780), operator ruling 2026-11-04, card q1 = A) — A SHARED-ENDPOINT
+ * EXTENSION'S DIRECTION IS A BETTER DEFAULT, NEVER A REQUIREMENT. «המשך AO חותך את מעגל P בנקודה R» with A on circle P:
+ * the line meets the circle at A and at ONE other point, R, so the stated side (beyond the second letter) holds only for
+ * some positions of the other end — beyond O only when O is inside the circle; for «המשך OA» (the shared end second),
+ * beyond A only when O is outside and A is the crossing the ray from O meets first. ADR-142 made either side acceptable
+ * (the side carries no information when no figure has it), and nothing placed the other end where it does.
+ *
+ * So when the other end is a movable free point that no constraint holds, and the stated side does not already hold at
+ * the drawn positions, its SEED is moved to where it does: inside the circle, keeping its direction from the centre, or
+ * outside along the outward normal at the shared end. It is a default (M4, ADR-052): seeds still sample the point, the
+ * configuration search's strict tier (ADR-267) keeps a configuration on the stated side whenever one exists, and when
+ * the other end is pinned, derived or constrained nothing moves and the ADR-142 / ADR-267 either-side reading stands.
+ */
+function seatExtensionBeyond(objects: GeoObject[], constraints: readonly Constraint[], pos: Map<Id, Vec>, cmd: Extract<Command, { type: 'extend-onto-circle' }>, shared: Id, other: Id): void {
+  const circ = objects.find((o): o is CircleObj => o.kind === 'circle' && o.id === cmd.circle);
+  const i = objects.findIndex((o) => o.id === other);
+  const o = objects[i];
+  if (!circ || !o || o.kind !== 'free-point' || o.pinned || o.rigid) return;
+  if (constraints.some((k) => constraintRefs(k).includes(other))) return;
+  const c = pos.get(circ.center);
+  const s = pos.get(shared);
+  const x = pos.get(other);
+  if (!c || !s || !x || other === circ.center) return;
+  const r = seedRadiusOf(circ, pos);
+  const out = sub(s, c);
+  const ro = Math.hypot(out.x, out.y);
+  if (!(r > 0) || !(ro > 0)) return;
+  let spot: Vec;
+  if (shared === cmd.a) {
+    // a–b–R with a on the circle: b must be strictly inside
+    if (dist(x, c) < r * 0.9) return;
+    const d = sub(x, c);
+    const dl = Math.hypot(d.x, d.y);
+    spot = dl > 0 ? add(c, scale(d, (0.45 * r) / dl)) : add(c, { x: 0.45 * r, y: 0 });
+  } else {
+    // a–b–R with b on the circle: a outside, and b the crossing the ray from a meets first
+    const inward = (c.x - s.x) * (s.x - x.x) + (c.y - s.y) * (s.y - x.y);
+    if (dist(x, c) > r * 1.1 && inward > 0) return;
+    spot = add(s, scale(out, (0.8 * r) / ro));
+  }
+  objects[i] = { ...o, x: spot.x, y: spot.y };
+  pos.set(other, spot);
+}
+
 export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
@@ -2500,9 +2545,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // Am.2 / `lineMeetsCircle`). No driven solve, no radius change: with only one other crossing the
       // "direction" is forced, and a numeric collinear solve here can collapse the new point onto the
       // shared endpoint ("A and D would be at the same point" — the operator's crash this fixes).
+      // #2518 (ADR-780): which side that crossing falls on is NOT forced — it is beyond the second letter only for some
+      // positions of the other end — so the stated side seats a movable other end where it holds (a better default).
       const shared = [cmd.a, cmd.b].find((id) => pointOnCircle(objects, id, cmd.circle));
       if (shared) {
         const other = shared === cmd.a ? cmd.b : cmd.a;
+        seatExtensionBeyond(objects, constraints, pos, cmd, shared, other);
         const lineId = `line-${other}${shared}`;
         addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: other, b: shared } });
         addObj(objects, { kind: 'line-circle', id: cmd.id, line: lineId, circle: cmd.circle, branch: 0, avoid: shared });

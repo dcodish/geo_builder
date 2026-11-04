@@ -6253,6 +6253,24 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'extension-shared-endpoint-past-second-2518',
+    title: '#2518: «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R» draws R beyond O (O seated inside circle P), A–O–R in order (ADR-780)',
+    guards:
+      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, the either-side control) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts; ADR-142's and ADR-267's scenarios lock the either-side tier.",
+    steps: ['מעגל שמרכזו O', 'מעגל שמרכזו P', 'נקודה A על מעגל P', 'המשך AO חותך את מעגל P בנקודה R'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const O = at(fig, 'O');
+      const R = at(fig, 'R');
+      const t = ((R.x - A.x) * (O.x - A.x) + (R.y - A.y) * (O.y - A.y)) / ((O.x - A.x) ** 2 + (O.y - A.y) ** 2);
+      expect(t, 'A–O–R in order: R beyond O').toBeGreaterThan(1);
+      const P = fig.circles.get('circle-P')!;
+      expect(Math.abs(dist(R, P.center) - P.r), 'R on circle P').toBeLessThan(1e-6);
+      expect(dist(O, P.center), 'O inside circle P').toBeLessThan(P.r);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
