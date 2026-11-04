@@ -11,7 +11,7 @@ import { freePlaneDef } from './freePlane';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -924,10 +924,10 @@ function freeVecMetricOf3(c: Construction3, cmd: Command3): FreeVecMetric3 | nul
   let m: FreeVecMetric3 | null = null;
   switch (cmd.type) {
     case 'vec-mag':
-      m = { kind: 'mag', e: one(cmd.name), value: cmd.value };
+      m = { kind: 'mag', e: one(cmd.name), value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) };
       break;
     case 'mag-val':
-      m = { kind: 'mag', e: cmd.e, value: cmd.value };
+      m = { kind: 'mag', e: cmd.e, value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) };
       break;
     case 'mag-rel':
       m = { kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c };
@@ -969,7 +969,7 @@ function anchoredMetricTwin3(c: Construction3, m: FreeVecMetric3): Command3 | nu
   const operand = (a: VecAtom): Operand3 => (a.kind === 'pair' ? { kind: 'segment', a: a.from, b: a.to } : { kind: 'vector', name: a.name });
   switch (m.kind) {
     case 'mag':
-      return { type: 'mag-val', e: sides[0], value: m.value };
+      return { type: 'mag-val', e: sides[0], value: m.value, ...(m.decimal ? { decimal: true as const } : {}) };
     case 'mag-rel':
       return { type: 'mag-rel', e1: sides[0], e2: sides[1], c: m.c };
     case 'cos': {
@@ -1718,13 +1718,8 @@ function oppositeParallelBase3(c: Construction3, apex: Id): [Id, Id] | null {
   return cands.length === 1 ? cands[0] : null;
 }
 
-/** A ring's identity up to where its cycle starts and which way round it is read (#1927, 2-D's `ringKey`). */
-export function ringKeyIds3(ids: readonly Id[]): string {
-  const n = ids.length;
-  const rots: string[] = [];
-  for (const seq of [[...ids], [...ids].reverse()]) for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
-  return rots.sort()[0];
-}
+/** A ring's identity up to where its cycle starts and which way round it is read — lives in baseShapes (#1986). */
+export { ringKeyIds3 } from './baseShapes';
 
 function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
   const id = (cmd as { id?: unknown }).id;
@@ -2307,7 +2302,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missingMid = missingPoint(c, [cmd.a, cmd.b]);
       if (missingMid) return { ok: false, error: missingMid };
       // #1476: the pool is shared with the dihedral construction's meeting point (./freeLetter)
-      const label = firstFreeLetter((l) => c.points.has(l));
+      // #2674 (ADR-3D-415): a letter the student gave this point by use is its letter; the tool's pick is only a default
+      const label = cmd.id ?? firstFreeLetter((l) => c.points.has(l));
       if (!label) return { ok: false, error: { code: 'already-defined', id: 'M' } }; // 19 letters taken — practically unreachable
       return applyCommand3(c, { type: 'point-on-segment3', id: label, a: cmd.a, b: cmd.b, t: 0.5 });
     }
@@ -2657,13 +2653,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!side) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
         const flat = applyCommand3(c, { type: 'altitude-foot', id: foot, from, a: side[0], b: side[1] });
         if (!flat.ok || cmd.len === undefined) return flat;
-        return applyCommand3(flat.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len } });
+        return applyCommand3(flat.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...(cmd.lenDecimal ? { decimal: true as const } : {}) } });
       }
       const made = applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
       // #1448: «גובה הפירמידה 4» — the phrase carried its value; the claim lands on apex→foot,
       // whose letter exists only now. The same two commands the two-line spelling always was.
       if (!made.ok || cmd.len === undefined) return made;
-      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len } });
+      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...(cmd.lenDecimal ? { decimal: true as const } : {}) } });
     }
 
     case 'point-in-span': {
@@ -3853,7 +3849,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const refErr = vectorRefsError3(c, [cmd.name]); // #1188: «|u| = 5» on a free u is step 4
       if (refErr) return { ok: false, error: refErr };
       const d = c.vectors.get(cmd.name)!;
-      return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: d.from, b: d.to, value: cmd.value } });
+      return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: d.from, b: d.to, value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) } });
     }
 
     case 'symbol-value': {
@@ -4132,8 +4128,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     // coordinates, whatever the arm below did).
     case 'point-on-circle3': {
       // '' = the single circle (ADR-029 implicit-reference); a named id must exist
-      if (cmd.circle === '' ? c.circles3.length !== 1 : !c.circles3.some((k) => k.id === cmd.circle)) {
-        return { ok: false, error: { code: 'unknown-line', id: cmd.circle || 'circle' } };
+      // #2611 (ADR-3D-414): the refusal speaks of the circle in the student's words — the letter he named it by, or
+      // what «המעגל» could not name — never the line wording and never an id («הישר «circle»»).
+      if (cmd.circle !== '' && !c.circles3.some((k) => k.id === cmd.circle)) {
+        return { ok: false, error: cmd.name !== undefined ? { code: 'unknown-circle', name: cmd.name } : { code: 'unknown-circle' } };
+      }
+      if (cmd.circle === '' && c.circles3.length !== 1) {
+        if (c.circles3.length === 0) return { ok: false, error: { code: 'unknown-circle' } };
+        // a circle «המעגל X» can name: one built on a centre the student lettered (`circle-<centre>`, ADR-029)
+        const centre = c.circles3.map((k) => ('center' in k.def && k.id === `circle-${k.def.center}` ? k.def.center : null)).find((x) => x !== null);
+        return { ok: false, error: centre ? { code: 'unknown-circle', several: true, centre, point: cmd.point } : { code: 'unknown-circle', several: true } };
       }
       const circle = cmd.circle === '' ? c.circles3[0] : c.circles3.find((k) => k.id === cmd.circle)!;
       // #2611 (ADR-3D-410) — the on-line rider's circle twin (ADR-3D-031). A NEW id stated onto the circle is CREATED
@@ -4229,8 +4233,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       if (cmd.e.length === 1 && Math.abs(cmd.e[0].coeff - 1) < 1e-12) {
         const a = cmd.e[0].atom;
-        if (a.kind === 'named') return applyCommand3(c, { type: 'vec-mag', name: a.name, value: cmd.value });
-        return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: a.from, b: a.to, value: cmd.value } });
+        const decimal = cmd.decimal ? { decimal: true as const } : {}; // #2361: the value as typed travels to the one stated-length seam
+        if (a.kind === 'named') return applyCommand3(c, { type: 'vec-mag', name: a.name, value: cmd.value, ...decimal });
+        return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: a.from, b: a.to, value: cmd.value, ...decimal } });
       }
       const next = clone(c);
       for (const t of cmd.e) {

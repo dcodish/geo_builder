@@ -52,8 +52,9 @@ import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidK
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
-  lineCrossing3} from './vec3';
-import { baseRingOf, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
+  lineCrossing3,
+  ringSelfCrossing3} from './vec3';
+import { baseRingOf, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -200,6 +201,40 @@ export function componentSimilarityDims(key: string, seed: number): number[] {
     sample(seed, `${key}-sim-tx`, -0.3, 0.3), sample(seed, `${key}-sim-ty`, -0.3, 0.3), sample(seed, `${key}-sim-tz`, -0.3, 0.3),
   ];
 }
+/**
+ * #1986 (ADR-3D-418) — THE CONCAVE SEAT of a flat quadrilateral, 2-D's ADR-622 one product over. `polygon4`'s own dims
+ * sample four points in CONVEX position, where exactly one cyclic order is simple: «מרובע ABCD · מרובע ABDC» (and the
+ * kite pair «דלתון ABCD · מרובע ABDC») then drew the second ring crossed at every seed, green. Four points with one
+ * inside the triangle of the other three make EVERY cyclic order simple at once, so this one seat serves every
+ * reordering. Which vertex is reflex is a discrete configuration choice the sentence never states (ADR-052): drawn
+ * from the seed, as a branch is, so «הציגו תצורה אחרת» reaches each (FR-ALT-2), and the reflex vertex sits at sampled
+ * barycentric weights inside a sampled outer triangle. Returned in the solid's gauge (v0 = (0,0), v1 = (1,0)) and
+ * counter-clockwise, like the convex seat. Used ONLY when `concaveSeatVertices3` registers the axis (and names
+ * which vertices may be reflex), so a single declared ring keeps today's convex seat bit-identically.
+ */
+function polygon4ConcaveDims(key: string, seed: number, allowed: readonly number[]): number[] {
+  const reflex = allowed[Math.min(allowed.length - 1, Math.floor(sample(seed, `${key}-reflex`, 0, allowed.length)))];
+  const outer = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: sample(seed, `${key}-rx`, 0.3, 0.7), y: sample(seed, `${key}-ry`, 0.8, 1.2) }];
+  const w = [sample(seed, `${key}-w0`, 0.6, 1.4), sample(seed, `${key}-w1`, 0.6, 1.4), sample(seed, `${key}-w2`, 0.6, 1.4)];
+  const sum = w[0] + w[1] + w[2];
+  const inner = { x: (w[0] * outer[0].x + w[1] * outer[1].x + w[2] * outer[2].x) / sum, y: (w[0] * outer[0].y + w[1] * outer[1].y + w[2] * outer[2].y) / sum };
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0, t = 0; i < 4; i++) pts.push(i === reflex ? inner : outer[t++]);
+  // the similarity taking v0 → (0,0), v1 → (1,0): z ↦ (z − z0)/(z1 − z0) in complex terms
+  const ex = pts[1].x - pts[0].x;
+  const ey = pts[1].y - pts[0].y;
+  const den = ex * ex + ey * ey;
+  const g = pts.map((q) => {
+    const dx = q.x - pts[0].x;
+    const dy = q.y - pts[0].y;
+    return { x: (dx * ex + dy * ey) / den, y: (dy * ex - dx * ey) / den };
+  });
+  let area = 0;
+  for (let i = 0; i < 4; i++) area += g[i].x * g[(i + 1) % 4].y - g[(i + 1) % 4].x * g[i].y;
+  const flip = area < 0 ? -1 : 1;
+  return [g[2].x, flip * g[2].y, g[3].x, flip * g[3].y];
+}
+
 /** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
 export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
   return [...solidDimsAll3(c, seed)[i]];
@@ -212,18 +247,22 @@ export function solidDimsAt(c: Construction3, i: number, seed: number): number[]
  * `perSolidDims` and the DOF count all read the same draws. #1855's per-solid similarity added seven keys to every
  * further solid, and sampling them again in each one-shot placement took two-solid figures past the #863 ceiling.
  */
-const solidDimsMemo3 = new WeakMap<readonly unknown[], Map<number, readonly (readonly number[])[]>>();
+const solidDimsMemo3 = new WeakMap<readonly unknown[], Map<number | string, readonly (readonly number[])[]>>();
 export function solidDimsAll3(c: Construction3, seed: number): readonly (readonly number[])[] {
   let bySeed = solidDimsMemo3.get(c.solids);
   if (!bySeed) solidDimsMemo3.set(c.solids, (bySeed = new Map()));
-  let all = bySeed.get(seed);
+  // #1986 (ADR-3D-418): which flat quadrilaterals take the concave seat is part of the configuration's identity
+  const concave = c.solids.map((solid) => (solid.kind === 'polygon4' ? concaveSeatVertices3(c, solid.ids) : null));
+  const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
+  let all = bySeed.get(memoKey);
   if (!all) {
     all = c.solids.map((solid, i) => {
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
-      const shape = solidDims(solid.kind, key, seed, solid.oblique);
+      const seat = concave[i];
+      const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
       return i === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
     });
-    bySeed.set(seed, all);
+    bySeed.set(memoKey, all);
   }
   return all;
 }
@@ -1060,10 +1099,66 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
   return pick(pool, paramValue !== undefined ? nearestBranch(pool, paramValue) : pool[seed % pool.length]);
 }
 
-/** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). */
-function openParamRange3(c: Construction3): [number, number] {
+/** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). `reach` (#1986,
+ *  ADR-3D-418, analytic's ADR-AG-256) widens the window's OPEN side(s) only; 1 is the default window, bit-identical. */
+function openParamRange3(c: Construction3, reach = 1): [number, number] {
   const sign = c.paramSigns.find(() => true);
-  return sign ? (sign.positive ? [0.3, 3] : [-3, -0.3]) : [-3, 3];
+  return sign ? (sign.positive ? [0.3, 3 * reach] : [-3 * reach, -0.3]) : [-3 * reach, 3 * reach];
+}
+
+/**
+ * #1986 (ADR-3D-418) — HOW FAR PAST THE DEFAULT WINDOW the ring search reaches a coordinate letter, analytic's
+ * ADR-AG-256 ported: «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» is a genuine trapezoid only for k > 4,
+ * outside the [−3, 3] the unpinned letter is drawn in. Each reach multiplies the window, `RING_REACH_TRIES` draws each
+ * under their own sample keys (a scaled copy of the default draw would keep its sign). A deterministic, bounded search
+ * (M3: a work budget, never a clock), paid only by a figure whose declared ring over a coordinate-letter point is
+ * drawn crossed at the default draw.
+ */
+const RING_REACHES3 = [4, 16, 64] as const;
+const RING_REACH_TRIES3 = 4;
+const ringReachMemo3 = new WeakMap<Construction3, Map<number, number | null>>();
+
+/** The declared rings with a vertex the free coordinate letter places — the only rings a reach can move. */
+function letterRings3(c: Construction3): Id[][] {
+  if (!c.param || pinningGivens(c) > 0 || c.paramGivens.length > 0) return [];
+  return declaredRings3(c).filter((ring) => ring.some((id) => c.points.get(id)?.kind === 'coord-sym'));
+}
+
+/**
+ * The parameter value this seed draws INSTEAD of the default one, or null when the default stands: the ring over the
+ * letter is simple at the default draw, or no widened draw makes it simple. Pure over (construction, seed), so the
+ * figure is re-derived from `(facts, seed)` alone — nothing is stored (the store's doctrine) — and every consumer
+ * (the drawing, the claim samples, «הציגו תצורה אחרת») reads the same configuration.
+ */
+function ringReachValue3(c: Construction3, seed: number): number | null {
+  const rings = letterRings3(c);
+  if (rings.length === 0) return null;
+  let per = ringReachMemo3.get(c);
+  if (!per) ringReachMemo3.set(c, (per = new Map()));
+  const known = per.get(seed);
+  if (known !== undefined) return known;
+  const crossed = (r: Resolved3): boolean =>
+    rings.some((ring) => {
+      const pts = ring.map((id) => r.positions.get(id));
+      return pts.every((q) => q) && ringSelfCrossing3(pts as Vec3[]);
+    });
+  const [lo1, hi1] = openParamRange3(c);
+  const plain = sample(seed, `param-${c.param}`, lo1, hi1);
+  let out: number | null = null;
+  if (crossed(resolve3(c, seed, { solvedFrame: true, paramValue: plain }))) {
+    search: for (const reach of RING_REACHES3) {
+      const [lo, hi] = openParamRange3(c, reach);
+      for (let t = 0; t < RING_REACH_TRIES3; t++) {
+        const v = sample(seed, `param-${c.param}-reach${reach}-${t}`, lo, hi);
+        if (!crossed(resolve3(c, seed, { solvedFrame: true, paramValue: v }))) {
+          out = v;
+          break search;
+        }
+      }
+    }
+  }
+  per.set(seed, out);
+  return out;
 }
 
 /** #1474: the pool entry an explicit configuration value names (exact for a value read off the pool). */
@@ -1849,6 +1944,11 @@ const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}): Resolved3 {
+  // #1986 (ADR-3D-418): a coordinate letter whose default draw crosses a declared ring is drawn at a widened reach
+  if (opts.paramValue === undefined && c.param) {
+    const reached = ringReachValue3(c, seed);
+    if (reached !== null) return resolve3(c, seed, { ...opts, paramValue: reached });
+  }
   const base = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
   let per = resolveMemo3.get(c);
   if (!per) resolveMemo3.set(c, (per = new Map()));
@@ -4207,14 +4307,38 @@ export function solidFaceCollapsed(c: Construction3, positions: Positions3, tol 
   return false;
 }
 
+/**
+ * #1986 (ADR-3D-418) — is any DECLARED ring drawn crossed here? The operator's "search first, refuse last" (2026-10-09,
+ * #1927): a ring some configuration of the sentence draws simple must be drawn that way. A ring with an unresolved
+ * vertex is not judged (never a veto). The predicate is `ringSelfCrossing3`, the store's own (ADR-3D-314/322).
+ *
+ * Judged only over rings the CONFIGURATION draws whole — every vertex a solid's vertex, a coordinate point or a
+ * coordinate-letter point. A ring with another kind of vertex (#1935's free point re-homed onto the ring's plane) is
+ * left out: a different seed would move the points the student already placed («only the free vertex moves», the
+ * 2026-10-09 ruling on #1935), so the seed search is the wrong door for it.
+ */
+const CONFIGURATION_VERTEX_KINDS3 = new Set(['solid-vertex', 'coord', 'coord-sym']);
+export function declaredRingCrossed3(c: Construction3, positions: Positions3): boolean {
+  for (const ring of declaredRings3(c)) {
+    if (!ring.every((id) => CONFIGURATION_VERTEX_KINDS3.has(c.points.get(id)?.kind ?? ''))) continue;
+    const pts = ring.map((id) => positions.get(id));
+    if (pts.every((q) => q) && ringSelfCrossing3(pts as Vec3[])) return true;
+  }
+  return false;
+}
+
 export function meetsShapePreferences3(c: Construction3, seed: number): boolean {
   const prefs = c.requirements.filter((req) => req.kind === 'quad-general');
   // #817: ...and the preference no utterance states — a solid's faces should have real area. It joins
   // the PREFERENCE tier deliberately: a figure whose givens genuinely force a flat face must still
   // draw (the #615 fallback), it just must not be chosen while a real configuration is available.
-  if (prefs.length === 0 && c.solids.length === 0) return true;
+  // #1986 (ADR-3D-418): ...and every declared ring drawn SIMPLE, the same tier for the same reason — a figure whose
+  // givens force a crossing still resolves, at the seed it resolved at before.
+  const rings = c.solids.length > 0 || c.quadShapes.length > 0 || c.claims.some((k) => k.type === 'polygon-open');
+  if (prefs.length === 0 && !rings) return true;
   const r = resolve3(c, seed);
   if (solidFaceCollapsed(c, r.positions)) return false;
+  if (declaredRingCrossed3(c, r.positions)) return false;
   return prefs.every((req) => {
     if (req.kind !== 'quad-general') return true;
     const ring = req.ids.map((id) => r.positions.get(id));

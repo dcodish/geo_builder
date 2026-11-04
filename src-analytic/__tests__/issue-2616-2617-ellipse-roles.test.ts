@@ -119,12 +119,12 @@ describe('#2616 — the book exercises build and answer the book (fixtures)', ()
 
 describe('#2616 — a focus or vertex named, in every copula order and in English', () => {
   it.each([
-    ['F1 הוא המוקד הימני של האליפסה', 'F1', '(4, 0)'],
-    ['המוקד הימני של האליפסה הוא F1', 'F1', '(4, 0)'],
-    ['הנקודה F1 היא המוקד הימני של האליפסה', 'F1', '(4, 0)'],
-    ['F1 המוקד הימני של האליפסה', 'F1', '(4, 0)'],
-    ['F2 הוא המוקד השמאלי של האליפסה', 'F2', '(-4, 0)'],
-    ['F1 is the right focus of the ellipse', 'F1', '(4, 0)'],
+    ['F1 הוא המוקד הימני של האליפסה', 'F₁', '(4, 0)'],
+    ['המוקד הימני של האליפסה הוא F1', 'F₁', '(4, 0)'],
+    ['הנקודה F1 היא המוקד הימני של האליפסה', 'F₁', '(4, 0)'],
+    ['F1 המוקד הימני של האליפסה', 'F₁', '(4, 0)'],
+    ['F2 הוא המוקד השמאלי של האליפסה', 'F₂', '(-4, 0)'],
+    ['F1 is the right focus of the ellipse', 'F₁', '(4, 0)'],
     ['A הקודקוד הימני של האליפסה', 'A', '(5, 0)'],
     ['A הוא הקודקוד העליון של האליפסה', 'A', '(0, 3)'],
     ['B הקודקוד התחתון של האליפסה', 'B', '(0, -3)'],
@@ -181,9 +181,9 @@ describe('#2616 — a focus or vertex named, in every copula order and in Englis
 
   it('«F1 ו-F2 מוקדי האליפסה» and «מוקדי האליפסה הם A ו-C»: which letter is which focus swaps under «הציגו תצורה אחרת»', () => {
     for (const [line, p] of [
-      ['F1 ו-F2 מוקדי האליפסה', 'F1'],
+      ['F1 ו-F2 מוקדי האליפסה', 'F₁'],
       ['מוקדי האליפסה הם A ו-C', 'A'],
-      ['F1 and F2 are the foci of the ellipse', 'F1'],
+      ['F1 and F2 are the foci of the ellipse', 'F₁'],
     ] as const) {
       expect(last([FIXED, line]).kind).toBe('record');
       const xs = new Set([0, 1, 2, 3].map((seed) => Math.sign(point([FIXED, line], p, seed)!.x)));
@@ -199,9 +199,9 @@ describe('#2616 — a focus or vertex named, in every copula order and in Englis
 
   it('the same role stated again is one point — nothing earlier moves (stability)', () => {
     const lines = [FREE, 'a=5', 'b=3', 'F1 הוא המוקד הימני של האליפסה'];
-    const before = point(lines, 'F1');
+    const before = point(lines, 'F₁');
     expect(last([...lines, 'המוקד הימני של האליפסה הוא F1']).kind).toBe('already-known');
-    const after = point([...lines, 'A(1,1)'], 'F1');
+    const after = point([...lines, 'A(1,1)'], 'F₁');
     expect(after).toEqual(before);
   });
 

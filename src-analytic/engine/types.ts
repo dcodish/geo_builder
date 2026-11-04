@@ -845,7 +845,7 @@ export type Fact =
   | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; host?: ConicHost; facts: Fact[] });
 
 /** The stand-ins a `via-ellipse-role` sentence carries for an ellipse's role points (#2616) — names no student writes. */
-export const ELLIPSE_ROLE_SENTINELS = ['Z₈', 'Z₉'] as const;
+export const ELLIPSE_ROLE_SENTINELS = ['Z₀₈', 'Z₀₉'] as const;
 
 /** One role point a `via-ellipse-role` sentence names, and the major-axis direction its side word asserts. */
 export interface EllipseRoleUse {
@@ -854,7 +854,7 @@ export interface EllipseRoleUse {
 }
 
 /** The stand-ins a `centres-distance` sentence carries for the two centres (#2391, ADR-AG-315) — names no student writes. */
-export const CENTRES_SENTINELS = ['Z₆', 'Z₇'] as const;
+export const CENTRES_SENTINELS = ['Z₀₆', 'Z₀₇'] as const;
 
 /** One circle a `circles-about` sentence speaks of (ADR-AG-219). */
 export type CircleSlot = { k: 'new'; r?: Expr } | { k: 'named'; name: string } | { k: 'the' };
@@ -872,7 +872,7 @@ export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse' | 'di
  * The stand-ins a stated cevian length is parsed over — its APEX and its FOOT (#1737, ADR-AG-265) — names no student
  * writes, as {@link CENTRE_SENTINEL}. M1 writes the resolved apex and foot in (`engine/cevian.ts` `measureFacts`).
  */
-export const CEVIAN_MEASURE_SENTINELS = ['Z₂', 'Z₃'] as const;
+export const CEVIAN_MEASURE_SENTINELS = ['Z₀₂', 'Z₀₃'] as const;
 
 /**
  * WHICH ROLE AN OBJECT'S LETTERS WERE RESOLVED FOR (#2018, ADR-AG-298 — 2-D's `RoleSideBinding`, ADR-596).
@@ -891,10 +891,10 @@ export interface RoleBinding {
 }
 
 /** The stand-ins a `role-side` sentence carries for its side's two ends (#1807, ADR-AG-266) — names no student writes. */
-export const ROLE_SIDE_SENTINELS = ['Z₄', 'Z₅'] as const;
+export const ROLE_SIDE_SENTINELS = ['Z₀₄', 'Z₀₅'] as const;
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
-export const CENTRE_SENTINEL = 'Z₁';
+export const CENTRE_SENTINEL = 'Z₀₁';
 
 /** The stand-in a `the-circle` statement carries for the circle M1 resolves (ADR-AG-196). */
 export const CIRCLE_SENTINEL = '⟨the-circle⟩';

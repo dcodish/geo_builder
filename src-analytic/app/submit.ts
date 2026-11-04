@@ -34,13 +34,47 @@ import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type 
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
-import { isPointName } from '../engine/pointName';
+import { isPointName, splitPointNames } from '../engine/pointName';
+import type { StatedMeasures } from '../engine/statedMeasures';
 
 /** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
 const typedAt = (line: string, id: string): number => {
   const at = line.split('').findIndex((_, i) => line.startsWith(id, i) && !/[0-9']/.test(line[i + id.length] ?? ''));
   return at < 0 ? Infinity : at;
 };
+
+/**
+ * WHAT A STATED VALUE LABELS — its key (#2491, [ADR-AG-401](../../docs/06c-decisions-analytic.md#adr-ag-401)): the unordered
+ * segment, the vertex with its unordered rays, the ring, the circle with its unordered arc.
+ * Keyed by WHAT is labelled, never counted, so a second spelling of a value already shown («AB=a+3» · «AB=3+a», #2105)
+ * adds no key. The relation layers (`equalLengths`, `equalAngles`) are not values (ADR-W-118 B2) and are not read.
+ *
+ * NOR IS THE KNEE (`rights`): 2-D's ADR-542 counts lengths, angles and areas, and its lock 4 leaves a ⟂ restatement
+ * implied because the ⟂ mark carries no number; the issue's own line keeps «AB ⟂ BC» on a figure already perpendicular a
+ * no-op. Here «∢ABC = 90» and «AB ⟂ BC» lower to ONE constraint (the parser's right-angle rule), so a knee read off the
+ * layer cannot tell the angle sentence from the relation, and counting it recorded «AB מאונך ל-AC» on three pinned
+ * points. Left out until that is ruled (#2491's round report).
+ */
+const statedValueKeys = (s: StatedMeasures): Set<string> => {
+  const pair = (a: string, b: string) => [a, b].sort().join('|');
+  return new Set([
+    ...s.lengths.map((x) => `L:${pair(x.a, x.b)}`),
+    ...s.angles.map((x) => `A:${x.v}:${pair(x.a, x.b)}`),
+    ...s.areas.map((x) => `S:${[...x.ids].sort().join('|')}`),
+    ...s.arcs.map((x) => `C:${x.circle}:${pair(x.a, x.b)}`),
+  ]);
+};
+
+/**
+ * DOES THE LINE ADD A VALUE THE FIGURE CAN SHOW? (#2491, ADR-AG-401 — 2-D's `impliedByPrior` visibility half, ADR-542:
+ * *"Objects and labels are visible; a step that adds one has produced"*.) True when the trial's stated-measure layer
+ * labels something the current figure's does not. Read off what `derive` already computed for both, so it costs nothing.
+ */
+export function addsStatedValue(current: Pick<Derivation, 'stated'>, trial: Pick<Derivation, 'stated'>): boolean {
+  const before = statedValueKeys(current.stated);
+  for (const k of statedValueKeys(trial.stated)) if (!before.has(k)) return true;
+  return false;
+}
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
@@ -499,6 +533,17 @@ function decideOnce(
    * A `narrowed` line is deliberately NOT here: «a הוא פרמטר» then «a<13» is also absorbed, but it
    * added information and belongs in the list like any other given.
    */
+  /**
+   * A LINE THAT ADDS A STATED VALUE RECORDS (#2491, ADR-AG-401), asked before both no-op answers. Operator, 2026-10-24:
+   * *"the AB=4 does add value. not for the data which we know but the tool can draw 4 on the segment"* — ADR-W-118 B2,
+   * every stated value is on the figure. «A(0,0)» · «B(4,0)» · «AB» · «AB = 4» was answered «זה כבר קיים באיור» with no
+   * row, and the 4 was nowhere. A value the figure already shows («AB = 4» twice, «AB ⟂ BC» after «∢ABC = 90») and a
+   * line that states no value («B נמצא על ציר ה-x») add no key and keep the no-op answer. The freedom, configuration
+   * and fault logic below are untouched: this only turns a no-op into a record for a line the fold already proved
+   * harmless (it reached here with no fault).
+   */
+  if (addsStatedValue(current, trial)) return recorded;
+
   if (trial.outcomes[lines.length] === 'known') {
     return { kind: 'already-known', line };
   }
@@ -541,6 +586,10 @@ function decideOnce(
 
   /**
    * A given the figure ALREADY ENTAILS (#1063) — the operator's B11/B12.
+   *
+   * **Never a line that adds a stated value** (#2491, ADR-AG-401): that one recorded above, before this gate, so its value
+   * is drawn (2-D's ADR-542 rule). An entailed AREA records too (operator ruling 2026-10-24, reversing ADR-AG-030's
+   * 2026-09-15 B11 answer for areas).
    *
    * #1045 catches a RESTATEMENT: the same fact twice, decided structurally in `applyFact`. This is
    * the larger notion — «שטח המשולש ABC הוא 6» on a determined triangle was never stated before, it
@@ -717,7 +766,7 @@ export function decideEdit(
   const parsed = parseLine(next.trim());
   if (!parsed.ok) return false;
   // the other rows' letters keep the probe's stand-in fresh (no fold needed: they are only excluded)
-  const letters = lines.flatMap((l, j) => (j === index ? [] : (l.match(/[A-Z]d*/g) ?? [])));
+  const letters = lines.flatMap((l, j) => (j === index ? [] : splitPointNames(l)));
   if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return false;
   if (disabled.includes(index)) return true;
   const edited = lines.map((l, j) => (j === index ? next : l));

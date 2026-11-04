@@ -108,7 +108,8 @@ export const SCENARIOS_1: Scenario[] = [
       allStepsOk(fig);
       expect(fig.violations).toEqual([]);
       expect(fig.construction.objects.find((o) => o.kind === 'angle-alias'), 'the canonical A1 binding').toMatchObject({ id: 'A1', vertex: 'A' });
-      expect(fig.labels.angles.map((a) => a.text), 'the digit sign, not «A1»').toContain('1');
+      // #1812 (ADR-782, operator ruling 2026-10-06 "Both show A₁"): the wedge carries the full name with its index as a subscript — it replaces #263's bare digit
+      expect(fig.labels.angles.map((a) => a.text), 'the book’s A₁, not the bare digit or «A1»').toContain('A₁');
       expect(fig.construction.constraints.some((c) => c.type === 'angle'), 'no degree value was asserted').toBe(false);
     },
   },
@@ -138,11 +139,11 @@ export const SCENARIOS_1: Scenario[] = [
       expect(dist(B, D)).toBeCloseTo(8, 1);
       expect(dist(B, C)).toBeCloseTo(6, 1);
       expect(dist(B, E)).toBeCloseTo(6, 1);
-      // The wedges carry their bound names — as DIGIT signs per #263 (the vertex labels show the letters);
+      // The wedges carry their bound names, written C₁ / E₁ (#1812, ADR-782 — it replaces #263's bare digit);
       // the bindings themselves are the alias objects.
       const aliases = fig.construction.objects.filter((o) => o.kind === 'angle-alias').map((o) => o.id).sort();
       expect(aliases).toEqual(['C1', 'E1']);
-      expect(fig.labels.angles.filter((a) => a.text === '1')).toHaveLength(2);
+      expect(fig.labels.angles.map((a) => a.text).sort(), '#1812 (ADR-782): C₁ and E₁, the book’s notation').toEqual(['C₁', 'E₁']);
     },
   },
   {

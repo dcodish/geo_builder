@@ -63,7 +63,7 @@ are the lexical half and the reader of `evalRadical`, defined side by side, so a
 one the reader values. Never `+m[n]`: the decimal-only `NUM`/`UNUM` in a magnitude slot is how «AD = √7»
 refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to `√`, so the atom only ever sees
 the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
-`evalRadical`, and keeps a radicand's own parentheses. The distance slot (`distanceGiven`) matches `MAG` and
+`evalRadical`, and keeps a radicand's own parentheses. A fraction is accounted by its value or by its numerator and denominator together (ADR-3D-340); a lone radical («√2», «5√2») by its value only, never by the implied /1 (#2285, [ADR-3D-417](06b-decisions-3d.md#adr-3d-417), 2-D's ADR-700). The distance slot (`distanceGiven`) matches `MAG` and
 reads it with `magValue` too, and the `A = (…)` claim (`coordsClaim`) composes from the tuple-component atom
 `VAL` and reads it with `literalValue`, the pair `A(…)` reads with (#2081,
 [ADR-3D-362](06b-decisions-3d.md#adr-3d-362)). The ratio and solid-size slots still take decimals until the
@@ -80,6 +80,8 @@ own line, `revolutionSizeLine` (after the volume/area claim rules) reads «<size
 <value>» and its English mirror and only RECORDS the solid, so it never claims a line another rule reads. A
 volume/area claim on a free-size solid is apply's same size refusal; `free-size-claim` is retired. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
+
+**Two numbers with only a space between them are refused** (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). `readStatement3` asks `shell/juxtaposedNumbers.findNumberPair` right after the radian check and answers `{ code: 'juxtaposed-numbers', detail, … }` — `guided`, worded by the suite keys `suite.refusal.juxtaposedNumbers*`, each reading read back through `parse3` (`teachPair`) — so «AB = 2 3» and «A(2 3, 1, 0)» never reach the model.
 
 **An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
 
@@ -368,6 +370,12 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   with the holder an end of the segment and in the plane's letters, `seg-cross` sharing it, `line-plane` through named
   carriers), or a foot dropped from the holder onto a carrier through it. Every other landing records and is said by
   `coincidences3`.
+- **The tool's letter yields to the student's ([ADR-3D-415](06b-decisions-3d.md#adr-3d-415), #2674).** `toolLetterTakenOver3`
+  (`store3.ts`), called by both statement seams (`decideCommands3`, `replaceFact`) after the candidate derive: a fresh
+  student letter whose 0-DOF definition equals that of a point no other line names (the pool letter an earlier
+  `midpoint-auto` picked at apply) names that point by use: the minting command keeps the letter (`midpoint-auto.id`,
+  which apply uses instead of the pool), so history is rewritten as one undo step and the pool letter is free again.
+  `sameStatement` compares `midpoint-auto` without that `id`, so «אמצע BB'» typed again is still already known.
 
 **A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through
@@ -527,8 +535,12 @@ clash rules are inherited and its refusal is the line's. A **named plane run** (
 mints a missing member `free3` until three members the figure holds are non-collinear (`spansPlane3`, read off
 `evaluate3`); each further missing member is minted as an `on-plane` rider of the run's own plane (the plane that
 names it, 2 sampled DOFs; `planeFromPointRun` seats it from the members already placed). Riders are carried to the
-refold by `preriders` (point → plane), applied over the `premint` points. An **anonymous plane run** (a `plane-run`
-operand or a `plane` / `p1` / `p2` field holding letters) names no plane a rider could ride, and is minted free as before.
+refold by `preriders` (point → plane), applied over the `premint` points. **There is no anonymous plane run**
+([ADR-3D-413](06b-decisions-3d.md#adr-3d-413), #2681): a run of 4+ letters in an operand position (a `plane-run`
+operand, a `plane` / `p1` / `p2` field holding letters, `plane-line-perp`'s `ids`) is declared by the parser as its
+own `plane-through` after the line's commands (`declareStatedPlanes3`, `parse3`'s one exit, read by
+`statedPlaneRuns3`), so a relation's plane is minted as a named run here and checked coplanar by the status pass
+exactly as «המישור ABCD» alone is.
 
 ### Guide prerequisites ([ADR-3D-398](06b-decisions-3d.md#adr-3d-398), #1566)
 
@@ -849,7 +861,10 @@ after the circle pass. A POLYGON's circle (`circum` / `incircle`, `ringCircle3`)
 and a drivable row of the carrier table; a tangent-line circle's rider still counts but is not driven. The
 `point-on-circle3` arm creates a new letter as the rider, re-homes a `free3` letter onto the circle unless the circle
 is built from it (`builtFrom3`), re-ordering the points parents-first (`parentsFirst3`), and leaves every placed
-point a check. The store's status pass stays the arbiter on final coordinates.
+point a check. The store's status pass stays the arbiter on final coordinates. A circle reference the arm cannot resolve is refused
+`unknown-circle` (the letter the student named it by — the parser carries it as the command's `name` — or `several`,
+with a centre-lettered circle as the next step, or no circle at all), and a failed membership is `not-on-circle`: a
+circle is never refused in the line's vocabulary or by its id ([ADR-3D-414](06b-decisions-3d.md#adr-3d-414)).
 
 **A host bound is restored, not only enforced** (#1735, ADR-3D-306). `offHost` (in `degenerate()`) rejects a
 converged candidate outside `[lo, hi]`; when the pool is otherwise empty, an acceptance site re-seats the
@@ -947,8 +962,16 @@ When some vertex is not coordinate-fixed, the same loop widens the scope to `pla
 sample (`knowledgeSamples3(c, claimSeeds(seed))`, unplaced samples skipped, none placed fails open), and every OTHER
 declared ring over a superset of its letters that orders them differently (the "partner" whose convexity forces the
 crossing) is a quadrilateral with a pair of opposite sides parallel at every sample — convex whenever simple. A partner
-that could be a dart (a kite, a general quadrilateral) fails the check open: a valid drawing exists that 3-D does not
-draw. The blame is the latest of the ring's ordered declaration, its placers and its partners' declarations, so the
+that could be a dart (a kite, a general quadrilateral) fails the check open, and since #1986
+([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
+letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
+the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
+`meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
+**The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
+4×, 16×, 64× its window (`ringReachValue3`, four draws each, analytic's ADR-AG-256), inside `resolve3` so the figure
+is pure over `(facts, seed)`; a ring still crossed at every claim sample after that is refused `ring-crossed`. The blame is the latest of the ring's ordered declaration, its placers and its partners' declarations, so the
 ring-first order refuses the shape line. **One ring is one cyclic order** (`ringKeyIds3`, apply.ts): a polygon bound
 over existing points, `recordShape` and `knownQuadShape` all match rings by cyclic order, never by letter set — a
 square's letters in another order are another ring.
@@ -1211,6 +1234,14 @@ The lengths come from `statedLengths` (`engine/dataView.ts`), shared with the pa
 unordered pair; not gated by `showWitnesses` or by edge visibility. A **length letter** (`lengthMarks`, «|AB| = k»,
 ADR-3D-381) draws in the same lane with its text (`lengthMarkText`: «k», «2k») until a value is stated on the pair,
 when the value wins.
+
+**One text per stated length** (#2361, [ADR-3D-416](06b-decisions-3d.md#adr-3d-416)). Each `statedLengths` entry is
+`{ value, text }`; the canvas label and the panel's `|AB| =` row both print `text` (the canvas's own 3-place `fmt`
+no longer touches a stated length). `text` is `statedMagText(value, decimal)`: `fmtNum` (the house two decimals)
+when the student wrote a decimal numeral, else `cleanMag`'s exact tiers. The parser's `typedDecimal` sets
+`decimal` on the `length-eq` claim (and on `vec-mag` / unit-coefficient `mag-val` / `perp-to-base`'s `lenDecimal`,
+which apply carries onto the claim); a length driving pin is always recorded with its claim, so the claim supplies it.
+A free vector's stated `mag` metric carries it to both of its panel rows. The squared row stays computed (`cleanNum`).
 
 **A bare vector naming is said aloud** (ADR-3D-381). `vec-rel`'s bare arm (`AB = <new letter>`, no «נסמן») lowers to
 `name-vector` with `bare: true`; the flag rides the vector record, and `buildNotices3` emits `vector-named-bare` for

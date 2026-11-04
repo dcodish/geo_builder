@@ -72,7 +72,7 @@ describe('#1773 — the fold, at the one boundary every rule reads', () => {
     expect(orthography('X_B<X_D')).toBe('x_B<x_D');
     expect(orthography('X_{B} > X_{D}')).toBe('x_{B} > x_{D}');
     expect(orthography('B_X<D_{X}')).toBe('B_x<D_{x}');
-    expect(orthography('Y_A2 = 5')).toBe('y_A2 = 5');
+    expect(orthography('Y_A2 = 5')).toBe('y_A₂ = 5'); // #2075: the point's index is the glyph
   });
 
   // Re-based by #2391 (ADR-AG-315): a point label's digit index is now written as the glyph the exam prints (`X_1` ≡ `X₁`).

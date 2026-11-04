@@ -274,6 +274,7 @@ export function gapState(g: KnownGap): GapState {
  * 3-D, so they are parked with it until someone files the 3-D plane-height port.
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
+  '#2458': 'open', // 3-D reading «A_1» and the glyph (#2075's sibling half)
   '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1448': 'closed',
   '#1677': 'icebox',
@@ -308,7 +309,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2409': 'open', // was #2448, merged into #2409 by the #2654 family sweep 2026-11-01: #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
-  '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
   '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
   '#2626': 'open', // #2621 E (ADR-AG-396): 2-D does not read the rhombus height or the three side lengths
   '#2624': 'open', // #2621 C (ADR-AG-395): 2-D drops a point name's prime
@@ -842,7 +842,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2443 (ADR-764) / #2503 (ADR-3D-378): the same impossible givens with NO declared triangle — two vertices of a quadrilateral, or loose points, would meet
   { id: 'impossible-isosceles-quad-2443-perp', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', note: 'AB = BC holds only where C meets A; D keeps the quadrilateral wide, so no ring is flat' },
   { id: 'impossible-isosceles-quad-2443-angle', family: 'angles', steps: ['מרובע ABCD', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused' },
-  { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', knownGap: [{ product: 'analytic', issue: '#2506' }], note: 'three loose points: no polygon at all' },
+  { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', note: 'three loose points: no polygon at all' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)
@@ -1421,7 +1421,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1927's 2026-10-09 ruling, "search first, refuse last" (ADR-W-121 Am. 2026-10-10; ADR-613, ADR-3D-322, ADR-AG-256):
   // a kite may be a dart, on which ABDC is simple, so no builder refuses it; a trapezoid's other orders can never be
   // simple, whatever its free ratio, so every builder refuses them.
-  { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (2-D and analytic draw the dart)' },
+  { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (every builder draws the dart; 3-D since #1986)' },
   { id: 'crossed-ring-1927-09', family: 'polygons', steps: ['טרפז ABCD', 'מרובע ACBD'], expect: 'refused', note: 'a trapezoid’s free ratio cannot save the ring' },
   { id: 'crossed-ring-1927-10', family: 'polygons', steps: ['מרובע ACBD', 'טרפז ABCD'], expect: 'refused', note: 'the ring first' },
   // #1991 (ADR-3D-327, ADR-AG-261; operator ruling 2026-10-10, option A): the same ring, declared with a SPECIFIC
@@ -1434,9 +1434,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
-  // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too. 3-D records the row
-  // as well, but draws the second ring CROSSED: that is a DRAWING gap, not a verdict one, and it is #1986.
-  { id: 'crossed-ring-1927-11', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a concave quadrilateral saves both rings: search first, never refused (3-D still draws it crossed — #1986)' },
+  // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)
+  // 3-D draws it as well (the concave seat). The drawing is locked in src3d/__tests__/issue-1986-ring-search.test.ts.
+  { id: 'crossed-ring-1927-11', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a concave quadrilateral saves both rings: search first, never refused, drawn concave in every builder' },
   { id: 'crossed-ring-1927-12', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ACBD'], expect: 'builds', note: 'the class, not the letters: any other order of the same four free points' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
@@ -1884,6 +1884,20 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'rhombus-long-diagonal-axis-2621', family: 'topic', steps: ['מעוין ABCD', 'האלכסון הגדול של המעוין נמצא על ציר ה-x'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'origin-side-2621', family: 'topic', steps: ['נתון ישר l המאונך לציר ה-x', 'הישר l עובר מימין לראשית הצירים'], contextFor: { '2d': [] }, expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'parallel-to-ab-2621', family: 'parallel-perpendicular', steps: ['קטע AB', 'ישר l המקביל ל-AB'], expect: 'builds', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'judged q-2621-parallel (2026-11-02): analytic draws a true parallel at a free offset; 2-D parse-fails the single row (measured at ebacadd1)' },
+  // #2677 (ADR-779): a circle pair's stated positions that exclude each other — refused, naming the earlier statement, in either order
+  { id: 'contained-then-ext-tangent-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבחוץ'], expect: 'refused', exception: 'X8', note: '2-D built it (every row green, the containment violated) before ADR-779' },
+  { id: 'contained-then-crossing-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D built it before ADR-779' },
+  { id: 'ext-tangent-then-contained-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבחוץ', 'מעגל P מוכל בתוך מעגל O'], expect: 'refused', exception: 'X8', note: '2-D built it before ADR-779' },
+  { id: 'crossing-then-contained-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P נחתכים בנקודות X ו-Y', 'מעגל P מוכל בתוך מעגל O'], expect: 'refused', exception: 'X8', note: '2-D built it before ADR-779' },
+  { id: 'contained-then-int-tangent-2677', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבפנים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2302' }], note: 'the ADR-704 control: containment with internal tangency still builds in 2-D; analytic refuses it unsatisfiable (its containment is strict, #2302)' },
+  // ── #2075 (ADR-AG-398): an indexed name in its LaTeX spelling is the glued name; 2-D folds it (ADR-228), analytic since ADR-AG-398 ──
+  { id: 'indexed-name-underscore-2075', family: 'points-incidence', steps: ['נקודה A_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }], note: '3-D does not read «A_1» (not-understood, measured ebacadd1) — #2458' },
+  { id: 'indexed-name-polygon-2075', family: 'polygons', steps: ['משולש A_1B_1C_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }] },
+  { id: 'indexed-name-multidigit-2075', family: 'points-incidence', steps: ['נקודה X12'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic refused a two-digit index before ADR-AG-398; 3-D does not read «נקודה X12» (not-handled, measured), though «X12(1,2,3)» records' },
+  // ── #2286 (ADR-AG-397, ruled 2026-11-03 «Refuse it, naming the line, in every builder»): two numbers with only a space between them ──
+  { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
+  { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
+  { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

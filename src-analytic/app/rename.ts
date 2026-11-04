@@ -65,6 +65,7 @@ import type { Construction, Id } from '../engine/types';
 import { positionalOf } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
+import { foldIndexedName } from '../../shell/indexedName';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { AnnotationMap } from './annotations';
 import { segKey } from '../render/scene';
@@ -81,7 +82,8 @@ export function normalizePointName(raw: string): string | null {
   const folded = foldPrimes(raw.trim());
   const quoted = /^[«"'(]/.test(folded);
   const s = folded.replace(/^[«"'(]+/, '').replace(quoted ? /[»"').,]+$/ : /[»").,]+$/, '');
-  const up = s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s;
+  // #2075 (ADR-AG-398): an index in any spelling is the one glyph name.
+  const up = foldIndexedName(s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s, 'glyph');
   return isPointName(up) ? up : null;
 }
 

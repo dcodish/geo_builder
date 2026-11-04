@@ -194,6 +194,8 @@ From the «lines and points» corpus (§8), numbered onward.
 **R10 — Anaphora.** «למעגל זה», «המעגל» resolve to an object introduced without a name.
 
 **R11 — Notation.** Primes (`A'`, `F₁'`) and subscripts (`F₁`, `l1`).
+- An indexed point name is ONE name in every spelling, drawn with its index lowered *(operator, 2026-10-13: "X_1(2,3) or X1 should create a 1 in subscript"; 2026-11-01: "they are the same")*: «X_1(2,3)», «X_{1}(2,3)», «X1(2,3)» and «X₁(2,3)» build the one point X₁; typing two of them never makes two points. A digit run follows 2-D: «X12», «X_{12}» are X₁₂ (ruled 2026-10-14).
+- Sources: ADR-AG-315, #2391, ADR-AG-398, #2075.
 
 **R11a — the PALETTE offers only what the grammar reads**. A chip the parser refuses is worse than no chip. The set: `²` `³` `√()` `·` `π` `ℓ` `≤` `≥` `≠` `|x|` `d_{}` `x_{}` `⊥` `∥` `∠` `°` `α` `β` `γ` `δ` `θ` `<` `S_{}` `⌢{}`, each driven through the real grammar under a totality guard; a chip never changes how a Hebrew line isolates.
 - Sources: ADR-AG-122, #1129, #511, ADR-AG-212, #1696, ADR-AG-215, ADR-AG-216, ADR-AG-214, ADR-AG-220, #1622.
@@ -736,8 +738,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R164 — an order between angle names, an angle named by a label, and an area label on an empty canvas build as they do in the 2-D tool**. A point's name or an indexed name is never a value.
 - «α < β», «20 < α < 60»
-- «נסמן זוית BAM כ-A1» → ∠A1 in the panel
-- Sources: ADR-AG-221, #1622, ADR-AG-238, #1701, ADR-AG-244, #1785.
+- «נסמן זוית BAM כ-A1» → «A₁» at the arc and in the panel: A with a subscript 1, no angle sign, as the 2-D tool writes it (operator ruling 2026-10-06 on #1812: "Both show A₁"; [ADR-AG-394](06c-decisions-analytic.md#adr-ag-394), [ADR-782](06-decisions.md#adr-782)). «נסמן ∠CAB=A12» → «A₁₂»; a label at another letter keeps its letter («נסמן ∠ABC=C1» → «C₁» at B)
+- Sources: ADR-AG-221, #1622, ADR-AG-238, #1701, ADR-AG-244, #1785, ADR-AG-394, ADR-782, #1812.
 
 **R170 — a trig given is written as its angle and indicates a slope; sin is a choice between two angles**. *(Operator ruling: "translate it to an angle and write it down".)*
 - «tan∢BAO = 2» → «63.43°»
@@ -791,7 +793,8 @@ a sentence the tool parsed.
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
 - «5 1/2» typed with a space, in any number → refused, teaching 5.5, 5+1/2 or 5*1/2; never 5·½. The symbol «5½» reads 5.5
-- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222.
+- «A(2 3, 1)», «x = 2 3», «AB = 2 3» — two numbers with only a space between them, in any number → refused, teaching 2.3, 23 or 2*3 (or the comma, «A(2 3)» → «A(2, 3)»); never 6 *(operator, 2026-11-03: "Refuse it, naming the line, in every builder")*
+- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222, ADR-AG-397, #2286.
 
 **R171 — a condition on x or y is never taken for a parameter; until a curve can be drawn in part, it is refused and says so**. Nothing of the line is recorded; a condition on another letter is a domain. Drawing part of a curve is #1846.
 - «y = 2x + 1, x > 0», «x הוא פרמטר» → refused, saying why
@@ -807,11 +810,13 @@ a sentence the tool parsed.
 
 **R54 — a given the figure already ENTAILS is said, not recorded**. A given true only at the current sample is not this case.
 - a given a determined figure satisfies → «זה כבר קיים באיור — אין מה להוסיף.», no row — 2-D's answer to a restatement its figure entails ([ADR-AG-330](06c-decisions-analytic.md#adr-ag-330))
-- Sources: ADR-AG-030, ADR-AG-330.
+- **except a given that adds a stated value to the figure** (a length, an angle, an area, an arc): it is recorded, and its value is drawn — «A(0,0)» · «B(4,0)» · «AB» · «AB = 4» lists «AB = 4» and writes 4 on AB; a value already shown («AB = 4» twice) or a line with no value («B נמצא על ציר ה-x») keeps the note (ADR-AG-401, #2491; operator 2026-10-24: *"the tool can draw 4 on the segment"*)
+- Sources: ADR-AG-030, ADR-AG-330, ADR-AG-401.
 
 **R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**. *(Narrows R54.)* A given true in one drawing and false in another chooses between them and is recorded; when unsure, the tool records.
 - the square of exam 15 Q5: «שיפוע הצלע BC הוא -1/2» → B(2,4), C(10,0); «…הוא 1/2» → the mirror
-- Sources: ADR-AG-188, #1629.
+- a given true in every configuration that adds a stated value is recorded for its value (R54's exception, ADR-AG-401)
+- Sources: ADR-AG-188, #1629, ADR-AG-401.
 
 **R48 — a given is checked whether or not the figure had freedom to spare**. Whether a carrier was free to move is a fact about the solver, not about whether the given holds.
 - Sources: ADR-AG-024, #1062.
@@ -844,7 +849,8 @@ a sentence the tool parsed.
 **R105 — a given set that holds only in a degenerate limit is REFUSED, never drawn as a needle**. Thinness is never the test; an exact solution is.
 - «משולש ABC» · «AB = AC» · «∠ABC = 90» → refused at every configuration
 - a stated 1° apex → drawn
-- Sources: ADR-AG-143, #1334, ADR-537.
+- two named points meeting, declared ring or not, refused naming both statements: «נקודה A» · «נקודה B» · «נקודה C» · «AB = BC» · «AC ⊥ BC» → refused at «AC ⊥ BC» with 2-D's sentence «… סותר את «AB = BC» …»; «AB = 10» · «BC = 9.9999» · «AC ⊥ BC» → drawn (ADR-AG-399, #2506)
+- Sources: ADR-AG-143, #1334, ADR-537, ADR-AG-399.
 
 **R172 — givens that force a declared polygon flat are refused, and the refusal says why**. *(Operator, ADR-W-115: "a flat line is not a triangle".)* Never «לא נמצאה תצורה», never drawn flat; amends R105's message and R64's pinned arm (ADR-AG-129).
 - «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» → refused, naming the polygon
@@ -1008,7 +1014,9 @@ a sentence the tool parsed.
 - «V(0,0)» · «X(4,0)» · «Y נמצאת על הישר y=x» · «שיעור ה-x של Y הוא 0» → recorded, «V ו-Y נפלו על אותה נקודה.»
 - «N1(1,1)» · «N2(1,1)» · «קטע N1N2» → recorded, «N1 ו-N2 נפלו על אותה נקודה.»
 - «A(0,0)» · «B(4,0)» · «M אמצע AB» · «N אמצע AB» → recorded, «M ו-N נפלו על אותה נקודה.»
-- Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401.
+- **On the canvas the two letters are ONE label, «C=E», as 2-D writes it** (operator ruling 2026-11-04, card q5 = A; [ADR-AG-393](06c-decisions-analytic.md#adr-ag-393), #2696): the letters in alphabetical order joined by «=», written once, with the stated coordinates of the dot when it has any («V=Y(0, 0)»). Both points stay.
+  - «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18» → E falls on C: «C=E», never «CE»
+- Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401, ADR-AG-393, #2696.
 
 **R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
 - «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message
@@ -1133,7 +1141,9 @@ a sentence the tool parsed.
 
 **R166 — a stated length is written where it can be read**. Away from the figure, in its blue, never over a label, point, side or the axis numbers; stable across «הציגו תצורה אחרת».
 - «AO = 3» → «3» beside AO
-- Sources: ADR-AG-223, #1717.
+- **Every value written on the canvas is written whole, inside it** ([ADR-AG-392](06c-decisions-analytic.md#adr-ag-392), #2689): a stated length, an angle, an area, a focus's or directrix's label, a traced locus's equation and a height's value never run past the canvas edge. A locus's equation moves along its own curve to a spot where it fits.
+  - «A(-3,0)» · «B(3,0)» · «נקודה P» · «PA + PB = 10», then «הצג מקום גאומטרי» on P → «אליפסה · x²/25 + y²/16 = 1» whole, never «… =» cut at the right edge
+- Sources: ADR-AG-223, #1717, ADR-AG-392, #2689.
 
 **R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**. *(Operator ruling: the canvas shows the inputs, the panel the computed values — ADR-W-047.)* A stated right angle is a knee, never «90°»; an area writes «S=13» inside (ADR-W-118 B9) however it was stated — «שטח ABC = 12» writes «S=12» — and a value that is one letter writes the letter alone: «נסמן את שטח ABC ב-S» writes «S» (ADR-AG-273); an area stated twice is one label; each value sits at its mark (ADR-AG-228); a computed value is never written. Known gap: #1806.
 - «∢ABC = 30» → «30°»; «tan∢BAO = 2» → «63.43°»

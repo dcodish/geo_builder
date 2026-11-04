@@ -201,7 +201,7 @@ describe('#2386 — refusals, each its own case', () => {
 describe('#2386 — controls unchanged', () => {
   it.each([
     ['D מעל A', { kind: 'coord-compare', id: 'D', axis: 'y', greater: true, rhs: { point: 'A' } }],
-    ['N1 משמאל ל-N2', { kind: 'coord-compare', id: 'N1', axis: 'x', greater: false, rhs: { point: 'N2' } }],
+    ['N1 משמאל ל-N2', { kind: 'coord-compare', id: 'N₁', axis: 'x', greater: false, rhs: { point: 'N₂' } }],
     ['M מעל ציר ה-x', { kind: 'coord-compare', id: 'M', axis: 'y', greater: true, rhs: { value: { kind: 'num', value: 0 } } }],
   ])('%s', (sentence, sel) => {
     expect(parseLine(sentence)).toEqual({ ok: true, facts: [{ t: 'selector', sel, src: sentence }] });

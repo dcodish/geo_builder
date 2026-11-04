@@ -203,7 +203,7 @@ describe('#2382 — the saved questions build green with every stated value visi
     // M's radius is never stated: the tangency pins r_M = 5, and it is READ (no phantom r_N1).
     const d = expectAllKnown(q3.lines, false);
     expect(paramRegister(d.construction).map((p) => p.sym)).toEqual(['r_M']);
-    const n1 = d.figure.points.find((p) => p.id === 'N1')!;
+    const n1 = d.figure.points.find((p) => p.id === 'N₁')!;
     expect(n1.x).toBeCloseTo(-4, 6);
     expect(n1.y).toBeCloseTo(-12, 6);
   });

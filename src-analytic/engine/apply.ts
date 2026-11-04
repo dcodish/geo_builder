@@ -6891,7 +6891,7 @@ function axisFacingOf(o: GeoObject): 'vertical' | 'horizontal' | null {
 }
 
 /** #1467: a point LETTER as the parser canonicalises it — what the mint pass may create (never a curve or a symbol). */
-const isPointLabel = (id: Id): boolean => /^[A-Z]d*'*$/.test(id);
+const isPointLabel = (id: Id): boolean => /^[A-Z][0-9₀-₉]*'*$/.test(id);
 
 /**
  * A domain in comparable form — see the `narrowed` vs `known` decision in `applyFact`.

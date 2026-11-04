@@ -52,6 +52,8 @@
  * `shapes.ts`; it inherits this with no edit here.
  */
 import type { Construction, Id } from './types';
+import type { AngleRef, Constraint, Direction } from './solve';
+import type { LengthExpr } from './lengths';
 import { promisesOneParallelPair } from './shapes';
 
 /** A position, as `evaluate` has already resolved it. */
@@ -398,6 +400,93 @@ export function legibilityFaults(
       if (nu === 0 || nv === 0) continue;
       const deg = (Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (nu * nv)))) * 180) / Math.PI;
       if (deg < SPREAD_MIN_DEG || deg > FREE_CORNER_MAX_DEG) out.push(`∠${a}${v}${b} ${deg.toFixed(1)}°`);
+    }
+  }
+  return out;
+}
+
+/**
+ * THE POINT PAIRS WHOSE MEETING EMPTIES A STATEMENT (#2506, [ADR-AG-399](../../docs/06c-decisions-analytic.md#adr-ag-399)
+ * — the analytic twin of 2-D's ADR-764 arm A and 3-D's ADR-3D-378; ADR-W-146's cross-builder semantic).
+ *
+ * «AC ⊥ BC» says something about two DIRECTIONS; with C on A the first has none, and the relation "holds" only because
+ * its own terms collapsed. The same for a length term's two ends («AB = BC» with A on C makes AC a point), an angle's
+ * vertex and either arm point, a midpoint's two ends, a slope's direction, a tangent line through two points. Those
+ * pairs are what the thin-ring arm (#1334, ADR-AG-143) must judge whether or not they belong to a declared ring: a
+ * needle is the tolerance's, not the geometry's, whatever the student called its points.
+ *
+ * A `Record` over EVERY constraint kind, so a kind added later fails `tsc` until it is classified here — never a hand
+ * list in the trigger. A kind whose meaning survives its points meeting (a coordinate pin, an incidence — a point may
+ * sit at a side's end —, an area, a parameter row) has none.
+ */
+type PairReader = { [K in Constraint['t']]: (k: Extract<Constraint, { t: K }>) => [Id, Id][] };
+const dirPair = (d: Direction): [Id, Id][] =>
+  d.k === 'points' ? [[d.a, d.b]] : d.k === 'bisector' ? [[d.v, d.a], [d.v, d.b]] : [];
+const anglePairs = (r: AngleRef): [Id, Id][] => [[r.v, r.a], [r.v, r.b]];
+const lengthPairs = (le: LengthExpr): [Id, Id][] =>
+  le.terms.flatMap((t): [Id, Id][] =>
+    t.kind === undefined || t.kind === 'length'
+      ? [[t.a, t.b]]
+      : t.kind === 'ellipse-dist' && 'p' in t.u && 'p' in t.v
+        ? [[t.u.p, t.v.p]]
+        : [],
+  );
+const OPERAND_PAIRS: PairReader = {
+  coord: () => [],
+  area: () => [],
+  midpoint: (k) => [[k.a, k.b]],
+  'on-line': () => [],
+  perpendicular: (k) => [[k.a, k.b], [k.c, k.d]],
+  angle: (k) => anglePairs(k.at),
+  'angle-ratio': (k) => [...anglePairs(k.left), ...anglePairs(k.right)],
+  relation: (k) => [...dirPair(k.u), ...dirPair(k.v)],
+  slope: (k) => dirPair(k.u),
+  'length-eq': (k) => [...lengthPairs(k.left), ...lengthPairs(k.right)],
+  'on-curve': () => [],
+  'on-line-2pt': () => [],
+  'tangent-axis': () => [],
+  'tangent-line': (k) => (k.line.kind === 'points' ? [[k.line.a, k.line.b]] : []),
+  'tangent-curve': (k) => (k.line.kind === 'points' ? [[k.line.a, k.line.b]] : []),
+  'tangent-circle': () => [],
+  'circle-conic': () => [],
+  'derived-at': () => [],
+  'param-eq': () => [],
+  'param-rel': () => [],
+  'radius-ratio': () => [],
+  'arc-sum': () => [],
+  // A choice's pairs are its options' (the evaluator sees the option the seed resolved; this is read over either).
+  choice: (k) => k.options.flatMap(constraintOperandPairs),
+  all: (k) => k.of.flatMap(constraintOperandPairs),
+};
+
+/** The operand pairs of `k` (see {@link OPERAND_PAIRS}); a pair naming one point twice is no pair. */
+export function constraintOperandPairs(k: Constraint): [Id, Id][] {
+  const read = OPERAND_PAIRS[k.t] as (k: Constraint) => [Id, Id][];
+  return read(k).filter(([a, b]) => a !== b);
+}
+
+/**
+ * The distinct operand pairs of `ks` that sit closer than `ratio` × `extent` at these positions — the pair half of the
+ * thin-ring arm's trigger (`ratio` = {@link THIN_SIN_TOL}) and of its verdict (`ratio` = {@link COLLAPSED_SIN_TOL}). A pair
+ * with an unplaced point is skipped, as `thinRingsOf` skips a ring with one.
+ */
+export function closePairsOf(
+  ks: readonly Constraint[],
+  at: (id: Id) => RingPt | undefined,
+  extent: number,
+  ratio: number,
+): [Id, Id][] {
+  const out: [Id, Id][] = [];
+  const seen = new Set<string>();
+  for (const k of ks) {
+    for (const [a, b] of constraintOperandPairs(k)) {
+      const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const p = at(a);
+      const q = at(b);
+      if (!p || !q) continue;
+      if (Math.hypot(p.x - q.x, p.y - q.y) < ratio * extent) out.push(a < b ? [a, b] : [b, a]);
     }
   }
   return out;

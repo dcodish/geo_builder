@@ -106,9 +106,9 @@ describe('#1701 — what still reads', () => {
     expect(play(['משולש ABC', line])).toEqual(['record', 'record']);
   });
 
-  it('«נסמן ∠CAB=A1» binds the label ∠A1, never a parameter A (E5, ADR-AG-221)', () => {
+  it('«נסמן ∠CAB=A1» binds the label ∠A₁ (#2075: A1 is A₁), never a parameter A (E5, ADR-AG-221)', () => {
     const syms = paramRegister(derive(['משולש ABC', 'נסמן ∠CAB=A1'], 0).construction).map((p) => p.sym);
-    expect(syms).toContain('∠A1');
+    expect(syms).toContain('∠A₁');
     expect(syms).not.toContain('A');
   });
 });

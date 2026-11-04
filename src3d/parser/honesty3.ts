@@ -471,9 +471,14 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
     // #2079 (ADR-3D-340): a fraction is accounted by its VALUE, or by its numerator AND its denominator
     // together (a rule that keeps the pair, as the ratio `p/q` does). Never by one of them alone: «1/2»
     // read as `radius: 1` left the 1 paying for the whole fraction, and the half-read line drew green.
-    // A lone radical term (no slash) has no parts, and keeps its accounting unchanged.
+    // #2285 (ADR-3D-417, 2-D's ADR-700 ported): a lone radical term (no slash) has no parts, so it is accounted by
+    // its VALUE only. Its `den` is the synthetic 1 and its `num` is the value itself, so the old `[num, den]`
+    // candidates added nothing but that 1 — and any payload 1 (an isosceles relation's `c: 1`, a `k: 1`) paid for
+    // «√2», so a reading that dropped the root committed green. Its other candidate is the RECIPROCAL, the lowering the
+    // bare-number pass below already grants every coefficient (`1 / n`): a magnitude ratio is normalised onto its
+    // left side, so «√2|u| = |v|» carries the root as `c: 1/√2` (the ADR-3D-417 sweep's one changed verdict).
     const fraction = m[2] !== undefined;
-    if (fraction ? !has([val, -val]) && !hasPair(num, den) : !has([val, -val, num, den])) flag(m[0]);
+    if (fraction ? !has([val, -val]) && !hasPair(num, den) : !has([val, -val, val === 0 ? NaN : 1 / val])) flag(m[0]);
   }
 
   // 3) bare numbers — accounted directly or via a standard lowering: a signed coordinate (−n), a

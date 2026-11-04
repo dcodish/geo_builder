@@ -728,13 +728,30 @@ export function twoConfigurations3(samples: readonly PointConfigSample3[]): [Vec
  * and `render/` consumes it as the pure consumer of engine output that it is.
  *
  * Keyed by the UNORDERED pair, which is what makes «AB = 5» and «BA = 5» one statement and one label.
+ *
+ * #2361 (ADR-3D-416): each entry carries its TEXT as well as its value, and both surfaces print that text, so
+ * one stated value reads the same on the edge and in the panel (the canvas had its own 3-place precision, so
+ * «4.005» read «4.005» there and «4.01» in the panel). The text is {@link statedMagText}. A length driving pin
+ * is always recorded with its claim (`recordPinGiven`), so the claim — read last — supplies the typed form.
  */
-export function statedLengths(c: Construction3): Map<string, number> {
-  const out = new Map<string, number>();
+export type StatedLength3 = { value: number; text: string };
+export function statedLengths(c: Construction3): Map<string, StatedLength3> {
+  const out = new Map<string, StatedLength3>();
   const key = (a: Id, b: Id) => [a, b].sort().join('|');
-  for (const pin of c.scalarPins) if (pin.kind === 'length') out.set(key(pin.a, pin.b), pin.value);
-  for (const cl of c.claims) if (cl.type === 'length-eq') out.set(key(cl.a, cl.b), cl.value);
+  for (const pin of c.scalarPins) if (pin.kind === 'length') out.set(key(pin.a, pin.b), { value: pin.value, text: statedMagText(pin.value) });
+  for (const cl of c.claims) if (cl.type === 'length-eq') out.set(key(cl.a, cl.b), { value: cl.value, text: statedMagText(cl.value, cl.decimal) });
   return out;
+}
+
+/**
+ * #2361 (ADR-3D-416) — how a STATED magnitude is printed, on every surface. Operator ruling sr-22 (ADR-W-175,
+ * 2026-11-02): two decimals when needed, computed with the full value — «7.9999» reads «8», as in 2-D. A value the
+ * student wrote as a DECIMAL prints in exactly those house decimals; the exact-form tiers of {@link cleanMag} exist
+ * for numbers the tool computes, and on a typed decimal they rewrote the student's «4.1» as «41/10» («2.5» as
+ * «5/2»). An integer, a fraction or a root as typed keeps its exact form, as before.
+ */
+export function statedMagText(value: number, decimal?: boolean): string {
+  return decimal ? fmtNum(value) : cleanMag(value);
 }
 
 /**
@@ -871,7 +888,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     // a magnitude is knowledge when STATED — or when the frame DERIVES it: identical
     // in every sampled configuration (the |u|=|v| class-value gate; operator 2026-07-09:
     // |BB'| = 18 is forced by the plane given + B, the student never has to type it)
-    let mag = lengths.get(k);
+    const stated = lengths.get(k);
+    let mag = stated?.value;
     if (mag === undefined && hasScale) {
       const per = positions.map((pos) => {
         const p = pos.get(a);
@@ -886,7 +904,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       label,
       decomp: coefs ? decompStr(coefs, basisNames) : symDecomp,
       coords: vectorFrame && d ? coordStr(d) : null, // #315: seed-stability distinguishes derivable from gauge for vectors; translation alone needs the explicit anchor
-      mag: mag !== undefined ? `|${label}| = ${cleanMag(mag)}` : null,
+      mag: mag !== undefined ? `|${label}| = ${stated ? stated.text : cleanMag(mag)}` : null, // #2361: a stated value prints its one text
       sq: mag !== undefined ? `${label}² = ${cleanNum(mag * mag)}` : null,
     };
     if (entry.decomp || entry.coords || entry.mag) entries.push(entry);
@@ -896,19 +914,30 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   for (const [name, d] of vecNames) addEntry(name, d.from, d.to, true);
   // #1188 (ADR-3D-386): a FREE vector's value is its own components — absolute, so no frame or scale gate applies.
   // It prints only when it is the SAME in every sampled configuration: a stated tuple does, a sampled one never.
+  // #2361 (ADR-3D-416): a free vector's STATED magnitude («|u| = 2.5») prints its stated text on this row too — the
+  // stated row below and this one read one value, so they print one spelling (it was «|u| = 2.5» over «|u| = 5/2»)
+  const statedFreeMag = new Map<string, StatedLength3>();
+  for (const fm of c.freeVecMetrics ?? []) {
+    if (fm.kind !== 'mag' || fm.e.length !== 1 || fm.e[0].coeff !== 1 || fm.e[0].atom.kind !== 'named') continue;
+    statedFreeMag.set(fm.e[0].atom.name, { value: fm.value, text: statedMagText(fm.value, fm.decimal) });
+  }
+  const freeMagText = (name: string, m: number) => {
+    const st = statedFreeMag.get(name);
+    return st && Math.abs(st.value - m) < 1e-6 * Math.max(1, m) ? st.text : cleanMag(m);
+  };
   for (const name of c.freeVectors.keys()) {
     const vals = resolved.map((r) => r.freeVectors.get(name));
     const v0 = vals[0];
     if (!v0 || !vals.every((v): v is Vec3 => !!v)) continue;
     const m = norm3(v0);
     if (vals.every((v) => sameVec(v, v0))) {
-      entries.push({ label: name, decomp: null, coords: coordStr(v0), mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+      entries.push({ label: name, decomp: null, coords: coordStr(v0), mag: `|${name}| = ${freeMagText(name, m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
       continue;
     }
     // #1188 step 4 (ADR-3D-406): a stated magnitude («|u| = 5») is knowledge while the direction is not — |u| prints
     // when it agrees across the configurations, the components do not
     if (vals.every((v) => Math.abs(norm3(v) - m) < 1e-6 * Math.max(1, m))) {
-      entries.push({ label: name, decomp: null, coords: null, mag: `|${name}| = ${cleanMag(m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
+      entries.push({ label: name, decomp: null, coords: null, mag: `|${name}| = ${freeMagText(name, m)}`, sq: `${name}² = ${cleanNum(m * m)}` });
     }
   }
   for (const [a, b] of c.segments) addEntry(`${a}${b}`, a, b, false);
@@ -956,8 +985,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         const per = mags[i].per as number[];
         const derived =
           stated === undefined && hasScale && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
-        const val = stated ?? derived;
-        relations.push(cls.map(relLabel).join(' = ') + (val !== undefined ? ` = ${cleanMag(val)}` : ''));
+        // #2361 (ADR-3D-416): a stated class value prints its one text, as its own row and its edge do
+        const valText = stated ? stated.text : derived !== undefined ? cleanMag(derived) : null;
+        relations.push(cls.map(relLabel).join(' = ') + (valText !== null ? ` = ${valText}` : ''));
       }
     }
   }
@@ -1660,7 +1690,7 @@ function freeMetricRow(m: FreeVecMetric3): string {
   const side = (e: readonly VecTermLike[]) => (e.length > 1 ? `(${vecSide(e)})` : vecSide(e));
   switch (m.kind) {
     case 'mag':
-      return `${mag(m.e)} = ${cleanMag(m.value)}`;
+      return `${mag(m.e)} = ${statedMagText(m.value, m.decimal)}`; // #2361: a stated magnitude, as every surface prints one
     case 'mag-rel':
       return `${mag(m.e1)} = ${m.c === 1 ? '' : cleanCoeff(m.c)}${mag(m.e2)}`;
     case 'dot':

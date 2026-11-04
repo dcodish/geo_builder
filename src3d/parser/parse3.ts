@@ -23,6 +23,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { spellVulgarFractions } from '../../shell/vulgarFractions';
 import { isPlanar, sameOperand } from '../engine/operands';
+import { statedPlaneRuns3 } from '../engine/mintable';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
@@ -1954,6 +1955,16 @@ function magValue(raw: string): number | null {
   const v = evalRadical(t.slice(1));
   return v === null ? null : -v;
 }
+/**
+ * #2361 ([ADR-3D-416](../../docs/06b-decisions-3d.md#adr-3d-416)) — the one fact a stated magnitude's DISPLAY needs
+ * from how the student wrote it: was it a decimal numeral («4.1», «7.9999»)? Such a value prints in the house
+ * decimals (sr-22, ADR-W-175), never as the fraction the exact-form tier would dress it in («41/10»). An integer,
+ * a fraction or a root keeps its exact form, so only a decimal is marked. Spread into the command that carries the
+ * value: `{ ...typedDecimal(raw) }`.
+ */
+function typedDecimal(raw: string): { decimal?: true } {
+  return /^-?\s*\d+\.\d+$/.test(raw.trim().replace(/^\((.*)\)$/, '$1').trim()) ? { decimal: true } : {};
+}
 export function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
   if (s0 === '') return null;
@@ -1980,7 +1991,7 @@ const lengthRel: Rule = (s) => {
   const vm = s.match(/^\|([a-w])\|\s*(?:=|שווה\s+ל)\s*(.+)$/);
   if (vm) {
     const val = evalRadical(vm[2]);
-    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val }];
+    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val, ...typedDecimal(vm[2]) }];
   }
   // the copula `הוא`/`is` joins the separators (the exam's `אורך המקצוע AB הוא 5√5` —
   // the ADR-3D-026 phrasing class)
@@ -1994,7 +2005,7 @@ const lengthRel: Rule = (s) => {
   if (num !== null)
     return [
       { type: 'segment3', a: a1, b: b1 },
-      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num } },
+      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num, ...typedDecimal(r) } },
     ];
   // #2092 (ADR-3D-381): a LETTER right side on the bar form — «|AB| = k», «|AB| = 2k». The taught spelling of a
   // length the operator ruled «AB = k» does not mean (that names a vector). Only the bars: «אורך AB הוא k» stays
@@ -2108,9 +2119,11 @@ const magEquality: Rule = (s) => {
   type MagLink = { expr: VecExpr; c: number };
   const mags: MagLink[] = [];
   const nums: number[] = [];
+  let numLink = '';
   for (const link of links) {
     const num = evalRadical(link);
     if (num !== null) {
+      if (nums.length === 0) numLink = link;
       nums.push(num);
       continue;
     }
@@ -2137,7 +2150,8 @@ const magEquality: Rule = (s) => {
   const draw = (e: VecExpr): Command3[] => segmentsOf(e);
   if (nums.length > 0) {
     const v = nums[0];
-    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c } as Command3]);
+    // #2361: a unit-coefficient magnitude carries the value as typed; `2|u| = 5` states |u| = 5/2, which the tool computed
+    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c, ...(mg.c === 1 ? typedDecimal(numLink) : {}) } as Command3]);
   }
   if (mags.length < 2) return null; // a lone magnitude with no value/partner says nothing
   const out: Command3[] = [];
@@ -2223,7 +2237,7 @@ const heightOfSolid: Rule = (s) => {
   const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: h.a, b: h.b, plane: [] };
   // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
   if (h.value !== undefined) {
-    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value } }];
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value, ...(h.decimal ? { decimal: true as const } : {}) } }];
   }
   return [role];
 };
@@ -2237,6 +2251,8 @@ interface HeightStatement3 {
   /** the sentence names the solid it is the height OF («גובה הפירמידה», "of the prism") */
   ofSolid: boolean;
   value?: number;
+  /** #2361: the value was typed as a decimal numeral (`typedDecimal`) */
+  decimal?: true;
 }
 
 function readHeight3(s: string): HeightStatement3 | null {
@@ -2258,7 +2274,7 @@ function readHeight3(s: string): HeightStatement3 | null {
     b: g.b,
     altitude: g.noun !== 'אנך',
     ofSolid: g.solid !== undefined,
-    ...(value !== undefined ? { value } : {}),
+    ...(value !== undefined ? { value, ...typedDecimal(g.value!) } : {}),
   };
 }
 
@@ -2383,7 +2399,7 @@ const heightFromApex: Rule = (s) => {
       type: 'perp-to-base',
       ...(from ? { from } : {}),
       ...(face ? { face } : {}),
-      ...(lenValue !== undefined ? { len: lenValue } : {}),
+      ...(lenValue !== undefined ? { len: lenValue, ...(typedDecimal(len!).decimal ? { lenDecimal: true as const } : {}) } : {}),
     },
   ];
 };
@@ -3019,7 +3035,7 @@ const onCircle3: Rule = (s) => {
     s.match(/^(?:ה?נקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+)?על\s+ה?מעגל(?:\s+([A-Z]\d*'?))?$/) ??
     s.match(/^(?:point\s+)?([A-Z]\d*'?)\s+(?:is\s+|lies\s+)?on\s+(?:the\s+)?circle(?:\s+([A-Z]\d*'?))?$/i);
   if (!m) return null;
-  return [{ type: 'point-on-circle3', point: m[1], circle: m[2] ? `circle-${m[2]}` : '' }];
+  return [m[2] ? { type: 'point-on-circle3', point: m[1], circle: `circle-${m[2]}`, name: m[2] } : { type: 'point-on-circle3', point: m[1], circle: '' }];
 };
 
 /**
@@ -4559,7 +4575,7 @@ const lengthClaim: Rule = (s) => {
   if (!m || value === null) return null;
   return [
     VEC_MARKED ? { type: 'draw-arrow', from: m[1], to: m[2] } : { type: 'segment3', a: m[1], b: m[2] },
-    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value } },
+    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value, ...typedDecimal(m[3]) } },
   ];
 };
 
@@ -5466,6 +5482,23 @@ function readCondition3(body: string): Command3[] | null {
 /** Guards the single re-parse below against any possibility of recursion. */
 let REWRITING = false;
 
+/**
+ * #2681 ([ADR-3D-413](../../docs/06b-decisions-3d.md#adr-3d-413)) — A PLANE NAMED BY FOUR OR MORE LETTERS DECLARES ITSELF,
+ * WHEREVER IT STANDS. «המישור ABCD» alone lowers to `plane-through`; the same run as a side of a relation («המישור ABCD
+ * מקביל למישור EFGH», «EF מאונך למישור ABCD») lowered to the relation alone, so its coplanarity was neither created
+ * (the mint pass made every letter an independent free point, ADR-3D-409's named-run rider never applied) nor checked
+ * (the status pass verifies `plane-through`). Every rule's output passes here once: each run
+ * {@link statedPlaneRuns3} reads that no `plane-through` of the line already declares is declared after the line's
+ * own commands — after, so a face's relation still records the face (`materializePlaneRun`'s first mention), and the
+ * declaration is then idempotent. Rules that already declared their run (the plane cut, a point on a plane) are
+ * unchanged.
+ */
+function declareStatedPlanes3(commands: Command3[]): Command3[] {
+  const declared = commands.filter((k): k is Extract<Command3, { type: 'plane-through' }> => k.type === 'plane-through').map((k) => k.ids.join(','));
+  const missing = statedPlaneRuns3(commands).filter((ids) => !declared.includes(ids.join(',')));
+  return missing.length === 0 ? commands : [...commands, ...missing.map((ids): Command3 => ({ type: 'plane-through', name: ids.join(''), ids }))];
+}
+
 export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
   PARAM_CONFLATED = null;
@@ -5485,8 +5518,11 @@ export function parse3(utterance: string): ParseResult3 {
   if (contradiction) return { ok: false, reason: 'inscribed-contradicts-noun', ...contradiction };
   for (const rule of RULES) {
     UNREAD3 = [];
-    const commands = rule(s);
-    if (commands) return UNREAD3.length ? { ok: true, commands, unread: UNREAD3 } : { ok: true, commands };
+    const read = rule(s);
+    if (read) {
+      const commands = declareStatedPlanes3(read);
+      return UNREAD3.length ? { ok: true, commands, unread: UNREAD3 } : { ok: true, commands };
+    }
   }
   // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
   // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).

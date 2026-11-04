@@ -13,13 +13,14 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
+import { indexedNameText } from '../../shell/indexedName';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
-import { EQUAL_NESTED_CANNOT_HOLD, equalNestedPair, type NestedRelation } from '@/engine/radiusFeasibility';
+import { EQUAL_NESTED_CANNOT_HOLD, PAIR_POSITION_CONFLICT, equalNestedPair, pairPositionConflict, pairPositionsStated, type NestedRelation, type PairPosition } from '@/engine/radiusFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
@@ -1549,15 +1550,14 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, forms.text, false, { letter: forms.letter, sym: forms.sym });
       }
       // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
-      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
-      // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
-      // point label already shows the letter — «A1» next to «A» duplicated it, #263); a name bound at
-      // a DIFFERENT letter keeps the full name (unambiguous). A name asserts no magnitude, so a refused
+      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). It is
+      // written as the book writes it, the index as subscript digits — «A₁» (operator ruling 2026-10-06
+      // on #1812, ADR-782: "Both show A₁"; it replaces #263's bare digit). A name bound at a DIFFERENT
+      // letter keeps its own letter («C₁» at A — #263's other half). A name asserts no magnitude, so a refused
       // alias could not lie the way a measure did; it is gated with the measure for ONE reason — every
       // fact-sourced label obeys one rule, "from a fact that held" — not because it needed to be.
       if (f.cmd.type === 'angle-alias') {
-        const digits = f.cmd.name.startsWith(f.cmd.vertex) ? f.cmd.name.slice(f.cmd.vertex.length) : '';
-        const text = /^\d+$/.test(digits) ? digits : f.cmd.name;
+        const text = indexedNameText(f.cmd.name);
         addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, text);
       }
     };
@@ -2110,6 +2110,45 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   };
   if (attribute && hoistDepth === 0) tagEqualNested(false);
+  /**
+   * #2677 ([ADR-779](docs/06-decisions.md#adr-779)) — the same provenance for a circle pair's stated positions that
+   * exclude each other (stage 0a's `pairPositionConflict`). The other side is the latest earlier statement that states
+   * the position the refused line does not («מעגל P מוכל בתוך מעגל O» for «…משיקים מבחוץ», and back), read from the
+   * fact list; a crossing point the refused line did not place falls back to the statement that placed it
+   * (`ownerByObjId`). The drop-one search cannot find a containment or «זרים»: neither owns a constraint.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = PAIR_POSITION_CONFLICT.exec(st);
+      if (!m) continue;
+      const [a, b] = [m[1], m[2]];
+      const own = groupKey(f);
+      const statedBy = (g: Fact) => lowerOne(g.cmd, symtab).flatMap((c) => pairPositionsStated(c, a, b));
+      const ownStates = new Set(facts.filter((x) => groupKey(x) === own).flatMap(statedBy));
+      // the side the refused line does not state; when it states both (or a reversed containment), the same word
+      const wanted = ([m[3], m[4]] as PairPosition[]).find((x) => !ownStates.has(x)) ?? (m[4] as PairPosition);
+      let declared = -1;
+      for (let j = facts.length - 1; j >= 0; j--) {
+        const g = facts[j];
+        if (!g.enabled || groupKey(g) === own || status[g.id] !== 'ok') continue;
+        if (statedBy(g).includes(wanted)) {
+          declared = j;
+          break;
+        }
+      }
+      if (declared < 0 && wanted === 'crossing') {
+        const x = cur.objects.find((o) => o.kind === 'circle-circle' && ((o.circle1 === a && o.circle2 === b) || (o.circle1 === b && o.circle2 === a)));
+        const owner = x ? ownerByObjId.get(x.id) : undefined;
+        if (owner !== undefined && facts[owner]?.enabled && groupKey(facts[owner]) !== own) declared = owner;
+      }
+      if (declared < 0) continue;
+      const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[declared]));
+      const tagged = withAttribution(st, first);
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
     const searched = new Set<string>();
@@ -2693,6 +2732,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   if (cmds.some((cmd) => collinearCircleImpossibility(cur, probe, cmd))) return false;
   // #2239 (ADR-692) / #2206 (ADR-713): equal circles stated nested — no later given makes them unequal or apart.
   if (equalNestedPair(cur, probe, cmds)) return false;
+  // #2677 (ADR-779): a circle pair's stated positions that exclude each other — no later given reconciles them.
+  if (pairPositionConflict(cur, probe)) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {

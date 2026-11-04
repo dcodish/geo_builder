@@ -1,7 +1,7 @@
 /**
  * THE POINT-NAME ATOM, ONCE (#2621 C, [ADR-AG-395](../../docs/06c-decisions-analytic.md#adr-ag-395)).
  *
- * A point is named by a capital Latin letter with an optional index digit («A», «F1», «D₂») and an optional PRIME
+ * A point is named by a capital Latin letter with an optional index, a digit run (#2075: «A», «F1», «D₂», «X₁₂»), and an optional PRIME
  * («A'»: the book's «A ו-A' הן נקודות החיתוך…», p10-9 ב). The atom was spelled inline in every reader — the grammar's
  * `NAME`, the length tokenizer's pair, the rename dialog's `POINT_NAME`, the store's, the ask lane's — so a prime had
  * to be taught to some thirty copies, and a copy that missed it would read «A'B» as «A» and «B» (2-D's silent drop,
@@ -17,8 +17,8 @@
  */
 import { displayPrimes } from '../../shell/primes';
 
-/** One point name: a capital, an optional index digit, an optional prime. */
-export const POINT_NAME = String.raw`[A-Z][0-9₀-₉]?(?:'(?![a-z]))?`;
+/** One point name: a capital, an optional index (a digit run, ADR-AG-398), an optional prime. */
+export const POINT_NAME = String.raw`[A-Z][0-9₀-₉]*(?:'(?![a-z]))?`;
 
 const WHOLE = new RegExp(`^${POINT_NAME}$`);
 /** "Is this whole string one point name?" */

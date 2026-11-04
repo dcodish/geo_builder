@@ -29,7 +29,10 @@
       "emptyTitle": "מה בונים היום?"
     },
     "refusal": {
-      "notUnderstood": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות."
+      "notUnderstood": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות.",
+      "juxtaposedNumbers": "לא ברור מה פירוש «{{detail}}». כתבו {{decimal}} (מספר עשרוני), {{joined}} (מספר אחד) או {{product}} (מכפלה).",
+      "juxtaposedNumbersProduct": "לא ברור מה פירוש «{{detail}}». אם הכוונה למכפלה, כתבו {{product}}.",
+      "juxtaposedNumbersComma": "לא ברור מה פירוש «{{detail}}». אם אלה שני מספרים, הפרידו ביניהם בפסיק: {{comma}}."
     },
     "notice": {
       "alreadyDrawn": "זה כבר קיים באיור — אין מה להוסיף.",

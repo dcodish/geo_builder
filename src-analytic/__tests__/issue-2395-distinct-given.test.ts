@@ -72,8 +72,8 @@ describe('#2395 — Q3 ב (waits on #2381: two-way choices always take the same 
     for (const seed of SEEDS) {
       const d = derive(q3.lines, seed);
       expect(d.faults, `seed ${seed}`).toEqual([]);
-      expect(near(d.figure.points.find((p) => p.id === 'N1'), -4, -12), `N1 at seed ${seed}`).toBe(true);
-      expect(near(d.figure.points.find((p) => p.id === 'N2'), 12, 0), `N2 at seed ${seed}`).toBe(true);
+      expect(near(d.figure.points.find((p) => p.id === 'N₁'), -4, -12), `N1 at seed ${seed}`).toBe(true);
+      expect(near(d.figure.points.find((p) => p.id === 'N₂'), 12, 0), `N2 at seed ${seed}`).toBe(true);
     }
   });
 
@@ -83,7 +83,7 @@ describe('#2395 — Q3 ב (waits on #2381: two-way choices always take the same 
     for (const seed of SEEDS) {
       const d = derive(lines, seed);
       expect(d.faults, `seed ${seed}`).toEqual([]);
-      const [a, b] = ['N1', 'N2'].map((id) => d.figure.points.find((p) => p.id === id)!);
+      const [a, b] = ['N₁', 'N₂'].map((id) => d.figure.points.find((p) => p.id === id)!);
       expect(Math.hypot(a.x - b.x, a.y - b.y), `seed ${seed}`).toBeGreaterThan(1);
     }
   });
@@ -91,21 +91,21 @@ describe('#2395 — Q3 ב (waits on #2381: two-way choices always take the same 
 
 describe('#2395 — every spelling parses, to the right noun', () => {
   it.each([
-    ['N1 ≠ N2', ['N1', 'N2'], undefined],
-    ['N1 != N2', ['N1', 'N2'], undefined],
+    ['N1 ≠ N2', ['N₁', 'N₂'], undefined],
+    ['N1 != N2', ['N₁', 'N₂'], undefined],
     ['A ≠ B', ['A', 'B'], undefined],
     ['l1 ≠ l2', ['l1', 'l2'], undefined],
     ['P ו-Q שונות', ['P', 'Q'], undefined],
-    ['הנקודות N1 ו-N2 שונות', ['N1', 'N2'], 'point'],
+    ['הנקודות N1 ו-N2 שונות', ['N₁', 'N₂'], 'point'],
     ['נקודות P ו-Q שונות', ['P', 'Q'], 'point'],
     ['P ו-Q הן נקודות שונות', ['P', 'Q'], 'point'],
-    ['המעגלים N1 ו-N2 שונים', ['N1', 'N2'], 'circle'],
-    ['מעגלים N1 ו-N2 שונים', ['N1', 'N2'], 'circle'],
+    ['המעגלים N1 ו-N2 שונים', ['N₁', 'N₂'], 'circle'],
+    ['מעגלים N1 ו-N2 שונים', ['N₁', 'N₂'], 'circle'],
     ['הישרים l1 ו-l2 שונים', ['l1', 'l2'], 'line'],
     ['l1 ו-l2 הם ישרים שונים', ['l1', 'l2'], 'line'],
     ['P and Q are distinct', ['P', 'Q'], undefined],
     ['P and Q are different points', ['P', 'Q'], 'point'],
-    ['the circles N1 and N2 are distinct', ['N1', 'N2'], 'circle'],
+    ['the circles N1 and N2 are distinct', ['N₁', 'N₂'], 'circle'],
     ['the lines l1 and l2 are different', ['l1', 'l2'], 'line'],
   ] as const)('%s', (sentence, names, noun) => {
     expect(parseLine(sentence)).toEqual({
@@ -179,7 +179,7 @@ describe('#2395 — refusals, each its own case', () => {
     expect(refusalOf(['נקודה P', 'P ≠ Q'])).toBeNull();
     expect(refusalOf(['נתון מעגל שמרכזו N1 ורדיוסו 10', 'המעגלים N1 ו-N2 שונים'])).toMatchObject({
       key: 'unknown-reference',
-      detail: 'N2',
+      detail: 'N₂',
       expected: 'circle',
     });
   });

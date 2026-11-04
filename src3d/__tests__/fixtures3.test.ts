@@ -20,7 +20,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure3 } from '../store/figureFile3';
-import { derive3 } from '../store/store3';
+import { derive3, statedCommand3 } from '../store/store3';
 import { parse3 } from '../parser/parse3';
 import { generateSeeded, schemaVersionCoverage, supportedSchemaVersions, versionsWithoutCoverage } from './fixtures3-gen';
 import type { SeededCorpus } from './fixtures3-gen';
@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2674 (ADR-3D-415) — the student's E takes the tool's M over (the 3-D half of the 2026-11-03 ruling). One point E, no
+  // notice, the next unnamed midpoint M, asserted in issue-2674-tool-letter.test.ts; this is the build + drift + load net.
+  'tool-letter-2674.geo3.json': ["קובייה ABCDA'B'C'D'", "אמצע BB'", "E אמצע BB'", "אמצע CC'"],
   // #1613 (built by #1467, ADR-3D-382; locked in round #2665) — the operator's sequence: a vector from a known point creates
   // its head. B's position, k staying open and the notice are asserted in issue-1613-vector-creates-head.test.ts; this is the build + drift net.
   'vector-creates-head-1613.geo3.json': ['A(0,0,0)', 'AB = (1,2,3)'],
@@ -499,10 +502,23 @@ const SEEDED: SeededCorpus = {
   // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
   // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
   'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2681 (ADR-3D-413) — a plane named by four letters inside a relation, on a blank canvas: its letters are created in
+  // one plane (before: built green in general position). The class and the refusals are asserted in plane-run-relation-2681.test.ts.
+  'plane-run-parallel-blank-2681.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
+  'plane-run-perp-line-blank-2681.geo3.json': ['המישור ABCD מאונך לישר EF'],
   // #2642 (ADR-3D-411) — the issue's split rows (one given per row, ADR-W-167): a line declared by a lowercase letter
   // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
   // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
   'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
+  // #2361 (ADR-3D-416) — the operator's exact four lines: a stated «AC = 7.9999» reads «8» (sr-22, two decimals when
+  // needed) and carries its typed-decimal mark. The labels on both surfaces are asserted in
+  // issue-2361-stated-value-text.test.ts; this is the build + drift net.
+  'stated-length-7-9999-2361.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9999'],
+  // #1986 (ADR-3D-418) — the issue's two reported rows: a second ring a dart saves, and a trapezoid a coordinate letter
+  // saves past its default window. Both rings drawn simple, k > 4 and the seeds are asserted in
+  // issue-1986-ring-search.test.ts; these are the build + drift net.
+  'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
+  'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
@@ -573,7 +589,8 @@ describe('fixtures3 — the regression net', () => {
         for (const f of r.facts) {
           const parsed = parse3(f.utterance);
           expect(parsed.ok, f.utterance).toBe(true);
-          if (parsed.ok) expect(parsed.commands, f.utterance).toEqual(f.cmds);
+          // #2674 (ADR-3D-415): a letter a later line gave a tool's point by use is history, not the parse
+          if (parsed.ok) expect(parsed.commands, f.utterance).toEqual(f.cmds.map(statedCommand3));
         }
       });
     });

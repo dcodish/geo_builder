@@ -42,7 +42,7 @@ import { VOCABULARY_ANALYTIC } from '../parser/scopeAnalytic';
 import { parseLine, POINT_NOUN_EN_ATOM, POINT_NOUN_HE_ATOM } from '../parser/parseAnalytic';
 import { firstIncidenceOpener, incidencePhraseAtStart } from '../../shell/incidencePhrase';
 import type { Fact } from '../engine/types';
-import { withPointName } from '../engine/pointName';
+import { splitPointNames, withPointName } from '../engine/pointName';
 
 /** A lowering as the probe compares it: the facts without their `src` (a framed line quotes the line as typed). */
 export const loweringKey = (facts: readonly Fact[]): string => JSON.stringify(facts, (k, v) => (k === 'src' ? undefined : v));
@@ -113,7 +113,7 @@ export function unreadPart(line: string, facts: readonly Fact[], figureLabels: r
 
 /** The labels a set of facts carries — every capital-letter token anywhere in them. */
 const carriedLabels = (facts: readonly Fact[]): Set<string> =>
-  new Set(loweringKey(facts).match(/[A-Z]\d*/g) ?? []);
+  new Set(splitPointNames(loweringKey(facts)));
 
 /** Is `rest` a lost part — labels `carried` already has, and particles with no construction signal? */
 function isLostPart(rest: string, carried: ReadonlySet<string>): boolean {

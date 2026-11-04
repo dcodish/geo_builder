@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-04T06:02:26.101Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אמצע BB'",
+      "cmds": [
+        {
+          "type": "midpoint-auto",
+          "a": "B",
+          "b": "B'",
+          "id": "E"
+        }
+      ]
+    },
+    {
+      "utterance": "E אמצע BB'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "E",
+          "a": "B",
+          "b": "B'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "אמצע CC'",
+      "cmds": [
+        {
+          "type": "midpoint-auto",
+          "a": "C",
+          "b": "C'"
+        }
+      ]
+    }
+  ]
+}

@@ -37,7 +37,7 @@ import {
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
-import { circlesTangentError, commonTangentCapacityError, equalNestedPair } from './radiusFeasibility';
+import { circlesTangentError, commonTangentCapacityError, equalNestedPair, pairPositionConflict } from './radiusFeasibility';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
@@ -1370,6 +1370,10 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // centres would coincide. Refused before the ladder; a stated radius is never rewritten to make the pair fit.
   const equalErr = equalNestedPair(prev, probed, [cmd]);
   if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  // #2677 (ADR-779), stage 0a: a circle pair's stated position that an earlier one excludes («משיקים מבחוץ» / «נחתכים»
+  // after «מוכל», «זרים» after a tangency…), in either order — refused by name, never drawn over the earlier statement.
+  const positionErr = pairPositionConflict(prev, probed);
+  if (positionErr) return { ok: false, error: positionErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
     return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
@@ -1631,6 +1635,8 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   // #2239 (ADR-692): a coupled line can state the equal-radii internal tangency as well as one statement can.
   const equalErr = equalNestedPair(prev, next, cmds);
   if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  const positionErr = pairPositionConflict(prev, next); // #2677 (ADR-779)
+  if (positionErr) return { ok: false, error: positionErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   // #1712 (ADR-587): a coupled line is still a list of statements — one that no configuration can take
   // on its own is refused by name here too, never handed to the joint solve to fail anonymously.
   const rangeErr = measureRangeImpossibility(newCons);

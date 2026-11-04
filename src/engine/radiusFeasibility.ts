@@ -141,3 +141,99 @@ export function commonTangentCapacityError(prev: Construction, cmd: Command): st
   if (position === 'ext-tangent' && cmd.kind === 'internal') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'ext-tangent');
   return null;
 }
+
+/**
+ * #2677 ([ADR-779](../../docs/06-decisions.md#adr-779)) — two STATED mutual positions of one circle pair that exclude each
+ * other. The words are what a statement can say about the pair: one circle strictly inside the other (`contained`), each
+ * outside the other (`disjoint`), touching from outside (`ext-tangent`, its kind STATED), touching with any kind
+ * (`tangent`), or a drawn crossing point (`crossing`).
+ */
+export type PairPosition = 'contained' | 'disjoint' | 'ext-tangent' | 'tangent' | 'crossing';
+/** An excluding pair, the containment first (`contained` twice: each circle stated inside the other). */
+export type PairPositionConflict = ['contained', Exclude<PairPosition, 'tangent'>];
+/** The engine message of {@link pairPositionConflict}; the humanizer reads it back through `parseEngineError`. */
+export const pairPositionConflictMessage = (a: Id, b: Id, [position, other]: PairPositionConflict): string =>
+  engineErrorDebugText({ code: 'pair-position-conflict', a, b, position, other });
+
+/**
+ * What the construction STATES about the pair (a, b) that excludes something else it states, or null. Read from the
+ * circle-position records (ADR-567 / ADR-645) and the pair's crossing points (`circle-circle` objects), never from
+ * coordinates. The exclusions are the plane's, and nothing more:
+ *  - a circle strictly inside another has no common point with it and is not outside it: it neither touches it from
+ *    outside, nor crosses it, nor is disjoint from it. Internal tangency is NOT excluded (ADR-704: «מוכל» plus «משיקים
+ *    מבפנים» builds), so a crossing point is excluded only while no tangency is stated (a touch point of a tangency is a
+ *    common point the tangency itself states), and a tangency whose kind nobody stated is not excluded either (the fold
+ *    resolves it internal under a containment, ADR-704);
+ *  - a circle inside another is the smaller one, so the other is not inside it (`contained` twice).
+ * Kinds of tangency against each other (ADR-704: a later stated kind wins) and a tangency against a second crossing
+ * point (the one-common-point guard, ADR-645) are not this reader's: they keep their own refusals. Nor is «זרים» against
+ * a tangency or a crossing: its outcome is the operator's question (round #2697), so it is still drawn with the
+ * disjointness flagged.
+ */
+export function pairPositionConflictOf(c: Pick<Construction, 'objects' | 'requirements'>, a: Id, b: Id): PairPositionConflict | null {
+  const pair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
+  let contained = false;
+  let reversed = false; // each circle stated inside the other
+  let outer: Id | undefined;
+  let disjoint = false;
+  let tangent = false;
+  let extStated = false;
+  for (const r of c.requirements ?? []) {
+    if (r.kind !== 'circle-position' || !pair(r.a, r.b)) continue;
+    if (r.relation === 'contained') {
+      if (contained && outer !== r.a) reversed = true;
+      contained = true;
+      outer = r.a;
+    }
+    else if (r.relation === 'disjoint') disjoint = true;
+    else if (r.relation === 'tangent') {
+      tangent = true;
+      if (r.kindStated !== false && r.external !== false) extStated = true;
+    }
+  }
+  if (!contained) return null;
+  const crossing = c.objects.some((o) => o.kind === 'circle-circle' && pair(o.circle1, o.circle2));
+  if (reversed) return ['contained', 'contained'];
+  if (contained && disjoint) return ['contained', 'disjoint'];
+  if (contained && extStated) return ['contained', 'ext-tangent'];
+  if (contained && crossing && !tangent) return ['contained', 'crossing'];
+  return null;
+}
+
+/**
+ * #2677 ([ADR-779](../../docs/06-decisions.md#adr-779)) — A STATEMENT ABOUT A CIRCLE PAIR'S MUTUAL POSITION THAT AN
+ * EARLIER ONE EXCLUDES, in either order. Stage 0a, beside {@link equalNestedPair}: `next` is the construction with the
+ * incoming commands applied; a pair whose stated positions exclude each other in `next` and did not in `prev` is
+ * refused, so the line that COMPLETES the contradiction is the one refused — «משיקים מבחוץ» or «נחתכים» after «מוכל»,
+ * or «מוכל» after either of them, «זרים» against «מוכל», and a containment stated both ways. Before ADR-779 each was applied as a construct
+ * over free centres and radii, the containment was only a requirement the drive never reconciled,
+ * and the figure was drawn with every row green and the verifier flagging the earlier statement. The fold's drop-one
+ * search names the other statement; the humanizer gives the reason.
+ */
+export function pairPositionConflict(prev: Construction, next: Construction): string | null {
+  const circles = next.objects.filter((o): o is Circle => o.kind === 'circle');
+  for (let i = 0; i < circles.length; i++)
+    for (let j = i + 1; j < circles.length; j++) {
+      const a = circles[i].id;
+      const b = circles[j].id;
+      const now = pairPositionConflictOf(next, a, b);
+      if (now && !pairPositionConflictOf(prev, a, b)) return pairPositionConflictMessage(a, b, now);
+    }
+  return null;
+}
+
+/** The wire of {@link pairPositionConflict} before the fold's attribution tail. */
+export const PAIR_POSITION_CONFLICT = /^over-constrained: circles (\S+) and (\S+) stated (\S+) and (\S+) cannot hold$/;
+
+/**
+ * #2677 ([ADR-779](../../docs/06-decisions.md#adr-779)) — which of the {@link PairPosition}s a command STATES about the
+ * pair (a, b), read from the command alone: the fold's provenance reader for the refusal's other side. The same words
+ * {@link pairPositionConflictOf} reads off the construction.
+ */
+export function pairPositionsStated(cmd: Command, a: Id, b: Id): PairPosition[] {
+  const pair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
+  if (cmd.type === 'set-circle-position' && pair(cmd.a, cmd.b) && cmd.relation !== 'any') return [cmd.relation];
+  if (cmd.type === 'circles-tangent' && pair(cmd.circle1, cmd.circle2)) return cmd.external && cmd.kindStated !== false ? ['tangent', 'ext-tangent'] : ['tangent'];
+  if (cmd.type === 'circle-circle-intersection' && pair(cmd.circle1, cmd.circle2)) return ['crossing'];
+  return [];
+}

@@ -21,7 +21,8 @@ import type { DerivedRule, EllipseSide, FootLine } from '../engine/derived';
 import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
-import { evalExpr, findMixedNumber, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { teachPair } from '../../shell/juxtaposedNumbers';
+import { evalExpr, findJuxtaposedNumbers, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RADIUS_CAPITALS, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
@@ -64,6 +65,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { foldIndexedName } from '../../shell/indexedName';
 import { arcRunRoles } from '../../shell/arcRun';
 import { POINT_NAME, splitPointNames } from '../engine/pointName';
 import {
@@ -137,6 +139,14 @@ export type ParseFailure =
    * `detail` is the student's own text; the glyph «5½» is not this (it reads 5.5).
    */
   | { code: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
+  /**
+   * #2286 (ADR-AG-397, operator ruling 2026-11-03: *"Refuse it, naming the line, in every builder"*) — any other
+   * number, whitespace, number «2 3»: ambiguous as written (2.3, 23 or 2·3), so refused before every rule and before the
+   * model. `detail` is the student's own pair; the rest is what it teaches, each reading kept only when the line reads
+   * with it in place (`shell/juxtaposedNumbers.teachPair` — a taught spelling is one the next Enter reads, #1156):
+   * `decimal` / `joined` (both whole) and `product` (`2*3`, or its value), or `comma` («A(2 3)» → `2, 3`).
+   */
+  | { code: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /**
    * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
    *
@@ -6792,10 +6802,10 @@ function parseOrder(line: string): RuleOutcome {
  */
 const LABEL_VERB = '(?:נסמן|נסמנה|מסמנים|לסמן)';
 const LABEL_ANGLE_HE = `(?:את\\s+)?(?:ה?${ANGLE_STEM_HE}ת\\s*|∠\\s*)`;
-const LABEL_NAME = `(?:∠\\s*|ה?${ANGLE_STEM_HE}ת\\s*)?([A-Z]\\d+|\\d+|[α-ορ-ω])`;
+const LABEL_NAME = `(?:∠\\s*|ה?${ANGLE_STEM_HE}ת\\s*)?([A-Z][0-9₀-₉]+|\\d+|[α-ορ-ω])`;
 const ANGLE_LABEL_HE = new RegExp(`^${LABEL_VERB}\\s*:?\\s+${LABEL_ANGLE_HE}(${NAME})(${NAME})(${NAME})\\s+(?:כ|ב(?:תור)?)\\s*-?\\s*${LABEL_NAME}$`);
-const ANGLE_LABEL_EQ = new RegExp(`^(?:${LABEL_VERB}|[Dd]enote|[Ll]et)\\s*:?\\s+(?:${LABEL_ANGLE_HE}|(?:the\\s+)?angle\\s+)(${NAME})(${NAME})(${NAME})\\s*=\\s*(?:∠\\s*)?([A-Z]\\d+)$`);
-const ANGLE_LABEL_EN = new RegExp(`^(?:[Dd]enote|[Ll]abel|[Mm]ark|[Ll]et)\\s+(?:the\\s+)?(?:angle\\s+|∠\\s*)(${NAME})(${NAME})(${NAME})\\s+(?:as|by|be)\\s+(?:∠\\s*|angle\\s+)?([A-Z]\\d+|\\d+|[α-ορ-ω])$`);
+const ANGLE_LABEL_EQ = new RegExp(`^(?:${LABEL_VERB}|[Dd]enote|[Ll]et)\\s*:?\\s+(?:${LABEL_ANGLE_HE}|(?:the\\s+)?angle\\s+)(${NAME})(${NAME})(${NAME})\\s*=\\s*(?:∠\\s*)?([A-Z][0-9₀-₉]+)$`);
+const ANGLE_LABEL_EN = new RegExp(`^(?:[Dd]enote|[Ll]abel|[Mm]ark|[Ll]et)\\s+(?:the\\s+)?(?:angle\\s+|∠\\s*)(${NAME})(${NAME})(${NAME})\\s+(?:as|by|be)\\s+(?:∠\\s*|angle\\s+)?([A-Z][0-9₀-₉]+|\\d+|[α-ορ-ω])$`);
 
 function parseAngleLabel(line: string): RuleOutcome {
   const m = ANGLE_LABEL_HE.exec(line) ?? ANGLE_LABEL_EQ.exec(line) ?? ANGLE_LABEL_EN.exec(line);
@@ -6804,7 +6814,8 @@ function parseAngleLabel(line: string): RuleOutcome {
   const at = angleNameOf(p, v, q);
   if (!at || !isAngleRef(at)) return refuse('repeated-vertex', line);
   if (GREEK_ALIAS.test(given)) return parseClause(`∠${p}${v}${q} = ${given}`);
-  const name = /^\d+$/.test(given) ? `${v}${given}` : given;
+  // #2075 (ADR-AG-398): a vertex and a digit («כ 1») is the indexed name A₁, spelled as «כ-A1» is folded
+  const name = /^\d+$/.test(given) ? foldIndexedName(`${v}${given}`, 'glyph') : given;
   // The binding first, so a taken label is the line's answer before its arms are looked for; then the two arms 2-D draws.
   return made([
     { t: 'constraint', k: { t: 'angle', at, value: { kind: 'sym', name: angleLabelSymbol(name) } }, src: line },
@@ -9032,10 +9043,15 @@ export function parseLine(raw: string): ParseResult {
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);
   if (unread) return { ok: false, code: `unread-${unread.kind}`, detail: unread.detail };
-  // #2222 (ADR-AG-284): an ASCII mixed number is refused here, before every rule and before the model, so no slot
-  // multiplies it and the fallback cannot either — one teaching sentence, whichever sentence carries it.
-  const mixed = findMixedNumber(line);
-  if (mixed) return { ok: false, code: 'mixed-number', detail: mixed.text, ...(mixed.decimal ? { decimal: mixed.decimal } : {}), sum: mixed.sum, product: mixed.product };
+  // #2222 (ADR-AG-284) / #2286 (ADR-AG-397): two numbers side by side — an ASCII mixed number, or any other pair — are
+  // refused here, before every rule and before the model, so no slot multiplies them and the fallback cannot either:
+  // one teaching sentence, whichever sentence carries them. The suite's one detector (`shell/juxtaposedNumbers`).
+  const juxt = findJuxtaposedNumbers(line);
+  if (juxt?.kind === 'mixed') return { ok: false, code: 'mixed-number', detail: juxt.text, ...(juxt.decimal ? { decimal: juxt.decimal } : {}), sum: juxt.sum, product: juxt.product };
+  if (juxt) {
+    const { kind: _k, ...teach } = teachPair(line, juxt, (l) => parseLine(l).ok);
+    return { ok: false, code: 'juxtaposed-numbers', detail: juxt.text, ...teach };
+  }
   // An angle the student NAMES (#1622 E5, ADR-AG-221) — read with its verb, before the lead-in is unwrapped.
   const label = parseAngleLabel(line);
   if (label) return label.ok ? made(label.facts.map((f) => ({ ...f, src: typed }))) : label;
@@ -9182,7 +9198,7 @@ const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
  * parsed with these, then each becomes a `vertex` placeholder that `engine/toolLetters.ts` resolves to the first free
  * letters in order. `NAME` reads them (a capital and one subscript digit); no student writes them.
  */
-const VERTEX_SENTINELS = ['Y₀', 'Y₁', 'Y₂', 'Y₃', 'Y₄', 'Y₅', 'Y₆', 'Y₇', 'Y₈', 'Y₉'];
+const VERTEX_SENTINELS = ['Y₀₀', 'Y₀₁', 'Y₀₂', 'Y₀₃', 'Y₀₄', 'Y₀₅', 'Y₀₆', 'Y₀₇', 'Y₀₈', 'Y₀₉'];
 
 /**
  * Parse `sentences` — the canonical sentences a line means — and re-attribute every fact to the student's line. The
@@ -10497,7 +10513,7 @@ export const MINT_PREFIX = '@mint:';
  */
 export { TOOL_PREFIX as FRESH_PREFIX } from '../engine/toolLetters';
 /** A name no student writes and no mint takes — the stand-in while a canonical sentence is parsed. */
-const MINT_SENTINEL = 'Z₀';
+const MINT_SENTINEL = 'Z₀₀';
 
 type PointSlot = { name: Id } | { x: Expr; y: Expr; key: string };
 
@@ -10820,7 +10836,8 @@ export function readAngleAsk(text: string): { a: string; v: string; b: string } 
  * still a rename the student asked for, and refusing it BY NAME is the submit path's job — returning
  * null would hand an understood sentence to the LLM seam.
  */
-const RENAME_SOURCE = '([A-Za-z](?:[0-9]|[₀-₉])?)';
+// #2075 (ADR-AG-398): an index in any spelling — glued digits, `_1`, `_{12}`, subscript digits — folded to the glyph below
+const RENAME_SOURCE = '([A-Za-z](?:_\\{?[0-9]+\\}?|[0-9]+|[₀-₉]+)?)';
 const RENAME_HE = new RegExp(
   String.raw`^(?:שנה|שנו|החלף|החליפו)\s+(?:את\s+)?(?:ה?שם\s+|ה?אות\s+)?(?:של\s+)?(?:ה?נקודה\s+)?${RENAME_SOURCE}\s+(?:ל|ב)\s*[-־]?\s*(\S+?)\.?$`,
 );
@@ -10832,7 +10849,7 @@ export function parseRenameAnalytic(raw: string): { from: string; to: string } |
   const s = trim(raw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ''));
   const m = RENAME_HE.exec(s) ?? RENAME_EN.exec(s);
   if (!m) return null;
-  return { from: m[1].toUpperCase(), to: m[2] };
+  return { from: foldIndexedName(m[1].toUpperCase(), 'glyph'), to: m[2] };
 }
 
 /**
@@ -10854,5 +10871,5 @@ export function parseSwapAnalytic(raw: string): { a: string; b: string } | null 
   const s = trim(raw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ''));
   const m = SWAP_HE.exec(s) ?? SWAP_EN.exec(s);
   if (!m) return null;
-  return { a: m[1].toUpperCase(), b: m[2] };
+  return { a: foldIndexedName(m[1].toUpperCase(), 'glyph'), b: m[2] };
 }

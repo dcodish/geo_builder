@@ -85,16 +85,19 @@ describe('#494 — a DETACHED clitic re-binds to its operand', () => {
 });
 
 describe('#380 — a point-run plane is THREE OR FOUR labels, in both relation frames', () => {
+  const rel = (u: string) => cmds(u)?.find((c) => c.type === 'seg-plane-rel');
   it('∥ accepts the box FACE it used to reject outright', () => {
-    // #821 (ADR-3D-177 Am. 1): ∥ now draws the ring too, so the relation is the LAST command (as for ⟂)
-    expect(cmds('AB מקביל למישור ABCD')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'parallel', plane: ['A', 'B', 'C', 'D'] });
-    expect(cmds("AB מקביל למישור DCC'D'")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['D', 'C', "C'", "D'"] });
-    expect(cmds("A'B' מקביל למישור ABCD")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', a: "A'", b: "B'", plane: ['A', 'B', 'C', 'D'] });
+    // #821 (ADR-3D-177 Am. 1): ∥ now draws the ring too. #2681 (ADR-3D-413): a 4-letter run is then declared as
+    // its plane (`plane-through`, after the relation), so the relation is read by its type, not its position.
+    expect(cmds('AB מקביל למישור ABCD')?.at(-1)).toEqual({ type: 'plane-through', name: 'ABCD', ids: ['A', 'B', 'C', 'D'] });
+    expect(rel('AB מקביל למישור ABCD')).toMatchObject({ type: 'seg-plane-rel', rel: 'parallel', plane: ['A', 'B', 'C', 'D'] });
+    expect(rel("AB מקביל למישור DCC'D'")).toMatchObject({ type: 'seg-plane-rel', plane: ['D', 'C', "C'", "D'"] });
+    expect(rel("A'B' מקביל למישור ABCD")).toMatchObject({ type: 'seg-plane-rel', a: "A'", b: "B'", plane: ['A', 'B', 'C', 'D'] });
     expect(cmds('AB מקביל למישור ABCD')?.filter((c) => c.type === 'segment3')).toHaveLength(4);
   });
 
   it('⟂ CARRIES the fourth label instead of silently dropping it', () => {
-    expect(cmds("A'B' מאונך למישור ABCD")?.at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', plane: ['A', 'B', 'C', 'D'] });
+    expect(rel("A'B' מאונך למישור ABCD")).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', plane: ['A', 'B', 'C', 'D'] });
     // …and draws the ring the student named, at whatever arity they named it
     expect(cmds("A'B' מאונך למישור ABCD")?.filter((c) => c.type === 'segment3')).toHaveLength(4);
     expect(cmds('AB מאונך למישור ACD')?.filter((c) => c.type === 'segment3')).toHaveLength(3);
@@ -106,7 +109,7 @@ describe('#380 — a point-run plane is THREE OR FOUR labels, in both relation f
   });
 
   it('English mirrors both arities', () => {
-    expect(cmds('AB is parallel to plane ABCD')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C', 'D'] });
+    expect(rel('AB is parallel to plane ABCD')).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C', 'D'] });
     expect(cmds('AB is parallel to plane ABC')?.at(-1)).toMatchObject({ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] });
   });
 });

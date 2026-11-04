@@ -46,3 +46,40 @@ export function convergeText(
 ): string {
   return pairs.map(([a, b]) => t(CONVERGE_KEY, { a: name(a), b: name(b) })).join(' ');
 }
+
+/**
+ * #2696 (ADR-AG-393; 2-D's ADR-486 rule, hoisted) — TWO LETTERS AT ONE SPOT ARE WRITTEN AS ONE LABEL, «B=D».
+ *
+ * The pairs are grouped (a chain «A~B», «B~C» is one group); each group's alphabetically first id CARRIES the joined
+ * text, its members sorted and joined by «=», and every other member carries `''` (drawn with no letter). The merge is
+ * by LABEL only: every point keeps its id, position and hover target. 2-D's `buildScene` (ADR-486) and analytic's
+ * (ADR-AG-393) both read it, so one coincidence reads the same in both builders (ADR-W-118 B1).
+ */
+export function mergedLabels(pairs: readonly (readonly [string, string])[]): Map<string, string> {
+  const groupOf = new Map<string, string>(); // id → its group's representative
+  const find = (x: string): string => {
+    let r = x;
+    while (groupOf.get(r) !== undefined && groupOf.get(r) !== r) r = groupOf.get(r)!;
+    return r;
+  };
+  for (const [a, b] of pairs) {
+    if (!groupOf.has(a)) groupOf.set(a, a);
+    if (!groupOf.has(b)) groupOf.set(b, b);
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) groupOf.set(rb, ra);
+  }
+  const members = new Map<string, string[]>();
+  for (const id of groupOf.keys()) {
+    const r = find(id);
+    members.set(r, [...(members.get(r) ?? []), id]);
+  }
+  const out = new Map<string, string>();
+  for (const ids of members.values()) {
+    if (ids.length < 2) continue;
+    const sorted = [...ids].sort();
+    out.set(sorted[0], sorted.join('='));
+    for (const id of sorted.slice(1)) out.set(id, '');
+  }
+  return out;
+}

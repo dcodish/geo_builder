@@ -46,7 +46,7 @@ const notice = (d: Derivation) => convergeText(coincidencesOf(d), he);
 describe('#1595 — analytic: a forced coincidence records, with the notice', () => {
   it.each([
     [['V(0,0)', 'X(4,0)', 'Y נמצאת על הישר y=x', 'שיעור ה-x של Y הוא 0'], 'V ו-Y נפלו על אותה נקודה.'], // #1571 T23
-    [['N1(1,1)', 'N2(1,1)', 'קטע N1N2'], 'N1 ו-N2 נפלו על אותה נקודה.'], // #2401
+    [['N1(1,1)', 'N2(1,1)', 'קטע N1N2'], 'N₁ ו-N₂ נפלו על אותה נקודה.'], // #2401; N1 is N₁ since #2075
     [['משולש ABC', 'AB=4', 'D על AB', 'AD=4'], 'B ו-D נפלו על אותה נקודה.'], // 2-D's D-on-B row
   ])('%j', (lines, sentence) => {
     const { recorded, d } = play(lines);

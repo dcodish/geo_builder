@@ -34,6 +34,14 @@ describe('#2621 C — the point-name atom', () => {
     expect(splitPointNames("A'BC'")).toEqual(["A'", 'B', "C'"]);
     expect(displayPointName("A'")).toBe('A′');
   });
+
+  it("the index is a digit run (#2075, ADR-AG-398), the prime sits after it: «X12'» is X₁₂'", () => {
+    for (const n of ['X₁₂', "X₁₂'", 'X12']) expect(isPointName(n), n).toBe(true);
+    expect(splitPointNames("X₁₂'Y₃")).toEqual(["X₁₂'", 'Y₃']);
+    expect(normalizePointName("X12'")).toBe("X₁₂'");
+    expect(kinds(["X12'(3,4)", "X_{12}(0,0)", "X₁₂X₁₂' = 5"])).toEqual(['record', 'record', 'record']);
+    expect(pointAt(["X12'(3,4)"], "X₁₂'")).toMatchObject({ x: 3, y: 4 });
+  });
 });
 
 describe("#2621 C — «A'» is a point name everywhere a letter is", () => {

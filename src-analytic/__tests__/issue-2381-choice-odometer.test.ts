@@ -42,23 +42,23 @@ const side = (f: Figure, id: string) => (at(f, id)![0] < 0 ? 'L' : 'R');
 describe('#2381 — the operator\'s Q3 ב lines', () => {
   it('«N1 משמאל ל-N2» records (fixture), with N₁ = (−5, 0) and N₂ = (15, 0) in every admitted configuration', () => {
     recordsEveryLine(repro.lines);
-    const seen = poolReadings(repro.lines, (f) => JSON.stringify([at(f, 'N1'), at(f, 'N2')]));
+    const seen = poolReadings(repro.lines, (f) => JSON.stringify([at(f, 'N₁'), at(f, 'N₂')]));
     expect([...seen]).toEqual([JSON.stringify([[-5, 0], [15, 0]])]);
   });
 
   it('the exam\'s own centres (fixture): the last line records, N₁ = (−4, −12) and N₂ = (12, 0)', () => {
     recordsEveryLine(exam.lines);
-    const seen = poolReadings(exam.lines, (f) => JSON.stringify([at(f, 'N1'), at(f, 'N2')]));
+    const seen = poolReadings(exam.lines, (f) => JSON.stringify([at(f, 'N₁'), at(f, 'N₂')]));
     expect([...seen]).toEqual([JSON.stringify([[-4, -12], [12, 0]])]);
   });
 
   it('without the side line the pool holds all four combinations', () => {
-    expect([...poolReadings(REPRO, (f) => side(f, 'N1') + side(f, 'N2'))].sort()).toEqual(['LL', 'LR', 'RL', 'RR']);
+    expect([...poolReadings(REPRO, (f) => side(f, 'N₁') + side(f, 'N₂'))].sort()).toEqual(['LL', 'LR', 'RL', 'RR']);
   });
 
   it('the opening drawing never stacks N₁ on N₂ (R61): another combination is opened on', () => {
     const d = derive(REPRO, 0);
-    expect(at(d.figure, 'N1')).not.toEqual(at(d.figure, 'N2'));
+    expect(at(d.figure, 'N₁')).not.toEqual(at(d.figure, 'N₂'));
   });
 
   it('REFUSAL — «N1 משמאל ל-N2» and «N2 משמאל ל-N1» together stay refused', () => {
@@ -70,7 +70,7 @@ describe('#2381 — the operator\'s Q3 ב lines', () => {
 describe('#2381 — the class: every combination of every kind of axis is reachable', () => {
   it('three radius-10 circles tangent at A: 8 of 8', () => {
     const lines = [...REPRO, 'נתון מעגל שמרכזו N3 ורדיוסו 10', 'מעגל N3 משיק למעגל M בנקודה A'];
-    expect(poolReadings(lines, (f) => side(f, 'N1') + side(f, 'N2') + side(f, 'N3')).size).toBe(8);
+    expect(poolReadings(lines, (f) => side(f, 'N₁') + side(f, 'N₂') + side(f, 'N₃')).size).toBe(8);
   });
 
   it('two right triangles: 9 of 9 seats', () => {
@@ -85,7 +85,7 @@ describe('#2381 — the class: every combination of every kind of axis is reacha
 
   it('a tangency choice × a crossing pair: 4 of 4', () => {
     const lines = [...REPRO.slice(0, 4), 'הישר y = 1 חותך את המעגל M בנקודות P ו-Q'];
-    expect(poolReadings(lines, (f) => side(f, 'N1') + (at(f, 'P')![0] < 0 ? 'P' : 'Q')).size).toBe(4);
+    expect(poolReadings(lines, (f) => side(f, 'N₁') + (at(f, 'P')![0] < 0 ? 'P' : 'Q')).size).toBe(4);
   });
 });
 

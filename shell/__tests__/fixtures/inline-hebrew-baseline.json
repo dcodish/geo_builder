@@ -5,6 +5,7 @@
  "shell/conjunction.ts": 5,
  "shell/glyphFold.ts": 1,
  "shell/incidencePhrase.ts": 4,
+ "shell/llm/honestyCore.ts": 1,
  "shell/math.tsx": 1,
  "shell/proofTarget.ts": 11,
  "shell/radianAngle.ts": 6,

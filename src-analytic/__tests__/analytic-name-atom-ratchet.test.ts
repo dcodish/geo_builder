@@ -11,9 +11,20 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.join(__dirname, '..');
-const SPELLINGS = ['[A-Z][0-9₀-₉]?', '[A-Z]\\d?', '[A-Z](?:[0-9]|[₀-₉])?', '[A-Z][0-9]?'];
+// #2075 (ADR-AG-398) made the index a digit run, so the `*` and `+` spellings are copies of the same atom.
+const SPELLINGS = [
+  '[A-Z][0-9₀-₉]?',
+  '[A-Z]\d?',
+  '[A-Z](?:[0-9]|[₀-₉])?',
+  '[A-Z][0-9]?',
+  '[A-Z][0-9₀-₉]*',
+  '[A-Z]\d*',
+  '[A-Z](?:[0-9]+|[₀-₉]+)?',
+  '[A-Z][0-9]*',
+];
 const BASELINE: Readonly<Record<string, number>> = {
   'engine/pointName.ts': 1, // the atom itself
+  'engine/apply.ts': 1, // `isPointLabel`: an id parser that also takes a repeated prime
   'parser/frameAnalytic.ts': 4, // the «X_A» axis subscript (2) and the common-tangent head's circle letters (2)
   'parser/parseAnalytic.ts': 3, // comments quoting the atom
 };

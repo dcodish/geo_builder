@@ -141,7 +141,7 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
     expect(kinds(lines)).toEqual(['record', 'record', 'record']);
     const facts = factsOf('נסמן זוית BAM כ-A1');
     expect(facts).toEqual([
-      { t: 'constraint', k: { t: 'angle', at: { v: 'A', a: 'B', b: 'M' }, value: { kind: 'sym', name: '∠A1' } }, src: '' },
+      { t: 'constraint', k: { t: 'angle', at: { v: 'A', a: 'B', b: 'M' }, value: { kind: 'sym', name: '∠A₁' } }, src: '' },
       { t: 'segment', id: 'seg-AB', a: 'A', b: 'B', ref: true, src: '' },
       { t: 'segment', id: 'seg-AM', a: 'A', b: 'M', ref: true, src: '' },
     ]);
@@ -149,7 +149,7 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
       const d = clean(lines, seed);
       expect(d.figure.segments.some((s) => s.id === 'seg-AM'), `seed ${seed}`).toBe(true);
       // The label IS the angle: the panel's ∠A1 is ∢BAM's own value.
-      expect(d.figure.env['∠A1'], `seed ${seed}`).toBeCloseTo(deg(d, 'A', 'B', 'M'), 4);
+      expect(d.figure.env['∠A₁'], `seed ${seed}`).toBeCloseTo(deg(d, 'A', 'B', 'M'), 4);
     }
   });
 
@@ -159,7 +159,7 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
     const fixed = ['A(0,0)', 'B(4,0)', 'C(0,3)', 'נסמן זוית BAC כ-A1'];
     expect(kinds(fixed)).toEqual(['record', 'record', 'record', 'record']);
     const d = clean(fixed, 0);
-    expect(d.figure.env['∠A1']).toBeCloseTo(90, 6);
+    expect(d.figure.env['∠A₁']).toBeCloseTo(90, 6);
     expect(pt(d, 'C')).toMatchObject({ x: 0, y: 3 });
   });
 
@@ -199,14 +199,14 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
 
   it('a label already on ANOTHER angle is refused naming it — never read as the equality ∢BAM = ∢MAC', () => {
     const v = typed([...base, 'נסמן זוית BAM כ-A1', 'נסמן זוית MAC כ-A1']).verdicts;
-    expect(v[3]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A1' } });
+    expect(v[3]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A₁' } });
     // The same binding restated (rays in either order) is absorbed.
     expect(kinds([...base, 'נסמן זוית BAM כ-A1', 'נסמן זוית MAB כ-A1'])[3]).toBe('already-known');
   });
 
   it('a label that is a POINT\'s name is refused, in either order (2-D: aliasTaken both ways)', () => {
-    expect(typed(['נקודה A1', 'נסמן זוית BAM כ-A1']).verdicts[1]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A1' } });
-    expect(typed(['משולש BAM', 'נסמן זוית BAM כ-A1', 'נקודה A1']).verdicts[2]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A1' } });
+    expect(typed(['נקודה A1', 'נסמן זוית BAM כ-A1']).verdicts[1]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A₁' } });
+    expect(typed(['משולש BAM', 'נסמן זוית BAM כ-A1', 'נקודה A1']).verdicts[2]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken', holder: 'A₁' } });
     expect(typed(['משולש BAM', 'נסמן זוית BAM כ-A1', 'A1(1,2)']).verdicts[2]).toMatchObject({ kind: 'refused', error: { key: 'alias-taken' } });
   });
 

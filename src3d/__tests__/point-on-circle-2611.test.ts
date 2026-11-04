@@ -124,7 +124,7 @@ describe('#2611 — an EXISTING point stated on a circle', () => {
 
   it('a placed point off the circle is still refused: a claim stays a claim', () => {
     run("קובייה ABCDA'B'C'D'", 'משולש ABC חסום במעגל', "A' על המעגל");
-    expect(st().lastError).toEqual({ code: 'not-on-line', id: "A'" });
+    expect(st().lastError).toEqual({ code: 'not-on-circle', id: "A'" }); // ADR-3D-414: the circle's own wording
     expect(st().facts).toHaveLength(2);
   });
 
@@ -137,7 +137,7 @@ describe('#2611 — an EXISTING point stated on a circle', () => {
   it('a free point the circle is built from is never re-homed onto it (no cycle)', () => {
     // O is minted free by the first line, then made the centre of a circle: «O על המעגל» must not seat O on its own circle
     run('M אמצע AO', 'מעגל O משיק לישר BC בנקודה F', 'O על המעגל');
-    expect(st().lastError).toEqual({ code: 'not-on-line', id: 'O' });
+    expect(st().lastError).toEqual({ code: 'not-on-circle', id: 'O' });
     expect(d().construction.points.get('O')?.kind).toBe('free3');
   });
 });
@@ -145,11 +145,11 @@ describe('#2611 — an EXISTING point stated on a circle', () => {
 describe('#2611 — what stage A leaves as it was', () => {
   it('two circles: «המעגל» names neither, as today', () => {
     run('משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC', 'D על המעגל');
-    expect(st().lastError).toEqual({ code: 'unknown-line', id: 'circle' });
+    expect(st().lastError).toEqual({ code: 'unknown-circle', several: true }); // ADR-3D-414: worded as a circle
   });
 
   it('a blank canvas keeps today\'s refusal until #253 (stage B)', () => {
     run('D על המעגל');
-    expect(st().lastError).toEqual({ code: 'unknown-line', id: 'circle' });
+    expect(st().lastError).toEqual({ code: 'unknown-circle' }); // ADR-3D-414: worded as a circle, no id
   });
 });

@@ -9,7 +9,7 @@
 import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
+import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
@@ -387,15 +387,8 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     return null;
   })();
   if (ringOrderFault) faults.push(ringOrderFault);
-  const completing =
-    figure.unsatisfied.length > 0
-      ? completingStatement(
-          construction,
-          construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]])),
-          seed,
-          pinnedBy,
-        )
-      : null;
+  const groupOfConstraint = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+  const completing = figure.unsatisfied.length > 0 ? completingStatement(construction, groupOfConstraint, seed, pinnedBy) : null;
   /**
    * ONE BLAME MECHANISM FOR THE WHOLE ADMISSION VERDICT (#1699, ADR-AG-240). The probe's answer is a statement whose
    * removal ADMITS a figure — every given holds, every selector holds, the ring is the noun's (`admittedFigure`). So when
@@ -529,8 +522,26 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
    */
   const flattened = !ringOrderFault && completing !== null ? collapsedByGivens(construction, seed) : [];
   const flatFault = flattened.length > 0 ? collapseFault(completing!, flattened[0]) : null;
+  /**
+   * THE GIVENS HOLD ONLY WHERE TWO NAMED POINTS MEET (#2506, ADR-AG-399 — 2-D's ADR-764, 3-D's ADR-3D-378; ADR-W-146).
+   * No declared ring went flat, but the thin-ring arm's pair trigger found the givens holding only with two points a
+   * statement relates on one dot («נקודה A» · «נקודה B» · «נקודה C» · «AB = BC» · «AC ⊥ BC»: C on A). That is a
+   * contradiction between statements, so the refusal is 2-D's over-constraint sentence (`measure-contradicts`): the
+   * completing line, the earlier statement it cannot hold with (`partnerStatement`, 2-D's `[vs #i]`), and the
+   * completing statement as the reason — never «לא נמצאה תצורה», which says the search missed.
+   */
+  const metPairs = !flatFault && !ringOrderFault && completing !== null ? pairsMetByGivens(construction, seed) : [];
+  const partner = metPairs.length > 0 ? partnerStatement(construction, groupOfConstraint, seed, completing!, pinnedBy) : null;
   if (flatFault) faults.push(flatFault);
-  else if (!ringOrderFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+  else if (metPairs.length > 0) {
+    faults.push({
+      index: completing!,
+      code: 'measure-contradicts',
+      detail: lines[completing!],
+      what: lines[completing!],
+      ...(partner !== null ? { declared: lines[partner] } : {}),
+    });
+  } else if (!ringOrderFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
   for (const k of !ringOrderFault && completing === null ? figure.unsatisfied : []) {

@@ -24,13 +24,14 @@ import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
 import { narrowingNotes3 } from './narrowing3';
-import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
+import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { findNumberPair, teachPair } from '../../shell/juxtaposedNumbers';
 import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -40,13 +41,13 @@ import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
-import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -92,6 +93,68 @@ export interface Derived3 {
   /** #1680 (ADR-3D-391 Am. 1): by fact id, the reading the fold gave a line's unmarked two-reading segment equation
    *  (`readSegmentEquation3`). Absent for a line that holds none. */
   readings: Readonly<Record<string, SegmentEquationReading3>>;
+}
+
+/**
+ * #2674 ([ADR-3D-415](../../docs/06b-decisions-3d.md#adr-3d-415)) — A STUDENT'S LETTER ON A TOOL'S POINT TAKES THE TOOL'S
+ * LETTER OVER (operator ruling 2026-11-03: *"Rename the tool's letter to the student's, no message (2-D's way, in every
+ * builder)"*; 2-D's ADR-653 `impliedIdentityBinding`, the PATTERN copied, never imported).
+ *
+ * «אמצע BB'» names its point with the pool's first free letter, picked at apply (`midpoint-auto`): that letter is the
+ * TOOL's, in no line the student typed. «E אמצע BB'» then defines E as the same point, and the figure used to carry
+ * both, M and E on one dot with the coincidence notice, a pair the student never made. Here the line that leaves a
+ * FRESH student letter L with the same 0-DOF definition as exactly one tool-lettered point M names M by use: the
+ * minting command keeps L (`midpoint-auto.id`), so the figure has one point, L, and M goes back to the pool (the next
+ * unnamed midpoint is M again, as in 2-D).
+ *
+ * Read from the construction, never from coordinates: equal DEFINITIONS (kind, parents, parameter) after the line, a
+ * derived kind only (a free point or a rider is a sampled coincidence, never an identity). Every point letter the
+ * other lines carry is the student's — a line that typed M («AM = 3») makes M the student's, and two student letters
+ * that the givens force together keep the notice (#1595 ruling B). `candidate` holds the line under `factId`; the
+ * tool's point must be minted by an EARLIER line. Returns the renamed list and its derive, or null (nothing to name,
+ * or the named list does not build: the line then stands as it was).
+ */
+function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed: number): { facts: Fact3[]; derived: Derived3 } | null {
+  const at = candidate.findIndex((f) => f.id === factId);
+  const line = candidate[at];
+  if (!line || !line.enabled) return null;
+  const others = candidate.filter((f) => f.id !== factId);
+  const studentLetters = new Set<string>();
+  for (const f of others) for (const l of pointLabels3(f.cmds)) studentLetters.add(l);
+  const lineLetters = pointLabels3(line.cmds);
+  const fresh = [...lineLetters].filter((l) => !studentLetters.has(l));
+  if (fresh.length === 0) return null;
+  const post = derive3(candidate as Fact3[], seed).construction.points;
+  const key = (id: Id): string | null => {
+    const def = post.get(id);
+    if (!def || !DERIVED_POINT_KINDS3.has(def.kind)) return null;
+    if (def.kind === 'on-segment') {
+      if (def.t === undefined) return null; // a free rider
+      // one segment, either way round: «אמצע BB'» and «אמצע B'B» are one point
+      return def.a <= def.b ? meaningKey({ kind: def.kind, a: def.a, b: def.b, t: def.t }) : meaningKey({ kind: def.kind, a: def.b, b: def.a, t: 1 - def.t });
+    }
+    if (def.kind === 'scaled-offset' && def.k === undefined) return null; // a free-ratio corner is a rider too
+    return meaningKey(def);
+  };
+  // the TOOL's letters: points of the figure no line names — and the command that minted each, which must precede the line
+  const minters = others.flatMap((f) =>
+    candidate.indexOf(f) < at && f.enabled ? f.cmds.flatMap((k, j) => (k.type === 'midpoint-auto' && k.id === undefined ? [{ f, j, a: k.a, b: k.b }] : [])) : []);
+  const found: { fact: Fact3; j: number; to: Id }[] = [];
+  for (const L of fresh) {
+    const k = key(L);
+    if (k === null) continue;
+    for (const [M, def] of post) {
+      if (lineLetters.has(M) || studentLetters.has(M) || def.kind !== 'on-segment' || key(M) !== k) continue;
+      const mint = minters.filter((m) => (m.a === def.a && m.b === def.b) || (m.a === def.b && m.b === def.a));
+      if (mint.length === 1) found.push({ fact: mint[0].f, j: mint[0].j, to: L });
+    }
+  }
+  if (found.length !== 1) return null;
+  const { fact, j, to } = found[0];
+  const facts = candidate.map((f) => (f.id === fact.id ? { ...f, cmds: f.cmds.map((k, i) => (i === j && k.type === 'midpoint-auto' ? { ...k, id: to } : k)) } : f));
+  const derived = derive3(facts, seed);
+  const st = derived.status[factId];
+  return (st === 'ok' || st === 'disabled') && derived.status[fact.id] === 'ok' ? { facts, derived } : null;
 }
 
 /**
@@ -162,6 +225,11 @@ export type StoreError3 =
    *  complex builder's notation only. «∠ABC = π» RECORDED an angle mark labelled π; the rest went to the model.
    *  Typed, so it never escalates; answered with 2-D's degrees sentence. */
   | { code: 'radian-angle' }
+  /** #2286 (ADR-AG-397, operator ruling 2026-11-03): two numbers with only a space between them («AB = 2 3») — 2.3, 23
+   *  or 2·3, so refused before the grammar and the model with the suite's sentence. `detail` is the student's pair;
+   *  the rest is what it teaches, each reading kept only when `parse3` reads the line with it in place (`teachPair`,
+   *  #1156): `decimal` / `joined` (both whole) and `product` (the value — this grammar reads no `*`), or `comma`. */
+  | { code: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /** #1919 (ADR-3D-328, ADR-626): a letter this tool cannot read — «משולש ДЖФ» RECORDED A, B, C, because a
    *  letter outside the label alphabet is invisible to `declLeftover`, so the shape read as unlabelled and
    *  `planarPolygon` drew its default names. `detail` is the student's own run(s); `name` is a run that
@@ -221,7 +289,8 @@ function seedForRequirements(facts: Fact3[], from: number): number | null {
   // preference nothing has to state, so the sweep must be consulted whenever the figure has solids.
   // Judged first on the resolution we ALREADY have, so the common (non-degenerate) case still returns
   // `from` without a single extra solve.
-  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions)) return from;
+  // #1986 (ADR-3D-418): ...and a declared ring drawn crossed asks the sweep too (its preference tier), judged the same way.
+  if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions) && !declaredRingCrossed3(construction, d.positions)) return from;
   return firstSatisfyingSeed3(construction, from);
 }
 
@@ -1539,21 +1608,7 @@ function deriveCore3(
    * (created, or bound over existing points) and a stated quad shape (`declaredQuads3`; a pyramid's base is
    * generated simple, so it carries no declaration of its own).
    */
-  const declaredRings3: Id[][] = (() => {
-    const all: Id[][] = [
-      ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
-      ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
-      ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
-    ];
-    const seenRings = new Set<string>();
-    const out: Id[][] = [];
-    for (const ring of all) {
-      if (seenRings.has(ring.join())) continue;
-      seenRings.add(ring.join());
-      out.push(ring);
-    }
-    return out;
-  })();
+  const declaredRings3: Id[][] = declaredRingsOf3(c); // #1986: the one enumeration, shared with the seed search
   const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
   const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
     ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring));
@@ -1677,6 +1732,31 @@ function deriveCore3(
         break;
       }
       f.forEach((x) => by.add(x));
+    }
+    /**
+     * #1986 (ADR-3D-418) — REFUSE LAST for a coordinate letter: every vertex fixed by coordinates or placed by the free
+     * letter («A(k,0,0)»). The resolve already drew the letter past its default window wherever that uncrosses the
+     * ring (`ringReachValue3`), so a ring still crossed at EVERY claim sample is one the search found no simple
+     * drawing for — the ruled refusal, in ADR-3D-322's words. A sample the pivot left unplaced is skipped; with none
+     * placed the check fails open.
+     */
+    const letterVertex = (id: Id) => c.points.get(id)?.kind === 'coord-sym';
+    if (!fixed && ring.some(letterVertex) && ring.every((id) => letterVertex(id) || coordinateFixers3(c, facts, id))) {
+      by.clear();
+      for (const id of ring) {
+        const f = letterVertex(id) ? placementFixers3(c, facts, id, false) ?? new Set(facts.filter((x) => x.enabled && x.cmds.some((k) => 'id' in k && k.id === id)).map((x) => x.id)) : coordinateFixers3(c, facts, id)!;
+        f.forEach((x) => by.add(x));
+      }
+      let placed = 0;
+      let saved = false;
+      for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
+        if (r.pivot !== null && r.pivot.solutions === 0) continue; // not a figure (ADR-3D-284)
+        placed++;
+        const at = ring.map((id) => r.positions.get(id));
+        if (at.some((q) => !q) || !ringSelfCrossing3(at as Vec3[])) { saved = true; break; }
+      }
+      if (placed === 0 || saved) continue; // fail open: a simple drawing exists, or there is no figure to judge
+      fixed = true;
     }
     if (!fixed) {
       // #1927 — the shape-placed scope, read over the claim samples
@@ -1884,7 +1964,7 @@ function deriveCore3(
           Math.abs(norm3(sub3(p, k.center)) - k.radius) <= 1e-5 * Math.max(k.radius, 1) &&
           Math.abs(dot3(sub3(p, k.center), k.normal)) <= 1e-5 * Math.max(k.radius, 1);
         if (!holds) {
-          status[f.id] = { code: 'not-on-line', id: cmd.point };
+          status[f.id] = { code: 'not-on-circle', id: cmd.point }; // #2611 (ADR-3D-414): the circle's own wording
           break;
         }
       } else if (cmd.type === 'right-pyramid-point') {
@@ -2106,7 +2186,12 @@ export interface Geo3State {
  * matters — a command list is a sequence, and two different orderings are not obviously the same claim.
  */
 const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
-  a.length === b.length && meaningKey(a) === meaningKey(b); // #1485: «הפאה SBC» restates «המישור SBC»
+  a.length === b.length && meaningKey(a.map(statedCommand3)) === meaningKey(b.map(statedCommand3)); // #1485: «הפאה SBC» restates «המישור SBC»
+
+/** #2674 (ADR-3D-415): a command as the student STATED it — a letter given to a tool's point by a later line is a
+ *  naming, not part of «אמצע BB'», so the line typed again is still the same statement, and its utterance still
+ *  lowers to it (the fixture drift net reads this). */
+export const statedCommand3 = (k: Command3): Command3 => (k.type === 'midpoint-auto' && k.id !== undefined ? { type: k.type, a: k.a, b: k.b } : k);
 
 /**
  * A ring's identity up to rotation and reversal (ADR-W-121; 2-D's `ringKey`, copied by design — the engine
@@ -2252,6 +2337,13 @@ function readStatement3(
   // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
   // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
   if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };
+  // #2286 (ADR-AG-397): two numbers with only a space between them, refused at the same reader with the suite's one
+  // detector (`shell/juxtaposedNumbers`) — never sent to the model. The mixed number «2 1/2» is not this shape (#2248).
+  const pair = findNumberPair(utterance);
+  if (pair) {
+    const { kind: _k, ...teach } = teachPair(utterance, pair, (l) => parse3(l).ok);
+    return { ok: false, error: { code: 'juxtaposed-numbers', detail: pair.text, ...teach } };
+  }
   // #1919 (ADR-3D-328): a letter the tool cannot read, refused at the one statement reader both seams
   // share — the shared rule every builder calls (`shell/inputScript`), run after the glyph fold's
   // look-alike row, so «משולש КМО» still records KMO and «משולש ДЖФ» is refused naming Д, Ж, Ф.
@@ -2507,10 +2599,13 @@ export function decideCommands3(
     }
   }
   const fact: Fact3 = { id: newId(), utterance: utterance.trim(), cmds: [...commands], enabled: true };
-  const candidate = [...facts, fact];
-  const derived = derive3(candidate, seed);
-  const status = derived.status[fact.id];
+  let candidate = [...facts, fact];
+  let derived = derive3(candidate, seed);
+  let status = derived.status[fact.id];
   if (status !== 'ok' && status !== 'disabled') return { kind: 'refused', error: status }; // keep-prior
+  // #2674 (ADR-3D-415): the student's letter on a point the TOOL lettered takes the tool's letter over
+  const named = toolLetterTakenOver3(candidate, fact.id, seed);
+  if (named) [candidate, derived, status] = [named.facts, named.derived, named.derived.status[fact.id]];
   if (opts.twins) {
     const twin = knownSegmentEquationTwin3(facts, seed, fact, derived);
     if (twin) return { kind: 'already-stated', twin, facts };
@@ -2693,7 +2788,9 @@ export const useGeo3 = create<Geo3State>()(
         // candidate status is 'disabled', so its rewrite passes the derive gate by construction
         // (it gates for real when re-enabled, exactly like the complex builder's muted-edit rule).
         const fact: Fact3 = { ...old, utterance: utterance.trim(), cmds: parsed.commands };
-        const candidate = facts.map((f) => (f.id === factId ? fact : f));
+        // #2674 (ADR-3D-415): the edit seam names a tool's point by use exactly as `submit` does (one function)
+        const typed = facts.map((f) => (f.id === factId ? fact : f));
+        const candidate = toolLetterTakenOver3(typed, factId, seed)?.facts ?? typed;
         const st = derive3(candidate, seed).status[factId];
         if (st !== 'ok' && st !== 'disabled') {
           set({ lastError: st }); // keep-prior: the old statement stands

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-04T05:59:50.067Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "דלתון ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "kite",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מרובע ABDC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "D",
+            "C"
+          ]
+        }
+      ]
+    }
+  ]
+}

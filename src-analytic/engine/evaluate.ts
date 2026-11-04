@@ -21,7 +21,7 @@ import { evalLengthExpr, type LengthExpr } from './lengths';
 import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
 import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
-import { cornerKey, legibilityFaults, ringFaultsOf, thinRingsOf, type RingFault } from './rings';
+import { closePairsOf, COLLAPSED_SIN_TOL, cornerKey, legibilityFaults, ringFaultsOf, thinRingsOf, THIN_SIN_TOL, type RingFault } from './rings';
 import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
@@ -143,6 +143,13 @@ export interface Figure {
    * that completed it as a collapse. Absent when none (and on a figure built by hand).
    */
   collapsedRings?: Id[];
+  /**
+   * Operand pairs (`constraintOperandPairs`) whose givens HOLD here only with the two points MET (#2506, ADR-AG-399): the
+   * thin-ring arm's pair trigger fired, the tightened re-solve met every residual and the pair went under the collapse
+   * floor. The givens hold only in the limit where two named points meet, whether or not they are a declared ring, so
+   * `derive` refuses the completing line naming both statements. Absent when none.
+   */
+  metPairs?: [Id, Id][];
   /**
    * Declared polygons the configuration walk found CROSSED in every valid candidate it evaluated (#1927, ADR-AG-250):
    * `drawableAt` found nothing whole, and among at least {@link FORCED_RING_FLOOR} candidates whose givens, selectors
@@ -3830,6 +3837,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const unsatisfied: Constraint[] = [];
   /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
   const collapsedRings: Id[] = [];
+  /** Operand pairs the givens hold on only MET (the same arm's pair trigger, #2506 / ADR-AG-399). */
+  const metPairs: [Id, Id][] = [];
   // The figure as SAMPLED, before any solve moves it — the reference a collapse is measured against (ADR-AG-213).
   const sampledEnv = env;
   let free = seeded;
@@ -4330,7 +4339,24 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   if (unsatisfied.length === 0 && c.constraints.length > 0 && (ids.length > 0 || sys.syms.length > 0)) {
     const pos0 = place(c, env, free);
     const thin = thinRingsOf(c, (id) => pos0.get(id));
-    if (thin.length > 0) {
+    /*
+     * …OR TWO NAMED POINTS A STATEMENT RELATES SIT CLOSE (#2506, ADR-AG-399 — ADR-764 arm A's diagnosis, one product over).
+     * "A declared ring is thin" is the observed shape of the failure, not the fact, which is that a stated relation holds
+     * only because its own terms collapsed: «נקודה A» · «נקודה B» · «נקודה C» · «AB = BC» · «AC ⊥ BC» drew C 3.9e-4 of the
+     * extent from A at every seed, green, with no ring to be thin. So the trigger also reads every constraint's OPERAND
+     * PAIRS (`constraintOperandPairs`, a Record over every kind) — every constraint, not the line's own: in the other
+     * order the collapsing pair belongs to the earlier «AC ⊥ BC». A pair that already shared one position in the SAMPLE
+     * (stated coordinates on one dot) is a coincidence by construction, not a collapse the solve bought, and is skipped.
+     */
+    const start = place(c, sampledEnv, seeded);
+    const startSpan = figureScale(start, sampledEnv, sys.syms);
+    const metInSample = ([a, b]: [Id, Id]): boolean => {
+      const p = start.get(a);
+      const q = start.get(b);
+      return !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y) <= SOLVE_TOL * Math.max(1, startSpan);
+    };
+    const closePairs = closePairsOf(c.constraints, (id) => pos0.get(id), figureScale(pos0, env, sys.syms), THIN_SIN_TOL).filter((p) => !metInSample(p));
+    if (thin.length > 0 || closePairs.length > 0) {
       const system = sys;
       const tight = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveMultiStart([system.toVec(free, env)], system.residualsAt));
       const posT = place(c, system.envAt(tight.values), system.asMap(tight.values));
@@ -4373,6 +4399,30 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         if (heldFlat && !statedAnglesContradict(c, ring.vertices)) collapsedRings.push(ring.id);
         const vertices = new Set<Id>(ring.vertices);
         const k = [...c.constraints].reverse().find((con) => mentionsAny(con, vertices));
+        if (k && !unsatisfied.includes(k)) unsatisfied.push(k);
+      }
+      /*
+       * The pair verdict (#2506, ADR-AG-399). The figure solve is already polished at the tight tolerance (round #2627), so
+       * the re-solve above is the question, not a new start: a genuine thin triangle («AB = 10 · BC = 9.9999 · AC ⊥ BC», a
+       * pair at 4.5e-3 of the extent) is an EXACT solution and MEETS the tight bar (measured: `ok` at every seed, the
+       * pair unmoved); a needle bought with slack does not — it either goes under the ring's collapse floor
+       * (`COLLAPSED_SIN_TOL` of the tight figure's extent) or the tight solve cannot meet the bar at all while the pair
+       * stays in the band (measured on «AC = BC · AB ⊥ AC»: `ok: false` at 15 of 16 evaluations, and the one seed the
+       * search drew sat at 1.4e-3, just above the floor — #1334's own failure, one arm over). Either is the givens
+       * holding only where the two points meet; it pushes the LAST constraint naming either point, the ring arm's blame.
+       */
+      const closeNow = closePairsOf(c.constraints, (id) => posT.get(id), span, tight.ok ? COLLAPSED_SIN_TOL : THIN_SIN_TOL);
+      for (const pair of closeNow) {
+        if (!closePairs.some((p) => p[0] === pair[0] && p[1] === pair[1])) continue;
+        /*
+         * Evidence for the two-statements refusal only when the pair is NOT two corners of one declared ring: a ring's
+         * meeting corners are the ring arm's business — its collapse (ADR-AG-247) or its stated angles' own contradiction
+         * (round #2678's split, «∢ABC = 90» · «∢ACB = 90» stays «unsatisfiable», as 2-D's ADR-746 / ADR-658 has it).
+         */
+        const inOneRing = c.objects.some((o) => o.kind === 'polygon' && o.vertices.includes(pair[0]) && o.vertices.includes(pair[1]));
+        if (heldFlat && !inOneRing) metPairs.push(pair);
+        const ends = new Set<Id>(pair);
+        const k = [...c.constraints].reverse().find((con) => mentionsAny(con, ends));
         if (k && !unsatisfied.includes(k)) unsatisfied.push(k);
       }
     }
@@ -4665,6 +4715,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     ).map((rf) => withRingDof(rf, c, sys, [...solvedVec])),
     carrierDof: figureDofOf(c, sys, solvedVec),
     ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
+    ...(metPairs.length > 0 ? { metPairs } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
     ...(pinned.pins.length > 0 ? { rootKey: pinned.pins.map((q) => q.index).join(',') } : {}),
@@ -5568,7 +5619,33 @@ export function completingStatement(
   seed: number,
   pinnedBy: ReadonlyMap<Id, number> = new Map(),
 ): number | null {
-  const groups = [...new Set([...groupOf, ...pinnedBy.values()].filter((g) => g >= 0))].sort((a, b) => b - a);
+  return firstAdmittingDrop(c, groupOf, seed, pinnedBy, null);
+}
+
+/**
+ * WHICH EARLIER STATEMENT DOES THE COMPLETING ONE CONTRADICT? (#2506, ADR-AG-399 — 2-D's `[vs #i]` rule.) The same
+ * drop-one, asked once more with the completing statement KEPT: the newest earlier statement whose removal admits a
+ * figure is its partner — «BC = 5» for «AB = 5 · BC = 5 · AC ⊥ BC», as 2-D names it. Its own `CONFLICT_PROBE_BUDGET`;
+ * `null` when no single earlier removal admits one (the refusal then names the completing line alone).
+ */
+export function partnerStatement(
+  c: Construction,
+  groupOf: readonly number[],
+  seed: number,
+  completing: number,
+  pinnedBy: ReadonlyMap<Id, number> = new Map(),
+): number | null {
+  return firstAdmittingDrop(c, groupOf, seed, pinnedBy, completing);
+}
+
+function firstAdmittingDrop(
+  c: Construction,
+  groupOf: readonly number[],
+  seed: number,
+  pinnedBy: ReadonlyMap<Id, number>,
+  keep: number | null,
+): number | null {
+  const groups = [...new Set([...groupOf, ...pinnedBy.values()].filter((g) => g >= 0 && g !== keep))].sort((a, b) => b - a);
   let spent = 0;
   for (const g of groups) {
     const without: Construction = {
@@ -5593,6 +5670,18 @@ export function completingStatement(
  * Called only on the refusal path, where `drawableAt` found nothing whole and so evaluated this whole window
  * already: every lookup is a memo hit (ADR-AG-144), never a new solve.
  */
+/**
+ * WHICH OPERAND PAIRS THE GIVENS FORCE TOGETHER (#2506, ADR-AG-399) — `Figure.metPairs` over the same window, the
+ * pair twin of {@link collapsedByGivens}. Refusal path only, every lookup a memo hit.
+ */
+export function pairsMetByGivens(c: Construction, seed: number): [Id, Id][] {
+  const out: [Id, Id][] = [];
+  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
+    for (const p of evaluate(c, s).metPairs ?? []) if (!out.some((q) => q[0] === p[0] && q[1] === p[1])) out.push(p);
+  }
+  return out;
+}
+
 export function collapsedByGivens(c: Construction, seed: number): Id[] {
   const out: Id[] = [];
   for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {

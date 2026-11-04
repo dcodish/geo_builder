@@ -50,8 +50,8 @@ function moved(prior: readonly string[], added: readonly string[], seed: number)
 
 /** [title, prior, added, the symbol, its measure on the figure] — the triage's table, He + En, plus the givens-prior rows. */
 const ROWS: ReadonlyArray<readonly [string, readonly string[], readonly string[], string, (d: D) => number]> = [
-  ['the operator’s sequence', ['משולש ABC', 'נקודה M על BC'], ['נסמן זוית BAM כ-A1'], '∠A1', (d) => angleDeg(d, 'A', 'B', 'M')],
-  ['the operator’s sequence (En)', ['triangle ABC', 'point M on BC'], ['denote angle BAM as A1'], '∠A1', (d) => angleDeg(d, 'A', 'B', 'M')],
+  ['the operator’s sequence', ['משולש ABC', 'נקודה M על BC'], ['נסמן זוית BAM כ-A1'], '∠A₁', (d) => angleDeg(d, 'A', 'B', 'M')],
+  ['the operator’s sequence (En)', ['triangle ABC', 'point M on BC'], ['denote angle BAM as A1'], '∠A₁', (d) => angleDeg(d, 'A', 'B', 'M')],
   ['a Greek letter for the angle', ['משולש ABC', 'נקודה M על BC'], ['נסמן זוית BAM כ-α'], 'α', (d) => angleDeg(d, 'A', 'B', 'M')],
   ['a triangle’s angle', ['משולש ABC'], ['נסמן זוית BAC כ-α'], 'α', (d) => angleDeg(d, 'A', 'B', 'C')],
   ['a side equal to a letter', ['משולש ABC'], ['AB = a'], 'a', (d) => dist(d, 'A', 'B')],
@@ -96,7 +96,7 @@ describe('#2632 — «הציגו תצורה אחרת» still changes the figure,
     const before = new Set(walk(prior, 6).map((s) => seedNumber(s)));
     const seeds = walk(lines, 6);
     expect(new Set(seeds.map((s) => seedNumber(s))).size).toBeGreaterThanOrEqual(before.size);
-    const values = new Set(seeds.map((s) => symbol(derive(lines, s), '∠A1').toFixed(4)));
+    const values = new Set(seeds.map((s) => symbol(derive(lines, s), '∠A₁').toFixed(4)));
     expect(values.size).toBeGreaterThan(1);
   });
 });

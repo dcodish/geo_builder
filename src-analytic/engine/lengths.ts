@@ -20,6 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
+import { indexedNameText } from '../../shell/indexedName';
 import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import { ellipseRolePoint, type EllipseRole, type Pt } from './derived';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
@@ -528,6 +529,16 @@ const ANGLE_LABEL_MARK = '∠';
 export const angleLabelSymbol = (name: string): string => `${ANGLE_LABEL_MARK}${name}`;
 /** The label a symbol carries, or `null` when it is no angle label. */
 export const angleLabelName = (sym: string): string | null => (sym.startsWith(ANGLE_LABEL_MARK) && sym.length > 1 ? sym.slice(1) : null);
+/**
+ * #1812 (ADR-AG-394) — HOW A SYMBOL IS SHOWN TO THE STUDENT. The `∠` above is a NAMESPACE mark, an internal id, never
+ * the label: operator ruling 2026-10-06, *"Both show A₁"* — an angle labelled «A1» reads «A₁» (A with a subscript 1,
+ * no angle sign) on the canvas, in the panel and in every sentence. Every other symbol is shown as it is stored. The
+ * symbol `∠A1` stays the storage id; only what is DISPLAYED changes.
+ */
+export const symbolText = (sym: string): string => {
+  const label = angleLabelName(sym);
+  return label === null ? sym : indexedNameText(label);
+};
 
 /**
  * x AND y ARE NEVER A LENGTH IN ANALYTIC (#1622, operator ruling 2026-10-03, amending the 2026-10-02 item; ADR-AG-222

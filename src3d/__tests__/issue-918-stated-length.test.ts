@@ -125,7 +125,7 @@ describe('#918 — one source for "what did the student state"', () => {
     // panel's. There is one list; this asserts the canvas is reading it.
     const { d, s } = scene([BOX, 'AB = 5', 'AD = 3', "AA' = 4"]);
     const fromEngine = [...statedLengths(d.construction).entries()]
-      .map(([k, v]) => `${k.split('|').join('')}:${v}`)
+      .map(([k, v]) => `${k.split('|').join('')}:${v.text}`) // #2361: the entry carries the one text both surfaces print
       .sort();
     expect(s.measures.map((m) => `${[m.a, m.b].sort().join('')}:${m.text}`).sort()).toEqual(fromEngine);
   });

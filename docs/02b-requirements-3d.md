@@ -679,9 +679,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
   SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
   first, «מרובע ABDC · מלבן ABCD»): when the ring crosses at every claim sample and no configuration branch can save
-  it, the line that completed it is refused with the same words. A ring a dart could save («דלתון ABCD · מרובע ABDC»)
-  is never refused (the operator's "search first, refuse last", 2026-10-09). A ring with a free vertex is
-  drawn simple by choice of configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
+  it, the line that completed it is refused with the same words. **A ring a configuration or a coordinate letter can
+  make simple is drawn simple** (#1986, ADR-3D-418; the operator's "search first, refuse last", 2026-10-09):
+  «דלתון ABCD · מרובע ABDC» is drawn as a dart, «מרובע ABCD · מרובע ABDC» as a concave quadrilateral, and
+  «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» as a genuine trapezoid (k > 4) — never crossed and green, and
+  «הציגו תצורה אחרת» keeps every declared ring simple. A ring over a coordinate letter is refused, in the same words,
+  only when the widened search finds no simple drawing. A ring with a free vertex is drawn simple by choice of
+  configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the
@@ -697,7 +701,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)
   and a stated angle (a labelled arc) but not for the commonest kind of all. Stated only, and drawn on a hidden
   edge too.
-  - Sources: ADR-3D-235, #918.
+  - **One text, two decimals when needed** (#2361, operator ruling sr-22 / ADR-W-175, 2026-11-02). The label on the
+    edge and the `|AB| = …` row in the data panel print the same text. A value written as a decimal reads in at most
+    two decimals and is computed with the full value («AC = 7.9999» reads «8», «AC = 4.005» reads «4.01»), and is
+    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. An integer, a fraction or a root
+    keeps its exact form («9/2», «2√3»; «√20» reads «2√5»). The same holds for a free vector's stated «|u| = 2.5».
+  - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
   on the canvas are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated
@@ -756,6 +765,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «קובייה ABCDA'B'C'D'» · «A'H גובה לפאה ABCD» → «A ו-H נפלו על אותה נקודה.». Still refused, as 2-D refuses «D חיתוך AB
   ו-BC»: a crossing whose two carriers are written through the point («G נקודת חיתוך של AC' עם מישור ADE», A is on both),
   naming it (`point-coincides`). Sources: ADR-3D-404, ADR-3D-405, ADR-W-176, ADR-W-177, #1595.
+  **A letter the TOOL gave is not a second name** *(operator ruling 2026-11-03 on #2674: "Rename the tool's letter to
+  the student's, no message (2-D's way, in every builder)")*: «קובייה ABCDA'B'C'D'» · «אמצע BB'» (the tool letters it
+  M) · «E אמצע BB'» shows one point, E, with no notice, and the next unnamed midpoint is M again, as in 2-D. A letter
+  the student typed is the student's («BM = 1» before «E אמצע BB'» keeps M and E, with the notice). Source: ADR-3D-415.
 
 ## Coverage
 
@@ -781,8 +794,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   convex polygon in the order written, free sizes) and then O, as 2-D does; «המישור BCC'B'», «E על המישור ABCD», a
   projection onto «המישור ABCD» create the plane's missing letters so that all of them lie in it (the fourth and later
   ones ride the plane through the first three). Letters already on the figure stay where they are; four existing
-  points that are not in one plane, named as a plane, are still refused.
-  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-W-162; #1467, #2048, #1566, #2610.
+  points that are not in one plane, named as a plane, are still refused. **The same holds for a plane named by its
+  letters inside a relation** (#2681): «המישור ABCD מקביל למישור EFGH», «המישור ABCD מאונך לישר EF», «EF מקביל
+  למישור ABCD», an angle or a distance to «המישור ABCD» create the run's letters in one plane, and over stated points
+  that are not in one plane the line is refused «not in one plane», exactly as «המישור ABCD» alone is.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-3D-413, ADR-W-162; #1467, #2048, #1566, #2610, #2681.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two

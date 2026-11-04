@@ -1117,9 +1117,11 @@ export function App() {
       circleShaped: (id) => isCircleShaped(d.construction, id),
       // #2688 (ADR-AG-388) — the grid / axis numbers / coordinates switches; the exports rasterise this same scene
       display,
+      // #2696 (ADR-AG-393) — two letters on one dot are written «C=E», from the pairs R214's notice reads
+      coincidences,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks, display]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle, roleMarks, display, coincidences]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 

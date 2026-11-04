@@ -349,6 +349,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A declared ring a coordinate letter can make simple («A(k,0) · … · טרפז ABCD») | n/a (no coordinates) | recorded, drawn crossed (#1986) | drawn simple, the letter searched (ADR-AG-256, #1939) | n/a | **Ruled** (#1939, 2026-10-09) — drawn, never refused, never crossed; 3-D is a known gap |
 | A proof target «הוכיחו כי» | refused | refused | refused | refused | **Same** (B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)); a bare statement is not a proof target (02d FR-KN-2, ruled to change, #2338) |
 | A number written with a fraction glyph «AB = 2½», «A(2⅓, 0, 0)» | that number: a mixed number is one number, all 18 glyphs (ADR-635) | same (ADR-3D-374, #2255) | ½ ¼ ¾ only; «2⅓» goes to the AI | not measured | **Gap** — analytic #2349; one reader, `shell/vulgarFractions.ts` (ADR-W-147) |
+| Two numbers with only a space between them «AB = 2 3», «A(2 3, 1)» | refused, 2.3 / 23 / 6 taught | same | refused, 2.3 / 23 / 2*3 taught | refused (its own sentence, #2247) | **Same** — ruled 2026-11-03 (#2286, ADR-AG-397); one detector, `shell/juxtaposedNumbers.ts`, one suite sentence |
 | An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts` |
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |

@@ -177,7 +177,8 @@ Its atom grammar has exactly one function, `√`, and `normalizeMath` maps `sqrt
 | 1 letter before `(` | kept | `k(x+1)` is a product, and the corpus writes it |
 | ≥3 letters NOT space-delimited | kept | `x²+y²-2abc=0` — juxtaposed parameters, ruled legal by #1068 |
 | a letter (Latin or Greek) IMMEDIATELY before a digit, `_` or a subscript digit | refused — an indexed name ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244), #1785) | «S1», «a2», «α1» are ONE name each; juxtaposition read `S·1`, so «S1» and «S2» shared one parameter and asserted a 1 : 2 ratio. Number-then-letter (`2a`) is unchanged |
-| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
+| any other number, whitespace, number («2 3», «2.5 3») | refused — a bare pair ([ADR-AG-397](06c-decisions-analytic.md#adr-ag-397), #2286) | ambiguous as written (2.3, 23 or 2·3); the tokenizer refuses it and `parseLine` answers `juxtaposed-numbers` before every rule and the model, teaching only the readings that read in place (`teachPair`). The detector is the suite's, `shell/juxtaposedNumbers.ts` |
+| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` (now in `shell/juxtaposedNumbers.ts`, ADR-AG-397) is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
 | the private-use range | never a run | `lengths.ts` encodes a length term (`AB`) as one character; it cannot appear in student input |
 
 The noun must be consumed by the rule that claims it: `DISTANCE` spells its English article as `NOUN` does
@@ -321,7 +322,7 @@ that mention them), each stated number by its own stretch of the sentence, and v
 other tag, so a radius r pays an equation's r² and «AB = 3» is not paid by «AB = 9»
 ([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)). A count is a BARE integer before a plural noun that is not a
 unit word (`UNIT_WORD`: «יחידות», «מטרים», «מעלות», "units", "degrees" and the singular and abbreviated units), so
-«√2 יחידות» and «30 מעלות» keep their stated values (ADR-AG-384 amendment 1).
+«√2 יחידות» and «30 מעלות» keep their stated values (ADR-AG-384 amendment 1). The unit words and the bare-integer atom are the shell's, shared with 2-D ([ADR-781](06-decisions.md#adr-781)). An answer's CURVES pay the parameters their canonical form leaves implicit ([ADR-AG-391](06c-decisions-analytic.md#adr-ag-391)): every parameter-free equation in a model line's facts is fitted as the engine fits it (`curveFromEquation`), and its parameters (a line's slope and intercept, or its `x = k`; a circle's centre and radius; a canonical ellipse's centre (0,0) and semi-axes; a canonical parabola's vertex (0,0) and p) are one more source of that line's union, so «x^2 + y^2 = 9» pays a stated centre (0,0) and «y = x + 3» a stated slope 1, while an answer centred elsewhere still drops the stated centre. Nothing computed from the parameters pays (a diameter, a focus, a point the curve passes through).
 
 *Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
@@ -340,6 +341,8 @@ A letter the tool cannot read is
 (`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
 reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
 look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
+**An indexed point name is folded to one id** (#2075, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)): `orthography` calls `shell/indexedName.foldIndexedName(line, 'glyph')`, so «X_1», «X_{1}», «X1» and «X₁» are all the id `X₁` (a digit run too: `X₁₂`) — the glyph the tool letters and every surface already print. Every copy of the point-name atom reads a digit run (`[A-Z][0-9₀-₉]*`); the parser's internal stand-ins are two-digit forms with a leading zero (`Y₀₀`…, `Z₀₀`…), so no student spelling reaches them.
+
 An angle measure written in radians is `radian-angle` (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)): `findRadianAngle` (`shell/radianAngle.ts`) is asked right after the proof target, before every rule and the model, worded from `errRadianAngle` (2-D's sentence); `detail` is the π value. The angle readers it covers are the ones analytic has — the angle given and the sector's «בזווית»; measured at b0e9dbea, an inclination, an angle between two lines and a trig argument are not read even in degrees.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's
@@ -702,7 +705,7 @@ Amended (ADR-AG-367 Am. 1): `direction-line` carries `to: [A, B]` for «ישר �
 
 #### The point-name atom ([ADR-AG-395](06c-decisions-analytic.md#adr-ag-395), #2621 C)
 
-`engine/pointName.ts` holds the one point-name atom (`POINT_NAME`: a capital, an optional index digit, an optional prime not
+`engine/pointName.ts` holds the one point-name atom (`POINT_NAME`: a capital, an optional index (a digit run, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)), an optional prime not
 before a lowercase letter) and its readers (`isPointName`, `splitPointNames`, `withPointName`, `displayPointName`). Every
 grammar rule, the length tokenizer, the ask lane, the rename dialog and the id parsers compose it; a ratchet counts the inline
 copies left. `orthography` folds every prime glyph to `'` first (`shell/primes`, shared with 3-D). The canvas and the panel
@@ -1375,7 +1378,11 @@ the other root, and a ring is offered only on the piece, its sentence saying «�
 `SPREAD_MIN_DEG` open, no stacked names — `separated`, `stackedPairs(f)`, `VISIBLE_FRACTION` of the `viewBox`,
 ADR-AG-181), **whole** (selectors hold, nothing vacant, `ringViolation` clean, every given holds, and a thin ring
 (`thinRingsOf`, `THIN_SIN_TOL`) survives a re-solve under `withToleranceFactor(TIGHT_TOLERANCE_FACTOR)` —
-[ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), ADR-537), **second best**, **fallback**. The top tier is opt-in
+[ADR-AG-143](06c-decisions-analytic.md#adr-ag-143), ADR-537; and so does an operand pair of any constraint closer than
+`THIN_SIN_TOL` of the extent (`constraintOperandPairs`, a `Record` over every kind in `engine/rings.ts`): it must
+meet the tight bar and stay over the `COLLAPSED_SIN_TOL` floor, or the givens hold only where two named points meet,
+recorded as `Figure.metPairs` and refused by `derive` as `measure-contradicts` naming the completing line and its
+`partnerStatement` — [ADR-AG-399](06c-decisions-analytic.md#adr-ag-399)), **second best**, **fallback**. The top tier is opt-in
 (only `derive`), so `isKnowledge` and `knownOptions` read what the tool would admit; `minInteriorAngleOf` decides
 nothing. The best effort stays inside the domains ([ADR-AG-162](06c-decisions-analytic.md#adr-ag-162), `admissible`),
 and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisions-analytic.md#adr-ag-159):
@@ -1756,6 +1763,22 @@ An injected isolator can be forgotten, so the kit lives in `i18n/bidi.ts`, re-ex
 `placeLengthLabels` places each stated length outward from its midpoint until clear (2-D's rule, copied), sharing
 `POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`.
 
+#### Every label is placed inside the canvas ([ADR-AG-392](06c-decisions-analytic.md#adr-ag-392), #2689)
+
+`placeSceneLabels` takes the canvas size as a hard bound: a position whose box leaves the view is never clear, and the
+position finally taken is moved inward until its box fits. An ANSWER's label (a traced locus's equation, a height's value)
+is a request in the same call (`answerLabelRequest`, 14px bold, `ANSWER_LABEL_FONT`): its candidates are four spots
+beside each of up to 32 points along its own trace (`alongTrace`, the midpoint first — where it always sat), it keeps off
+its own curve (`LabelRequest.avoid`), and it yields to every stated value (priority 2). `Figure.tsx` centres it on the
+returned position, as every placed label.
+
+#### Two letters on one dot are one label ([ADR-AG-393](06c-decisions-analytic.md#adr-ag-393), #2696)
+
+`App.tsx` hands `buildScene` the pairs R214's notice reads (`coincidencesOf`, as `SceneKnowledge.coincidences`);
+`buildScene` joins them with 2-D's rule, `shell/converge` `mergedLabels` (2-D's `src/render/scene.ts` calls the same
+function): the alphabetically first id carries «C=E», the others carry `''` (`hasLetter` false — no letter placed, no
+label box). The carrier writes its own stated coordinates, else the first member's that has any.
+
 #### Where a point's letter is written ([ADR-AG-389](06c-decisions-analytic.md#adr-ag-389), #2691)
 
 `placePointLetters` runs in `buildScene` before `placeSceneLabels`: 2-D's seed (`outwardDir`, the widest gap between the
@@ -1879,7 +1902,10 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 
 `App.submit` dry-runs the list with the new line: `faulted` refuses, `created` / `narrowed` record, `known` gives a
 notice. The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
-because `absorbed` hid two events.
+because `absorbed` hid two events. **Before either no-op answer** (`already-known`, `already-follows`) the decision
+asks `addsStatedValue(current, trial)` (`app/submit.ts`): a trial whose stated-measure layer labels something the
+current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc; not the knee, which «⟂» shares), never
+counted — records, so its value is drawn (2-D's ADR-542 visibility half; [ADR-AG-401](06c-decisions-analytic.md#adr-ag-401)).
 
 *Identifiers:* `no`
 

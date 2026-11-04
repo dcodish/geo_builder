@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -36,7 +36,7 @@ import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
-import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm } from '../../shell/llm/honestyCore';
+import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
 import { resolvePairRoles } from './pairRoles';
 import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
@@ -13003,9 +13003,10 @@ const normalizeAreaSubscript = (s: string): string =>
  * Scoped to a letter + `_` + DIGITS, so it can't touch the area marker's `S_{ABC}` (uppercase LETTERS).
  * #1814 (ADR-600): any NAME letter, Greek too, so «α_1» ≡ «α1» (one sentence, one verdict). Latin-only, the
  * underscore form slipped past every guard that knows «α1» and read as 1°.
+ * #2075 (ADR-AG-398): the fold is the suite's (`shell/indexedName.foldIndexedName`, `'glued'`), which analytic calls
+ * with its own canonical form — the third copy moved to the shared atom.
  */
-const POINT_SUBSCRIPT = new RegExp(String.raw`(${NAME_LETTER})_\{?(\d+)\}?`, 'g');
-const normalizePointSubscript = (s: string): string => s.replace(POINT_SUBSCRIPT, '$1$2');
+const normalizePointSubscript = (s: string): string => foldIndexedName(s, 'glued');
 
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>
@@ -13635,6 +13636,12 @@ function withCarrierSegments(commands: AnyCommand[]): AnyCommand[] {
 }
 
 /**
+ * A COUNT slot of {@link statedNumberText}: the shell's bare integer (`COUNT_DIGITS`), not a ratio's «פי»-prefixed digit,
+ * before a plural noun that is not a `UNIT_WORD` and not «פעמים» / "times" (#160, #2692 / ADR-781).
+ */
+const COUNT_SLOT = new RegExp(String.raw`(?<!פי\s)${COUNT_DIGITS}\s+(?=(?!${UNIT_WORD})(?:(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z])))`, 'g');
+
+/**
  * The text the number gate scans (ADR-250), shared with the read-extent number probe (#2198, ADR-678) so the two
  * can never disagree about what a STATED number is. `raw` is the normalized line; `counted` blanks the digits in
  * count slots; `s` also blanks name indices. Both blanking passes are length-preserving, so an index into `s` is
@@ -13660,8 +13667,12 @@ function statedNumberText(utterance: string): { raw: string; counted: string; s:
   // letter-bearing text at the SAME index as the digit match in `s`, so a blank must occupy exactly
   // the span it replaced. Every consumer downstream separates on optional whitespace, so the widened
   // runs are invisible to it.
+  // #2692 (ADR-781): a count is the shell's BARE integer (`COUNT_DIGITS`: never one term of «√2», «3/4», «1.5») and never
+  // a value before a UNIT word (`UNIT_WORD`) — «5 סנטימטרים», «30 מעלות», "5 meters", "30 degrees" end like a plural
+  // noun, and reading them as counts blanked the stated value, so an answer that changed it passed. One atom pair for
+  // both builders' gates (analytic's ADR-AG-384 am. 1).
   const blank = (m: string): string => ' '.repeat(m.length);
-  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
+  const counted = raw.replace(COUNT_SLOT, blank);
   // #1814 (ADR-600): a NAME's index is never a magnitude, whatever alphabet the name is in. Latin-only, the
   // «1» of «α1» counted as a stated number and the bogus value 1° paid for it.
   const s = counted.replace(new RegExp(String.raw`${NAME_LETTER}\d*`, 'g'), blank);

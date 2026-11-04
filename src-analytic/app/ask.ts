@@ -19,6 +19,7 @@
  * number at all. Asking «AB» on a figure that has not fixed it gets the open answer — which is
  * itself worth knowing, and is the truthful one.
  */
+import { foldIndexedName } from '../../shell/indexedName';
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
@@ -969,7 +970,8 @@ const ASK_CLOSER = /\s*(?:=\s*)?[?？]\s*$|\s*=\s*$/;
 const OPTIONS_OPENER = /^(?:את\s+)?(?:שתי|כל)\s+ה?אפשרויות\s+ל-?(?=[א-ת])/;
 const OPTIONS_HINT = /\s*\(\s*(?:שתי|כל\s+ה?)\s*אפשרויות\s*\)\s*$/;
 export function normaliseAsk(question: string): string {
-  let t = question.trim().replace(ASK_CLOSER, '').trim().replace(OPTIONS_HINT, '').replace(ASK_CLOSER, '').trim();
+  // #2075 (ADR-AG-398): a point's index in any spelling is the glyph the figure's ids carry («A1» asks about A₁)
+  let t = foldIndexedName(question.trim(), 'glyph').replace(ASK_CLOSER, '').trim().replace(OPTIONS_HINT, '').replace(ASK_CLOSER, '').trim();
   const open = ASK_OPENER.exec(t);
   if (open && open[0].length < t.length) t = t.slice(open[0].length).trim();
   const options = OPTIONS_OPENER.exec(t);
