@@ -15036,7 +15036,7 @@ The one moving point now carries the whole change, so its own move is larger tha
 
 It reads the scene as drawn, so it holds with every #2688 switch on or off (a letter-only box is placed with the values off). With #1863 (round #2678) the conic chip's marks are ink too: `buildScene` builds the role marks before the letters, each directrix joins the hard ink and each focus dot is a dot no letter may cover (`placePointLetters`' `marks`); the sweep runs every figure again with every stated conic's chip on «both».
 
-**Unchanged.** The figure, every point's position, every mark and value rule, the panel, the exports' path (they rasterise this scene). Two letters on one dot are still two letters, now side by side (2-D's «B=E» merge, ADR-486, is not ported here: not asked).
+**Unchanged.** The figure, every point's position, every mark and value rule, the panel, the exports' path (they rasterise this scene). Two letters on one dot are still two letters, now side by side (2-D's «B=E» merge, ADR-486, is not ported here: not asked). **⚠ Amended by [ADR-AG-393](#adr-ag-393)** (operator ruling 2026-11-04): they are now one label, «C=E».
 
 **Measured after.** The same sweep: **0 crossings of ink, 0 letter overlaps, 0 dots covered**. Scene build over the 110 fixtures 29.6 → 34.8 ms in all; the worst fixture +8.6 % of its derive + scene (0.28 ms), under the 10 % bar.
 
@@ -15070,3 +15070,59 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** `src-analytic/parser/__tests__/honesty-implicit-curve-values-2680.test.ts`: the rows above (drop nothing); answers that really change a value (a moved centre, a changed radius, a parameter paid once, a changed slope or intercept), each naming it; the mocked model lane end to end (the centred and the translated circle commit; a circle centred elsewhere is refused with `llm-dropped`, naming «0», «0»). `honesty-radical-2646.test.ts` and `issue-1355-llm-honesty.test.ts` are unchanged and green.
 
 **Behaviour change for a student:** in analytic, a correct AI answer written in canonical form is no longer refused for a parameter the form leaves implicit: «מעגל שמרכזו (0,0) ורדיוסו 3» answered «x^2 + y^2 = 9», an expanded circle equation, a line of slope 1 written «y = x + 3». An answer that really moves a stated centre or changes a slope is still refused with the existing dropped-given sentence.
+
+## ADR-AG-392 — Every canvas label is placed inside the canvas; an answer's label joins the one placement and moves along its curve (#2689)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P2, analytic, session-found) · round #2697 · branch `fix/2689-locus-label-edge`
+**Requirements:** [02c](02c-requirements-analytic.md) R166 (amended: every value on the canvas is written whole, inside it) · **Design:** [04c](04c-design-analytic.md) § *Every label is placed inside the canvas* (new, under *Where a stated length is written*).
+
+**Context.** Found by round #2678's pre-play: «A(-3,0)» · «B(3,0)» · «נקודה P» · «PA + PB = 10», then «הצג מקום גאומטרי» on P. Measured at `ebacadd1` through the student's path (derive → ask by the chip → `drawnLoci` → `drawnBox` → `viewBox` → `buildScene`) at the app's 720×720 fallback canvas, seed 0: the ellipse's label started at x = 631 and ran ~215px, past the 720 edge — the student read «אליפסה · x²/25 + y²/16 =» with no «1». `Figure.tsx` wrote it at a fixed `dx 6 / dy −6` from the trace's midpoint; the height's value (`measures[].label`, #1048) the same way at `dx 6 / dy −4` from its perpendicular's midpoint. Neither went through `placeSceneLabels`, and `placeSceneLabels` itself had no notion of the view: a length or an angle value at the edge could step out of it too.
+
+**The class.** *A value written on the canvas is positioned with no knowledge of the canvas bound* — every answer label (never placed at all) and every placed label (placed, but unbounded). One wrong outcome: a value the student cannot read whole.
+
+**Decision.**
+1. `placeSceneLabels` takes the canvas size (`view`). A position whose box leaves the view is never clear; the position finally taken (no clear spot) is moved inward until its box fits (`intoView`). Without `view` (a unit caller) nothing is bounded.
+2. An answer's label is a `LabelRequest` in the same call (`answerLabelRequest`): its candidates are four spots — up-right (where it always sat), up-left, down-right, down-left — beside each of up to 32 points along its own trace (`alongTrace`, midpoint first, then outward both ways); a height's label has its perpendicular's midpoint as its one anchor. It keeps off its own curve (`LabelRequest.avoid`), is measured at its own 14px bold (`font`, `bold`), and has priority 2, so it yields to every stated value.
+3. `Figure.tsx` centres both answer labels on the returned position (`textAnchor="middle"`, `dy 0.35em`), as every placed label is.
+
+**Sibling audit.** 2-D: its canvas is re-fitted to the scene with a reserved inset (`src/render/transform.ts` "kept clear on every side so labels/marks aren't clipped"), and it draws no locus label — class not present. 3-D and complex: no traced-curve label; their labels are projected inside the fitted frame — not touched. In analytic, the other unplaced labels are the construction's 2x/x ratio marks and a circle centre's coordinate label, both anchored on ink that is inside the frame by construction; not changed (no report).
+
+**Measured after.** The reported ellipse, an ellipse x²/16 + y²/12, the bisector `MA = MB` (an open trace running off the view), a parabola y² = 8x and a translated circle, seeds 0–3, at 720×720, 900×600 and 420×600: every label's box inside the canvas (it was outside on the reported case at 720×720 and 900×600).
+
+**Locks.** `src-analytic/__tests__/issue-2689-answer-label-in-view.test.ts` — the five figures × four seeds × three canvases (the canvas label equals the panel's value and its box is inside), the bound on a length and on a candidate-bound value at the edge, no bound without a view, and the height's value inside the view.
+
+**Behaviour change for a student:** a locus equation (and a height's value) is written whole inside the canvas; at the edge it moves along its curve to where it fits, and it no longer sits on a point's letter or a stated value. Before, it could be cut off at the edge.
+
+## ADR-AG-393 — Two letters on one dot are written as one label, «C=E», by 2-D's join rule, now shared in shell (#2696)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P3, analytic) · round #2697 · branch `fix/2696-coincident-letters-join` (stacked on `fix/2689-locus-label-edge`) · amends [ADR-AG-389](#adr-ag-389)'s "two letters, side by side"
+**Requirements:** [02c](02c-requirements-analytic.md) R214 (amended: on the canvas the pair is one label) · **Design:** [04c](04c-design-analytic.md) § *Two letters on one dot are one label* (new).
+
+**Context.** On the operator's #2691 figure («משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18») the altitude's foot E lands on C (seeds 0, 3) or on B (seeds 1, 2). Measured at `52fefb5f`: `coincidencesOf` has the pair, R214's notice says so, and the canvas placed two letter boxes side by side — the student read «CE». 2-D writes one label «C=E» (ADR-486). **Operator ruling 2026-11-04 (card q5 = A): match 2-D.**
+
+**The class.** *A coincidence the builder already knows (the notice's pairs) never reached its canvas* — every pair, every figure; analytic's scene had no merge at all.
+
+**Decision.** 2-D's join (the union-find over the pairs, alphabetically first id carries the members sorted and joined by «=», the others `''`) moves verbatim from `src/render/scene.ts` to `shell/converge.ts` `mergedLabels`, beside the notice's `coincidentPairs` it pairs with; 2-D's `buildScene` calls it (no 2-D behaviour change — `issue-942-coincident-views.test.ts` re-run green). Analytic's `buildScene` takes `SceneKnowledge.coincidences` — `App.tsx` passes `coincidencesOf(d)`, the same pairs the notice reads, so the canvas and the notice agree — and writes the carrier's label from `mergedLabels`. A silent member (`hasLetter` false) gets no letter placed and no label box. The carrier writes the dot's stated coordinates: its own, else the first member's that has any (the members are one point; a stated value stays visible).
+
+**Sibling audit.** 2-D: the reference, now reading the shared function. 3-D and complex: no label merge (grep `coincid` in `src3d/render`, `src-complex/render`: none) — not ported (the ruling names analytic); raised as a question in the round report.
+
+**Locks.** `src-analytic/__tests__/issue-2696-coincident-letters-joined.test.ts` — his figure at seeds 0–3 (one «X=E» label, E silent, every other letter untouched), the caller-hands-none control, «V=Y» keeping V's (0, 0), and the shared rule (a pair, a chain, two pairs, none).
+
+**Behaviour change for a student:** two letters on one dot read «C=E» on the canvas, as in the 2-D tool; before, «CE».
+
+## ADR-AG-394 — An angle's label is shown «A₁»: the `∠` is a storage mark, never shown; one display function over a shared spelling (#1812)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P2, analytic + 2-D, reported) · round #2697 · branch `fix/1812-angle-label-subscript` (stacked on `fix/2696-coincident-letters-join`) · 2-D arm: [ADR-782](06-decisions.md#adr-782)
+**Requirements:** [02c](02c-requirements-analytic.md) R164 (amended: «A₁» at the arc and in the panel, as in 2-D) · **Design:** none (internal) — the display function sits beside `angleLabelName` in `engine/lengths.ts`.
+
+**Context.** Operator, playing round #1776 T5 (2026-10-06): *"the expected behavior is A and small 1 and without the angle symbol"*; ruling the same day: *"Both show A₁"* — analytic AND 2-D label an angle named «A1» as A₁ at the arc. Measured at `9d0ca6c0` through `decideSubmit` → `derive` → `buildScene` / `paramRows`: «משולש ABC» · «נסמן ∠CAB=A1» recorded, the arc read «∠A1», the «פרמטרים» row «∠A1»; 2-D drew «1» (#263).
+
+**The class.** *Every surface that shows an angle label printed its storage id* (`angleLabelSymbol` = `∠A1`, ADR-AG-221 — the `∠` keeps the label from colliding with a point named A1). The surfaces: the canvas arc label (`statedText` of the stated value), the parameters row (`paramRows`), and every sentence that quotes a stated value through `statedText` (the restatement refusals, `reasonText`). The alias-taken refusal already names the bare label (`holder: A1`); the ask lane answers no question about the label.
+
+**Decision.** `shell/indexedName` `indexedNameText` spells an indexed name as the book does — trailing digits as subscript digits («A1» → «A₁», «A12» → «A₁₂», «A» unchanged). `engine/lengths.ts` `symbolText(sym)` shows an angle label through it and every other symbol as stored; `statedText` prints a symbol through `symbolText`, and `paramRows` names each row through it. The storage id stays `∠A1` (its locks: `issue-1701`, `issue-1785`, `issue-2632` — unchanged). The canvas carries the subscript as Unicode digits in the one `<text>`: the ruling asks for "A with a small 1", which «A₁» is, in the arc label, the panel and the exports alike — so the plan's `{text, sub}` scene part was not needed (a mechanism choice).
+
+**Sibling audit.** 2-D drew the bare digit (#263) — changed in the same item to the ruling ([ADR-782](06-decisions.md#adr-782)), through the same `indexedNameText`. 3-D: the angle-alias sentence is a parked known gap (parity rows `angle-label-*-1622`, #1679) — nothing drawn. Complex: no angle labels. Greek aliases (α) are stored bare and are unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts` — the reported sentence (records; «A₁» at seeds 0–3; the panel row «A₁…», no `∠`; «A₁ = 30» after a value), every spelling («∠CAB=A1», «כ-A1», «כ 1», "denote … as A1», «B2», «A12»), `symbolText` / `statedText` / `indexedNameText` units, and the analytic canvas writing «A₁» for the three spellings whose 2-D half is `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (product trees never import each other).
+
+**Behaviour change for a student:** «נסמן ∠CAB=A1» labels the angle «A₁» (A with a small 1, no angle sign) on the canvas and in the panel, in both builders; before, analytic wrote «∠A1» and 2-D a bare «1».

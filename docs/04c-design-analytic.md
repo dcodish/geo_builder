@@ -1733,6 +1733,22 @@ An injected isolator can be forgotten, so the kit lives in `i18n/bidi.ts`, re-ex
 `placeLengthLabels` places each stated length outward from its midpoint until clear (2-D's rule, copied), sharing
 `POINT_LABEL`, `LENGTH_LABEL_FONT`, `TICK_LABEL`.
 
+#### Every label is placed inside the canvas ([ADR-AG-392](06c-decisions-analytic.md#adr-ag-392), #2689)
+
+`placeSceneLabels` takes the canvas size as a hard bound: a position whose box leaves the view is never clear, and the
+position finally taken is moved inward until its box fits. An ANSWER's label (a traced locus's equation, a height's value)
+is a request in the same call (`answerLabelRequest`, 14px bold, `ANSWER_LABEL_FONT`): its candidates are four spots
+beside each of up to 32 points along its own trace (`alongTrace`, the midpoint first — where it always sat), it keeps off
+its own curve (`LabelRequest.avoid`), and it yields to every stated value (priority 2). `Figure.tsx` centres it on the
+returned position, as every placed label.
+
+#### Two letters on one dot are one label ([ADR-AG-393](06c-decisions-analytic.md#adr-ag-393), #2696)
+
+`App.tsx` hands `buildScene` the pairs R214's notice reads (`coincidencesOf`, as `SceneKnowledge.coincidences`);
+`buildScene` joins them with 2-D's rule, `shell/converge` `mergedLabels` (2-D's `src/render/scene.ts` calls the same
+function): the alphabetically first id carries «C=E», the others carry `''` (`hasLetter` false — no letter placed, no
+label box). The carrier writes its own stated coordinates, else the first member's that has any.
+
 #### Where a point's letter is written ([ADR-AG-389](06c-decisions-analytic.md#adr-ag-389), #2691)
 
 `placePointLetters` runs in `buildScene` before `placeSceneLabels`: 2-D's seed (`outwardDir`, the widest gap between the

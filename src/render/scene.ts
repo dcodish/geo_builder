@@ -14,6 +14,7 @@ import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
 import { visibleCoincidences } from './pointDescriptions';
+import { mergedLabels } from '../../shell/converge';
 import { mathLabelBox } from './mathMetrics';
 import { hasMath } from '../../shell/math';
 import { MARK_FIT_FRACTION, MIN_MARK_SCALE, markFitScale } from '../../shell/marks';
@@ -321,33 +322,8 @@ export function buildScene(
    * others carry `''` — an empty label is an existing, supported state here (an anonymous promotable
    * point uses it). The carrier is the alphabetically first id, so the text is stable across re-renders.
    */
-  const mergedLabel = new Map<Id, string>();
-  {
-    const groupOf = new Map<Id, Id>(); // id → its group's representative
-    const find = (x: Id): Id => {
-      let r = x;
-      while (groupOf.get(r) !== undefined && groupOf.get(r) !== r) r = groupOf.get(r)!;
-      return r;
-    };
-    for (const [a, b] of visibleCoincidences(opts?.coincidences ?? [])) {
-      if (!groupOf.has(a)) groupOf.set(a, a);
-      if (!groupOf.has(b)) groupOf.set(b, b);
-      const ra = find(a);
-      const rb = find(b);
-      if (ra !== rb) groupOf.set(rb, ra);
-    }
-    const members = new Map<Id, Id[]>();
-    for (const id of groupOf.keys()) {
-      const r = find(id);
-      members.set(r, [...(members.get(r) ?? []), id]);
-    }
-    for (const ids of members.values()) {
-      if (ids.length < 2) continue;
-      const sorted = [...ids].sort();
-      mergedLabel.set(sorted[0], sorted.join('='));
-      for (const id of sorted.slice(1)) mergedLabel.set(id, '');
-    }
-  }
+  // the join is shell's (#2696, ADR-AG-393): analytic reads the same rule
+  const mergedLabel: Map<Id, string> = mergedLabels(visibleCoincidences(opts?.coincidences ?? []));
 
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];

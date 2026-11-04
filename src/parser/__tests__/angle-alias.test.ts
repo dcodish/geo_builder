@@ -43,10 +43,10 @@ describe('the naming statement (#235)', () => {
     expect(cmds('נסמן זוית BAM ב-A1').find((c) => c.type === 'angle-alias')).toBeTruthy(); // the ב connector too
   });
 
-  it('builds with the arc mark and the DIGIT sign on the wedge (#263 — the vertex label already shows the letter)', () => {
+  it('builds with the arc mark and «A₁» on the wedge (#1812, ADR-782 — it replaced #263’s bare digit)', () => {
     const fig = replay(factsOf(['משולש ABM', 'נסמן זוית BAM כ-A1']));
     for (const s of Object.values(fig.status)) expect(s).toBe('ok');
-    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: '1' });
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: 'A₁' });
     expect(fig.angleMarks).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', right: false });
   });
 
@@ -85,17 +85,17 @@ describe('the naming statement (#235)', () => {
     if (r.ok) expect(r.commands.some((c) => c.type === 'set-angle')).toBe(false);
   });
 
-  // ── #263: the wedge sign is the DIGIT alone when the name is vertex+digits ──
-  it('«נסמן זוית CAD כ 1» draws the sign «1» (the vertex label already shows the A)', () => {
+  // ── #1812 (ADR-782, ruling 2026-10-06 "Both show A₁"): the wedge carries the name with a subscript index — it replaced #263's bare digit ──
+  it('«נסמן זוית CAD כ 1» draws «A₁»', () => {
     const fig = replay(factsOf(['משולש ABC', 'D על CB', 'AD', 'נסמן זוית CAD כ 1']));
     for (const s of Object.values(fig.status)) expect(s).toBe('ok');
-    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'C', ray2: 'D', text: '1' });
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'C', ray2: 'D', text: 'A₁' });
     expect(fig.construction.objects.find((o) => o.kind === 'angle-alias')).toMatchObject({ id: 'A1', vertex: 'A' });
   });
 
-  it('a name bound at a DIFFERENT letter keeps the full name on the wedge', () => {
+  it('a name bound at a DIFFERENT letter keeps its own letter on the wedge («K₁»)', () => {
     const fig = replay(factsOf(['משולש ABM', 'נסמן זוית BAM כ-K1']));
-    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: 'K1' });
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: 'K₁' });
   });
 });
 
