@@ -807,11 +807,13 @@ a sentence the tool parsed.
 
 **R54 — a given the figure already ENTAILS is said, not recorded**. A given true only at the current sample is not this case.
 - a given a determined figure satisfies → «זה כבר קיים באיור — אין מה להוסיף.», no row — 2-D's answer to a restatement its figure entails ([ADR-AG-330](06c-decisions-analytic.md#adr-ag-330))
-- Sources: ADR-AG-030, ADR-AG-330.
+- **except a given that adds a stated value to the figure** (a length, an angle, an area, an arc): it is recorded, and its value is drawn — «A(0,0)» · «B(4,0)» · «AB» · «AB = 4» lists «AB = 4» and writes 4 on AB; a value already shown («AB = 4» twice) or a line with no value («B נמצא על ציר ה-x») keeps the note (ADR-AG-401, #2491; operator 2026-10-24: *"the tool can draw 4 on the segment"*)
+- Sources: ADR-AG-030, ADR-AG-330, ADR-AG-401.
 
 **R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**. *(Narrows R54.)* A given true in one drawing and false in another chooses between them and is recorded; when unsure, the tool records.
 - the square of exam 15 Q5: «שיפוע הצלע BC הוא -1/2» → B(2,4), C(10,0); «…הוא 1/2» → the mirror
-- Sources: ADR-AG-188, #1629.
+- a given true in every configuration that adds a stated value is recorded for its value (R54's exception, ADR-AG-401)
+- Sources: ADR-AG-188, #1629, ADR-AG-401.
 
 **R48 — a given is checked whether or not the figure had freedom to spare**. Whether a carrier was free to move is a fact about the solver, not about whether the given holds.
 - Sources: ADR-AG-024, #1062.

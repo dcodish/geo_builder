@@ -1860,7 +1860,10 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 
 `App.submit` dry-runs the list with the new line: `faulted` refuses, `created` / `narrowed` record, `known` gives a
 notice. The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
-because `absorbed` hid two events.
+because `absorbed` hid two events. **Before either no-op answer** (`already-known`, `already-follows`) the decision
+asks `addsStatedValue(current, trial)` (`app/submit.ts`): a trial whose stated-measure layer labels something the
+current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc; not the knee, which «⟂» shares), never
+counted — records, so its value is drawn (2-D's ADR-542 visibility half; [ADR-AG-401](06c-decisions-analytic.md#adr-ag-401)).
 
 *Identifiers:* `no`
 

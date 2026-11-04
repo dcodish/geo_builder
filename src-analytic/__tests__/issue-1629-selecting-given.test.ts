@@ -68,7 +68,7 @@ describe('#1629 — a selecting given records; an entailed one still follows', (
     for (const x of xs) expect(x).toBeCloseTo(2, 4);
   });
 
-  it('a given TRUE in both configurations (|AB| = √80) still answers already-follows', () => {
+  it('a given TRUE in both configurations (|AB| = √80) selects nothing — it records only for its drawn value (#2491)', () => {
     // The premise, measured: AB = √80 in each mirror (A = −B, B = (±2, 4)).
     const c = derive(SQUARE, 0).construction;
     const pool = configurationPool(c);
@@ -78,7 +78,8 @@ describe('#1629 — a selecting given records; an entailed one still follows', (
       expect(Math.hypot(pt(f, 'A').x - pt(f, 'B').x, pt(f, 'A').y - pt(f, 'B').y)).toBeCloseTo(Math.sqrt(80), 4);
     }
     for (const seed of [0, 1, 2]) {
-      expect(decideSubmit('אורך הצלע AB הוא √80', SQUARE, seed).kind).toBe('already-follows');
+      // #2491 (ADR-AG-401): it adds the «√80» on AB, so it records; the configuration logic is unchanged (it selects none).
+      expect(decideSubmit('אורך הצלע AB הוא √80', SQUARE, seed).kind).toBe('record');
     }
   });
 });

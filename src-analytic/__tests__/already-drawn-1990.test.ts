@@ -18,7 +18,8 @@ describe("#1990 — analytic's no-op verdicts, and the one note they are worded 
     [['ריבוע ABCD'], 'ריבוע ABCD', 'already-known'],
     [['ריבוע ABCD'], 'מרובע ADCB', 'already-known'],
     [['משולש ABC', '∠ABC = 90'], 'AB ⟂ BC', 'already-known'],
-    [['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4', 'already-follows'],
+    // #2491 (ADR-AG-401): «AB = 4» over a drawn AB now records (its 4 is drawn); a line that states no value keeps the note.
+    [['A(0,0)', 'B(4,0)'], 'B נמצא על ציר ה-x', 'already-follows'],
   ])('%j · «%s» → %s', (lines, line, kind) => {
     expect(decideSubmit(line, lines, 0).kind).toBe(kind);
   });
