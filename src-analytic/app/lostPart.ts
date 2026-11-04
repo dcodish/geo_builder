@@ -42,6 +42,7 @@ import { VOCABULARY_ANALYTIC } from '../parser/scopeAnalytic';
 import { parseLine, POINT_NOUN_EN_ATOM, POINT_NOUN_HE_ATOM } from '../parser/parseAnalytic';
 import { firstIncidenceOpener, incidencePhraseAtStart } from '../../shell/incidencePhrase';
 import type { Fact } from '../engine/types';
+import { splitPointNames, withPointName } from '../engine/pointName';
 
 /** A lowering as the probe compares it: the facts without their `src` (a framed line quotes the line as typed). */
 export const loweringKey = (facts: readonly Fact[]): string => JSON.stringify(facts, (k, v) => (k === 'src' ? undefined : v));
@@ -112,7 +113,7 @@ export function unreadPart(line: string, facts: readonly Fact[], figureLabels: r
 
 /** The labels a set of facts carries — every capital-letter token anywhere in them. */
 const carriedLabels = (facts: readonly Fact[]): Set<string> =>
-  new Set(loweringKey(facts).match(/[A-Z][0-9₀-₉]*/g) ?? []);
+  new Set(splitPointNames(loweringKey(facts)));
 
 /** Is `rest` a lost part — labels `carried` already has, and particles with no construction signal? */
 function isLostPart(rest: string, carried: ReadonlySet<string>): boolean {
@@ -241,7 +242,7 @@ export function declinedThrough(line: string, records: (piece: string, before: r
  * property in the figure it makes — a taught remedy is one the next Enter accepts (ADR-W-030's promise). Anything else
  * returns null and the line keeps the path it had.
  */
-const POINT_PROPERTY = /^(?:ה?נקודה\s+([A-Z][0-9₀-₉]*)|([A-Z][0-9₀-₉]*)\s+(?:היא\s+|הינה\s+)?נקודה)\s*,?\s+(?:ה?מקיימת|שמקיימת)\s+(.+?)\s*[.]?$/;
+const POINT_PROPERTY = withPointName(/^(?:ה?נקודה\s+(ℕ)|(ℕ)\s+(?:היא\s+|הינה\s+)?נקודה)\s*,?\s+(?:ה?מקיימת|שמקיימת)\s+(.+?)\s*[.]?$/);
 
 export function declinedPointProperty(line: string, records: (piece: string, before: readonly string[]) => boolean): LostPart | null {
   const m = POINT_PROPERTY.exec(line.trim());

@@ -25,6 +25,7 @@
  */
 import type { Pt } from './derived';
 import type { Id, NumCurve } from './types';
+import { POINT_NAME } from './pointName';
 
 /** A line as `ax + by + c = 0`, normalized so that one line is always one triple. */
 export interface NamedLine {
@@ -34,7 +35,7 @@ export interface NamedLine {
 }
 
 /** A name spells a segment when it is two DIFFERENT letters — «AB», never «AA». */
-const PAIR = /^([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)$/;
+const PAIR = new RegExp(`^(${POINT_NAME})(${POINT_NAME})$`);
 
 /** The two point ids a name spells, or `null` when the name is not a pair of letters. */
 export function asPair(name: string): [Id, Id] | null {

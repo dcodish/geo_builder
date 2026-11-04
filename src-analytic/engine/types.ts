@@ -552,7 +552,9 @@ export type Fact =
    * offset symbol (`toolSymbol(id, 'c')`), a free DOF (ADR-052). M1 decides new vs existing: a NAMED line the figure
    * already has is the relation about it, as before.
    */
-  | (FactBase & { t: 'direction-line'; id: Id; name?: string; rel: 'parallel' | 'perpendicular'; axis: 'x' | 'y' })
+  | (FactBase & { t: 'direction-line'; id: Id; name?: string; rel: 'parallel' | 'perpendicular'; axis: 'x' | 'y'; to?: [Id, Id] })
+  /** «הישר l עובר מימין לראשית הצירים» — the side of the origin an axis-parallel line passes (#2621, ADR-AG-367 Am. 1); M1 resolves it to `axis-cut`. */
+  | (FactBase & { t: 'origin-side'; line: Extract<Direction, { k: 'points' | 'curve' }>; side: 'right' | 'left' | 'above' | 'below' })
   /**
    * «משוואת המשיק היא 4x+3y=40» — the equation of «THE tangent», with no touch point named (#1619 B3).
    * WHICH tangent is M1's question: the one tangent object the figure holds (the equation is then a
@@ -801,6 +803,18 @@ export type Fact =
    */
   | (FactBase & { t: 'vertices-on-axes'; noun?: string })
   /**
+   * A QUADRILATERAL'S DIAGONAL BY ITS ROLE (#2621 E, [ADR-AG-396](../../docs/06c-decisions-analytic.md#adr-ag-396)) —
+   * `both`: «אלכסוני המעוין על הצירים», each diagonal on an axis, which on which a choice; else «האלכסון הגדול (הקטן) של
+   * המעוין» `is` the pair `ids` («… הוא AC»), or lies on `axis` («… נמצא על ציר ה-x», which diagonal a choice). The ring is
+   * resolved at M1 by `noun` / `ring`, as every shape-noun sentence's.
+   */
+  | (FactBase & { t: 'diagonal-role'; noun?: string; ring?: Id[]; both?: true; long?: boolean; ids?: [Id, Id]; axis?: 'x' | 'y' })
+  /**
+   * «צלעות המשולש הן 13, 14 ו-15» (#2621 E, ADR-AG-396) — a triangle's three side lengths, which side has which unstated:
+   * a choice over the assignments (operator ruling 2026-10-30, Q1 → A). The ring is M1's contextual question.
+   */
+  | (FactBase & { t: 'side-lengths'; ring?: Id[]; values: Expr[] })
+  /**
    * A SENTENCE ABOUT ONE OR TWO CIRCLES IT MAY HAVE TO DRAW (#1622 slice E3, #1693; ADR-AG-219) — «שני מעגלים נחתכים
    * בנקודות A ו-B», «נתון מעגל», «מעגל בקוטר 10», «AB משיק משותף למעגלים O ו-P», «ישר חותך את שני המעגלים …». Each
    * {@link CircleSlot} is resolved at M1, in order, to a circle id, and `about` — the statement, written over
@@ -896,6 +910,26 @@ export const CIRCLE_SENTINEL = '⟨the-circle⟩';
  * it can never couple with one of theirs.
  */
 export function directionLineFacts(f: Extract<Fact, { t: 'direction-line' }>): Fact[] {
+  /*
+   * PARALLEL TO A LINE THROUGH TWO POINTS (#2621, [ADR-AG-367](../../docs/06c-decisions-analytic.md#adr-ag-367) Am. 1; judged
+   * q-2621-parallel) — «ישר המקביל ל-AB»: its direction is AB's, which only the figure knows, so the line is the general
+   * `a·x + b·y = c` over three tool symbols, with (a, b) a unit normal (a² + b² = 1) and the relation to AB stated: two of
+   * the three are consumed, the offset c stays the one free DOF (ADR-052, sampled; «הציגו תצורה אחרת» moves it).
+   */
+  if (f.to) {
+    const s = (part: string): Expr => ({ kind: 'sym', name: toolSymbol(f.id, part) });
+    const eq: Expr = {
+      kind: 'sub',
+      a: { kind: 'add', a: { kind: 'mul', a: s('a'), b: { kind: 'sym', name: 'x' } }, b: { kind: 'mul', a: s('b'), b: { kind: 'sym', name: 'y' } } },
+      b: s('c'),
+    };
+    const norm: Expr = { kind: 'add', a: { kind: 'pow', a: s('a'), b: { kind: 'num', value: 2 } }, b: { kind: 'pow', a: s('b'), b: { kind: 'num', value: 2 } } };
+    return [
+      { t: 'curve', id: f.id, label: { name: f.name ?? '', kind: 'line' }, curve: { kind: 'line', eq }, stated: true, src: f.src },
+      { t: 'constraint', k: { t: 'param-rel', left: norm, right: { kind: 'num', value: 1 } }, src: f.src, definition: true },
+      { t: 'constraint', k: { t: 'relation', rel: f.rel, u: { k: 'curve', id: f.id }, v: { k: 'points', a: f.to[0], b: f.to[1] } }, src: f.src },
+    ];
+  }
   const horizontal = (f.rel === 'parallel') === (f.axis === 'x');
   const sym = toolSymbol(f.id, 'c');
   const eq: Expr = { kind: 'sub', a: { kind: 'sym', name: horizontal ? 'y' : 'x' }, b: { kind: 'sym', name: sym } };
@@ -1463,7 +1497,14 @@ export type Quantity =
    * selector kind. Both sides are the same KIND (the parser pairs a length with a length or a number, an angle
    * with an angle or a number of degrees).
    */
-  | { k: 'order'; left: OrderSide; right: OrderSide };
+  | { k: 'order'; left: OrderSide; right: OrderSide }
+  /**
+   * A POINT SET WIDER THAN IT IS TALL (#2621 E, [ADR-AG-396](../../docs/06c-decisions-analytic.md#adr-ag-396)) — the x-extent of
+   * `ids` minus their y-extent. For a quadrilateral whose one diagonal lies on an axis (and the other, perpendicular to it
+   * in a rhombus, parallel to the other axis) it is the horizontal diagonal's length minus the vertical one's, so
+   * «האלכסון הגדול נמצא על ציר ה-x» is this quantity's sign on each option of the which-diagonal choice.
+   */
+  | { k: 'extent'; ids: Id[] };
 
 /**
  * One side of a stated ORDER (#1621 D3, ADR-AG-216): a length expression (`lengths.ts`: segments and areas — the

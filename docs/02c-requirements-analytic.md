@@ -377,7 +377,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «E נקודת החיתוך של X עם Y», «X חותך את Y בנקודה E»
 - Sources: ADR-AG-224, #1715, #1727.
 
-**R216 — a line given by its direction alone is drawn, its position free**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities" — the ellipse book, p2-15 and p6-2 ב.)* A line parallel or perpendicular to an axis, with no point and no equation, is drawn as `x = c` or `y = c` with `c` unstated: «הציגו תצורה אחרת» moves it, and a later given (a crossing's length, a point on it, the side it crosses an axis on) pins or bounds it. Its equation is printed only once the givens fix it. A named line the figure already has keeps its reading: the sentence is the relation about it. One given per row ([ADR-W-167](06w-decisions-workspace.md#adr-w-167)): the book's compound sentences are written as their rows.
+**R216 — a line given by its direction alone is drawn, its position free**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities" — the ellipse book, p2-15 and p6-2 ב.)* A line parallel or perpendicular to an axis, with no point and no equation, is drawn as `x = c` or `y = c` with `c` unstated: «הציגו תצורה אחרת» moves it, and a later given (a crossing's length, a point on it, the side it crosses an axis on) pins or bounds it. Its equation is printed only once the givens fix it. A named line the figure already has keeps its reading: the sentence is the relation about it. One given per row ([ADR-W-167](06w-decisions-workspace.md#adr-w-167)): the book's compound sentences are written as their rows. *(Amended 2026-11-04, ADR-AG-367 Am. 1.)* The side of the origin an axis-parallel line passes is its own row («הישר l עובר מימין לראשית הצירים»), and a line parallel to a two-point line with no point («ישר המקביל ל-AB») is drawn the same way, its offset free.
 - «ישר מאונך לציר ה-x», «ישר המקביל לציר ה-y», «נתון ישר l המאונך לציר ה-x», «ישר l מאונך לציר ה-x», "a line perpendicular to the x-axis", "line l parallel to the x-axis"
 - p2-15's «ישר המקביל לציר ה-x חותך את האליפסה בנקודות P ו-Q» is the rows «נתון ישר l המקביל לציר ה-x» · «הישר l חותך את האליפסה בנקודות P ו-Q» (R85); p6-2 ב's «…, שעובר מימין לראשית הצירים» is the row «הישר l חותך את ציר ה-x בנקודה הנמצאת מימין לציר ה-y» (R182). The compound line itself is not read
 - not read here: a direction given by a line rather than an axis («ישר המקביל ל-AB»)
@@ -1187,6 +1187,14 @@ a sentence the tool parsed.
 **R233 — a point's letter sits next to its point, never on a line**. *(Operator, 2026-11-03: "points C and D are not located correctly and are on the line instead of next to it".)* The letter (with its stated coordinates) is written on the open side of the point, away from the segments and lines at it, as in the 2-D tool, and moves off any drawn segment, line, curve, other point or other letter that would cover it. The values are written after, clear of the letters. It holds with every canvas switch on or off.
 - «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · … · «AD תיכון» → C and D beside side BC, not on it
 - Sources: ADR-AG-389, #2691.
+
+**R234 — a point name may carry a prime**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities" — the ellipse book, p10-9 ב.)* «A'» is a point name wherever a letter is: by coordinates, in a length, a segment, a line, a ring and a rename, as its own point distinct from A, drawn A′. Every prime glyph (′ ’ ׳ …) is the same name. A point pair named as the crossings of a curve with two carriers («A ו-A' הן נקודות החיתוך של האליפסה עם החלק החיובי ועם החלק השלילי של ציר ה-x») is the two crossings, in order.
+- «A(0,0)» · «A'(3,4)» · «AA' = 5» → records; the panel lists A′ = (3, 4)
+- Sources: ADR-AG-395, #2621.
+
+**R235 — a shape's height, diagonals and sides in the book's words**. *(Operator, 2026-10-30 on #2621: "now we need to build all capabilities"; Q1 → A.)* «גובה המעוין הוא …» is the rhombus's height, drawn; «אלכסוני המעוין על הצירים» puts each diagonal on an axis; «האלכסון הגדול (הקטן) של המעוין הוא AC» and «… נמצא על ציר ה-x» say which diagonal is longer; «צלעות המשולש הן 13, 14 ו-15» gives the three sides. Which diagonal or side gets which value, where the sentence does not say, is drawn one way and «הציגו תצורה אחרת» cycles the others; a later given pins it. One given per row (ADR-W-167).
+- «נתון מעוין ABCD» · «היקף המעוין הוא 20» · «שטח המעוין הוא 24» · «האלכסון הגדול של המעוין נמצא על ציר ה-x» → the 8-diagonal on the x-axis
+- Sources: ADR-AG-396, #2621.
 
 ---
 

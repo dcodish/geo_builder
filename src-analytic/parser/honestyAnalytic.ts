@@ -24,6 +24,7 @@ import { nameAccounting, scanNumbers, spendAccounts, unionByMax, COUNT_DIGITS, L
 import { LETTER_LINE_NAME_ATOM, POINT_NAME_ATOM, parseLine } from './parseAnalytic';
 import { HE_NUM_UNITS } from './frameAnalytic';
 import { NUMERAL_ALT, asRoman, numeralKey } from '../engine/names';
+import { isPointName, withPointName } from '../engine/pointName';
 import { evalExpr, symbolsOf, type Expr } from '../engine/expr';
 import { curveFromEquation } from '../engine/conic';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
@@ -33,8 +34,9 @@ import type { Construction, NumCurve } from '../engine/types';
  * A point label in this product: a capital letter with an optional digit subscript — `A`, `B`, `F1`.
  * Exactly what the system prompt tells the model to emit, so the two cannot drift apart silently.
  */
-const LABEL = () => /[A-Z][0-9₀-₉]*/g;
-const RUN = () => /(?<![A-Za-z])(?:[A-Z][0-9₀-₉]*){3,}(?![a-z\d])/g;
+// #2621 C (ADR-AG-395): the one atom, so a label carries its digit run (#2075) and its PRIME («A'»).
+const LABEL = () => withPointName(/ℕ/g);
+const RUN = () => withPointName(/(?<![A-Za-z])(?:ℕ){3,}(?![a-zd])/g);
 
 /**
  * Restore any point run the model respelled, before the lines are re-parsed.
@@ -298,7 +300,7 @@ function curveParameters(c: NumCurve): number[] {
 export function existingNamesAnalytic(c: Pick<Construction, 'objects' | 'params'>): Set<string> {
   const out = new Set<string>();
   for (const o of c.objects) {
-    if (/^[A-Z][0-9₀-₉]*$/.test(o.id)) out.add(o.id);
+    if (isPointName(o.id)) out.add(o.id);
     const num = numeralKey(o.id);
     if (num) out.add(`#${num.slice(num.indexOf('-') + 1)}`);
     const line = /^line-(.+)$/.exec(o.id);

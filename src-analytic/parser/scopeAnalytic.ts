@@ -31,6 +31,7 @@
  * the exact string gets it more directly, with no renderer in between.
  */
 import { respectively, unwrap } from './frameAnalytic';
+import { POINT_NAME } from '../engine/pointName';
 
 /**
  * The closed imperative lexicon.
@@ -118,7 +119,7 @@ export const CONSTRUCTION_VERBS_HE = ['העבר', 'תעביר', 'העבירו', 
 const NON_GEOMETRIC_HE = /(?<![א-ת])כרצונ(?:כם|כן|ך)(?![א-ת])/g;
 
 /** A point label, and a list of them — «A», «A ו-C», «A, B ו-C». */
-const LBL = String.raw`[A-Z][0-9₀-₉]*`;
+const LBL = POINT_NAME;
 const LBL_LIST = String.raw`${LBL}(?:\s*(?:,|ו-?)\s*${LBL})*`;
 /** The anchor nouns an adverbial names a point by — «מן **הנקודה** B», «מן **הקודקודים** A ו-C». */
 const ANCHOR_NOUN = '(?:נקודה|נקודות|קודקוד|קודקודים)';

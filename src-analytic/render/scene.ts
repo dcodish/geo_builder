@@ -19,6 +19,7 @@ import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
 import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
 import { ALL_SHOWN, type CanvasDisplay } from './canvasDisplay';
+import { displayPointName } from '../engine/pointName';
 
 /**
  * THE KEY A SEGMENT'S DISPLAY IS FILED UNDER (#1653) — its two endpoint letters, unordered.
@@ -1035,7 +1036,8 @@ export function buildScene(
         : merged.has(p.id)
           ? label.split('=').map(coordsOf).find((c) => c !== undefined)
           : coordsOf(p.id);
-    return { id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label, coords };
+    // #2621 C (ADR-AG-395): a primed name is DRAWN with the typographic prime, A′ (3-D's glyph), a merged «A'=B» too.
+    return { id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label: displayPointName(label), coords };
   });
 
   /**

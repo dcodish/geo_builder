@@ -125,8 +125,10 @@ describe('#2621 B — a line given by its direction alone', () => {
     expect(ask(derive(p215.lines, 0), 'משוואת האליפסה', fmtAnalytic).value).toContain('x²/64 + y²/48 = 1');
   });
 
-  it('a direction given by a line, not an axis, is not read here (the round\'s question)', () => {
+  // Ruled since (judged q-2621-parallel; ADR-AG-367 Am. 1): the single row draws a true parallel (issue-2621-side-parallel.test.ts);
+  // the compound row with its crossing is still not read whole (ADR-W-167).
+  it('a direction given by a line: the single row reads, the compound row with its crossing does not', () => {
     expect(last(['A(0,0)', 'B(2,1)', 'נתון מעגל x^2+y^2=25', 'ישר המקביל ל-AB חותך את המעגל בנקודות P ו-Q']).kind).toBe('refused');
-    expect(last(['A(0,0)', 'B(2,1)', 'ישר המקביל ל-AB']).kind).toBe('refused');
+    expect(last(['A(0,0)', 'B(2,1)', 'ישר המקביל ל-AB']).kind).toBe('record');
   });
 });

@@ -699,7 +699,30 @@ symbol `toolSymbol(id, 'c')` (spelled in `names.ts`, re-exported by `carriers.ts
 use; the panel prints no tool symbol (`readsToolSymbol`). An anonymous id hashes the sentence, so two sentences are two
 lines. Anything after the direction declines the sentence (one given per row, ADR-W-167).
 
-*Identifiers:* `parseDirectionLine` · `direction-line` · `directionLineFacts` · `toolSymbol` · `readsToolSymbol`
+Amended (ADR-AG-367 Am. 1): `direction-line` carries `to: [A, B]` for «ישר המקביל ל-AB» — `a·x + b·y = c` over three tool symbols, a² + b² = 1 (`param-rel`) and the parallel relation to AB, the offset the one free DOF; and `origin-side` («הישר l עובר מימין לראשית הצירים») resolves at M1 (`axisFacingOf`) to the `axis-cut` of an axis-parallel line.
+
+*Identifiers:* `parseDirectionLine` · `direction-line` · `directionLineFacts` · `toolSymbol` · `readsToolSymbol` · `origin-side` · `axisFacingOf`
+
+#### The point-name atom ([ADR-AG-395](06c-decisions-analytic.md#adr-ag-395), #2621 C)
+
+`engine/pointName.ts` holds the one point-name atom (`POINT_NAME`: a capital, an optional index (a digit run, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)), an optional prime not
+before a lowercase letter) and its readers (`isPointName`, `splitPointNames`, `withPointName`, `displayPointName`). Every
+grammar rule, the length tokenizer, the ask lane, the rename dialog and the id parsers compose it; a ratchet counts the inline
+copies left. `orthography` folds every prime glyph to `'` first (`shell/primes`, shared with 3-D). The canvas and the panel
+draw the prime as ′. `distributedCrossingClauses` (the frame) reads «P ו-Q הן נקודות החיתוך של X עם Y1 ועם Y2» as two
+one-point crossing sentences.
+
+*Identifiers:* `POINT_NAME` · `isPointName` · `splitPointNames` · `withPointName` · `displayPointName` · `foldPrimes` · `distributedCrossingClauses`
+
+#### A shape's parts by their role ([ADR-AG-396](06c-decisions-analytic.md#adr-ag-396), #2621 E)
+
+`parseShapeParts` lowers «אלכסוני המעוין על הצירים», «האלכסון הגדול/הקטן של המעוין הוא AC / נמצא על ציר ה-x» to
+`diagonal-role` and «צלעות המשולש הן 13, 14 ו-15» to `side-lengths`. M1 resolves the ring and states a constraint
+`choice` over the unstated assignments (each option an `all` of incidences or of `length-eq`s), and the longer/shorter
+diagonal as a `sign` region: the `order` of the two diagonals' lengths, or the new quantity `extent` (x-extent less
+y-extent) on the axis choice. `parseShapeHeight` takes the rhombus; `applyHeightOf` draws its height as a trapezoid's (D onto AB).
+
+*Identifiers:* `parseShapeParts` · `diagonal-role` · `side-lengths` · `extent` · `applyHeightOf`
 
 #### The tangent as an operand, and named ([ADR-AG-368](06c-decisions-analytic.md#adr-ag-368), #2621 A)
 

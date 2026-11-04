@@ -59,6 +59,7 @@ import { curveEquationOf, curveParts, directrixText, locusEquation } from './cur
 import { parabolaFocus } from '../engine/curves';
 import { ellipseRolePoint, type EllipseRole, type EllipseSide } from '../engine/derived';
 import { ringsNamed } from '../engine/shapes';
+import { isPointName, withPointName } from '../engine/pointName';
 
 /** The question is EXACTLY one point-to-line distance, for the same reason `BARE_LENGTH` exists. */
 const POINT_LINE_ONLY = /^(?:ה?מרחק|[Dd]istance)\s+\S.*$/;
@@ -225,10 +226,10 @@ export interface Answer {
  * A compound expression is arithmetic the student assembled, not one named move, and the technique
  * table has nothing honest to say about it. The trace explains a ROW; it does not narrate a sum.
  */
-const BARE_LENGTH = /^(?:ה?(?:קטע|צלע|אורך)\s+)?[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*$/;
+const BARE_LENGTH = withPointName(/^(?:ה?(?:קטע|צלע|אורך)\s+)?ℕℕ$/);
 
 /** A single point's name, which is a question about its coordinates. */
-const POINT_ONLY = /^[A-Z][0-9₀-₉]*$/;
+const POINT_ONLY = { test: isPointName };
 
 /**
  * «שיפוע הישר l1» — the third thing the operator named for a line (#1048).
@@ -317,14 +318,14 @@ const LOCUS_PHRASE = /^(?:ה?מקום\s+ה?גי?אומטרי|(?:[Tt]he\s+)?locus
 
 /** «שיעורי (הנקודה) M», «הקואורדינטות של M», "the coordinates of (point) M" (#2393 R1). */
 const COORDS_OF =
-  /^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z][0-9₀-₉]*)$/;
+  withPointName(/^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?(ℕ)$/);
 
 /** «(הערך של) a», "the value of a" — a parameter by its symbol (#2393 R2); taken only for a symbol the register holds. */
 const PARAM_ASK = /^(?:ה?ערך\s+(?:של\s+)?|(?:the\s+)?value\s+of\s+)?([a-zα-ω](?:_\w+)?)$/;
 
 /** «(משוואת) המעגל שמרכזו N», "the circle centred at N" — a circle by its centre (#2393 R3). */
 const CIRCLE_CENTRED_AT =
-  /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+)?(?:ה?מעגל\s+ש(?:ה)?מרכזו\s+(?:(?:הוא|היא)\s+)?(?:ב?ה?נקודה\s+)?|(?:the\s+|a\s+)?circle\s+(?:cent(?:red|ered)\s+at|with\s+(?:its\s+)?cent(?:re|er)(?:\s+at)?|whose\s+cent(?:re|er)\s+is)\s+(?:the\s+point\s+)?)([A-Z][0-9₀-₉]*)$/;
+  withPointName(/^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+)?(?:ה?מעגל\s+ש(?:ה)?מרכזו\s+(?:(?:הוא|היא)\s+)?(?:ב?ה?נקודה\s+)?|(?:the\s+|a\s+)?circle\s+(?:cent(?:red|ered)\s+at|with\s+(?:its\s+)?cent(?:re|er)(?:\s+at)?|whose\s+cent(?:re|er)\s+is)\s+(?:the\s+point\s+)?)(ℕ)$/);
 
 /** «משוואת המעגל / הפרבולה / האליפסה», "the equation of the circle" — THE curve of that kind (#2393 R4). */
 const THE_CURVE = /^(?:ה?משוואת\s+ה(מעגל|פרבולה|אליפסה)|[Tt]he\s+equation\s+of\s+the\s+(circle|parabola|ellipse))$/;

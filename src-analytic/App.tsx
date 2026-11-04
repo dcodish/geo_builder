@@ -100,6 +100,7 @@ import { unstatedChoiceText } from './app/unstatedChoice';
 import { locusChips } from './app/locusChip';
 import { circleNoteText, circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
 import { withConic } from './app/annotations';
+import { displayPointName } from './engine/pointName';
 
 
 declare const __BUILD__: string;
@@ -1968,7 +1969,7 @@ export function App() {
                   const row = settled(() => pointTextOf(d, p.id, kx, ky, fmt));
                   return (
                     <span key={p.id}>
-                      <ValueRow text={`${p.id} = ${row.pending ? checking : row.value}`} />
+                      <ValueRow text={`${displayPointName(p.id)} = ${row.pending ? checking : row.value}`} />
                     </span>
                   );
                 }),

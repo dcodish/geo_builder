@@ -24,6 +24,7 @@
  */
 import { sameDerivation } from './sameDerivation';
 import { factsWithin, ROLE_SIDE_SENTINELS, type Fact, type Id } from './types';
+import { POINT_NAME } from './pointName';
 
 export type ToolPointRole = 'midpoint' | 'bisector-mid' | 'midpoint-2' | 'foot' | 'end' | 'diameter-end' | 'crossing' | 'secant' | 'touch' | 'common' | 'vertex';
 
@@ -176,7 +177,7 @@ export function resolveToolLetters(
         helperPh.delete(held.id);
       }
     }
-    for (const m of text.match(/"[A-Z][0-9₀-₉]*"/g) ?? []) used.add(m.slice(1, -1));
+    for (const m of text.match(new RegExp(`"${POINT_NAME}"`, 'g')) ?? []) used.add(m.slice(1, -1));
     out.push(f);
   });
   return { facts: out, minted };

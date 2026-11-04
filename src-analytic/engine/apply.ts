@@ -24,7 +24,7 @@ import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type Elli
 import { namesCurveFeature, sameDerivation } from './sameDerivation';
 import { isHelperId, typedLetters } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
+import { EN_SHAPE, displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
@@ -32,6 +32,7 @@ import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positive
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
+import { POINT_NAME, isPointName } from './pointName';
 import {
   CENTRE_SENTINEL,
   ELLIPSE_ROLE_SENTINELS,
@@ -66,6 +67,7 @@ import {
   type Id,
   type PointObject,
   type PolygonObject,
+  type OrderSide,
 } from './types';
 
 export type ApplyErrorCode =
@@ -1282,7 +1284,7 @@ function stateCircleOn(c: Construction, centre: Id, id: Id, src: string, hidden?
 }
 
 /** A name a student writes for a POINT (a capital letter, an optional index) that is not a circle numeral («I», «II»). */
-const POINT_LETTER = /^[A-Z][0-9₀-₉]*$/;
+const POINT_LETTER = { test: isPointName };
 
 /**
  * A NAMED CIRCLE THE FIGURE DOES NOT HAVE YET: THE REFERENCE STATES IT (#1670, ADR-AG-210; operator 2026-10-02 — follow
@@ -2265,6 +2267,15 @@ function applyHeightOf(c: Construction, f: Extract<Fact, { t: 'height-of' }>): A
     if (!ringEdge(e1) || !ringEdge(e2) || sameEdge(e1, e2)) continue;
     if (bases.some(([p, q]) => (sameEdge(p, e1) && sameEdge(q, e2)) || (sameEdge(p, e2) && sameEdge(q, e1)))) continue;
     bases.push([e1, e2]);
+  }
+  /*
+   * A RHOMBUS'S HEIGHT (#2621 E, [ADR-AG-396](../../docs/06c-decisions-analytic.md#adr-ag-396)) — the distance between two
+   * opposite sides, and every such distance is the same length (area ÷ side), so it is GAUGE, never a choice: drawn as a
+   * trapezoid's is, from the vertex before a side onto it — D onto AB — its foot the tool's letter, its length the value.
+   * Drawn because a stated value is visible on the figure (the honesty invariant), exactly as the trapezoid's.
+   */
+  if (ringsNamed([host], EN_SHAPE.rhombus).length === 1) {
+    return applyFact(c, { t: 'cevian-of', role: 'altitude', apex: ring[3], side: [ring[0], ring[1]], foot: f.foot, toolFoot: true, measure: f.measure, src: f.src });
   }
   const trapezoid = ringsNamed([host], 'טרפז').length === 1;
   const parallelogram = host.noun !== undefined && normalizeShapeNoun(host.noun) === 'מקבילית';
@@ -4672,7 +4683,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'direction-line': {
       const held = objectById(c, f.id) ?? (f.name ? curveByName(c, f.name) : undefined);
       if (held) {
-        return applyFact(c, { t: 'constraint', k: { t: 'relation', rel: f.rel, u: { k: 'curve', id: held.id }, v: { k: 'axis', axis: f.axis } }, src: f.src });
+        const v: Direction = f.to ? { k: 'points', a: f.to[0], b: f.to[1] } : { k: 'axis', axis: f.axis };
+        return applyFact(c, { t: 'constraint', k: { t: 'relation', rel: f.rel, u: { k: 'curve', id: held.id }, v }, src: f.src });
       }
       return applyAll(c, directionLineFacts(f));
     }
@@ -5111,6 +5123,95 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * among the options the other givens leave alive (#1642's `evaluateTryingChoices`), never a guess the tool
      * makes — and an assignment the ring cannot be drawn on (three vertices on one axis) is simply not admitted.
      */
+    /**
+     * «הישר l עובר מימין לראשית הצירים» (#2621, ADR-AG-367 Am. 1) — the side of the origin an AXIS-PARALLEL line passes: a
+     * vertical line's x-axis crossing is right or left of the origin, a horizontal line's y-axis crossing above or below it
+     * (the `axis-cut` region, D7 kind 2). Read only for such a line, as the session's choice recorded: a slanted line, or a
+     * side the direction has no crossing for («מעל» a vertical line), is not this sentence and is refused naming it.
+     */
+    case 'origin-side': {
+      const id = f.line.k === 'curve' ? f.line.id : null;
+      const o = id ? (objectById(c, id) ?? curveByName(c, id.replace(/^line-/, ''))) : undefined;
+      if (f.line.k === 'curve' && !o) return { ok: false, error: unknownRef(c, f.line.id) };
+      const facing = o ? axisFacingOf(o) : null;
+      const vertical = f.side === 'right' || f.side === 'left';
+      if (facing !== (vertical ? 'vertical' : 'horizontal')) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const line: Direction = o ? { k: 'curve', id: o.id } : f.line;
+      return applyFact(c, { t: 'selector', sel: { kind: 'axis-cut', line, axis: vertical ? 'x' : 'y', greater: f.side === 'right' || f.side === 'above' }, src: f.src });
+    }
+
+    /**
+     * «אלכסוני המעוין על הצירים» · «האלכסון הגדול של המעוין הוא AC / נמצא על ציר ה-x» (#2621 E, ADR-AG-396). The ring is
+     * the sentence's (its letters, else its noun's one ring). Each diagonal on an axis is the conjunction of its two ends'
+     * incidences (`all`), and which diagonal is on which axis is unstated — ONE discrete choice of the options
+     * (#1642's `evaluateTryingChoices`, ADR-052), never a pick. The longer / shorter diagonal is an ORDER (a region) on the
+     * two diagonals' lengths; on an axis it rides the choice as the ring's extent, positive when the x-axis diagonal is the
+     * longer, so the option the student's word rules out has no figure.
+     */
+    case 'diagonal-role': {
+      const cands = (ringsNamed(c.objects, f.noun) as PolygonObject[]).filter(
+        (o) => o.vertices.length === 4 && (!f.ring || f.ring.every((v) => o.vertices.includes(v))),
+      );
+      if (cands.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', cands, 4) };
+      const [p, q, r, s] = cands[0].vertices;
+      const diagonals: Array<[Id, Id]> = [[p, r], [q, s]];
+      const onAxis = (d: readonly [Id, Id], axis: 'x' | 'y'): Constraint => ({
+        t: 'all',
+        of: d.map((id): Constraint => (axis === 'x' ? { t: 'on-line', id, a: 0, b: 1, c: 0 } : { t: 'on-line', id, a: 1, b: 0, c: 0 })),
+      });
+      if (f.both) {
+        const options: Constraint[] = [
+          { t: 'all', of: [onAxis(diagonals[0], 'x'), onAxis(diagonals[1], 'y')] },
+          { t: 'all', of: [onAxis(diagonals[0], 'y'), onAxis(diagonals[1], 'x')] },
+        ];
+        return applyFact(c, { t: 'constraint', k: { t: 'choice', options }, src: f.src });
+      }
+      const longer = f.long !== false;
+      if (f.ids) {
+        const at = diagonals.findIndex((d) => sameEdge(d, f.ids!));
+        if (at < 0) return { ok: false, error: { code: 'not-a-diagonal', detail: f.src } };
+        const [mine, other] = [diagonals[at], diagonals[1 - at]];
+        const len = (d: readonly [Id, Id]): OrderSide => ({ t: 'length', le: parseLengthExpr(`${d[0]}${d[1]}`)! });
+        return applyAll(c, [
+          { t: 'segment', id: segmentIdOf(f.ids[0], f.ids[1]), a: f.ids[0], b: f.ids[1], src: f.src },
+          { t: 'selector', sel: { kind: 'sign', q: { k: 'order', left: len(mine), right: len(other) }, positive: longer }, src: f.src },
+        ]);
+      }
+      if (!f.axis) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+      const wider = (f.axis === 'x') === longer;
+      return applyAll(c, [
+        { t: 'constraint', k: { t: 'choice', options: diagonals.map((d) => onAxis(d, f.axis!)) }, src: f.src },
+        { t: 'selector', sel: { kind: 'sign', q: { k: 'extent', ids: [p, q, r, s] }, positive: wider }, src: f.src },
+      ]);
+    }
+
+    /**
+     * «צלעות המשולש הן 13, 14 ו-15» (#2621 E, ADR-AG-396) — the three lengths on the triangle's three sides, which side has
+     * which unstated: ONE choice over the distinct assignments (operator ruling 2026-10-30, Q1 → A: «הציגו תצורה אחרת»
+     * cycles them, and a later «BC = 14» narrows it as any stated option does).
+     */
+    case 'side-lengths': {
+      const cands = (c.objects.filter((o) => o.kind === 'polygon') as PolygonObject[]).filter(
+        (o) => o.vertices.length === 3 && (!f.ring || f.ring.every((v) => o.vertices.includes(v))),
+      );
+      if (cands.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', cands, 3) };
+      const [a, b, d] = cands[0].vertices;
+      const sides: Array<[Id, Id]> = [[a, b], [b, d], [d, a]];
+      const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const seen = new Set<string>();
+      const options: Constraint[] = [];
+      for (const perm of perms) {
+        const key = perm.map((i) => JSON.stringify(f.values[i])).join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        options.push({
+          t: 'all',
+          of: sides.map(([u, v], i): Constraint => ({ t: 'length-eq', left: parseLengthExpr(`${u}${v}`)!, right: { expr: f.values[perm[i]], terms: [] } })),
+        });
+      }
+      return applyFact(c, { t: 'constraint', k: options.length === 1 ? options[0] : { t: 'choice', options }, src: f.src });
+    }
+
     case 'vertices-on-axes': {
       const rings = ringsNamed(c.objects, f.noun) as PolygonObject[];
       if (rings.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', rings.length) };
@@ -5481,7 +5582,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                       : sel.q.k === 'order'
                         ? // Every point either side measures (#1621 D3) — a vertex of an angle, an end of a length.
                           [sel.q.left, sel.q.right].flatMap((o) => (o.t === 'length' ? lengthRefs(o.le) : o.t === 'angle' ? [o.at.v, o.at.a, o.at.b] : []))
-                        : [sel.q.p, sel.q.a, sel.q.b]
+                        : sel.q.k === 'extent'
+                          ? sel.q.ids
+                          : [sel.q.p, sel.q.a, sel.q.b]
               : sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [sel.id, ...('point' in sel.rhs ? [sel.rhs.point] : [])]
@@ -6773,6 +6876,20 @@ function areaLabelRing(f: Fact): Id[] | null {
 }
 const polygonIdOf = (ring: readonly Id[]): Id => `poly-${ring.join('')}`;
 
+/**
+ * Is this line PARALLEL TO AN AXIS, by its own statement — a vertical line (`x = c`: no y in its equation, or ⊥ to the
+ * x-axis by construction) or a horizontal one — or neither (#2621, ADR-AG-367 Am. 1). Read off how the line was stated,
+ * never off one configuration's numbers, so the answer is the same at every seed.
+ */
+function axisFacingOf(o: GeoObject): 'vertical' | 'horizontal' | null {
+  if (o.kind === 'line-at' && o.dir.k === 'axis') return (o.dir.axis === 'x') === o.perp ? 'vertical' : 'horizontal';
+  if (o.kind !== 'curve' || o.curve.kind !== 'line') return null;
+  const syms = new Set(symbolsOf((o.curve as { eq: Expr }).eq));
+  if (syms.has('x') && !syms.has('y')) return 'vertical';
+  if (syms.has('y') && !syms.has('x')) return 'horizontal';
+  return null;
+}
+
 /** #1467: a point LETTER as the parser canonicalises it — what the mint pass may create (never a curve or a symbol). */
 const isPointLabel = (id: Id): boolean => /^[A-Z][0-9₀-₉]*'*$/.test(id);
 
@@ -6801,7 +6918,7 @@ function normalizeDomain(d: Domain): Record<string, unknown> {
  * happens to be — so the endpoints are compared, never the string.
  */
 function segmentOverSameEnds(c: Construction, curveId: Id): boolean {
-  const m = /^line-([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)$/.exec(curveId);
+  const m = new RegExp(`^line-(${POINT_NAME})(${POINT_NAME})$`).exec(curveId);
   if (!m) return false;
   const [, a, b] = m;
   return c.objects.some(

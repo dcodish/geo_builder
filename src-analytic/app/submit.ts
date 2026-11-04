@@ -34,6 +34,7 @@ import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type 
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
+import { isPointName, splitPointNames } from '../engine/pointName';
 import type { StatedMeasures } from '../engine/statedMeasures';
 
 /** #1467: where a letter first appears in the typed line (a letter the line does not spell sorts last). */
@@ -250,7 +251,7 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
 };
 
 /** The figure's letters — never a stand-in for a substituted label (`shell/readExtent.ts`). */
-const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter((id) => /^[A-Z][0-9₀-₉]*$/.test(id));
+const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter(isPointName);
 
 /** #1888 / #1889 (ADR-AG-251) — the refusal a lost part gets: the whole line, with its parts in the student's words. */
 const lostPartRefusal = (line: string, lost: LostPart): SubmitVerdict => ({
@@ -765,7 +766,7 @@ export function decideEdit(
   const parsed = parseLine(next.trim());
   if (!parsed.ok) return false;
   // the other rows' letters keep the probe's stand-in fresh (no fold needed: they are only excluded)
-  const letters = lines.flatMap((l, j) => (j === index ? [] : (l.match(/[A-Z][0-9₀-₉]*/g) ?? [])));
+  const letters = lines.flatMap((l, j) => (j === index ? [] : splitPointNames(l)));
   if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return false;
   if (disabled.includes(index)) return true;
   const edited = lines.map((l, j) => (j === index ? next : l));

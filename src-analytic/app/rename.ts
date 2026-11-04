@@ -70,17 +70,21 @@ import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { AnnotationMap } from './annotations';
 import { segKey } from '../render/scene';
 import type { Seed } from '../engine/evaluate';
+import { foldPrimes } from '../../shell/primes';
+import { POINT_NAME as POINT_NAME_ATOM, isPointName, splitPointNames } from '../engine/pointName';
 
 export { parseRenameAnalytic, parseSwapAnalytic };
 
-/** A point's letter, as this grammar names points: one capital, optionally an index (a digit run) — folded to the glyph (#2075). */
-const POINT_NAME = /^[A-Z](?:[0-9]+|[₀-₉]+)?$/;
 
 /** The letter the student typed, as a point name — upper-cased like the siblings; null when it is not one. */
 export function normalizePointName(raw: string): string | null {
-  const s = raw.trim().replace(/^[«"'(]+|[»"').,]+$/g, '');
+  // #2621 C (ADR-AG-395): a trailing `'` is the name's PRIME («A'»), unless the student opened with a quote too.
+  const folded = foldPrimes(raw.trim());
+  const quoted = /^[«"'(]/.test(folded);
+  const s = folded.replace(/^[«"'(]+/, '').replace(quoted ? /[»"').,]+$/ : /[»").,]+$/, '');
+  // #2075 (ADR-AG-398): an index in any spelling is the one glyph name.
   const up = foldIndexedName(s.length > 0 ? s[0].toUpperCase() + s.slice(1) : s, 'glyph');
-  return POINT_NAME.test(up) ? up : null;
+  return isPointName(up) ? up : null;
 }
 
 /** A letter map — `from → to` for a rename, `{A: B, B: A}` for a swap. Keys passed {@link normalizePointName}. */
@@ -114,9 +118,9 @@ export const relabelText = (s: string, from: string, to: string): string => rela
  * the same polygon. The order the student wrote is kept elsewhere in the fact (`vertices`), so
  * comparing a prefixed id as a letter multiset loses nothing.
  */
-const MINTED_RUN = /^([a-z][a-z-]*-)((?:[A-Z](?:[0-9]+|[₀-₉]+)?)+)$/;
+const MINTED_RUN = new RegExp(`^([a-z][a-z-]*-)((?:${POINT_NAME_ATOM})+)$`);
 const canonId = (s: string): string =>
-  s.replace(MINTED_RUN, (_, prefix: string, run: string) => prefix + (run.match(/[A-Z](?:[0-9]+|[₀-₉]+)?/g) ?? []).sort().join(''));
+  s.replace(MINTED_RUN, (_, prefix: string, run: string) => prefix + splitPointNames(run).sort().join(''));
 
 /** Fields of a parsed fact that are RAW TEXT, not ids — the line itself and an equation's source. */
 const RAW_FIELDS = new Set(['src', 'eqSrc']);
