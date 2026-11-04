@@ -5294,11 +5294,11 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'second-alias-refused-2191',
     title: '«משולש ABC» · «נסמן זוית ABC כ-A1» · «נסמן זוית ABC כ-B2»: the second alias is refused with the one-name sentence and A1 stays (#2191, ADR-720)',
     guards:
-      "#2191 (P3), operator ruling 2026-10-16 (ballot round 5, card 5 `second-alias`, option A: «Refuse it with the one-name sentence»). Measured on de7c221f: the third line committed, the angle's one label slot took «2» and A1 vanished without a word. Root cause: measureRestatement (ADR-661's one-name judge) read only symbolic measures, so a second alias never reached the fold's restatement pre-scan. Fix: an alias arm, alias against alias only. Asserts the report's first two lines build with the label A1, the third is refused at the door with the dry run's name-taken status, and a loaded list holding all three keeps A1 and renders ADR-661's sentence naming the first line. The spelling matrix is src/app/__tests__/issue-2191-second-alias.test.ts.",
+      "#2191 (P3), operator ruling 2026-10-16 (ballot round 5, card 5 `second-alias`, option A: «Refuse it with the one-name sentence»). Measured on de7c221f: the third line committed, the angle's one label slot took «2» and A1 vanished without a word. Root cause: measureRestatement (ADR-661's one-name judge) read only symbolic measures, so a second alias never reached the fold's restatement pre-scan. Fix: an alias arm, alias against alias only. Asserts the report's first two lines build with the label «A₁» (ADR-782, #1812: an alias label is written with a subscript), the third is refused at the door with the dry run's name-taken status, and a loaded list holding all three keeps A1 and renders ADR-661's sentence naming the first line. The spelling matrix is src/app/__tests__/issue-2191-second-alias.test.ts.",
     steps: ['משולש ABC', 'נסמן זוית ABC כ-A1'],
     check(fig) {
       allStepsOk(fig);
-      expect(fig.labels.angles.map((a) => a.text)).toEqual(['A1']);
+      expect(fig.labels.angles.map((a) => a.text)).toEqual(['A₁']);
       const v = gateVerdict(factsOf(['משולש ABC', 'נסמן זוית ABC כ-A1']), 'נסמן זוית ABC כ-B2');
       expect(v.kind, JSON.stringify(v)).toBe('refused');
       const loaded = factsOf(['משולש ABC', 'נסמן זוית ABC כ-A1', 'נסמן זוית ABC כ-B2']);
@@ -5309,7 +5309,7 @@ export const SCENARIOS_4: Scenario[] = [
       const raw = d.status[bad[0].id] as string;
       const he = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
       expect(stripFormatControls(humanizeError(raw, he, bad[0].utterance, otherUtteranceForError(loaded, raw)))).toBe('לזווית ABC כבר יש שם: A1 (בשורה «נסמן זוית ABC כ-A1»). לכל זווית שם אחד — המשיכו עם A1.');
-      expect(d.labels.angles.map((a) => a.text)).toEqual(['A1']);
+      expect(d.labels.angles.map((a) => a.text)).toEqual(['A₁']);
     },
   },
   {
