@@ -395,6 +395,9 @@ export function wordingOf(e: EngineError): Worded | null {
       return one('nameTaken', { key: e.measure === 'angle' ? 'errors.angleNameTaken' : 'errors.lengthNameTaken', params: { name: e.name, symbol: e.symbol } });
     case 'equal-nested':
       return one('overConstrainedReason', { nested: { what: { key: `errors.equalNestedReason.${e.relation}`, params: {} } } });
+    case 'pair-position-conflict':
+      // #2677 (ADR-779): the fold's drop-one search names the earlier statement; the reason is the plane's exclusion
+      return one('overConstrainedReason', { nested: { what: { key: `errors.pairPositionReason.${e.position}-${e.other}`, params: {} } } });
     case 'tangents-exhausted':
       return one('tangentsExhausted', { key: tangentsExhaustedKey(e.kind, e.position) });
     case 'restated-size':

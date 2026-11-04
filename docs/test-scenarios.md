@@ -2251,3 +2251,7 @@ over all four (ADR-041).
 ### `divides-existing-point-2591` — «נקודה D» · «D מחלקת את AB ביחס 1:2»: D at the stated ratio; a midpoint that divides 1:2 is refused (#2591, ADR-773)
 
 **Guards against:** a stated ratio given to an existing point dropped by the M1 lowering: D drawn at AD/DB = 0.14, green, and «D אמצע AB» · «D מחלקת את AB ביחס 1:2» committed green with D at the midpoint. **Asserts** every step green and AD/DB = 0.5; on «משולש ABC» · «D אמצע AB» the divider line is refused by the engine, naming «|AD| = 0.5·|DB|» as the colon form does. The class matrix is `src/engine/__tests__/existing-point-stated-t-2591.test.ts`.
+
+### `contained-pair-relations-2677` — «מעגל P מוכל בתוך מעגל O» · «משיקים מבחוץ» / «נחתכים בנקודות X ו-Y»: refused naming the containment; «משיקים מבפנים» builds (#2677, ADR-779)
+
+**Guards against:** a tangency from outside or a crossing of a pair stated contained, committed with every row green while the verifier flagged the containment. **Asserts** containment plus internal tangency builds clean (ADR-704); after the containment, each of the two report lines is refused before it becomes a fact, and the student reads «לא ניתן: «…» סותר את «מעגל P מוכל בתוך מעגל O» …» with the exclusion's reason. The class matrix (reverse orders, «זרים» against the containment, a containment stated both ways) is `src/app/__tests__/issue-2677-pair-position-conflict.test.ts`.

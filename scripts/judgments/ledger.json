@@ -1311,6 +1311,16 @@
       "chosen": true,
       "at": "2026-11-03T18:55:50.589Z",
       "status": "pending"
+    },
+    {
+      "id": "text-2677-pair-position-reasons",
+      "kind": "text",
+      "issue": "#2677",
+      "what": "The reason clause of the refusal when two stated positions of one circle pair exclude each other (errors.pairPositionReason.*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
+      "choice": "contained-ext-tangent: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו יכול להשיק לו מבחוץ · contained-crossing: מעגל שמוכל בתוך מעגל אחר נמצא כולו בתוכו, ולכן אין להם נקודות חיתוך · contained-disjoint: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו מחוץ לו · contained-contained: מעגל שמוכל בתוך מעגל אחר קטן ממנו, ולכן המעגל האחר אינו מוכל בתוכו",
+      "chosen": true,
+      "at": "2026-11-04T06:50:46.591Z",
+      "status": "pending"
     }
   ],
   "demoted": {

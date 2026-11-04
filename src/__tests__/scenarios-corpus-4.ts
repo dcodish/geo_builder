@@ -6228,6 +6228,31 @@ export const SCENARIOS_4: Scenario[] = [
       expect(text).toBe(bare(`${he('errors.restatedSize_said_vs', { said: 'D מחלקת את AB ביחס 1:2', other: 'D אמצע AB' })} ${he('errors.retryHint')}`));
     },
   },
+  {
+    id: 'contained-pair-relations-2677',
+    title: '#2677: after «מעגל P מוכל בתוך מעגל O», «משיקים מבחוץ» and «נחתכים בנקודות X ו-Y» are refused naming the containment; internal tangency still builds (ADR-779)',
+    guards:
+      "#2677 (P2, wrong answer): a circle pair's stated position that an earlier statement excludes was built. Measured at ebacadd1 through decideDeterministic2D: after «מעגל P מוכל בתוך מעגל O», «המעגלים O ו-P משיקים מבחוץ» and «המעגלים O ו-P נחתכים בנקודות X ו-Y» committed with every row ok while the verifier flagged circle-contained; the reverse orders and «זרים» against a crossing or a tangency the same. Root cause (ADR-779): the tangency and the crossing are constructs over free centres and radii, and the containment / disjointness only a requirement the drive never reconciled, so nothing compared the two statements before commit. Fix: stage 0a's pairPositionConflict refuses the statement that completes an exclusion, either order, and the fold names the other statement by provenance. The class matrix is src/app/__tests__/issue-2677-pair-position-conflict.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים מבפנים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'containment with internal tangency builds clean (ADR-704)').toEqual([]);
+      const prior = factsOf(['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O']);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      for (const [line, why] of [
+        ['המעגלים O ו-P משיקים מבחוץ', 'contained-ext-tangent'],
+        ['המעגלים O ו-P נחתכים בנקודות X ו-Y', 'contained-crossing'],
+      ] as const) {
+        const v = gateVerdict(prior, line);
+        expect(v.kind === 'refused' && v.reason, line + ': refused before it becomes a fact').toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        const text = bare(figureExplainer(he, replay(prior, 0).construction, prior)(detail, line, otherUtteranceForError(prior, detail)));
+        const reason = he('errors.pairPositionReason.' + why);
+        expect(text).toBe(bare(he('errors.overConstrained_said_vs', { said: line, other: 'מעגל P מוכל בתוך מעגל O', what: reason }) + ' ' + he('errors.retryHint')));
+      }
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
