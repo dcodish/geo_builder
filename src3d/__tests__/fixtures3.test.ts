@@ -20,7 +20,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure3 } from '../store/figureFile3';
-import { derive3 } from '../store/store3';
+import { derive3, statedCommand3 } from '../store/store3';
 import { parse3 } from '../parser/parse3';
 import { generateSeeded, schemaVersionCoverage, supportedSchemaVersions, versionsWithoutCoverage } from './fixtures3-gen';
 import type { SeededCorpus } from './fixtures3-gen';
@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2674 (ADR-3D-415) — the student's E takes the tool's M over (the 3-D half of the 2026-11-03 ruling). One point E, no
+  // notice, the next unnamed midpoint M, asserted in issue-2674-tool-letter.test.ts; this is the build + drift + load net.
+  'tool-letter-2674.geo3.json': ["קובייה ABCDA'B'C'D'", "אמצע BB'", "E אמצע BB'", "אמצע CC'"],
   // #1613 (built by #1467, ADR-3D-382; locked in round #2665) — the operator's sequence: a vector from a known point creates
   // its head. B's position, k staying open and the notice are asserted in issue-1613-vector-creates-head.test.ts; this is the build + drift net.
   'vector-creates-head-1613.geo3.json': ['A(0,0,0)', 'AB = (1,2,3)'],
@@ -577,7 +580,8 @@ describe('fixtures3 — the regression net', () => {
         for (const f of r.facts) {
           const parsed = parse3(f.utterance);
           expect(parsed.ok, f.utterance).toBe(true);
-          if (parsed.ok) expect(parsed.commands, f.utterance).toEqual(f.cmds);
+          // #2674 (ADR-3D-415): a letter a later line gave a tool's point by use is history, not the parse
+          if (parsed.ok) expect(parsed.commands, f.utterance).toEqual(f.cmds.map(statedCommand3));
         }
       });
     });

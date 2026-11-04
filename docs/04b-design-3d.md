@@ -368,6 +368,12 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   with the holder an end of the segment and in the plane's letters, `seg-cross` sharing it, `line-plane` through named
   carriers), or a foot dropped from the holder onto a carrier through it. Every other landing records and is said by
   `coincidences3`.
+- **The tool's letter yields to the student's ([ADR-3D-415](06b-decisions-3d.md#adr-3d-415), #2674).** `toolLetterTakenOver3`
+  (`store3.ts`), called by both statement seams (`decideCommands3`, `replaceFact`) after the candidate derive: a fresh
+  student letter whose 0-DOF definition equals that of a point no other line names (the pool letter an earlier
+  `midpoint-auto` picked at apply) names that point by use: the minting command keeps the letter (`midpoint-auto.id`,
+  which apply uses instead of the pool), so history is rewritten as one undo step and the pool letter is free again.
+  `sameStatement` compares `midpoint-auto` without that `id`, so «אמצע BB'» typed again is still already known.
 
 **A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through

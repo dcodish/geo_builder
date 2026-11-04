@@ -466,6 +466,9 @@ export interface MidpointAutoCommand {
   type: 'midpoint-auto';
   a: Id;
   b: Id;
+  /** #2674 ([ADR-3D-415](../../docs/06b-decisions-3d.md#adr-3d-415)): the letter a LATER line gave this point by use
+   *  («E אמצע BB'» after «אמצע BB'»). Absent while the point wears the tool's letter, which apply picks per fold. */
+  id?: Id;
 }
 
 /** `נסמן: AB = u` — bind a lowercase name to the ordered pair from→to. */

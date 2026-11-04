@@ -2307,7 +2307,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missingMid = missingPoint(c, [cmd.a, cmd.b]);
       if (missingMid) return { ok: false, error: missingMid };
       // #1476: the pool is shared with the dihedral construction's meeting point (./freeLetter)
-      const label = firstFreeLetter((l) => c.points.has(l));
+      // #2674 (ADR-3D-415): a letter the student gave this point by use is its letter; the tool's pick is only a default
+      const label = cmd.id ?? firstFreeLetter((l) => c.points.has(l));
       if (!label) return { ok: false, error: { code: 'already-defined', id: 'M' } }; // 19 letters taken — practically unreachable
       return applyCommand3(c, { type: 'point-on-segment3', id: label, a: cmd.a, b: cmd.b, t: 0.5 });
     }

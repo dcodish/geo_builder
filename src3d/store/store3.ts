@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
 import { narrowingNotes3 } from './narrowing3';
-import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
+import { normalizeLabel3, pointLabels3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
@@ -92,6 +92,68 @@ export interface Derived3 {
   /** #1680 (ADR-3D-391 Am. 1): by fact id, the reading the fold gave a line's unmarked two-reading segment equation
    *  (`readSegmentEquation3`). Absent for a line that holds none. */
   readings: Readonly<Record<string, SegmentEquationReading3>>;
+}
+
+/**
+ * #2674 ([ADR-3D-415](../../docs/06b-decisions-3d.md#adr-3d-415)) — A STUDENT'S LETTER ON A TOOL'S POINT TAKES THE TOOL'S
+ * LETTER OVER (operator ruling 2026-11-03: *"Rename the tool's letter to the student's, no message (2-D's way, in every
+ * builder)"*; 2-D's ADR-653 `impliedIdentityBinding`, the PATTERN copied, never imported).
+ *
+ * «אמצע BB'» names its point with the pool's first free letter, picked at apply (`midpoint-auto`): that letter is the
+ * TOOL's, in no line the student typed. «E אמצע BB'» then defines E as the same point, and the figure used to carry
+ * both, M and E on one dot with the coincidence notice, a pair the student never made. Here the line that leaves a
+ * FRESH student letter L with the same 0-DOF definition as exactly one tool-lettered point M names M by use: the
+ * minting command keeps L (`midpoint-auto.id`), so the figure has one point, L, and M goes back to the pool (the next
+ * unnamed midpoint is M again, as in 2-D).
+ *
+ * Read from the construction, never from coordinates: equal DEFINITIONS (kind, parents, parameter) after the line, a
+ * derived kind only (a free point or a rider is a sampled coincidence, never an identity). Every point letter the
+ * other lines carry is the student's — a line that typed M («AM = 3») makes M the student's, and two student letters
+ * that the givens force together keep the notice (#1595 ruling B). `candidate` holds the line under `factId`; the
+ * tool's point must be minted by an EARLIER line. Returns the renamed list and its derive, or null (nothing to name,
+ * or the named list does not build: the line then stands as it was).
+ */
+function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed: number): { facts: Fact3[]; derived: Derived3 } | null {
+  const at = candidate.findIndex((f) => f.id === factId);
+  const line = candidate[at];
+  if (!line || !line.enabled) return null;
+  const others = candidate.filter((f) => f.id !== factId);
+  const studentLetters = new Set<string>();
+  for (const f of others) for (const l of pointLabels3(f.cmds)) studentLetters.add(l);
+  const lineLetters = pointLabels3(line.cmds);
+  const fresh = [...lineLetters].filter((l) => !studentLetters.has(l));
+  if (fresh.length === 0) return null;
+  const post = derive3(candidate as Fact3[], seed).construction.points;
+  const key = (id: Id): string | null => {
+    const def = post.get(id);
+    if (!def || !DERIVED_POINT_KINDS3.has(def.kind)) return null;
+    if (def.kind === 'on-segment') {
+      if (def.t === undefined) return null; // a free rider
+      // one segment, either way round: «אמצע BB'» and «אמצע B'B» are one point
+      return def.a <= def.b ? meaningKey({ kind: def.kind, a: def.a, b: def.b, t: def.t }) : meaningKey({ kind: def.kind, a: def.b, b: def.a, t: 1 - def.t });
+    }
+    if (def.kind === 'scaled-offset' && def.k === undefined) return null; // a free-ratio corner is a rider too
+    return meaningKey(def);
+  };
+  // the TOOL's letters: points of the figure no line names — and the command that minted each, which must precede the line
+  const minters = others.flatMap((f) =>
+    candidate.indexOf(f) < at && f.enabled ? f.cmds.flatMap((k, j) => (k.type === 'midpoint-auto' && k.id === undefined ? [{ f, j, a: k.a, b: k.b }] : [])) : []);
+  const found: { fact: Fact3; j: number; to: Id }[] = [];
+  for (const L of fresh) {
+    const k = key(L);
+    if (k === null) continue;
+    for (const [M, def] of post) {
+      if (lineLetters.has(M) || studentLetters.has(M) || def.kind !== 'on-segment' || key(M) !== k) continue;
+      const mint = minters.filter((m) => (m.a === def.a && m.b === def.b) || (m.a === def.b && m.b === def.a));
+      if (mint.length === 1) found.push({ fact: mint[0].f, j: mint[0].j, to: L });
+    }
+  }
+  if (found.length !== 1) return null;
+  const { fact, j, to } = found[0];
+  const facts = candidate.map((f) => (f.id === fact.id ? { ...f, cmds: f.cmds.map((k, i) => (i === j && k.type === 'midpoint-auto' ? { ...k, id: to } : k)) } : f));
+  const derived = derive3(facts, seed);
+  const st = derived.status[factId];
+  return (st === 'ok' || st === 'disabled') && derived.status[fact.id] === 'ok' ? { facts, derived } : null;
 }
 
 /**
@@ -2106,7 +2168,12 @@ export interface Geo3State {
  * matters — a command list is a sequence, and two different orderings are not obviously the same claim.
  */
 const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean =>
-  a.length === b.length && meaningKey(a) === meaningKey(b); // #1485: «הפאה SBC» restates «המישור SBC»
+  a.length === b.length && meaningKey(a.map(statedCommand3)) === meaningKey(b.map(statedCommand3)); // #1485: «הפאה SBC» restates «המישור SBC»
+
+/** #2674 (ADR-3D-415): a command as the student STATED it — a letter given to a tool's point by a later line is a
+ *  naming, not part of «אמצע BB'», so the line typed again is still the same statement, and its utterance still
+ *  lowers to it (the fixture drift net reads this). */
+export const statedCommand3 = (k: Command3): Command3 => (k.type === 'midpoint-auto' && k.id !== undefined ? { type: k.type, a: k.a, b: k.b } : k);
 
 /**
  * A ring's identity up to rotation and reversal (ADR-W-121; 2-D's `ringKey`, copied by design — the engine
@@ -2507,10 +2574,13 @@ export function decideCommands3(
     }
   }
   const fact: Fact3 = { id: newId(), utterance: utterance.trim(), cmds: [...commands], enabled: true };
-  const candidate = [...facts, fact];
-  const derived = derive3(candidate, seed);
-  const status = derived.status[fact.id];
+  let candidate = [...facts, fact];
+  let derived = derive3(candidate, seed);
+  let status = derived.status[fact.id];
   if (status !== 'ok' && status !== 'disabled') return { kind: 'refused', error: status }; // keep-prior
+  // #2674 (ADR-3D-415): the student's letter on a point the TOOL lettered takes the tool's letter over
+  const named = toolLetterTakenOver3(candidate, fact.id, seed);
+  if (named) [candidate, derived, status] = [named.facts, named.derived, named.derived.status[fact.id]];
   if (opts.twins) {
     const twin = knownSegmentEquationTwin3(facts, seed, fact, derived);
     if (twin) return { kind: 'already-stated', twin, facts };
@@ -2693,7 +2763,9 @@ export const useGeo3 = create<Geo3State>()(
         // candidate status is 'disabled', so its rewrite passes the derive gate by construction
         // (it gates for real when re-enabled, exactly like the complex builder's muted-edit rule).
         const fact: Fact3 = { ...old, utterance: utterance.trim(), cmds: parsed.commands };
-        const candidate = facts.map((f) => (f.id === factId ? fact : f));
+        // #2674 (ADR-3D-415): the edit seam names a tool's point by use exactly as `submit` does (one function)
+        const typed = facts.map((f) => (f.id === factId ? fact : f));
+        const candidate = toolLetterTakenOver3(typed, factId, seed)?.facts ?? typed;
         const st = derive3(candidate, seed).status[factId];
         if (st !== 'ok' && st !== 'disabled') {
           set({ lastError: st }); // keep-prior: the old statement stands
