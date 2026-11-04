@@ -1617,6 +1617,22 @@
       "chosen": true,
       "at": "2026-11-04T12:01:20.801Z",
       "status": "pending"
+    },
+    {
+      "id": "q7-2518-reversed-extension",
+      "question": "Does the refusal also apply to the case ADR-142 and ADR-267 accepted, where two approved bagrut figures are typed with the letters reversed?",
+      "class": "extension-impossible-stated-side",
+      "verdict": "escalate",
+      "reason": "Reverses a shipped promise (ADR-142, ADR-267, #1843) and the record does not settle how far the newest words reach. Answered by the operator 2026-11-04: option A.",
+      "nearest": [
+        {
+          "quote": "what happens in this case is that we need to refuse and say that the correct syntax would be המשך OA.",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2518"
+        }
+      ],
+      "at": "2026-11-04T21:09:50.005Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
