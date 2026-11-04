@@ -63,7 +63,7 @@ are the lexical half and the reader of `evalRadical`, defined side by side, so a
 one the reader values. Never `+m[n]`: the decimal-only `NUM`/`UNUM` in a magnitude slot is how «AD = √7»
 refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to `√`, so the atom only ever sees
 the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
-`evalRadical`, and keeps a radicand's own parentheses. The distance slot (`distanceGiven`) matches `MAG` and
+`evalRadical`, and keeps a radicand's own parentheses. A fraction is accounted by its value or by its numerator and denominator together (ADR-3D-340); a lone radical («√2», «5√2») by its value only, never by the implied /1 (#2285, [ADR-3D-417](06b-decisions-3d.md#adr-3d-417), 2-D's ADR-700). The distance slot (`distanceGiven`) matches `MAG` and
 reads it with `magValue` too, and the `A = (…)` claim (`coordsClaim`) composes from the tuple-component atom
 `VAL` and reads it with `literalValue`, the pair `A(…)` reads with (#2081,
 [ADR-3D-362](06b-decisions-3d.md#adr-3d-362)). The ratio and solid-size slots still take decimals until the
