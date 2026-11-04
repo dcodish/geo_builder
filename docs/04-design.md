@@ -782,6 +782,8 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
 read the same `RULES` entries.
 
+**Two numbers with only a space between them** («AB = 2 3», #2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)) are refused in `decidePreParse` beside the radian check — `refuse`, `guided`, log `scope:juxtaposed-numbers`, the suite note `suite.refusal.juxtaposedNumbers*` built by `juxtaposedPairNote` — and in `runEditCommit`. The detector is `shell/juxtaposedNumbers.findNumberPair`; the readings it teaches are read back through `parse` (`teachPair`), so the product is taught as its value. The mixed number «2 1/2» is not this shape (#2248).
+
 **An angle written in radians** (#1837, [ADR-710](06-decisions.md#adr-710)) takes the same positions: `findRadianAngle` (`shell/radianAngle.ts`, [04w](04w-design-shell.md)) is asked in `decidePreParse` right after the proof target — `refuse`, `guided`, logged `scope:radian-angle`, note `input.scope.radian-angle` — in `runEditCommit`, and at the top of `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` can draw «∠ABC = pi/2» as 2°.
 
 **A letter the tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) takes the same two positions.

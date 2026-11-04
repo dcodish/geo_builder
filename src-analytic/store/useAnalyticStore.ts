@@ -115,6 +115,8 @@ export type InputError =
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
   | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
+  /** #2286 (ADR-AG-397) — any other number–space–number «2 3», refused with its readings (`shell/juxtaposedNumbers`). */
+  | { key: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /**

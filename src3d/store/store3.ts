@@ -31,6 +31,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { findNumberPair, teachPair } from '../../shell/juxtaposedNumbers';
 import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -162,6 +163,11 @@ export type StoreError3 =
    *  complex builder's notation only. «∠ABC = π» RECORDED an angle mark labelled π; the rest went to the model.
    *  Typed, so it never escalates; answered with 2-D's degrees sentence. */
   | { code: 'radian-angle' }
+  /** #2286 (ADR-AG-397, operator ruling 2026-11-03): two numbers with only a space between them («AB = 2 3») — 2.3, 23
+   *  or 2·3, so refused before the grammar and the model with the suite's sentence. `detail` is the student's pair;
+   *  the rest is what it teaches, each reading kept only when `parse3` reads the line with it in place (`teachPair`,
+   *  #1156): `decimal` / `joined` (both whole) and `product` (the value — this grammar reads no `*`), or `comma`. */
+  | { code: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /** #1919 (ADR-3D-328, ADR-626): a letter this tool cannot read — «משולש ДЖФ» RECORDED A, B, C, because a
    *  letter outside the label alphabet is invisible to `declLeftover`, so the shape read as unlabelled and
    *  `planarPolygon` drew its default names. `detail` is the student's own run(s); `name` is a run that
@@ -2252,6 +2258,13 @@ function readStatement3(
   // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
   // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
   if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };
+  // #2286 (ADR-AG-397): two numbers with only a space between them, refused at the same reader with the suite's one
+  // detector (`shell/juxtaposedNumbers`) — never sent to the model. The mixed number «2 1/2» is not this shape (#2248).
+  const pair = findNumberPair(utterance);
+  if (pair) {
+    const { kind: _k, ...teach } = teachPair(utterance, pair, (l) => parse3(l).ok);
+    return { ok: false, error: { code: 'juxtaposed-numbers', detail: pair.text, ...teach } };
+  }
   // #1919 (ADR-3D-328): a letter the tool cannot read, refused at the one statement reader both seams
   // share — the shared rule every builder calls (`shell/inputScript`), run after the glyph fold's
   // look-alike row, so «משולש КМО» still records KMO and «משולש ДЖФ» is refused naming Д, Ж, Ф.

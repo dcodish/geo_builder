@@ -90,6 +90,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
     case 'radian-angle':
       return t('err.radianAngle');
+    // #2286 (ADR-AG-397): two numbers side by side — the suite's sentence, one for every builder (ADR-W-118 B1)
+    case 'juxtaposed-numbers':
+      if (err.comma) return t('suite.refusal.juxtaposedNumbersComma', { detail: err.detail, comma: err.comma });
+      return err.decimal
+        ? t('suite.refusal.juxtaposedNumbers', { detail: err.detail, decimal: err.decimal, joined: err.joined ?? '', product: err.product ?? '' })
+        : t('suite.refusal.juxtaposedNumbersProduct', { detail: err.detail, product: err.product ?? '' });
     // #1919 (ADR-3D-328): a letter the tool cannot read — the operator's two sentences, 2-D's wording
     // verbatim (ADR-W-118 B1), with the student's own letters.
     case 'unread-name':

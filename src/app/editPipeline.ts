@@ -20,7 +20,7 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { ambiguousDefiniteShapeNote, lettersOnScreen, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
@@ -30,6 +30,7 @@ import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { findNumberPair } from '../../shell/juxtaposedNumbers';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -97,6 +98,13 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // #1837 (ADR-710): an angle written in radians is refused here exactly as at submit.
   if (findRadianAngle(editText)) {
     setInputNote(t('input.scope.radian-angle'));
+    return false;
+  }
+  // #2286 (ADR-AG-397): two numbers with only a space between them are refused here exactly as at submit.
+  const pair = findNumberPair(editText);
+  if (pair) {
+    const note = juxtaposedPairNote(editText, pair);
+    setInputNote(t(note.key, note.params));
     return false;
   }
   // #1919 (ADR-626): an edit is a statement too — a letter the tool cannot read is refused here exactly

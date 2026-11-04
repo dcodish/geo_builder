@@ -33,6 +33,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'unread-name': [{}],
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
+  'juxtaposed-numbers': [{ detail: '2 3', decimal: '2.3', joined: '23', product: '2*3' }, { detail: '2.5 3', product: '2.5*3' }],
   'reserved-coordinate': [{}],
   'capital-magnitude': [{ detail: 'נתון מעגל O שרדיוסו K', letter: 'K', corrected: 'נתון מעגל O שרדיוסו k' }], // #2427 (ADR-AG-325)
   'bad-arity': [{}],

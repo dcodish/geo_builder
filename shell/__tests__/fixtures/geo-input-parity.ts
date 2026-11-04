@@ -1872,6 +1872,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'plural-lines-crossing-2533', family: 'intersections', steps: ['מרובע ABCD', 'M is the intersection of lines AB and CD'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D read "lines" as the segments (onSeg) and re-seated the quadrilateral into a crossed one before ADR-774 (the line reading is locked in src/parser/__tests__/plural-line-operands-2533.test.ts). Analytic cell: after an uncoordinated «מרובע ABCD» it refuses the crossing of the side lines AB and CD in every spelling, singular and plural (ring-contradicts-noun, measured 2142a8d1); on coordinate points it records the plural' },
   { id: 'plural-lines-meet-he-2533', family: 'intersections', steps: ['מרובע ABCD', 'הישרים AB ו-CD נחתכים בנקודה M'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '«הישרים» read as lines in 2-D before ADR-774 too (its prefix «הישר»); analytic: the side-line crossing refusal of plural-lines-crossing-2533' },
   { id: 'plural-rays-crossing-2533', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של הקרניים AB ו-CD'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D read «הקרניים» as the segments before ADR-774; analytic has no ray operand and refuses it (bad-operand on coordinate points, measured)' },
+  // ── #2286 (ADR-AG-397, ruled 2026-11-03 «Refuse it, naming the line, in every builder»): two numbers with only a space between them ──
+  { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
+  { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
+  { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

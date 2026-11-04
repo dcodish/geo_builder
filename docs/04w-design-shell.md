@@ -383,6 +383,8 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 ### Angles in radians ([ADR-W-142](06w-decisions-workspace.md#adr-w-142))
 
+`shell/juxtaposedNumbers.ts` decides whether a typed line holds two NUMBERS with only whitespace between them (#2286, [ADR-AG-397](06c-decisions-analytic.md#adr-ag-397)). It is pure, knows no product and returns no strings. `findMixedNumber` (an integer, whitespace, a fraction «5 1/2», ADR-AG-284), `findNumberPair` (any other pair «2 3», a pair that starts a mixed number skipped), `findJuxtaposedNumbers` (either, the mixed number first — analytic's tokenizer and `parseLine`, complex's `lex`) and `teachPair(line, pair, reads)`, which keeps each reading — `2.3` and `23` when both are whole, the product `2*3` or its value, or the comma `2, 3` — only when the caller's grammar reads the line with it in place (#1156). 2-D (`decidePreParse`, `runEditCommit`) and 3-D (`readStatement3`) ask `findNumberPair`; the sentence is the suite key `suite.refusal.juxtaposedNumbers` (and `…Product`, `…Comma`).
+
 `shell/radianAngle.ts` decides whether a typed line gives an ANGLE MEASURE written with π. It is pure, knows no product and returns no strings: `findRadianAngle(text)` returns `{ radian: true, span: [start, end), value }` or `null`, with indices into the string the caller passed.
 
 | match | examples |

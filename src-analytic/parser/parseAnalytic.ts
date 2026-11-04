@@ -21,7 +21,8 @@ import type { DerivedRule, EllipseSide, FootLine } from '../engine/derived';
 import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
-import { evalExpr, findMixedNumber, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { teachPair } from '../../shell/juxtaposedNumbers';
+import { evalExpr, findJuxtaposedNumbers, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RADIUS_CAPITALS, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
@@ -135,6 +136,14 @@ export type ParseFailure =
    * `detail` is the student's own text; the glyph «5½» is not this (it reads 5.5).
    */
   | { code: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
+  /**
+   * #2286 (ADR-AG-397, operator ruling 2026-11-03: *"Refuse it, naming the line, in every builder"*) — any other
+   * number, whitespace, number «2 3»: ambiguous as written (2.3, 23 or 2·3), so refused before every rule and before the
+   * model. `detail` is the student's own pair; the rest is what it teaches, each reading kept only when the line reads
+   * with it in place (`shell/juxtaposedNumbers.teachPair` — a taught spelling is one the next Enter reads, #1156):
+   * `decimal` / `joined` (both whole) and `product` (`2*3`, or its value), or `comma` («A(2 3)» → `2, 3`).
+   */
+  | { code: 'juxtaposed-numbers'; detail: string; decimal?: string; joined?: string; product?: string; comma?: string }
   /**
    * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
    *
@@ -8902,10 +8911,15 @@ export function parseLine(raw: string): ParseResult {
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);
   if (unread) return { ok: false, code: `unread-${unread.kind}`, detail: unread.detail };
-  // #2222 (ADR-AG-284): an ASCII mixed number is refused here, before every rule and before the model, so no slot
-  // multiplies it and the fallback cannot either — one teaching sentence, whichever sentence carries it.
-  const mixed = findMixedNumber(line);
-  if (mixed) return { ok: false, code: 'mixed-number', detail: mixed.text, ...(mixed.decimal ? { decimal: mixed.decimal } : {}), sum: mixed.sum, product: mixed.product };
+  // #2222 (ADR-AG-284) / #2286 (ADR-AG-397): two numbers side by side — an ASCII mixed number, or any other pair — are
+  // refused here, before every rule and before the model, so no slot multiplies them and the fallback cannot either:
+  // one teaching sentence, whichever sentence carries them. The suite's one detector (`shell/juxtaposedNumbers`).
+  const juxt = findJuxtaposedNumbers(line);
+  if (juxt?.kind === 'mixed') return { ok: false, code: 'mixed-number', detail: juxt.text, ...(juxt.decimal ? { decimal: juxt.decimal } : {}), sum: juxt.sum, product: juxt.product };
+  if (juxt) {
+    const { kind: _k, ...teach } = teachPair(line, juxt, (l) => parseLine(l).ok);
+    return { ok: false, code: 'juxtaposed-numbers', detail: juxt.text, ...teach };
+  }
   // An angle the student NAMES (#1622 E5, ADR-AG-221) — read with its verb, before the lead-in is unwrapped.
   const label = parseAngleLabel(line);
   if (label) return label.ok ? made(label.facts.map((f) => ({ ...f, src: typed }))) : label;

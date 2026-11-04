@@ -204,6 +204,8 @@ export function errorText(error: InputError, t: Translate): string {
     'unread-word': 'errUnreadWord',
     // #2222 (ADR-AG-284) — the operator's three spellings; the decimal only when the fraction terminates
     'mixed-number': error.key === 'mixed-number' && error.decimal ? 'errMixedNumber' : 'errMixedNumberNoDecimal',
+    // #2286 (ADR-AG-397) — the suite's sentence, one for every builder: the decimal and one-number readings when both are whole
+    'juxtaposed-numbers': error.key !== 'juxtaposed-numbers' ? '' : error.comma ? 'suite.refusal.juxtaposedNumbersComma' : error.decimal ? 'suite.refusal.juxtaposedNumbers' : 'suite.refusal.juxtaposedNumbersProduct',
     // #1888 / #1889 (ADR-AG-251) — a line that loses a part: its parts listed, or the right angle's two lines taught
     'split-statements': error.key === 'split-statements' && error.teach ? 'errRightAngleVertex' : 'errSplitStatements',
     'reserved-coordinate': 'errReservedCoordinate',
@@ -377,9 +379,11 @@ export function errorText(error: InputError, t: Translate): string {
     nameOf: error.key === 'name-taken' ? (error.nameOf ?? '') : '',
     what: error.key === 'measure-contradicts' ? (error.what ?? '') : '',
     labels: error.key === 'llm-dropped' || error.key === 'llm-invented-existing' ? error.labels : '',
-    decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
+    decimal: error.key === 'mixed-number' || error.key === 'juxtaposed-numbers' ? (error.decimal ?? '') : '',
+    joined: error.key === 'juxtaposed-numbers' ? (error.joined ?? '') : '',
     sum: error.key === 'mixed-number' ? error.sum : '',
-    product: error.key === 'mixed-number' ? error.product : '',
+    product: error.key === 'mixed-number' ? error.product : error.key === 'juxtaposed-numbers' ? (error.product ?? '') : '',
+    comma: error.key === 'juxtaposed-numbers' ? (error.comma ?? '') : '',
     letter: error.key === 'capital-magnitude' ? error.letter : '',
     lineName: error.key === 'line-exists' ? error.lineName : '',
     corrected: error.key === 'capital-magnitude' ? error.corrected : '',

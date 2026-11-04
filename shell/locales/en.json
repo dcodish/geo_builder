@@ -29,7 +29,10 @@
       "emptyTitle": "What are we building today?"
     },
     "refusal": {
-      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples."
+      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples.",
+      "juxtaposedNumbers": "It is not clear what «{{detail}}» means. Write {{decimal}} (a decimal), {{joined}} (one number) or {{product}} (a product).",
+      "juxtaposedNumbersProduct": "It is not clear what «{{detail}}» means. If you mean a product, write {{product}}.",
+      "juxtaposedNumbersComma": "It is not clear what «{{detail}}» means. If these are two numbers, separate them with a comma: {{comma}}."
     },
     "notice": {
       "alreadyDrawn": "That's already on the figure — nothing to add.",
