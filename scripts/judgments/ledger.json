@@ -1311,6 +1311,16 @@
       "chosen": true,
       "at": "2026-11-03T18:55:50.589Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-2611-circle-refusals",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "the 3-D refusals for a point stated on a circle: a missing named circle, no circle, several circles (with/without a centre-lettered one), and a point off the circle — replacing the line sentence that showed «circle»/«circle-O»",
+      "choice": "«D אינה על המעגל — בדקו את הנתונים» · «המעגל O עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מעגל שמרכזו O משיק לישר AB בנקודה T» — ואז כתבו את השורה שוב.» · «עדיין אין מעגל בשרטוט, ולכן «המעגל» לא מציין דבר. הגדירו מעגל תחילה — למשל «משולש ABC חסום במעגל» — ואז כתבו את השורה שוב.» · «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».» / «הכלי עדיין לא יודע לבחור בין כמה מעגלים כשכתוב רק «המעגל», ולאף אחד מהם אין מרכז בשם — זו מגבלה של הכלי.» (en mirrors)",
+      "chosen": true,
+      "at": "2026-11-04T06:35:27.642Z",
+      "status": "pending"
     }
   ],
   "demoted": {

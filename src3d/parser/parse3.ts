@@ -3020,7 +3020,7 @@ const onCircle3: Rule = (s) => {
     s.match(/^(?:ה?נקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+)?על\s+ה?מעגל(?:\s+([A-Z]\d*'?))?$/) ??
     s.match(/^(?:point\s+)?([A-Z]\d*'?)\s+(?:is\s+|lies\s+)?on\s+(?:the\s+)?circle(?:\s+([A-Z]\d*'?))?$/i);
   if (!m) return null;
-  return [{ type: 'point-on-circle3', point: m[1], circle: m[2] ? `circle-${m[2]}` : '' }];
+  return [m[2] ? { type: 'point-on-circle3', point: m[1], circle: `circle-${m[2]}`, name: m[2] } : { type: 'point-on-circle3', point: m[1], circle: '' }];
 };
 
 /**

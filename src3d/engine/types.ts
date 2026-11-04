@@ -1212,7 +1212,8 @@ export type Command3 =
   | LineProjectionCommand
   | Circle3Command
   // V8-i: `A נמצאת על המעגל` — verify a point lies on a circle in R³ (checked in the store vs the resolved circle)
-  | { type: 'point-on-circle3'; point: Id; circle: string }
+  /** `name`: the letter the student named the circle by («המעגל O», #2611) — what a refusal shows; `circle` is its id. */
+  | { type: 'point-on-circle3'; point: Id; circle: string; name?: Id }
   | FootOnLineCommand
   | Line3Command
   | LinePerpPlaneCommand
@@ -2043,6 +2044,11 @@ export type EngineError3 =
   | { code: 'plane-side-undefined'; id: string } // above/below a (near-)vertical plane is meaningless
   | { code: 'wrong-side-of-plane'; id: Id } // a stated above/below does not hold for the point
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
+  // #2611 (ADR-3D-414): a CIRCLE reference or membership speaks of the circle, never of a line or an id.
+  // `name`: the letter the student named a missing circle by; else `several` (more than one circle, «המעגל» names
+  // none) or neither (no circle at all). `centre`: a circle the student can name by its centre, for the next step (with the stated `point`).
+  | { code: 'unknown-circle'; name?: Id; several?: true; centre?: Id; point?: Id }
+  | { code: 'not-on-circle'; id: Id } // a stated on-circle membership does not hold
   // #769 (ADR-3D-183): a DERIVED point (a crossing, a foot, a midpoint…) lands on a point the figure
   // already names — the geometry the student asked for is right, the NAME is not: it is `with`.
   | { code: 'point-coincides'; id: Id; with: Id }
