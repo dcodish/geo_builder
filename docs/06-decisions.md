@@ -20075,3 +20075,16 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/engine/__tests__/existing-point-stated-t-2591.test.ts`, which asserts the **rendered** text through the submit pipeline's composition. The cases are the report, the prose spelling, 3:2, a square side 1:3, the colon form's red row, the rider-with-ratio row, and a control where a typed coefficient keeps its reason. The floor sentence fails every case. `humanize-provenance.test.ts` covers check (c″) on a float coefficient, a ratio and an unseen label; a non-over-constrained frame still floors; and every `withoutReason` names a `saidOnly` wording. `humanize-cases.ts` adds the bare `over-constrained` row with its sentence. `engine-error-total.test.ts`: `over-constrained-unnamed` is worded (floor without a sentence). Golden: the two `over-constrained` entries that carry a sentence moved from the floor to the frame. Scenario `divides-existing-point-2591` (scenarios-corpus-4) now asserts the rendered note too. Its detail regex is now escaped: the unescaped `|` read as alternation, so it accepted any over-constrained detail.
 
 **Behaviour change for a student:** a stated ratio that an existing point cannot take («D אמצע AB» then «D מחלקת את AB ביחס 1:2») is refused with «לא ניתן: «D מחלקת את AB ביחס 1:2» סותר את «D אמצע AB» — אי אפשר לקיים את שניהם יחד.», not «משהו השתבש…». Any over-constrained refusal whose reason the student could not have typed now names their statements and leaves out the tool's arithmetic.
+
+## ADR-782 — An angle alias is written «A₁» on its wedge, replacing #263's bare digit (#1812)
+
+**Status:** accepted · 2026-11-04 · bug (P2, 2-D + analytic, reported) · round #2697 · branch `fix/1812-angle-label-subscript` · amends [ADR-386](#adr-386)'s #263 display rule · analytic arm: [ADR-AG-394](06c-decisions-analytic.md#adr-ag-394)
+**Requirements:** [02c](02c-requirements-analytic.md) R164 (the one line both builders now meet) · **Design:** none (internal)
+
+**Context.** Operator ruling 2026-10-06 on #1812: *"Both show A₁"* — analytic AND 2-D label an angle named «A1» as A₁ (A with a subscript 1, no angle sign) at the arc. 2-D drew the DIGIT alone when the name was the vertex letter plus digits (#263: «A1» beside the vertex label «A» looked duplicated) and the full name otherwise. Measured at `9d0ca6c0`: «משולש ABC» · «נסמן ∠CAB=A1» → `labels.angles` text «1».
+
+**Decision.** `replay/core.ts` writes the alias label as `indexedNameText(name)` (`shell/indexedName`, the spelling analytic shares): «A₁», «C₁», «A₁₂». #263's other half holds: a name bound at a different letter keeps its own letter («K₁» at A). Unicode subscript digits in the one label string — the measure-label stream, `verify`'s label honesty (a non-numeric text asserts no value) and the exports carry it unchanged.
+
+**Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. The two-builder agreement is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
+
+**Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».

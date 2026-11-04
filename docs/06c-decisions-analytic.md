@@ -15082,3 +15082,20 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Locks.** `src-analytic/__tests__/issue-2696-coincident-letters-joined.test.ts` — his figure at seeds 0–3 (one «X=E» label, E silent, every other letter untouched), the caller-hands-none control, «V=Y» keeping V's (0, 0), and the shared rule (a pair, a chain, two pairs, none).
 
 **Behaviour change for a student:** two letters on one dot read «C=E» on the canvas, as in the 2-D tool; before, «CE».
+
+## ADR-AG-394 — An angle's label is shown «A₁»: the `∠` is a storage mark, never shown; one display function over a shared spelling (#1812)
+
+**Date:** 2026-11-04 · **Status:** accepted · bug (P2, analytic + 2-D, reported) · round #2697 · branch `fix/1812-angle-label-subscript` (stacked on `fix/2696-coincident-letters-join`) · 2-D arm: [ADR-782](06-decisions.md#adr-782)
+**Requirements:** [02c](02c-requirements-analytic.md) R164 (amended: «A₁» at the arc and in the panel, as in 2-D) · **Design:** none (internal) — the display function sits beside `angleLabelName` in `engine/lengths.ts`.
+
+**Context.** Operator, playing round #1776 T5 (2026-10-06): *"the expected behavior is A and small 1 and without the angle symbol"*; ruling the same day: *"Both show A₁"* — analytic AND 2-D label an angle named «A1» as A₁ at the arc. Measured at `9d0ca6c0` through `decideSubmit` → `derive` → `buildScene` / `paramRows`: «משולש ABC» · «נסמן ∠CAB=A1» recorded, the arc read «∠A1», the «פרמטרים» row «∠A1»; 2-D drew «1» (#263).
+
+**The class.** *Every surface that shows an angle label printed its storage id* (`angleLabelSymbol` = `∠A1`, ADR-AG-221 — the `∠` keeps the label from colliding with a point named A1). The surfaces: the canvas arc label (`statedText` of the stated value), the parameters row (`paramRows`), and every sentence that quotes a stated value through `statedText` (the restatement refusals, `reasonText`). The alias-taken refusal already names the bare label (`holder: A1`); the ask lane answers no question about the label.
+
+**Decision.** `shell/indexedName` `indexedNameText` spells an indexed name as the book does — trailing digits as subscript digits («A1» → «A₁», «A12» → «A₁₂», «A» unchanged). `engine/lengths.ts` `symbolText(sym)` shows an angle label through it and every other symbol as stored; `statedText` prints a symbol through `symbolText`, and `paramRows` names each row through it. The storage id stays `∠A1` (its locks: `issue-1701`, `issue-1785`, `issue-2632` — unchanged). The canvas carries the subscript as Unicode digits in the one `<text>`: the ruling asks for "A with a small 1", which «A₁» is, in the arc label, the panel and the exports alike — so the plan's `{text, sub}` scene part was not needed (a mechanism choice).
+
+**Sibling audit.** 2-D drew the bare digit (#263) — changed in the same item to the ruling ([ADR-782](06-decisions.md#adr-782)), through the same `indexedNameText`. 3-D: the angle-alias sentence is a parked known gap (parity rows `angle-label-*-1622`, #1679) — nothing drawn. Complex: no angle labels. Greek aliases (α) are stored bare and are unchanged.
+
+**Locks.** `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts` — the reported sentence (records; «A₁» at seeds 0–3; the panel row «A₁…», no `∠`; «A₁ = 30» after a value), every spelling («∠CAB=A1», «כ-A1», «כ 1», "denote … as A1», «B2», «A12»), `symbolText` / `statedText` / `indexedNameText` units, and the 2-D and analytic canvases agreeing on «A₁» for three spellings.
+
+**Behaviour change for a student:** «נסמן ∠CAB=A1» labels the angle «A₁» (A with a small 1, no angle sign) on the canvas and in the panel, in both builders; before, analytic wrote «∠A1» and 2-D a bare «1».

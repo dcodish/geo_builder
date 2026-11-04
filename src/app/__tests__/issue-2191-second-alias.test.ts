@@ -76,8 +76,8 @@ describe('#2191 — a second alias for one angle is refused with the one-name se
   });
 
   it('the label stays A1', () => {
-    expect(angleLabels(['משולש ABC', A1, 'נסמן זוית ABC כ-B2'])).toEqual(['A1']);
-    expect(angleLabels(['משולש ABC', 'נסמן זוית ABC כ-B2', A1])).toEqual(['2']); // B2 at B draws its digit (#263)
+    expect(angleLabels(['משולש ABC', A1, 'נסמן זוית ABC כ-B2'])).toEqual(['A₁']);
+    expect(angleLabels(['משולש ABC', 'נסמן זוית ABC כ-B2', A1])).toEqual(['B₂']); // B2 at B: «B₂» (#1812, ADR-782 — was #263's bare digit)
   });
 
   it('a loaded list holding both lines shows the second refused, in the same sentence', () => {
@@ -89,7 +89,7 @@ describe('#2191 — a second alias for one angle is refused with the one-name se
     const raw = d.status[last.id] as string;
     expect(raw).toMatch(/^name-taken: angle ABC is already named A1 \[vs #\d+\]$/);
     expect(stripFormatControls(humanizeError(raw, he, last.utterance, otherUtteranceForError(facts, raw)))).toBe(angleTaken('ABC', 'A1', A1));
-    expect(d.labels.angles.map((a) => a.text)).toEqual(['A1']);
+    expect(d.labels.angles.map((a) => a.text)).toEqual(['A₁']);
   });
 });
 
@@ -97,7 +97,7 @@ describe('unchanged — another angle, the same name elsewhere, the identical al
   it('aliases on two different angles both show', async () => {
     const { v } = await decide(['משולש ABC', 'נסמן זוית ABC כ-A1'], 'נסמן זוית BAC כ-B2');
     expect(v.kind).toBe('commit');
-    expect(angleLabels(['משולש ABC', 'נסמן זוית ABC כ-A1', 'נסמן זוית BAC כ-B2']).sort()).toEqual(['A1', 'B2']);
+    expect(angleLabels(['משולש ABC', 'נסמן זוית ABC כ-A1', 'נסמן זוית BAC כ-B2']).sort()).toEqual(['A₁', 'B₂']);
   });
 
   it('the same name on another angle is still the parser\'s alias-taken clarification', async () => {

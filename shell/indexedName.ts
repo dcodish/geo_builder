@@ -35,3 +35,15 @@ export const INDEXED_NAME_RE = new RegExp(INDEXED_NAME);
  * «a12» cannot restart at its «2»). Prefix it to a number fragment: `UNGLUED + NUM`.
  */
 export const UNGLUED = String.raw`(?<![A-Za-zΑ-Ωα-ω_\d.])`;
+
+/** The ten subscript digits, «₀»…«₉». */
+const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
+
+/**
+ * #1812 ([ADR-AG-394](../docs/06c-decisions-analytic.md#adr-ag-394), [ADR-782](../docs/06-decisions.md#adr-782)) — AN
+ * INDEXED NAME AS THE BOOK WRITES IT: the trailing digits as subscript digits, «A1» → «A₁», «A12» → «A₁₂»; a name with
+ * no index is unchanged («A», «α»). Operator ruling 2026-10-06: an angle labelled «A1» reads «A₁», with no angle sign,
+ * in every builder. Text only — an SVG `<text>`, a panel row and a sentence all carry it as is.
+ */
+export const indexedNameText = (name: string): string =>
+  name.replace(/(?<=[^\d])\d+$/, (d) => [...d].map((c) => SUBSCRIPT_DIGITS[Number(c)]).join(''));

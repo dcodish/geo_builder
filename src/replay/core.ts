@@ -13,6 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
+import { indexedNameText } from '../../shell/indexedName';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
@@ -1549,15 +1550,14 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, forms.text, false, { letter: forms.letter, sym: forms.sym });
       }
       // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
-      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
-      // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
-      // point label already shows the letter — «A1» next to «A» duplicated it, #263); a name bound at
-      // a DIFFERENT letter keeps the full name (unambiguous). A name asserts no magnitude, so a refused
+      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). It is
+      // written as the book writes it, the index as subscript digits — «A₁» (operator ruling 2026-10-06
+      // on #1812, ADR-782: "Both show A₁"; it replaces #263's bare digit). A name bound at a DIFFERENT
+      // letter keeps its own letter («C₁» at A — #263's other half). A name asserts no magnitude, so a refused
       // alias could not lie the way a measure did; it is gated with the measure for ONE reason — every
       // fact-sourced label obeys one rule, "from a fact that held" — not because it needed to be.
       if (f.cmd.type === 'angle-alias') {
-        const digits = f.cmd.name.startsWith(f.cmd.vertex) ? f.cmd.name.slice(f.cmd.vertex.length) : '';
-        const text = /^\d+$/.test(digits) ? digits : f.cmd.name;
+        const text = indexedNameText(f.cmd.name);
         addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, text);
       }
     };

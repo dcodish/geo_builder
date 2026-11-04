@@ -736,8 +736,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R164 — an order between angle names, an angle named by a label, and an area label on an empty canvas build as they do in the 2-D tool**. A point's name or an indexed name is never a value.
 - «α < β», «20 < α < 60»
-- «נסמן זוית BAM כ-A1» → ∠A1 in the panel
-- Sources: ADR-AG-221, #1622, ADR-AG-238, #1701, ADR-AG-244, #1785.
+- «נסמן זוית BAM כ-A1» → «A₁» at the arc and in the panel: A with a subscript 1, no angle sign, as the 2-D tool writes it (operator ruling 2026-10-06 on #1812: "Both show A₁"; [ADR-AG-394](06c-decisions-analytic.md#adr-ag-394), [ADR-782](06-decisions.md#adr-782)). «נסמן ∠CAB=A12» → «A₁₂»; a label at another letter keeps its letter («נסמן ∠ABC=C1» → «C₁» at B)
+- Sources: ADR-AG-221, #1622, ADR-AG-238, #1701, ADR-AG-244, #1785, ADR-AG-394, ADR-782, #1812.
 
 **R170 — a trig given is written as its angle and indicates a slope; sin is a choice between two angles**. *(Operator ruling: "translate it to an angle and write it down".)*
 - «tan∢BAO = 2» → «63.43°»

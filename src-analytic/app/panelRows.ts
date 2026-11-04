@@ -7,6 +7,7 @@ import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { domainText, type Construction, type ParamDecl, positionalOf } from '../engine/types';
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
+import { symbolText } from '../engine/lengths';
 import { curveEquationOf, curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
@@ -316,16 +317,18 @@ export function paramRows(
           return here ? `[${t}]` : t;
         })
         .join(' או ');
-      out.push({ key: group.syms.join(','), text: `(${group.syms.join(', ')}) = ${text}` });
+      out.push({ key: group.syms.join(','), text: `(${group.syms.map(symbolText).join(', ')}) = ${text}` });
       continue;
     }
-    const shown = valueText(k, fmt, sym);
+    // #1812 (ADR-AG-394): the row names the symbol as the student sees it — an angle's label «A₁», never «∠A1»
+    const name = symbolText(sym);
+    const shown = valueText(k, fmt, name);
     const text =
       shown !== null
-        ? `${sym} = ${shown}`
+        ? `${name} = ${shown}`
         : !k.known && k.pending
-          ? `${sym} = ${words.checking}`
-          : `${domainText(sym, domain)}${used ? '' : ` ${words.unused}`}`;
+          ? `${name} = ${words.checking}`
+          : `${domainText(name, domain)}${used ? '' : ` ${words.unused}`}`;
     out.push({ key: sym, text });
   }
   return out;
