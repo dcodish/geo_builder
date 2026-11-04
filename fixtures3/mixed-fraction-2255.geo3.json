@@ -37,7 +37,8 @@
             "type": "length-eq",
             "a": "A",
             "b": "B",
-            "value": 2.5
+            "value": 2.5,
+            "decimal": true
           }
         }
       ]

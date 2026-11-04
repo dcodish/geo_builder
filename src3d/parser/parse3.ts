@@ -1954,6 +1954,16 @@ function magValue(raw: string): number | null {
   const v = evalRadical(t.slice(1));
   return v === null ? null : -v;
 }
+/**
+ * #2361 ([ADR-3D-416](../../docs/06b-decisions-3d.md#adr-3d-416)) — the one fact a stated magnitude's DISPLAY needs
+ * from how the student wrote it: was it a decimal numeral («4.1», «7.9999»)? Such a value prints in the house
+ * decimals (sr-22, ADR-W-175), never as the fraction the exact-form tier would dress it in («41/10»). An integer,
+ * a fraction or a root keeps its exact form, so only a decimal is marked. Spread into the command that carries the
+ * value: `{ ...typedDecimal(raw) }`.
+ */
+function typedDecimal(raw: string): { decimal?: true } {
+  return /^-?\s*\d+\.\d+$/.test(raw.trim().replace(/^\((.*)\)$/, '$1').trim()) ? { decimal: true } : {};
+}
 export function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
   if (s0 === '') return null;
@@ -1980,7 +1990,7 @@ const lengthRel: Rule = (s) => {
   const vm = s.match(/^\|([a-w])\|\s*(?:=|שווה\s+ל)\s*(.+)$/);
   if (vm) {
     const val = evalRadical(vm[2]);
-    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val }];
+    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val, ...typedDecimal(vm[2]) }];
   }
   // the copula `הוא`/`is` joins the separators (the exam's `אורך המקצוע AB הוא 5√5` —
   // the ADR-3D-026 phrasing class)
@@ -1994,7 +2004,7 @@ const lengthRel: Rule = (s) => {
   if (num !== null)
     return [
       { type: 'segment3', a: a1, b: b1 },
-      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num } },
+      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num, ...typedDecimal(r) } },
     ];
   // #2092 (ADR-3D-381): a LETTER right side on the bar form — «|AB| = k», «|AB| = 2k». The taught spelling of a
   // length the operator ruled «AB = k» does not mean (that names a vector). Only the bars: «אורך AB הוא k» stays
@@ -2108,9 +2118,11 @@ const magEquality: Rule = (s) => {
   type MagLink = { expr: VecExpr; c: number };
   const mags: MagLink[] = [];
   const nums: number[] = [];
+  let numLink = '';
   for (const link of links) {
     const num = evalRadical(link);
     if (num !== null) {
+      if (nums.length === 0) numLink = link;
       nums.push(num);
       continue;
     }
@@ -2137,7 +2149,8 @@ const magEquality: Rule = (s) => {
   const draw = (e: VecExpr): Command3[] => segmentsOf(e);
   if (nums.length > 0) {
     const v = nums[0];
-    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c } as Command3]);
+    // #2361: a unit-coefficient magnitude carries the value as typed; `2|u| = 5` states |u| = 5/2, which the tool computed
+    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c, ...(mg.c === 1 ? typedDecimal(numLink) : {}) } as Command3]);
   }
   if (mags.length < 2) return null; // a lone magnitude with no value/partner says nothing
   const out: Command3[] = [];
@@ -2223,7 +2236,7 @@ const heightOfSolid: Rule = (s) => {
   const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: h.a, b: h.b, plane: [] };
   // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
   if (h.value !== undefined) {
-    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value } }];
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value, ...(h.decimal ? { decimal: true as const } : {}) } }];
   }
   return [role];
 };
@@ -2237,6 +2250,8 @@ interface HeightStatement3 {
   /** the sentence names the solid it is the height OF («גובה הפירמידה», "of the prism") */
   ofSolid: boolean;
   value?: number;
+  /** #2361: the value was typed as a decimal numeral (`typedDecimal`) */
+  decimal?: true;
 }
 
 function readHeight3(s: string): HeightStatement3 | null {
@@ -2258,7 +2273,7 @@ function readHeight3(s: string): HeightStatement3 | null {
     b: g.b,
     altitude: g.noun !== 'אנך',
     ofSolid: g.solid !== undefined,
-    ...(value !== undefined ? { value } : {}),
+    ...(value !== undefined ? { value, ...typedDecimal(g.value!) } : {}),
   };
 }
 
@@ -2383,7 +2398,7 @@ const heightFromApex: Rule = (s) => {
       type: 'perp-to-base',
       ...(from ? { from } : {}),
       ...(face ? { face } : {}),
-      ...(lenValue !== undefined ? { len: lenValue } : {}),
+      ...(lenValue !== undefined ? { len: lenValue, ...(typedDecimal(len!).decimal ? { lenDecimal: true as const } : {}) } : {}),
     },
   ];
 };
@@ -4559,7 +4574,7 @@ const lengthClaim: Rule = (s) => {
   if (!m || value === null) return null;
   return [
     VEC_MARKED ? { type: 'draw-arrow', from: m[1], to: m[2] } : { type: 'segment3', a: m[1], b: m[2] },
-    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value } },
+    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value, ...typedDecimal(m[3]) } },
   ];
 };
 

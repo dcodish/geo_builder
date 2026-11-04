@@ -1526,17 +1526,18 @@ export function buildScene3(
    * losing your given, and that option was explicitly rejected.
    *
    * The list comes from the engine's `statedLengths`, the same one the data panel reads, so the canvas
-   * and the panel cannot disagree about what the student stated.
+   * and the panel cannot disagree about what the student stated — nor (#2361, ADR-3D-416) about how it reads: the
+   * label is the entry's own text, never this surface's 3-place `fmt`.
    */
   const measures: SceneMeasure3[] = [];
-  for (const [key, value] of statedLengths(c)) {
+  for (const [key, { text }] of statedLengths(c)) {
     const [a, b] = key.split('|') as [Id, Id];
     const pa = positions.get(a);
     const pb = positions.get(b);
     if (!pa || !pb) continue; // an unresolved endpoint has nowhere to put the label
     const p = w2s(pa);
     const q = w2s(pb);
-    measures.push({ a, b, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: fmt(value) });
+    measures.push({ a, b, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text });
   }
   // #2092 (ADR-3D-381): a length stated as a LETTER («|AB| = k», «|AB| = 2k») wears that letter in the same lane until
   // a value lands on it — then the value above is what was stated and the letter yields, as 2-D's label does.

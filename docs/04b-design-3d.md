@@ -1212,6 +1212,14 @@ unordered pair; not gated by `showWitnesses` or by edge visibility. A **length l
 ADR-3D-381) draws in the same lane with its text (`lengthMarkText`: «k», «2k») until a value is stated on the pair,
 when the value wins.
 
+**One text per stated length** (#2361, [ADR-3D-416](06b-decisions-3d.md#adr-3d-416)). Each `statedLengths` entry is
+`{ value, text }`; the canvas label and the panel's `|AB| =` row both print `text` (the canvas's own 3-place `fmt`
+no longer touches a stated length). `text` is `statedMagText(value, decimal)`: `fmtNum` (the house two decimals)
+when the student wrote a decimal numeral, else `cleanMag`'s exact tiers. The parser's `typedDecimal` sets
+`decimal` on the `length-eq` claim (and on `vec-mag` / unit-coefficient `mag-val` / `perp-to-base`'s `lenDecimal`,
+which apply carries onto the claim); a length driving pin is always recorded with its claim, so the claim supplies it.
+A free vector's stated `mag` metric carries it to both of its panel rows. The squared row stays computed (`cleanNum`).
+
 **A bare vector naming is said aloud** (ADR-3D-381). `vec-rel`'s bare arm (`AB = <new letter>`, no «נסמן») lowers to
 `name-vector` with `bare: true`; the flag rides the vector record, and `buildNotices3` emits `vector-named-bare` for
 each such vector — derived from the construction like every notice, so undo, the ✎ edit and load show the right thing.

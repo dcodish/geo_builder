@@ -503,6 +503,10 @@ const SEEDED: SeededCorpus = {
   // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
   // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.
   'line-lowercase-perp-2642.geo3.json': ['ישר ℓ1', 'ישר ℓ2', 'ישר d', 'd מאונך ל-ℓ1', 'd מאונך ל-ℓ2'],
+  // #2361 (ADR-3D-416) — the operator's exact four lines: a stated «AC = 7.9999» reads «8» (sr-22, two decimals when
+  // needed) and carries its typed-decimal mark. The labels on both surfaces are asserted in
+  // issue-2361-stated-value-text.test.ts; this is the build + drift net.
+  'stated-length-7-9999-2361.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9999'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
