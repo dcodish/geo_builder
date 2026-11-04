@@ -1,5 +1,22 @@
 {
-  "pending": [
+  "pending": [],
+  "results": [
+    {
+      "sheet": "round-2665",
+      "id": "T4",
+      "kind": "3d:assertion",
+      "queued": "2026-11-02",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "נתון: v = (10,-5,0)"
+      ],
+      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+      "pass": true,
+      "date": "2026-11-02",
+      "note": "operator 2026-11-02: all the rest of the tests pass"
+    },
     {
       "sheet": "prod-2026-11-03",
       "id": "P2",
@@ -14,7 +31,10 @@
         "M אמצע AB",
         "N אמצע AB"
       ],
-      "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»"
+      "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "fix-2691",
@@ -39,7 +59,10 @@
         "נתון הישר l1: 4x+y+3=0",
         "הישר l1 מאונך ל-KL"
       ],
-      "lookFor": "K, L, A, B, M כתובות ליד הנקודות, לא על מעגל, משיק או ישר"
+      "lookFor": "K, L, A, B, M כתובות ליד הנקודות, לא על מעגל, משיק או ישר",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -57,7 +80,10 @@
         "משולש ABC חסום במעגל",
         "F אמצע הקשת BC במעגל O"
       ],
-      "lookFor": "Still two circles, no third. O is drawn at the centre of the circle through A, B and C, and F sits on that circle, midway along arc BC."
+      "lookFor": "Still two circles, no third. O is drawn at the centre of the circle through A, B and C, and F sits on that circle, midway along arc BC.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -74,7 +100,10 @@
         "מרובע ABED חסום במעגל",
         "משולש ABC חסום במעגל"
       ],
-      "lookFor": "Two circles are drawn: one through A, B, E and D, and a second through A, B and C. The equations panel lists «⊙ABE» and «⊙ABC»."
+      "lookFor": "Two circles are drawn: one through A, B, E and D, and a second through A, B and C. The equations panel lists «⊙ABE» and «⊙ABC».",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -88,7 +117,10 @@
         "מרובע ABCD",
         "הקרניים AB ו-CD נחתכים בנקודה M"
       ],
-      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB."
+      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -102,7 +134,10 @@
         "מרובע ABCD",
         "M נקודת החיתוך של הקרניים AB ו-CD"
       ],
-      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB."
+      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -117,7 +152,10 @@
         "הישר l1: y=2x+1",
         "l1 מאונך לציר ה-x ועובר דרך A"
       ],
-      "lookFor": "The last line is refused with «השם הזה כבר תפוס בשרטוט — הוא ישר…», and l1 stays the line y = 2x + 1."
+      "lookFor": "The last line is refused with «השם הזה כבר תפוס בשרטוט — הוא ישר…», and l1 stays the line y = 2x + 1.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -131,7 +169,10 @@
         "A(1,2)",
         "ישר l1 מאונך לציר ה-x דרך A"
       ],
-      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A."
+      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "prod-2026-11-03b",
@@ -144,7 +185,10 @@
       "lines": [
         "z = 3 + 4i"
       ],
-      "lookFor": "z is plotted at (3, 4)."
+      "lookFor": "z is plotted at (3, 4).",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -162,7 +206,10 @@
         "הצלע BC מקבילה לציר ה-x",
         "הנקודה M היא אמצע הצלע BC"
       ],
-      "lookFor": "A does not move, so its row has no «הצג מקום גאומטרי» chip and no curve is drawn for A."
+      "lookFor": "A does not move, so its row has no «הצג מקום גאומטרי» chip and no curve is drawn for A.",
+      "pass": true,
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     },
     {
       "sheet": "round-2678",
@@ -176,25 +223,10 @@
         "A(1,2)",
         "l1 מאונך לציר ה-x ועובר דרך A"
       ],
-      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A."
-    }
-  ],
-  "results": [
-    {
-      "sheet": "round-2665",
-      "id": "T4",
-      "kind": "3d:assertion",
-      "queued": "2026-11-02",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "נתון: v = (10,-5,0)"
-      ],
-      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
       "pass": true,
-      "date": "2026-11-02",
-      "note": "operator 2026-11-02: all the rest of the tests pass"
+      "date": "2026-11-04",
+      "note": "operator 2026-11-04: all tests pass"
     }
   ],
   "demoted": {}
