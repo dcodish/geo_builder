@@ -499,6 +499,10 @@ const SEEDED: SeededCorpus = {
   // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
   // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
   'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2681 (ADR-3D-413) — a plane named by four letters inside a relation, on a blank canvas: its letters are created in
+  // one plane (before: built green in general position). The class and the refusals are asserted in plane-run-relation-2681.test.ts.
+  'plane-run-parallel-blank-2681.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
+  'plane-run-perp-line-blank-2681.geo3.json': ['המישור ABCD מאונך לישר EF'],
   // #2642 (ADR-3D-411) — the issue's split rows (one given per row, ADR-W-167): a line declared by a lowercase letter
   // is that line in a relation with no noun before it (before: «d מאונך ל-ℓ1» refused unknown-vector d). The class,
   // the controls and the geometry are asserted in line-name-as-vector-2642.test.ts; this is the build + drift net.

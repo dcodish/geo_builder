@@ -781,8 +781,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   convex polygon in the order written, free sizes) and then O, as 2-D does; «המישור BCC'B'», «E על המישור ABCD», a
   projection onto «המישור ABCD» create the plane's missing letters so that all of them lie in it (the fourth and later
   ones ride the plane through the first three). Letters already on the figure stay where they are; four existing
-  points that are not in one plane, named as a plane, are still refused.
-  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-W-162; #1467, #2048, #1566, #2610.
+  points that are not in one plane, named as a plane, are still refused. **The same holds for a plane named by its
+  letters inside a relation** (#2681): «המישור ABCD מקביל למישור EFGH», «המישור ABCD מאונך לישר EF», «EF מקביל
+  למישור ABCD», an angle or a distance to «המישור ABCD» create the run's letters in one plane, and over stated points
+  that are not in one plane the line is refused «not in one plane», exactly as «המישור ABCD» alone is.
+  - Sources: ADR-3D-382, ADR-3D-399, ADR-3D-409, ADR-3D-413, ADR-W-162; #1467, #2048, #1566, #2610, #2681.
 - **FR-SP-26 (Must)** — **A line named with its noun before it exists is created free.** «קובייה ABCD» · «הישר k מאונך
   למישור ABC» builds: k is a free line exactly as «ישר k» declares it (its unpinned DOF resampled), in every relation
   that names a line — ⟂ / ∥ / an angle to a plane or a segment, «A על הישר k», «הישר k חותך את המישור … בנקודה M», two

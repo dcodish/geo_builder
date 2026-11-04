@@ -23,6 +23,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { spellVulgarFractions } from '../../shell/vulgarFractions';
 import { isPlanar, sameOperand } from '../engine/operands';
+import { statedPlaneRuns3 } from '../engine/mintable';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
@@ -5466,6 +5467,23 @@ function readCondition3(body: string): Command3[] | null {
 /** Guards the single re-parse below against any possibility of recursion. */
 let REWRITING = false;
 
+/**
+ * #2681 ([ADR-3D-413](../../docs/06b-decisions-3d.md#adr-3d-413)) — A PLANE NAMED BY FOUR OR MORE LETTERS DECLARES ITSELF,
+ * WHEREVER IT STANDS. «המישור ABCD» alone lowers to `plane-through`; the same run as a side of a relation («המישור ABCD
+ * מקביל למישור EFGH», «EF מאונך למישור ABCD») lowered to the relation alone, so its coplanarity was neither created
+ * (the mint pass made every letter an independent free point, ADR-3D-409's named-run rider never applied) nor checked
+ * (the status pass verifies `plane-through`). Every rule's output passes here once: each run
+ * {@link statedPlaneRuns3} reads that no `plane-through` of the line already declares is declared after the line's
+ * own commands — after, so a face's relation still records the face (`materializePlaneRun`'s first mention), and the
+ * declaration is then idempotent. Rules that already declared their run (the plane cut, a point on a plane) are
+ * unchanged.
+ */
+function declareStatedPlanes3(commands: Command3[]): Command3[] {
+  const declared = commands.filter((k): k is Extract<Command3, { type: 'plane-through' }> => k.type === 'plane-through').map((k) => k.ids.join(','));
+  const missing = statedPlaneRuns3(commands).filter((ids) => !declared.includes(ids.join(',')));
+  return missing.length === 0 ? commands : [...commands, ...missing.map((ids): Command3 => ({ type: 'plane-through', name: ids.join(''), ids }))];
+}
+
 export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
   PARAM_CONFLATED = null;
@@ -5485,8 +5503,11 @@ export function parse3(utterance: string): ParseResult3 {
   if (contradiction) return { ok: false, reason: 'inscribed-contradicts-noun', ...contradiction };
   for (const rule of RULES) {
     UNREAD3 = [];
-    const commands = rule(s);
-    if (commands) return UNREAD3.length ? { ok: true, commands, unread: UNREAD3 } : { ok: true, commands };
+    const read = rule(s);
+    if (read) {
+      const commands = declareStatedPlanes3(read);
+      return UNREAD3.length ? { ok: true, commands, unread: UNREAD3 } : { ok: true, commands };
+    }
   }
   // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
   // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).
