@@ -756,6 +756,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «קובייה ABCDA'B'C'D'» · «A'H גובה לפאה ABCD» → «A ו-H נפלו על אותה נקודה.». Still refused, as 2-D refuses «D חיתוך AB
   ו-BC»: a crossing whose two carriers are written through the point («G נקודת חיתוך של AC' עם מישור ADE», A is on both),
   naming it (`point-coincides`). Sources: ADR-3D-404, ADR-3D-405, ADR-W-176, ADR-W-177, #1595.
+  **A letter the TOOL gave is not a second name** *(operator ruling 2026-11-03 on #2674: "Rename the tool's letter to
+  the student's, no message (2-D's way, in every builder)")*: «קובייה ABCDA'B'C'D'» · «אמצע BB'» (the tool letters it
+  M) · «E אמצע BB'» shows one point, E, with no notice, and the next unnamed midpoint is M again, as in 2-D. A letter
+  the student typed is the student's («BM = 1» before «E אמצע BB'» keeps M and E, with the notice). Source: ADR-3D-415.
 
 ## Coverage
 
