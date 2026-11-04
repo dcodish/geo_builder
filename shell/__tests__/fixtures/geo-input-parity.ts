@@ -309,7 +309,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2409': 'open', // was #2448, merged into #2409 by the #2654 family sweep 2026-11-01: #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
-  '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
   '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
   '#2629': 'open', // #2618 (ADR-AG-355): 2-D does not read «קודקודי ה<noun> ABCD נמצאים על המעגל» (analytic reads it as the inscribed sentence)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
@@ -841,7 +840,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2443 (ADR-764) / #2503 (ADR-3D-378): the same impossible givens with NO declared triangle — two vertices of a quadrilateral, or loose points, would meet
   { id: 'impossible-isosceles-quad-2443-perp', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', note: 'AB = BC holds only where C meets A; D keeps the quadrilateral wide, so no ring is flat' },
   { id: 'impossible-isosceles-quad-2443-angle', family: 'angles', steps: ['מרובע ABCD', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused' },
-  { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', knownGap: [{ product: 'analytic', issue: '#2506' }], note: 'three loose points: no polygon at all' },
+  { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', note: 'three loose points: no polygon at all' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)

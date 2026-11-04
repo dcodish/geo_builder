@@ -146,8 +146,8 @@ describe("#1556 — the operator's tangential quadrilateral, one side per line",
 describe('#1556 — the entailment gate still says so when a given really follows', () => {
   const PINNED = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
 
-  it('#1063: the area of a determined, stated triangle is «already follows»', () => {
-    expect(decideSubmit('שטח המשולש ABC הוא 6', [...PINNED, 'משולש ABC'], 0).kind).toBe('already-follows');
+  it('#1063: the area of a determined, stated triangle records for its drawn value (#2491, ADR-AG-401)', () => {
+    expect(decideSubmit('שטח המשולש ABC הוא 6', [...PINNED, 'משולש ABC'], 0).kind).toBe('record');
   });
 
   it('a bounded tangency the figure already satisfies is still «already follows», not a new given', () => {

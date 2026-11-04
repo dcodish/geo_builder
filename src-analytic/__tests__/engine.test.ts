@@ -657,9 +657,11 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
      * it is the entailment test doing its job rather than failing it: what it asks is whether the
      * figure GAINED anything, and now it did.
      *
-     * Where the shape is already stated, nothing is gained and the answer is unchanged.
+     * Where the shape is already stated, nothing is gained — but the AREA is a value the figure can now show, so
+     * the line records and «S=6» is drawn (#2491, ADR-AG-401; operator ruling 2026-10-24, card e18 A, reversing
+     * ADR-AG-030's 2026-09-15 B11 answer for areas).
      */
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('entailed');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
     expect(verdict(PINNED, 'שטח המשולש ABC הוא 6')).toBe('recorded');
     // …and the figure it recorded really is the triangle.
     expect(derive([...PINNED, 'שטח המשולש ABC הוא 6'], 0).figure.segments).toHaveLength(3);
@@ -705,10 +707,11 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
    */
   it('#1102 — the reported sentences reach the entailment test at all', () => {
     // #1652 (ADR-AG-200): a length given NAMES its pair and draws it, so over bare points it records (it drew
-    // something — #1639's shape for a relation); with the segment already drawn it is still "already follows".
+    // something — #1639's shape for a relation); with the segment already drawn it records too, because its 4 is a
+    // value the figure then shows (#2491, ADR-AG-401: the operator's *"the tool can draw 4 on the segment"*), as the area does.
     expect(verdict(['A(0,0)', 'B(4,0)'], 'AB = 4')).toBe('recorded');
-    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('entailed');
-    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('entailed');
+    expect(verdict(['A(0,0)', 'B(4,0)', 'AB'], 'AB = 4')).toBe('recorded');
+    expect(verdict([...PINNED, 'משולש ABC'], 'שטח המשולש ABC הוא 6')).toBe('recorded');
     expect(verdict([...PINNED, 'משולש ABC'], 'B נמצא על ציר ה-x')).toBe('entailed');
   });
 
