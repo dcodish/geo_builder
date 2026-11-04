@@ -15096,6 +15096,6 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 
 **Sibling audit.** 2-D drew the bare digit (#263) — changed in the same item to the ruling ([ADR-782](06-decisions.md#adr-782)), through the same `indexedNameText`. 3-D: the angle-alias sentence is a parked known gap (parity rows `angle-label-*-1622`, #1679) — nothing drawn. Complex: no angle labels. Greek aliases (α) are stored bare and are unchanged.
 
-**Locks.** `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts` — the reported sentence (records; «A₁» at seeds 0–3; the panel row «A₁…», no `∠`; «A₁ = 30» after a value), every spelling («∠CAB=A1», «כ-A1», «כ 1», "denote … as A1», «B2», «A12»), `symbolText` / `statedText` / `indexedNameText` units, and the 2-D and analytic canvases agreeing on «A₁» for three spellings.
+**Locks.** `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts` — the reported sentence (records; «A₁» at seeds 0–3; the panel row «A₁…», no `∠`; «A₁ = 30» after a value), every spelling («∠CAB=A1», «כ-A1», «כ 1», "denote … as A1», «B2», «A12»), `symbolText` / `statedText` / `indexedNameText` units, and the analytic canvas writing «A₁» for the three spellings whose 2-D half is `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (product trees never import each other).
 
 **Behaviour change for a student:** «נסמן ∠CAB=A1» labels the angle «A₁» (A with a small 1, no angle sign) on the canvas and in the panel, in both builders; before, analytic wrote «∠A1» and 2-D a bare «1».

@@ -20085,6 +20085,6 @@ No new student text. Every sentence is an existing ruled string.
 
 **Decision.** `replay/core.ts` writes the alias label as `indexedNameText(name)` (`shell/indexedName`, the spelling analytic shares): «A₁», «C₁», «A₁₂». #263's other half holds: a name bound at a different letter keeps its own letter («K₁» at A). Unicode subscript digits in the one label string — the measure-label stream, `verify`'s label honesty (a non-numeric text asserts no value) and the exports carry it unchanged.
 
-**Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. The two-builder agreement is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
+**Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. New: `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (four spellings → «A₁», «B₂»); analytic's half over the same sentences is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
 
 **Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».

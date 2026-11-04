@@ -12,7 +12,6 @@
  */
 import { describe, expect, it } from 'vitest';
 import { indexedNameText } from '../../shell/indexedName';
-import { factsOf, replayFacts } from '../../src/__tests__/scenario-pipeline';
 import { panelKnowledge, paramRows } from '../app/panelRows';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
@@ -84,11 +83,9 @@ describe('#1812 — the class: every spelling of the label, every surface', () =
   });
 });
 
-describe('#1812 — one sentence, one drawing: 2-D and analytic both write «A₁»', () => {
+describe('#1812 — one sentence, one drawing: analytic writes what 2-D writes', () => {
+  // 2-D's half is src/__tests__/issue-1812-angle-alias-subscript.test.ts — the same sentences, the same «A₁» (product trees never import each other)
   it.each(['נסמן ∠CAB=A1', 'נסמן זוית CAB כ-A1', 'נסמן זוית CAB כ 1'])('«%s»', (line) => {
-    const lines = ['משולש ABC', line];
-    const twoD = replayFacts(factsOf(lines as never)).labels.angles.map((a) => a.text);
-    expect(twoD).toEqual(['A₁']);
-    expect(canvasAngleTexts(lines)).toEqual(twoD);
+    expect(canvasAngleTexts(['משולש ABC', line])).toEqual(['A₁']);
   });
 });
