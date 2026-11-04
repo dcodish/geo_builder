@@ -26,6 +26,7 @@ import { NUMERAL_ALT, isNumeralName, letterlessCircleName } from '../engine/name
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
+import { foldIndexedName } from '../../shell/indexedName';
 import { areaNotation } from '../engine/lengths';
 
 /**
@@ -46,19 +47,17 @@ const ANGLE_ADJECTIVE_EN = `(?:acute|obtuse)(?:[\\s-]+angled)?`;
  * It is unambiguous because a point label's subscript is DIGITS (`X_1`, `carriers.POINT_TOKEN`). A letter after the `_`
  * (or the axis letter after a label's `_`) can only be a coordinate component, so `X_1` is never touched.
  */
-const SUB_AXIS_FIRST = /(?<![A-Za-z0-9_])([XY])(\s*_\s*\{?\s*[A-Z][0-9₀-₉]?\s*\}?)(?![A-Za-z0-9_])/g;
-const SUB_AXIS_LAST = /(?<![A-Za-z0-9_])([A-Z][0-9₀-₉]?\s*_\s*\{?\s*)([XY])(?![A-Za-z0-9_])/g;
+const SUB_AXIS_FIRST = /(?<![A-Za-z0-9_])([XY])(\s*_\s*\{?\s*[A-Z][0-9₀-₉]*\s*\}?)(?![A-Za-z0-9_])/g;
+const SUB_AXIS_LAST = /(?<![A-Za-z0-9_])([A-Z][0-9₀-₉]*\s*_\s*\{?\s*)([XY])(?![A-Za-z0-9_])/g;
 
 /**
- * A POINT'S INDEX TYPED WITH AN UNDERSCORE IS THE INDEX THE EXAM PRINTS (#2391, ADR-AG-315) — `N_2`, `N_{2}` are `N₂`,
- * the subscript glyph `NAME` already reads (2-D reads `N_2` too). A CAPITAL base and a DIGIT run only: a lowercase base
- * (`x_B`, `r_M`), a letter index (`S_ABC`, the area notation) and the axis forms above are never touched, and the stored
- * line keeps the raw text (ADR-W-111: the typeset row reads either spelling).
+ * A POINT'S INDEX IN ANY SPELLING IS THE INDEX THE EXAM PRINTS — `N_2`, `N_{2}` (#2391, ADR-AG-315) and the glued `N2`
+ * (#2075, ADR-AG-398) are `N₂`, the subscript glyph `NAME` reads, a digit run included (`X12` → `X₁₂`). The fold is the
+ * suite's (`shell/indexedName.foldIndexedName`, `'glyph'`): a CAPITAL base only — a lowercase base (`x_B`, `r_M`, `m_1`,
+ * `l1`), a letter index (`S_ABC`, the area notation) and the axis forms above are never touched, and the stored line
+ * keeps the raw text (ADR-W-111: the typeset row reads either spelling). Operator, 2026-10-13: *"X_1(2,3) or X1 should
+ * create a 1 in subscript"*; 2026-11-01: *"2075 re x1 - they are the same"*.
  */
-// A name may follow another — `N_1N_2` is the pair N₁N₂ — so a digit before the base and a capital after the index bound it.
-const SUB_INDEX = /(?<![A-Za-z_])([A-Z])\s*_\s*(?:\{\s*([0-9]+)\s*\}|([0-9]+))(?![a-z0-9_])/g;
-const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
-const subscriptOf = (digits: string): string => [...digits].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join('');
 
 /**
  * One spelling per symbol. ∢ (U+2222) and ∡ (U+2221) are the exam's angle glyphs and mean ∠ (#1555);
@@ -80,7 +79,7 @@ export function orthography(raw: string): string {
     .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
     .replace(SUB_AXIS_FIRST, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
     .replace(SUB_AXIS_LAST, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
-    .replace(SUB_INDEX, (_m, base: string, braced: string | undefined, bare: string | undefined) => `${base}${subscriptOf(braced ?? bare ?? '')}`)
+    .replace(/^[\s\S]*$/, (t) => foldIndexedName(t, 'glyph'))
     // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
     // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
     // the ∢/∡ and ⁰ folds that were spelled here, in the same order, and adds the rows analytic never
@@ -246,7 +245,7 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   // Length units — «MO = 8 ס"מ». Units carry no geometry here: every length is in the plane's units.
   [/(\d)\s*(?:ס"מ|ס״מ|סמ'|cm)(?![א-תA-Za-z])/g, '$1'],
   // «O – מרכז המעגל», «O - ראשית הצירים»: a dash between a name and its description.
-  [/^([A-Z][0-9₀-₉]?)\s+[–—-]\s+(?=[א-ת])/, '$1 '],
+  [/^([A-Z][0-9₀-₉]*)\s+[–—-]\s+(?=[א-ת])/, '$1 '],
   // «משוואת המעגל הנתון היא …», «הישר הנתון», «הנקודה הנתונה» (#1619 B1) — «הנתון» after a definite noun is
   // the given-prefix as an ADJECTIVE: "the given circle" is the circle. Written out per inflection (final ן).
   [/(?<=(?:^|\s)ה[א-ת]+)\s+הנתו(?:ן|נה|נים|נות)(?=\s|:|,|$)/g, ''],
@@ -284,7 +283,7 @@ function dropShapeQualifier(s: string): string {
 // The origin — «O ראשית הצירים» is O(0,0) (#1612)
 // ---------------------------------------------------------------------------
 
-const NAME = '[A-Z][0-9₀-₉]?';
+const NAME = '[A-Z][0-9₀-₉]*';
 /**
  * A CIRCLE's name in a reference slot (#2391, ADR-AG-315) — a numeral first («II» before «I», `NUMERAL_ALT` is longest
  * first; «מעגל II» is never the point I), else a centre letter. Case-sensitive on purpose (the [IVX] trap).
@@ -1103,7 +1102,7 @@ export function segmentsOf(line: string): Segment[] {
     else if (depth === 0 && ch === ' ') {
       // «A משמאל ל-O ו-C מימין ל-O» (#1706 follow-up, ADR-AG-222): «ו-» before a point's name may join two sentences.
       // The joint is kept as the separator, so a reading that merges the pieces gets the line back unchanged.
-      const joint = /^ ו-?(?=[A-Z][0-9₀-₉]?\s)/.exec(line.slice(i));
+      const joint = /^ ו-?(?=[A-Z][0-9₀-₉]*\s)/.exec(line.slice(i));
       if (joint) {
         cut(i, joint[0], joint[0].length);
         i += joint[0].length - 1;
@@ -1153,7 +1152,7 @@ const TANGENT_SAME_SIDE = '(?:נמצאים\\s+|מונחים\\s+)?(?:ב|מ)אות
 const TANGENT_OPPOSITE_SIDES =
   '(?:נמצאים\\s+|מונחים\\s+)?(?:(?:ב|מ)צדדים\\s+(?:ה)?שונים\\s+(?:שלו|של\\s+ה?משיק)|(?:ב|מ)שני\\s+(?:ה)?צדדים\\s+(?:שלו|של\\s+ה?משיק)|(?:ב|מ)שני\\s+צדדיו)';
 /** «משיק (משותף)?» then «ש(שני )?ה?מעגלים (X ו-Y)?» — the tangent noun and the circles its clause names. */
-const TANGENT_HEAD = '((?:^|\\s)ה?משיק(?:\\s+ה?משותף)?)\\s+ש(?:(שני\\s+ה?מעגלים)|(ה?מעגלים(?:\\s+[A-Z][0-9₀-₉]?\\s*ו-?\\s*[A-Z][0-9₀-₉]?)?))\\s+';
+const TANGENT_HEAD = '((?:^|\\s)ה?משיק(?:\\s+ה?משותף)?)\\s+ש(?:(שני\\s+ה?מעגלים)|(ה?מעגלים(?:\\s+[A-Z][0-9₀-₉]*\\s*ו-?\\s*[A-Z][0-9₀-₉]*)?))\\s+';
 const TANGENT_EXTERNAL = new RegExp(`${TANGENT_HEAD}${TANGENT_SAME_SIDE}(?=$|[\\s,.;])`, 'g');
 const TANGENT_INTERNAL = new RegExp(`${TANGENT_HEAD}${TANGENT_OPPOSITE_SIDES}(?=$|[\\s,.;])`, 'g');
 /** English: "(a) common tangent with both circles on the same side of it" / "… on opposite sides of it". */

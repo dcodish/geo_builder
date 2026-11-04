@@ -509,7 +509,7 @@ export function cleanSeed(raw: unknown): Seed {
 
 function cleanSeedNames(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const NAME = /^[A-Z][0-9₀-₉]?$/;
+  const NAME = /^[A-Z][0-9₀-₉]*$/;
   return Object.fromEntries(
     Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => NAME.test(e[0]) && typeof e[1] === 'string' && NAME.test(e[1])),
   );

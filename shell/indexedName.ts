@@ -35,3 +35,33 @@ export const INDEXED_NAME_RE = new RegExp(INDEXED_NAME);
  * «a12» cannot restart at its «2»). Prefix it to a number fragment: `UNGLUED + NUM`.
  */
 export const UNGLUED = String.raw`(?<![A-Za-zΑ-Ωα-ω_\d.])`;
+
+const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
+const subscriptOf = (digits: string): string => [...digits].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join('');
+
+/** 2-D's fold (ADR-228, ADR-600): `X_1`, `X_{1}`, `α_1` → the glued `X1` — any name letter, any digit run. */
+const UNDERSCORE_TO_GLUED = new RegExp(String.raw`(${NAME_LETTER})_\{?(\d+)\}?`, 'g');
+
+/**
+ * Analytic's two spellings of a point's index, folded to the subscript glyphs the exam prints (#2391 ADR-AG-315, #2075
+ * ADR-AG-398). A CAPITAL base only: a lowercase letter is a parameter or an axis (`m_1`, `x_B`), never a point.
+ * - the underscore — `N_2`, `N_{12}` (a digit run; a letter index `S_ABC` and a lowercase base are never touched);
+ * - the glued digits — `X1`, `X12`, `A1B1` — unless a lowercase letter is glued before the capital (a word, `l1`'s kin)
+ *   or the run continues as a decimal (`A1.5`), a lowercase letter or a subscript digit.
+ */
+const UNDERSCORE_TO_GLYPH = /(?<![A-Za-z_])([A-Z])\s*_\s*(?:\{\s*([0-9]+)\s*\}|([0-9]+))(?![a-z0-9_])/g;
+const GLUED_TO_GLYPH = /(?<![a-z])([A-Z])([0-9]+)(?![a-z_₀-₉]|\.\d)/g;
+
+/**
+ * ONE INDEXED NAME, ONE SPELLING (#2075, [ADR-AG-398](../docs/06c-decisions-analytic.md#adr-ag-398)) — the fold every
+ * builder's parser boundary calls so «X_1», «X_{1}», «X1» (and in analytic «X₁») are the one name they are, a digit
+ * run included («X12», «X_{12}»). Two canonical forms, because the builders' ids already differ and a saved figure
+ * must keep its letters: `'glued'` — 2-D's ASCII `X1`, drawn with the digits lowered (`subscriptLabel`); `'glyph'` —
+ * analytic's `X₁`, the subscript glyph its tool letters (`P₁`, `M₁`) and every surface already print.
+ */
+export function foldIndexedName(s: string, to: 'glued' | 'glyph'): string {
+  if (to === 'glued') return s.replace(UNDERSCORE_TO_GLUED, '$1$2');
+  return s
+    .replace(UNDERSCORE_TO_GLYPH, (_m, base: string, braced: string | undefined, bare: string | undefined) => `${base}${subscriptOf(braced ?? bare ?? '')}`)
+    .replace(GLUED_TO_GLYPH, (_m, base: string, digits: string) => `${base}${subscriptOf(digits)}`);
+}

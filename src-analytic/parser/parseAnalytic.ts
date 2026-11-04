@@ -65,6 +65,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { foldIndexedName } from '../../shell/indexedName';
 import { arcRunRoles } from '../../shell/arcRun';
 import {
   centreClauses,
@@ -409,7 +410,7 @@ const extentOfNoun = (noun: string | undefined): 'line' | 'segment' | undefined 
   return hit ? (hit.bounded ? 'segment' : 'line') : undefined;
 };
 /** «<noun>? XY» — a named pair and the registry row of the noun in front of it (absent for a bare pair). */
-const PIECE_PHRASE = new RegExp(`^(?:(${PIECE_NOUN})\\s+)?(${'[A-Z][0-9₀-₉]?'})(${'[A-Z][0-9₀-₉]?'})$`);
+const PIECE_PHRASE = new RegExp(`^(?:(${PIECE_NOUN})\\s+)?(${'[A-Z][0-9₀-₉]*'})(${'[A-Z][0-9₀-₉]*'})$`);
 function readPiece(text: string): { a: Id; b: Id; noun?: string; row?: StraightNoun } | null {
   const m = PIECE_PHRASE.exec(trim(text));
   if (!m || m[2] === m[3]) return null;
@@ -505,7 +506,7 @@ const COPULA_WORDS = 'הוא|היא|הם|הן|הינו|הינה|הינם|הינ�
 const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
 /** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
-const NAME = '[A-Z][0-9₀-₉]?';
+const NAME = '[A-Z][0-9₀-₉]*';
 /** #1355 — the point-name atom, exported so the LLM seam's honesty gates read a name exactly as the grammar does. */
 export const POINT_NAME_ATOM = NAME;
 /**
@@ -534,13 +535,13 @@ const LINE_NUMERAL_RE = new RegExp(`^${LINE_NUMERAL}$`);
  */
 /** #1355 — the letter line-name atom (`l`, `ℓ1`), exported for the honesty gates (the lexical-atoms rule, docs/17 §3). */
 export const LETTER_LINE_NAME_ATOM = '[ℓl][0-9]?';
-const LINE_NAME = `(?:${LETTER_LINE_NAME_ATOM}|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+const LINE_NAME = `(?:${LETTER_LINE_NAME_ATOM}|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*)`;
 /**
  * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
  * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
  * below owns it. A numeral names a LINE only where the student wrote the line noun.
  */
-const LINE_NAME_PLAIN = `(?:${LETTER_LINE_NAME_ATOM}|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+const LINE_NAME_PLAIN = `(?:${LETTER_LINE_NAME_ATOM}|[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*)`;
 
 // How a numeral-named line is CALLED («ישר 1» / «line 1») is `lineNameOf` in engine/names.ts (#1350), so
 // `nameReading` inverts it from the same table.
@@ -1079,7 +1080,7 @@ const NAME_RUN = `(?:${NAME})+`;
 /** The English shape nouns, longest first — DERIVED from the registry (read by the concurrency and measure roles). */
 const ROLE_SHAPE_EN = [...Object.keys(EN_SHAPE), 'polygon'].sort((a, b) => b.length - a.length).join('|');
 
-const splitNames = (run: string): string[] => run.match(/[A-Z][0-9₀-₉]?/g) ?? [];
+const splitNames = (run: string): string[] => run.match(/[A-Z][0-9₀-₉]*/g) ?? [];
 
 /**
  * The concurrency points, keyed by the role noun the corpus uses.
@@ -2013,7 +2014,7 @@ function distributedLines(phrase: string): [string, string] | null {
 
 function withLineNoun(s: string): string {
   const t = trim(s);
-  return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?$/.test(t) ? `הישר ${t}` : t;
+  return /^[ℓl][0-9]?$/.test(t) || /^[A-Z][0-9₀-₉]*[A-Z][0-9₀-₉]*$/.test(t) ? `הישר ${t}` : t;
 }
 
 /**
@@ -6719,10 +6720,10 @@ function parseOrder(line: string): RuleOutcome {
  */
 const LABEL_VERB = '(?:נסמן|נסמנה|מסמנים|לסמן)';
 const LABEL_ANGLE_HE = `(?:את\\s+)?(?:ה?${ANGLE_STEM_HE}ת\\s*|∠\\s*)`;
-const LABEL_NAME = `(?:∠\\s*|ה?${ANGLE_STEM_HE}ת\\s*)?([A-Z]\\d+|\\d+|[α-ορ-ω])`;
+const LABEL_NAME = `(?:∠\\s*|ה?${ANGLE_STEM_HE}ת\\s*)?([A-Z][0-9₀-₉]+|\\d+|[α-ορ-ω])`;
 const ANGLE_LABEL_HE = new RegExp(`^${LABEL_VERB}\\s*:?\\s+${LABEL_ANGLE_HE}(${NAME})(${NAME})(${NAME})\\s+(?:כ|ב(?:תור)?)\\s*-?\\s*${LABEL_NAME}$`);
-const ANGLE_LABEL_EQ = new RegExp(`^(?:${LABEL_VERB}|[Dd]enote|[Ll]et)\\s*:?\\s+(?:${LABEL_ANGLE_HE}|(?:the\\s+)?angle\\s+)(${NAME})(${NAME})(${NAME})\\s*=\\s*(?:∠\\s*)?([A-Z]\\d+)$`);
-const ANGLE_LABEL_EN = new RegExp(`^(?:[Dd]enote|[Ll]abel|[Mm]ark|[Ll]et)\\s+(?:the\\s+)?(?:angle\\s+|∠\\s*)(${NAME})(${NAME})(${NAME})\\s+(?:as|by|be)\\s+(?:∠\\s*|angle\\s+)?([A-Z]\\d+|\\d+|[α-ορ-ω])$`);
+const ANGLE_LABEL_EQ = new RegExp(`^(?:${LABEL_VERB}|[Dd]enote|[Ll]et)\\s*:?\\s+(?:${LABEL_ANGLE_HE}|(?:the\\s+)?angle\\s+)(${NAME})(${NAME})(${NAME})\\s*=\\s*(?:∠\\s*)?([A-Z][0-9₀-₉]+)$`);
+const ANGLE_LABEL_EN = new RegExp(`^(?:[Dd]enote|[Ll]abel|[Mm]ark|[Ll]et)\\s+(?:the\\s+)?(?:angle\\s+|∠\\s*)(${NAME})(${NAME})(${NAME})\\s+(?:as|by|be)\\s+(?:∠\\s*|angle\\s+)?([A-Z][0-9₀-₉]+|\\d+|[α-ορ-ω])$`);
 
 function parseAngleLabel(line: string): RuleOutcome {
   const m = ANGLE_LABEL_HE.exec(line) ?? ANGLE_LABEL_EQ.exec(line) ?? ANGLE_LABEL_EN.exec(line);
@@ -6731,7 +6732,8 @@ function parseAngleLabel(line: string): RuleOutcome {
   const at = angleNameOf(p, v, q);
   if (!at || !isAngleRef(at)) return refuse('repeated-vertex', line);
   if (GREEK_ALIAS.test(given)) return parseClause(`∠${p}${v}${q} = ${given}`);
-  const name = /^\d+$/.test(given) ? `${v}${given}` : given;
+  // #2075 (ADR-AG-398): a vertex and a digit («כ 1») is the indexed name A₁, spelled as «כ-A1» is folded
+  const name = /^\d+$/.test(given) ? foldIndexedName(`${v}${given}`, 'glyph') : given;
   // The binding first, so a taken label is the line's answer before its arms are looked for; then the two arms 2-D draws.
   return made([
     { t: 'constraint', k: { t: 'angle', at, value: { kind: 'sym', name: angleLabelSymbol(name) } }, src: line },
@@ -8346,7 +8348,7 @@ function parseConstraint(raw: string): RuleOutcome {
      * only) and has no value until the lines are parallel, so the solve could never reach it.
      */
     const only = left && left.terms.length === 1 && left.expr.kind === 'sym' ? left.terms[0] : null;
-    const pairOf = (n: string) => /^([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)$/.exec(n);
+    const pairOf = (n: string) => /^([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)$/.exec(n);
     if (only && only.kind === 'line-line' && right && right.terms.length === 0) {
       const u = pairOf(only.u);
       const v = pairOf(only.v);
@@ -8807,7 +8809,7 @@ const ratioFact = (
 function parseRatioColon(line: string): Fact[] | null {
   const m = line.match(
     new RegExp(
-      String.raw`^\s*([A-Z]\d?)\s*([A-Z]\d?)\s*:\s*([A-Z]\d?)\s*([A-Z]\d?)\s*=\s*` + RATIO_PQ + RATIO_END,
+      String.raw`^\s*([A-Z][0-9₀-₉]*)\s*([A-Z][0-9₀-₉]*)\s*:\s*([A-Z][0-9₀-₉]*)\s*([A-Z][0-9₀-₉]*)\s*=\s*` + RATIO_PQ + RATIO_END,
     ),
   );
   if (!m) return null;
@@ -8841,7 +8843,7 @@ function parseDividesInRatio(line: string): Fact[] | null {
   // (a) divider-first — the one-liner that makes this worth having.
   const div = line.match(
     new RegExp(
-      String.raw`([A-Z]\d?)\s+(?:מחלק[הת]?|divides?)\s+(?:את\s+)?(?:ה?(?:קטע|צלע)\s+)?([A-Z]\d?)\s*([A-Z]\d?)[\s\S]*?(?:ביחס|יחס|ratio)\D*?` +
+      String.raw`([A-Z][0-9₀-₉]*)\s+(?:מחלק[הת]?|divides?)\s+(?:את\s+)?(?:ה?(?:קטע|צלע)\s+)?([A-Z][0-9₀-₉]*)\s*([A-Z][0-9₀-₉]*)[\s\S]*?(?:ביחס|יחס|ratio)\D*?` +
         RATIO_PQ,
       'i',
     ),
@@ -8861,7 +8863,7 @@ function parseDividesInRatio(line: string): Fact[] | null {
    */
   const two = line.match(
     new RegExp(
-      String.raw`(?:ה?יחס|ratio)[\s\S]*?([A-Z]\d?)([A-Z]\d?)\s*(?::|\/|ל-?|to|and|ו-?|,)\s*([A-Z]\d?)([A-Z]\d?)[\s\S]*?` +
+      String.raw`(?:ה?יחס|ratio)[\s\S]*?([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)\s*(?::|\/|ל-?|to|and|ו-?|,)\s*([A-Z][0-9₀-₉]*)([A-Z][0-9₀-₉]*)[\s\S]*?` +
         RATIO_PQ,
       'i',
     ),
@@ -9064,7 +9066,7 @@ const HAS_A_WORD = /(?:^|\s)[A-Za-z]{3,}(?=\s|$)/;
  * parsed with these, then each becomes a `vertex` placeholder that `engine/toolLetters.ts` resolves to the first free
  * letters in order. `NAME` reads them (a capital and one subscript digit); no student writes them.
  */
-const VERTEX_SENTINELS = ['Y₀', 'Y₁', 'Y₂', 'Y₃', 'Y₄', 'Y₅', 'Y₆', 'Y₇', 'Y₈', 'Y₉'];
+const VERTEX_SENTINELS = ['Y₀₀', 'Y₀₁', 'Y₀₂', 'Y₀₃', 'Y₀₄', 'Y₀₅', 'Y₀₆', 'Y₀₇', 'Y₀₈', 'Y₀₉'];
 
 /**
  * Parse `sentences` — the canonical sentences a line means — and re-attribute every fact to the student's line. The
@@ -10379,7 +10381,7 @@ export const MINT_PREFIX = '@mint:';
  */
 export { TOOL_PREFIX as FRESH_PREFIX } from '../engine/toolLetters';
 /** A name no student writes and no mint takes — the stand-in while a canonical sentence is parsed. */
-const MINT_SENTINEL = 'Z₀';
+const MINT_SENTINEL = 'Z₀₀';
 
 type PointSlot = { name: Id } | { x: Expr; y: Expr; key: string };
 
@@ -10702,7 +10704,8 @@ export function readAngleAsk(text: string): { a: string; v: string; b: string } 
  * still a rename the student asked for, and refusing it BY NAME is the submit path's job — returning
  * null would hand an understood sentence to the LLM seam.
  */
-const RENAME_SOURCE = '([A-Za-z](?:[0-9]|[₀-₉])?)';
+// #2075 (ADR-AG-398): an index in any spelling — glued digits, `_1`, `_{12}`, subscript digits — folded to the glyph below
+const RENAME_SOURCE = '([A-Za-z](?:_\\{?[0-9]+\\}?|[0-9]+|[₀-₉]+)?)';
 const RENAME_HE = new RegExp(
   String.raw`^(?:שנה|שנו|החלף|החליפו)\s+(?:את\s+)?(?:ה?שם\s+|ה?אות\s+)?(?:של\s+)?(?:ה?נקודה\s+)?${RENAME_SOURCE}\s+(?:ל|ב)\s*[-־]?\s*(\S+?)\.?$`,
 );
@@ -10714,7 +10717,7 @@ export function parseRenameAnalytic(raw: string): { from: string; to: string } |
   const s = trim(raw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ''));
   const m = RENAME_HE.exec(s) ?? RENAME_EN.exec(s);
   if (!m) return null;
-  return { from: m[1].toUpperCase(), to: m[2] };
+  return { from: foldIndexedName(m[1].toUpperCase(), 'glyph'), to: m[2] };
 }
 
 /**
@@ -10736,5 +10739,5 @@ export function parseSwapAnalytic(raw: string): { a: string; b: string } | null 
   const s = trim(raw.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ''));
   const m = SWAP_HE.exec(s) ?? SWAP_EN.exec(s);
   if (!m) return null;
-  return { a: m[1].toUpperCase(), b: m[2] };
+  return { a: foldIndexedName(m[1].toUpperCase(), 'glyph'), b: m[2] };
 }

@@ -341,6 +341,8 @@ A letter the tool cannot read is
 (`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
 reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
 look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
+**An indexed point name is folded to one id** (#2075, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)): `orthography` calls `shell/indexedName.foldIndexedName(line, 'glyph')`, so «X_1», «X_{1}», «X1» and «X₁» are all the id `X₁` (a digit run too: `X₁₂`) — the glyph the tool letters and every surface already print. Every copy of the point-name atom reads a digit run (`[A-Z][0-9₀-₉]*`); the parser's internal stand-ins are two-digit forms with a leading zero (`Y₀₀`…, `Z₀₀`…), so no student spelling reaches them.
+
 An angle measure written in radians is `radian-angle` (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)): `findRadianAngle` (`shell/radianAngle.ts`) is asked right after the proof target, before every rule and the model, worded from `errRadianAngle` (2-D's sentence); `detail` is the π value. The angle readers it covers are the ones analytic has — the angle given and the sector's «בזווית»; measured at b0e9dbea, an inclination, an angle between two lines and a trig argument are not read even in degrees.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's
