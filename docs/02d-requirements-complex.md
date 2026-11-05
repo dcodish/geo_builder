@@ -70,7 +70,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   - Sources: [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465
 - **FR-GP-7 (Must)** — **A number the givens determine always shows its value.** Exact form when the
   value is exact; otherwise ≈ decimals — never the bare name, and never a fraction standing in for a
-  value that is not one. «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°»)
+  value that is not one. A number typed as a decimal reads as a decimal, computed in full and shown to
+  two decimals when needed: «z = 7.9999» reads «z = 8», «z = 1.234» reads «z = 1.23», «z = 1.5 + 2.25i» reads
+  «z = 1.5+2.25i» ([ADR-CX-088](06d-decisions-complex.md#adr-cx-088)). «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°»)
   in the panel and, being typed with no parameter, on the canvas. "Determined" is the same test a
   question («|z1|») is answered by, so the panel prints a number exactly when that question would get one;
   a number with freedom left keeps its bare name.

@@ -411,4 +411,4 @@ behave.
 
 ## The typed spelling on the canvas ([ADR-W-179](06w-decisions-workspace.md#adr-w-179))
 
-A number typed with no parameter takes its canvas label from `replay/typedSpelling.ts`, which reads the parts out of `Constraint.src` through `shell/literal`. Only the view the line was typed in changes. A part that does not read as the fold's value gives no label, so the reading stands. The fold never reads it.
+A number typed with no parameter takes its canvas label from `replay/typedSpelling.ts`, which reads the parts out of `Constraint.src` through `shell/literal`. Only the view the line was typed in changes. A part that does not read as the fold's value gives no label, so the reading stands. The fold never reads it. `typedDecimalReadings` applies the same read to the panel for a line with a decimal in it ([ADR-CX-088](06d-decisions-complex.md#adr-cx-088)): the Rat cannot tell 1.234 from 617/500, so the rule asks the line, with no denominator threshold.

@@ -25,7 +25,7 @@
  */
 
 import { fmtNum } from '../../shell/format';
-import { typedCartesian, typedPolar } from './typedSpelling';
+import { typedCartesian, typedDecimalReadings, typedPolar } from './typedSpelling';
 import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
@@ -2162,7 +2162,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
       // #1497 (ADR-W-179): a number typed with no parameter, as typed, in the view it was typed in (D1)
       const line = how.includes('typed') ? names.map((n) => typedLineOf(n, statedList)).find((c) => c !== null) ?? null : null;
       if (!line) return { ...p, canvas: p.reading, canvasCart: p.readingCart };
-      return { ...p, canvas: typedPolar(line, p.reading, Math.hypot(p.z.re, p.z.im)) ?? p.reading, canvasCart: typedCartesian(line, p.display, p.z) ?? p.readingCart };
+      const q = { ...p, ...typedDecimalReadings(line, p) }; // ADR-CX-088: the panel's reading of a typed decimal
+      return { ...q, canvas: typedPolar(line, q.reading, Math.hypot(p.z.re, p.z.im)) ?? q.reading, canvasCart: typedCartesian(line, p.display, p.z) ?? q.readingCart };
     }
     for (const part of [def.re, def.im]) for (const k of part.terms.keys()) if (studentValued.has(k) && rationalParams.has(k)) competing.add(k);
     const form = substituteKnown(def, shownValues);

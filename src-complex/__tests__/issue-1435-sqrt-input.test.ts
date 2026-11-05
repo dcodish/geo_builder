@@ -137,8 +137,8 @@ describe('#1435 A1 — a closed radical literal is ALWAYS a known number (T75)',
     expect(pointOf(lines, 'z3').readingCart).toBe('z₃ = -4+3i');
   });
 
-  it('a fraction literal now prints its exact pair under `=` (was «≈ 1.5+2.5i»)', () => {
-    expect(pointOf(['z1 = 1.5 + 2.5i']).readingCart).toBe('z₁ = 3/2+(5/2)i');
+  it('a decimal literal reads under `=` as the decimal it is (was «≈ 1.5+2.5i», then «3/2+(5/2)i»; ADR-CX-088)', () => {
+    expect(pointOf(['z1 = 1.5 + 2.5i']).readingCart).toBe('z₁ = 1.5+2.5i');
   });
 
   it('a float is never read back as a rational over a root: √2 + √3 is not 10949/3480', () => {
