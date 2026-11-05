@@ -18,6 +18,7 @@ import { unstatedChoiceText } from '../app/unstatedChoice';
 import { derive, type Derivation } from '../engine/derive';
 import { unstatedChoices } from '../engine/unstatedChoices';
 import { analyticI18n } from '../i18n';
+import { buildScene } from '../render/scene';
 
 const SEEDS = Array.from({ length: 24 }, (_, i) => i);
 const KITE = 'דלתון ABCD';
@@ -202,6 +203,58 @@ describe('#2006 — the row: the role name while open, the letters once fixed', 
   it('keeps the equation in the row', () => {
     const d = derive([KITE, MAIN], 0);
     expect(panelKnowledge(d).curves[0].known).toMatchObject({ kind: 'line' });
+  });
+});
+
+describe('#2006 — the canvas name once a pair is stated (judged 2026-11-05, ruling q15 B)', () => {
+  /**
+   * What the two orders share: what is drawn and how it is named, the line's equation and the letters on it, every text.
+   * Not the coordinates: the figure is solved line by line (ADR-AG-348), so a statement moves only what it introduced,
+   * and two orders of one figure are two different starts at a seed. Forcing them equal would break that stability.
+   */
+  const seen = (d: Derivation) => {
+    const sc = buildScene(d.figure, d.box, 640, 480, { stated: d.stated });
+    return {
+      lines: sc.curves.map(({ name, kind, ink }) => ({ name, kind, ink })),
+      equations: d.figure.curves.map((c) => [c.curve, carried(d, c.id)]),
+      points: sc.points.map((p) => p.id).sort(),
+      segments: sc.segments.map((g) => g.key).sort(),
+      labels: sc.stated.labels.map((l) => l.text).sort(),
+    };
+  };
+
+  it.each([
+    [MAIN, 'AB = AD', 'AC'],
+    [MAIN, 'BA = BC', 'BD'],
+    [SECONDARY, 'AB = AD', 'BD'],
+    [SECONDARY, 'BA = BC', 'AC'],
+  ])('%s · %s: either order draws the same thing, the line named %s', (line, pair, name) => {
+    for (const s of [0, 1, 2, 3, 4, 5]) {
+      const after = derive([KITE, line, pair], s);
+      const first = derive([KITE, pair, line], s);
+      expect(after.figure.curves[0].label.name).toBe(name);
+      expect(seen(after)).toEqual(seen(first));
+    }
+  });
+
+  it('the name rides the label, the id is never rewritten, and the row agrees', () => {
+    const d = derive([KITE, MAIN, 'AB = AD'], 0);
+    expect(d.figure.curves[0].id.startsWith('line-')).toBe(false);
+    expect(rowNames(d)).toEqual(['AC']);
+  });
+
+  it('while the pair is open the line stays unnamed on the canvas (not ruled)', () => {
+    expect(derive([KITE, MAIN], 0).figure.curves[0].label.name).toBe('');
+  });
+
+  it('a side role line stays nameless on the label: it is not drawn', () => {
+    const d = derive(['משולש שווה שוקיים ABC', 'משוואת הבסיס היא x-2y+6=0', 'AB=AC'], 0);
+    expect(d.figure.curves[0].label.name).toBe('');
+  });
+
+  it('a line the student already calls AC keeps the name alone', () => {
+    const d = derive([KITE, MAIN, 'הישר AC', 'AB = AD'], 0);
+    expect(d.figure.curves.filter((c) => c.label.name === 'AC')).toHaveLength(1);
   });
 });
 

@@ -2431,6 +2431,23 @@ function attachToOptions(c: Construction, seat: number | undefined, options: Rea
 }
 
 /**
+ * A STATED PAIR GIVES A DRAWN ROLE LINE ITS LETTERS (#2006, ADR-AG-406; judged 2026-11-05, ruling q15 B): once the collapse
+ * has stood its two vertices on the line, the canvas names it as it does with the pair stated first. The name rides the
+ * label and the id is never rewritten (the rule `toolNamed` keeps), so the riders stay on their own line. A side's line is
+ * not drawn, so it has no name to show; a figure that already calls that pair of letters a line keeps its own.
+ */
+function lettersOnDrawnRoleLines(c: Construction, members: readonly Constraint[]): Construction {
+  const named = (o: CurveObject): CurveObject => {
+    const ends = members.flatMap((k) => (k.t === 'on-curve' && k.curve === o.id ? [k.id] : []));
+    if (ends.length !== 2) return o;
+    const name = ends.join('');
+    const taken = c.objects.some((x) => x.id === lineIdOf(name) || (x.kind === 'curve' && x.label.name === name));
+    return taken ? o : { ...o, label: { ...o.label, name } };
+  };
+  return { ...c, objects: c.objects.map((o) => (o.kind === 'curve' && o.stated && o.label.role && o.label.name === '' ? named(o) : o)) };
+}
+
+/**
  * «משוואת האלכסון הראשי היא …» — A KITE'S DIAGONAL NAMED BY ITS ROLE (#1070; #2006, ADR-AG-406).
  *
  * Operator ruling A, 2026-10-13: *"the line y=2x is the main diagonal in every drawing; which letters lie on it changes
@@ -3427,7 +3444,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // One option left is the student's statement of all of it: its members stand as plain constraints (#2006, ADR-AG-406).
         const left: Constraint[] = kept.length === 1 ? membersOf(kept[0]) : [{ t: 'choice', options: kept }];
         narrowed.splice(narrows, 1, ...left);
-        return { ok: true, effect: 'narrowed', next: { ...c, constraints: narrowed } };
+        return { ok: true, effect: 'narrowed', next: lettersOnDrawnRoleLines({ ...c, constraints: narrowed }, kept.length === 1 ? left : []) };
       }
       return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
     }
