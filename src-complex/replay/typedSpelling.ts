@@ -8,8 +8,9 @@
  * The constraint already quotes its line (`Constraint.src`). This reads the spelling of the parts from that quote through
  * the shared `shell/literal` and never decides anything about the number: the value stays the fold's, and a part that
  * does not read as the value the fold holds gives no label, so the reading stands. Only the view the line was typed in
- * changes («the view's own form»); the other view is a conversion, and the panel keeps its readings.
+ * changes («the view's own form»); the other view is a conversion. The panel keeps its readings, except a typed decimal's (ADR-CX-088).
  */
+import { fmtNum } from '../../shell/format';
 import { givenText, readLiteral } from '../../shell/literal';
 
 const no = (): string => '';
@@ -64,4 +65,37 @@ export function typedPolar(src: string, reading: string, modulus: number): strin
   if (!typed || !shape || !readLiteral(typed)) return null;
   const text = givenText(modulus, typed, no);
   return text === '' ? null : `${shape[1]}${text}${shape[2]}`;
+}
+
+/** Is this literal (a real part, or an imaginary part with its `i`) spelled as a decimal? */
+const isDecimal = (raw: string): boolean => {
+  const body = raw.replace(/[·*]?i$/, '').replace(/^[+\-−]/, '').replace(/^\((.*)\)$/, '$1');
+  return readLiteral(body)?.decimal === true;
+};
+
+/**
+ * ADR-CX-088 (judged, sr-22): the panel's own reading of a number typed as a DECIMAL. The exact value layer holds a Rat,
+ * so «z = 1.234» read «617/500» and «z = 7.9999» read «79999/10000»: a decimal dressed as a fraction, with no threshold
+ * that could tell them apart, because the Rat no longer knows how it was typed. The line does, so this asks it. It
+ * reaches a line with a decimal in it and nothing else: a fraction or root alone keeps its reading, and a value computed
+ * from a decimal never comes here. Each reading changes only where the decimal IS that view's number: the cartesian
+ * parts, a typed modulus, or the modulus of a number on one axis.
+ */
+export function typedDecimalReadings(
+  src: string,
+  p: { readonly display: string; readonly z: { re: number; im: number }; readonly reading: string; readonly readingCart: string },
+): { reading: string; readingCart: string } {
+  const none = { reading: p.reading, readingCart: p.readingCart };
+  const rhs = rightSide(src);
+  if (rhs === null) return none;
+  const modulus = Math.hypot(p.z.re, p.z.im);
+  const typedMod = rhs.match(/^(.+?)[·*]?cis/)?.[1];
+  if (typedMod !== undefined) return isDecimal(typedMod) ? { ...none, reading: typedPolar(src, p.reading, modulus) ?? p.reading } : none;
+  const parts = cartesianParts(rhs);
+  if (!parts) return none;
+  const pieces = [parts.re, parts.im].filter((t): t is string => t !== null && t !== '');
+  if (!pieces.some(isDecimal)) return none;
+  const readingCart = typedCartesian(src, p.display, p.z) ?? p.readingCart;
+  const shape = p.reading.match(/^(.* = ).+?(·cis.*)$/);
+  return { readingCart, reading: pieces.length === 1 && shape ? `${shape[1]}${fmtNum(modulus)}${shape[2]}` : p.reading };
 }

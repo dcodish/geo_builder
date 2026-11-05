@@ -36,8 +36,8 @@ describe('#1497 — the cartesian view', () => {
     expect(point([line]).canvasCart).toBe(text);
   });
 
-  it('the panel keeps its reading', () => {
-    expect(point(['z = 0.5+1.25i']).readingCart).toBe('z = 1/2+(5/4)i');
+  it('a fraction or a root alone keeps the panel reading it had', () => {
+    expect(point(['z = √8']).readingCart).toBe('z = 2√2');
   });
 });
 
@@ -54,6 +54,47 @@ describe('#1497 — the polar view', () => {
     expect(point(['z = √8cis45']).canvasCart).toBe('z = 2+2i');
     store().resetSession();
     expect(point(['z = 2cis120']).canvasCart).toBe('z = -1+√3i');
+  });
+});
+
+describe('ADR-CX-088 — a typed decimal reads as a decimal in the panel (sr-22)', () => {
+  it.each([
+    ['z = 7.9999', 'z = 8'],
+    ['z = 1.234', 'z = 1.23'],
+    ['z = 1.5 + 2.25i', 'z = 1.5+2.25i'],
+    ['z = 0.5+1.25i', 'z = 0.5+1.25i'],
+    ['z = 2/3+1.5i', 'z = 2/3+1.5i'],
+    ['z = 2.5i', 'z = 2.5i'],
+  ])('«%s» reads «%s» in the cartesian panel', (line, text) => {
+    expect(point([line]).readingCart).toBe(text);
+  });
+
+  it.each([
+    ['z = 7.9999', 'z = 8·cis0°'],
+    ['z = 1.234', 'z = 1.23·cis0°'],
+    ['z = 0.5cis30', 'z = 0.5·cis30°'],
+    ['z = -1.5', 'z = 1.5·cis180°'],
+  ])('«%s» reads «%s» in the polar panel', (line, text) => {
+    expect(point([line]).reading).toBe(text);
+  });
+
+  it('the canvas polar label of a typed decimal is no fraction either', () => {
+    expect(point(['z = 7.9999']).canvas).toBe('z = 8·cis0°');
+  });
+
+  it('the value is computed in full, whatever the row reads', () => {
+    const p = point(['z = 7.9999']);
+    expect(p.z.re).toBeCloseTo(7.9999, 10);
+  });
+
+  it('what the ruling did not reach is unchanged', () => {
+    expect(point(['z = 0.5cis30']).readingCart).toBe('z = √3/4+(1/4)i'); // a conversion
+    store().resetSession();
+    expect(point(['z = 2/3']).readingCart).toBe('z = 2/3'); // a fraction
+    store().resetSession();
+    expect(point(['z = 2/3']).reading).toBe('z = 2/3·cis0°');
+    store().resetSession();
+    expect(point(['z = 1.5', 'w = 2z'], 'w').readingCart).toBe('w = 3'); // computed from a decimal: not decided
   });
 });
 
