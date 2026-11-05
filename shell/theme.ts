@@ -45,6 +45,9 @@ export const color = {
   ok: '#16a34a',
   okSoft: '#f0fdf4',
   okBorder: '#bbf7d0',
+  info: '#1d4ed8', // the blue ⓘ information strip (2-D's, ADR-W-180): nothing failed, nothing to act on
+  infoSoft: '#eff6ff',
+  infoBorder: '#bfdbfe',
   warn: '#b45309',
   warnSoft: '#fffbeb',
   warnBorder: '#fde68a',

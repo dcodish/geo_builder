@@ -61,7 +61,9 @@ import { loadFigureText } from '@/store/figureLoad';
 import { forgetSession, offeredSession, restoreSession, startSessionPersist } from '@/store/sessionPersist';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
-import { Banner } from '../shell/frame/Banner';
+import { Banner, InfoNote } from '../shell/frame/Banner';
+import { NarrowingNote } from '../shell/frame/NarrowingNote';
+import { color as shellColor } from '../shell/theme';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
 import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
 // #1189 (ADR-W-079): a figure travels as a LINK — the teacher copies one, the student taps it.
@@ -1533,12 +1535,12 @@ export default function App() {
           {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
           {visibleCoincidences(coincidences).length > 0 && (
-            <div style={infoBanner}>
+            <div data-testid="converge-note">
               {/* #581 (ADR-447 Am. 1, operator ruling): a pair with a machinery-minted member is not
                   shown at all — the notice explains why two points the STUDENT KNOWS merged. What
                   remains is student-named, so `describePoint` is a no-op here today; it stays as the
                   ADR-447 seam should a described anonymous pair ever be ruled back in. */}
-              ⓘ {convergeText(visibleCoincidences(coincidences), t, describePoint) /* #1595 (ADR-W-176): the suite key, `suite.notice.converge` */}
+              <InfoNote>{convergeText(visibleCoincidences(coincidences), t, describePoint) /* #1595 (ADR-W-176): the suite key, `suite.notice.converge` */}</InfoNote>
             </div>
           )}
 
@@ -1561,10 +1563,10 @@ export default function App() {
           )}
 
           {narrowed?.facts === facts && narrowed.list.length > 0 && (
-            <div style={infoBanner} data-testid="narrowed-note">
+            <div data-testid="narrowed-note">
               {/* #1996 (ADR-655, ADR-W-129): the givens forced a declared ring into a narrower named kind — said
                   in one cause-naming sentence, derived from the always-on sweep (stale-guarded like the dots). */}
-              ⓘ {narrowingText(narrowed.list, (k, o) => t(k, o) as string).join(' ')}
+              <NarrowingNote>{narrowingText(narrowed.list, (k, o) => t(k, o) as string).join(' ')}</NarrowingNote>
             </div>
           )}
 
@@ -2318,9 +2320,9 @@ const infoBanner: React.CSSProperties = {
   padding: '8px 12px',
   fontSize: 13,
   borderRadius: 8,
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  color: '#1d4ed8',
+  border: `1px solid ${shellColor.infoBorder}`,
+  background: shellColor.infoSoft,
+  color: shellColor.info,
 };
 // del / editInput retired with the shared FactList (B5-2d): row actions and the editor are chrome.
 const iconBtn = (color: string): React.CSSProperties => ({

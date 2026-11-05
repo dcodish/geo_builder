@@ -377,7 +377,7 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   which apply uses instead of the pool), so history is rewritten as one undo step and the pool letter is free again.
   `sameStatement` compares `midpoint-auto` without that `id`, so «אמצע BB'» typed again is still already known.
 
-**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
+**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996), on the shared `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through
 the same function with `narrow = false`, so no recursion and no `deriveStats3` count). Declared kind: a `quad-shape`'s
 base + `adj` (`declaredKind3`), `rect-complete`, a `QUAD_PYRAMIDS` solid's base (its ring `ids[0..3]`), a flat
@@ -386,7 +386,7 @@ triangle's `readShapePhrase3` adjectives. Forced kinds: `ringKinds` over `knowle
 The cause search is capped at `NARROW_TRIALS_3D` subset trials (a COUNT — past it «בגלל הנתונים, …»). `buildNotices3`
 turns the result into `{ kind: 'narrowed', ids, note }`, rendered by `i18n/narrowingText3.ts` (`notice.narrowed.*`).
 `CYCLIC_MEMBER` is the solver's fix table only; the one pair the lattice cannot name — a right pyramid over a plain
-«מרובע» — keeps ADR-3D-090's `base-constrained` sentence.
+«מרובע» — keeps ADR-3D-090's `base-constrained` sentence, on the same `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).
 **Both voices: the subject decides, and the ring is read past the circle's name (#1975, [ADR-3D-341](06b-decisions-3d.md#adr-3d-341)).**
 `circleContains3`'s fallback (no container marker) asks `circleEnclosesByVoice3` — the copy of 2-D's voice reader:
 the subject of «חוסם» / "circumscribe" is the outer figure, and a ring between the circle noun and the verb («מעגל

@@ -5927,6 +5927,8 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 
 ## ADR-W-129 — The givens forced a narrower kind: one cause-naming sentence in every builder, from one shared decision (#1996, #1899)
 
+**⚠ Amended by [ADR-W-180](#adr-w-180) (2026-11-05):** the note's face is shared too, the blue ⓘ strip in every builder.
+
 **Status:** accepted · 2026-10-15 · **Issue:** #1996 (feature, P2, workspace) and #1899 (folded in) · round #2128 · PR `feat/1996-narrowing-note` · builder entries [ADR-655](06-decisions.md#adr-655) (2-D), [ADR-3D-343](06b-decisions-3d.md#adr-3d-343) (3-D), [ADR-AG-276](06c-decisions-analytic.md#adr-ag-276) (analytic).
 **Operator rulings (cited verbatim; each is the authority for a line of the decision):**
 - 2026-10-08, #1899 (`/decisions`): *"Add it to 2-D"* — *"2-D shows 3-D's notice, in 3-D's words, whenever an inscription forces a declared quadrilateral into a narrower shape"*; analytic follows under B1.
@@ -6851,6 +6853,8 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 
 ## ADR-W-176 — Two letters on one dot are accepted, and every builder says so in 2-D's sentence, one suite key (#1595)
 
+**⚠ Amended by [ADR-W-180](#adr-w-180) (2026-11-05):** the notice sits on the blue ⓘ strip in every builder.
+
 > **⚠ Superseded in part** 2026-11-02 by [ADR-W-177](#adr-w-177) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): the first bullet of *How the rulings fit together* — a NEW letter whose definition puts it on a point already there is refused — no longer holds for a coincidence the definition FORCES; that is accepted with this ADR's notice in every builder.
 
 **Status:** accepted · 2026-11-02 · feature (P2, all four builders) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · **Operator rulings:** 2026-09-30 (#1595, playing round #1571 T23: *"when 2 dots are on top of each other we should accept but always give a message about it. this is correct for all tools"*); 2026-10-30 (PR #2605 T34: *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user. this needs to happen here too"*) · plan of 2026-10-07 (#1595), armed `auto-ok` 2026-10-04 · **Extends:** [ADR-W-148](#adr-w-148) (a notice joins the suite text), [ADR-W-152](#adr-w-152)'s shape · per-product: 2-D unchanged (ADR-123, ADR-447 Am. 1), [ADR-3D-404](06b-decisions-3d.md#adr-3d-404), [ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), [ADR-CX-086](06d-decisions-complex.md#adr-cx-086)
@@ -6993,3 +6997,30 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Locks.** `shell/__tests__/retryLostNames.test.ts`, `server/__tests__/issue-2231-keep.test.ts`, `src/app/__tests__/issue-2231-llm-retry.test.ts` (through `runSubmit`), `src3d/__tests__/issue-2231-llm-retry3.test.ts` (through `escalate3Flow` and `decideSteps3`), `src-analytic/__tests__/issue-2231-llm-retry.test.ts` (through `runFallback`). All mocked (standing rule 2).
 
 **Behaviour change for a student:** a line whose AI reading lost a typed name may now build with that name, after a second request; a line that stays lost reads the same refusal as before, a moment later.
+## ADR-W-180 — The forced-narrowing note has one face in every builder: the blue ⓘ strip, 2-D's (#2266)
+
+**Status:** accepted · 2026-11-05 · bug (P2, analytic + 3-D, complex for item 5) · round #2722 · branch `fix/2266-narrowing-note` · amends the display line of [ADR-W-129](#adr-w-129), [ADR-AG-276](06c-decisions-analytic.md#adr-ag-276), [ADR-3D-343](06b-decisions-3d.md#adr-3d-343) and [ADR-AG-377](06c-decisions-analytic.md#adr-ag-377) item 4. LADDER stage: none (display only; no fold, solve or sampling change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R179, R223; [02b](02b-requirements-3d.md) FR-SP-15; [02w](02w-requirements-workspace.md) the two-letters row. · **Design:** [04w](04w-design-shell.md) (`Banner`'s `info` kind, `InfoNote`, `NarrowingNote`), [04c](04c-design-analytic.md), [04b](04b-design-3d.md).
+
+**Operator:** 2026-10-16, #2266, playing T64: *"2266 - no other tool as that symbol so we need same messages across tools"*. Told that 2-D does carry the ⓘ, and shown keeping it against dropping it: *"2266 - A"*, keep the ⓘ everywhere, as 2-D has it.
+
+**Measured (28dac0c3, a real browser, «מלבן ABCD» · «מעוין ABCD»).** 2-D: ⓘ, text `#1d4ed8` on `#eff6ff`, border `#bfdbfe`, padding 8/12, radius 8, 13 px, 37.5 px tall. Analytic: ⓘ, amber `Banner kind="notice"`, padding 6/10. 3-D: no ⓘ, Tailwind blue box, radius 12, 14 px. The issue's table held; the sentence was already one.
+
+**Class.** A note one decision produces in every builder (`shell/narrowing.ts`) had its mark and its colour written per builder, so each drifted by itself. Nothing in `shell/` could say what the note looks like: the banner family had no information kind.
+
+**Decision.**
+1. **`Banner` gains `kind="info"`**, with the tokens `color.info`, `infoSoft`, `infoBorder` and 2-D's padding, `role="note"`. 2-D's `infoBanner` reads the same tokens.
+2. **`shell/frame/NarrowingNote`** is the note's one face: the ⓘ and the `info` strip around the caller's sentence. 2-D, 3-D and analytic all render it, so neither the mark nor the colour can differ per builder again. For a student 2-D is unchanged: after the change it measures the same colours, padding, radius, size and height as before.
+3. **Analytic's ellipse-made-a-circle note goes with it.** ADR-AG-377 put it "in the narrowing note's channel and voice", and the operator's ruling there calls it the same message as the quadrilateral and triangle ones (*"we have such messages when a quad becomes a specific quad or a triangle becomes a right triangle. so this ruling is a generic ruling"*). Left amber it would have been the one note of the family off the strip, a split this fix caused.
+4. **`src-analytic/app/NarrowingNotes.tsx`** holds analytic's two note lists: they arrive after paint, so a server render of the App never reaches them, and a lock needs to render them.
+5. **Two letters on one dot takes the same face** (judged 2026-11-05, round #2722, q13, choice A). Measured at this branch: 2-D blue strip with ⓘ; analytic and complex amber with ⓘ; 3-D its blue box with ⓘ. All four now render `InfoNote`, so analytic and complex turn blue and 3-D takes the shared strip. The words are unchanged (`suite.notice.converge`).
+6. **3-D's `base-constrained` sentence moves to `NarrowingNote`** (judged 2026-11-05, round #2722, q14, choice A). Only the face changes: the sentence stays ADR-3D-090's and the shared kind lattice is untouched.
+   Its letters are the base ring (judged 2026-11-05, round #2722, q16, choice A, from the operator's 2026-10-13 ruling on #1996: the pyramid narrowing note names the base ring and never prints the apex). `notices.ts` passed the solid's ids, so it read «(ABCDS)»; it now passes `baseRingOf`, so it reads «(ABCD)». Nothing else reads this notice's ids.
+7. **`InfoNote`** (`shell/frame/Banner.tsx`) is the ⓘ strip itself. `NarrowingNote` is its name for the narrowing family, so a two-letters note is not called a narrowing note.
+
+**Sibling audit (docs/17 §1).** Complex has no shape nouns and no narrowing note. 3-D's other notices stay on their box. The two notes this audit first left out are items 5 and 6.
+
+**Locks.** `noteFaceFaults` in `shell/__tests__/fixtures/narrowing-note-rows.ts` is the one check. `src/__tests__/narrowing-note-face-2266.test.tsx` and `src3d/__tests__/narrowing-note-face-2266.test.tsx` server-render the real App; `src-analytic/__tests__/narrowing-note-face-2266.test.tsx` renders `NarrowingNotes` over the real note readers and checks the App mounts it. `src-complex/__tests__/narrowing-note-face-2266.test.tsx` server-renders the real App for the two-letters note; the 2-D, 3-D and analytic locks cover that note too, through the real App, and 3-D's covers `base-constrained`. `shell/__tests__/narrowing-note-face-meta-2266.test.tsx` shows the check catches the amber strip, the missing ⓘ, a note that is absent and a blue neighbour.
+
+**Behaviour change for a student:** in analytic the «ABCD הוא כעת ריבוע…» and «ABCD הוגבל…» notes, and «האליפסה היא כעת מעגל…», are blue instead of amber. In 3-D the same notes open with ⓘ and match 2-D's strip, and the right pyramid's «כדי שהפירמידה תהיה ישרה, הבסיס…» sentence gains the ⓘ and the strip. «A ו-B נפלו על אותה נקודה.» is blue in analytic and complex, and in 3-D sits on the shared strip. 2-D looks as it did.

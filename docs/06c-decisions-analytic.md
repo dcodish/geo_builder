@@ -12292,6 +12292,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-276 — Analytic says when the givens forced a narrower kind, in the shared sentence family, once its configuration pool completes (#1996, #1899)
 
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the note is the blue ⓘ strip, no longer amber.
+
 **Status:** accepted · 2026-10-15 · feature (P2, analytic) · round #2128 · PR `feat/1996-narrowing-note` · the analytic half of [ADR-W-129](06w-decisions-workspace.md#adr-w-129) (rulings quoted there; analytic follows 2-D under B1, #1899's 2026-10-08 ruling).
 **Requirements:** [02c](02c-requirements-analytic.md) R179 (new) · **Design:** [04c](04c-design-analytic.md) "A declared shape the givens force narrower is said" · **LADDER stage:** none (a derived layer after the pool completes).
 
@@ -14858,6 +14860,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 **Behaviour change for a student:** a parabola's and an ellipse's row carry a chip «הצג מדריך» / «הצג מדריכים»; pressing it cycles the directrix, the focus and both onto the figure, and back to nothing.
 
 ## ADR-AG-377 — An ellipse the givens make a circle is said to be one; its centre is a circle's (#1863, #2676)
+
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the channel it joins is now the blue ⓘ strip; read `Banner kind="notice"` below accordingly.
 
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. The conic → circle family of #2676's generic rule. LADDER stage: none (a knowledge read and a display).
 
