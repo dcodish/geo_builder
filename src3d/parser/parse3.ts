@@ -3029,6 +3029,81 @@ const circleTangentLine: Rule = (s) => {
   return null;
 };
 
+/**
+ * #253 (ADR-3D-419) — the clauses a stated circle may carry, in either order: a radius and a plane. The sentence is
+ * read to its END: a clause this does not read leaves a remainder and the rule declines, so nothing stated is dropped.
+ */
+const CIRCLE_RADIUS_CLAUSE = new RegExp(String.raw`^\s*(?:,|and\b|with\b|of\b|ו-?(?=רדיוס|ברדיוס|שרדיוסו))?\s*(?:שאורך\s+רדיוסו|אורך\s+רדיוסו|שרדיוסו|רדיוסו|ברדיוס|רדיוס|(?:a\s+|the\s+)?radius|r(?=\s*=))\s*(?:(?:הוא|is|of|=|שווה\s+ל-?)\s*)?(${UNUM})(?![\d/√.])`, 'i');
+const CIRCLE_PLANE_CLAUSE = new RegExp(String.raw`^\s*(?:,|and\b|ו-?(?=במישור|נמצא|מוכל))?\s*(?:(?:ה?נמצא|ה?מוכל|ש?נמצא|ש?מוכל|lying|that\s+lies|lies|which\s+lies|is)\s+)?(?:במישור|in\s+(?:the\s+)?plane)\s+(${PLANE_NAME.source}|(?:${LBL}){3,})(?![\w'א-ת])`, 'i');
+
+/** Reads the clauses after a circle's name. `null`: a remainder no clause reads, or a size no circle has. */
+function readCircleClauses(tail: string): { plane?: string; planeRun?: Id[]; radius?: number } | null {
+  const out: { plane?: string; planeRun?: Id[]; radius?: number } = {};
+  let s = tail.replace(/[.\s]+$/, '');
+  while (s.trim() !== '') {
+    const r = s.match(CIRCLE_RADIUS_CLAUSE);
+    if (r && out.radius === undefined) {
+      out.radius = +r[1];
+      if (!(out.radius > 0)) return null;
+      s = s.slice(r[0].length);
+      continue;
+    }
+    const p = s.match(CIRCLE_PLANE_CLAUSE);
+    if (p && out.plane === undefined) {
+      const raw = p[1];
+      if (/^(?:π|pi)/i.test(raw)) out.plane = canonicalPlane(raw);
+      else {
+        out.planeRun = raw.match(/[A-Z]\d*'?/g)!;
+        out.plane = out.planeRun.join('');
+      }
+      s = s.slice(p[0].length);
+      continue;
+    }
+    return null;
+  }
+  return out;
+}
+
+const CIRCLE_OPENER_HE = String.raw`(?:(?:במרחב\s+)?(?:נתון|נתונה|יהי|יהיה|קיים)\s*:?\s+(?:במרחב\s+)?)?`;
+const CIRCLE_HEAD_HE = new RegExp(String.raw`^${CIRCLE_OPENER_HE}ה?מעגל\s+(?:במרחב\s+)?(?:(?:שמרכזו|שמרכזה|מרכזו|שמרכז|במרכז|מרכז|עם\s+מרכז|בעל\s+מרכז)(?:\s+(?:הוא|בנקודה))?\s+(?:הנקודה\s+)?)?\(?(${LBL})(?![A-Z0-9'])\)?(.*)$`);
+const CIRCLE_HEAD_EN = new RegExp(String.raw`^(?:(?:given|let)\s+)?(?:(?:an?|the)\s+)?circle\s+(?:(?:with\s+)?cent(?:er|re|ered|red)\s+(?:at\s+)?)?\(?(${LBL})(?![A-Z0-9'])\)?(.*)$`, 'i');
+
+/**
+ * #253 (ADR-3D-419): a GIVEN circle in R³ — «נתון מעגל שמרכזו O», «מעגל O ברדיוס 5», «מעגל שמרכזו O במישור π1 ורדיוסו 5»,
+ * "a circle with center O". What is unstated stays a free DOF, and on an existing circle the same sentence is a given
+ * about it (apply's M1).
+ */
+const givenCircle3: Rule = (s) => {
+  const m = s.match(CIRCLE_HEAD_HE) ?? s.match(CIRCLE_HEAD_EN);
+  if (!m) return null;
+  const cl = readCircleClauses(m[2]);
+  if (!cl) return null;
+  const def: Circle3Def = { kind: 'free', center: m[1], ...(cl.plane !== undefined ? { plane: cl.plane } : {}), ...(cl.radius !== undefined ? { radius: cl.radius } : {}) };
+  return [
+    ...(cl.planeRun ? [{ type: 'plane-through' as const, name: cl.plane!, ids: cl.planeRun }] : []),
+    { type: 'circle3', id: `circle-${m[1]}`, def },
+  ];
+};
+
+const CIRCLE_RADIUS_LINE = new RegExp(String.raw`^(?:ה?רדיוס\s+(?:של\s+)?ה?מעגל|(?:the\s+)?radius\s+of\s+(?:the\s+)?circle)(?:\s+(${LBL}))?\s*(?:(?:הוא|is|=|שווה\s+ל-?)\s*)?(${UNUM})(?![\d/√.])\s*\.?$`, 'i');
+
+/** #253 (ADR-3D-419): a size or plane stated about an existing circle, by the same reference a membership uses. */
+const circleStatement3: Rule = (s) => {
+  const rad = s.match(CIRCLE_RADIUS_LINE);
+  if (rad && +rad[2] > 0) {
+    return [rad[1] ? { type: 'circle-given', circle: `circle-${rad[1]}`, name: rad[1], radius: +rad[2] } : { type: 'circle-given', circle: '', radius: +rad[2] }];
+  }
+  // the letterless reference; a lettered «מעגל O במישור π1» is `givenCircle3`'s
+  const m = /^ה?מעגל\s+(?:ה?נמצא\s+|ה?מוכל\s+)?במישור\s/.test(s) || /^(?:the\s+)?circle\s+(?:lies\s+|is\s+)?in\s+(?:the\s+)?plane\s/i.test(s);
+  if (!m) return null;
+  const cl = readCircleClauses(s.replace(/^ה?מעגל\s+/, '').replace(/^(?:the\s+)?circle\s+/i, ''));
+  if (!cl?.plane) return null;
+  return [
+    ...(cl.planeRun ? [{ type: 'plane-through' as const, name: cl.plane, ids: cl.planeRun }] : []),
+    { type: 'circle-given', circle: '', plane: cl.plane, ...(cl.radius !== undefined ? { radius: cl.radius } : {}) },
+  ];
+};
+
 /** V8-i: `A נמצאת על המעגל` / `A על המעגל O` / `A is on the circle` — a verified membership. `''` = the single circle. */
 const onCircle3: Rule = (s) => {
   const m =
@@ -5343,6 +5418,8 @@ export const RULES: Rule[] = [
   commonPerp, // V8-h: common perpendicular of two lines — before the ⟂-to-a-line rules; tight two-line-target regex
   lineProjection, // V8-h: `היטל הישר TB על המישור ABCD`
   circleTangentLine, // V8-i: `מעגל O משיק לישר AB בנקודה B`
+  circleStatement3, // #253: `המעגל במישור π1`, `רדיוס המעגל O הוא 5`
+  givenCircle3, // #253: `נתון מעגל שמרכזו O`. Reads to the END of the line, so a clause it does not read declines
   dropPerpToLine,
   lineRelGiven, // S2 (#378): ∥/⟂ with a NAMED-LINE side — after the line⟂π / plane-run⟂line / common-perp owners
   distanceGiven, // S5 (#378): a stated distance between two operands

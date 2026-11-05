@@ -667,6 +667,23 @@ type; a `mutual-rel` ∥ and a `cos-angle` with a line arm become `line-rel` (�
 `line-rel` (∥, an angle, ⊂). It reads the construction only, so a replay resolves the same way; a declared vector and an
 undeclared name are untouched (`unknown-vector` as before).
 
+### A free-standing given circle ([ADR-3D-419](06b-decisions-3d.md#adr-3d-419), #253)
+
+`Circle3Def { kind: 'free'; center; plane?; radius? }` is resolved inside `circleGeom3` by `resolveFreeCircle`
+(`engine/freeCircle.ts`), the `resolveFreePlane` shape: pins are read from the recorded construction, the rest is
+sampled, and the returned `dof` feeds `freeDofCount3` through `circles3[].freeDof`.
+
+| Pin | Recorded in | Pins |
+| --- | --- | --- |
+| a stated radius | `def.radius` | the radius |
+| a length from the centre to a rider | a `length-eq` claim (`radiusLengthCircle3`, never a pivot pin) | the radius |
+| a stated plane | `def.plane`, plus `on-planes` for the centre | the orientation |
+| a placed point on the circle | `circleMembers3` | the radius if nothing above did, and one orientation DOF per independent chord |
+| tangency | `def` becomes `tangent-line`; held values become claims | everything |
+
+Statements about an existing circle merge through `stateCircleGiven3` (M1). The on-circle rider is the ADR-3D-410
+one: `pointParents3` adds the circle's members, so a rider follows them.
+
 ### Free objects: one operand seam ([ADR-3D-388](06b-decisions-3d.md#adr-3d-388), #2484)
 
 A free line (`resolveFreeLine`) and a free plane (`resolveFreePlane`) read the operand a relation names through the same

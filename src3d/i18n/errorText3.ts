@@ -267,6 +267,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #2611 (ADR-3D-414): a circle reference or membership in the circle's own words
     case 'not-on-circle':
       return t('err.notOnCircle', { id: err.id });
+    // #253 (ADR-3D-419): a size or plane stated about a circle that cannot take it
+    case 'circle-given-conflict':
+      return t(err.what === 'radius' ? 'err.circleRadiusConflict' : 'err.circlePlaneConflict', { name: err.name });
+    case 'circle-given-determined':
+      return t(err.what === 'radius' ? 'err.circleRadiusDetermined' : 'err.circlePlaneDetermined');
     case 'unknown-circle':
       return err.name !== undefined
         ? t('err.unknownCircle', { name: err.name })

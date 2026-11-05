@@ -14605,3 +14605,38 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/issue-1986-ring-search.test.ts` (the four rows at seeds 0–5; the dart, the concave quadrilateral, k > 4 and varying; purity; «הציגו תצורה אחרת»; the single-ring bit-identity; the convex-whenever-simple controls refused; a pentagon over a coordinate letter whose fixed sides cross is refused). Fixtures `fixtures3/kite-dart-second-ring-1986.geo3.json` and `fixtures3/coord-letter-trapezoid-1986.geo3.json`. Scenario `crossed-ring-search-1986` in `scenarios3.test.ts`. The notes on parity rows `crossed-ring-1927-08` and `-11` are updated (their verdicts are unchanged).
 
 **Behaviour change for a student:** in 3-D, «דלתון ABCD» then «מרובע ABDC» draws a dart; «מרובע ABCD» then «מרובע ABDC» draws a concave quadrilateral; «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» draws a genuine trapezoid with k > 4. None of them is drawn crossed and green any more.
+
+---
+
+## ADR-3D-419 — A free-standing given circle in R³: everything unstated is a free DOF, and later givens pin it (#253)
+
+**Status:** accepted · 2026-11-05 · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-28 · **Design:** [04b](04b-design-3d.md) "A free-standing given circle". **Stage:** the free-object resolution ([LADDER](LADDER.md)): a sibling of the free plane's and free line's, inside `circleGeom3`.
+
+**Context.** Prod, 2026-07-09: «נתון מעגל שמרכזו O.» was `not-understood`, and re-measured at 20cfa5de it still was, in every spelling, with or without a radius or a plane. The LLM lane could not rescue it: its answer must re-parse, and the grammar had no free form to lower to. `Circle3Def` had no free kind, and no rule emitted `center-plane-radius`. A circle in R³ is planar, so without a plane it cannot be drawn determinately.
+
+**Ruling.** Operator, 2026-07-27 (option A), restated 2026-08-13: *"A bare `נתון מעגל שמרכזו O` builds immediately: centre = the existing O or a created free point, radius free unless stated, plane orientation free (2 sampled DOF, seeded horizontal so the default drawing reads naturally). Later inputs pin it — on-circle memberships, an explicit plane (`המעגל במישור π1` / a named face), tangency, a radius given."* Asking before drawing was rejected: bagrut questions open with the bare circle and state the plane later, so a gate would refuse the textbook's own input order (ADR-104), and unstated means free, not blocked (ADR-052).
+
+**Class.** A given circle with an unstated magnitude had no representation, so it was unbuildable rather than free. The capability added: a circle whose plane and radius are free DOFs, pinned by the accumulated givens.
+
+**Decision.**
+1. **`Circle3Def { kind: 'free'; center; plane?; radius? }`**, resolved by `resolveFreeCircle` (`engine/freeCircle.ts`), the `resolveFreePlane` shape as ADR-3D-124 asked: pins are honoured exactly, the rest is sampled, and the reported `dof` comes from the reading that did the pinning. The orientation constraints go through the free plane's own `unitNormalsFor`. The DOF cue sums `circles3[].freeDof`.
+2. **Default drawing.** Seed 0 is horizontal. A later seed samples the normal away from edge-on (|n_z| ≥ 0.5), where a circle would draw as a line segment. With one placed point the seed-0 drawing is the one closest to horizontal.
+3. **M1 for a circle.** A size or plane stated about an existing circle is a given on it. «מעגל O ברדיוס 5» on an existing free O merges; `circle-given` carries the letterless references («המעגל במישור π1», «רדיוס המעגל הוא 5»). A stated plane also puts the centre on it through the existing `on-planes` lane, so a free plane's member rule applies unchanged.
+4. **A placed point on the circle** is recorded in `circleMembers3` and pins: the radius when nothing stated did, and `n ⟂ chord`, as a free plane's member chord. Two determine the circle. Further members stay with the store's `not-on-circle` check, the arbiter. A rider reads the members through `pointParents3`, so one created before the pinning point still lands on the pinned circle.
+5. **A length from the centre to a rider IS the radius** (docs/17 §2.2, the semantic predicate `radiusLengthCircle3`). It is lowered at apply and keeps its claim for the label and the verdict. As a pivot drive it moved the free centre behind the rider and refused a true figure `not-on-circle`. The order-swapped form drops the earlier `length` pin when the point becomes a rider.
+6. **Tangency stated on a free circle** replaces its definition with the tangent form, whose plane and radius are derived. What the free circle already held stays stated, as a `distance-rel` and a `plane-rel contained` claim, so a contradicting radius is refused and never dropped.
+7. **The rule reads the sentence to its end.** A clause it does not read («בקוטר 6», «ברדיוס 2/3») leaves a remainder, so it declines and the line goes on to the model as before.
+
+**Rejected.** A hidden `π` for each circle, reusing `resolveFreePlane` directly: ADR-3D-350 keeps a circle's plane out of the student's planes map, and that resolver's offset and relation machinery is not a circle's. Raising the radius as a pivot carrier: nothing needs it, since every radius given in the ruling is read directly.
+
+**Measured for 2-D (the reference, ADR-W-118 B1) at 20cfa5de.** «מעגל O ברדיוס 5» draws the circle at that size with `measures: []`: no number on the canvas. 3-D draws the same. **Known gap:** 3-D has no values row for a radius (2-D has `values.radius`), so a stated radius is shown by the circle's size and in the givens list only.
+
+**Not built here.** «מעגל ABC»: the sighting was added to #253 as demand evidence and no ruling covers it, so it stays `not-understood`. A bare letterless «מעגל» keeps its `cross-app` guidance. «D על המעגל» on a blank canvas stays #2611's stage B. A radius or plane stated on a determined circle is refused `circle-given-determined`; driving a polygon's size from its circle's radius is not ruled.
+
+**Sibling audit.** The class needs a plane to be free, so it is 3-D's alone. 2-D reads «מעגל O ברדיוס 5» (measured at 20cfa5de); analytic records «נתון מעגל שמרכזו O.», «מעגל O», «מעגל O ברדיוס 5», «מעגל שמרכזו O ורדיוסו 5» and "a circle with center O" (same commit). Complex has no such object.
+
+**Found, not fixed.** A capitalised English article reads as a point: «A circle O» is refused `dropped-given` naming «A», and «R=5» names «R». This is not new: «A sphere with center O» is refused the same way at 20cfa5de. It is the shared label gate's behaviour, so it is out of this PR's scope.
+
+**Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
+
+**Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.

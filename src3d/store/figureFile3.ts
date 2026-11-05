@@ -127,6 +127,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'perp-to-base': true,
   'plane-cut': true,
   'point-on-circle3': true,
+  'circle-given': true,
   'rect-complete': true,
   'quad-shape': true, // #587 (ADR-3D-152): a stated flat quad shape — `rect-complete`'s general form
   'shape-ref3': true, // #2235 (ADR-3D-351): an unnamed shape noun — the ring is picked at apply, so the file keeps the reference

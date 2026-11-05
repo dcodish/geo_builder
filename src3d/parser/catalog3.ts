@@ -354,6 +354,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'טרפז ישר-זווית ABCD', en: 'right trapezoid ABCD' },
   { category: 'solids', he: 'טרפז שווה שוקיים ABCD', en: 'isosceles trapezoid ABCD' },
   { category: 'solids', he: 'טרפז ABCD חסום במעגל', en: 'trapezoid ABCD inscribed in a circle' },
+  { category: 'solids', he: 'נתון מעגל שמרכזו O', en: 'a circle with center O' },
+  { category: 'solids', he: 'מעגל O ברדיוס 5', en: 'circle O with radius 5' },
+  { category: 'solids', he: 'מעגל O במישור π1', en: 'circle O in plane π1' },
   { category: 'points', he: 'D על המעגל', en: 'D is on the circle' },
   { category: 'points', he: 'T על הקטע SC כך ש-TABCD היא פירמידה ישרה', en: 'T on SC such that TABCD is a right pyramid' },
   // --- drawing ---

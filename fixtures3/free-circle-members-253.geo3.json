@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T06:25:03.798Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "O(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "O",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "A(2,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 2,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B(0,2,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 0,
+          "y": 2,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "מעגל שמרכזו O",
+      "cmds": [
+        {
+          "type": "circle3",
+          "id": "circle-O",
+          "def": {
+            "kind": "free",
+            "center": "O"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "A על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "A",
+          "circle": ""
+        }
+      ]
+    },
+    {
+      "utterance": "B על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "B",
+          "circle": ""
+        }
+      ]
+    }
+  ]
+}

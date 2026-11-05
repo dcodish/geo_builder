@@ -933,7 +933,10 @@ export type Circle3Def =
   // face. Neither carries a `center` point id: the centre is DERIVED, and inventing a label for it
   // would assert a name the student never gave (the V6 unnamed-centre rule).
   | { kind: 'circum'; ring: Id[] }
-  | { kind: 'incircle'; ring: Id[] };
+  | { kind: 'incircle'; ring: Id[] }
+  // #253 (ADR-3D-419): a GIVEN circle whose unstated plane and radius are free DOFs (`resolveFreeCircle`). `plane` and
+  // `radius` are present only when stated; later givens merge into them (M1).
+  | { kind: 'free'; center: Id; plane?: string; radius?: number };
 
 /**
  * #2125 (ADR-3D-342) — the id of an UNNAMED circle of a ring, keyed by (kind, ring). The circle through the
@@ -1222,6 +1225,9 @@ export type Command3 =
   // V8-i: `A נמצאת על המעגל` — verify a point lies on a circle in R³ (checked in the store vs the resolved circle)
   /** `name`: the letter the student named the circle by («המעגל O», #2611) — what a refusal shows; `circle` is its id. */
   | { type: 'point-on-circle3'; point: Id; circle: string; name?: Id }
+  // #253 (ADR-3D-419): a size or plane stated about an existing circle: «המעגל במישור π1», «רדיוס המעגל O הוא 5».
+  // `circle` is the id in `circles3`, '' for the single circle, as on `point-on-circle3`.
+  | { type: 'circle-given'; circle: string; name?: Id; plane?: string; radius?: number }
   | FootOnLineCommand
   | Line3Command
   | LinePerpPlaneCommand
@@ -1542,6 +1548,8 @@ export interface Construction3 {
   revolutions: RevolutionObj[];
   /** V8-i — circles in R³ (centre + plane + radius), resolved from final positions/lines. */
   circles3: Circle3Obj[];
+  /** #253 (ADR-3D-419): the PLACED points stated on a free circle. Each pins it; a rider is defined by it instead. */
+  circleMembers3: { point: Id; circle: string }[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
   vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
   /**
@@ -1724,6 +1732,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   relPlanes: new Map(),
   revolutions: [],
   circles3: [],
+  circleMembers3: [],
   vecDefs: [],
   symbolPins: [],
   claims: [],
@@ -2057,6 +2066,10 @@ export type EngineError3 =
   // none) or neither (no circle at all). `centre`: a circle the student can name by its centre, for the next step (with the stated `point`).
   | { code: 'unknown-circle'; name?: Id; several?: true; centre?: Id; point?: Id }
   | { code: 'not-on-circle'; id: Id } // a stated on-circle membership does not hold
+  // #253 (ADR-3D-419): a size or plane stated about a circle. `conflict`: a free circle already holds a different one.
+  // `determined`: the figure already fixes it, so it cannot be set.
+  | { code: 'circle-given-conflict'; name: Id; what: 'radius' | 'plane' }
+  | { code: 'circle-given-determined'; name?: Id; what: 'radius' | 'plane' }
   // #769 (ADR-3D-183): a DERIVED point (a crossing, a foot, a midpoint…) lands on a point the figure
   // already names — the geometry the student asked for is right, the NAME is not: it is `with`.
   | { code: 'point-coincides'; id: Id; with: Id }
