@@ -95,7 +95,7 @@ function plainRowNode3(text: string): React.ReactElement {
  * reading it never made, on the row that should teach the student what to fix.
  *
  * The gate, as for the other two callers, is the CALLER's: the fact row asks `isVectorFact3` (the parsed
- * commands), the preview asks `isVectorMarked3` (what was typed), and the echo asks the QUESTION's own
+ * commands), the preview asks the dry-run parse and `isVectorMarked3` (what was typed), and the echo asks the QUESTION's own
  * parse — `QueryResult.echo`, which is `'vector'` iff `parseQuery` bound an operand as a vector (`|AB|`,
  * `AB·CD`, `∠(AB,CD)`, a bare `BB'`), and `'plain'` for a length by word, a distance, a plane, or a
  * question not understood. Otherwise the plain branch is exactly the fact row's.
@@ -119,10 +119,12 @@ export function askEchoNode3(text: string, echo: QueryEcho3, vecNames: Set<strin
  *
  * Two things differ from the row, both necessarily:
  *
- *   THE PREDICATE. A preview runs on text that has not been parsed, so there is no fact to ask
- *   `isVectorFact3` about; the gate is `isVectorMarked3` — what the student explicitly wrote. The
- *   gate is still the CALLER's job either way: `VecMath`'s `PAIR` regex matches a bare `AB` with no
- *   mark required, so handing it an unmarked line would arrow «אורך AB = 5» — the honesty case.
+ *   THE PREDICATE. A preview runs on a line that is not a fact yet, and `render` must not import the
+ *   parser, so the CALLER asks: `readAsVector` is the dry-run parse through the row's own registry
+ *   (`app/previewReading3.ts`, #1549, so «BA=(-3,4,5)» previews what its card shows), and a line that
+ *   does not parse yet still has `isVectorMarked3`, what the student explicitly wrote. The gate is the
+ *   caller's job either way: `VecMath`'s `PAIR` regex matches a bare `AB` with no mark required, so
+ *   handing it an ungated line would arrow «אורך AB = 5» — the honesty case.
  *
  *   THE ISOLATION. The vector branch passes text that has NOT been isolated, per this file's opening
  *   note: `VecMath`'s tokenizer would otherwise read LRI/PDI as `op` tokens (measured — «וקטור AB = 5»
@@ -132,7 +134,7 @@ export function askEchoNode3(text: string, echo: QueryEcho3, vecNames: Set<strin
  * `null` when nothing changes, so the box grows no empty second row — but that test is now about the
  * RENDERING rather than the string; see the note on the vector branch below.
  */
-export function inputPreviewNode3(text: string, vecNames: Set<string>): React.ReactElement | null {
+export function inputPreviewNode3(text: string, vecNames: Set<string>, readAsVector = false): React.ReactElement | null {
   // #1152 — a line carrying an equation is typeset, and this stays FIRST (see #1313, which owns the
   // divergence that leaves: the step row puts the VECTOR branch first, and a line that is both is
   // rendered lossily by either renderer. Ordering is left exactly as each surface already had it.)
@@ -152,7 +154,7 @@ export function inputPreviewNode3(text: string, vecNames: Set<string>): React.Re
    * preview exactly when `VecMath` will build structure, and otherwise fall through to the plain
    * branch, whose null rule is still right because there preview and box really are the same text.
    */
-  if (isVectorMarked3(text)) {
+  if (readAsVector || isVectorMarked3(text)) {
     const shown = vectorNotation(text, vecNames);
     if (typesetsAsVector(shown, vecNames)) return <VecMath text={shown} vecNames={vecNames} />;
   }

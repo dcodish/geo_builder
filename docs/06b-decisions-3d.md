@@ -14640,3 +14640,33 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
+
+## ADR-3D-425 — A line the tool reads as a vector is shown as one, from a total registry over the command kinds (#1549)
+
+**Status:** accepted · 2026-11-05 · bug (P2) · round #2722 · branch `fix/1549-vector-math-input` off `main` @ 28dac0c3 · operator rulings 2026-09-29 on #1549
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-4a · **Design:** [04b](04b-design-3d.md) "The input preview composes", where the row gate is a registry and the preview reads the dry-run parse
+
+**Class.** A **display gate** that decides "is this a vector statement?" from a **hand-written list of kinds** silently renders every later vector kind as prose. Instance: on a cube with `B(0,7,8)`, the operator's «BA→=(-3,4,5)» previewed with the arrow and committed as flat text with his raw `→`, and «BA=(-3,4,5)» showed no arrow on either surface.
+
+**Context — re-measured at 28dac0c3.** Both reported rows are as the issue says: `inject-pair`, status ok, A at (−3, 11, 13), and a plain card. **The data-panel arm of ruling 2 is already delivered:** #2077 (ADR-3D-368) added `pairPins` to `statedVectorRows`, so «BA⃗ = (-3, 4, 5)» is listed today. This ADR adds only the lock. #1313, which the plan treated as a live neighbour, is parked.
+
+**Root cause.** `render/notation.ts`'s `VEC_CMD_TYPES` was a hand-written `Set` from ADR-3D-013, and `factDisplay3` held a second inline copy of the predicate. `inject-pair` and every later vector kind were never added, and nothing made a new kind answer the question. The preview was gated on the typed text alone.
+
+**Decision.**
+1. **`VECTOR_READING_3: Record<Command3['type'], 'vector' | 'plain'>`**, with `CLAIM_VECTOR_READING_3` over `Claim3['type']`, both total (the `COMMAND_SAVEABLE` shape, #288). A new kind does not compile until it answers. `isVectorFact3` reads them and `factDisplay3` calls `isVectorFact3`.
+2. **Read as vectors, added:** `inject-pair`, `mag-val`, `mag-rel` (the plan), `dot-eq-chain` (the plan's dot kinds, ruling 1), and `vec-mag`, `draw-arrow`, `declare-vector`, which the plan left under "everything else". Ruling 1 covers them: *"every other spelling that lowers to a vector command"*. `AB→` was the reported defect exactly: a `draw-arrow` row printing a raw arrow.
+3. **The preview asks the parse (ruling 1).** `app/previewReading3.ts` `previewReadsVector3(construction, raw)` runs `parse3` through the registry, and `App3` passes the answer to `inputPreviewNode3`, because `render` must not import the parser. `isVectorMarked3` stays for a marked line that does not parse yet, so a half-typed `DC→=` keeps its strip.
+
+**Not delivered: `cos-angle` reads `'plain'`, pending a ruling.** Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
+
+**Limits of "the card and the strip agree".**
+- An unmarked two-reading equation («DC=3AB» over existing points) stays unarrowed in the strip, as today. Its card follows the fold's verdict (ADR-3D-391 Am. 1), and trying both readings per keystroke is a fold on every key.
+- A line carrying a fraction or a root takes the strip's math branch first («AB=(1/2,1,0)»): #1313's parked divergence, unchanged.
+- A name the line itself introduces («u=(1,2,3)») is not yet in the strip's declared names, so it is underlined on the card only.
+
+**Sibling audit.** 2-D has no vector notation by design (#1184), and analytic and complex have no `VecMath`, so the class is 3-D's alone. The query-side twin is `vectorAtoms` (ADR-3D-301).
+
+**Locks.** `src3d/__tests__/issue-1549-vector-row-kind.test.tsx`, on rendered markup through the real `submit` and the same preview call `App3` makes: his exact sequence in both spellings, card ≡ strip per spelling, the kinds, the segment guard, the stated-vector row. Fixture `fixtures3/vector-pair-row-1549.geo3.json` (his sequence).
+
+**Behaviour change for a student:** a vector given as «BA=(-3,4,5)», with or without an arrow, now shows an arrow over BA on its row, and the strip under the box shows it while typing. The same holds for a vector magnitude, a dot-product chain, a bare «AB→» and «חץ A'C». A length, and a perpendicularity between segments, stays plain.
