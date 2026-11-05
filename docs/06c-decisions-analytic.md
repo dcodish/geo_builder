@@ -15326,26 +15326,29 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 
 **Locks.** New `src-analytic/__tests__/arc-length-refusal-2032.test.ts`: the reported line, 31 spellings on a sector, a named circle and an equation circle, both locales, the taught line records, degree controls, the radian sums, a question. Parity rows `arc-bare-pi-2032`, `arc-bare-pi-no-arc-2032` and `arc-length-172` carry #2710 on analytic's cell.
 
-**Behaviour change for a student:** in analytic, «קשת AB = 4π» no longer draws a tiny arc. It is refused with a sentence that says arcs are read in degrees. «אורך הקשת AB הוא 4π» gets the same sentence, where it used to get "not understood".
+**Judged ruling q10 (ADR-789).** A length unit on one arc says length, so «קשת AB = 4 ס"מ» takes this refusal too. It is read in `parseLine` before `unwrap` strips the unit, through the shared `shell/arcLengthUnit`.
 
-## ADR-AG-409 — A letter after its coordinates is taught as «A(3,5)»; the `=` form and the bare tuple are not built (#1774)
+**Behaviour change for a student:** in analytic, «קשת AB = 4π» no longer draws a tiny arc, and «קשת AB = 4 ס"מ» no longer draws a 4° one. Each is refused with a sentence that says arcs are read in degrees. «אורך הקשת AB הוא 4π» gets the same sentence, where it used to get "not understood".
+
+## ADR-AG-409 — «(3,5)A» and «A = (3,5)» are taught as «A(3,5)», and the definite «הישר» binds the drawn line (#1774)
 
 **Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/1774-bare-coordinate-point` (stacked on `fix/2032-arc-length-refusal`) · prod session `0c3paux9`, 2026-10-04: «y=3x+2» · «(3,5)» · «(3,5)A».
-**Requirements:** [02c](02c-requirements-analytic.md) R8 · **Design:** none (internal)
+**Requirements:** [02c](02c-requirements-analytic.md) R8, R246 · **Design:** none (internal)
 **Applies** [ADR-W-030](06w-decisions-workspace.md#adr-w-030) to a new slip.
 
-**Measured (`3ce5f8f9`, `decideSubmit`, after «y=3x+2»).** The issue's table still holds: «A(3,5)», «הנקודה (3,5)», «נתונה הנקודה (3,5)» record; «(3,5)», «(3,5)A», «A = (3,5)», «B:(3,5)» are `not-handled`. Of #1587, folded in here: «הנקודה P(1,3) נמצאת על הישר AB» and «הנקודה (1,3) על הישר AB» now record. «הנקודה (1,5) על הישר» does not, because «P על הישר» does not either: the bare definite line is read by no rule. That is not a coordinate gap, and nothing is changed for it here.
+**Measured (`3ce5f8f9`, `decideSubmit`, after «y=3x+2»).** The issue's table still holds: «A(3,5)», «הנקודה (3,5)», «נתונה הנקודה (3,5)» record; «(3,5)», «(3,5)A», «A = (3,5)», «B:(3,5)» are `not-handled`. Of #1587, folded in here: «הנקודה P(1,3) נמצאת על הישר AB» and «הנקודה (1,3) על הישר AB» now record. «הנקודה (1,5) על הישר» did not, because «P על הישר» did not either: no rule read the bare definite line.
 
 **The class.** A point stated with its letter on the wrong side of its coordinates reached the model, a paid call that fails on a keyless server, for a line whose meaning the tool can read.
 
 **Decision.** `app/pointOrder.ts` rewrites a whole line of `(x,y)L` runs, and the not-handled branch of the submit decision teaches the result (`kind: 'teach'`, `note: 'point-order'`): the canonical goes in the box and one Enter records it, the same contract as an imperative wrapper, including that what is taught is a line the next Enter accepts here. The parser reads no new spelling, so «(3,5)A» never enters a fact list. The operator's words on ADR-W-030: *"I don't want the tool to support the wrong text input because it teaches them wrong."* The sentence is new text (ADR-W-174): «שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.»
 
-**Two arms of the plan are not built.**
-- **`L = (x,y)`.** The plan lowers it as `L(x,y)`. The operator ruled the opposite on #1245, 2026-09-19: *"analytics should not accept E=()"*, and accepted that a student gets not-handled here. The arming of 2026-10-05 was a batch approval that never named this. docs/17 §9: a plan that reverses a ruling escalates that arm. `issue-1251-llm-fallback.test.ts` locks the same ruling on the model's examples.
-- **The bare tuple `(x,y)`.** The plan accepts it as «הנקודה (x,y)». No ruling or quote covers accepting it, and ADR-W-030 points the other way, so its verdict waits for the operator (Rule 7). The lock records today's `not-handled`.
+**Judged rulings of round #2722, which replace this ADR's first landing (`b754d9d5`).**
+- **`L = (x,y)` (q8).** The plan lowered it as `L(x,y)`, which reverses the operator's ruling on #1245, 2026-09-19: *"analytics should not accept E=()"*. So `=` never builds. It is taught through the same path, with its own note: «נקודה נכתבת בלי סימן שוויון». `app/pointOrder.ts` reads both shapes (`pointSpelling`). Other separators («B:(3,5)») are not decided and stay not understood.
+- **The definite «הישר» (q11).** ADR-W-175: *"a definite noun binds the drawn object of its kind."* The measurement here had found no rule reading it. It uses the existing `on-kind` seam, with `line` added as a kind noun, so no new mechanism: one line binds, two ask with `errHost`'s question, and a coordinate point reads through it too («הנקודה (1,5) על הישר»). No line stays `not-handled` at the apply boundary, and a side is not a line object, so a side alone does too: both are unruled and keep today's verdict.
+- **The bare tuple `(x,y)` (q7).** Not built. It goes to the operator, and the lock records today's `not-handled`.
 
 **Sibling audit (docs/17 §1).** 2-D: the class does not apply, since every coordinate point is refused to the analytic Builder; «(3,5)A» itself escalates rather than reaching that refusal. 3-D: measured, «(1,2,3)A» is `not-handled` and «A(1,2,3)» builds. Not changed: the teaching is analytic's item, and no ruling asks it of 3-D. Complex: has no named coordinate pairs.
 
-**Locks.** New `src-analytic/__tests__/point-order-1774.test.ts`: the reported line, 11 spellings each taught and each recording, both locales, lines that are not taught, the `=` and bare rows, the neighbours. Parity row `ex-coordinate-letter-after-1774`.
+**Locks.** New `src-analytic/__tests__/point-order-1774.test.ts`: the reported line, both taught shapes spelling by spelling, each recording, both locales, lines that are not taught, the bare row, the neighbours, and «הישר» with one, two and no lines. Parity rows `ex-coordinate-letter-after-1774`, `ex-coordinate-equals-1774`.
 
-**Behaviour change for a student:** «(3,5)A» no longer says "not understood". The box fills with «A(3,5)» and a note says the letter comes first; Enter draws it.
+**Behaviour change for a student:** «(3,5)A» and «A = (3,5)» no longer say "not understood". The box fills with «A(3,5)» and a note says why; Enter draws it. «P על הישר» on a figure with one line puts P on it; with two lines the tool asks which.

@@ -32,7 +32,7 @@ import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
-import { pointOrderCanonical } from './pointOrder';
+import { pointSpelling } from './pointOrder';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
 import { isPointName, splitPointNames } from '../engine/pointName';
@@ -117,7 +117,7 @@ export type SubmitVerdict =
    * tool would reject.
    */
   /** `note` picks the teaching line; with none, the imperative wrapper's, which names `verb`. */
-  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' }
+  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' }
   /**
    * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
    * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
@@ -392,13 +392,13 @@ function decideOnce(
       const capital = capitalSizeRetry(line, figureLabelsOf(current));
       if (capital) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capital } };
       /**
-       * #1774 (ADR-AG-409) — A LETTER AFTER ITS COORDINATES, «(3,5)A»: right-to-left typing, taught as «A(3,5)» (ADR-W-030).
-       * As for a wrapper, what is taught is a line the next Enter accepts here, or the line stays as it was.
+       * #1774 (ADR-AG-409) — «(3,5)A» AND «A = (3,5)»: never accepted, each taught as «A(3,5)» (ADR-W-030). As for a
+       * wrapper, what is taught is a line the next Enter accepts here, or the line stays as it was.
        */
-      const flipped = pointOrderCanonical(line);
-      if (flipped !== null) {
-        const next = decideSubmit(flipped, lines, seed, current).kind;
-        if (next === 'record' || next === 'already-known') return { kind: 'teach', verb: '', canonical: flipped, note: 'point-order' };
+      const spelling = pointSpelling(line);
+      if (spelling) {
+        const next = decideSubmit(spelling.canonical, lines, seed, current).kind;
+        if (next === 'record' || next === 'already-known') return { kind: 'teach', verb: '', ...spelling };
       }
     }
     /**

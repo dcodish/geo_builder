@@ -65,6 +65,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { readArcUnitValue } from '../../shell/arcLengthUnit';
 import { foldIndexedName } from '../../shell/indexedName';
 import { arcRunRoles } from '../../shell/arcRun';
 import { POINT_NAME, splitPointNames } from '../engine/pointName';
@@ -7155,10 +7156,10 @@ const COMPONENT_EN = new RegExp(
  * the exam never uses is a phrase the student has never seen (ADR-AG-005 D8).
  */
 const ON_KIND_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה)|(מעגל))$`
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה|ישר)|(מעגל))$`
 );
 const ON_KIND_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse)|a\\s+(circle))$`
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse|line)|a\\s+(circle))$`
 ,  'i',
 );
 
@@ -7167,9 +7168,11 @@ const KIND_NOUNS: Record<string, CurveKind> = {
   מעגל: 'circle',
   פרבולה: 'parabola',
   אליפסה: 'ellipse',
+  ישר: 'line',
   circle: 'circle',
   parabola: 'parabola',
   ellipse: 'ellipse',
+  line: 'line',
 };
 
 const ON_AXIS_HE = new RegExp(
@@ -9046,6 +9049,10 @@ export function parseLine(raw: string): ParseResult {
   // the complex builder's notation only. π as a number («AB = π», «מעגל שהיקפו 6π») is not an angle and still reads.
   const radian = findRadianAngle(line);
   if (radian) return { ok: false, code: 'radian-angle', detail: radian.value };
+  // ADR-789 (#2032): a length unit on an arc says it is the arc's LENGTH, read here before `unwrap` strips the unit, after
+  // which «קשת AB = 4 ס"מ» is 4 degrees. The same refusal as «אורך הקשת AB הוא 4» until #2710 (ADR-AG-408).
+  const arcUnit = readArcUnitValue(line);
+  if (arcUnit) return { ok: false, code: 'arc-length-unread', detail: arcUnit.a + arcUnit.b };
   // #1919: the shared input-script rule, called where the proof target is — before every rule and before
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);

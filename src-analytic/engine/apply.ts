@@ -4015,6 +4015,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const bound = applyFact(created.next, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: TOUCHED_CIRCLE_ID }, src: f.src });
         return bound.ok ? { ...bound, effect: 'created' } : bound;
       }
+      // «הישר» with no line drawn: the definite noun's creation is not ruled here while a free line is unbuilt (#2226), so
+      // the line stays not understood (ADR-AG-409).
+      if (matches.length === 0 && f.kind === 'line') return { ok: false, error: { code: 'not-handled', detail: f.src } };
       if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }

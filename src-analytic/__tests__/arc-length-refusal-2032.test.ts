@@ -35,12 +35,13 @@ describe('#2032 — analytic refuses an arc length, never degrees', () => {
     'הקשת AB = 4π', '⌢AB = 4π', '⏜AB = 4π', '⌢{AB} = 4π', 'arc AB = 4π', 'arc AB is 4π', 'arc AB equals 4π',
     'הקשת AB היא 4π', 'הקשת AB היא π', 'קשת AB שווה ל-4π', 'קשת AB = 4π במעגל O', 'קשת AB במעגל O = 4π', '2 קשת AB = 4π',
   ];
+  const UNITS = ['קשת AB = 4 ס"מ', 'קשת AB = 4 ס״מ', 'קשת AB = 4 סנטימטרים', 'arc AB = 4 cm', 'הקשת AB היא 4 ס"מ', 'קשת AB = 4 יחידות', 'קשת AB = 4 ס"מ במעגל O']; // judged q10, ADR-789
   const SPELLED = [
     'אורך הקשת AB הוא 4π', 'אורך הקשת AB = 4π', 'אורך קשת AB = 4π', 'אורך הקשת = 4π', 'arc length AB = 4π',
     'arc length AB is 4π', 'the length of the arc AB is 4π', 'אורך הקשת AB הוא 5', 'אורך הקשת AB = L',
     'אורך הקשת AB הוא רבע מהיקף המעגל',
   ];
-  it.each([...BARE, ...SPELLED])('«%s» on a sector, a named circle and an equation circle', (line) => {
+  it.each([...BARE, ...UNITS, ...SPELLED])('«%s» on a sector, a named circle and an equation circle', (line) => {
     for (const ctx of [SECTOR, CIRCLE, EQUATION]) expect([ctx[0], keyOf(submit(line, ctx))]).toEqual([ctx[0], 'arc-length-unread']);
   });
 
@@ -58,7 +59,7 @@ describe('#2032 — analytic refuses an arc length, never degrees', () => {
   });
 
   it('an arc in degrees is unchanged', () => {
-    for (const line of ['קשת AB = 40', 'קשת AB = 40°', 'קשת AB = 40 במעגל O', 'הקשת AB היא 40 מעלות', 'arc AB = 40', 'קשת AB = 200']) {
+    for (const line of ['קשת AB = 40', 'קשת AB = 40°', 'קשת AB = 40 במעגל O', 'הקשת AB היא 40 מעלות', 'arc AB = 40', 'קשת AB = 200', 'קשת AB = 2/3', 'קשת AB = 40 מעלות']) {
       expect([line, submit(line, SECTOR).kind]).toEqual([line, 'record']);
     }
   });
@@ -69,6 +70,7 @@ describe('#2032 — analytic refuses an arc length, never degrees', () => {
       expect([line, keyOf(submit(line, four))]).toEqual([line, 'radian-angle']);
     }
     expect(submit('קשת AB + קשת CD = 180', four).kind).toBe('record');
+    expect(submit('קשת AB + קשת CD = 4 ס"מ', four).kind).toBe('record'); // a unit on a sum is not ruled (ADR-789): today's degrees
     expect(submit('קשת AB = 2 קשת CD', four).kind).toBe('record');
   });
 

@@ -80,6 +80,10 @@ export function teachCanonical(utterance: string, cmds: AnyCommand[], locale: Lo
   if (!text) return null;
   const meaningful = cmds.filter((c) => c.type !== 'segment');
   // the angle family: a phrasing that never names the angle (`A = 40`) is the non-canonical case
-  if (meaningful[0]?.type === 'set-angle' && !NAMES_ANGLE.test(utterance)) return text;
+  if (meaningful[0]?.type === 'set-angle' && !NAMES_ANGLE.test(utterance)) {
+    // «קשת AB = 2/3» (ADR-789): a value with no short decimal has no sentence to teach, so no hint rather than 0.6666666666666666
+    const v = meaningful[0].value;
+    return Math.abs(v * 1e6 - Math.round(v * 1e6)) < 1e-6 ? text : null;
+  }
   return null;
 }

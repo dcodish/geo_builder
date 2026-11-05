@@ -1880,6 +1880,26 @@
       ],
       "at": "2026-11-05T10:14:56.720Z",
       "status": "escalated"
+    },
+    {
+      "id": "round-2722-arc-unit-words",
+      "kind": "text",
+      "issue": "#2032",
+      "what": "the length-unit words that make an arc's value its length (ADR-789, judged q10)",
+      "choice": "ס\"מ, ס״מ, סמ', סנטימטר(ים), מ\"מ, מילימטר(ים), מטר(ים), יחידה, יחידות (אורך), יח', cm, mm, unit(s), centimeter(s), millimeter(s), meter(s), with the -metre spellings. The one-letter מ' and m stay out: 4m is a coefficient.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
+      "status": "pending"
+    },
+    {
+      "id": "round-2722-point-equals-note",
+      "kind": "text",
+      "issue": "#1774",
+      "what": "the note on «A = (3,5)» when it is taught (judged q8)",
+      "choice": "נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
+      "status": "pending"
     }
   ],
   "demoted": {
