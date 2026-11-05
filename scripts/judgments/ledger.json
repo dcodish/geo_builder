@@ -1880,6 +1880,26 @@
       ],
       "at": "2026-11-05T10:14:56.720Z",
       "status": "escalated"
+    },
+    {
+      "id": "chose-2611-unnamed-circle-notice",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "the created notice for a circle with no centre letter («D על המעגל» on an empty canvas), since «נוצר מעגל חדש שמרכזו X» has no X to name",
+      "choice": "נוצר מעגל חדש — אם זו טעות הקלדה, לחצו ✕ לביטול השורה",
+      "chosen": true,
+      "at": "2026-11-05T15:45:16.431Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2611-unnamed-circle-conflict",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "a radius or plane contradicting the one a circle with no letter already holds",
+      "choice": "למעגל כבר נתון רדיוס אחר — בדקו את הנתונים / המעגל כבר נמצא במישור אחר — בדקו את הנתונים",
+      "chosen": true,
+      "at": "2026-11-05T15:45:16.431Z",
+      "status": "pending"
     }
   ],
   "demoted": {

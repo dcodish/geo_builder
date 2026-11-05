@@ -119,6 +119,8 @@
     "notOnCircle": "«{{id}}» is not on the circle — check the givens",
     "circleRadiusConflict": "Circle {{name}} already has a different radius. Check the givens",
     "circlePlaneConflict": "Circle {{name}} already lies in a different plane. Check the givens",
+    "circleRadiusConflictUnnamed": "The circle already has a different radius — check the givens",
+    "circlePlaneConflictUnnamed": "The circle already lies in a different plane — check the givens",
     "circleRadiusDetermined": "This circle's radius comes from the figure, so it cannot be set separately. Check the givens",
     "circlePlaneDetermined": "This circle's plane comes from the figure, so it cannot be set separately. Check the givens",
     "unknownCircle": "Circle {{name}} is not defined yet. Define it first, by its centre and what it is tangent to, then type the line again.",

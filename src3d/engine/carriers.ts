@@ -160,6 +160,8 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
       return carrierPts(c.circles3.find((k) => k.id === def.circle)?.def).concat(
         c.circleMembers3.filter((m) => m.circle === def.circle).map((m) => m.point),
       );
+    case 'circle-centre3':
+      return c.circleMembers3.filter((m) => m.circle === def.circle).map((m) => m.point);
     case 'vec-defined':
       return carrierPts(c.vecDefs[def.def]);
     case 'vec-pair':

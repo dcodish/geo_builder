@@ -47,7 +47,7 @@ import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } fro
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
-import { resolveFreeCircle } from './freeCircle';
+import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
@@ -3528,6 +3528,10 @@ function evaluateSolidsAndPoints(
         return sgn * mag;
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
+    } else if (def.kind === 'circle-centre3') {
+      // #2611 stage B (ADR-3D-420): the circle's members precede it (`pointParents3`), and it stands where they say
+      const k = c.circles3.find((x) => x.id === def.circle);
+      if (k?.def.kind === 'free') pos.set(id, placeUnnamedCentre3(c, k.id, k.def, seed, pos, null).center);
     } else if (def.kind === 'free3') {
       // #774 (ADR-3D-172): a mixed-run minted point — all three components are free sampled DOFs,
       // spread-scaled off the placed figure for general position (the `partial` pattern with no
@@ -3955,7 +3959,12 @@ function circleGeom3(
     e2 = cross3(normal, e1);
     return { id: k.id, center: solved.center, normal, radius: solved.radius, e1, e2 };
   }
-  const center = pos.get(k.def.center);
+  // #2611 stage B (ADR-3D-420): a free circle with no centre letter places its own centre from its pins
+  const statedPlane = k.def.kind === 'free' && k.def.plane !== undefined ? planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos) : undefined;
+  if (k.def.kind === 'free' && k.def.plane !== undefined && !statedPlane) return null;
+  const placesCentre = k.def.kind === 'free' && (k.def.center === undefined || c.points.get(k.def.center)?.kind === 'circle-centre3');
+  const unnamed = k.def.kind === 'free' && placesCentre ? placeUnnamedCentre3(c, k.id, k.def, seed, pos, statedPlane ?? null) : null;
+  const center = unnamed ? unnamed.center : pos.get(k.def.center as Id);
   if (!center) return null;
   if (k.def.kind === 'tangent-line') {
     const through = c.pointLines.get(k.def.line);
@@ -3971,14 +3980,12 @@ function circleGeom3(
     e2 = normalize3(sub3(ln.dir, scale3(e1, dot3(ln.dir, e1)))); // tangent dir, orthonormalised
     normal = normalize3(cross3(e1, e2));
   } else if (k.def.kind === 'free') {
-    // #253 (ADR-3D-419): a stated plane must resolve first; everything unstated is the resolution's to sample
-    const pl = k.def.plane === undefined ? undefined : planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
-    if (k.def.plane !== undefined && !pl) return null;
-    const r = resolveFreeCircle(c, k.id, k.def, center, seed, pos, pl?.n ?? null);
+    // #253 (ADR-3D-419): a stated plane must resolve first (above); everything unstated is the resolution's to sample
+    const r = resolveFreeCircle(c, k.id, k.def, center, seed, pos, unnamed?.normal ?? statedPlane?.n ?? null);
     const seedAxis = Math.abs(r.normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
     e1 = normalize3(cross3(r.normal, seedAxis));
     e2 = cross3(r.normal, e1);
-    return { id: k.id, center, normal: r.normal, radius: r.radius, e1, e2, freeDof: r.dof };
+    return { id: k.id, center, normal: r.normal, radius: r.radius, e1, e2, freeDof: r.dof + (unnamed?.dof ?? 0) };
   } else {
     const pl = planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
     if (!pl) return null;

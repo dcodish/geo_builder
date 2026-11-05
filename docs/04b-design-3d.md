@@ -487,6 +487,8 @@ existence of points the line did not name, and the mint pass's refold places poi
 
 ### The mint pass ([ADR-3D-382](06b-decisions-3d.md#adr-3d-382), #1467)
 
+**Circles** ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420), #2611): an `unknown-circle` that `mintableCircle3` accepts takes the #1566 solid lane: the row carries a `circle3` declaration (`MintedSolid3.circle`) applied at the row, so a centre an earlier row placed is read in list order. `Derived3.createdCircles` feeds the notice and such a row has no `created` entry. `«המעגל»` creates `{kind: 'free'}` under `UNNAMED_CIRCLE_ID3`, with no centre point at all: `placeUnnamedCentre3` places the centre from the seed and the circle's pins only, because the point pass and the circle pass read `pos` at different moments and a rider must lie on the circle both see. From the second placed member on, a `free3` centre letter no pin drives becomes `circle-centre3` and takes the same placement.
+
 `deriveCore3`, after the post-pass fixpoint and the stale-message refresh: each still-red row (list order) whose latest
 dry run (`dryRunOn`) reports `unknown-point` / `two-unknowns` on a `mintableId3` id has that id minted `free3`
 (`mintFree`) and is dry-run again until it applies — then applied, recorded in `created[factId]` (unless
@@ -669,7 +671,7 @@ undeclared name are untouched (`unknown-vector` as before).
 
 ### A free-standing given circle ([ADR-3D-419](06b-decisions-3d.md#adr-3d-419), #253)
 
-`Circle3Def { kind: 'free'; center; plane?; radius? }` is resolved inside `circleGeom3` by `resolveFreeCircle`
+`Circle3Def { kind: 'free'; center?; plane?; radius? }` is resolved inside `circleGeom3` by `resolveFreeCircle`
 (`engine/freeCircle.ts`), the `resolveFreePlane` shape: pins are read from the recorded construction, the rest is
 sampled, and the returned `dof` feeds `freeDofCount3` through `circles3[].freeDof`.
 

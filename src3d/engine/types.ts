@@ -935,8 +935,13 @@ export type Circle3Def =
   | { kind: 'circum'; ring: Id[] }
   | { kind: 'incircle'; ring: Id[] }
   // #253 (ADR-3D-419): a GIVEN circle whose unstated plane and radius are free DOFs (`resolveFreeCircle`). `plane` and
-  // `radius` are present only when stated; later givens merge into them (M1).
-  | { kind: 'free'; center: Id; plane?: string; radius?: number };
+  // `radius` are present only when stated; later givens merge into them (M1). #2611 stage B (ADR-3D-420): `center` is
+  // absent on a circle the mint pass created for «המעגל»: its centre is a free DOF with no letter, never an invented
+  // one (the V6 unnamed-centre rule; 2-D's FR-RN-8), placed by `placeUnnamedCentre3`.
+  | { kind: 'free'; center?: Id; plane?: string; radius?: number };
+
+/** #2611 stage B (ADR-3D-420): the id of the circle «המעגל» creates on a figure with none. One can exist: a second is only ever named. */
+export const UNNAMED_CIRCLE_ID3: Id = 'circle-free';
 
 /**
  * #2125 (ADR-3D-342) — the id of an UNNAMED circle of a ring, keyed by (kind, ring). The circle through the
@@ -1370,6 +1375,10 @@ export type PointDef =
   // #2611 (ADR-3D-410): a free point riding a circle (1 sampled DOF, the angle in the circle's own frame) — the on-line
   // rider's circle twin: «D על המעגל» places a new D on the circle. `circle` is the circle's id in `circles3`.
   | { kind: 'on-circle3'; circle: string }
+  // #2611 stage B (ADR-3D-420): the lettered, otherwise free centre of a free circle that placed points stated on it have
+  // taken over (`placeUnnamedCentre3`): two points at different distances from a sampled centre are both on the circle
+  // once the centre stands where they say.
+  | { kind: 'circle-centre3'; circle: Id }
   // ADR-3D-032: `M(k,1,3)` — typed coordinates carrying the figure's SINGLE symbolic
   // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
   // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
@@ -2068,7 +2077,7 @@ export type EngineError3 =
   | { code: 'not-on-circle'; id: Id } // a stated on-circle membership does not hold
   // #253 (ADR-3D-419): a size or plane stated about a circle. `conflict`: a free circle already holds a different one.
   // `determined`: the figure already fixes it, so it cannot be set.
-  | { code: 'circle-given-conflict'; name: Id; what: 'radius' | 'plane' }
+  | { code: 'circle-given-conflict'; name?: Id; what: 'radius' | 'plane' }
   | { code: 'circle-given-determined'; name?: Id; what: 'radius' | 'plane' }
   // #769 (ADR-3D-183): a DERIVED point (a crossing, a foot, a midpoint…) lands on a point the figure
   // already names — the geometry the student asked for is right, the NAME is not: it is `with`.

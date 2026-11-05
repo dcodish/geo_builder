@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T15:30:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "D על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "D",
+          "circle": ""
+        }
+      ]
+    }
+  ]
+}

@@ -507,6 +507,9 @@ const SEEDED: SeededCorpus = {
   // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
   // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
   'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2611 stage B (ADR-3D-420) — a blank canvas: the circle the line refers to is created (before: refused `unknown-circle`).
+  // The class, the notice and the refusals are asserted in circle-created-by-reference-2611.test.ts.
+  'point-on-circle-blank-2611.geo3.json': ['D על המעגל'],
   // #2681 (ADR-3D-413) — a plane named by four letters inside a relation, on a blank canvas: its letters are created in
   // one plane (before: built green in general position). The class and the refusals are asserted in plane-run-relation-2681.test.ts.
   'plane-run-parallel-blank-2681.geo3.json': ['המישור ABCD מקביל למישור EFGH'],

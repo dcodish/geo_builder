@@ -58,7 +58,7 @@ import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { Banner } from '../shell/frame/Banner';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
-import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
+import { CREATED_NOTICE_KEYS, createdNoticeTextOf } from '../shell/session/createdPoints';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
@@ -877,7 +877,7 @@ export default function App3() {
           {/* #1467 (ADR-W-162): shown while its line is still the last row — any later row, ✕, undo or edit retires it */}
           {lastCreated && !lastError && !busy && facts[facts.length - 1]?.id === lastCreated.factId && (
             <CreatedNotice
-              text={t(createdNoticeText(lastCreated.ids).key, createdNoticeText(lastCreated.ids).params)}
+              text={t(createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).key, createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).params)}
               undoLabel={t(CREATED_NOTICE_KEYS.undo)}
               onUndo={() => {
                 logDebug3({ kind: 'action', action: 'delete', detail: lastCreated.factId });

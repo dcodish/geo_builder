@@ -1898,6 +1898,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'indexed-name-polygon-2075', family: 'polygons', steps: ['משולש A_1B_1C_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }] },
   { id: 'indexed-name-multidigit-2075', family: 'points-incidence', steps: ['נקודה X12'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic refused a two-digit index before ADR-AG-398; 3-D does not read «נקודה X12» (not-handled, measured), though «X12(1,2,3)» records' },
   // ── #2286 (ADR-AG-397, ruled 2026-11-03 «Refuse it, naming the line, in every builder»): two numbers with only a space between them ──
+  { id: 'blank-point-on-circle-2611', family: 'circles', steps: ['D על המעגל'], expect: 'builds', note: 'the circle the line refers to is created (#2048 ruling A, ADR-3D-420)' },
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
@@ -1910,11 +1911,10 @@ export const UNCOVERED_CATALOG: Readonly<Record<Product, readonly string[]>> = {
   analytic: ['O מרכז המעגל I'],
   '3d': [
     'BE/ED = 1:3', // 3-D builds it on its solid; no plane context makes the row type in every builder
-    'D על המעגל', // 3-D needs D to exist first; its catalog context is not a plane figure
     'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', // 2-D takes ~9 s to escalate it — too slow for a lock row
     '∠SDB', // a bare angle: 3-D draws it, 2-D refuses it as a question with no value — ruled 2026-10-04, owned by #1981
   ],
 };
 
 /** The ceiling of each allowlist. Raising one is a visible edit, which is the point. */
-export const UNCOVERED_CEILING: Readonly<Record<Product, number>> = { '2d': 0, analytic: 1, '3d': 4 };
+export const UNCOVERED_CEILING: Readonly<Record<Product, number>> = { '2d': 0, analytic: 1, '3d': 3 };
