@@ -541,7 +541,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A stated **point** keeps the letter the student wrote on a free axis — «A(1,t,2)» reads `A(1, t, 2)`, never
   `A(1, ?, 2)`, like analytic — and its value once the letter is known; asking «A» answers the same text, while
   a single coordinate («y של A») stays undetermined, since a letter is a name, not a value.
-  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077.
+  **The step list follows the same reading:** a line the tool reads as a vector shows vector notation on its row and
+  in the strip under the box, whether or not the student typed an arrow («BA=(-3,4,5)» shows `BA⃗ = (−3, 4, 5)`);
+  a length stays plain (operator, 2026-09-29: *"Display follows meaning: always arrows."*).
+  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077; [ADR-3D-425](06b-decisions-3d.md#adr-3d-425), #1549.
 
 ## Equations — the algebraic lane
 

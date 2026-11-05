@@ -45,6 +45,7 @@ import { escalate3 } from './parser/llm3';
 import { escalate3Flow } from './app/escalate3Flow';
 import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { decideDeterministic3 } from './app/decideDeterministic3';
+import { previewReadsVector3 } from './app/previewReading3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
@@ -799,7 +800,8 @@ export default function App3() {
              * bidi repair" and becomes "what you typed, typeset".
              */
             /**
-             * #1195 — and the VECTOR notation, for a line the student explicitly marked.
+             * #1195 — and the VECTOR notation, for a line the student marked or the parse reads as
+             * vectors (#1549: the card and the strip answer from one registry).
              *
              * #1312 — the whole three-way choice lives in `inputPreviewNode3`, beside the step row's
              * `FactRowText3`, and NOT as a ternary here. Writing it inline is what hid the defect:
@@ -812,7 +814,7 @@ export default function App3() {
              * second row. The direction stays on `textDir3` for BOTH box and preview (#868,
              * and #1314 owns the question that leaves).
              */
-            preview={(s) => inputPreviewNode3(s, new Set(vectorNames3(derived.construction)))}
+            preview={(s) => inputPreviewNode3(s, new Set(vectorNames3(derived.construction)), previewReadsVector3(derived.construction, s))}
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}
           />

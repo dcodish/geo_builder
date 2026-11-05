@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T20:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קוביה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": ["A", "B", "C", "D", "A'", "B'", "C'", "D'"]
+        }
+      ]
+    },
+    {
+      "utterance": "B(0,7,8)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 0,
+          "y": 7,
+          "z": 8
+        }
+      ]
+    },
+    {
+      "utterance": "BA→=(-3,4,5)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "B",
+          "b": "A",
+          "x": -3,
+          "y": 4,
+          "z": 5,
+          "srcs": ["-3", "4", "5"]
+        }
+      ]
+    }
+  ]
+}

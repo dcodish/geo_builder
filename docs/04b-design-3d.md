@@ -1319,12 +1319,13 @@ pair:
 | branch | gate | prepared how |
 | --- | --- | --- |
 | mathematics (#1152) | `hasMath` | isolated, then `MathText` |
-| vector (#1195) | `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
+| vector (#1195, #1549) | `previewReadsVector3` (the dry-run parse) or `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
 | plain | — | isolated, `null` when isolation changes nothing |
 
 **Every `VecMath` caller gates it, and the gate is the caller's** ([ADR-3D-301](06b-decisions-3d.md#adr-3d-301), #1543).
 `VecMath`'s `PAIR` regex arrows any two-label run, so each surface in `FactRow3.tsx` decides: the step row
-by its commands (`isVectorFact3`), the preview by the typed text (`isVectorMarked3`), the ask echo
+by its commands (`isVectorFact3`, a total registry over `Command3` and `Claim3`, ADR-3D-425), the preview by
+the dry-run parse through the same registry (`app/previewReading3.ts`), else the typed text (`isVectorMarked3`), the ask echo
 (`askEchoNode3`) by `QueryResult.echo` — `'vector'` iff `parseQuery` bound a vector atom (`|AB|`, `AB·CD`,
 `∠(AB,CD)`, bare `AB`), else `'plain'`.
 
@@ -1346,10 +1347,13 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 | surface | what it can ask | gate |
 | --- | --- | --- |
 | step row (`factDisplay3`) | the COMMANDS exist | `isVectorFact3` |
-| input preview (`inputPreviewNode3`) | only the RAW TEXT — no command yet | `isVectorMarked3` |
+| input preview (`inputPreviewNode3`) | the DRY-RUN PARSE, passed in by `App3` because `render` must not import the parser | `previewReadsVector3`, else `isVectorMarked3` on a line that does not parse yet |
 | `vectorNotation` itself | — | **none; it is unconditional** |
 
-`vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate.
+`vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate. A two-reading
+segment equation («DC=3AB» over existing points) is the one line a parse cannot answer: its card follows the fold's
+`readings` verdict (ADR-3D-391 Am. 1), so the preview leaves it unarrowed. `cos-angle` reads `'plain'` pending a
+ruling: «AB ⟂ AD» and right-angled shapes lower to it too (ADR-3D-425).
 
 ## Known gaps
 
