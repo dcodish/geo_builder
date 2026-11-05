@@ -6922,3 +6922,22 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 **Measured (2026-11-03, 32 closed rounds since 1 Oct).** 471 closed: 376 changes on main, 95 housekeeping. Round #2665: 2 on main, 15 housekeeping (13 parked, 2 already fixed). A refresh reads its timelines eight at a time: 1 min 48 s, where one at a time took 5 min 44 s.
 
 **Consequences.** The number the operator reads first is what a student can now see change, and the second is what his sitting will close. Parks still shrink the queue, on their own line. Not built: the roadmap page's "Fix rounds" panel shows the new row fields only when the page is next republished.
+
+## ADR-W-181 — A question is answered, and a question the tool cannot read is told what it can (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2, all four builders) · fix round #2722 · branch `fix/1454-ask-a-value`
+
+**Operator:** the /decisions pass of 2026-09-27: *"Approve all 38"*, which took this issue's arms 1–3, and *"Compute on ask"* for arm 4. External review, relayed the same day: *"Asking about a defined object ('w', 'A') should return its value, not «זהו נתון, לא שאלה». 'Not understood' should suggest valid phrasings, as 3D already does."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-DP-2, FR-DP-4 · **Design:** [04w](04w-design-shell.md) § the frame components (`AskLane`'s required `unreadableHint`)
+
+**Class.** A question typed in the ask lane is answered by a different rule in each builder: what counts as a question, what an unreadable one says, and what must happen before it gets an answer.
+
+**Decision.**
+1. **`AskLane` requires `unreadableHint`**, the product's own "not understood" text with its examples, the way `AppFrame` requires its privacy text. The answered rows are the product's (ADR-W-038), so the lane cannot print the text itself; a required prop is the seam at which a builder must have examples, and `ask-lane-parity.test.ts` (now all four builders) asserts the row prints the same key. In the lane it is the box's `aria-description`, which draws nothing.
+2. **The copy:** complex «לא זוהה — נסו |z1|, arg(z1), Re(w), r», analytic «לא זוהה — נסו A, AB, שטח ABC, שיפוע AB»; 2-D and 3-D already had theirs.
+3. **Per product:** complex reads a bare name in the lane as its value question ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087)); 2-D's ask computes its own answer ([ADR-788](06-decisions.md#adr-788)).
+
+**Sibling audit.** 3-D's bare name is a supported query and analytic has a point rule, so neither says «this is a given»; 2-D's bare letter is a symbol lookup and a point has no value there (no coordinates), so its row keeps «לא זוהה». Analytic carries only the copy, so it needs no ADR of its own.
+
+**Behaviour change for a student:** in complex and analytic a question the tool cannot read now names phrasings that work.

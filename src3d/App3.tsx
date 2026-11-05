@@ -1297,6 +1297,7 @@ export default function App3() {
                   dir="ltr"
                   placeholder={t('query.placeholder')}
                   addLabel={t('query.add')}
+                  unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
                     addQuery(text);
                   }}

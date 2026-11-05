@@ -211,7 +211,8 @@ src/
                constraintKey identity), apply (applyCommand reducer), evaluate (topological sweep + the
                driven solvers), step (applyStep/applyCoupledStep + the failure ladder, docs/LADDER.md),
                sample, verify (givens verifier), relations/detectShapes, inscribe/variants, solveBudget,
-               valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool)
+               valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool; an ask
+                            fills the store's `asks` layer, «חשב ערכים» fills `values`, ADR-788)
   parser/      parse.ts (bilingual grammar: ordered rules + post-pass chokepoints + honesty gates), catalog,
                context (buildParseCtx — the docs/17 §3b registry), scope, llm/llmShared (the LLM-fallback seam)
   app/         submitPipeline.ts (the text→command orchestration), decideDeterministic.ts (the whole pre-LLM

@@ -29,6 +29,15 @@ const APPS: { product: string; file: string }[] = [
   { product: '2-D', file: 'src/App.tsx' },
   { product: '3-D', file: 'src3d/App3.tsx' },
   { product: 'complex', file: 'src-complex/App.tsx' },
+  { product: 'analytic', file: 'src-analytic/App.tsx' },
+];
+
+/** #1454: the key each product's row prints when it cannot read a question, and that key's Hebrew text. */
+const UNREADABLE: { product: string; file: string; call: string; rowCall: string; locale: string; he: RegExp }[] = [
+  { product: '2-D', file: 'src/App.tsx', call: "t('values.q.not-understood')", rowCall: 't(`values.q.${qr.note ?? ', locale: 'src/i18n/locales/he.json', he: /"q.not-understood": "לא זוהה — נסו [^"]*∠ABC/ },
+  { product: '3-D', file: 'src3d/App3.tsx', call: "t('query.note.notUnderstood')", rowCall: 't(`query.note.${r.note}`', locale: 'src3d/i18n/locales/he.json', he: /"notUnderstood": "לא זוהה — נסו A, /  },
+  { product: 'complex', file: 'src-complex/App.tsx', call: "t('askUnreadable')", rowCall: "'askIsStatement' : 'askUnreadable'", locale: 'src-complex/i18n/index.ts', he: /askUnreadable: 'לא זוהה — נסו |z1|, arg(z1), Re(w), r'/ },
+  { product: 'analytic', file: 'src-analytic/App.tsx', call: "t('askUnreadable')", rowCall: "t('askUnreadable')}", locale: 'src-analytic/i18n/index.ts', he: /askUnreadable: 'לא זוהה — נסו A, AB, שטח ABC, שיפוע AB'/ },
 ];
 
 describe('#741 — one ask lane across the builders', () => {
@@ -65,11 +74,26 @@ describe('#741 — one ask lane across the builders', () => {
     ).toBe(true);
   });
 
-  it('2-D: asking is what PULLS the values compute (#217 economics, one step later)', () => {
+  it('2-D: asking computes the ANSWER, and only «חשב ערכים» computes the panel (#1454, ADR-788)', () => {
     const src = read('src/App.tsx');
     const lane = src.slice(src.indexOf('<AskLane'), src.indexOf('</AskLane>'));
-    expect(lane, 'the submit handler runs the compute when the layer is stale').toContain('viewValues()');
     expect(lane).toContain('addQuery(');
+    expect(lane, 'the full panel stays on its button').not.toContain('viewValues()');
+  });
+
+  describe('#1454 — no builder ships a "not understood" without example phrasings', () => {
+    for (const { product, file, call, rowCall, locale, he } of UNREADABLE) {
+      it(`${product} passes its examples to the lane, from the key its row prints`, () => {
+        const src = read(file);
+        expect(src, `${file} must pass unreadableHint`).toContain(`unreadableHint={${call}}`);
+        expect(src, `${file}'s row must print the same text`).toContain(rowCall);
+        expect(read(locale), `${locale} must carry the examples`).toMatch(he);
+      });
+    }
+
+    it('the prop is REQUIRED — a lane without it does not compile', () => {
+      expect(read('shell/frame/AskLane.tsx')).toContain('  unreadableHint: string;');
+    });
   });
 
   it('«חשב ערכים» survives as the SEPARATE trigger that volunteers the automatic rows', () => {

@@ -120,7 +120,7 @@ export function lowerAsks(asks: readonly string[], scope: ComplexScope = NO_SCOP
   const exprQueries: ExprQuery[] = [];
   const argQueries: ArgQuery[] = [];
   for (const raw of asks) {
-    const { ask: a } = parseAsk(raw, scope);
+    const { ask: a } = parseLaneAsk(raw, scope);
     if (!a) continue;
     queries.push(...a.queries);
     ratios.push(...a.ratios);
@@ -171,6 +171,32 @@ export function parseAsk(
   if (!framed.ok) return { parsed: plain.ok ? plain : framed, ask: null };
   const ask = askArtifacts(framed.line) ?? bareNameValue(framed.line);
   return ask ? { parsed: framed, ask } : { parsed: plain.ok ? plain : framed, ask: null };
+}
+
+/**
+ * #1454 — THE LANE'S READING of a line: {@link parseAsk}, plus the one thing the lane knows that the
+ * givens box does not. Typed as a given, a bare name («z2») declares a number; typed in the ask box,
+ * nothing can be declared, so it can only be asking about that number. It lowers to the value question
+ * («מהו w» reads the same), answered by stage 5d: the value when the givens force one, else the WHY.
+ * `readAsk` routes the GIVENS box and stays on `parseAsk`; a line that states («w = 3») is unchanged.
+ */
+export function parseLaneAsk(
+  raw: string,
+  scope: ComplexScope = NO_SCOPE,
+): { readonly parsed: ParseOutcome; readonly ask: AskArtifacts | null } {
+  const read = parseAsk(raw, scope);
+  if (read.ask || !read.parsed.ok) return read;
+  const bare = bareNameValue(read.parsed.line) ?? markedOriginValue(read.parsed.line);
+  return bare ? { parsed: read.parsed, ask: bare } : read;
+}
+
+/** «O» in the lane — the origin parses as an object (ADR-CX-085), and the number it names is 0. */
+function markedOriginValue(l: ParsedLine): AskArtifacts | null {
+  const said =
+    l.constraints.length + l.filters.length + l.assertions.length + l.measures.length +
+    l.sequences.length + l.roots.length + l.declares.length;
+  if (said > 0 || l.objects.length !== 1 || l.objects[0].kind !== 'origin') return null;
+  return { queries: [], ratios: [], exprQueries: [{ expr: { t: 'num', v: rat(0n) }, src: l.objects[0].src }], argQueries: [] };
 }
 
 /** A framed bare name («מהו w») — nothing stated, one name mentioned: the value question about it. */

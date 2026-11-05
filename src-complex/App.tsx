@@ -1152,6 +1152,7 @@ export function App() {
                   dir="auto"
                   placeholder={t('askPlaceholder')}
                   addLabel={t('askAdd')}
+                  unreadableHint={t('askUnreadable')}
                   onSubmit={(text) => submitQuery(text)}
                   palette={{
                     symbols: SYMBOLS,
