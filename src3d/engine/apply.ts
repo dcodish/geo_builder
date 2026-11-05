@@ -8,6 +8,7 @@ import { constantVec3, figureDefinedFreeVector3, figureRelationOf3, freeNamesIn3
 import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
+import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
@@ -173,6 +174,7 @@ function clone(c: Construction3): Construction3 {
     relPlanes: new Map(c.relPlanes),
     revolutions: [...c.revolutions],
     circles3: [...c.circles3],
+    circleMembers3: [...c.circleMembers3],
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
     claims: [...c.claims],
@@ -403,6 +405,32 @@ function resolveQuadRing(c: Construction3, face: Id[], errId: Id): { ok: true; f
 
 /** #2611: the points a circle of the figure is built from (its ring, its centre, its carrier line's or plane's points). */
 const circleParentIds3 = (c: Construction3, circle: string): Id[] => pointParents3(c, { kind: 'on-circle3', circle });
+
+/**
+ * #253 (ADR-3D-419) — M1 for a circle: a size or plane stated about an EXISTING circle is a given on it, never a
+ * re-creation. A free circle takes it. One already holding a different value refuses naming the statement, and a
+ * circle the figure determines (a polygon's, a tangent one) refuses, because its size is not free to set.
+ */
+function stateCircleGiven3(
+  c: Construction3,
+  k: Construction3['circles3'][number],
+  given: { plane?: string; radius?: number },
+  name?: Id,
+): ApplyResult3 {
+  const what = given.radius !== undefined ? 'radius' : 'plane';
+  if (k.def.kind !== 'free') return { ok: false, error: name !== undefined ? { code: 'circle-given-determined', name, what } : { code: 'circle-given-determined', what } };
+  const { center, plane } = k.def;
+  const held = heldRadius3(c, k.id, k.def);
+  if (given.radius !== undefined && held !== undefined && Math.abs(given.radius - held) > 1e-9)
+    return { ok: false, error: { code: 'circle-given-conflict', name: center, what: 'radius' } };
+  if (given.plane !== undefined && plane !== undefined && given.plane !== plane)
+    return { ok: false, error: { code: 'circle-given-conflict', name: center, what: 'plane' } };
+  const merged = { ...k.def, ...(given.plane !== undefined ? { plane: given.plane } : {}), ...(given.radius !== undefined ? { radius: given.radius } : {}) };
+  const next = clone(c);
+  next.circles3 = next.circles3.map((x) => (x.id === k.id ? { id: k.id, def: merged } : x));
+  if (given.plane === undefined || plane !== undefined) return { ok: true, next };
+  return applyCommand3Inner(next, { type: 'on-planes', id: center, plane: given.plane }); // the centre lies on the plane
+}
 
 /**
  * #2611 (ADR-3D-410) — THE POINT ORDER, PARENTS FIRST. The point pass evaluates in insertion order, so a point re-defined
@@ -2710,6 +2738,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // scalar-pin route below (byte-identical prism/pyramid behaviour, and the pivot honours
       // it through the same gauge scale); volume and area have no pin kind, so they take this
       // lane at any dim count.
+      // #253 (ADR-3D-419): a length from a free circle's centre to its rider IS the circle's radius. It pins the radius
+      // (`resolveFreeCircle`) and keeps its claim for the label and the verdict; as a pivot drive it would move the free
+      // centre behind the rider's back.
+      const radiusOf = cmd.claim.type === 'length-eq' ? c.circles3.find((k) => k.id === radiusLengthCircle3(c, (cmd.claim as { a: Id }).a, (cmd.claim as { b: Id }).b)) : undefined;
+      if (cmd.claim.type === 'length-eq' && radiusOf?.def.kind === 'free') {
+        const held = heldRadius3(c, radiusOf.id, radiusOf.def);
+        if (held !== undefined && Math.abs(held - cmd.claim.value) > 1e-9) return { ok: false, error: { code: 'circle-given-conflict', name: radiusOf.def.center, what: 'radius' } };
+        next.claims.push({ ...cmd.claim, given: true });
+        return { ok: true, next };
+      }
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
@@ -4083,7 +4121,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     // V8-i (G13): a circle in R³. `tangent-line`: centered at `center`, in the plane through the
     // centre & the line, tangent to it — the touch point is the ⟂ foot of the centre onto the line.
     case 'circle3': {
-      if (c.circles3.some((k) => k.id === cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const prior = c.circles3.find((k) => k.id === cmd.id);
+      if (prior && cmd.def.kind === 'free') return stateCircleGiven3(c, prior, { plane: cmd.def.plane, radius: cmd.def.radius }, cmd.def.center);
+      // #253: tangency stated on a free circle pins it: the plane, radius and touch point are the tangent form's
+      const freeTangent = prior?.def.kind === 'free' && cmd.def.kind === 'tangent-line' && prior.def.center === cmd.def.center ? prior.def : null;
+      if (prior && !freeTangent) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       if (cmd.def.kind === 'circum' || cmd.def.kind === 'incircle') {
         // #442: every ring vertex must exist — the circle is DERIVED from them (M1: the statement is
         // about the polygon the student already drew, never a re-creation of its vertices).
@@ -4094,6 +4136,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       } else if (cmd.def.kind === 'tangent-line') {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (!c.lines.has(cmd.def.line) && !c.pointLines.has(cmd.def.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.def.line } };
+      } else if (cmd.def.kind === 'free') {
+        if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
+        if (cmd.def.plane !== undefined && !c.planes.has(cmd.def.plane) && !c.pointPlanes.has(cmd.def.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.def.plane } };
       } else {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (!c.planes.has(cmd.def.plane) && !c.pointPlanes.has(cmd.def.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.def.plane } };
@@ -4106,7 +4151,15 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (noun) return { ok: false, error: noun };
       }
       const next = clone(c);
-      next.circles3.push({ id: cmd.id, def: cmd.def });
+      if (freeTangent) {
+        next.circles3 = next.circles3.map((k) => (k.id === cmd.id ? { id: cmd.id, def: cmd.def } : k));
+        // what the free circle already held is still stated: it stays a verified claim on the tangent form
+        const line: Operand3 = { kind: 'line', name: (cmd.def as { line: string }).line };
+        if (freeTangent.radius !== undefined) next.claims.push({ type: 'distance-rel', a: { kind: 'point', id: freeTangent.center }, b: line, value: freeTangent.radius });
+        if (freeTangent.plane !== undefined) next.claims.push({ type: 'plane-rel', rel: 'contained', a: line, b: { kind: 'plane-named', name: freeTangent.plane } });
+      } else next.circles3.push({ id: cmd.id, def: cmd.def });
+      if (cmd.def.kind === 'free' && cmd.def.plane !== undefined)
+        return applyCommand3Inner(next, { type: 'on-planes', id: cmd.def.center, plane: cmd.def.plane }); // the centre lies on the plane
       // #1792 — the BACKSTOP, total over every route (grammar rule or LLM line): a circle THROUGH a ring of
       // four or more is a claim that the ring is concyclic, and the figure must prove it. The circle's
       // centre is FITTED (`ringCircumcentre3`) and its radius read from vertex 0, so without this a
@@ -4155,9 +4208,28 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (c.points.get(cmd.point)?.kind === 'free3' && !builtFrom3(c, circleParentIds3(c, circle.id), cmd.point)) {
         const next = clone(c);
         next.points.set(cmd.point, { kind: 'on-circle3', circle: circle.id });
+        // #253: an earlier «OD = 4» drove two free points; as of this line it is the radius, whichever came first
+        next.scalarPins = next.scalarPins.filter((p) => !(p.kind === 'length' && radiusLengthCircle3(next, p.a, p.b)));
+        return { ok: true, next: parentsFirst3(next) };
+      }
+      // #253: a PLACED point on a free circle pins it (`resolveFreeCircle`), and the store's check is its arbiter
+      if (circle.def.kind === 'free' && circle.def.center !== cmd.point && !c.circleMembers3.some((m) => m.circle === circle.id && m.point === cmd.point)) {
+        const next = clone(c);
+        next.circleMembers3.push({ point: cmd.point, circle: circle.id });
         return { ok: true, next: parentsFirst3(next) };
       }
       return { ok: true, next: c };
+    }
+
+    // #253 (ADR-3D-419): «המעגל במישור π1», «רדיוס המעגל O הוא 5», resolved as a membership resolves its circle
+    case 'circle-given': {
+      if (cmd.circle !== '' && !c.circles3.some((k) => k.id === cmd.circle))
+        return { ok: false, error: cmd.name !== undefined ? { code: 'unknown-circle', name: cmd.name } : { code: 'unknown-circle' } };
+      if (cmd.circle === '' && c.circles3.length !== 1)
+        return { ok: false, error: c.circles3.length === 0 ? { code: 'unknown-circle' } : { code: 'unknown-circle', several: true } };
+      const k = cmd.circle === '' ? c.circles3[0] : c.circles3.find((x) => x.id === cmd.circle)!;
+      if (cmd.plane !== undefined && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      return stateCircleGiven3(c, k, { plane: cmd.plane, radius: cmd.radius }, cmd.name);
     }
 
     // V8-f (G6): cos of the angle between two operands. M1 (the ADR-3D-010 shape): on a

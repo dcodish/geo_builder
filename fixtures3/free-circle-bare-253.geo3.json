@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T06:25:03.779Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "נתון מעגל שמרכזו O.",
+      "cmds": [
+        {
+          "type": "circle3",
+          "id": "circle-O",
+          "def": {
+            "kind": "free",
+            "center": "O"
+          }
+        }
+      ]
+    }
+  ]
+}

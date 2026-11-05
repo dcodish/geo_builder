@@ -29,6 +29,11 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #253 (ADR-3D-419) — the exact prod line, then the textbook's order: the bare circle first, what pins it later. The
+  // geometry is asserted in free-circle-253.test.ts; this is the build + drift + load net.
+  'free-circle-bare-253.geo3.json': ['נתון מעגל שמרכזו O.'],
+  'free-circle-pinned-253.geo3.json': ['נתון מעגל שמרכזו O.', 'π1: z=1', 'המעגל במישור π1', 'רדיוס המעגל הוא 3', 'D על המעגל'],
+  'free-circle-members-253.geo3.json': ['O(0,0,0)', 'A(2,0,0)', 'B(0,2,0)', 'מעגל שמרכזו O', 'A על המעגל', 'B על המעגל'],
   // #2674 (ADR-3D-415) — the student's E takes the tool's M over (the 3-D half of the 2026-11-03 ruling). One point E, no
   // notice, the next unnamed midpoint M, asserted in issue-2674-tool-letter.test.ts; this is the build + drift + load net.
   'tool-letter-2674.geo3.json': ["קובייה ABCDA'B'C'D'", "אמצע BB'", "E אמצע BB'", "אמצע CC'"],

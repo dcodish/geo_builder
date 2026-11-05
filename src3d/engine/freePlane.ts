@@ -87,7 +87,7 @@ const orient = (n: Vec3): Vec3 => {
  *  - **exactly one** → a CONE about `û` at that cosine; its SPIN is a genuine free DOF, sampled.
  *  - **none** → no answer here; the caller keeps its own fully-sampled path.
  */
-function unitNormalsFor(cons: { u: Vec3; cos: number }[], seed: number, key: string): { ns: Vec3[]; sampled: number } {
+export function unitNormalsFor(cons: { u: Vec3; cos: number }[], seed: number, key: string): { ns: Vec3[]; sampled: number } {
   const indep: { u: Vec3; cos: number }[] = [];
   for (const cn of cons) {
     if (indep.every((w) => norm3(cross3(w.u, cn.u)) > 1e-6)) indep.push(cn);

@@ -47,6 +47,7 @@ import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } fro
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
+import { resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
 import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
@@ -509,7 +510,16 @@ export interface Resolved3 {
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
-  circles3: { id: string; center: Vec3; normal: Vec3; radius: number; e1: Vec3; e2: Vec3 }[];
+  circles3: {
+    id: string;
+    center: Vec3;
+    normal: Vec3;
+    radius: number;
+    e1: Vec3;
+    e2: Vec3;
+    /** #253: a free circle's remaining sampled DOFs, reported by its resolution (the ADR-3D-124 discipline). */
+    freeDof?: number;
+  }[];
   /** #487 (ADR-3D-124) — per FREE plane, how many of its 3 DOFs stayed SAMPLED this resolution. Derived
    *  by the same code that did the pinning, so the DOF cue can never disagree with the sampler. */
   freePlaneDofs: Map<string, number>;
@@ -1259,6 +1269,8 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
   for (const dof of resolved.freePlaneDofs.values()) freeT += dof;
   // #552: a FREE line's remaining sampled DOFs, same discipline.
   for (const dof of resolved.freeLineDofs.values()) freeT += dof;
+  // #253: a FREE circle's remaining sampled DOFs, same discipline.
+  for (const k of resolved.circles3) freeT += k.freeDof ?? 0;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = 0;
     // #325: a symbolic component (`B(2t,t,k)`) constrains like a numeric one, and each distinct
@@ -3139,7 +3151,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   // and every plane surface (patch, label, «מישורים» row, crossing offer) reads it (#2126, ADR-3D-350).
   const circles3: Resolved3['circles3'] = [];
   for (const k of c.circles3) {
-    const g = circleGeom3(c, k, pos, planes, lines);
+    const g = circleGeom3(c, k, seed, pos, planes, lines);
     if (g) circles3.push(g);
   }
   // #2611 (ADR-3D-410): an on-circle rider its circle could not yet resolve inside the point pass (a circle whose
@@ -3538,7 +3550,7 @@ function evaluateSolidsAndPoints(
       // #2611 (ADR-3D-410): the circle's own points precede the rider, so it resolves here; when its carrier line or
       // plane resolves only later the rider is seated after the circle pass instead
       const k = c.circles3.find((x) => x.id === def.circle);
-      const g = k && circleGeom3(c, k, pos, planes, lines);
+      const g = k && circleGeom3(c, k, seed, pos, planes, lines);
       if (g) seatOnCircleRider3(seed, pos, g, id, riderTOverride);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
@@ -3915,6 +3927,7 @@ function seatOnPlaneRider(
 function circleGeom3(
   c: Construction3,
   k: Construction3['circles3'][number],
+  seed: number,
   pos: Positions3,
   planes: Map<string, ResolvedPlane>,
   lines: Map<string, ResolvedLine>,
@@ -3957,6 +3970,15 @@ function circleGeom3(
     e1 = normalize3(radial);
     e2 = normalize3(sub3(ln.dir, scale3(e1, dot3(ln.dir, e1)))); // tangent dir, orthonormalised
     normal = normalize3(cross3(e1, e2));
+  } else if (k.def.kind === 'free') {
+    // #253 (ADR-3D-419): a stated plane must resolve first; everything unstated is the resolution's to sample
+    const pl = k.def.plane === undefined ? undefined : planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
+    if (k.def.plane !== undefined && !pl) return null;
+    const r = resolveFreeCircle(c, k.id, k.def, center, seed, pos, pl?.n ?? null);
+    const seedAxis = Math.abs(r.normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+    e1 = normalize3(cross3(r.normal, seedAxis));
+    e2 = cross3(r.normal, e1);
+    return { id: k.id, center, normal: r.normal, radius: r.radius, e1, e2, freeDof: r.dof };
   } else {
     const pl = planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
     if (!pl) return null;
@@ -4061,8 +4083,11 @@ function reresolveFreeObjects3(
     else if (def.kind === 'on-circle3') {
       // #2611: a rider of a circle carried by a free plane or a free line follows the re-resolved carrier
       const k = c.circles3.find((x) => x.id === def.circle);
-      const free = k && ((k.def.kind === 'center-plane-radius' && freePlane(k.def.plane)) || (k.def.kind === 'tangent-line' && isFreeLine3(c, k.def.line)));
-      const g = free ? circleGeom3(c, k, pos, planes, lines) : null;
+      const free =
+        k &&
+        (((k.def.kind === 'center-plane-radius' || k.def.kind === 'free') && k.def.plane !== undefined && freePlane(k.def.plane)) ||
+          (k.def.kind === 'tangent-line' && isFreeLine3(c, k.def.line)));
+      const g = free ? circleGeom3(c, k, seed, pos, planes, lines) : null;
       if (g) seatOnCircleRider3(seed, pos, g, id);
     } else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
       const from = pos.get(def.from);

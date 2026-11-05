@@ -2245,6 +2245,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "a circle with center O",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "נתון מעגל שמרכזו O",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "en",
+    "text": "circle O with radius 5",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O ברדיוס 5",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "en",
+    "text": "circle O in plane π1",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O במישור π1",
+    "winner": "givenCircle3",
+  },
+  {
+    "lang": "en",
     "text": "D is on the circle",
     "winner": "onCircle3",
   },

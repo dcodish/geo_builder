@@ -819,6 +819,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   own row, then the example. On a canvas that already holds a figure the click submits the example alone. The
   examples that still fail on an empty canvas are each owned by a named open issue, and their number only goes down.
   - Sources: ADR-3D-398; #1566, #2048 (card d6), the operator's ruling of 2026-10-30 (3A).
+- **FR-SP-28 (Must)** — **A given circle builds before its plane or radius is known** (#253,
+  [ADR-3D-419](06b-decisions-3d.md#adr-3d-419), operator 2026-07-27). «נתון מעגל שמרכזו O», «מעגל O», "a circle with
+  center O" draw a circle at once, around the existing O or a created one. Its radius and plane orientation are free
+  unless stated: the default drawing is horizontal, «הציגו תצורה אחרת» resamples them, and they are counted in the
+  freedom cue. «מעגל O ברדיוס 5» and «מעגל שמרכזו O במישור π1 ורדיוסו 5» state them in the sentence, in either order.
+  Later lines pin the same circle, in any order: «רדיוס המעגל הוא 5», «המעגל במישור π1», a placed point on it («A על
+  המעגל», two determine the circle), a length from the centre to a point on it («OD = 4» is the radius), and tangency
+  («מעגל O משיק לישר AB בנקודה T»). A second, different radius or plane is refused naming the circle, and a radius or
+  plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126).
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

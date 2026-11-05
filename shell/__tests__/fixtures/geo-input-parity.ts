@@ -1797,6 +1797,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
   // ── #2427 (ADR-AG-325): a capital letter as a size — analytic refuses it with the lowercase lesson; "only R" is analytic's ──
   { id: 'capital-radius-2427', family: 'circles', steps: ['נתון מעגל O שרדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'], note: 'the T38 line (#2414); 2-D reads K as its radius symbol' },
+  // #253 (ADR-3D-419): a given circle by its centre, stated bare or with its radius, reads in 3-D too
+  { id: 'given-circle-253', family: 'circles', steps: ['נתון מעגל שמרכזו O'], expect: 'builds' },
+  { id: 'given-circle-radius-253', family: 'circles', steps: ['מעגל O ברדיוס 5'], expect: 'builds' },
   { id: 'capital-radius-centre-2427', family: 'circles', steps: ['מעגל שמרכזו O ורדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'] },
   { id: 'capital-length-2427', family: 'lengths', steps: ['משולש ABC', 'AB = K'], expect: 'not-handled', exception: 'X11', note: '2-D and 3-D hand it to the model; analytic refuses it, teaching «AB = k» (#2427)' },
 

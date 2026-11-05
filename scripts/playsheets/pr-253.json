@@ -1,0 +1,167 @@
+{
+  "name": "pr-253",
+  "title": "PR #TBD — #253: a free-standing given circle in 3-D",
+  "cases": [
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T1",
+      "title": "The exact prod line draws a circle at once",
+      "lines": [
+        "נתון מעגל שמרכזו O."
+      ],
+      "lookFor": "Start with «נקה הכל». A flat, horizontal-looking circle appears around a new point O, and no plane patch is drawn.",
+      "before": "Prod answers «לא הבנתי» (or whatever the model guesses)."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T2",
+      "title": "«הציגו תצורה אחרת» tilts and resizes the circle",
+      "lines": [
+        "O(0,0,0)",
+        "מעגל O"
+      ],
+      "cycles": 4,
+      "expectConfigsDiffer": true,
+      "lookFor": "Start with «נקה הכל». Press «הציגו תצורה אחרת» a few times. The circle changes size and tilt, O does not move, and the circle never collapses into a line.",
+      "before": "Prod cannot draw this circle."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T3",
+      "title": "The textbook's order: the circle first, its plane and radius later",
+      "lines": [
+        "נתון מעגל שמרכזו O",
+        "π1: z=1",
+        "המעגל במישור π1",
+        "רדיוס המעגל הוא 3"
+      ],
+      "lookFor": "Start with «נקה הכל». Every line is accepted. After the last line the circle lies flat in the plane π1, with O on the plane, and it is visibly larger.",
+      "before": "Prod refuses the first line, so the rest has nothing to refer to."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T4",
+      "title": "Radius and plane in one sentence",
+      "lines": [
+        "π1: z=0",
+        "O(0,0,0)",
+        "מעגל שמרכזו O במישור π1 ורדיוסו 2"
+      ],
+      "cycles": 2,
+      "lookFor": "Start with «נקה הכל». The circle lies in π1. «הציגו תצורה אחרת» no longer changes it, because nothing is free.",
+      "before": "Prod does not read the sentence."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T5",
+      "title": "Two known points on the circle fix it",
+      "lines": [
+        "O(0,0,0)",
+        "A(2,0,0)",
+        "B(0,2,0)",
+        "מעגל שמרכזו O",
+        "A על המעגל",
+        "B על המעגל"
+      ],
+      "cycles": 2,
+      "lookFor": "Start with «נקה הכל». After the last line the circle passes through A and B, none of the three points moved, and «הציגו תצורה אחרת» no longer changes it.",
+      "before": "Prod refuses «מעגל שמרכזו O»."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T6",
+      "title": "A length to a point on the circle is its radius",
+      "lines": [
+        "מעגל O",
+        "D על המעגל",
+        "OD = 4"
+      ],
+      "expectFigure": [
+        "4"
+      ],
+      "lookFor": "Start with «נקה הכל». D stays on the circle and OD is labelled 4.",
+      "before": "Prod refuses «מעגל O»."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T7",
+      "title": "Tangency stated later takes over",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,0,0)",
+        "O(1,1,0)",
+        "מעגל O",
+        "מעגל O משיק לישר AB בנקודה T"
+      ],
+      "lookFor": "Start with «נקה הכל». The circle now touches line AB at a new point T.",
+      "before": "Prod refuses «מעגל O», and answers «already defined» for any second statement about a circle."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T8",
+      "title": "REFUSAL: a second radius",
+      "lines": [
+        "מעגל O ברדיוס 5",
+        "רדיוס המעגל הוא 3"
+      ],
+      "expectRefusal": "למעגל O כבר נתון רדיוס אחר — בדקו את הנתונים",
+      "lookFor": "Start with «נקה הכל». The second line is refused with «למעגל O כבר נתון רדיוס אחר — בדקו את הנתונים». The circle keeps radius 5.",
+      "before": "Prod refuses the first line."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T9",
+      "title": "REFUSAL: a radius on a circle the figure determines",
+      "lines": [
+        "משולש ABC חסום במעגל",
+        "רדיוס המעגל הוא 3"
+      ],
+      "expectRefusal": "הרדיוס של המעגל הזה נקבע מהשרטוט, ולכן אי אפשר לקבוע אותו בנפרד — בדקו את הנתונים",
+      "lookFor": "Start with «נקה הכל». The second line is refused with «הרדיוס של המעגל הזה נקבע מהשרטוט, ולכן אי אפשר לקבוע אותו בנפרד — בדקו את הנתונים».",
+      "before": "Prod does not read the second line."
+    },
+    {
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5174",
+      "path": "/3d.html",
+      "id": "T10",
+      "title": "Regression guard: the tangent form still builds",
+      "lines": [
+        "A(0,0,0)",
+        "B(2,0,0)",
+        "O(1,1,0)",
+        "מעגל שמרכזו O משיק לישר AB בנקודה T"
+      ],
+      "lookFor": "Start with «נקה הכל». Builds as on prod.",
+      "before": "unchanged"
+    }
+  ]
+}

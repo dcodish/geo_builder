@@ -156,7 +156,10 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
     case 'line-plane':
       return carrierPts(def.line).concat(carrierPts(def.plane));
     case 'on-circle3':
-      return carrierPts(c.circles3.find((k) => k.id === def.circle)?.def);
+      // #253: a free circle's radius and orientation read its placed members, so they precede its riders
+      return carrierPts(c.circles3.find((k) => k.id === def.circle)?.def).concat(
+        c.circleMembers3.filter((m) => m.circle === def.circle).map((m) => m.point),
+      );
     case 'vec-defined':
       return carrierPts(c.vecDefs[def.def]);
     case 'vec-pair':

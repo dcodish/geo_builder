@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T06:25:03.791Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "נתון מעגל שמרכזו O.",
+      "cmds": [
+        {
+          "type": "circle3",
+          "id": "circle-O",
+          "def": {
+            "kind": "free",
+            "center": "O"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "π1: z=1",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π1",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -1,
+              "p": 0
+            },
+            "src": "z=1"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "המעגל במישור π1",
+      "cmds": [
+        {
+          "type": "circle-given",
+          "circle": "",
+          "plane": "π1"
+        }
+      ]
+    },
+    {
+      "utterance": "רדיוס המעגל הוא 3",
+      "cmds": [
+        {
+          "type": "circle-given",
+          "circle": "",
+          "radius": 3
+        }
+      ]
+    },
+    {
+      "utterance": "D על המעגל",
+      "cmds": [
+        {
+          "type": "point-on-circle3",
+          "point": "D",
+          "circle": ""
+        }
+      ]
+    }
+  ]
+}
