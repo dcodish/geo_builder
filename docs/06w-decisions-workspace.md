@@ -6946,6 +6946,7 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 4. **`src-analytic/app/NarrowingNotes.tsx`** holds analytic's two note lists: they arrive after paint, so a server render of the App never reaches them, and a lock needs to render them.
 5. **Two letters on one dot takes the same face** (judged 2026-11-05, round #2722, q13, choice A). Measured at this branch: 2-D blue strip with ⓘ; analytic and complex amber with ⓘ; 3-D its blue box with ⓘ. All four now render `InfoNote`, so analytic and complex turn blue and 3-D takes the shared strip. The words are unchanged (`suite.notice.converge`).
 6. **3-D's `base-constrained` sentence moves to `NarrowingNote`** (judged 2026-11-05, round #2722, q14, choice A). Only the face changes: the sentence stays ADR-3D-090's and the shared kind lattice is untouched.
+   Its letters are the base ring (judged 2026-11-05, round #2722, q16, choice A, from the operator's 2026-10-13 ruling on #1996: the pyramid narrowing note names the base ring and never prints the apex). `notices.ts` passed the solid's ids, so it read «(ABCDS)»; it now passes `baseRingOf`, so it reads «(ABCD)». Nothing else reads this notice's ids.
 7. **`InfoNote`** (`shell/frame/Banner.tsx`) is the ⓘ strip itself. `NarrowingNote` is its name for the narrowing family, so a two-letters note is not called a narrowing note.
 
 **Sibling audit (docs/17 §1).** Complex has no shape nouns and no narrowing note. 3-D's other notices stay on their box. The two notes this audit first left out are items 5 and 6.

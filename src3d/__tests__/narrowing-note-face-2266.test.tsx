@@ -49,6 +49,7 @@ describe('#2266 — 3-D: the forced-narrowing note’s face', () => {
   it('the right pyramid over a plain «מרובע» takes the same face, its words unchanged (judged 2026-11-05, q14)', () => {
     const note = noteMarkup(page(['פירמידה ישרה SABCD שבסיסה מרובע']), 'base-constrained-note');
     expect(note).toContain('כדי שהפירמידה תהיה ישרה');
+    expect(stripFormatControls(note)).toContain('(ABCD)'); // the base ring, never the apex (judged 2026-11-05, q16)
     expect(noteFaceFaults(note, '3d')).toEqual([]);
   });
 
