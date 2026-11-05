@@ -5931,8 +5931,8 @@ const FROM_HE = `(?:ה?יוצא\\s+)?מ(?:ן\\s+|-\\s*)?(?:ה?(?:קודקוד|נ
  * «… פוגש את הצלע בנקודה M» · «… בנקודה H» · "… at H" — the foot NAMED after the fact (ADR-AG-211): the form a
  * renamed tool letter is written into, lowered exactly as the tool's own foot (a derived point, at M1). Last group.
  */
-const FOOT_TAIL_HE = `(?:\\s+(?:ש?(?:פוגש|חותך)\\s+(?:אותה|אותו|את\\s+ה?צלע))?\\s+ב(?:ה)?נקודה\\s+(${NAME}))?`;
-const FOOT_TAIL_EN = `(?:\\s+(?:(?:meets|cuts)\\s+(?:it|the\\s+side)\\s+)?at\\s+(?:the\\s+point\\s+)?(${NAME}))?`;
+const FOOT_TAIL_HE = `(?:\\s+(?:ש?(?:פוגש|חותך)\\s+(?:אותה|אותו|את\\s+ה?צלע)\\s+)?ב(?:ה)?נקודה\\s+(${NAME}))?`;
+const FOOT_TAIL_EN = `(?:\\s+(?:(?:meets|cuts)\\s+(?:it|the\\s+side)\\s+)?at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME}))?`;
 const FROM_APEX_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})(?:\\s+${ROLE_TARGET_HE})?${FOOT_TAIL_HE}$`);
 const FROM_APEX_EN = new RegExp(
   `^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})(?:\\s+${ROLE_TARGET_EN})?${FOOT_TAIL_EN}$`,
@@ -5942,12 +5942,24 @@ const FROM_APEX_EN = new RegExp(
 const TO_SIDE_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})${FOOT_TAIL_HE}$`);
 const TO_SIDE_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+(?:the\\s+)?(?:side\\s+)?(${NAME})(${NAME})${FOOT_TAIL_EN}$`, 'i');
 /**
- * «תיכון ליתר» · «הגובה ליתר AB» · "the median to the hypotenuse" (#1222, operator ruling 2026-10-02 on #1620): the side
- * is the hypotenuse — named («ליתר AB», which also STATES that it is, ADR-AG-200's claim), or the one the figure's
- * stated right angle faces (M1). Groups: role, side u, side v.
+ * «תיכון ליתר» · «הגובה ליתר AB» · «גובה ליתר מ-C» · "the median to the hypotenuse" (#1222; #2074, ADR-AG-411): the side
+ * is the hypotenuse — named («ליתר AB», which also STATES that it is, ADR-AG-200's claim), the one opposite a typed
+ * apex (which states the right angle there), or the one the figure's right triangle says (M1). Groups: role, side u,
+ * side v, apex, foot.
  */
-const TO_HYP_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_HE}$`);
-const TO_HYP_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+the\\s+hypotenuse(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_EN}$`, 'i');
+const TO_HYP_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר(?:\\s+(${NAME})(${NAME}))?(?:\\s+${FROM_HE}(${NAME}))?${FOOT_TAIL_HE}$`);
+const TO_HYP_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+the\\s+hypotenuse(?:\\s+(${NAME})(${NAME}))?(?:\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME}))?${FOOT_TAIL_EN}$`, 'i');
+/** «גובה מ-C ליתר» · "the median from C to the hypotenuse" (#2074): the apex before the noun. Groups: role, apex, foot. */
+const HYP_FROM_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})\\s+(?:ל|אל\\s+)-?\\s*ה?יתר${FOOT_TAIL_HE}$`);
+const HYP_FROM_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})\\s+to\\s+the\\s+hypotenuse${FOOT_TAIL_EN}$`, 'i');
+/** «חוצה זווית C בנקודה K» · "the bisector of angle C at K" (#2166, ADR-790): the foot typed after the bisector. Groups: the sentence, its angle, foot. */
+const BIS_FOOT_HE = new RegExp(`^(${HE_GIVEN}${BISECTOR_HE}\\s+((?:${NAME}){1,3}))\\s+ב(?:ה)?נקודה\\s+(${NAME})$`);
+const BIS_FOOT_EN = new RegExp(`^((?:the\\s+|an?\\s+)?(?:angle\\s+)?bisector\\s+of\\s+(?:the\\s+)?(?:angle\\s+)?((?:${NAME}){1,3}))\\s+at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`, 'i');
+/** «התיכון ליתר הוא CM» (#2074): the noun first. Groups: role, end, end. */
+const HYP_NOUN_FIRST_HE = new RegExp(`^${HE_GIVEN}ה${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר${HE_IS}\\s+(${NAME})(${NAME})$`);
+/** «CM תיכון ליתר» · "CM is the median to the hypotenuse" (#2074): the cevian's two letters typed. Groups: end, end, role. */
+const HYP_NAMED_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר$`);
+const HYP_NAMED_EN = new RegExp(`^${CEVIAN_LEAD_EN}(${NAME})(${NAME})\\s+${CEVIAN_SUBJECT_EN}(${CEVIAN_ROLE_EN})\\s+to\\s+the\\s+hypotenuse$`, 'i');
 /** «AD גובה» · «AD הוא התיכון» · "AD is the altitude" · "AD median" — the cevian named, its target not (#1240). */
 const NAMED_ONLY_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}$`);
 const NAMED_ONLY_EN = new RegExp(`^${CEVIAN_LEAD_EN}(${NAME})(${NAME})\\s+${CEVIAN_SUBJECT_EN}(${CEVIAN_ROLE_EN})$`, 'i');
@@ -6278,7 +6290,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     const [, roleSrc, apex, u0, v0, triRun, named] = fa;
     const role = roleOf(roleSrc);
     if (named === apex) return refuse('degenerate-role', line);
-    if (!u0 && !triRun) return made([{ t: 'cevian-of', role, apex, foot: named ?? footMint(role, apex), toolFoot: true, src: line }]);
+    if (!u0 && !triRun) return made([{ t: 'cevian-of', role, apex, foot: named ?? footMint(role, apex), toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
     const side = cevianSide(apex, u0, v0, triRun);
     if (typeof side === 'string') return refuse(side, line);
     const { u, v, ring } = side;
@@ -6286,7 +6298,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     const tri = ring ? namedShapeFacts('משולש', ring, line) : [];
     if (tri === 'bad-arity') return refuse('bad-arity', line);
     // A foot the sentence names may already be a point of the figure — M1 decides (derived when new, ADR-AG-211).
-    if (named) return made([...tri, { t: 'cevian-of', role, apex, side: [u, v], foot: named, toolFoot: true, src: line }]);
+    if (named) return made([...tri, { t: 'cevian-of', role, apex, side: [u, v], foot: named, toolFoot: true, typedFoot: true, src: line }]);
     // The key says what the foot IS — the side's midpoint, the perpendicular's foot — in the forms the midsegment
     // (ADR-AG-208) and the perpendicular (ADR-AG-207) key theirs, so one point reached two ways is one placeholder.
     const sorted = [u, v].sort();
@@ -6295,17 +6307,39 @@ function parseCevianFamily(line: string): RuleOutcome {
   }
   const hyp = TO_HYP_HE.exec(line) ?? TO_HYP_EN.exec(line);
   if (hyp) {
-    const [, roleSrc, u, v, named] = hyp;
+    const [, roleSrc, u, v, apex, named] = hyp;
     const role = roleOf(roleSrc);
     if (u && u === v) return refuse('repeated-vertex', line);
-    if (named && (named === u || named === v)) return refuse('degenerate-role', line);
-    const foot = named ?? footMint(role, u ? `hyp-${[u, v].sort().join('')}` : 'hyp');
+    if (named && (named === u || named === v || named === apex)) return refuse('degenerate-role', line);
+    if (apex && (apex === u || apex === v)) return refuse('degenerate-role', line);
+    const foot = named ?? footMint(role, u ? `hyp-${[u, v].sort().join('')}` : apex ? `hyp-${apex}` : 'hyp');
     // A named hypotenuse is a claim (ADR-AG-200's «היתר AB»: the right angle faces it), stated before the cevian.
     const claim = u ? claimFacts(nounRow('יתר'), u, v, line) ?? [] : [];
+    const from = apex ? { apex } : {};
     return made([
       ...claim,
-      u ? { t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line } : { t: 'cevian-of', role, hypotenuse: true, foot, toolFoot: true, src: line },
+      { t: 'cevian-of', role, ...from, ...(u ? { side: [u, v] as [Id, Id] } : { hypotenuse: true as const }), foot, toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line },
     ]);
+  }
+  const bf = BIS_FOOT_HE.exec(line) ?? BIS_FOOT_EN.exec(line);
+  if (bf) {
+    const letters = bf[2].match(new RegExp(NAME, 'g')) ?? [];
+    const vertex = letters.length === 3 ? letters[1] : letters.length === 1 ? letters[0] : null;
+    if (vertex && vertex !== bf[3]) return viaSentences(line, [`${vertex}${bf[3]} ${bf[1]}`]);
+  }
+  const hf = HYP_FROM_HE.exec(line) ?? HYP_FROM_EN.exec(line);
+  if (hf) {
+    const [, roleSrc, apex, named] = hf;
+    if (named === apex) return refuse('degenerate-role', line);
+    const role = roleOf(roleSrc);
+    return made([{ t: 'cevian-of', role, apex, hypotenuse: true, foot: named ?? footMint(role, `hyp-${apex}`), toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
+  }
+  const hnf = HYP_NOUN_FIRST_HE.exec(line);
+  const hn = hnf ? [hnf[0], hnf[2], hnf[3], hnf[1]] : HYP_NAMED_HE.exec(line) ?? HYP_NAMED_EN.exec(line);
+  if (hn) {
+    const [, apex, foot, roleSrc] = hn;
+    if (apex === foot) return refuse('degenerate-role', line);
+    return made([{ t: 'cevian-of', role: roleOf(roleSrc), apex, foot, hypotenuse: true, either: true, src: line }]);
   }
   const ts = TO_SIDE_HE.exec(line) ?? TO_SIDE_EN.exec(line);
   if (ts) {
@@ -6314,7 +6348,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     if (named === u || named === v) return refuse('degenerate-role', line);
     const role = roleOf(roleSrc);
     const foot = named ?? footMint(role, `-${[u, v].sort().join('')}`);
-    return made([{ t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line }]);
+    return made([{ t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
   }
 
   // ── the cevian named, its target not ──

@@ -437,7 +437,6 @@ const he = {
   errAmbiguousCevian:
     'הקודקוד או הצלע במשפט «{{detail}}» שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
     'אפשר לציין את הצלע או את המשולש, למשל «AD גובה לצלע BC» או «AD גובה במשולש ABC».',
-  // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
   errAmbiguousSide:
     'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: «{{detail}}». ' +
     'כתבו את הצלע עצמה, למשל «מלבן ABCD» ואחר כך «AB = 4», או את שתי המידות, למשל «מלבן ABCD במידות 4*6».',
@@ -450,9 +449,7 @@ const he = {
     '«משולש שווה שוקיים ABC» בשביל הבסיס), או ציינו את הצלע באותיות (למשל «תיכון לצלע AB»).',
   roleWordBase: 'בסיס',
   roleWordLeg: 'שוק',
-  errAmbiguousHypotenuse:
-    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: «{{detail}}». ' +
-    'כתבו איזו צלע היא היתר, למשל «תיכון ליתר AB», או איזו זווית ישרה, למשל «זווית C ישרה».',
+  roleWordHypotenuse: 'יתר',
   errCevianNoRightAngle:
     'במשפט «{{detail}}» אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
     'אפשר לציין קודם זווית ישרה, למשל «זווית C ישרה», או לכתוב את הצלע במפורש, למשל «תיכון לצלע AB».',
@@ -1043,9 +1040,7 @@ const en: typeof he = {
     '«isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
   roleWordBase: 'base',
   roleWordLeg: 'leg',
-  errAmbiguousHypotenuse:
-    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: «{{detail}}». ' +
-    'Name the hypotenuse — for example «the median to the hypotenuse AB» — or the right angle, for example «angle C is right».',
+  roleWordHypotenuse: 'hypotenuse',
   errCevianNoRightAngle:
     'In «{{detail}}» there is no right triangle in your figure, so there is no hypotenuse. ' +
     'State a right angle first, for example «angle C is right», or name the side outright, for example «the median to side AB».',

@@ -2271,3 +2271,6 @@ over all four (ADR-041).
 ### `perp-piece-keeps-relation-2232` — «משולש ABC» · «M על AB» · «MK אנך ל-AB»: the perpendicular at M (#2232, ADR-786)
 
 **Guards against:** the foot reading collapsing K onto M. **Asserts** K ≠ M and MK ⟂ AB.
+### `foot-letter-follows-the-seat-2166` — «תיכון ליתר בנקודה K»: the foot is named K and follows the right angle; «תיכון לצלע AB בנקודה K» names the midpoint (#2166, ADR-790)
+
+**Guards against:** a foot letter after a cevian noun read by no rule, so the line went to the model. **Asserts** no M is drawn, every view green over three presses, K equidistant from the three vertices at each, the right angle visiting every vertex, and K the midpoint of AB on the side form.

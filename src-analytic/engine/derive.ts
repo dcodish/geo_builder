@@ -69,7 +69,7 @@ export interface LineFault {
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
   /** For `ambiguous-role-side` (#2018, ADR-AG-298): the role the cevian named — the refusal words it. */
-  role?: 'base' | 'leg';
+  role?: 'base' | 'leg' | 'hypotenuse';
   /** For a bisector named by a polygon's side (#2115, ADR-AG-299): the angle's vertex and the host's kind (`pair` is the side). */
   vertex?: string;
   polygonKind?: string;

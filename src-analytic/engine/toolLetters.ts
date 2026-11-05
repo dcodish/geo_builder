@@ -108,6 +108,10 @@ const segId = (a: Id, b: Id): Id => `seg-${[a, b].sort().join('')}`;
 const polyId = (v: readonly Id[]): Id =>
   `poly-${[[...v], [...v].reverse()].flatMap((b) => b.map((_, i) => [...b.slice(i), ...b.slice(0, i)].join(''))).sort()[0]}`;
 
+/** The letter a role's point takes against the letters `taken` — for M1, when only the figure says a point is the tool's. */
+export const freeToolLetter = (role: ToolPointRole, taken: ReadonlySet<string>): string | undefined =>
+  [...TOOL_LETTERS[role], ...POOL].find((x) => !taken.has(x));
+
 export function resolveToolLetters(
   facts: readonly Fact[],
   owner: readonly number[],

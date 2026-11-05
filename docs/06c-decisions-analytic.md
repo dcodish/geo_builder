@@ -9546,7 +9546,7 @@ Controls:
 
 ## ADR-AG-211 — The tool's letters are 2-D's, through one role → letter table; the cevian's tool foot is derived; «תיכון ליתר» asks unless the right angle is stated (#1620 S6, #1222)
 
-**Status:** accepted · 2026-10-02 · **⚠ Amended by [ADR-AG-345](#adr-ag-345) (2026-10-28, operator ruling «B» of 2026-10-27 on #2583):** a perpendicular bisector's midpoint is no longer lettered or drawn — it is a helper until a line letters it; every other role keeps its letter. · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
+**Status:** accepted · 2026-10-02 · **⚠ Partly superseded by [ADR-AG-411](#adr-ag-411) (2026-11-05, #2074):** «תיכון ליתר» on an open right triangle no longer asks; it draws on the shown triangle. · **⚠ Amended by [ADR-AG-345](#adr-ag-345) (2026-10-28, operator ruling «B» of 2026-10-27 on #2583):** a perpendicular bisector's midpoint is no longer lettered or drawn — it is a helper until a line letters it; every other role keeps its letter. · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R103c (new); R103b's foot letters and its "not yet: «תיכון ליתר»" amended; the perpendicular-foot bullet (ADR-AG-207) amended: P₁ → H. · **Design:** [04c](04c-design-analytic.md) — new section "The tool's letters: one table, one resolver"; ADR-AG-209's "tool-named foot" paragraph superseded. · **LADDER stage:** the mint seam (`resolveToolLetters`, before `resolveMints`), M1 (`cevian-of` `toolFoot` / `hypotenuse`). No solver change.
 
@@ -15502,3 +15502,39 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` (the #2230 rhombus; M(3,4) is the test's point, the report does not give M's coordinates); catalog line «CD אנך לציר ה-x».
 
 **Behaviour change for a student:** «MK אנך לציר x» draws the foot named K, with no AI.
+## ADR-AG-411 — «תיכון ליתר» on a right triangle with no stated right angle draws on the shown triangle and follows the seat; a typed vertex states it (#2074)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, `analytic` + `2d`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-AG-211](#adr-ag-211) (the hypotenuse question) · **Extends** [ADR-AG-298](#adr-ag-298) to the hypotenuse · ports 2-D's [ADR-659](06-decisions.md#adr-659) and [ADR-790](06-decisions.md#adr-790) (#2166) · LADDER stage: none (M1 and the existing `resolvedAt` pass)
+**Requirements:** [02c](02c-requirements-analytic.md) R103c (rewritten) and R178 · **Design:** [04c](04c-design-analytic.md) "A cevian to a side named by its role", the hypotenuse paragraph
+
+**Rulings.** 2026-10-13: *"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show other option will create a different triangle with the constraints in place"*. 2026-10-14: *"Naming C («CM תיכון ליתר») or AB («תיכון ליתר AB») forces the seat"*; card `d14-2072-cross`: analytic follows 2-D.
+
+**Measured before** (`28dac0c3`, `decideSubmit`, as the 2026-10-14 plan measured it at `939b160a`; #2018 has landed). After «משולש ישר-זווית ABC»: «תיכון ליתר», «התיכון ליתר», «גובה ליתר» and "the median to the hypotenuse" asked `ambiguous-hypotenuse`; the typed-apex spellings and «… בנקודה K» were `not-handled`. Two right triangles, with both right angles stated, asked `ambiguous-hypotenuse`, whose text says no right angle was stated.
+
+**Class (docs/17 §1).** *A role statement about a right triangle whose right-angle vertex is an unstated, cyclable choice is refused instead of being bound to the current choice, and a typed letter that forces the choice is not read as the claim it is.* Members: median and altitude; the bare noun, the definite, English; a typed apex; a typed foot.
+
+**Root cause.** The `cevian-of { hypotenuse }` arm refused on `openRight`, and `RoleBinding` had no hypotenuse: the mechanism #2018 built for the isosceles apex was never offered the seat.
+
+**Decision.**
+1. `RoleBinding.role` gains `hypotenuse`; `roleVertexOf` reads it over `rightAngleKeys(ring)`, the noun's own keys, so `followObjects` rotates a bound cevian with no new pass.
+2. `applyHypotenuseCevian` owns the arm. One host: an open seat binds at choice seed 0's vertex through `boundCevian`, shared with `applyRoleCevian`; a stated right angle is the lettered twin, unbound.
+3. A typed apex states `rightAngleAt` and draws the lettered cevian, unbound. New readers: `… ליתר מ-C`, `גובה מ-C ליתר`, `CM תיכון ליתר`, «התיכון ליתר הוא CM» and the English forms. A segment typed foot-first is oriented by the ring; two ring letters, or none, ask.
+4. Several right triangles ask `ambiguous-role-side` with 2-D's sentence (`roleWordHypotenuse`). `ambiguous-hypotenuse` and `errAmbiguousHypotenuse` had no reader left and are deleted.
+5. `FOOT_TAIL_HE` required two whitespace runs, so the bare «… בנקודה K» that ADR-AG-211 documents never matched anywhere. Repaired at the constant, so «תיכון לצלע AB בנקודה K» and «גובה מ-A בנקודה H» read as that ADR says, the median judged (q17, choice C, 2026-11-05) and the altitude on #2166's armed `[2-D]` line. `FOOT_TAIL_EN` gains "at point K".
+6. A typed foot is `typedFoot`, so an existing point can never silently replace it: a tool's letter yields to it (#2674), a student's stays with the model. Before this it was dropped with «כבר ידוע».
+7. A vertex letter is the apex: «תיכון ליתר בנקודה C» as «CM תיכון ליתר», the foot the tool's. Judged q19, choice B, 2026-11-05; 2-D measured at `5f315584` (`set-angle` at C). The context-free parser cannot know the ring, so M1 picks the letter with `freeToolLetter`. Known cost: that letter is not announced on the row, unlike a parser-minted one.
+8. «חוצה זווית C בנקודה K» reads as «CK חוצה זווית C», 2-D's reading (#2166).
+
+**Deviation recorded.** The plan's reader list named the apex forms «CM …», «… מ-C» and English; «גובה מ-C ליתר», "the median from C to the hypotenuse" and «התיכון ליתר הוא CM» were added because 2-D reads them (measured) and the plan rules one verdict.
+
+**Not delivered (measured).** A stated length on an open seat («התיכון ליתר הוא 4») builds bound in 2-D and is `not-handled` here: the length would have to follow the moving median, a constraint binding analytic lacks, as for «תיכון לבסיס» (ADR-AG-298). Unscheduled parity cell `hypotenuse-median-length-open-2074`. A foot the figure already holds is `not-handled`, 2-D's verdict.
+
+**Measured after.** See the locks: at 24 seeds through `decideSubmit` + `derive`, M or H sits opposite the drawn right angle, all three seats appear, A, B, C do not move (≤1e-9), the constraints are unchanged.
+
+**Cost (docs/17 §7).** None new: one rotation per bound object per configuration, #2018's pass.
+
+**Sibling audit.** 2-D: ADR-659, ADR-787. 3-D reads no role nouns (#1679, parked). Complex has no plane hypotenuse. «משוואת היתר» (ADR-AG-266) shares the seat choice: locked in both orders.
+
+**Locks.** `src-analytic/__tests__/issue-2074-hypotenuse-open.test.ts`; fixture `issue-2074-hypotenuse-median-open.analytic.json`. Re-based: `issue-1620-tool-letters.test.ts`, `issue-2018-role-cevian.test.ts`, `message-floor-2028.test.ts`. Parity: the `#2074` gaps on `cat-2d-051`, `hypotenuse-altitude-open-2074`, `hypotenuse-apex-pins-2074` closed, and `#2074` left `GAP_ISSUES`.
+
+**Behaviour change for a student.** On «משולש ישר-זווית ABC», «תיכון ליתר» and «גובה ליתר» draw at once and follow the right angle through «הציגו תצורה אחרת». «CM תיכון ליתר» and «גובה ליתר מ-C» put the right angle at the typed vertex. With two right triangles the question is now 2-D's «אין בסרטוט צלע יחידה…».

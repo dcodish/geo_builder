@@ -6312,6 +6312,34 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
     },
   },
+  {
+    id: 'foot-letter-follows-the-seat-2166',
+    title: '#2166 (ADR-790): «תיכון ליתר בנקודה K» and «תיכון לצלע AB בנקודה K» name the foot K; on an open right triangle K follows the right angle',
+    guards:
+      'A foot letter after a cevian noun read by no rule, so a sentence the tool understood went to the model. Ruling 2026-10-15: *"«תיכון לצלע AB בנקודה K» (and «ליתר», «מ-C») draws the median with its foot named K, and cycles like the bare noun on an open right triangle"*.',
+    steps: ['משולש ישר-זווית ABC', 'תיכון ליתר בנקודה K'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.positions.has('M'), 'the tool letter is not drawn').toBe(false);
+      const facts = factsOf(['משולש ישר-זווית ABC', 'תיכון ליתר בנקודה K']);
+      const seats = new Set<string>();
+      for (const view of pressAll(facts, 3)) {
+        expect(Object.values(view.status).every((st) => st === 'ok'), 'every view is green').toBe(true);
+        const K = at(view, 'K');
+        const [a, b, c] = (['A', 'B', 'C'] as const).map((v) => dist(K, at(view, v)));
+        expect(Math.abs(a - b) + Math.abs(b - c), 'the midpoint of a hypotenuse is equidistant from the three vertices').toBeLessThan(1e-6);
+        const seat = (['A', 'B', 'C'] as const).find((v) => {
+          const [p, q] = (['A', 'B', 'C'] as const).filter((x) => x !== v).map((x) => at(view, x));
+          const o = at(view, v);
+          return Math.abs((p.x - o.x) * (q.x - o.x) + (p.y - o.y) * (q.y - o.y)) < 1e-6;
+        });
+        seats.add(seat ?? '?');
+      }
+      expect([...seats].sort(), 'the right angle visits every vertex').toEqual(['A', 'B', 'C']);
+      const side = replay(factsOf(['משולש ABC', 'תיכון לצלע AB בנקודה K']), 0);
+      expect(dist(at(side, 'K'), { x: (at(side, 'A').x + at(side, 'B').x) / 2, y: (at(side, 'A').y + at(side, 'B').y) / 2 })).toBeLessThan(1e-9);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
