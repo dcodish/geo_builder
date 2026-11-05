@@ -6271,6 +6271,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(O, P.center), 'O inside circle P').toBeLessThan(P.r);
     },
   },
+  {
+    id: 'tool-midpoint-reversed-takes-letter-2674',
+    title: '#2674: «משולש ABC» · «אמצע BC» · «D אמצע CB» shows one point D and no notice, as «D אמצע BC» does (ADR-785)',
+    guards:
+      '#2674, operator ruling 2026-11-04 (round #2697 questions page, card q3 = A: "Rename for the reversed spelling too"). Measured at 28dac0c3 through decideDeterministic2D: labels A B C D M, coincidences [[M, D]]. Root cause: definitionKey and commandConflict compared a definition by its operands spelling; both now read unspelled. Matrix: src/app/__tests__/issue-2674-reversed-spelling.test.ts.',
+    steps: ['משולש ABC', 'אמצע BC', 'D אמצע CB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.positions.has('M'), 'the tool letter M yielded to D').toBe(false);
+      expect(dist(at(fig, 'D'), { x: (at(fig, 'B').x + at(fig, 'C').x) / 2, y: (at(fig, 'B').y + at(fig, 'C').y) / 2 }), 'D is the midpoint').toBeLessThan(1e-9);
+      expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

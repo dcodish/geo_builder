@@ -20148,3 +20148,24 @@ No new student text. Every sentence is an existing ruled string.
 **Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. New: `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (four spellings → «A₁», «B₂»); analytic's half over the same sentences is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
 
 **Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».
+
+## ADR-785 — A definition is compared with its operands' spelling taken out: «D אמצע CB» takes the tool's M, as «D אמצע BC» does (#2674)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D + analytic) · round #2722 · branch `fix/2674-letter-takeover-reversed` · operator ruling 2026-11-04 (round #2697 questions page, card q3 = A): *"Rename for the reversed spelling too"* · amends [ADR-653](#adr-653) · analytic arm: [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404) · 3-D: already so ([ADR-3D-415](06b-decisions-3d.md#adr-3d-415))
+**Requirements:** [02](02-requirements.md) FR-EN-9 and FR-EN-20 · **Design:** [04](04-design.md) § the point naming's general criterion; [LADDER](LADDER.md) stage 1: `commandConflict` reads a restatement through `unspelled`, so it enters no stage.
+
+**Class.** *A statement about a point is compared with an existing definition by how its operands were written, not by what they name.* Two comparisons had it. Measured at `28dac0c3` through `decideDeterministic2D` → `commitVerdict` → `replay`:
+- Naming by use (`definitionKey`): «משולש ABC» · «אמצע BC» · «D אמצע CB» kept M and D with «M ו-D נפלו על אותה נקודה.»; «D אמצע BC» renamed M to D. The same for «תיכון מ-A במשולש ABC» · «D אמצע CB», for «אמצע CB» · «D אמצע BC», and for an altitude's foot («גובה מ-A לצלע BC» · «AD גובה לצלע CB»).
+- The idempotent restatement (`commandConflict`, FR-EN-9): «M אמצע BC» · «M אמצע CB» recorded a row and lowered it to a hidden twin `~M`, where the exact spelling answers «כבר קיים». The same for a foot and for «E נקודת החיתוך של AC ו-BD» restated as «…CA ו-DB» or «…BD ו-AC».
+
+**The second comparison is part of the first.** Changing `definitionKey` alone gave one visible point D, with a hidden twin `~D` behind it (the renamed D is midpoint BC, the line says midpoint CB, so M1 lowered it). The twin is not inert: `reinterpretAsConstraint` allows one twin per point, so «D אמצע AB» after it read «'D' is already defined» instead of the refusal the exact spelling gets, which names the statement. The ruling says *exactly as «D אמצע BC» does*, so both comparisons had to move.
+
+**Decision.** One reading, `unspelled` (`engine/step.ts`): an object with its operands' order taken out, for the kinds that read them as a set. A midpoint's and a foot's side, a circumcentre's vertices, and a line-line crossing's two lines (each sorted, then the pair sorted, each within-segment flag travelling with its own line). Every other kind stays as written, because its order means something (a square's corner, a rotation). `definitionKey` and `commandConflict` both read it; no second comparison was added. Restatement in `foldCommand` still compares commands exactly, which is right: it drops a duplicate row, and a reversed line reaches `commandConflict`.
+
+**Unchanged.** A letter the student typed stays theirs («AM = 3» before «D אמצע CB» keeps M, D and the notice). Two student letters on one point keep the notice. A different segment takes nothing over. Undo brings M back.
+
+**Sibling audit.** Analytic reads a reversed midpoint already (`sameDerivation`); locked, and its other remnants of this issue are [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404). 3-D reads a segment either way round in `toolLetterTakenOver3` (ADR-3D-415, locked); it has no other tool-lettered point. Complex: no tool-lettered point in its engine (grepped). **Not in this item:** «אלכסוני המקבילית נחתכים» · «E נקודת החיתוך של AC ו-BD» keeps M and E with the notice in EITHER spelling, because the line carries `onSeg` and the tool's point does not. That is a difference of statement, not of spelling, and is recorded on #2674.
+
+**Locks.** `src/app/__tests__/issue-2674-reversed-spelling.test.ts`; scenario `tool-midpoint-reversed-takes-letter-2674`.
+
+**Behaviour change for a student:** «משולש ABC» · «אמצע BC» · «D אמצע CB» shows one point D and no message, as does a foot named on the reversed side. A definition restated the other way round («M אמצע BC» · «M אמצע CB») now answers «כבר קיים», as the exact spelling does, instead of adding a row that changed nothing (FR-EN-9: *equivalent*, and the reversed-twin rule of #2209).

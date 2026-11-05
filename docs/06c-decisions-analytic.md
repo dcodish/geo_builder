@@ -14781,8 +14781,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 **Not in this item.**
 - **3-D** (ADR-W-157: "to 3-D if simple"): its one tool-minted derived letter is `midpoint-auto` («אמצע BB'» → M). «קובייה ABCDA'B'C'D'» · «אמצע BB'» · «E אמצע BB'» keeps M and E there. The letter is picked at apply and never enters a fact, so the port needs typed-letter tracking through `deriveCore3`'s several folds. This is recorded on #2674. The parity table cannot hold it, because the table measures verdicts and this is a drawing (ADR-W-170 §3). The reserved ADR-3D-412 is unused.
-- **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
-- **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
 
 **Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the operator's two lines through `decideSubmit`; every tool family above; the controls); `issue-1620-tool-letters` (its #1595 assertion flipped to one point D, citing this ruling); fixture `median-student-names-foot-2674`.
 
@@ -15293,3 +15293,23 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-404 — The rest of a tool's letter yielding: the letter returns to the pool, and P₁ yields too (#2674)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic) · round #2722 · branch `fix/2674-letter-takeover-reversed` · operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the student's, no message (2-D's way, in every builder)"*; ruling 2026-11-04, card q3 = A: *"Rename for the reversed spelling too"* · completes [ADR-AG-387](#adr-ag-387) · 2-D arm: [ADR-785](06-decisions.md#adr-785)
+**Requirements:** [02c](02c-requirements-analytic.md) R231 · **Design:** [04c](04c-design-analytic.md) § *A tool's letter yields to the student's*.
+
+**Re-measured at `28dac0c3` through `decideSubmit` → `derive`.** The reversed spelling already held here: «משולש ABC» · «אמצע BC» · «D אמצע CB» is one point D, through `sameDerivation`, which reads a midpoint's segment as a set. Only locks were added for it. Two of ADR-AG-387's *Not in this item* entries were still true.
+
+**Class.** *A tool's letter handed over to a student's stays spent.* The letters are chosen before the fold, so a rename the fold makes reached neither the pool nor the rows.
+
+**Decision.**
+1. **The next free letter** ([2-D], measured at `28dac0c3`: «תיכון מ-A במשולש ABC» · «D אמצע CB» · «תיכון מ-B במשולש ABC» gives D and M). `resolveToolLetters` recognises a takeover on the fold's own terms: a student's derivation under a fresh letter, the same derivation as an earlier `auto` fact, and a tool letter no line since has typed. It returns the letter to the pool, drops that `minted` row, and points every later placeholder of the point at the student's letter, so the median restated reads D. The fold still does the rename.
+2. **The coordinate mint.** `resolveMints` runs before any id is built from the name, so ADR-AG-387's worry about ids such as `circle-at-P₁` does not apply: the placeholder simply resolves to the student's letter. A fact stating a fresh letter later at the same coordinates takes the mint, unless a line in between typed the reserved name. The name goes back to the pool and no `minted` row is written. This is the #1270 rule (*a student's letter wins*) read in the other order.
+   The line itself is a restatement of a placed point, which the fold answers `known`, so `decideSubmit` first asks whether the line put a letter on the figure: one that did records, because it owns that letter (2-D's ADR-653).
+
+**Unchanged.** A letter stated before the coordinates wins, as it did. A letter already used before the mint does not take it. A typed tool letter is the student's: M typed in between keeps M taken, so the next midpoint is N.
+
+**Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the round #2722 describes); fixtures `midpoint-reversed-takes-letter-2674`, `coordinate-letter-takes-mint-2674`.
+
+**Behaviour change for a student:** after D takes a median's M, the next median's midpoint is M, not N. «טרפז ABCD» · «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» shows one point E and no message; before, P₁ and E with «P₁ ו-E נפלו על אותה נקודה.».

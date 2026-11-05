@@ -15,7 +15,7 @@
 
 import { indexedNameText } from '../../shell/indexedName';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
-import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
@@ -31,7 +31,7 @@ import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, stat
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, unspelled, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -5048,7 +5048,7 @@ export function autoNamedLabels(raw: Fact[]): Set<Id> {
  *  key: equal parameter values there are a sampled coincidence, never an identity. */
 function definitionKey(o: { kind: string; id?: string }): string | null {
   if (o.kind === 'free-point' || (o as { free?: boolean }).free) return null;
-  const { id: _id, solve: _solve, ...rest } = o as Record<string, unknown>;
+  const { id: _id, solve: _solve, ...rest } = unspelled(o as GeoObject) as unknown as Record<string, unknown>;
   return JSON.stringify(Object.keys(rest).sort().map((k) => [k, rest[k]]));
 }
 
