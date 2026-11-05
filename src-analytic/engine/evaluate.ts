@@ -11,7 +11,7 @@
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
 import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
-import { curveParentsOf } from './derived';
+import { curveParentsOf, parentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
@@ -2481,8 +2481,22 @@ function lineGroupsOf(c: Construction): LineGroups {
    * radius `r_O`, a line's free direction `θ_l4`, a parameter in a stated equation)? The symbol is in the solve vector
    * as much as the points are, wherever the row reads it (`carrierSystem` solves every `paramRegister` symbol).
    */
+  /*
+   * …except a CLOSED FORM OF THE EARLIER FIGURE about a vertex this line introduced (#2408, ADR-AG-403): a `derived-at`
+   * whose subject is a free vertex of a LATER line than every parent of its rule says where that vertex is, given the
+   * figure as it stood, and the vertex alone meets it (two coordinates, two rows). The symbols its parents are read
+   * through (a free circle's radius) are the earlier figure's, so its group fits the vertex and the circle stays put.
+   */
+  const subjectLed = (k: Constraint): boolean => {
+    if (k.t !== 'derived-at') return false;
+    const own = lines[k.id];
+    const subject = c.objects.find((o) => o.id === k.id);
+    if (own === undefined || !subject || !isFree(subject)) return false;
+    const parents = [...parentsOf(k.rule), ...curveParentsOf(k.rule)];
+    return parents.length > 0 && parents.every((p) => lines[p] !== undefined && lines[p] < own);
+  };
   const throughSymbol = (k: Constraint): boolean =>
-    constraintSymbols([k]).length > 0 || [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0);
+    constraintSymbols([k]).length > 0 || (!subjectLed(k) && [...idsIn(k, new Set())].some((id) => (symsOf.get(id)?.size ?? 0) > 0));
   let unknownLine = false;
   /** The free vertices `value` is placed from, its latest line, and that line's vertices — null for none. */
   const topOf = (value: unknown): { all: Set<Id>; line: number; ids: Id[] } | null => {
@@ -3153,6 +3167,37 @@ function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: 
 }
 
 /**
+ * TWO FREE CIRCLES WITH A COMMON TANGENT START APART (#2408, ADR-AG-403) — as 2-D samples them, and #1071's lesson: a seed,
+ * never a verdict. Only a pair apart has room for every tangent still to come, so a later tangent has no reason to move
+ * what stands. Starting there keeps every seed and reads the sample alone, where sample-and-reject left the walk and the
+ * steered solve to land somewhere that depended on how many tangents the figure held. A pair sampled too close keeps
+ * its first circle and the direction between them. Nothing but the tangents may speak of either circle: a position the
+ * student stated, a tangency or a point on a circle settles the pair, and the solve answers for it from its own sample.
+ */
+function seedFreePairs(c: Construction, seeded: Map<Id, Pt>, env: Env, seed: number): void {
+  const isTouch = (k: Constraint) => k.t === 'derived-at' && k.rule.t === 'common-touch';
+  const touches = c.constraints.filter(isTouch) as Array<Extract<Constraint, { t: 'derived-at' }>>;
+  if (touches.length === 0) return;
+  const others = JSON.stringify([c.constraints.filter((k) => !isTouch(k)), c.selectors.filter((q) => q.kind !== 'distinct')]);
+  const unspoken = (o: { id: Id; centre: Id }) => !others.includes(`"${o.id}"`) && !others.includes(`"${o.centre}"`);
+  const pairs = new Set(touches.map((k) => (k.rule as { circles: [Id, Id] }).circles.join('|')));
+  for (const pair of pairs) {
+    const [p, q] = pair.split('|').map((id) => c.objects.find((o) => o.id === id));
+    if (p?.kind !== 'circle-at' || q?.kind !== 'circle-at' || !unspoken(p) || !unspoken(q)) continue;
+    const a = seeded.get(p.centre);
+    const b = seeded.get(q.centre);
+    const sum = evalExpr(p.r, env) + evalExpr(q.r, env);
+    if (!a || !b || !Number.isFinite(sum)) continue;
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    if (d > 1.05 * sum) continue;
+    const turn = 2 * Math.PI * jitter(seed, 907);
+    const [ux, uy] = d > 1e-9 ? [(b.x - a.x) / d, (b.y - a.y) / d] : [Math.cos(turn), Math.sin(turn)];
+    const at = sum * (1.15 + 0.5 * jitter(seed, 911));
+    seeded.set(q.centre, { x: a.x + at * ux, y: a.y + at * uy });
+  }
+}
+
+/**
  * THE PINS' ROOTS SEED THE SOLVE (#2380, [ADR-AG-303](../../docs/06c-decisions-analytic.md#adr-ag-303)) — `pinRoots.ts`
  * finds every 1-DOF pin of an in-scope parameter and its roots by scan; here each configuration takes one. Seed 0 takes
  * the root nearest its own sample (the root the descent reached before this, so the first drawing does not move);
@@ -3432,6 +3477,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   );
   /** The hashed starts, before any region seeding moves them — #1687's last start (ADR-AG-348). */
   const hashed: ReadonlyMap<Id, Pt> = new Map(seeded);
+  seedFreePairs(c, seeded, env, seed);
   /**
    * A REGION selector SEEDS the point it names, instead of only filtering the result (#1071).
    *

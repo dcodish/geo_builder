@@ -45,17 +45,19 @@ export const circleResolver = (refs: CircleRefs | undefined): CircleResolver => 
  * #197 Am. 8 — THE tangents-exhausted sentence for a pair's mutual position and the asked kind (disjoint 4, externally
  * tangent 3, intersecting 2, internally tangent 1, contained 0). One mapping for both seats that refuse a common tangent
  * beyond what the pair has: the parser's deterministic refusal (`decideDeterministic`) and, since #2428
- * ([ADR-741](../../docs/06-decisions.md#adr-741)), the engine's stage-0 guard (`commonTangentCapacityError`).
+ * ([ADR-741](../../docs/06-decisions.md#adr-741)), the engine's stage-0 guard (`commonTangentCapacityError`). The sentences
+ * are SUITE text since #2408 (ADR-AG-403): analytic shows them byte for byte (`shell/locales`, ADR-W-148); the at-touch
+ * hint stays 2-D's, since only 2-D reads the sentence it suggests.
  */
 export function tangentsExhaustedKey(kind: 'external' | 'internal' | 'any', position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained', hint?: 'at-touch'): string {
   return hint === 'at-touch' ? 'input.tangentsExhaustedTouch'
-    : position === 'contained' ? 'input.tangentsExhaustedContained'
-    : position === 'int-tangent' ? (kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntTangent')
-    : position === 'intersecting' ? (kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntersecting')
-    : position === 'ext-tangent' ? (kind === 'external' ? 'input.tangentsExhaustedExternal' : kind === 'internal' ? 'input.tangentsExhaustedTouchTaken' : 'input.tangentsExhaustedExtTangent')
-    : kind === 'external' ? 'input.tangentsExhaustedExternal'
-    : kind === 'internal' ? 'input.tangentsExhaustedInternal'
-    : 'input.tangentsExhaustedAny';
+    : position === 'contained' ? 'suite.refusal.tangentsExhaustedContained'
+    : position === 'int-tangent' ? (kind === 'internal' ? 'suite.refusal.tangentsExhaustedNoInternal' : 'suite.refusal.tangentsExhaustedIntTangent')
+    : position === 'intersecting' ? (kind === 'internal' ? 'suite.refusal.tangentsExhaustedNoInternal' : 'suite.refusal.tangentsExhaustedIntersecting')
+    : position === 'ext-tangent' ? (kind === 'external' ? 'suite.refusal.tangentsExhaustedExternal' : kind === 'internal' ? 'suite.refusal.tangentsExhaustedTouchTaken' : 'suite.refusal.tangentsExhaustedExtTangent')
+    : kind === 'external' ? 'suite.refusal.tangentsExhaustedExternal'
+    : kind === 'internal' ? 'suite.refusal.tangentsExhaustedInternal'
+    : 'suite.refusal.tangentsExhaustedAny';
 }
 
 /** The subset of i18next's `t` we need — a key plus interpolation params → string. */
@@ -280,7 +282,7 @@ export const WORDINGS = {
   // replay/core.ts (#2023, ADR-661): the operator's verbatim «כבר יש שם» sentences (2026-10-13).
   nameTaken: { key: 'errors.angleNameTaken', keys: ['errors.angleNameTaken', 'errors.lengthNameTaken'], namesOtherLine: true },
   // radiusFeasibility.ts commonTangentCapacityError (#2428, ADR-741): the parser's own tangents-exhausted sentences.
-  tangentsExhausted: { key: 'input.tangentsExhaustedIntTangent', keys: ['input.tangentsExhaustedIntTangent', 'input.tangentsExhaustedNoInternal', 'input.tangentsExhaustedTouchTaken', 'input.tangentsExhaustedContained'] },
+  tangentsExhausted: { key: 'suite.refusal.tangentsExhaustedIntTangent', keys: ['suite.refusal.tangentsExhaustedIntTangent', 'suite.refusal.tangentsExhaustedNoInternal', 'suite.refusal.tangentsExhaustedTouchTaken', 'suite.refusal.tangentsExhaustedContained'] },
   // lower.ts letterSystem (#2165 + #2119, ADR-681): the over-constrained frame WITHOUT a reason clause (2026-10-15).
   restatedSize: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, circleParams: ['circle'] },
   // evaluate.ts — `over-constrained: |AC| = 9 cannot hold`, with the fold's optional `[vs #i]` (#943 half B)

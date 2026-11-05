@@ -1095,7 +1095,15 @@ one `touch` (`statedTangent` admits a tangency of unstated kind). Names: the stu
 numeral taken in any notation by `nameReading`). The ask lane resolves the touch tangent by `touchTangentNoun`; the exam's
 sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
 
-*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
+**A letter-named tangent is a slot of the pair ([ADR-AG-403](06c-decisions-analytic.md#adr-ag-403), #2408).** Past the touch
+arms above, `commonTangentSlot` reads what the pair holds (`pairCommonTangents`) and answers a `choice` of families, each
+option a `common-touch` pair of `derived-at` rows (`evalRule` over `commonTangentLine`), `known` for a restatement, the tangent
+at T on a pair touching from outside, or the refusal `tangentsExhaustedOf` names. `discreteAxes.ts` offers each slot what
+its pair's earlier slots left (`openOptions`, `settledSlots`), so the pair's digits are one permutation's Lehmer code and a new
+tangent is a new slowest digit. A `distinct` beside the slot rejects a dead assignment. `seedFreePairs` starts two circles
+nothing else speaks of apart. A missing family is a residual (`familyGap`). `subjectLed` fits a later vertex alone.
+
+*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `tangentsExhausted` · `commonTangentSlot` · `pairCommonTangents` · `commonTouchOf` · `common-touch` · `reversedFamily` · `familyGap` · `openOptions` · `settledSlots` · `seedFreePairs` · `subjectLed`
 
 **The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
 `unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,
@@ -1438,7 +1446,7 @@ shape warning and the narrowing note all read it; the marker stays stored for th
 A configuration the givens contradict is never knowledge. Every static discrete axis is one digit of one odometer
 (`engine/discreteAxes.ts` `assignmentAt`, [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)): constraint `choice`s in
 construction order (nested ones depth first on the chosen branch), then region `choice`s, then the `crossing-nth { both }`
-pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. `evaluateTryingChoices` walks the next
+pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. A pair's common tangents read one permutation, each digit's base one less than its predecessor's ([ADR-AG-403](06c-decisions-analytic.md#adr-ag-403)). `evaluateTryingChoices` walks the next
 combinations at the same samples (`Figure.choiceSeed`, `choiceSeedOf(c, seed)`; `max(min(total, CHOICE_TRIES), largest n)`
 of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions-analytic.md#adr-ag-303)): `engine/pinRoots.ts`
 `walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over

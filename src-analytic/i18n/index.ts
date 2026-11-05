@@ -358,8 +358,6 @@ const he = {
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
-  // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte.
-  errNoCommonTangent: 'למעגל המוכל בתוך מעגל אין אף משיק משותף.',
   // #2388 (ADR-AG-307; operator ruling 2026-10-20) — the radius capital as a point AND the radius parameter: both readings, the earlier line.
   errRadiusLetterIsPoint: '{{holder}} כבר שם של נקודה בשרטוט (בשורה «{{declared}}»), ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
   errRadiusLetterIsPointAlone: '{{holder}} כבר שם של נקודה בשרטוט, ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
@@ -961,7 +959,6 @@ const en: typeof he = {
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
-  errNoCommonTangent: 'A circle contained inside another has no common tangent at all.',
   errRadiusLetterIsPoint: '{{holder}} is already the name of a point in the figure (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
   errRadiusLetterIsPointAlone: '{{holder}} is already the name of a point in the figure, and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
   errRadiusLetterIsRadius: '{{holder}} already marks the radius parameter (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the name of a point. One name marks one thing: give the point another name.',
