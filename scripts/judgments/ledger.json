@@ -1633,6 +1633,74 @@
       ],
       "at": "2026-11-04T21:09:50.005Z",
       "status": "escalated"
+    },
+    {
+      "id": "q-2331-bare-r",
+      "question": "In 2-D, when a student types a bare letter r on a circle nobody sized, does r mean that circle's radius?",
+      "class": "letter-binding",
+      "verdict": "escalate",
+      "reason": "Reserved rule 4: his precedents conflict on this exact sequence. The 2026-10-17 ruling on #2331 refuses «AB = r» when no circle is declared «ברדיוס r» (option A). The 2026-10-23 ballot answer on #2333 keeps r on circle O and commits P's line (option B), which needs line 4 to commit. Newer-beats-older does not apply: the #2333 question was which circle r names, its options never offered a refusal at line 4, and neither #2333 comment mentions #2331. Both rulings reject the behaviour at HEAD (option C).",
+      "nearest": [
+        {
+          "quote": "no one said the r represents the radius so this is a silent assumption. we should not assume this and tell user to be specific about a radius declaration.",
+          "date": "2026-10-17",
+          "link": "https://github.com/dcodish/geo_builder/issues/2331"
+        },
+        {
+          "quote": "Refuse and teach. With no circle declared «ברדיוס r» (or «רדיוס מעגל O הוא r»), «AB = r» is not built",
+          "date": "2026-10-17",
+          "link": "https://github.com/dcodish/geo_builder/issues/2331#issuecomment-6238161978"
+        },
+        {
+          "quote": "r keeps naming circle O. The circle it named when written. P's line commits and AB stays put.",
+          "date": "2026-10-23",
+          "link": "https://github.com/dcodish/geo_builder/issues/2333#issuecomment-6358195133"
+        }
+      ],
+      "at": "2026-11-05T06:16:36.713Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2622-stretch",
+      "question": "How should a student perform the book's operation of stretching or shrinking a curve?",
+      "class": "curve-stretch-operation-shape",
+      "verdict": "escalate",
+      "reason": "Reserved rule 2, kept by the operator: on #2622 he left the shape open until he has played the ellipse work, and no later comment, ruling or ADR settles it. sr-04 (ADR-W-174 §2) may say such a construct gets built, but it gives no shape and does not lift a reservation stated on this exact question. Reserved rule 3 also applies: how far the capability reaches is scope.",
+      "nearest": [
+        {
+          "quote": "questions about proof are out od scope by definition on all tools. what we should support is a way for user to move a point (streatch it). so maybe הרחיבו and מתחו and their opposite כיווצו? we can leave this decision for later and have it open. Once all is developed i will play with it and think how is best to address.",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/2622"
+        },
+        {
+          "quote": "this is a real issue that we need to be able to build so if you ask me should we build it, i will say yes. so why ask if we know the answer.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "at": "2026-11-05T06:16:36.713Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2622-move-non-equation",
+      "question": "When the student picks move on a curve not typed as an equation, what happens to its row?",
+      "class": "curve-transformation-move-row",
+      "verdict": "escalate",
+      "reason": "Reserved rules 3 and 4: no precedent. The 2026-11-05 ruling says moving rewrites the row but not what form a non-equation row takes, and 'Curves with an equation first' reads two ways.",
+      "nearest": [
+        {
+          "quote": "Ask each time: new curve or move the existing one",
+          "date": "2026-11-05",
+          "link": "https://github.com/dcodish/geo_builder/issues/2622#issuecomment-6651696787"
+        },
+        {
+          "quote": "Curves with an equation first",
+          "date": "2026-11-05",
+          "link": "https://github.com/dcodish/geo_builder/issues/2622#issuecomment-6651696787"
+        }
+      ],
+      "at": "2026-11-05T06:49:39.194Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
