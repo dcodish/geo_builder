@@ -2450,6 +2450,70 @@
       ],
       "at": "2026-11-05T21:48:36.310Z",
       "status": "escalated"
+    },
+    {
+      "id": "q26",
+      "question": "#1806, analytic: «BC = a» · «a = √8» now reads «√8», the spelling given to the letter. A keep; B restore «2√2».",
+      "class": "typed-number-display",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A length stated as a bare letter whose value the student typed shows that value on the segment in the format he entered it.",
+      "precedents": [
+        {
+          "quote": "display on BC on canvas should be with the sqrt as entered by user",
+          "date": "2026-10-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/1806"
+        },
+        {
+          "quote": "we need to keep the format of entry",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Only a measure stated as one bare letter; not a scaled letter.",
+      "at": "2026-11-05T22:39:15.033Z",
+      "status": "pending"
+    },
+    {
+      "id": "q27",
+      "question": "#1497, complex: the panel reads «79999/10000» for a typed decimal. A leave; B read as decimals.",
+      "class": "number-display",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "In complex, a number typed as a decimal reads as a decimal in the data panel under sr-22: «7.9999» reads «8», «1.234» reads «1.23», never a fraction, no new threshold.",
+      "precedents": [
+        {
+          "quote": "the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "should apply to all tools.",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497#issuecomment-5865099634"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A typed decimal's own panel value only, not a value computed from one. A typed fraction or root keeps its form.",
+      "at": "2026-11-05T22:39:15.033Z",
+      "status": "pending"
+    },
+    {
+      "id": "q28",
+      "question": "complex: «z = 2/3cis30» reads as 2/(3cis30). A leave; B read as (2/3)cis30.",
+      "class": "fraction-before-cis-reading",
+      "verdict": "escalate",
+      "reason": "B reverses a promise in accepted ADR-CX-056 Am. 1 with no ruling, and nothing he said decides it; sr-16 suggests a third outcome, refuse and teach, that no option states.",
+      "nearest": [
+        {
+          "quote": "So I would say in general, if you don't know ask, it's always better to ask and tell the user how to write each specific item.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "at": "2026-11-05T22:39:15.033Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
