@@ -43,6 +43,7 @@ import { figureContext } from '@/parser/llmShared';
 import { circleMembers, circleRefs, isGeoPoint } from '@/engine';
 import type { AnyCommand, Construction, Id, Vec } from '@/engine';
 import { createdByReference } from './createdPoints';
+import { extensionSideVerdict } from './extensionSide';
 import { dryRunOutcome, groupKey, nameByUseCommands, primeFoldFor, replay, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
@@ -537,6 +538,15 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   if (invented.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `invented-labels:${invented.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsInvented', { labels: invented.join(', ') }));
+    ui.setBusy(false);
+    return;
+  }
+  // #2518 (ADR-784): the impossible-side refusal holds on this lane too (the ADR-240 pattern); the offer is built from
+  // the model's canonical line, the sentence the grammar read, and quotes what the student typed.
+  const wrongSide = extensionSideVerdict(utterance, out!.built.map((g) => g.step).join(' '), llmCmds, parseCtxNow(), curFacts, cur.seed);
+  if (wrongSide) {
+    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: wrongSide.result, commands: llmCmds });
+    ui.setInputNote(t(wrongSide.messageKey, wrongSide.params));
     ui.setBusy(false);
     return;
   }

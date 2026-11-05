@@ -1570,17 +1570,16 @@ function convexInOrder(pts: Vec[]): boolean {
 
 /**
  * #2518 ([ADR-780](../../docs/06-decisions.md#adr-780), operator ruling 2026-11-04, card q1 = A) — A SHARED-ENDPOINT
- * EXTENSION'S DIRECTION IS A BETTER DEFAULT, NEVER A REQUIREMENT. «המשך AO חותך את מעגל P בנקודה R» with A on circle P:
+ * EXTENSION'S SIDE IS SEATED, NOT DRIVEN. «המשך AO חותך את מעגל P בנקודה R» with A on circle P:
  * the line meets the circle at A and at ONE other point, R, so the stated side (beyond the second letter) holds only for
  * some positions of the other end — beyond O only when O is inside the circle; for «המשך OA» (the shared end second),
- * beyond A only when O is outside and A is the crossing the ray from O meets first. ADR-142 made either side acceptable
- * (the side carries no information when no figure has it), and nothing placed the other end where it does.
+ * beyond A only when O is outside and A is the crossing the ray from O meets first.
  *
  * So when the other end is a movable free point that no constraint holds, and the stated side does not already hold at
  * the drawn positions, its SEED is moved to where it does: inside the circle, keeping its direction from the centre, or
  * outside along the outward normal at the shared end. It is a default (M4, ADR-052): seeds still sample the point, the
- * configuration search's strict tier (ADR-267) keeps a configuration on the stated side whenever one exists, and when
- * the other end is pinned, derived or constrained nothing moves and the ADR-142 / ADR-267 either-side reading stands.
+ * configuration search keeps a configuration on the stated side whenever one exists, and when the other end is pinned,
+ * derived or constrained nothing moves. A typed line whose side then holds nowhere is refused (ADR-784).
  */
 function seatExtensionBeyond(objects: GeoObject[], constraints: readonly Constraint[], pos: Map<Id, Vec>, cmd: Extract<Command, { type: 'extend-onto-circle' }>, shared: Id, other: Id): void {
   const circ = objects.find((o): o is CircleObj => o.kind === 'circle' && o.id === cmd.circle);

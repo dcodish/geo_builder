@@ -1053,9 +1053,23 @@ beyond O exactly when O is inside the circle; «המשך OA» puts R beyond A ex
 the ray from O meets first. `seatExtensionBeyond` (LADDER stage 2a) moves the other end's SEED there when it is a
 movable free point that no constraint references and the side does not already hold: inside, at `0.45·r` from the
 centre along its own direction, or outside, at `0.8·r` along the outward normal at the shared end. A default only
-(M4): seeds still sample it, the configuration search's strict tier (ADR-267) keeps a configuration on the stated side
-whenever one exists, and a pinned, derived or constrained other end is never moved, so the ADR-142 either-side
-acceptance answers exactly as before.
+(M4): seeds still sample it, the configuration search keeps a configuration on the stated side whenever one exists, and
+a pinned, derived or constrained other end is never moved.
+
+### A typed extension whose side no figure has is refused ([ADR-784](06-decisions.md#adr-784))
+
+`extensionsClear`, the verifier and every search hold one bar, the stated letter order; ADR-142's either-side tier is
+gone. The shared-endpoint branch still carries no `collinear-order`, so the ladder cannot refuse it: a typed line is
+judged by `impossibleExtensionSide` (`replay/core.ts`, beside `forcedCrossedRing`), which asks only about an extension
+built as that branch's `line-circle`. On the stated side at the drawn seed of the trial figure, it passes, which is how
+ADR-780's seat answers at no cost. Otherwise it reads the prior figure's `sharedSamples` pool, computes the crossing in
+each sample from the two ends and the centre, and refutes at the verifier's bar (`t > 1`) when no sample has the side; it
+fails open like its twin. `extensionSideVerdict` (`app/extensionSide.ts`)
+is the one verdict the submit decision, the ✎ edit and the LLM lane ask. It offers the student's sentence with the two
+letters reversed only if that line parses to the reversed extension, passes the same gate and builds, so a point between
+the two letters gets the refusal alone. A saved figure and a later line never pass through this gate: they replay with
+every row built, and the verifier flags the row (`figure.v.orderBeyond`, or `figure.v.orderBeyondOther` when the point
+is past the first letter).
 
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 
