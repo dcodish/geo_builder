@@ -1067,9 +1067,16 @@ each sample from the two ends and the centre, and refutes at the verifier's bar 
 fails open like its twin. `extensionSideVerdict` (`app/extensionSide.ts`)
 is the one verdict the submit decision, the ✎ edit and the LLM lane ask. It offers the student's sentence with the two
 letters reversed only if that line parses to the reversed extension, passes the same gate and builds, so a point between
-the two letters gets the refusal alone. A saved figure and a later line never pass through this gate: they replay with
-every row built, and the verifier flags the row (`figure.v.orderBeyond`, or `figure.v.orderBeyondOther` when the point
-is past the first letter).
+the two letters gets the refusal alone.
+
+The same gate reads every STANDING shared-endpoint extension on each typed line. One on its side at the drawn seed before
+the line, off it after, and off it in every sample of the trial figure is refused as `input.extensionSideBroken`, naming
+the line and the extension. The prior pool cannot answer this, so `gateSamples` runs the trial's sampling jobs at the drawn
+seed (`atSeed`, skipping the display-seed search), stops at the first sample on the side, and stops at a deterministic work
+cap; a run that stops either way answers nothing and the line commits. A figure with no extension pays one scan of the
+fact list. A saved figure never passes through this gate: it replays with every row built, the verifier flags the row
+(`figure.v.orderBeyond`, or `figure.v.orderBeyondOther` when the point is past the first letter), and being already off
+its side, it never blames a new line.
 
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 

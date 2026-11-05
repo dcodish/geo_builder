@@ -628,8 +628,8 @@ export function checkGivens(
     const id = positions.get(cmd.id);
     if (!a || !b || !id) continue;
     // #2518 (ADR-784, operator rulings 2026-11-04): one bar for every extension, the stated side. ADR-142's
-    // shared-endpoint either-side acceptance is withdrawn; a typed line whose side no figure has is refused
-    // before commit (`impossibleExtensionSide`), so only a figure saved earlier or a later line reaches this.
+    // shared-endpoint either-side acceptance is withdrawn; a typed line whose side no figure has, or that
+    // breaks a standing one, is refused before commit (`impossibleExtensionSide`), so a saved figure is what reaches this.
     const ab2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
     const t = ab2 < 1e-18 ? 0.5 : ((id.x - a.x) * (b.x - a.x) + (id.y - a.y) * (b.y - a.y)) / ab2; // id's param on a→b
     if (t <= 1) {

@@ -7,6 +7,9 @@
  * remedy"): the reversed line is parsed and dry-run against the same figure, and offered only if it reads as the
  * reversed extension and builds. When it does not (the point lies between the two letters, so neither extension reaches
  * it), the refusal stands alone.
+ *
+ * A later line that makes a STANDING extension impossible (judge ruling on #2518, option B) is refused here too, naming
+ * the extension's line and the statement that broke it. It offers nothing: the line to change is another row.
  */
 import { impossibleExtensionSide, type ExtensionSide } from '@/replay/core';
 import { dryRunOutcome, type Fact } from '@/store/geoStore';
@@ -14,7 +17,7 @@ import { parse, type ParseContext } from '@/parser';
 import type { AnyCommand } from '@/engine';
 
 export interface ExtensionSideVerdict {
-  messageKey: 'input.extensionSideImpossible' | 'input.extensionSideImpossibleNoStep';
+  messageKey: 'input.extensionSideImpossible' | 'input.extensionSideImpossibleNoStep' | 'input.extensionSideBroken';
   params: Record<string, string>;
   /** the logged result */
   result: string;
@@ -44,6 +47,13 @@ function reversedBuilds(side: ExtensionSide, line: string, ctx: ParseContext, fa
 export function extensionSideVerdict(utterance: string, sentence: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: number): ExtensionSideVerdict | null {
   const side = impossibleExtensionSide(facts, [...commands], seed);
   if (!side) return null;
+  if (side.standing !== undefined) {
+    return {
+      messageKey: 'input.extensionSideBroken',
+      params: { detail: utterance.trim(), extension: side.standing, id: side.id, second: side.b },
+      result: `extension-side-broken:${side.a}${side.b}`,
+    };
+  }
   const line = reversedSentence(side, sentence);
   const step = line !== null && reversedBuilds(side, line, ctx, facts, seed) ? line : null;
   const params = { detail: utterance.trim(), id: side.id, second: side.b };

@@ -4083,27 +4083,61 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
   }
 }
 
-/** The extension a line states and no configuration satisfies. */
+/** The work {@link gateSamples} may spend: 16 plain evaluations and the finishing pass fit; a figure whose every sample re-solves does not. */
+export const extensionSideConfig = { cap: 150_000 };
+
+/**
+ * The narrow pool of a figure the gate asks ONE thing about, at the drawn seed: its jobs in order, stopped at the first
+ * sample that answers (``hit``), the `sampleSubset` idea with no full pool behind it. `null` when a sample hit or the
+ * deterministic work cap cut the run: neither is evidence of "in every sample", and the caller fails open.
+ */
+function gateSamples(facts: Fact[], seed: number, hit: (pos: ReadonlyMap<Id, Vec>) => boolean): SharedSamples | null {
+  const before = sampleMemo;
+  try {
+    return withWorkEpoch(() => {
+      const { jobs, finish, raw } = samplingJobs(facts, { wide: false, atSeed: seed });
+      const limit = work.done + extensionSideConfig.cap;
+      return withWorkBudget(extensionSideConfig.cap, () => {
+        for (let i = 0; i < jobs.length; i++) {
+          if (i > 0 && work.done > limit) return null;
+          const n = raw.length;
+          jobs[i]();
+          if (raw.slice(n).some(hit)) return null;
+        }
+        return finish(true);
+      });
+    });
+  } finally {
+    sampleMemo = before;
+  }
+}
+
+/** The extension whose stated side no configuration has. `standing`: the row of an earlier line, which this line broke. */
 export interface ExtensionSide {
   a: Id;
   b: Id;
   id: Id;
+  standing?: string;
 }
 
 /**
- * A TYPED EXTENSION WHOSE STATED SIDE NO CONFIGURATION HAS (#2518, [ADR-784](docs/06-decisions.md#adr-784), operator
- * rulings 2026-11-04). «המשך AO חותך את מעגל P בנקודה R» with A on circle P: the line's only other crossing is R, so
- * the extension is the deterministic `line-circle` of `extend-onto-circle`'s shared-endpoint branch, which carries no
- * order constraint for the ladder to refuse. The side is a fact about the figure, so it is asked of the figure: R
- * beyond the second letter at the drawn seed of the trial figure, else at some sample of the PRIOR figure's pool (M3, one
- * sampler, the pool `forcedCrossedRing` reads, never a new search). Reading the prior pool is sound for the reason it is
- * sound there: the crossing is a function of the two ends and the circle, and the line can only narrow the configurations.
- * The reversed sentence the verdict proves reads the same memoized pool. The bar is the verifier's (`t > 1`), not the
- * sampling bar's clearance: a refusal needs the side to be absent, not merely tight.
+ * A STATED EXTENSION SIDE NO CONFIGURATION HAS (#2518, [ADR-784](docs/06-decisions.md#adr-784), operator rulings
+ * 2026-11-04). «המשך AO חותך את מעגל P בנקודה R» with A on circle P: the line's only other crossing is R, so the extension
+ * is the deterministic `line-circle` of `extend-onto-circle`'s shared-endpoint branch, which carries no order constraint
+ * for the ladder to refuse. The side is a fact about the figure, so it is asked of the figure, one test for both members:
  *
- * A line whose other end can move costs nothing: ADR-780's `seatExtensionBeyond` has already put it on the stated side
- * at the drawn seed. An extension built any other way (a target that exists, neither end on the circle) carries
- * `collinear-order`, and the ladder owns it.
+ * - **An extension this line states.** Off its side at the drawn seed of the trial figure and at every sample of the PRIOR
+ *   figure's pool (M3, the pool `forcedCrossedRing` reads). The prior pool is sound here: the crossing is a function of the
+ *   two ends and the circle, and the line can only narrow the configurations.
+ * - **A standing extension this line breaks** (judge ruling on #2518, option B). The line is what narrowed the figure, so
+ *   the prior pool cannot answer: it reads the TRIAL figure's pool. The side must have held before, at the drawn seed or
+ *   in the prior pool. A figure already off its side (a saved one) never blames the line, so it stays editable.
+ *
+ * ADR-780's seat is why a movable other end passes the first test at no cost. The bar is the verifier's (`t > 1`), not
+ * the sampling bar's clearance: a refusal needs the side to be absent, not merely tight. A figure with no extension pays
+ * one scan of the fact list; a line that leaves every extension on its side at the drawn seed pays the trial replay the
+ * dry run reuses. Any other extension (a target that exists, neither end on the circle) carries `collinear-order`, and
+ * the ladder owns it.
  *
  * **Fails open**, like its twins: a thin pool, a sample missing a point, any throw → `null`, and the line commits.
  *
@@ -4112,12 +4146,21 @@ export interface ExtensionSide {
 export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], seed = 0): ExtensionSide | null {
   try {
     const stated = commands.flatMap((c) => (c.type === 'extend-onto-circle' ? [c] : []));
-    if (stated.length === 0) return null; // a line that states no extension pays nothing
-    const fig = replay(trialFacts(facts, commands), seed);
+    const standing = facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ c: f.cmd, utterance: f.utterance }] : []));
+    if (stated.length === 0 && standing.length === 0) return null; // a figure with no extension pays nothing
+    const trial = trialFacts(facts, commands);
+    const fig = replay(trial, seed);
     const objects = fig.construction.objects;
+    type Ext = { a: Id; b: Id; id: Id; circle: Id };
+    /** The shared end and centre of an extension built by the shared-endpoint branch. */
+    const seatOf = (c: Ext) => {
+      const o = objects.find((x) => x.id === c.id);
+      const circle = objects.find((x) => x.id === c.circle);
+      return o?.kind === 'line-circle' && o.avoid !== undefined && circle?.kind === 'circle' ? { shared: o.avoid, center: circle.center } : null;
+    };
     /** Is the crossing past the second letter here? `null` when a point is unplaced. */
-    const beyond = (pos: ReadonlyMap<Id, Vec>, c: ExtensionSide, shared: Id, center: Id): boolean | null => {
-      const a = pos.get(c.a), b = pos.get(c.b), s = pos.get(shared), o = pos.get(center);
+    const beyond = (pos: ReadonlyMap<Id, Vec>, c: Ext, seat: { shared: Id; center: Id }): boolean | null => {
+      const a = pos.get(c.a), b = pos.get(c.b), s = pos.get(seat.shared), o = pos.get(seat.center);
       if (!a || !b || !s || !o) return null;
       const ux = b.x - a.x, uy = b.y - a.y;
       const u2 = ux * ux + uy * uy;
@@ -4126,18 +4169,25 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
       const k = (2 * ((o.x - s.x) * ux + (o.y - s.y) * uy)) / u2;
       return ((s.x + k * ux - a.x) * ux + (s.y + k * uy - a.y) * uy) / u2 > 1;
     };
-    const open = stated.flatMap((c) => {
-      const o = objects.find((x) => x.id === c.id);
-      const circle = objects.find((x) => x.id === c.circle);
-      if (o?.kind !== 'line-circle' || o.avoid === undefined || circle?.kind !== 'circle') return []; // not the shared-endpoint branch
-      return beyond(fig.positions, c, o.avoid, circle.center) === false ? [{ c, shared: o.avoid, center: circle.center }] : []; // the prefilter
-    });
-    if (open.length === 0) return null;
-    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate, as `forcedCrossedRing`
-    if (pool.samples.length === 0) return null;
-    if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return null;
-    const hit = open.find(({ c, shared, center }) => pool.samples.every((pos) => beyond(pos, c, shared, center) === false));
-    return hit ? { a: hit.c.a, b: hit.c.b, id: hit.c.id } : null;
+    /** The pool's verdict: every sample off the side. A thin pool answers nothing. */
+    const offEverywhere = (pool: SharedSamples, c: Ext, seat: { shared: Id; center: Id }): boolean => {
+      if (pool.samples.length === 0) return false;
+      if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return false;
+      return pool.samples.every((pos) => beyond(pos, c, seat) === false);
+    };
+    for (const c of stated) {
+      const seat = seatOf(c);
+      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
+    }
+    const before = replay(facts, seed).positions;
+    for (const { c, utterance } of standing) {
+      const seat = seatOf(c);
+      if (!seat || beyond(fig.positions, c, seat) !== false) continue; // the prefilter: on its side on screen ⇒ on it somewhere
+      if (beyond(before, c, seat) !== true) continue; // already off it on screen: not this line's doing
+      const pool = gateSamples(trial, seed, (pos) => beyond(pos, c, seat) === true);
+      if (pool && offEverywhere(pool, c, seat)) return { a: c.a, b: c.b, id: c.id, standing: utterance ?? `${c.a}${c.b}` };
+    }
+    return null;
   } catch {
     return null; // fails open, always
   }
@@ -4559,10 +4609,13 @@ function sideSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] 
   });
   return kept.length >= 2 ? kept : samples;
 }
-export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
+export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: number } = {}) {
   const configs = variantConfigs(facts);
-  const seed0 = configs.length === 1 ? firstSatisfyingSeed(facts) : 0;
-  const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : firstSatisfyingSeed(vf)).construction);
+  // #2518 (ADR-784): `atSeed` skips the display-seed search. A gate asking about a figure with an unmet requirement
+  // pays the whole futile sweep there (3 s on a five-line figure), for a base construction it does not need.
+  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeed(vf);
+  const seed0 = configs.length === 1 ? settled(facts) : 0;
+  const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : settled(vf)).construction);
   // #434 (ADR-509): a DETERMINED figure's pool is its ADMISSIBLE SET, not one sample. `freeDofCount === 0`
   // is a count, and a count can lie (ADR-424's class — a redundancy pattern pushing it to 0 while the figure
   // still moves with the seed); and a seed can never reach a branch or a seat. So the pool is every
@@ -4649,7 +4702,7 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
     if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap, strict: true });
     return (sampleMemo = { facts, key, constructions, samples: converged, determined: complete_, complete: complete && !overCap });
   };
-  return { jobs, finish };
+  return { jobs, finish, raw };
 }
 /**
  * Which crossings of the drawn ink are FORCED — present in EVERY valid configuration of the figure
@@ -4838,7 +4891,7 @@ export function sampleSubset(facts: Fact[], counterexample?: (pos: Map<Id, Vec>)
 /** #1996: how many sampling jobs the counterexample probe of {@link sampleSubset} runs before the full pool. */
 const SUBSET_PROBE_JOBS = 4;
 
-export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
+export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number } = {}): SharedSamples {
   // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
   // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
   // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
@@ -4847,7 +4900,7 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {})
   if (hit) return hit;
   return withWorkEpoch(() => samplePool(facts, opts));
 }
-function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples {
+function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
@@ -4860,7 +4913,7 @@ function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples
   // that, a job's memo hit was free, so the pool came back cut cold and complete warm.
   const memoBefore = sampleMemo;
   // #1770 (ADR-586): every fold the pool reads — its setup and its jobs — is observed for re-attempt cuts.
-  const observed = observeReattemptCuts(() => samplingJobs(facts, { wide: !narrow }));
+  const observed = observeReattemptCuts(() => samplingJobs(facts, { wide: !narrow, atSeed: opts.atSeed }));
   const { jobs, finish } = observed.value;
   const aborts0 = solveBudget.aborts;
   const runJobs = (stop: () => boolean) => {

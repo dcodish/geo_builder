@@ -14,7 +14,9 @@ vi.mock('@/parser/llm', () => ({ llmParse: async () => ({ built: [], dropped: []
 
 import { driveThroughGate } from '@/__tests__/submit-gate';
 import { findValidConfig, meetsRequirements, replay, searchAnotherView, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { impossibleExtensionSide } from '@/replay/core';
+import { extensionSideConfig, impossibleExtensionSide } from '@/replay/core';
+import { work } from '@/engine/solveBudget';
+import { parse } from '@/parser';
 import { extensionSideVerdict } from '@/app/extensionSide';
 import { ctxOf } from '@/__tests__/scenario-pipeline';
 import type { AnyCommand, Vec } from '@/engine';
@@ -155,6 +157,60 @@ describe('#2518 (ADR-784, rulings 2026-11-04) — a stated side no figure has is
     expect(impossibleExtensionSide(facts, [{ type: 'segment', id: 'seg-AO', a: 'A', b: 'O' } as AnyCommand], 0)).toBeNull();
     const { facts: bare } = driveThroughGate(['מעגל שמרכזו P', 'קטע AO']);
     expect(impossibleExtensionSide(bare, [{ type: 'extend-onto-circle', id: 'R', a: 'A', b: 'O', circle: 'circle-P' }], 0)).toBeNull();
+  });
+});
+
+describe('#2518 (ADR-784, judge ruling, option B) — a later line that makes a standing extension impossible is refused', () => {
+  const STANDING = ['מעגל שמרכזו P ברדיוס 3', 'נקודה A על מעגל P', 'נקודה O', 'המשך AO חותך את מעגל P בנקודה R'];
+  const expectBroken = (lines: string[]) => {
+    const { facts, refused } = driveThroughGate(lines);
+    expect(refused.map((r) => r.utterance)).toEqual([lines[lines.length - 1]]);
+    expect(refused[0].verdict).toMatchObject({ kind: 'refused', reason: 'extension-side', detail: 'input.extensionSideBroken' });
+    expect(facts.some((f) => f.utterance === lines[lines.length - 1]), 'nothing committed').toBe(false);
+  };
+
+  it('a pinned circle: «OP = 10» after the extension', () => expectBroken([...STANDING, 'OP = 10']));
+
+  it('a free radius, where a larger circle would have worked, is refused too (the report, then «OP = 10»)', () => expectBroken([...REPORT, 'OP = 10']));
+
+  it('the refusal names the extension line and the statement that broke it', () => {
+    const { facts } = driveThroughGate(STANDING);
+    const c = parse('OP = 10', ctxOf(facts));
+    if (!c.ok) throw new Error('parse');
+    const v = extensionSideVerdict('OP = 10', 'OP = 10', c.commands, ctxOf(facts), facts, 0);
+    expect(v?.messageKey).toBe('input.extensionSideBroken');
+    expect(v?.params).toEqual({ detail: 'OP = 10', extension: STANDING[3], id: 'R', second: 'O' });
+  });
+
+  it('a line that leaves the side possible commits', () => {
+    const { refused } = driveThroughGate([...STANDING, 'AO = 2']);
+    expect(refused).toEqual([]);
+  });
+
+  it('a figure already off its side (a saved one) never blames a new line', () => {
+    const { facts } = driveThroughGate(PINNED);
+    const saved = trialFacts(facts, [{ type: 'extend-onto-circle', id: 'R', a: 'A', b: 'O', circle: 'circle-P' }]);
+    const line = parse('AO = 12', ctxOf(saved));
+    if (!line.ok) throw new Error('parse');
+    expect(impossibleExtensionSide(saved, line.commands, 0)).toBeNull();
+  });
+
+  it('a figure with no extension pays nothing: not one read of a fact beyond its command', () => {
+    const { facts } = driveThroughGate(['ריבוע ABCD', 'נקודה G על AD']);
+    let reads = 0;
+    const watched = facts.map((f) => new Proxy(f, { get: (t, k) => { if (k !== 'cmd' && k !== 'enabled') reads++; return Reflect.get(t, k); } }));
+    expect(impossibleExtensionSide(watched, [{ type: 'segment', id: 'seg-AB', a: 'A', b: 'B' } as AnyCommand], 0)).toBeNull();
+    expect(reads, 'no replay, no trial, no pool').toBe(0);
+  });
+
+  it('a line on the side at the drawn seed spends only the trial replay; the work cap bounds the rest, the same on every run', () => {
+    const { facts } = driveThroughGate(REPORT);
+    const c = parse('נקודה M על AR', ctxOf(facts));
+    if (!c.ok) throw new Error('parse');
+    const w0 = work.done;
+    expect(impossibleExtensionSide(facts, c.commands, 0)).toBeNull();
+    expect(work.done - w0).toBeLessThan(1000);
+    expect(extensionSideConfig.cap).toBeLessThanOrEqual(150_000);
   });
 });
 
