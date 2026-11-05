@@ -193,6 +193,10 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 `shell/vulgarFractions.ts` `spellVulgarFractions` spells every Unicode vulgar-fraction glyph (all 18, ½ … ⅒) as the digits the number readers read — 2-D's ADR-635 reader, moved here unchanged when 3-D became its second caller (#2255). A MIXED number is one number: the exact decimal when the fraction terminates («2½» → `2.5`, «2 ½» too), else the improper fraction («2⅓» → `7/3`); the whole part is guarded by `indexedName`'s `UNGLUED`, so a subscripted label is never a mixed number. A glyph coefficient of a radical moves below it («½√3» → `√3/2`, «¾√3» → `3√3/4`), a glyph under a root is parenthesised («√½» → `√(1/2)`), and a lone glyph is `a/b`, spaced away from a glued letter or digit. It is a PARSER-boundary spelling, not a store one: 2-D `normalizeUtterance` (through its `src/parser/lexicon.ts` re-export) and 3-D `normalize3` call it, and the stored line keeps the glyph as typed. **Analytic is not a caller yet**: its `frameAnalytic.ts` folds ½ ¼ ¾ only, so «2⅓» goes to the AI there (#2349). The cross-builder lock is the parity rows `glyph-fraction-ratio-2008` and `vulgar-mixed-length-2255`, with 2-D's `vulgar-fraction-2008` and 3-D's `vulgar-fraction-2255` tests.
 
+### A stated number and its spelling ([ADR-W-179](06w-decisions-workspace.md#adr-w-179))
+
+`shell/literal.ts` is the one seam: `readLiteral(raw)` at the parser gives a literal's value and spelling, and `givenText(value, src, tier)` at every given printer gives the text. A decimal prints through `fmtNum` (sr-22); a fraction or a root prints as written; a literal that no longer reads as `value` falls back to the caller's `tier`; a non-literal expression («4π») prints as it stands. A derived row never calls it. 3-D carries `src` on its commands, 2-D reads `expr.text`, analytic reads `spelledText(e)`, complex reads `Constraint.src`.
+
 ### The input-script rule ([ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328))
 
 `shell/inputScript.ts` answers one question for all four builders: **is there a letter in this line the tool

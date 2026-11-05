@@ -406,3 +406,7 @@ behave.
 - **`/complex-builder/api/*` is reverse-proxied in production** by the directives in
   `deploy/apache-complex-builder.conf`; the gap [#903](https://github.com/dcodish/geo_builder/issues/903)
   recorded is closed.
+
+## The typed spelling on the canvas ([ADR-W-179](06w-decisions-workspace.md#adr-w-179))
+
+A number typed with no parameter takes its canvas label from `replay/typedSpelling.ts`, which reads the parts out of `Constraint.src` through `shell/literal`. Only the view the line was typed in changes. A part that does not read as the fold's value gives no label, so the reading stands. The fold never reads it.

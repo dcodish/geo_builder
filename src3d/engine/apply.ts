@@ -19,6 +19,7 @@ import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3,
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
+import { spellingOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -842,7 +843,7 @@ function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs:
     if (!/^[a-w]$/.test(n)) return { ok: false, error: { code: 'bad-name', id: n } };
     if (vectorNameTaken3(c, n)) return { ok: false, error: { code: 'already-defined', id: n } };
     const next = clone(c);
-    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ coeff: t.coeff, atom: t.atom })) });
+    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ ...t })) }); // #1497: `...t` keeps the typed coefficient
     return { ok: true, next };
   }
   if (fresh.length > 0) return { ok: false, error: { code: 'unknown-vector', id: fresh[0] } };
@@ -856,7 +857,7 @@ function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs:
     if (c.freeVecMetrics.some((m) => exprVectorNames(m.kind === 'mag' ? m.e : [...m.e1, ...m.e2]).includes(n))) continue; // ADR-3D-406
     if ([...c.freeVectors.values()].some((o) => o.def && exprVectorNames(o.def).includes(n))) continue; // another is defined by it
     const next = clone(c);
-    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ coeff: t.coeff, atom: t.atom })) });
+    next.freeVectors.set(n, { comps: [null, null, null], def: other.map((t) => ({ ...t })) }); // #1497: `...t` keeps the typed coefficient
     return { ok: true, next };
   }
   // 3. an anchored arrow equal to a constant: its pin
@@ -901,7 +902,7 @@ function freeVecEquation3(c: Construction3, lhs: import('./types').VecExpr, rhs:
  *    pivot ↔ free solve and stays `free-vector-coupling` (b3, `later`).
  */
 function freeVecRel3(c: Construction3, cmd: Extract<Command3, { type: 'vec-rel' }>): ApplyResult3 {
-  const flat = (terms: import('./types').SymTerm[]): import('./types').VecExpr => terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom }));
+  const flat = (terms: import('./types').SymTerm[]): import('./types').VecExpr => terms.map((t) => ({ coeff: t.coeff.k, ...(t.src ? { src: t.src } : {}), atom: t.atom }));
   const firstFree = (terms: import('./types').SymTerm[]): string => freeNamesIn3(c, flat(terms))[0] ?? '?';
   // inline every DEFINED free vector by its combination — the one inliner (#2603 b1), with the letter's part carried
   const expand = (terms: import('./types').SymTerm[]): import('./types').SymTerm[] =>
@@ -953,13 +954,13 @@ function freeVecMetricOf3(c: Construction3, cmd: Command3): FreeVecMetric3 | nul
   let m: FreeVecMetric3 | null = null;
   switch (cmd.type) {
     case 'vec-mag':
-      m = { kind: 'mag', e: one(cmd.name), value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) };
+      m = { kind: 'mag', e: one(cmd.name), value: cmd.value, ...spellingOf(cmd) };
       break;
     case 'mag-val':
-      m = { kind: 'mag', e: cmd.e, value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) };
+      m = { kind: 'mag', e: cmd.e, value: cmd.value, ...spellingOf(cmd) };
       break;
     case 'mag-rel':
-      m = { kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c };
+      m = { kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c, ...(cmd.src ? { src: cmd.src } : {}) };
       break;
     case 'dot-given':
       m = { kind: 'dot', e1: one(cmd.v1), e2: one(cmd.v2), value: cmd.value };
@@ -998,9 +999,9 @@ function anchoredMetricTwin3(c: Construction3, m: FreeVecMetric3): Command3 | nu
   const operand = (a: VecAtom): Operand3 => (a.kind === 'pair' ? { kind: 'segment', a: a.from, b: a.to } : { kind: 'vector', name: a.name });
   switch (m.kind) {
     case 'mag':
-      return { type: 'mag-val', e: sides[0], value: m.value, ...(m.decimal ? { decimal: true as const } : {}) };
+      return { type: 'mag-val', e: sides[0], value: m.value, ...spellingOf(m) };
     case 'mag-rel':
-      return { type: 'mag-rel', e1: sides[0], e2: sides[1], c: m.c };
+      return { type: 'mag-rel', e1: sides[0], e2: sides[1], c: m.c, ...(m.src ? { src: m.src } : {}) };
     case 'cos': {
       const [a, b] = [single(sides[0]), single(sides[1])];
       return a && b ? { type: 'cos-angle', u: a.atom, v: b.atom, cos: m.cos * Math.sign(a.coeff) * Math.sign(b.coeff) } : null;
@@ -2682,13 +2683,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!side) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
         const flat = applyCommand3(c, { type: 'altitude-foot', id: foot, from, a: side[0], b: side[1] });
         if (!flat.ok || cmd.len === undefined) return flat;
-        return applyCommand3(flat.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...(cmd.lenDecimal ? { decimal: true as const } : {}) } });
+        return applyCommand3(flat.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...spellingOf({ value: cmd.len, src: cmd.lenSrc, decimal: cmd.lenDecimal }) } });
       }
       const made = applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
       // #1448: «גובה הפירמידה 4» — the phrase carried its value; the claim lands on apex→foot,
       // whose letter exists only now. The same two commands the two-line spelling always was.
       if (!made.ok || cmd.len === undefined) return made;
-      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...(cmd.lenDecimal ? { decimal: true as const } : {}) } });
+      return applyCommand3(made.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len, ...spellingOf({ value: cmd.len, src: cmd.lenSrc, decimal: cmd.lenDecimal }) } });
     }
 
     case 'point-in-span': {
@@ -3077,7 +3078,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: false, error: { code: 'symbolic-new-point', id: cmd.id } }; // a NEW point needs numbers
       }
       const next = clone(c);
-      next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z });
+      next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z, ...(cmd.srcs ? { srcs: cmd.srcs } : {}) });
       return { ok: true, next };
     }
 
@@ -3719,7 +3720,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           claim: {
             type: 'vec-eq',
             lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }],
-            rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })),
+            rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, ...(t.src ? { src: t.src } : {}), atom: t.atom })),
           },
         });
         if (!asClaim.ok) return asClaim;
@@ -3888,7 +3889,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const refErr = vectorRefsError3(c, [cmd.name]); // #1188: «|u| = 5» on a free u is step 4
       if (refErr) return { ok: false, error: refErr };
       const d = c.vectors.get(cmd.name)!;
-      return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: d.from, b: d.to, value: cmd.value, ...(cmd.decimal ? { decimal: true as const } : {}) } });
+      return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: d.from, b: d.to, value: cmd.value, ...spellingOf(cmd) } });
     }
 
     case 'symbol-value': {
@@ -4312,9 +4313,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       if (cmd.e.length === 1 && Math.abs(cmd.e[0].coeff - 1) < 1e-12) {
         const a = cmd.e[0].atom;
-        const decimal = cmd.decimal ? { decimal: true as const } : {}; // #2361: the value as typed travels to the one stated-length seam
-        if (a.kind === 'named') return applyCommand3(c, { type: 'vec-mag', name: a.name, value: cmd.value, ...decimal });
-        return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: a.from, b: a.to, value: cmd.value, ...decimal } });
+        const spelling = spellingOf(cmd); // #1497: the value as typed travels to the one stated-length seam
+        if (a.kind === 'named') return applyCommand3(c, { type: 'vec-mag', name: a.name, value: cmd.value, ...spelling });
+        return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: a.from, b: a.to, value: cmd.value, ...spelling } });
       }
       const next = clone(c);
       for (const t of cmd.e) {

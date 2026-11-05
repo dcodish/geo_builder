@@ -99,7 +99,8 @@
               "atom": {
                 "kind": "named",
                 "name": "u"
-              }
+              },
+              "src": "1/2"
             },
             {
               "coeff": {
@@ -109,7 +110,8 @@
               "atom": {
                 "kind": "named",
                 "name": "v"
-              }
+              },
+              "src": "1/2"
             },
             {
               "coeff": {
@@ -119,7 +121,8 @@
               "atom": {
                 "kind": "named",
                 "name": "w"
-              }
+              },
+              "src": "5/3"
             }
           ]
         }
@@ -167,7 +170,8 @@
               "atom": {
                 "kind": "named",
                 "name": "u"
-              }
+              },
+              "src": "1/5"
             },
             {
               "coeff": {
@@ -177,7 +181,8 @@
               "atom": {
                 "kind": "named",
                 "name": "v"
-              }
+              },
+              "src": "1/5"
             }
           ]
         }

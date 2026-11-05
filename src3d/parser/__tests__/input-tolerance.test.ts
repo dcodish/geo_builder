@@ -141,7 +141,8 @@ describe('#513 — a PARENTHESISED radicand reads as the bare one, in every slot
   });
 
   it('the same atom serves a COORDINATE component — one reader, not one per slot (#510)', () => {
-    expect(cmds('C(√(2),1,0)')).toEqual(cmds('C(√2,1,0)'));
+    const bare = (u: string) => cmds(u)?.map((c) => ({ ...c, srcs: undefined })); // #1497: `srcs` is the spelling, as typed
+    expect(bare('C(√(2),1,0)')).toEqual(bare('C(√2,1,0)'));
     expect(cmds('C(√(2),1,0)')).toMatchObject([{ type: 'point3', id: 'C', x: Math.SQRT2 }]);
   });
 

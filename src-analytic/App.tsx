@@ -39,7 +39,7 @@ import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
+import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
@@ -2155,7 +2155,7 @@ export function App() {
                   const [a, b] = s.ends;
                   const k = s.length;
                   return (
-                    <span key={s.id}><ValueRow text={`${a}${b} = ${valueText(k, fmt, `${a}${b}`) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${segmentLengthText(s, fmt) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
                   );
                 }),
               },

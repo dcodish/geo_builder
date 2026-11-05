@@ -8,7 +8,8 @@
  * CALL it rather than reproduce it (the #1102 rule this tree already records).
  */
 import type { derive } from '../engine/derive';
-import { exprText } from '../engine/expr';
+import { exprText, literalText, type Expr } from '../engine/expr';
+import { givenText } from '../../shell/literal';
 import { knownCurve, knownValue, knownValues, reportPending } from '../engine/evaluate';
 import { valueText } from './panelRows';
 
@@ -22,7 +23,13 @@ export function pointText(
   ky: Know,
   fmt: (v: number) => string,
 ): string {
-  if (kx.known && ky.known) return `(${fmt(kx.value as number)}, ${fmt(ky.value as number)})`;
+  if (kx.known && ky.known) {
+    // #1497 (ADR-W-179): a coordinate the student stated prints as typed; one the figure fixed reads the tiers
+    const own = d.construction.objects.find((o) => o.id === id);
+    const coord = (e: Expr | undefined, v: number): string =>
+      e ? givenText(v, literalText(e), fmt) : fmt(v);
+    return `(${coord(own?.kind === 'point' ? own.x : undefined, kx.value as number)}, ${coord(own?.kind === 'point' ? own.y : undefined, ky.value as number)})`;
+  }
 
   /**
    * A DISCRETE SET of positions (#1036) — «הבחן בין שני מקרים», which the corpus asks about six

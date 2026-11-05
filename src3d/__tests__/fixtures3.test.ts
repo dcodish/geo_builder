@@ -522,6 +522,9 @@ const SEEDED: SeededCorpus = {
   // needed) and carries its typed-decimal mark. The labels on both surfaces are asserted in
   // issue-2361-stated-value-text.test.ts; this is the build + drift net.
   'stated-length-7-9999-2361.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9999'],
+  // #1497 (ADR-3D-426) — the operator's four lines: «SD = (2/3)u» keeps its spelling. The row is asserted in
+  // issue-1497-format-of-entry.test.ts; this is the build + drift net.
+  'format-of-entry-2-3u-1497.geo3.json': ['פירמידה משולשת ABCS', 'D על SB', 'נסמן: SB = u', 'SD = (2/3)u'],
   // #1986 (ADR-3D-418) — the issue's two reported rows: a second ring a dart saves, and a trapezoid a coordinate letter
   // saves past its default window. Both rings drawn simple, k > 4 and the seeds are asserted in
   // issue-1986-ring-search.test.ts; these are the build + drift net.

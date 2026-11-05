@@ -125,7 +125,8 @@
               "atom": {
                 "kind": "named",
                 "name": "u"
-              }
+              },
+              "src": "2/3"
             },
             {
               "coeff": {
@@ -135,7 +136,8 @@
               "atom": {
                 "kind": "named",
                 "name": "v"
-              }
+              },
+              "src": "1/3"
             }
           ]
         }

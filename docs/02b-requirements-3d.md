@@ -708,8 +708,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - **One text, two decimals when needed** (#2361, operator ruling sr-22 / ADR-W-175, 2026-11-02). The label on the
     edge and the `|AB| = …` row in the data panel print the same text. A value written as a decimal reads in at most
     two decimals and is computed with the full value («AC = 7.9999» reads «8», «AC = 4.005» reads «4.01»), and is
-    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. An integer, a fraction or a root
-    keeps its exact form («9/2», «2√3»; «√20» reads «2√5»). The same holds for a free vector's stated «|u| = 2.5».
+    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. A fraction or a root reads as typed
+    («9/2», «2√3», «√20», «√8», #1497, [ADR-3D-426](06b-decisions-3d.md#adr-3d-426)), and so does a stated coordinate
+    («B(0.5,0,0)», «B(2/3,0,0)») and a vector coefficient («SD = (2/3)u» reads «2/3u»). The same holds for a free
+    vector's stated «|u| = 2.5».
   - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is

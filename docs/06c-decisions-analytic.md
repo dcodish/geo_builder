@@ -15438,3 +15438,43 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** New `src-analytic/__tests__/point-order-1774.test.ts`: the reported line, both taught shapes spelling by spelling, each recording, both locales, lines that are not taught, the bare row, the neighbours, and «הישר» with one, two and no lines. Parity rows `ex-coordinate-letter-after-1774`, `ex-coordinate-equals-1774`.
 
 **Behaviour change for a student:** «(3,5)A» and «A = (3,5)» no longer say "not understood". The box fills with «A(3,5)» and a note says why; Enter draws it. «P על הישר» on a figure with one line puts P on it; with two lines the tool asks which.
+## ADR-AG-413 — A stated coordinate prints as typed, in the panel and on the canvas (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (analytic, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the analytic half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 · **Design:** [04c](04c-design-analytic.md) § the stated-measure layer · **LADDER stage:** none (display)
+
+**Root cause.** A known coordinate reached both surfaces as a number and `fmtAnalytic` re-spelled it: «A(0.5,2/3)» read `(1/2, 2/3)`, «A(√8,1.25)» read `(2√2, 5/4)`. The `Expr` already held the structure; nothing read it once the value was known.
+
+**Decision.** `spelledText(e)` (`engine/expr.ts`) prints an `Expr` in the student's notation, juxtaposition at every depth. It is the analytic `src`, because the canvas reads the `Expr`, not the line. `provenanceOf` carries it on a stated coordinate with no letter in it; `pointText` and the canvas label print it through `givenText`, so a decimal reads the house decimals (sr-22). A coordinate through a letter, and any point the figure fixed, read the tiers. `statedText` now delegates to it, so «3√7/2» has no «·».
+
+**Sibling audit.** ADR-W-179. The stated-length canvas label is [ADR-AG-407](#adr-ag-407).
+
+**Locks.** `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`.
+
+## ADR-AG-407 — A stated value is labelled as typed, and π survives the expression layer (#1806, #2033)
+
+**Status:** accepted · 2026-11-05 · bug (analytic, P2 + P3) · fix round #2722, stream I · branch `fix/1806-2033-canvas-spelling`, stacked on [ADR-AG-413](#adr-ag-413) · the #1806 plan and the #2033 plan of 2026-10-13 · **amends** [ADR-AG-225](#adr-ag-225) §3 («a number prints through `fmtAnalytic`» becomes «a given prints as typed») · **amends** the #1129 reading of π (π still evaluates as a constant, and now prints as π)
+
+**Operator:** 2026-10-06: *"display on BC on canvas should be with the sqrt as entered by user"*. 2026-09-28 (#1497): a given prints as typed, in every tool; «√8» stays «√8». 2026-10-13 (#2033): *"A, Accept at P3, as 2-D does."* 2026-11-02 (sr-22): a decimal reads two decimals when needed.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 · **Design:** [04c](04c-design-analytic.md) § the stated-measure layer · **LADDER stage:** none (display)
+
+**Measured before** (`fded2a8c`, `derive` → `buildScene`): «BC=6√5» → «6√5» (the plan's «13.42» is gone: #2394's surd tier guesses it); «BC=√8» → «2√2»; «BC=0.5» → «1/2»; «BC=1.25» → «5/4»; «AB = 4π» → «12.57»; «שטח המשולש ABC הוא 12π» → «S=37.7»; «∢ABC = 22.5» → «45/2°».
+
+**Root cause.** **Class:** *a stated value is labelled by re-printing a float, or a lossy `Expr`, instead of the student's own spelling.* `valueOf` evaluated a symbol-free value and dropped its text, so `valueText` guessed through `fmtAnalytic`. π had a second root: `tokenize` made it a plain number, so no printer of the `Expr` could write it, and the #1806 plan as written would have turned «S=37.7» into «S=12·3.14».
+
+**Decision.**
+1. **`{ kind: 'num', value: Math.PI, pi: true }`.** The token remembers π; evaluation still reads `value`, so #1129's constant semantics hold and no solve changes. Every printer writes «π», and a number times π juxtaposes («12π») in `exprText` too.
+2. **One spelling-keeper.** `StatedValue` gains `src` from `literalText(e)`, the channel ADR-AG-413 built, and `valueText` prints it through the shared `givenText`. There is no second keeper: `literalText` is the `Expr`-side half `shell/literal` cannot supply, because the canvas reads the `Expr`, not the line. `shell/literal` reads no π, so `literalText` admits an expression that carries one.
+3. **What keeps the fallback (ADR-AG-225 §3):** a trig given's angle (a converted value is not what was typed), and arithmetic («BC = 2+3»).
+
+   **Not honoured from the plan, by measurement.** The plan kept the fallback for a value fixed through a letter, expecting «BC = a» · «a = √8» to read «2√2». The fold substitutes the letter, so the `length-eq` holds `√8` in either order, no letter reaches `valueOf`, and the plan's own mechanism prints «√8», the spelling the student gave the letter (docs/17 §9). Keeping «2√2» would need a new record of the substitution. It is a question for the operator, reported in round #2722.
+4. **The panel's length row** of a stated segment reads the same text (`segmentLengthText`); a derived length keeps the tiers.
+5. **Other printers of the `Expr`.** A typed π now prints «π» in curve equations (`curveText`), the circle row, point text, constraint descriptions and `carriers.ts`. The circle row reads `spelledText`, so «r = 2π».
+
+**Sibling audit.** 2-D's canvas writes «6√5», «√8», «2/3», «0.5», «4π» at `28dac0c3`, so analytic now agrees on every row. 3-D and complex are ADR-W-179; complex π is #2000. A radian angle keeps its refusal (#1837): the check reads the line, and the value is unchanged. #2013 reads `src` like every other lane, so its planned text field is not needed.
+
+**Locks.** `src-analytic/__tests__/issue-1806-2033-canvas-spelling.test.ts` (one row per spelling through the real `derive` → `buildScene`, the operator's `d_{BC}=6√5`, both fallbacks, the printers, |AB| = 4π at 24 seeds).
+
+**Behaviour change for a student:** a stated length, area or angle in analytic is labelled as typed: a root stays unsimplified, a decimal stays a decimal, and a π value reads with π.

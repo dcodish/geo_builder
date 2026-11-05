@@ -1243,6 +1243,8 @@ the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expr
 
 ### The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
 
+A stated value carries its spelling: `src` on the `length-eq` claim, `vec-mag`, `mag-val`, `mag-rel`, `lenSrc` on `perp-to-base`, `srcs` on a tuple, `src` on `VecTerm`/`SymTerm` ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426)). `statedMagText` and `statedCoordText` print it through `shell/literal`. Display only: nothing solves from it. `spellingOf` reads the older `decimal` mark from a save.
+
 | kind | scene record | shape |
 | --- | --- | --- |
 | distance | `SceneWitness3` | dashed closest-point segment **+** value |

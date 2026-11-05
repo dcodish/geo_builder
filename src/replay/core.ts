@@ -14,6 +14,7 @@
  */
 
 import { indexedNameText } from '../../shell/indexedName';
+import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
@@ -5025,7 +5026,30 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   // enabled facts only, so deselecting the statement that named it removes its row with it.
   const symbols = symbolBindings(enabledCmds);
   // #1601 (ADR-558): the panel SAYS when its pool was cut short, rather than reading as "nothing to derive".
-  return { ...computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined, shared.complete, shared.samples.map((pos, i) => seedOfSample.get(pos) ?? i)), complete: shared.complete };
+  const panel = computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined, shared.complete, shared.samples.map((pos, i) => seedOfSample.get(pos) ?? i));
+  return { ...panel, rows: withGivenSpelling(panel.rows, enabledCmds), complete: shared.complete };
+}
+
+/**
+ * #1497 ([ADR-W-179](../../docs/06w-decisions-workspace.md#adr-w-179)) — a stated row prints the student's spelling.
+ * 2-D's parser already keeps it (`expr.text`, the text the canvas label prints), so the panel reads that one text
+ * instead of re-spelling the float: «AB = √8» read «2√2» here and «√8» on the segment, «2/3» read «0.67». Through the
+ * shared given printer. A row in the student's unit, or with two values, is not a stated literal and keeps its own form.
+ */
+function withGivenSpelling(rows: ValuesPanelResult['rows'], cmds: readonly AnyCommand[]): ValuesPanelResult['rows'] {
+  const sorted = (ids: readonly string[]) => [...ids].join('').split('').sort().join('');
+  const spelled = new Map<string, { value: number; text: string }>();
+  for (const c of cmds) {
+    if (c.type === 'measure-length' && 'value' in c.expr && c.expr.text) spelled.set(`length:${sorted([c.a, c.b])}`, { value: c.expr.value, text: c.expr.text });
+    if (c.type === 'measure-area' && !c.round && 'value' in c.expr && c.expr.text) spelled.set(`area:${sorted(c.ids)}`, { value: c.expr.value, text: c.expr.text });
+    if (c.type === 'measure-perimeter' && !c.round && 'value' in c.expr && c.expr.text) spelled.set(`perimeter:${sorted(c.ids)}`, { value: c.expr.value, text: c.expr.text });
+  }
+  return rows.map((r) => {
+    const typed = r.stated && !r.unit && !r.or && !r.pm ? spelled.get(`${r.kind}:${sorted(r.ids)}`) : undefined;
+    // the stated value, not the row's: the row is read off the solved figure, to the solver's tolerance
+    const given = typed ? givenText(typed.value, typed.text, () => '') : '';
+    return given ? { ...r, given } : r;
+  });
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

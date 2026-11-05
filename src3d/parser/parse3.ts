@@ -22,6 +22,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { spellVulgarFractions } from '../../shell/vulgarFractions';
+import { readLiteral } from '../../shell/literal';
 import { isPlanar, sameOperand } from '../engine/operands';
 import { statedPlaneRuns3 } from '../engine/mintable';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
@@ -1467,14 +1468,12 @@ const stripStatementPrefix = (s: string): string =>
  *  here: {@link normalize3} spells it as digits (#2255, ADR-3D-374), so no reader keeps a glyph table. */
 function parseCoeff(s: string | undefined): number | null {
   if (s === undefined || s === '') return 1;
-  const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (frac) {
-    const den = parseInt(frac[2], 10);
-    return den === 0 ? null : parseInt(frac[1], 10) / den;
-  }
   if (/√/.test(s)) return evalRadical(s); // #55 gap (a): a RADICAL coefficient (`√2·OD`) makes `AB = √2·OD`
   // a vec-rel exactly like `A'K = 4/5 DN` (the neutral vector lane — coefficient pair=pair is NOT the bare
   // c=1 ambiguity), instead of falling through to not-handled → the LLM.
+  const lit = readLiteral(s); // #1497: the shared reader (`shell/literal`)
+  if (lit) return lit.value;
+  if (/^\d+\s*\/\s*0+$/.test(s.trim())) return null; // a zero denominator refuses, never a half-read numerator
   const v = parseFloat(s);
   return Number.isFinite(v) ? v : null;
 }
@@ -1533,8 +1532,9 @@ export function parseVecExpr(src: string): VecExpr | null {
     const coeff = parseCoeff(m[2]);
     if (coeff === null) return null;
     const signed = (m[1] === '-' ? -1 : 1) * coeff;
-    if (m[3]) expr.push({ coeff: signed, atom: { kind: 'named', name: m[3] } });
-    else expr.push({ coeff: signed, atom: { kind: 'pair', from: m[4], to: m[5] } });
+    const spelled = m[2] ? statedSrc(m[2]) : {}; // #1497: the coefficient as typed
+    if (m[3]) expr.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: m[3] } });
+    else expr.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: m[4], to: m[5] } });
   }
   return expr;
 }
@@ -1892,8 +1892,10 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
     }
     const neg = (x: number) => (x === 0 ? 0 : -x); // never emit -0 (JSON round-trips it to 0)
     const signed: LinExpr = sign === '-' ? { k: neg(coeff.k), p: neg(coeff.p) } : coeff;
-    if (pairA) terms.push({ coeff: signed, atom: { kind: 'pair', from: pairA, to: pairB } });
-    else terms.push({ coeff: signed, atom: { kind: 'named', name: named } });
+    // #1497: a purely numeric coefficient keeps its spelling, «(2/3)u» as «2/3»; a letter's never does
+    const spelled = !symLetter && coeff.p === 0 ? statedSrc(paren ?? `${numRaw ?? ''}${divisor ? `/${divisor}` : ''}`) : {};
+    if (pairA) terms.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: pairA, to: pairB } });
+    else terms.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: named } });
   }
   return { terms, symbol };
 }
@@ -1913,17 +1915,6 @@ let PARAM_CONFLATED: string | null = null;
 /** #836: a rule saw «אלכסון ראשי» used as a definite REFERENCE — four candidates, so it must ask. */
 let MAIN_DIAGONAL_AMBIGUOUS = false;
 
-/** The VALUE of a {@link RADICAND} capture — `48`, `(48)`, `(12/4)`. Null on a zero denominator, so a
- *  malformed radicand refuses rather than reaching a figure as NaN or Infinity. */
-const RADICAND_FRAC_RE = new RegExp(String.raw`^(${UNUM})\s*\/\s*(${UNUM})$`);
-function radicandValue(raw: string): number | null {
-  const inner = raw.trim().replace(/^\(\s*(.*?)\s*\)$/, '$1');
-  const frac = inner.match(RADICAND_FRAC_RE);
-  if (frac) return +frac[2] === 0 ? null : +frac[1] / +frac[2];
-  const v = +inner;
-  return Number.isFinite(v) ? v : null;
-}
-
 /** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4), and — #513 — a
  *  parenthesised radicand: √(48), 2√(3), √(12/4), √(48)/4. */
 /**
@@ -1932,7 +1923,6 @@ function radicandValue(raw: string): number | null {
  * the atom (2-D escalates it), and so does «×» (2-D escalates «2×√7»).
  */
 const ROOT_PRODUCT = String.raw`(?:[*·]\s*(?=√))`;
-const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*${ROOT_PRODUCT}?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
 /**
  * #1827 ([ADR-3D-341](../../docs/06b-decisions-3d.md#adr-3d-337)) — THE MAGNITUDE ATOM: the lexical
  * half of {@link evalRadical}, and the ONE source every stated-magnitude slot composes from. `7`, `2.5`,
@@ -1956,27 +1946,18 @@ function magValue(raw: string): number | null {
   return v === null ? null : -v;
 }
 /**
- * #2361 ([ADR-3D-416](../../docs/06b-decisions-3d.md#adr-3d-416)) — the one fact a stated magnitude's DISPLAY needs
- * from how the student wrote it: was it a decimal numeral («4.1», «7.9999»)? Such a value prints in the house
- * decimals (sr-22, ADR-W-175), never as the fraction the exact-form tier would dress it in («41/10»). An integer,
- * a fraction or a root keeps its exact form, so only a decimal is marked. Spread into the command that carries the
- * value: `{ ...typedDecimal(raw) }`.
+ * #1497 ([ADR-3D-426](../../docs/06b-decisions-3d.md#adr-3d-426)) — the student's SPELLING of a stated magnitude,
+ * spread into the command that carries its value: `{ ...statedSrc(raw) }`. It replaces #2361's `decimal` mark, which
+ * kept one bit of this. An integer spells itself in every tier, so it carries nothing.
  */
-function typedDecimal(raw: string): { decimal?: true } {
-  return /^-?\s*\d+\.\d+$/.test(raw.trim().replace(/^\((.*)\)$/, '$1').trim()) ? { decimal: true } : {};
+function statedSrc(raw: string): { src?: string } {
+  const lit = readLiteral(raw);
+  return lit && !/^-?\d+$/.test(lit.src) ? { src: lit.src } : {};
 }
 export function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
-  if (s0 === '') return null;
-  const m = s0.match(RADICAL_RE);
-  if (!m || (!m[1] && !m[2])) return null;
-  const a = m[1] ? +m[1] : 1;
-  const radicand = m[2] !== undefined ? radicandValue(m[2]) : 1;
-  if (radicand === null || radicand < 0) return null; // √ of a negative is not a real magnitude
-  const r = m[2] !== undefined ? Math.sqrt(radicand) : 1;
-  const d = m[3] ? +m[3] : 1;
-  if (d === 0) return null;
-  return (a * r) / d;
+  if (s0 === '' || /^[-−+]/.test(s0)) return null; // unsigned: {@link magValue} and {@link literalValue} own the sign
+  return readLiteral(s0)?.value ?? null;
 }
 
 /** `|EN| = (√6/4)·|w|` / `|AS| = |AB|` / `אורך EN שווה לאורך AS` / bare `AS = AB` — a
@@ -1991,7 +1972,7 @@ const lengthRel: Rule = (s) => {
   const vm = s.match(/^\|([a-w])\|\s*(?:=|שווה\s+ל)\s*(.+)$/);
   if (vm) {
     const val = evalRadical(vm[2]);
-    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val, ...typedDecimal(vm[2]) }];
+    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val, ...statedSrc(vm[2]) }];
   }
   // the copula `הוא`/`is` joins the separators (the exam's `אורך המקצוע AB הוא 5√5` —
   // the ADR-3D-026 phrasing class)
@@ -2005,7 +1986,7 @@ const lengthRel: Rule = (s) => {
   if (num !== null)
     return [
       { type: 'segment3', a: a1, b: b1 },
-      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num, ...typedDecimal(r) } },
+      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num, ...statedSrc(r) } },
     ];
   // #2092 (ADR-3D-381): a LETTER right side on the bar form — «|AB| = k», «|AB| = 2k». The taught spelling of a
   // length the operator ruled «AB = k» does not mean (that names a vector). Only the bars: «אורך AB הוא k» stays
@@ -2116,7 +2097,7 @@ const magEquality: Rule = (s) => {
   if (!s.includes('|')) return null;
   const links = s.split(/\s*=\s*|\s+שווה\s+ל-?\s*/).map((t0) => t0.trim()).filter((t0) => t0 !== '');
   if (links.length < 2) return null;
-  type MagLink = { expr: VecExpr; c: number };
+  type MagLink = { expr: VecExpr; c: number; cs: string };
   const mags: MagLink[] = [];
   const nums: number[] = [];
   let numLink = '';
@@ -2143,7 +2124,7 @@ const magEquality: Rule = (s) => {
     if (c === null || c <= 0) return null;
     const expr = parseVecExpr(inner);
     if (!expr || expr.length === 0) return null;
-    mags.push({ expr, c });
+    mags.push({ expr, c, cs });
   }
   if (mags.length === 0) return null;
   if (new Set(nums).size > 1) return null; // |u|=1=2 is a contradiction, not a parse
@@ -2151,13 +2132,13 @@ const magEquality: Rule = (s) => {
   if (nums.length > 0) {
     const v = nums[0];
     // #2361: a unit-coefficient magnitude carries the value as typed; `2|u| = 5` states |u| = 5/2, which the tool computed
-    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c, ...(mg.c === 1 ? typedDecimal(numLink) : {}) } as Command3]);
+    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c, ...(mg.c === 1 ? statedSrc(numLink) : {}) } as Command3]);
   }
   if (mags.length < 2) return null; // a lone magnitude with no value/partner says nothing
   const out: Command3[] = [];
   for (let i = 0; i + 1 < mags.length; i++) {
     out.push(...draw(mags[i].expr), ...draw(mags[i + 1].expr));
-    out.push({ type: 'mag-rel', e1: mags[i].expr, e2: mags[i + 1].expr, c: mags[i + 1].c / mags[i].c } as Command3);
+    out.push({ type: 'mag-rel', e1: mags[i].expr, e2: mags[i + 1].expr, c: mags[i + 1].c / mags[i].c, ...(mags[i].c === 1 ? statedSrc(mags[i + 1].cs) : {}) } as Command3);
   }
   return out;
 };
@@ -2237,7 +2218,7 @@ const heightOfSolid: Rule = (s) => {
   const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: h.a, b: h.b, plane: [] };
   // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
   if (h.value !== undefined) {
-    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value, ...(h.decimal ? { decimal: true as const } : {}) } }];
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value, ...(h.src ? { src: h.src } : {}) } }];
   }
   return [role];
 };
@@ -2251,8 +2232,8 @@ interface HeightStatement3 {
   /** the sentence names the solid it is the height OF («גובה הפירמידה», "of the prism") */
   ofSolid: boolean;
   value?: number;
-  /** #2361: the value was typed as a decimal numeral (`typedDecimal`) */
-  decimal?: true;
+  /** #1497: the value as typed (`statedSrc`) */
+  src?: string;
 }
 
 function readHeight3(s: string): HeightStatement3 | null {
@@ -2274,7 +2255,7 @@ function readHeight3(s: string): HeightStatement3 | null {
     b: g.b,
     altitude: g.noun !== 'אנך',
     ofSolid: g.solid !== undefined,
-    ...(value !== undefined ? { value, ...typedDecimal(g.value!) } : {}),
+    ...(value !== undefined ? { value, ...statedSrc(g.value!) } : {}),
   };
 }
 
@@ -2399,7 +2380,7 @@ const heightFromApex: Rule = (s) => {
       type: 'perp-to-base',
       ...(from ? { from } : {}),
       ...(face ? { face } : {}),
-      ...(lenValue !== undefined ? { len: lenValue, ...(typedDecimal(len!).decimal ? { lenDecimal: true as const } : {}) } : {}),
+      ...(lenValue !== undefined ? { len: lenValue, ...(statedSrc(len!).src ? { lenSrc: statedSrc(len!).src } : {}) } : {}),
     },
   ];
 };
@@ -2745,6 +2726,8 @@ const symNames = (
 /** #2077 (ADR-3D-368): the three components AS TYPED, only whitespace trimmed — the display channel every
  *  component reader attaches, so the data panel prints a given the way the student wrote it (#1497). */
 const compSrcs = (raw: readonly string[]): CompSrcs => [raw[0].trim(), raw[1].trim(), raw[2].trim()];
+/** #1497: the same channel on a tuple of plain numbers, only when a component is spelled as more than an integer. */
+const spelledComps = (raw: readonly string[]): { srcs?: CompSrcs } => (raw.some((t) => statedSrc(t).src) ? { srcs: compSrcs(raw) } : {});
 
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
 function parseComp(t: string): { num: number | null; expr: SymComp | null } {
@@ -2793,7 +2776,7 @@ const coordPoint: Rule = (s) => {
   const cmds: Command3[] = [
     comps.some((t) => t.expr !== null)
       ? { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num, syms, ...(symExprs ? { symExprs } : {}), srcs: compSrcs([x, y, z]) }
-      : { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num },
+      : { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num, ...spelledComps([x, y, z]) },
   ];
   let rest = restRaw.trim();
   // ADR-3D-032: the exam's appositive sign clause — `M(k,1,3), k הוא פרמטר חיובי` /
@@ -4650,7 +4633,7 @@ const lengthClaim: Rule = (s) => {
   if (!m || value === null) return null;
   return [
     VEC_MARKED ? { type: 'draw-arrow', from: m[1], to: m[2] } : { type: 'segment3', a: m[1], b: m[2] },
-    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value, ...typedDecimal(m[3]) } },
+    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value, ...statedSrc(m[3]) } },
   ];
 };
 

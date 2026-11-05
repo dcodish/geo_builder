@@ -38,7 +38,7 @@
             "a": "A",
             "b": "B",
             "value": 2.5,
-            "decimal": true
+            "src": "2.5"
           }
         }
       ]

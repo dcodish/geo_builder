@@ -7,6 +7,7 @@
 import React from 'react';
 import { formatMeasure, type ExactForm, type UnitValue } from '@/format';
 import { rowOptions, type TwoValues, type ValueAnswer } from '@/engine/valuesPanel';
+import { MathText } from '../../shell/math';
 
 const m = (tag: string, props: Record<string, unknown> | null, ...children: React.ReactNode[]) =>
   React.createElement(tag, props, ...children);
@@ -80,13 +81,15 @@ export function MathValues({
   label,
   or,
 }: {
-  row: ValueAnswer & TwoValues;
+  row: ValueAnswer & TwoValues & { given?: string };
   degrees?: boolean;
   /** the row's own name, repeated before the second value */
   label: string;
   /** the joiner word in the UI's locale */
   or: string;
 }): React.ReactElement {
+  // #1497 (ADR-W-179): a given prints as the student typed it, typeset the way the step list typesets the same line
+  if (row.given) return <span dir="ltr"><MathText text={row.given} /></span>;
   const o = rowOptions(row);
   const one = (a: ValueAnswer) => <MathValue value={a.value} exact={a.exact} degrees={degrees} unit={a.unit} />;
   if (o.kind === 'one') return one(o.value);

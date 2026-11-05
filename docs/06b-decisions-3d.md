@@ -14678,3 +14678,23 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/circle-created-by-reference-2611.test.ts` (every spelling at eight seeds, the DOF count, order, pins, the refusals that stay, placed members, the shared notice rows). Fixture `fixtures3/point-on-circle-blank-2611.geo3.json`. Parity row `blank-point-on-circle-2611`. The `#2611` row of `catalog-blank-canvas-1566.test.ts` and the `D על המעגל` allowlist line of `UNCOVERED_CATALOG` are gone. `circle-refusal-words-2611.test.ts`, `point-on-circle-2611.test.ts` and `free-circle-253.test.ts` are re-based on the ruling: their blank-canvas refusals were session verdicts carried over until #253, never a ruling.
 
 **Behaviour change for a student:** in 3-D, a line about «המעגל» on an empty canvas now draws a circle and says so. Before, it was refused.
+## ADR-3D-426 — A stated number carries its spelling: `src` replaces the `decimal` mark (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (3d, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the 3-D half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179) · **amends** [ADR-3D-416](#adr-3d-416) (its mark is replaced, as its Decision 4 and the #1497 cross-link of 2026-11-04 planned)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 · **Design:** [04b](04b-design-3d.md) § "The stated-magnitude lane" · **LADDER stage:** none (display)
+
+**Root cause.** `parseCoeff` and `literalValue` returned a bare number, so `2/3` and `0.6667` were one value and `0.5` and `1/2` were one value. The panel then guessed: `cleanCoeff` at 4 decimals, `cleanNum`/`cleanMag` by fitting a fraction or a surd. #2361's `decimal` mark kept one bit of the spelling.
+
+**Decision.**
+1. The readers go through `shell/literal`: `evalRadical`, `magValue` and `parseCoeff` keep their contract (unsigned, signed, loose), so the parse-drift nets hold. `statedSrc(raw)` replaces `typedDecimal` and spreads `{ src }` onto the same commands (`length-eq`, `vec-mag`, `mag-val`; `lenSrc` on `perp-to-base`). An integer spells itself in every tier, so it carries nothing, and the integer corpus is byte-identical.
+2. **`statedMagText(value, src)`** is now `givenText` over `cleanMag`, so the canvas and the panel stay one text.
+3. **A coordinate:** a tuple of plain numbers records `srcs` when a component is spelled as more than an integer; a `coord` point keeps them. `statedCoordText` prints them in `points`, `pointCoords` and `pointComps`, the latest statement of the coordinate first, so the row and the canvas label read one text. A stated tuple row goes through the same printer, so its typed decimal reads the house decimals.
+4. **A coefficient:** `VecTerm` and `SymTerm` gain `src`; `mag-rel` gains it when the left side has no coefficient of its own. `vecSide` prints it, and `cleanCoeff` is deleted. A coefficient the tool computed reads `cleanNum`, so an eliminated relation reads «1/3» where it read «0.3333».
+5. `spellingOf` in `types.ts` is the one reader of the old mark, for a save made since #2361.
+
+**Measured after.** «SD = (2/3)u» → `SD⃗ = 2/3u`; «B(0.5,0,0)» → `B(0.5, 0, 0)`; «AB = √8» → «√8» on both surfaces; «AB = 4/6» → «4/6»; «7.9999» → «8» everywhere; AB² stays computed.
+
+**Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
+
+**Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.
