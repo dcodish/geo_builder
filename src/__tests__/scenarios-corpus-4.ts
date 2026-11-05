@@ -6254,6 +6254,33 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'perp-piece-foot-2232',
+    title: '#2232: «MK אנך ל-AB» with M placed and K new draws K on AB with MK ⟂ AB (ADR-786)',
+    guards:
+      '#2232 (operator ruling 2026-10-16, B: yes). The noun «אנך» from a placed point to a new letter states a foot; it was refused, or read as a relation with K off the side.',
+    steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - A.x) * uy - (K.y - A.y) * ux), 'K on line AB').toBeLessThan(1e-6);
+      expect(Math.abs((M.x - K.x) * ux + (M.y - K.y) * uy), 'MK ⟂ AB').toBeLessThan(1e-6);
+      expect(dist(M, K), 'a real foot').toBeGreaterThan(1e-6);
+    },
+  },
+  {
+    id: 'perp-piece-keeps-relation-2232',
+    title: '#2232: «MK אנך ל-AB» with M ON AB stays the perpendicular at M: a foot would be M itself',
+    guards: '#2232: the foot reading never collapses K onto M; the relation it had stands.',
+    steps: ['משולש ABC', 'M על AB', 'MK אנך ל-AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      expect(dist(M, K), 'K is not M').toBeGreaterThan(1e-6);
+      expect(Math.abs((M.x - K.x) * (B.x - A.x) + (M.y - K.y) * (B.y - A.y)), 'MK ⟂ AB').toBeLessThan(1e-6);
+    },
+  },
+  {
     id: 'extension-shared-endpoint-past-second-2518',
     title: '#2518: «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R» draws R beyond O (O seated inside circle P), A–O–R in order (ADR-780)',
     guards:

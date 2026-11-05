@@ -5714,6 +5714,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       if (f.t === 'derived') {
         const standing = objectById(c, f.id);
+        /*
+         * #2231 (ADR-AG-410): «MK אנך לציר x» reads as a foot only from a placed M to a new K. `parseLine` takes no figure, so
+         * the decision is here; any other figure keeps HEAD's verdict, `not-handled`, the LLM seam.
+         */
+        if (f.piece && (standing || !parentsOf(f.rule).every((p) => objectById(c, p)))) return { ok: false, error: { code: 'not-handled', detail: f.src } };
         // A name the TOOL offers (#1270, ADR-AG-184) never takes a letter that is already held, and is
         // never a condition on its holder: the default yields, and the figure is left as it was (M4).
         if (standing && f.auto) return { ok: true, effect: 'known', next: c };

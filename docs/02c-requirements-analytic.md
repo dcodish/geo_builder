@@ -1018,6 +1018,8 @@ a sentence the tool parsed.
   - «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18» → E falls on C: «C=E», never «CE»
 - Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401, ADR-AG-393, #2696.
 
+**R246 — «MK אנך לציר x» with M placed and K new builds K, the foot of the perpendicular from M**, with the piece MK drawn and no AI; the target may be any line («MK אנך ל-AB», ADR-786's reading). The noun only: «MK מאונך לציר x» stays the relation. With K placed, M not placed, or M on the line, the line goes to the AI as before. A name the AI's answer loses is [FR-SU-32](02w-requirements-workspace.md). *(Operator ruling 2026-10-16, B: "yes"; [ADR-AG-410](06c-decisions-analytic.md#adr-ag-410), #2231.)*
+
 **R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
 - «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message
 - «גובה מ-A במשולש ABC» · «AD גובה במשולש ABC» → one point D

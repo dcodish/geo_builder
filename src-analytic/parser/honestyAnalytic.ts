@@ -314,6 +314,8 @@ export function existingNamesAnalytic(c: Pick<Construction, 'objects' | 'params'
 export interface Faithfulness {
   /** Names the student stated that the answer never mentions, then numbers it never accounts for: as typed. */
   dropped: string[];
+  /** The NAME half of {@link dropped}: what the one retry asks the model to keep (#2231, ADR-W-189). A lost number never retries. */
+  droppedNames: string[];
   /** Names the answer wrote that the student did not, and the figure does not hold. */
   invented: string[];
   /**
@@ -386,8 +388,10 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
     ];
   });
 
+  const droppedNames = names.dropped.map((k) => shownOf.get(k) ?? k);
   return {
-    dropped: [...names.dropped.map((k) => shownOf.get(k) ?? k), ...droppedNumbers.map((o) => o.raw)],
+    dropped: [...droppedNames, ...droppedNumbers.map((o) => o.raw)],
+    droppedNames,
     invented: names.invented.map((k) => shownOf.get(k) ?? k),
     inventedExisting: inventedExisting.map((k) => shownOf.get(k) ?? k),
   };

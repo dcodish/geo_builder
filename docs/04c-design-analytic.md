@@ -301,6 +301,14 @@ nothing.
 be written (`הישר y-3=4(x-2)`). Steps must be catalogue commands. `fallbackRefusal` (`app/fallback.ts`) words a
 non-recording answer (ADR-AG-170).
 
+### «MK אנך לציר x»: a reading the figure decides ([ADR-AG-410](06c-decisions-analytic.md#adr-ag-410))
+
+`parsePerpendicular`'s piece arm (`PERP_PIECE_HE` / `_EN`) reads the noun with two names and any foot line, and lowers
+through `perpendicularFacts` to what «האנך מ-M …» builds, with the second name as the foot. `parseLine` takes no figure, so
+the foot fact carries `piece: true`, and `applyFact` answers `not-handled` when the foot's letter is held or a parent is
+missing; `decideSubmit` does the same when the trial puts the foot on its own point. Those figures keep the verdict an
+unread line gets, so the sentence still reaches the model there.
+
 ### The LLM lane's faithfulness gates ([ADR-AG-279](06c-decisions-analytic.md#adr-ag-279))
 
 `runFallback` runs `faithfulnessAnalytic` (`parser/honestyAnalytic.ts`) after the all-or-nothing re-decide and

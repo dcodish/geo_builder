@@ -36,7 +36,8 @@ export async function llmParseAnalytic(
   context: string,
   // `locale` (#1297): the session's language, so the proxy renders a one-language prompt and the
   // model answers in the language the student is working in.
-  opts: { signal?: AbortSignal; fetchImpl?: typeof fetch; locale?: 'he' | 'en' } = {},
+  // `keep` (#2231, ADR-W-189): the names the previous answer lost — this call is the one retry.
+  opts: { signal?: AbortSignal; fetchImpl?: typeof fetch; locale?: 'he' | 'en'; keep?: readonly string[] } = {},
 ): Promise<LlmStepsOutcome | null> {
   const doFetch = opts.fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') return null;
@@ -46,7 +47,7 @@ export async function llmParseAnalytic(
     const res = await doFetch(`${import.meta.env.BASE_URL}api/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ utterance, context, tool: 'analytic', ...(opts?.locale ? { locale: opts.locale } : {}) }),
+      body: JSON.stringify({ utterance, context, tool: 'analytic', ...(opts?.locale ? { locale: opts.locale } : {}), ...(opts?.keep?.length ? { keep: opts.keep } : {}) }),
       signal: opts.signal,
     });
     if (!res.ok) {

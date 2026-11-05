@@ -39,6 +39,7 @@ import { llmParse } from '@/parser/llm';
 import { laneContext } from './laneContext';
 import { droppedPropertyWords } from '@/parser/propertyWords';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
+import { askKeepingNames, nameRetryEvent } from '../../shell/llm/retryLostNames';
 import { figureContext } from '@/parser/llmShared';
 import { circleMembers, circleRefs, isGeoPoint } from '@/engine';
 import type { AnyCommand, Construction, Id, Vec } from '@/engine';
@@ -325,6 +326,16 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
     const d = replay(withBinds(st.facts), st.seed);
     return { construction: d.construction, positions: d.positions };
   };
+  /** The NEW labels a set of commands never carries (ADR-089): the one name gate, read by the retry and by the battery. */
+  const lostNewLabels = (cmds: AnyCommand[]): string[] => {
+    const fig = replay(withBinds(store().facts)).construction;
+    return droppedNewLabels(
+      utterance,
+      cmds,
+      fig.objects.filter(isGeoPoint).map((o) => o.id),
+      fig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])), // bound radius letters are measure names, not points (#54)
+    );
+  };
   const v = boundView();
   const ctx = figureContext(
     v.construction.objects.filter(isGeoPoint).map((o) => o.id),
@@ -340,7 +351,16 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
     // #2428 (ADR-741): each canonical line re-parses with the FULL context of its figure — the first with the context
     // the deterministic path read, a later one with the trial figure the earlier lines built (`laneContext`).
     const first = bindCmds.length ? buildParseCtx(v.construction, v.positions) : parseCtxNow();
-    out = await llmParse(utterance, ctx, laneContext(first, () => ({ facts: withBinds(store().facts), seed: store().seed })), { signal: controller.signal });
+    const lane = laneContext(first, () => ({ facts: withBinds(store().facts), seed: store().seed }));
+    // #2231 (ADR-W-189): an answer that loses a typed name is asked for once more, under the same abort. The battery
+    // below judges whichever answer comes back, so a name still lost is refused by `input.labelsDropped`, as ever.
+    const kept = await askKeepingNames(
+      (keep) => llmParse(utterance, ctx, lane, { signal: controller.signal, ...(keep ? { keep } : {}) }),
+      (a) => lostNewLabels(a.built.flatMap((g) => g.commands)),
+      (a) => !a.busy && a.built.length + a.dropped.length > 0,
+    );
+    out = kept.answer;
+    if (kept.retry) logDebug(nameRetryEvent(kept.retry));
   } finally {
     clearTimeout(timeout);
     deps.llmAbortRef.current = null;
@@ -457,12 +477,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
     { skip: lostVerbs.includes('חוצה/bisect') ? ['angle-bisector', 'bisect'] : [] },
   );
   const stillDropped: string[] = mergeWordItems(unreadItems(
-    droppedNewLabels(
-      utterance,
-      llmCmds,
-      llmFig.objects.filter(isGeoPoint).map((o) => o.id),
-      llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])), // bound radius letters are measure names, not points (#54)
-    ),
+    lostNewLabels(llmCmds),
     // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
     // stated magnitude must name it, never commit the partial figure
     droppedGivenNumbers(utterance, llmCmds),

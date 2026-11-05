@@ -2259,3 +2259,11 @@ over all four (ADR-041).
 ### `extension-shared-endpoint-past-second-2518` — «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R»: R beyond O (#2518, ADR-780)
 
 **Guards against:** a shared-endpoint extension drawn on the wrong side of its second letter (R between A and O, or beyond A) while every row was green, although putting O inside circle P gives the stated side. **Asserts** every step green, A–O–R in order, R on circle P, O inside circle P. The matrix is `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`; ADR-142's and ADR-267's scenarios lock the either-side tier.
+
+### `perp-piece-foot-2232` — «משולש ABC» · «M על AC» · «MK אנך ל-AB»: K is the foot on AB (#2232, ADR-786)
+
+**Guards against:** the noun «אנך» from a placed point to a new letter refused, or read as a relation with K off the side. **Asserts** K on line AB, MK ⟂ AB, K ≠ M, at every seed.
+
+### `perp-piece-keeps-relation-2232` — «משולש ABC» · «M על AB» · «MK אנך ל-AB»: the perpendicular at M (#2232, ADR-786)
+
+**Guards against:** the foot reading collapsing K onto M. **Asserts** K ≠ M and MK ⟂ AB.

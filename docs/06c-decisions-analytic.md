@@ -15293,3 +15293,24 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-410 — «MK אנך לציר x» reads as K, the foot of the perpendicular from M: the noun, a placed point and a new letter (#2231)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: *"despite me calling it K"*; ruling B: *"yes"*
+**Requirements:** [02c](02c-requirements-analytic.md) R246 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: a reading the figure decides". Stage: parse (F3), before the fold; the figure's half in `applyFact`.
+
+**Class.** *A segment named by a placed point and a new letter, stated as «אנך» to a line, has no reader, so the student's letter depends on what the AI answers.* The AI's reading of the operator's sentence, `האנך מהנקודה M לציר ה-x`, named no foot, and the tool coined H. Since ADR-AG-279 that is refused naming K; the sentence itself was still unread.
+
+**Measured at 28dac0c3.** «MK אנך לציר x», «… ה-x», «… y», «… ה-y»: `not-handled`. «K רגל האנך מ-M לציר ה-x» records. The plan's account of «MK מאונך לציר x» (refused `unknown-reference K`) is out of date: since ADR-W-162 it records and creates K; it stays what it is, a relation with K off the axis.
+
+**Decision.**
+1. The piece arm of `parsePerpendicular` reads `NAME NAME [הוא|היא] [ה]אנך ל<line>`, an optional trailing «בנקודה K» naming the same foot, and the English "MK is a perpendicular to the x-axis". It lowers through `perpendicularFacts`: the foot, named K, and the piece MK drawn.
+2. The target is any foot line, not only an axis: 2-D reads the same sentence over a pair (ADR-786), and a 2-D input change ports to analytic in the same item (ADR-W-157). The plan named the axis; the wider target is that port.
+3. `parseLine` takes no figure, so the fact carries `piece: true`, and the figure decides: `applyFact` answers `not-handled` when K is held or a parent is missing, `decideSubmit` when M lies on the line (the foot would be M). Those figures keep the verdict they had. A piece from a letter of the line is not this sentence.
+4. Only the noun. «מאונך / ניצב» keep the relation: they do not say K is on the axis.
+
+**Sibling check.** 2-D: ADR-786. 3-D reads «MK אנך ל-AB» as a relation, with K off AB; not ported (the plan did not judge it simple; 3-D has no «רגל האנך» sentence at all, #1679), recorded on the parity row.
+
+**Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` (the #2230 rhombus; M(3,4) is the test's point, the report does not give M's coordinates); catalog line «CD אנך לציר ה-x».
+
+**Behaviour change for a student:** «MK אנך לציר x» draws the foot named K, with no AI.
