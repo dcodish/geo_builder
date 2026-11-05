@@ -83,9 +83,12 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   measureContradictsAlone: { '2d': ['errors.overConstrained_said'], '3d': null, complex: null, analytic: ['errMeasureContradictsAlone'] },
   // #2119 (ADR-684): a second, different radius — 2-D's ruled sentence, no reason clause, in analytic too
   radiusContradicts: { '2d': ['errors.restatedSize_said_vs'], '3d': null, complex: null, analytic: ['errRadiusContradicts'] },
-  // #1837 (ADR-710, ADR-W-142; operator ruling 2026-10-07): an angle written in radians, one sentence in every plane-geometry
-  // builder. The complex builder reads radians by design (`cis(π/3)`), so it has no such refusal.
-  radianAngle: { '2d': ['input.scope.radian-angle'], '3d': ['err.radianAngle'], complex: null, analytic: ['errRadianAngle'] },
+  // #1837 (ADR-710, ADR-W-142; operator ruling 2026-10-07): an angle written in radians, one sentence in the plane builders.
+  // The complex builder reads radians by design (`cis(π/3)`), so it has no such refusal. 3-D has the surface in its own
+  // words, the next role, so its `null` here does not mean "no such surface".
+  radianAngle: { '2d': ['input.scope.radian-angle'], '3d': null, complex: null, analytic: ['errRadianAngle'] },
+  // #2335 (ADR-3D-424; operator 2026-10-17, T22: "note should say בגיאומטריה של המרחב"): the space builder's sentence.
+  radianAngleSpace: { '2d': null, '3d': ['err.radianAngle'], complex: null, analytic: null },
   // #1942 (ADR-3D-367): a lone vertex read as its one polygon's angle, said aloud on the committed step — 3-D copies 2-D's
   // sentence (ADR-590). Analytic's own notice (ADR-AG-243, `noticeAngleReadAs`) says «הצורה» where 2-D says «המצולע»:
   // a measured wording difference outside this issue, reported as found work, so it is not asserted here.
@@ -114,6 +117,7 @@ const RULED: Record<string, Record<Lang, string>> = {
   saveQuestion: { he: 'הורידו שאלה', en: 'Download question' },
   questionHeading: { he: 'נתון:', en: 'Given:' },
   radianAngle: { he: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90', en: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90' },
+  radianAngleSpace: { he: 'בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90', en: 'In solid geometry, angles are written in degrees — for example ∠ABC = 90' },
   // the operator's verbatim sentences (2026-10-13, cards d4-2023 and d5-2023-length), placeholders normalised
   angleNameTaken: {
     he: 'לזווית {{N}} כבר יש שם: {{N}} (בשורה «{{N}}»). לכל זווית שם אחד — המשיכו עם {{N}}.',

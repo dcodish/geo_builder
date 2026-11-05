@@ -6058,6 +6058,8 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 
 **Slow-tier goldens that may drift (batch's to re-record):** `decide-submit3-parity-1394` if a case types a π angle (`record`/`not-understood` → `refused`); `decide-parity-1395-*` as ADR-710 says.
 
+**Amendment 1 (2026-11-05, #2335) — 3-D says «המרחב».** The verdict stays one in every builder; the plane sentence stays one voice in 2-D and analytic. 3-D's sentence is «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". This is a recorded exception to [ADR-W-118](#adr-w-118) B1, by the operator's own request: round #2291 T22, 2026-10-17, *"note should say בגיאומטריה של המרחב"*; spelling ruled 2026-10-18, *"Use «גאומטריה» (the majority spelling)"*. See [ADR-3D-424](06b-decisions-3d.md#adr-3d-424).
+
 ## ADR-W-144 — An AI answer keeps every shape and role word the student typed: one shared word reader, a product evidence check (#1906)
 
 **Status:** accepted · 2026-10-17 · bug (P2; 2d + 3d, analytic to follow) · fix round #2304, stream Q · **Extends** [ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)'s honesty core (`shell/llm/honestyCore.ts`) and [ADR-W-016](#adr-w-016) (no vocabulary in `shell/`) · product sides: [ADR-722](06-decisions.md#adr-722) (2-D), [ADR-3D-364](06b-decisions-3d.md#adr-3d-364) (3-D)

@@ -159,7 +159,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   - Sources: [ADR-W-125](06w-decisions-workspace.md#adr-w-125), #1778.
 - **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
   builders an angle measure written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at
-  once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+  once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». 3-D says it of its own subject, «של המרחב» ([ADR-3D-424](06b-decisions-3d.md#adr-3d-424), #2335).
   π as a number (a length, a circumference) and π as a name (3-D's planes π1, π2) are unchanged; the complex
   Builder keeps reading π inside «cis». The operator's rulings: «Refuse and teach degrees» (2026-10-07), «only
   the complex tool should» (2026-10-08).
@@ -350,7 +350,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A proof target «הוכיחו כי» | refused | refused | refused | refused | **Same** (B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)); a bare statement is not a proof target (02d FR-KN-2, ruled to change, #2338) |
 | A number written with a fraction glyph «AB = 2½», «A(2⅓, 0, 0)» | that number: a mixed number is one number, all 18 glyphs (ADR-635) | same (ADR-3D-374, #2255) | ½ ¼ ¾ only; «2⅓» goes to the AI | not measured | **Gap** — analytic #2349; one reader, `shell/vulgarFractions.ts` (ADR-W-147) |
 | Two numbers with only a space between them «AB = 2 3», «A(2 3, 1)» | refused, 2.3 / 23 / 6 taught | same | refused, 2.3 / 23 / 2*3 taught | refused (its own sentence, #2247) | **Same** — ruled 2026-11-03 (#2286, ADR-AG-397); one detector, `shell/juxtaposedNumbers.ts`, one suite sentence |
-| An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts` |
+| An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts`; 3-D's sentence says «של המרחב», the operator's 2026-10-17 (#2335, ADR-3D-424) |
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |

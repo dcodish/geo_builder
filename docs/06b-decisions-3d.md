@@ -14640,3 +14640,24 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
+
+## ADR-3D-424 — The radian refusal in 3-D says «המרחב»: a space builder does not call itself plane geometry (#2335)
+
+**Status:** accepted · 2026-11-05 · bug (P2; 3-D) · fix round #2722, stream Q · **Issue:** #2335 · **Amends** [ADR-W-142](06w-decisions-workspace.md#adr-w-142) · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-21a · [02w](02w-requirements-workspace.md) FR-SU-20 and the behaviour-table row "An angle written with π" · **Design:** none (internal).
+
+**Context.** Operator, round #2291 T22, 2026-10-17, on «משולש ABC» · «∠ABC = π» at `/3d.html`: *"note should say בגיאומטריה של המרחב"*. Re-measured at 28dac0c3: `err.radianAngle` still read «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+
+**Ruling.** The spelling, 2026-10-18: *"Use «גאומטריה» (the majority spelling)"*. The English is the translation of the asked sentence, and new text is the session's, reviewed after ([ADR-W-174](06w-decisions-workspace.md#adr-w-174)).
+
+**Class.** *A 3-D string that names a plane-geometry context, copied word for word under a cross-product parity rule.* ADR-W-142 copied the 2-D sentence, and the one-wording lock then held it in place.
+
+**Decision.**
+1. `err.radianAngle` reads «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". The refusal itself, its code and its category are unchanged.
+2. **The lock moves, it does not lift.** Role `radianAngle` in `suite-vocabulary.test.ts` keeps 2-D and analytic; 3-D has its own role `radianAngleSpace`, with its ruled text. `null` alone would be false: it means "no such surface", and 3-D has one.
+3. `radian-angle-rows.ts` gains `RADIAN_SENTENCE_SPACE_HE/EN`, and 3-D's thin lock passes them to the shared rows. Every other row is untouched.
+
+**Sibling audit.** The class has one member in 3-D. A grep of both 3-D locales for «של המישור», «גאומטריה» and "plane geometry" finds this key, `wrongSideOfPlane` (a real plane) and `cross-app`, which truthfully sends plane geometry to the 2-D tool. 2-D and analytic are plane-geometry builders, so the sentence is true there. Complex has no such refusal.
+
+**Locks.** `src3d/__tests__/radian-angle-1837.test.ts` (the operator's exact two lines through `decideSubmit3` and `errorText3`, Hebrew and English, and all 16 shared spellings against the space sentence); `shell/__tests__/suite-vocabulary.test.ts` (both roles). Nothing is built, so there is no fixture.
+
+**Behaviour change for a student:** in 3-D, an angle written with π is refused with «…של המרחב…» instead of «…של המישור…». The verdict is unchanged, and the 2-D and analytic sentences are unchanged.
