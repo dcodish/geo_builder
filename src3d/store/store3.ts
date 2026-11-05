@@ -2301,6 +2301,31 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
   return undefined;
 }
 
+/** A point's three stated numbers, in either spelling of the statement: «B(1,2,3)» or «B = (1,2,3)». Null otherwise. */
+const statedCoords3 = (k: Command3): { id: Id; at: Vec3 } | null => {
+  const c = k.type === 'point3' ? k : k.type === 'claim' && k.claim.type === 'coords-eq' ? k.claim : null;
+  return c && c.x !== null && c.y !== null && c.z !== null ? { id: c.id, at: { x: c.x, y: c.y, z: c.z } } : null;
+};
+
+/**
+ * #2341 ([ADR-3D-423](../../docs/06b-decisions-3d.md#adr-3d-423)) — A POINT'S COORDINATES, STATED AGAIN IN THE OTHER SPELLING, ARE
+ * THE SAME STATEMENT. «B(√2,0,0)» and «B=(√2,0,0)» lower to an injection and a claim, so `sameStatement` read two
+ * statements and the second became a ✓ row (operator, 2026-10-17: *"the 3rd line should not be accepted and we say
+ * that it is already known"*). The twin is the line that STATED those numbers for that point, read at the verifier's
+ * own tolerance. Only a stated number is compared: «E = (1,0,0)» on a point the student never gave coordinates is their
+ * ANSWER and stays a verified row (ADR-3D-075), and different numbers are no twin, so they are refused as before.
+ * Like the ring rule, a line that says more than this keeps a muted row muted.
+ */
+function coordinateRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
+  const line = commands.length === 1 ? statedCoords3(commands[0]) : null;
+  if (!line) return undefined;
+  const same = (k: Command3): boolean => {
+    const c = statedCoords3(k);
+    return c !== null && c.id === line.id && norm3(sub3(c.at, line.at)) <= CLAIM_REL_TOL * Math.max(norm3(line.at), 1);
+  };
+  return facts.find((f) => (f.enabled || f.cmds.length === 1) && f.cmds.some(same));
+}
+
 /**
  * #926 (ADR-3D-220, ADR-W-044) — what a change to ONE row did to the OTHERS. A delete, a mute or an edit
  * of `changed` is committed as asked, but the rows it took from green to red — a value whose letter it
@@ -2588,7 +2613,7 @@ export function decideCommands3(
   // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
   // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
   if (opts.twins) {
-    const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated);
+    const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated) ?? coordinateRestatementTwin3(statedFacts, stated);
     const twin = found && facts.find((f) => f.id === found.id);
     if (twin) {
       return {

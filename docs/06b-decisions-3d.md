@@ -14640,3 +14640,35 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
+
+## ADR-3D-423 — A point's coordinates restated in the other spelling are already known (#2341)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 3d) · fix round #2722, stream P · branch `fix/2341-restated-point-3d` from `main` @ `28dac0c3` · plan armed `auto-ok` 2026-10-17 · **partly built:** the plan's `[asked]` line; its `[2-D]` line waits for the operator (below)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a (new), FR-SP-5 (the restatement line) · **Design:** [04b](04b-design-3d.md) § "A point's coordinates restated" · **Ladder:** none: the submit decision's twin rule, before the candidate derive; no solve stage changes
+
+**Operator:** round #2304 T29, 2026-10-17: *"the test passes but the 3rd line should not be accepted and we say that it is already known"*.
+
+**Measured at pickup** (`28dac0c3`, `decideDeterministic3`). «A(0,0,0)» · «B(√2,0,0)» · «B=(√2,0,0)» recorded a ✓ row, as the issue says.
+
+**The class.** *A statement of a point's coordinates, in a spelling other than the line that stated them, is recorded as a new given instead of answered as already known.*
+
+**Root cause.** `sameStatement` compares lowered commands. «B(…)» lowers to `point3` and «B=(…)» to a `coords-eq` claim, so one statement in two spellings read as two.
+
+**Decision.** `coordinateRestatementTwin3` joins `sameStatement` and `ringRestatementTwin3` at the twin rule in `decideCommands3`, so the verdict is the existing `already-stated`: no row, and the #1990 sentence, or the #613 silent re-tick of a muted twin. A line is a twin of an earlier one when both state all three numbers of the same point and they agree at the verifier's `CLAIM_REL_TOL`. It compares stated numbers and samples nothing. Both orders are covered. Different numbers are no twin and are refused as before. It has no fixed spelling list: it reads the two command kinds that can state a point's coordinates.
+
+**The plan's `[2-D]` line was built, measured, and withdrawn.** The plan asked for the general rule: any line the figure already satisfies adds no row. Built as `impliedByPrior` is built, it turned `test:fast` red in 14 files, 45 tests, and the red was the gate working (docs/17 §9), because the rule reverses standing locks:
+- **The exam gates**, «both answers verify»: `scenarios3.test.ts` (2019, 2020, 2023, 2024), `v7-gates.test.ts` (2021), `exam-2026-2.test.ts`. «F = (1.5, 3, 0)», a collinearity or a plane equation is the student's checked answer (FR-CL-1, ADR-3D-075, *"the tool's charter"* in ADR-3D-108).
+- **The stated ⊥ knee**, `right-angle-knee.test.ts`, `knee-screen-size.test.ts` (#307): the line that draws the knee would have been dropped.
+- **The stated skew relation in the panel**, `mutual-rel.test.ts` (operator, 2026-07-28), and `line-name-as-vector-2642.test.ts`.
+- **A first statement of a face**, `restate-dedupe-613.test.ts`: «פירמידה SABC» · «משולש ABC» would have recorded nothing.
+- **The ADR-3D-209 notices** (#396, #842, #850, #853), recorded with their own note. ADR-3D-377 kept them apart too.
+
+The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac0c3`: «ריבוע ABCD» · «AB ⊥ BC» / «AB ∥ CD» and «AB = 3» · «BA = 3» are noops, but a line adding a value or ink commits («ריבוע ABCD» · «זווית ABC = 90», «AB = 5» · «BC = 5», «מעוין ABCD» · «AC ⊥ BD»), and so does a given true only by the tool's default («טרפז ABCD» · «AB ∥ CD», «משולש ישר זווית ABC» · «AB ⊥ BC», ADR-605). Whether 3-D's relations should follow is a product question, on #2341.
+
+**A load replays as saved.** `fixtures3/coords-claim-surd-2081.geo3.json` holds the old row and loads unchanged.
+
+**Sibling audit.** 2-D has no coordinates. Analytic: «A(0,0)» · «B(4,0)» · «B=(4,0)» is `not-handled`, so the class is absent; its spelling «B(4,0)» twice is `already-known`. Complex: ADR-CX-084 covers it. Grepped the twin rule: its two call sites are in `decideCommands3`, and the model lane asks without twins, as it always has.
+
+**Locks.** `src3d/__tests__/known-line-2341.test.ts`: the operator's sequence, the reverse order, every spelling, the re-tick, both refusals, the new point, the answer on a derived point, the load. `issue-2081-held-slots.test.ts` re-based: its radical spellings now assert the restatement, and each also verifies as an answer on a midpoint.
+
+**Behaviour change for a student:** in 3-D, «B=(√2,0,0)» after «B(√2,0,0)», or the reverse, now answers «זה כבר קיים באיור — אין מה להוסיף.» and adds no row. Before, it added a ✓ row.
