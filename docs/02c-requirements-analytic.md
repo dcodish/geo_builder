@@ -1149,7 +1149,8 @@ a sentence the tool parsed.
 - «∢ABC = 30» → «30°»; «tan∢BAO = 2» → «63.43°»
 - «AB = 3a» → «3a»
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality draws no mark at rest; it stays in the givens list, and is drawn only in an opt-in relations layer. The text below describes the code until that ships. A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
-- Sources: ADR-AG-225, #1714, ADR-W-047, #1241, ADR-AG-237, #1806, ADR-W-118, #1805, #1865, #1733, ADR-AG-228.
+- A stated coordinate reads as typed in the panel and on the canvas: «A(0.5,2/3)» reads «(0.5, 2/3)», «A(√8,1.25)» reads «(√8, 1.25)»; a decimal reads at most two decimals (FR-SU-30).
+- Sources: ADR-AG-225, #1714, ADR-W-047, #1241, ADR-AG-237, #1806, ADR-W-118, #1805, #1865, #1733, ADR-AG-228, ADR-AG-413, #1497.
 
 **R176 — a construction point off the drawn ink gets its line extended, dashed, to meet it, as in the 2-D tool**. *(Operator rulings 2026-10-09 and 2026-10-10: "Lines, and show why".)* A point the construction puts on a line through two named points (a height's foot, a diagonal meet, a crossing) that lands beyond the drawn piece gets that line drawn on, dashed, from the end of the ink out to it. A point on the drawn piece gets nothing.
 - «טרפז ABCD» · «AE גובה» with E past D → DC extended, dashed, from D to E

@@ -24,6 +24,7 @@
  */
 import { findJuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
 import { fmtNum } from '../../shell/format';
+import { readLiteral } from '../../shell/literal';
 
 
 export type Expr =
@@ -418,6 +419,15 @@ export function exprText(e: Expr): string {
   return print(e, 0);
 }
 
+/**
+ * The same expression in the student's notation (#1497, ADR-W-179): the exam multiplies a number by JUXTAPOSITION
+ * (`6√5`, `3a`, `3√7/2`), so a stated value reads that way wherever it sits in the expression. `exprText` keeps `·`,
+ * which an equation's reader needs.
+ */
+export function spelledText(e: Expr): string {
+  return print(e, 0, true);
+}
+
 /** Binding power, matching the parser's own levels: add/sub < mul/div < pow < atom. */
 const POW: Record<Expr['kind'], number> = {
   num: 9,
@@ -431,7 +441,7 @@ const POW: Record<Expr['kind'], number> = {
   sub: 1,
 };
 
-function print(e: Expr, need: number): string {
+function print(e: Expr, need: number, spelled = false): string {
   const body = ((): string => {
     switch (e.kind) {
       case 'num':
@@ -440,20 +450,21 @@ function print(e: Expr, need: number): string {
       case 'sym':
         return e.name;
       case 'neg':
-        return `-${print(e.a, POW.neg)}`;
+        return `-${print(e.a, POW.neg, spelled)}`;
       case 'sqrt':
-        return `√${print(e.a, 9)}`;
+        return `√${print(e.a, 9, spelled)}`;
       case 'add':
-        return `${print(e.a, POW.add)} + ${print(e.b, POW.add)}`;
+        return `${print(e.a, POW.add, spelled)} + ${print(e.b, POW.add, spelled)}`;
       case 'sub':
         // The right operand binds tighter: `a - (b - c)` must keep its parentheses.
-        return `${print(e.a, POW.sub)} - ${print(e.b, POW.sub + 1)}`;
+        return `${print(e.a, POW.sub, spelled)} - ${print(e.b, POW.sub + 1, spelled)}`;
       case 'mul':
-        return `${print(e.a, POW.mul)}·${print(e.b, POW.mul)}`;
+        if (spelled && e.a.kind === 'num' && (e.b.kind === 'sym' || e.b.kind === 'sqrt')) return `${print(e.a, POW.mul, spelled)}${print(e.b, POW.mul, spelled)}`;
+        return `${print(e.a, POW.mul, spelled)}·${print(e.b, POW.mul, spelled)}`;
       case 'div':
-        return `${print(e.a, POW.div)}/${print(e.b, POW.div + 1)}`;
+        return `${print(e.a, POW.div, spelled)}/${print(e.b, POW.div + 1, spelled)}`;
       case 'pow':
-        return `${print(e.a, POW.pow + 1)}^${print(e.b, POW.pow)}`;
+        return `${print(e.a, POW.pow + 1, spelled)}^${print(e.b, POW.pow, spelled)}`;
       default: {
         const unprinted: never = e;
         throw new Error(`expression kind has no text: ${JSON.stringify(unprinted)}`);
@@ -461,6 +472,15 @@ function print(e: Expr, need: number): string {
     }
   })();
   return POW[e.kind] < need ? `(${body})` : body;
+}
+
+/**
+ * A number the student wrote as a literal, in their spelling, or undefined (#1497, ADR-AG-413). The parse substitutes a
+ * valued letter, so «t = 0.5» · «A(2t,1)» holds the constant `2·0.5`: that is arithmetic, not a spelling, and reads the tiers.
+ */
+export function literalText(e: Expr): string | undefined {
+  const text = spelledText(e);
+  return symbolsOf(e).length === 0 && readLiteral(text) !== null && !/^-?\d+$/.test(text) ? text : undefined; // an integer spells itself
 }
 
 /** A constant expression — no parameters — which is the common case and worth asking about. */

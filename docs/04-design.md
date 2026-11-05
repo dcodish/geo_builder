@@ -1728,6 +1728,7 @@ The relations layer's definite values, the values panel and the forced crossing 
   number). It rides `detectAll` into the store's `determinacy` slot (facts-keyed, like `crossings`), and
   `figureStatus` (`app/figureStatus.ts`) maps it to the status line (FR-ALT-6). The values panel reads the same
   `complete` flag.
+- **A «נתון» row prints the spelling** ([ADR-W-179](06w-decisions-workspace.md#adr-w-179), #1497): `computeValues` (`withGivenSpelling`) sets `ValueRow.given` from the `measure-*` command's `expr.text`, the text the canvas label prints; `MathValues` typesets it with `MathText`. A row in the student's unit, or with two values, keeps its own form.
 - **The values panel's one value gate** ([ADR-634](06-decisions.md#adr-634), #1867): every row and every question in
   `computeValuesPanel` asks `optionsOf` — one value when the pool agrees; the quantity's TWO values (classified by
   `shell/valueOptions`, at `REL_TOL`) when the pool is `determined` and `complete` and each value is seen at two

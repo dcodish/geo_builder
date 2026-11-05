@@ -30,7 +30,7 @@
  * A trig given prints the ANGLE it fixes, in degrees (operator ruling on #1718/#1719: «63.43°», never «tan=2»).
  * Formatting stays a DISPLAY concern: this hands the renderer a number or a text, never a rounded string.
  */
-import { exprText, evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { exprText, evalExpr, spelledText, symbolsOf, type Env, type Expr } from './expr';
 import { angleLabelName, isTermPlaceholder, symbolText, type LengthExpr } from './lengths';
 import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
@@ -85,7 +85,7 @@ export function statedText(e: Expr): string {
   // #1812 (ADR-AG-394): an angle's label is written as the book writes it — «A₁», never the internal «∠A1»
   if (e.kind === 'sym') return symbolText(e.name);
   if (e.kind === 'mul' && e.a.kind === 'num' && (e.b.kind === 'sym' || e.b.kind === 'sqrt')) return `${exprText(e.a)}${statedText(e.b)}`;
-  return exprText(e);
+  return spelledText(e);
 }
 
 /**

@@ -15293,3 +15293,17 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-413 — A stated coordinate prints as typed, in the panel and on the canvas (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (analytic, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the analytic half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 · **Design:** [04c](04c-design-analytic.md) § the stated-measure layer · **LADDER stage:** none (display)
+
+**Root cause.** A known coordinate reached both surfaces as a number and `fmtAnalytic` re-spelled it: «A(0.5,2/3)» read `(1/2, 2/3)`, «A(√8,1.25)» read `(2√2, 5/4)`. The `Expr` already held the structure; nothing read it once the value was known.
+
+**Decision.** `spelledText(e)` (`engine/expr.ts`) prints an `Expr` in the student's notation, juxtaposition at every depth. It is the analytic `src`, because the canvas reads the `Expr`, not the line. `provenanceOf` carries it on a stated coordinate with no letter in it; `pointText` and the canvas label print it through `givenText`, so a decimal reads the house decimals (sr-22). A coordinate through a letter, and any point the figure fixed, read the tiers. `statedText` now delegates to it, so «3√7/2» has no «·».
+
+**Sibling audit.** ADR-W-179. The stated-length canvas label is [ADR-AG-407](#adr-ag-407).
+
+**Locks.** `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`.

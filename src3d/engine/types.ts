@@ -59,7 +59,17 @@ export type VecAtom =
 
 export interface VecTerm {
   coeff: number;
+  /** #1497 (ADR-3D-426): the coefficient as typed, for DISPLAY only. Nothing solves from it. */
+  src?: string;
   atom: VecAtom;
+}
+
+/**
+ * #1497 (ADR-3D-426): the spelling a stated magnitude carries. `src` replaced #2361's `decimal` mark, which saves made
+ * since 2026-11-04 still hold, so a marked value with no `src` reads as the decimal it was: one reader, here.
+ */
+export function spellingOf(x: { value: number; src?: string; decimal?: true }): { src?: string } {
+  return x.src !== undefined ? { src: x.src } : x.decimal ? { src: String(x.value) } : {};
 }
 
 /** A linear combination Σ coeff·atom — the ONLY expression form (no CAS). */
@@ -68,6 +78,8 @@ export type VecExpr = VecTerm[];
 /** A term whose coefficient may be linear in ONE scalar symbol (V7: `(k/2)·DB⃗`): coeff = k + p·symbol. */
 export interface SymTerm {
   coeff: LinExpr;
+  /** #1497 (ADR-3D-426): a numeric coefficient as typed, for DISPLAY only. */
+  src?: string;
   atom: VecAtom;
 }
 
@@ -108,11 +120,11 @@ export type Claim3 =
    */
   | { type: 'polygon-open'; ids: Id[]; given: true }
   /**
-   * AB = 3 (all points pinned ⇒ a CHECK). `decimal` (#2361, ADR-3D-416): the student WROTE the value as a decimal
-   * numeral («AC = 4.1»), so it is printed in the house decimals, never dressed by an exact-form tier («41/10»).
+   * AB = 3 (all points pinned ⇒ a CHECK). `src` (#1497, ADR-3D-426): the value as the student spelled it; a given prints
+   * as typed. `decimal` (#2361) is the mark `src` replaced, read only from an old save ({@link spellingOf}).
    * Absent for an integer, a fraction or a root as typed, and for a value the tool computed.
    */
-  | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true; decimal?: true }
+  | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true; src?: string; decimal?: true }
   /** #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — «AB + BC = 10», 2-D's `set-measure-sum` (length unit). Fixes the scale. */
   | { type: 'length-sum'; terms: { a: Id; b: Id; c: number }[]; value: number; given?: true }
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
@@ -180,7 +192,7 @@ export type Claim3 =
   // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — |e1| = c·|e2| (a ratio,
   // similarity-invariant) and |e| = value (an absolute size). Simple-atom instances are
   // normalized onto vec-mag/length-eq/length-rel at apply; only genuine expressions land here.
-  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
   | { type: 'mag-val'; e: VecExpr; value: number };
 
 /** S3 (#378) — the relations a PLANE takes part in. `coincident` is the plane twin of S4's. */
@@ -257,7 +269,7 @@ export type ScalarPin =
   | { kind: 'distance'; a: Operand3; b: Operand3; value: number }
   // #393/#335 (ADR-3D-107): |e1| = c·|e2| over vector EXPRESSIONS — a ratio of magnitudes,
   // similarity-invariant (both sides scale together), the expression twin of `length-rel`.
-  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
   // #393/#335: |e| = value — an absolute size on an expression magnitude; fixes the scale
   // exactly like `length`/`distance`.
   | { kind: 'mag-val'; e: VecExpr; value: number };
@@ -731,8 +743,8 @@ export interface FreeVecEq3 {
  * figure ↔ free solve, refused `free-vector-coupling`, #2603).
  */
 export type FreeVecMetric3 =
-  | { kind: 'mag'; e: VecExpr; value: number; decimal?: true } // `decimal`: as on the `length-eq` claim (#2361)
-  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { kind: 'mag'; e: VecExpr; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
+  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
   | { kind: 'dot'; e1: VecExpr; e2: VecExpr; value: number }
   | { kind: 'cos'; e1: VecExpr; e2: VecExpr; cos: number }
   | { kind: 'par'; e1: VecExpr; e2: VecExpr };
@@ -1156,14 +1168,14 @@ export type Command3 =
   | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number; soft?: boolean; origin?: CommandOrigin3 }
   // |w| = 2 — a numeric magnitude on a NAMED vector; apply resolves the pair and
   // delegates to the ordinary length given (claim when pinned, driving pin when free)
-  | { type: 'vec-mag'; name: string; value: number; decimal?: true } // `decimal`: as on the `length-eq` claim (#2361)
+  | { type: 'vec-mag'; name: string; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
   // #393/#335 (ADR-3D-107): magnitude equality over vector EXPRESSIONS — |e1| = c·|e2| and
   // |e| = value (a chain link lowers to these per adjacent pair / per stated value). Apply
   // NORMALIZES simple unit-coefficient atoms onto the existing owners (vec-mag / length-eq /
   // length-rel — the parallelepiped-normalization precedent), so only genuine expressions
   // reach the mag-* pin/claim lanes; M1 routes drive-vs-verify like every scalar given.
-  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
-  | { type: 'mag-val'; e: VecExpr; value: number; decimal?: true } // `decimal`: as on the `length-eq` claim (#2361)
+  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
+  | { type: 'mag-val'; e: VecExpr; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
   // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
   | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand
@@ -1275,7 +1287,7 @@ export type Command3 =
   // a solid with no derivable apex (prism/box) refuses `bad-solid`, never a guess.
   // `len` (#1448): «גובה הפירמידה 4» — the height phrase carrying its own value. The foot's letter
   // is minted at apply, so the length claim must chain THERE, on apex→foot, not in the parser.
-  | { type: 'perp-to-base'; from?: Id; face?: Id[]; len?: number; lenDecimal?: true } // `lenDecimal`: `len` typed as a decimal (#2361)
+  | { type: 'perp-to-base'; from?: Id; face?: Id[]; len?: number; lenSrc?: string; lenDecimal?: true } // `lenSrc`: `len` as typed (#1497); `lenDecimal`: an old save's mark (#2361)
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   // `ring` (#1792): the polygon a SOFT default right angle belongs to — a right trapezoid's. An explicit
@@ -1344,7 +1356,7 @@ export type PointDef =
   | { kind: 'on-segment'; a: Id; b: Id; t?: number }
   | { kind: 'centroid'; of: [Id, Id, Id] }
   | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] }
-  | { kind: 'coord'; x: number; y: number; z: number }
+  | { kind: 'coord'; x: number; y: number; z: number; srcs?: CompSrcs } // `srcs` (#1497): the tuple as typed, for display
   // ADR-3D-094 (#276): a NEW point stated with PARTIALLY-known numeric coordinates and no
   // symbols («הקודקוד D על החלק החיובי של ציר ה-x» → y=z=0, x free): each null component is
   // a free sampled DOF (ADR-052), Lane-A absolute like `coord`. A sign-given on a null axis

@@ -6922,3 +6922,44 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 **Measured (2026-11-03, 32 closed rounds since 1 Oct).** 471 closed: 376 changes on main, 95 housekeeping. Round #2665: 2 on main, 15 housekeeping (13 parked, 2 already fixed). A refresh reads its timelines eight at a time: 1 min 48 s, where one at a time took 5 min 44 s.
 
 **Consequences.** The number the operator reads first is what a student can now see change, and the second is what his sitting will close. Parks still shrink the queue, on their own line. Not built: the roadmap page's "Fix rounds" panel shows the new row fields only when the page is next republished.
+
+## ADR-W-179 — A given prints as the student typed it, through one shared reader and one shared printer, in every builder (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (workspace, 2d, 3d, analytic, complex; P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the #1497 fix plan of 2026-09-28 · product ADRs [ADR-3D-426](06b-decisions-3d.md#adr-3d-426), [ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)
+
+**Operator:** 2026-09-28 (3-D): *"data was entered as 2/3 and datapanel shows 0.666 - we need to keep the format of entry"*. The same day, on reach: *"should apply to all tools"*; on the root: *"sqrt(8) can stay as it is for now"*. Newer, and binding on decimals: sr-22 ([ADR-W-175](#adr-w-175), 2026-11-02): «7.9999» reads «8», computed in full, *"Typed and computed values follow the same rule"*.
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-30; [02](02-requirements.md) FR-RV-17; [02b](02b-requirements-3d.md) FR-RD-8; [02c](02c-requirements-analytic.md) R168; [02d](02d-requirements-complex.md) the canvas rule of ADR-CX-065 · **Design:** [04w](04w-design-shell.md) § "A stated number and its spelling"; [04b](04b-design-3d.md) § "The stated-magnitude lane"; [04](04-design.md) § the values panel; [04d](04d-design-complex.md) · **LADDER stage:** none (display)
+
+**Measured before** (`28dac0c3`, each product's real path):
+
+| typed | 2-D canvas | 2-D «נתון» row | 3-D panel | analytic coordinate | complex canvas |
+|---|---|---|---|---|---|
+| `2/3` | 2/3 | **0.67** | 2/3 (`0.6667u` as a coefficient) | 2/3 | 2/3 |
+| `0.5` | 0.5 | 0.5 | **1/2** as a coordinate | **1/2** | **1/2** |
+| `1.25` | 1.25 | 1.25 | **5/4** as a coordinate | **5/4** | **5/4** |
+| `√8` | √8 | **2√2** | **2√2** | **2√2** | **2√2** |
+
+The complex rows are the student's own lines and were always right. Complex «z = 7.9999» read «79999/10000» on the canvas.
+
+**Root cause.** **Class:** *a stated number is printed by re-spelling a float, because the parse kept its value and lost its spelling.* Every printer guessed, so each product guessed differently, and a printer that happened to guess right only looked correct.
+
+**Decision.**
+1. **`shell/literal.ts`: one reader, one printer.** `readLiteral(raw) → { value, src, decimal } | null` reads the family every builder's value slot admits: `p/q`, a decimal, `√n`, `k√n`, `√n/q`, `√(a/b)`, a glyph through the shared `spellVulgarFractions`, and a sign. `givenText(value, src, tier)` is the printer every given row calls. `src` is text, not chrome, and it names no product, so it passes the shell test ([ADR-W-016](#adr-w-016)): 3-D, 2-D, analytic and complex all call it.
+2. **sr-22 narrows "as typed" for a decimal.** A decimal spelling prints through `fmtNum`, never as the raw text: «7.9999» reads «8», «0.6667» reads «0.67». A fraction or a root prints exactly as written, unreduced («4/6», «√8»), because no rule of his touches those.
+3. **A spelling can never print a number the figure does not hold.** A literal `src` that no longer reads as `value` falls back to `tier`, so a term rescaled after the parse (an inlined free vector, an eliminated coefficient) reads the tiers.
+4. **Derived rows are untouched.** A given row prints `src`; a derived row prints the product's tiers. In a square with «AB = √8» the panel shows `√8` beside a derived `2√2`. #1460 hoists the recognizer for derived values and must keep this split.
+5. **Each product.**
+   - **3-D** ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426)): `parseCoeff`, `evalRadical` and `magValue` read through `readLiteral`; `src` replaces #2361's `decimal` mark on every command that carried it, and joins coordinates and vector coefficients. `cleanCoeff` is deleted.
+   - **2-D:** the canvas already printed the spelling. Its parser keeps `expr.text`, the same channel under an older name, so `computeValues` hands the «נתון» rows that text (`withGivenSpelling`) and they print it through `givenText`, typeset by `MathText`.
+   - **Analytic** ([ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)): the `Expr` keeps the structure, so `spelledText(e)` is its `src`; a stated coordinate prints it in the panel and on the canvas.
+   - **Complex:** a number typed with no parameter reads as typed on the canvas, in the view it was typed in (D1). `Constraint.src` already quotes the line; `replay/typedSpelling.ts` reads the parts from it through `readLiteral`. The panel's readings stay computed (ADR-CX-065).
+6. **Old saves** with no `src` keep the tiers. A 3-D save made since #2361 holds a `decimal` mark, which `spellingOf` reads as the decimal it was.
+
+**Sibling audit.** Grepped each tree's stated-number printers and measured them (table above). The analytic canvas length label is #1806 / [ADR-AG-407](06c-decisions-analytic.md#adr-ag-407), stacked on this. Not changed, by the plan's scope: an equation's canonical form (a curve row is the tool's normal form, not a given row), a stated angle (a degree value, always decimal), and 2-D's circle radius, which has no spelled form to keep («ברדיוס √8» does not parse deterministically). No third copy remains: 2-D's parser keeps its own reader, held to this one by `issue-1497-given-spelling.test.tsx` (the canvas label equals `givenText` over `readLiteral`, per spelling).
+
+**Deviation from the plan.** The plan had every parser call `readLiteral` in place of its private reader. 3-D does. 2-D's `numexprVal` and its radical readers are entangled with the symbolic branches and already keep the text, so rerouting them would risk verdicts to gain nothing a student sees; the agreement lock holds them instead. Analytic and complex read expressions, not literals, and their parsers are unchanged.
+
+**Locks.** `shell/__tests__/literal-1497.test.ts`; `src3d/__tests__/issue-1497-format-of-entry.test.ts` (the operator's sequence, every table row); `src/__tests__/issue-1497-given-spelling.test.tsx`; `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`; `src-complex/__tests__/canvas-spelling-1497.test.ts`; `issue-2361-stated-value-text.test.ts` re-based («√20» now reads «√20», which ADR-3D-416 left to this issue).
+
+**Behaviour change for a student:** a fraction or a root reads as typed wherever a given is printed, in every builder; a decimal is never rewritten as a fraction; a decimal past two places reads the house decimals.

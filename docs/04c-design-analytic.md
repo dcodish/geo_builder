@@ -1791,6 +1791,8 @@ agree on where a letter is.
 
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality (two plain lengths, an `angle-ratio` with k = 1) draws no tick or arc at rest; it stays in the givens list, drawn only in an opt-in relations layer. The text below describes the code until that ships.
 
+`engine/expr.ts` `spelledText(e)` prints an `Expr` in the student's notation; it is this tree's `src` ([ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)), printed through `shell/literal` `givenText`.
+
 `engine/statedMeasures.ts` `statedMeasures(construction, origin, choiceSeed)` reads what a SENTENCE stated — a plain
 length or an equality, an `angle` (or a `tan` / `cos` angle), a ⊥ knee (the cevian's at its FOOT, #1241,
 ADR-AG-237), an `area`, an arc — and never a noun's definition (`Fact.definition`). It travels `derive` →

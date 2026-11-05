@@ -10,6 +10,7 @@
 import { polylines, type Box } from '../engine/curves';
 import { markPoint } from '../engine/derived';
 import { fmtAnalytic } from '../format';
+import { givenText } from '../../shell/literal';
 import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
@@ -1009,11 +1010,11 @@ export function buildScene(
      * showing nothing. A number is still never printed for an open coordinate.
      */
     const part = (
-      comp: { known: boolean; value?: number; expr?: string } | undefined,
+      comp: { known: boolean; value?: number; expr?: string; text?: string } | undefined,
       axis: 'x' | 'y',
     ): ScenePart =>
       comp && comp.known
-        ? { text: fmtAnalytic(comp.value as number) }
+        ? { text: givenText(comp.value as number, comp.text, fmtAnalytic) } // #1497: a stated coordinate, as typed
         : comp?.expr
           ? { text: comp.expr }
           : { text: axis, sub: id };

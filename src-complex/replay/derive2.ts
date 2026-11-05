@@ -25,10 +25,11 @@
  */
 
 import { fmtNum } from '../../shell/format';
+import { typedCartesian, typedPolar } from './typedSpelling';
 import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, valuedParamOf } from '../model/cartesianForm';
+import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, typedLineOf, valuedParamOf } from '../model/cartesianForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
 import { type ExpVec, eq as modEq, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
@@ -2157,7 +2158,12 @@ export function foldConstraints(input: FoldInput): Derived2 {
     const how = names.map((n) => statedAs(n, statedList, setMembers));
     if (how.every((h) => h === 'computed')) return { ...p, canvas: p.display, canvasCart: p.display };
     const def = how.includes('typed') ? names.map((n) => definitionOf(n, statedList)).find((d) => d !== null) ?? null : null;
-    if (!def) return { ...p, canvas: p.reading, canvasCart: p.readingCart };
+    if (!def) {
+      // #1497 (ADR-W-179): a number typed with no parameter, as typed, in the view it was typed in (D1)
+      const line = how.includes('typed') ? names.map((n) => typedLineOf(n, statedList)).find((c) => c !== null) ?? null : null;
+      if (!line) return { ...p, canvas: p.reading, canvasCart: p.readingCart };
+      return { ...p, canvas: typedPolar(line, p.reading, Math.hypot(p.z.re, p.z.im)) ?? p.reading, canvasCart: typedCartesian(line, p.display, p.z) ?? p.readingCart };
+    }
     for (const part of [def.re, def.im]) for (const k of part.terms.keys()) if (studentValued.has(k) && rationalParams.has(k)) competing.add(k);
     const form = substituteKnown(def, shownValues);
     const closed = closedParts(form);
