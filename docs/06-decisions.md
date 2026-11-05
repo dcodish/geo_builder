@@ -1023,6 +1023,8 @@ Parsing is uppercase-labels-only after the keyword (so a lowercase word like "th
 
 ## ADR-071 — "AB = √2R" couples a length to a FREE radius (a `length-radius` constraint), not a frozen distance
 
+**Amended by** [ADR-783](#adr-783): against a stated radius the witness's angle is no carrier unless the witness is an endpoint.
+
 **Status:** Accepted (2026-06-20). Operator's tangent figure: `מעגל O` (a free-radius circle), tangent from external A touching at D, B on the circle, segments AB/AO/BO/DO, then **`AB=√2R`** and **`BO=R`**. It reported `over-constrained: |AB| = 7.07 cannot hold`.
 
 **Three stacked defects (each hid the next).** (1) **Parser** — `measureSqrt` wasn't anchored to end-of-input (unlike its sibling length rules), so `√2R` matched only the `√2` and **silently dropped the trailing R** (the [ADR-024](#adr-024)/[ADR-026](#adr-026) unanchored-rule class). The rule now consumes an optional trailing variable that multiplies the radical (`√2R` ⇒ `{coef: √2, var: R}`) and anchors the RHS. (2) **Lowering** — `buildSymTab` froze `R` to the circle's default radius (5) **even for a free-radius circle**, turning `AB=√2R` into a FIXED `set-distance 7.07` that fought the still-free radius DOF ([ADR-051](#adr-051)/[ADR-052](#adr-052): a default masquerading as fixed) → a **seed-fragile** over-constraint. It now leaves `R` unfrozen for a free-radius circle. (3) **Solver** — even coupled as a ratio against the radius witness `OB` (`|AB| = √2·|OB|`), `driveOrCheck` drove B's on-circle angle and the joint Nelder–Mead gave up from most seeds.
@@ -20148,3 +20150,33 @@ No new student text. Every sentence is an existing ruled string.
 **Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. New: `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (four spellings → «A₁», «B₂»); analytic's half over the same sentences is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
 
 **Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».
+
+## ADR-783 — An owner must be able to move what it owns: `residualRefs`, and a stated radius no longer lends its witness to a length (#2590)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D, wrong-answer) · fix round #2722 stream C · branch `fix/2590-pinned-radius-driver` · amends [ADR-071](#adr-071) ("plus the witness's on-circle angle") · reads with [ADR-399](#adr-399) and [ADR-281](#adr-281)
+
+**Requirements:** none (internal) · **Design:** [04](04-design.md) § Engine, "An owner must be able to move what it owns" · **LADDER stage:** 3 (`recruitFreeDofs`, the 3B row), and the apply-time pick ahead of 2d′
+
+**Measured before** (`main` 28dac0c3, `decideDeterministic2D` → store → `replay`, seeds 0–23, model mocked). «מעגל O ברדיוס r · קטע OR · OR=r · r = 5» green at seed 0 only, sole owner the hidden `~radw-circle-O`, and every other configuration empty. Same 1/24: «OR=2r · r = 2.5», the pin first, «AB=r», «AB=2r», «AB=r+1 · r = 4», «ריבוע ABCD · מעגל O ברדיוס r · AB=r · r = 5», two lengths against one radius. «קטע AB · AB=r · r = 3» was 24/24 with four owners (O, A, B, the witness) for one equation.
+
+**Class.** *Something counts as able to satisfy a constraint because the constraint mentions it, not because the residual can move with it.* `length-radius` is `|ab| − k·|centre·witness| − add`. The letter system puts «r = 5» on the circle, so the radius is pinned before «OR=r» applies, in either entry order, and `|centre·witness|` is then a constant. Two sites read the mention as ability. `driveOrCheck` marked the witness, so `ensureOwnership` saw a directive and never ran its probe: the figure held only where the default drawing satisfied it by coincidence. `recruitFreeDofs` walked newest-ref-first from that witness, so no singleton could help and the widest rung took four carriers, whose re-solve moved the accepted figure and failed ADR-399's stability check. These are one defect; docs/17 §2.2 and M2 law (i).
+
+**Decision.** `residualRefs(con, objects)`, beside `constraintRefs` in `engine/solve.ts`: the points whose motion can change the residual in this figure. For a `length-radius` against a stated radius it answers the endpoints; for every other case it answers `constraintRefs`. The test is what the radius IS (`via`), never who is busy. `driveOrCheck`'s witness marking and every carrier-choosing site of `recruitFreeDofs` read it: cases A, B, D (both the reach and K1's alternative), C, E and F. Case A's K is never a `length-radius` today, because the branch in `driveOrCheck` returns before an on-segment claim; it reads the predicate so no site asks the old question. `evaluate`, `dofRank`, `sample`, `verify` and `core`'s related-set keep `constraintRefs`: they need the positions the residual READS. `ensureOwnership` is unchanged: once no impotent directive is minted, its probe runs. No chokepoint list grows.
+
+**Not shipped.** The experiment's two inline checks (the plan's table), which asked one question twice. The escalation's per-owner derivative probe (cost on every accept). `orphanedBy` (a measured no-op).
+
+**A difference from the experiment.** The experiment dropped the witness marking whenever the witness was not an endpoint, free radius included. `residualRefs` keeps `witness` while the radius is free, because that ref is the route to the radius in the ancestor walk, so an UNPINNED «AB=r» keeps today's two owners (radius and witness): unchanged from `main`, not the plan's table entry "the radius". The witness's own angle still cannot move the residual there. It does no harm with the radius as a live co-owner, and no row reproduces a case where it is the only directive.
+
+**Kinds reviewed for the same shape** (a ref the residual treats as a constant). `length-radius` is the only one that measures a length through a reference pair. A whole-circle `area` / `perimeter` / `*-ratio` operand reads `[centre, member]`, but its residual depends on that pair as the size itself; the sentence that would pin it and drive it, «שטח המעגל שווה לשטח המשולש ABC», does not parse deterministically.
+
+**Measured after** (the same path). Every row above 24/24 with one endpoint owner per equation (R or B; B and D for two lengths), and the numeric twin «מעגל O ברדיוס 5 · קטע AB · AB=5» has the same owner. English spelling, a real on-circle witness («נקודה P על המעגל»), and «AB=r/2», «AB=r-1» likewise. Controls unchanged: no pin 24/24 with the radius moving; #2489 T34 24/24; «קטע AB · AB = k · k = 5» 24/24 by `distance`, not this path. The pin moves nothing at seed 0. A failing row cost ~1.9 s for 24 seeds and now costs ~330 ms; no solve was added to any figure.
+
+**Not this defect.** «קטע BC · נקודה M על BC · קטע OM · OM=r · r = 5» is 14/24 after the fix, exactly as its numeric twin «OM=5» is on the same tip: M's segment does not reach the circle in every sampled configuration. The letter form now matches the number; that row's seed rate is the numeric one's.
+
+**Ports (ADR-W-157).** 2-D only. `length-radius` exists in no other tree (grepped `src3d/`, `src-analytic/`, `src-complex/`): analytic solves jointly with no per-DOF owner table, and 3-D's pins carry their owner explicitly (ADR-3D-393). No parity row: the sentence's verdict did not change, only its reach across configurations.
+
+**Locks.** Fixture `src/__tests__/fixtures/issue-2590-pinned-radius-orphan.geo.json` (the report's four lines). `src/engine/__tests__/pinned-radius-owner-2590.test.ts`: every row above at seeds 0–23 with the owner asserted, both entry orders, both locales, two lengths, the numeric twin, the free-radius controls, stability at seed 0, and the predicate's own cases. `src/app/__tests__/issue-2489-symbolic-length-points.test.ts` stays green unedited.
+
+**Unblocks.** #2579's measure half: re-measure it with the segment carrier on.
+
+**Behaviour change for a student:** a length stated in a radius letter whose value is known («OR=r», «AB=2r», with «r = 5») draws in every configuration «הציגו תצורה אחרת» shows, as the same sentence with the number does. Before, every configuration but the first was empty and the row read "not determined".
