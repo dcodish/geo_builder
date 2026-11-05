@@ -119,8 +119,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
     never ignored**, and a coordinate that pins a point's free freedom places the point, whatever it sits on
     («K על AB · K(1,0,0)» puts K at the midpoint).
   - **A length, angle, ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.**
-  - For the coordinate, vector and measure rules: a true restatement stays green, an unstated or symbolic
-    component is not checked, and on a solid or a free figure the statement drives instead.
+  - For the coordinate, vector and measure rules: a true restatement stays green, except that stated coordinates or
+    a stated length in another spelling add no row (FR-SP-19a); an unstated or symbolic component is not checked, and
+    on a solid or a free figure the statement drives instead.
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
     yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
     «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363); «בדקו את החישוב» is kept for a given the student's own data contradicts.
@@ -359,6 +360,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
   makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
   - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346, ADR-3D-377; #1953, #1988, #1990, #2171, #2180.
+- **FR-SP-19a (Must)** — **Stated numbers restated are already known.** «B(√2,0,0)» · «B=(√2,0,0)», in either order and
+  any spelling of the same numbers, adds no row and shows the note of FR-SP-19 (operator 2026-10-17: *"the 3rd line
+  should not be accepted and we say that it is already known"*). So does a stated length in the other letter order or
+  any spelling of the same value («AB = 3» · «BA = 3», «BA = 6/2»), as in 2-D. Different numbers are refused as before.
+  A coordinate line on a point the student never gave coordinates, or a first length on a segment, is their answer or
+  a value to draw, and it stays a verified row (FR-CL-1).
+  - Sources: ADR-3D-423; #2341.
 - **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
   indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
   "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
