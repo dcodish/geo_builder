@@ -41,7 +41,7 @@ import { circlesTangentError, commonTangentCapacityError, equalNestedPair, pairP
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
-import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
+import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, residualRefs, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -2039,7 +2039,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
   for (const sp of solved) {
     const K = sp.constraint;
     const recruits = new Set<Id>();
-    for (const ref of constraintRefs(K)) for (const a of freeCarrierAncestors(objects, ref)) recruits.add(a);
+    for (const ref of residualRefs(K, objects)) for (const a of freeCarrierAncestors(objects, ref)) recruits.add(a);
     recruits.delete(sp.id);
     if (recruits.size === 0) continue;
     changed = true;
@@ -2078,7 +2078,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
     // over-recruit class, reproduced by the redefine-existing-point M1 tests). Two stages only, each
     // one evaluate, so the failure path pays at most one extra evaluate over the old single-shot mark.
     const objIdx = (id: Id) => objects.findIndex((o) => o.id === id);
-    const refs = [...new Set(constraintRefs(K))].sort((p, q) => objIdx(q) - objIdx(p)); // newest first
+    const refs = [...new Set(residualRefs(K, objects))].sort((p, q) => objIdx(q) - objIdx(p)); // newest first
     const minimal = refs.length > 0 ? freeDrivableAncestors(objects, refs[0]).filter((id) => !isSolving(objects, id)) : [];
     const full = [...new Set(refs.flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
     // ONE-DOF-AT-A-TIME first ([ADR-281](docs/06-decisions.md#adr-281), issue #51 — the M2 "least
@@ -2130,13 +2130,13 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
     let dDid = false; // case (D) mutated the assignment (verified just below)
     const preD = objects; // TRANSACTIONAL (M2 law ii / S1.1): a failed (D) experiment restores exactly
     if (!verified) {
-      const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
+      const reachable = new Set(residualRefs(K, objects).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
       for (const x of objects) {
         if (!reachable.has(x.id)) continue;
         const sv = (x as { solve?: SolveDirective }).solve;
         if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
         const K1 = sv.constraint;
-        const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && constraintRefs(K1).includes(o.id));
+        const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && residualRefs(K1, objects).includes(o.id));
         if (!alt) continue;
         // The displaced directive's `also` co-drive list moves WITH K1 to the receiving carrier
         // ([ADR-402](docs/06-decisions.md#adr-402), #258 sibling audit) — dropping it destroyed the
@@ -2179,7 +2179,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
       const sv = (o as { solve?: { constraint: Constraint } }).solve;
       if (sv) carrierCount.set(sv.constraint, (carrierCount.get(sv.constraint) ?? 0) + 1);
     }
-    const reach = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
+    const reach = new Set(residualRefs(K, objects).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
     const steal = objects.find((o) => {
       const sv = (o as { solve?: { constraint: Constraint } }).solve;
       return reach.has(o.id) && sv && (carrierCount.get(sv.constraint) ?? 0) >= 2;
@@ -2244,7 +2244,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
         const sv = (o as { solve?: SolveDirective }).solve;
         if (sv && sv.constraint !== K) claimed.set(o.id, sv);
       }
-      const kept = constraintRefs(K).filter((id) => claimed.has(id));
+      const kept = residualRefs(K, beforeK).filter((id) => claimed.has(id));
       const hostId = kept.find((id) => beforeK.find((o) => o.id === id)?.kind === 'free-point');
       if (kept.length && hostId) {
         const baked = resolveDriven({ objects: beforeK, constraints: [...c.constraints, ...added] });

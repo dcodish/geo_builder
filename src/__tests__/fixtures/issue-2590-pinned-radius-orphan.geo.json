@@ -1,0 +1,68 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-05T12:00:00.000Z",
+  "name": "pinned-radius-orphan-2590",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "SnVwdDgsgNKpGqRUV37xw",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "utterance": "מעגל O ברדיוס r",
+      "group": "lS_tbPG2t7UhCpv6fru12",
+      "enabled": true
+    },
+    {
+      "id": "BSxlHpDXsCEP63qOWvt-Q",
+      "cmd": {
+        "type": "radius-symbol",
+        "circle": "circle-O",
+        "name": "r"
+      },
+      "utterance": "מעגל O ברדיוס r",
+      "group": "lS_tbPG2t7UhCpv6fru12",
+      "enabled": true
+    },
+    {
+      "id": "KbwKmulKZ_k7bpoWlPjB8",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "R"
+      },
+      "utterance": "קטע OR",
+      "enabled": true
+    },
+    {
+      "id": "iKq--J91AfQP0FF5gd9vS",
+      "cmd": {
+        "type": "measure-length",
+        "a": "O",
+        "b": "R",
+        "expr": {
+          "coef": 1,
+          "var": "r"
+        }
+      },
+      "utterance": "OR=r",
+      "enabled": true
+    },
+    {
+      "id": "8oo1Pf2Mgmqx5TKn-JcU_",
+      "cmd": {
+        "type": "set-var",
+        "name": "r",
+        "value": 5
+      },
+      "utterance": "r = 5",
+      "enabled": true
+    }
+  ]
+}

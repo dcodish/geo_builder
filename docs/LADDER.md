@@ -89,7 +89,7 @@ Cooperative budget (`budgetExceeded()`) can bail between cases — armed only ar
 |---|---|---|---|---|
 | 3A | on-segment-solved widening | a closed-form solved point that can't satisfy alone → back to numeric + recruit its free param ancestors | no (joint solve decides) | `recruit:A` |
 | — | per new constraint K: early-stop when the system already evaluates valid (an earlier K's recruit fixed the step) | | | |
-| 3B | staged recruiting (ADR-281): each candidate DOF **alone** → the newest ref's minimal set → the full union | self-verified per rung; **the last rung commits the widest marking even on failure** (downstream cases re-point from it) | `recruit:B` / `recruit:B-forced` |
+| 3B | staged recruiting (ADR-281): each candidate DOF **alone** → the newest ref's minimal set → the full union; every case's candidates start from `residualRefs`, the refs that can move K's residual ([ADR-783](06-decisions.md#adr-783)) | self-verified per rung; **the last rung commits the widest marking even on failure** (downstream cases re-point from it) | `recruit:B` / `recruit:B-forced` |
 | 3D | free-the-blocker (ADR-074): re-point an earlier claimant K1 to an alternative DOF, release the contested one to K | verified after | `recruit:D` |
 | 3C | steal from an over-subscribed constraint (≥2 carriers) | **NON-TRANSACTIONAL: the steal persists even when its verification fails** — two comments document downstream compensation; violates M2 law (ii); S1.1 fixes | `recruit:C` |
 | 3E | redundant-carrier lend — K1 stays as a check | self-verifying | `recruit:E` |

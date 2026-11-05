@@ -16,7 +16,7 @@ import { circlesStatedTangent, ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
-import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
+import { constraintKey, constraintRefs, residual, residualRefs, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
 import { recordRequirement, requirementsField } from './requirements';
@@ -141,7 +141,8 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   // circle, so the radius can't grow without bound), but a moderate radius + the right θ still satisfies
   // |ab| = k·R. Driving both (2 DOF) keeps the solve well-posed; recruitFreeDofs widens it only if even
   // that can't hold. A tautology ("BO=R", B on the circle ⇒ |BO| ≡ R) holds for every radius/θ, so the
-  // solve just keeps the seed.
+  // solve just keeps the seed. Against a STATED radius the witness counts only as an endpoint: |centre·witness|
+  // is then a constant, and a directive it cannot act on would read as ownership and skip ADR-399's probe (#2590).
   if (con.type === 'length-radius') {
     const ci = objects.findIndex((o) => o.id === con.circle);
     const circ = ci >= 0 ? objects[ci] : undefined;
@@ -150,7 +151,7 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     }
     const wi = objects.findIndex((o) => o.id === con.witness);
     const wit = wi >= 0 ? objects[wi] : undefined;
-    if (wit && wit.kind === 'on-circle' && (wit as { solve?: unknown }).solve === undefined) {
+    if (wit && wit.kind === 'on-circle' && (wit as { solve?: unknown }).solve === undefined && residualRefs(con, objects).includes(con.witness)) {
       objects[wi] = { ...wit, solve: { constraint: con, branch: 0 } };
     }
     constraints.push(con); // verified after the driven solve (and the recruit-DOFs fallback if it can't hold)
