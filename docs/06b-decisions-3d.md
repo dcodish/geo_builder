@@ -12836,6 +12836,8 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 ## ADR-3D-343 — One narrowing notice, in the shared family, replaces 3-D's two base-derived sentences: said when the givens forced a narrower kind, naming what did (#1996, #1915's re-attribution)
 
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the note opens with the ⓘ and sits on the suite's blue strip.
+
 **Status:** accepted · 2026-10-15 · feature (P2, 3-D) · round #2128 · PR `feat/1996-narrowing-note` · the 3-D half of [ADR-W-129](06w-decisions-workspace.md#adr-w-129) (rulings quoted there) · **Supersedes** the notice half of [ADR-3D-307](#adr-3d-307) (#1792's `inscribed-constrained`) and of ADR-3D-090's `base-constrained` (kept only for the plain «מרובע» base, below).
 **Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 (a notice when the shape is narrowed, naming the cause) · **Design:** [04b](04b-design-3d.md) "A declared ring the givens force narrower is said" · **LADDER stage:** none (derived after the fold).
 

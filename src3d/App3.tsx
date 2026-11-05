@@ -56,6 +56,7 @@ import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 // #1374: the SHORT link — upload the figure + its preview, get themathbible.com/g/<id> back.
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
+import { NarrowingNote } from '../shell/frame/NarrowingNote';
 import { Banner } from '../shell/frame/Banner';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
 import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
@@ -831,11 +832,14 @@ export default function App3() {
           {/* #305 (ADR-3D-090): a NON-error build notice — the step committed, and the figure was
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
-          {!busy && notices.map((n, i) => (
+          {!busy && notices.map((n, i) => n.kind === 'narrowed' ? (
+            // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family, on its one face (#2266)
+            <div key={`notice-${i}`} data-testid="narrowed-note">
+              <NarrowingNote>{narrowingText3(n.note, t as NarrowTranslate)}</NarrowingNote>
+            </div>
+          ) : (
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {n.kind === 'narrowed' // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family
-                ? narrowingText3(n.note, t as NarrowTranslate)
-                : n.kind === 'base-constrained' // ADR-3D-090, kept for the plain «מרובע» base only (#1996)
+              {n.kind === 'base-constrained' // ADR-3D-090, kept for the plain «מרובע» base only (#1996)
                   ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })

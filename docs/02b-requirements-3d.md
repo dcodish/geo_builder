@@ -292,7 +292,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   family (2-D's FR-HS-14, ADR-W-129: «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.»;
   a right pyramid over a base it narrows: «כדי שהפירמידה תהיה ישרה, ABCD הוגבל …»; a given typed first is named instead;
   nothing when the declared noun is already the cyclic one, «טרפז שווה שוקיים»); every other forced narrowing the
-  givens make is said in the same family, as in 2-D; a right trapezoid in a circle is refused — in one sentence,
+  givens make is said in the same family, as in 2-D, on 2-D's blue ⓘ information strip ([ADR-W-180](06w-decisions-workspace.md#adr-w-180), #2266); a right trapezoid in a circle is refused — in one sentence,
   and also when «טרפז ישר זווית ABCD» and the circle («ABCD חסום במעגל», «מעגל חוסם את ABCD», a pyramid's
   right-trapezoid base) are stated on two lines, in either order: the second line is refused, naming both. A
   shape's own condition draws no segment the student did not name. The 2-D twin is FR-EN-14. A circle inscribed in a pentagon

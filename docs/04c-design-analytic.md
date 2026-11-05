@@ -1425,8 +1425,8 @@ kind is `SHAPES[…].kind` of a polygon whose noun the line's OWN text names (`n
 admitted figures of `drawableAt(c, 0..POOL_SIZE-1)`, only once `configurationPool(c).complete()`; a deferred pool
 reports pending and returns nothing, so `poolScheduler`'s re-render brings the note. Subset trials re-derive the
 anchors plus the chosen lines, settled "not forced" at the first counterexample. `App.tsx` computes it in a passive
-effect after paint (never in render) and shows one `Banner kind="notice"` per note under the shape warnings; the
-given text is the line as the page shows it (`rowShownText`, below).
+effect after paint (never in render) and shows one shared `NarrowingNote` per note under the shape warnings, through
+`app/NarrowingNotes.tsx` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)); the given text is the line as the page shows it (`rowShownText`, below).
 
 **A row's shown text** ([ADR-AG-326](06c-decisions-analytic.md#adr-ag-326), #2424). `rowShownText(line, spokenFor[i])` in
 `store/useAnalyticStore.ts`, beside the marker's writer `spokenPart` and reader `spokenSentence`: the stored sentence
@@ -1839,7 +1839,7 @@ through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra p
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross
 at the origin, labelled `(0, 0)` under the circle's own rule. `circleNotesOf(lines, d, rederive)` finds the cause as
 the narrowing note does — every other line whose removal stops it being round, else its own line — and `App.tsx`
-computes it in a passive effect after paint and renders it as an ⓘ `Banner kind="notice"` after the narrowing notes
+computes it in a passive effect after paint and renders it as a `NarrowingNote` after the narrowing notes
 (`circleNoteText`, the narrowing note's `cause` keys and voice). `isCircleShaped` is the engine's `isRoundEllipse` (`engine/crossings.ts`), so the offer list reads it too: `roundEllipseCentresOf` offers the centre on the circle centre's path (`offersOf` → the letter popover → `decideCentreName` → `centreSentenceOf(…, construction)`), recording «<letter> מרכז האליפסה» — the `centre` role of `readRoleRef`, lowered (`ellipse-centre-of`) by `nameEllipseRole` to `ellipse-point` `{ k: 'centre' }`. `curveParts` prints such an ellipse's row with «מרכז: (0, 0)» (`curveRoundCentreLabel`) instead of its foci.
 
 ### The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))

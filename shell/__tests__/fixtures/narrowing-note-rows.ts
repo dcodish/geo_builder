@@ -14,6 +14,8 @@
  * `shell/__tests__/narrowing-note-meta-1996.test.ts` proves these checks catch a broken gate.
  */
 
+import { color } from '../../theme';
+
 export type Builder = '2d' | '3d' | 'analytic';
 
 /** What a builder did with a sequence: whether every line recorded, and the narrowing notes on screen after it. */
@@ -165,4 +167,24 @@ export async function narrowingFaults(gate: NarrowGate, b: Builder, rows: readon
     else if (!ok) faults.push(`${label} in ${b}: expected ${JSON.stringify(want)}, got ${JSON.stringify(v.notes)}`);
   }
   return faults;
+}
+
+/**
+ * THE NOTE'S FACE (#2266, ADR-W-180) — operator, 2026-10-16: *"2266 - A"*, keep the ⓘ everywhere, as 2-D has it, and
+ * *"same messages across tools"*. Each tree renders its real note (`narrowing-note-face-2266.test.tsx`) and hands the
+ * markup here; `narrowing-note-face-meta-2266.test.tsx` proves this catches each way the builders used to differ.
+ */
+export function noteFaceFaults(html: string, b: Builder): string[] {
+  const faults: string[] = [];
+  const has = (rule: string) => html.replace(/\s/g, '').toLowerCase().includes(rule.toLowerCase());
+  if (!html.includes('ⓘ')) faults.push(`the note in ${b} has no ⓘ`);
+  if (!has(`color:${color.info}`) || !has(`background:${color.infoSoft}`) || !has(`border-color:${color.infoBorder}`)) {
+    faults.push(`the note in ${b} is not on the blue information strip`);
+  }
+  return faults;
+}
+
+/** The note's own markup in a rendered page: the element carrying `testId`, through its end, so a neighbour cannot vouch for it. */
+export function noteMarkup(html: string, testId: string): string {
+  return html.match(new RegExp(`<div[^>]*data-testid="${testId}"[^>]*>[\\s\\S]*?</div></div></div>`))?.[0] ?? '';
 }

@@ -1,7 +1,9 @@
 /**
  * The error/notice banner — one voice for refusals and warnings across builders (ADR-W-016 seed:
  * "error/notice banners"). `error` is a refusal (red, `role="alert"`); `notice` is a warning that
- * does not block — the load audit's home (ADR-242: the load reports what it could not restore).
+ * does not block — the load audit's home (ADR-242: the load reports what it could not restore);
+ * `info` is a statement about the figure with nothing wrong and nothing to do (blue, `role="note"`,
+ * 2-D's strip measured, ADR-W-180).
  *
  * The banner carries no strings of its own — content and the dismiss label are the caller's,
  * through its own i18n instance, so the product's error voice stays its own (ADR-276: a message
@@ -12,7 +14,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { color, fs, radius } from '../theme';
 
 interface BannerProps {
-  kind: 'error' | 'notice';
+  kind: 'error' | 'notice' | 'info';
   children: ReactNode;
   /** Present = dismissable; the label is the caller's translated text. */
   onDismiss?: () => void;
@@ -22,12 +24,9 @@ interface BannerProps {
 }
 
 export function Banner({ kind, children, onDismiss, dismissLabel, dismissAriaLabel }: BannerProps) {
-  const pal =
-    kind === 'error'
-      ? { fg: color.danger, bg: color.dangerSoft, border: color.dangerBorder }
-      : { fg: color.warn, bg: color.warnSoft, border: color.warnBorder };
+  const pal = PALETTE[kind];
   return (
-    <div role={kind === 'error' ? 'alert' : 'status'} style={{ ...box, color: pal.fg, background: pal.bg, borderColor: pal.border }}>
+    <div role={ROLE[kind]} style={{ ...box, ...(kind === 'info' ? infoPadding : null), color: pal.fg, background: pal.bg, borderColor: pal.border }}>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
       {onDismiss && (
         <button type="button" onClick={onDismiss} aria-label={dismissAriaLabel} style={{ ...dismissBtn, color: pal.fg }}>
@@ -37,6 +36,13 @@ export function Banner({ kind, children, onDismiss, dismissLabel, dismissAriaLab
     </div>
   );
 }
+
+const PALETTE = {
+  error: { fg: color.danger, bg: color.dangerSoft, border: color.dangerBorder },
+  notice: { fg: color.warn, bg: color.warnSoft, border: color.warnBorder },
+  info: { fg: color.info, bg: color.infoSoft, border: color.infoBorder },
+} as const;
+const ROLE = { error: 'alert', notice: 'status', info: 'note' } as const;
 
 const box: CSSProperties = {
   display: 'flex',
@@ -48,6 +54,8 @@ const box: CSSProperties = {
   fontSize: fs.body,
   lineHeight: 1.5,
 };
+/** 2-D's information strip is the reference for this kind, its padding included (ADR-W-118 B1, ADR-W-180). */
+const infoPadding: CSSProperties = { padding: '8px 12px' };
 const dismissBtn: CSSProperties = {
   border: 'none',
   background: 'transparent',

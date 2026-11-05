@@ -377,7 +377,7 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   which apply uses instead of the pool), so history is rewritten as one undo step and the pool letter is free again.
   `sameStatement` compares `midpoint-auto` without that `id`, so «אמצע BB'» typed again is still already known.
 
-**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
+**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996), on the shared `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through
 the same function with `narrow = false`, so no recursion and no `deriveStats3` count). Declared kind: a `quad-shape`'s
 base + `adj` (`declaredKind3`), `rect-complete`, a `QUAD_PYRAMIDS` solid's base (its ring `ids[0..3]`), a flat
