@@ -35,6 +35,7 @@ import { angleLabelName, isTermPlaceholder, symbolText, type LengthExpr } from '
 import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
 import type { FootLine } from './derived';
+import { lineIdOf } from './names';
 
 /** A stated value, as the renderer should write it: a NUMBER the givens fix, or the student's own TEXT. */
 export type StatedValue = { num: number } | { text: string };
@@ -58,6 +59,11 @@ export interface StatedMeasures {
   areas: Array<{ ids: Id[]; value: StatedValue; bare?: true }>;
   /** «⌢AC = 60°» — written ON the arc of `circle` between `a` and `b` (2-D's ADR-335: never a wedge at the centre). */
   arcs: Array<{ circle: Id; a: Id; b: Id; value: StatedValue }>;
+  /**
+   * #2057 (ADR-AG-406) — a polygon's side that carries a stated equation, by its letters or its role: `curve` is the line,
+   * `a` and `b` the side THIS configuration took. Written beside the side, for every stated side equation.
+   */
+  sideEquations: Array<{ curve: Id; a: Id; b: Id }>;
   /** «AB = AC» — `count` ticks per member, one count per equality class (1, 2, …). */
   equalLengths: Array<{ a: Id; b: Id; count: number }>;
   /** «∢ABC = ∢ACB» — `count` arcs per member, one count per equality class. */
@@ -70,6 +76,7 @@ export const NO_STATED_MEASURES: StatedMeasures = {
   rights: [],
   areas: [],
   arcs: [],
+  sideEquations: [],
   equalLengths: [],
   equalAngles: [],
 };
@@ -173,7 +180,7 @@ export function statedMeasures(
     return { text: statedText(e) };
   };
 
-  const out: StatedMeasures = { lengths: [], angles: [], rights: [], areas: [], arcs: [], equalLengths: [], equalAngles: [] };
+  const out: StatedMeasures = { lengths: [], angles: [], rights: [], areas: [], arcs: [], sideEquations: sideEquationsOf(c, resolve), equalLengths: [], equalAngles: [] };
   const lengthPairs: Array<[{ a: Id; b: Id }, { a: Id; b: Id }]> = [];
   const anglePairs: Array<[{ v: Id; a: Id; b: Id }, { v: Id; a: Id; b: Id }]> = [];
   /**
@@ -338,6 +345,30 @@ export function statedMeasures(
   out.equalAngles = equalityClasses(anglePairs, (r) => angKey(r.v, r.a, r.b)).flatMap((cls, i) =>
     cls.map((r) => ({ ...r, count: i + 1 })),
   );
+  return out;
+}
+
+/**
+ * WHICH SIDES CARRY A STATED EQUATION, AND WHERE IN THIS CONFIGURATION (#2057, ADR-AG-406). Operator, 2026-10-14: *"The
+ * equation text is shown beside the side on the canvas, for every stated side equation, open role or settled, as well
+ * as in the panel."* A `curve` object is a line given by its equation; it is a side when its letters are a ring edge,
+ * or when it carries a side's role, and then the side is the two vertices the drawn option puts on it.
+ */
+function sideEquationsOf(c: Construction, resolve: (k: Extract<Constraint, { t: 'choice' }>) => readonly Constraint[]): StatedMeasures['sideEquations'] {
+  const rings = c.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : []));
+  const flat = (k: Constraint): Constraint[] => (k.t === 'all' ? k.of.flatMap(flat) : k.t === 'choice' ? [] : [k]);
+  const held = c.constraints.flatMap((k) => (k.t === 'choice' ? resolve(k).flatMap(flat) : flat(k)));
+  const edge = (a: Id, b: Id) => rings.some((r) => r.some((p, i) => { const q = r[(i + 1) % r.length]; return (p === a && q === b) || (p === b && q === a); }));
+  const out: StatedMeasures['sideEquations'] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'curve') continue;
+    const ends = held.flatMap((k) => (k.t === 'on-curve' && k.curve === o.id ? [k.id] : []));
+    const pair = ends.flatMap((a, i) => ends.slice(i + 1).flatMap((b) => (edge(a, b) ? [[a, b] as const] : [])));
+    if (pair.length !== 1) continue;
+    const role = o.label.role;
+    if (role === 'main-diagonal' || role === 'secondary-diagonal') continue;
+    if (role || o.id === lineIdOf(`${pair[0][0]}${pair[0][1]}`) || o.id === lineIdOf(`${pair[0][1]}${pair[0][0]}`)) out.push({ curve: o.id, a: pair[0][0], b: pair[0][1] });
+  }
   return out;
 }
 

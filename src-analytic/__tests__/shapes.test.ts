@@ -63,9 +63,12 @@ describe('#1049 — every noun in the table BUILDS, and its givens actually HOLD
     });
 
     it(`a kite has its two pairs of ADJACENT equal sides (seed ${seed})`, () => {
+      // W4 (2026-10-08, #2006): *"the equal pair is a choice"*, so one of the two adjacent-pair options holds.
       const { p } = at(['דלתון ABCD'], seed);
-      expect(len(p.A, p.D)).toBeCloseTo(len(p.A, p.B), 5);
-      expect(len(p.C, p.D)).toBeCloseTo(len(p.C, p.B), 5);
+      const near = (x: number, y: number) => Math.abs(x - y) < 1e-5;
+      const axisAC = near(len(p.A, p.D), len(p.A, p.B)) && near(len(p.C, p.D), len(p.C, p.B));
+      const axisBD = near(len(p.B, p.A), len(p.B, p.C)) && near(len(p.D, p.A), len(p.D, p.C));
+      expect(axisAC || axisBD).toBe(true);
     });
 
     it(`an isosceles trapezoid keeps BOTH givens (seed ${seed})`, () => {

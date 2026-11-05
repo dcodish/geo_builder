@@ -2063,6 +2063,8 @@ a stated value that is not 90 falls through rather than being quietly treated as
 
 ## ADR-AG-037 — A diagonal is an OBJECT, and only some shapes have a PRINCIPAL one (#1070)
 
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-406](#adr-ag-406) (#2006, operator W4 2026-10-08 and ruling A 2026-10-13): the kite's fixed AC. The kite's pair is a choice, and its main diagonal follows the chosen pair; the letters are fixed only by a stated pair.
+
 **Status:** accepted, 2026-09-15 · **Builds on** [ADR-AG-035](#adr-ag-035) (the registry) ·
 **Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
 
@@ -12049,6 +12051,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-266 — A side named by its role alone is the side the figure says; an open role is a degree of freedom (#1807)
 
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-406](#adr-ag-406) (#2057, operator rulings 2026-10-13 and 2026-10-14): "drawn once, anonymous" stands for the line's name, but it now carries its role, which lists it in the panel, and its equation is written beside the side.
+
 **Date:** 2026-10-12 · **Status:** accepted · P2 feature · fix round #1998, branch `feat/1807-analytic-base-equation`, stacked on `feat/1737-analytic-role-length` (ADR-AG-265) @ `c6818ccb` · operator report and rulings of 2026-10-06 on #1807; plan armed the same day (*"arm all"*).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R178 — a side named by its role alone is the side the figure says; an open role is cycled; a shape with no such role refuses. · **Design:** [04c](04c-design-analytic.md), "A side named by its role alone": `parseRoleSide`, the `role-side` fact, `applyRoleSide`, the joint-option collapse.
@@ -12095,6 +12099,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 5. **App:** the note in the row's `notes` slot (`role="note"`), and the `unstatedTitle` cue beside «הציגו תצורה אחרת» with the notes as its tooltip — 2-D's two surfaces.
 
 **Behaviour change for a student.** All `[ruled]`/`[2-D]` on #1864: the notes and cue above; the taught line pins the choice and the note goes, in any spelling; muting it brings the note back; «זווית A קהה» now builds (it was refused not-handled); «זווית BAC קהה» on an obtuse triangle and «A על ציר ה-x» on an axes figure stop «הציגו תצורה אחרת» offering the options they rule out; «משולש שווה שוקיים ABC · AC=AB» no longer draws an equilateral triangle in some configurations.
+
+> **⚠ Superseded** 2026-11-05 by [ADR-AG-406](#adr-ag-406): the kite is delivered, with the role diagonal and its row name ruled.
 
 **Approved but not delivered — the kite (W4), #2006.** Making «דלתון ABCD»'s pair a choice is a row change (and (2b) already pins it by «AB=AD»), but «משוואת האלכסון הראשי היא y=2x» builds ONE stated line labelled `AC`; once the pair cycles, that line must carry B and D in the other configuration, and what its label shows then is a product decision. Filed `needs-operator` with three options; the kite keeps ADR-AG-037 until it is ruled.
 
@@ -15293,3 +15299,44 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-406 — A statement that names part of a shape by its role is resolved per option: the kite's pair is a choice, its main diagonal follows it, and a role line is named, listed and written (#2006, #2057)
+
+**Date:** 2026-11-05 · **Status:** accepted · feature (P3, analytic) · round #2722 · branch `feat/2006-2057-open-role-sides`, one PR (`Closes #2006`, `Closes #2057`), operator ruling 2026-11-04 (card q4 = C): *"Fold #2057 into #2006's PR"*.
+**Requirements:** [02c](02c-requirements-analytic.md) R14 (the kite joins the said choices), R62 (the role diagonal), R168 (a stated side equation is written beside the side), R178 (the row's name) · **Design:** [04c](04c-design-analytic.md) "The tool's choices are SAID", "Discrete freedom", "Contextual references", "A side named by its role alone", the stated-measures section. **LADDER stage:** none; `choice` is existing discrete freedom and the canvas text is render-only.
+**Supersedes in part** [ADR-AG-037](#adr-ag-037) (the kite's fixed AC), [ADR-AG-266](#adr-ag-266) ("drawn once, anonymous", for the panel) and the undelivered paragraph of [ADR-AG-267](#adr-ag-267). **Reverses** #1070's reading of the bare kite.
+
+**Rulings.**
+- W4, 2026-10-08 ([#1864](https://github.com/dcodish/geo_builder/issues/1864#issuecomment-6055556692)): *"«דלתון ABCD» in analytic: the equal pair is a choice, shown with 2-D's note and cycled as in 2-D. «האלכסון הראשי» follows the chosen pair, which changes ADR-AG-037's fixed AC."*
+- 2026-10-13, follow-up ballot ([#2006](https://github.com/dcodish/geo_builder/issues/2006#issuecomment-6142487588)), withdrawing a refusal: *"we should never reject a statement we just dont know how exactly it looks. this is why we have the seeds and dof."*
+- Ruling A, 2026-10-13 ([#2006](https://github.com/dcodish/geo_builder/issues/2006#issuecomment-6149122873)): *"the line y=2x is the main diagonal in every drawing; which letters lie on it changes with the configuration"*, and it holds for «האלכסון המשני».
+- Row name, 2026-10-13 ([#2006](https://github.com/dcodish/geo_builder/issues/2006#issuecomment-6151714563), [#2057](https://github.com/dcodish/geo_builder/issues/2057#issuecomment-6151728351)): the role name while the role is open, the letters once fixed.
+- Canvas, 2026-10-14 ([#2057](https://github.com/dcodish/geo_builder/issues/2057#issuecomment-6167334274)): *"The equation text is shown beside the side on the canvas, for every stated side equation, open role or settled, as well as in the panel."*
+
+**Measured before (`28dac0c3`, `derive` + `panelKnowledge`).** «דלתון ABCD»: fixed AB = AD, CB = CD, no note. «BA = BC» on it: a rhombus (all sides 6.441). «משוואת האלכסון הראשי היא y=2x»: `line-AC`, named AC, always. «משולש שווה שוקיים ABC» · «משוואת הבסיס היא x-2y+6=0»: no panel row, no note; the same for «השוק», «היתר», a trapezoid's base and the incidence form. No side equation anywhere on the canvas.
+
+**The class.** A statement that names part of a shape by its role is resolved once, from a pick the student never made, instead of per option of the shape's open choice, and what it draws is held by a carrier every surface keyed on a name then drops. Two members were the kite's pair (M4, docs/17 §3: a hard-coded default that survived «BA = BC») and its diagonal (read off the vertex order); ADR-AG-266 had already solved the role-named side. The note's silence and the panel's empty row were the same class on the reading side.
+
+**Decision.**
+1. **The kite's row is a `choice`** in 2-D's `variantPairs` order. The note, the cycling and ADR-AG-267's narrowing needed no code.
+2. **The axis is read per option, structurally:** `axisOf` returns the vertices where the option's equal pairs meet. No per-noun table; the row only says it has a principal diagonal (`principalDiagonal: true`).
+3. **One mechanism for a role's riders.** `seatOver` and `attachToOptions` are lifted out of `applyRoleSide`, and `applyRoleDiagonal` is their second caller. Settled → the lettered twin, byte-identical. Open → one stated line `curve-<role>-<hash>`, never `line-AC`, so «הישר AC» cannot resolve to it in a BD drawing. `seatOver` matches an option that INCLUDES the key, so a second sentence finds a seat the first rewrote. A restated role sentence now adds nothing (`known`).
+4. **The note survives riders:** `unstatedChoices` classifies by the option's equalities. This restores the isosceles note too; a choice with no equality stays unsaid.
+5. **`label.role`, set at mint, is the row's name while open.** `label.name` stays '', so no role phrase becomes a line name, and `toolNamed` skips a role line: it already has a name, so it takes no l-number (ADR-AG-319). `panelListsCurve` lists it: the student mentioned it. `roleLineLetters` answers "the letters once fixed": the riders a collapse wrote, else the two ring vertices on the line in every admitted configuration.
+6. **`sideEquations`, a stated-measure lane**, written beside the side the drawing took, in the same label pass as the lengths, behind the values switch. A diagonal is no side: the ruling names sides, and the kite's diagonal is a drawn line.
+
+7. **A collapse stands the option's members as plain constraints.** `applyFact`'s joint-option collapse used to leave an `all` in the seat: «CB=CD» then missed the duplicate absorb and every reader of a top-level equality missed the pair, which cost the #1463 circle precision. The members stay on the line of the sentence that opened the choice, and `fold`'s attribution now goes by identity, not slot, because a collapse moves what follows it. Measured on the #1464 figure with «B(1,1)» · «x_B > x_D»: the line blamed moved to «B(1,1)» until the attribution was right, and is «x_B > x_D» again, as on `main`.
+
+**Deviation from the plan's "What the student will see".** The plan measured a prototype in which «CB = CD» after «AB = AD» answered «כבר נובע». With decision 7 it answers «כבר ידוע», which is what production says today: the line is unchanged for the student.
+
+**Correcting two plan claims, measured at pickup (no outcome changes).** The addendum on #2057 says `applyRoleSide` keeps the student's equation on the carrier as `eqSrc`; it does not (the label is rebuilt), so the lane reads `curve.eq` off the object. The plan says the joint-option collapse "writes the letters in"; it writes the riders in and the line keeps its `curve-<role>-…` id, which is why the letters are read rather than stored. Plan step `suite-vocabulary.test.ts` needed no change: that lock maps the template key, not nouns. #2018 landed first and did not write the 06w principle, so it is quoted above; the 06w entry is owed by the round (no id was allocated to this item).
+
+**Measured after (24 seeds, whole 24/24).** «דלתון ABCD»: axis AC 12, BD 12. With the main diagonal: AC 10, BD 14, the line through the drawn axis at 24/24. The secondary: the other two vertices at 24/24. Both, in one cycle: 24/24. Line then «AB = AD»: AC 24/24; then «BA = BC»: BD 24/24, never a rhombus. «דלתון ABCD חסום במעגל» 13/11, «מעגל חסום בדלתון ABCD» 8/16.
+
+**Cost (docs/17 §7).** One more discrete choice on every unpinned kite: «דלתון ABCD» 4.8 ms per seed, the 81 corpus entries with a kite or a role sentence 6.2 s on `main`, 9.0 s here (derive, panel and 24 `drawableAt`), the heaviest 0.4 s to 2.1 s (`issue-1937-1971-off-ink`). The one pathological case was not a figure: `analyticCorpus` reads every string array in the tests as a sequence, and the noun list of `issue-1619-b2-inscribed` became nine rings on four points, an unsatisfiable figure that took 72 s to derive on `main` and 131 s with the kite's choice, repeated by every corpus sweep; a whole-tree run sat on it for over 20 minutes. It left the corpus: the list is no longer an array literal.
+
+**Sibling audit (docs/17 §1).** `principalDiagonal` had one consumer, `diagonal-eq`, reached by every spelling of the sentence. «מרובע», «מקבילית», «מעוין» keep `undistinguished-diagonal` (locked). 2-D has the variant, the note and the cycling, and no equation sentence (X2); 3-D reads no role diagonal and no role noun (#1679, parked). Complex has no shapes of this kind. Nothing to port; no parity row changes.
+
+**Locks.** `src-analytic/__tests__/issue-2006-kite-pair-choice.test.ts` (W4 rows, the operator's sequence at 24 seeds, secondary, both, either order, English, restated, the twin line, refusals, the row) · `issue-2057-open-role-row.test.ts` (every role and form He and En, either order, #1078's carrier, the note, the canvas block, the values switch) · fixtures `issue-2006-kite-main-diagonal`, `issue-2057-open-role-base` · re-based: `diagonals.test.ts`, `shapes.test.ts`, `issue-1619-b2-inscribed.test.ts`, `issue-1864-choice-notes.test.ts`, each quoting its ruling.
+
+**Behaviour change for a student:** «דלתון ABCD» now shows the note and «הציגו תצורה אחרת» swaps which sides are equal; «AB = AD» records, where it said «כבר ידוע»; «BA = BC» draws a kite, not a rhombus. The main diagonal's line carries A and C in one drawing and B and D in another until the pair is stated, and its row reads «האלכסון הראשי: y = 2x» until then. An equation for a base, leg or hypotenuse is listed in the panel, and every stated side equation is written beside its side on the canvas.

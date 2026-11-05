@@ -76,15 +76,19 @@ describe('#1070 — only some shapes HAVE a principal diagonal', () => {
    * plain quadrilateral, a parallelogram or a rhombus the phrase has no referent, and choosing one
    * would assert a distinction the question never made (ADR-052 in vocabulary form).
    */
-  it('a kite resolves both of them, to the two different diagonals', () => {
-    expect(ids(['דלתון ABCD', 'משוואת האלכסון הראשי היא y=2x'])).toContain('line-AC');
-    expect(ids(['דלתון ABCD', 'משוואת האלכסון המשני היא y=-x'])).toContain('line-BD');
+  // Re-based on #2006 (ADR-AG-406). #1070 (2026-09-15): *"for a דלתון - i want to be able to say משוואת האלכסון הראשי"*
+  // stands; its fixed AC does not. W4 (2026-10-08): *"«האלכסון הראשי» follows the chosen pair, which changes
+  // ADR-AG-037's fixed AC."* Ruling A (2026-10-13): *"the line y=2x is the main diagonal in every drawing; which letters
+  // lie on it changes with the configuration"*. The bare-kite rows are locked per seed in issue-2006-kite-pair-choice.
+  it('a kite whose pair is stated resolves both of them, to the two different diagonals', () => {
+    expect(ids(['דלתון ABCD', 'AB = AD', 'משוואת האלכסון הראשי היא y=2x'])).toContain('line-AC');
+    expect(ids(['דלתון ABCD', 'AB = AD', 'משוואת האלכסון המשני היא y=-x'])).toContain('line-BD');
   });
 
   it('and the principal one is the AXIS OF SYMMETRY, verified from the placed points', () => {
     // Not from the vertex order: `AC` is principal because |AB|=|AD| and |CB|=|CD| make it the axis,
-    // which is what the registry row says and what the figure must show.
-    const d = derive(['דלתון ABCD'], 0);
+    // which is what the stated pair says and what the figure must show.
+    const d = derive(['דלתון ABCD', 'AB = AD'], 0);
     const p = Object.fromEntries(d.figure.points.map((q) => [q.id, q]));
     const len = (a: string, b: string) => Math.hypot(p[a].x - p[b].x, p[a].y - p[b].y);
     expect(len('A', 'B')).toBeCloseTo(len('A', 'D'), 5);
@@ -107,7 +111,7 @@ describe('#1070 — only some shapes HAVE a principal diagonal', () => {
   it('keeps working when the kite was named in a second sentence', () => {
     // «מרובע ABCD» then «דלתון ABCD» is one ring that learned what it is (#1049) — and that is what
     // makes the principal diagonal resolvable here.
-    expect(ids(['מרובע ABCD', 'דלתון ABCD', 'משוואת האלכסון הראשי היא y=2x'])).toContain('line-AC');
+    expect(ids(['מרובע ABCD', 'דלתון ABCD', 'AB = AD', 'משוואת האלכסון הראשי היא y=2x'])).toContain('line-AC');
   });
 });
 

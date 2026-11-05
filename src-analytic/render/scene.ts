@@ -759,6 +759,8 @@ function ticks(min: number, max: number, project: (v: number) => number): AxisTi
 export interface SceneKnowledge {
   /** Is this curve`s shape — and so its centre — the same in every configuration? */
   curveKnown?: (id: string) => boolean;
+  /** #2057 (ADR-AG-406) — a stated side equation's text, printed by the panel's formatter, which the renderer cannot see. */
+  sideEquationText?: (id: string) => string;
   /**
    * The crossings to offer, in WORLD coordinates, each with the sentence it would add (#1025).
    *
@@ -1112,7 +1114,7 @@ export function buildScene(
   const labelled = projected.filter((s) => s.label);
   // #1714: the stated-measure layer's marks, and its labels as REQUESTS — placed in the same call as the lengths, so
   // one placement keeps every stated value clear of every other (#1717's rule, one path).
-  const statedDraft = statedScene(fig, t, knows.stated, projected);
+  const statedDraft = statedScene(fig, t, knows.stated, projected, knows.sideEquationText);
   // #2688 (ADR-AG-388): values switched off → the stated layer keeps its MARKS (arcs, knees, ticks) and writes no value
   if (!display.values) {
     statedDraft.requests = [];
@@ -1345,6 +1347,7 @@ function statedScene(
   t: Transform,
   stated: StatedMeasures | undefined,
   segments: readonly SceneSegment[],
+  equationText?: (id: string) => string,
 ): StatedDraft {
   const out: StatedDraft = { marks: [], ticks: [], requests: [], kinds: [] };
   if (!stated) return out;
@@ -1407,6 +1410,13 @@ function statedScene(
     const A = at(l.a);
     const B = at(l.b);
     if (A && B) ask('length', lengthRequests([{ x1: A.x, y1: A.y, x2: B.x, y2: B.y, text: lbl(valueText(l.value)) }], fig.points.map((p) => ({ id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label: p.id })))[0]);
+  }
+  // #2057 (ADR-AG-406): the equation beside the side, in the same pass as the lengths, so the two never overlap.
+  for (const e of stated.sideEquations) {
+    const A = at(e.a);
+    const B = at(e.b);
+    const text = equationText?.(e.curve);
+    if (A && B && text) ask('length', lengthRequests([{ x1: A.x, y1: A.y, x2: B.x, y2: B.y, text: lbl(text) }], fig.points.map((p) => ({ id: p.id, cx: t.sx(p.x), cy: t.sy(p.y), label: p.id })))[0]);
   }
   for (const ar of stated.areas) {
     const ps = ar.ids.map(at).filter((p): p is MarkPt => p !== null);

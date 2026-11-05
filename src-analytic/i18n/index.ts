@@ -451,6 +451,12 @@ const he = {
     '«משולש שווה שוקיים ABC» בשביל הבסיס), או ציינו את הצלע באותיות (למשל «תיכון לצלע AB»).',
   roleWordBase: 'בסיס',
   roleWordLeg: 'שוק',
+  // #2006, #2057 (ADR-AG-406): an equation row's name while the role is open, ruled 2026-10-13.
+  roleLineBase: 'הבסיס',
+  roleLineLeg: 'השוק',
+  roleLineHypotenuse: 'היתר',
+  roleLineMainDiagonal: 'האלכסון הראשי',
+  roleLineSecondaryDiagonal: 'האלכסון המשני',
   errAmbiguousHypotenuse:
     'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: «{{detail}}». ' +
     'כתבו איזו צלע היא היתר, למשל «תיכון ליתר AB», או איזו זווית ישרה, למשל «זווית C ישרה».',
@@ -1041,6 +1047,11 @@ const en: typeof he = {
     '«isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
   roleWordBase: 'base',
   roleWordLeg: 'leg',
+  roleLineBase: 'base',
+  roleLineLeg: 'leg',
+  roleLineHypotenuse: 'hypotenuse',
+  roleLineMainDiagonal: 'main diagonal',
+  roleLineSecondaryDiagonal: 'secondary diagonal',
   errAmbiguousHypotenuse:
     'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: «{{detail}}». ' +
     'Name the hypotenuse — for example «the median to the hypotenuse AB» — or the right angle, for example «angle C is right».',

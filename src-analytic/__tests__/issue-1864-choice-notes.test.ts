@@ -227,7 +227,6 @@ describe('#1864 — the choices that are NOT said', () => {
     [['נתון מעגל O', 'נתון מעגל M', 'מעגל O ומעגל M משיקים']],
     [['משולש ABC', 'sin∢ACB = 1/2']],
     [['משולש ABC', 'מלבן DEFG חסום במשולש ABC']],
-    [['דלתון ABCD']], // the kite's pair is fixed by its letters until #2006
     [['מקבילית ABCD']],
   ])('%j shows no note', (lines) => {
     expect(notes(lines)).toEqual([]);

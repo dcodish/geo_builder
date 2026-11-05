@@ -62,6 +62,7 @@ const statedValueKeys = (s: StatedMeasures): Set<string> => {
     ...s.angles.map((x) => `A:${x.v}:${pair(x.a, x.b)}`),
     ...s.areas.map((x) => `S:${[...x.ids].sort().join('|')}`),
     ...s.arcs.map((x) => `C:${x.circle}:${pair(x.a, x.b)}`),
+    ...s.sideEquations.map((x) => `E:${pair(x.a, x.b)}`),
   ]);
 };
 

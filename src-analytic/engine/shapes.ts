@@ -84,6 +84,43 @@ const equal = (a: Id, b: Id, c: Id, d: Id): Constraint => ({
 /** Exactly one of these holds, and the student has not said which. */
 const choice = (options: Constraint[]): Constraint => ({ t: 'choice', options });
 
+/** Every one of these holds: one option of a {@link choice} that says several things at once. */
+const all = (of: Constraint[]): Constraint => ({ t: 'all', of });
+
+/** A segment as two point ids, in the spelling its constraint carries. */
+export type Seg = readonly [Id, Id];
+
+/** An option's members: itself, or the statements an `all` option conjoins. */
+export const membersOf = (o: Constraint): Constraint[] => (o.t === 'all' ? o.of : [o]);
+
+/** A bare segment-to-segment equality («AB = AC»), as its two segments; null for anything else. */
+export function segmentEquality(k: Constraint): readonly [Seg, Seg] | null {
+  if (k.t !== 'length-eq') return null;
+  const seg = (le: typeof k.left): Seg | null => {
+    if (le.terms.length !== 1) return null;
+    const t = le.terms[0] as { kind?: string; a?: Id; b?: Id };
+    // The expression must be the term itself: «AB = 2AC» is a ratio, not an equal pair.
+    if ((t.kind !== undefined && t.kind !== 'length') || !t.a || !t.b || le.expr.kind !== 'sym') return null;
+    return [t.a, t.b];
+  };
+  const l = seg(k.left);
+  const r = seg(k.right);
+  return l && r ? [l, r] : null;
+}
+
+/**
+ * THE AXIS AN OPTION OF EQUAL PAIRS DEFINES (#2006, [ADR-AG-406](../../docs/06c-decisions-analytic.md#adr-ag-406)): the two
+ * vertices where each equal pair meets, read off the option's own equalities and never off the vertex order. Null
+ * when the option does not say two such pairs.
+ */
+export function axisOf(option: Constraint): [Id, Id] | null {
+  const meets = membersOf(option).flatMap((m) => {
+    const eq = segmentEquality(m);
+    return eq ? eq[0].filter((p) => eq[1].includes(p)) : [];
+  });
+  return meets.length === 2 && meets[0] !== meets[1] ? [meets[0], meets[1]] : null;
+}
+
 /** What a shape noun carries: how many vertices it needs, and what it asserts about them. */
 export interface ShapeRow {
   /** 3 for a triangle, 4 for a quadrilateral — checked before the constraints are built (#1042). */
@@ -91,13 +128,15 @@ export interface ShapeRow {
   /** The givens the noun carries, over its vertices in ring order. */
   givens: (v: Id[]) => Constraint[];
   /**
-   * Does this noun distinguish a PRINCIPAL diagonal, and if so which pair of vertices is it?
+   * Does this noun distinguish a PRINCIPAL diagonal?
    *
    * A kite's principal diagonal is its axis of symmetry — a geometric fact, not a naming
    * convention — so it can be named. A plain quadrilateral has no such thing, and «האלכסון הראשי»
    * there must be refused rather than guessed ([#1070](https://github.com/dcodish/geo_builder/issues/1070)).
+   * WHICH pair of vertices it joins follows the row's choice, per option ({@link axisOf}; #2006,
+   * [ADR-AG-406](../../docs/06c-decisions-analytic.md#adr-ag-406)): the same line is the main diagonal in every drawing.
    */
-  principalDiagonal?: (v: Id[]) => [Id, Id];
+  principalDiagonal?: true;
   /**
    * A noun that can NEVER be inscribed in a circle (#1554 ruling 1, re-affirmed 2026-10-01; ADR-AG-198): the
    * noun a circumscribing circle would force the ring into, which this noun itself excludes. In a cyclic
@@ -219,12 +258,14 @@ export const SHAPES: Record<string, ShapeRow> = {
     ],
   },
   דלתון: {
-    // A kite: two pairs of ADJACENT equal sides, meeting at `A` and at `C`. That makes `AC` the axis
-    // of symmetry, which is why this row — and only some others — can name a principal diagonal.
+    // A kite: two pairs of ADJACENT equal sides. WHICH two is unstated, so the pair is a choice, shown with 2-D's note
+    // and cycled as in 2-D (operator, W4, 2026-10-08, #1864): 2-D's `variantPairs` order, so the note names the drawn
+    // pair in 2-D's letters (ADR-AG-267). The vertices where the pairs meet are the axis of symmetry, which is why this
+    // row, and only some others, can name a principal diagonal; it follows the chosen pair ({@link axisOf}).
     arity: 4,
     kind: 'kite',
-    givens: ([a, b, c, d]) => [equal(a, b, a, d), equal(c, b, c, d)],
-    principalDiagonal: ([a, , c]) => [a, c],
+    givens: ([a, b, c, d]) => [choice([all([equal(a, b, a, d), equal(c, b, c, d)]), all([equal(a, b, b, c), equal(a, d, d, c)])])],
+    principalDiagonal: true,
   },
   /*
    * --- polygons of five sides and more (#1622, ADR-AG-217) ---

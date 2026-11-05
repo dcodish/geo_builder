@@ -1,14 +1,14 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { admittedPool, isKnowledge, knownCurve, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
 import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
-import { domainText, type Construction, type ParamDecl, positionalOf } from '../engine/types';
+import { domainText, type Construction, type LineRole, type ParamDecl, positionalOf } from '../engine/types';
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
 import { symbolText } from '../engine/lengths';
-import { curveEquationOf, curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
+import { curveEquationOf, curveEquationText, curveParts, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 
@@ -48,11 +48,76 @@ import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 /** The shape both the panel and its locks need — deliberately narrower than `CurveObject`. */
 export interface PanelCurve {
   stated: boolean;
-  label: { name: string };
+  label: { name: string; role?: LineRole };
 }
 
-/** Does this curve get an equation row? */
-export const panelListsCurve = (c: PanelCurve): boolean => c.stated || c.label.name !== '';
+/**
+ * Does this curve get an equation row? A line carrying a ROLE is one the student mentioned by that role (#2057,
+ * ADR-AG-406): the same ruling, *"if we specifically mention a line, we should have its equation"*.
+ */
+export const panelListsCurve = (c: PanelCurve): boolean => c.stated || c.label.name !== '' || !!c.label.role;
+
+/** How close a vertex must lie to a line to be carried by it, as the solve leaves it. */
+const ON_LINE_TOL = 1e-6;
+
+/**
+ * THE LETTERS A ROLE LINE CARRIES IN EVERY CONFIGURATION (#2006, #2057, ADR-AG-406) — the two ring vertices on it once a
+ * given has fixed them, else null. Operator, 2026-10-13: *"the role name while the role is open, the letters once fixed"*.
+ *
+ * A collapsed choice has written the riders in, which the structure answers at once. A pair the givens settle with no
+ * statement of it («x_A > 0», a coordinate) leaves the riders in the choice, so the configuration pool answers too
+ * (the knowledge gate, ADR-AG-180): a pool that cannot tell yet says the letters are not known, never a guess.
+ */
+export function roleLineLetters(c: Construction, id: string): string | null {
+  const rings = c.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : []));
+  const twoOf = (ids: readonly string[]): string | null => {
+    const ring = rings.find((r) => ids.filter((p) => r.includes(p)).length === 2);
+    return ring ? ring.filter((p) => ids.includes(p)).join('') : null;
+  };
+  const standing = c.constraints.filter((k) => k.t !== 'choice').flatMap((k) => (k.t === 'all' ? k.of : [k]));
+  const written = twoOf(standing.flatMap((k) => (k.t === 'on-curve' && k.curve === id ? [k.id] : [])));
+  if (written) return written;
+  const pool = admittedPool(c);
+  if (!pool || pool.length === 0) return null;
+  const carried = (f: Figure): string[] => {
+    const line = f.curves.find((q) => q.id === id)?.curve;
+    if (!line || line.kind !== 'line') return [];
+    const scale = Math.hypot(line.a, line.b) || 1;
+    return f.points.filter((p) => Math.abs(line.a * p.x + line.b * p.y + line.c) / scale < ON_LINE_TOL).map((p) => p.id);
+  };
+  const first = carried(pool[0]);
+  return twoOf(first.filter((p) => pool.every((f) => carried(f).includes(p))));
+}
+
+/** The i18n key of a role line's row name. */
+export const ROLE_ROW_KEY = {
+  base: 'roleLineBase',
+  leg: 'roleLineLeg',
+  hypotenuse: 'roleLineHypotenuse',
+  'main-diagonal': 'roleLineMainDiagonal',
+  'secondary-diagonal': 'roleLineSecondaryDiagonal',
+} as const satisfies Record<LineRole, string>;
+
+/**
+ * THE NAME A CURVE'S ROW LEADS WITH (#2006, #2057, ADR-AG-406) — its own name; a role line's letters once fixed; the role
+ * phrase while open. One decision, so a lock can call it (ADR-W-053).
+ */
+export function curveRowName(c: PanelCurve, row: { letters?: string | null }, t: (key: (typeof ROLE_ROW_KEY)[LineRole]) => string): string {
+  if (c.label.name !== '' || !c.label.role) return c.label.name;
+  return row.letters ?? t(ROLE_ROW_KEY[c.label.role]);
+}
+
+/**
+ * THE EQUATION WRITTEN BESIDE A STATED SIDE (#2057, ADR-AG-406) — what the student stated, printed as the panel row
+ * prints it: a number equation through the panel's own formatter, one with a letter in it as its open form. It is
+ * read off the curve the student wrote, so no computed equation can reach the canvas (no gate is needed or skipped).
+ */
+export function sideEquationText(d: Pick<Derivation, 'construction' | 'figure'>, id: string): string {
+  const o = d.construction.objects.find((q) => q.id === id);
+  const drawn = d.figure.curves.find((q) => q.id === id);
+  if (o?.kind === 'curve' && symbolsOf(o.curve.eq).length === 0 && drawn) return curveParts(drawn.curve).equation;
+  return openCurveText(d.construction, id);
+}
 
 /**
  * WHAT THE DATA PANEL KNOWS (#1289) — the panel's own knowledge gates, as one callable decision.
@@ -82,7 +147,7 @@ export interface PanelKnowledge {
    */
   readonly angles: readonly { at: AngleRef; k: PanelKnown }[];
   /** each LISTED curve, with its equation when every coefficient is invariant, else null; `pending` = not yet settled (#1473) */
-  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean; options: NumCurve[] | null }[];
+  readonly curves: readonly { id: string; known: ReturnType<typeof knownCurve>; pending: boolean; options: NumCurve[] | null; letters: string | null }[];
 }
 
 export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): PanelKnowledge {
@@ -116,7 +181,9 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       const s = settled(() => curveEquationOf(c, cu.id));
       const known = s.value && 'known' in s.value ? s.value.known : null;
       const options = s.value && 'options' in s.value ? s.value.options : null;
-      return { id: cu.id, known, pending: s.pending, options };
+      // A pending pool leaves the role's name on the row, and the row re-reads when it completes (#1473).
+      const letters = cu.label.role && cu.label.name === '' ? settled(() => roleLineLetters(c, cu.id)).value : null;
+      return { id: cu.id, known, pending: s.pending, options, letters };
     }),
   };
 }
