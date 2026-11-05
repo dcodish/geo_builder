@@ -57,6 +57,7 @@ import { figureExplainer } from '@/app/studentVocabulary';
 import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
+import { parseValueQuery } from '@/parser/valueQuery';
 import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { roleReadings } from '@/app/roleReadings';
@@ -6338,6 +6339,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect([...seats].sort(), 'the right angle visits every vertex').toEqual(['A', 'B', 'C']);
       const side = replay(factsOf(['משולש ABC', 'תיכון לצלע AB בנקודה K']), 0);
       expect(dist(at(side, 'K'), { x: (at(side, 'A').x + at(side, 'B').x) / 2, y: (at(side, 'A').y + at(side, 'B').y) / 2 })).toBeLessThan(1e-9);
+    },
+  },
+  {
+    id: 'ask-computes-its-answer-1454',
+    title: '«ריבוע ABCD» · «G על AD» · «זווית GBA = 37»: «∠GBC» asked answers 53°, and «∠GBC» on the figure before the angle answers «לא נקבע» (#1454, ADR-788)',
+    guards:
+      '#1454 arm 4, operator 2026-09-27: "Compute on ask". The question is answered by the values path, the panel rules: a determined value prints, else its WHY. The store split (the ask leaves the panel behind its button) is src/__tests__/issue-1454-compute-on-ask.test.ts.',
+    steps: ['ריבוע ABCD', 'G על AD', 'זווית GBA = 37'],
+    check(fig) {
+      allStepsOk(fig);
+      const asked = (lines: string[]) => computeValues(factsOf(lines), [{ text: '∠GBC', q: parseValueQuery('∠GBC') }]).queryRows[0];
+      expect(asked(['ריבוע ABCD', 'G על AD', 'זווית GBA = 37']).value).toBeCloseTo(53, 4);
+      expect(asked(['ריבוע ABCD', 'G על AD']).note).toBe('undetermined');
     },
   },
 ];

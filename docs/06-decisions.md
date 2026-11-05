@@ -20317,3 +20317,26 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts` (the foot-letter blocks, both locales, the refusals). Scenario `foot-letter-follows-the-seat-2166` (corpus 4). Parity rows `foot-letter-*-2166`, `hypotenuse-foot-letter-2074`.
 
 **Behaviour change for a student.** «תיכון לצלע AB בנקודה K», «תיכון מ-C בנקודה K», «תיכון ליתר בנקודה K», the same with «גובה», and «חוצה זווית C בנקודה K» draw at once with the foot named K. A K already on that side moves to the foot; a K on another side is refused.
+## ADR-788 — Submitting a question computes its answer, and the full panel stays on its button (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D) · fix round #2722 · part of [ADR-W-181](06w-decisions-workspace.md#adr-w-181) · amends [ADR-134](#adr-134) and [ADR-433](#adr-433) for the ask lane only
+
+**Operator:** 2026-09-27, asked whether 2-D should compute on ask like its siblings: *"Compute on ask"*. Scope as recorded: the worker path, the same value and knowledge rules as the panel; a determined value prints, else its WHY row; the «חשב ערכים» button stays for the full values panel; a perf lock on the heaviest fixture within the production worker budget; the busy text «חושב…» (#1453).
+
+**Requirements:** [02](02-requirements.md) FR-RV-5 · [02w](02w-requirements-workspace.md) FR-DP-2 · **Design:** [04](04-design.md) § the values panel and the ask lane
+
+**Stage:** none. This is the store seam of a read-only layer; the ladder and the pool are untouched.
+
+**Measured at pickup.** The issue's account had moved: since #477 and #741 a submitted question already ran the compute, so the waiting row was not the state after asking. What was left of the ruling: the ask ran `viewValues`, so it filled the PANEL too. The values card opened and «חשב ערכים» left on every ask, and on removing a question. And the App's `computingValues` ended with the first of the two computes one ask started, so the row could flip to «ממתין לחישוב» with the answer still running.
+
+**Class.** A question and the panel shared one layer, so an answer could not exist without the panel.
+
+**Decision.** `asks` is a layer of its own beside `values`, tagged by facts the same way. `addQuery` calls `answerAsks`, which runs `geoValues` (the worker's values op, the one pool) and keeps its `queryRows`; `viewValues` stays the button's. No second answer path exists, so an answer cannot disagree with the panel. It costs the panel's row pass, measured below against the pool. `askLaneRows` (engine/valuesPanel) composes the rows: the ask's answer, else the panel's, else waiting. `asking` is the figure being answered; only the latest run clears it, and the row says «חושב…» for it. `removeQuery` computes nothing. `viewValues` drops only on a changed figure: a question added meanwhile has its own run, so it no longer discards the panel.
+
+**Not changed.** A saved question after a new fact still reads «ממתין לחישוב — לחצו «חשב ערכים»» (#882): the ruling covers submitting. Whether it should re-answer by itself is reported to the operator on the issue.
+
+**Sibling audit.** See [ADR-W-181](06w-decisions-workspace.md#adr-w-181). 3-D, complex and analytic derive their answers with the figure and have no such layer.
+
+**Perf.** All 160 fixtures measured, cold pool on the work PC: the heaviest by the clock is `issue-572-load-collapse` (12.7 s, 4.03M work), by work `issue-1771-semicircle-three-vertices` (10.1 s, 4.58M, cut by the cap); the row pass is at most 1 ms, so sharing `computeValues` costs nothing and needs no ask-only op. An ask behind the pool takes 0 ms and no new sweep, and that is the app's path: `detectCrossings` samples the same pool on every change of the facts, on the same lane. So the lock (`issue-1454-ask-budget.test.ts`) asserts the 12 s worker budget on that path, and counted work on a cold pool. **The ruled lock is not met on a cold pool by the clock:** 12.7 s against 12 s, 6% over, in vitest. That pool is the sweep's, unchanged by this ADR, and it cannot be cut by time: the operator's later ruling of 2026-09-30 (ADR-558) makes the pool a function of the input alone. Reported on the issue.
+
+**Behaviour change for a student:** asking prints the answer and leaves the values card closed, with «חשב ערכים» still offered; the row says «חושב…» while it computes.

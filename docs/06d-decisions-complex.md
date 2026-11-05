@@ -4473,3 +4473,17 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Sibling audit.** 2-D is the reference (ADR-123). 3-D and analytic: same item, ADR-3D-404 and ADR-AG-366.
 
 **Behaviour change for a student:** two named numbers with one value now show «z₁ ו-z₂ נפלו על אותה נקודה.» while both are on the figure.
+
+## ADR-CX-087 — A bare name in the ask box is a question about it (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2) · fix round #2722 · part of [ADR-W-181](06w-decisions-workspace.md#adr-w-181)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-0 · **Design:** [04d](04d-design-complex.md) § the ask lane reading
+
+**Class.** A line that names one object and states nothing is a declaration in the givens box, and the ask lane read it by the givens' rule, so the student was told it was a given.
+
+**Decision.** `parseLaneAsk` is `parseAsk` plus the one thing the lane knows: nothing can be declared there, so a line that only names one number asks about it. It lowers through the existing `bareNameValue` (the reading «מהו w» already had), and stage 5d answers: the value when the givens force one, else the WHY. `lowerAsks` and `askRowsOf` take it; `readAsk`, which routes the GIVENS box, stays on `parseAsk`, so «z2» there still declares, and a line that states («w = 3») stays `statement` in both. The marked origin «O» (ADR-CX-085) is the same case in another parse: an object, not a declared name; the lane reads it as the number 0. The test `readAsk('z2')` is unchanged on purpose.
+
+**Sibling audit.** See [ADR-W-181](06w-decisions-workspace.md#adr-w-181).
+
+**Behaviour change for a student:** «w» in the ask box prints w's value, or why it has none, instead of «זהו נתון, לא שאלה».

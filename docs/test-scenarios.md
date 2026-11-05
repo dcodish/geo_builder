@@ -2274,3 +2274,6 @@ over all four (ADR-041).
 ### `foot-letter-follows-the-seat-2166` — «תיכון ליתר בנקודה K»: the foot is named K and follows the right angle; «תיכון לצלע AB בנקודה K» names the midpoint (#2166, ADR-790)
 
 **Guards against:** a foot letter after a cevian noun read by no rule, so the line went to the model. **Asserts** no M is drawn, every view green over three presses, K equidistant from the three vertices at each, the right angle visiting every vertex, and K the midpoint of AB on the side form.
+### `ask-computes-its-answer-1454` — «ריבוע ABCD» · «G על AD» · «זווית GBA = 37»: asking «∠GBC» answers 53°, and before the angle «לא נקבע» (#1454, ADR-788)
+
+**Guards against:** an ask answered by anything but the values path's rules. **Asserts** every step green, the determined angle prints 53° as the question's own row, and the figure without the angle gives the row its WHY, not a number. The split that leaves the full panel on its button is `src/__tests__/issue-1454-compute-on-ask.test.ts`.

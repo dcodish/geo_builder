@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
-import type { ValuesPanelResult } from '@/engine/valuesPanel';
+import type { QueryInput, QueryRow, ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
 import { branchCount, cyclableVariant, variantCountOf, withVariant } from '@/engine';
 import { parseValueQuery } from '@/parser/valueQuery';
@@ -162,6 +162,11 @@ export interface GeoState {
   /** #217 (ADR-410): the VALUES panel — every fixed/known value, stated + derived, computed on user
    *  request from the shared sample pool (off-thread). Tagged by facts so a stale result never shows. */
   values: { result: ValuesPanelResult; facts: Fact[] } | null;
+  /** #1454 (ADR-788): the answers to the saved questions, computed by asking. A layer of its own, tagged the
+   *  same way: asking answers the question and leaves the full panel behind its button. */
+  asks: { rows: QueryRow[]; facts: Fact[] } | null;
+  /** #1454: the figure an ask is being answered for right now; null when none is — the row's «חושב…». */
+  asking: Fact[] | null;
   /** #477: the student's own value QUERIES, verbatim as typed, in ask order. A question, never a fact —
    *  they never enter `replay`, never move a point and never appear in the step list; they only ride the
    *  values computation. Persisted with the figure, so a saved worksheet reopens with its questions. */
@@ -224,9 +229,11 @@ export interface GeoState {
   /** #217: compute the values panel (pull-only — req 4: never in the submit path). */
   viewValues: () => Promise<void>;
   clearValues: () => void;
-  /** #477: ask for / drop a specific quantity in the values panel. */
+  /** #477: ask for / drop a specific quantity. #1454 (ADR-788): asking computes the question's answer, never the panel. */
   addQuery: (text: string) => void;
   removeQuery: (text: string) => void;
+  /** #1454: the answers to the saved questions, off-thread, from the values path — `asks`, not the panel. */
+  answerAsks: () => Promise<void>;
   /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
    *  (samples the figure); the caller paints a busy state first. A re-press recomputes. */
   detectShapes: () => Promise<void>;
@@ -365,6 +372,11 @@ function commitCommands(
   set({ facts: next });
 }
 
+/** A saved question as the values path takes it: the student's text and its parse. */
+const asQueryInput = (text: string): QueryInput => ({ text, q: parseValueQuery(text) });
+/** #1454: the latest ask. A worker runs one message at a time, so only the last run's answer holds every saved question. */
+let askRun = 0;
+
 export const useGeoStore = create<GeoState>()(
   temporal(
     (set, get) => ({
@@ -380,6 +392,8 @@ export const useGeoStore = create<GeoState>()(
       hiddenCircles: [],
       relations: null,
       values: null,
+      asks: null,
+      asking: null,
       queries: [],
       shapes: null,
       crossings: null,
@@ -532,10 +546,9 @@ export const useGeoStore = create<GeoState>()(
         // #217 (ADR-410): the 2-D dataView. Off-thread, pull-only (req 4) — the detect lane's worker
         // computes the rows from the shared pool (a pure classification pass when the sweep is warm).
         const facts = get().facts;
-        const asked = get().queries;
         try {
-          const result = await geoValues(facts, asked.map((text) => ({ text, q: parseValueQuery(text) })));
-          if (get().facts !== facts || get().queries !== asked) return; // superseded — never show another figure's values
+          const result = await geoValues(facts, get().queries.map(asQueryInput));
+          if (get().facts !== facts) return; // superseded — never show another figure's values
           set({ values: { result, facts } });
         } catch (err) {
           if (!isCancelled(err)) throw err;
@@ -543,17 +556,33 @@ export const useGeoStore = create<GeoState>()(
       },
       clearValues: () => set({ values: null }),
 
-      /** #477: ask for a quantity. The panel recomputes so the answer comes from the same pool as the
-       *  rows; a duplicate question is a no-op rather than a second identical line. */
+      /** #477: ask for a quantity; a duplicate is not a second line. #1454 (ADR-788, operator 2026-09-27:
+       *  "Compute on ask"): submitting IS the compute, of the questions' rows only — the values path with
+       *  its one pool, so an answer cannot disagree with the panel, and the panel itself stays on its
+       *  button. A re-typed question whose answer is stale asks again. */
       addQuery: (text: string) => {
         const t = text.trim();
-        if (!t || get().queries.includes(t)) return;
-        set({ queries: [...get().queries, t] });
-        void get().viewValues();
+        if (!t) return;
+        if (!get().queries.includes(t)) set({ queries: [...get().queries, t] });
+        const { asks, facts } = get();
+        if (asks?.facts === facts && asks.rows.some((r) => r.text === t)) return;
+        void get().answerAsks();
       },
-      removeQuery: (text: string) => {
-        set({ queries: get().queries.filter((q) => q !== text) });
-        void get().viewValues();
+      // dropping a question asks nothing: its row leaves the lane and no answer changes
+      removeQuery: (text: string) => set({ queries: get().queries.filter((q) => q !== text) }),
+
+      answerAsks: async () => {
+        const facts = get().facts;
+        const run = ++askRun;
+        set({ asking: facts });
+        try {
+          const { queryRows: rows } = await geoValues(facts, get().queries.map(asQueryInput));
+          if (run === askRun && get().facts === facts) set({ asks: { rows, facts } });
+        } catch (err) {
+          if (!isCancelled(err)) throw err;
+        } finally {
+          if (run === askRun) set({ asking: null });
+        }
       },
 
       detectShapes: async () => {
@@ -828,7 +857,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, figureName: '', seed: 0, displayMode: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, displayMode: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, asks: null, shapes: null, queries: [] });
         useGeoStore.temporal.getState().clear();
       },
 

@@ -237,7 +237,8 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   solution-set letter reports its spread; the argument of a number KNOWN to be 0 says 0 has no
   direction, never «not determined». **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The rest of this requirement describes the code until that ships. Every question may carry a frame — «מהו …», «חשבו את …», «what is …»
   before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
-  given.
+  given. A bare name in the ask box («w») asks that number's value, or why it has none; the same line in the
+  givens box declares it ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087)).
   - Sources: [ADR-CX-055](06d-decisions-complex.md#adr-cx-055) Amendment 1, #1437
 - **FR-KN-1 (Must)** — **A quantity with exactly two possible values shows both**, as in every other tool — here too for a question about a solution-set letter (FR-CN-6): «Im(z1) = ±3» when they are opposites, otherwise «Re(z1) = -1 או Re(z1) = 2» (ADR-W-118 B12, W1, [ADR-CX-066](06d-decisions-complex.md#adr-cx-066), #1867). Three or more values, or a set the tool cannot prove complete, show none. **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was

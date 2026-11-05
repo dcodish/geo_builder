@@ -2260,6 +2260,7 @@ export function App() {
                 dir="auto"
                 placeholder={t('askPlaceholder')}
                 addLabel={t('askAdd')}
+                unreadableHint={t('askUnreadable')}
                 onSubmit={(text) => {
                   // Idempotent, not a toggle (#1118) — see `askOnce`.
                   askOnce(text);

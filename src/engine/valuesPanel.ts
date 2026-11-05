@@ -236,6 +236,25 @@ export function waitingNote(computing: boolean): QueryNote {
   return computing ? 'computing' : 'pending';
 }
 
+/**
+ * #1454 (ADR-788): the ask lane's rows — every saved question, in the order asked, with the answer the
+ * figure's current layers hold. An ask is answered on its own (`asks`); the «חשב ערכים» panel answers
+ * the saved questions too (`panel`), and both read the one pool. A question neither holds is waiting.
+ */
+export function askLaneRows(
+  queries: readonly string[],
+  asks: readonly QueryRow[] | null,
+  panel: readonly QueryRow[] | null,
+  computing: boolean,
+): QueryRow[] {
+  return queries.map(
+    (text) =>
+      asks?.find((r) => r.text === text) ??
+      panel?.find((r) => r.text === text) ??
+      { text, kind: null, label: null, ids: [], value: null, exact: null, note: waitingNote(computing) },
+  );
+}
+
 /** One answered (or honestly refused) query. */
 export interface QueryRow extends TwoValues {
   /** exactly what the student typed — echoed back so the list reads as their own questions. */

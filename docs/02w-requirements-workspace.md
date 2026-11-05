@@ -383,8 +383,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   computation having run, and it does not vanish when the student adds a fact.
   - Sources: [ADR-W-038](06w-decisions-workspace.md#adr-w-038).
 - **FR-DP-2 (Must)** — **Asking is the pull.** Nothing expensive is computed until the student actually
-  asks; opening the panel computes nothing.
-  - Sources: ADR-W-038.
+  asks; opening the panel computes nothing. Asking computes that question's answer and nothing else the
+  student did not ask for: a product with a full-panel button keeps it.
+  - Sources: ADR-W-038, [ADR-788](06-decisions.md#adr-788).
 - **FR-DP-3 (Must)** — **The panel reports what the FIGURE knows, never what one drawing happens to
   show.** A value is displayed only when it is invariant across the figure's residual freedom; a number
   true only of the current sample is not knowledge and must not be printed. A value the givens fix to exactly
@@ -397,8 +398,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
     B7, #1861; generalises the 2-D reveal contract, [FR-RV-5](02-requirements.md).
 - **FR-DP-4 (Must)** — **Answers are product-shaped; the lane is not.** A length with units, a vector
   equation and a complex modulus are genuinely different answers, and each product owns its rows. What is
-  shared is the box, the submit, the palette and the always-there rule.
-  - Sources: ADR-W-038.
+  shared is the box, the submit, the palette and the always-there rule. A question a product cannot read
+  says so with that product's own example phrasings; none may ship without them.
+  - Sources: ADR-W-038, [ADR-W-181](06w-decisions-workspace.md#adr-w-181).
 - **FR-DP-5 (Should)** — **The panel is opt-in** and never surfaces a geometric fact unbidden — the
   boundary that keeps students reaching their own conclusions ([10-pedagogy](10-pedagogy.md)).
 

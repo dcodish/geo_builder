@@ -17,7 +17,7 @@ import { useStore } from 'zustand';
 import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
-import { waitingNote } from '@/engine/valuesPanel';
+import { askLaneRows } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -159,6 +159,8 @@ export default function App() {
   const toggleCircleHidden = useGeoStore((s) => s.toggleCircleHidden);
   const relations = useGeoStore((s) => s.relations);
   const valuesState = useGeoStore((s) => s.values);
+  const asksState = useGeoStore((s) => s.asks); // #1454: the answers an ask computed, without the panel
+  const asking = useGeoStore((s) => s.asking);
   const viewValues = useGeoStore((s) => s.viewValues);
   // clearValues retired from the UI (B6-2d): the panel head hides the column; a fact change
   // stales the layer store-side, and the in-panel button re-pulls.
@@ -1950,9 +1952,9 @@ export default function App() {
               each tool — 2-D behind a button, 3-D always there. It is now the 3-D shape everywhere, on
               the shared `AskLane`.
               #217's pull-only economics are UNCHANGED by the move: nothing is computed because the lane
-              is visible — `addQuery` runs the values compute when a question is SUBMITTED, which is the
-              same "only on demand" bargain one step later, and «חשב ערכים» stays as the separate trigger
-              that volunteers the automatic rows. */}
+              is visible. #1454 (ADR-788): `addQuery` computes the question's answer when it is SUBMITTED
+              and fills the `asks` layer only; «חשב ערכים» stays as the separate trigger of the full
+              panel, so asking neither opens that card nor takes its button away. */}
           {facts.length > 0 && (
             <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.queryTitle')}</div>
@@ -1963,22 +1965,16 @@ export default function App() {
                 placeholder={t('values.queryPlaceholder')}
                 addLabel={t('values.queryAdd')}
                 hint={t('values.queryHint')}
+                unreadableHint={t('values.q.not-understood')}
                 dir={textDir(queryText)}
-                onSubmit={(text) => {
-                  addQuery(text);
-                  // The question IS the pull (#217): compute now if this figure's values are stale.
-                  if (!valuesLayer && !computingValues) {
-                    setComputingValues(true);
-                    void viewValues().finally(() => setComputingValues(false));
-                  }
-                }}
+                onSubmit={(text) => addQuery(text)}
                 palette={{ symbols: SYMBOL_SPECS, startCollapsed: true, compact: true, toggleTitle: t('values.paletteShow') }}
               >
                 {/* An answered row when the values layer is current; the question alone, marked as
                     waiting, while it is not — never a silently dropped question. */}
                 {/* #882: the fallback row's note is a real `QueryNote`, so a value with no message
                     cannot ship again — `values-panel-notes.test.ts` walks that union against both locales. */}
-                {(valuesLayer?.queryRows ?? queries.map((text) => ({ text, label: undefined, value: null, exact: undefined, kind: undefined, unit: undefined, note: waitingNote(computingValues) }))).map((qr) => (
+                {askLaneRows(queries, asksState?.facts === facts ? asksState.rows : null, valuesLayer?.queryRows ?? null, computingValues || asking === facts).map((qr) => (
                   <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
                     <button
                       type="button"

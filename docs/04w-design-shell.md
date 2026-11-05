@@ -30,7 +30,7 @@ identity, because "a fork wearing a shared file's name" ([ADR-W-016](06w-decisio
 rule 2) reintroduces the divergence the tree exists to remove.
 
 **How it is achieved in practice: slots, not flags.** Every frame component takes the product-shaped part
-as a prop it renders without inspecting — `AskLane` takes "the product's own answered rows",
+as a prop it renders without inspecting — `AskLane` takes "the product's own answered rows" and a required `unreadableHint`,
 `DataPanel` takes "extra product blocks below the skeleton", `FactList` takes "the product's row of list
 actions". The component owns the *shape*; the caller owns the *content*. There is no `product === '2d'`-style
 branch anywhere in `shell/` source, `shell/frame/` included.

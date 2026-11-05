@@ -18,8 +18,8 @@
  * rule — the shell is parameterized by its caller and knows no product).
  *
  * Asking is also the PULL: a product whose answers are expensive computes them when the question is
- * submitted, not when the panel opens (2-D's #217 economics survive the move — nothing is computed
- * until the student actually asks).
+ * submitted (2-D's #217 economics survive the move — nothing is computed until the student actually
+ * asks, and since #1454 an ask computes the question's answer, not the whole values panel).
  */
 import { useState, type FormEvent, type MutableRefObject, type ReactNode } from 'react';
 import { SymbolRow, type SymbolRowProps } from './SymbolRow';
@@ -33,6 +33,14 @@ export interface AskLaneProps {
   addLabel: string;
   /** Tooltip for the box (optional — 2-D explains what may be asked). */
   hint?: string;
+  /**
+   * The product's own "not understood" text WITH its example phrasings (#1454). REQUIRED, the way
+   * `AppFrame` requires its privacy text: the answered rows are the product's, so this is the one seam
+   * at which a builder must show it has examples at all. An example-less «לא הבנתי» cannot compile. The
+   * row that says it uses the same key (`ask-lane-parity.test.ts`); here it is the box's accessible
+   * description, so a screen reader hears what may be asked.
+   */
+  unreadableHint: string;
   /** Text direction for the box. `'auto'` follows the typed content. */
   dir?: 'ltr' | 'rtl' | 'auto';
   /** The symbol palette, when the product has one. Everything except the controlled value/ref. */
@@ -51,6 +59,7 @@ export function AskLane({
   placeholder,
   addLabel,
   hint,
+  unreadableHint,
   dir = 'auto',
   palette,
   children,
@@ -82,6 +91,7 @@ export function AskLane({
             title={hint}
             dir={dir}
             aria-label={placeholder}
+            aria-description={unreadableHint}
             data-ask-input
             style={{ minWidth: 0, flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', font: 'inherit' }}
           />

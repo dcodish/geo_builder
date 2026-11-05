@@ -7024,3 +7024,21 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Locks.** `noteFaceFaults` in `shell/__tests__/fixtures/narrowing-note-rows.ts` is the one check. `src/__tests__/narrowing-note-face-2266.test.tsx` and `src3d/__tests__/narrowing-note-face-2266.test.tsx` server-render the real App; `src-analytic/__tests__/narrowing-note-face-2266.test.tsx` renders `NarrowingNotes` over the real note readers and checks the App mounts it. `src-complex/__tests__/narrowing-note-face-2266.test.tsx` server-renders the real App for the two-letters note; the 2-D, 3-D and analytic locks cover that note too, through the real App, and 3-D's covers `base-constrained`. `shell/__tests__/narrowing-note-face-meta-2266.test.tsx` shows the check catches the amber strip, the missing ⓘ, a note that is absent and a blue neighbour.
 
 **Behaviour change for a student:** in analytic the «ABCD הוא כעת ריבוע…» and «ABCD הוגבל…» notes, and «האליפסה היא כעת מעגל…», are blue instead of amber. In 3-D the same notes open with ⓘ and match 2-D's strip, and the right pyramid's «כדי שהפירמידה תהיה ישרה, הבסיס…» sentence gains the ⓘ and the strip. «A ו-B נפלו על אותה נקודה.» is blue in analytic and complex, and in 3-D sits on the shared strip. 2-D looks as it did.
+## ADR-W-181 — A question is answered, and a question the tool cannot read is told what it can (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2, all four builders) · fix round #2722 · branch `fix/1454-ask-a-value`
+
+**Operator:** the /decisions pass of 2026-09-27: *"Approve all 38"*, which took this issue's arms 1–3, and *"Compute on ask"* for arm 4. External review, relayed the same day: *"Asking about a defined object ('w', 'A') should return its value, not «זהו נתון, לא שאלה». 'Not understood' should suggest valid phrasings, as 3D already does."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-DP-2, FR-DP-4 · **Design:** [04w](04w-design-shell.md) § the frame components (`AskLane`'s required `unreadableHint`)
+
+**Class.** A question typed in the ask lane is answered by a different rule in each builder: what counts as a question, what an unreadable one says, and what must happen before it gets an answer.
+
+**Decision.**
+1. **`AskLane` requires `unreadableHint`**, the product's own "not understood" text with its examples, the way `AppFrame` requires its privacy text. The answered rows are the product's (ADR-W-038), so the lane cannot print the text itself; a required prop is the seam at which a builder must have examples, and `ask-lane-parity.test.ts` (now all four builders) asserts the row prints the same key. In the lane it is the box's `aria-description`, which draws nothing.
+2. **The copy:** complex «לא זוהה — נסו |z1|, arg(z1), Re(w), r», analytic «לא זוהה — נסו A, AB, שטח ABC, שיפוע AB»; 2-D and 3-D already had theirs.
+3. **Per product:** complex reads a bare name in the lane as its value question ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087)); 2-D's ask computes its own answer ([ADR-788](06-decisions.md#adr-788)).
+
+**Sibling audit.** 3-D's bare name is a supported query and analytic has a point rule, so neither says «this is a given»; 2-D's bare letter is a symbol lookup and a point has no value there (no coordinates), so its row keeps «לא זוהה». Analytic carries only the copy, so it needs no ADR of its own.
+
+**Behaviour change for a student:** in complex and analytic a question the tool cannot read now names phrasings that work.
