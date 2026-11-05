@@ -97,9 +97,9 @@ describe('#2033 — a value stated with π is labelled with π', () => {
     expect(pointText(p, 'A', k.x, k.y, fmtAnalytic)).toBe('(π, 2π)');
   });
 
-  it('a constraint description writes π too', () => {
-    const k = scene([TRI, 'AB = 4π']).d.construction.constraints.find((c) => c.t === 'length-eq')!;
-    expect(describeConstraint(k)).toContain('= 4π');
+  it('a constraint description that prints a value writes π too', () => {
+    // A length's description prints no value («AB = ערך»), so the plan's «… = 4π» row has nothing to read there.
+    expect(describeConstraint({ t: 'param-eq', sym: { name: 'a' }, value: parseExpr('2π')! } as never)).toBe('a = 2π');
   });
 
   it('evaluation is unchanged: π is still the constant, and |AB| is 4π at 24 seeds', () => {
