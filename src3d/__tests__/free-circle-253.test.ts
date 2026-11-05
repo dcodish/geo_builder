@@ -249,8 +249,6 @@ describe('#253 — refusals name the statement', () => {
     [['מעגל O', 'D על המעגל', 'OD = 4', 'רדיוס המעגל הוא 5'], { code: 'circle-given-conflict', name: 'O', what: 'radius' }],
     [['π1: z=0', 'π2: z=1', 'מעגל O במישור π1', 'מעגל O במישור π2'], { code: 'circle-given-conflict', name: 'O', what: 'plane' }],
     [['משולש ABC חסום במעגל', 'רדיוס המעגל הוא 3'], { code: 'circle-given-determined', what: 'radius' }],
-    [['רדיוס המעגל הוא 3'], { code: 'unknown-circle' }],
-    [['המעגל במישור π1'], { code: 'unknown-circle' }],
   ];
   it.each(CASES)('%j', (lines, error) => {
     const { s } = run(lines.slice(0, -1));

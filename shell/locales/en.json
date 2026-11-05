@@ -40,6 +40,7 @@
       "createdPoint": "New point {{names}} was created — if this is a typo, press ✕ to undo the line.",
       "createdPoints": "New points {{names}} were created — if this is a typo, press ✕ to undo the line.",
       "createdCircle": "New circle centred at {{centre}} was created — if this is a typo, press ✕ to undo the line.",
+      "createdCircleUnnamed": "A new circle was created — if this is a typo, press ✕ to undo the line.",
       "createdUndo": "Undo the line"
     }
   }

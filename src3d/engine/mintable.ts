@@ -12,7 +12,7 @@
  *   SOLID (with no solid it stays refused, #978, ADR-3D-246); «XY גובה הפירמידה» says XY IS the pyramid's height.
  *   Minting would draw a free segment certified as that element (`solidElement3`).
  */
-import type { Command3, Construction3, SolidNoun } from './types';
+import { UNNAMED_CIRCLE_ID3, type Circle3Def, type Command3, type Construction3, type SolidNoun } from './types';
 import { FREE_PLANE_TOKEN } from './freePlane';
 
 /** A 3-D point label as the parser canonicalises it: an uppercase letter, glued digits, primes. */
@@ -212,6 +212,26 @@ export function mintableSolid3(
   };
   walk(cmds);
   return found;
+}
+
+/**
+ * #2611 stage B ([ADR-3D-420](../../docs/06b-decisions-3d.md#adr-3d-420); #2048 ruling A, 2026-10-13: *"A referenced circle
+ * that does not exist … is created as a free circle, with the same notice"*) — A CIRCLE A LINE REFERS TO THAT THE FIGURE
+ * LACKS. The engine's own `unknown-circle` answer says so, for every statement that resolves a circle; nothing here lists
+ * command kinds. What is created is `Circle3Def.free`, as «מעגל O» declares it:
+ * - «המעגל», on a figure with no circle: a circle with no centre letter (the V6 unnamed-centre rule, 2-D's FR-RN-8);
+ * - «המעגל O», when every circle of the figure already has its letter: the circle on centre O. A letter over a drawn
+ *   circle with no letter may name THAT circle (2-D: «משולש ABC חסום במעגל» · «D על המעגל O» names it), so it is no
+ *   missing circle, and the refusal stands.
+ * «המעגל» over several circles (`several`) is the student's to settle (#2705). `circle` is the centre's label the
+ * notice names, `''` for none.
+ */
+export function mintableCircle3(st: { code: string; name?: unknown; several?: unknown } | null, c: Construction3): { id: string; def: Circle3Def; circle: string } | null {
+  if (!st || st.code !== 'unknown-circle' || st.several) return null;
+  if (st.name === undefined) return c.circles3.length === 0 ? { id: UNNAMED_CIRCLE_ID3, def: { kind: 'free' }, circle: '' } : null;
+  if (typeof st.name !== 'string' || !POINT_LABEL3.test(st.name)) return null;
+  if (c.circles3.some((k) => !('center' in k.def) || k.def.center === undefined)) return null;
+  return { id: `circle-${st.name}`, def: { kind: 'free', center: st.name }, circle: st.name };
 }
 
 /**

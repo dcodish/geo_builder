@@ -463,7 +463,7 @@ shows the notice while that line is the last row (2-D `createdByReference` + `co
 A line that created a CIRCLE by its centre ([ADR-W-164](06w-decisions-workspace.md#adr-w-164), #2552 D9) shows
 `suite.notice.createdCircle` («נוצר מעגל חדש שמרכזו {{centre}} — …») instead: `CreatedNotice.circle` carries the centre,
 `createdNoticeTextOf(notice)` picks the key, and the ✕ is the same. The rows' sixth (circle) row runs for a builder that
-hands `CreatedNoticeSentences.circle`; today only analytic (`record.createdCircle`).
+hands `CreatedNoticeSentences.circle`: analytic (`record.createdCircle`) and 3-D (`Derived3.createdCircles`). A circle with no centre letter carries `circle: ''` and shows `suite.notice.createdCircleUnnamed` ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420)).
 
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 

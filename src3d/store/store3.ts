@@ -38,7 +38,7 @@ import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
-import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
+import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -90,6 +90,9 @@ export interface Derived3 {
   /** #1467 (ADR-3D-382): by fact id, the points that line CREATED by reference — the fold's mint pass, last resort
    *  after the deferral fixpoint. What the «נוצרה נקודה חדשה …» notice names. Absent for a line that created none. */
   created: Readonly<Record<string, readonly string[]>>;
+  /** #2611 stage B (ADR-3D-420, ADR-W-164): the circle a line created, by row: its centre's label, `''` for an unnamed one.
+   *  A notice is the circle's or the points', never both, so such a row has no `created` entry. */
+  createdCircles: Readonly<Record<string, string>>;
   /** #1680 (ADR-3D-391 Am. 1): by fact id, the reading the fold gave a line's unmarked two-reading segment equation
    *  (`readSegmentEquation3`). Absent for a line that holds none. */
   readings: Readonly<Record<string, SegmentEquationReading3>>;
@@ -676,7 +679,12 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
 }
 
 /** #1566 (ADR-3D-399): a solid the mint pass created for a row — the declaration it applies, and the points that made. */
-type MintedSolid3 = { readonly cmds: readonly Command3[]; readonly ids: readonly string[] };
+type MintedSolid3 = {
+  readonly cmds: readonly Command3[];
+  readonly ids: readonly string[];
+  /** #2611 stage B (ADR-3D-420): the row created a CIRCLE by this declaration: its centre's label, `''` for none. */
+  readonly circle?: string;
+};
 
 /** #1422 — the memo's counter lock seam (the 2-D `conflictSearchStats` idiom): one press must
  *  cost exactly one uncached derive, asserted by count, never by clock. */
@@ -1053,9 +1061,13 @@ function deriveCore3(
     return null;
   };
   /** What the latest attempt says is missing and the pass may create: a point, or (#2489) a line named in a line slot. */
-  type Missing3 = { kind: 'point' | 'line' | 'plane'; id: string } | { kind: 'solid'; id: string; cmds: Command3[] };
+  type Missing3 = { kind: 'point' | 'line' | 'plane'; id: string } | { kind: 'solid'; id: string; cmds: Command3[]; circle?: string };
   const missingOf = (st: FactStatus3 | null, base: Construction3, f: Fact3): Missing3 | null => {
     if (st === null || typeof st !== 'object') return null;
+    // #2611 stage B (ADR-3D-420; #2048 ruling A): a circle the line refers to and the figure lacks is created as its
+    // declaration creates it, in the row's own list position (the #1566 solid shape: its centre may be an earlier row's)
+    const circle = mintableCircle3(st as { code: string }, base);
+    if (circle) return { kind: 'solid', id: circle.id, cmds: [{ type: 'circle3', id: circle.id, def: circle.def }], circle: circle.circle };
     const id = (st as { id?: unknown }).id;
     if (typeof id !== 'string') return null;
     if ((st.code === 'unknown-point' || st.code === 'two-unknowns') && mintableId3(id, base)) return { kind: 'point', id };
@@ -1092,6 +1104,11 @@ function deriveCore3(
           const declCmds: readonly Command3[] = m.kind === 'solid' ? m.cmds : polygonCmds!;
           // #1566 (ADR-3D-399): the declaration's own clash rules are inherited, and its refusal is the line's (atomic)
           if (solidMade) break; // one solid per line: a second «no such solid» after the first is the line's own reason
+          // #2611 stage B: the centre letter of a created circle is created with it, and its notice is the circle's
+          if (m.kind === 'solid' && m.circle && mintableId3(m.circle, probe)) {
+            ids.push(m.circle);
+            probe = mintFree(probe, [m.circle]);
+          }
           let made = probe;
           let refused: FactStatus3 | null = null;
           for (const cmd of declCmds) {
@@ -1107,7 +1124,7 @@ function deriveCore3(
             break;
           }
           const before = probe;
-          solidMade = { cmds: declCmds, ids: [...made.points.keys()].filter((k) => !before.points.has(k)) };
+          solidMade = { cmds: declCmds, ids: [...made.points.keys()].filter((k) => !before.points.has(k)), ...(m.kind === 'solid' && m.circle !== undefined ? { circle: m.circle } : {}) };
           probe = made;
           st = dryRunOn(probe, f);
           continue;
@@ -1256,8 +1273,11 @@ function deriveCore3(
   /** What the notice names: the points created by REFERENCE — a row that only declares («קטע AB» · «דלתון ABCD») is silent. */
   const created: Record<string, string[]> = Object.fromEntries(
     Object.entries(mintedBy)
-      .filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? []) && !startsFigure3(id))
+      .filter(([id]) => status[id] === 'ok' && !declaresOnly3(factsIn.find((f) => f.id === id)?.cmds ?? []) && !startsFigure3(id) && solidsBy[id]?.circle === undefined)
       .map(([id, pts]) => [id, solidsBy[id] ? [...solidsBy[id].ids, ...pts] : pts]),
+  );
+  const createdCircles: Record<string, string> = Object.fromEntries(
+    Object.entries(solidsBy).flatMap(([id, s]) => (s.circle !== undefined && status[id] === 'ok' ? [[id, s.circle]] : [])),
   );
   // #2235 (ADR-3D-351): from here on every reader asks what each line stated ABOUT THE FIGURE — a shape reference is
   // read as the ring it was applied to (the blame, crossing, collapse and narrowing passes below never see a placeholder)
@@ -2093,7 +2113,7 @@ function deriveCore3(
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, readings };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
 }
 
 export interface Geo3State {
@@ -2112,7 +2132,7 @@ export interface Geo3State {
   lastNotice: { code: 'already-stated' } | { code: 'vertex-angle-read-as'; angles: string } | null;
   /** #1467 (ADR-3D-382): the points the last recorded line created by reference, and that line's fact id — what the
    *  «נוצרה נקודה חדשה …» notice names; its ✕ removes the fact. Null after any other verdict. */
-  lastCreated: { factId: string; ids: readonly string[] } | null;
+  lastCreated: { factId: string; ids: readonly string[]; circle?: string } | null;
   submit: (utterance: string) => void;
   /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
    *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
@@ -2728,12 +2748,14 @@ export const useGeo3 = create<Geo3State>()(
             return;
           case 'record': {
             const added = v.facts[v.facts.length - 1];
-            const ids = added ? derive3(v.facts, v.seed).created[added.id] : undefined;
+            const made = added ? derive3(v.facts, v.seed) : null;
+            const ids = added ? made?.created[added.id] : undefined;
+            const circle = added ? made?.createdCircles[added.id] : undefined; // #2611 stage B: one notice per line
             set({
               facts: v.facts,
               seed: v.seed,
               lastError: null,
-              lastCreated: added && ids?.length ? { factId: added.id, ids } : null,
+              lastCreated: added && circle !== undefined ? { factId: added.id, ids: [], circle } : added && ids?.length ? { factId: added.id, ids } : null,
               // #1942: a lone vertex read as its polygon's angle is said aloud, never a silent pick (2-D's note)
               lastNotice: v.readAs?.length ? { code: 'vertex-angle-read-as', angles: v.readAs.map((a) => `∠${a}`).join(', ') } : null,
             });

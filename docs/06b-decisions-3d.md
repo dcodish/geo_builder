@@ -14631,7 +14631,7 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 
 **Measured for 2-D (the reference, ADR-W-118 B1) at 20cfa5de.** «מעגל O ברדיוס 5» draws the circle at that size with `measures: []`: no number on the canvas. 3-D draws the same. **Known gap:** 3-D has no values row for a radius (2-D has `values.radius`), so a stated radius is shown by the circle's size and in the givens list only.
 
-**Not built here.** «מעגל ABC»: the sighting was added to #253 as demand evidence and no ruling covers it, so it stays `not-understood`. A bare letterless «מעגל» keeps its `cross-app` guidance. «D על המעגל» on a blank canvas stays #2611's stage B. A radius or plane stated on a determined circle is refused `circle-given-determined`; driving a polygon's size from its circle's radius is not ruled.
+**Not built here.** «מעגל ABC»: the sighting was added to #253 as demand evidence and no ruling covers it, so it stays `not-understood`. A bare letterless «מעגל» keeps its `cross-app` guidance. «D על המעגל» on a blank canvas stays #2611's stage B ([ADR-3D-420](#adr-3d-420)). A radius or plane stated on a determined circle is refused `circle-given-determined`; driving a polygon's size from its circle's radius is not ruled.
 
 **Sibling audit.** The class needs a plane to be free, so it is 3-D's alone. 2-D reads «מעגל O ברדיוס 5» (measured at 20cfa5de); analytic records «נתון מעגל שמרכזו O.», «מעגל O», «מעגל O ברדיוס 5», «מעגל שמרכזו O ורדיוסו 5» and "a circle with center O" (same commit). Complex has no such object.
 
@@ -14640,3 +14640,41 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
+
+## ADR-3D-420 — A line that refers to a circle the figure lacks creates it, with no invented letter (#2611, stage B)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 3-D) · fix round #2722, stream A · branch `fix/2611-point-on-circle-3d` · plan of 2026-11-03 on #2611, stage B, unblocked by #253 ([ADR-3D-419](#adr-3d-419))
+
+**Requirements:** [02b](02b-requirements-3d.md) the point-on-circle row · **Design:** [04b](04b-design-3d.md) § *The mint pass*, [04w](04w-design-shell.md) § *The created-points notice* · **LADDER stage:** none (the fold's mint pass, after the fixpoint; `placeUnnamedCentre3` sits in the free-object resolution of ADR-3D-419).
+
+**Re-measured at pickup (`28dac0c3`, `useGeo3.submit`).** Stage A holds: «משולש ABC חסום במעגל» · «D על המעגל» and «מעגל חסום במשולש ABC» · «D על המעגל» place D on the circle. The blank canvas is still refused, now `unknown-circle` (ADR-3D-414). #253 merged (PR #2717), so stage B is built. Two points differ from the plan: the code is `unknown-circle`, not `unknown-line circle`, and 2-D shows no notice for this line (`commitVerdict` returns `null`), so the notice below rests on #2048 ruling A, not on 2-D.
+
+**Ruling.** Operator, 2026-10-13, #2048 ruling A: *"A referenced circle that does not exist (e.g. «G חיתוך מעגל O ומעגל P») is created as a free circle, with the same notice."*
+
+**Class and root cause.** *A statement that refers to a circle the figure lacks is refused, where a referred point, line, plane or solid is created.* The mint pass read `unknown-point`, `unknown-line`, `unknown-plane` and `no-such-solid`, and never `unknown-circle`. `Circle3Def.free` also required a centre letter, so a circle with no letter had no representation.
+
+**Decision.**
+1. **`mintableCircle3`** (`engine/mintable.ts`) reads the engine's own `unknown-circle` answer, so every statement that resolves a circle is covered, never a list of command kinds (docs/17 §3). A letterless reference on a figure with no circle creates `{kind: 'free'}`. «המעגל O» creates the circle on O when every circle of the figure has its letter. `several` creates nothing (#2705).
+2. **The row carries the declaration**, the ADR-3D-399 solid lane, so a centre placed by an earlier row is read in list order. A centre letter the figure lacks is created with it.
+3. **`center` is optional on a free circle.** The centre of «המעגל» is a free DOF with no letter: no point is added, so no reader of `points` can show a name the student never gave (the V6 unnamed-centre rule; 2-D's `@ctr-` hidden point, FR-RN-8). It counts 3 in the DOF cue.
+4. **`placeUnnamedCentre3`** places that centre from the seed and the pins alone. It reads no spread off `pos`, because the point pass and the circle pass see `pos` at different moments and a rider must lie on the circle both see.
+5. **Placed points stated on the circle are all on it.** One gives a sampled reach, two the perpendicular bisector, three the circumcentre and the plane. A fourth off it stays `not-on-circle`.
+6. **A lettered `free3` centre takes the same placement from its second placed member** (`circle-centre3`), unless a pin drives it. ADR-3D-419 decision 4 left it a check, so «משולש ABC» · «מעגל O» · «A על המעגל» · «B על המעגל» refused a true figure. 2-D builds that sequence and «משולש ABC» · «A על המעגל O» · «B על המעגל O» · «C על המעגל O» (measured at `28dac0c3`, `run-sequence.mjs`). The verdict is the same and the drawing is not: 2-D reshapes the vertices onto the circle around O, and 3-D keeps the vertices and moves O.
+7. **The notice.** «D על המעגל O» shows the ruled `createdCircle` text. An unnamed circle has no centre to name, so `CreatedNotice.circle: ''` shows `suite.notice.createdCircleUnnamed`. 3-D now passes the shared circle row. Two `circle-given-conflict` texts cover the circle with no letter.
+
+**What the student sees.**
+- `[ruled]` #2048 ruling A: «D על המעגל» on an empty canvas draws a circle with D on it, with the notice. «הציגו תצורה אחרת» moves everything unstated.
+- `[ruled]` + `[2-D]` (`28dac0c3`): «D על המעגל O» creates circle O.
+- `[ruled]`: «רדיוס המעגל הוא 3» and «המעגל במישור π1» on an empty canvas create the circle. 2-D sends both to the model (not-handled), so 3-D is ahead of the reference here.
+- `[2-D]` (`28dac0c3`): several placed points stated on a circle whose centre nothing holds all land on it.
+- `[ruled]` ADR-W-174: the new wording, «נוצר מעגל חדש — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» and the two letterless conflict sentences.
+
+**Not built here.** «משולש ABC חסום במעגל» · «D על המעגל O» stays refused `unknown-circle`. 2-D lets the letter name the drawn circle and draws O at its centre. 3-D has no point for a derived centre, and «O מרכז המעגל» is not read at all, so this is a new mechanism. The `{}` variant of `unknown-circle` («עדיין אין מעגל בשרטוט») now has no route from a typed line; it stays as the code a statement-only reader falls back on, and message-floor keeps it covered.
+
+**Sibling products (ADR-W-157).** 2-D builds these lines and shows no notice for them, which is ruling A's gap on 2-D, still owned by #2048. Analytic's blank-canvas row is #2048 card d5. Complex has no such membership.
+
+**Sibling audit.** `unknown-circle` is produced by two arms, `point-on-circle3` and `circle-given`, and the mint reads the code. Grepped `src3d/` for the `def.center` readers of a free circle: `tsc` flags each, and each now handles no letter.
+
+**Locks.** `src3d/__tests__/circle-created-by-reference-2611.test.ts` (every spelling at eight seeds, the DOF count, order, pins, the refusals that stay, placed members, the shared notice rows). Fixture `fixtures3/point-on-circle-blank-2611.geo3.json`. Parity row `blank-point-on-circle-2611`. The `#2611` row of `catalog-blank-canvas-1566.test.ts` and the `D על המעגל` allowlist line of `UNCOVERED_CATALOG` are gone. `circle-refusal-words-2611.test.ts`, `point-on-circle-2611.test.ts` and `free-circle-253.test.ts` are re-based on the ruling: their blank-canvas refusals were session verdicts carried over until #253, never a ruling.
+
+**Behaviour change for a student:** in 3-D, a line about «המעגל» on an empty canvas now draws a circle and says so. Before, it was refused.

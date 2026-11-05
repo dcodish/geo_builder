@@ -428,7 +428,8 @@ function stateCircleGiven3(
   const merged = { ...k.def, ...(given.plane !== undefined ? { plane: given.plane } : {}), ...(given.radius !== undefined ? { radius: given.radius } : {}) };
   const next = clone(c);
   next.circles3 = next.circles3.map((x) => (x.id === k.id ? { id: k.id, def: merged } : x));
-  if (given.plane === undefined || plane !== undefined) return { ok: true, next };
+  // #2611 stage B (ADR-3D-420): a circle with no centre letter keeps its centre in the plane by itself (`placeUnnamedCentre3`)
+  if (given.plane === undefined || plane !== undefined || center === undefined) return { ok: true, next };
   return applyCommand3Inner(next, { type: 'on-planes', id: center, plane: given.plane }); // the centre lies on the plane
 }
 
@@ -4137,7 +4138,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (!c.lines.has(cmd.def.line) && !c.pointLines.has(cmd.def.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.def.line } };
       } else if (cmd.def.kind === 'free') {
-        if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
+        if (cmd.def.center !== undefined && !c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (cmd.def.plane !== undefined && !c.planes.has(cmd.def.plane) && !c.pointPlanes.has(cmd.def.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.def.plane } };
       } else {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
@@ -4155,10 +4156,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.circles3 = next.circles3.map((k) => (k.id === cmd.id ? { id: cmd.id, def: cmd.def } : k));
         // what the free circle already held is still stated: it stays a verified claim on the tangent form
         const line: Operand3 = { kind: 'line', name: (cmd.def as { line: string }).line };
-        if (freeTangent.radius !== undefined) next.claims.push({ type: 'distance-rel', a: { kind: 'point', id: freeTangent.center }, b: line, value: freeTangent.radius });
+        if (freeTangent.radius !== undefined) next.claims.push({ type: 'distance-rel', a: { kind: 'point', id: (cmd.def as { center: Id }).center }, b: line, value: freeTangent.radius });
         if (freeTangent.plane !== undefined) next.claims.push({ type: 'plane-rel', rel: 'contained', a: line, b: { kind: 'plane-named', name: freeTangent.plane } });
       } else next.circles3.push({ id: cmd.id, def: cmd.def });
-      if (cmd.def.kind === 'free' && cmd.def.plane !== undefined)
+      if (cmd.def.kind === 'free' && cmd.def.plane !== undefined && cmd.def.center !== undefined)
         return applyCommand3Inner(next, { type: 'on-planes', id: cmd.def.center, plane: cmd.def.plane }); // the centre lies on the plane
       // #1792 — the BACKSTOP, total over every route (grammar rule or LLM line): a circle THROUGH a ring of
       // four or more is a claim that the ring is concyclic, and the figure must prove it. The circle's
@@ -4216,6 +4217,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (circle.def.kind === 'free' && circle.def.center !== cmd.point && !c.circleMembers3.some((m) => m.circle === circle.id && m.point === cmd.point)) {
         const next = clone(c);
         next.circleMembers3.push({ point: cmd.point, circle: circle.id });
+        // #2611 stage B (ADR-3D-420): from the second placed point on, a centre nothing else holds stands where they say
+        // (2-D: «A על המעגל O» · «B על המעגל O» over a triangle). A centre a pin drives keeps its owner and the check.
+        const held = circle.def.center;
+        const pinned = held !== undefined && [...c.scalarPins, ...c.symbolPins].some((p) => JSON.stringify(p).includes(`"${held}"`));
+        if (held !== undefined && !pinned && next.points.get(held)?.kind === 'free3' && next.circleMembers3.filter((m) => m.circle === circle.id).length >= 2)
+          next.points.set(held, { kind: 'circle-centre3', circle: circle.id });
         return { ok: true, next: parentsFirst3(next) };
       }
       return { ok: true, next: c };
