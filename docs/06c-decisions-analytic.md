@@ -15485,7 +15485,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 ## ADR-AG-410 — «MK אנך לציר x» reads as K, the foot of the perpendicular from M: the noun, a placed point and a new letter (#2231)
 
 **Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: *"despite me calling it K"*; ruling B: *"yes"*
-**Requirements:** [02c](02c-requirements-analytic.md) R246 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: a reading the figure decides". Stage: parse (F3), before the fold; the figure's half in `applyFact`.
+**Requirements:** [02c](02c-requirements-analytic.md) R247 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: a reading the figure decides". Stage: parse (F3), before the fold; the figure's half in `applyFact`.
 
 **Class.** *A segment named by a placed point and a new letter, stated as «אנך» to a line, has no reader, so the student's letter depends on what the AI answers.* The AI's reading of the operator's sentence, `האנך מהנקודה M לציר ה-x`, named no foot, and the tool coined H. Since ADR-AG-279 that is refused naming K; the sentence itself was still unread.
 
