@@ -944,7 +944,7 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'shared-endpoint-extension-either-side-default',
-    title: 'booklet-571 p.78 Q4: "המשך AC חותך את מעגל P בנקודה E" on the two-tangent-chords figure lands E beyond A (C-A-E)',
+    title: 'booklet-571 p.78 Q4 in the book\'s order: "המשך CA חותך את מעגל P בנקודה E" lands E beyond A (C-A-E) (the reversed «AC» is refused, ADR-784)',
     guards:
       "operator session eew5ezi5 (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): two circles meet at A,B; chord AD in P tangent to O at A; chord CB in O tangent to P at B; 'המשך AC חותך את מעגל P בנקודה E' (the operator typed חותר — a typo the LLM corrected). Every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber-flagged orderBeyond — 'fails to create the C-A-E sequence'. Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived ONLY behind extensionsClear's `relax` flag, set solely by firstSatisfyingSeed's fallback pass — so (a) the strict primary sweep demanded E beyond C, which is geometrically impossible here at EVERY seed (CB tangent to circle P pins C outside P), burning the app's 2500ms wall budget before the fallback ever ran, and (b) meetsRequirements/`findValidConfig` used the STRICT form, rejecting the very seed the fallback found — the consumers disagreed. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wherever achievable (the ADR-098 free-DOF family, where the order genuinely SELECTS the config), the ADR-142 either-side bar as the ACCEPTANCE tier, searched in ONE interleaved budget-safe sweep (a fallback bar rides the same loop, never a second pass); meetsRequirements/findValidConfig/resample/the ADR-256 sample filter all honour the ladder.",
     steps: [
@@ -953,7 +953,7 @@ export const SCENARIOS_4: Scenario[] = [
       // chord's fresh «מעגל P» minted a THIRD circle through A, D (every row green); now it names the drawn circle A rides.
       'AD מיתר במעגל P משיק למעגל O בנקודה A',
       'CB מיתר במעגל O משיק למעגל P בנקודה B',
-      { llm: ['המשך AC חותך את מעגל P בנקודה E'] }, // the operator's חותר typo, as the LLM's corrected canonical line
+      { llm: ['המשך CA חותך את מעגל P בנקודה E'] }, // the book's order (ADR-784), as the LLM's corrected canonical line; «AC» is refused
       'CE',
     ],
     check(fig) {
@@ -6257,7 +6257,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'extension-shared-endpoint-past-second-2518',
     title: '#2518: «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R» draws R beyond O (O seated inside circle P), A–O–R in order (ADR-780)',
     guards:
-      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, the either-side control) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts; ADR-142's and ADR-267's scenarios lock the either-side tier.",
+      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, and the refusals of ADR-784) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts.",
     steps: ['מעגל שמרכזו O', 'מעגל שמרכזו P', 'נקודה A על מעגל P', 'המשך AO חותך את מעגל P בנקודה R'],
     check(fig) {
       allStepsOk(fig);

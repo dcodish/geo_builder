@@ -32,6 +32,7 @@ import type { AnyCommand } from '@/engine';
 import { ctxOf } from './scenario-pipeline';
 import { vertexPairVerdict } from '@/app/vertexPairCevian';
 import { ROLE_READING_WORK_CAP } from '@/app/decideDeterministic';
+import { extensionSideVerdict } from '@/app/extensionSide';
 
 /** Why the deterministic path did not commit — the app's own branch, named. */
 export type GateRefusal =
@@ -46,13 +47,15 @@ export type GateRefusal =
   | 'empty'
   /** #1927 (ADR-608): a ring declared over placed points that crosses in every configuration — refused before
    *  the dry run with `input.ringContradictsNoun`; `detail` is the ring */
-  | 'crossed-ring';
+  | 'crossed-ring'
+  /** #2518 (ADR-784): an extension whose stated side no configuration has; `detail` is the note's key, `step` the offer */
+  | 'extension-side';
 
 export type GateVerdict =
   | { kind: 'commit'; commands: AnyCommand[] }
   /** a clean RE-ENTRY of things that already exist — friendly, and NOT an escalation (ADR-156) */
   | { kind: 'noop' }
-  | { kind: 'refused'; reason: GateRefusal; detail?: string };
+  | { kind: 'refused'; reason: GateRefusal; detail?: string; step?: string };
 
 /**
  * Would `App.submit`'s deterministic path commit `utterance` against `facts`?
@@ -75,6 +78,9 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   // #1927 (ADR-608): the app refuses a ring over placed points that crosses in every configuration before the dry run.
   const crossed = forcedCrossedRing(facts, r.commands, seed);
   if (crossed) return { kind: 'refused', reason: 'crossed-ring', detail: crossed.join('') };
+  // #2518 (ADR-784): the app's own verdict, called
+  const wrongSide = extensionSideVerdict(utterance, utterance, r.commands, ctx, facts, seed);
+  if (wrongSide) return { kind: 'refused', reason: 'extension-side', detail: wrongSide.messageKey, step: wrongSide.params.step };
   // #1671 (ADR-584): the app warms the seat sweep's rotated folds (in the worker) before the dry run — mirrored here.
   for (const fc of seatSweepWarmup(facts, r.commands, seed)) replay(fc, seed);
   const outcome = dryRunOutcome(facts, r.commands, seed);

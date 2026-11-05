@@ -31,7 +31,7 @@ import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, stat
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -2814,37 +2814,20 @@ function figureSpan(fig: Derived): number {
  * the SAMPLING bar (auto-pick + "show another"); the verifier's amber check stays looser (a marginal but
  * genuinely-beyond figure is valid, not "wrong"), so we never flag a figure we'd still draw.
  */
-export function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
+export function extensionsClear(facts: Fact[], fig: Derived): boolean {
   const margin = 0.05 * figureSpan(fig);
   const triples = extensionTriples(facts);
   if (triples.length === 0) return true;
-  // Two bars, both real (ADR-098 vs ADR-142, reconciled by ADR-267): STRICT is the PREFERENCE — the letter
-  // order is honoured whenever some configuration achieves it (on a free-DOF figure "המשך CA → D" genuinely
-  // SELECTS the placement, ADR-098). RELAXED is the ACCEPTANCE bar for a SHARED-ENDPOINT extension (an
-  // endpoint already on the target circle ⇒ the second crossing is UNIQUE): when NO configuration achieves
-  // the letter-order side (booklet-571 p.78 Q4: CB tangent to circle P pins C outside P, so E can never land
-  // beyond C) the order carries no information and EITHER extension counts — a point genuinely BETWEEN the
-  // endpoints still fails. Every consumer that needs "is this config valid at all" passes relax=true;
-  // "strict first, relaxed only if strict is unachievable" is the SEARCH's job (`firstSatisfyingSeed`
-  // interleaves both bars in ONE budgeted sweep — never a second full pass, issue #19).
-  const members = relax ? circleMembers(fig.construction) : [];
-  for (const { a, b, id, circle } of triples) {
+  // ONE bar (#2518, ADR-784, operator rulings 2026-11-04): the stated letter order, for every extension. The
+  // shared-endpoint either-side tier (ADR-142, ADR-267's acceptance tier) is withdrawn.
+  for (const { a, b, id } of triples) {
     const pa = fig.positions.get(a), pb = fig.positions.get(b), pid = fig.positions.get(id);
     if (!pa || !pb || !pid) return false;
     const abx = pb.x - pa.x, aby = pb.y - pa.y;
     const abl = Math.hypot(abx, aby);
     if (abl < 1e-9) return false;
     const beyondB = ((pid.x - pb.x) * abx + (pid.y - pb.y) * aby) / abl; // signed distance of id past b along a→b
-    let reach = beyondB;
-    if (relax) {
-      // Entries are per circle id (ADR-244), so match the extension's target circle exactly.
-      const memberPts = members.find((m) => m.id === circle)?.points ?? [];
-      if (memberPts.includes(a) || memberPts.includes(b)) {
-        const beyondA = -((pid.x - pa.x) * abx + (pid.y - pa.y) * aby) / abl; // signed distance of id past a
-        reach = Math.max(beyondB, beyondA);
-      }
-    }
-    if (reach < Math.max(0.5, margin)) return false;
+    if (beyondB < Math.max(0.5, margin)) return false;
   }
   return true;
 }
@@ -3003,8 +2986,8 @@ export const WORKER_SEARCH_BUDGET_MS = 12_000;
  * another circle, and an apex whose side decides whether two segments cross, are both placements only a
  * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
  * the default configuration after a step and to gate "show another configuration". Bounded by `budgetMs`
- * of wall-clock (E2): past the deadline it returns the best seed seen so far (the relaxed fallback if one
- * was recorded, else `from` — keep the current view, amber if short).
+ * of wall-clock (E2): past the deadline it returns the best seed seen so far, else `from` — keep the
+ * current view, amber if short.
  */
 /**
  * #194 (ADR-474) — the DISPLAY-QUALITY preference, as a predicate over an already-computed figure.
@@ -3059,8 +3042,6 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // wedge is hard to read, two labels at one point are impossible to read. A candidate that stacks them
   // is still acceptable (it may be the only seating), so it enters as a lower tier rather than failing.
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
-  // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
-  const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   // #194 (ADR-474): the current view is kept only when it is BOTH satisfying and legible — otherwise it
   // is remembered as the strict fallback and the sweep looks for one that is also well spread.
   if (ok(base0) && spreadOk(base0)) return from;
@@ -3077,16 +3058,9 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
     for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
   }
   for (let s = from; s < from + budget; s++) seeds.push(s);
-  // ONE interleaved sweep, both bars per seed (issue #19 / ADR-267): STRICT wins the moment it's found (the
-  // letter order is honoured whenever achievable, ADR-098); the first RELAXED-only seed is remembered as the
-  // fallback and returned when the sweep ends — or the DEADLINE hits — without a strict hit (ADR-142: no
-  // configuration achieves the letter-order side, so the order carries no information). The old shape — a
-  // full strict pass, THEN a full relaxed pass — burned the entire wall budget on a provably futile strict
-  // sweep for the ADR-142 class, so the live app (2500ms) never reached the fallback its tests (∞) always did.
-  let fallback = okRelaxed(base0) ? from : -1;
   // #194 (ADR-474): the STRICT-but-squashed fallback — the seed today would have returned. Recorded
   // while sweeping (ADR-267: one interleaved pass, never a second) so the preference costs no extra
-  // replay: tier 1 is strict AND well spread, tier 2 is strict (today), tier 3 the relaxed fallback.
+  // replay: tier 1 is strict AND well spread, tier 2 is strict (today).
   let strictOnly = ok(base0) && separatedView(base0) ? from : -1;
   let strictOnlyScore = strictOnly >= 0 ? spreadScore(base0) : -1;
   // #942: acceptable but stacked — used only if no separated candidate is found at all.
@@ -3112,13 +3086,11 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
           strictOnlyScore = sc;
         }
       }
-      if (fallback < 0 && okRelaxed(fig)) fallback = s;
     }
     // Past the sweep or the deadline: settle for the best tier seen, exactly as before the preference
     // existed. A figure with no well-spread configuration lands on the same seed it used to.
-    // #942 (ADR-486): a stacked-but-satisfying seed sits between them — better than a relaxed fallback
-    // that fails a stated requirement, worse than any separated view.
-    return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : fallback >= 0 ? fallback : from;
+    // #942 (ADR-486): a stacked-but-satisfying seed comes last — worse than any separated view.
+    return strictOnly >= 0 ? strictOnly : coincidentOnly >= 0 ? coincidentOnly : from;
   });
 }
 
@@ -3180,7 +3152,7 @@ export function factsWaitingForLetter(facts: readonly Fact[]): Set<string> {
  * genuinely under-determined PENDING figure also passes (its unsatisfied constraint is not a violation —
  * it's waiting for more givens, ADR-104 — so there is nothing to search for).
  */
-export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = false): boolean {
+export function meetsRequirements(facts: Fact[], seed = 0): boolean {
   const fig = replay(facts, seed);
   const waiting = factsWaitingForLetter(facts);
   return (
@@ -3196,10 +3168,7 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
     // to, and the post-commit search then exhausted into «לא נמצאה תצורה…» beside a perfectly good figure.
     facts.every((f) => !f.enabled || fig.status[f.id] === 'ok' || waiting.has(f.id)) &&
     fig.violations.length === 0 &&
-    // relaxExtensions: the ADR-142 acceptance bar for a config `firstSatisfyingSeed` returned as its
-    // shared-endpoint FALLBACK — the letter-order side is unachievable, so either extension counts
-    // (issue #19: `findValidConfig` used to strictly reject the very seed the fallback found).
-    extensionsClear(facts, fig, relaxExtensions) &&
+    extensionsClear(facts, fig) &&
     intersectionsWithinSegments(fig) &&
     segmentsCrossWithin(facts, fig.positions) &&
     pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
@@ -3241,7 +3210,7 @@ export const separatedView = (fig: Derived): boolean => fig.coincidences.length 
  *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
  *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
  *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
-export let lastConfigTier: 'current' | 'relaxed' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
+export let lastConfigTier: 'current' | 'sweep' | 'seat' | 'variant' | 'reflect' | 'branch' | null = null;
 
 export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
   lastConfigTier = null;
@@ -3267,16 +3236,9 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     }
     meetingOnly = s0;
     meetingScore = separatedView(fig0) ? spreadScore(fig0) : -0.5; // below every separated candidate
-  }
-  // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
-  // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
-  // validity test for s0. Checked BEFORE the strict sweep/branch tiers: when s0 is a fallback those tiers are
-  // provably futile on the extension bar (the sweep re-covers seeds firstSatisfyingSeed already rejected),
-  // and their cold replays would burn the remaining budget and bail to null past the very config in hand —
-  // the exact starvation this ADR removes. When s0 simply failed OTHER requirement dimensions (violations,
-  // convexity, distinctness), the relaxed check fails identically and the tiers below run as before.
-  if (meetsRequirements(facts, s0, true)) {
-    lastConfigTier = 'relaxed';
+    // #2518 (ADR-784): a view that meets every requirement is kept. ADR-267's relaxed check, gone with its tier, is what
+    // answered here (strict implies relaxed); #1739 locks that the resolver does not move a valid commit seed.
+    lastConfigTier = 'current';
     return { facts, seed: s0 };
   }
   // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
@@ -3399,9 +3361,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
  * The "show another configuration" SEARCH, extracted PURE (#41 / [ADR-290](docs/06-decisions.md#adr-290))
  * so a geometry worker can run it off the main thread; the store's `resample` action applies its result.
  * Semantics unchanged: a wall-clock budget (2026-07-06 review hotspot #3 — past the deadline, return what
- * we have; tests run deadline-free), the ADR-267 preference ladder (a STRICT-valid view wins outright; a
- * RELAXED-valid one — the ADR-142 shared-endpoint either-side bar — is a fallback offered only when the
- * CURRENT view itself is not strict-valid), the shared `meetsRequirements` acceptance bar, and the
+ * we have; tests run deadline-free), the shared `meetsRequirements` acceptance bar, and the
  * similarity-invariant fingerprint (a same-shape-resized view is not "another configuration"). The
  * deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a single
  * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
@@ -3413,8 +3373,6 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
   const curFp = shapeFingerprint(cur.construction, cur.positions, cur.circles);
   let s = seed;
   const deadline = Date.now() + budgetMs;
-  const curStrict = meetsRequirements(facts, seed);
-  let fallback = -1;
   /** #194: the first requirement-meeting but squashed candidate — the answer when nothing better shows. */
   let squashed = -1;
   for (let k = 0; k < CONFIG_SEEDS && Date.now() <= deadline; k++) {
@@ -3430,11 +3388,9 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
       // still be able to reach it (ADR-052), so it is what this press returns.
       if (spreadOk(r)) return s;
       if (squashed < 0) squashed = s;
-      continue;
     }
-    if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
   }
-  return squashed >= 0 ? squashed : fallback >= 0 ? fallback : null;
+  return squashed >= 0 ? squashed : null;
 }
 
 /** The command types whose `branch` a student can cycle — shared by `cycleAlt` and the composite
@@ -3456,10 +3412,9 @@ export const BRANCH_CYCLE_KINDS = new Set(['point-by-distances', 'arc-midpoint',
  * everything-advances composite first (branch+1 & variant+1 & fresh seed — what the old path always
  * applied), then single discrete steps (walking further around a cycle so an invalid neighbour never
  * strands the rest of the family), then the plain seed resample (`searchResample`, shape-diff gated).
- * A discrete step is inherently a different drawing, so it needs no fingerprint check. The ADR-267
- * ladder is kept: strict-valid wins; a relaxed-valid composite is a fallback offered only when the
- * CURRENT view itself is not strict-valid. Returns null when nothing in budget qualifies — the caller
- * keeps the current view ("only configuration"), never applies an unvalidated one.
+ * A discrete step is inherently a different drawing, so it needs no fingerprint check. Returns null when
+ * nothing in budget qualifies — the caller keeps the current view ("only configuration"), never applies an
+ * unvalidated one.
  */
 /**
  * #569 (ADR-445 remainder, ADR-481): the RIGHT-ANGLE SEAT is a discrete configuration dimension, and
@@ -3638,15 +3593,13 @@ export function searchAnotherView(
   const axes = configurationAxes(facts, cur.construction);
   const total = axes.reduce((p, a) => p * a.n, 1);
   const hasDofs = freeDofs(cur.construction).length > 0;
-  const curStrict = meetsRequirements(facts, seed);
   const steps = Math.min(total - 1, SEARCH_AXIS_STEPS_MAX);
   const candidates = Array.from({ length: Math.max(0, steps) }, (_, k) => withAssignment(facts, axes, advanceAssignment(axes, k + 1)));
 
-  let fallback: { facts: Fact[]; seed: number } | null = null;
   /**
    * #942 (ADR-486): a candidate that MEETS every requirement but stacks two named points is held back
-   * rather than returned. It is legal — it may even be the only seating — so it is kept as a tier above
-   * the relaxed `fallback`, and returned only if the whole search finds nothing separated.
+   * rather than returned. It is legal — it may even be the only seating — so it is kept, and returned
+   * only if the whole search finds nothing separated.
    */
   let coincident: { facts: Fact[]; seed: number } | null = null;
   let k = 0;
@@ -3662,9 +3615,7 @@ export function searchAnotherView(
         // #942: separated wins outright; coincident is remembered and only used if nothing else turns up.
         if (withSolveBudget(deadline, () => separatedView(replay(fc, s)))) return { facts: fc, seed: s };
         if (!coincident) coincident = { facts: fc, seed: s };
-        continue;
       }
-      if (!curStrict && !fallback && withSolveBudget(deadline, () => meetsRequirements(fc, s, true))) fallback = { facts: fc, seed: s };
     }
   }
   // The plain seed resample (no discrete step) — shape-diff gated, existing semantics.
@@ -3673,9 +3624,8 @@ export function searchAnotherView(
     if (s !== null) return { facts, seed: s };
   }
   // #942 (ADR-486): the coincident view is offered only now, with every separated option exhausted —
-  // "only when there is no other config". It still beats the RELAXED fallback, which fails a stated
-  // requirement rather than merely stacking two labels.
-  return coincident ?? fallback;
+  // "only when there is no other config".
+  return coincident;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
@@ -4133,6 +4083,116 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
   }
 }
 
+/** The work {@link gateSamples} may spend: 16 plain evaluations and the finishing pass fit; a figure whose every sample re-solves does not. */
+export const extensionSideConfig = { cap: 150_000 };
+
+/**
+ * The narrow pool of a figure the gate asks ONE thing about, at the drawn seed: its jobs in order, stopped at the first
+ * sample that answers (``hit``), the `sampleSubset` idea with no full pool behind it. `null` when a sample hit or the
+ * deterministic work cap cut the run: neither is evidence of "in every sample", and the caller fails open.
+ */
+function gateSamples(facts: Fact[], seed: number, hit: (pos: ReadonlyMap<Id, Vec>) => boolean): SharedSamples | null {
+  const before = sampleMemo;
+  try {
+    return withWorkEpoch(() => {
+      const { jobs, finish, raw } = samplingJobs(facts, { wide: false, atSeed: seed });
+      const limit = work.done + extensionSideConfig.cap;
+      return withWorkBudget(extensionSideConfig.cap, () => {
+        for (let i = 0; i < jobs.length; i++) {
+          if (i > 0 && work.done > limit) return null;
+          const n = raw.length;
+          jobs[i]();
+          if (raw.slice(n).some(hit)) return null;
+        }
+        return finish(true);
+      });
+    });
+  } finally {
+    sampleMemo = before;
+  }
+}
+
+/** The extension whose stated side no configuration has. `standing`: the row of an earlier line, which this line broke. */
+export interface ExtensionSide {
+  a: Id;
+  b: Id;
+  id: Id;
+  standing?: string;
+}
+
+/**
+ * A STATED EXTENSION SIDE NO CONFIGURATION HAS (#2518, [ADR-784](docs/06-decisions.md#adr-784), operator rulings
+ * 2026-11-04). «המשך AO חותך את מעגל P בנקודה R» with A on circle P: the line's only other crossing is R, so the extension
+ * is the deterministic `line-circle` of `extend-onto-circle`'s shared-endpoint branch, which carries no order constraint
+ * for the ladder to refuse. The side is a fact about the figure, so it is asked of the figure, one test for both members:
+ *
+ * - **An extension this line states.** Off its side at the drawn seed of the trial figure and at every sample of the PRIOR
+ *   figure's pool (M3, the pool `forcedCrossedRing` reads). The prior pool is sound here: the crossing is a function of the
+ *   two ends and the circle, and the line can only narrow the configurations.
+ * - **A standing extension this line breaks** (judge ruling on #2518, option B). The line is what narrowed the figure, so
+ *   the prior pool cannot answer: it reads the TRIAL figure's pool. The side must have held before, at the drawn seed or
+ *   in the prior pool. A figure already off its side (a saved one) never blames the line, so it stays editable.
+ *
+ * ADR-780's seat is why a movable other end passes the first test at no cost. The bar is the verifier's (`t > 1`), not
+ * the sampling bar's clearance: a refusal needs the side to be absent, not merely tight. A figure with no extension pays
+ * one scan of the fact list; a line that leaves every extension on its side at the drawn seed pays the trial replay the
+ * dry run reuses. Any other extension (a target that exists, neither end on the circle) carries `collinear-order`, and
+ * the ladder owns it.
+ *
+ * **Fails open**, like its twins: a thin pool, a sample missing a point, any throw → `null`, and the line commits.
+ *
+ * @returns the extension, or `null`.
+ */
+export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], seed = 0): ExtensionSide | null {
+  try {
+    const stated = commands.flatMap((c) => (c.type === 'extend-onto-circle' ? [c] : []));
+    const standing = facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ c: f.cmd, utterance: f.utterance }] : []));
+    if (stated.length === 0 && standing.length === 0) return null; // a figure with no extension pays nothing
+    const trial = trialFacts(facts, commands);
+    const fig = replay(trial, seed);
+    const objects = fig.construction.objects;
+    type Ext = { a: Id; b: Id; id: Id; circle: Id };
+    /** The shared end and centre of an extension built by the shared-endpoint branch. */
+    const seatOf = (c: Ext) => {
+      const o = objects.find((x) => x.id === c.id);
+      const circle = objects.find((x) => x.id === c.circle);
+      return o?.kind === 'line-circle' && o.avoid !== undefined && circle?.kind === 'circle' ? { shared: o.avoid, center: circle.center } : null;
+    };
+    /** Is the crossing past the second letter here? `null` when a point is unplaced. */
+    const beyond = (pos: ReadonlyMap<Id, Vec>, c: Ext, seat: { shared: Id; center: Id }): boolean | null => {
+      const a = pos.get(c.a), b = pos.get(c.b), s = pos.get(seat.shared), o = pos.get(seat.center);
+      if (!a || !b || !s || !o) return null;
+      const ux = b.x - a.x, uy = b.y - a.y;
+      const u2 = ux * ux + uy * uy;
+      if (u2 < 1e-18) return false;
+      // the line's other crossing of the circle through s about o: s reflected across the foot of o on the line
+      const k = (2 * ((o.x - s.x) * ux + (o.y - s.y) * uy)) / u2;
+      return ((s.x + k * ux - a.x) * ux + (s.y + k * uy - a.y) * uy) / u2 > 1;
+    };
+    /** The pool's verdict: every sample off the side. A thin pool answers nothing. */
+    const offEverywhere = (pool: SharedSamples, c: Ext, seat: { shared: Id; center: Id }): boolean => {
+      if (pool.samples.length === 0) return false;
+      if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return false;
+      return pool.samples.every((pos) => beyond(pos, c, seat) === false);
+    };
+    for (const c of stated) {
+      const seat = seatOf(c);
+      if (seat && beyond(fig.positions, c, seat) === false && offEverywhere(sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS, atSeed: seed }), c, seat)) return { a: c.a, b: c.b, id: c.id };
+    }
+    const before = replay(facts, seed).positions;
+    for (const { c, utterance } of standing) {
+      const seat = seatOf(c);
+      if (!seat || beyond(fig.positions, c, seat) !== false) continue; // the prefilter: on its side on screen ⇒ on it somewhere
+      if (beyond(before, c, seat) !== true) continue; // already off it on screen: not this line's doing
+      const pool = gateSamples(trial, seed, (pos) => beyond(pos, c, seat) === true);
+      if (pool && offEverywhere(pool, c, seat)) return { a: c.a, b: c.b, id: c.id, standing: utterance ?? `${c.a}${c.b}` };
+    }
+    return null;
+  } catch {
+    return null; // fails open, always
+  }
+}
+
 export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): StepOutcome {
   // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
   // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the
@@ -4549,10 +4609,13 @@ function sideSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] 
   });
   return kept.length >= 2 ? kept : samples;
 }
-export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
+export function samplingJobs(facts: Fact[], opts: { wide?: boolean; atSeed?: number } = {}) {
   const configs = variantConfigs(facts);
-  const seed0 = configs.length === 1 ? firstSatisfyingSeed(facts) : 0;
-  const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : firstSatisfyingSeed(vf)).construction);
+  // #2518 (ADR-784): `atSeed` skips the display-seed search. A gate asking about a figure with an unmet requirement
+  // pays the whole futile sweep there (3 s on a five-line figure), for a base construction it does not need.
+  const settled = (vf: Fact[]) => opts.atSeed ?? firstSatisfyingSeed(vf);
+  const seed0 = configs.length === 1 ? settled(facts) : 0;
+  const constructions = configs.map((vf) => replay(vf, configs.length === 1 ? seed0 : settled(vf)).construction);
   // #434 (ADR-509): a DETERMINED figure's pool is its ADMISSIBLE SET, not one sample. `freeDofCount === 0`
   // is a count, and a count can lie (ADR-424's class — a redundancy pattern pushing it to 0 while the figure
   // still moves with the seed); and a seed can never reach a branch or a seat. So the pool is every
@@ -4637,13 +4700,9 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
     if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap, strict: true });
-    // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
-    // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
-    // to the unfiltered converged pool (which would count wrong-side samples as configurations).
-    const relaxed = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived, true));
-    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged, determined: complete_, complete: complete && !overCap });
+    return (sampleMemo = { facts, key, constructions, samples: converged, determined: complete_, complete: complete && !overCap });
   };
-  return { jobs, finish };
+  return { jobs, finish, raw };
 }
 /**
  * Which crossings of the drawn ink are FORCED — present in EVERY valid configuration of the figure
@@ -4832,7 +4891,7 @@ export function sampleSubset(facts: Fact[], counterexample?: (pos: Map<Id, Vec>)
 /** #1996: how many sampling jobs the counterexample probe of {@link sampleSubset} runs before the full pool. */
 const SUBSET_PROBE_JOBS = 4;
 
-export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
+export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number } = {}): SharedSamples {
   // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
   // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
   // values op after the detect sweep reuses it instead of recomputing the whole pool, and the status line and
@@ -4841,7 +4900,7 @@ export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {})
   if (hit) return hit;
   return withWorkEpoch(() => samplePool(facts, opts));
 }
-function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples {
+function samplePool(facts: Fact[], opts: { deadlineMs?: number; atSeed?: number }): SharedSamples {
   sampleStats.sweeps++;
   // The UI-thread gate samples the NARROW set (ADR-509's three seeds, no extra button seeds): measured while
   // building ADR-558, the widened set doubled its main-thread cost on a determined figure (0.67 s → 1.32 s
@@ -4854,7 +4913,7 @@ function samplePool(facts: Fact[], opts: { deadlineMs?: number }): SharedSamples
   // that, a job's memo hit was free, so the pool came back cut cold and complete warm.
   const memoBefore = sampleMemo;
   // #1770 (ADR-586): every fold the pool reads — its setup and its jobs — is observed for re-attempt cuts.
-  const observed = observeReattemptCuts(() => samplingJobs(facts, { wide: !narrow }));
+  const observed = observeReattemptCuts(() => samplingJobs(facts, { wide: !narrow, atSeed: opts.atSeed }));
   const { jobs, finish } = observed.value;
   const aborts0 = solveBudget.aborts;
   const runJobs = (stop: () => boolean) => {
