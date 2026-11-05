@@ -27,6 +27,7 @@ import { NUMERAL_ALT, asRoman, numeralKey } from '../engine/names';
 import { isPointName, withPointName } from '../engine/pointName';
 import { evalExpr, symbolsOf, type Expr } from '../engine/expr';
 import { curveFromEquation } from '../engine/conic';
+import { ellipseFoci, isOn, parabolaFocus } from '../engine/curves';
 import { RESERVED_SYMBOLS } from '../engine/carriers';
 import type { Construction, NumCurve } from '../engine/types';
 
@@ -211,8 +212,11 @@ function inEquation(text: string, at: number): boolean {
   return run.includes('=') && /[xy]/.test(run);
 }
 
+/** The text the number gate reads; every occurrence's `at` indexes it. */
+const numberText = (text: string): string => takeNumeralNames(normalise(text));
+
 const numbersOf = (text: string): StatedNumber[] => {
-  const t = takeNumeralNames(normalise(text));
+  const t = numberText(text);
   return scanNumbers(t, NUMBER_BLANKS).map((o) => ({ ...o, eq: inEquation(t, o.at) }));
 };
 
@@ -230,13 +234,18 @@ const PERPENDICULAR = /⊥|מאונ[ךכ]|ניצב|ישרה|perpendicular|right/
  * constant expression with a root in it is ONE number, its value (#2646): the facts of «AB = 5√2» carry 7.07…, never
  * a 5 and a 2, exactly as the line's text reads. `plane`: some expression mentions x or y (the line is an equation).
  */
-function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean; plane: boolean; curves: NumCurve[] } {
+function factAccounts(line: string): { names: string[]; numbers: number[]; perp: boolean; plane: boolean; curves: NumCurve[]; radii: number[] } {
   const r = parseLine(line);
-  if (!r.ok) return { names: [], numbers: [], perp: false, plane: false, curves: [] };
+  if (!r.ok) return { names: [], numbers: [], perp: false, plane: false, curves: [], radii: [] };
   const names: string[] = [];
   const numbers: number[] = [];
   const curves: NumCurve[] = [];
+  const radii: number[] = [];
   let plane = false;
+  /** ADR-AG-405: a circle with no equation still states its radius, as a constant («ברדיוס 3»; «בקוטר 6» is 6/2). */
+  const radius = (e: Expr): void => {
+    if (symbolsOf(e).length === 0) radii.push(Math.abs(evalExpr(e)));
+  };
   const walk = (v: unknown, key: string): void => {
     if (key === 'src') return;
     if (typeof v === 'number') numbers.push(v);
@@ -244,9 +253,11 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
     else if (Array.isArray(v)) v.forEach((x) => walk(x, key));
     else if (v && typeof v === 'object') {
       const o = v as Record<string, unknown>;
+      if (o.t === 'radius-of' && o.value && isExpr(o.value as Record<string, unknown>)) radius(o.value as Expr);
       if (isExpr(o)) {
         const e = o as unknown as Expr;
         const syms = symbolsOf(e);
+        if (key === 'r') radius(e);
         if (syms.some((s) => RESERVED_SYMBOLS.has(s))) plane = true;
         if (syms.length === 0 && hasRoot(e)) return void numbers.push(Math.abs(evalExpr(e)));
         // #2680: an EQUATION with no parameter is a curve the answer drew: keep it, read as the engine reads it
@@ -261,7 +272,7 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
     }
   };
   walk(r.facts, '');
-  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)), plane, curves };
+  return { names, numbers, perp: /perp|right/i.test(JSON.stringify(r.facts)), plane, curves, radii };
 }
 
 /**
@@ -272,8 +283,8 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
  * curve's own parameters, read off the engine's fit (`curveFromEquation`), never a digit-0 exemption: the answer pays a
  * stated centre only when its curve has that centre.
  *
- * The parameters of each canonical form, and nothing computed from them (a diameter, a focus, a point the curve passes
- * through: a value the student would have to compute is ADR-AG-279's `y=4x-5`, refused for the copying form):
+ * The parameters of each canonical form. A value COMPUTED from them (a diameter, a focus, a point the curve passes
+ * through) is read by its stated role, in {@link heldByCurves} (ADR-AG-405):
  * - a line `y = mx + n`: m and n; a vertical `x = k`: k;
  * - a circle `(x−a)² + (y−b)² = r²`: a, b, r;
  * - a canonical ellipse `x²/a² + y²/b² = 1`: its centre (0, 0), a, b;
@@ -291,6 +302,118 @@ function curveParameters(c: NumCurve): number[] {
     case 'ellipse':
       return [0, 0, c.a, c.b];
   }
+}
+
+/** What the answer drew: its curves, and the radii of the circles it stated without an equation. */
+interface AnswerShapes {
+  curves: readonly NumCurve[];
+  radii: readonly number[];
+}
+type Ellipse = NumCurve & { kind: 'ellipse' };
+type Parabola = NumCurve & { kind: 'parabola' };
+
+const close = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
+const ellipses = (s: AnswerShapes): Ellipse[] => s.curves.filter((c): c is Ellipse => c.kind === 'ellipse');
+const parabolas = (s: AnswerShapes): Parabola[] => s.curves.filter((c): c is Parabola => c.kind === 'parabola');
+const radiiOf = (s: AnswerShapes): number[] => [...s.radii, ...s.curves.flatMap((c) => (c.kind === 'circle' ? [c.r] : []))];
+const hasFocus = (s: AnswerShapes, x: number, y: number): boolean =>
+  [...parabolas(s).map(parabolaFocus), ...ellipses(s).flatMap(ellipseFoci)].some((f) => close(f.x, x) && close(f.y, y));
+
+/** The words between a role noun and its value: «קוטרו הוא 6», «הציר הגדול באורך 10», "diameter of 6". */
+const LINK = String.raw`(?:\s*(?:הוא|היא|הם|הן|שווה\s+ל-?|שווים\s+ל-?|באורך|שאורכו|שאורכה|of|is|are|equals?|equal\s+to|=|:))*\s*`;
+/** An axis in a crossing, either script: «את ציר x», «ציר ה-y», "the x-axis". */
+const AXIS = String.raw`(?:(?:את\s+)?ה?ציר\s*(?:ה-?)?([xy])|(?:the\s+)?([xy])[-\s]axis)`;
+const CROSS = String.raw`(?:חות[כך][א-ת]*|פוג[שע][א-ת]*|cuts?|crosses|meets|intersects?)\s+${AXIS}`;
+/** The words between a role noun and a coordinate pair: «מוקדי האליפסה הם», «עובר בנקודה A», "through the point". */
+const POINT_LEAD = String.raw`(?:\s+(?:של\s+)?ה?(?:פרבולה|אליפסה)|\s+of\s+the\s+[a-z]+)?${LINK}(?:(?:the\s+)?points?\s*|ב?-?ה?נקוד(?:ה|ות)\s*|ב-?)?(?:${POINT_ATOM})?\s*$`;
+/** Never a half: «חצי קוטר 3» is a radius and «חצי הציר הגדול 5» a semi-axis, parameters {@link curveParameters} pays. */
+const NOT_HALF = String.raw`(?<!חצי\s+ה?)(?<!semi-?)`;
+
+/** A value's ROLE, read off the words right before it, and the test that the answer's curve really holds it there. */
+const SCALAR_ROLES: readonly { before: RegExp; holds: (s: AnswerShapes, v: number, axis: string) => boolean }[] = [
+  { before: new RegExp(String.raw`${NOT_HALF}(?:קוטר[א-ת]*|diameter)${LINK}$`, 'i'), holds: (s, v) => radiiOf(s).some((r) => close(2 * r, v)) },
+  {
+    before: new RegExp(String.raw`${NOT_HALF}(?:ציר[א-ת]*\s+ה?(?:גדול|ראשי|ארוך)|major\s+axis)${LINK}$`, 'i'),
+    holds: (s, v) => ellipses(s).some((c) => close(2 * Math.max(c.a, c.b), v)),
+  },
+  {
+    before: new RegExp(String.raw`${NOT_HALF}(?:ציר[א-ת]*\s+ה?(?:קטן|משני|קצר)|minor\s+axis)${LINK}$`, 'i'),
+    holds: (s, v) => ellipses(s).some((c) => close(2 * Math.min(c.a, c.b), v)),
+  },
+  {
+    before: new RegExp(String.raw`(?:מרחק\s+(?:בין\s+)?ה?מוקד[א-ת]*|distance\s+between\s+(?:the\s+)?foci|focal\s+distance)${LINK}$`, 'i'),
+    holds: (s, v) =>
+      ellipses(s).some((c) => {
+        const [a, b] = ellipseFoci(c);
+        return close(Math.hypot(a.x - b.x, a.y - b.y), v);
+      }),
+  },
+  {
+    before: new RegExp(String.raw`(?:מדריך|מדריכ[א-ת]*|directrix)[^0-9]*?x\s*=\s*-?\s*$`, 'i'),
+    holds: (s, v) => parabolas(s).some((c) => close(Math.abs(c.p) / 2, v)),
+  },
+  {
+    // Unsigned, like every scalar here: the hyphen of «ב-2» is a maqaf, never a sign.
+    before: new RegExp(String.raw`${CROSS}\s*(?:ב-?|בנקודה\s*|at\s+)$`, 'i'),
+    holds: (s, v, axis) => s.curves.some((c) => [v, -v].some((at) => (axis === 'x' ? isOn(c, at, 0) : isOn(c, 0, at)))),
+  },
+];
+
+const PAIR_ROLES: readonly { before: RegExp; holds: (s: AnswerShapes, x: number, y: number) => boolean }[] = [
+  {
+    before: new RegExp(String.raw`(?:דרך|עובר[א-ת]*|מכיל[א-ת]*|through|passes|passing|contains?|containing|${CROSS})${POINT_LEAD}`, 'i'),
+    holds: (s, x, y) => s.curves.some((c) => isOn(c, x, y)),
+  },
+  { before: new RegExp(String.raw`(?:מוקד[א-ת]*|foc(?:us|i))${POINT_LEAD}`, 'i'), holds: hasFocus },
+];
+
+/** A coordinate pair's parenthesis: two parts, each of which may hold one group («(√(2), 1)»). */
+const PAIR = /\(((?:[^(),;]|\([^()]*\))*)[,;]((?:[^(),;]|\([^()]*\))*)\)/g;
+/** What joins one pair of a list to the next: «(4,0) ו-(-4,0)», "(1,2) and (3,4)"; the next may be named. */
+const LIST_GAP = new RegExp(String.raw`^\s*,?\s*(?:ו\s*-?|and\b)?\s*(?:${POINT_ATOM})?\s*$`);
+
+/**
+ * #2680 ([ADR-AG-405](../../docs/06c-decisions-analytic.md#adr-ag-405), operator ruling 2026-11-04: *"Accept when the
+ * answer's curve really has the value"*) — THE STATED VALUES THE ANSWER'S CURVE HOLDS IN ANOTHER FORM. The number gate
+ * looks a value up, and a value the answer COMPUTED is not there to find: a diameter of 6 in «x^2 + y^2 = 9», the point
+ * (2,3) in «y = 4x - 5», the focus (1,0) in «y^2 = 4x». This reads each occurrence's stated ROLE and tests the curve the
+ * engine draws, with the engine's own {@link isOn}, {@link parabolaFocus} and {@link ellipseFoci}.
+ *
+ * The test needs the role. «x^2 + y^2 = 25» does pass through (3,4), and that does not pay a stated CENTRE (3,4); its
+ * diameter is 10, and that does not pay a stated RADIUS 10. A value with no role here goes to the number gate as before.
+ *
+ * Returns the positions of the occurrences proven held. They need no account and spend none, so the multiset is left
+ * for what remains: in «(2,3), slope 4» answered «y=4x-5», the 4 pays the slope, not the root of the stated 2.
+ */
+function heldByCurves(utterance: string, stated: readonly StatedNumber[], shapes: AnswerShapes): Set<number> {
+  const held = new Set<number>();
+  if (shapes.curves.length === 0 && shapes.radii.length === 0) return held;
+  const t = numberText(utterance);
+  const inPair = new Set<number>();
+  let role: (typeof PAIR_ROLES)[number] | undefined;
+  let prevEnd = -1;
+  for (const m of t.matchAll(PAIR)) {
+    const open = m.index ?? 0;
+    const end = open + m[0].length;
+    const parts = stated.filter((o) => o.at > open && o.at < end);
+    if (parts.length !== 2) continue;
+    const signed = (o: StatedNumber): number => (/-\s*$/.test(t.slice(open, o.at)) ? -o.value : o.value);
+    const before = t.slice(0, open);
+    const listed = prevEnd >= 0 && LIST_GAP.test(t.slice(prevEnd, open)) ? role : undefined;
+    role = PAIR_ROLES.find((r) => r.before.test(before)) ?? listed;
+    prevEnd = end;
+    for (const o of parts) inPair.add(o.at);
+    if (role?.holds(shapes, signed(parts[0]), signed(parts[1]))) for (const o of parts) held.add(o.at);
+  }
+  for (const o of stated) {
+    if (inPair.has(o.at)) continue;
+    const before = t.slice(0, o.at);
+    for (const r of SCALAR_ROLES) {
+      const m = r.before.exec(before);
+      if (m && r.holds(shapes, o.value, (m[1] ?? m[2] ?? '').toLowerCase())) held.add(o.at);
+    }
+  }
+  return held;
 }
 
 /**
@@ -333,7 +456,8 @@ export interface Faithfulness {
  *    went with it).
  * 2. **Dropped number**: every stated number must be paid, as a multiset, by a model line's numbers or facts:
  *    the value itself, its square (a radius stated, r² in the equation), its square root, or, for 90, a line
- *    that states a right angle.
+ *    that states a right angle. A value whose stated role the answer's curve really holds needs no account
+ *    (ADR-AG-405, {@link heldByCurves}).
  * 3. **Invented name**: every point, line or numeral name the model WROTE must be stated or in the figure. Read
  *    off the text, so a name the grammar mints while lowering (P₁, a canonical centre) is never counted.
  * 4. **Invented existing name** (#2225, ADR-AG-281, operator ruling 2026-10-16): a name the model wrote that the
@@ -372,11 +496,13 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
   modelLines.forEach((line, i) => {
     const occ = numbersOf(line);
     const tag = facts[i].plane || occ.some((o) => o.eq) ? EQ : PLAIN;
-    const params = facts[i].curves.flatMap(curveParameters).map(Math.abs);
+    const params = [...facts[i].curves.flatMap(curveParameters).map(Math.abs), ...facts[i].radii];
     for (const value of unionByMax(occ.map((o) => o.value), facts[i].numbers, params)) accounts.push({ value, tag });
     if (facts[i].perp || PERPENDICULAR.test(line)) accounts.push({ value: 90, tag });
   });
-  const droppedNumbers = spendAccounts(numbersOf(utterance), accounts, (o) => {
+  const statedNumbers = numbersOf(utterance);
+  const held = heldByCurves(utterance, statedNumbers, { curves: facts.flatMap((f) => f.curves), radii: facts.flatMap((f) => f.radii) });
+  const droppedNumbers = spendAccounts(statedNumbers.filter((o) => !held.has(o.at)), accounts, (o) => {
     const across = o.eq ? PLAIN : EQ;
     return [
       { value: o.value, tag: EQ },
