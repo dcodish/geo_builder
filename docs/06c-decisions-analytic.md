@@ -12311,6 +12311,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-279 — The LLM lane accounts its answer against the student's sentence: a dropped name or number, or an invented name, refuses (#1355)
 
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-405](#adr-ag-405) (#2680, operator ruling 2026-11-04): an answer that computes a value is no longer refused when its curve really has that value, so `y=4x-5` for «(2,3), slope 4» now pays both. The gates themselves stand.
+
 **Status:** accepted · 2026-10-16 · feature (P1, analytic; raised from P2 by the operator 2026-10-15: «1355 is p1») · fix round #2245, stream E · PR `feat/1355-analytic-llm-honesty-gates`
 **Requirements:** [02c](02c-requirements-analytic.md) R104a (new) · **Design:** [04c](04c-design-analytic.md) "The LLM lane's faithfulness gates" · **LADDER stage:** none (the LLM seam, after the re-parse)
 **Siblings:** 2-D's battery (`src/app/submitPipeline.ts`: `droppedNewLabels`, `introducedNewLabels` #255, `droppedGivenNumbers` #437) · 3-D's `lostGivens3` (no mirror gate: #1821) · complex has no fallback (#1869)
@@ -15051,6 +15053,8 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 
 ## ADR-AG-391 — An answer's curve pays the parameters its canonical form leaves implicit: «x^2 + y^2 = 9» keeps a stated centre (0,0) (#2680)
 
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-405](#adr-ag-405) (#2680, operator ruling 2026-11-04): "Nothing COMPUTED from the parameters pays" is replaced. A computed value now pays by its stated role, when the curve really has it. The parameters stay as decided here.
+
 **Date:** 2026-11-04 · **Status:** accepted · bug (P3, analytic) · fix round #2697 stream S2, branch `fix/2680-implicit-curve-values` (stacked on #2692's) · plan: the #2680 body (option 2 of #2646's list), auto-ok 2026-11-04. LADDER stage: none (the model-lane honesty gate). **Amends** [ADR-AG-384](#adr-ag-384) (its "Found, not this class" line is decided here).
 
 **Requirements:** none (internal) — the honesty invariants (a given is never silently dropped, and a correct answer is never refused for one it did not drop) already promise it. · **Design:** [04c](04c-design-analytic.md) § "The LLM lane's faithfulness gates".
@@ -15293,3 +15297,32 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-405 — An AI answer that computes a stated value is accepted when its curve really has that value, read by the value's stated role (#2680)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P3, analytic) · fix round #2722 stream G, branch `fix/2680-honesty-origin-centre` · operator ruling 2026-11-04, round #2697 questions page, card q2 = B: *"Accept when the answer's curve really has the value"*. LADDER stage: none (the model-lane honesty gate). **Replaces** the October rule that the model must copy the student's numbers, as a refusal: [ADR-AG-279](#adr-ag-279)'s `y=4x-5` line and [ADR-AG-391](#adr-ag-391)'s "Nothing COMPUTED from the parameters pays".
+
+**Requirements:** [02c](02c-requirements-analytic.md) R104a (amended: a computed value the curve has is not lost) · **Design:** [04c](04c-design-analytic.md) § "The LLM lane's faithfulness gates".
+
+**Measured before** (`28dac0c3`, `faithfulnessAnalytic`, the model mocked): every row #2680 left for the ruling was refused: «מעגל שקוטרו 6 ומרכזו (0,0)» answered «x^2 + y^2 = 9» dropped «6»; «מעגל שמרכזו (0,0) ועובר דרך (3,0)» dropped a «0»; «ישר ששיפועו 1 ועובר דרך (0,3)» answered «y = x + 3» dropped «0»; «פרבולה שמוקדה (1,0)» answered «y^2 = 4x» dropped «1»; «אליפסה שמוקדיה (4,0) ו-(-4,0) וצירה הגדול 10» answered «x^2/25 + y^2/9 = 1» dropped «4», «4», «10»; «ישר שעובר דרך (2,3) ושיפועו 4» answered «y=4x-5» dropped «3», «4». The same cause in a spelling with no equation: «מעגל O שקוטרו 6» answered «מעגל O ברדיוס 3» dropped «6», and «מעגל O שרדיוסו 3» answered «מעגל O בקוטר 6» dropped «3».
+
+**Class (docs/17 §1).** *A stated value that a correct answer holds in another form* looks dropped, because the number gate only looks a value up, and a computed value is not there to find.
+
+**Decision.**
+1. **The test is on the curve the engine draws.** `heldByCurves` (`parser/honestyAnalytic.ts`) reads the answer's curves through ADR-AG-391's seam, and tests them with the engine's own `isOn`, `parabolaFocus` and `ellipseFoci`. It is a comparison, never "the answer parses".
+2. **The test reads the value's stated ROLE**, from the words right before it. This is the part the plan did not spell out, and it is required by its second line: without it «x^2 + y^2 = 25» would pay a stated centre (3,4), because it passes through (3,4), and «x^2 + y^2 = 9» a stated radius 6, because its diameter is 6. Both are wrong answers refused today. The first version the #2697 session tried had no role, and that is why it was withdrawn. The roles: a point the curve passes through (`דרך`, `עובר`, `מכיל`, through, passes, contains, or an axis crossing given as a pair), a focus or foci, a diameter, a major or minor axis length (never a half axis, which is a parameter), the distance between the foci, a directrix `x = k`, an axis crossing given as a number. A list carries its role along: «(4,0) ו-(-4,0)».
+3. **A held value spends no account**, so it is taken out before the multiset runs. This is a deviation from the plan's "after the literal check". After it, the fix would have needed a slope role too: in «(2,3), slope 4» answered «y=4x-5» the stated 2 spends the 4 as its square before the stated 4 is reached.
+4. **A circle stated with no equation holds its radius**: `factAccounts` keeps a constant `radius-of` value or `r` slot («בקוטר 6» is 6/2), so it pays a stated diameter by its role and a stated radius directly.
+5. **The prompt is unchanged.** It still asks the model to copy the stated numbers, which gives the student's own form when it can. The ruling lifts the refusal, not the request, and a prompt change is a proxy deploy nobody asked for.
+
+A value with no role in the table goes to the number gate as before, and stays refused if nothing pays it: the safe direction, and today's behaviour. Known members left that way: an angle with the x-axis (slope = tan), the sum of the distances to the foci, a line a value is stated by reference to («מקביל ל-y=2x+1»).
+
+**The sweep.** Old and new gate side by side over every logged model answer (`logs/prod-events-analytic.jsonl`, `logs/debug-log-analytic.jsonl`, 37 distinct utterance and answer pairs): no verdict changed. No logged answer has hit this; the rows are the session's, as the oracle. The harness was removed before the commit.
+
+**Limit, unchanged and reported for a ruling.** A value the literal multiset already pays is accepted even when its stated role contradicts the curve: «מעגל שקוטרו 6 ומרכזו (0,0)» answered «x^2 + y^2 = 36» (a radius of 6), «פרבולה שמוקדה (2,0)» answered «y^2 = 4x» (p = 2, focus (1,0)), «אליפסה שמוקדיה (5,0) ו-(-5,0)» answered with a = 5. The role reader could refuse them, but a refusal there is a new outcome no ruling covers, and it can break a correct answer whose role-bearing curve has no equation.
+
+**Ports (ADR-W-157).** 2-D measured at `28dac0c3`: its gate already halves a number in a sentence that says «קוטר» (`droppedGivenNumbers`, ADR-259), so a diameter agrees; it has no equation curve, so the other roles have nothing to read. 3-D's number gate is #2285, and complex has no gate of this shape. The parity table runs the deterministic lanes and cannot hold a model-lane row, so there is no cell.
+
+**Locks.** `src-analytic/parser/__tests__/honesty-computed-values-2680.test.ts`: the rows above and each role's other spellings (paid); a wrong value in each role, and a value the curve holds in another role (refused, naming it); the mocked model lane end to end. `issue-1355-llm-honesty.test.ts` row O2b changes from dropped «3», «4» to nothing dropped; its invented `l1` still refuses. `honesty-implicit-curve-values-2680.test.ts` is unchanged and green.
+
+**Behaviour change for a student:** in analytic, a correct AI answer that computes a value from the sentence is accepted instead of refused: a diameter halved, a point the curve passes through, a focus, a directrix, an axis length, an intercept. A value the curve does not have is still refused with the existing dropped-given sentence.

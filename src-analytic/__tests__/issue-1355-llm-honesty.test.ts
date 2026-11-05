@@ -87,7 +87,7 @@ describe('#1355 (b) — the logged FAITHFUL answers still commit (must-not-chang
 describe('#1355 (c) — ORACLE rows (authored by the session as the model, not evidence)', () => {
   it.each<[string, string, string[], string[], boolean]>([
     ['O1 the centre lost', 'נתון מעגל שמרכזו בנקודה (2,3) ושרדיוסו הוא 5', ['נתון מעגל שמשוואתו x^2+y^2=25'], ['2', '3'], false],
-    ['O2b computed, and a name invented', 'ישר שעובר דרך (2,3) ושיפועו 4', ['משוואת הישר l1 היא y=4x-5'], ['3', '4'], true],
+    ['O2b computed (ADR-AG-405: its curve has the values), and a name invented', 'ישר שעובר דרך (2,3) ושיפועו 4', ['משוואת הישר l1 היא y=4x-5'], [], true],
     ['O4 the parameter’s bound lost', 'הפרמטר a קטן מ 13 בבקשה', ['a פרמטר'], ['13'], false],
     ['O5 the ratio lost', 'הנקודה P מחלקת את הקטע AB ביחס של 2 ל 3', ['P אמצע AB'], ['2', '3'], false],
     ['O7 B dropped and l1 invented', 'תעביר ישר דרך A ודרך B', ['דרך A עובר ישר l1'], ['B'], true],
