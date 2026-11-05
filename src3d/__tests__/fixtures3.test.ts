@@ -456,6 +456,14 @@ const SEEDED: SeededCorpus = {
   // ADR-3D-390 Am. 1 (operator ruling 2A, 2026-10-30) — two lines about one free vector are a relation on the figure: «AB = p ·
   // DC = p» drives the base to a parallelogram (before: free-vector-coupling). Asserted in issue-1188-free-vector-step2.test.ts.
   'free-vector-parallelogram-1188.geo3.json': ['פירמידה SABCD שבסיסה מרובע', 'וקטור p', 'AB = p', 'DC = p'],
+  // #2684 (ADR-3D-421) — the joint figure ↔ free-vector solve; the relations are asserted in issue-2684-free-vector-joint.test.ts
+  'free-vector-joint-letter-2684.geo3.json': ["קובייה ABCDA'B'C'D'", 'וקטור p', "E על AC' כך ש-AE = t·p"],
+  'free-vector-joint-pair-2684.geo3.json': ["קובייה ABCDA'B'C'D'", 'וקטור p', 'AD = k·p'],
+  'free-vector-joint-span-2684.geo3.json': ['מנסרה ישרה משולשת ABC', "M אמצע B'C'", "K על AA' כך ש-AK = 2KA'", "נסמן: AA' = w, KC = v", 'וקטור u', 'P על AM כך ש-KP = αu + βv'],
+  'free-vector-joint-letter-owned-2684.geo3.json': ['u = (k,1,2)', 'A(0,0,0)', 'AE = k·u'],
+  'free-vector-joint-metric-2684.geo3.json': ["קובייה ABCDA'B'C'D'", 'וקטור p', 'p ⟂ AB'],
+  'free-vector-joint-size-2684.geo3.json': ["קובייה ABCDA'B'C'D'", 'וקטור p', '|AB| = |p|'],
+  'free-vector-joint-order-2684.geo3.json': ["קובייה ABCDA'B'C'D'", 'וקטור p', '|p| = 2', 'AB = p'],
   'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 
   // #2092 (ADR-3D-381) — the taught length spelling: a length given as a letter, shared by two edges, then valued

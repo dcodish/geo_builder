@@ -194,11 +194,11 @@ describe('#1188 step 2 — a free vector and the figure', () => {
 const COUPLING: string[][] = [
   // (ADR-3D-390 Am. 1: «AB = p · AD = p» left this list — it is decided on the figure, below)
   // #2603 b2 (ADR-3D-407): «וקטור p · A(0,0,0) · AE = t·p» left this list — it builds (issue-2603-free-vector-joint.test.ts).
-  // What stays is b3, the joint pivot ↔ free-vector solve: a letter on an existing pair, or one the figure must turn p for
-  [CUBE, 'וקטור p', 'AD = k·p'],
-  [CUBE, 'וקטור p', "E על AC' כך ש-AE = t·p"],
-  // a span point over an UNDEFINED free vector
-  ['מנסרה ישרה משולשת ABC', "M אמצע B'C'", "K על AA' כך ש-AK = 2KA'", "נסמן: AA' = w, KC = v", 'וקטור u', 'P על AM כך ש-KP = αu + βv'],
+  // #2684 (ADR-3D-421): a letter on an existing pair and a span point over an undefined vector left it too — the joint
+  // solve builds them (issue-2684-free-vector-joint.test.ts). What stays: a new point over a vector the figure reaches
+  [CUBE, 'וקטור p', 'p ⟂ AB', 'AE = p'],
+  // and a letter another lane owns: two solvers cannot own one number
+  ['A(t,0,0)', 'D(1,1,1)', 'וקטור p', 'AD = t·p'],
 ];
 
 describe('#1188 step 2 — what it cannot solve yet is refused honestly', () => {

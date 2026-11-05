@@ -286,6 +286,7 @@ export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3;
  * hand-maintained list drifts; a total function over the union cannot.
  */
 const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
+  'free-joint': false, // #2684 (ADR-3D-421): read off the pin — see `scalePinned`
   length: true, // |DC| = 4 — an absolute size
   'length-sum': true, // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — an absolute size, like `length`
   dot: true, // u·v = 24 scales as s², so it fixes s
@@ -348,6 +349,7 @@ const PIN_OPERAND_PAIRS: { [K in ScalarPin['kind']]: (c: Construction3, p: Extra
   'bisector-dir': (_c, p) => tag3([[p.apex, p.a], [p.apex, p.b], [p.apex, p.tip]], true),
   'line-plane-angle': (_c, p) => tag3([[p.a, p.b]], true),
   concyclic: () => [],
+  'free-joint': () => [], // #2684: a closure, its operands are not point pairs
   mutual: (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
   'plane-rel': (_c, p) => tag3([operandPair3(p.a), operandPair3(p.b)], true),
   distance: (_c, p) => tag3([p.a.kind === 'point' && p.b.kind === 'point' ? [p.a.id, p.b.id] : null], false),
@@ -412,7 +414,7 @@ export function pinOperandPlanes3(c: Construction3, pin: ScalarPin): Id[][] {
 
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
-  return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind]);
+  return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind] || (p.kind === 'free-joint' && p.gauge));
 }
 
 /**
@@ -814,6 +816,10 @@ export function solvePivot(
       }
     }
   }
+  // #2684 (ADR-3D-421): an enrolled free-vector unknown is one more lane entry — unbounded, started at its seeded sample
+  for (const pin of c.scalarPins) {
+    if (pin.kind === 'free-joint') for (const u of pin.unknowns) riders.push({ id: u.key, t0: u.t0, lo: -Infinity, hi: Infinity, spread: false });
+  }
   /** The trial rider parameters at `x` — `undefined` when the lane is empty (every path stays bit-identical). */
   const riderMap = (x: number[]): ReadonlyMap<Id, number> | undefined =>
     riders.length === 0 ? undefined : new Map(riders.map((r, i) => [r.id, x[riderBase + i]]));
@@ -1147,7 +1153,14 @@ export function solvePivot(
     };
     const scalarStart = out.length; // #990: the scalar pins' rows begin here
     for (const pin of c.scalarPins) {
-      if (pin.kind === 'length') {
+      if (pin.kind === 'free-joint') {
+        // #2684 (ADR-3D-421): the enrolled unknowns ride the rider lane; one that no residual reads keeps its sample
+        const u0 = new Map(pin.unknowns.map((u) => [u.key, u.t0]));
+        out.push(...pin.residuals(at, (key) => {
+          const i = riders.findIndex((r) => r.id === key);
+          return i >= 0 ? x[riderBase + i] : (u0.get(key) ?? NaN);
+        }));
+      } else if (pin.kind === 'length') {
         const a = at(pin.a);
         const b = at(pin.b);
         out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);

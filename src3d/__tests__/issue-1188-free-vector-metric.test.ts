@@ -138,23 +138,17 @@ describe('#1188 step 4 — givens that cannot all hold are refused, naming the l
   });
 });
 
-describe('#1188 step 4 — a metric relation between a free vector and the FIGURE is a joint solve (#2603)', () => {
+describe('#1188 step 4 — a metric relation between a free vector and the FIGURE', () => {
+  // #2684 (ADR-3D-421): «p ⟂ AB», an angle, a dot product and «|AB| = |p|» left this list: the joint solve builds them
+  // (issue-2684-free-vector-joint.test.ts). What stays is a relation with no vector form.
   it.each([
-    [CUBE, 'וקטור p', 'p ⟂ AB'],
-    [CUBE, 'וקטור p', 'הזווית בין p ל-AB היא 60'],
-    [CUBE, 'וקטור p', 'נסמן: AB = u', 'u·p = 1'],
-    [CUBE, 'וקטור p', '|AB| = |p|'],
+    [CUBE, 'וקטור p', 'p ⟂ מישור ABC'],
   ])('«%s · %s · %s» is the tool’s limit, quoting the line', (...lines) => {
     const errs = run(lines);
     expect(errs.slice(0, -1).every((e) => e === null)).toBe(true);
     expect(errs[errs.length - 1]).toBe('free-vector-coupling');
     expect(text()).toContain(`«${lines[lines.length - 1]}»`);
     expect(text()).toContain('מגבלה של הכלי');
-  });
-
-  it('a free vector the figure reaches through an equation takes no metric given either («AB = p + q» · «|p| = 1»)', () => {
-    const errs = run([CUBE, 'וקטור p', 'וקטור q', 'AB = p + q', '|p| = 1']);
-    expect(errs).toEqual([null, null, null, null, 'free-vector-coupling']);
   });
 
   it('must not change: an anchored vector’s magnitude is the length given, as before', () => {

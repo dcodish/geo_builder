@@ -5,8 +5,7 @@
  *  - b1: «AB = p · AD = k·p» and «וקטור u · KB = u · P על AM כך ש-KP = αu + βv» were refused `free-vector-coupling`
  *    («זו מגבלה של הכלי»), although p IS AB and u IS KB — the twins written with the arrow build;
  *  - b2: «וקטור p · A(0,0,0) · AE = t·p» was refused the same way, although p needs no figure to be drawn.
- * What stays refused is b3 (`later`): the joint pivot ↔ free-vector solve, rows in issue-1188-free-vector-step2's
- * `COUPLING` list.
+ * b3, the joint pivot ↔ free-vector solve, is #2684 (ADR-3D-421): issue-2684-free-vector-joint.test.ts.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
@@ -76,8 +75,8 @@ describe('#2603 b1 — a free vector the figure defines IS that arrow', () => {
     expect(errs[errs.length - 1]).not.toBe('free-vector-coupling');
   });
 
-  it('the reverse order «|p| = 2 · AB = p» is still the tool’s limit (b3, #2684)', () => {
-    expect(run([CUBE, 'וקטור p', '|p| = 2', 'AB = p'])).toEqual([null, null, null, 'free-vector-coupling']);
+  it('the reverse order «|p| = 2 · AB = p» agrees (#2684, ADR-3D-421)', () => {
+    expect(run([CUBE, 'וקטור p', '|p| = 2', 'AB = p'])).toEqual([null, null, null, null]);
   });
 
   it('need-basis is unchanged: an undefined «וקטור p» beside u, v, w still does not count', () => {
@@ -127,8 +126,7 @@ describe('#2603 b2 — a free letter scaling a free vector that needs no figure'
     SEEDS.forEach((s, i) => expect(pos("C'", s)).toEqual(before[i]));
   });
 
-  it('a letter another lane already owns is not a free scalar: it stays the tool’s limit (b3)', () => {
-    const errs = run(['u = (k,1,2)', 'A(0,0,0)', 'AE = k·u']);
-    expect(errs).toEqual([null, null, 'free-vector-coupling']);
+  it('a letter the free vector owns is one number with the point’s (#2684, ADR-3D-421)', () => {
+    expect(run(['u = (k,1,2)', 'A(0,0,0)', 'AE = k·u'])).toEqual([null, null, null]);
   });
 });

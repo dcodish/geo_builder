@@ -92,7 +92,7 @@ describe('span-defined point (Greek scalars)', () => {
   it('P על AM כך ש-KP = αu + βv → a DRIVEN point + its segments, both languages', () => {
     for (const input of ['P על AM כך ש-KP = αu + βv', 'P on AM such that KP = αu + βv']) {
       const r = cmds(input);
-      expect(r[0]).toEqual({ type: 'point-in-span', id: 'P', a: 'A', b: 'M', vecFrom: 'K', span: ['u', 'v'] });
+      expect(r[0]).toEqual({ type: 'point-in-span', id: 'P', a: 'A', b: 'M', vecFrom: 'K', span: ['u', 'v'], letters: ['α', 'β'] });
       expect(r[1]).toEqual({ type: 'segment3', a: 'A', b: 'M' });
       expect(r[2]).toEqual({ type: 'segment3', a: 'K', b: 'P' });
     }

@@ -13,9 +13,9 @@
  *
  * Linear only, closed form (src3d/CLAUDE.md boundary 3: a linear solve, no CAS). Two questions are asked of it:
  *  1. STRUCTURE (at apply, `freeVecSystemVerdict3`): does a combination of the equations say something about the
- *     ANCHORED figure (a coupling the free system cannot absorb — refused `free-vector-coupling`), or about the
  *     stated numbers alone, falsely (a contradiction — `free-vector-conflict`)? Decided by eliminating the unknowns,
- *     never by a sample, so a satisfiable given is never refuted against a drawing (ADR-052).
+ *     never by a sample, so a satisfiable given is never refuted against a drawing (ADR-052). A combination that says
+ *     something about the ANCHORED figure is a DRIVE of the joint solve below (#2684), never a refusal.
  *  2. VALUE (at resolve, `solveFreeVectors3`): the MINIMUM-NORM PROJECTION of the seeded sample onto the solution
  *     set, x = s − Uᵀ(U s − β) over an orthonormal basis U of the equations' row space. What the givens leave free
  *     stays sampled and moves with «הציגו תצורה אחרת»; a new equation moves the drawing minimally, singling out no
@@ -24,12 +24,21 @@
  *
  * Reads nothing positional except the anchored atoms' endpoints, which the caller passes (post-pivot). A vector whose
  * form needs no position is PURE and can be resolved before the pivot (a figure point defined by it, «AE = p»).
+ *
+ * #2684 ([ADR-3D-421](../../docs/06b-decisions-3d.md#adr-3d-421)) — THE JOINT SOLVE. A relation that ties free unknowns
+ * to the figure through a letter, a span or a metric («AD = k·p», «KP = αu + βv», «p ⟂ AB») is ENROLLED: every unknown
+ * it reaches leaves the pure block, and the relation is a residual over them and the figure. Two rungs, in order:
+ *  1. ABSORB (`solveFreeVectors3`, post-pivot): the free vector turns to meet the figure, with the figure as constants.
+ *     Nothing the student drew moves, so a figure that absorbs is bit-identical to the same figure without the relation.
+ *  2. DRIVE (`freeJointPin3`, read by `resolve3`): a figure that cannot absorb («p = (1,0,0)» · «AB ∥ p») re-enters the
+ *     pivot with the enrolled unknowns in its rider lane and the relations as a scalar pin, so both move at once.
+ * A stated relation is a claim as well (`freeRelationHolds3`): what neither rung can satisfy is refuted, by name.
  */
 import { sample } from './rng';
 import { leastSquares } from './solve3';
 import { cross3, dot3, norm3, v3, type Vec3 } from './vec3';
-import type { Construction3, FreeVec3, FreeVecMetric3, Id, SymComp, VecAtom, VecExpr } from './types';
-import { freeVecSymsOf, symbolValueOf } from './types';
+import type { Construction3, FreeVec3, FreeVecMetric3, Id, ScalarPin, SymComp, VecAtom, VecExpr } from './types';
+import { freeVecSymsOf, SPAN_LETTER, symbolValueOf } from './types';
 import { namedVector3 } from './vecExpr';
 
 /** #1188 (ADR-3D-386): the range an unstated free-vector component is sampled in, ±FREE_VEC_RANGE. */
@@ -69,7 +78,12 @@ export interface FreeSystem3 {
   metrics: MetricForm[] | null;
 }
 
-type MetricForm = { m: FreeVecMetric3; f1: [Aff, Aff, Aff]; f2: [Aff, Aff, Aff] | null };
+type Forms3 = [Aff, Aff, Aff];
+/** One given's forms. `terms` (#2684): a vector relation's right side, Σ (k + letter)·form; `f1` is its left side. */
+type MetricForm = { m: FreeVecMetric3; f1: Forms3; f2: Forms3 | null; terms?: { k: number; letter: Aff | null; f: Forms3 }[] };
+
+/** Every form a given reads (for reach and purity). */
+const metricAffs = (e: MetricForm): Aff[] => [...e.f1, ...(e.f2 ?? []), ...(e.terms ?? []).flatMap((t) => [...t.f, ...(t.letter ? [t.letter] : [])])];
 
 const memo = new WeakMap<object, FreeSystem3>();
 
@@ -190,23 +204,48 @@ function buildSystem(c: Construction3): FreeSystem3 {
     if (!l || !r) continue;
     for (let i = 0; i < 3; i++) rows.push(diff(l[i], r[i]));
   }
+  // #1188 step 4 (ADR-3D-406): the metric givens' operands, as forms over the same unknowns. #2684: first, so a ratio
+  // letter that is also a component's name is an unknown when the one-letter rule below reads it
+  const metricForm = (m: FreeVecMetric3): MetricForm | null => {
+    if (m.kind === 'ratio' || m.kind === 'span') {
+      const terms: NonNullable<MetricForm['terms']> = [];
+      const left = [0, 1, 2].map((i) => pairForm(m.from, m.to, i)) as Forms3;
+      if (m.kind === 'ratio') {
+        for (const t of m.terms) {
+          const f = atomForm(t.atom);
+          if (!f) return null;
+          if (t.coeff.k !== 0) terms.push({ k: t.coeff.k, letter: null, f });
+          if (t.coeff.p !== 0) terms.push({ k: t.coeff.p, letter: symForm(m.symbol ?? '?'), f });
+        }
+      } else {
+        for (const [i, name] of m.span.entries()) {
+          const f = atomForm({ kind: 'named', name });
+          if (!f) return null;
+          terms.push({ k: 1, letter: symForm(SPAN_LETTER(m.id, i as 0 | 1)), f });
+        }
+      }
+      return { m, f1: left, f2: null, terms };
+    }
+    const f1 = exprForm(m.kind === 'mag' ? m.e : m.e1);
+    const f2 = m.kind === 'mag' ? null : exprForm(m.e2);
+    if (!f1 || (m.kind !== 'mag' && !f2)) return null;
+    return { m, f1, f2 };
+  };
+  let metrics: MetricForm[] | null = [];
+  for (const m of c.freeVecMetrics) {
+    const form = metricForm(m);
+    if (!form) {
+      metrics = null;
+      break;
+    }
+    metrics.push(form);
+  }
   // one letter, one number: a letter naming a free component that is ALSO an affine unknown is that component
   for (const b of c.partialNames) {
     if (b.target.kind !== 'vector' || !index.has(`s:${b.sym}`)) continue;
     const f = forms.get(b.target.name);
     if (!f) continue;
     rows.push(diff(f[AXES.indexOf(b.axis)], symForm(b.sym)));
-  }
-  // #1188 step 4 (ADR-3D-406): the metric givens' operands, as forms over the same unknowns
-  let metrics: MetricForm[] | null = [];
-  for (const m of c.freeVecMetrics) {
-    const f1 = exprForm(m.kind === 'mag' ? m.e : m.e1);
-    const f2 = m.kind === 'mag' ? null : exprForm(m.e2);
-    if (!f1 || (m.kind !== 'mag' && !f2)) {
-      metrics = null;
-      break;
-    }
-    metrics.push({ m, f1, f2 });
   }
   return { unknowns, forms, rows, nonLinear, metrics };
 }
@@ -247,9 +286,9 @@ function orthogonalise(sys: FreeSystem3, rowFilter?: (r: number) => boolean): Or
     }
     const len = Math.hypot(...u);
     if (len <= TOL * scale) {
-      if (leftover) return;
+      if (leftover?.kind === 'conflict') return; // a coupling does not hide a later contradiction (#2684: it is a drive)
       const anchoredLeft = [...g.values()].some((a) => Math.abs(a) > TOL * scale);
-      if (anchoredLeft) leftover = { row: ri, kind: 'coupling' };
+      if (anchoredLeft) leftover ??= { row: ri, kind: 'coupling' };
       else if (Math.abs(beta) > TOL * scale) leftover = { row: ri, kind: 'conflict' };
       return;
     }
@@ -264,27 +303,27 @@ function orthogonalise(sys: FreeSystem3, rowFilter?: (r: number) => boolean): Or
 export type FreeVecVerdict3 = { ok: true } | { ok: false; kind: 'conflict' | 'coupling' | 'non-linear' | 'unresolved' };
 
 /**
- * STRUCTURE: can the free vectors absorb every equation for ANY drawing of the anchored figure? `coupling` — a
- * combination of the equations constrains the figure itself (the pivot would have to solve it jointly);
- * `conflict` — one constrains only stated numbers, and falsely. Position-free, so it is decided at apply.
+ * STRUCTURE: does a combination of the givens contradict the stated numbers alone (`conflict`)? Position-free, so it is
+ * decided at apply. A combination that constrains the figure is the joint solve's drive (#2684, ADR-3D-421): it refutes
+ * nothing here, against any sample, and what cannot be met is the relation's own claim at resolve.
  */
 export function freeVecSystemVerdict3(c: Construction3): FreeVecVerdict3 {
   if (c.freeVectors.size === 0) return { ok: true };
   const sys = freeVecSystem3(c);
   if (sys.nonLinear) return { ok: false, kind: 'non-linear' };
   if ([...sys.forms.values()].some((f) => f === null) || sys.metrics === null) return { ok: false, kind: 'unresolved' };
-  const { leftover } = orthogonalise(sys);
-  if (leftover) return { ok: false, kind: leftover.kind };
+  if (orthogonalise(sys).leftover?.kind === 'conflict') return { ok: false, kind: 'conflict' };
   if (sys.metrics.length === 0) return { ok: true };
-  // #1188 step 4 (ADR-3D-406): a metric given is about the free vectors ALONE, or it is a joint solve (#2603); and the
-  // metric givens together must be able to hold
-  const mc = metricCheck3(c);
-  if (!mc.pure) return { ok: false, kind: 'coupling' };
-  return mc.solution ? { ok: true } : { ok: false, kind: 'conflict' };
+  // #1188 step 4 (ADR-3D-406): the metric givens over stated numbers alone must be able to hold together
+  return metricCheck3(c).solution ? { ok: true } : { ok: false, kind: 'conflict' };
 }
 
-/** How many of the system's unknowns the equations leave free — the DOF the cue counts (structural: rank only). */
-export function freeVecDofCount3(c: Construction3): number {
+/**
+ * How many of the system's unknowns the equations leave free — the DOF the cue counts (structural: rank only). `at`
+ * (#2684, ADR-3D-421): the drawing to measure an enrolled relation's rank at — its operands read the figure, so its
+ * gradient exists only there (ADR-3D-248's measurement: an unmeasured block is the ADR-052 smell).
+ */
+export function freeVecDofCount3(c: Construction3, at?: { positions: ReadonlyMap<Id, Vec3>; freeX: readonly number[] }): number {
   if (c.freeVectors.size === 0) return 0;
   const sys = freeVecSystem3(c);
   const { basis } = orthogonalise(sys);
@@ -292,9 +331,9 @@ export function freeVecDofCount3(c: Construction3): number {
   if (!sys.metrics || sys.metrics.length === 0) return linear;
   // #1188 step 4 (ADR-3D-406): a metric given consumes what its gradient adds to the linear rows' span, measured at a
   // solution (a generic point: the seeded one the check found) — «|u| = 5» leaves 2 of u's 3, «u ∥ v» 4 of 6
-  const mc = metricCheck3(c);
-  if (!mc.solution) return linear;
-  return Math.max(0, linear - metricRank(sys, mc.solution, basis.map((b) => b.u)));
+  const x = at?.freeX.length === sys.unknowns.length ? at.freeX : metricCheck3(c).solution;
+  if (!x) return linear;
+  return Math.max(0, linear - metricRank(sys, x, basis.map((b) => b.u), at ? coordOf(at.positions) : undefined));
 }
 
 // ---------------------------------------------------------------------------
@@ -307,20 +346,42 @@ const METRIC_MU = 0.05;
 const METRIC_STARTS = 8;
 const METRIC_TOL = 1e-8;
 
-const evalPure = (f: Aff, x: readonly number[]): number => {
+/** An anchored coordinate at a drawing, by the forms' `${pointId}|${axis}` key. */
+type Coord = (key: string) => number | undefined;
+const coordOf = (positions: ReadonlyMap<Id, Vec3>): Coord => (key) => {
+  const bar = key.lastIndexOf('|');
+  const p = positions.get(key.slice(0, bar));
+  return p ? [p.x, p.y, p.z][Number(key.slice(bar + 1))] : undefined;
+};
+
+const evalPure = (f: Aff, x: readonly number[], coord?: Coord): number => {
   let v = f.c;
   for (const [j, a] of f.x) v += a * x[j];
+  for (const [key, a] of f.g) v += a * (coord?.(key) ?? NaN);
   return v;
 };
-const vecOf = (f: [Aff, Aff, Aff], x: readonly number[]): Vec3 => v3(evalPure(f[0], x), evalPure(f[1], x), evalPure(f[2], x));
+const vecOf = (f: Forms3, x: readonly number[], coord?: Coord): Vec3 => v3(evalPure(f[0], x, coord), evalPure(f[1], x, coord), evalPure(f[2], x, coord));
 
 /** One metric given's residuals at `x` (all zero when it holds). A direction (∥, an angle) is scale-free, so it is
  *  measured on unit vectors; on a zero operand it is far from holding — a zero vector has no direction. */
-function metricResiduals(e: MetricForm, x: readonly number[]): number[] {
-  const a = vecOf(e.f1, x);
-  const b = e.f2 ? vecOf(e.f2, x) : v3(0, 0, 0);
+function metricResiduals(e: MetricForm, x: readonly number[], coord?: Coord): number[] {
+  const a = vecOf(e.f1, x, coord);
+  const b = e.f2 ? vecOf(e.f2, x, coord) : v3(0, 0, 0);
   const m = e.m;
   switch (m.kind) {
+    case 'ratio':
+    case 'span': {
+      // #2684 (ADR-3D-421): left − Σ (k + letter)·form, component by component — a letter makes it bilinear, never a CAS
+      const r = [a.x, a.y, a.z];
+      for (const t of e.terms ?? []) {
+        const w = vecOf(t.f, x, coord);
+        const k = t.k * (t.letter ? evalPure(t.letter, x, coord) : 1);
+        r[0] -= k * w.x;
+        r[1] -= k * w.y;
+        r[2] -= k * w.z;
+      }
+      return r;
+    }
     case 'mag':
       return [norm3(a) - m.value];
     case 'mag-rel':
@@ -340,15 +401,22 @@ function metricResiduals(e: MetricForm, x: readonly number[]): number[] {
   }
 }
 
-/** The unknowns the metric givens reach, closed under the linear rows that share an unknown with them. */
-function metricVars(sys: FreeSystem3): { vars: number[]; rows: Aff[] } {
+/** A block of the metric solve: the givens, the linear rows sharing their unknowns, and every unknown they reach. */
+interface MetricBlock {
+  metrics: MetricForm[];
+  rows: Aff[];
+  vars: number[];
+}
+
+/** The unknowns `metrics` reach, closed under the linear rows that share an unknown with them. */
+function metricBlock(sys: FreeSystem3, metrics: MetricForm[], rowOk: (row: Aff) => boolean = () => true): MetricBlock {
   const reach = new Set<number>();
-  for (const e of sys.metrics ?? []) for (const f of [...e.f1, ...(e.f2 ?? [])]) for (const j of f.x.keys()) reach.add(j);
+  for (const e of metrics) for (const f of metricAffs(e)) for (const j of f.x.keys()) reach.add(j);
   const rows: Aff[] = [];
   for (let grew = true; grew; ) {
     grew = false;
     for (const row of sys.rows) {
-      if (rows.includes(row) || ![...row.x.keys()].some((j) => reach.has(j))) continue;
+      if (!rowOk(row) || rows.includes(row) || ![...row.x.keys()].some((j) => reach.has(j))) continue;
       rows.push(row);
       for (const j of row.x.keys()) {
         if (!reach.has(j)) {
@@ -358,47 +426,47 @@ function metricVars(sys: FreeSystem3): { vars: number[]; rows: Aff[] } {
       }
     }
   }
-  return { vars: [...reach].sort((p, q) => p - q), rows };
+  return { metrics, rows, vars: [...reach].sort((p, q) => p - q) };
 }
 
 /**
- * Solve the metric givens from `start` (a seeded sample, already projected onto the linear rows): first near the
- * start (a small pull toward it), then exactly (the pull released) — so what the givens leave free stays close to the
- * sample and moves with the seed, and the givens hold. The linear rows those unknowns share ride along as residuals.
+ * Solve a block from `start` (a seeded sample, already projected onto the linear rows): first near the start (a small
+ * pull toward it), then exactly (the pull released) — so what the givens leave free stays close to the sample and moves
+ * with the seed, and the givens hold. The linear rows those unknowns share ride along as residuals. `coord` (#2684):
+ * the drawing an enrolled relation reads, a constant here.
  */
-function solveMetrics(sys: FreeSystem3, start: readonly number[]): { x: number[]; ok: boolean } {
-  const { vars, rows } = metricVars(sys);
+function solveBlock(b: MetricBlock, start: readonly number[], coord?: Coord): { x: number[]; ok: boolean } {
+  const { vars, rows, metrics } = b;
   const put = (y: readonly number[]): number[] => {
     const z = [...start];
     vars.forEach((j, i) => (z[j] = y[i]));
     return z;
   };
-  if (vars.length === 0) return { x: [...start], ok: metricsHold(sys, start) };
+  if (vars.length === 0) return { x: [...start], ok: blockHolds(b, start, coord) };
   const res = (y: readonly number[]): number[] => {
     const z = put(y);
     const out: number[] = [];
-    for (const e of sys.metrics ?? []) out.push(...metricResiduals(e, z));
-    for (const row of rows) out.push(evalPure(row, z));
+    for (const e of metrics) out.push(...metricResiduals(e, z, coord));
+    for (const row of rows) out.push(evalPure(row, z, coord));
     return out;
   };
   const y0 = vars.map((j) => start[j]);
   const near = leastSquares((y) => [...res(y), ...y.map((v, i) => METRIC_MU * (v - y0[i]))], y0, 80).x;
   const z = put(leastSquares(res, near, 80).x);
-  return { x: z, ok: metricsHold(sys, z) };
+  return { x: z, ok: blockHolds(b, z, coord) };
 }
 
-function metricsHold(sys: FreeSystem3, x: readonly number[]): boolean {
-  for (const e of sys.metrics ?? []) {
+function blockHolds(b: MetricBlock, x: readonly number[], coord?: Coord): boolean {
+  for (const e of b.metrics) {
     const scale = Math.max(1, Math.abs(e.m.kind === 'mag' || e.m.kind === 'dot' ? e.m.value : 0));
-    if (metricResiduals(e, x).some((r) => !(Math.abs(r) <= METRIC_TOL * scale))) return false;
+    if (metricResiduals(e, x, coord).some((r) => !(Math.abs(r) <= METRIC_TOL * scale))) return false;
   }
-  const { rows } = metricVars(sys);
-  for (const row of rows) if (!(Math.abs(evalPure(row, x)) <= METRIC_TOL * Math.max(1, Math.abs(row.c)))) return false;
+  for (const row of b.rows) if (!(Math.abs(evalPure(row, x, coord)) <= METRIC_TOL * Math.max(1, Math.abs(row.c)))) return false;
   return true;
 }
 
 /** The rank the metric givens add to the linear rows' span `lin` (orthonormal), at `x` — central differences. */
-function metricRank(sys: FreeSystem3, x: readonly number[], lin: readonly number[][]): number {
+function metricRank(sys: FreeSystem3, x: readonly number[], lin: readonly number[][], coord?: Coord): number {
   const n = x.length;
   const grads: number[][] = [];
   for (const e of sys.metrics ?? []) {
@@ -409,8 +477,8 @@ function metricRank(sys: FreeSystem3, x: readonly number[], lin: readonly number
       const xm = [...x];
       xp[j] += h;
       xm[j] -= h;
-      const rp = metricResiduals(e, xp);
-      const rm = metricResiduals(e, xm);
+      const rp = metricResiduals(e, xp, coord);
+      const rm = metricResiduals(e, xm, coord);
       cols.push(rp.map((v, i) => (v - rm[i]) / (2 * h)));
     }
     const m = cols[0]?.length ?? 0;
@@ -438,38 +506,38 @@ function metricRank(sys: FreeSystem3, x: readonly number[], lin: readonly number
 }
 
 interface MetricCheck3 {
-  /** every metric operand is a combination of free vectors that no anchored arrow reaches */
-  pure: boolean;
-  /** a point where every row holds, from the first seeded start that converges — null: none did (unsatisfiable) */
+  /** a point where the stated-numbers givens hold, from the first seeded start that converges — null: none did */
   solution: number[] | null;
 }
 const metricMemo = new WeakMap<object, MetricCheck3>();
 
+/** A form with no anchored term. */
+const noFigure = (f: Aff): boolean => f.g.size === 0;
+
 /**
- * STRUCTURE for the metric givens (at apply): are they about the free vectors alone, and can they all hold together?
- * Decided over the free unknowns only — no figure, no drawing — from up to {@link METRIC_STARTS} seeded starts, so a
- * satisfiable given is never refuted against a sample of the figure (ADR-052).
+ * STRUCTURE for the metric givens (at apply): can the ones about STATED NUMBERS alone hold together? Decided over the
+ * unknowns only — no figure, no drawing — from up to {@link METRIC_STARTS} seeded starts, so a satisfiable given is
+ * never refuted against a sample of the figure (ADR-052). A given whose form reads the figure, and a row that does, is
+ * the joint solve's and is not weighed here (#2684).
  */
 function metricCheck3(c: Construction3): MetricCheck3 {
   const hit = metricMemo.get(c);
   if (hit) return hit;
   const sys = freeVecSystem3(c);
-  const tainted = anchoredUnknowns(sys);
-  const pure = (sys.metrics ?? []).every((e) => [...e.f1, ...(e.f2 ?? [])].every((f) => f.g.size === 0 && ![...f.x.keys()].some((j) => tainted.has(j))));
+  const block = metricBlock(sys, (sys.metrics ?? []).filter((e) => metricAffs(e).every(noFigure)), noFigure);
   let solution: number[] | null = null;
-  for (let s = 0; pure && s < METRIC_STARTS && !solution; s++) {
-    const r = solveMetrics(sys, projectedSample(c, sys, s, tainted));
+  for (let s = 0; s < METRIC_STARTS && !solution; s++) {
+    const r = solveBlock(block, projectedSample(c, sys, s));
     if (r.ok) solution = r.x;
   }
-  const out = { pure, solution };
+  const out = { solution };
   metricMemo.set(c, out);
   return out;
 }
 
-/** The seeded sample projected onto the PURE linear rows — where every metric solve starts. */
-function projectedSample(c: Construction3, sys: FreeSystem3, seed: number, tainted: ReadonlySet<number>): number[] {
-  const pureRow = (ri: number): boolean => sys.rows[ri].g.size === 0 && ![...sys.rows[ri].x.keys()].some((j) => tainted.has(j));
-  const { basis } = orthogonalise(sys, pureRow);
+/** The seeded sample projected onto the rows that read no figure — where every apply-time check starts. */
+function projectedSample(c: Construction3, sys: FreeSystem3, seed: number): number[] {
+  const { basis } = orthogonalise(sys, (ri) => sys.rows[ri].g.size === 0);
   const x = sampleUnknowns(c, sys, seed);
   const corr = basis.map((b) => b.u.reduce((acc, u, j) => acc + u * x[j], 0) - b.beta);
   basis.forEach((b, k) => {
@@ -482,21 +550,22 @@ function projectedSample(c: Construction3, sys: FreeSystem3, seed: number, taint
 // Value
 // ---------------------------------------------------------------------------
 
+const compSign = (c: Construction3, name: string, ax: 'x' | 'y' | 'z'): number | undefined => {
+  const g = c.componentSigns.find((cs) => cs.target.kind === 'vector' && cs.target.name === name && cs.axis === ax);
+  return g ? (g.positive ? 1 : -1) : undefined;
+};
+const symSign = (c: Construction3, sym: string): number | undefined => {
+  const g = [...c.paramSigns].reverse().find((p) => p.sym === sym);
+  return g ? (g.positive ? 1 : -1) : undefined;
+};
+
 /** The seeded sample of every unknown — step 1's sampler for components (sign, norm floor), a letter in ±range. */
 function sampleUnknowns(c: Construction3, sys: FreeSystem3, seed: number): number[] {
   const s = new Array<number>(sys.unknowns.length).fill(0);
-  const compSign = (name: string, ax: 'x' | 'y' | 'z'): number | undefined => {
-    const g = c.componentSigns.find((cs) => cs.target.kind === 'vector' && cs.target.name === name && cs.axis === ax);
-    return g ? (g.positive ? 1 : -1) : undefined;
-  };
-  const symSign = (sym: string): number | undefined => {
-    const g = [...c.paramSigns].reverse().find((p) => p.sym === sym);
-    return g ? (g.positive ? 1 : -1) : undefined;
-  };
   const draw = (key: string, sg: number | undefined): number =>
     sg === undefined ? sample(seed, key, -FREE_VEC_RANGE, FREE_VEC_RANGE) : sg * sample(seed, key, 0.15, 1) * FREE_VEC_RANGE;
   sys.unknowns.forEach((u, j) => {
-    if (u.kind === 'sym') s[j] = draw(`fvsym-${u.sym}`, symSign(u.sym));
+    if (u.kind === 'sym') s[j] = draw(`fvsym-${u.sym}`, symSign(c, u.sym));
   });
   // components, per vector, exactly as ADR-3D-386 drew them — including the norm floor's re-draws
   for (const [name, fv] of c.freeVectors) {
@@ -506,7 +575,7 @@ function sampleUnknowns(c: Construction3, sys: FreeSystem3, seed: number): numbe
     const valueAt = (k: number): Vec3 => {
       const comp = (i: number): number => {
         const e = own.find((o) => o.u.axis === i);
-        if (e) return draw(`fvec-${name}-${AXES[i]}${k === 0 ? '' : `#${k}`}`, compSign(name, AXES[i]));
+        if (e) return draw(`fvec-${name}-${AXES[i]}${k === 0 ? '' : `#${k}`}`, compSign(c, name, AXES[i]));
         const n = fv.comps[i];
         if (n !== null) return n;
         const sc = fv.symComps?.[i];
@@ -521,7 +590,7 @@ function sampleUnknowns(c: Construction3, sys: FreeSystem3, seed: number): numbe
   return s;
 }
 
-/** Union-find over the unknowns: which equations touch the anchored figure, transitively. */
+/** Union-find over the unknowns: which equations and which metric givens touch the anchored figure, transitively. */
 function anchoredUnknowns(sys: FreeSystem3): Set<number> {
   const parent = sys.unknowns.map((_, j) => j);
   const find = (j: number): number => (parent[j] === j ? j : (parent[j] = find(parent[j])));
@@ -530,7 +599,13 @@ function anchoredUnknowns(sys: FreeSystem3): Set<number> {
     const js = [...row.x.keys()];
     for (let i = 1; i < js.length; i++) parent[find(js[i])] = find(js[0]);
   }
+  const metricJs = (sys.metrics ?? []).map((e) => {
+    const affs = metricAffs(e);
+    return { js: [...new Set(affs.flatMap((f) => [...f.x.keys()]))], anchored: affs.some((f) => f.g.size > 0) };
+  });
+  for (const { js } of metricJs) for (let i = 1; i < js.length; i++) parent[find(js[i])] = find(js[0]);
   for (const row of sys.rows) if (row.g.size > 0) for (const j of row.x.keys()) tainted.add(find(j));
+  for (const { js, anchored } of metricJs) if (anchored) for (const j of js) tainted.add(find(j));
   const out = new Set<number>();
   sys.unknowns.forEach((_, j) => {
     if (tainted.has(find(j))) out.add(j);
@@ -541,7 +616,39 @@ function anchoredUnknowns(sys: FreeSystem3): Set<number> {
 export interface FreeVecSolution3 {
   values: Map<string, Vec3>;
   syms: Map<string, number>;
+  /** #2684 (ADR-3D-421): every unknown's value at this drawing (the rank probe and the claims read it) */
+  x: number[];
+  /** #2684: every enrolled relation and figure row holds at this drawing — `false` asks for the pivot's joint rung */
+  holds: boolean;
 }
+
+/** The givens and rows whose unknowns reach the figure (#2684, ADR-3D-421), or reading it directly. */
+function jointBlock(sys: FreeSystem3): MetricBlock {
+  const tainted = anchoredUnknowns(sys);
+  const touches = (f: Aff) => f.g.size > 0 || [...f.x.keys()].some((j) => tainted.has(j));
+  const block = metricBlock(sys, (sys.metrics ?? []).filter((e) => metricAffs(e).some(touches)));
+  // a linear row on the figure no metric shares is met by the projection alone, unless it is over-determined: it joins
+  const rows = sys.rows.filter((row) => block.rows.includes(row) || row.g.size > 0);
+  return { ...block, rows };
+}
+
+/** #1188: no free vector of the block is drawn shorter than the floor. */
+function aboveFloor(sys: FreeSystem3, vars: readonly number[], x: readonly number[], coord: Coord): boolean {
+  for (const f of sys.forms.values()) if (f && f.some((a) => vars.some((j) => a.x.has(j))) && norm3(vecOf(f, x, coord)) < FREE_VEC_FLOOR * FREE_VEC_RANGE) return false;
+  return true;
+}
+
+/** A stated sign on a letter or a free component of the block holds. */
+function signsHold(c: Construction3, sys: FreeSystem3, vars: readonly number[], x: readonly number[]): boolean {
+  return vars.every((j) => {
+    const u = sys.unknowns[j];
+    const sign = u.kind === 'sym' ? symSign(c, u.sym) : compSign(c, u.name, AXES[u.axis]);
+    return sign === undefined || sign * x[j] > 0;
+  });
+}
+
+/** How many seeded starts the absorb rung tries at one drawing before it asks for the pivot. */
+const JOINT_STARTS = 4;
 
 /**
  * VALUE: every free vector at `seed`. With `positions` (post-pivot) all of them; without (pre-pivot) only the PURE
@@ -551,49 +658,77 @@ export interface FreeVecSolution3 {
 export function solveFreeVectors3(c: Construction3, seed: number, positions?: ReadonlyMap<Id, Vec3>): FreeVecSolution3 {
   const values = new Map<string, Vec3>();
   const syms = new Map<string, number>();
-  if (c.freeVectors.size === 0) return { values, syms };
+  if (c.freeVectors.size === 0) return { values, syms, x: [], holds: true };
   const sys = freeVecSystem3(c);
-  const tainted = positions ? new Set<number>() : anchoredUnknowns(sys);
-  const pureRow = (ri: number): boolean => sys.rows[ri].g.size === 0 && ![...sys.rows[ri].x.keys()].some((j) => tainted.has(j));
+  const tainted = anchoredUnknowns(sys);
+  const scope = positions ? new Set<number>() : tainted; // what this pass leaves unresolved
+  const pureRow = (ri: number): boolean => sys.rows[ri].g.size === 0 && ![...sys.rows[ri].x.keys()].some((j) => scope.has(j));
   const { basis } = orthogonalise(sys, positions ? undefined : pureRow);
-  const coord = (key: string): number | undefined => {
-    const bar = key.lastIndexOf('|');
-    const p = positions?.get(key.slice(0, bar));
-    return p ? [p.x, p.y, p.z][Number(key.slice(bar + 1))] : undefined;
-  };
-  const x = sampleUnknowns(c, sys, seed);
-  if (basis.length > 0) {
+  const coord: Coord | undefined = positions ? coordOf(positions) : undefined;
+  const project = (x: number[]): number[] => {
+    if (basis.length === 0) return x;
     // x ← s − Uᵀ(U s − β), with β's anchored part read at this drawing
     const corr = basis.map((b) => {
       let us = 0;
       for (let j = 0; j < x.length; j++) us += b.u[j] * x[j];
       let beta = b.beta;
-      for (const [key, a] of b.g) beta -= a * (coord(key) ?? NaN);
+      for (const [key, a] of b.g) beta -= a * (coord?.(key) ?? NaN);
       return us - beta;
     });
     basis.forEach((b, k) => {
       for (let j = 0; j < x.length; j++) x[j] -= b.u[j] * corr[k];
     });
+    return x;
+  };
+  const x = project(sampleUnknowns(c, sys, seed));
+  // #1188 step 4 (ADR-3D-406): the metric givens over the free vectors alone, solved from this seed's projected sample
+  // — so a branch («u ∥ v» with |u| = |v|: v = ±u) and what the givens leave free both follow the seed. The pre-pivot
+  // and post-pivot passes solve the same block from the same start. A start that does not converge falls back to the
+  // check's solution: the givens hold at every seed.
+  const isJoint = (e: MetricForm) => metricAffs(e).some((f) => f.g.size > 0 || [...f.x.keys()].some((j) => tainted.has(j)));
+  const pure = (sys.metrics ?? []).filter((e) => !isJoint(e));
+  if (pure.length > 0) {
+    const block = metricBlock(sys, pure, (row) => row.g.size === 0);
+    const sol = metricCheck3(c).solution;
+    let r = solveBlock(block, x);
+    if (!r.ok && sol) r = { x: sol, ok: true };
+    if (r.ok) for (const j of block.vars) x[j] = r.x[j];
   }
-  // #1188 step 4 (ADR-3D-406): the metric givens, solved from this seed's projected sample — so a branch («u ∥ v» with
-  // |u| = |v|: v = ±u) and what the givens leave free both follow the seed. Their unknowns are pure (the apply check),
-  // so the pre-pivot and post-pivot passes solve the same block from the same start. A start that does not converge
-  // falls back to the check's solution: the givens hold at every seed.
-  if (sys.metrics && sys.metrics.length > 0) {
-    const mc = metricCheck3(c);
-    if (mc.pure && mc.solution) {
-      let r = solveMetrics(sys, x);
-      if (!r.ok) r = { x: mc.solution, ok: true };
-      for (const j of metricVars(sys).vars) x[j] = r.x[j];
+  // #2684 (ADR-3D-421): the ABSORB rung — the enrolled unknowns turn to meet this drawing, the figure a constant. The
+  // pivot's joint rung, when it runs, leaves a drawing where this converges from the same start.
+  let holds = true;
+  if (coord) {
+    const block = jointBlock(sys);
+    if (block.metrics.length > 0 || block.rows.length > 0) {
+      const anchorsPlaced = [...block.metrics.flatMap(metricAffs), ...block.rows].every((f) => [...f.g.keys()].every((k) => coord(k) !== undefined));
+      holds = !anchorsPlaced; // a figure point that did not resolve has its own refusal
+      // a scale-free relation («p ⟂ AB») can land a vector on a dot, and «AD = k·p» on the sign «k חיובי» refuses: another
+      // start, the vectors turned round first, unless every start does
+      const turned = () => x.map((v, j) => (sys.unknowns[j].kind === 'comp' ? -v : v));
+      let met: number[] | null = null;
+      for (let s = 0; anchorsPlaced && s < JOINT_STARTS; s++) {
+        const start = s === 0 ? x : s === 1 ? turned() : project(sampleUnknowns(c, sys, seed + 1009 * s));
+        const r = solveBlock(block, start, coord);
+        if (!r.ok) continue;
+        met ??= r.x;
+        if (aboveFloor(sys, block.vars, r.x, coord) && signsHold(c, sys, block.vars, r.x)) {
+          met = r.x;
+          break;
+        }
+      }
+      if (met) {
+        holds = true;
+        for (const j of block.vars) x[j] = met[j];
+      }
     }
   }
   const evalAff = (f: Aff): number => {
     let v = f.c;
     for (const [j, a] of f.x) {
-      if (tainted.has(j)) return NaN;
+      if (scope.has(j)) return NaN;
       v += a * x[j];
     }
-    for (const [key, a] of f.g) v += a * (coord(key) ?? NaN);
+    for (const [key, a] of f.g) v += a * (coord?.(key) ?? NaN);
     return v;
   };
   for (const [name, f] of sys.forms) {
@@ -602,14 +737,76 @@ export function solveFreeVectors3(c: Construction3, seed: number, positions?: Re
     if ([v.x, v.y, v.z].every(Number.isFinite)) values.set(name, v);
   }
   sys.unknowns.forEach((u, j) => {
-    if (u.kind === 'sym' && !tainted.has(j) && Number.isFinite(x[j])) syms.set(u.sym, x[j]);
+    if (u.kind === 'sym' && !scope.has(j) && Number.isFinite(x[j])) syms.set(u.sym, x[j]);
   });
   // a letter the student valued («k = 3») is a constant of the system, never an unknown — its value all the same
   for (const sym of freeVecSymsOf(c)) {
     const val = symbolValueOf(c, sym);
     if (val !== undefined) syms.set(sym, val);
   }
-  return { values, syms };
+  // #2684 (ADR-3D-421): a letter that names a free component («u = (k,1,2)») is that component's number
+  for (const b of c.partialNames) {
+    if (b.target.kind !== 'vector' || syms.has(b.sym)) continue;
+    const v = values.get(b.target.name);
+    if (v) syms.set(b.sym, v[b.axis]);
+  }
+  return { values, syms, x, holds };
+}
+
+/**
+ * #2684 (ADR-3D-421) — THE JOINT RUNG'S PIN: the enrolled unknowns as rider-lane entries started at their seeded sample
+ * (the ADR-3D-390 minimum-norm discipline: the solve leaves them only as far as it must), and the block's residuals
+ * over them and the figure. Transient: `resolve3` adds it to one retry's construction, never to the fold.
+ */
+export function freeJointPin3(c: Construction3, seed: number, gauge: boolean): Extract<ScalarPin, { kind: 'free-joint' }> | null {
+  if (c.freeVectors.size === 0) return null;
+  const sys = freeVecSystem3(c);
+  const { metrics, rows, vars: reached } = jointBlock(sys);
+  if (metrics.length === 0 && rows.length === 0) return null;
+  // the placement can matter only against a stated number: with none, every relation is similarity-invariant
+  const stated = [...sys.forms.values()].some((f) => f?.some((a) => a.c !== 0)) || rows.some((row) => row.c !== 0) || metrics.some((e) => e.m.kind === 'mag' || e.m.kind === 'dot');
+  if (gauge && !stated) return null;
+  const start = sampleUnknowns(c, sys, seed);
+  const vars = [...new Set([...reached, ...rows.flatMap((row) => [...row.x.keys()])])];
+  const key = (j: number) => `free-joint|${j}`;
+  return {
+    kind: 'free-joint',
+    gauge,
+    unknowns: vars.map((j) => ({ key: key(j), t0: start[j] })),
+    residuals: (at, y) => {
+      const x = [...start];
+      for (const j of vars) x[j] = y(key(j));
+      const coord: Coord = (k) => {
+        const bar = k.lastIndexOf('|');
+        const p = at(k.slice(0, bar));
+        return p ? [p.x, p.y, p.z][Number(k.slice(bar + 1))] : undefined;
+      };
+      const out: number[] = [];
+      for (const e of metrics) out.push(...metricResiduals(e, x, coord));
+      for (const row of rows) out.push(evalPure(row, x, coord));
+      return out.map((v) => (Number.isFinite(v) ? v : 10));
+    },
+  };
+}
+
+/** #2684 (ADR-3D-421): the relations the joint solve drives — each given, and `null` for rows left over on the figure. */
+export function freeRelationsDriven3(c: Construction3): (FreeVecMetric3 | null)[] {
+  if (c.freeVectors.size === 0) return [];
+  const sys = freeVecSystem3(c);
+  const { metrics } = jointBlock(sys);
+  return [...metrics.map((e) => e.m), ...(orthogonalise(sys).leftover?.kind === 'coupling' ? [null] : [])];
+}
+
+const REL_HOLD = 1e-6;
+/** #2684 (ADR-3D-421): the claim of an enrolled relation — `m`, or `null` for the figure rows — at a drawing. */
+export function freeRelationHolds3(c: Construction3, m: FreeVecMetric3 | null, positions: ReadonlyMap<Id, Vec3>, x: readonly number[]): boolean {
+  const sys = freeVecSystem3(c);
+  if (x.length !== sys.unknowns.length) return false;
+  const coord = coordOf(positions);
+  if (m === null) return sys.rows.every((row) => Math.abs(evalPure(row, x, coord)) <= REL_HOLD * Math.max(1, Math.abs(row.c)));
+  const e = (sys.metrics ?? []).find((f) => f.m === m);
+  if (!e) return true; // rewritten since: its line is now its anchored twin
+  return metricResiduals(e, x, coord).every((r) => Math.abs(r) <= REL_HOLD);
 }
 
 /** Is the free vector `name` PURE — resolvable with no position (its form and its equations reach no anchored point)? */
@@ -629,6 +826,16 @@ export function pureFreeVectors3(c: Construction3, seed: number): ReadonlyMap<st
   let hit = bySeed.get(seed);
   if (!hit) bySeed.set(seed, (hit = solveFreeVectors3(c, seed).values));
   return hit;
+}
+
+/**
+ * #2684 (ADR-3D-421): the number of a letter the free-vector system owns, for a point the same letter scales
+ * («u = (k,1,2)» · «AE = k·u») — `undefined` when the system does not own it, so a vec-def's own sampling stands.
+ */
+export function pureFreeLetter3(c: Construction3, sym: string, seed: number): number | undefined {
+  if (c.freeVectors.size === 0) return undefined;
+  const owns = freeVecSymsOf(c).includes(sym) || c.partialNames.some((b) => b.sym === sym && b.target.kind === 'vector' && c.freeVectors.has(b.target.name));
+  return owns ? solveFreeVectors3(c, seed).syms.get(sym) : undefined;
 }
 
 /** A combination's value when it is a CONSTANT — free vectors whose forms carry no unknown and no position — else null. */

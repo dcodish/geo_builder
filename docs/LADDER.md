@@ -144,4 +144,8 @@ Not a stage the ladder climbs, but the one number every stage's consumers read: 
 | L3 | case 3C steal persisted on failed verification (M2 law ii violation, compensated downstream) | **FIXED** — restore-on-failure; case 3D got the same treatment; the downstream compensations' comments updated (the early-stop guard remains for 3B-forced) |
 | L4 | case 3B's last rung commits the widest marking on failure | deliberate (downstream cases re-point from it) — kept, documented |
 
+**3-D, the V4 pivot ([ADR-3D-421](06b-decisions-3d.md#adr-3d-421), #2684).** The joint free-vector rung sits after the whole
+of `resolve3Uncached`, in `resolveJoint3`: the absorb rung reads the finished figure; only a relation it cannot meet
+re-enters the pivot, enrolled unknowns in the rider lane, gauge frozen and then free. No 2-D stage changes.
+
 All three entry points now call the ONE `runFailureLadder()` (step.ts) with a `prefix` trace tag; the stages of §2e–2i run identically everywhere.

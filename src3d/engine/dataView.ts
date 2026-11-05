@@ -1689,6 +1689,17 @@ function freeMetricRow(m: FreeVecMetric3): string {
   const mag = (e: readonly VecTermLike[]) => `|${vecSide(e)}|`;
   const side = (e: readonly VecTermLike[]) => (e.length > 1 ? `(${vecSide(e)})` : vecSide(e));
   switch (m.kind) {
+    case 'ratio': // #2684 (ADR-3D-421): the line as stated, its letter in place
+      return `${pairArrow(m.from, m.to)} = ${m.terms
+        .map((t, i) => {
+          const name = t.atom.kind === 'named' ? t.atom.name : pairArrow(t.atom.from, t.atom.to);
+          const part = t.coeff.p !== 0 ? `${Math.abs(t.coeff.p) === 1 ? '' : cleanCoeff(Math.abs(t.coeff.p))}${m.symbol ?? ''}` : cleanCoeff(Math.abs(t.coeff.k));
+          const neg = (t.coeff.p !== 0 ? t.coeff.p : t.coeff.k) < 0;
+          return `${i === 0 ? (neg ? '−' : '') : neg ? ' − ' : ' + '}${part}${name}`;
+        })
+        .join('')}`;
+    case 'span':
+      return `${pairArrow(m.from, m.to)} = ${m.letters[0]}${m.span[0]} + ${m.letters[1]}${m.span[1]}`;
     case 'mag':
       return `${mag(m.e)} = ${statedMagText(m.value, m.decimal)}`; // #2361: a stated magnitude, as every surface prints one
     case 'mag-rel':

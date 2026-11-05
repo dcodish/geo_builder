@@ -137,7 +137,8 @@
           "span": [
             "u",
             "v"
-          ]
+          ],
+          "letters": ["α", "β"]
         },
         {
           "type": "segment3",
