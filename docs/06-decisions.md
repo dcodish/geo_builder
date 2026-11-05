@@ -20236,3 +20236,21 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/app/__tests__/issue-2674-reversed-spelling.test.ts`; scenario `tool-midpoint-reversed-takes-letter-2674`.
 
 **Behaviour change for a student:** «משולש ABC» · «אמצע BC» · «D אמצע CB» shows one point D and no message, as does a foot named on the reversed side. A definition restated the other way round («M אמצע BC» · «M אמצע CB») now answers «כבר קיים», as the exact spelling does, instead of adding a row that changed nothing (FR-EN-9: *equivalent*, and the reversed-twin rule of #2209).
+## ADR-789 — An arc's plain fraction is degrees, and a length unit makes it the arc's length (#2032)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D + analytic, `wrong-answer`) · round #2722 · branch `fix/1774-bare-coordinate-point` · judged rulings q9 and q10 under the operator's words of 2026-11-02 ([ADR-W-175](06w-decisions-workspace.md#adr-w-175)): *"An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees."* · amends [ADR-664](#adr-664) · analytic arm: [ADR-AG-408](06c-decisions-analytic.md#adr-ag-408)
+**Requirements:** [02](02-requirements.md) FR-IN-16 · [02c](02c-requirements-analytic.md) R245 · **Design:** none (internal)
+
+**Measured before (`b754d9d5`, `decideDeterministic2D`).** «קשת AB = 2/3» committed `measure-length`, the chord AB = 2/3 (analytic: an arc of 0.67°). «קשת AB = 4 ס"מ» committed `set-angle 4` in both builders.
+
+**The class.** A value on an arc is read by what it happens to look like, not by what it says. ADR-664 left «anything else» to fall through, and a fraction fell through to the length rules; each builder's unit strip, right for every other value, erased the one word that said length.
+
+**Decision.** `arcValue` reads a plain fraction as a plain number. `shell/arcLengthUnit`, one reader for both builders, finds one arc with a length unit before either builder strips it: 2-D folds the line into «אורך הקשת AB הוא 4» at the strip boundary (`foldArcLengthUnit`), so it commits that sentence's command and answers as that sentence does with no drawn arc; analytic refuses it (ADR-AG-408). Unit words: the session's list, recorded with `judgments.mjs chose`; the one-letter «מ'» and "m" stay out, because «4m» is a coefficient. A π value stays a length, a root keeps going to the AI (#2174), and #2174's «אם התכוונת לאורך הקשת» note is untouched.
+
+`teachCanonical` no longer prints a value with no short decimal: «קשת AB = 2/3» would have taught «∠AOB = 0.6666666666666666». It shows no hint; «7/2» teaches 3.5 as before.
+
+**Sibling audit (docs/17 §1).** Analytic: already reads a fraction as degrees; the unit is ADR-AG-408's refusal. 3-D and complex have no arcs. Not changed, and reported: an arc SUM with a unit, «קשת AB + קשת CD = 4 ס"מ», keeps today's degrees in analytic and today's verdict in 2-D; the ruling names one arc's value. «קשת AB = 2/3» shows its value as a decimal on the figure, as any degree value does.
+
+**Locks.** New `src/app/__tests__/issue-2032-arc-plain-values.test.ts`; parity rows `arc-fraction-2032`, `arc-unit-length-2032`; analytic's `arc-length-refusal-2032.test.ts`.
+
+**Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 0.67°, not a chord of length 2/3. «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.

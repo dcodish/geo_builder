@@ -184,7 +184,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «נתונה אליפסה שמשוואתה x²/9−y²/16=1» → "that is a hyperbola, and this tool does not draw those"
 - Sources: ADR-AG-170.
 
-**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form.
+**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form. A letter after its coordinates, «(3,5)A» (right-to-left typing), and an equals sign, «A = (3,5)», are taught, not accepted: «A(3,5)» goes in the input box with a note saying why (ADR-AG-409, #1774).
 - Sources: ADR-AG-187, #1618.
 
 **R9 — Picture references are recognised and ignored.** They parse to **nothing**, inline or trailing, and never fall through to `not-handled` (ADR-3D-214 D2).
@@ -581,6 +581,15 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «חצי מעגל שקוטרו AB», «גזרה AOB בזווית 80»
 - «רבע מעגל AOB» and «גזרה AOB» are centred at O, «גזרה OAB» too: the middle letter is the centre, or an O/P/Q letter written first, read as 2-D reads it
 - Sources: ADR-AG-220, #1622, ADR-AG-331, #2486.
+
+**R245 — an arc's length is refused, never read as degrees**. *(Operator ruling 2026-11-04 on #2032, card q5 = B: "Refuse «קשת AB = 4π» honestly now, then build A".)* The tool has no arc-length measure yet (#2710). A π value on one arc, a value with a length unit («קשת AB = 4 ס"מ»), and any statement of an arc's length, is refused with «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», in the student's letters. An arc in degrees is unchanged (R163). An arc sum or ratio written with π is an angle in radians and is refused as one.
+- «קשת AB = 4π», «⌢AB = 3π», «קשת AB = 2π/3», "arc AB = 4π"
+- «אורך הקשת AB הוא 4π», «אורך הקשת AB = 5», "arc length AB is 4π", «קשת AB = 4 ס"מ»
+- Sources: ADR-AG-408, ADR-789, #2032, #2710, ADR-W-142.
+
+**R246 — the definite «הישר» binds the drawn line**. *(Operator, 2026-11-02, [ADR-W-175](06w-decisions-workspace.md#adr-w-175): "a definite noun binds the drawn object of its kind.")* In a point-on sentence, one line on the figure binds; two or more ask which with the existing question. No line, or only a side, stays not understood: those two cases are not ruled.
+- «y=3x+2» · «P על הישר», «הנקודה (1,5) על הישר», "P is on the line"
+- Sources: ADR-AG-409, #1774.
 
 **R74 — a conic is named by its KIND**. A figure holding two of a kind refuses the reference rather than inventing an ordinal.
 - «הנקודה A נמצאת על האליפסה», «P על הפרבולה»

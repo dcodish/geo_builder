@@ -65,6 +65,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { readArcUnitValue } from '../../shell/arcLengthUnit';
 import { foldIndexedName } from '../../shell/indexedName';
 import { arcRunRoles } from '../../shell/arcRun';
 import { POINT_NAME, splitPointNames } from '../engine/pointName';
@@ -125,6 +126,13 @@ export type ParseFailure =
    * The shared rule is `shell/radianAngle`; `detail` is the π value as typed.
    */
   | { code: 'radian-angle'; detail: string }
+  /**
+   * #2032 (ADR-AG-408, operator ruling 2026-11-04, card q5 = B: *"Refuse «קשת AB = 4π» honestly now, then build A"*) — a
+   * statement of an arc's LENGTH, which this tool has no reader for until #2710: «קשת AB = 4π» (2-D's length, ADR-664,
+   * which this reader used to draw as 4π DEGREES) and «אורך הקשת AB הוא 4π». `detail` is the arc's letters — the refusal
+   * teaches «קשת AB = 40» with the student's own arc — or «AB» for a sentence that names none.
+   */
+  | { code: 'arc-length-unread'; detail: string }
   /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
@@ -7148,10 +7156,10 @@ const COMPONENT_EN = new RegExp(
  * the exam never uses is a phrase the student has never seen (ADR-AG-005 D8).
  */
 const ON_KIND_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה)|(מעגל))$`
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה|ישר)|(מעגל))$`
 );
 const ON_KIND_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse)|a\\s+(circle))$`
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse|line)|a\\s+(circle))$`
 ,  'i',
 );
 
@@ -7160,9 +7168,11 @@ const KIND_NOUNS: Record<string, CurveKind> = {
   מעגל: 'circle',
   פרבולה: 'parabola',
   אליפסה: 'ellipse',
+  ישר: 'line',
   circle: 'circle',
   parabola: 'parabola',
   ellipse: 'ellipse',
+  line: 'line',
 };
 
 const ON_AXIS_HE = new RegExp(
@@ -9039,6 +9049,10 @@ export function parseLine(raw: string): ParseResult {
   // the complex builder's notation only. π as a number («AB = π», «מעגל שהיקפו 6π») is not an angle and still reads.
   const radian = findRadianAngle(line);
   if (radian) return { ok: false, code: 'radian-angle', detail: radian.value };
+  // ADR-789 (#2032): a length unit on an arc says it is the arc's LENGTH, read here before `unwrap` strips the unit, after
+  // which «קשת AB = 4 ס"מ» is 4 degrees. The same refusal as «אורך הקשת AB הוא 4» until #2710 (ADR-AG-408).
+  const arcUnit = readArcUnitValue(line);
+  if (arcUnit) return { ok: false, code: 'arc-length-unread', detail: arcUnit.a + arcUnit.b };
   // #1919: the shared input-script rule, called where the proof target is — before every rule and before
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);
@@ -9717,6 +9731,30 @@ function arcSide(side: string): Array<{ k: Expr; a: Id; b: Id } | { value: Expr 
   return out;
 }
 
+/** π written in a value, glyph or word — not the «pi» inside a longer word. */
+const PI_WRITTEN = /π|(?<![A-Za-z])pi(?![A-Za-z0-9])/i;
+
+/** The noun of an arc's length, as 2-D's `ROUND_REF.arc` reads it: «אורך הקשת», «אורך קשת», «אורך של הקשת», "arc length", "the length of the arc". */
+const ARC_LENGTH_NOUN = /^(?:אורך\s+(?:של\s+)?ה?קשת|(?:the\s+)?(?:length\s+of\s+(?:the\s+)?arc|arc(?:'s)?\s+length)\b)/i;
+/** What follows that noun in a STATEMENT: the arc's letters if any, a copula, a value. Case-sensitive: a vertex is a capital, and "is" is not the labels I, S. */
+const ARC_LENGTH_REST = new RegExp(`^\\s*(?:של\\s+)?[⌢⏜]?\\s*\\{?\\s*(?:(${NAME})\\s*(${NAME}))?\\s*\\}?\\s*(?:=|(?<![א-ת])(?:הוא|היא|שווה)(?![א-ת])|\\b(?:is|equals?)\\b)\\s*\\S`);
+
+/**
+ * «אורך הקשת AB הוא 4π» · «אורך הקשת = 4π» · "arc length AB is 4π" — a statement of an arc's length, in any value: 2-D
+ * reads it (ADR-632) and this tool has no such measure yet. An owned refusal (ADR-AG-408, #2032), which says so and
+ * names what IS read; #2710 replaces it with the reader. A question («מהו אורך הקשת AB») is not a statement, and stays
+ * out of this rule.
+ */
+function parseArcLengthStatement(line: string): RuleOutcome {
+  const ref = ARC_CIRCLE_REF.exec(line);
+  const body = ref ? line.slice(0, ref.index) + line.slice(ref.index + ref[0].length) : line;
+  const noun = ARC_LENGTH_NOUN.exec(body);
+  if (!noun) return null;
+  const rest = ARC_LENGTH_REST.exec(body.slice(noun[0].length));
+  if (!rest) return null;
+  return { ok: false, code: 'arc-length-unread', detail: rest[1] && rest[2] ? rest[1] + rest[2] : 'AB' };
+}
+
 /**
  * «קשת AB = 40 במעגל O» · «⌢{AC} = 60°» · «קשת DE = 2 קשת CE» · «קשת CD שווה לקשת DE» · «קשת AC + קשת BE = קשת AD +
  * קשת BC במעגל O» · "arc AB = 40 in circle O" — ARC MEASURES (2-D's `arcValue`, `arcEquality`, `measureSum`). Every
@@ -9731,8 +9769,10 @@ function parseArcMeasure(line: string): RuleOutcome {
     .replace(/(?<![א-ת])שוו(?:ה|ות)\s+ל-?\s*(?=ה?קשת|⌢|⏜)/g, '= ')
     // «הקשת AC שווה ל-60» · «קשת AC היא 60 מעלות» — a copula before a NUMBER is the value (between two arcs it is
     // 2-D's taught «arc-copula», not read here).
-    .replace(/(?<![א-ת])(?:שוו(?:ה|ות)(?:\s*ל-?)?|היא|הוא)\s*(?=[0-9])/g, '= ')
-    .replace(/\bequals?\b|\bis\s+equal\s+to\b/gi, '=');
+    .replace(/(?<![א-ת])(?:שוו(?:ה|ות)(?:\s*ל-?)?|היא|הוא)\s*(?=[0-9π]|pi\b)/g, '= ')
+    .replace(/\bequals?\b|\bis\s+equal\s+to\b/gi, '=')
+    // "arc AB is 4π": 2-D reads this copula too; only a π value needs it here, to reach the refusal below
+    .replace(/\bis\s+(?=[0-9.]*\s*\*?\s*(?:π|pi\b))/gi, '= ');
   const sides = body.split('=');
   if (sides.length !== 2) return null;
   const left = arcSide(sides[0]);
@@ -9746,6 +9786,12 @@ function parseArcMeasure(line: string): RuleOutcome {
   const values = [...left.filter((t): t is { value: Expr } => 'value' in t).map((t) => neg(t.value)), ...right.filter((t): t is { value: Expr } => 'value' in t).map((t) => t.value)];
   if (terms.length === 0 || values.length > 1) return null;
   if (terms.some((t) => t.a === t.b)) return refuse('repeated-vertex', line);
+  // π IN THE VALUE (the Expr has lost it, so it is read off the student's text) is never degrees: one arc against a π
+  // value is its LENGTH (the 2026-10-13 ruling), refused until #2710 reads it (ADR-AG-408); an arc sum written with π is
+  // an angle in radians, #1837's refusal (the rule #1837 and #2032's plan both keep).
+  if (PI_WRITTEN.test(sides.join('='))) {
+    return terms.length === 1 ? { ok: false, code: 'arc-length-unread', detail: terms[0].a + terms[0].b } : { ok: false, code: 'radian-angle', detail: line };
+  }
   let value: Expr = values[0] ?? { kind: 'num', value: 0 };
   // A lone arc of more than 180° is the major arc: its central angle (unsigned) is the minor arc's, 360 − value.
   if (terms.length === 1 && values.length === 1) {
@@ -9976,6 +10022,7 @@ function parseArcFamily(line: string): RuleOutcome {
     parseSemicircle(line) ??
     parseSector(line) ??
     parseDiameterFrom(line) ??
+    parseArcLengthStatement(line) ??
     parseArcMeasure(line)
   );
 }

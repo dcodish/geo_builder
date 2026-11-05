@@ -15380,3 +15380,61 @@ A value with no role in the table goes to the number gate as before, and stays r
 **Locks.** `src-analytic/parser/__tests__/honesty-computed-values-2680.test.ts`: the rows above and each role's other spellings (paid); a wrong value in each role, and a value the curve holds in another role (refused, naming it); the mocked model lane end to end. `issue-1355-llm-honesty.test.ts` row O2b changes from dropped «3», «4» to nothing dropped; its invented `l1` still refuses. `honesty-implicit-curve-values-2680.test.ts` is unchanged and green.
 
 **Behaviour change for a student:** in analytic, a correct AI answer that computes a value from the sentence is accepted instead of refused: a diameter halved, a point the curve passes through, a focus, a directrix, an axis length, an intercept. A value the curve does not have is still refused with the existing dropped-given sentence.
+## ADR-AG-408 — An arc's length is refused until its reader exists: a π value on an arc is never degrees (#2032)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `wrong-answer`) · round #2722 · branch `fix/2032-arc-length-refusal` · operator, 2026-11-04, round #2697 questions page, card q5 = **B**: *"Refuse «קשת AB = 4π» honestly now, then build A"*, A being the arc-length reader (#2710). Earlier ruling, 2026-10-13: *"both read it as the arc's length"*.
+**Requirements:** [02c](02c-requirements-analytic.md) R245 · **Design:** none (internal)
+**Amends** [ADR-AG-220](#adr-ag-220) (its arc reader no longer reads a π value). The 2-D half is ADR-664, landed in round #2128; this is the analytic half. #2710 lifts this refusal when the reader lands.
+
+**Measured before (`28dac0c3`, `decideSubmit` against `decideDeterministic2D`), after «גזרה AOB».**
+
+| line | 2-D | analytic |
+| --- | --- | --- |
+| «קשת AB = 4π», «3π», «π», «0.5π», «4pi», «4*π», «⌢AB = 4π», "arc AB = 4π", «הקשת AB היא 4π» | the length (`measure-perimeter`) | a record: 4π **degrees** |
+| «קשת AB = 2π/3», «π/2» | not-handled | a record: 2.09°, 1.57° |
+| «אורך הקשת AB הוא 4π», «= 5», «= L», «… רבע מהיקף המעגל», "arc length AB = 4π" | the length | not-handled |
+| «קשת AB + קשת BA = π» | not-handled | a record: 3.14 degrees |
+| «קשת AB = 40», «40°» | degrees | degrees |
+
+With no drawn arc (a circle with A and B on it) 2-D does not understand the π lines; analytic drew the same arc.
+
+**The class.** A statement of an arc's length, or a π value on an arc, is read as something other than what it says: `arcSide` passed every value to `measureValue`, π is a plain number there (`engine/expr.ts`), and the arc reader's value is degrees. The spelled form had no reader, so it went to the model, which has nothing to say it with either.
+
+**Decision.** Two refusals at the arc family, no new mechanism, and no chokepoint list grows.
+- `parseArcMeasure`, once it has read the terms, tests the student's text for π (the `Expr` has lost it). One arc against a π value is the owned `arc-length-unread`. Every π value is refused, not only the ones 2-D reads as a length: option B of the escalation is *"a single arc set equal to a π value"*, and «2π/3» drawn as 2.09° is the same wrong figure. Its copulas admit a π value so «הקשת AB היא π» and "arc AB is 4π" reach the refusal.
+- `parseArcLengthStatement` claims the spelled statement in any value, the set 2-D reads. It reads the noun as 2-D's `ROUND_REF.arc` does, the letters case-sensitively. A question stays out of it: it needs a copula and a value.
+
+The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», with the student's own arc. The parser reads no figure, so the refusal is the same with or without a drawn arc: the row `arc-bare-pi-no-arc-2032` stays a gap (2-D not-handled, analytic refused) until #2710 resolves the arc.
+
+**Found in round: an arc sum written with π.** «קשת AB + קשת CD = π» drew as degrees: the same reader and the same cause. #1837 and #2032's plan both keep the rule (2026-10-13): *"any other arc measure with π is refused as radians"*, under the ruling *"analytics tool should not support radians at all"*. #1837's sweep did not list this reader. It now gives the `radian-angle` refusal. 2-D says not-handled there; its #1837 predicate covers only an angle noun.
+
+**Sibling audit (docs/17 §1).** 2-D: ADR-664 closed the π class. 3-D: outside circle geometry (X8). Complex: has no arcs. Not this class, and not changed: «קשת AB = 2√3» (degrees here, not-handled in 2-D) is #2174; «שטח הגזרה AOB הוא 12π» stays not-handled, as no degree reading exists for it.
+
+**Locks.** New `src-analytic/__tests__/arc-length-refusal-2032.test.ts`: the reported line, 31 spellings on a sector, a named circle and an equation circle, both locales, the taught line records, degree controls, the radian sums, a question. Parity rows `arc-bare-pi-2032`, `arc-bare-pi-no-arc-2032` and `arc-length-172` carry #2710 on analytic's cell.
+
+**Judged ruling q10 (ADR-789).** A length unit on one arc says length, so «קשת AB = 4 ס"מ» takes this refusal too. It is read in `parseLine` before `unwrap` strips the unit, through the shared `shell/arcLengthUnit`.
+
+**Behaviour change for a student:** in analytic, «קשת AB = 4π» no longer draws a tiny arc, and «קשת AB = 4 ס"מ» no longer draws a 4° one. Each is refused with a sentence that says arcs are read in degrees. «אורך הקשת AB הוא 4π» gets the same sentence, where it used to get "not understood".
+
+## ADR-AG-409 — «(3,5)A» and «A = (3,5)» are taught as «A(3,5)», and the definite «הישר» binds the drawn line (#1774)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/1774-bare-coordinate-point` (stacked on `fix/2032-arc-length-refusal`) · prod session `0c3paux9`, 2026-10-04: «y=3x+2» · «(3,5)» · «(3,5)A».
+**Requirements:** [02c](02c-requirements-analytic.md) R8, R246 · **Design:** none (internal)
+**Applies** [ADR-W-030](06w-decisions-workspace.md#adr-w-030) to a new slip.
+
+**Measured (`3ce5f8f9`, `decideSubmit`, after «y=3x+2»).** The issue's table still holds: «A(3,5)», «הנקודה (3,5)», «נתונה הנקודה (3,5)» record; «(3,5)», «(3,5)A», «A = (3,5)», «B:(3,5)» are `not-handled`. Of #1587, folded in here: «הנקודה P(1,3) נמצאת על הישר AB» and «הנקודה (1,3) על הישר AB» now record. «הנקודה (1,5) על הישר» did not, because «P על הישר» did not either: no rule read the bare definite line.
+
+**The class.** A point stated with its letter on the wrong side of its coordinates reached the model, a paid call that fails on a keyless server, for a line whose meaning the tool can read.
+
+**Decision.** `app/pointOrder.ts` rewrites a whole line of `(x,y)L` runs, and the not-handled branch of the submit decision teaches the result (`kind: 'teach'`, `note: 'point-order'`): the canonical goes in the box and one Enter records it, the same contract as an imperative wrapper, including that what is taught is a line the next Enter accepts here. The parser reads no new spelling, so «(3,5)A» never enters a fact list. The operator's words on ADR-W-030: *"I don't want the tool to support the wrong text input because it teaches them wrong."* The sentence is new text (ADR-W-174): «שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.»
+
+**Judged rulings of round #2722, which replace this ADR's first landing (`b754d9d5`).**
+- **`L = (x,y)` (q8).** The plan lowered it as `L(x,y)`, which reverses the operator's ruling on #1245, 2026-09-19: *"analytics should not accept E=()"*. So `=` never builds. It is taught through the same path, with its own note: «נקודה נכתבת בלי סימן שוויון». `app/pointOrder.ts` reads both shapes (`pointSpelling`). Other separators («B:(3,5)») are not decided and stay not understood.
+- **The definite «הישר» (q11).** ADR-W-175: *"a definite noun binds the drawn object of its kind."* The measurement here had found no rule reading it. It uses the existing `on-kind` seam, with `line` added as a kind noun, so no new mechanism: one line binds, two ask with `errHost`'s question, and a coordinate point reads through it too («הנקודה (1,5) על הישר»). No line stays `not-handled` at the apply boundary, and a side is not a line object, so a side alone does too: both are unruled and keep today's verdict.
+- **The bare tuple `(x,y)` (q7).** Not built. It goes to the operator, and the lock records today's `not-handled`.
+
+**Sibling audit (docs/17 §1).** 2-D: the class does not apply, since every coordinate point is refused to the analytic Builder; «(3,5)A» itself escalates rather than reaching that refusal. 3-D: measured, «(1,2,3)A» is `not-handled` and «A(1,2,3)» builds. Not changed: the teaching is analytic's item, and no ruling asks it of 3-D. Complex: has no named coordinate pairs.
+
+**Locks.** New `src-analytic/__tests__/point-order-1774.test.ts`: the reported line, both taught shapes spelling by spelling, each recording, both locales, lines that are not taught, the bare row, the neighbours, and «הישר» with one, two and no lines. Parity rows `ex-coordinate-letter-after-1774`, `ex-coordinate-equals-1774`.
+
+**Behaviour change for a student:** «(3,5)A» and «A = (3,5)» no longer say "not understood". The box fills with «A(3,5)» and a note says why; Enter draws it. «P על הישר» on a figure with one line puts P on it; with two lines the tool asks which.

@@ -37,6 +37,7 @@ import { readFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
+import { readArcUnitValue } from '../../shell/arcLengthUnit';
 import { resolvePairRoles } from './pairRoles';
 import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
@@ -3458,14 +3459,15 @@ const arcValue: Rule = (s, ctx) => {
   if (!/arc|קשת|⌢|⏜/i.test(s)) return null;
   if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
   // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
-  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
+  // A plain fraction is degrees too (ADR-789): with no unit, nothing in the line says length.
+  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
   if (!m) return arcSize(s, ctx); // not a degree number: a π value is the arc's LENGTH, a symbol is asked about (ADR-664)
   const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
   const pair = labelRun(stripped, 2);
   if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
   const center = resolveCenter(s, ctx);
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
-  const value = parseFloat(m[2]);
+  const value = parseFloat(m[2]) / (m[3] ? parseFloat(m[3]) : 1);
   if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
   return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
 };
@@ -14074,6 +14076,12 @@ const VALUE_UNIT = String.raw`(?:יחידות|יחידה|יח['׳]|ס"?מ|מ"?מ
 const VALUE_UNIT_RX = new RegExp(String.raw`(?<=\d)\s*${VALUE_UNIT}(?![א-תA-Za-z])`, 'gi');
 const stripValueUnits = (s: string): string => s.replace(VALUE_UNIT_RX, '');
 
+/** A length unit on an arc is the one unit that is not noise: it says the value is the arc's LENGTH (ADR-789), so the line is that sentence. */
+const foldArcLengthUnit = (s: string): string => {
+  const arc = readArcUnitValue(s);
+  return arc ? `אורך הקשת ${arc.a}${arc.b} הוא ${arc.value}` : s;
+};
+
 /**
  * THE COPULA IS NOT PART OF THE LENGTH VALUE'S VOCABULARY (#1157) — the length twin of
  * [ADR-498](../../docs/06-decisions.md)'s `angleValueOf`, and the same defect one construct over.
@@ -14420,7 +14428,7 @@ export function normalizeUtterance(raw: string): string {
   // downstream sees one shape.
   // #1691 (ADR-AG-239): «F ו- G», «F ו -G», «F ו - G» are «F ו-G» — the shared fold every builder's boundary calls.
   // #2553 (ADR-AG-337): «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is «… חיצוני לשני המעגלים» — one fold (copied to analytic).
-  const lengths = normalizeVerboseLength(stripValueUnits(foldTangentSide(foldConjunctionSpacing(orth))));
+  const lengths = normalizeVerboseLength(stripValueUnits(foldArcLengthUnit(foldTangentSide(foldConjunctionSpacing(orth)))));
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
   // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read

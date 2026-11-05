@@ -237,6 +237,7 @@ const he = {
   // #1919 — a WORD in another script: the operator's Hebrew-and-English sentence, the same in every builder.
   // #1837 (ADR-W-142) — an angle in radians: 2-D's ruled sentence (operator, 2026-10-07)
   errRadianAngle: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90',
+  errArcLengthUnread: 'הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת {{detail}} = 40',
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   // #2222 (ADR-AG-284, operator ruling 2026-10-16) — an ASCII mixed number: a decimal, the sum, or the product.
   errMixedNumber: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
@@ -676,6 +677,9 @@ const he = {
    */
   noticeTeachCanonical:
     'בספר לא כותבים «{{verb}}» — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  // #1774 (ADR-AG-409) — «(3,5)A»: the letter comes first; the sentence is already in the box
+  noticeTeachPointOrder: 'שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  noticeTeachPointEquals: 'נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
   sessionContinue: 'המשך מהמקום שבו הפסקת',
@@ -854,6 +858,7 @@ const en: typeof he = {
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
+  errArcLengthUnread: "This tool does not read an arc's length yet. An arc is written here in degrees — for example arc {{detail}} = 40",
   errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
   errMixedNumber: '«{{detail}}» could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
   errMixedNumberNoDecimal: '«{{detail}}» could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
@@ -1221,6 +1226,8 @@ const en: typeof he = {
   redo: 'Redo',
   noticeTeachCanonical:
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
+  noticeTeachPointOrder: "A point's letter comes before its coordinates. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
+  noticeTeachPointEquals: 'A point is written without an equals sign. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',

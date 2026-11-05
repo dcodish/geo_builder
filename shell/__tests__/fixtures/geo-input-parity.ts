@@ -288,6 +288,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1839': 'closed', // #2018 (ADR-AG-298): analytic does not read a bare role with typed letters until 2-D's reading is ruled · closed as fixed in 2-D without this port: parked (ADR-W-119), found 2026-11-02
   '#2047': 'open',
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
+  '#2710': 'open', // ADR-AG-408 (#2032): analytic refuses an arc's length until its reader lands
   '#2174': 'open', // was #2041, merged into #2174 by the #2654 family sweep 2026-11-01: #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
 
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
@@ -673,8 +674,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-127', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קוטר AB במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-128', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'F על מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8' },
   { id: 'diameter-cut-end-2056', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2056): F, a stated end of the diameter, is put on circle O — cat-2d-128 without «F על מעגל O»' },
-  { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic builds it as 4π degrees until #2013 — the verdict row cannot see degrees against length, the class test does' },
-  { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic draws a 12.57° arc until #2013' },
+  { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic refuses it, never degrees (ADR-AG-408, operator 2026-11-04), until the reader #2710' },
+  { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic refuses it naming what it reads (ADR-AG-408) until the reader #2710 resolves the arc' },
+  { id: 'arc-fraction-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 2/3'], expect: 'builds', exception: 'X8', note: 'ADR-789: a plain fraction is degrees in both, never the chord (the verdict row cannot see which; the class tests do)' },
+  { id: 'arc-unit-length-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4 ס"מ'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-789: a length unit makes it the arc\x27s length; analytic refuses it (ADR-AG-408) until the reader #2710' },
   { id: 'arc-symbol-value-2041', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = x'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2174' }], note: 'ADR-664 (#2041): 2-D asks degrees or length with the ruled sentence; analytic\x27s half of the ruling is open' },
   { id: 'arc-fresh-2037-01', family: 'chords-arcs', steps: ['קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2037): 2-D creates circle O and puts A and B on it; analytic does the same since ADR-W-162 (#1467 closed #2129)' },
   { id: 'cat-2d-129', family: 'chords-arcs', steps: ['קוטר מנקודה F במעגל O'], expect: 'builds', exception: 'X8' },
@@ -1147,7 +1150,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-sector-reflex', family: 'chords-arcs', steps: ['גזרה AOB בזווית 200'], expect: 'builds', exception: 'X8' },
   // #172 (ADR-632): a sector's area and an arc's length as measures — size, ratio to the circle, letter
   { id: 'sector-area-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB הוא 12π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
-  { id: 'arc-length-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
+  { id: 'arc-length-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'analytic refuses it (ADR-AG-408) until the reader #2710' },
   { id: 'sector-area-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB = ¼ משטח המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
   { id: 'arc-length-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא רבע מהיקף המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
   { id: 'sector-area-letter-172', family: 'chords-arcs', steps: ['גזרה AOB', 'נסמן את שטח הגזרה ב-S'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
@@ -1161,6 +1164,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-diameter-from-contextual', family: 'chords-arcs', steps: ['מעגל O', 'F על מעגל O', 'קוטר מנקודה F'], expect: 'builds', exception: 'X8' },
   // ── exception rows: the builders outside the family must answer honestly, never build ──
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
+  { id: 'ex-coordinate-letter-after-1774', family: 'topic', steps: ['(3,5)A'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: right-to-left typing, taught as A(3,5) (ADR-W-030)' },
+  { id: 'ex-coordinate-equals-1774', family: 'topic', steps: ['A = (3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: never accepted, taught as A(3,5) (ADR-W-030, ruling 2026-09-19 on #1245)' },
   { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
   { id: 'ex-origin', family: 'topic', steps: ['O ראשית הצירים'], expect: 'builds', exception: 'X1', only: ['analytic'] },

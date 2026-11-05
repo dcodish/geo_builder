@@ -1163,6 +1163,36 @@
       "status": "escalated"
     },
     {
+      "id": "t-1863-parabola-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the parabola chip's four labels (each names the next press)",
+      "choice": "הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר (Show directrix · Show focus · Show focus and directrix · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-ellipse-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the ellipse chip's four labels, plural (two foci, two directrices)",
+      "choice": "הצג מדריכים · הצג מוקדים · הצג מוקדים ומדריכים · הסתר (Show directrices · Show foci · Show foci and directrices · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-circle-notice",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the notice when an ellipse's givens make it a circle (the narrowing note's voice, cause first)",
+      "choice": "בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה. (Because of the given …, the ellipse is now a circle — a circle is a kind of ellipse.)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
       "id": "chose-2402-unknown-symbol",
       "kind": "text",
       "issue": "#2402",
@@ -1273,36 +1303,6 @@
       "status": "pending"
     },
     {
-      "id": "t-1863-parabola-chip",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the parabola chip's four labels (each names the next press)",
-      "choice": "הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר (Show directrix · Show focus · Show focus and directrix · Hide)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
-      "id": "t-1863-ellipse-chip",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the ellipse chip's four labels, plural (two foci, two directrices)",
-      "choice": "הצג מדריכים · הצג מוקדים · הצג מוקדים ומדריכים · הסתר (Show directrices · Show foci · Show foci and directrices · Hide)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
-      "id": "t-1863-circle-notice",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the notice when an ellipse's givens make it a circle (the narrowing note's voice, cause first)",
-      "choice": "בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה. (Because of the given …, the ellipse is now a circle — a circle is a kind of ellipse.)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
       "id": "chose-2688-display-labels",
       "kind": "text",
       "issue": "#2688",
@@ -1310,26 +1310,6 @@
       "choice": "«הסתר רשת» ⇄ «הצג רשת» · «הסתר מספרים» ⇄ «הצג מספרים» · «הסתר ערכים» ⇄ «הצג ערכים» (en: \"Hide grid\" / \"Show grid\" · \"Hide numbers\" / \"Show numbers\" · \"Hide values\" / \"Show values\")",
       "chosen": true,
       "at": "2026-11-03T18:55:50.589Z",
-      "status": "pending"
-    },
-    {
-      "id": "text-2677-pair-position-reasons",
-      "kind": "text",
-      "issue": "#2677",
-      "what": "The reason clause of the refusal when two stated positions of one circle pair exclude each other (errors.pairPositionReason.*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
-      "choice": "contained-ext-tangent: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו יכול להשיק לו מבחוץ · contained-crossing: מעגל שמוכל בתוך מעגל אחר נמצא כולו בתוכו, ולכן אין להם נקודות חיתוך · contained-disjoint: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו מחוץ לו · contained-contained: מעגל שמוכל בתוך מעגל אחר קטן ממנו, ולכן המעגל האחר אינו מוכל בתוכו",
-      "chosen": true,
-      "at": "2026-11-04T06:50:46.591Z",
-      "status": "pending"
-    },
-    {
-      "id": "chose-2611-circle-refusals",
-      "kind": "text",
-      "issue": "#2611",
-      "what": "the 3-D refusals for a point stated on a circle: a missing named circle, no circle, several circles (with/without a centre-lettered one), and a point off the circle — replacing the line sentence that showed «circle»/«circle-O»",
-      "choice": "«D אינה על המעגל — בדקו את הנתונים» · «המעגל O עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מעגל שמרכזו O משיק לישר AB בנקודה T» — ואז כתבו את השורה שוב.» · «עדיין אין מעגל בשרטוט, ולכן «המעגל» לא מציין דבר. הגדירו מעגל תחילה — למשל «משולש ABC חסום במעגל» — ואז כתבו את השורה שוב.» · «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».» / «הכלי עדיין לא יודע לבחור בין כמה מעגלים כשכתוב רק «המעגל», ולאף אחד מהם אין מרכז בשם — זו מגבלה של הכלי.» (en mirrors)",
-      "chosen": true,
-      "at": "2026-11-04T06:35:27.642Z",
       "status": "pending"
     },
     {
@@ -1370,6 +1350,26 @@
       "choice": "«לא ניתן: «AC ⊥ BC» סותר את «AB = BC» — אי אפשר לקיים את שניהם יחד. הסיבה: AC ⊥ BC.» (the existing errMeasureContradicts frame; what = the typed line)",
       "chosen": true,
       "at": "2026-11-04T06:11:02.623Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2611-circle-refusals",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "the 3-D refusals for a point stated on a circle: a missing named circle, no circle, several circles (with/without a centre-lettered one), and a point off the circle — replacing the line sentence that showed «circle»/«circle-O»",
+      "choice": "«D אינה על המעגל — בדקו את הנתונים» · «המעגל O עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מעגל שמרכזו O משיק לישר AB בנקודה T» — ואז כתבו את השורה שוב.» · «עדיין אין מעגל בשרטוט, ולכן «המעגל» לא מציין דבר. הגדירו מעגל תחילה — למשל «משולש ABC חסום במעגל» — ואז כתבו את השורה שוב.» · «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».» / «הכלי עדיין לא יודע לבחור בין כמה מעגלים כשכתוב רק «המעגל», ולאף אחד מהם אין מרכז בשם — זו מגבלה של הכלי.» (en mirrors)",
+      "chosen": true,
+      "at": "2026-11-04T06:35:27.642Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2677-pair-position-reasons",
+      "kind": "text",
+      "issue": "#2677",
+      "what": "The reason clause of the refusal when two stated positions of one circle pair exclude each other (errors.pairPositionReason.*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
+      "choice": "contained-ext-tangent: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו יכול להשיק לו מבחוץ · contained-crossing: מעגל שמוכל בתוך מעגל אחר נמצא כולו בתוכו, ולכן אין להם נקודות חיתוך · contained-disjoint: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו מחוץ לו · contained-contained: מעגל שמוכל בתוך מעגל אחר קטן ממנו, ולכן המעגל האחר אינו מוכל בתוכו",
+      "chosen": true,
+      "at": "2026-11-04T06:50:46.591Z",
       "status": "pending"
     },
     {
@@ -1899,6 +1899,26 @@
       "choice": "למעגל כבר נתון רדיוס אחר — בדקו את הנתונים / המעגל כבר נמצא במישור אחר — בדקו את הנתונים",
       "chosen": true,
       "at": "2026-11-05T15:45:16.431Z",
+      "status": "pending"
+    },
+    {
+      "id": "round-2722-arc-unit-words",
+      "kind": "text",
+      "issue": "#2032",
+      "what": "the length-unit words that make an arc's value its length (ADR-789, judged q10)",
+      "choice": "ס\"מ, ס״מ, סמ', סנטימטר(ים), מ\"מ, מילימטר(ים), מטר(ים), יחידה, יחידות (אורך), יח', cm, mm, unit(s), centimeter(s), millimeter(s), meter(s), with the -metre spellings. The one-letter מ' and m stay out: 4m is a coefficient.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
+      "status": "pending"
+    },
+    {
+      "id": "round-2722-point-equals-note",
+      "kind": "text",
+      "issue": "#1774",
+      "what": "the note on «A = (3,5)» when it is taught (judged q8)",
+      "choice": "נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
       "status": "pending"
     }
   ],
