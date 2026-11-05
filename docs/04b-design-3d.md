@@ -767,7 +767,7 @@ The fact row reads the same record (Am. 2): `App3` hands `Derived3.readings[f.id
 `lengthReadingText3` (`render/notation.ts`): the student's own text with each of the equation's two pair tokens
 wrapped in bars («AA'=3BC» → «|AA'|=3|BC|»), composed from the command when the text does not hold both pairs.
 
-**A point's coordinates restated** (ADR-3D-423, #2341). `coordinateRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `point3` and the `coords-eq` claim are the two ways to state a point's numbers, so it compares them directly at `CLAIM_REL_TOL`. A coordinate line on a point with no stated numbers has no twin and stays an answer.
+**Stated numbers restated** (ADR-3D-423, #2341). `numbersRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `statedNumbers3` reads what a command states as numbers, of what: a point's coordinates (`point3`, the `coords-eq` claim) or a segment's length in either letter order (the `length-eq` claim). It compares them at `CLAIM_REL_TOL`, and the twin must already draw the line's `segment3` ink. A line with no stated numbers to match has no twin, so a coordinate answer or a first length stays a row.
 
 **A length sum** (ADR-3D-392, #1680) is the `length-sum` claim and `ScalarPin` (Σ cᵢ·|aᵢbᵢ| = value, the
 `lengthSum` rule, 2-D's `set-measure-sum`). It routes exactly as `length-eq`: the driving pin plus its recorded

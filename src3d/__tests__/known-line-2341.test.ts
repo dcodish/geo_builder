@@ -70,6 +70,50 @@ describe('#2341 — the class: one statement in two spellings', () => {
   });
 });
 
+describe('#2341 — a length restated, [judged] q21 2026-11-05 (2-D\'s noop)', () => {
+  it.each([
+    [['משולש ABC', 'AB = 3'], 'BA = 3'], // the ruled line
+    [['משולש ABC', 'BA = 3'], 'AB = 3'], // the other order
+    [['משולש ABC', 'AB = 3'], 'BA = 6/2'], // another spelling of the value
+    [['משולש ABC', 'AB = 3'], '|BA| = 3'],
+    [['משולש ABC', 'AB = 3'], 'AB = 3.0'],
+    [['משולש ABC', 'AB = 2.5'], 'BA = 5/2'],
+    [['משולש ABC', 'AB = √2'], 'BA = √2'],
+    [["קובייה ABCDA'B'C'D'", 'AB = 3'], 'BA = 3'],
+    [['A(0,0,0)', 'B(3,0,0)', 'AB = 3'], 'BA = 3'],
+  ])('%j + «%s»: no row, the note', (lines, line) => {
+    build(lines);
+    const rows = st().facts.length;
+    st().submit(line);
+    expect(st().facts).toHaveLength(rows);
+    expect(st().lastError).toBeNull();
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+  });
+
+  it.each(['BA = 4', 'AB = 4'])('«AB = 3» + «%s» is still refused', (line) => {
+    build(['משולש ABC', 'AB = 3']);
+    st().submit(line);
+    expect(st().lastError?.code).toBe('givens-contradict');
+    expect(st().facts).toHaveLength(2);
+  });
+
+  it('a muted twin is re-ticked with no note', () => {
+    build(['משולש ABC', 'AB = 3']);
+    const twin = st().facts[1];
+    st().toggle(twin.id);
+    st().submit('BA = 3');
+    expect(st().facts).toHaveLength(2);
+    expect(st().facts[1].enabled).toBe(true);
+    expect(st().lastNotice).toBeNull();
+  });
+
+  it('a first value on a segment still records: this compares stated numbers only', () => {
+    build(['A(0,0,0)', 'B(√2,0,0)']);
+    expect(verdict('AB = √2')).toBe('record');
+    expect(verdict('BA = √2')).toBe('record');
+  });
+});
+
 describe('#2341 — the boundary: these keep their row', () => {
   it("a coordinate line on a point the student never gave coordinates is their ANSWER (ADR-3D-075)", () => {
     build(['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB']);

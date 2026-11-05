@@ -2301,29 +2301,44 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
   return undefined;
 }
 
-/** A point's three stated numbers, in either spelling of the statement: «B(1,2,3)» or «B = (1,2,3)». Null otherwise. */
-const statedCoords3 = (k: Command3): { id: Id; at: Vec3 } | null => {
-  const c = k.type === 'point3' ? k : k.type === 'claim' && k.claim.type === 'coords-eq' ? k.claim : null;
-  return c && c.x !== null && c.y !== null && c.z !== null ? { id: c.id, at: { x: c.x, y: c.y, z: c.z } } : null;
+/**
+ * What a command states as NUMBERS, and of what: a point's three coordinates, in either spelling («B(1,2,3)», «B = (1,2,3)»),
+ * or a segment's length, in either letter order («AB = 3», «BA = 3»). Null for anything else.
+ */
+const statedNumbers3 = (k: Command3): { of: string; values: readonly number[] } | null => {
+  if (k.type === 'point3' || (k.type === 'claim' && k.claim.type === 'coords-eq')) {
+    const c = k.type === 'point3' ? k : (k.claim as Extract<Claim3, { type: 'coords-eq' }>);
+    return c.x !== null && c.y !== null && c.z !== null ? { of: `point:${c.id}`, values: [c.x, c.y, c.z] } : null;
+  }
+  if (k.type === 'claim' && k.claim.type === 'length-eq') return { of: `length:${inkKey3(k.claim.a, k.claim.b)}`, values: [k.claim.value] };
+  return null;
 };
+const inkKey3 = (a: Id, b: Id): string => [a, b].sort().join('|');
+/** The pairs a line asks to draw (`segment3`), and the rest: what it STATES. */
+const inkOf3 = (cmds: readonly Command3[]): string[] => cmds.flatMap((k) => (k.type === 'segment3' ? [inkKey3(k.a, k.b)] : []));
+const statementsOf3 = (cmds: readonly Command3[]): Command3[] => cmds.filter((k) => k.type !== 'segment3');
 
 /**
- * #2341 ([ADR-3D-423](../../docs/06b-decisions-3d.md#adr-3d-423)) — A POINT'S COORDINATES, STATED AGAIN IN THE OTHER SPELLING, ARE
- * THE SAME STATEMENT. «B(√2,0,0)» and «B=(√2,0,0)» lower to an injection and a claim, so `sameStatement` read two
- * statements and the second became a ✓ row (operator, 2026-10-17: *"the 3rd line should not be accepted and we say
- * that it is already known"*). The twin is the line that STATED those numbers for that point, read at the verifier's
- * own tolerance. Only a stated number is compared: «E = (1,0,0)» on a point the student never gave coordinates is their
- * ANSWER and stays a verified row (ADR-3D-075), and different numbers are no twin, so they are refused as before.
- * Like the ring rule, a line that says more than this keeps a muted row muted.
+ * #2341 ([ADR-3D-423](../../docs/06b-decisions-3d.md#adr-3d-423)) — THE SAME NUMBERS STATED AGAIN IN ANOTHER SPELLING ARE THE SAME
+ * STATEMENT. «B(√2,0,0)» and «B=(√2,0,0)» lower to an injection and a claim, and «AB = 3» and «BA = 3» to two claims in
+ * two letter orders, so `sameStatement` read two statements and the second became a row (operator, 2026-10-17: *"the 3rd
+ * line should not be accepted and we say that it is already known"*; the length, [judged] q21, 2026-11-05, as 2-D does).
+ * The twin is the line that STATED those numbers of that point or segment, read at the verifier's own tolerance.
+ * Only a stated number is compared: «E = (1,0,0)» on a point the student never gave coordinates is their ANSWER and
+ * stays a verified row (ADR-3D-075), and different numbers are no twin, so they are refused as before. The twin must
+ * already draw whatever ink the line asks for. Like the ring rule, a line that says more than this keeps a muted row muted.
  */
-function coordinateRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
-  const line = commands.length === 1 ? statedCoords3(commands[0]) : null;
+function numbersRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
+  const said = statementsOf3(commands);
+  const line = said.length === 1 ? statedNumbers3(said[0]) : null;
   if (!line) return undefined;
+  const ink = inkOf3(commands);
   const same = (k: Command3): boolean => {
-    const c = statedCoords3(k);
-    return c !== null && c.id === line.id && norm3(sub3(c.at, line.at)) <= CLAIM_REL_TOL * Math.max(norm3(line.at), 1);
+    const c = statedNumbers3(k);
+    if (c === null || c.of !== line.of) return false;
+    return Math.hypot(...c.values.map((v, i) => v - line.values[i])) <= CLAIM_REL_TOL * Math.max(Math.hypot(...line.values), 1);
   };
-  return facts.find((f) => (f.enabled || f.cmds.length === 1) && f.cmds.some(same));
+  return facts.find((f) => (f.enabled || statementsOf3(f.cmds).length === 1) && f.cmds.some(same) && ink.every((key) => inkOf3(f.cmds).includes(key)));
 }
 
 /**
@@ -2613,7 +2628,7 @@ export function decideCommands3(
   // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
   // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
   if (opts.twins) {
-    const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated) ?? coordinateRestatementTwin3(statedFacts, stated);
+    const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated) ?? numbersRestatementTwin3(statedFacts, stated);
     const twin = found && facts.find((f) => f.id === found.id);
     if (twin) {
       return {

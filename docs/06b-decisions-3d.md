@@ -14641,20 +14641,24 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
 
-## ADR-3D-423 — A point's coordinates restated in the other spelling are already known (#2341)
+## ADR-3D-423 — Stated numbers restated in another spelling are already known (#2341)
 
-**Status:** accepted · 2026-11-05 · bug (P2, 3d) · fix round #2722, stream P · branch `fix/2341-restated-point-3d` from `main` @ `28dac0c3` · plan armed `auto-ok` 2026-10-17 · **partly built:** the plan's `[asked]` line; its `[2-D]` line waits for the operator (below)
-**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a (new), FR-SP-5 (the restatement line) · **Design:** [04b](04b-design-3d.md) § "A point's coordinates restated" · **Ladder:** none: the submit decision's twin rule, before the candidate derive; no solve stage changes
+**Status:** accepted · 2026-11-05 · bug (P2, 3d) · fix round #2722, stream P · branch `fix/2341-restated-point-3d` from `main` @ `28dac0c3` · plan armed `auto-ok` 2026-10-17 · **partly built:** the plan's `[asked]` line and the restated length (`[judged]` q21, 2026-11-05: choice B); the general `[2-D]` line is **open** as q20, with the operator (below)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a (new), FR-SP-5 (the restatement line) · **Design:** [04b](04b-design-3d.md) § "Stated numbers restated" · **Ladder:** none: the submit decision's twin rule, before the candidate derive; no solve stage changes
 
 **Operator:** round #2304 T29, 2026-10-17: *"the test passes but the 3rd line should not be accepted and we say that it is already known"*.
 
-**Measured at pickup** (`28dac0c3`, `decideDeterministic3`). «A(0,0,0)» · «B(√2,0,0)» · «B=(√2,0,0)» recorded a ✓ row, as the issue says.
+**Ruling on the length** (`[judged]`, q21 choice B, 2026-11-05): «AB = 3» · «BA = 3» answers «זה כבר קיים באיור — אין מה להוסיף.» with no row, in either letter order and any spelling of the same value, as 2-D does; «BA = 4» stays a refusal.
 
-**The class.** *A statement of a point's coordinates, in a spelling other than the line that stated them, is recorded as a new given instead of answered as already known.*
+**Measured at pickup** (`28dac0c3`, `decideDeterministic3`). «A(0,0,0)» · «B(√2,0,0)» · «B=(√2,0,0)» recorded a ✓ row, as the issue says. So did «משולש ABC» · «AB = 3» · «BA = 3», «BA = 6/2», «|BA| = 3» and «BA = 3.0», while «AB = √9» was already a twin. «BA = 4» was refused `givens-contradict`.
 
-**Root cause.** `sameStatement` compares lowered commands. «B(…)» lowers to `point3` and «B=(…)» to a `coords-eq` claim, so one statement in two spellings read as two.
+**The class.** *A statement of a point's coordinates or a segment's length, in a spelling other than the line that stated those numbers, is recorded as a new given instead of answered as already known.*
 
-**Decision.** `coordinateRestatementTwin3` joins `sameStatement` and `ringRestatementTwin3` at the twin rule in `decideCommands3`, so the verdict is the existing `already-stated`: no row, and the #1990 sentence, or the #613 silent re-tick of a muted twin. A line is a twin of an earlier one when both state all three numbers of the same point and they agree at the verifier's `CLAIM_REL_TOL`. It compares stated numbers and samples nothing. Both orders are covered. Different numbers are no twin and are refused as before. It has no fixed spelling list: it reads the two command kinds that can state a point's coordinates.
+**Root cause.** `sameStatement` compares lowered commands. «B(…)» lowers to `point3` and «B=(…)» to a `coords-eq` claim, and «BA = 3» to a `length-eq` with its letters swapped, so one statement in two spellings read as two.
+
+**Decision.** `numbersRestatementTwin3` joins `sameStatement` and `ringRestatementTwin3` at the twin rule in `decideCommands3`, so the verdict is the existing `already-stated`: no row, and the #1990 sentence, or the #613 silent re-tick of a muted twin. One comparison, `statedNumbers3`, reads what a command states as numbers, of what: a point's three coordinates, or a segment's length under its unordered pair. A line is a twin of an earlier one when it states only those numbers, they agree at the verifier's `CLAIM_REL_TOL`, and the earlier line already draws any ink the line asks for. It compares stated numbers and samples nothing. Different numbers are no twin and are refused as before. A first value on a segment has no twin and records, so it is drawn.
+
+**Open: q20, with the operator.** Whether 3-D answers «a relation the figure already holds» as 2-D does is not decided and is not built. The next paragraph is the evidence.
 
 **The plan's `[2-D]` line was built, measured, and withdrawn.** The plan asked for the general rule: any line the figure already satisfies adds no row. Built as `impliedByPrior` is built, it turned `test:fast` red in 14 files, 45 tests, and the red was the gate working (docs/17 §9), because the rule reverses standing locks:
 - **The exam gates**, «both answers verify»: `scenarios3.test.ts` (2019, 2020, 2023, 2024), `v7-gates.test.ts` (2021), `exam-2026-2.test.ts`. «F = (1.5, 3, 0)», a collinearity or a plane equation is the student's checked answer (FR-CL-1, ADR-3D-075, *"the tool's charter"* in ADR-3D-108).
@@ -14663,12 +14667,12 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 - **A first statement of a face**, `restate-dedupe-613.test.ts`: «פירמידה SABC» · «משולש ABC» would have recorded nothing.
 - **The ADR-3D-209 notices** (#396, #842, #850, #853), recorded with their own note. ADR-3D-377 kept them apart too.
 
-The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac0c3`: «ריבוע ABCD» · «AB ⊥ BC» / «AB ∥ CD» and «AB = 3» · «BA = 3» are noops, but a line adding a value or ink commits («ריבוע ABCD» · «זווית ABC = 90», «AB = 5» · «BC = 5», «מעוין ABCD» · «AC ⊥ BD»), and so does a given true only by the tool's default («טרפז ABCD» · «AB ∥ CD», «משולש ישר זווית ABC» · «AB ⊥ BC», ADR-605). Whether 3-D's relations should follow is a product question, on #2341.
+The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac0c3`: «ריבוע ABCD» · «AB ⊥ BC» / «AB ∥ CD» and «AB = 3» · «BA = 3» are noops, but a line adding a value or ink commits («ריבוע ABCD» · «זווית ABC = 90», «AB = 5» · «BC = 5», «מעוין ABCD» · «AC ⊥ BD»), and so does a given true only by the tool's default («טרפז ABCD» · «AB ∥ CD», «משולש ישר זווית ABC» · «AB ⊥ BC», ADR-605). The length noop is built above. Whether 3-D's relations should follow is q20, on #2341.
 
 **A load replays as saved.** `fixtures3/coords-claim-surd-2081.geo3.json` holds the old row and loads unchanged.
 
-**Sibling audit.** 2-D has no coordinates. Analytic: «A(0,0)» · «B(4,0)» · «B=(4,0)» is `not-handled`, so the class is absent; its spelling «B(4,0)» twice is `already-known`. Complex: ADR-CX-084 covers it. Grepped the twin rule: its two call sites are in `decideCommands3`, and the model lane asks without twins, as it always has.
+**Sibling audit.** 2-D has no coordinates, and its length noop is what the ruling ports. Analytic: «A(0,0)» · «B(4,0)» · «B=(4,0)» is `not-handled`, so the class is absent; its spelling «B(4,0)» twice is `already-known`. Complex: ADR-CX-084 covers it. Grepped the twin rule: its two call sites are in `decideCommands3`, and the model lane asks without twins, as it always has.
 
-**Locks.** `src3d/__tests__/known-line-2341.test.ts`: the operator's sequence, the reverse order, every spelling, the re-tick, both refusals, the new point, the answer on a derived point, the load. `issue-2081-held-slots.test.ts` re-based: its radical spellings now assert the restatement, and each also verifies as an answer on a midpoint.
+**Locks.** `src3d/__tests__/known-line-2341.test.ts`: the operator's sequence, the reverse order, every spelling, the re-tick, both refusals, the new point, the answer on a derived point, the load; for the length, both letter orders, the value's spellings, a solid and placed points, «BA = 4» and «AB = 4», the re-tick, a first value. `issue-2081-held-slots.test.ts` re-based: its radical spellings now assert the restatement, and each also verifies as an answer on a midpoint.
 
-**Behaviour change for a student:** in 3-D, «B=(√2,0,0)» after «B(√2,0,0)», or the reverse, now answers «זה כבר קיים באיור — אין מה להוסיף.» and adds no row. Before, it added a ✓ row.
+**Behaviour change for a student:** in 3-D, «B=(√2,0,0)» after «B(√2,0,0)», or the reverse, and «BA = 3» after «AB = 3», now answer «זה כבר קיים באיור — אין מה להוסיף.» and add no row. Before, each added a ✓ row.
