@@ -52,7 +52,7 @@ import { SYMBOLS } from './ui/symbols';
 import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
 import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
-import { Banner } from '../shell/frame/Banner';
+import { Banner, InfoNote } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
 import { coincidencesOf } from './app/coincidences';
 import { convergeText } from '../shell/converge';
@@ -1486,10 +1486,7 @@ export function App() {
             */}
             {coincidences.length > 0 && (
               <div style={{ marginTop: 8 }} data-testid="analytic-converge-note">
-                <Banner kind="notice">
-                  <span aria-hidden="true">ⓘ </span>
-                  {convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}
-                </Banner>
+                <InfoNote>{convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}</InfoNote>
               </div>
             )}
           </div>

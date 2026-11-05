@@ -174,7 +174,7 @@ export async function narrowingFaults(gate: NarrowGate, b: Builder, rows: readon
  * *"same messages across tools"*. Each tree renders its real note (`narrowing-note-face-2266.test.tsx`) and hands the
  * markup here; `narrowing-note-face-meta-2266.test.tsx` proves this catches each way the builders used to differ.
  */
-export function noteFaceFaults(html: string, b: Builder): string[] {
+export function noteFaceFaults(html: string, b: Builder | 'complex'): string[] {
   const faults: string[] = [];
   const has = (rule: string) => html.replace(/\s/g, '').toLowerCase().includes(rule.toLowerCase());
   if (!html.includes('ⓘ')) faults.push(`the note in ${b} has no ⓘ`);

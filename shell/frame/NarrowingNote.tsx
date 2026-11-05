@@ -6,14 +6,4 @@
  * and the colour were each builder's own, which is how analytic came to draw it amber and 3-D to lose the ⓘ. They live
  * here so they cannot differ again. The sentence is the caller's, through its own locale: this file holds no string.
  */
-import type { ReactNode } from 'react';
-import { Banner } from './Banner';
-
-export function NarrowingNote({ children }: { children: ReactNode }) {
-  return (
-    <Banner kind="info">
-      <span aria-hidden="true">ⓘ </span>
-      {children}
-    </Banner>
-  );
-}
+export { InfoNote as NarrowingNote } from './Banner';

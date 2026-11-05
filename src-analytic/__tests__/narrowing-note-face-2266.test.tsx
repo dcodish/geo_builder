@@ -8,7 +8,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { I18nextProvider } from 'react-i18next';
+import { describe, expect, it, vi } from 'vitest';
+import { App } from '../App';
+import { useAnalyticStore } from '../store/useAnalyticStore';
 import { NarrowingNotes } from '../app/NarrowingNotes';
 import { narrowingNotesOf } from '../app/narrowing';
 import { circleNotesOf } from '../app/conicMarks';
@@ -16,6 +19,13 @@ import { derive } from '../engine/derive';
 import { analyticI18n } from '../i18n';
 import { stripFormatControls } from '../../shell/bidi';
 import { noteFaceFaults, noteMarkup } from '../../shell/__tests__/fixtures/narrowing-note-rows';
+
+vi.mock('../store/useAnalyticStore', async (importOriginal) => {
+  const m = await importOriginal<typeof import('../store/useAnalyticStore')>();
+  const real = m.useAnalyticStore;
+  const live = (sel?: (s: ReturnType<typeof real.getState>) => unknown) => (sel ? sel(real.getState()) : real.getState());
+  return { ...m, useAnalyticStore: Object.assign(live, real) };
+});
 
 const t = (k: string, o?: Record<string, unknown>) => analyticI18n.getFixedT('he')(k, o) as string;
 
@@ -45,6 +55,18 @@ describe('#2266 — analytic: the forced-narrowing note’s face', () => {
   it('the ellipse the givens make a circle keeps the narrowing note’s face', () => {
     const note = noteMarkup(page(['נתונה אליפסה שמשוואתה x^2/9+y^2/9=1']), 'analytic-conic-circle-note');
     expect(note).toContain('כעת מעגל');
+    expect(noteFaceFaults(note, 'analytic')).toEqual([]);
+  });
+
+  it('two letters on one dot, on the same strip, through the real App (judged 2026-11-05, q13)', () => {
+    useAnalyticStore.getState().restore({ lines: ['N1(1,1)', 'N2(1,1)', 'קטע N1N2'] });
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={analyticI18n}>
+        <App />
+      </I18nextProvider>,
+    );
+    const note = noteMarkup(html, 'analytic-converge-note');
+    expect(note).toContain('נפלו על אותה נקודה');
     expect(noteFaceFaults(note, 'analytic')).toEqual([]);
   });
 

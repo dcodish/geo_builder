@@ -19,26 +19,42 @@ vi.mock('../store/store3', async (importOriginal) => {
   return { ...m, useGeo3: Object.assign(live, real) };
 });
 
+/** The real App3 over the figure the real submit decision records for `lines`. */
+function page(lines: readonly string[]): string {
+  let n = 0;
+  let st: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  for (const line of lines) {
+    const v = decideDeterministic3(st, line, () => `f${++n}`);
+    if (v.kind !== 'record') throw new Error(`did not record: ${line}`);
+    st = { facts: v.facts, seed: v.seed };
+  }
+  useGeo3.setState(st);
+  return renderToStaticMarkup(
+    <I18nextProvider i18n={i18n3d}>
+      <App3 />
+    </I18nextProvider>,
+  );
+}
+
 describe('#2266 — 3-D: the forced-narrowing note’s face', () => {
   it.each([
     [['מלבן ABCD', 'מעוין ABCD'], 'ABCD הוא כעת ריבוע'], // the operator's T64
     [['מקבילית ABCD', 'AB = BC'], 'ABCD הוגבל'], // the cause-naming sentence
   ])('%j shows the ⓘ on the blue information strip', (lines, words) => {
-    let n = 0;
-    let st: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
-    for (const line of lines) {
-      const v = decideDeterministic3(st, line, () => `f${++n}`);
-      if (v.kind !== 'record') throw new Error(`did not record: ${line}`);
-      st = { facts: v.facts, seed: v.seed };
-    }
-    useGeo3.setState(st);
-    const html = renderToStaticMarkup(
-      <I18nextProvider i18n={i18n3d}>
-        <App3 />
-      </I18nextProvider>,
-    );
-    const note = noteMarkup(html, 'narrowed-note');
+    const note = noteMarkup(page(lines), 'narrowed-note');
     expect(stripFormatControls(note)).toContain(words);
+    expect(noteFaceFaults(note, '3d')).toEqual([]);
+  });
+
+  it('the right pyramid over a plain «מרובע» takes the same face, its words unchanged (judged 2026-11-05, q14)', () => {
+    const note = noteMarkup(page(['פירמידה ישרה SABCD שבסיסה מרובע']), 'base-constrained-note');
+    expect(note).toContain('כדי שהפירמידה תהיה ישרה');
+    expect(noteFaceFaults(note, '3d')).toEqual([]);
+  });
+
+  it('two letters on one dot, on the shared strip (judged 2026-11-05, q13)', () => {
+    const note = noteMarkup(page(['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB', 'N(1,0,0)']), 'converge-note');
+    expect(note).toContain('נפלו על אותה נקודה');
     expect(noteFaceFaults(note, '3d')).toEqual([]);
   });
 });

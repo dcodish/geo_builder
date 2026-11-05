@@ -57,6 +57,7 @@ import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
 import { NarrowingNote } from '../shell/frame/NarrowingNote';
+import { InfoNote } from '../shell/frame/Banner';
 import { Banner } from '../shell/frame/Banner';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
 import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
@@ -837,11 +838,14 @@ export default function App3() {
             <div key={`notice-${i}`} data-testid="narrowed-note">
               <NarrowingNote>{narrowingText3(n.note, t as NarrowTranslate)}</NarrowingNote>
             </div>
+          ) : n.kind === 'base-constrained' ? (
+            // ADR-3D-090, kept for the plain «מרובע» base only (#1996); on the narrowing note's face (ADR-W-180)
+            <div key={`notice-${i}`} data-testid="base-constrained-note">
+              <NarrowingNote>{t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })}</NarrowingNote>
+            </div>
           ) : (
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {n.kind === 'base-constrained' // ADR-3D-090, kept for the plain «מרובע» base only (#1996)
-                  ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : n.kind === 'line-rel-noun'
+              {n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'line-auto-named'
                     ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
@@ -861,8 +865,8 @@ export default function App3() {
           {/* #1595 (ADR-3D-404, ADR-W-176): two letters on one dot are accepted, and the page says so — 2-D's ADR-123
               sentence through the suite key, read from the DRAWN figure, so it holds while the drawing has the pair. */}
           {!busy && derived.coincidences.length > 0 && (
-            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              ⓘ {convergeText(derived.coincidences, t as ConvergeTranslate)}
+            <div data-testid="converge-note">
+              <InfoNote>{convergeText(derived.coincidences, t as ConvergeTranslate)}</InfoNote>
             </div>
           )}
           {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared

@@ -386,7 +386,7 @@ triangle's `readShapePhrase3` adjectives. Forced kinds: `ringKinds` over `knowle
 The cause search is capped at `NARROW_TRIALS_3D` subset trials (a COUNT — past it «בגלל הנתונים, …»). `buildNotices3`
 turns the result into `{ kind: 'narrowed', ids, note }`, rendered by `i18n/narrowingText3.ts` (`notice.narrowed.*`).
 `CYCLIC_MEMBER` is the solver's fix table only; the one pair the lattice cannot name — a right pyramid over a plain
-«מרובע» — keeps ADR-3D-090's `base-constrained` sentence.
+«מרובע» — keeps ADR-3D-090's `base-constrained` sentence, on the same `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).
 **Both voices: the subject decides, and the ring is read past the circle's name (#1975, [ADR-3D-341](06b-decisions-3d.md#adr-3d-341)).**
 `circleContains3`'s fallback (no container marker) asks `circleEnclosesByVoice3` — the copy of 2-D's voice reader:
 the subject of «חוסם» / "circumscribe" is the outer figure, and a ring between the circle noun and the verb («מעגל

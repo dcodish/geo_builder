@@ -6,7 +6,7 @@
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Banner } from '../frame/Banner';
+import { Banner, InfoNote } from '../frame/Banner';
 import { NarrowingNote } from '../frame/NarrowingNote';
 import { noteFaceFaults, noteMarkup } from './fixtures/narrowing-note-rows';
 
@@ -31,6 +31,13 @@ describe('#2266 — the note’s face catches a builder that differs', () => {
   it('catches 3-D’s missing ⓘ, on the strip and on its old box', () => {
     expect(noteFaceFaults(strip(<Banner kind="info">נוסח</Banner>), '3d')).toEqual(['the note in 3d has no ⓘ']);
     expect(noteFaceFaults(strip(<div role="note" className="border-blue-300 bg-blue-50">נוסח</div>), '3d')).toHaveLength(2);
+  });
+
+  it('the two-letters note: the strip passes in every builder that shows it, and complex’s amber is caught (q13)', () => {
+    for (const b of ['2d', '3d', 'analytic', 'complex'] as const) {
+      expect(noteFaceFaults(noteMarkup(strip(<InfoNote>A ו-B נפלו על אותה נקודה.</InfoNote>), 'n'), b)).toEqual([]);
+    }
+    expect(noteFaceFaults(strip(<Banner kind="notice">ⓘ A ו-B נפלו על אותה נקודה.</Banner>), 'complex')).toEqual(['the note in complex is not on the blue information strip']);
   });
 
   it('a note that is not on the page is a fault, not a pass', () => {

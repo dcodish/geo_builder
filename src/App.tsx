@@ -61,7 +61,7 @@ import { loadFigureText } from '@/store/figureLoad';
 import { forgetSession, offeredSession, restoreSession, startSessionPersist } from '@/store/sessionPersist';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
-import { Banner } from '../shell/frame/Banner';
+import { Banner, InfoNote } from '../shell/frame/Banner';
 import { NarrowingNote } from '../shell/frame/NarrowingNote';
 import { color as shellColor } from '../shell/theme';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
@@ -1535,12 +1535,12 @@ export default function App() {
           {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
           {visibleCoincidences(coincidences).length > 0 && (
-            <div style={infoBanner}>
+            <div data-testid="converge-note">
               {/* #581 (ADR-447 Am. 1, operator ruling): a pair with a machinery-minted member is not
                   shown at all — the notice explains why two points the STUDENT KNOWS merged. What
                   remains is student-named, so `describePoint` is a no-op here today; it stays as the
                   ADR-447 seam should a described anonymous pair ever be ruled back in. */}
-              ⓘ {convergeText(visibleCoincidences(coincidences), t, describePoint) /* #1595 (ADR-W-176): the suite key, `suite.notice.converge` */}
+              <InfoNote>{convergeText(visibleCoincidences(coincidences), t, describePoint) /* #1595 (ADR-W-176): the suite key, `suite.notice.converge` */}</InfoNote>
             </div>
           )}
 

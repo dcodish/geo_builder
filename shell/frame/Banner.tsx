@@ -37,6 +37,19 @@ export function Banner({ kind, children, onDismiss, dismissLabel, dismissAriaLab
   );
 }
 
+/**
+ * The information strip opened by the ⓘ, 2-D's face for a note about the figure: the forced narrowing (ADR-W-180) and
+ * two letters on one dot. The sentence is the caller's. A note on this face cannot lose the mark or the colour by builder.
+ */
+export function InfoNote({ children }: { children: ReactNode }) {
+  return (
+    <Banner kind="info">
+      <span aria-hidden="true">ⓘ </span>
+      {children}
+    </Banner>
+  );
+}
+
 const PALETTE = {
   error: { fg: color.danger, bg: color.dangerSoft, border: color.dangerBorder },
   notice: { fg: color.warn, bg: color.warnSoft, border: color.warnBorder },
