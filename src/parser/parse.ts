@@ -10810,8 +10810,8 @@ const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}[A-Za-z
  */
 const perpendicularPiece: Rule = (s, ctx) => {
   const m =
-    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+(?:${COPULA_HE}\s+)?ה?אנ${KAF}\s+ל-?\s*(${ULABEL})(${ULABEL})(?:\s+בנקודה\s+(${ULABEL}))?\s*$`)) ??
-    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+is\s+(?:a|the)\s+perpendicular\s+(?:on)?to\s+(${ULABEL})(${ULABEL})(?:\s+at\s+(${ULABEL}))?\s*$`));
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+(?:${COPULA_HE}\s+)?ה?אנ${KAF}\s+ל-?\s*(${ULABEL})(${ULABEL})(?:\s+בנקודה\s+(${ULABEL}))?\s*\.?\s*$`)) ??
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+is\s+(?:a|the)\s+perpendicular\s+(?:on)?to\s+(${ULABEL})(${ULABEL})(?:\s+at\s+(${ULABEL}))?\s*\.?\s*$`));
   if (!m) return null;
   const [from, to, a, b, at] = [m[1], m[2], m[3], m[4], m[5]];
   const have = new Set(ctx.points ?? []);
