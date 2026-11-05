@@ -229,7 +229,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
   "this is not supported" sends them away from a form that works. A clarification names the alternatives
-  in the student's notation and never escalates to the LLM lane; the tool asks only when the figure really
+  in the student's notation and never escalates to the LLM lane (a name an LLM answer loses is asked for once more, [FR-SU-32](02w-requirements-workspace.md)); the tool asks only when the figure really
   is ambiguous.
   - Sources: ADR-3D-131, ADR-3D-239; #467, #836, #866.
 - **FR-SP-10 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»

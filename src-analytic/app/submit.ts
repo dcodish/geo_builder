@@ -452,6 +452,16 @@ function decideOnce(
   // stepped past the session's seed; solving the line from there replaced the triangle on the screen with another one.
   const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {});
   /**
+   * #2231 (ADR-AG-410) — «MK אנך לציר x» from a point OF the line: the foot would be M itself, so the sentence is not the
+   * dropped perpendicular it reads as, and it keeps the verdict an unread line gets (the model's seam, as 2-D's relation).
+   */
+  for (const f of parsed.facts) {
+    if (f.t !== 'derived' || !f.piece || f.rule.t !== 'foot') continue;
+    const foot = trial.figure.points.find((p) => p.id === f.id);
+    const from = trial.figure.points.find((p) => p.id === (f.rule as { from: string }).from);
+    if (foot && from && Math.hypot(foot.x - from.x, foot.y - from.y) < 1e-9) return { kind: 'refused', error: { code: 'not-handled', detail: line, key: 'not-handled' } as unknown as InputError };
+  }
+  /**
    * #2427 (ADR-AG-325) — a capital the grammar READ as a parameter («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M»):
    * asked of the register, so every family is one question. R, S beside an area, and a point of the figure are not this.
    */

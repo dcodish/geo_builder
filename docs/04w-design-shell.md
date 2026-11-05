@@ -316,10 +316,19 @@ Read the last row of that table first. The products **differ** in what they emit
 kept (`prepareLine` returns `{ match, emit }`) rather than unified: unifying would change output in a
 shipped tool, a behaviour change wearing a refactor's clothes.
 
-**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `App3`, analytic in `runFallback`. In
+**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `src3d/app/escalate3Flow.ts`, analytic in `runFallback`. In
 every case it runs on the model's lines and **before** the deterministic re-parse, because the restored
 spelling is what must be parsed, recorded and read back. Complex has no LLM lane yet
 ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B14, #1869).
+
+**The one retry ([ADR-W-189](06w-decisions-workspace.md#adr-w-189), #2231).** `shell/llm/retryLostNames.ts`
+`askKeepingNames(ask, lostNamesOf, usable)` calls the transport once and, when the builder's own name gate reports a lost
+name on a usable answer, once more with `keep`: exactly one retry. It decides which answer goes on and nothing else; the
+builder's full battery then judges that answer. The body field `keep` is validated by `readKeep` in
+`server/llm/harness.ts` (at most 8 name tokens, otherwise ignored), and `buildRequest` adds one line after the student
+request; without it the request is byte-identical. The gates injected: 2-D `droppedNewLabels`, 3-D `droppedNewLabels3`,
+analytic `faithfulnessAnalytic(...).droppedNames`. A retry logs one `llm-retry` action (`nameRetryEvent`), detail
+`K:recovered` or `K:lost`, which the lean sinks and the admin session view already carry.
 
 **The corrections are logged.** Each product puts `restored` (`WAS→WANT`) on the submit event. Without
 it, a submit that was silently corrected looks exactly like one that needed no correction.

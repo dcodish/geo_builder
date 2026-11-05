@@ -594,6 +594,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'hypotenuse-no-right-angle', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
   // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
+  { id: 'perp-piece-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'], expect: 'builds', note: 'the same verdict, not yet the same figure: 2-D and analytic put K on AB as the foot (ADR-786, ADR-AG-410); 3-D reads a relation with K off AB, unported (#2231)' },
   { id: 'perp-to-base-flat-1944', family: 'cevians-centres', steps: ['משולש ABC', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }] },
   { id: 'perp-to-base-trapezoid-1944', family: 'cevians-centres', steps: ['טרפז ABCD', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }], note: 'the foot drops on the PARALLEL base (CD in 2-D, DC in 3-D), not on the first side of the ring' },
   { id: 'cat-2d-052', family: 'cevians-centres', steps: ['גובה מ-A במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -1168,6 +1169,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-coordinate-equals-1774', family: 'topic', steps: ['A = (3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: never accepted, taught as A(3,5) (ADR-W-030, ruling 2026-09-19 on #1245)' },
   { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
+  { id: 'ex-perp-piece-axis-2231', family: 'topic', steps: ['C(4,6)', 'CD אנך לציר ה-x'], contextFor: { '2d': [] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'D, the foot on the axis (ADR-AG-410); over a pair the sentence is the shared row perp-piece-2232' },
   { id: 'ex-origin', family: 'topic', steps: ['O ראשית הצירים'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-quadrant-1655', family: 'topic', steps: ['במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '#1655: 2-D used to draw the incircle and drop the quadrant' },
   { id: 'ex-slope-1654', family: 'topic', steps: ['משולש ABC', 'נתון: שיפוע הצלע AB הוא 3/4'], expect: 'builds', exception: 'X2', note: '#1654: 2-D used to commit |AB| = 0.75' },

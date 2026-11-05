@@ -110,7 +110,7 @@ describe('#1355 (c) — ORACLE rows (authored by the session as the model, not e
     ['plural numeral names («הישרים 1 ו-2»)', 'A נקודת החיתוך של הישרים 1 ו-2', ['A היא נקודת החיתוך של ישר 1 וישר 2']],
     ['a count is not a magnitude', 'מנקודה A יוצאים 2 משיקים למעגל O', ['המשיקים מ-A למעגל O']],
   ])('%s commits', (_name, utterance, answer) => {
-    expect(gates(utterance, answer, ['A(0,0)', 'B(4,0)', 'מעגל O'])).toEqual({ dropped: [], invented: [], inventedExisting: [] });
+    expect(gates(utterance, answer, ['A(0,0)', 'B(4,0)', 'מעגל O'])).toEqual({ dropped: [], droppedNames: [], invented: [], inventedExisting: [] });
   });
 });
 
@@ -120,7 +120,7 @@ describe('#1355 (c) — ORACLE rows (authored by the session as the model, not e
  */
 describe('#1355 (d) — every catalogue example is faithful to itself', () => {
   it.each(COMMAND_CATALOG_ANALYTIC.flatMap((e) => [[e.he], [e.en]]))('«%s»', (line) => {
-    expect(faithfulnessAnalytic(line, [line], new Set())).toEqual({ dropped: [], invented: [], inventedExisting: [] });
+    expect(faithfulnessAnalytic(line, [line], new Set())).toEqual({ dropped: [], droppedNames: [], invented: [], inventedExisting: [] });
   });
 });
 

@@ -39,6 +39,7 @@ import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
+import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
@@ -1022,9 +1023,10 @@ export function App() {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, act, atSeed, (utterance, context) =>
-        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he' }),
+      const out = await runFallback(raw, act, atSeed, (utterance, context, keep) =>
+        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he', ...(keep ? { keep } : {}) }),
       );
+      if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**
        * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
        *

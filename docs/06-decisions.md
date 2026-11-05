@@ -20254,3 +20254,19 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** New `src/app/__tests__/issue-2032-arc-plain-values.test.ts`; parity rows `arc-fraction-2032`, `arc-unit-length-2032`; analytic's `arc-length-refusal-2032.test.ts`.
 
 **Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 0.67°, not a chord of length 2/3. «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.
+## ADR-786 — «MK אנך ל-AB» from a placed M to a new K draws K, the foot on AB (#2232, in #2231's family)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (2-D, closed into #2231's family) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: B → *"yes"* (analytic and 2-D)
+**Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** none (internal): a parser rule. Stage: parse, before the ladder.
+
+**Class.** *A segment named by a placed point and a new letter, stated as the noun «אנך» to a side, is read as a free relation or a line's name, so the foot the sentence states is not built.*
+
+**Measured at 28dac0c3; the plan's account is partly out of date.** #2232 measured «משולש ABC · M על AC · MK אנך ל-AB» refused «'M' is already defined». Today it is read by `perpendicularConstraint` and refused «cannot place M on segment AC so that MK ⟂ AB» on some figures, and with M a vertex («AK אנך ל-BC») it records a relation with K created **off** BC. «MK אנך ל-AB בנקודה K», which #2232 called the working spelling, is the one still refused «already defined» (`lineNameLabels` reads the leading «MK» as the line's name). The asked outcome is unchanged: K on AB, MK ⟂ AB.
+
+**Decision.** A rule, `perpendicularPiece`, ahead of `perpendicularLine`: with M placed, K new, A and B placed, the noun «אנך» (optionally «בנקודה K», or "MK is a perpendicular to AB") lowers to `foot` K from M on AB, named, plus the segment MK. Every other figure keeps its reading: both letters new («DE אנך ל-AB»), K placed, M a letter of AB, or M on AB, where the sentence is the perpendicular at M and a foot would be M itself. «מאונך / ניצב» keep the relation. The rule reads `ctx.points`, `onSegment`, `midpointOf` and `collinearWith`, all semantic fields (docs/17 §3b). Not an existing-object guard: it adds a reading for a NEW letter.
+
+**Sibling check.** Analytic: ADR-AG-410, the same sentence. 3-D reads it as a relation with K off AB: recorded on parity row `perp-piece-2232`, unported.
+
+**Locks.** Scenarios `perp-piece-foot-2232` (K on AB and MK ⟂ AB at every seed) and `perp-piece-keeps-relation-2232`; parity row `perp-piece-2232`; catalog line.
+
+**Behaviour change for a student:** «AK אנך ל-BC» on a triangle now puts K on BC, where it used to float beside it with the right angle kept; «MK אנך ל-AB» with M on AC builds instead of refusing.

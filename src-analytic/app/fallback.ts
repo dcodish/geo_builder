@@ -36,8 +36,9 @@ import type { Seed } from '../engine/evaluate';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
 import { existingNamesAnalytic, faithfulnessAnalytic, restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
 import type { InputError } from '../store/useAnalyticStore';
+import { askKeepingNames, type NameRetry } from '../../shell/llm/retryLostNames';
 
-export type FallbackOutcome =
+type Judged =
   /** The proxy was throttled. The caller says "busy", never "I did not understand". */
   | { kind: 'busy'; why: 'rate-limited' | 'daily-limit' }
   /** No usable answer, or the model judged the request inexpressible. Keep the deterministic refusal. */
@@ -91,6 +92,9 @@ export type FallbackOutcome =
       inventedExisting?: string[];
     };
 
+/** What came of the fallback, with the one retry (#2231, ADR-W-189) when one was made, for the log. */
+export type FallbackOutcome = Judged & { retry?: NameRetry };
+
 /** What the model is told the figure already holds. Kept short — the proxy caps it at 1000 chars. */
 export function fallbackContext(lines: readonly string[]): string {
   if (!lines.length) return 'The figure is empty.';
@@ -102,14 +106,30 @@ export function fallbackContext(lines: readonly string[]): string {
  *
  * `ask` is the transport (`llmParseAnalytic` in the app, a stub in tests). `lines` is the figure as
  * accepted so far; `seed` is the configuration on screen.
+ *
+ * #2231 (ADR-W-189): an answer that loses a name the student typed is asked for once more, naming what to keep
+ * (`keep`, the third argument of `ask`, on the retry only). A lost number never retries. Whichever answer comes back
+ * meets every gate below, so a name still lost is the `unfaithful` refusal that names it.
  */
 export async function runFallback(
   utterance: string,
   lines: readonly string[],
   seed: Seed,
-  ask: (utterance: string, context: string) => Promise<LlmStepsOutcome | null>,
+  ask: (utterance: string, context: string, keep?: readonly string[]) => Promise<LlmStepsOutcome | null>,
 ): Promise<FallbackOutcome> {
-  const answer = await ask(utterance, fallbackContext(lines));
+  const context = fallbackContext(lines);
+  const existing = existingNamesAnalytic(derive(lines, seed).construction);
+  const { answer, retry } = await askKeepingNames(
+    (keep) => (keep ? ask(utterance, context, keep) : ask(utterance, context)),
+    (a) => faithfulnessAnalytic(utterance, restoreStatedSequencesAnalytic(utterance, [...a.steps]).lines, existing).droppedNames,
+    (a) => !a.busy && a.steps.length > 0,
+  );
+  const out = judgeAnswer(utterance, lines, seed, answer, existing);
+  return retry ? { ...out, retry } : out;
+}
+
+/** The gates, on the one answer that goes on. */
+function judgeAnswer(utterance: string, lines: readonly string[], seed: Seed, answer: LlmStepsOutcome | null, existing: ReadonlySet<string>): Judged {
   if (!answer) return { kind: 'none' };
   if (answer.busy) return { kind: 'busy', why: answer.busy };
   if (!answer.steps.length) return { kind: 'none' };
@@ -158,7 +178,7 @@ export async function runFallback(
    * dropped above as already-known still states its given, so it still accounts for a name or a number.
    */
   if (accepted.length) {
-    const f = faithfulnessAnalytic(utterance, gated.lines, existingNamesAnalytic(derive(lines, seed).construction));
+    const f = faithfulnessAnalytic(utterance, gated.lines, existing);
     if (f.dropped.length || f.invented.length || f.inventedExisting.length) {
       return {
         kind: 'unfaithful',

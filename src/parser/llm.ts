@@ -63,7 +63,8 @@ export async function llmParse(
   utterance: string,
   context: string,
   ctxFor: LaneContext = () => ({}),
-  opts: { signal?: AbortSignal } = {},
+  // `keep` (#2231, ADR-W-189): the names the previous answer lost — this call is the one retry
+  opts: { signal?: AbortSignal; keep?: readonly string[] } = {},
 ): Promise<LlmOutcome | null> {
   let steps: string[];
   try {
@@ -74,7 +75,7 @@ export async function llmParse(
     const res = await fetch(`${import.meta.env.BASE_URL}api/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ utterance, context }),
+      body: JSON.stringify({ utterance, context, ...(opts.keep?.length ? { keep: opts.keep } : {}) }),
       signal: opts.signal,
     });
     if (!res.ok) {

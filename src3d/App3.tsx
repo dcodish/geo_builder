@@ -42,7 +42,8 @@ import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
-import { restoreStatedSequences3 } from './parser/honesty3';
+import { escalate3Flow } from './app/escalate3Flow';
+import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { decideDeterministic3 } from './app/decideDeterministic3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
@@ -595,20 +596,15 @@ export default function App3() {
     if (err?.code === 'not-understood') {
       setBusy(true);
       try {
-        const live = useGeo3.getState();
-        const ctx = `Existing points: ${[...derive3(live.facts, live.seed).construction.points.keys()].join(', ') || '(none)'}.`;
-        const rawSteps = await escalate3(raw, ctx);
-        // #555 (ADR-3D-173) — the SEQUENCE gate, applied to the canonical lines BEFORE the re-parse:
-        // a stated point-run the model respelled is restored to the student's own spelling, so the
-        // tested grammar derives the semantics from what the student wrote (the 2-D #536 shape).
-        const seq = rawSteps ? restoreStatedSequences3(raw, rawSteps) : null;
-        const steps = seq ? seq.lines : rawSteps;
+        // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test
+        const { steps, restored, retry } = await escalate3Flow(useGeo3.getState(), raw, escalate3);
+        if (retry) logDebug3(nameRetryEvent(retry));
         if (steps) submitSteps(raw, steps);
         err = useGeo3.getState().lastError;
         // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
         // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
         // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(seq && seq.restored.length > 0 ? { restored: seq.restored } : {}), result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }

@@ -212,7 +212,7 @@ export type Fact =
    * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
    * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
    */
-  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true; follows?: RoleBinding })
+  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true; follows?: RoleBinding; piece?: true })
   /**
    * `ref` (#1639, ADR-AG-198) — the segment is drawn by a sentence that REFERS to its ends («AC קוטר במעגל»), so
    * the ends must already exist: it never introduces them, as the bare «AC» line (which NAMES the segment) does.

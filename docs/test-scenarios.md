@@ -2264,3 +2264,10 @@ over all four (ADR-041).
 ### `tool-midpoint-reversed-takes-letter-2674` — «משולש ABC» · «אמצע BC» · «D אמצע CB»: one point D, no notice (#2674, ADR-785)
 
 **Guards against:** a tool's midpoint keeping its letter beside the student's when the student writes the segment the other way round, so "the same point" depended on spelling. **Asserts** every step green, no verifier violation, no M, D at the midpoint, and no coincidence pair.
+### `perp-piece-foot-2232` — «משולש ABC» · «M על AC» · «MK אנך ל-AB»: K is the foot on AB (#2232, ADR-786)
+
+**Guards against:** the noun «אנך» from a placed point to a new letter refused, or read as a relation with K off the side. **Asserts** K on line AB, MK ⟂ AB, K ≠ M, at every seed.
+
+### `perp-piece-keeps-relation-2232` — «משולש ABC» · «M על AB» · «MK אנך ל-AB»: the perpendicular at M (#2232, ADR-786)
+
+**Guards against:** the foot reading collapsing K onto M. **Asserts** K ≠ M and MK ⟂ AB.

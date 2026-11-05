@@ -1362,3 +1362,9 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 - A vector given by its COMPONENTS with no points at all («נתון: v = (10,-5,0)») cannot start a figure:
   `Construction3.vectors` is `Map<name, {from, to}>` — a vector IS a point pair — so this needs the
   positionless-vector design in [#1188](https://github.com/dcodish/geo_builder/issues/1188).
+
+## The LLM escalation is an `app/` module ([ADR-W-189](06w-decisions-workspace.md#adr-w-189), #2231)
+
+`src3d/app/escalate3Flow.ts` holds what `App3` did inline: the ask, the one retry (`askKeepingNames` over `droppedNewLabels3`)
+and the sequence gate, pure over the injected `escalate3`. It commits nothing: `App3` hands the steps to `submitSteps`, whose
+`decideSteps3` runs the battery.

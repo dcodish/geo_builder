@@ -6,13 +6,14 @@
  * app posts to the existing `/geo-builder/api/parse` reverse proxy.
  */
 
-export async function escalate3(utterance: string, context: string): Promise<string[] | null> {
+export async function escalate3(utterance: string, context: string, keep?: readonly string[]): Promise<string[] | null> {
   try {
     const endpoint = import.meta.env.DEV ? '/api/parse' : '/geo-builder/api/parse';
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ utterance, context, tool: '3d' }),
+      // `keep` (#2231, ADR-W-189): the names the previous answer lost — this call is the one retry
+      body: JSON.stringify({ utterance, context, tool: '3d', ...(keep?.length ? { keep } : {}) }),
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { steps?: unknown };

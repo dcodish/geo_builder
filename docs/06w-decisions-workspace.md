@@ -6967,3 +6967,29 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Locks.** `shell/__tests__/literal-1497.test.ts`; `src3d/__tests__/issue-1497-format-of-entry.test.ts` (the operator's sequence, every table row); `src/__tests__/issue-1497-given-spelling.test.tsx`; `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`; `src-complex/__tests__/canvas-spelling-1497.test.ts`; `issue-2361-stated-value-text.test.ts` re-based («√20» now reads «√20», which ADR-3D-416 left to this issue).
 
 **Behaviour change for a student:** a fraction or a root reads as typed wherever a given is printed, in every builder; a decimal is never rewritten as a fraction; a decimal past two places reads the house decimals.
+## ADR-W-189 — An AI answer that loses a name the student typed is asked for once more; still lost, the refusal naming it stands (#2231)
+
+**Status:** accepted · 2026-11-05 · operator ruling · bug (P2, `reported`, 2d + 3d + analytic + server) · round #2722 · branch `fix/2231-keep-student-letter` · **supersedes ruling (c) of 2026-10-16** on #2231 (accept with a notice), which was never built
+
+**Operator:** 2026-10-16: *"1b"* (retry once, naming the letter); 2026-10-18, the decisions page: **A**, *"Retry once. If K is still missing, keep today's refusal naming K."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-32; [02](02-requirements.md) FR-IN-2b and [02b](02b-requirements-3d.md) point to it · **Design:** [04w](04w-design-shell.md) "The one retry"; [04b](04b-design-3d.md) "The LLM escalation is an `app/` module". Not a ladder mechanism: it sits at the LLM seam, before any stage.
+
+**Class.** *When the AI's reading of a sentence loses a name the student typed (a point or a line), each builder refuses at once, although one more request naming what to keep usually recovers the student's own figure.* The refusals are right (ADR-240, ADR-3D-147, ADR-AG-279) and stay. Every builder with an AI fallback lacked the retry in the same way; complex has no AI fallback, so nothing to retry.
+
+**Measured at 28dac0c3 (mocked model).** Analytic `runFallback('MK אנך לציר x')` with the logged answer `האנך מהנקודה M לציר ה-x`: `unfaithful, dropped: ['K']`, one call; `l3 הוא אנך אמצעי של EK` with `אנך אמצעי ל-EK`: `dropped: ['l3']`. That second sentence is now read by the grammar on a figure holding E and K (#1138), so it no longer reaches the model there; the seam lock keeps it as the line-name case.
+
+**Decision.**
+1. `shell/llm/retryLostNames.ts`: `askKeepingNames` asks once, and once more with `keep` when the builder's own name gate reports a lost name on a usable answer. Exactly one retry. A retry that fails (no answer, busy, empty) leaves the first answer. No strings, no product knowledge (ADR-W-016).
+2. The trigger is NAMES only: 2-D `droppedNewLabels`, 3-D `droppedNewLabels3`, analytic `faithfulnessAnalytic`'s new `droppedNames`, which counts line names through the tree's own lexing. A lost number, relation or word keeps today's refusal on the first answer.
+3. After the retry nothing new decides: the answer goes through the full battery, unchanged. A name still lost gets 2-D `input.labelsDropped`, 3-D `dropped-given`, analytic `llm-dropped`. No figure is drawn without a typed letter; the notice of ruling (c) is not built.
+4. Server: the body's optional `keep` is validated by `readKeep` (at most 8 name tokens, otherwise ignored) and adds one line after the student request. A retry is an ordinary request: it counts against the per-IP limit and the daily cap. Without `keep` the request is byte-identical. Shared server, parameterized by `tool:`, never forked.
+5. 3-D's escalation moves out of `App3` into `src3d/app/escalate3Flow.ts`, so the decision is reachable from a test (docs/17 §3, the seam registry's second half).
+
+**Deviations from the plan, mechanism only.** The retry logs one `llm-retry` `action` event (`nameRetryEvent`), not a `retry` field on the `llm` event: 2-D ends a submit at a dozen log sites, and the lean sinks drop unknown submit fields, while an action reaches the admin session view unchanged. The name token also admits Hebrew letters and a space, up to 8 characters, because a numeral line's shown name is «ישר 3». A timeout or a cancel during the retry leaves the first answer, so the student reads the refusal naming the letter, not «service busy». A dashboard counter is not built; the action rows are its data.
+
+**Cost.** One more model call, only after a name loss, at most once per submit, under the existing limits and the existing 15 s bound (2-D and analytic share one abort across both calls).
+
+**Locks.** `shell/__tests__/retryLostNames.test.ts`, `server/__tests__/issue-2231-keep.test.ts`, `src/app/__tests__/issue-2231-llm-retry.test.ts` (through `runSubmit`), `src3d/__tests__/issue-2231-llm-retry3.test.ts` (through `escalate3Flow` and `decideSteps3`), `src-analytic/__tests__/issue-2231-llm-retry.test.ts` (through `runFallback`). All mocked (standing rule 2).
+
+**Behaviour change for a student:** a line whose AI reading lost a typed name may now build with that name, after a second request; a line that stays lost reads the same refusal as before, a moment later.

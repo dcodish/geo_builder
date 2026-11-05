@@ -148,6 +148,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'האנך מהנקודה B לציר ה-x', en: 'the perpendicular from B to the x-axis', needs: ['B(1,14)'] },
   { category: 'lines', family: 'F3', he: 'האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D', en: 'the perpendicular from C to the x-axis meets it at D', needs: ['C(4,6)'] },
   { category: 'lines', family: 'F3', he: 'D רגל האנך מ-C לציר ה-x', en: 'D is the foot of the perpendicular from C to the x-axis', needs: ['C(4,6)'] },
+  { category: 'lines', family: 'F3', he: 'CD אנך לציר ה-x', en: 'CD is a perpendicular to the x-axis', needs: ['C(4,6)'] },
   {
     category: 'lines',
     family: 'F3',

@@ -7939,6 +7939,14 @@ const PERP_PLURAL_EN = new RegExp(
 const PERP_FOOT_EN = new RegExp(
   `^(?:(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+foot\\s+of\\s+the\\s+perpendicular${PERP_FROM_EN}\\s+(?:on)?to\\s+(.+)$`,
 );
+/**
+ * #2231 ([ADR-AG-410](../../docs/06c-decisions-analytic.md#adr-ag-410)) — «MK אנך לציר x» · «MK אנך ל-AB» · «MK הוא אנך לציר
+ * ה-y» · «MK אנך ל-AB בנקודה K» · "MK is a perpendicular to the x-axis": the NOUN, the piece that ends on the line, so its
+ * second letter is the foot. The adjectives «מאונך / ניצב» keep the relation: «MK מאונך לציר x» does not say K is on the
+ * axis. A trailing point, when written, is that foot, or it is not this sentence.
+ */
+const PERP_PIECE_HE = new RegExp(`^(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?ה?אנך${PERP_TO_HE}(?:\\s+בנקודה\\s+(${NAME}))?$`);
+const PERP_PIECE_EN = new RegExp(`^(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+perpendicular\\s+(?:on)?to\\s+(.+?)(?:\\s+at\\s+(${NAME}))?$`);
 /** «האנך» as an OPERAND — bare, or by its description («האנך שהורידו מנקודה B לציר ה-x»). */
 const PERP_REF_HE = new RegExp(`^ה?אנך(?:${PERP_VERB_CLAUSE}${PERP_FROM_HE}(?:${PERP_TO_HE})?)?$`);
 const PERP_REF_EN = new RegExp(`^(?:[Tt]he\\s+)?[Pp]erpendicular(?:${PERP_FROM_EN}(?:\\s+(?:on)?to\\s+(.+?))?)?$`);
@@ -8040,6 +8048,16 @@ function parsePerpendicular(line: string): RuleOutcome {
   if (foot) {
     const [, id, from, onto] = foot;
     return perpendicularFacts(from, onto, id, false, line);
+  }
+  const piece = PERP_PIECE_HE.exec(line) ?? PERP_PIECE_EN.exec(line);
+  if (piece) {
+    const [, from, to, onto, at] = piece;
+    if (from === to || (at && at !== to)) return null;
+    const target = footLineOf(onto, { out: [], src: '' });
+    // A piece from a point of the line, or ending on one of its letters, has no foot: not this sentence.
+    if (!target || (target.k === 'points' && [target.a, target.b].some((p) => p === from || p === to))) return null;
+    const read = perpendicularFacts(from, onto, to, true, line);
+    return read.ok ? made(read.facts.map((f) => (f.t === 'derived' && f.id === to ? { ...f, piece: true } : f))) : read;
   }
   const one = PERP_HE.exec(line) ?? PERP_EN.exec(line);
   if (one) {
