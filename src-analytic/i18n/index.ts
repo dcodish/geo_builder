@@ -679,6 +679,8 @@ const he = {
    */
   noticeTeachCanonical:
     'בספר לא כותבים «{{verb}}» — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  // #1774 (ADR-AG-409) — «(3,5)A»: the letter comes first; the sentence is already in the box
+  noticeTeachPointOrder: 'שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
   sessionContinue: 'המשך מהמקום שבו הפסקת',
@@ -1226,6 +1228,7 @@ const en: typeof he = {
   redo: 'Redo',
   noticeTeachCanonical:
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
+  noticeTeachPointOrder: "A point's letter comes before its coordinates. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',

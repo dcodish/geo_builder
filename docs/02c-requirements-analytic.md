@@ -184,7 +184,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «נתונה אליפסה שמשוואתה x²/9−y²/16=1» → "that is a hyperbola, and this tool does not draw those"
 - Sources: ADR-AG-170.
 
-**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form.
+**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form. A letter after its coordinates, «(3,5)A» (right-to-left typing), is taught, not accepted: «A(3,5)» goes in the input box with «שם הנקודה נכתב לפני השיעורים» (ADR-AG-409, #1774).
 - Sources: ADR-AG-187, #1618.
 
 **R9 — Picture references are recognised and ignored.** They parse to **nothing**, inline or trailing, and never fall through to `not-handled` (ADR-3D-214 D2).
