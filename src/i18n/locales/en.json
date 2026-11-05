@@ -75,7 +75,8 @@
       "no-circle": "«{{noun}} {{pair}}»: there is no circle in the figure yet, so it is unclear which end is the centre. Draw the circle first — e.g. «circle {{a}}».",
       "no-polygon": "«{{noun}} {{pair}}»: {{pair}} is not a side of any triangle or trapezoid in the figure, so there is nothing to give it that role. Declare the shape first.",
       "several-polygons": "«{{noun}} {{pair}}»: {{pair}} is a side of several shapes ({{options}}), so it is unclear which one is meant. State the given directly — e.g. a right angle or parallel sides.",
-      "leg-apex": "«{{noun}} {{pair}}»: in a triangle a leg starts at the apex — {{a}} or {{b}} — and the sentence does not say which. Write the equality: «{{a}}{{b}} = {{a}}{{other}}» or «{{b}}{{a}} = {{b}}{{other}}»."
+      "leg-apex": "«{{noun}} {{pair}}»: in a triangle a leg starts at the apex — {{a}} or {{b}} — and the sentence does not say which. Write the equality: «{{a}}{{b}} = {{a}}{{other}}» or «{{b}}{{a}} = {{b}}{{other}}».",
+      "hypotenuse-apex": "The right angle was stated at vertex {{other}}, so the hypotenuse is {{pair}} and a line to it starts at {{other}}, not at {{options}}. Write the line from {{other}}, or change the line that states the right angle."
     },
     "noAngleYet": "There is no angle at vertex {{vertex}} yet — first draw two sides that leave {{vertex}}, or write the angle with three letters.",
     "ambiguousAngleOptions": "There are several angles at {{vertex}}: {{options}}. Which one do you mean? Write it with three letters — e.g. «∠{{example}} = 90» — or give it a name: «denote angle {{example}} as {{vertex}}1».",

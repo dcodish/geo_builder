@@ -22,7 +22,7 @@ import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTange
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
 import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
 import { namesCurveFeature, sameDerivation } from './sameDerivation';
-import { isHelperId, typedLetters } from './toolLetters';
+import { freeToolLetter, isHelperId, typedLetters } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { EN_SHAPE, displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
@@ -2508,6 +2508,11 @@ function applyHypotenuseCevian(c: Construction, f: Extract<Fact, { t: 'cevian-of
   const [{ ring, at }] = [...hosts.values()];
   const { hypotenuse: _hypotenuse, either: _either, ...cevian } = f;
   const across = (v: Id): [Id, Id] => ring.filter((x) => x !== v) as [Id, Id];
+  // «תיכון ליתר בנקודה C» with C a vertex: the locative apex (2-D's LOCATIVE_APEX); the foot is then the tool's.
+  if (!f.apex && ring.includes(f.foot)) {
+    const foot = freeToolLetter(f.role === 'median' ? 'midpoint' : 'foot', new Set(c.objects.map((o) => o.id)));
+    if (foot) return applyFact(c, { ...f, apex: f.foot, foot });
+  }
   if (f.apex) {
     // The typed segment's end that is a vertex of the triangle is the apex; two, or none, name no vertex.
     const swap = f.either && !ring.includes(f.apex) && ring.includes(f.foot);
@@ -5433,6 +5438,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // The same point derived the same way already has a name (#1153): the cevian runs to IT.
         const rule = toolFootRule(f.role, apex, u, v);
         const same = c.objects.find((o) => o.kind === 'derived' && !o.follows && sameDerivation(o.rule, rule));
+        // #2166 (ADR-790): the typed letter is never dropped: the tool's letter yields to it (#2674), a student's is the model's.
+        if (same && f.typedFoot) {
+          if (same.kind === 'derived' && same.tool) return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
+          return { ok: false, error: { code: 'not-handled', detail: f.src } };
+        }
         if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]);
         // The foot's letter is the tool's (#2674): `auto`, so a student's fresh letter for the same point takes it over.
         const tool = toolFootFacts(f.role, apex, f.foot, u, v, f.src).map((h): Fact => (h.t === 'derived' ? { ...h, auto: true } : h));

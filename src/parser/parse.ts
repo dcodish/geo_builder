@@ -11053,8 +11053,49 @@ const existingFootOf = (ctx: ParseContext, from: Id | null, a: Id, b: Id): Id | 
 
 const SPECIAL_LINE_HEAD = /תיכון|גובה|\bmedian\b|\bheight\b|\baltitude\b/i;
 const ROLE_NOUN_RX = /(?<![א-ת])(?:ל|על\s+|אל\s+)ה?(יתר|בסיס(?!\s*ה?(?:גדול|קטן))|שוקיים|שוק)(?![א-ת])|\b(?:to|onto|on)\s+the\s+(hypotenuse|base|legs?)\b/i;
-/** The foot's letter closing a role cevian: «… בנקודה K», "… at K", "… at the point K" (#2074, ADR-787). */
-const ROLE_FOOT_TAIL = rx(String.raw`\s(?:ב-?\s*ה?נקודה\s+|at\s+(?:the\s+)?(?:point\s+)?)(${LABEL})\s*$`);
+/** The foot's letter closing a cevian sentence: «… בנקודה K», "… at K", "… at the point K" (#2166, ADR-790). */
+const FOOT_LETTER_TAIL = rx(String.raw`\s(?:ב-?\s*ה?נקודה\s+|at\s+(?:the\s+)?(?:point\s+)?)(${LABEL})\s*$`);
+/** A cevian head, the bisector's included (the role reader's heads never read a bisector). */
+const FOOT_LETTER_HEAD = rx(String.raw`${SPECIAL_LINE_HEAD.source}|${BISECT_KW}`);
+
+/**
+ * A FOOT LETTER STATED AFTER A CEVIAN NOUN (#2166, [ADR-790](../../docs/06-decisions.md#adr-790)) — «תיכון לצלע AB בנקודה K»,
+ * «תיכון ליתר בנקודה K», «תיכון מ-C בנקודה K», «גובה מ-C בנקודה K», «חוצה זווית C בנקודה K», "median to side AB at K".
+ *
+ * Every cevian rule reads the foot only in the named-segment form («CK תיכון»); in the noun forms the tool letters the
+ * foot and «בנקודה K» stays unread. One reader, not one per rule: the rest of the line goes through the real grammar,
+ * and the one foot it mints takes the typed letter. Renaming is what keeps the reading the bare noun's, so `roleSide`
+ * travels unchanged and an open right triangle cycles. It declines a letter that is a vertex (a locative apex, or
+ * `split-statements`), a crossing, a rest that names the segment itself, a foot the figure already holds under another
+ * letter, and a bound foot on a point the figure holds: an existing point cannot follow the seat.
+ */
+const cevianFootLetter: Rule = (s, ctx) => {
+  if (!FOOT_LETTER_HEAD.test(s)) return null;
+  const tail = s.match(FOOT_LETTER_TAIL);
+  if (!tail) return null;
+  const name = up(tail[1]);
+  if ((ctx.polygons ?? []).some((ring) => ring.map(up).includes(name))) return null;
+  const rest = s.slice(0, tail.index).trim();
+  // «התיכון לצלע AB חותך את המעגל בנקודה K»: the letter closes a crossing, another statement's point, not the foot.
+  if (rx(MEET_KW).test(rest)) return null;
+  if (!SPECIAL_LINE_HEAD.test(s)) {
+    // The bare bisector noun has no reading of its own to rename: it is its named-segment form, «CK חוצה זווית C».
+    const letters = statedLabelTokens(rest);
+    const vertex = letters.length === 1 ? letters[0] : letters.length === 3 ? letters[1] : null;
+    if (!vertex || vertex === name) return null;
+    const named = parse(`${vertex}${name} ${rest}`, ctx);
+    return named.ok ? named.commands : null;
+  }
+  const r = parse(rest, ctx);
+  if (!r.ok) return null;
+  const feet = r.commands.filter((c): c is Extract<Command, { type: 'midpoint' | 'foot' }> => c.type === 'midpoint' || c.type === 'foot');
+  if (feet.length !== 1 || feet[0].id === name) return null;
+  const old = feet[0].id;
+  if (statedLabelTokens(rest).includes(old) || ctx.points?.includes(old)) return null;
+  if (ctx.points?.includes(name) && r.commands.some((c) => c.roleSide)) return null;
+  return JSON.parse(JSON.stringify(r.commands), (_k, v) => (v === old ? name : v)) as Command[];
+};
+
 const roleSideLine: Rule = (s, ctx) => {
   if (!SPECIAL_LINE_HEAD.test(s)) return null;
   const m = s.match(ROLE_NOUN_RX);
@@ -11068,8 +11109,8 @@ const roleSideLine: Rule = (s, ctx) => {
   const unstatedHosts = roleAll.filter((r) => r.unstated);
   // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
   // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
-  // (#2074: the foot tail is not a pair — "… at K" would read as the side AT.)
-  const afterNoun = s.replace(ROLE_FOOT_TAIL, '').slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
+  // (#2166: the foot tail is not a pair — "… at K" would read as the side AT.)
+  const afterNoun = s.replace(FOOT_LETTER_TAIL, '').slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
   const selected = afterNoun
     ? cands.find((r) => sameSide(r.edge[0], r.edge[1], up(afterNoun[1]), up(afterNoun[2]))) ?? null
     : null;
@@ -11131,6 +11172,13 @@ const roleSideLine: Rule = (s, ctx) => {
     });
     if (hits.length === 1) typedIso = hits[0];
   }
+  // #2074 (ADR-787, judged 2026-11-05: "the diagram either respects all input or refuses"): a STATED right angle, and
+  // the one ring vertex the sentence typed is another vertex — no reading makes that line a cevian to the hypotenuse.
+  if (role === 'hypotenuse' && !afterNoun && cands.length === 1 && cands[0].ring && cands[0].at) {
+    const typed = [...new Set(statedLabelTokens(s).filter((l) => cands[0].ring!.map(up).includes(l)))];
+    if (typed.length === 1 && typed[0] !== up(cands[0].at))
+      return { clarify: 'role-claim', why: 'hypotenuse-apex', noun, a: cands[0].edge[0], b: cands[0].edge[1], other: up(cands[0].at), options: typed };
+  }
   const pick =
     namedOpenSide || apexClaim || typedIso ? null
     : bindOpen ?? selected ??
@@ -11144,14 +11192,9 @@ const roleSideLine: Rule = (s, ctx) => {
   // any other letters stay untouched for the letter-form rules to read
   const restated = rx(String.raw`(?:${ROLE_NOUN_RX.source})\s*(?:${p}${q}|${q}${p})(?![A-Za-z\d])`, 'i');
   const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
-  // #2074 (ADR-787): «תיכון ליתר בנקודה K» names the foot, a NEW point outside the triangle. It is read as the letter
-  // form «CK תיכון לצלע AB» with the resolver's apex, so the binding below carries the line with the right angle. A
-  // foot the figure already holds is not read here: on an open seat it could not follow.
-  const pickRing = role === 'hypotenuse' ? pick?.ring?.map(up) : undefined;
-  const footTyped = pickRing ? s.match(ROLE_FOOT_TAIL)?.[1] : undefined;
-  const newFoot = footTyped && !pickRing!.includes(up(footTyped)) && !ctx.points?.includes(up(footTyped)) ? up(footTyped) : null;
-  const letterForm = newFoot ? `${pickRing!.find((x) => x !== p && x !== q)}${newFoot} ${s.replace(ROLE_FOOT_TAIL, '').replace(ROLE_NOUN_RX, target)}` : null;
-  const rewritten = (letterForm ?? (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target))).replace(/\s+/g, ' ').trim();
+  // #2166: a foot letter `cevianFootLetter` declined on an open seat stays declined here: it could not follow the seat.
+  if (bindOpen && FOOT_LETTER_TAIL.test(s)) return null;
+  const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
   const r = parse(rewritten, ctx);
   if (!r.ok) return null;
   // #2074 (ADR-659): the typed apex's claim, prepended as the role-claim post-pass prepends «היתר AB»'s
@@ -12810,6 +12853,7 @@ export const RULES: Rule[] = [
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
   shapeHeight, // #1443: «גובה הטרפז 4» — a height magnitude with no segment named: mint + draw the foot, or ASK which height
   roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
+  cevianFootLetter, // #2166: «תיכון לצלע AB בנקודה K» — the rest through the grammar, its one foot takes the typed letter
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   pairEqualSize, // #2149 «רדיוסי המעגלים O ו-P שווים» — equal size of a named pair (ADR-671); before radiusRatio/setRadius
@@ -13285,7 +13329,7 @@ function withConcentricResolution(
  *  - `several-polygons` — the pair is a side of several polygons the role could be about;
  *  - `leg-apex` — a leg of a triangle: the apex is one of its two ends and the words do not say which.
  */
-export type RoleClaimWhy = 'centre-end' | 'no-centre-end' | 'no-circle' | 'no-polygon' | 'several-polygons' | 'leg-apex';
+export type RoleClaimWhy = 'centre-end' | 'no-centre-end' | 'no-circle' | 'no-polygon' | 'several-polygons' | 'leg-apex' | 'hypotenuse-apex';
 
 /** Command kinds that put a point on a circle (or define a circle through it) — the forms a rule uses
  *  when IT modelled a chord end's membership. */

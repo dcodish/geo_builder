@@ -17260,7 +17260,7 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 
 **Measured after** (the same path, plus «הציגו תצורה אחרת» through `searchAnotherView`). Every spelling commits bound at C; A, B, C do not move when the line is added; three presses walk the right angle C → A → B → C with the median's foot (or the altitude's) on the side opposite it each time, every view green with no violation. «CM / AM תיכון ליתר» and «גובה ליתר מ-C» put the right angle at the typed vertex, and no press moves it. «תיכון ליתר AB» unchanged (∠C = 90). «תיכון ליתר» · «זווית A ישרה» runs from A to BC at every view (ADR-596 / FR-ALT-7). Two open right triangles ask `roleSideUnresolved`.
 
-**Not delivered (measured; ⚠ delivered by [ADR-787](#adr-787), 2026-11-05).** «תיכון ליתר בנקודה K» now goes to the model, as «זווית C ישרה» · «תיכון ליתר בנקודה K» already does: 2-D has no reading of a median whose foot letter is given by «בנקודה K» («משולש ABC» · «תיכון לצלע AB בנקודה K» goes to the model too). Before it was asked. The plan expected it to bind; that needs the foot-letter reading, a separate capability (reported as found work). **The analytic half** waits for #2018 (its plan's item), so analytic still asks; parity rows carry the gap on #2074.
+**Not delivered (measured; ⚠ delivered by [ADR-790](#adr-790), 2026-11-05).** «תיכון ליתר בנקודה K» now goes to the model, as «זווית C ישרה» · «תיכון ליתר בנקודה K» already does: 2-D has no reading of a median whose foot letter is given by «בנקודה K» («משולש ABC» · «תיכון לצלע AB בנקודה K» goes to the model too). Before it was asked. The plan expected it to bind; that needs the foot-letter reading, a separate capability (reported as found work). **The analytic half** waits for #2018 (its plan's item), so analytic still asks; parity rows carry the gap on #2074.
 
 **Cost (docs/17 §7).** One pass over a triangle's objects/constraints per role read; no sampler, no solve, no new axis.
 
@@ -20149,27 +20149,50 @@ No new student text. Every sentence is an existing ruled string.
 
 **Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».
 
-## ADR-787 — «תיכון ליתר בנקודה K»: the foot's letter typed after the role noun is read, and the foot follows the right angle (#2074)
+## ADR-787 — A vertex typed against a stated right angle is refused: «זווית A ישרה» · «CM תיכון ליתר» (#2074)
 
-**Status:** accepted · 2026-11-05 · bug (P2, `2d` + `analytic`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Completes** [ADR-659](#adr-659) (its "Not delivered" line) · the 2-D side of [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411)
-**Requirements:** [02](02-requirements.md) FR-ALT-7 (a foot letter follows too) · **Design:** [04](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** none (a parse rewrite; no solve, sample or stage changes)
+**Status:** accepted · 2026-11-05 · bug (P2, `2d` + `analytic`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-659](#adr-659) · the 2-D side of [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411)
+**Requirements:** [02](02-requirements.md) FR-IN-9 · **Design:** [04](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** none (a parse refusal)
 
-**The request.** 2026-10-13 (#2074), and the plan's `[asked]` line of 2026-10-14: «תיכון ליתר בנקודה K» behaves as «תיכון ליתר».
+**The ruling.** Judged 2026-11-05 (round #2722, q18, choice B, [ADR-W-173](06w-decisions-workspace.md)), on the precedents *"the idea of order is not relevant since the diagram should either respect all input or refuse to build"* (#1339, 2026-09-19) and *"Refuse only when nothing the student wrote can save it"* (#1927, 2026-10-09).
 
-**Measured before** (`28dac0c3`, the recorded ADR-659 verdict): with an open seat, and with a stated one, the line went to the model.
+**Measured before** (`5f315584`, `decideDeterministic2D`). «משולש ישר-זווית ABC» · «זווית A ישרה» · «CM תיכון ליתר» committed `midpoint, segment`, with no refusal. The same with «משולש ABC» first. The reverse order, «CM תיכון ליתר» · «זווית A ישרה», was refused. So the verdict depended on the order, and analytic refused both.
 
-**Class (docs/17 §1).** *A foot's letter typed after a role noun is not consumed by the role reader, so a sentence the reader understood escalates on the leftover letter.*
+**Class (docs/17 §1).** *A typed vertex that contradicts a stated right angle is lowered as a cevian to the stated hypotenuse, so the typed letter is kept and the claim «ליתר» silently is not.* Members: «CM …», «… מ-C», «… בנקודה C», median and altitude.
 
-**Decision.** `roleSideLine` reads a closing `ROLE_FOOT_TAIL` («… בנקודה K», "… at K", "… at the point K") for the hypotenuse. A letter outside the triangle that the figure does not hold rewrites the line to its letter form «CK תיכון לצלע AB», with the resolver's apex; the student typed no triangle letter, so the ADR-596 binding applies and the fold moves the line with `rot`. A foot the figure already holds is not read: on an open seat it could not follow, so it keeps its model verdict. The tail is also stripped before the letters-after-the-noun read, which took "at" for the side AT.
+**Decision.** In `roleSideLine`, when one hypotenuse is STATED and the sentence types exactly one ring vertex that is not its vertex, the line is refused with `role-claim` / `hypotenuse-apex`. The new sentence names the stated vertex, the hypotenuse it makes, and the typed vertex (new text, [ADR-W-174](06w-decisions-workspace.md)). The vertex of the stated right angle builds as before.
 
-**Not widened.** «תיכון ליתר» only. «תיכון לבסיס בנקודה K» and the lettered «תיכון לצלע AB בנקודה K» keep their model verdict.
+**Measured after.** Both entry orders refuse, for the four spellings and on a plain triangle; «זווית A ישרה» · «AM תיכון ליתר» builds.
 
-**Measured after.** See the locks: the Hebrew and English median and altitude forms bind, walk C → A → B → C with the foot on the side opposite the right angle, leave A, B, C unmoved, and never call the model.
+**Cost (docs/17 §7).** One letter filter per hypotenuse line.
 
-**Cost (docs/17 §7).** One regex per role line. No sampler, no solve.
+**Sibling audit.** Analytic refuses both orders (`unsatisfiable`). 3-D reads no role nouns (#1679, parked).
 
-**Sibling audit.** Analytic: [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411), same item; its `FOOT_TAIL_HE` could not match a bare «בנקודה K» and is repaired there. 3-D reads no role nouns (#1679, parked). Complex has no plane hypotenuse.
+**Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts`, the refusal block.
 
-**Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts` (the foot-letter block; the old "same verdict as its stated twin" row replaced). Parity row `hypotenuse-foot-letter-2074`.
+**Behaviour change for a student.** With the right angle stated at A, «CM תיכון ליתר» is refused and says why, instead of being drawn.
 
-**Behaviour change for a student.** «תיכון ליתר בנקודה K» and «גובה ליתר בנקודה K» draw at once, with the foot named K, and «הציגו תצורה אחרת» moves it with the right angle.
+## ADR-790 — A foot letter after a cevian noun names the foot: «תיכון לצלע AB בנקודה K», «תיכון ליתר בנקודה K» (#2166)
+
+**Status:** accepted · 2026-11-05 · bug (P2, `2d`, `analytic`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Delivers** [ADR-659](#adr-659)'s "Not delivered" line · analytic: [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411)
+**Requirements:** [02](02-requirements.md) FR-ALT-7 and FR-IN-9 · **Design:** [04](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** none (a parse rule)
+
+**The ruling.** 2026-10-15 on #2166: *"«תיכון לצלע AB בנקודה K» (and «ליתר», «מ-C») draws the median with its foot named K, and cycles like the bare noun on an open right triangle"*. The altitude, the bisector and an existing K are the armed plan's `[2-D]` lines (measured at `18e38e44`); the median in both builders is also judged q17, choice C, 2026-11-05.
+
+**Measured before** (`28dac0c3`). The median and altitude noun forms with «בנקודה K» escalated; «חוצה זווית C בנקודה K» escalated, and so does the bare «חוצה זווית C».
+
+**Class (docs/17 §1).** *A foot letter stated after a cevian noun is read by no rule.*
+
+**Decision.** One rule, `cevianFootLetter`, registered just before `roleSideLine`. It takes a closing `FOOT_LETTER_TAIL`, sends the rest through the grammar, requires exactly one foot (`midpoint` or `foot`), and renames it. Renaming keeps the bare noun's reading, so `roleSide` travels and an open right triangle cycles. It declines a vertex (the locative apex, or `split-statements`), a rest that names the segment, a foot the figure already holds under another letter, and a bound foot on a point the figure holds.
+
+**Plan contact, recorded.**
+- **The bisector** could not be renamed: its bare noun has no reading in 2-D. The rule reads it as its named form «CK חוצה זווית C», which is the plan's own comparison.
+- **A crossing.** The plan's rule named no guard, and measured, «התיכון לצלע AB חותך את המעגל בנקודה K» made K the midpoint, a stated crossing silently replaced. The rule declines when the rest carries `MEET_KW`, because the letter then closes another statement. This is a word test in a §3 chokepoint; the alternative, a leftover check on the rest, needs a parser that reports unread words, which 2-D's does not.
+
+**Cost (docs/17 §7).** One extra parse of the rest, on lines with a cevian head and a foot tail only.
+
+**Sibling audit.** Analytic: ADR-AG-411. 3-D does not read the bare noun, so a foot letter has nothing to name: unscheduled parity cells on `foot-letter-*-2166`. Complex has no cevians.
+
+**Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts` (the foot-letter blocks, both locales, the refusals). Scenario `foot-letter-follows-the-seat-2166` (corpus 4). Parity rows `foot-letter-*-2166`, `hypotenuse-foot-letter-2074`.
+
+**Behaviour change for a student.** «תיכון לצלע AB בנקודה K», «תיכון מ-C בנקודה K», «תיכון ליתר בנקודה K», the same with «גובה», and «חוצה זווית C בנקודה K» draw at once with the foot named K. A K already on that side moves to the foot; a K on another side is refused.

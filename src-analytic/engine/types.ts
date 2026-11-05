@@ -321,6 +321,8 @@ export type Fact =
       hypotenuse?: true;
       /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
       toolFoot?: true;
+      /** The sentence typed the foot's letter («… בנקודה K», #2166), so an existing point cannot silently replace it. */
+      typedFoot?: true;
       /**
        * EITHER END MAY BE THE VERTEX (#1999, ADR-AG-278): the sentence wrote the segment's two letters and the role, and
        * only the figure says which end is the vertex — «AM תיכון לצלע CD» after «משולש CMD» is «MA תיכון לצלע CD». M1

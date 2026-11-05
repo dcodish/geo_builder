@@ -15296,7 +15296,7 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 
 ## ADR-AG-411 — «תיכון ליתר» on a right triangle with no stated right angle draws on the shown triangle and follows the seat; a typed vertex states it (#2074)
 
-**Date:** 2026-11-05 · **Status:** accepted · bug (P2, `analytic` + `2d`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-AG-211](#adr-ag-211) (the hypotenuse question) · **Extends** [ADR-AG-298](#adr-ag-298) to the hypotenuse · ports 2-D's [ADR-659](06-decisions.md#adr-659) and [ADR-787](06-decisions.md#adr-787) · LADDER stage: none (M1 and the existing `resolvedAt` pass)
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, `analytic` + `2d`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-AG-211](#adr-ag-211) (the hypotenuse question) · **Extends** [ADR-AG-298](#adr-ag-298) to the hypotenuse · ports 2-D's [ADR-659](06-decisions.md#adr-659) and [ADR-790](06-decisions.md#adr-790) (#2166) · LADDER stage: none (M1 and the existing `resolvedAt` pass)
 **Requirements:** [02c](02c-requirements-analytic.md) R103c (rewritten) and R178 · **Design:** [04c](04c-design-analytic.md) "A cevian to a side named by its role", the hypotenuse paragraph
 
 **Rulings.** 2026-10-13: *"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show other option will create a different triangle with the constraints in place"*. 2026-10-14: *"Naming C («CM תיכון ליתר») or AB («תיכון ליתר AB») forces the seat"*; card `d14-2072-cross`: analytic follows 2-D.
@@ -15312,7 +15312,10 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 2. `applyHypotenuseCevian` owns the arm. One host: an open seat binds at choice seed 0's vertex through `boundCevian`, shared with `applyRoleCevian`; a stated right angle is the lettered twin, unbound.
 3. A typed apex states `rightAngleAt` and draws the lettered cevian, unbound. New readers: `… ליתר מ-C`, `גובה מ-C ליתר`, `CM תיכון ליתר`, «התיכון ליתר הוא CM» and the English forms. A segment typed foot-first is oriented by the ring; two ring letters, or none, ask.
 4. Several right triangles ask `ambiguous-role-side` with 2-D's sentence (`roleWordHypotenuse`). `ambiguous-hypotenuse` and `errAmbiguousHypotenuse` had no reader left and are deleted.
-5. `FOOT_TAIL_HE` required two whitespace runs, so the bare «… בנקודה K» that ADR-AG-211 documents never matched anywhere. Repaired at the constant, so the lettered «תיכון לצלע BC בנקודה D» and «גובה מ-A בנקודה H» read as that ADR says.
+5. `FOOT_TAIL_HE` required two whitespace runs, so the bare «… בנקודה K» that ADR-AG-211 documents never matched anywhere. Repaired at the constant, so «תיכון לצלע AB בנקודה K» and «גובה מ-A בנקודה H» read as that ADR says, the median judged (q17, choice C, 2026-11-05) and the altitude on #2166's armed `[2-D]` line. `FOOT_TAIL_EN` gains "at point K".
+6. A typed foot is `typedFoot`, so an existing point can never silently replace it: a tool's letter yields to it (#2674), a student's stays with the model. Before this it was dropped with «כבר ידוע».
+7. A vertex letter is the apex: «תיכון ליתר בנקודה C» as «CM תיכון ליתר», the foot the tool's. Judged q19, choice B, 2026-11-05; 2-D measured at `5f315584` (`set-angle` at C). The context-free parser cannot know the ring, so M1 picks the letter with `freeToolLetter`. Known cost: that letter is not announced on the row, unlike a parser-minted one.
+8. «חוצה זווית C בנקודה K» reads as «CK חוצה זווית C», 2-D's reading (#2166).
 
 **Deviation recorded.** The plan's reader list named the apex forms «CM …», «… מ-C» and English; «גובה מ-C ליתר», "the median from C to the hypotenuse" and «התיכון ליתר הוא CM» were added because 2-D reads them (measured) and the plan rules one verdict.
 

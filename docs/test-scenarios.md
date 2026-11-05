@@ -2259,3 +2259,7 @@ over all four (ADR-041).
 ### `extension-shared-endpoint-past-second-2518` — «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R»: R beyond O (#2518, ADR-780)
 
 **Guards against:** a shared-endpoint extension drawn on the wrong side of its second letter (R between A and O, or beyond A) while every row was green, although putting O inside circle P gives the stated side. **Asserts** every step green, A–O–R in order, R on circle P, O inside circle P. The matrix is `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`; ADR-142's and ADR-267's scenarios lock the either-side tier.
+
+### `foot-letter-follows-the-seat-2166` — «תיכון ליתר בנקודה K»: the foot is named K and follows the right angle; «תיכון לצלע AB בנקודה K» names the midpoint (#2166, ADR-790)
+
+**Guards against:** a foot letter after a cevian noun read by no rule, so the line went to the model. **Asserts** no M is drawn, every view green over three presses, K equidistant from the three vertices at each, the right angle visiting every vertex, and K the midpoint of AB on the side form.

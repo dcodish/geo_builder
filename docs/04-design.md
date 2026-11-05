@@ -1566,9 +1566,10 @@ letter typed (the noun alone, or a foot outside the ring) → the commands BIND 
 typed («CM תיכון ליתר», «גובה ליתר מ-C») → the cevian to the opposite side plus `set-angle` 90° at that vertex,
 unbound (the claim «תיכון ליתר AB» states); more than one host (another right triangle, open or stated) →
 `role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
-triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse. A new foot letter closing the
-line («… בנקודה K», "… at K", `ROLE_FOOT_TAIL`) rewrites it as «CK תיכון לצלע AB» with the resolver's apex, so the
-binding still applies ([ADR-787](06-decisions.md#adr-787)); a foot the figure already holds is not read there.
+triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse. One ring vertex typed against a
+STATED right angle is `role-claim` / `hypotenuse-apex` ([ADR-787](06-decisions.md#adr-787)). A foot letter closing a
+cevian sentence is `cevianFootLetter`, just before `roleSideLine`: the rest goes through the grammar and its one foot
+is renamed, so `roleSide` travels and the line still follows the seat ([ADR-790](06-decisions.md#adr-790)).
 
 **A role stated about typed letters is a claim, in every spelling ([ADR-708](06-decisions.md#adr-708), #1839).** Typed
 letters stay literal (no binding), and the sentence also states its role through one lowering, `isoscelesRoleClaim`

@@ -173,6 +173,28 @@ describe('#2074 — a typed letter forces the seat (ruling 2026-10-14)', () => {
       }
     });
   }
+  // Judged 2026-11-05: analytic reads a vertex letter as the apex, as 2-D does (measured: `set-angle` at that vertex).
+  for (const [line, vertex] of [['תיכון ליתר בנקודה C', 'C'], ['תיכון ליתר בנקודה A', 'A'], ['the median to the hypotenuse at B', 'B']] as const) {
+    it(`«${line}»: the letter is the apex: the right angle at ${vertex}, the foot the tool's M`, () => {
+      for (const seed of SEEDS) {
+        const d = built([RT, line], seed);
+        expect(seatOf(d), `seed ${seed}`).toBe(vertex);
+        expect(isMid(d, 'M', across(vertex)), `seed ${seed}`).toBe(true);
+      }
+    });
+  }
+  it('«גובה ליתר בנקודה C»: the altitude from C, the foot H', () => {
+    for (const seed of SEEDS) {
+      const d = built([RT, 'גובה ליתר בנקודה C'], seed);
+      expect(seatOf(d)).toBe('C');
+      expect(isFoot(d, 'H', 'C', 'AB')).toBe(true);
+    }
+  });
+  it('a vertex letter against a stated right angle is refused, in both entry orders', () => {
+    expect(refusal([RT, 'זווית A ישרה', 'תיכון ליתר בנקודה C'])).not.toBe('record');
+    expect(refusal([RT, 'תיכון ליתר בנקודה C', 'זווית A ישרה'])).not.toBe('record');
+    expect(refusal([RT, 'CM תיכון ליתר', 'זווית A ישרה'])).not.toBe('record');
+  });
   it('«תיכון ליתר AB» is unchanged: the right angle at C at every seed', () => {
     for (const seed of SEEDS) {
       const d = built([RT, 'תיכון ליתר AB'], seed);
@@ -276,5 +298,36 @@ describe('#2074 — what still asks', () => {
     expect(refusal([RT, 'K על AB', 'תיכון ליתר בנקודה K'])).toBe('not-handled');
     expect(refusal([RT, 'התיכון ליתר הוא 4'])).toBe('not-handled');
     expect(refusal([RT, 'הגובה ליתר הוא 4'])).toBe('not-handled');
+  });
+});
+
+describe('#2166 — a foot letter after a cevian noun, as 2-D reads it', () => {
+  const T = 'משולש ABC';
+  for (const line of ['תיכון לצלע AB בנקודה K', 'תיכון מ-C בנקודה K', 'median to side AB at K', 'median from C at point K']) {
+    it(`«${line}»: K is the midpoint of AB`, () => {
+      for (const seed of [0, 1, 2]) expect(isMid(built([T, line], seed), 'K', 'AB')).toBe(true);
+    });
+  }
+  for (const [line, from, side, foot] of [['גובה לצלע AB בנקודה K', 'C', 'AB', 'K'], ['גובה מ-A בנקודה H', 'A', 'BC', 'H']] as const) {
+    it(`«${line}»: ${foot} is the foot from ${from}`, () => {
+      for (const seed of [0, 1, 2]) expect(isFoot(built([T, line], seed), foot, from, side)).toBe(true);
+    });
+  }
+  it('«חוצה זווית C בנקודה K» is «CK חוצה זווית C»', () => {
+    for (const seed of [0, 1, 2]) {
+      const [a, b] = [built([T, 'חוצה זווית C בנקודה K'], seed), built([T, 'CK חוצה זווית C'], seed)];
+      expect(Math.hypot(P(a, 'K').x - P(b, 'K').x, P(a, 'K').y - P(b, 'K').y)).toBeLessThan(1e-9);
+    }
+  });
+  it('a point already on the side moves to the foot', () => {
+    for (const seed of [0, 1, 2]) expect(isMid(built([T, 'K על AB', 'תיכון לצלע AB בנקודה K'], seed), 'K', 'AB')).toBe(true);
+  });
+  it('REFUSAL: a point on another side cannot be that foot', () => {
+    expect(refusal([T, 'K על BC', 'תיכון לצלע AB בנקודה K'])).not.toBe('record');
+  });
+  it('the tool’s letter yields to a typed one: the letter is never dropped', () => {
+    const d = built([T, 'תיכון מ-C', 'תיכון לצלע AB בנקודה K'], 0);
+    expect(isMid(d, 'K', 'AB')).toBe(true);
+    expect(d.figure.points.some((p) => p.id === 'M')).toBe(false);
   });
 });
