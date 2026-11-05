@@ -26,6 +26,7 @@ import { isHelperId, typedLetters } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { EN_SHAPE, displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { probeEnvs } from './probes';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
 import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
@@ -506,7 +507,7 @@ function admitStated(
     const merged = r.next.params.find((p) => p.sym === value.name)?.domain;
     return merged && emptyDomain(merged) ? refuse : { ok: true, next: r.next };
   }
-  const somewhere = PROBE_ENVS.some((env) => inDomain(domain, evalExpr(value, env)));
+  const somewhere = probeEnvs(value).some((env) => inDomain(domain, evalExpr(value, env)));
   return somewhere ? { ok: true, next: c } : refuse;
 }
 
@@ -839,12 +840,6 @@ export type ApplyOutcome =
  */
 const CURVE_BEARING: ReadonlySet<string> = new Set(['curve', 'circle-at', 'line-at', 'circle-thru', 'common-tangent']);
 
-/** The probe environment for restatement comparison — see `sameNumbers`. */
-const PROBE_ENVS: Env[] = [
-  { a: 1.7, b: 2.3, k: 1.3, m: 0.7, n: 2.1, p: 1.9, r: 1.1, t: 2.7 },
-  { a: 3.1, b: 1.1, k: 2.9, m: 1.3, n: 0.9, p: 3.3, r: 2.3, t: 1.3 },
-];
-
 /**
  * WHAT KIND OF CURVE an object is — one answer for every contextual reference (#1057, #1324).
  *
@@ -868,7 +863,7 @@ export function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'line-at' || o.kind === 'common-tangent') return 'line';
   if (o.kind !== 'curve') return null;
   if (o.curve.kind) return o.curve.kind;
-  const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
+  const probe = resolveCurve(o.curve, probeEnvs(o.curve.eq)[0]);
   return probe.ok ? probe.curve.kind : null;
 }
 
@@ -964,7 +959,7 @@ function centresAlwaysCoincide(c: Construction, a: GeoObject, b: GeoObject): boo
     return 'moves';
   };
   let judged = 0;
-  for (const env of PROBE_ENVS) {
+  for (const env of probeEnvs(...circleExprs(c, a), ...circleExprs(c, b))) {
     const p = centreAt(a, env);
     const q = centreAt(b, env);
     if (p === 'moves' || q === 'moves') return false;
@@ -1111,7 +1106,7 @@ function resolveCurveByEq(c: Construction, eq: unknown): Id | null {
     Object.entries(a).every(([key, v]) => typeof v !== 'number' || (typeof b[key] === 'number' && close(v, b[key] as number)));
   for (const o of c.objects) {
     if (o.kind !== 'curve') continue;
-    const match = PROBE_ENVS.every((env) => {
+    const match = probeEnvs(eq as Expr, o.curve.eq).every((env) => {
       const mine = resolveCurve({ eq } as typeof o.curve, env);
       const theirs = resolveCurve(o.curve, env);
       return mine.ok && theirs.ok && same(mine.curve as unknown as Record<string, unknown>, theirs.curve as unknown as Record<string, unknown>);
@@ -1185,7 +1180,7 @@ const mintedEffect = (out: ApplyOutcome, minted: boolean): ApplyOutcome =>
 function sameNumbers(a: unknown, b: unknown): boolean {
   const ea = a as Parameters<typeof evalExpr>[0];
   const eb = b as Parameters<typeof evalExpr>[0];
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(ea, eb).every((env) => {
     const va = evalExpr(ea, env);
     const vb = evalExpr(eb, env);
     if (!Number.isFinite(va) || !Number.isFinite(vb)) return false;
@@ -1566,7 +1561,7 @@ function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: 
   let stated = standardCircleParts(eq);
   if (!stated && (spoken.a || spoken.b || spoken.r || usedElsewhere)) {
     // A circle with constant centre and radius needs no algebra: its parts are read at the probes.
-    const fits = PROBE_ENVS.map((env) => resolveCurve({ eq } as Curve, env));
+    const fits = probeEnvs(eq).map((env) => resolveCurve({ eq } as Curve, env));
     const first = fits[0];
     if (!first.ok || first.curve.kind !== 'circle') return null;
     const { cx, cy, r } = first.curve;
@@ -1592,7 +1587,7 @@ function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: 
   }
   const carriedFacts: Fact[] = [];
   if (spoken.r) {
-    const at = PROBE_ENVS.map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
+    const at = probeEnvs(carried.r).map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
     const constant = at.every((v) => Number.isFinite(v) && v === at[0]);
     carriedFacts.push(
       constant || !stated
@@ -2109,7 +2104,7 @@ function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
       if (k.t === 'tangent-circle' && sidesAre(k.a, k.b, o1, c1, o2, c2)) return k.branch === 'external' ? 'ext-tangent' : 'int-tangent';
     }
   }
-  const at = PROBE_ENVS.map((env) => [circleAtProbe(c, o1, env), circleAtProbe(c, o2, env)] as const);
+  const at = probeEnvs(...circleExprs(c, o1), ...circleExprs(c, o2)).map((env) => [circleAtProbe(c, o1, env), circleAtProbe(c, o2, env)] as const);
   const [p0, q0] = at[0];
   if (!p0 || !q0) return null;
   const same = (u: NumCircle | null, v: NumCircle) =>
@@ -2140,6 +2135,14 @@ function statedTangent(c: Construction, c1: Id, c2: Id): boolean {
 }
 
 type NumCircle = { kind: 'circle'; cx: number; cy: number; r: number };
+
+/** What `circleAtProbe` and `centresAlwaysCoincide` read of a circle: the expressions its probes must cover (#2566). */
+function circleExprs(c: Construction, o: GeoObject): Expr[] {
+  if (o.kind === 'curve') return [o.curve.eq];
+  if (o.kind !== 'circle-at') return [];
+  const centre = objectById(c, o.centre);
+  return centre && centre.kind === 'point' ? [centre.x as Expr, centre.y as Expr, o.r as Expr] : [o.r as Expr];
+}
 
 /** A circle's numbers at a probe, when they are read off its own statement (a centre given by coordinates, an equation). */
 function circleAtProbe(c: Construction, o: GeoObject, env: Env): NumCircle | null {
@@ -3740,7 +3743,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'sector': {
       if (f.a === f.b || f.v === f.a || f.v === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
-      const deg = f.value ? evalExpr(f.value, PROBE_ENVS[0]) : null;
+      const deg = f.value ? evalExpr(f.value, probeEnvs(f.value)[0]) : null;
       if (deg !== null && !(deg > 0 && deg < 360)) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       const reflex = deg !== null && deg > 180;
       const central: Expr | undefined = f.value && reflex ? { kind: 'sub', a: { kind: 'num', value: 360 }, b: f.value } : f.value;
@@ -4159,7 +4162,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       // The stated circle's centre and radius, read at the probes: a value that moves with the parameters
       // is not a constant this boundary can write down (no CAS) — refused by name, never dropped.
-      const fits = PROBE_ENVS.map((env) => resolveCurve({ eq: f.eq } as Curve, env));
+      const fits = probeEnvs(f.eq).map((env) => resolveCurve({ eq: f.eq } as Curve, env));
       const first = fits[0];
       if (!first.ok || first.curve.kind !== 'circle') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       const { cx, cy, r } = first.curve;
@@ -4176,7 +4179,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // different is the contradiction, said on this line (not left to the solve to miss).
       const centre = objectById(c, host.centre);
       if (centre && centre.kind === 'point') {
-        const at = PROBE_ENVS.map((env) => [evalExpr(centre.x as Parameters<typeof evalExpr>[0], env), evalExpr(centre.y as Parameters<typeof evalExpr>[0], env)]);
+        const at = probeEnvs(centre.x, centre.y).map((env) => [evalExpr(centre.x as Parameters<typeof evalExpr>[0], env), evalExpr(centre.y as Parameters<typeof evalExpr>[0], env)]);
         const fixed = at.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && close(x, at[0][0]) && close(y, at[0][1]));
         if (fixed && !(close(at[0][0], cx) && close(at[0][1], cy))) {
           return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
@@ -4352,7 +4355,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (host.kind === 'circle-at') r = host.r as Expr;
       else if (host.kind === 'curve') {
         const curve = host.curve;
-        const radii = PROBE_ENVS.map((env) => {
+        const radii = probeEnvs(curve.eq).map((env) => {
           const rc = resolveCurve(curve, env);
           return rc.ok && rc.curve.kind === 'circle' ? rc.curve.r : NaN;
         });
@@ -4793,7 +4796,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       if (host.kind === 'curve') {
         // An equation circle's radius is determined by its equation — the sentence is a claim.
-        const agrees = PROBE_ENVS.every((env) => {
+        const agrees = probeEnvs(host.curve.eq, f.value).every((env) => {
           const rc = resolveCurve(host!.kind === 'curve' ? host!.curve : { eq: undefined as never }, env);
           const v = evalExpr(f.value as Parameters<typeof evalExpr>[0], env);
           return rc.ok && rc.curve.kind === 'circle' && Number.isFinite(v) && Math.abs(rc.curve.r - v) <= 1e-9 * Math.max(1, rc.curve.r, Math.abs(v));
@@ -4938,7 +4941,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       const own: Array<[number, number, number]> = [];
       let agrees = true;
-      for (const env of PROBE_ENVS) {
+      for (const env of probeEnvs(host.curve.eq, f.eq)) {
         const pc = resolveCurve(host.curve, env);
         const gl = resolveCurve({ eq: f.eq }, env);
         if (!pc.ok || pc.curve.kind !== 'parabola' || !gl.ok || gl.curve.kind !== 'line') {
@@ -6335,7 +6338,7 @@ function sameCurve(a: Curve, b: Curve): boolean {
   // an unclaimed family agrees with whatever the other one claimed. Identity is the equation; the
   // kind is an expectation the classifier will settle either way.
   if (a.kind && b.kind && a.kind !== b.kind) return false;
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(a.eq, b.eq).every((env) => {
     const ka = fitConic(a.eq, env);
     const kb = fitConic(b.eq, env);
     if (!ka || !kb) return false;
@@ -6377,7 +6380,7 @@ const IDENTICAL_COEF_TOL = 1e-12;
 
 function identicalCurve(a: Curve, b: Curve): boolean {
   if (a.kind && b.kind && a.kind !== b.kind) return false;
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(a.eq, b.eq).every((env) => {
     const ka = fitConic(a.eq, env);
     const kb = fitConic(b.eq, env);
     if (!ka || !kb) return false;
