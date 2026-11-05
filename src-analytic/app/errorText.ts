@@ -225,7 +225,6 @@ export function errorText(error: InputError, t: Translate): string {
     'coordinate-restriction': 'errCoordinateRestriction',
     'ambiguous-cevian': 'errAmbiguousCevian',
     'cevian-no-triangle': 'errCevianNoTriangle',
-    'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
     'ambiguous-no-right-angle': 'errCevianNoRightAngle',
     // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
     'ambiguous-role-side': 'errRoleSideUnresolved',
@@ -387,7 +386,7 @@ export function errorText(error: InputError, t: Translate): string {
     letter: error.key === 'capital-magnitude' ? error.letter : '',
     lineName: error.key === 'line-exists' ? error.lineName : '',
     corrected: error.key === 'capital-magnitude' ? error.corrected : '',
-    role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
+    role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : error.role === 'hypotenuse' ? 'roleWordHypotenuse' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',

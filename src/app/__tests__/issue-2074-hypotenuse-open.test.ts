@@ -144,9 +144,39 @@ describe('#2074 — what still asks', () => {
     expect(g.last.note?.key).toBe('input.roleSideUnresolved');
   });
 
-  it('«תיכון ליתר בנקודה K» gets the verdict its stated-angle twin gets (the foot-letter reading is a separate gap)', async () => {
-    const open = await play([RT, 'תיכון ליתר בנקודה K']);
-    const stated = await play([RT, 'זווית C ישרה', 'תיכון ליתר בנקודה K']);
-    expect(open.last.kind).toBe(stated.last.kind);
+  it('a foot the figure already holds is not read on an open seat: it stays with the model', async () => {
+    const g = await play(['משולש ישר-זווית ABC', 'K על AB', 'תיכון ליתר בנקודה K']);
+    expect(g.last.kind).not.toBe('commit');
+  });
+});
+
+// #2074 (ADR-787): the plan's [asked] spelling ADR-659 did not deliver — the foot's letter typed after the noun.
+describe('#2074 — «תיכון ליתר בנקודה K»: the foot takes the typed letter and follows the seat', () => {
+  for (const [noun, line, lang] of [
+    [RT, 'תיכון ליתר בנקודה K', 'he'],
+    [RT, 'גובה ליתר בנקודה K', 'he'],
+    ['right triangle ABC', 'the median to the hypotenuse at K', 'en'],
+    ['right triangle ABC', 'the altitude to the hypotenuse at the point K', 'en'],
+  ] as const) {
+    it(`«${line}»: K on the side opposite the right angle at every view, A/B/C unmoved`, async () => {
+      const g = await play([noun, line], lang);
+      expect(g.verdicts.map((v) => v.kind)).toEqual(['commit', 'commit']);
+      const before = replay(g.facts.slice(0, 1), 0).positions;
+      const after = replay(g.facts, 0).positions as Map<string, P>;
+      for (const id of TRI) expect(Math.hypot(after.get(id)!.x - before.get(id)!.x, after.get(id)!.y - before.get(id)!.y), `${id} unmoved`).toBeLessThan(1e-9);
+      const views = presses(g.facts, 'K');
+      expect(views.map((v) => v.seat)).toEqual(['C', 'A', 'B', 'C']);
+      for (const v of views) {
+        expect(v.green).toBe(true);
+        expect(v.side).toBe(opposite(v.seat));
+      }
+      expect(llmParseMock).not.toHaveBeenCalled();
+    });
+  }
+
+  it('a stated right angle: the same letter, on the side it faces', async () => {
+    const g = await play([RT, 'זווית A ישרה', 'תיכון ליתר בנקודה K']);
+    expect(g.last.kind).toBe('commit');
+    expect(presses(g.facts, 'K').map((v) => v.side)).toEqual(['BC', 'BC', 'BC', 'BC']);
   });
 });

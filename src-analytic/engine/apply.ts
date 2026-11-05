@@ -31,7 +31,7 @@ import { measureRestatement } from './statedMeasures';
 import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
-import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
+import { followObjects, isoscelesKeys, rightAngleKeys, roleVertexOf } from './roles';
 import { POINT_NAME, isPointName } from './pointName';
 import {
   CENTRE_SENTINEL,
@@ -67,6 +67,7 @@ import {
   type Id,
   type PointObject,
   type PolygonObject,
+  type RoleBinding,
   type OrderSide,
 } from './types';
 
@@ -236,15 +237,13 @@ export type ApplyErrorCode =
   | 'ambiguous-cevian'
   | 'cevian-no-triangle'
   /**
-   * «תיכון ליתר» where the figure leaves the right angle open (a right triangle's noun alone) or holds several right
-   * triangles — a QUESTION: which side is the hypotenuse (#1222, operator ruling 2026-10-02 on #1620). And
-   * `ambiguous-no-right-angle` where no triangle has a right angle at all: there is no hypotenuse.
+   * «תיכון ליתר» where no triangle has a right angle at all: there is no hypotenuse (#1222).
    */
-  | 'ambiguous-hypotenuse'
   | 'ambiguous-no-right-angle'
   /**
    * «תיכון לבסיס» / «גובה לשוק» where no single polygon gives the role a side (#2018, ADR-AG-298): a plain triangle,
-   * an equilateral one, a trapezoid (2-D reads the role on a triangle only), none, or several. 2-D's `clarify`
+   * an equilateral one, a trapezoid (2-D reads the role on a triangle only), none, or several; «תיכון ליתר» with
+   * several right triangles (#2074, ADR-AG-411). 2-D's `clarify`
    * (`input.roleSideUnresolved`), its sentence verbatim; `role` carries which role, for the locale to word.
    */
   | 'ambiguous-role-side'
@@ -375,7 +374,7 @@ export interface ApplyError {
   polygon?: string;
   pair?: string;
   /** For `ambiguous-role-side` (#2018): the role the sentence named. */
-  role?: 'base' | 'leg';
+  role?: 'base' | 'leg' | 'hypotenuse';
   /** For `name-taken` (#2054): the target as the refused line spells it (`ABC`, `AB`), and whether it is an angle or a segment. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -2330,7 +2329,7 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     const noun = o.noun ? normalizeShapeNoun(o.noun) : '';
     if (ring.length === 3) {
       let keys: Constraint[];
-      if (f.role === 'hypotenuse') keys = [rightAngleAt(ring[0], ring[1], ring[2]), rightAngleAt(ring[1], ring[0], ring[2]), rightAngleAt(ring[2], ring[0], ring[1])];
+      if (f.role === 'hypotenuse') keys = rightAngleKeys(ring);
       else if (noun === 'משולש שווה שוקיים') keys = isoscelesKeys(ring);
       else return null;
       const sidesAt = (i: number): Array<[Id, Id]> =>
@@ -2456,16 +2455,72 @@ function applyRoleCevian(c: Construction, role: 'base' | 'leg', g: Extract<Fact,
   }
   // OPEN. Which sides already carry a bound cevian of this kind.
   if (g.measure) return { ok: false, error: { code: 'not-handled', detail: src } };
+  return boundCevian(c, role, kind, g.foot, ring, apex, sides, src);
+}
+
+/**
+ * THE CEVIAN BOUND TO A ROLE ON AN OPEN VERTEX (#2018; #2074): built at the letters of `apex` (the vertex the choice
+ * takes at choice seed 0) on the first of `sides` not yet carrying a bound cevian of this kind, and carrying `follows`.
+ * The objects are 0-DOF and add no constraint, so the line never moves the triangle.
+ */
+function boundCevian(c: Construction, role: RoleBinding['role'], kind: 'median' | 'altitude', foot: Id, ring: [Id, Id, Id], apex: Id, sides: ReadonlyArray<[Id, Id]>, src: string): ApplyOutcome {
+  const shown = followObjects(c.objects, resolveChoices(c.constraints, 0));
+  const ruleFor = ([u, v]: [Id, Id]) => toolFootRule(kind, ring.find((x) => x !== u && x !== v)!, u, v);
   const taken = (sd: [Id, Id]) =>
     shown.some((o) => o.kind === 'derived' && o.follows?.role === role && sameDerivation(o.rule, ruleFor(sd)));
   const side = sides.find((sd) => !taken(sd));
   if (!side) return { ok: true, effect: 'known', next: c };
+  if (objectById(c, foot)) return { ok: false, error: { code: 'not-handled', detail: src } };
   const from = ring.find((x) => x !== side[0] && x !== side[1])!;
-  const follows = { role, ring: [...ring] as [Id, Id, Id], at: apex };
-  const facts = toolFootFacts(kind, from, g.foot, side[0], side[1], src).map((h): Fact =>
-    h.t === 'derived' ? { ...h, follows } : h.t === 'segment' ? { ...h, id: `seg-${role}-${anonOf([kind, g.foot, ring])}`, follows } : h,
+  const follows: RoleBinding = { role, ring: [...ring] as [Id, Id, Id], at: apex };
+  const facts = toolFootFacts(kind, from, foot, side[0], side[1], src).map((h): Fact =>
+    h.t === 'derived' ? { ...h, follows } : h.t === 'segment' ? { ...h, id: `seg-${role}-${anonOf([kind, foot, ring])}`, follows } : h,
   );
   return applyAll(c, facts);
+}
+
+/**
+ * A CEVIAN TO THE HYPOTENUSE (#1222, ADR-AG-211; #2074, ADR-AG-411, 2-D's ADR-659) — «תיכון ליתר», «גובה ליתר».
+ *
+ * Operator, 2026-10-13: *"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show
+ * other option will create a different triangle with the constraints in place"*; ruling 2026-10-14: *"Naming C
+ * («CM תיכון ליתר») or AB («תיכון ליתר AB») forces the seat"*, and analytic follows 2-D. The host is the figure's one
+ * right triangle: a triangle with a stated right angle, or whose noun's seat is still open.
+ *
+ * - No host → `ambiguous-no-right-angle`; several → 2-D's question, `ambiguous-role-side`.
+ * - A TYPED apex states the right angle at it (the claim «תיכון ליתר AB» states), and the rest is the lettered twin.
+ * - A STATED right angle → the lettered twin: the figure is the one the letters draw, and nothing rotates.
+ * - An OPEN seat → the cevian bound to the role at the seat of choice seed 0; `resolvedAt` re-letters it per
+ *   configuration, so the foot keeps its letter and always lies on the side opposite the drawn right angle. A foot
+ *   the figure already holds, or a stated length, is not read on an open seat (2-D's verdict: the model's).
+ */
+function applyHypotenuseCevian(c: Construction, f: Extract<Fact, { t: 'cevian-of' }>): ApplyOutcome {
+  const hosts = new Map<string, { ring: [Id, Id, Id]; at?: Id }>();
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
+    const ring = o.vertices as [Id, Id, Id];
+    const stated = roleVertexOf(c.constraints, ring, 'hypotenuse');
+    if (stated.length === 1) hosts.set([...ring].sort().join(), { ring, at: stated[0] });
+    else if (stated.length === 0 && o.noun && shapeRow(normalizeShapeNoun(o.noun))?.kind === 'right-triangle') hosts.set([...ring].sort().join(), { ring });
+  }
+  if (hosts.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
+  if (hosts.size > 1) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+  const [{ ring, at }] = [...hosts.values()];
+  const { hypotenuse: _hypotenuse, either: _either, ...cevian } = f;
+  const across = (v: Id): [Id, Id] => ring.filter((x) => x !== v) as [Id, Id];
+  if (f.apex) {
+    // The typed segment's end that is a vertex of the triangle is the apex; two, or none, name no vertex.
+    const swap = f.either && !ring.includes(f.apex) && ring.includes(f.foot);
+    const [apex, foot] = swap ? [f.foot, f.apex] : [f.apex, f.foot];
+    if (!ring.includes(apex) || (f.either && ring.includes(foot))) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+    const [u, v] = across(apex);
+    return applyAll(c, [{ t: 'constraint', k: rightAngleAt(apex, u, v), src: f.src }, { ...cevian, apex, foot, side: [u, v] }]);
+  }
+  if (at) return applyFact(c, { ...cevian, apex: at, side: across(at) });
+  if (f.measure) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+  const seats = roleVertexOf(resolveChoices(c.constraints, 0), ring, 'hypotenuse');
+  if (seats.length !== 1) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+  return boundCevian(c, 'hypotenuse', f.role, f.foot, ring, seats[0], [across(seats[0])], f.src);
 }
 
 /** A stable, content-derived suffix for the anonymous line a role sentence draws — the same line, the same id. */
@@ -5293,6 +5348,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * the apex. Only when the written first letter does not qualify and the second does are they swapped, so every
        * vertex-first sentence, and every sentence whose letters name no vertex, resolves exactly as before.
        */
+      if (f.hypotenuse) return applyHypotenuseCevian(c, f);
       if (f.either && f.apex) {
         const isVertex = (id: Id): boolean =>
           c.objects.some(
@@ -5307,11 +5363,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         }
       }
       const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
-      let openRight = false;
       // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.
       if (f.apex && f.side) targets.set('named', { apex: f.apex, u: f.side[0], v: f.side[1] });
       /** A height named from its apex, which any ring can host; every other cevian resolves in a triangle. */
-      const ringHost = f.role === 'altitude' && f.apex !== undefined && !f.side && !f.hypotenuse;
+      const ringHost = f.role === 'altitude' && f.apex !== undefined && !f.side;
       /** Per shape holding the apex: its opposite sides, as a signature — two shapes that disagree are an ask. */
       const shapes = new Map<string, string>();
       /** Every candidate side, deduped, in declaration order — the union 2-D's `cevianShapeEdges` draws one from. */
@@ -5321,18 +5376,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
         if (o.vertices.length !== 3 && !ringHost) continue;
         const ring = o.vertices;
-        if (f.hypotenuse) {
-          // The right angle the figure STATES — a constraint, never the noun's open choice (ADR-052: never assume C).
-          const right = ring.filter((v) => {
-            const [p, q] = ring.filter((x) => x !== v);
-            const k = rightAngleAt(v, p, q);
-            return c.constraints.some((g) => g.t !== 'choice' && sameConstraint(g, k));
-          });
-          if (right.length === 1) {
-            const [u, v] = ring.filter((x) => x !== right[0]);
-            targets.set(`${right[0]}|${[u, v].sort().join('')}`, { apex: right[0], u, v });
-          } else if (right.length === 0 && o.noun && /ישר/.test(o.noun)) openRight = true;
-        } else if (f.side) {
+        if (f.side) {
           const [u, v] = f.side;
           if (!ring.includes(u) || !ring.includes(v) || u === v) continue;
           const apex = ring.find((x) => x !== u && x !== v)!;
@@ -5372,16 +5416,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const pick = onFoot.length === 1 ? onFoot[0] : parallelBase ?? (new Set(shapes.values()).size > 1 ? 'ask' : union[0]);
         if (pick === 'ask') return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
         if (pick) targets.set(`${f.apex}|${edgeKey(pick)}`, { apex: f.apex!, u: pick[0], v: pick[1] });
-      } else if (f.apex && !f.side && !f.hypotenuse && targets.size > 1) {
+      } else if (f.apex && !f.side && targets.size > 1) {
         const onSide = [...targets].filter(([, t]) => footOnPair(c, f.foot, t.u, t.v));
         if (onSide.length > 0) {
           targets.clear();
           for (const [k, t] of onSide) targets.set(k, t);
         }
       }
-      if (f.hypotenuse && (openRight ? targets.size === 0 : false)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
-      if (f.hypotenuse && targets.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
-      if (f.hypotenuse && (targets.size > 1 || openRight)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
       if (targets.size === 0) return { ok: false, error: { code: 'cevian-no-triangle', detail: f.src } };
       if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
       const [{ apex, u, v }] = [...targets.values()];

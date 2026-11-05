@@ -1344,7 +1344,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F16',
     he: 'תיכון ליתר AB',
     en: 'the median to the hypotenuse AB',
-    // ADR-AG-211 (#1222): the hypotenuse is named — or faces a STATED right angle; an open one is asked, never assumed.
+    // ADR-AG-411 (#2074): the letters state the hypotenuse; «תיכון ליתר» alone draws on the shown triangle and cycles.
     needs: ['A(4,0)', 'B(0,3)', 'C(0,0)', 'משולש ישר-זווית ABC'],
   },
   {

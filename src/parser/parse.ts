@@ -11053,6 +11053,8 @@ const existingFootOf = (ctx: ParseContext, from: Id | null, a: Id, b: Id): Id | 
 
 const SPECIAL_LINE_HEAD = /תיכון|גובה|\bmedian\b|\bheight\b|\baltitude\b/i;
 const ROLE_NOUN_RX = /(?<![א-ת])(?:ל|על\s+|אל\s+)ה?(יתר|בסיס(?!\s*ה?(?:גדול|קטן))|שוקיים|שוק)(?![א-ת])|\b(?:to|onto|on)\s+the\s+(hypotenuse|base|legs?)\b/i;
+/** The foot's letter closing a role cevian: «… בנקודה K», "… at K", "… at the point K" (#2074, ADR-787). */
+const ROLE_FOOT_TAIL = rx(String.raw`\s(?:ב-?\s*ה?נקודה\s+|at\s+(?:the\s+)?(?:point\s+)?)(${LABEL})\s*$`);
 const roleSideLine: Rule = (s, ctx) => {
   if (!SPECIAL_LINE_HEAD.test(s)) return null;
   const m = s.match(ROLE_NOUN_RX);
@@ -11066,7 +11068,8 @@ const roleSideLine: Rule = (s, ctx) => {
   const unstatedHosts = roleAll.filter((r) => r.unstated);
   // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
   // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
-  const afterNoun = s.slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
+  // (#2074: the foot tail is not a pair — "… at K" would read as the side AT.)
+  const afterNoun = s.replace(ROLE_FOOT_TAIL, '').slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
   const selected = afterNoun
     ? cands.find((r) => sameSide(r.edge[0], r.edge[1], up(afterNoun[1]), up(afterNoun[2]))) ?? null
     : null;
@@ -11141,7 +11144,14 @@ const roleSideLine: Rule = (s, ctx) => {
   // any other letters stay untouched for the letter-form rules to read
   const restated = rx(String.raw`(?:${ROLE_NOUN_RX.source})\s*(?:${p}${q}|${q}${p})(?![A-Za-z\d])`, 'i');
   const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
-  const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
+  // #2074 (ADR-787): «תיכון ליתר בנקודה K» names the foot, a NEW point outside the triangle. It is read as the letter
+  // form «CK תיכון לצלע AB» with the resolver's apex, so the binding below carries the line with the right angle. A
+  // foot the figure already holds is not read here: on an open seat it could not follow.
+  const pickRing = role === 'hypotenuse' ? pick?.ring?.map(up) : undefined;
+  const footTyped = pickRing ? s.match(ROLE_FOOT_TAIL)?.[1] : undefined;
+  const newFoot = footTyped && !pickRing!.includes(up(footTyped)) && !ctx.points?.includes(up(footTyped)) ? up(footTyped) : null;
+  const letterForm = newFoot ? `${pickRing!.find((x) => x !== p && x !== q)}${newFoot} ${s.replace(ROLE_FOOT_TAIL, '').replace(ROLE_NOUN_RX, target)}` : null;
+  const rewritten = (letterForm ?? (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target))).replace(/\s+/g, ' ').trim();
   const r = parse(rewritten, ctx);
   if (!r.ok) return null;
   // #2074 (ADR-659): the typed apex's claim, prepended as the role-claim post-pass prepends «היתר AB»'s

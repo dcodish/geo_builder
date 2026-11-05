@@ -314,8 +314,9 @@ export type Fact =
       foot: Id;
       side?: [Id, Id];
       /**
-       * «תיכון ליתר» (#1222, operator ruling 2026-10-02 on #1620): the side is the HYPOTENUSE of the one triangle whose
-       * right angle the figure states; a right triangle whose right angle is still a choice asks which side it is.
+       * «תיכון ליתר» (#2074, ADR-AG-411): the side is the HYPOTENUSE of the figure's one right triangle — opposite the
+       * stated right angle, or, on a noun whose seat is still a choice, opposite the seat the configuration draws (the
+       * objects are bound to the role). With `apex` the sentence typed the right angle's vertex, which states it.
        */
       hypotenuse?: true;
       /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
@@ -885,7 +886,7 @@ export const CEVIAN_MEASURE_SENTINELS = ['Z₀₂', 'Z₀₃'] as const;
  * role there — the one configuration seam (ADR-AG-245), so the canvas, the panel and every reader agree.
  */
 export interface RoleBinding {
-  role: 'base' | 'leg';
+  role: 'base' | 'leg' | 'hypotenuse';
   ring: [Id, Id, Id];
   at: Id;
 }

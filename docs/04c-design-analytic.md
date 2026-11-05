@@ -817,6 +817,8 @@ A cevian MINTS a point whose definition differs per option of the isosceles `cho
 
 *Identifiers:* `parseRoleCevian` · `ROLE_CEVIAN_HE/EN` · `applyRoleCevian` · `RoleBinding` · `follows` · `engine/roles.ts` (`isoscelesKeys`, `roleVertexOf`, `followObjects`) · `resolvedAt` · `drawnOption` · `ambiguous-role-side` · `errRoleSideUnresolved`
 
+**The hypotenuse ([ADR-AG-411](06c-decisions-analytic.md#adr-ag-411), #2074).** `RoleBinding.role` takes `hypotenuse`, and `roleVertexOf` answers the seat over `rightAngleKeys(ring)`, so the same `followObjects` pass rotates a cevian with the right-triangle noun's choice. `applyHypotenuseCevian` owns `cevian-of { hypotenuse }`: it finds the one host (a triangle with a stated right angle, or the noun with its seat open); a typed apex lowers to `rightAngleAt` plus the lettered cevian; a stated seat lowers to the lettered cevian; an open seat goes through `boundCevian`, shared with `applyRoleCevian`. No host is `ambiguous-no-right-angle`, several are `ambiguous-role-side`. A foot the figure already holds, or a stated length, is `not-handled` on an open seat: a constraint cannot follow.
+
 ### The perpendicular from a point, and the line through a point that cuts a side ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), #1620)
 
 The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.ts`, `footOn`, `curveParentsOf`).
