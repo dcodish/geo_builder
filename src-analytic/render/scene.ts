@@ -1277,7 +1277,8 @@ const pathOf = (ps: readonly MarkPt[]): string =>
   ps.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('');
 
 /** A stated value as written: a number through the shared formatter (#723), or the student's own text. */
-const valueText = (v: StatedValue, unit = ''): string => ('num' in v ? `${fmtAnalytic(v.num)}${unit}` : v.text);
+/** #1806 (ADR-AG-407, amending ADR-AG-225 §3): a given prints as typed; a number with no spelling reads `fmtAnalytic`. */
+const valueText = (v: StatedValue, unit = ''): string => ('num' in v ? `${givenText(v.num, v.src, fmtAnalytic)}${unit}` : v.text);
 
 /**
  * WHERE AN ANGLE'S VALUE MAY GO (#1733, ADR-AG-228) — every candidate within {@link ANGLE_LABEL_BOUND} arc radii of
