@@ -10,4 +10,3 @@ Working rules live in CLAUDE.md, docs/17, docs/22, docs/RUNBOOK.md and the skill
 - [Promo video plan](promo-video-plan.md) — the operator's parked teacher-video project: format, storyboard, open questions
 - [Browser probes hit the live LLM](browser-probes-hit-live-llm.md) — launch every Playwright probe through scripts/lib/browser-harness.mjs
 - [Roadmap draft](roadmap-strategy-draft.md) — the roadmap pages; what is open
-- [Work PC reads slowly](work-pc-slow-file-reads.md) — full suites take ~87 min there and two time-limit tests fail; run them from home (#2718)
