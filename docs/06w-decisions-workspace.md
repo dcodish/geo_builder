@@ -6128,6 +6128,8 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 
 ## ADR-W-148 — Suite-wide text lives once, in `shell/locales`: the narrow exception to "shell holds no strings" (#2201 phase 1; amends ADR-W-016)
 
+> **Extended by [ADR-AG-403](06c-decisions-analytic.md#adr-ag-403)** (#2408, 2026-11-05): the nine `tangentsExhausted*` sentences 2-D and analytic both show moved to `suite.refusal.*`; analytic's `errNoCommonTangent` is the suite's `tangentsExhaustedContained`. 2-D's `tangentsExhaustedTouch` hint stays 2-D's.
+
 **Status:** accepted · 2026-10-23 · debt (P3, workspace) · fix round #2466, stream C · branch `fix/2201-p1-suite-locales` · **Amends:** [ADR-W-016](#adr-w-016) rule 2 · **Operator ruling** 2026-10-16
 **Requirements:** none (internal) · **Design:** [04w](04w-design-shell.md) § *Suite-wide text*
 

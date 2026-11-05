@@ -6,7 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
 import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
@@ -32,6 +32,8 @@ export interface LineFault {
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
+  /** For `no-common-tangent` (#2408, ADR-AG-403): which of 2-D's tangentsExhausted* sentences. */
+  tangents?: ApplyError['tangents'];
   /** For an unknown reference: what KIND was expected, so the message uses the right noun (#1179). */
   expected?: ApplyError['expected'];
   /** For a second naming: WHO already holds the position, so the refusal shows it (#1153). */
@@ -310,7 +312,7 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...lineExistsFields(e) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...(e.tangents ? { tangents: e.tangents } : {}), ...lineExistsFields(e) });
   });
 
   /**
@@ -649,6 +651,9 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     const objectLine = (id: string) => pinnedBy.get(id) ?? lineOf.get(id) ?? -1;
     /** The line that put `p` on circle `K` for good — or null when it is not, in every configuration. */
     const onForGood = (K: (typeof construction.objects)[number], p: string): number | null => {
+      // A letter-named common tangent's touch is on its circle in every configuration (#2408, ADR-AG-403).
+      const touch = commonTouchOf(construction, p);
+      if (touch && touch.circle === K.id) return constraintOn[touch.index];
       if (onCurveByConstruction(construction, K, p)) {
         const at = construction.constraints.findIndex((k) => k.t === 'on-curve' && k.id === p && k.curve === K.id);
         return at >= 0 ? constraintOn[at] : objectLine(K.id);
@@ -743,6 +748,9 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
         (k) => k.t === 'relation' && k.rel === 'perpendicular' && ((isRadius(k.u) && isStraight(k.v)) || (isRadius(k.v) && isStraight(k.u))),
       );
       if (rel >= 0) return constraintOn[rel];
+      // A letter-named common tangent: the line through its two touches is the family's tangent at each (ADR-AG-403).
+      const slot = commonTouchOf(construction, Q);
+      if (slot && slot.circle === K.id && sameSet(s.pts, [Q, slot.partner])) return constraintOn[slot.index];
       const isTangentObject = (id: string) => {
         const T = objectById(construction, id);
         return (

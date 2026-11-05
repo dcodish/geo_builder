@@ -15,6 +15,7 @@ import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
+import type { TangentsExhausted } from '../engine/apply';
 import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
@@ -232,8 +233,12 @@ export type InputError =
   | { key: 'ambiguous-side'; detail: string }
   /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */
   | { key: 'polygon-not-supported'; detail: string }
-  /** #2390 (ADR-AG-314) — «כל המשיקים המשותפים» about a circle inside the other: 2-D's `input.tangentsExhaustedContained`. */
-  | { key: 'no-common-tangent'; detail: string }
+  /**
+   * #2390 (ADR-AG-314) — «כל המשיקים המשותפים» about a circle inside the other; #2408 / #2411 (ADR-AG-403) — a
+   * letter-named common tangent with no free slot. `tangents` names which of the suite's tangentsExhausted* sentences
+   * (2-D's, moved to `shell/locales`); absent is `Contained`.
+   */
+  | { key: 'no-common-tangent'; detail: string; tangents?: TangentsExhausted }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

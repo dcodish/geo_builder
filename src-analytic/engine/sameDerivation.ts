@@ -18,6 +18,14 @@
  */
 import type { DerivedRule, FootLine } from './derived';
 import type { Id } from './types';
+import { reversedFamily } from './commonTangents';
+
+/** One slot of one pair on one circle, in either order of the pair (#2408, ADR-AG-403). */
+function sameCommonTouch(a: Extract<DerivedRule, { t: 'common-touch' }>, b: Extract<DerivedRule, { t: 'common-touch' }>): boolean {
+  if (a.circles[0] === b.circles[0] && a.circles[1] === b.circles[1]) return a.family === b.family && a.on === b.on;
+  if (a.circles[0] === b.circles[1] && a.circles[1] === b.circles[0]) return reversedFamily(a.family) === b.family && a.on !== b.on;
+  return false;
+}
 
 /** The same unordered pair or set of vertices, whatever order they were written in. */
 const sameSet = (a: readonly Id[], b: readonly Id[]) =>
@@ -70,6 +78,10 @@ export function sameDerivation(a: DerivedRule, b: DerivedRule): boolean {
     // Where two circles touch is one point whichever circle is named first (#1504).
     case 'touch-point':
       return b.t === 'touch-point' && sameSet([a.a, a.b], [b.a, b.b]);
+    // One slot of one pair, on one circle (#2408): the same touch whichever order the pair is named in — the family's
+    // a/b side is read along the directed line of centres, so a reversed pair swaps a and b.
+    case 'common-touch':
+      return b.t === 'common-touch' && sameCommonTouch(a, b);
     // One circle, one side: the same touch whichever end is named first (#1619 B2).
     case 'side-touch':
       return b.t === 'side-touch' && a.circle === b.circle && sameSet([a.a, a.b], [b.a, b.b]);
@@ -107,6 +119,7 @@ export function namesCurveFeature(rule: DerivedRule): boolean {
     case 'parabola-focus':
     case 'ellipse-point':
     case 'touch-point':
+    case 'common-touch':
     case 'side-touch':
       return true;
     case 'midpoint':
