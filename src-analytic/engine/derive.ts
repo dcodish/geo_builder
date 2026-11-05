@@ -13,7 +13,7 @@ import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatem
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
-import { resolveToolLetters } from './toolLetters';
+import { resolveToolLetters, typedLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
@@ -1102,7 +1102,11 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
  * a point the student already stated at exactly those coordinates keeps THEIR letter (the #1270 rule — a
  * student's letter wins); otherwise the next free reserved name, P₁, P₂, … — subscripted, so it is a letter a
  * student does not reach for first, and `NAME` reads it back. Earlier names never move when a line is added, so
- * the figure stays stable. Pure over the list, like everything `derive` does.
+ * the figure stays stable — but for one: the tool's reserved letter yields to a student's FRESH letter stated later at
+ * those coordinates (#2674, ADR-AG-404; operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the
+ * student's, no message (2-D's way, in every builder)"*), unless a line in between typed it, which makes it the
+ * student's (ADR-AG-387's rule). Decided here, before any id is built from the name (`circle-at-…`, `r_…`), and the
+ * reserved letter goes back to the pool. Pure over the list, like everything `derive` does.
  */
 function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
   const text = JSON.stringify(facts);
@@ -1120,17 +1124,17 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   facts.forEach((f, i) => {
     if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
     const at = numeric(f);
-    const own = at
-      ? facts.slice(0, i).find((g) => {
-          if (g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
-          const q = numeric(g);
-          return q !== null && Math.abs(q[0] - at[0]) < 1e-12 && Math.abs(q[1] - at[1]) < 1e-12;
-        })
-      : undefined;
-    if (own && own.t === 'point') {
+    const stated = (g: Fact): g is Extract<Fact, { t: 'point' }> => {
+      if (!at || g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
+      const q = numeric(g);
+      return q !== null && Math.abs(q[0] - at[0]) < 1e-12 && Math.abs(q[1] - at[1]) < 1e-12;
+    };
+    const own = facts.slice(0, i).find(stated);
+    if (own) {
       names.set(f.id, own.id);
       return;
     }
+    const count = n;
     let name: string;
     // The ORIGIN is O when that letter is free (#1628) — the exam's own name for it, and the same default
     // that yields as the canonical circle's centre (ADR-AG-184): a point the student already called O keeps
@@ -1138,6 +1142,13 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
     if (at && at[0] === 0 && at[1] === 0 && !used.has(CENTRE_LETTER)) name = CENTRE_LETTER;
     else do name = `P${subscript(++n)}`;
     while (used.has(name));
+    const taker = facts.findIndex((g, j) => j > i && stated(g));
+    const to = taker >= 0 ? facts[taker] : undefined;
+    if (to?.t === 'point' && !facts.slice(0, i).some((g) => JSON.stringify(g).includes(`"${to.id}"`)) && !facts.slice(i, taker + 1).some((g) => g.src && typedLetters(g.src).has(name))) {
+      names.set(f.id, to.id);
+      n = count;
+      return;
+    }
     used.add(name);
     names.set(f.id, name);
     minted.push({ index: owner[i], id: name });

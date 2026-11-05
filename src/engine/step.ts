@@ -83,6 +83,39 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   return ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
 }
 
+/**
+ * #2674 ([ADR-785](../../docs/06-decisions.md#adr-785)) — AN OBJECT WITH ITS OPERANDS' SPELLING TAKEN OUT. Which way round
+ * a student wrote a segment is no part of what a point is: the midpoint of BC is the midpoint of CB, the foot on BC the
+ * foot on CB, a triangle's circumcentre the same for any order of its vertices, and two lines meet at one place
+ * whichever is named first. The ONE reading of "the same definition": {@link commandConflict}'s idempotent restatement
+ * and `impliedIdentityBinding`'s naming by use both compare through it. Only these kinds read their operands so: a
+ * square's corner, a rotation, a ray are ORDERED, and stay as written.
+ */
+export function unspelled<T extends GeoObject>(o: T): T;
+export function unspelled(o: GeoObject): GeoObject {
+  const up = (a: Id, b: Id): [Id, Id] => (a <= b ? [a, b] : [b, a]);
+  switch (o.kind) {
+    case 'midpoint':
+    case 'foot': {
+      const [a, b] = up(o.a, o.b);
+      return { ...o, a, b };
+    }
+    case 'circumcenter': {
+      const [a, b, c] = [o.a, o.b, o.c].sort();
+      return { ...o, a, b, c };
+    }
+    case 'line-line-intersection': {
+      // each line carries its own within-segment flag with it
+      const [a, b] = up(o.a, o.b), [c, d] = up(o.c, o.d);
+      const { onSeg1, onSeg2, ...rest } = o;
+      const flags = (one?: boolean, two?: boolean) => ({ ...(one === undefined ? {} : { onSeg1: one }), ...(two === undefined ? {} : { onSeg2: two }) });
+      return `${a}${b}` <= `${c}${d}` ? { ...rest, a, b, c, d, ...flags(onSeg1, onSeg2) } : { ...rest, a: c, b: d, c: a, d: b, ...flags(onSeg2, onSeg1) };
+    }
+    default:
+      return o;
+  }
+}
+
 /** The kinds a shape command's DERIVED corners are built as (audit 2026-07-20: produced ONLY by
  *  square/rectangle/rhombus/parallelogram/trapezoid/right-triangle) — the M1 reinterpretation key
  *  in {@link commandConflict} (#223 / ADR-375). */
@@ -144,7 +177,7 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
   const reusesBase = cmd.type !== 'free-point' && produced.some((o) => o.kind === 'free-point');
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
-    if (!existing || deepEqual(existing, o)) continue;
+    if (!existing || deepEqual(unspelled(existing), unspelled(o))) continue;
     if (o.kind === 'free-point') {
       if (reusesBase) continue; // base corner reuses any existing point (composition)
       if (existing.kind === 'free-point') continue; // free-point command = move (ADR-011)

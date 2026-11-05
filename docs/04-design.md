@@ -766,7 +766,7 @@ aside, `withAnonymousAutoCentres` re-picks a held token; `withMetricCentreBindin
 
 **The point naming has a general criterion** ([ADR-653](06-decisions.md#adr-653), #2122): beside ADR-440's line-slot
 arm, `impliedIdentityBinding` (`replay/core.ts`) trial-applies the line and names by use an auto-named point M that the
-line leaves with the same definition (`definitionKey`: kind, parents, parameters; never a free DOF) as exactly one
+line leaves with the same definition (`definitionKey`: kind, parents, parameters, read through `unspelled`, which also serves `commandConflict`'s idempotent restatement, [ADR-785](06-decisions.md#adr-785); never a free DOF) as exactly one
 student point L — the touch point M that `tangentTouchCopy` copies into X. A fresh L is the `point` rename; an existing
 L is a `merge` naming (`mergeFacts`): M takes L's letter in the facts before the line, valid only while M is defined
 before L first appears. A merge makes the line's statement true by construction, so both commit seams commit it as a

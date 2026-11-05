@@ -37,6 +37,8 @@ mutates, the refusal is also the CHEAP path (#1335 measured 19.6 s → 2.2 s on 
 
 ## Stage 1 — the conflict / M1 branch (`commandConflict` ≠ null)
 
+A definition equal to the existing one with its operands' spelling taken out (`unspelled`, [ADR-785](06-decisions.md#adr-785)) is no conflict, so it enters no stage.
+
 The reinterpretation chain, first non-null wins (M1: a statement about an existing object is a constraint):
 
 | # | Reinterpreter | Trace token |

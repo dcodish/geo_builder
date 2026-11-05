@@ -1524,7 +1524,7 @@ straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name fo
 returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
 refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
 
-**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), #2674). A derived point the
+**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404), #2674). Letters are chosen before the fold, so `resolveToolLetters` reads a takeover on the fold's own terms and returns the letter to the pool, and `resolveMints` gives a coordinate point's placeholder a later fresh letter at those coordinates. A derived point the
 tool lettered is applied with `auto`, and its object carries `tool`. That covers a fresh mint in `resolveToolLetters`,
 a `toolFoot` cevian and the canonical centre. `foldPass` drops the mark when a fact's sentence types the letter
 (`typedLetters`). ONE POSITION, ONE NAME then treats a `tool` holder as it treats a helper: a student's derivation of

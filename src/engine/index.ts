@@ -19,6 +19,7 @@ export {
   cycleAlternative,
   firstCyclableBranch,
   deepEqual,
+  unspelled,
   maxDelta,
   emptyConstruction,
 } from './step';

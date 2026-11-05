@@ -2259,3 +2259,8 @@ over all four (ADR-041).
 ### `extension-shared-endpoint-past-second-2518` — «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R»: R beyond O (#2518, ADR-780)
 
 **Guards against:** a shared-endpoint extension drawn on the wrong side of its second letter (R between A and O, or beyond A) while every row was green, although putting O inside circle P gives the stated side. **Asserts** every step green, A–O–R in order, R on circle P, O inside circle P. The matrix, with the refusals of ADR-784, is `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`.
+**Guards against:** a shared-endpoint extension drawn on the wrong side of its second letter (R between A and O, or beyond A) while every row was green, although putting O inside circle P gives the stated side. **Asserts** every step green, A–O–R in order, R on circle P, O inside circle P. The matrix is `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`; ADR-142's and ADR-267's scenarios lock the either-side tier.
+
+### `tool-midpoint-reversed-takes-letter-2674` — «משולש ABC» · «אמצע BC» · «D אמצע CB»: one point D, no notice (#2674, ADR-785)
+
+**Guards against:** a tool's midpoint keeping its letter beside the student's when the student writes the segment the other way round, so "the same point" depended on spelling. **Asserts** every step green, no verifier violation, no M, D at the midpoint, and no coincidence pair.

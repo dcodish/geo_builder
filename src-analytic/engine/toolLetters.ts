@@ -119,6 +119,8 @@ export function resolveToolLetters(
   const out: Fact[] = [];
   /** A helper's placeholder, by the helper's id — so a later lettered derivation of it re-points that placeholder. */
   const helperPh = new Map<Id, string>();
+  /** A tool's derived point a student's letter has taken over: its letter is the student's now. */
+  const yielded = new Set<Fact>();
   facts.forEach((f0, i) => {
     // A segment's id is its SORTED ends, and a placeholder may sort first inside it — it is re-keyed from its ends
     // below, so its id is never where a placeholder is discovered.
@@ -176,6 +178,22 @@ export function resolveToolLetters(
         names.set(helperPh.get(held.id)!, named);
         helperPh.delete(held.id);
       }
+    }
+    // A STUDENT'S FRESH LETTER TAKES A TOOL'S LETTER OVER (#2674, ADR-AG-387): the fold renames M to D, so M is back in the
+    // pool here (ADR-AG-404; 2-D's next midpoint is M again), every later placeholder of it reads D, and no row announces
+    // M. Same terms as the fold's: a tool's letter no line since has typed (`applyTyped`), and a fresh student letter.
+    for (const g of factsWithin(f)) {
+      if (g.t !== 'derived' || g.auto || g.follows || isHelperId(g.id) || used.has(g.id)) continue;
+      const rule = g.rule;
+      const at = out.findIndex((h) => h.t === 'derived' && h.auto && !h.follows && !yielded.has(h) && sameDerivation(h.rule, rule));
+      const tool = out[at];
+      if (!tool || tool.t !== 'derived') continue;
+      const lines = [...out.slice(at), f];
+      if (lines.some((h) => h.src && typedLetters(h.src).has(tool.id))) continue;
+      yielded.add(tool);
+      used.delete(tool.id);
+      minted.splice(minted.findIndex((m) => m.id === tool.id && m.index === owner[at]), 1);
+      for (const [k, v] of names) if (v === tool.id) names.set(k, g.id);
     }
     for (const m of text.match(new RegExp(`"${POINT_NAME}"`, 'g')) ?? []) used.add(m.slice(1, -1));
     out.push(f);

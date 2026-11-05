@@ -14789,8 +14789,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 **Not in this item.**
 - **3-D** (ADR-W-157: "to 3-D if simple"): its one tool-minted derived letter is `midpoint-auto` («אמצע BB'» → M). «קובייה ABCDA'B'C'D'» · «אמצע BB'» · «E אמצע BB'» keeps M and E there. The letter is picked at apply and never enters a fact, so the port needs typed-letter tracking through `deriveCore3`'s several folds. This is recorded on #2674. The parity table cannot hold it, because the table measures verdicts and this is a drawing (ADR-W-170 §3). The reserved ADR-3D-412 is unused.
-- **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
-- **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
 
 **Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the operator's two lines through `decideSubmit`; every tool family above; the controls); `issue-1620-tool-letters` (its #1595 assertion flipped to one point D, citing this ruling); fixture `median-student-names-foot-2674`.
 
@@ -15329,3 +15329,22 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** Fixtures `issue-2408-four-tangents-fixed` and `-free`. `src-analytic/__tests__/issue-2408-2411-tangent-slots.test.ts`: four distinct lines measured from the circles; every refusal by position, byte for byte; the 24 permutations and prefix stability at each; stability of both pairs at seeds 0–5 and 0–24; a free pair drawn apart, a later «המעגלים נחתכים» and later equations honoured; the reversed pair. Parity rows `common-tangent-distinct-2408`, `common-tangent-fifth-2408`, `common-tangent-nested-2411`.
 
 **Behaviour change for a student:** in analytic each named common tangent of a pair is a different line, one past the pair's count is refused with 2-D's sentence, a circle inside another is refused naming the reason, and adding a tangent moves nothing already drawn. On an exam pair with no further given the first drawing may be the other external tangent than before (ADR-AG-314's `ext-a`), still one press of «הציגו תצורה אחרת» from it.
+## ADR-AG-404 — The rest of a tool's letter yielding: the letter returns to the pool, and P₁ yields too (#2674)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic) · round #2722 · branch `fix/2674-letter-takeover-reversed` · operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the student's, no message (2-D's way, in every builder)"*; ruling 2026-11-04, card q3 = A: *"Rename for the reversed spelling too"* · completes [ADR-AG-387](#adr-ag-387) · 2-D arm: [ADR-785](06-decisions.md#adr-785)
+**Requirements:** [02c](02c-requirements-analytic.md) R231 · **Design:** [04c](04c-design-analytic.md) § *A tool's letter yields to the student's*.
+
+**Re-measured at `28dac0c3` through `decideSubmit` → `derive`.** The reversed spelling already held here: «משולש ABC» · «אמצע BC» · «D אמצע CB» is one point D, through `sameDerivation`, which reads a midpoint's segment as a set. Only locks were added for it. Two of ADR-AG-387's *Not in this item* entries were still true.
+
+**Class.** *A tool's letter handed over to a student's stays spent.* The letters are chosen before the fold, so a rename the fold makes reached neither the pool nor the rows.
+
+**Decision.**
+1. **The next free letter** ([2-D], measured at `28dac0c3`: «תיכון מ-A במשולש ABC» · «D אמצע CB» · «תיכון מ-B במשולש ABC» gives D and M). `resolveToolLetters` recognises a takeover on the fold's own terms: a student's derivation under a fresh letter, the same derivation as an earlier `auto` fact, and a tool letter no line since has typed. It returns the letter to the pool, drops that `minted` row, and points every later placeholder of the point at the student's letter, so the median restated reads D. The fold still does the rename.
+2. **The coordinate mint.** `resolveMints` runs before any id is built from the name, so ADR-AG-387's worry about ids such as `circle-at-P₁` does not apply: the placeholder simply resolves to the student's letter. A fact stating a fresh letter later at the same coordinates takes the mint, unless a line in between typed the reserved name. The name goes back to the pool and no `minted` row is written. This is the #1270 rule (*a student's letter wins*) read in the other order.
+   The line itself is a restatement of a placed point, which the fold answers `known`, so `decideSubmit` first asks whether the line put a letter on the figure: one that did records, because it owns that letter (2-D's ADR-653).
+
+**Unchanged.** A letter stated before the coordinates wins, as it did. A letter already used before the mint does not take it. A typed tool letter is the student's: M typed in between keeps M taken, so the next midpoint is N.
+
+**Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the round #2722 describes); fixtures `midpoint-reversed-takes-letter-2674`, `coordinate-letter-takes-mint-2674`.
+
+**Behaviour change for a student:** after D takes a median's M, the next median's midpoint is M, not N. «טרפז ABCD» · «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» shows one point E and no message; before, P₁ and E with «P₁ ו-E נפלו על אותה נקודה.».
