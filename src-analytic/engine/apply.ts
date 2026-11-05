@@ -2432,9 +2432,10 @@ function attachToOptions(c: Construction, seat: number | undefined, options: Rea
 
 /**
  * A STATED PAIR GIVES A DRAWN ROLE LINE ITS LETTERS (#2006, ADR-AG-406; judged 2026-11-05, ruling q15 B): once the collapse
- * has stood its two vertices on the line, the canvas names it as it does with the pair stated first. The name rides the
- * label and the id is never rewritten (the rule `toolNamed` keeps), so the riders stay on their own line. A side's line is
- * not drawn, so it has no name to show; a figure that already calls that pair of letters a line keeps its own.
+ * has stood its two vertices on the line, the line carries the name the pair-first order gives it, for what reads a
+ * drawn line's name (the pick menu, its title, a sentence naming AC). The canvas writes no line's name, in either order.
+ * The name rides the label and the id is never rewritten (the rule `toolNamed` keeps), so the riders stay on their own
+ * line. A side's line is not drawn; a figure that already calls that pair of letters a line keeps its own.
  */
 function lettersOnDrawnRoleLines(c: Construction, members: readonly Constraint[]): Construction {
   const named = (o: CurveObject): CurveObject => {
@@ -6720,6 +6721,8 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
    * anything about it, so a future resolved reference is attributed with nothing to remember.
    */
   const constraintFact: number[] = [];
+  /** The fact that first said each member of a choice's options (#2006, ADR-AG-406), by identity. */
+  const memberFact = new Map<Constraint, number>();
   // The same attribution for SELECTORS (#1619 B1): a region («מחוץ למעגל») is a selector M1 builds from a
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
@@ -6739,15 +6742,19 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     const narrowedFrom = (old: Constraint | undefined, k: Constraint): boolean =>
       old !== undefined && old.t === 'choice' && k.t === 'choice' && k.options.every((o) => old.options.includes(o));
     // By IDENTITY, not by slot: a collapse stands its option's members in one seat (#2006, ADR-AG-406), which moves the
-    // constraints after it, and each of those stays on its own line. The members stay the opener's, as the option
-    // was: the noun that said them, never the line that named one of them.
+    // constraints after it, and each of those stays on its own line. A member keeps the fact that FIRST said it, not
+    // the choice's latest owner: a role sentence rewrites the noun's seat, and the noun's pair is still the noun's
+    // definition once a stated pair collapses it, in either order of those two lines.
     const held = [...constraintFact];
     constraintFact.length = 0;
-    const memberOf = (o: Constraint, k: Constraint) => o === k || (o.t === 'all' && o.of.includes(k));
     c.constraints.forEach((k, at) => {
-      const was = before.findIndex((o) => o === k || (o.t === 'choice' && o.options.length > 1 && o.options.some((p) => p !== k && memberOf(p, k))));
-      const from = was >= 0 ? held[was] : narrowedFrom(before[at], k) ? held[at] : undefined;
+      const was = before.indexOf(k);
+      const from = was >= 0 ? held[was] : memberFact.has(k) ? memberFact.get(k) : narrowedFrom(before[at], k) ? held[at] : undefined;
       constraintFact[at] = from ?? i;
+    });
+    c.constraints.forEach((k, at) => {
+      if (k.t !== 'choice') return;
+      for (const o of k.options) for (const m of membersOf(o)) if (!memberFact.has(m)) memberFact.set(m, constraintFact[at]);
     });
     c.selectors.forEach((s, at) => {
       if (beforeSel[at] === s && selectorFact[at] !== undefined) return;

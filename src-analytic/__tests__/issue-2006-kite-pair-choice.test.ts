@@ -208,7 +208,8 @@ describe('#2006 — the row: the role name while open, the letters once fixed', 
 
 describe('#2006 — the canvas name once a pair is stated (judged 2026-11-05, ruling q15 B)', () => {
   /**
-   * What the two orders share: what is drawn and how it is named, the line's equation and the letters on it, every text.
+   * What the two orders share: what is drawn and how it is named, the line's equation and the letters on it, every text,
+   * every mark (the equal-side ticks included: both orders measured in the browser).
    * Not the coordinates: the figure is solved line by line (ADR-AG-348), so a statement moves only what it introduced,
    * and two orders of one figure are two different starts at a seed. Forcing them equal would break that stability.
    */
@@ -220,6 +221,8 @@ describe('#2006 — the canvas name once a pair is stated (judged 2026-11-05, ru
       points: sc.points.map((p) => p.id).sort(),
       segments: sc.segments.map((g) => g.key).sort(),
       labels: sc.stated.labels.map((l) => l.text).sort(),
+      ticks: sc.stated.ticks.length,
+      marks: sc.stated.marks.length,
     };
   };
 
@@ -235,6 +238,18 @@ describe('#2006 — the canvas name once a pair is stated (judged 2026-11-05, ru
       expect(after.figure.curves[0].label.name).toBe(name);
       expect(seen(after)).toEqual(seen(first));
     }
+  });
+
+  it('a stated pair draws no equal-side tick in either order, as the kite with no line', () => {
+    for (const lines of [[KITE, 'AB = AD'], [KITE, 'AB = AD', MAIN], [KITE, MAIN, 'AB = AD'], [KITE, MAIN, 'BA = BC']]) {
+      expect(derive(lines, 0).stated.equalLengths, JSON.stringify(lines)).toEqual([]);
+    }
+  });
+
+  it('the pair stays the noun\'s line and the riders the sentence\'s, whichever came first', () => {
+    const d = derive([KITE, MAIN, 'AB = AD'], 0);
+    expect(d.constraintLine).toEqual(derive([KITE, MAIN, 'AB = AD'], 1).constraintLine);
+    expect(d.constraintLine).toEqual([0, 0, 1, 1]);
   });
 
   it('the name rides the label, the id is never rewritten, and the row agrees', () => {
