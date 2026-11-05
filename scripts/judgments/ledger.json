@@ -1701,6 +1701,159 @@
       ],
       "at": "2026-11-05T06:49:39.194Z",
       "status": "escalated"
+    },
+    {
+      "id": "q-2694-lowercase-line",
+      "question": "In 2-D, what should a lowercase line name do, given that 2-D has no axes and names no line?",
+      "class": "lowercase-line-name-2d",
+      "verdict": "escalate",
+      "reason": "Reserved rule 3. His card q3 chose 'in analytic and 2-D' on a premise the measurement disproved, and nothing of his says what 'in 2-D' means now.",
+      "nearest": [
+        {
+          "quote": "A — Read it, in analytic and 2-D",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2672#issuecomment-6623358508"
+        }
+      ],
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2270-hidden-letter-circle",
+      "question": "After «שני מעגלים משיקים», does «מעגל O ברדיוס 5» name one of the pair or draw a new circle?",
+      "class": "hidden-centre-letter",
+      "verdict": "ruled",
+      "choice": "C",
+      "ruling": "The 2026-10-20 ruling supersedes the 2026-10-16 card: while the centre is hidden, the tool's internal letter dictates nothing, so O is a new letter and a new circle is drawn.",
+      "precedents": [
+        {
+          "quote": "in all cases where the user didnt define the circle center, and the center is not on the screen shown (this is what happens in Q2), the internal name the system uses should not dictate a constraint.",
+          "date": "2026-10-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/2362#issuecomment-6284827250"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Applies while centres are hidden; a shown O binds.",
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2294-clock",
+      "question": "Does 'a fixed amount of work, never the clock' reach the «כבר קיים» test?",
+      "class": "door-budget-clock-or-work",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The «כבר קיים» test stays on the clock: the 2026-10-04 ruling replaced the clock for the seat rescue only.",
+      "precedents": [
+        {
+          "quote": "the interactive searches keep the clock",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-558"
+        },
+        {
+          "quote": "Replace the 1.5 s clock for this check with a deterministic work cap in charged units",
+          "date": "2026-10-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/1671#issuecomment-5983047875"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A measured verdict flip on a real machine would be a new question. settleVariantDefaults is not decided.",
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-1781-angle-new-letter",
+      "question": "On «משולש CDE» · «A על CD» · «B על CE», is «זווית BXC = 100» drawn by placing X, or refused?",
+      "class": "create-on-mention",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A referenced point the figure lacks is created, and X is placed where the angle holds.",
+      "precedents": [
+        {
+          "quote": "A referenced point that does not exist is created, with #1467's notice",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-162"
+        },
+        {
+          "quote": "Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-121"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Not #2450's rows with a circle, or whether the rider B may move.",
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-2277-no-face",
+      "question": "On a cube, does «המשולש ישר זווית» refuse or create a new triangle?",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "sr-12 is the later standing rule: a definite noun with no drawn object of its kind creates the object.",
+      "precedents": [
+        {
+          "quote": "sr-12, A: a definite noun binds the drawn object of its kind. This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "It does not choose the new triangle's letters.",
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "pending"
+    },
+    {
+      "id": "q-right-vertex",
+      "question": "Which vertex does «משולש ישר זווית ABC» start at in analytic and 3-D?",
+      "class": "right-angle-seat-default",
+      "verdict": "escalate",
+      "reason": "Cycling is ruled (#2363, both tools). The starting vertex has no precedent.",
+      "nearest": [
+        {
+          "quote": "2363 - Q1: in the case of משולש ישר זוית ABC the tool need to have a dof for the right angle and this is the same case for english. Q2: Same ruling for 3d tool",
+          "date": "2026-10-20",
+          "link": "https://github.com/dcodish/geo_builder/issues/2363#issuecomment-6284827835"
+        }
+      ],
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-ray-circle",
+      "question": "Must the crossing in «הקרן AB חותכת את המעגל» lie on the ray?",
+      "class": "ray-crossing-side",
+      "verdict": "escalate",
+      "reason": "No precedent: his ruling covers two rays, not a ray against a circle, and ADR-780 points the other way.",
+      "nearest": [
+        {
+          "quote": "A — True rays: the crossing lies on both rays, the figure adapts or the line is refused",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2533#issuecomment-6623357934"
+        }
+      ],
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q-2220-older-circle-moves",
+      "question": "Circles O and P are apart and Q is stated contained in both: does P move, or is the line refused?",
+      "class": "stability-tolerance",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "Their being apart is only a free sample, so a free circle moves as little as possible and the figure is drawn.",
+      "precedents": [
+        {
+          "quote": "sr-27, C: an object placed by value stays exactly put; a free one moves as little as possible.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Free circles only. Not circles placed by value or stated «זרים».",
+      "at": "2026-11-05T08:22:19.489Z",
+      "status": "pending"
     }
   ],
   "demoted": {
