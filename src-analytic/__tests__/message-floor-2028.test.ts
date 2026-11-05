@@ -30,6 +30,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'out-of-scope': [{}],
   'proof-target': [{}],
   'radian-angle': [{ detail: 'π/2' }],
+  'arc-length-unread': [{ detail: 'AB' }], // #2032 (ADR-AG-408)
   'unread-name': [{}],
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],

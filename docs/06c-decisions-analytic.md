@@ -15293,3 +15293,37 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** New `src-analytic/__tests__/stated-value-restatement-2491.test.ts` (the operator's four lines → `record` with AB = 4 in `stated`; nine class rows; the English spelling; nine controls (the ⟂ on pinned points and the square's 90 among them); a contradiction still refused; the predicate keyed by label). Re-based, each flipped by this mechanism (verdict controls written by sessions, not rulings): `already-drawn-1990.test.ts` (its `already-follows` member is now «B נמצא על ציר ה-x»), `engine.test.ts` (the #1080 area and the #1102 «AB = 4» rows), `issue-1629-selecting-given.test.ts` (|AB| = √80 draws its value), `issue-1556-freerank-equality-rows.test.ts` (the area). No fixture: the essence is a verdict.
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
+
+## ADR-AG-408 — An arc's length is refused until its reader exists: a π value on an arc is never degrees (#2032)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `wrong-answer`) · round #2722 · branch `fix/2032-arc-length-refusal` · operator, 2026-11-04, round #2697 questions page, card q5 = **B**: *"Refuse «קשת AB = 4π» honestly now, then build A"*, A being the arc-length reader (#2710). Earlier ruling, 2026-10-13: *"both read it as the arc's length"*.
+**Requirements:** [02c](02c-requirements-analytic.md) R245 · **Design:** none (internal)
+**Amends** [ADR-AG-220](#adr-ag-220) (its arc reader no longer reads a π value). The 2-D half is ADR-664, landed in round #2128; this is the analytic half. #2710 lifts this refusal when the reader lands.
+
+**Measured before (`28dac0c3`, `decideSubmit` against `decideDeterministic2D`), after «גזרה AOB».**
+
+| line | 2-D | analytic |
+| --- | --- | --- |
+| «קשת AB = 4π», «3π», «π», «0.5π», «4pi», «4*π», «⌢AB = 4π», "arc AB = 4π", «הקשת AB היא 4π» | the length (`measure-perimeter`) | a record: 4π **degrees** |
+| «קשת AB = 2π/3», «π/2» | not-handled | a record: 2.09°, 1.57° |
+| «אורך הקשת AB הוא 4π», «= 5», «= L», «… רבע מהיקף המעגל», "arc length AB = 4π" | the length | not-handled |
+| «קשת AB + קשת BA = π» | not-handled | a record: 3.14 degrees |
+| «קשת AB = 40», «40°» | degrees | degrees |
+
+With no drawn arc (a circle with A and B on it) 2-D does not understand the π lines; analytic drew the same arc.
+
+**The class.** A statement of an arc's length, or a π value on an arc, is read as something other than what it says: `arcSide` passed every value to `measureValue`, π is a plain number there (`engine/expr.ts`), and the arc reader's value is degrees. The spelled form had no reader, so it went to the model, which has nothing to say it with either.
+
+**Decision.** Two refusals at the arc family, no new mechanism, and no chokepoint list grows.
+- `parseArcMeasure`, once it has read the terms, tests the student's text for π (the `Expr` has lost it). One arc against a π value is the owned `arc-length-unread`. Every π value is refused, not only the ones 2-D reads as a length: option B of the escalation is *"a single arc set equal to a π value"*, and «2π/3» drawn as 2.09° is the same wrong figure. Its copulas admit a π value so «הקשת AB היא π» and "arc AB is 4π" reach the refusal.
+- `parseArcLengthStatement` claims the spelled statement in any value, the set 2-D reads. It reads the noun as 2-D's `ROUND_REF.arc` does, the letters case-sensitively. A question stays out of it: it needs a copula and a value.
+
+The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», with the student's own arc. The parser reads no figure, so the refusal is the same with or without a drawn arc: the row `arc-bare-pi-no-arc-2032` stays a gap (2-D not-handled, analytic refused) until #2710 resolves the arc.
+
+**Found in round: an arc sum written with π.** «קשת AB + קשת CD = π» drew as degrees: the same reader and the same cause. #1837 and #2032's plan both keep the rule (2026-10-13): *"any other arc measure with π is refused as radians"*, under the ruling *"analytics tool should not support radians at all"*. #1837's sweep did not list this reader. It now gives the `radian-angle` refusal. 2-D says not-handled there; its #1837 predicate covers only an angle noun.
+
+**Sibling audit (docs/17 §1).** 2-D: ADR-664 closed the π class. 3-D: outside circle geometry (X8). Complex: has no arcs. Not this class, and not changed: «קשת AB = 2√3» (degrees here, not-handled in 2-D) is #2174; «שטח הגזרה AOB הוא 12π» stays not-handled, as no degree reading exists for it.
+
+**Locks.** New `src-analytic/__tests__/arc-length-refusal-2032.test.ts`: the reported line, 31 spellings on a sector, a named circle and an equation circle, both locales, the taught line records, degree controls, the radian sums, a question. Parity rows `arc-bare-pi-2032`, `arc-bare-pi-no-arc-2032` and `arc-length-172` carry #2710 on analytic's cell.
+
+**Behaviour change for a student:** in analytic, «קשת AB = 4π» no longer draws a tiny arc. It is refused with a sentence that says arcs are read in degrees. «אורך הקשת AB הוא 4π» gets the same sentence, where it used to get "not understood".

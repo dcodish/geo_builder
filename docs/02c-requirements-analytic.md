@@ -581,6 +581,11 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «רבע מעגל AOB» and «גזרה AOB» are centred at O, «גזרה OAB» too: the middle letter is the centre, or an O/P/Q letter written first, read as 2-D reads it
 - Sources: ADR-AG-220, #1622, ADR-AG-331, #2486.
 
+**R245 — an arc's length is refused, never read as degrees**. *(Operator ruling 2026-11-04 on #2032, card q5 = B: "Refuse «קשת AB = 4π» honestly now, then build A".)* The tool has no arc-length measure yet (#2710). A π value on one arc, and any statement of an arc's length, is refused with «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», in the student's letters. An arc in degrees is unchanged (R163). An arc sum or ratio written with π is an angle in radians and is refused as one.
+- «קשת AB = 4π», «⌢AB = 3π», «קשת AB = 2π/3», "arc AB = 4π"
+- «אורך הקשת AB הוא 4π», «אורך הקשת AB = 5», "arc length AB is 4π"
+- Sources: ADR-AG-408, #2032, #2710, ADR-W-142.
+
 **R74 — a conic is named by its KIND**. A figure holding two of a kind refuses the reference rather than inventing an ordinal.
 - «הנקודה A נמצאת על האליפסה», «P על הפרבולה»
 - Sources: ADR-AG-049.
