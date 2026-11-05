@@ -124,6 +124,8 @@ const LATIN_RE = /[A-Za-z]/;
 
 /** The letters a student can index (Latin and Greek — never the private-use length encoding), and what starts an index (#1785). */
 const INDEXED_LETTER_RE = /[A-Za-zα-ορ-ω]/;
+/** Is this symbol a letter a student wrote — never a tool symbol (`r_O`, `θ_<id>`) or a private-use length placeholder? (#2566) */
+export const isStudentLetter = (name: string): boolean => name.length === 1 && INDEXED_LETTER_RE.test(name);
 const INDEX_START_RE = /[0-9_₀-₉]/;
 
 function tokenize(src: string): Tok[] | null {

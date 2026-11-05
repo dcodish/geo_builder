@@ -487,6 +487,12 @@ reading** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183)): `nameReading` (`
 (`Derivation.notices`) and the record verdict, and set with the line (`recordLine(line, notice)`,
 `recordLlmLines(…, notice)`; `commitRecord` / `noticeText`).
 
+**The probe is total, keyed by name** ([ADR-AG-412](06c-decisions-analytic.md#adr-ag-412), #2566). Every identity or
+restatement question is answered at `probeEnvs(...exprs)` (`engine/probes.ts`): two environments built from the
+expressions asked about, assigning each letter a student can type one value per NAME, distinct across names. A fixed
+alphabet cannot return: `evalExpr` answers NaN for an absent letter, which reads as "different". The plane's `x`, `y`, a
+length placeholder and a tool symbol stay absent.
+
 *Identifiers:* `\|cos\|` · `III`
 
 **A line referred to by its name** ([ADR-AG-317](06c-decisions-analytic.md#adr-ag-317)). A narrowed line keeps its
