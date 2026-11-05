@@ -1854,6 +1854,32 @@
       "limits": "Free circles only. Not circles placed by value or stated «זרים».",
       "at": "2026-11-05T08:22:19.489Z",
       "status": "pending"
+    },
+    {
+      "id": "q-2294-settle",
+      "question": "Should the drawing settled at commit depend only on what was typed, or keep the clock?",
+      "class": "settle-clock-or-work",
+      "verdict": "escalate",
+      "reason": "Reserved rule 4: no precedent decides this check and the nearest pull in opposite directions. The 2026-09-30 'same input, same answer' was for the knowledge pool, the 2026-10-04 work cap says 'for this check', and M3's clock list does not name the settle. The cost at commit, about 27 s or a corner square fixed on every machine, was never weighed by him.",
+      "nearest": [
+        {
+          "quote": "same input, same answer",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-558"
+        },
+        {
+          "quote": "the interactive searches keep the clock",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-558"
+        },
+        {
+          "quote": "I dont want to wait 40s just to start looking for an alternative so if after 2-3s there is no solution maybe we search for a different config or better if we can seach in parallel.",
+          "date": "2026-09-15",
+          "link": "https://github.com/dcodish/geo_builder/issues/1012#issuecomment-5675700562"
+        }
+      ],
+      "at": "2026-11-05T10:14:56.720Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
