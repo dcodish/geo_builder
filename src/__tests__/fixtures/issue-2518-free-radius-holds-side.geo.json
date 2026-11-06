@@ -1,0 +1,84 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-06T12:00:00.000Z",
+  "name": "issue-2518-free-radius-holds-side",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "utterance": "מעגל שמרכזו O",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "utterance": "מעגל שמרכזו P",
+      "group": "g1",
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-P"
+      },
+      "utterance": "נקודה A על מעגל P",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g3.4",
+      "cmd": {
+        "type": "extend-onto-circle",
+        "id": "R",
+        "a": "A",
+        "b": "O",
+        "circle": "circle-P"
+      },
+      "utterance": "המשך AO חותך את מעגל P בנקודה R",
+      "group": "g3",
+      "enabled": true
+    },
+    {
+      "id": "g4.5",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "P"
+      },
+      "utterance": "OP = 10",
+      "group": "g4",
+      "enabled": true
+    },
+    {
+      "id": "g5.6",
+      "cmd": {
+        "type": "set-distance",
+        "a": "O",
+        "b": "P",
+        "value": 10
+      },
+      "utterance": "OP = 10",
+      "group": "g4",
+      "enabled": true
+    }
+  ]
+}

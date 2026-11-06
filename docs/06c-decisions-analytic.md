@@ -15561,3 +15561,17 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/probe-alphabet-2566.test.ts`: the click and rows 1–6 for eight letters and three controls (63 of 86 tests red before the fix), distinctness, a twin sweep over the other reads, and the probe itself. The #2554 class guard loses its known-gap row. Fixture `circle-centre-letter-radius-2566.analytic.json`: the circle, the click's exact line, the respelling.
 
 **Behaviour change for a student:** every letter now behaves as r always did. The + at the centre of «(x-13)^2+y^2=R^2» names it, and that circle retyped in any spelling is known, never refused and never drawn twice.
+
+## ADR-AG-414 — An extension from a point on a circle starts the circle large enough (#2518)
+
+**Status:** accepted · 2026-11-06 · bug (P2 + wrong-answer, analytic port of 2-D's [ADR-791](06-decisions.md#adr-791)) · fix round #2722 · operator ruling 2026-11-06 on #2518: *"its not right to refuse. this shape is possible"*
+
+**Requirements:** [02c](02c-requirements-analytic.md) R142 · **Design:** none (internal)
+
+**Measured before** (`main` 10331c78, `decideSubmit`). «המשך AO חותך את מעגל P בנקודה R» with A on the circle and «OP = 10» was refused `unsatisfiable`, later and typed. A radius a given reaches is solved and its sample is the solve's start, in a window that never reaches 10, so the `beyond` selector rejected every seed.
+
+**Decision.** `seedExtensionRadii` (`engine/evaluate.ts`, folded with the sign selectors): when a `beyond` crossing and its first letter lie on one circle whose radius is a free symbol, the start goes to 1.25 × the figure's stated scale. A start, never a verdict: the judge keeps the last word, and a stated radius is no symbol, so it stays refused. The shared end second already built.
+
+**Locks.** `src-analytic/__tests__/extension-free-radius-2518.test.ts`; parity rows `ext-circle-later-free-radius-2518`, `ext-circle-typed-free-radius-2518`. Analytic still offers no reversed sentence on its refusal (the note on `ext-circle-side-impossible-2518`).
+
+**Behaviour change for a student:** in the analytic builder, a sentence a larger circle can satisfy draws instead of being refused.

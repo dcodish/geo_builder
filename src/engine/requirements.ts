@@ -61,6 +61,17 @@ export const isSideRecord = (r: SideRequirement): r is SideRecord => r.kind !== 
 /** The construction's stated sides (#1739, ADR-594) — empty for every figure without one. */
 export const sideRecordsOf = (c: Construction): SideRecord[] => (c.requirements ?? []).filter(isSideRecord);
 
+/**
+ * Does a stated side name this point, or a stated mutual position name the circle it centres? A seat moving it would be
+ * moving a point the student placed by a statement.
+ */
+export const statedSideOf = (c: Pick<Construction, 'requirements' | 'objects'>, id: Id): boolean =>
+  (c.requirements ?? []).some((r) => {
+    if (r.kind === 'declared-shape') return false;
+    if (r.kind === 'circle-position') return c.objects.some((o) => o.kind === 'circle' && o.center === id && (o.id === r.a || o.id === r.b));
+    return r.kind === 'line-side' ? [r.a, r.b, ...r.subjects].includes(id) : r.id === id;
+  });
+
 /** "On the circle" tolerance — the verifier's (2 % of the radius, a small floor); a side is strict beyond it. */
 export const onCircleTol = (r: number): number => Math.max(0.05, r * 0.02);
 

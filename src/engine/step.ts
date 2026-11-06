@@ -41,6 +41,7 @@ import { circlesTangentError, commonTangentCapacityError, equalNestedPair, pairP
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
+import { reseatExtensions } from './extensionSide';
 import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, residualRefs, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
@@ -1351,7 +1352,14 @@ function circlesCrossingTangentError(prev: Construction, cmd: Command, prevEval:
 
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
-  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyStepLadder(prev, cmd))), prev, [cmd]), prev);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, sideSeated(applyStepLadder(prev, cmd)))), prev, [cmd]), prev);
+}
+
+/** #2518 (ADR-791): after an accepted step, an extension a free quantity can hold is put back on its stated side. */
+function sideSeated(r: StepResult): StepResult {
+  if (!r.ok) return r;
+  const seated = reseatExtensions(r.construction, r.positions);
+  return seated ? { ...r, ...seated, ladder: [...(r.ladder ?? []), 'seat:extension-side'] } : r;
 }
 
 /** The M1 redefinition arm's solve: a reinterpreted placement (ADR-028) is accepted on its primary evaluate, else it
@@ -1648,7 +1656,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
-  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyCoupledStepLadder(prev, cmds))), prev, cmds), prev);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, sideSeated(applyCoupledStepLadder(prev, cmds)))), prev, cmds), prev);
 }
 
 function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult {

@@ -19,7 +19,7 @@ import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImpliesInEveryReading, quadRel
 import { constraintKey, constraintRefs, residual, residualRefs, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
-import { recordRequirement, requirementsField } from './requirements';
+import { recordRequirement, requirementsField, statedSideOf } from './requirements';
 
 /**
  * A constraint either *drives* a free DOF or *checks* the figure (ADR-012/014).
@@ -1582,12 +1582,12 @@ function convexInOrder(pts: Vec[]): boolean {
  * configuration search keeps a configuration on the stated side whenever one exists, and when the other end is pinned,
  * derived or constrained nothing moves. A typed line whose side then holds nowhere is refused (ADR-784).
  */
-function seatExtensionBeyond(objects: GeoObject[], constraints: readonly Constraint[], pos: Map<Id, Vec>, cmd: Extract<Command, { type: 'extend-onto-circle' }>, shared: Id, other: Id): void {
+function seatExtensionBeyond(prev: Construction, objects: GeoObject[], constraints: readonly Constraint[], pos: Map<Id, Vec>, cmd: Extract<Command, { type: 'extend-onto-circle' }>, shared: Id, other: Id): void {
   const circ = objects.find((o): o is CircleObj => o.kind === 'circle' && o.id === cmd.circle);
   const i = objects.findIndex((o) => o.id === other);
   const o = objects[i];
   if (!circ || !o || o.kind !== 'free-point' || o.pinned || o.rigid) return;
-  if (constraints.some((k) => constraintRefs(k).includes(other))) return;
+  if (constraints.some((k) => constraintRefs(k).includes(other)) || statedSideOf(prev, other)) return; // #2518 (ADR-791): «O בתוך מעגל P» is a statement too
   const c = pos.get(circ.center);
   const s = pos.get(shared);
   const x = pos.get(other);
@@ -2550,10 +2550,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const shared = [cmd.a, cmd.b].find((id) => pointOnCircle(objects, id, cmd.circle));
       if (shared) {
         const other = shared === cmd.a ? cmd.b : cmd.a;
-        seatExtensionBeyond(objects, constraints, pos, cmd, shared, other);
+        seatExtensionBeyond(prev, objects, constraints, pos, cmd, shared, other);
         const lineId = `line-${other}${shared}`;
         addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: other, b: shared } });
-        addObj(objects, { kind: 'line-circle', id: cmd.id, line: lineId, circle: cmd.circle, branch: 0, avoid: shared });
+        addObj(objects, { kind: 'line-circle', id: cmd.id, line: lineId, circle: cmd.circle, branch: 0, avoid: shared, stated: [cmd.a, cmd.b] });
         addObj(objects, segment(cmd.a, cmd.id)); // the drawn secant (through the shared end)
         break;
       }

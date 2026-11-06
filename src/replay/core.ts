@@ -29,6 +29,7 @@ import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities
 import { carrierParams, setCarrierVals } from '@/engine/evaluate';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
+import { crossingPastSecond } from '@/engine/extensionSide';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
@@ -4139,7 +4140,8 @@ export interface ExtensionSide {
  *   the prior pool cannot answer: it reads the TRIAL figure's pool. The side must have held before, at the drawn seed or
  *   in the prior pool. A figure already off its side (a saved one) never blames the line, so it stays editable.
  *
- * ADR-780's seat is why a movable other end passes the first test at no cost. The bar is the verifier's (`t > 1`), not
+ * ADR-780's seat and ADR-791's re-seat (after every accepted step) run first, so a figure a free quantity can hold passes
+ * the first test at no cost, and only a figure nothing can save reaches the pool. The bar is the verifier's (`t > 1`), not
  * the sampling bar's clearance: a refusal needs the side to be absent, not merely tight. A figure with no extension pays
  * one scan of the fact list; a line that leaves every extension on its side at the drawn seed pays the trial replay the
  * dry run reuses. Any other extension (a target that exists, neither end on the circle) carries `collinear-order`, and
@@ -4164,17 +4166,7 @@ export function impossibleExtensionSide(facts: Fact[], commands: AnyCommand[], s
       const circle = objects.find((x) => x.id === c.circle);
       return o?.kind === 'line-circle' && o.avoid !== undefined && circle?.kind === 'circle' ? { shared: o.avoid, center: circle.center } : null;
     };
-    /** Is the crossing past the second letter here? `null` when a point is unplaced. */
-    const beyond = (pos: ReadonlyMap<Id, Vec>, c: Ext, seat: { shared: Id; center: Id }): boolean | null => {
-      const a = pos.get(c.a), b = pos.get(c.b), s = pos.get(seat.shared), o = pos.get(seat.center);
-      if (!a || !b || !s || !o) return null;
-      const ux = b.x - a.x, uy = b.y - a.y;
-      const u2 = ux * ux + uy * uy;
-      if (u2 < 1e-18) return false;
-      // the line's other crossing of the circle through s about o: s reflected across the foot of o on the line
-      const k = (2 * ((o.x - s.x) * ux + (o.y - s.y) * uy)) / u2;
-      return ((s.x + k * ux - a.x) * ux + (s.y + k * uy - a.y) * uy) / u2 > 1;
-    };
+    const beyond = (pos: ReadonlyMap<Id, Vec>, c: Ext, seat: { shared: Id; center: Id }) => crossingPastSecond(pos, c.a, c.b, seat.shared, seat.center);
     /** The pool's verdict: every sample off the side. A thin pool answers nothing. */
     const offEverywhere = (pool: SharedSamples, c: Ext, seat: { shared: Id; center: Id }): boolean => {
       if (pool.samples.length === 0) return false;

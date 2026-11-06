@@ -2013,7 +2013,7 @@ function freeAngleOf(c: Construction, sel: Extract<Selector, { kind: 'sign' }>):
 }
 
 function foldSignSelectors(c: Construction, env: Env): Env {
-  let out = env;
+  let out = seedExtensionRadii(c, env);
   for (const sel of c.selectors) {
     if (sel.kind === 'major-axis') {
       out = foldMajorAxis(c, sel, out);
@@ -2033,6 +2033,32 @@ function foldSignSelectors(c: Construction, env: Env): Env {
     const reduced = ((theta % Math.PI) + Math.PI) % Math.PI;
     const isPositive = reduced > 0 && reduced < Math.PI / 2;
     if (isPositive !== sel.positive) out = { ...out, [sym]: Math.PI - reduced };
+  }
+  return out;
+}
+
+/**
+ * AN EXTENSION FROM A POINT ON A CIRCLE STARTS THE CIRCLE LARGE ENOUGH (#2518, [ADR-AG-414](../../docs/06c-decisions-analytic.md#adr-ag-414),
+ * 2-D's [ADR-791](../../docs/06-decisions.md#adr-791); operator ruling 2026-11-06: *"its not right to refuse. this shape is possible"*).
+ *
+ * «המשך AO חותך את המעגל בנקודה R» with A on the circle: R lies past O only when O is inside the circle. A radius a given
+ * reaches is solved, and its sample is the solve's start, in a window that never reaches a stated «OP = 10», so the `beyond`
+ * selector rejected every seed. The start goes above the figure's stated scale. A start, never a verdict: a radius the
+ * student stated is no symbol here, and the judge keeps the last word.
+ */
+function seedExtensionRadii(c: Construction, env: Env): Env {
+  let out = env;
+  const scale = statedScale(c.objects, c.constraints);
+  for (const sel of c.selectors) {
+    if (sel.kind !== 'beyond') continue;
+    const circles = (id: Id) => c.constraints.flatMap((k) => (k.t === 'on-curve' && k.id === id ? [k.curve] : []));
+    const shared = circles(sel.a);
+    for (const curve of circles(sel.id)) {
+      if (!shared.includes(curve)) continue;
+      const host = c.objects.find((o) => o.id === curve);
+      if (host?.kind !== 'circle-at' || host.r.kind !== 'sym' || !(host.r.name in out)) continue;
+      if (out[host.r.name] <= scale) out = { ...out, [host.r.name]: 1.25 * scale };
+    }
   }
   return out;
 }

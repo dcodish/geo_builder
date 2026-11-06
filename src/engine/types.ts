@@ -317,6 +317,8 @@ export interface LineCirclePoint {
   branch: number;
   avoid?: Id;
   onSegment?: [Id, Id];
+  /** #2518 (ADR-791): a shared-endpoint extension's letters in the student's order, the point past the second */
+  stated?: [Id, Id];
 }
 
 /**

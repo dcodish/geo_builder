@@ -171,7 +171,6 @@ describe('#2518 (ADR-784, judge ruling, option B) — a later line that makes a 
 
   it('a pinned circle: «OP = 10» after the extension', () => expectBroken([...STANDING, 'OP = 10']));
 
-  it('a free radius, where a larger circle would have worked, is refused too (the report, then «OP = 10»)', () => expectBroken([...REPORT, 'OP = 10']));
 
   it('the refusal names the extension line and the statement that broke it', () => {
     const { facts } = driveThroughGate(STANDING);

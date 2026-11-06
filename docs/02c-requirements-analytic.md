@@ -675,6 +675,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R142 — diagonals, extensions, the midsegment and a point on a side with a condition read as the 2-D tool reads them**. *(Operator ruling: the same experience as 2-D.)*
 - «E על המשך הצלע BC» → E past C
+- «המשך AO חותך את המעגל בנקודה R» with A on the circle and a stated distance that puts O beyond the circle's first size → the circle adapts, R past O; a stated radius that cannot hold it is refused (ADR-AG-414)
 - «הנקודה E נמצאת על צלע BC כך ש-AE = AC»
 - «קטע האמצעים לצלע BC במשולש ABC» → midpoints M and N
 - Sources: ADR-AG-208, #1620.

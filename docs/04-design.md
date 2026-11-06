@@ -1080,6 +1080,16 @@ fact list. A saved figure never passes through this gate: it replays with every 
 (`figure.v.orderBeyond`, or `figure.v.orderBeyondOther` when the point is past the first letter), and being already off
 its side, it never blames a new line.
 
+### A stated side a free quantity can hold is re-seated ([ADR-791](06-decisions.md#adr-791))
+
+The branch records the stated letters on its `line-circle` (`stated`). After an accepted step, `reseatExtensions`
+(`engine/extensionSide.ts`, LADDER 2b′) tries closed-form seats on each shared-endpoint extension off its side: θ, size,
+size with θ, centre, centre with θ. Size means a free radius, or the free point the circle passes through; a circle stated
+larger or stated to contain it grows too, and a tangent neighbour's free centre moves out. A try is kept only if the whole
+figure evaluates, the side holds, and every stated side, stated position and radius order still holds, so the seat never
+needs to know which figures are hopeless: it tries, and the gate above refuses what is left. `crossingPastSecond` is the
+one reading of the side. Because it runs in the fold, a saved figure a free quantity can hold redraws on its side.
+
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 
 Every circle-pair relation's apply-time seat (LADDER stage 2a) asks one chooser, `seatMover(objects, a, b)` in
