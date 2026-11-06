@@ -1142,7 +1142,7 @@ export type Command =
   // draws is identical — the flag records the ROLE CLAIM the noun makes, so it can be checked instead of
   // being consumed as a way of pointing at a pair (#966, ADR-499; the 2-D half of #859's ruling).
   | { type: 'segment'; a: Id; b: Id; diagonal?: true }
-  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number; arcOf?: Id } // arcOf: the value is an ARC measure on that circle (vertex = centre) — constraint identical, display on the arc, no centre wedge (ADR-116/335)
+  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number; arcOf?: Id; src?: string } // src: a fraction as the student spelled it, for every printer (ADR-W-179, ADR-789); arcOf: the value is an ARC measure on that circle (vertex = centre) — constraint identical, display on the arc, no centre wedge (ADR-116/335)
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
   // Bind a CONCENTRIC pair's roles: `inner` stays strictly inside `outer` (ADR-244). A REQUIREMENT, never a

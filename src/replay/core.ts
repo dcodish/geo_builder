@@ -2395,15 +2395,17 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // Sourced exactly like the angle MARK below (facts, `status === 'ok'`), which is why the wedge was drawn
   // but bare — mark from the fact, value from the constraint. `fillOnly` keeps a symbolic label ("2α",
   // an alias name) ahead of the raw number, so this only ever fills a gap.
+  const arcSpelling = new Map<string, string>();
   for (const fi of fold.iterOrder) {
     const f = facts[fi];
     if (status[f.id] !== 'ok') continue;
     const c = f.cmd;
     if (c.type === 'set-angle') {
-      const text = `${fmtMeasure(c.value)}°`;
+      const text = `${givenText(c.value, c.src, fmtMeasure)}°`; // a fraction as typed (ADR-W-179, ADR-789)
       if (c.arcOf) {
         const k = `${c.arcOf}:${[c.ray1, c.ray2].sort().join('')}`;
         if (!arcByKey.has(k)) arcByKey.set(k, { circle: c.arcOf, a: c.ray1, b: c.ray2, text });
+        if (c.src) arcSpelling.set(k, c.src);
       } else {
         addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: c.vertex, ray1: c.ray1, ray2: c.ray2 }, text, true);
       }
@@ -2420,7 +2422,10 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     if (con.type === 'distance' && !con.derived) addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
     else if (con.type === 'angle') {
       // An ARC measure (ADR-335): the value prints ON the arc — never at the (often hidden) centre vertex.
-      if (con.arcOf) arcByKey.set(`${con.arcOf}:${[con.ray1, con.ray2].sort().join('')}`, { circle: con.arcOf, a: con.ray1, b: con.ray2, text: `${fmtMeasure(con.value)}°` });
+      if (con.arcOf) {
+        const k = `${con.arcOf}:${[con.ray1, con.ray2].sort().join('')}`;
+        arcByKey.set(k, { circle: con.arcOf, a: con.ray1, b: con.ray2, text: `${givenText(con.value, arcSpelling.get(k), fmtMeasure)}°` }); // a spelling that no longer reads as the value falls back (ADR-W-179)
+      }
       else addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
     }
     else if (con.type === 'area') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-area', ids: con.ids, ...(con.round ? { round: con.round } : {}) }, fmtMeasure(con.value), true);
@@ -5038,8 +5043,9 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
  */
 function withGivenSpelling(rows: ValuesPanelResult['rows'], cmds: readonly AnyCommand[]): ValuesPanelResult['rows'] {
   const sorted = (ids: readonly string[]) => [...ids].join('').split('').sort().join('');
-  const spelled = new Map<string, { value: number; text: string }>();
+  const spelled = new Map<string, { value: number; text: string; unit?: string }>();
   for (const c of cmds) {
+    if (c.type === 'set-angle' && c.src) spelled.set(`angle:${sorted([c.ray1, c.vertex, c.ray2])}`, { value: c.value, text: c.src, unit: '°' });
     if (c.type === 'measure-length' && 'value' in c.expr && c.expr.text) spelled.set(`length:${sorted([c.a, c.b])}`, { value: c.expr.value, text: c.expr.text });
     if (c.type === 'measure-area' && !c.round && 'value' in c.expr && c.expr.text) spelled.set(`area:${sorted(c.ids)}`, { value: c.expr.value, text: c.expr.text });
     if (c.type === 'measure-perimeter' && !c.round && 'value' in c.expr && c.expr.text) spelled.set(`perimeter:${sorted(c.ids)}`, { value: c.expr.value, text: c.expr.text });
@@ -5048,7 +5054,7 @@ function withGivenSpelling(rows: ValuesPanelResult['rows'], cmds: readonly AnyCo
     const typed = r.stated && !r.unit && !r.or && !r.pm ? spelled.get(`${r.kind}:${sorted(r.ids)}`) : undefined;
     // the stated value, not the row's: the row is read off the solved figure, to the solver's tolerance
     const given = typed ? givenText(typed.value, typed.text, () => '') : '';
-    return given ? { ...r, given } : r;
+    return given ? { ...r, given: `${given}${typed?.unit ?? ''}` } : r;
   });
 }
 

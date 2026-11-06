@@ -20247,13 +20247,13 @@ No new student text. Every sentence is an existing ruled string.
 
 **Decision.** `arcValue` reads a plain fraction as a plain number. `shell/arcLengthUnit`, one reader for both builders, finds one arc with a length unit before either builder strips it: 2-D folds the line into «אורך הקשת AB הוא 4» at the strip boundary (`foldArcLengthUnit`), so it commits that sentence's command and answers as that sentence does with no drawn arc; analytic refuses it (ADR-AG-408). Unit words: the session's list, recorded with `judgments.mjs chose`; the one-letter «מ'» and "m" stay out, because «4m» is a coefficient. A π value stays a length, a root keeps going to the AI (#2174), and #2174's «אם התכוונת לאורך הקשת» note is untouched.
 
-`teachCanonical` no longer prints a value with no short decimal: «קשת AB = 2/3» would have taught «∠AOB = 0.6666666666666666». It shows no hint; «7/2» teaches 3.5 as before.
+**A fraction keeps its spelling (pre-play of round #2722, ADR-W-179).** `set-angle` kept the float and lost the spelling, so the step row read «∠AOB = 0.6666666666666666» and the hint would have taught it. `«∠ABC = 2/3»` had the same row, from the same printer. `set-angle` now carries `src` for a fraction, from both of its readers (`arcValue`, `angleValueOf`). `givenText` prints it on the row («∠AOB = 2/3°»), the hint and export («∠AOB = 2/3», a sentence the tool reads), the canvas («2/3°») and the given's panel row. A decimal or a whole number carries no `src` and prints as before. The row's degree sign is new text (ADR-W-174).
 
-**Sibling audit (docs/17 §1).** Analytic: already reads a fraction as degrees; the unit is ADR-AG-408's refusal. 3-D and complex have no arcs. Not changed, and reported: an arc SUM with a unit, «קשת AB + קשת CD = 4 ס"מ», keeps today's degrees in analytic and today's verdict in 2-D; the ruling names one arc's value. «קשת AB = 2/3» shows its value as a decimal on the figure, as any degree value does.
+**Sibling audit (docs/17 §1).** Analytic: already reads a fraction as degrees; the unit is ADR-AG-408's refusal. 3-D and complex have no arcs. Not changed, and reported: an arc SUM with a unit, «קשת AB + קשת CD = 4 ס"מ», keeps today's degrees in analytic and today's verdict in 2-D; the ruling names one arc's value. The row of a whole or decimal arc value («∠AOB = 40») keeps no degree sign, as before.
 
 **Locks.** New `src/app/__tests__/issue-2032-arc-plain-values.test.ts`; parity rows `arc-fraction-2032`, `arc-unit-length-2032`; analytic's `arc-length-refusal-2032.test.ts`.
 
-**Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 0.67°, not a chord of length 2/3. «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.
+**Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 2/3°, not a chord of length 2/3, and the row reads «∠AOB = 2/3°». «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.
 ## ADR-786 — «MK אנך ל-AB» from a placed M to a new K draws K, the foot on AB (#2232, in #2231's family)
 
 **Date:** 2026-11-05 · **Status:** accepted · bug (2-D, closed into #2231's family) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: B → *"yes"* (analytic and 2-D)

@@ -2913,7 +2913,7 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
  * leaving the value half split is what let #831's stated guarantee be true and this bug exist anyway.
  */
 type AngleValue =
-  | { kind: 'num'; value: number; rest: string }
+  | { kind: 'num'; value: number; rest: string; src?: string }
   /** #1851 (ADR-662): `konst` / `text` — a symbol plus a constant («α + 40»), read by the shared {@link AFFINE_TAIL}. */
   | { kind: 'sym'; coef: number; sym: string; rest: string; konst?: number; text?: string };
 
@@ -2984,7 +2984,7 @@ function angleValueOf(stripped: string): AngleValue | null {
     // drew 40°. A value symbol still standing beside the number means the value is not a number, and this
     // rule cannot represent `symbol ± number`; decline, and the line escalates whole.
     if (VALUE_SYMBOL_LEFT.test(rest)) return null;
-    return { kind: 'num', value: parseFloat(numM[1]) / den, rest };
+    return { kind: 'num', value: parseFloat(numM[1]) / den, rest, ...(numM[2] !== undefined ? { src: `${numM[1]}/${numM[2]}` } : {}) };
   }
   return null;
 }
@@ -3036,7 +3036,7 @@ const angle: Rule = (s, ctx) => {
   return [
     { type: 'segment', a: v, b: r1 },
     { type: 'segment', a: v, b: r2 },
-    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value },
+    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value, ...(val?.kind === 'num' && val.src ? { src: val.src } : {}) },
   ];
 };
 
@@ -3469,7 +3469,7 @@ const arcValue: Rule = (s, ctx) => {
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
   const value = parseFloat(m[2]) / (m[3] ? parseFloat(m[3]) : 1);
   if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
-  return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
+  return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center), ...(m[3] ? { src: `${m[2]}/${m[3]}` } : {}) }];
 };
 
 /**

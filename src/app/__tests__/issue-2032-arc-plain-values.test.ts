@@ -12,6 +12,7 @@ vi.mock('@/parser/llm', () => ({ llmParse: vi.fn(async () => ({ built: [], dropp
 import { decideDeterministic2D, type Verdict2D } from '../decideDeterministic';
 import { commitVerdict } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { stepLabel } from '@/parser';
 import { readArcUnitValue } from '../../../shell/arcLengthUnit';
 
 const st = () => useGeoStore.getState();
@@ -41,9 +42,47 @@ describe('ADR-789 — a plain fraction on an arc is degrees, never the chord', (
     }
   });
 
-  it('a teaching hint never prints a value it cannot spell', async () => {
-    expect((await after(SECTOR, 'קשת AB = 2/3') as { note?: unknown }).note ?? null).toBeNull();
-    expect(await after(SECTOR, 'קשת AB = 7/2')).toMatchObject({ note: { key: 'input.canonicalHint', params: { canonical: '∠AOB = 3.5' } } });
+  // Pre-play of round #2722: the row read «∠AOB = 0.6666666666666666», with no degree sign and not the given's spelling.
+  describe('a fraction keeps the student\'s spelling (ADR-W-179)', () => {
+    const committed = async (ctx: readonly string[], line: string) => {
+      const v = await after(ctx, line);
+      if (v.kind !== 'commit') throw new Error(`${line}: ${v.kind}`);
+      commitVerdict(v, line);
+      return v;
+    };
+
+    it.each([['2/3'], ['3/7'], ['22/7'], ['7/2'], ['4/6']])('«קשת AB = %s»: the row, the hint, and the figure', async (typed) => {
+      const line = `קשת AB = ${typed}`;
+      const v = await committed(SECTOR, line);
+      expect(stepLabel([...v.commands], line, 'he')).toBe(`∠AOB = ${typed}°`);
+      expect(v).toMatchObject({ note: { key: 'input.canonicalHint', params: { canonical: `∠AOB = ${typed}` } } });
+      const labels = JSON.stringify(replay(st().facts, st().seed).labels);
+      expect(labels).toContain(`${typed}°`);
+      expect(labels).not.toMatch(/\d\.\d{6}/);
+    });
+
+    it('the taught sentence is read, and keeps the same spelling', async () => {
+      const v = await after(SECTOR, '∠AOB = 2/3');
+      expect(v.kind).toBe('commit');
+      if (v.kind === 'commit') expect(stepLabel([...v.commands], '∠AOB = 2/3', 'he')).toBe('∠AOB = 2/3°');
+    });
+
+    it('the same printer: an angle given as a fraction', async () => {
+      for (const line of ['∠ABC = 2/3', 'זווית ABC = 3/7']) {
+        const v = await after(['משולש ABC'], line);
+        if (v.kind !== 'commit') throw new Error(line);
+        expect(stepLabel([...v.commands], line, 'he')).toMatch(/^∠ABC = \d\/\d°$/);
+      }
+    });
+
+    it('a decimal and a whole number print as before, with no src', async () => {
+      for (const [line, row] of [['קשת AB = 0.5', '∠AOB = 0.5'], ['קשת AB = 40', '∠AOB = 40']]) {
+        const v = await after(SECTOR, line);
+        if (v.kind !== 'commit') throw new Error(line);
+        expect(stepLabel([...v.commands], line, 'he')).toBe(row);
+        expect(commandOf(v)).not.toHaveProperty('src');
+      }
+    });
   });
 
   it('the neighbours keep their verdicts', async () => {
