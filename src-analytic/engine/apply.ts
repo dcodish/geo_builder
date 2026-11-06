@@ -6177,7 +6177,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.t === 'derived') {
         const standing = objectById(c, f.id);
         /*
-         * #2231 (ADR-AG-410): «MK אנך לציר x» reads as a foot only from a placed M to a new K. `parseLine` takes no figure, so
+         * #2231 (ADR-AG-421): «MK אנך לציר x בנקודה K» reads as a foot only from a placed M to a new K. `parseLine` takes no figure, so
          * the decision is here; any other figure keeps HEAD's verdict, `not-handled`, the LLM seam.
          */
         if (f.piece && (standing || !parentsOf(f.rule).every((p) => objectById(c, p)))) return { ok: false, error: { code: 'not-handled', detail: f.src } };

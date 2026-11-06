@@ -10823,20 +10823,19 @@ const cutTargetOrder = (cutText: string, c1: Id, c2: Id, e: Id): Id[] | undefine
 const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}[A-Za-z]\d*\s*[A-Za-z]\d*\b`, 'i');
 
 /**
- * #2232 ([ADR-786](../../docs/06-decisions.md#adr-786)) — «MK אנך ל-AB» · «MK הוא אנך ל-AB» · «MK אנך ל-AB בנקודה K» ·
- * "MK is a perpendicular to AB", with M placed and K new: the NOUN, the piece that ends on the line, so K is the foot from M
- * (the same construction as «K רגל האנך מ-M ל-AB», with the piece drawn). The adjectives «מאונך / ניצב» keep the relation,
- * and so does every other figure: both letters new («DE אנך ל-AB»), K placed (`perpendicularConstraint`), or M on AB, where
- * the foot would be M itself and the sentence is the perpendicular at M.
+ * #2232 ([ADR-795](../../docs/06-decisions.md#adr-795)) — «MK אנך ל-AB בנקודה K» · "MK is a perpendicular to AB at K", with M
+ * placed and K new: the sentence SAYS where K is, so K is the foot from M, with the piece drawn. Without that clause nothing
+ * is assumed (operator, 2026-11-06: *"If user want the point to be on a, they will need to say so"*): «MK אנך ל-AB» is the
+ * relation, `perpendicularConstraint`'s. So is every other figure: K placed, or M on AB, where a foot would be M itself.
  */
 const perpendicularPiece: Rule = (s, ctx) => {
   const m =
-    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+(?:${COPULA_HE}\s+)?ה?אנ${KAF}\s+ל-?\s*(${ULABEL})(${ULABEL})(?:\s+בנקודה\s+(${ULABEL}))?\s*\.?\s*$`)) ??
-    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+is\s+(?:a|the)\s+perpendicular\s+(?:on)?to\s+(${ULABEL})(${ULABEL})(?:\s+at\s+(${ULABEL}))?\s*\.?\s*$`));
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+(?:${COPULA_HE}\s+)?ה?אנ${KAF}\s+ל-?\s*(${ULABEL})(${ULABEL})\s+בנקודה\s+(${ULABEL})\s*\.?\s*$`)) ??
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+is\s+(?:a|the)\s+perpendicular\s+(?:on)?to\s+(${ULABEL})(${ULABEL})\s+at\s+(${ULABEL})\s*\.?\s*$`));
   if (!m) return null;
   const [from, to, a, b, at] = [m[1], m[2], m[3], m[4], m[5]];
   const have = new Set(ctx.points ?? []);
-  if ((at && at !== to) || !have.has(from) || have.has(to) || !have.has(a) || !have.has(b)) return null;
+  if (at !== to || !have.has(from) || have.has(to) || !have.has(a) || !have.has(b)) return null;
   if (from === a || from === b) return null;
   const isTarget = ([x, y]: readonly [string, string]) => (x === a && y === b) || (x === b && y === a);
   const hosts = [ctx.onSegment?.[from], ctx.midpointOf?.[from], ...(ctx.collinearWith?.[from] ?? [])];
@@ -12981,7 +12980,7 @@ export const RULES: Rule[] = [
   // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then
   // models the foot as a second definition of C and over-constrains it. These only fire on a
   // perpendicular/parallel keyword + an explicit through-point, so a plain intersection falls through.
-  perpendicularPiece, // #2232: «MK אנך ל-AB» from a placed M to a new K — before `perpendicularLine` reads «MK» as a line's name
+  perpendicularPiece, // #2232: «MK אנך ל-AB בנקודה K» from a placed M to a new K — before `perpendicularLine` reads «MK» as a line's name
   perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint & line∩line)
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
   dashCollinear, // "A-O1-O2-B" — a dash-separated ordered collinear list (before segment/collinear rules)

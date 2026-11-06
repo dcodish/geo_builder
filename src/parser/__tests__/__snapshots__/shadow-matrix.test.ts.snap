@@ -910,16 +910,6 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
-    "text": "MK is a perpendicular to AB",
-    "winner": "perpendicularConstraint",
-  },
-  {
-    "lang": "he",
-    "text": "MK אנך ל-AB",
-    "winner": "perpendicularConstraint",
-  },
-  {
-    "lang": "en",
     "text": "E is where the bisectors of BAC and BCA meet",
     "winner": "bisectorIntersection",
   },

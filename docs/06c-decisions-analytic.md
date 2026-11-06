@@ -15540,6 +15540,8 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Behaviour change for a student:** a stated length, area or angle in analytic is labelled as typed: a root stays unsimplified, a decimal stays a decimal, and a π value reads with π.
 ## ADR-AG-410 — «MK אנך לציר x» reads as K, the foot of the perpendicular from M: the noun, a placed point and a new letter (#2231)
 
+> **⚠ Superseded in part by [ADR-AG-421](#adr-ag-421)** (operator, 2026-11-06): the sentence without «בנקודה K» is the relation; K is not assumed on the axis. The foot stands only for «MK אנך לציר x בנקודה K».
+
 **Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: *"despite me calling it K"*; ruling B: *"yes"*
 **Requirements:** [02c](02c-requirements-analytic.md) R247 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: a reading the figure decides". Stage: parse (F3), before the fold; the figure's half in `applyFact`.
 
@@ -15799,3 +15801,19 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-1848-both-sides-drawn.test.ts`, the shared table `shell/__tests__/fixtures/stated-length-relation-ink.ts`, parity rows `length-relation-bars-1848`, `length-ratio-bars-1848`, `length-ratio-colon-1848`.
 
 **Behaviour change for a student:** «|AC| = 2|BD|» and «|AC| = |BD|» draw AC and BD. Bars around a single length set to a number draw nothing, as before.
+
+## ADR-AG-421 — «MK אנך לציר x» assumes nothing about K: the noun is the relation, and the foot needs «בנקודה K» (#2231)
+
+**Date:** 2026-11-06 · **Status:** accepted · operator ruling · bug (analytic) · round #2727, stream E · branch `fix/2231-no-assumed-foot` · **supersedes [ADR-AG-410](#adr-ag-410) in part**
+**Operator:** 2026-11-06: *"If user want the point to be on a, they will need to say so. This is true to all tools."*
+**Requirements:** [02c](02c-requirements-analytic.md) R247 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: the relation, and the foot when stated". Stage: parse (F3).
+
+**Class.** *A relation stated about a segment was read as a statement about where its end lies.*
+
+**Measured at `prod/2026-11-05-2`.** The noun was `not-handled`, so it reached the AI; «MK מאונך לציר x» was the relation, K created off the axis, in every figure. The reference for the ruling is that relation and 3-D's, so the noun reads as it does; it does not go back to the AI, where the model's reading could again put K on the axis.
+
+**Decision.** The piece arm of `parsePerpendicular` hands a sentence with no trailing clause to the relation handler, so noun and adjective lower alike, in every figure (K placed, M not placed, M on the line). With «בנקודה K» / "at K" it keeps ADR-AG-410's foot and its figure conditions. The catalog teaches «CD אנך לציר ה-x בנקודה D». The AI name-retry (ADR-W-189) is untouched.
+
+**Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` now states the foot; parity rows `perp-piece-2232`, `perp-foot-stated-2232`, `ex-perp-piece-axis-2231`.
+
+**Behaviour change for a student:** «MK אנך לציר x» creates K off the axis, with the «נוצרה נקודה חדשה» notice, and no AI; «MK אנך לציר x בנקודה K» keeps the foot.

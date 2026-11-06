@@ -8000,10 +8000,10 @@ const PERP_FOOT_EN = new RegExp(
   `^(?:(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+foot\\s+of\\s+the\\s+perpendicular${PERP_FROM_EN}\\s+(?:on)?to\\s+(.+)$`,
 );
 /**
- * #2231 ([ADR-AG-410](../../docs/06c-decisions-analytic.md#adr-ag-410)) — «MK אנך לציר x» · «MK אנך ל-AB» · «MK הוא אנך לציר
- * ה-y» · «MK אנך ל-AB בנקודה K» · "MK is a perpendicular to the x-axis": the NOUN, the piece that ends on the line, so its
- * second letter is the foot. The adjectives «מאונך / ניצב» keep the relation: «MK מאונך לציר x» does not say K is on the
- * axis. A trailing point, when written, is that foot, or it is not this sentence.
+ * #2231 ([ADR-AG-421](../../docs/06c-decisions-analytic.md#adr-ag-421)) — «MK אנך לציר x» · «MK אנך ל-AB» · «MK הוא אנך לציר
+ * ה-y» · "MK is a perpendicular to the x-axis": the noun states the RELATION, as «MK מאונך …» does, and nothing else: K is not
+ * assumed on the line (operator, 2026-11-06: *"If user want the point to be on a, they will need to say so"*). With
+ * «בנקודה K», which says so, the second letter is the foot.
  */
 const PERP_PIECE_HE = new RegExp(`^(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?ה?אנך${PERP_TO_HE}(?:\\s+בנקודה\\s+(${NAME}))?$`);
 const PERP_PIECE_EN = new RegExp(`^(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+perpendicular\\s+(?:on)?to\\s+(.+?)(?:\\s+at\\s+(${NAME}))?$`);
@@ -8112,7 +8112,11 @@ function parsePerpendicular(line: string): RuleOutcome {
   const piece = PERP_PIECE_HE.exec(line) ?? PERP_PIECE_EN.exec(line);
   if (piece) {
     const [, from, to, onto, at] = piece;
-    if (from === to || (at && at !== to)) return null;
+    if (!at) {
+      const relation = parseConstraint(`${from}${to} מאונך ל-${onto}`);
+      return relation?.ok ? made(relation.facts.map((f) => ({ ...f, src: line }))) : relation;
+    }
+    if (from === to || at !== to) return null;
     const target = footLineOf(onto, { out: [], src: '' });
     // A piece from a point of the line, or ending on one of its letters, has no foot: not this sentence.
     if (!target || (target.k === 'points' && [target.a, target.b].some((p) => p === from || p === to))) return null;
