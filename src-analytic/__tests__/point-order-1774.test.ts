@@ -58,10 +58,38 @@ describe('#1774 — a letter after its coordinates is taught', () => {
   });
 
   it('other shapes stay out of the rewrite', () => {
-    for (const line of ['√(3,5)', '(3,5)AB', '(3,5)', '(3,5) על הישר AB', 'A(3,5)', '(3,5)A על הישר AB', '(1,2,3)']) {
+    for (const line of ['√(3,5)', '(3,5)AB', '(3,5) על הישר AB', 'A(3,5)', '(3,5)A על הישר AB', '(1,2,3)', '(3,5), (4,6)', '()', '(3)']) {
       expect([line, keyOf(submit(line))]).not.toEqual([line, 'teach']);
     }
-    for (const line of ['√(3,5)', '(3,5)AB', '(3,5)', 'AB = (3,5)', 'A = 3', 'A = (3,5) על הישר', 'B:(3,5)']) expect([line, pointSpelling(line)]).toEqual([line, null]);
+    for (const line of ['√(3,5)', '(3,5)AB', 'AB = (3,5)', 'A = 3', 'A = (3,5) על הישר', 'B:(3,5)']) expect([line, pointSpelling(line)]).toEqual([line, null]);
+  });
+});
+
+describe('#1774 — a bare pair is taught (the operator, 2026-11-06: "Teach it")', () => {
+  const LRM = String.fromCharCode(0x200e);
+  it.each(['(3,5)', '(3, 5)', ' (3,5) ', '(3,5).', `${LRM}(3,5)${LRM}`])('«%s» fills the box, and one Enter records it', (typed) => {
+    const v = submit(typed);
+    expect(v.kind === 'teach' && v.note).toBe('point-bare');
+    expect(v.kind === 'teach' && v.canonical.replace(/, /, ',')).toBe('נתונה הנקודה (3,5)');
+    if (v.kind === 'teach') expect(submit(v.canonical).kind).toBe('record');
+  });
+
+  it('negative and radical coordinates are the same pair', () => {
+    expect(submit('(-1,7)')).toEqual({ kind: 'teach', verb: '', canonical: 'נתונה הנקודה (-1,7)', note: 'point-bare' });
+    expect(submit('(√2,1)')).toEqual({ kind: 'teach', verb: '', canonical: 'נתונה הנקודה (√2,1)', note: 'point-bare' });
+  });
+
+  it('it draws the point', () => {
+    const lines = confirmTaught(['(3,5)'], 0);
+    expect(lines).toEqual(['נתונה הנקודה (3,5)']);
+    const d = derive(lines, 0);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.points.map((p) => [p.x, p.y])).toEqual([[3, 5]]);
+  });
+
+  it('the note says why, in both locales', () => {
+    expect(he('noticeTeachPointBare', { canonical: 'נתונה הנקודה (3,5)' })).toContain('זוג מספרים לבדו אינו משפט');
+    expect(en('noticeTeachPointBare', { canonical: 'נתונה הנקודה (3,5)' })).toContain('A pair of numbers alone is not a sentence');
   });
 });
 
@@ -119,10 +147,6 @@ describe('#1774 — the definite «הישר» binds the drawn line (judged q11)'
 });
 
 describe('#1774 — what was not built', () => {
-  it('the bare tuple keeps today\'s verdict until it is ruled on', () => {
-    expect(keyOf(submit('(3,5)'))).toBe('not-handled');
-  });
-
   it('the neighbours that already read still read', () => {
     for (const line of ['A(3,5)', 'A (3,5)', 'נתונה הנקודה (3,5)', 'הנקודה (3,5)', 'the point (3,5)', 'point (3,5)']) expect([line, submit(line).kind]).toEqual([line, 'record']);
     const ab = ['A(0,0)', 'B(2,6)'];

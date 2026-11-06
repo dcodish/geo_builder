@@ -15732,3 +15732,22 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-1808-colon-ratio-radical.test.ts` (the operator's lines at seeds 0–3, the product fact, the divider and the prose, the refusals); the fixture `colon-ratio-radical-1808.analytic.json`; rows `colon-ratio-*-1808`.
 
 **Behaviour change for a student:** in the analytic builder a ratio with a root builds in every spelling, and the root stays exact.
+
+## ADR-AG-422 — A bare coordinate pair is taught: «(3,5)» → «נתונה הנקודה (3,5)» (#1774)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2727 · branch `fix/1774-bare-tuple-teach` · the operator's ruling of 2026-11-06 on the open arm: *"Teach it"*
+**Requirements:** [02c](02c-requirements-analytic.md) R8 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (parser)
+
+**Builds on** [ADR-AG-409](#adr-ag-409), which left this one arm open.
+
+**Measured at pickup** (`e3e515e2`, `decideSubmit`, after «y=3x+2»). `(3,5)` was `not-handled`, reaching the model; `נתונה הנקודה (3,5)` records.
+
+**Decision.** `pointSpelling` gains a third shape, `point-bare`: a whole line that is one pair, with no head, its bidi marks ignored. `decideOnce` needs no change: as for the other two, it teaches only what the next Enter accepts, so «(1,2,3)» is never taught. The note is new text (ADR-W-174).
+
+**Not widened.** Only one pair, alone on its line. «(3,5), (4,6)», «(3,5) על הישר AB» and «√(3,5)» are not this shape.
+
+**Sibling audit (docs/17 §1).** 2-D refuses coordinates by design (X1) and 3-D reads R³: the row is `only: ['analytic']`. Complex: «(3,5)» is not a point there.
+
+**Locks.** `src-analytic/__tests__/point-order-1774.test.ts`: the shape, the marks, the note in both locales, the shapes that stay out; row `ex-coordinate-bare-1774`.
+
+**Behaviour change for a student:** in the analytic builder a bare «(3,5)» fills the box with «נתונה הנקודה (3,5)» and a note; Enter draws the point.

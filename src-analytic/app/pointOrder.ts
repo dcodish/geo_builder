@@ -7,8 +7,13 @@
  * rewrite the figure would not take is never taught.
  *
  * Whole-line only: every run must be a pair followed by a name, with separators between. «√(3,5)» and «(3,5)AB» stay out.
+ *
+ * A bare «(3,5)» is the third shape (ADR-AG-422, the operator's ruling of 2026-11-06: *"Teach it"*): one pair, alone on
+ * the line, taught as «נתונה הנקודה (3,5)».
  */
+import { stripFormatControls } from '../../shell/bidi';
 import { POINT_NAME } from '../engine/pointName';
+import { givenPointSentence } from '../parser/scopeAnalytic';
 
 const HEAD = /^(?:(?:the\s+)?points?\s+|(?:נתונ(?:ה|ות)\s+)?(?:ה?נקוד(?:ה|ות)\s+)?)/i;
 const RUN = () => new RegExp(String.raw`\(([^()]*)\)\s*(${POINT_NAME})(?![A-Za-z0-9])`, 'g');
@@ -17,12 +22,14 @@ const EQUALS_RUN = () => new RegExp(String.raw`(?<![A-Za-z0-9'])(${POINT_NAME})\
 
 /** What the line did wrong, and the sentence the book writes. */
 export interface PointSpelling {
-  readonly note: 'point-order' | 'point-equals';
+  readonly note: 'point-order' | 'point-equals' | 'point-bare';
   readonly canonical: string;
 }
 
-/** The line in the book's spelling, or `null` when the whole line is not one of the two shapes. */
+/** The line in the book's spelling, or `null` when the whole line is not one of the three shapes. */
 export function pointSpelling(line: string): PointSpelling | null {
+  const bare = /^\(([^()]*,[^()]*)\)\.?$/.exec(stripFormatControls(line).trim());
+  if (bare) return { note: 'point-bare', canonical: givenPointSentence(bare[1]) };
   const head = HEAD.exec(line)?.[0] ?? '';
   const body = line.slice(head.length);
   const clean = (re: RegExp) => body.replace(re, '').replace(/[, ו-]/g, '').length === 0;

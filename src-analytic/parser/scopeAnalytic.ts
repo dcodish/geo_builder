@@ -131,6 +131,8 @@ const SETTING_NOUN = '(?:משולש|מרובע|ריבוע|מלבן|מעוי?י?�
 const FROM_ADV = new RegExp(String.raw`^(?:מן\s+|מ-?)(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL_LIST})(?=[\s,]|$)\s*,?\s*`);
 /** «דרך E», «דרך הנקודה D», «דרך הנקודה D שעל המעגל». The rider is kept: a frame decides what it implies. */
 const THROUGH_ADV = new RegExp(String.raw`^דרך\s+(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL})(?=[\s,]|$)(?:\s+ש(?:על|נמצאת\s+על)\s+(ה[א-ת]+))?\s*,?\s*`);
+/** The sentence a bare coordinate pair is taught as (#1774, ADR-AG-422): «נתונה הנקודה (3,5)», a grammar sentence of this builder. */
+export const givenPointSentence = (pair: string): string => `נתונה הנקודה (${pair})`;
 /** «לישר AB» at the head of a predicate: the noun before a line named by two points, never «לישר y = 7» (#1775). */
 const NAMED_LINE_OPERAND = new RegExp(String.raw`^לישר\s+(?=${LBL}${LBL}(?:\s|$))`);
 /** «… דרך הנקודה A» at the END of the object (#2391 B2): what precedes it, and the anchor. */

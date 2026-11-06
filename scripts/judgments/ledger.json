@@ -2518,6 +2518,16 @@
       ],
       "at": "2026-11-05T22:39:15.033Z",
       "status": "escalated"
+    },
+    {
+      "id": "chose-1774-bare-note",
+      "kind": "text",
+      "issue": "#1774",
+      "what": "The note beside a bare pair taught as «נתונה הנקודה (3,5)»",
+      "choice": "זוג מספרים לבדו אינו משפט. כתבתי לכם את המשפט בשורת הקלט: «…» — לחצו Enter כדי לשרטט.",
+      "chosen": true,
+      "at": "2026-11-06T13:01:48.453Z",
+      "status": "pending"
     }
   ],
   "demoted": {
