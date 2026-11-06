@@ -844,7 +844,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   Later lines pin the same circle, in any order: «רדיוס המעגל הוא 5», «המעגל במישור π1», a placed point on it («A על
   המעגל», two determine the circle), a length from the centre to a point on it («OD = 4» is the radius), and tangency
   («מעגל O משיק לישר AB בנקודה T»). A second, different radius or plane is refused naming the circle, and a radius or
-  plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126).
+  plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126). A stated
+  radius shows in the data panel, «רדיוס O = 3», or «רדיוס המעגל = 3» for a circle with no letter, as in 2-D; no number
+  is drawn on the canvas (ADR-3D-420).
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

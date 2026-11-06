@@ -80,7 +80,7 @@ describe('dataView — organize your data', () => {
   });
 
   it('#296 panelIsEmpty: a relations-only panel is NOT empty', () => {
-    const empty: DataPanel = { stated: [], relations: [], mutual: [], vectors: [], points: [], planes: [], pointCoords: {}, pointComps: {}, pointOptions: {}, params: [] };
+    const empty: DataPanel = { radii: [], stated: [], relations: [], mutual: [], vectors: [], points: [], planes: [], pointCoords: {}, pointComps: {}, pointOptions: {}, params: [] };
     expect(panelIsEmpty(empty)).toBe(true);
     // the bug: only relations present → the App used to render "empty" and hide them
     expect(panelIsEmpty({ ...empty, relations: ['|u| = |v|', 'u·v = 0'] })).toBe(false);
@@ -90,6 +90,7 @@ describe('dataView — organize your data', () => {
     // #1196: and for the STATED rows, which are the case that reported a false "nothing to show" on a
     // figure whose only knowledge was the two vector givens the student had just written down.
     expect(panelIsEmpty({ ...empty, stated: ['u = AB⃗'] })).toBe(false);
+    expect(panelIsEmpty({ ...empty, radii: [{ circle: null, text: '3' }] })).toBe(false); // #2611 (ADR-3D-420)
   });
 
   it('perpendicular declared vectors surface as u·v = 0 (operator, 2026-07-08)', () => {
