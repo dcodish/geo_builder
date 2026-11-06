@@ -1808,6 +1808,8 @@ ADR-AG-237), an `area`, an arc — and never a noun's definition (`Fact.definiti
 `angleArcPoints`, `markFitScale`) is the shared mark geometry ([04w](04w-design-shell.md)); `statedScene` places every
 value in one `placeSceneLabels` call, each value bounded to its mark (ADR-AG-228).
 
+A noun's open choice is read for what the drawn option shows (a value, a knee), and an equality inside it is not read as a relation (`inOpenChoice`, ADR-W-118 B2, ADR-AG-406).
+
 **The `sideEquations` lane** ([ADR-AG-406](06c-decisions-analytic.md#adr-ag-406), #2057): one entry per `curve` object that is a polygon's side, by its letters (`line-XY` with XY a ring edge) or its side role, with the two vertices the drawn option puts on it, so an open role's text follows the side. The text is the caller's (`sideEquationText`, handed in through `SceneKnowledge`, because the panel's formatter is the app's): a number equation as the panel row prints it, one with a letter as its open form. It is read off the student's own curve, so a computed equation never reaches this lane. It is requested as a length, in the same placement pass.
 
 **An area has two representations, one reader** ([ADR-AG-273](06c-decisions-analytic.md#adr-ag-273), #2031): the copula's

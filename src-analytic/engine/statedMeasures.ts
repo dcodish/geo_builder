@@ -24,6 +24,8 @@
  * angle is right — is shown as the configuration resolved it, because the drawn seat is otherwise invisible and
  * «הציגו תצורה אחרת» moves it. `origin` tells the two apart: the parser marks what it built as a definition
  * (`Fact.definition`), and the fold says which fact added each constraint (`constraintFact`).
+ * The exception reaches VALUES and knees, never a RELATION (#2006, ADR-AG-406; ADR-W-118 B2): an equality inside an open
+ * choice is one nobody stated, so it draws no tick and no arc, as 2-D draws none on «דלתון ABCD» or «משולש שווה שוקיים ABC».
  *
  * **The value is the student's**: a number prints as a number, a letter as the letter. A letter the student later
  * VALUED («∢ABC = α» · «α = 30») prints the value, which is 2-D's default (ADR-W-047 — measured: 2-D shows «30°»).
@@ -205,6 +207,8 @@ export function statedMeasures(
   };
   const seenRight = new Set<string>();
 
+  /** Reading the drawn option of an open choice: its values are shown, its relations are not (ADR-W-118 B2). */
+  let inOpenChoice = false;
   const read = (k: Constraint): void => {
     switch (k.t) {
       case 'length-eq': {
@@ -212,7 +216,7 @@ export function statedMeasures(
         const r = plainMeasure(k.right);
         if (l && r) {
           // Two lengths are an equality (ticks); an area against an area, or against a length, is a relation — no value.
-          if (l.kind === 'length' && r.kind === 'length') lengthPairs.push([{ a: l.a, b: l.b }, { a: r.a, b: r.b }]);
+          if (l.kind === 'length' && r.kind === 'length' && !inOpenChoice) lengthPairs.push([{ a: l.a, b: l.b }, { a: r.a, b: r.b }]);
           return;
         }
         const m = l ?? r;
@@ -249,7 +253,7 @@ export function statedMeasures(
         return;
       }
       case 'angle-ratio': {
-        if (k.k.kind === 'num' && k.k.value === 1) anglePairs.push([k.left, k.right]);
+        if (k.k.kind === 'num' && k.k.value === 1 && !inOpenChoice) anglePairs.push([k.left, k.right]);
         return;
       }
       case 'perpendicular': {
@@ -316,7 +320,9 @@ export function statedMeasures(
     if (from === undefined) return;
     if (k.t === 'choice') {
       // The configuration's OWN option — what the figure drew — whoever opened the choice.
+      inOpenChoice = true;
       resolve(k).forEach(read);
+      inOpenChoice = false;
       return;
     }
     if (from === 'statement') read(k);

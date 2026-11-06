@@ -79,6 +79,33 @@ describe('#2057 — the panel', () => {
   });
 });
 
+describe('#2006 — an unstated choice draws no relation (ADR-W-118 B2, 2-D measured: 0 ticks on both nouns)', () => {
+  const ticks = (lines: string[], s: number) => scene(derive(lines, s)).stated.ticks;
+
+  it.each([[[ISO]], [['דלתון ABCD']], [[ISO, BASE]], [['דלתון ABCD', 'משוואת האלכסון הראשי היא y=2x']], [['משולש ABC', 'אורך השוק AB הוא 5']]])(
+    '%j draws no equal-side tick at any seed',
+    (lines) => {
+      for (const s of SEEDS) expect(ticks(lines, s)).toEqual([]);
+    },
+  );
+
+  it('a stated equality keeps what it drew: the relation layer is B2\'s own ruled change, not this one', () => {
+    expect(ticks(['משולש ABC', 'AB = AC'], 0)).toHaveLength(2);
+    expect(ticks([ISO, 'AB=AC'], 0)).toHaveLength(2);
+  });
+
+  it('a value is not a relation: a stated length on an open seat keeps its value', () => {
+    const d = derive(['משולש ABC', 'אורך השוק AB הוא 5'], 0);
+    expect(d.stated.lengths.map((l) => [l.a, l.b, l.value])).toEqual([['A', 'B', { num: 5 }]]);
+  });
+
+  it("a value inside an open choice is still written, and a seat's knee still drawn", () => {
+    const sine = derive(['משולש ABC', 'sin∢ACB = 1/2'], 0);
+    expect(sine.stated.angles).toHaveLength(1);
+    expect(derive(['משולש ישר זווית ABC'], 0).stated.rights).toHaveLength(1);
+  });
+});
+
 describe('#2057 — the note the rider silenced', () => {
   it('«הבסיס» keeps the equal-pair note while the apex is open, and it goes with «AB=AC»', () => {
     expect(unstatedChoices(derive([ISO, BASE], 0)).map((c) => c.kind)).toEqual(['equal-pair']);
