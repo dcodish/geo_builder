@@ -453,7 +453,7 @@ function decideOnce(
   // stepped past the session's seed; solving the line from there replaced the triangle on the screen with another one.
   const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {});
   /**
-   * #2231 (ADR-AG-410) — «MK אנך לציר x» from a point OF the line: the foot would be M itself, so the sentence is not the
+   * #2231 (ADR-AG-421) — «MK אנך לציר x בנקודה K» from a point OF the line: the foot would be M itself, so the sentence is not the
    * dropped perpendicular it reads as, and it keeps the verdict an unread line gets (the model's seam, as 2-D's relation).
    */
   for (const f of parsed.facts) {

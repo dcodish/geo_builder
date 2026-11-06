@@ -20258,6 +20258,8 @@ No new student text. Every sentence is an existing ruled string.
 **Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 2/3°, not a chord of length 2/3, and the row reads «∠AOB = 2/3°». «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.
 ## ADR-786 — «MK אנך ל-AB» from a placed M to a new K draws K, the foot on AB (#2232, in #2231's family)
 
+> **⚠ Superseded in part by [ADR-795](#adr-795)** (operator, 2026-11-06): the sentence without «בנקודה K» is the relation; K is not assumed on AB. The foot stands only for «MK אנך ל-AB בנקודה K».
+
 **Date:** 2026-11-05 · **Status:** accepted · bug (2-D, closed into #2231's family) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: B → *"yes"* (analytic and 2-D)
 **Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** none (internal): a parser rule. Stage: parse, before the ladder.
 
@@ -20370,3 +20372,24 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/engine/__tests__/extension-free-quantity-2518.test.ts`: T5 and its next view, 13 further builds, 8 kept refusals, both bagrut lines, the stated positions, the cost and saved paths. ADR-784's free-radius refusal is removed. Fixture `src/__tests__/fixtures/issue-2518-free-radius-holds-side.geo.json`, the operator's exact lines. Parity rows `ext-circle-later-free-radius-2518`, `ext-circle-typed-free-radius-2518`. Driven in a real browser through `browser-harness.mjs`: T5, the typed form, the pinned refusal.
 
 **Behaviour change for a student:** a sentence a free size or place can satisfy now draws, with the circle adapting, instead of being refused. A saved figure of that kind redraws correctly. A figure nothing can save is refused as before, and a stated side of O now counts.
+
+## ADR-795 — «MK אנך ל-AB» assumes nothing about K: the relation, and the foot only when the sentence says so (#2231, #2232)
+
+**Date:** 2026-11-06 · **Status:** accepted · operator ruling · bug (2-D) · round #2727, stream E · branch `fix/2231-no-assumed-foot` · **supersedes [ADR-786](#adr-786) in part**
+**Operator:** 2026-11-06: *"this is something I need to revert. We should assume anything about this cases. If user want the point to be on a, they will need to say so. This is true to all tools."* (He means should NOT assume.)
+**Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** [LADDER](LADDER.md) row 2i⁺⁺. Stage: 2i⁺⁺, after the failure ladder.
+
+**Class.** *A relation stated about a segment was read as a statement about where its end lies.* The ruling of 2026-10-16 asked for it; this ruling takes it back, in every tool.
+
+**Measured at `prod/2026-11-05-2`, the reference.** «AK אנך ל-BC», «M אמצע AC · MK אנך ל-AB», «M על AB · MK אנך ל-AB»: the relation, K off the line. 3-D: the relation. **«M על AC · MK אנך ל-AB» was refused «cannot place M on segment AC so that MK ⟂ AB»**, and so were «MK מאונך ל-AB», «MK ⊥ AB», «נקודה K · MK אנך ל-AB» and «ריבוע ABCD · G על AD · GK אנך ל-AB». That refusal is false: K alone can carry the relation.
+
+**Decision.**
+1. `perpendicularPiece` reads only the sentence that says where K lands: «MK אנך ל-AB בנקודה K», "MK is a perpendicular to AB at K". ADR-786's catalog line goes: the sentence needs a placed M, and the catalog lines build on a fresh figure. «MK אנך ל-AB» goes back to `perpendicularConstraint`.
+2. The false refusal is not re-created. `driveOrCheck`'s first rung gives a ⟂ to a free rider, and with no root the step was lost. Stage 2i⁺⁺: when the failure ladder and the rider's foot (ADR-728) have no figure, `heldRiderOfPerpendicular` re-runs the step with the rider held, so the free-point rung drives K; the rider gets its slide back on the result. It claims only a free rider with, at its other end, a free point nothing else is about, so a vertex never moves for it. It runs only where every other path refused, so no figure that built can change. The refusal stands for a sentence with no such end. This is a third arm beside the recruit ladder because the recruiter cannot see a directive held inside an `on-segment-solved` object, which is ADR-728's finding too.
+3. The rung is the ⟂'s only: the same refusal on «MK ∥ AB» was not in the ruling (see the round report's question).
+
+**Sibling check.** Analytic: [ADR-AG-421](06c-decisions-analytic.md#adr-ag-421). 3-D reads the relation already; it does not read «בנקודה K» (a known-gap cell on parity row `perp-foot-stated-2232`).
+
+**Locks.** `src/engine/__tests__/issue-2231-rider-held.test.ts`; scenarios `perp-relation-rider-2231`, `perp-relation-vertex-2231`, `perp-piece-foot-2232` (now the stated foot), `perp-piece-keeps-relation-2232`; parity rows `perp-piece-2232`, `perp-foot-stated-2232`.
+
+**Behaviour change for a student:** «MK אנך ל-AB» no longer puts K on AB, and with M on a side it builds where it used to be refused; «AK אנך ל-BC» is back to K off BC; the same relation written «מאונך» or «⊥» with M on a side builds too; «MK אנך ל-AB בנקודה K» keeps the foot.

@@ -301,13 +301,13 @@ nothing.
 be written (`הישר y-3=4(x-2)`). Steps must be catalogue commands. `fallbackRefusal` (`app/fallback.ts`) words a
 non-recording answer (ADR-AG-170).
 
-### «MK אנך לציר x»: a reading the figure decides ([ADR-AG-410](06c-decisions-analytic.md#adr-ag-410))
+### «MK אנך לציר x»: the relation, and the foot when stated ([ADR-AG-421](06c-decisions-analytic.md#adr-ag-421))
 
-`parsePerpendicular`'s piece arm (`PERP_PIECE_HE` / `_EN`) reads the noun with two names and any foot line, and lowers
-through `perpendicularFacts` to what «האנך מ-M …» builds, with the second name as the foot. `parseLine` takes no figure, so
-the foot fact carries `piece: true`, and `applyFact` answers `not-handled` when the foot's letter is held or a parent is
-missing; `decideSubmit` does the same when the trial puts the foot on its own point. Those figures keep the verdict an
-unread line gets, so the sentence still reaches the model there.
+`parsePerpendicular`'s piece arm (`PERP_PIECE_HE` / `_EN`) reads the noun with two names. With no trailing clause it hands
+the sentence to the relation handler as «MK מאונך ל-…», so the noun and the adjective are one statement and K is assumed
+nowhere. With «בנקודה K» it lowers through `perpendicularFacts`: the foot, named K, with the piece drawn. `parseLine` takes no
+figure, so that foot fact carries `piece: true`, and `applyFact` answers `not-handled` when the foot's letter is held or a
+parent is missing; `decideSubmit` does the same when the trial puts the foot on its own point.
 
 ### The LLM lane's faithfulness gates ([ADR-AG-279](06c-decisions-analytic.md#adr-ag-279))
 

@@ -802,6 +802,32 @@ export function normalizeShapeComposition(prev: Construction, cmd: Command): Com
 }
 
 /**
+ * #2231 ([ADR-795](../../docs/06-decisions.md#adr-795)) — «MK ⟂ AB» whose M is a free rider and whose K is a free point nothing
+ * else is about. The ⟂ drives M's slide (`driveOrCheck`'s first rung), and when no position on M's segment holds it the step
+ * was refused «cannot place M on segment AC», though K alone can carry the relation: a false refusal. This returns the
+ * figure with that rider HELD, so the same statement falls to the free-point rung; `applyStep` asks it only when the ⟂ form,
+ * its whole failure ladder and the rider's foot have no figure, and gives the rider its slide back on the result.
+ */
+export function heldRiderOfPerpendicular(prev: Construction, cmd: Command): { held: Construction; rider: Id } | null {
+  if (cmd.type !== 'set-perpendicular') return null;
+  const byId = (id: Id) => prev.objects.find((o) => o.id === id);
+  const carries = (x: Id, p: Id): boolean => {
+    const o = byId(x);
+    if (!o || o.kind !== 'free-point' || o.pinned || o.rigid || o.solve !== undefined) return false;
+    if (prev.constraints.some((c) => constraintRefs(c).includes(x))) return false;
+    return prev.objects.every((u) => u.id === x || !objectParents(u).includes(x) || (u.kind === 'segment' && objectParents(u).includes(p)));
+  };
+  const rides = (p: Id): boolean => {
+    const o = byId(p);
+    return !!o && o.kind === 'on-segment' && o.free === true && (o as { solve?: unknown }).solve === undefined;
+  };
+  const pairs: [Id, Id][] = [[cmd.a, cmd.b], [cmd.b, cmd.a], [cmd.c, cmd.d], [cmd.d, cmd.c]];
+  const rider = pairs.find(([p, x]) => rides(p) && carries(x, p))?.[0];
+  if (!rider) return null;
+  return { rider, held: { ...prev, objects: prev.objects.map((o) => (o.id === rider ? ({ ...o, free: false } as GeoObject) : o)) } };
+}
+
+/**
  * #2089 ([ADR-728](../../docs/06-decisions.md#adr-728)) — M1: «XP ⟂ CD» about a point P that already RIDES
  * segment CD is the statement «XP גובה לצלע CD»: P is the foot of the perpendicular from X onto CD. This returns
  * that `foot` placement of the existing P, which `applyStep`'s redefinition arm turns into `P ≡ ~P` (ADR-028) with

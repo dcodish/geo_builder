@@ -2,7 +2,7 @@
  * #2231 ([ADR-W-189](../../docs/06w-decisions-workspace.md#adr-w-189)) — analytic's one retry, through `runFallback` with a
  * mocked model (standing rule 2: the session is the oracle, no live call).
  *
- * The operator's report sentences need no model any more («MK אנך לציר x» is read, ADR-AG-410; «l3 הוא אנך אמצעי של EK» since
+ * The operator's report sentences need no model any more («MK אנך לציר x» is read as the relation, ADR-AG-421; «l3 הוא אנך אמצעי של EK» since
  * #1138), so they are fed to `runFallback` directly: what is locked is the seam, which any sentence the grammar misses
  * reaches. The first model answers are the ones his two reports logged.
  */
