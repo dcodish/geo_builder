@@ -1937,7 +1937,8 @@ const ROOT_PRODUCT = String.raw`(?:[*·]\s*(?=√))`;
  * (the `magnitude-atom` sweep in `issue-1827-magnitude-atom.test.ts` holds that, rule by rule).
  * An ANGLE stays decimal (`ANGLE_VAL`): its unit is the degree.
  */
-const MAG = String.raw`(?:(?:${UNUM}\s*${ROOT_PRODUCT}?)?\s*√\s*${RADICAND}|${UNUM})(?:\s*\/\s*${UNUM})?`;
+const MAG_TERM = String.raw`(?:(?:${UNUM}\s*${ROOT_PRODUCT}?)?\s*√\s*${RADICAND}|${UNUM})`;
+const MAG = String.raw`${MAG_TERM}(?:\s*\/\s*${UNUM})?`;
 /** The reader paired with {@link MAG}: a signed magnitude literal's value, null when it is not one. */
 function magValue(raw: string): number | null {
   const t = raw.trim();
@@ -3927,18 +3928,18 @@ const angleSegClaim: Rule = (s0) => {
  */
 const RATIO_SEP = String.raw`\s*[:/]\s*`;
 const lengthRatioClaim: Rule = (s) => {
-  const m = s.match(
-    new RegExp(
-      `^([A-Z]\\d*'?)([A-Z]\\d*'?)${RATIO_SEP}([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${UNUM})(?:${RATIO_SEP}(${UNUM}))?$`,
-    ),
-  );
+  // #1808 (ADR-3D-427): a term is a magnitude, read by the shared atom, so «3:√13» reads as «3/√13» and «√3/2» as «√3/2».
+  const head = `^([A-Z]\\d*'?)([A-Z]\\d*'?)${RATIO_SEP}([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*`;
+  const m =
+    s.match(new RegExp(`${head}(${MAG_TERM})(?:${RATIO_SEP}(${MAG_TERM}))?$`)) ?? s.match(new RegExp(`${head}(${MAG})\\s*:\\s*(${MAG})$`));
   if (!m) return null;
-  const [, a1, b1, a2, b2, p, q = '1'] = m;
-  if (+p <= 0 || +q <= 0) return null; // a length ratio is positive — zero states a collapsed segment
+  const [, a1, b1, a2, b2, pSrc, qSrc = '1'] = m;
+  const [p, q] = [magValue(pSrc), magValue(qSrc)];
+  if (p === null || q === null || p <= 0 || q <= 0) return null; // a length ratio is positive — zero states a collapsed segment
   return [
     { type: 'segment3', a: a1, b: b1 },
     { type: 'segment3', a: a2, b: b2 },
-    { type: 'claim', claim: { type: 'length-ratio', a1, b1, a2, b2, p: +p, q: +q } },
+    { type: 'claim', claim: { type: 'length-ratio', a1, b1, a2, b2, p, q } },
   ];
 };
 

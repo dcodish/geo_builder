@@ -440,18 +440,6 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
     }
   };
 
-  // 1) RATIO `a:b` — one statement, consumed whole: lowered as t = a/(a+b) (on-segment ratios),
-  //    as the plain quotient (length-ratio claims), or kept as its two integers.
-  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/g)) {
-    const i = m.index!;
-    spans.push([i, i + m[0].length]);
-    const a = parseFloat(m[1]);
-    const b = parseFloat(m[2]);
-    if (!has([a / (a + b), b / (a + b), b === 0 ? NaN : a / b, a === 0 ? NaN : b / a, a, b, -a, -b])) flag(m[0]);
-  }
-
-  // 2) RADICAL / FRACTION value expressions `[coef]√n [/ term]` or `a/b` — evaluated and consumed
-  //    WHOLE (the value the parser lowers to is what must be accounted, not the raw digits).
   // #1827: the radical term is the PARSER'S atom and is read by the parser's own reader, so the gate can
   // never value a radicand («√(3/4)») differently from the rule that lowered it
   const RAD = String.raw`√\s*${RADICAND}`;
@@ -460,6 +448,25 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
     if (!t.includes('√')) return parseFloat(t);
     return evalRadical(t.replace(/\s*[*·]\s*/g, '')) ?? NaN;
   };
+  // #1808 (ADR-3D-427): a ratio's terms are the same terms, each optionally a quotient, so «3:2√3» is never read as «3:2».
+  const QUOTIENT = String.raw`(?:${TERM})(?:\s*\/\s*(?:${TERM}))?`;
+  const evalQuotient = (t: string): number => {
+    const [n, d] = t.split(/\/(?![^(]*\))/);
+    return d === undefined ? evalTerm(n.trim()) : evalTerm(n.trim()) / evalTerm(d.trim());
+  };
+
+  // 1) RATIO `a:b` — one statement, consumed whole: lowered as t = a/(a+b) (on-segment ratios),
+  //    as the plain quotient (length-ratio claims), or kept as its two integers.
+  for (const m of s.matchAll(new RegExp(String.raw`(${QUOTIENT})\s*:\s*(${QUOTIENT})`, 'g'))) {
+    const i = m.index!;
+    spans.push([i, i + m[0].length]);
+    const a = evalQuotient(m[1]);
+    const b = evalQuotient(m[2]);
+    if (!has([a / (a + b), b / (a + b), b === 0 ? NaN : a / b, a === 0 ? NaN : b / a, a, b, -a, -b])) flag(m[0]);
+  }
+
+  // 2) RADICAL / FRACTION value expressions `[coef]√n [/ term]` or `a/b` — evaluated and consumed
+  //    WHOLE (the value the parser lowers to is what must be accounted, not the raw digits).
   for (const m of s.matchAll(new RegExp(`(${TERM})(?:\\s*/\\s*(${TERM}))?`, 'g'))) {
     if (!/√|\//.test(m[0])) continue; // a bare number → the single-number pass below (with its own lowering candidates)
     const i = m.index!;

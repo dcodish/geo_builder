@@ -15709,3 +15709,26 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-1772-described-line-operand.test.ts` (the model's two lines verbatim, 5 spellings × 7 frames landing on C = (0, 7) at seeds 0–3, English, the point-on, one line not two, the refusals); the fixture `described-line-operand-1772.analytic.json`.
 
 **Behaviour change for a student:** in the analytic builder, «C היא נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר y=7» and its orders build at once, with no trip to the model.
+
+## ADR-AG-418 — A colon ratio's term is any constant `AB = …` reads, and a radical stays exact (#1808)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic + 2-D + 3-D, `reported`) · round #2727 · branch `fix/1808-colon-ratio-radical` · the operator's report of 2026-10-06 (*"ratio is not understood"*); plan approved *"1808 - ok"*
+**Requirements:** [02c](02c-requirements-analytic.md) R119 · **Design:** [04c](04c-design-analytic.md) "A ratio's terms" · **LADDER stage:** none (parser)
+
+**Twins:** [ADR-793](06-decisions.md#adr-793), the reference, and [ADR-3D-427](06b-decisions-3d.md#adr-3d-427).
+
+**Measured at pickup** (`2dcc4880`). `AB:AC=3:√(13)`, `C מחלקת את AB ביחס 1:√2` and `היחס בין AB ל-CD הוא 3:√13` were `not-handled`; `AB/AC = 3/√13` and `√13·AB = 3·AC` built the rectangle.
+
+**The class.** *A colon ratio's terms are read by a digits pattern, not by the value reader.* `RATIO_PQ` covered the bare colon and the divider, and `ratioAsEquation` carried a copy.
+
+**Decision.**
+1. **`readRatioTerms`, over `constantLengthExpr`.** `RATIO_PQ` now only finds the two sides; each must be a constant with a positive value, so the guard evaluates the term. Anything else leaves the sentence to the next rule, as a word there always did.
+2. **`ratioFact` keeps a radical exact.** Two plain numbers keep their quotient tree (unchanged). A radical term lowers to `q·X = p·Y` over the real parsed trees, and the bare colon equals «√13·AB = 3·AC» fact for fact. `ratioAsEquation` writes the student's terms into its equation.
+
+**A lock not honoured.** The plan asks the colon to equal the slash spelling fact for fact. It cannot equal both: the slash lowers to a `div` tree and the product to `mul`, measured. The colon follows the plan's own `q·X = p·Y`, so it equals the product, and the slash is locked by the figure: B = (6,3).
+
+**Sibling audit (docs/17 §1).** 2-D and 3-D: the twins. Complex: no such grammar.
+
+**Locks.** `src-analytic/__tests__/issue-1808-colon-ratio-radical.test.ts` (the operator's lines at seeds 0–3, the product fact, the divider and the prose, the refusals); the fixture `colon-ratio-radical-1808.analytic.json`; rows `colon-ratio-*-1808`.
+
+**Behaviour change for a student:** in the analytic builder a ratio with a root builds in every spelling, and the root stays exact.

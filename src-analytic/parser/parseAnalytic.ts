@@ -22,7 +22,7 @@ import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../en
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { teachPair } from '../../shell/juxtaposedNumbers';
-import { evalExpr, findJuxtaposedNumbers, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { evalExpr, findJuxtaposedNumbers, isConstant, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RADIUS_CAPITALS, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
@@ -8263,8 +8263,10 @@ function ratioAsEquation(line: string): string | null {
     // «… למרחקה מ-…» — the second distance's possessive refers to the first's subject (#2620 A2).
     const y = resolveAnaphor(x, measureSide(pair.slice(j.index! + j[0].length)));
     if (!x || !y || !parseLengthExpr(x) || !parseLengthExpr(y)) continue;
-    const pq = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(value.trim());
-    return pq ? `(${pq[2]})*(${x}) = (${pq[1]})*(${y})` : `${x} = (${trim(value)})*(${y})`;
+    // #1808 (ADR-AG-418): a term is any constant `AB = …` reads, so «3:√13» keeps its radical in the equation.
+    const colon = value.trim().split(':');
+    const pq = colon.length === 2 ? readRatioTerms(colon[0], colon[1]) : null;
+    return pq ? `(${pq.q.src})*(${x}) = (${pq.p.src})*(${y})` : `${x} = (${trim(value)})*(${y})`;
   }
   return null;
 }
@@ -8972,10 +8974,25 @@ function parseConstraint(raw: string): RuleOutcome {
  * decline a tail that is not an equation in the plane's variables. Ordering here as well is belt and
  * braces; 2-D learned the same lesson the same way and says so in `dividesInRatio`'s own comment.
  *
- * No CAS is needed: `p` and `q` are literal digits and `p/q` is arithmetic, well inside ADR-AG-001 D1.
+ * No CAS is needed: `p/q` of literal digits is arithmetic, well inside ADR-AG-001 D1, and a radical term stays a tree.
  */
-const RATIO_PQ = String.raw`(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)`;
-const RATIO_END = String.raw`\s*` + '$';
+/** #1808 (ADR-AG-418): the two sides of a colon, each one token; {@link readRatioTerms} decides whether they are numbers. */
+const RATIO_PQ = String.raw`(\S+?)\s*:\s*(\S+)`;
+/**
+ * THE TERMS OF A COLON RATIO (#1808, ADR-AG-418) — every constant `AB = …` reads, by that same reader: «3», «2.5», «√13»,
+ * «√(13)», «2√3». Positive by VALUE, never by a first digit. `null` when either side is not a positive constant, so the
+ * sentence is not this rule's, as a word or a parameter there always made it.
+ */
+type RatioTerm = { src: string; expr: Expr };
+function ratioTerm(raw: string): RatioTerm | null {
+  const src = raw.trim().replace(/[.,;]+$/, '');
+  const c = constantLengthExpr(src);
+  return c && isConstant(c.expr) && evalExpr(c.expr) > 0 ? { src, expr: c.expr } : null;
+}
+function readRatioTerms(p: string, q: string): { p: RatioTerm; q: RatioTerm } | null {
+  const [a, b] = [ratioTerm(p), ratioTerm(q)];
+  return a && b ? { p: a, q: b } : null;
+}
 
 /**
  * The relation itself: |first| = (p/q)·|second|. Shared by all three spellings.
@@ -8998,15 +9015,19 @@ const RATIO_END = String.raw`\s*` + '$';
 const ratioFact = (
   first: [string, string],
   second: [string, string],
-  p: number,
-  q: number,
+  { p, q }: { p: RatioTerm; q: RatioTerm },
   src: string,
 ): Fact | null => {
   const left = parseLengthExpr(first[0] + first[1]);
   const right = parseLengthExpr(second[0] + second[1]);
   if (!left || !right) return null;
+  // Two numbers divide; a radical term stays exact, as `q·X = p·Y`, the tree of «√13·AB = 3·AC» (#1808).
+  if (p.expr.kind !== 'num' || q.expr.kind !== 'num') {
+    const scale = (by: Expr, e: LengthExpr): LengthExpr => ({ expr: { kind: 'mul', a: by, b: e.expr }, terms: e.terms });
+    return { t: 'constraint', k: { t: 'length-eq', left: scale(q.expr, left), right: scale(p.expr, right) }, src };
+  }
   const scaled: LengthExpr = {
-    expr: { kind: 'mul', a: { kind: 'num', value: p / q }, b: right.expr },
+    expr: { kind: 'mul', a: { kind: 'num', value: p.expr.value / q.expr.value }, b: right.expr },
     terms: right.terms,
   };
   return { t: 'constraint', k: { t: 'length-eq', left, right: scaled }, src };
@@ -9021,21 +9042,20 @@ const ratioFact = (
 function parseRatioColon(line: string): Fact[] | null {
   const m = line.match(
     new RegExp(
-      String.raw`^\s*(${NAME})\s*(${NAME})\s*:\s*(${NAME})\s*(${NAME})\s*=\s*` + RATIO_PQ + RATIO_END,
+      String.raw`^\s*(${NAME})\s*(${NAME})\s*:\s*(${NAME})\s*(${NAME})\s*=\s*(\S.*?)\s*:\s*(\S.*?)\s*$`,
     ),
   );
   if (!m) return null;
-  const p = Number(m[5]);
-  const q = Number(m[6]);
-  if (!(p > 0) || !(q > 0)) return null;
-  const fact = ratioFact([m[1], m[2]], [m[3], m[4]], p, q, line);
+  const terms = readRatioTerms(m[5], m[6]);
+  if (!terms) return null;
+  const fact = ratioFact([m[1], m[2]], [m[3], m[4]], terms, line);
   // «AC:CB = 3:2» names both pairs, so both are drawn (#1652) — the length rule's own reading of a named pair.
   return fact ? [fact, ...lengthPieces([`${m[1]}${m[2]}`, `${m[3]}${m[4]}`], line)] : null;
 }
 
 /** The placement shared by the divider and prose spellings: `C` sits on `AB`, between its ends. */
-function ratioDividerFacts(id: string, a: string, b: string, p: number, q: number, src: string): Fact[] | null {
-  const ratio = ratioFact([a, id], [id, b], p, q, src);
+function ratioDividerFacts(id: string, a: string, b: string, terms: { p: RatioTerm; q: RatioTerm }, src: string): Fact[] | null {
+  const ratio = ratioFact([a, id], [id, b], terms, src);
   if (!ratio) return null;
   return [
     { t: 'declare', id, src },
@@ -9061,9 +9081,8 @@ function parseDividesInRatio(line: string): Fact[] | null {
     ),
   );
   if (div) {
-    const p = Number(div[4]);
-    const q = Number(div[5]);
-    if (p > 0 && q > 0) return ratioDividerFacts(div[1], div[2], div[3], p, q, line);
+    const terms = readRatioTerms(div[4], div[5]);
+    if (terms) return ratioDividerFacts(div[1], div[2], div[3], terms, line);
   }
 
   /**
@@ -9086,9 +9105,8 @@ function parseDividesInRatio(line: string): Fact[] | null {
     if (shared) {
       const start = a1 === shared ? b1 : a1;
       const end = a2 === shared ? b2 : a2;
-      const p = Number(two[5]);
-      const q = Number(two[6]);
-      if (p > 0 && q > 0 && start !== end) return ratioDividerFacts(shared, start, end, p, q, line);
+      const terms = readRatioTerms(two[5], two[6]);
+      if (terms && start !== end) return ratioDividerFacts(shared, start, end, terms, line);
     }
   }
   return null;

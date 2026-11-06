@@ -20394,3 +20394,29 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/app/__tests__/issue-1775-construction-operands.test.ts` (point × line noun × frame, each equal to the short spelling's commands; the English twins; the stated line against the figure's side; the refusals); rows `construction-operand-1775-*`.
 
 **Behaviour change for a student:** in 2-D the exam's own wording of these constructions builds at once, as the short spelling does.
+
+## ADR-793 — A ratio's term is a number like any other: «AB:AC=3:√13» (#1808)
+
+**Status:** accepted · 2026-11-06 · bug (P2, 2-D + analytic + 3-D, reported) · fix round #2727 · branch `fix/1808-colon-ratio-radical` · the operator's report of 2026-10-06 (*"ratio is not understood"*) and his approval of the plan the same day (*"1808 - ok"*)
+
+**Requirements:** [02](02-requirements.md) FR-IN-2 · **Design:** [04](04-design.md) "Parser chokepoints and gates" · **Stage:** none (parser and honesty gates)
+
+**Twins:** [ADR-AG-418](06c-decisions-analytic.md#adr-ag-418), [ADR-3D-427](06b-decisions-3d.md#adr-3d-427).
+
+**Measured at pickup** (`2dcc4880`). `AB:AC=3:√13` was `not-handled`. The plan's table holds at `parse`, but at the submit decision `AB/AC=3/√13` **escalated** too: `parse` reads k = 0.832 and the honesty gates then hunted «3» and «13» in it. `AB:AC=3:2.5x` committed k = 1.2, its `x` dropped.
+
+**The class.** *A ratio's term is read by a digits-only pattern, while a ratio keeps only its quotient, so nothing can account for a term that is not plain.* Two halves: the reader, and the gates behind it.
+
+**Decision.**
+1. **`RATPQ` is two `NUMEXPR` atoms**, read by `ratioTerms`. `segmentRatioColon` and `dividesInRatio` use it; `segmentRatioColon` is anchored at the end, closing the prefix read.
+2. **A term of zero keeps each rule's own guard**, now read off the value: positive for the bare colon, a positive sum for the divider.
+3. **The rule declares what it consumed** (ADR-462): `radicalAccounts` puts each term's value and literal digits in `consumed.numbers`, when a term carries a √, or a `/` in a colon. Plain terms are unchanged, so their commands are byte-identical. `segmentRatio` declares too, which is what makes the slash form commit.
+4. **The gate's pair pass does not take digits out of a larger term:** «3:2√3» is not the pair «3:2», «√3:2» is not «3:2», «3:3/2» is not «3:3».
+
+**Not widened.** A term reads what `AB = …` reads, so «3:3/2» reads as 3 : 1.5, which is unambiguous because the colon separates the terms. `RATIO_PQ`, the similarity slot, keeps digits: its ruling names no radical.
+
+**Sibling audit (docs/17 §1).** Analytic and 3-D had the class, and share these rows. 3-D reads neither «מחלקת … ביחס» nor «היחס בין … הוא» in digits, so those two cells are unscheduled gaps. Complex: no such grammar.
+
+**Locks.** `src/__tests__/issue-1808-colon-ratio-radical.test.ts`; rows `colon-ratio-*-1808`, `slash-ratio-radical-1808`.
+
+**Behaviour change for a student:** in 2-D a ratio with a root builds at once, in the colon and the slash; a ratio followed by a stray letter is no longer drawn without it.

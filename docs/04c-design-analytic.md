@@ -397,6 +397,10 @@ The taught sentence is one the gate accepts; unknown input is never dismembered;
 The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of `shell/`
 ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)).
 
+### A ratio's terms ([ADR-AG-418](06c-decisions-analytic.md#adr-ag-418), #1808)
+
+`readRatioTerms` reads each side of a colon with `constantLengthExpr`, positive by value. `ratioFact` keeps a quotient for two numbers and `q·X = p·Y` over the real trees for a radical, so the radical stays exact.
+
 ### The exam's construction register ([ADR-AG-206](06c-decisions-analytic.md#adr-ag-206), #1620)
 
 `constructionCandidates` (`parser/scopeAnalytic.ts`) reads the closed grammar `ADVERBIAL* VERB ADVERBIAL* NOUN NAMES? REST`

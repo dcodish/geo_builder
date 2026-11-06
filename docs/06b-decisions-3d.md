@@ -14825,3 +14825,22 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
 
 **Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.
+
+## ADR-3D-427 — A length ratio's term is a magnitude: «AB:AC=3:√13», «AB/AC=3/√13» (#1808)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, 3-D + 2-D + analytic, `reported`) · round #2727 · branch `fix/1808-colon-ratio-radical` · the operator's report of 2026-10-06, plan approved *"1808 - ok"*
+**Requirements:** none (internal: 2-D's verdict, per ADR-W-108) · **Design:** none (internal)
+
+**Twins:** [ADR-793](06-decisions.md#adr-793), the reference, and [ADR-AG-418](06c-decisions-analytic.md#adr-ag-418).
+
+**The class.** *`lengthRatioClaim`'s terms were the decimal `UNUM`*, the slot #1827 ([ADR-3D-337](#adr-3d-337)) left, so both the colon and the slash were `not-understood` for a root.
+
+**Decision.** The terms are the shared magnitude atom, read by `magValue`. `MAG_TERM` is `MAG` without its fraction, so «3/2» after a `/` separator stays p = 3, q = 2; a colon takes a whole `MAG` on each side («3:3/2»). The positivity guard reads the value. The honesty gate's ratio pass reads the same terms, so «3:2√3» is never the pair «3:2».
+
+**The hold this ends.** [ADR-3D-362](#adr-3d-362) left the ratio slot out of the 2026-10-14 ruling, *"unchanged (#1808)"*, and its control asserted `not-understood`. #1808's plan names 3-D and the operator approved it on 2026-10-06, so the control moved.
+
+**Not ported.** 3-D reads neither «מחלקת … ביחס» nor «היחס בין … הוא» in digits: known-gap cells on `colon-ratio-divider-1808` and `colon-ratio-prose-1808`.
+
+**Locks.** `src3d/__tests__/issue-1808-colon-ratio-radical.test.ts`; the parity rows.
+
+**Behaviour change for a student:** in 3-D a length ratio with a root builds, in the colon and the slash.

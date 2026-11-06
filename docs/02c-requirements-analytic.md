@@ -372,7 +372,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «הישר CD עובר דרך P», «הצלע BC נמצאת על הישר y=x-4», «הנקודה (-3,7)»
 - «AC ו-BD נפגשים בנקודה M» → lines and M; «M מפגש AC ו-BD» → M alone
 - A line described by a point and a relation is an operand wherever a line is one: «C היא נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר y=7», «הישר y=7 חותך את הישר דרך P המאונך ל-AB בנקודה C», «C על הישר דרך P המאונך ל-AB» (ADR-AG-417, #1772)
-- Sources: ADR-AG-164, #1281, #1495, ADR-AG-168, #1429, ADR-AG-230, #1609, #1512, ADR-AG-241, #1751, ADR-592, ADR-AG-417.
+- A ratio's term is any constant a length reads, and a radical stays exact: «AB:AC=3:√13», «C מחלקת את AB ביחס 1:√2», «היחס בין AB ל-CD הוא 3:√13» (ADR-AG-418, #1808)
+- Sources: ADR-AG-164, #1281, #1495, ADR-AG-168, #1429, ADR-AG-230, #1609, #1512, ADR-AG-241, #1751, ADR-592, ADR-AG-417, ADR-AG-418.
 
 **R167 — two lines of any kind meet at a named point**. Bisectors, altitudes, medians, perpendiculars, tangents and named lines; parallel or repeated lines are refused.
 - «<line> ו<line> נפגשים בנקודה E», with «חוצה זוית B», «הגובה מ-A», «האנך האמצעי לצלע AB» as lines

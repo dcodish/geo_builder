@@ -1923,6 +1923,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
+  // ── #1808 (ADR-793 / ADR-AG-418 / ADR-3D-427): a ratio's term is a number; a spelling 3-D does not read in digits is a gap in digits too ──
+  { id: 'colon-ratio-radical-1808', family: 'midpoint-ratio', steps: ['משולש ABC', 'AB:AC=3:√13'], expect: 'builds' },
+  { id: 'colon-ratio-radical-paren-1808', family: 'midpoint-ratio', steps: ['משולש ABC', 'AB:AC=3:√(13)'], expect: 'builds' },
+  { id: 'slash-ratio-radical-1808', family: 'midpoint-ratio', steps: ['משולש ABC', 'AB/AC=3/√13'], expect: 'builds' },
+  { id: 'colon-ratio-product-1808', family: 'midpoint-ratio', steps: ['משולש ABC', 'AB:AC=3:2√3'], expect: 'builds' },
+  { id: 'colon-ratio-divider-1808', family: 'midpoint-ratio', steps: ['קטע AB', 'C מחלקת את AB ביחס 1:√2'], expect: 'builds', knownGap: [{ product: '3d' }], note: '3-D reads no «מחלקת … ביחס», in digits either (measured 2dcc4880)' },
+  { id: 'colon-ratio-prose-1808', family: 'midpoint-ratio', steps: ['קטע AB', 'היחס בין AC ל-CB הוא 1:√2'], expect: 'builds', knownGap: [{ product: '3d' }], note: '3-D reads no «היחס בין … הוא», in digits either (measured 2dcc4880)' },
   // ── #1772 (ADR-AG-417): a line described by a point and a relation, as an operand ──
   ...[
     'E נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר CD',

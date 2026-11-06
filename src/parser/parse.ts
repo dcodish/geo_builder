@@ -3731,7 +3731,7 @@ const segmentRatio: Rule = (s) => {
   if (!m) return null;
   const v = numexprVal(m.groups!, 'v');
   if (!v) return null;
-  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: v.value }];
+  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: v.value, ...radicalAccounts(m.groups!, 'v') }];
 };
 
 /**
@@ -3772,6 +3772,18 @@ const numTermVal = (g: Record<string, string | undefined>, t: string): number | 
   return null;
 };
 const NUMEXPR = (p: string) => String.raw`(?<${p}all>${NUMTERM(`${p}A`)}(?:\s*\/\s*${NUMTERM(`${p}B`)})?)`;
+/**
+ * #1808 ([ADR-793](../../docs/06-decisions.md#adr-793)) — A RATIO KEEPS ONE QUOTIENT, so a radical term leaves no trace of its
+ * own in `k` or `t`: the honesty gates hunted «3» and «13» in 0.832 and sent a sentence the rule read whole to the
+ * model. The rule declares what it consumed (ADR-462), each term's value and its literal digits. Plain numbers, and a
+ * plain fraction in the slash form, keep the gates' quotient pass, which pays for them.
+ */
+const radicalAccounts = (g: Record<string, string | undefined>, ...ps: string[]): { consumed?: Consumed } => {
+  const texts = ps.map((p) => g[`${p}all`] ?? '');
+  if (!texts.some((t) => t.includes('√') || (ps.length > 1 && t.includes('/')))) return {};
+  const values = ps.flatMap((p) => numexprVal(g, p)?.value ?? []);
+  return { consumed: { numbers: [...values, ...texts.flatMap((t) => t.match(/\d+(?:\.\d+)?/g) ?? []).map(Number)] } };
+};
 const hasDivisor = (g: Record<string, string | undefined>, p: string): boolean => termMatched(g, `${p}B`);
 /** Is this a value form OWNED by the shared atom rather than the existing bare-number / `coef√` rules — a
  *  QUOTIENT (`35/√32`) OR a PARENTHESISED radicand (`√(2/3)`, `5√(2/3)` — which `measureSqrt` can't parse)?
@@ -4201,12 +4213,11 @@ const lengthProduct: Rule = (s) => {
  */
 const segmentRatioColon: Rule = (s) => {
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*:\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATPQ}`),
+    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*:\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATPQ}\s*\.?\s*$`),
   );
   if (!m) return null;
-  const p = parseFloat(m[5]), q = parseFloat(m[6]);
-  if (p <= 0 || q <= 0) return null;
-  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: p / q }];
+  const k = ratioTerms(m.groups!);
+  return k && k.p > 0 && k.q > 0 ? [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: k.p / k.q, ...radicalAccounts(m.groups!, 'rp', 'rq') }] : null;
 };
 
 /**
@@ -4218,7 +4229,16 @@ const segmentRatioColon: Rule = (s) => {
  */
 /** An unsigned decimal — the one inline spelling the two-term ratio patterns below share (S2.1 ratchet). */
 const UDEC = String.raw`\d+(?:\.\d+)?`;
-const RATPQ = String.raw`(${UDEC})\s*:\s*(${UDEC})`;
+/**
+ * #1808 ([ADR-793](../../docs/06-decisions.md#adr-793)) — a colon ratio's TERMS are numbers like any other: each is the
+ * shared value atom, as the slash form's is (ADR-298), so «3:√13» and «3:√(13)» read as «3/√13» does. A term must be
+ * guarded by its VALUE, never by its first digit; `ratioTerms` is the atom's reader.
+ */
+const RATPQ = String.raw`${NUMEXPR('rp')}\s*:\s*${NUMEXPR('rq')}`;
+const ratioTerms = (g: Record<string, string | undefined>): { p: number; q: number } | null => {
+  const [p, q] = [numexprVal(g, 'rp')?.value, numexprVal(g, 'rq')?.value];
+  return p !== undefined && q !== undefined ? { p, q } : null;
+};
 /**
  * #2065 ([ADR-700](docs/06-decisions.md#adr-700)) — a two-term ratio in either spelling, «p:q» or «p ל-q» (the shared
  * `RATIO_SEP` atom, which the dropped-number gate's pair pass composes too). The SIMILARITY slot reads it; the
@@ -4234,8 +4254,8 @@ const dividesInRatio: Rule = (s) => {
     ),
   );
   if (div) {
-    const p = parseFloat(div[4]), q = parseFloat(div[5]);
-    if (p + q > 0) return [{ type: 'point-on-segment', id: up(div[1]), a: up(div[2]), b: up(div[3]), t: p / (p + q) }];
+    const r = ratioTerms(div.groups!);
+    if (r && r.p + r.q > 0) return [{ type: 'point-on-segment', id: up(div[1]), a: up(div[2]), b: up(div[3]), t: r.p / (r.p + r.q), ...radicalAccounts(div.groups!, 'rp', 'rq') }];
   }
   // (b) sub-segments named: "the ratio between DG and GC is p:q" — DG,GC share the divider G; the host
   // segment runs from DG's free end (D) to GC's free end (C). Single-letter labels (the bagrut convention).
@@ -4248,8 +4268,8 @@ const dividesInRatio: Rule = (s) => {
     if (shared) {
       const start = a1 === shared ? b1 : a1; // DG's free end (D)
       const end = a2 === shared ? b2 : a2; // GC's free end (C)
-      const p = parseFloat(two[5]), q = parseFloat(two[6]);
-      if (p + q > 0 && start !== end) return [{ type: 'point-on-segment', id: shared, a: start, b: end, t: p / (p + q) }];
+      const r = ratioTerms(two.groups!);
+      if (r && r.p + r.q > 0 && start !== end) return [{ type: 'point-on-segment', id: shared, a: start, b: end, t: r.p / (r.p + r.q), ...radicalAccounts(two.groups!, 'rp', 'rq') }];
     }
   }
   return null;
@@ -13922,6 +13942,8 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   for (const m of s.matchAll(new RegExp(String.raw`${num}${RATIO_SEP}(-?${UDEC})`, 'g'))) {
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
+    // #1808 (ADR-793): digits inside a larger term are not the pair: «3:2√3» is not «3:2», «√3:2» not «3:2», «3:3/2» not «3:3»
+    if (/^\s*[*·]?\s*[√/]/.test(s.slice(i + m[0].length)) || /√\s*\(?\s*$/.test(s.slice(0, i))) continue;
     const colon = m[0].includes(':');
     const p = parseFloat(m[1]);
     const qv = parseFloat(m[2]);

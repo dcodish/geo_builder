@@ -342,6 +342,10 @@ Historical: current risks and the decisions that answer them live in the ADR log
 
 A ⊥/∥ construction statement composes the lexicon's `POINT_OPERAND_NOUN` (in `THROUGH_PT`) and `LINE_OPERAND_NOUN` (in the line slots of `perpendicularLine` and `parallelLine`); a frame never spells «הנקודה» or «לישר» itself. `altitude`'s perpendicular branch reads «לישר AB» before `statedSide`, which stays the cevian nouns' reader.
 
+### A ratio's term is the value atom ([ADR-793](06-decisions.md#adr-793), #1808)
+
+`RATPQ` is two `NUMEXPR`, read by `ratioTerms`. A ratio keeps one quotient, so a term with a √ or a `/` leaves no trace in `k` or `t`: the rule declares its terms through `radicalAccounts` (`consumed.numbers`, ADR-462), and `droppedGivenNumbers`' pair pass skips digits that belong to a larger term.
+
 ### The clarification family, and where an ASK beats an escalation (#777, [ADR-490](06-decisions.md#adr-490))
 
 `not-handled` is the escalation seam: whatever reaches it becomes a paid LLM call — right for a sentence the

@@ -82,8 +82,8 @@ describe('#2081 item 1 — a radical in the coordinate-claim slot «A = (…)»'
     ]);
   });
 
-  it('the controls are left alone: the ratio slot and a symbolic claim', () => {
-    expect(build([BOX, 'AB:AD = 1:√2']).last.kind).toBe('not-understood');
+  it('the control is left alone: a symbolic claim. The ratio slot this ruling held for #1808 is that issue\'s (ADR-3D-427)', () => {
+    expect(build([BOX, 'AB:AD = 1:√2']).last.kind).toBe('record');
     expect(build([BOX, 'A=(0,0,t)']).last.kind).toBe('not-understood');
   });
 });
