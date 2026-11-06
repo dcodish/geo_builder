@@ -657,8 +657,9 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 
 **R137 — a piece named by its role is understood wherever a side is, and the role is honoured; a length given draws the pairs it names**. *(Operator: "when i write הישר BC מקביל לציר ה-x — accepted. when i write המיתר BC מקביל לציר ה-x — its rejected".)*
 - «המיתר BC מקביל לציר ה-x», «אורך השוק BC הוא 6»
-- «OC = 15, BC = 3» → both drawn; «d_{OC} = 15» → nothing drawn
-- Sources: ADR-AG-200, #1651, #1652, #1620, #1637.
+- «OC = 15, BC = 3» → both drawn; «d_{OC} = 15» and «|OC| = 15» → nothing drawn
+- A relation between two lengths draws both, however written: «AC = 2BD», «AC:BD = 2:1», «|AC| = 2|BD|», «|AC| = |BD|» (ADR-AG-420)
+- Sources: ADR-AG-200, ADR-AG-420, #1651, #1652, #1620, #1637, #1848.
 
 **R177 — a length stated with its segment's ROLE in front keeps the role and the length; a height stated as a number is the shape's**. *(ADR-W-118 B1: 2-D's verdict and drawing, measured at `403efe66`.)* The role is drawn as on its own — the diagonal, the median's midpoint, the altitude's foot, the foot the tool names for a phrase («הגובה לצלע BC») — and the length lands on that segment; a relation stays a bound. A trapezoid's height given as a number is drawn between its bases (its foot gets a letter, H); a triangle's or a parallelogram's is ASKED, offering sentences that each build. «האלכסון» claims a diagonal: a side of the polygon holding both letters, or any pair of a triangle, is refused in 2-D's words.
 - «מקבילית ABCD» · «האלכסון AC = 8» · «משולש ABC» · «התיכון AM = 5» / «הגובה AH הוא 5» / «התיכון AM גדול מ-5» (a bound)

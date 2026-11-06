@@ -1183,7 +1183,7 @@ export type Command =
   // quotients cross-multiplied at parse, squares = repeated pair. See {@link LengthProductConstraint}.
   | { type: 'set-length-product'; k: number; lhs: Id[]; rhs: Id[] }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean; trapezoidLegs?: boolean } // trapezoidLegs: the isosceles-trapezoid macro's leg equality, stated on the legs of the ASSUMED base pair — replay re-seats it onto the legs of the ring in force when a stated ∥ pins the other pair (#989, ADR-506). soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.
-  | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
+  | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number; derived?: true } // |ab| = k·|cd| + add; derived: the tool's own lowering, not a stated relation, so it draws nothing (#1848)
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number; add?: number; arcOf?: Id } // ∠1 = k·∠2 + add (degrees; #1851); arcOf: both are ARC measures on that circle (ADR-116) — the engine ignores it, the parser puts the arc endpoints on the circle (ADR-663)
   | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)

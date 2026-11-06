@@ -3081,6 +3081,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-ratio':
       driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}) });
+      // #1848 (ADR-794; operator ruling 2026-10-30, "in all tools"): a stated relation between two lengths draws both
+      // segments, as «AB = CD» does (FR-IN-7). Here, after the constraint, so the line is still one command: its row, its
+      // created points and every spelling are what they were. A ratio the tool derived names no segment.
+      if (!cmd.derived) {
+        addObj(objects, segment(cmd.a, cmd.b));
+        addObj(objects, segment(cmd.c, cmd.d));
+      }
       break;
 
     // ADR-632: a round operand (sector / arc / whole circle) rides along — the residual measures it, and

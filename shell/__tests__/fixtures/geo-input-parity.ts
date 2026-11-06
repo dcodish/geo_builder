@@ -1947,6 +1947,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
     'דרך הנקודה P מעבירים ישר המקביל לישר AB',
     'מהנקודה P מורידים אנך לישר AB',
   ].map((line, i): ParityRow => ({ id: `construction-operand-1775-0${i + 1}`, family: 'cevians-centres', steps: ['קטע AB', 'P על AB', line], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1358' }, { product: '3d' }], note: 'analytic teaches it, 2-D builds it until #1358 converges them; 3-D reads no drawn line through a point in this frame, in any spelling (measured c0029d25)' })),
+  // ── #1848 (ADR-794, ADR-AG-420, ADR-3D-428, operator 2026-10-30 "in all tools"): a stated relation between two lengths draws
+  // both segments. The verdict is here; the ink is the shared table stated-length-relation-ink.ts, asserted by each builder.
+  { id: 'length-relation-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = |BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
+  { id: 'length-ratio-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = 2|BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
+  { id: 'length-ratio-colon-1848', family: 'lengths', steps: ['מרובע ABCD', 'AC:BD = 2:1'], expect: 'builds', note: 'AC and BD drawn in every builder' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

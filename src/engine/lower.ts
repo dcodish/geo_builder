@@ -697,6 +697,7 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
           d: rep.refs[1],
           k: e.coef / rep.coef,
           ...(konst ? { add: konst } : {}),
+          derived: true, // the letter's arithmetic, and a symbolic measure does not draw (FR-IN-7)
         },
       ];
     }

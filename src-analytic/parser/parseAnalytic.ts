@@ -57,7 +57,7 @@ function measureValue(src: string): Expr | 'declined' | null {
 function unreadable(src: string): RuleOutcome {
   return INDEXED_TOKEN.test(src) ? null : refuse('bad-equation', src);
 }
-import { angleLabelSymbol, constantLengthExpr, lineEqToken, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr, type LineEquation } from '../engine/lengths';
+import { angleLabelSymbol, constantLengthExpr, lineEqToken, namedLengthPairs, planeLetterLength, parseLengthExpr, writtenLengthPairs, type LengthExpr, type LineEquation } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CENTRES_SENTINELS, ELLIPSE_ROLE_SENTINELS, type EllipseRoleUse, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, FIGURE_TANGENT_ID, type ConicHost, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
@@ -2291,14 +2291,24 @@ function pieceFacts(noun: PieceNoun, a: Id, b: Id, src: string): Fact[] {
  * nothing: the student chose the word that says distance. Which pairs were NAMED is the length reader's own answer
  * (`namedLengthPairs`), never a second scan of the text.
  */
-function lengthPieces(sides: readonly string[], src: string): Fact[] {
+function lengthPieces(sides: readonly string[], src: string, pairsOf: typeof namedLengthPairs = namedLengthPairs): Fact[] {
   const seen = new Set<string>();
-  return sides.flatMap((side) => namedLengthPairs(side)).flatMap(({ a, b }) => {
+  return sides.flatMap((side) => pairsOf(side)).flatMap(({ a, b }) => {
     const key = [a, b].sort().join();
     if (seen.has(key)) return [];
     seen.add(key);
     return pieceFacts('segment', a, b, src);
   });
+}
+
+/**
+ * A RELATION BETWEEN LENGTHS DRAWS BOTH SIDES (#1848, ADR-AG-420, amending ADR-AG-200 for the bars) — a length pair on
+ * each side of the «=», however each is written: «|AC| = 2|BD|» draws AC and BD as «AC = 2BD» does. A value has only
+ * one side, so «|OC| = 5» stays the distance #1652 ruled it, and a worded distance writes no pair.
+ */
+function comparedPieces(left: string, right: string, src: string): Fact[] {
+  const compared = writtenLengthPairs(left).length > 0 && writtenLengthPairs(right).length > 0;
+  return lengthPieces([left, right], src, compared ? writtenLengthPairs : namedLengthPairs);
 }
 
 /**
@@ -8578,7 +8588,7 @@ function parseConstraint(raw: string): RuleOutcome {
     if (left && right) {
       return made([
         { t: 'constraint', k: { t: 'length-eq', left, right }, src: line },
-        ...lengthPieces([leftSrc!, rightSrc!], line),
+        ...comparedPieces(leftSrc!, rightSrc!, line),
         ...roles.out,
       ]);
     }

@@ -2276,3 +2276,6 @@ over all four (ADR-041).
 ### `ask-computes-its-answer-1454` — «ריבוע ABCD» · «G על AD» · «זווית GBA = 37»: asking «∠GBC» answers 53°, and before the angle «לא נקבע» (#1454, ADR-788)
 
 **Guards against:** an ask answered by anything but the values path's rules. **Asserts** every step green, the determined angle prints 53° as the question's own row, and the figure without the angle gives the row its WHY, not a number. The split that leaves the full panel on its button is `src/__tests__/issue-1454-compute-on-ask.test.ts`.
+### `stated-ratio-draws-both-1848` — «מרובע ABCD» · «AC = 2BD»: a stated ratio between two lengths draws AC and BD (#1848, ADR-794)
+
+**Guards against:** the same sentence with a 2 in it leaving the compared segments off the figure. **Asserts** every step green, AC and BD drawn, and |AC|/|BD| = 2.

@@ -2565,7 +2565,7 @@ function statedRatioTail(constrained: Construction, cmd: Command): Command | nul
   if (statedT === undefined || cmd.type !== 'point-on-segment') return null;
   const o = constrained.objects.find((x) => x.id === cmd.id) as { kind?: string; t?: number; free?: boolean } | undefined;
   if (o?.kind === 'on-segment' && !o.free && o.t === statedT) return null; // re-homed at the stated t
-  return { type: 'set-ratio', a: cmd.a, b: cmd.id, c: cmd.id, d: cmd.b, k: statedSegmentRatio(statedT) };
+  return { type: 'set-ratio', a: cmd.a, b: cmd.id, c: cmd.id, d: cmd.b, k: statedSegmentRatio(statedT), derived: true };
 }
 
 const centroid = (ps: Vec[]): Vec => ({

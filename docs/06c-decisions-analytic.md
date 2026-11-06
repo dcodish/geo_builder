@@ -15776,3 +15776,26 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-2639-order-free-side.test.ts` (the reported case at seeds 0–4 and across 24 configurations, stability, the other spellings and directions, a crossing's bound, two bounds, the chain in both line orders, a stated bound, two free points, and three refusals: the contradiction, a cycle, two bounds with no room). Fixtures `issue-2639-above-solved-point.analytic.json`, `issue-2639-order-chain.analytic.json`.
 
 **Behaviour change for a student:** «A מעל C» over a point the givens place now records, with A drawn above it at every configuration. A free point stated above a stated point can be drawn at a different first position than before (the operator accepted this, 2026-11-06), still on the named side. An order that cannot hold is refused as before.
+
+## ADR-AG-420 — A relation between lengths written in bars draws both segments; a value in bars stays a distance (#1848)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, 2-D, 3-D, analytic) · fix round #2727, stream C · branch `fix/1848-both-sides-drawn` · operator ruling 2026-10-30 on #1848 (*"3 A - in all tools"*, naming «|AC| = 2|BD|») · **amends** [ADR-AG-200](#adr-ag-200) item 6 for the bars · siblings [ADR-794](06-decisions.md#adr-794), [ADR-3D-428](06b-decisions-3d.md#adr-3d-428)
+**Requirements:** [02c](02c-requirements-analytic.md) R137 · **Design:** none (internal) · **LADDER stage:** none (the parser's ink)
+
+**Measured before** (`main` c0029d25, `decideSubmit`, after «מרובע ABCD»). «AC = BD», «AC = 2BD» and «AC:BD = 2:1» drew AC and BD. «|AC| = |BD|» and «|AC| = 2|BD|» drew neither.
+
+**Root cause.** Not a missing port: a ruling. #1652 ranked `|XY|` with the distance spellings, because the reader rewrites the bars into «המרחק בין X ל-Y» and `namedLengthPairs` counts only the pair token. The ruling of 2026-10-30 is newer and names the sentence in all tools.
+
+**Decision.** A RELATION between lengths draws what it writes. `writtenLengthPairs` reads one side's pairs, named or barred; `comparedPieces` uses it when each side of the «=» has one, and otherwise keeps `namedLengthPairs`. So:
+
+- «|AC| = |BD|», «|AC| = 2|BD|», «|AC| = BD» draw AC and BD. The equality is included: keying the ink on the coefficient would be a special case (docs/17), and the ruling's sentence is "a stated relation between two lengths".
+- «|OC| = 5» still draws nothing: a value has one length, so #1652 holds. «|AC| + |BD| = 10» likewise, with no length on the right.
+- «d_{AC} = 2d_{BD}» and the worded «המרחק בין …» still draw nothing: the student chose the word that says distance, the operator's own line on #1652.
+
+**ADR-W-118 B2.** Unchanged: segments, no mark at rest.
+
+**Sibling audit.** 2-D and 3-D: ADR-794, ADR-3D-428. A difference left as it was: 2-D draws «|AC| + |BD| = 10» and «|AB| = 5», analytic does not (#1652's ruling; not part of this one).
+
+**Locks.** `src-analytic/__tests__/issue-1848-both-sides-drawn.test.ts`, the shared table `shell/__tests__/fixtures/stated-length-relation-ink.ts`, parity rows `length-relation-bars-1848`, `length-ratio-bars-1848`, `length-ratio-colon-1848`.
+
+**Behaviour change for a student:** «|AC| = 2|BD|» and «|AC| = |BD|» draw AC and BD. Bars around a single length set to a number draw nothing, as before.

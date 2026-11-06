@@ -2024,12 +2024,25 @@ function lowerLengthLetter3(c: Construction3, cl: Extract<Claim3, { type: 'lengt
   return next;
 }
 
+/** #1848 (ADR-3D-428): a numeric ratio that placed a rider is still a stated relation between two lengths, so it draws
+ *  both, as the `length-rel` arm does. A letter («SE = t·SA») is the rider idiom and names its coefficient, not a ratio
+ *  of lengths: it keeps its ink. A shape's own condition draws nothing (#1844). */
+function withStatedRatioInk(next: Construction3, before: Construction3, cmd: Command3): Construction3 {
+  const st = ratioStatement(before, cmd);
+  if (!st || !('k' in st.coeff) || ('origin' in cmd && cmd.origin)) return next;
+  const missing = [st.pair1, st.pair2].filter(([a, b], i, all) => !hasSegment(next, a, b) && !(i === 1 && samePair(all[0], a, b)));
+  return missing.length === 0 ? next : { ...next, segments: [...next.segments, ...missing] };
+}
+
 function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
   // #748: normalize a ratio stated over a free rider's two halves into the point-on-segment given it
   // is — HERE, at the one entry point every command passes through (the ADR-3D-089 `parallelepiped`
   // precedent), so all three spellings share one path instead of three routing sites.
   const retarget = riderRatioRetarget(c, cmd);
-  if (retarget) return applyCommand3(c, retarget);
+  if (retarget) {
+    const placed = applyCommand3(c, retarget);
+    return placed.ok ? { ...placed, next: withStatedRatioInk(placed.next, c, cmd) } : placed;
+  }
   // #1188 step 4 (ADR-3D-406): a metric given that names a free vector is a row of the free-vector system — one door
   const metric = freeVecMetricOf3(c, cmd);
   if (metric) return freeVecMetric3(c, metric);
@@ -3929,9 +3942,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, [cmd.a1, cmd.b1, ...pair2]);
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
-      // #1844 (ADR-3D-308): a STATED relation draws its lhs pair; a shape's own condition (an isosceles
-      // trapezoid's equal diagonals) names no segment, so it leaves no ink — it still drives and is judged.
-      if (!cmd.origin && !hasSegment(next, cmd.a1, cmd.b1)) next.segments.push([cmd.a1, cmd.b1]);
+      // #1844 (ADR-3D-308): a shape's own condition (an isosceles trapezoid's equal diagonals) names no segment, so it
+      // leaves no ink — it still drives and is judged. #1848 (ADR-3D-428): a STATED relation draws every segment it names,
+      // both sides of the «=», ratios included, as `cos-angle` and `mag-rel` do. A named vector on the right is no
+      // segment (`mag-rel` does not draw one either), so only a written pair is ink.
+      if (!cmd.origin) {
+        const named: [Id, Id][] = 'pair' in cmd.rhs ? [[cmd.a1, cmd.b1], cmd.rhs.pair] : [[cmd.a1, cmd.b1]];
+        for (const [a, b] of named) if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+      }
       for (const end of [cmd.a1, cmd.b1, ...pair2]) {
         const def = next.points.get(end);
         if (def?.kind === 'vec-defined') {
