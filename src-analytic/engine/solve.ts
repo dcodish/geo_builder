@@ -303,6 +303,8 @@ export type Constraint =
    */
   | {
       t: 'on-line-2pt';
+      /** «C על הישר AB»: the sentence's noun, which draws a tangent's undrawn line (#2408, ADR-AG-415). No part of the given's identity. */
+      saysLine?: true;
       id: Id;
       a: Id;
       b: Id;

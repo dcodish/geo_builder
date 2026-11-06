@@ -160,8 +160,9 @@ describe('#2418 — the pair whose only tangent is the touch tangent', () => {
   it('(d) a later «T על AB» records (it draws the segment and orders T between)', () => {
     expect(submit([...INT, 'AB משיק משותף למעגלים O ו-K', 'T על AB']).verdicts.map((v) => v.kind).at(-1)).toBe('record');
   });
-  it('(d) a later «T על הישר AB» genuinely follows: «already known» (ADR-AG-020)', () => {
-    expect(submit([...INT, 'AB משיק משותף למעגלים O ו-K', 'T על הישר AB']).verdicts.map((v) => v.kind).at(-1)).toBe('already-known');
+  // #2408 (ADR-AG-415): it holds already (ADR-AG-020), and it speaks of the line, which the sentence before drew as a segment.
+  it('(d) a later «T על הישר AB» holds already, and records: it draws the line', () => {
+    expect(submit([...INT, 'AB משיק משותף למעגלים O ו-K', 'T על הישר AB']).verdicts.map((v) => v.kind).at(-1)).toBe('record');
   });
   it('(e) «פנימי» on its own on circles touching from outside draws the tangent at T', () => {
     const pts = built([...FX, 'AB משיק משותף פנימי למעגלים M ו-N']);

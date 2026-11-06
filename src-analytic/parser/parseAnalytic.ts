@@ -1518,7 +1518,8 @@ function incidenceOn(operand: string, id: Id, claims?: ClaimSink): Constraint | 
    */
   if (dir?.k === 'points') {
     const bounded = BOUNDED_NOUN.test(trim(operand));
-    return { t: 'on-line-2pt', id, a: dir.a, b: dir.b, ...(bounded ? { bounded: true } : {}) };
+    const saysLine = /^ה?ישר\s|^(?:the\s+)?line\s/i.test(trim(operand));
+    return { t: 'on-line-2pt', id, a: dir.a, b: dir.b, ...(bounded ? { bounded: true } : {}), ...(saysLine ? { saysLine: true } : {}) };
   }
 
   /**
@@ -4056,7 +4057,9 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     const slots = twoCircleSlots(target);
     if (!slots) return null;
     const kind = kindWord ? TANGENT_KIND[kindWord.toLowerCase()] : undefined;
-    if (!at) return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line), line);
+    // «הישר AB משיק משותף …» says a line, and keeps it; «AB …» and «הקטע AB …» draw the segment (#2408, ADR-AG-415).
+    const saysLine = /^ה?ישר\s|^the\s+line\s/i.test(g);
+    if (!at) return aboutCircles(slots, commonTangentFacts(a, b, SLOT1, SLOT2, kind, line, saysLine ? `${a}${b}` : undefined), line);
     // «CD משיק משותף למעגלים O ו-P בנקודה M» — the circles touch at M, and CD is the tangent there, M between C and D.
     if (kindWord || slots[0].k !== 'named' || slots[1].k !== 'named' || at === a || at === b) return null;
     const [o, p] = [slots[0].name, slots[1].name];
@@ -4065,7 +4068,8 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     if (!touch.ok || !tangent.ok) return null;
     return aboutCircles(slots, [
       ...touch.facts,
-      ...tangent.facts,
+      // With no line said, the same tangent at M through the M1 arm that inks a sentence by what it names.
+      ...(saysLine ? tangent.facts : commonTangentFacts(a, b, SLOT1, SLOT2, undefined, line).map((x) => (x.t === 'common-tangent' ? { ...x, onLine: [at] } : x))),
       { t: 'selector', sel: { kind: 'between', id: at, a, b }, src: line },
     ], line);
   }
@@ -7814,7 +7818,9 @@ function commonTangentSet(g: string, line: string): RuleOutcome {
     if (!slots) return null;
     const names = set[1] ? set[1].split(new RegExp(`\\s*,\\s*|${AND_ANY}`)).map(trim).filter(Boolean) : undefined;
     if (names && new Set(names).size !== names.length) return refuse('repeated-vertex', line);
-    return aboutCircles(slots, [{ t: 'common-tangents', circles: [SLOT1, SLOT2], ...(names ? { names } : {}), src: line }], line);
+    // The tangents' ends are the tool's letters, 2-D's (AB, CD, EF, GH): how many a pair has only M1 knows (#2408, ADR-AG-415).
+    const touches = Array.from({ length: 8 }, (_, i) => toolPoint('vertex', `tangent-set-${i}`));
+    return aboutCircles(slots, [{ t: 'common-tangents', circles: [SLOT1, SLOT2], ...(names ? { names } : {}), touches, src: line }], line);
   }
   const touch = TOUCH_TANGENT_HE.exec(g) ?? TOUCH_TANGENT_EN.exec(g);
   if (!touch) return null;
