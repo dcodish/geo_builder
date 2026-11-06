@@ -2528,6 +2528,16 @@
       "chosen": true,
       "at": "2026-11-06T13:01:48.453Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-1808-point-case-note",
+      "kind": "text",
+      "issue": "#1808",
+      "what": "the note beside a lowercase point taught as its capital, «c(4,7)» → «C(4,7)» (judged q13)",
+      "choice": "שם של נקודה נכתב באות גדולה. כתבתי לכם את המשפט בשורת הקלט: «C(4,7)» — לחצו Enter כדי לשרטט.",
+      "chosen": true,
+      "at": "2026-11-06T14:17:54.678Z",
+      "status": "pending"
     }
   ],
   "demoted": {

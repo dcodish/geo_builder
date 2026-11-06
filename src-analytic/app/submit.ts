@@ -118,7 +118,7 @@ export type SubmitVerdict =
    * tool would reject.
    */
   /** `note` picks the teaching line; with none, the imperative wrapper's, which names `verb`. */
-  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' | 'point-bare' }
+  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' | 'point-bare' | 'point-case' }
   /**
    * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
    * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
@@ -394,9 +394,9 @@ function decideOnce(
       if (capital) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capital } };
       /**
        * #1774 (ADR-AG-409) — «(3,5)A» AND «A = (3,5)»: never accepted, each taught as «A(3,5)» (ADR-W-030). As for a
-       * wrapper, what is taught is a line the next Enter accepts here, or the line stays as it was.
+       * wrapper, what is taught is a line the next Enter accepts here, or the line stays as it was. «c(4,7)» too (ADR-AG-423).
        */
-      const spelling = pointSpelling(line);
+      const spelling = pointSpelling(line, lines);
       if (spelling) {
         const next = decideSubmit(spelling.canonical, lines, seed, current).kind;
         if (next === 'record' || next === 'already-known') return { kind: 'teach', verb: '', ...spelling };

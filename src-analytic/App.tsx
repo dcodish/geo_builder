@@ -978,7 +978,7 @@ export function App() {
        * intention as a mistake is the #1045 lesson.
        */
       case 'teach':
-        setNotice(t(verdict.note === 'point-order' ? 'noticeTeachPointOrder' : verdict.note === 'point-equals' ? 'noticeTeachPointEquals' : verdict.note === 'point-bare' ? 'noticeTeachPointBare' : 'noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
+        setNotice(t(verdict.note === 'point-order' ? 'noticeTeachPointOrder' : verdict.note === 'point-equals' ? 'noticeTeachPointEquals' : verdict.note === 'point-bare' ? 'noticeTeachPointBare' : verdict.note === 'point-case' ? 'noticeTeachPointCase' : 'noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
         return sentenceOutcome(verdict); // the canonical goes INTO the box (ADR-W-030)
       /**
        * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names

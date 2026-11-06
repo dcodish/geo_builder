@@ -15821,7 +15821,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 ## ADR-AG-423 — Found under the judge's rulings: «האנך» with two drawn asks which (#1775)
 
 **Date:** 2026-11-06 · **Status:** accepted · judged · bug (analytic) · round #2727, stream F · branch `fix/2727-found-rulings` · **partly supersedes [ADR-AG-416](#adr-ag-416)**
-**Requirements:** [02c](02c-requirements-analytic.md) R253 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (M1's `on-kind`)
+**Requirements:** [02c](02c-requirements-analytic.md) R253, R8 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (M1's `on-kind`, the parser)
 **Twin:** [ADR-796](06-decisions.md#adr-796), the 2-D arm.
 
 **1. Two perpendiculars ask (q15, q16).** sr-12, ADR-W-175: *"With two, the tool asks which, using the existing question."* The existing question is `errHost.named`, which lists candidates and shows the student's own sentence with the first one in it. `on-kind perpendicular` passed a count, so it could only reach the counted sentence. It now carries each perpendicular's description as `from:onto`, and `errorText` words it, because the engine holds no locale. The description reads back: «האנך מ-P ל-AB» now binds a drawn line through P perpendicular to AB, where it used to build a second perpendicular. That is ADR-AG-229's "never duplicated", extended to the line. A candidate with no description (a perpendicular to a curve or a named line) keeps the counted sentence, and so does a named altitude, because a partial list would misstate the figure.
@@ -15833,3 +15833,9 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **2. The paste line (q12).** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2» reads as two rows, through the shared splitter ([ADR-796](06-decisions.md#adr-796) point 3).
 
 **Behaviour change for a student:** that line, which used to be «לא הבנתי», builds two rows.
+
+**3. A lowercase point (q13, #1808).** ADR-W-030 lists a label in the other case as a member of the class: *"I don't want the tool to support the wrong text input because it teaches them wrong"*. **Measured:** «c(4,7)» was `not-handled`, reaching the model. `pointSpelling` gains a fourth shape, `point-case`, through #1774's path: pre-filled, and only when the next Enter accepts it. The rewrite is taught only when it is certain. A letter any typed line of the figure already uses (a parameter «y = ax + 2», a line's name «l: y=2x») is left as it was, and so are x and y, which are the plane's. An equation line is read whole, because «ax» uses a; in a sentence a word of three letters or more is not a use of its letters. The comma keeps a pair: «c(4)» stays out. The note is new text (ADR-W-174), recorded with `scripts/judgments.mjs chose`.
+
+**Locks.** `src-analytic/__tests__/point-order-1774.test.ts`; row `ex-coordinate-case-1808`.
+
+**Behaviour change for a student:** «c(4,7)» fills the box with «C(4,7)» and a note; Enter draws the point.

@@ -686,6 +686,7 @@ const he = {
   // #1774 (ADR-AG-409) — «(3,5)A»: the letter comes first; the sentence is already in the box
   noticeTeachPointOrder: 'שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   noticeTeachPointEquals: 'נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  noticeTeachPointCase: 'שם של נקודה נכתב באות גדולה. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   noticeTeachPointBare: 'זוג מספרים לבדו אינו משפט. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
@@ -1241,6 +1242,7 @@ const en: typeof he = {
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   noticeTeachPointOrder: "A point's letter comes before its coordinates. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
   noticeTeachPointEquals: 'A point is written without an equals sign. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
+  noticeTeachPointCase: "A point's name is written with a capital letter. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
   noticeTeachPointBare: 'A pair of numbers alone is not a sentence. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
