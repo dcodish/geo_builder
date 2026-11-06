@@ -15684,3 +15684,28 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts` (the spelling grid, the teach's lowering, the paste with its marks, C = (0, 7) at seeds 0–3, each refusal with its count); the fixture `through-perpendicular-1775.analytic.json`; rows `construction-operand-1775-*`, a known gap naming #1358.
 
 **Behaviour change for a student:** in the analytic builder, the exam's «דרך הנקודה P מעבירים אנך לישר AB» pre-fills the line through P, and «האנך» in the next sentence means that line.
+
+## ADR-AG-417 — A line described by a point and a relation is an operand wherever a line is one (#1772)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2727 · branch `fix/1772-described-line-operand`, stacked on `fix/1775-construction-imperative` @ `bf3fa353` · the plan armed 2026-10-05
+**Requirements:** [02c](02c-requirements-analytic.md) R119 · **Design:** [04c](04c-design-analytic.md) "The perpendicular from a point, and the line through a point that cuts a side" · **LADDER stage:** none (parser)
+
+**Measured at pickup** (`bf3fa353`, `decideSubmit`). The issue's naming rows have moved: `דרך C עובר ישר l2 המקביל ל-AB`, `דרך P עובר ישר l1 המאונך ל-AB` and `ישר l1 דרך P מאונך ל-AB` record since [ADR-AG-371](#adr-ag-371) and [ADR-AG-382](#adr-ag-382), so the plan's line-declaration half had nothing left to build. The operand half stood: the operands swapped were `not-handled`, and both crossing nouns were `bad-operand`.
+
+**The class.** *A line described by a point and a relation is read as a sentence and in the subject slot of «חותך», and as an operand nowhere.* The same class as [ADR-AG-224](#adr-ag-224) for line-objects, and that ADR's reader is the fix.
+
+**Decision.**
+1. **The described line joins `lineObjectOperand`.** Its table already says what a `line-at` operand does. The gate is `isDescribedLine`, the through-rule's own subject-first patterns, so the operand cannot mean anything its sentence does not. `incidenceOn` is the one reader, so the crossing noun, «חותך», «נפגשים» and «C על …» all take it, in both orders and in English. A free direction («הישר דרך P») is not a described line and stays `bad-operand`.
+2. **Two rules gave way.** A relation word inside the operand («… דרך P מאונך ל-AB עם …») reached `parseConstraint`'s relation rule first, which read the sentence as a relation and refused it: an unread relation now tries `parseIntersection`, and «C על …» over a described line is never a relation. `meetFrame` now runs before `parseThroughLine`, whose tail took «AB והישר y=7 נפגשים …» as a direction. Each still answers `null` for a sentence it cannot read, so a relation or a through-sentence is untouched.
+
+**The LLM grammar.** It teaches no described-line crossing, so no remedy was false; the parser now accepts what the model proposed.
+
+**Differs from 2-D, by the armed plan.** 2-D and 3-D hand these sentences to the model; analytic reads them. Rows `described-line-operand-1772-*`, unscheduled analytic cells: a known difference, and 2-D's is the reference.
+
+**Not read.** `l1 עובר דרך P ו- l1⊥AB`, two clauses over a name, stays `bad-operand`. «הישר שעובר דרך P ומאונך ל-AB» reads in five positions of the grid and not as the first operand of the crossing noun or of «נפגשים»: the join splits at «ומאונך», and those stay `bad-operand`.
+
+**Sibling audit (docs/17 §1).** Grepped every `incidenceOn` caller: the crossing, the point-on, the extension and the through-cut. 2-D and 3-D: as above. Complex: no such grammar.
+
+**Locks.** `src-analytic/__tests__/issue-1772-described-line-operand.test.ts` (the model's two lines verbatim, 5 spellings × 7 frames landing on C = (0, 7) at seeds 0–3, English, the point-on, one line not two, the refusals); the fixture `described-line-operand-1772.analytic.json`.
+
+**Behaviour change for a student:** in the analytic builder, «C היא נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר y=7» and its orders build at once, with no trip to the model.

@@ -1400,6 +1400,14 @@ type ObjectOperand = { t: 'object'; facts: Fact[] };
 const LINE_OBJECT_NOUN = /^(?:ה?(?:חוצה|גובה|תיכון|אנך)(?=[\s-])|(?:the\s+|an?\s+)?(?:angle\s+)?(?:bisector|altitude|height|median|perpendicular)\b)/i;
 
 /**
+ * «הישר [העובר] דרך P המאונך ל-AB», «הישר המקביל ל-AB דרך P», "the line through P perpendicular to AB" as an operand
+ * (#1772, ADR-AG-417): the subject-first orders of the through-rule, whose patterns are the only reader of these words.
+ * «דרך P עובר ישר …» opens with its point, so it is a sentence, never an operand.
+ */
+const isDescribedLine = (operand: string): boolean =>
+  [THROUGH_LINE_FIRST_HE, THROUGH_LAST_HE, THROUGH_EN, THROUGH_LAST_EN].some((re) => re.test(operand));
+
+/**
  * ONE READER FOR A LINE-OBJECT NAMED AS AN OPERAND (#1715, ADR-AG-224).
  *
  * Operator, round sheet T4: *"…not variations of it such as חוצה זוית DCB וחוצה זוית CBA נפגשים בנקודה E or חוצה זוית
@@ -1416,14 +1424,16 @@ const LINE_OBJECT_NOUN = /^(?:ה?(?:חוצה|גובה|תיכון|אנך)(?=[\s-]
  *   triangle);
  * - a cevian named from its apex («הגובה מ-A», `cevian-of`) → on the line through the apex and its foot;
  * - a drawn piece from a point to a derived one («האנך מ-A ל-BC», «הגובה מ-A לצלע BC») → on that piece's line;
- * - a line through a point («האנך האמצעי ל-AB», `line-at`) → on that line.
+ * - a line through a point («האנך האמצעי ל-AB», `line-at`) → on that line;
+ * - a line DESCRIBED by a point and a relation («הישר דרך P המאונך ל-AB», #1772, ADR-AG-417), which has no noun of its
+ *   own, so the gate is the through-rule's own patterns ({@link isDescribedLine}) → on that line, the same `line-at`.
  *
  * Anything else the sentence reader built is not a line-object (`null`, and the caller's other readers go on). A
  * cevian named only by its side («הגובה לצלע BC») has no apex until M1 finds it, so it is not read here — 2-D does
  * not read it in these frames either.
  */
 function lineObjectOperand(operand: string, id: Id): ObjectOperand | 'bad' | null {
-  if (!LINE_OBJECT_NOUN.test(operand)) return null;
+  if (!LINE_OBJECT_NOUN.test(operand) && !isDescribedLine(operand)) return null;
   const r = parseClause(operand);
   if (!r.ok) return r.code === 'not-handled' ? null : 'bad';
   const facts = r.facts.map((f) => ({ ...f, src: '' })) as Fact[];
@@ -8428,7 +8438,10 @@ function parseConstraint(raw: string): RuleOutcome {
    * A relation is recognisable from its verb, which no other rule uses, so matching it early costs
    * nothing and removes the ambiguity entirely.
    */
-  const rel = RELATION_HE.exec(line) ?? RELATION_EN.exec(line) ?? RELATION_SYM.exec(line);
+  // #1772 (ADR-AG-417): nor does a relation own «C על הישר דרך P מאונך ל-AB»: its word belongs to the line the point is on.
+  const carrier = ON_OBJECT_HE.exec(line) ?? ON_OBJECT_EN.exec(line);
+  const onDescribedLine = !!carrier && isDescribedLine(`${carrier[2] ?? ''} ${trim(carrier[3])}`.trim());
+  const rel = onDescribedLine ? null : (RELATION_HE.exec(line) ?? RELATION_EN.exec(line) ?? RELATION_SYM.exec(line));
   if (rel) {
     const [, left, word, right] = rel;
     // A role noun's claim is stated beside the relation (#1651, ADR-AG-200): «המיתר BC ∥ ציר ה-x» is also «B, C על המעגל».
@@ -8438,7 +8451,8 @@ function parseConstraint(raw: string): RuleOutcome {
     const v = direction(right, claims, EQ_LINES);
     // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
     // rather than a fall-through to "I did not understand you" (ADR-AG-017).
-    if (!u || !v) return refuse('bad-operand', line);
+    // #1772 (ADR-AG-417): the relation word may belong to a crossing's operand, «C נקודת החיתוך של הישר דרך P מאונך ל-AB עם …».
+    if (!u || !v) return parseIntersection(line) ?? refuse('bad-operand', line);
     const parallel = new RegExp(`^(?:מקביל|parallel|${REL_PARALLEL_SYM})`, 'i').test(word);
     // Each operand that names a PAIR is drawn, by its own noun (#1639) — after the relation, which refers to them.
     const drawn = ([[left, u], [right, v]] as const).flatMap(([text, d]) =>
@@ -10452,10 +10466,12 @@ function parseClauseRules(raw: string): ParseResult {
     // the student wrote perfectly — the swallowing defect #1059 records, and the relation rule's own
     // docblock gives the cure: a construction recognisable from a keyword no other rule uses costs
     // nothing to match early and removes the ambiguity entirely.
+    // `meetFrame` BEFORE `parseThroughLine` (#1772, ADR-AG-417): a subject that opens with a described line reads as that
+    // line, and the rule would take everything after «ל-» as its direction and refuse it.
     // `meetFrame` BEFORE `parsePerpendicular` (#1715): «האנך מ-A ל-BC וחוצה זוית C נפגשים בנקודה E» starts like a
     // perpendicular, whose rule would take everything after «ל-» as its line and refuse it. The frame answers `null`
     // for a subject it cannot split into two operands, so a sentence that is a perpendicular is untouched.
-    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseRoleLength(line) ?? parseShapeHeight(line) ?? parseDistanceCoordinate(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? meetFrame(line) ?? parseThroughLine(line) ?? parsePerpendicular(line) ?? parseRoleLength(line) ?? parseShapeHeight(line) ?? parseDistanceCoordinate(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried

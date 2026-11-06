@@ -849,6 +849,7 @@ A cevian MINTS a point whose definition differs per option of the isosceles `cho
 The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.ts`, `footOn`, `curveParentsOf`).
 `parsePerpendicular` and `perpendicularFacts` build it (placeholders `@mint:foot(…)`, `@mint:mid(…)`, renamed via
 `namingCandidates`); «האנך» as an operand is `perpendicularRef` → `on-kind` (or `noHost(…, 'perpendicular', n)`);
+a line described by a point and a relation is `lineObjectOperand` behind `isDescribedLine`, the through-rule's own patterns ([ADR-AG-417](06c-decisions-analytic.md#adr-ag-417), #1772);
 `THROUGH_CUT_HE` / `_EN` build a `drawn: false` line that cuts a side.
 
 *Identifiers:* `curveAt` · `FootLine` · `evalRule` · `from` · `parseThroughLine` · `footLineOf` · `P₁…` · `seg-` · `{ t: 'kind', kind: 'perpendicular', foot?: { from, onto? } }` · `on-line-2pt(id, from, foot)` · `errHost.{none,many}.perpendicular` · `THROUGH_LINE_FIRST_HE` · `parseIntersectionPlain` · `on-curve(F, line)` · `incidenceOn(target)` · `PIECE_SUBJECT` · `PIECE_VERB`

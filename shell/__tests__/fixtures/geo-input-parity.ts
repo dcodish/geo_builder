@@ -1923,6 +1923,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
+  // ── #1772 (ADR-AG-417): a line described by a point and a relation, as an operand ──
+  ...[
+    'E נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר CD',
+    'הישר CD חותך את הישר דרך P המאונך ל-AB בנקודה E',
+    'הישר דרך P המאונך ל-AB והישר CD נפגשים בנקודה E',
+    'E על הישר דרך P המאונך ל-AB',
+  ].map((line, i): ParityRow => ({ id: `described-line-operand-1772-0${i + 1}`, family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'P על AB', line], expect: 'not-handled', knownGap: [{ product: 'analytic' }], note: '2-D and 3-D hand it to the model; analytic reads it (#1772, the plan armed 2026-10-05)' })),
   // ── #1775 (ADR-792 / ADR-AG-416): the exam's construction frames, with their operands' nouns. 2-D's verdict → teach is #1358 ──
   ...[
     'דרך הנקודה P מעבירים אנך לישר AB',

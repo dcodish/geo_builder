@@ -371,7 +371,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - **⚠ Superseded by R85 (ADR-AG-185):** the last sentence only — «…בנקודות A ו-B» was ruled (#1512, option a) and is built: the sentence names both crossings, assigned as R85 says.
 - «הישר CD עובר דרך P», «הצלע BC נמצאת על הישר y=x-4», «הנקודה (-3,7)»
 - «AC ו-BD נפגשים בנקודה M» → lines and M; «M מפגש AC ו-BD» → M alone
-- Sources: ADR-AG-164, #1281, #1495, ADR-AG-168, #1429, ADR-AG-230, #1609, #1512, ADR-AG-241, #1751, ADR-592.
+- A line described by a point and a relation is an operand wherever a line is one: «C היא נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר y=7», «הישר y=7 חותך את הישר דרך P המאונך ל-AB בנקודה C», «C על הישר דרך P המאונך ל-AB» (ADR-AG-417, #1772)
+- Sources: ADR-AG-164, #1281, #1495, ADR-AG-168, #1429, ADR-AG-230, #1609, #1512, ADR-AG-241, #1751, ADR-592, ADR-AG-417.
 
 **R167 — two lines of any kind meet at a named point**. Bisectors, altitudes, medians, perpendiculars, tangents and named lines; parallel or repeated lines are refused.
 - «<line> ו<line> נפגשים בנקודה E», with «חוצה זוית B», «הגובה מ-A», «האנך האמצעי לצלע AB» as lines
