@@ -19,12 +19,25 @@ import type { SegmentEquationReading3 } from '../engine/types';
 // isolation transform. `i18n/bidi` imports NOTHING — it is a leaf — so this edge runs downward, the
 // direction `render` already depends in. The reverse (bidi importing render) would invert it.
 
+/**
+ * #2684 (ADR-3D-421 Am. 1) — A SENTENCE WITH A «כך ש-» CLAUSE IS PROSE UP TO THE CLAUSE. «E על AC' כך ש-AE = t·p» says E is
+ * on the SEGMENT AC', and only what follows «כך ש» is a vector statement: an arrow on AC' would assert what the student
+ * never said, and the clause's hyphen is the Hebrew joiner, not an operator. Returns the prose head (the joiner in it)
+ * and the clause; a row with no such clause is all clause. The one reader, for the notation and the tokenizer.
+ */
+export function splitVectorClause3(row: string): { head: string; clause: string } {
+  const m = row.match(/^.*?(?:כך\s*ש|such\s+that)[\s\-־:]*/i);
+  return m ? { head: m[0], clause: row.slice(m[0].length) } : { head: '', clause: row };
+}
+
 /** Command types whose rows read as vector statements (the word וקטור is decoration). */
 export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
 
 /** Apply textbook vector notation to a vector-statement utterance: pair arrows + name underlines. */
 export function vectorNotation(utterance: string, vecNames: Set<string>): string {
-  let u = utterance.replace(new RegExp(String.raw`(?:^|(?<=[\s,:]))${VECTOR_WORD_SRC}\s+`, 'gi'), '');
+  const stripped = utterance.replace(new RegExp(String.raw`(?:^|(?<=[\s,:]))${VECTOR_WORD_SRC}\s+`, 'gi'), '');
+  const { head, clause } = splitVectorClause3(stripped);
+  let u = clause;
   /**
    * #1194 — A SPACING ARROW BECOMES THE COMBINING ONE. It does not survive beside it.
    *
@@ -53,7 +66,7 @@ export function vectorNotation(utterance: string, vecNames: Set<string>): string
     // «(1-t)u»), no letter/digit after («u/6», «v-», end-of-line fine; «u6»/«uv» stay unstyled).
     u = u.replace(new RegExp('(?<![A-Za-z֐-׿])(' + names + ')(?![A-Za-z\\d֐-׿])', 'g'), '$1̲');
   }
-  return u;
+  return head + u;
 }
 
 /** Is this fact a VECTOR statement? (#313: the MathML layer applies only where this is true —
