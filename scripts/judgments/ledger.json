@@ -1948,7 +1948,11 @@
       "confidence": "high",
       "limits": "Does not decide the later line's text or offer (session's, ADR-W-174), saved figures, or the free-radius case, which goes in the Heads-up with a play case.",
       "at": "2026-11-05T21:48:35.994Z",
-      "status": "pending"
+      "status": "overruled",
+      "overrule": {
+        "note": "its not right to refuse. this shape is possible (T5, 2026-11-06: a free radius can hold the stated side; refusal stays only where nothing the student wrote can save it)",
+        "at": "2026-11-06T06:32:50.694Z"
+      }
     },
     {
       "id": "q2",
@@ -2517,6 +2521,7 @@
     }
   ],
   "demoted": {
-    "new-name-on-forced-coincident-point": 0
+    "new-name-on-forced-coincident-point": 0,
+    "later-line-breaks-stated-extension-side": 0
   }
 }
