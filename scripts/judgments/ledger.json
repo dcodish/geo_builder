@@ -2528,6 +2528,507 @@
       "chosen": true,
       "at": "2026-11-06T13:01:48.453Z",
       "status": "pending"
+    },
+    {
+      "id": "r2727-q1",
+      "question": "3-D, over drawn points: «מרובע ABCD» · «AC = 2BD». Today the tool asks \"length or vector?\". Options: (a) keep asking; (b) read it as a length relation without asking; (c) ask, then draw on answer.",
+      "class": "length-or-vector-reading",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "A segment equation is asked about only when both readings can be true. As vectors, «AC = 2BD» makes the diagonals parallel, which forces the ring ABCD to cross, and a crossed ring is not a valid quadrilateral. So only the length reading can be true: it builds as lengths with no question, shows «|AC| = 2|BD|» and draws both segments.",
+      "precedents": [
+        {
+          "quote": "in general, if something is not sure if its a vecotor or length, we should ask if both can be true and if only one can be true, we will assume this is the case",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1680#issuecomment-6517299760"
+        },
+        {
+          "quote": "since AB=AC cannot be vectors for a quad pyramid to hold, we must assume these are length and write them as such",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/pull/2605#issuecomment-6533621923"
+        },
+        {
+          "quote": "a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration, in every builder, with analytic's `errRingContradictsNoun`. Never green, never a raw error.",
+          "date": "2026-10-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6062317713"
+        },
+        {
+          "quote": "Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "The tool's vector trial is green only because it accepts a crossed ring. Measured at c0029d25: marked «AC⃗ = 2BD⃗» builds a crossed ABCD with no complaint. This ruling does not decide what that marked line should do. The same rule reaches «AC = BD». «AB = CD» is named in the older 2026-10-04 'ask too' ruling, so if the session moves it, that is a Heads-up under sr-10. «AB = DC» (a parallelogram, both readings hold) keeps asking. The 2026-10-30 ruling is general but does not name a crossed ring; that step comes from the #1927 rulings, hence medium.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q2",
+      "question": "2-D: «AC = BD/2», «2AC = 3BD», «AC = 2BD + 1» go to the AI model; analytic builds them deterministically. Options: (a) leave; (b) 2-D builds them deterministically.",
+      "class": "known-construct-other-wording",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A wording of a construct the tool reads is built only when it is a textbook form or seen in the prod logs. None of these three was found in the exam fixtures or the local logs, so 2-D leaves them to the fallback.",
+      "precedents": [
+        {
+          "quote": "there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "I would go with the recommendation you have option A",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The search covered logs/*.jsonl (to 2026-11-04) and the fixtures only. If a textbook or a prod line turns up, ADR-W-174 item 3 makes it a P3 read with no card. Likewise if the fallback is measured to fail on these (oracle only, rule 2), it rises above P3. The analytic difference stays a known one.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q3",
+      "question": "3-D relations panel lists «|AC| = |BD|» but not a ratio («|AC| = 2|BD|», «AC:BD = 2:1»). Options: (a) leave; (b) a ratio gets a relations row.",
+      "class": "relations-panel-ratio-row",
+      "verdict": "escalate",
+      "reason": "No precedent (reserved rule 4). His words cover a relation's place in the givens list and its ink, not whether a ratio gets a row in the 3-D data panel's relations section. That section's equality row comes from an equal-magnitude class in dataView (ADR-3D-014 lineage). 2-D's relations layer is 'equal sides & angles', so it gives no ratio reference either. A new row kind is also a scope question (rule 3).",
+      "nearest": [
+        {
+          "quote": "B2 — The honesty invariant names values. Every stated value is on the figure: a length, an angle, an area, a letter, the right-angle knee. A stated relation (AB = AC, ∥) is in the givens list. It is drawn only in an opt-in relations layer, never as a mark at rest, in every tool.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        },
+        {
+          "quote": "3 A - in all tools",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1848#issuecomment-6517487267"
+        }
+      ],
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2727-q4",
+      "question": "2-D: «משולש ABC» · «M על AC» · «MK ∥ AB» is refused «cannot place M on segment AC so that MK ∥ AB», though K alone can carry the relation. Options: (a) keep refusing; (b) build the relation with K free.",
+      "class": "refusal-a-free-letter-can-save",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "A line is refused only when nothing the student wrote can save it. K is a letter in the sentence that can carry «MK ∥ AB», so the figure is drawn, not refused.",
+      "precedents": [
+        {
+          "quote": "Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        },
+        {
+          "quote": "its not right to refuse. this shape is possible",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2518#issuecomment-6678779949"
+        },
+        {
+          "quote": "We should assume anything about this cases. If user want the point to be on a, they will need to say so. This is true to all tools.",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2231#issuecomment-6684074141"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "General rule from consistent rulings of one kind (a figure a free letter can hold, refused): the crossed-ring family and a stated extension side. None of the three names ∥, and the 2026-11-06 ruling speaks of the ⟂ sentence. No contrary ruling was found. This does not decide the mechanism, or any case where no free letter can carry the relation; those stay refused.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q5",
+      "question": "2-D: same figure with «MK מאונך ל-AB», «MK ⊥ AB», «נקודה K · MK אנך ל-AB» and «ריבוע ABCD · G על AD · GK אנך ל-AB» were refused the same way. Options: (a) keep refusing; (b) build the relation with K free, off AB.",
+      "class": "perp-relation-assumes-no-foot",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "«MK אנך ל-AB» assumes nothing about K, in every tool. It is the relation, with K not placed on AB unless the sentence says so, and a refusal that K could carry is not kept.",
+      "precedents": [
+        {
+          "quote": "this is something I need to revert. We should assume anything about this cases. If user want the point to be on a, they will need to say so. This is true to all tools.",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2231#issuecomment-6684074141"
+        },
+        {
+          "quote": "Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The ruling comment reads his 'assume' as 'should NOT assume'. This does not cover ∥ (q4). It does not cover a sentence with no free end to hold the relation, where the refusal stands. «MK אנך ל-AB בנקודה K» keeps the foot.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q6",
+      "question": "3-D does not read «MK אנך ל-AB בנקודה K» (2-D and analytic read it as K being the foot). Options: (a) leave to the model; (b) 3-D reads the clause.",
+      "class": "2d-fix-port-to-3d",
+      "verdict": "ruled",
+      "choice": "other",
+      "ruling": "Porting a 2-D input fix to 3-D is the session's judgement, by how simple it is. If the session finds the clause simple, 3-D reads it (b). If not, the parity row stays a known gap and the sentence stays with the model (a). Either way, a student who says K is the foot must get K on AB, or an honest refusal.",
+      "precedents": [
+        {
+          "quote": "yes - and we need you to have some judgement as to the 3d tool. we dont need a full 2d case for the 3d tool but there will be cases where the issue is so simple that we should let 3d support it.",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-157"
+        },
+        {
+          "quote": "If user want the point to be on a, they will need to say so. This is true to all tools.",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2231#issuecomment-6684074141"
+        }
+      ],
+      "confidence": "high",
+      "limits": "This does not judge how simple the port is. It does not reopen the bare «MK אנך ל-AB», which stays the relation in 3-D. It does not decide the clause on solids beyond the sentence as written.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q7",
+      "question": "Analytic: a point fully determined by the givens (circle, on the y-axis, above the x-axis) is labelled on the canvas «C(0, y_C)» while the data panel says C = (0, 10). Options: (a) leave; (b) the canvas shows the value; (c) the canvas shows only the letter.",
+      "class": "canvas-question-panel-answer",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "The canvas shows what the point's own givens pin, so a point on the y-axis reads «C(0, y_C)» even when the figure determines it. The solved value stays in the data panel.",
+      "precedents": [
+        {
+          "quote": "for B, we should show `B(x_B, 0)`",
+          "date": "2026-09-15",
+          "link": "https://github.com/dcodish/geo_builder/issues/1032#issuecomment-5679063650"
+        },
+        {
+          "quote": "Anything that is derived from the figure should stay in the data panel",
+          "date": "2026-09-15",
+          "link": "https://github.com/dcodish/geo_builder/issues/1032#issuecomment-5679063650"
+        },
+        {
+          "quote": "if the value of the parameter is computable, but user did not enter it, the canvas always shows the parameter and data panel can show the computed values.",
+          "date": "2026-09-08",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-047"
+        }
+      ],
+      "confidence": "high",
+      "limits": "ADR-AG-016 records this exact disagreement as the feature (B(x_B, 0) on the canvas, B(2, 0) in the panel). The recorded exceptions (a circle's centre, a parabola's and ellipse's foci and directrix) do not reach an ordinary point.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q8",
+      "question": "3-D: «מישור π 2x+y=1» reads as plane π2: x+y=1, losing the 2x. Options: (a) read π: 2x+y=1; (b) refuse; (c) leave.",
+      "class": "plane-name-index-vs-coefficient",
+      "verdict": "escalate",
+      "reason": "No precedent chooses between (a) and (b) (reserved rule 4). Measured at c0029d25: name π2, equation x+y=1. The honesty invariant excludes (c), because a stated 2x vanishes. It allows both parsing and refusing, so it does not decide. His rule that the book's form fixes a reading does not settle it either: he spoke of a line head («ישר l x=…»), never of a digit after π. No ruling covers a space before the plane's index. The narrow question for him: read «π 2x» as π with coefficient 2, or refuse.",
+      "nearest": [
+        {
+          "quote": "Where the book or an earlier ruling fixes a reading, the tool takes it and shows the form it read. … Where nothing fixes it, the tool asks, and teaches how to write each reading. It never guesses silently.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "ישר l x=(-1,5,-11)+t(m-1,5-m,-2)",
+          "date": "2026-08-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/640"
+        }
+      ],
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2727-q9",
+      "question": "3-D: «מישור π - x+y+z=1» used to build −x+y+z=1; a dash after the name is now a separator, giving x+y+z=1. Options: (a) separator; (b) minus sign; (c) refuse as ambiguous.",
+      "class": "plane-name-dash-separator",
+      "verdict": "escalate",
+      "reason": "No operator words decide it (reserved rule 4). The rule 'a spaced dash after a NAME is a separator; a glued minus is the student's sign' is ADR-3D-160's (#640), written by a session with no quote of his. Only-his-words-count excludes it as precedent. His own prod line uses a spaced dash after a name, but that is usage, not a ruling on the sign. Round #2727 has already built (a) on the round branch, tagged [ruled], so the student-visible change in ADR-3D-429 needs his word. Choosing (b) or (c) would reverse ADR-3D-160 for named planes such as π1. sr-16's 'never guesses silently' points toward asking only if nothing fixes the reading, and whether ADR-3D-160 counts is his call.",
+      "nearest": [
+        {
+          "quote": "ישר l - x=(1,2,3)+t(m-2,m, m+2)",
+          "date": "2026-08-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/482"
+        },
+        {
+          "quote": "מישור π1 - x+(m-2)y+(m-1)z-5",
+          "date": "2026-08-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/482"
+        },
+        {
+          "quote": "Where nothing fixes it, the tool asks, and teaches how to write each reading. It never guesses silently.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2727-q10",
+      "question": "3-D: «משוואת π היא …» and «משוואת ABC היא …» (no noun «מישור») go to the model. Options: (a) leave; (b) read them.",
+      "class": "known-construct-other-wording",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A wording of a construct the tool reads is built only when it is a textbook form or seen in the prod logs. These noun-less spellings were found in neither, so they stay with the fallback.",
+      "precedents": [
+        {
+          "quote": "there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "I would go with the recommendation you have option A",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The search covered the local 3-D logs, the 3-D tests and the sample-questions folder. A textbook or prod hit makes «משוואת π היא …» a P3 read. «משוואת ABC היא …» would still need a check that it has no second meaning; a wording with one goes to him.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q11",
+      "question": "3-D: the status line says «✓ הציור נקבע במלואו על ידי הנתונים» on a bare cube, which still has free degrees of freedom. Options: (a) leave; (b) change it.",
+      "class": "fully-determined-status",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "«✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every tool, so a bare cube with free degrees of freedom must not show it.",
+      "precedents": [
+        {
+          "quote": "B8 — «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every tool (#1596, raised to P2).",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        },
+        {
+          "quote": "Ruling: yes, all tools, with one shared sentence.",
+          "date": "2026-10-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/1596#issuecomment-5978363250"
+        }
+      ],
+      "confidence": "high",
+      "limits": "02w FR-SU-1 already carries the ⚠ Ruled to change stamp, so this is not a reversal. This does not decide how 3-D counts its degrees of freedom or configurations; #1596's rule is that N is counted, never estimated. The status wording is the shared set of 2026-09-27.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q12",
+      "question": "Analytic paste line: «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2» is not read, though each half alone is. Options: (a) leave; (b) read it.",
+      "class": "known-construct-other-wording",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "A construct the tool already reads, in another wording that means exactly the same, is read when it is a textbook form or seen in the prod logs. This line is a bagrut paste from the prod log (#1775), so it is read, at P3 with no card.",
+      "precedents": [
+        {
+          "quote": "I would go with the recommendation you have option A",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "A construct the tool already reads, in another wording, is read (sr-06 A).",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "Not every variant is worth building. The ones worth building are textbook forms and forms seen in the prod logs.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "This covers the sentence as the two halves it reads, stating nothing more than they state. It does not say whether other 'X and Y' joins are read. Its priority stays P3 unless the fallback is measured to fail on it.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q13",
+      "question": "Analytic: lowercase «c(4,7)» as a point with coordinates is not read. Options: (a) leave refused; (b) read it as point C; (c) teach it.",
+      "class": "non-canonical-input-taught",
+      "verdict": "ruled",
+      "choice": "c",
+      "ruling": "Non-canonical input is never silently accepted. A label in a case the product does not use is taught as the exact canonical sentence, pre-filled for the student to press Enter, so «c(4,7)» teaches «C(4,7)».",
+      "precedents": [
+        {
+          "quote": "when a user enters a command like add a line, draw a shape, we need to tell him to add the input as a textbook would — so we need to guide them so they learn. I don't want the tool to support the wrong text input because it teaches them wrong",
+          "date": "2026-08-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-030"
+        },
+        {
+          "quote": "Teach it",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/1774#issuecomment-6683952474"
+        }
+      ],
+      "confidence": "high",
+      "limits": "ADR-W-030 lists a label in the other case as a member of the class. It applies only where the rewrite is certain and the next Enter accepts it. A lowercase letter that already means a parameter or line in the figure is not decided here. The note's text is the session's (ADR-W-174).",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q14",
+      "question": "Analytic: «l1 עובר דרך P ו- l1⊥AB» stays refused. Options: (a) leave; (b) read it.",
+      "class": "known-construct-other-wording",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A wording of a construct the tool reads is built only when it is a textbook form or seen in the prod logs. This two-clause spelling is in neither; the logs hold its two clauses as separate lines, which do read. So it stays as it is.",
+      "precedents": [
+        {
+          "quote": "Not every variant is worth building. The ones worth building are textbook forms and forms seen in the prod logs.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The local prod log ends 2026-10-25. A later prod or textbook hit makes it a P3 read.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q15",
+      "question": "2-D: bare «האנך» after a drawn perpendicular goes to the model; analytic reads it as the figure's one perpendicular line (and with two perpendiculars refuses, counting them). Options: (a) leave 2-D; (b) 2-D reads it too.",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "A definite noun binds the drawn object of its kind in every builder, so with one perpendicular drawn, «האנך» in 2-D binds to it.",
+      "precedents": [
+        {
+          "quote": "sr-12, A: a definite noun binds the drawn object of its kind. This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "sr-05, A: a ruling applies to every builder by default.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "sr-12 says that with two perpendiculars the tool ASKS which, so 2-D should not copy analytic's counted refusal without a ruling, and analytic's refusal differs from sr-12 (see q16). With no perpendicular drawn, sr-12 says the object is created, but «האנך» with nothing to drop from may not define one; that case is not decided here.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q16",
+      "question": "Analytic: bare «האנך» naming the figure's one perpendicular line, e.g. after «הישר העובר דרך P מאונך ל-AB» then «האנך חותך את הישר y = 7 בנקודה C». Options: (a) read it; (b) refuse it.",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "With one perpendicular line drawn, the definite noun «האנך» binds to it.",
+      "precedents": [
+        {
+          "quote": "sr-12, A: a definite noun binds the drawn object of its kind. This covers «המעגל», «the circle», «הוא/היא» and a role word. With one such object, the noun binds to it.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "This covers the one-object case only. ADR-AG-416 refuses with a count when two perpendiculars are drawn, while sr-12 says the tool asks which with the existing question. That difference needs a plan line or a ruling; it is not settled here.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q17",
+      "question": "Analytic: «|AC| = 2|BD|» and «|AC| = |BD|» over a quadrilateral. Options: (a) draw both segments; (b) draw nothing, since bars mean a distance.",
+      "class": "stated-length-relation-ink",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A stated relation between two lengths draws both segments, ratios included, in every tool, so bars around both sides of such a relation draw AC and BD in analytic.",
+      "precedents": [
+        {
+          "quote": "3 A - in all tools",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1848#issuecomment-6517487267"
+        },
+        {
+          "quote": "AC is drawn but BD is not so we need some logic and consistency. if we draw AC there is no reason not to draw DB",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/issues/1848"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The ruling comment names «|AC| = 2|BD|»; it supersedes the older #1652 reading for a relation between two lengths. A value in bars («|OC| = 5») and the worded distance spellings are not decided here.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q18",
+      "question": "2-D: spellings «AC/BD = 2» and «AC פי 2 מ-BD» of a length relation. Options: (a) draw both segments as «AC = 2BD» does; (b) draw nothing.",
+      "class": "stated-length-relation-ink",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A stated relation between two lengths draws both segments, ratios included, in every tool, whatever its spelling.",
+      "precedents": [
+        {
+          "quote": "3 A - in all tools",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1848#issuecomment-6517487267"
+        }
+      ],
+      "confidence": "high",
+      "limits": "This covers what the sentence names only, with no mark at rest (B2). A relation the tool lowers for itself, and a shape's own condition, draw nothing (#1844).",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q19",
+      "question": "3-D, data panel «נתונים שנתתם»: a declared name (u after «נסמן: AB = u») gains the underline it has on the rows, and a typed «1/2» there renders as a stacked fraction instead of flat. Options: (a) keep as on the rows; (b) keep the panel plain.",
+      "class": "math-notation-across-surfaces",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A declared vector name is underlined wherever a vector is written, and a typed fraction is shown stacked as on the rows, so the panel's stated rows keep the rows' notation.",
+      "precedents": [
+        {
+          "quote": "point pairs get the combining arrow (SE⃗ = 3/4 SD⃗), declared vector names get the textbook underline (u̲)",
+          "date": "2026-07-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-195"
+        },
+        {
+          "quote": "in FE=u/6-v/6 the u is not underlined like a vector should be",
+          "date": "2026-07-25",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-073"
+        },
+        {
+          "quote": "the x of point P is not shown correctly. the y of point P is the right presentation",
+          "date": "2026-09-18",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-060"
+        },
+        {
+          "quote": "sr-05, A: a ruling applies to every builder by default.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "A general rule from consistent notation rulings, none naming this panel. The stacked-fraction ruling was given on an analytic row (y of P stacked, x flat), and reaches 3-D through sr-05. A stacked 1/2 still keeps the student's fraction, as 'keep the format of entry' asks. The panel's other sections are not decided.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2727-q20",
+      "question": "3-D: other claims that pin the figure («AB = 3» on a free cube) lead with ✓ «verified» on the row, though the line moved the figure. Options: (a) leave; (b) lead with ● as a stated plane equation that moved the figure now does.",
+      "class": "given-row-lead",
+      "verdict": "ruled",
+      "choice": "b",
+      "ruling": "A statement the givens do not already decide is a given that shapes the figure, and no ✓ «verified» ever appears on a given. So any claim row that moved the figure leads with ●, not only a plane equation.",
+      "precedents": [
+        {
+          "quote": "sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure. «הוכיחו» is refused in every builder. No ✓ \"verified\" ever appears on a given.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "When the plane equation moved the figure (it pinned), the row is a given and shows ● like every other given.",
+          "date": "2026-09-29",
+          "link": "https://github.com/dcodish/geo_builder/issues/1542#issuecomment-5889529378"
+        }
+      ],
+      "confidence": "high",
+      "limits": "sr-19 is later than FR-CL-1's 'verified' row and orders this. Whether a statement the figure already holds shows a row at all is #2341's ruling of 2026-11-06 (no row, «כבר קיים»), still owed a fix plan. The fold cost per row is the session's mechanism.",
+      "at": "2026-11-06T14:04:12.613Z",
+      "status": "pending"
     }
   ],
   "demoted": {
