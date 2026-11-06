@@ -24,7 +24,7 @@ import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type Elli
 import { namesCurveFeature, sameDerivation } from './sameDerivation';
 import { freeToolLetter, isHelperId, typedLetters } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { EN_SHAPE, displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
+import { EN_SHAPE, axisOf, displacedAssumption, isGenericNoun, membersOf, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { probeEnvs } from './probes';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
@@ -2389,7 +2389,7 @@ function freeLineNames(c: Construction, n: number): string[] {
  * read it. Allocated in fold order, so undo, the seed and «הציגו תצורה אחרת» never renumber a line.
  */
 function toolNamed(c: Construction, o: CurveObject): CurveObject {
-  if (!o.stated || o.label.name !== '' || curveKindOf(o) !== 'line') return o;
+  if (!o.stated || o.label.name !== '' || o.label.role || curveKindOf(o) !== 'line') return o;
   return { ...o, label: { ...o.label, name: freeLineNames(c, 1)[0], auto: true } };
 }
 
@@ -2509,7 +2509,8 @@ function applyHeightOf(c: Construction, f: Extract<Fact, { t: 'height-of' }>): A
  *   with the drawn apex (ADR-052 — an unstated choice is a degree of freedom, never refused, never a fixed pick);
  * - a trapezoid's two bases (or legs), or an isosceles triangle's two legs once its apex is settled → a new choice
  *   between them, the trapezoid's pair stated by the role's own claim (#1159).
- * The sentence's line is drawn once, anonymous: in an open figure no pair of letters names it.
+ * The sentence's line is drawn once, anonymous: in an open figure no pair of letters names it. It carries the role
+ * (`label.role`, #2057, ADR-AG-406), which is what the data panel names its row by.
  */
 function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): ApplyOutcome {
   const [s1, s2] = ROLE_SIDE_SENTINELS;
@@ -2521,14 +2522,6 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     const rest = ring.filter((_, k) => k !== i);
     return [rest[0], rest[1]];
   };
-  /** The noun's choice (or what is left of it) over `keys` — the seat holding it, else the keys stated outright. */
-  const seatOver = (keys: readonly Constraint[]): { seat: number; opts: Array<{ with: Constraint; i: number }> } | { fixed: number[] } => {
-    const idxOf = (o: Constraint): number => keys.findIndex((k) => sameConstraint(o, k) || (o.t === 'all' && o.of.some((x) => sameConstraint(x, k))));
-    const seat = c.constraints.findIndex((k) => k.t === 'choice' && k.options.length > 0 && k.options.every((o) => idxOf(o) >= 0));
-    const held = seat >= 0 ? c.constraints[seat] : undefined;
-    if (held && held.t === 'choice') return { seat, opts: held.options.map((o) => ({ with: o, i: idxOf(o) })) };
-    return { fixed: keys.flatMap((k, i) => (c.constraints.some((x) => x.t !== 'choice' && sameConstraint(x, k)) ? [i] : [])) };
-  };
   const readingOf = (o: PolygonObject): Reading | null => {
     const ring = o.vertices;
     const noun = o.noun ? normalizeShapeNoun(o.noun) : '';
@@ -2539,7 +2532,7 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
       else return null;
       const sidesAt = (i: number): Array<[Id, Id]> =>
         f.role === 'leg' ? sideOf(ring, i).map((x): [Id, Id] => [ring[i], x]) : [sideOf(ring, i)];
-      const s = seatOver(keys);
+      const s = seatOver(c, keys);
       if ('seat' in s) return { poly: o, seat: s.seat, options: s.opts.flatMap(({ with: w, i }) => sidesAt(i).map((side) => ({ side, with: w }))) };
       if (s.fixed.length === 0) return null;
       return { poly: o, options: s.fixed.flatMap((i) => sidesAt(i).map((side) => ({ side }))) };
@@ -2579,7 +2572,7 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     if (g.t === 'curve') {
       const id = `curve-${f.role}-${anonOf(g.curve)}`;
       renamed.set(g.id, id);
-      once.push({ ...g, id, label: { name: '', ...(g.label.kind ? { kind: g.label.kind } : {}) } });
+      once.push({ ...g, id, label: { name: '', ...(g.label.kind ? { kind: g.label.kind } : {}), role: f.role } });
       continue;
     }
     // The ring's own vertices and sides are already drawn; the role's claim is each option's, except a trapezoid's
@@ -2597,22 +2590,120 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     for (const [from, to] of renamed) text = text.split(JSON.stringify(from)).join(JSON.stringify(to));
     return JSON.parse(text) as T;
   };
+  const drawn = applyAll(c, once);
+  if (!drawn.ok) return drawn;
+  return attachToOptions(drawn.next, seat, options.map(({ side, with: w }) => ({ with: w, riders: per.map((k) => onSide(rename(k), side)) })), f.src);
+}
+
+/**
+ * THE NOUN'S CHOICE (OR WHAT IS LEFT OF IT) OVER `keys` — the seat holding it, else the keys stated outright. A key may
+ * be one statement or an `all` (a kite's two equal pairs); an option matches when it INCLUDES the key's members, so a
+ * seat a first role sentence rewrote is found by the second (main diagonal, then secondary).
+ */
+function seatOver(c: Construction, keys: readonly Constraint[]): { seat: number; opts: Array<{ with: Constraint; i: number }> } | { fixed: number[] } {
+  const includes = (held: readonly Constraint[], k: Constraint) => membersOf(k).every((m) => held.some((x) => sameConstraint(x, m)));
+  const idxOf = (o: Constraint): number => keys.findIndex((k) => sameConstraint(o, k) || includes(membersOf(o), k));
+  const seat = c.constraints.findIndex((k) => k.t === 'choice' && k.options.length > 0 && k.options.every((o) => idxOf(o) >= 0));
+  const held = seat >= 0 ? c.constraints[seat] : undefined;
+  if (held && held.t === 'choice') return { seat, opts: held.options.map((o) => ({ with: o, i: idxOf(o) })) };
+  const standing = c.constraints.filter((x) => x.t !== 'choice').flatMap(membersOf);
+  return { fixed: keys.flatMap((k, i) => (includes(standing, k) ? [i] : [])) };
+}
+
+/**
+ * A STATEMENT ABOUT A PART NAMED BY ITS ROLE, HUNG ON EVERY OPTION OF THE CHOICE THAT DECIDES IT (#1807 ADR-AG-266, #2006
+ * ADR-AG-406): each option becomes `all(option, its riders)`, in place at `seat`, or a new choice when there is none.
+ * One cycle, so the role's letters can never disagree with the drawn option. Restated, it adds nothing.
+ */
+function attachToOptions(c: Construction, seat: number | undefined, options: ReadonlyArray<{ with?: Constraint; riders: readonly Constraint[] }>, src: string): ApplyOutcome {
+  const own = (w?: Constraint) => (w ? membersOf(w) : []);
+  if (options.every((o) => o.riders.every((r) => own(o.with).some((x) => sameConstraint(x, r))))) return { ok: true, effect: 'known', next: c };
   const choice: Constraint = {
     t: 'choice',
-    options: options.map(({ side, with: w }) => {
-      const of = [...(w ? (w.t === 'all' ? w.of : [w]) : []), ...per.map((k) => onSide(rename(k), side))];
+    options: options.map((o) => {
+      const of = [...own(o.with), ...o.riders];
       return of.length === 1 ? of[0] : { t: 'all', of };
     }),
   };
-  const drawn = applyAll(c, once);
-  if (!drawn.ok) return drawn;
   if (seat === undefined) {
-    const out = applyFact(drawn.next, { t: 'constraint', k: choice, src: f.src });
+    const out = applyFact(c, { t: 'constraint', k: choice, src });
     return out.ok ? { ...out, effect: 'created' } : out;
   }
-  const constraints = [...drawn.next.constraints];
+  const constraints = [...c.constraints];
   constraints[seat] = choice;
-  return { ok: true, effect: 'created', next: { ...drawn.next, constraints } };
+  return { ok: true, effect: 'created', next: { ...c, constraints } };
+}
+
+/**
+ * A STATED PAIR GIVES A DRAWN ROLE LINE ITS LETTERS (#2006, ADR-AG-406; judged 2026-11-05, ruling q15 B): once the collapse
+ * has stood its two vertices on the line, the line carries the name the pair-first order gives it, for what reads a
+ * drawn line's name (the pick menu, its title, a sentence naming AC). The canvas writes no line's name, in either order.
+ * The name rides the label and the id is never rewritten (the rule `toolNamed` keeps), so the riders stay on their own
+ * line. A side's line is not drawn; a figure that already calls that pair of letters a line keeps its own.
+ */
+function lettersOnDrawnRoleLines(c: Construction, members: readonly Constraint[]): Construction {
+  const named = (o: CurveObject): CurveObject => {
+    const ends = members.flatMap((k) => (k.t === 'on-curve' && k.curve === o.id ? [k.id] : []));
+    if (ends.length !== 2) return o;
+    const name = ends.join('');
+    const taken = c.objects.some((x) => x.id === lineIdOf(name) || (x.kind === 'curve' && x.label.name === name));
+    return taken ? o : { ...o, label: { ...o.label, name } };
+  };
+  return { ...c, objects: c.objects.map((o) => (o.kind === 'curve' && o.stated && o.label.role && o.label.name === '' ? named(o) : o)) };
+}
+
+/**
+ * «משוואת האלכסון הראשי היא …» — A KITE'S DIAGONAL NAMED BY ITS ROLE (#1070; #2006, ADR-AG-406).
+ *
+ * Operator ruling A, 2026-10-13: *"the line y=2x is the main diagonal in every drawing; which letters lie on it changes
+ * with the configuration … until the student states the pair (e.g. «AB = AD»), which fixes it"*, and *"The same holds for
+ * «האלכסון המשני»"*. So the role is resolved per option of the kite's pair, never once from the vertex order:
+ * - SETTLED (the pair is stated) → the letters, as its lettered twin «משוואת האלכסון AC היא y=2x»;
+ * - OPEN → one stated line with a role-derived id, never `line-AC`, so «הישר AC» cannot resolve to it in a BD drawing,
+ *   and each option carries its own two vertices on it (`attachToOptions`, the role side's machinery).
+ */
+function applyRoleDiagonal(c: Construction, f: Extract<Fact, { t: 'diagonal-eq' }>): ApplyOutcome {
+  const rings = c.objects.filter((o) => o.kind === 'polygon' && !!o.noun && !!shapeRow(o.noun)?.principalDiagonal) as PolygonObject[];
+  const refused: ApplyOutcome = { ok: false, error: { code: 'undistinguished-diagonal', detail: f.src } };
+  if (rings.length !== 1) return refused;
+  const ring = rings[0];
+  const keys = shapeRow(ring.noun!)!.givens(ring.vertices).flatMap((k) => (k.t === 'choice' ? k.options : []));
+  /** The diagonal this sentence names under one option. The SECONDARY is the two vertices the axis does not join. */
+  const lettersOf = (key: Constraint): [Id, Id] => {
+    const axis = axisOf(key)!;
+    if (f.principal) return axis;
+    const [p, q] = ring.vertices.filter((x) => !axis.includes(x));
+    return [p, q];
+  };
+  const s = seatOver(c, keys);
+  if (!('seat' in s)) {
+    if (s.fixed.length === 0) return refused;
+    const [a, b] = lettersOf(keys[s.fixed[0]]);
+    const id = lineIdOf(`${a}${b}`);
+    return applyAll(c, [
+      // STATED (#1076): the student asked for this diagonal by giving its equation, so it is part
+      // of the figure they are drawing, not a carrier minted to hold something else.
+      { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
+      { t: 'declare', id: a, src: f.src },
+      { t: 'declare', id: b, src: f.src },
+      { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
+      { t: 'constraint', k: { t: 'on-curve', id: b, curve: id }, src: f.src },
+    ]);
+  }
+  const role = f.principal ? 'main-diagonal' : 'secondary-diagonal';
+  const curve: Curve = { kind: 'line', eq: f.eq };
+  const id = `curve-${role}-${anonOf(curve)}`;
+  const drawn = applyFact(c, { t: 'curve', id, label: { name: '', kind: 'line', role, eqSrc: f.eqSrc }, curve, stated: true, src: f.src });
+  if (!drawn.ok) return drawn;
+  // A line the figure already draws with this equation absorbs the mint (M1): the riders then ride that line.
+  const held = drawn.next.objects.find((o): o is CurveObject => o.kind === 'curve' && (o.id === id || identicalCurve(o.curve, curve)));
+  if (!held) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+  return attachToOptions(
+    drawn.next,
+    s.seat,
+    s.opts.map(({ with: w, i }) => ({ with: w, riders: lettersOf(keys[i]).map((p): Constraint => ({ t: 'on-curve', id: p, curve: held.id })) })),
+    f.src,
+  );
 }
 
 /**
@@ -3616,8 +3707,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const open = c.constraints[narrows] as Extract<Constraint, { t: 'choice' }>;
         const kept = open.options.filter(partOf);
         const narrowed = [...c.constraints];
-        narrowed[narrows] = kept.length === 1 ? kept[0] : { t: 'choice', options: kept };
-        return { ok: true, effect: 'narrowed', next: { ...c, constraints: narrowed } };
+        // One option left is the student's statement of all of it: its members stand as plain constraints (#2006, ADR-AG-406).
+        const left: Constraint[] = kept.length === 1 ? membersOf(kept[0]) : [{ t: 'choice', options: kept }];
+        narrowed.splice(narrows, 1, ...left);
+        return { ok: true, effect: 'narrowed', next: lettersOnDrawnRoleLines({ ...c, constraints: narrowed }, kept.length === 1 ? left : []) };
       }
       return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
     }
@@ -3701,26 +3794,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * «משוואת האלכסון AC היא y=2x» would have produced, so ADR-AG-026`s incidences come with it.
      */
     case 'diagonal-eq': {
-      const rings = c.objects.filter(
-        (o) => o.kind === 'polygon' && !!o.noun && !!shapeRow(o.noun)?.principalDiagonal,
-      ) as PolygonObject[];
-      if (rings.length !== 1) {
-        return { ok: false, error: { code: 'undistinguished-diagonal', detail: f.src } };
-      }
-      const ring = rings[0];
-      const [p, q] = shapeRow(ring.noun!)!.principalDiagonal!(ring.vertices);
-      // The SECONDARY diagonal is the other one: the two vertices the principal does not join.
-      const [a, b] = f.principal ? [p, q] : ring.vertices.filter((x) => x !== p && x !== q);
-      const id = lineIdOf(`${a}${b}`);
-      return applyAll(c, [
-        // STATED (#1076): the student asked for this diagonal by giving its equation, so it is part
-        // of the figure they are drawing, not a carrier minted to hold something else.
-        { t: 'curve', id, label: { name: `${a}${b}`, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
-        { t: 'declare', id: a, src: f.src },
-        { t: 'declare', id: b, src: f.src },
-        { t: 'constraint', k: { t: 'on-curve', id: a, curve: id }, src: f.src },
-        { t: 'constraint', k: { t: 'on-curve', id: b, curve: id }, src: f.src },
-      ]);
+      return applyRoleDiagonal(c, f);
     }
 
     /**
@@ -7026,6 +7100,8 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
    * anything about it, so a future resolved reference is attributed with nothing to remember.
    */
   const constraintFact: number[] = [];
+  /** The fact that first said each member of a choice's options (#2006, ADR-AG-406), by identity. */
+  const memberFact = new Map<Constraint, number>();
   // The same attribution for SELECTORS (#1619 B1): a region («מחוץ למעגל») is a selector M1 builds from a
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
@@ -7045,9 +7121,20 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     // is one of the old choice's own options, by identity.
     const narrowedFrom = (old: Constraint | undefined, k: Constraint): boolean =>
       old !== undefined && old.t === 'choice' && k.t === 'choice' && k.options.every((o) => old.options.includes(o));
+    // By IDENTITY, not by slot: a collapse stands its option's members in one seat (#2006, ADR-AG-406), which moves the
+    // constraints after it, and each of those stays on its own line. A member keeps the fact that FIRST said it, not
+    // the choice's latest owner: a role sentence rewrites the noun's seat, and the noun's pair is still the noun's
+    // definition once a stated pair collapses it, in either order of those two lines.
+    const held = [...constraintFact];
+    constraintFact.length = 0;
     c.constraints.forEach((k, at) => {
-      if ((before[at] === k || narrowedFrom(before[at], k)) && constraintFact[at] !== undefined) return;
-      constraintFact[at] = i;
+      const was = before.indexOf(k);
+      const from = was >= 0 ? held[was] : memberFact.has(k) ? memberFact.get(k) : narrowedFrom(before[at], k) ? held[at] : undefined;
+      constraintFact[at] = from ?? i;
+    });
+    c.constraints.forEach((k, at) => {
+      if (k.t !== 'choice') return;
+      for (const o of k.options) for (const m of membersOf(o)) if (!memberFact.has(m)) memberFact.set(m, constraintFact[at]);
     });
     c.selectors.forEach((s, at) => {
       if (beforeSel[at] === s && selectorFact[at] !== undefined) return;

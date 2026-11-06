@@ -40,7 +40,7 @@ import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
 import { nameRetryEvent } from '../shell/llm/retryLostNames';
-import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, slopeRowText, valueText } from './app/panelRows';
+import { curveRowName, detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, sideEquationText, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
@@ -1085,6 +1085,8 @@ export function App() {
      */
     return buildScene(d.figure, zoomed, canvasSize.w, canvasSize.h, {
       curveKnown: (id) => knownCurve(d.construction, id) !== null,
+      // #2057 (ADR-AG-406): the stated side equation, printed as the panel row prints it.
+      sideEquationText: (id) => sideEquationText(d, id),
       /**
        * THE HEIGHTS TO DRAW (#1048) — one per answered point-to-line distance, carried on the answer
        * that produced it so the drawing and the number come from the same measurement.
@@ -1988,7 +1990,7 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: knows.curves.map(({ id, known, pending, options }) => {
+                rows: knows.curves.map(({ id, known, pending, options, letters }) => {
                   const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
@@ -2004,7 +2006,7 @@ export function App() {
                    * `curveParts` prints the equation, which is what tells two anonymous parabolas
                    * apart — and it is the student's own equation, not ours.
                    */
-                  const name = c.label.name;
+                  const name = curveRowName(c, { letters }, t);
                   /**
                    * A curve the givens have not FIXED still has an equation, and the student wrote it
                    * (#1023). Printing a dash threw it away: «נתונה פרבולה שמשוואתה y²=2px» read as `—`

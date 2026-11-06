@@ -167,7 +167,16 @@ export interface CurveLabel {
    * replaces it (operator ruling 2026-10-20, Q3); his own name is never replaced.
    */
   auto?: true;
+  /**
+   * THE ROLE A LINE WAS STATED BY, WHILE NO LETTERS CAN NAME IT (#2006, #2057, [ADR-AG-406](../../docs/06c-decisions-analytic.md#adr-ag-406)) — set at mint
+   * on the one line an open role sentence draws («משוואת הבסיס היא …», «משוואת האלכסון הראשי היא …»). `name` stays '',
+   * so no role phrase becomes a line name (the pick menu, name resolution); the data panel names the row from this.
+   */
+  role?: LineRole;
 }
+
+/** The roles a line can be stated by while the figure's open choice decides its letters. */
+export type LineRole = 'base' | 'leg' | 'hypotenuse' | 'main-diagonal' | 'secondary-diagonal';
 
 // ---------------------------------------------------------------------------
 // Facts — the ordered source of truth
@@ -410,7 +419,7 @@ export type Fact =
    * refused by name for one that does not. Guessing would assert a distinction the question never
    * made.
    */
-  | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
+  | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr; eqSrc: string })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
   /** `hidden` (#1622 E4, ADR-AG-220): the circle a SECTOR is cut from — it carries the arc's ends, and only the arc is drawn. */
   /**

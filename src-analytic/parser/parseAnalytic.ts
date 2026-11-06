@@ -2164,7 +2164,7 @@ function parseDerived(line: string): RuleOutcome {
     const eq = equationExpr(eqSrc);
     if (!eq) return unreadable(trim(eqSrc));
     const principal = /ראשי|main|principal|major/i.test(which);
-    return made([{ t: 'diagonal-eq', principal, eq, src: line }]);
+    return made([{ t: 'diagonal-eq', principal, eq, eqSrc: eqSrc.trim(), src: line }]);
   }
 
   // «אלכסוני המרובע ABCD נפגשים בנקודה O» — the VERB form (#1070). Not a concurrency subject («הישרים

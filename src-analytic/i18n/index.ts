@@ -449,6 +449,12 @@ const he = {
     '«משולש שווה שוקיים ABC» בשביל הבסיס), או ציינו את הצלע באותיות (למשל «תיכון לצלע AB»).',
   roleWordBase: 'בסיס',
   roleWordLeg: 'שוק',
+  // #2006, #2057 (ADR-AG-406): an equation row's name while the role is open, ruled 2026-10-13.
+  roleLineBase: 'הבסיס',
+  roleLineLeg: 'השוק',
+  roleLineHypotenuse: 'היתר',
+  roleLineMainDiagonal: 'האלכסון הראשי',
+  roleLineSecondaryDiagonal: 'האלכסון המשני',
   roleWordHypotenuse: 'יתר',
   errCevianNoRightAngle:
     'במשפט «{{detail}}» אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
@@ -1040,6 +1046,11 @@ const en: typeof he = {
     '«isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
   roleWordBase: 'base',
   roleWordLeg: 'leg',
+  roleLineBase: 'base',
+  roleLineLeg: 'leg',
+  roleLineHypotenuse: 'hypotenuse',
+  roleLineMainDiagonal: 'main diagonal',
+  roleLineSecondaryDiagonal: 'secondary diagonal',
   roleWordHypotenuse: 'hypotenuse',
   errCevianNoRightAngle:
     'In «{{detail}}» there is no right triangle in your figure, so there is no hypotenuse. ' +

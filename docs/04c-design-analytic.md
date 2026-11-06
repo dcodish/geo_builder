@@ -571,7 +571,9 @@ ARE, never by the sentence: equalities between two segments → `equal-pair`; ea
 over 90° (a region `choice`) → `obtuse-vertex`; an `assumed` parallel on a one-parallel-pair ring → `parallel-pair`
 (legs when an equality between the other two sides holds). Every other choice — a right-angle seat, a tangency, a
 sine's two roots, an inscribed square — is not said. Which option is drawn is read off the drawn figure (`holdsOn`,
-`selectorsHold`), as `statedMeasures` reads it.
+`selectorsHold`), as `statedMeasures` reads it. An option is classified by its equalities: the riders a role sentence
+hangs on it (`on-curve`) are ignored, so the note survives them (ADR-AG-406); a choice with no equality in an option is
+not `equal-pair`.
 
 #### "Until stated" is the apply step's structure
 
@@ -610,6 +612,8 @@ never demoted.
 
 `choice` is a constraint kind: `options[seed % 3]` cycles the right-angle seat, `resolveChoices(constraints, seed)`
 runs first in `evaluate`, `residual` throws on an unresolved choice, and a stated option collapses it (`narrowed`).
+The kite's row is one too (ADR-AG-406): `choice(all(AB=AD, CB=CD), all(AB=BC, AD=DC))`, 2-D's `variantPairs` order, and a
+stated part narrows it through the joint-option collapse.
 
 *Identifiers:* `משולש ABC` · `משולש ישר-זווית ABC` · `+ זווית B ישרה`
 
@@ -617,7 +621,11 @@ runs first in `evaluate`, `residual` throws on an unresolved choice, and a state
 
 Contextual references («זווית B ישרה», «שטח הדלתון», `meet-of` via `concurrencyOf`,
 [ADR-AG-182](06c-decisions-analytic.md#adr-ag-182)) resolve at M1 when exactly one object answers, else
-`ambiguous-angle` / `ambiguous-shape`.
+`ambiguous-angle` / `ambiguous-shape`. A kite's main or secondary diagonal (`diagonal-eq` → `applyRoleDiagonal`,
+[ADR-AG-406](06c-decisions-analytic.md#adr-ag-406)) resolves per option of the pair, on the role side's machinery: the keys
+are the row's own options, `axisOf` reads an option's axis off its equalities (the vertices where the pairs meet), and
+`seatOver` matches an option that INCLUDES the key. Pair settled → the lettered twin. Open → one stated line
+`curve-<role>-<hash>`, `label.role` set, `name` empty, with each option's two vertices hung on it by `attachToOptions`.
 
 ### A canonical circle's centre is the tool's O ([ADR-AG-184](06c-decisions-analytic.md#adr-ag-184), #1270)
 
@@ -821,7 +829,9 @@ The line is COMPOSED, never rewritten (2-D's ADR-574/575 shape). `parseRoleLengt
 
 `parseClause`'s last resort before `not-handled`: `parseRoleSide` writes a bare «הבסיס» / «השוק» / «היתר» (En "the base / leg / hypotenuse") as «<noun> Z₄Z₅» (`ROLE_SIDE_SENTINELS`) and reads the line through the real grammar, so the reading is the lettered twin's. It keeps the reading only when it puts that side on a stated LINE (a `curve` over the sentinels: the equation and incidence forms) and lowers it to `role-side { role, facts }`. M1's `applyRoleSide` finds the one polygon where the role has a content (an isosceles noun's apex choice, a triangle's right-angle seat, a trapezoid's parallel pair; none or several → `noHost`). A SETTLED role (a stated equal pair or right angle, `seatOver`'s `fixed`) applies the facts with the side's letters written in. An OPEN one replaces the noun's choice IN PLACE with `choice(all(option, the statement's constraints on that option's side))`: the line is drawn once, anonymous (`curve-<role>-<hash>`), and the declarations, sides and role claims (a trapezoid's pair excepted, stated once) are left to the ring. A statement naming PART of exactly one joint option («AB=AC» later) collapses the choice to that whole option, at the same seat the plain collapse uses.
 
-*Identifiers:* `BARE_ROLE_HE/EN` · `parseRoleSide` · `role-side` · `ROLE_SIDE_SENTINELS` · `applyRoleSide` · `seatOver` · `readingOf` · `anonOf` · the joint-option collapse in `applyFact`'s constraint arm
+**The panel names the line by its role while the role is open** ([ADR-AG-406](06c-decisions-analytic.md#adr-ag-406), #2006, #2057). `label.role` is set at mint; `panelListsCurve` reads it as "mentioned"; `name` stays empty, so no role phrase reaches a slot, the pick menu or `toolNamed`. `curveRowName` composes the row: its own name; else `roleLineLetters` (the two ring vertices on the line in every configuration: the top-level riders a collapse wrote, else the admitted pool, the knowledge gate); else the role phrase (`ROLE_ROW_KEY`). A stated pair also names a DRAWN role line on the label (`lettersOnDrawnRoleLines`, at the joint-option collapse), for what reads a line's name (the pick menu, its title, a sentence). `SceneCurve.name` is not drawn by `Figure.tsx`: no line's name is written on the analytic canvas. The id is not rewritten, and an undrawn side's line has no name. `fold` keeps each choice member on the fact that first said it (`memberFact`), so a collapsed pair stays the noun's definition, with no tick, in either order.
+
+*Identifiers:* `BARE_ROLE_HE/EN` · `parseRoleSide` · `role-side` · `ROLE_SIDE_SENTINELS` · `applyRoleSide` · `seatOver` · `attachToOptions` · `readingOf` · `anonOf` · `label.role` · `roleLineLetters` · `curveRowName` · the joint-option collapse in `applyFact`'s constraint arm
 
 ### A cevian to a side named by its role ([ADR-AG-298](06c-decisions-analytic.md#adr-ag-298), #2018)
 
@@ -1825,6 +1835,10 @@ ADR-AG-237), an `area`, an arc — and never a noun's definition (`Fact.definiti
 `Derivation.stated` → `buildScene(…, { stated })` → `Scene.stated`; `shell/marks.ts` (`rightAngleKnee`,
 `angleArcPoints`, `markFitScale`) is the shared mark geometry ([04w](04w-design-shell.md)); `statedScene` places every
 value in one `placeSceneLabels` call, each value bounded to its mark (ADR-AG-228).
+
+A noun's open choice is read for what the drawn option shows (a value, a knee), and an equality inside it is not read as a relation (`inOpenChoice`, ADR-W-118 B2, ADR-AG-406).
+
+**The `sideEquations` lane** ([ADR-AG-406](06c-decisions-analytic.md#adr-ag-406), #2057): one entry per `curve` object that is a polygon's side, by its letters (`line-XY` with XY a ring edge) or its side role, with the two vertices the drawn option puts on it, so an open role's text follows the side. The text is the caller's (`sideEquationText`, handed in through `SceneKnowledge`, because the panel's formatter is the app's): a number equation as the panel row prints it, one with a letter as its open form. It is read off the student's own curve, so a computed equation never reaches this lane. It is requested as a length, in the same placement pass.
 
 **An area has two representations, one reader** ([ADR-AG-273](06c-decisions-analytic.md#adr-ag-273), #2031): the copula's
 `area` and the measure equation's `length-eq` with one area term («שטח ABC = 12», and «נסמן את שטח ABC ב-S» restated as

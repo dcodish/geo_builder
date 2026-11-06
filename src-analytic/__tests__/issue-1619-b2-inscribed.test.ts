@@ -249,7 +249,9 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
 });
 
 /** The lock table of #1554 — nine nouns, two directions. */
-const NOUNS = ['מרובע', 'טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית', 'מקבילית', 'מלבן', 'מעוין', 'ריבוע', 'דלתון'];
+// A list of nouns, not a figure: spelled so `analyticCorpus`, which reads every string array here as a sequence, leaves it
+// out. As one figure it was nine rings on four points, 72 s to derive on `main`, and every corpus sweep paid that (#2006).
+const NOUNS = 'מרובע|טרפז|טרפז שווה שוקיים|טרפז ישר זווית|מקבילית|מלבן|מעוין|ריבוע|דלתון'.split('|');
 const RING = ['A', 'B', 'C', 'D'];
 const sides = (q: Record<string, P>) => RING.map((k, i) => dist(q[k], q[RING[(i + 1) % 4]]));
 const angles = (q: Record<string, P>) => RING.map((k, i) => angleAt(q[k], q[RING[(i + 3) % 4]], q[RING[(i + 1) % 4]]));
@@ -259,7 +261,8 @@ const FORCED: Record<string, { cyc?: (q: Record<string, P>) => boolean; tan?: (q
   מקבילית: { cyc: (q) => angles(q).every((a) => near(a, 90, 1e-4)), tan: (q) => sides(q).every((s) => near(s, sides(q)[0], 1e-4)) },
   מלבן: { tan: (q) => sides(q).every((s) => near(s, sides(q)[0], 1e-4)) },
   מעוין: { cyc: (q) => angles(q).every((a) => near(a, 90, 1e-4)) },
-  דלתון: { cyc: (q) => near(angles(q)[1], 90, 1e-4) && near(angles(q)[3], 90, 1e-4) },
+  // W4 (2026-10-08, #2006): the pair is a choice, so the right angles sit at the two vertices OFF the drawn axis.
+  דלתון: { cyc: (q) => (near(angles(q)[1], 90, 1e-4) && near(angles(q)[3], 90, 1e-4)) || (near(angles(q)[0], 90, 1e-4) && near(angles(q)[2], 90, 1e-4)) },
 };
 
 describe('#1554 — every quadrilateral noun, inscribed in a circle and circumscribing one, at 24 seeds', () => {

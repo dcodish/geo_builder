@@ -7044,3 +7044,18 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Sibling audit.** 3-D's bare name is a supported query and analytic has a point rule, so neither says «this is a given»; 2-D's bare letter is a symbol lookup and a point has no value there (no coordinates), so its row keeps «לא זוהה». Analytic carries only the copy, so it needs no ADR of its own.
 
 **Behaviour change for a student:** in complex and analytic a question the tool cannot read now names phrasings that work.
+
+## ADR-W-182 — A statement is never rejected for what the figure has not settled: it is drawn as one option, and the seeds and DOF carry the rest (#2006)
+
+**Date:** 2026-11-05 · **Status:** accepted · workspace principle · round #2722 · PR #2724 · **Applied in** [ADR-AG-406](06c-decisions-analytic.md#adr-ag-406) (analytic), and earlier, unnamed, in [ADR-AG-266](06c-decisions-analytic.md#adr-ag-266) and [ADR-AG-298](06c-decisions-analytic.md#adr-ag-298).
+**Requirements:** none (internal): a rule for how a builder answers; each product's promise stays in its own requirements doc (for analytic, 02c R14, R62, R178) · **Design:** none (internal): the mechanism is each builder's own (analytic: `attachToOptions`, 04c "A side named by its role alone").
+
+**The ruling.** Operator, follow-up ballot of 2026-10-13, card 13 ([#2006](https://github.com/dcodish/geo_builder/issues/2006#issuecomment-6142487588)), changing his first answer, which had refused a sentence about a kite's main diagonal until the equal pair was stated:
+
+> In this case, there is no base for refusal. in these cases we draw an option and view another option would change nodes and give a different option. until the user adds enough context to narrow it further. we should never reject a statement we just dont know how exactly it looks. this is why we have the seeds and dof.
+
+**Decision.** A statement that is true of SOME option of a figure's open choice, or that depends on a magnitude still free, is accepted and drawn in one option. «הציגו תצורה אחרת» may show another until the student adds enough to narrow it. Not knowing exactly how the figure looks is never a reason to refuse.
+
+**Its reach.** It concerns a statement the figure cannot yet place, not one it can never satisfy: a contradiction, a shape with no such part, and a truly ambiguous reference keep their refusals. Each builder's own ruling bounds the case: a plain triangle has no base, so a cevian to it asks (#2018, ADR-AG-298). This is the discrete twin of [ADR-052](06-decisions.md#adr-052), every unstated magnitude is a free DOF.
+
+**Consequences.** A session that wants a refusal because a choice is still open needs a dated ruling of his for that case. Other builders are not changed by this entry: where one refuses such a sentence today, that is a finding for its own queue.

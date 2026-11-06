@@ -42,13 +42,12 @@
 import type { Derivation } from './derive';
 import { admittedPool, holdsOn, selectorsHold, type Figure } from './evaluate';
 import { parseLengthExpr } from './lengths';
-import { promisesOneParallelPair } from './shapes';
+import { membersOf, promisesOneParallelPair, segmentEquality, type Seg } from './shapes';
 import { sameConstraint, type Constraint } from './solve';
 import { assignmentAt } from './discreteAxes';
 import type { Id, Selector } from './types';
 
-/** A segment as two point ids, in the spelling its constraint carries. */
-export type Seg = readonly [Id, Id];
+export type { Seg };
 
 export type UnstatedChoice =
   /** Which segments are equal — `pairs` is the drawn option's equalities («AB = AC»; a two-pair option lists both). */
@@ -69,25 +68,6 @@ export type UnstatedChoiceKind = UnstatedChoice['kind'];
 export const UNSTATED_CHOICE_KINDS: readonly UnstatedChoiceKind[] = ['equal-pair', 'parallel-pair', 'obtuse-vertex', 'axes'];
 
 type Choice = Extract<Constraint, { t: 'choice' }>;
-type LengthEq = Extract<Constraint, { t: 'length-eq' }>;
-
-/** A bare segment-to-segment equality («AB = AC»), as its two segments — null for anything else. */
-function segmentEquality(k: Constraint): readonly [Seg, Seg] | null {
-  if (k.t !== 'length-eq') return null;
-  const seg = (le: LengthEq['left']): Seg | null => {
-    if (le.terms.length !== 1) return null;
-    const t = le.terms[0] as { kind?: string; a?: Id; b?: Id };
-    // The expression must be the term itself — «AB = 2AC» is a ratio, not an equal pair.
-    if ((t.kind !== undefined && t.kind !== 'length') || !t.a || !t.b || le.expr.kind !== 'sym') return null;
-    return [t.a, t.b];
-  };
-  const l = seg(k.left);
-  const r = seg(k.right);
-  return l && r ? [l, r] : null;
-}
-
-/** An option's members — itself, or the statements an `all` option conjoins. */
-const membersOf = (o: Constraint): Constraint[] => (o.t === 'all' ? o.of : [o]);
 
 /** The axis a constraint puts its point on — null when it is not an incidence with a coordinate axis. */
 function axisOf(k: Constraint): { id: Id; axis: 'x' | 'y' } | null {
@@ -160,10 +140,18 @@ export function unstatedChoices(d: Derivation): UnstatedChoice[] {
     if (!said(line)) return;
 
     if (k.t === 'choice' && k.options.length > 1) {
-      const equalities = k.options.map((o) => membersOf(o).map(segmentEquality));
-      if (equalities.every((ms) => ms.length > 0 && ms.every((m) => m !== null))) {
+      /**
+       * A role sentence hangs its line on every option (`applyRoleSide`), and the pair stays exactly as open as it was
+       * (#2006, ADR-AG-406; operator: *"we should keep the message up as long as its not defined"*), so the option's
+       * other members are RIDERS and the option is classified by its equalities.
+       */
+      const equalities = k.options.map((o) => membersOf(o).flatMap((m) => segmentEquality(m) ?? []));
+      if (equalities.every((ms) => ms.length > 0)) {
         if (poolAgrees(poolOnce(), k.options, (o, f) => holdsOn(d.construction, o, f))) return;
-        const pairs = membersOf(drawnOption(d, k)).map((m) => segmentEquality(m)!);
+        const pairs = membersOf(drawnOption(d, k)).flatMap((m) => {
+          const eq = segmentEquality(m);
+          return eq ? [eq] : [];
+        });
         out.push({ kind: 'equal-pair', line, pairs });
         return;
       }
