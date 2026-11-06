@@ -20370,3 +20370,29 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/engine/__tests__/extension-free-quantity-2518.test.ts`: T5 and its next view, 13 further builds, 8 kept refusals, both bagrut lines, the stated positions, the cost and saved paths. ADR-784's free-radius refusal is removed. Fixture `src/__tests__/fixtures/issue-2518-free-radius-holds-side.geo.json`, the operator's exact lines. Parity rows `ext-circle-later-free-radius-2518`, `ext-circle-typed-free-radius-2518`. Driven in a real browser through `browser-harness.mjs`: T5, the typed form, the pinned refusal.
 
 **Behaviour change for a student:** a sentence a free size or place can satisfy now draws, with the circle adapting, instead of being refused. A saved figure of that kind redraws correctly. A figure nothing can save is refused as before, and a stated side of O now counts.
+
+## ADR-794 — A stated ratio between two lengths draws both segments (#1848)
+
+**Status:** accepted · 2026-11-06 · bug (P2, 2-D, 3-D, analytic) · fix round #2727, stream C · branch `fix/1848-both-sides-drawn` · operator ruling 2026-10-30 on #1848 (*"3 A - in all tools"*: a stated relation between two lengths draws both segments, ratios included, in 2-D, analytic and 3-D) · siblings [ADR-AG-420](06c-decisions-analytic.md#adr-ag-420), [ADR-3D-428](06b-decisions-3d.md#adr-3d-428)
+
+**Requirements:** [02](02-requirements.md) FR-IN-7 · **Design:** none (internal) · **Stage:** none (the parser's ink; no solver change)
+
+**The class.** A stated relation between two lengths is drawn by whether it is an equality or not, so the same sentence with a coefficient in it loses its segments.
+
+**Measured before** (`main` c0029d25, through the gate, after «מרובע ABCD»). «AC = BD» and «|AC| = |BD|» drew AC and BD. «AC = BD + 2» and «AC > BD» drew both. «AC = 2BD», «|AC| = 2|BD|», «AC:BD = 2:1», «AC/BD = 2» and «AC פי 2 מ-BD» drew neither.
+
+**Root cause.** `equalSegments` emits two `segment` commands with its `set-equal` (FR-IN-7). Nothing draws for a `set-ratio`: its rules (`ratioConstraint`, its Hebrew «פי» arm, `segmentRatio`, `segmentRatioColon`) emit the constraint alone.
+
+**Decision.** The `set-ratio` arm of `applyCommand` draws its two segments, after the constraint, so every spelling draws through one seam. The ruling's plan names this arm. The tool's own lowerings carry `derived: true` and draw nothing: the shared-letter ratio in `lower.ts` (a symbolic measure does not draw, FR-IN-7) and the stated position's tail in `step.ts`. The similarity sentence names the sides of triangles it draws.
+
+**Why not in the parser, beside the equality.** Tried first, both orders, measured. Segments after the `set-ratio` turned a red row green, because a line's row reports its last command. Segments before it made the segment carrier create the line's new points instead of `impliedPoints` (ADR-769), which moved them and held «AD:DB = 1:2» on a blank page only to a 1e-6 residual, and it drifted every stored fixture's commands. In the arm the line stays one command: parse output, created points, row status and refusal wording are unchanged, and a saved figure gains the ink too.
+
+**A point on a side.** «D על AB» · «AD:DB = 1:2» now holds `seg-AD` and `seg-BD` over AB, as «AD = DB» always did and analytic already does. They lie on the side, so nothing new shows there.
+
+**ADR-W-118 B2.** Unchanged. This draws the segments the sentence names, and adds no tick, label or mark at rest. A relation's marks stay in the opt-in layer.
+
+**Sibling audit (docs/17 §1).** Analytic drew the ratio spellings already and missed the bars: ADR-AG-420. 3-D drew the left pair only: ADR-3D-428. Complex has no such sentence. The shared ink table `shell/__tests__/fixtures/stated-length-relation-ink.ts` is asserted by all three builders, the way the parity rows carry a verdict.
+
+**Locks.** `src/app/__tests__/issue-1848-both-sides-drawn.test.ts`, scenario `stated-ratio-draws-both-1848`, parity rows `length-relation-bars-1848`, `length-ratio-bars-1848`, `length-ratio-colon-1848`.
+
+**Behaviour change for a student:** «AC = 2BD» and every other way of stating a ratio between two lengths draws both segments, as «AC = BD» does. A saved figure with such a line draws them when it is opened.

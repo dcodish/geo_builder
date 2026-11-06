@@ -1922,6 +1922,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
+  // ── #1848 (ADR-794, ADR-AG-420, ADR-3D-428, operator 2026-10-30 "in all tools"): a stated relation between two lengths draws
+  // both segments. The verdict is here; the ink is the shared table stated-length-relation-ink.ts, asserted by each builder.
+  { id: 'length-relation-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = |BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
+  { id: 'length-ratio-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = 2|BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
+  { id: 'length-ratio-colon-1848', family: 'lengths', steps: ['מרובע ABCD', 'AC:BD = 2:1'], expect: 'builds', note: 'AC and BD drawn in every builder' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

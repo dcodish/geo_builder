@@ -84,20 +84,20 @@ describe('#1844 the reported lines draw only the ring (and the solid), at seeds 
 });
 
 describe('#1844 the control — a STUDENT\'s own relation still draws what it names', () => {
-  it('«טרפז שווה שוקיים ABCD» · «|AC| = |BD|» draws AC', () => {
+  it('«טרפז שווה שוקיים ABCD» · «|AC| = |BD|» draws AC and BD (#1848)', () => {
     const facts = build(['טרפז שווה שוקיים ABCD', '|AC| = |BD|']);
     expect(facts).not.toBeNull();
     const d = derive3(facts!, 0);
     for (const f of facts!) expect(d.status[f.id]).toBe('ok');
-    expect(strayInk(d.construction)).toEqual(['AC']);
+    expect(strayInk(d.construction)).toEqual(['AC', 'BD']);
     // the typed relation is unmarked — the marker belongs to shape lowerings only
     const typed = facts![1].cmds.find((k) => k.type === 'length-rel');
     expect(typed && 'origin' in typed ? typed.origin : undefined).toBeUndefined();
   });
 
-  it('«טרפז ABCD» · «|AC| = |BD|» draws AC (no shape condition to share the pair with)', () => {
+  it('«טרפז ABCD» · «|AC| = |BD|» draws AC and BD (no shape condition to share the pair with)', () => {
     const facts = build(['טרפז ABCD', '|AC| = |BD|'])!;
-    expect(strayInk(derive3(facts, 0).construction)).toEqual(['AC']);
+    expect(strayInk(derive3(facts, 0).construction)).toEqual(['AC', 'BD']);
   });
 });
 
@@ -118,9 +118,7 @@ describe('#1844 apply: every drawing relation kind skips its ink when shape-inte
     const shaped = applyCommand3(quad(), shapeInternal3([cmd as Parameters<typeof shapeInternal3>[0][number]])[0]);
     expect(stated.ok && shaped.ok).toBe(true);
     if (!stated.ok || !shaped.ok) return;
-    expect(strayInk(stated.next).sort(), 'a stated relation draws its operands').toEqual(
-      cmd.type === 'length-rel' ? ['AC'] : ['AC', 'BD'],
-    );
+    expect(strayInk(stated.next).sort(), 'a stated relation draws its operands').toEqual(['AC', 'BD']);
     expect(strayInk(shaped.next), 'a shape condition draws nothing').toEqual([]);
     // and nothing else changes: the same drive and the same judgement
     expect(shaped.next.scalarPins).toEqual(stated.next.scalarPins);

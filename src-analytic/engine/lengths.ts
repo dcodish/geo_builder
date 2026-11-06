@@ -294,13 +294,15 @@ const DISTANCE_FRAMES: RegExp[] = [
  * answer a DIFFERENT measurement — the exact honesty failure #1151 records for the English form.
  */
 const SYM_OPERAND = String.raw`(?:${POINT_NAME}){1,2}|[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
+/** «|AB|» — the bars around a POINT pair, the one spelling both readers of the notation share. */
+const BAR_PAIR_SOURCE = String.raw`\|\s*(${POINT_NAME})\s*(${POINT_NAME})\s*\|`;
 const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
   // d_{AB} · d_{A,B} · d_{A,l1}
   [new RegExp(String.raw`\bd\s*_\s*\{\s*(${SYM_OPERAND})\s*,?\s*(${SYM_OPERAND})\s*\}`, 'g'), 'המרחק בין $1 ל-$2'],
   // d(A,B) — the comma is required, or `d(x)` of a function would be claimed
   [new RegExp(String.raw`\bd\s*\(\s*(${SYM_OPERAND})\s*,\s*(${SYM_OPERAND})\s*\)`, 'g'), 'המרחק בין $1 ל-$2'],
   // |AB| — the bars are the absolute-value notation for a length, and only a POINT PAIR is a length
-  [new RegExp(String.raw`\|\s*(${POINT_NAME})\s*(${POINT_NAME})\s*\|`, 'g'), 'המרחק בין $1 ל-$2'],
+  [new RegExp(BAR_PAIR_SOURCE, 'g'), 'המרחק בין $1 ל-$2'],
 ];
 
 /**
@@ -382,6 +384,17 @@ export function namedLengthPairs(src: string): Array<{ a: Id; b: Id }> {
     const t = le.terms[i];
     return t.kind === undefined || t.kind === 'length' ? [{ a: t.a, b: t.b }] : [];
   });
+}
+
+/**
+ * THE PAIRS ONE SIDE OF A LENGTH RELATION WRITES — the named ones and the barred ones (#1848, ADR-AG-420). The operator,
+ * 2026-10-30: a stated relation between two lengths draws both, «|AC| = 2|BD|» included, "in all tools". So inside a
+ * relation the bars write a segment, while a value («|OC| = 5») keeps the distance reading above: the caller decides
+ * which it holds, this only reads the side. A worded distance («המרחק בין A ל-B», «d_{AB}») is neither.
+ */
+export function writtenLengthPairs(src: string): Array<{ a: Id; b: Id }> {
+  const barred = [...normalizeMath(src).matchAll(new RegExp(BAR_PAIR_SOURCE, 'g'))].map((m) => ({ a: m[1], b: m[2] }));
+  return [...namedLengthPairs(src), ...barred.filter(({ a, b }) => a !== b)];
 }
 
 /**

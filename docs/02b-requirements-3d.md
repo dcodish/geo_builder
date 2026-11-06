@@ -296,7 +296,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   givens make is said in the same family, as in 2-D, on 2-D's blue ⓘ information strip ([ADR-W-180](06w-decisions-workspace.md#adr-w-180), #2266); a right trapezoid in a circle is refused — in one sentence,
   and also when «טרפז ישר זווית ABCD» and the circle («ABCD חסום במעגל», «מעגל חוסם את ABCD», a pyramid's
   right-trapezoid base) are stated on two lines, in either order: the second line is refused, naming both. A
-  shape's own condition draws no segment the student did not name. The 2-D twin is FR-EN-14. A circle inscribed in a pentagon
+  shape's own condition draws no segment the student did not name; a STATED relation between two lengths («|AC| = |BD|», «|AC| = 2|BD|») draws both (ADR-3D-428). The 2-D twin is FR-EN-14. A circle inscribed in a pentagon
   or hexagon (any spelling, lettered or not) is refused before the model with «הכלי עדיין לא יודע לשרטט מעגל חסום
   במחומש — זו מגבלה של הכלי.» (the noun filled in); nothing is drawn. «משוכלל» / "regular" on a flat polygon is an
   adjective 3-D draws only on a square: elsewhere the line goes to the model, and an answer that drops it is refused.

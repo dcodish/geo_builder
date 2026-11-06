@@ -14825,3 +14825,23 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
 
 **Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.
+
+## ADR-3D-428 — A stated relation between two lengths draws both sides (#1848)
+
+**Status:** accepted · 2026-11-06 · bug (P2, 2-D, 3-D, analytic) · fix round #2727, stream C · branch `fix/1848-both-sides-drawn` · operator 2026-10-07 (*"if we draw AC there is no reason not to draw DB"*) and ruling 2026-10-30 (*"3 A - in all tools"*) · **amends** [ADR-3D-308](#adr-3d-308) (its lhs-only ink) · siblings [ADR-794](06-decisions.md#adr-794), [ADR-AG-420](06c-decisions-analytic.md#adr-ag-420)
+
+**Requirements:** [02b](02b-requirements-3d.md) (the shape-condition line of the polygon requirement) · **Design:** none (internal) · **LADDER stage:** none (ink; the pin and the claim are unchanged)
+
+**Measured before** (`main` c0029d25, `decideDeterministic3`). «טרפז שווה שוקיים ABCD» · «|AC| = |BD|» drew AC only; so did «מרובע ABCD» · «|AC| = 2|BD|», «אורך AC שווה לאורך BD» and «D על AB» · «AD = 2DB». «AC:BD = 2:1» and «AC/BD = 2» drew both.
+
+**Root cause.** The `length-rel` arm of `apply.ts` drew `a1b1` only. `cos-angle` and `mag-rel` draw every pair they name, and round #2602's sweep found `length-rel` the only arm out of step.
+
+**Decision.** Under the same `!cmd.origin` guard, the arm draws both pairs, so a shape's own condition still draws nothing (#1844). A numeric ratio over a free rider never reaches the arm, because `riderRatioRetarget` turns it into the rider's placement, so that door draws the same two pairs (`withStatedRatioInk`): «D על AB» · «AD = 2DB» drew AD alone. A letter («SE = t·SA») is the rider idiom and keeps its ink. A named vector on the right («|AB| = 2|u|») is no segment and `mag-rel` draws none, so only a written pair is ink. «AC = 2BD» over points already drawn still asks «length or vector?» (ADR-3D-391); its length answer lowers to this arm and draws both.
+
+**ADR-W-118 B2.** Unchanged: segments, no mark at rest.
+
+**Sibling audit.** ADR-794 and ADR-AG-420. Complex has no such sentence.
+
+**Locks.** `src3d/__tests__/issue-1848-both-sides-drawn.test.ts`, the shared table `shell/__tests__/fixtures/stated-length-relation-ink.ts`, parity rows `length-relation-bars-1848`, `length-ratio-bars-1848`, `length-ratio-colon-1848`.
+
+**Behaviour change for a student:** «|AC| = |BD|» and «|AC| = 2|BD|» draw BD as well as AC.

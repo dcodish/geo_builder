@@ -6354,6 +6354,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect(asked(['ריבוע ABCD', 'G על AD']).note).toBe('undetermined');
     },
   },
+  {
+    id: 'stated-ratio-draws-both-1848',
+    title: '«מרובע ABCD» · «AC = 2BD»: a stated ratio between two lengths draws AC and BD, as «AC = BD» does (#1848, ADR-794)',
+    guards:
+      'Operator ruling 2026-10-30 on #1848, "3 A - in all tools": a stated relation between two lengths draws both segments, ratios included. The parser drew an equality\'s two segments and a ratio\'s neither, so the same sentence with a 2 in it left the diagonals off the figure.',
+    steps: ['מרובע ABCD', 'AC = 2BD'],
+    check(fig) {
+      allStepsOk(fig);
+      const drawn = fig.construction.objects.flatMap((o) => (o.kind === 'segment' ? [[o.a, o.b].sort().join('')] : []));
+      expect(drawn, 'both compared segments are on the figure').toEqual(expect.arrayContaining(['AC', 'BD']));
+      expect(dist(at(fig, 'A'), at(fig, 'C')) / dist(at(fig, 'B'), at(fig, 'D')), 'the ratio holds').toBeCloseTo(2, 6);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
