@@ -1498,7 +1498,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'משיק חיצוני משותף לשני המעגלים', en: 'an external common tangent of the two circles', needs: ['מעגל O', 'מעגל P'] },
   { category: 'circles', family: 'F5', he: 'משיק משותף ששני המעגלים נמצאים באותו צד שלו', en: 'a common tangent with both circles on the same side of it', needs: ['מעגל O', 'מעגל P'] },
   { category: 'circles', family: 'F5', he: 'הישר l משיק משותף חיצוני לשני המעגלים', en: 'the line l is an external common tangent of the two circles', needs: ['מעגל O', 'מעגל P'] },
-  { category: 'circles', family: 'F5', he: 'A נקודת ההשקה של l1 עם מעגל O', en: 'A is the point of tangency of l1 with circle O', needs: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3', 'כל המשיקים המשותפים לשני המעגלים'] },
+  { category: 'circles', family: 'F5', he: 'P נקודת ההשקה של l1 עם מעגל O', en: 'P is the point of tangency of l1 with circle O', needs: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3', 'כל המשיקים המשותפים לשני המעגלים'] },
   // #2390 (ADR-AG-314): every common tangent of the pair, named l1, l2, …; the tangent at the touching circles' common point.
   { category: 'circles', family: 'F5', he: 'כל המשיקים המשותפים לשני המעגלים', en: 'all the common tangents of the two circles', needs: ['שני מעגלים זרים'] },
   { category: 'circles', family: 'F5', he: 'המשיק העובר בנקודה המשותפת לשני המעגלים', en: 'the tangent through the common point of the two circles', needs: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T'] },

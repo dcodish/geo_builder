@@ -12,7 +12,8 @@ type Row = { file: string; key: string; value: string };
 type Result = { rows: Row[]; codes: { code: string; keys: string[] }[] };
 const find = (q: string) => findMessage(q) as Promise<Result>;
 
-describe('#2201 phase 4 — find-message', () => {
+// Each call scans every locale and source file, which outlasts vitest's 5 s default under a full suite's load.
+describe('#2201 phase 4 — find-message', { timeout: 30_000 }, () => {
   it('a suite.* value is found once, in shell/ — never again under a product that merges it', async () => {
     const he = JSON.parse(readFileSync(join(REPO_ROOT, 'shell/locales/he.json'), 'utf8'));
     const label: string = he.suite.about.label;

@@ -435,6 +435,7 @@
  "fixture:issue-2486-quarter-AOB.geo.json": "dc1d56d3b9fa5cd8",
  "fixture:issue-2499-diameter-after-pinned-distance.geo.json": "6662f0825aab9ab7",
  "fixture:issue-2518-extension-through-circle-point.geo.json": "fb4e7c9a8d7c8217",
+ "fixture:issue-2518-free-radius-holds-side.geo.json": "6cc7f1604cbaa78b",
  "fixture:issue-2533-plural-lines-quad.geo.json": "984d2bff928ad9fb",
  "fixture:issue-2590-pinned-radius-orphan.geo.json": "9623108c03989ae5",
  "fixture:issue-260-two-host-membership.geo.json": "167ca5c3e43619c1",
