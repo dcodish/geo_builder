@@ -177,6 +177,9 @@ function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed:
  *   and write them as such"*). A length reading that cannot hold either goes through the ordinary length path and
  *   gets that path's own verdict — the contradiction naming the statement — so no sentence is ever asked about
  *   when only one of its readings was ever possible.
+ * - a vector reading that CROSSES a declared ring cannot hold either (ADR-3D-431, judged q1): the fold's own `ring-crossed`
+ *   verdict lands on the declaring row, not on this line, so the trial reads the whole list. «מרובע ABCD» · «AC = 2BD» as
+ *   vectors makes the diagonals parallel, and a crossed ring is not a quadrilateral (#1927). «AB = DC» is not crossed and asks.
  * The trials run at one canonical seed, so a line's reading never changes with «הציגו תצורה אחרת»; the verdict
  * depends only on the list up to the line, so a later line never re-reads an earlier one. Memoized by that prefix.
  */
@@ -190,7 +193,12 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
   const trial = (reading: SegmentEquationReading3): Derived3 | null => {
     const forced: Fact3 = { ...line, cmds: line.cmds.map((k, i) => (i === at && k.type === 'vec-rel' ? { ...k, reading } : k)) };
     const d = deriveCore3([...prefix.slice(0, -1), forced], READING_SEED, true);
-    return d.status[line.id] === 'ok' ? d : null;
+    if (d.status[line.id] !== 'ok') return null;
+    if (reading === 'vector') {
+      const crossed = (of: Derived3): number => Object.values(of.status).filter((s) => s !== 'ok' && s !== 'disabled' && s.code === 'ring-crossed').length;
+      if (crossed(d) > 0 && crossed(d) > crossed(deriveCore3(prefix.slice(0, -1), READING_SEED, true))) return null;
+    }
+    return d;
   };
   const asVector = trial('vector');
   const asLength = asVector ? trial('length') : null; // Am. 2: with no vector reading, the length one is taken as is

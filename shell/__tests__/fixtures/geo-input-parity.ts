@@ -196,7 +196,7 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     patterns: [/(?:רדיוס\S*|radius)\s+[A-QS-Z](?![A-Za-z0-9₀-₉_'])/, /[=+−-]\s*\d*[A-QS-Z](?![A-Za-z0-9₀-₉_'])\s*$/],
   },
   X12: {
-    title: 'a bare XY = k·ZW whose vector and length readings both hold and differ asks length-or-vector in 3-D («מרובע ABCD» · «AB = CD»)',
+    title: 'a bare XY = k·ZW whose vector and length readings both hold and differ asks length-or-vector in 3-D («מרובע ABCD» · «AB = DC»)',
     reason:
       'operator rulings 2026-10-04 and 2026-10-13 on #1680 (ADR-3D-391, ADR-W-108 Am.): 3-D is the builder with vectors, so an unmarked segment equation over points already drawn asks «length or vector?»; one that defines a new point builds. Narrowed by the operator rule of 2026-10-30 on PR #2605 (ADR-3D-391 Am. 1): it asks only when BOTH readings can hold and give different figures; where only the length reading can hold («משולש ABC» · «AB = AC», «D על AB» · «AD = 3BD») 3-D builds like 2-D. 2-D and analytic have no vector reading (X7) and read equal lengths',
     products: ['2d', 'analytic'],
@@ -631,7 +631,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-072', family: 'area-perimeter', steps: ['נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-073', family: 'area-perimeter', steps: ['משולש ABC', 'היקף המשולש ABC = 20'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-074', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds' },
-  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', exception: 'X12' },
+  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', note: 'as vectors the ring crosses, so only the length reading can be true: no question in 3-D either (judged 2026-11-06, ADR-3D-431)' },
+  { id: 'cat-2d-075b', family: 'lengths', steps: ['מרובע ABCD', 'AB = DC'], expect: 'builds', exception: 'X12' },
+  { id: 'length-only-reading-1848', family: 'lengths', steps: ['מרובע ABCD', 'AC = 2BD'], expect: 'builds', note: 'the diagonals as vectors would cross the ring (judged 2026-11-06, ADR-3D-431)' },
   { id: 'cat-2d-076', family: 'lengths', steps: ['מרובע ABCD', 'AB = 2 AD'], expect: 'builds', exception: 'X12' },
   { id: 'cat-2d-077', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'AD:DB = 1:2'], expect: 'builds' },
   { id: 'cat-2d-078', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'G מחלקת את DC ביחס 1:2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
