@@ -1,0 +1,150 @@
+{
+ "name": "prod-2026-11-06-2",
+ "title": "Prod smoke, 2026-11-06-2",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "2-D builds and draws a stated ratio",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "AC = 2BD"
+   ],
+   "lookFor": "AC and BD drawn",
+   "before": "See round #2727.",
+   "expectFigure": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "P2",
+   "title": "2-D: the perpendicular assumes no foot",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "משולש ABC",
+    "M על AC",
+    "MK אנך ל-AB"
+   ],
+   "lookFor": "K created",
+   "before": "See round #2727.",
+   "expect": [
+    "נוצרה נקודה חדשה K"
+   ]
+  },
+  {
+   "id": "P3",
+   "title": "3-D: no question when only lengths can be true",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = CD"
+   ],
+   "lookFor": "row reads |AB| = |CD|",
+   "before": "See round #2727.",
+   "expectRows": [
+    "|AB| = |CD|"
+   ]
+  },
+  {
+   "id": "P4",
+   "title": "3-D: the parallelogram pair still asks",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = DC"
+   ],
+   "lookFor": "asks",
+   "before": "See round #2727.",
+   "expectRefusal": "לווקטור"
+  },
+  {
+   "id": "P5",
+   "title": "3-D: a digit glued to a variable",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מישור π 2x+y=1"
+   ],
+   "lookFor": "π: 2x + y - 1 = 0",
+   "before": "See round #2727.",
+   "expect": [
+    "2x + y - 1 = 0"
+   ]
+  },
+  {
+   "id": "P6",
+   "title": "Analytic: the reported rectangle",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "מלבן ABCD",
+    "A(0,0)",
+    "C(4,7)",
+    "B ברביע הראשון",
+    "AC",
+    "AB:AC=3:√(13)"
+   ],
+   "lookFor": "B and D solved",
+   "before": "See round #2727.",
+   "expect": [
+    "(6, 3)",
+    "(-2, 4)"
+   ]
+  },
+  {
+   "id": "P7",
+   "title": "Analytic: a free point above a solved one",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתון מעגל שמשוואתו x^2+(y-5)^2=25",
+    "C על המעגל",
+    "C על ציר ה-y",
+    "C מעל ציר ה-x",
+    "A מעל C"
+   ],
+   "lookFor": "records",
+   "before": "See round #2727.",
+   "expect": [
+    "(0, 10)"
+   ]
+  },
+  {
+   "id": "P8",
+   "title": "Complex loads and draws",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z = 3+4i"
+   ],
+   "lookFor": "z drawn",
+   "before": "See round #2727.",
+   "expect": [
+    "3"
+   ]
+  }
+ ]
+}

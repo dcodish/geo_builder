@@ -50,6 +50,94 @@
         "אורך השוק AB הוא 5"
       ],
       "lookFor": "«5» on AB, no ticks."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T56",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5175",
+      "path": "/3d.html",
+      "lines": [
+        "מישור π 2x+y=1"
+      ],
+      "lookFor": "The panel reads π: 2x + y - 1 = 0."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T55",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5175",
+      "path": "/3d.html",
+      "lines": [
+        "קוביה ABCDA'B'C'D'",
+        "AB = 3",
+        "AC = 3√2"
+      ],
+      "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T54",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "lines": [
+        "c(4,7)"
+      ],
+      "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה»."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T53",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(6,0)",
+        "הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2"
+      ],
+      "lookFor": "Two rows, P on AB."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T52",
+      "kind": "2d:assertion",
+      "queued": "2026-11-06",
+      "product": "2d",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "P על AB",
+        "Q על AC",
+        "דרך P מעבירים אנך ל-AB",
+        "דרך Q מעבירים אנך ל-AC",
+        "E על האנך"
+      ],
+      "lookFor": "Asks which, naming both; the line stays in the box."
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T51",
+      "kind": "2d:assertion",
+      "queued": "2026-11-06",
+      "product": "2d",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "P על AB",
+        "דרך P מעבירים אנך ל-AB",
+        "האנך חותך את AC בנקודה E"
+      ],
+      "lookFor": "E on the canvas."
     }
   ],
   "results": [
