@@ -1,0 +1,1059 @@
+{
+ "name": "round-2722",
+ "title": "Fix round #2722",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "3-D: a point on a circle, on an empty canvas",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "D על המעגל"
+   ],
+   "cycles": 1,
+   "expect": [
+    "נוצר מעגל חדש"
+   ],
+   "lookFor": "A circle with D on it, no centre letter, the notice «נוצר מעגל חדש». «הציגו תצורה אחרת» changes the tilt and D stays on it. The view refits to the circle each time, so its size on screen stays about the same.",
+   "before": "Refused «עדיין אין מעגל בשרטוט…»."
+  },
+  {
+   "id": "T2",
+   "title": "3-D: a radius stated first creates the circle",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "רדיוס המעגל הוא 3"
+   ],
+   "expect": [
+    "נוצר מעגל חדש",
+    "רדיוס המעגל"
+   ],
+   "lookFor": "A circle, the notice, and in the data panel under «מדידות»: «רדיוס המעגל = 3». No number on the canvas, as in 2-D (a question for you). Beyond the plan, and ahead of 2-D, which sends this line to the AI.",
+   "before": "Refused."
+  },
+  {
+   "id": "T3",
+   "title": "2-D: a definition restated backwards says it already exists",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "M אמצע CB"
+   ],
+   "lookFor": "«כבר קיים», no new row. You did not ask for this one.",
+   "before": "A second row that changed nothing.",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T4",
+   "title": "2-D: a bagrut line typed reversed is refused and offers the right sentence",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו-B",
+    "AD מיתר במעגל P משיק למעגל O בנקודה A",
+    "CB מיתר במעגל O משיק למעגל P בנקודה B",
+    "המשך AC חותך את מעגל P בנקודה E"
+   ],
+   "expectRefusal": "המשך CA חותך את מעגל P בנקודה E",
+   "lookFor": "Refused, offering «המשך CA חותך את מעגל P בנקודה E». This reverses ADR-142, as you ruled.",
+   "before": "Drew green."
+  },
+  {
+   "id": "T5",
+   "title": "2-D: a later line that makes the side impossible, on a free radius",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל שמרכזו O",
+    "מעגל שמרכזו P",
+    "נקודה A על מעגל P",
+    "המשך AO חותך את מעגל P בנקודה R",
+    "OP = 10"
+   ],
+   "expectRefusal": "OP = 10",
+   "lookFor": "«OP = 10» is refused, naming both statements, even though a circle P larger than 10 could have kept R past O. Does that read fair to a student?",
+   "before": "Committed green, R beyond A."
+  },
+  {
+   "id": "T6",
+   "title": "Analytic: free circles stay put as four tangents are added",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל O",
+    "מעגל K",
+    "AB משיק משותף למעגלים O ו-K",
+    "CD משיק משותף למעגלים O ו-K",
+    "EF משיק משותף למעגלים O ו-K",
+    "GH משיק משותף למעגלים O ו-K"
+   ],
+   "cycles": 2,
+   "expectConfigsDiffer": true,
+   "lookFor": "Four different lines, and input feels instant. Type the four lines yourself and watch: from the first tangent on, the circles and earlier tangents never move. The configurations cycle which tangent has which name.",
+   "before": "O, K and A moved with every tangent."
+  },
+  {
+   "id": "T7",
+   "title": "Analytic: a later given still picks the tangent (riskiest)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "נתון מעגל שמרכזו O(0,0) ורדיוסו 2",
+    "נתון מעגל שמרכזו K(6,0) ורדיוסו 1",
+    "AB משיק משותף למעגלים O ו-K",
+    "הישר AB חותך את ציר ה-y מתחת לציר ה-x",
+    "CD משיק משותף למעגלים O ו-K"
+   ],
+   "lookFor": "AB crosses the y-axis below the x-axis; CD is a different line; the panel lists AB with two equations («… או …»), since two tangents meet that given; C, D and CD read «—», since they still have more than two possible values. Known and not this case: the status still says «הציור נקבע במלואו», which is false, is the same on prod, and is #1596.",
+   "before": "AB the same; CD could share its line."
+  },
+  {
+   "id": "T8",
+   "title": "2-D: «AK אנך ל-BC» now puts K on BC",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "AK אנך ל-BC"
+   ],
+   "expectFigure": [
+    "K"
+   ],
+   "lookFor": "K on line BC, the foot from A. Behaviour change.",
+   "before": "K was created off BC, with AK perpendicular to BC."
+  },
+  {
+   "id": "T9",
+   "title": "Analytic: «האליפסה היא כעת מעגל» moves to the blue strip",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/9+y^2/9=1"
+   ],
+   "expect": [
+    "האליפסה היא כעת מעגל"
+   ],
+   "lookFor": "Blue ⓘ strip. Not in the plan's lines; a one-word revert if you disagree.",
+   "before": "Amber."
+  },
+  {
+   "id": "T10",
+   "title": "3-D: «וקטור u» and «חץ A'C» rows",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "AB→",
+    "חץ A'C",
+    "וקטור u"
+   ],
+   "lookFor": "An arrow over AB with no raw →; an arrow over A'C beside «חץ»; the row for «וקטור u» shows the underlined u alone. Beyond the reported rows.",
+   "before": "All three plain text."
+  },
+  {
+   "id": "T11",
+   "title": "2-D: «קשת AB = 2/3» is degrees, never the chord",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 2/3"
+   ],
+   "lookFor": "The row reads ∠AOB = 2/3° as a typeset fraction, the arc is labelled 2/3°, no chord label, no raw decimal.",
+   "before": "Chord AB = 2/3."
+  },
+  {
+   "id": "T12",
+   "title": "2-D: a pinned radius draws in every configuration",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל O ברדיוס r",
+    "קטע OR",
+    "OR=r",
+    "r = 5"
+   ],
+   "cycles": 3,
+   "lookFor": "O, R and the circle are drawn in every configuration, all four rows green, OR = 5. The ⚠ note about the letter r is the existing notice on a committed row.",
+   "before": "Every configuration but the first was empty.",
+   "expectRefusal": "נקראה כסמל מידה"
+  },
+  {
+   "id": "T13",
+   "title": "2-D: a reversed extension is refused and offers the sentence",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל שמרכזו P ברדיוס 3",
+    "נקודה A על מעגל P",
+    "נקודה O",
+    "OP = 10",
+    "המשך AO חותך את מעגל P בנקודה R"
+   ],
+   "expectRefusal": "המשך OA חותך את מעגל P בנקודה R",
+   "lookFor": "Refused, offering «המשך OA חותך את מעגל P בנקודה R».",
+   "before": "Drew R beyond A, green."
+  },
+  {
+   "id": "T14",
+   "title": "2-D: the report still draws R past O",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל שמרכזו O",
+    "מעגל שמרכזו P",
+    "נקודה A על מעגל P",
+    "המשך AO חותך את מעגל P בנקודה R"
+   ],
+   "expectFigure": [
+    "R"
+   ],
+   "lookFor": "Green, R drawn.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T15",
+   "title": "Analytic: a fifth tangent is refused",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "נתון מעגל שמרכזו O(0,0) ורדיוסו 2",
+    "נתון מעגל שמרכזו K(6,0) ורדיוסו 1",
+    "AB משיק משותף למעגלים O ו-K",
+    "CD משיק משותף למעגלים O ו-K",
+    "EF משיק משותף למעגלים O ו-K",
+    "GH משיק משותף למעגלים O ו-K",
+    "IJ משיק משותף למעגלים O ו-K"
+   ],
+   "expectRefusal": "לשני מעגלים אין משיק משותף חמישי",
+   "lookFor": "The fifth refused, naming the count.",
+   "before": "Recorded on AB's line."
+  },
+  {
+   "id": "T16",
+   "title": "Analytic: a circle inside a circle names the reason",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "נתון מעגל שמרכזו O(0,0) ורדיוסו 5",
+    "נתון מעגל שמרכזו K(1,0) ורדיוסו 2",
+    "AB משיק משותף למעגלים O ו-K"
+   ],
+   "expectRefusal": "למעגל המוכל בתוך מעגל אין אף משיק משותף",
+   "lookFor": "Refused with the reason.",
+   "before": "«לא נמצאה תצורה…»."
+  },
+  {
+   "id": "T17",
+   "title": "3-D: repeating a point in the other spelling",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "A(0,0,0)",
+    "B(√2,0,0)",
+    "B=(√2,0,0)"
+   ],
+   "expect": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "No third row, the note.",
+   "before": "A third row with ✓."
+  },
+  {
+   "id": "T18",
+   "title": "3-D: a length repeated with its letters swapped",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "AB = 3",
+    "BA = 3"
+   ],
+   "expect": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "Two rows, the note.",
+   "before": "A third row with ✓."
+  },
+  {
+   "id": "T19",
+   "title": "3-D: an answer on a computed point keeps its row",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "A(0,0,0)",
+    "B(2,0,0)",
+    "M אמצע AB",
+    "M=(1,0,0)"
+   ],
+   "expectAbsent": [
+    "כבר קיים"
+   ],
+   "lookFor": "A fourth row, no «כבר קיים».",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T20",
+   "title": "Analytic: a letter after the coordinates is taught",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "y=3x+2",
+    "(3,5)A"
+   ],
+   "expect": [
+    "שם הנקודה נכתב לפני השיעורים"
+   ],
+   "lookFor": "The note teaches «A(3,5)».",
+   "before": "Not understood, then a paid model call."
+  },
+  {
+   "id": "T21",
+   "title": "Analytic: «A = (3,5)» is taught, not drawn",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "y=3x+2",
+    "A = (3,5)"
+   ],
+   "expect": [
+    "נקודה נכתבת בלי סימן שוויון"
+   ],
+   "lookFor": "The note teaches «A(3,5)».",
+   "before": "Not understood."
+  },
+  {
+   "id": "T22",
+   "title": "Analytic: an arc in π is refused honestly",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 4π"
+   ],
+   "expectRefusal": "הכלי עדיין לא קורא אורך של קשת",
+   "lookFor": "Refused, no arc drawn.",
+   "before": "A tiny 12.57° arc, green."
+  },
+  {
+   "id": "T23",
+   "title": "Analytic: a length unit on an arc gets the same answer",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 4 ס\"מ"
+   ],
+   "expectRefusal": "הכלי עדיין לא קורא אורך של קשת",
+   "lookFor": "Refused, nothing drawn.",
+   "before": "A 4° arc."
+  },
+  {
+   "id": "T24",
+   "title": "Analytic: an arc sum in π is refused",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל O",
+    "A על מעגל O",
+    "B על מעגל O",
+    "C על מעגל O",
+    "D על מעגל O",
+    "קשת AB + קשת CD = π"
+   ],
+   "expectRefusal": "זוויות נכתבות במעלות",
+   "lookFor": "The radian refusal.",
+   "before": "Read as 3.14 degrees."
+  },
+  {
+   "id": "T25",
+   "title": "2-D: a length unit makes it the arc's length",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 4 ס\"מ"
+   ],
+   "lookFor": "The arc is 4 long with 4 written on it.",
+   "before": "A 4° arc."
+  },
+  {
+   "id": "T26",
+   "title": "Analytic: «הישר» binds the one line",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "y=3x+2",
+    "הנקודה (1,5) על הישר"
+   ],
+   "lookFor": "The point sits on the line at (1,5).",
+   "before": "Not understood."
+  },
+  {
+   "id": "T27",
+   "title": "3-D: the π refusal speaks of space",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "∠ABC = π"
+   ],
+   "expectRefusal": "בגאומטריה של המרחב",
+   "lookFor": "«בגאומטריה של המרחב…».",
+   "before": "«…של המישור…»."
+  },
+  {
+   "id": "T28",
+   "title": "2-D keeps the plane sentence",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "∠ABC = π"
+   ],
+   "expectRefusal": "בגאומטריה של המישור",
+   "lookFor": "«בגאומטריה של המישור…».",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T29",
+   "title": "Analytic: median to the hypotenuse on the shown triangle",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "תיכון ליתר"
+   ],
+   "cycles": 2,
+   "expectConfigsDiffer": true,
+   "expectFigure": [
+    "M"
+   ],
+   "lookFor": "M appears; each configuration moves the right angle.",
+   "before": "Refused with a question."
+  },
+  {
+   "id": "T30",
+   "title": "Analytic: «MK אנך לציר x» keeps the student's K",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "M(3,4)",
+    "MK אנך לציר x"
+   ],
+   "expectFigure": [
+    "K"
+   ],
+   "lookFor": "K drawn at (3,0), no H.",
+   "before": "Refused, naming K."
+  },
+  {
+   "id": "T31",
+   "title": "2-D: a foot from a point on a side",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "M על AC",
+    "MK אנך ל-AB"
+   ],
+   "lookFor": "K on line AB, MK at a right angle to AB.",
+   "before": "Refused «cannot place M…»."
+  },
+  {
+   "id": "T32",
+   "title": "2-D: a vertex against a stated right angle is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "זווית A ישרה",
+    "CM תיכון ליתר"
+   ],
+   "expectRefusal": "נאמר שהזווית הישרה היא בקודקוד A",
+   "lookFor": "Refused, naming the stated vertex.",
+   "before": "A line drawn with no refusal."
+  },
+  {
+   "id": "T33",
+   "title": "2-D: a median with a typed foot letter",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "תיכון לצלע AB בנקודה K"
+   ],
+   "expectFigure": [
+    "K"
+   ],
+   "lookFor": "The median ends at K, no M.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T34",
+   "title": "Analytic: the same circle in another spelling is not drawn twice",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "נתון מעגל שמשוואתו (x-13)^2+y^2=R^2",
+    "נתון מעגל שמשוואתו (x-13)^2+y^2-R^2=0"
+   ],
+   "expect": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "«זה כבר קיים באיור», one circle, one row.",
+   "before": "A second circle drawn on the first."
+  },
+  {
+   "id": "T35",
+   "title": "2-D: asking answers and leaves the panel closed",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "ריבוע ABCD",
+    "G על AD",
+    "זווית GBA = 37"
+   ],
+   "asks": [
+    "∠GBC"
+   ],
+   "expect": [
+    "53"
+   ],
+   "lookFor": "The row reads 53°, the card stays closed.",
+   "before": "The full card opened."
+  },
+  {
+   "id": "T36",
+   "title": "Complex: a bare name answers",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "lines": [
+    "z1 = 3+4i",
+    "w = 2z1"
+   ],
+   "asks": [
+    "w"
+   ],
+   "expect": [
+    "6+8i"
+   ],
+   "lookFor": "w = 6+8i.",
+   "before": "«זהו נתון, לא שאלה»."
+  },
+  {
+   "id": "T37",
+   "title": "Analytic: the narrowing note",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מלבן ABCD",
+    "מעוין ABCD"
+   ],
+   "expect": [
+    "ⓘ",
+    "ABCD הוא כעת ריבוע"
+   ],
+   "lookFor": "The ⓘ note.",
+   "before": "The same words on amber."
+  },
+  {
+   "id": "T38",
+   "title": "3-D: the narrowing note gains the ⓘ",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מלבן ABCD",
+    "מעוין ABCD"
+   ],
+   "expect": [
+    "ⓘ",
+    "ABCD הוא כעת ריבוע"
+   ],
+   "lookFor": "The ⓘ opens the note.",
+   "before": "No ⓘ."
+  },
+  {
+   "id": "T39",
+   "title": "3-D: the pyramid note names the base",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "פירמידה ישרה SABCD שבסיסה מרובע"
+   ],
+   "expect": [
+    "(ABCD)"
+   ],
+   "expectAbsent": [
+    "ABCDS)"
+   ],
+   "lookFor": "«הבסיס (ABCD)», ⓘ strip.",
+   "before": "«(ABCDS)»."
+  },
+  {
+   "id": "T40",
+   "title": "Complex: a typed decimal reads as typed, canvas and panel",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "lines": [
+    "z = 0.5+1.25i"
+   ],
+   "lookFor": "The canvas and the panel both read z = 0.5+1.25i.",
+   "before": "z = 1/2+(5/4)i on both."
+  },
+  {
+   "id": "T41",
+   "title": "3-D: keeps a typed fraction coefficient",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "פירמידה משולשת ABCS",
+    "D על SB",
+    "נסמן: SB = u",
+    "SD = (2/3)u"
+   ],
+   "lookFor": "The given row reads 2/3 u.",
+   "before": "0.6667u."
+  },
+  {
+   "id": "T42",
+   "title": "Analytic: a length with π",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "AB = 4π"
+   ],
+   "expectFigure": [
+    "4π"
+   ],
+   "lookFor": "«4π» on AB.",
+   "before": "«12.57»."
+  },
+  {
+   "id": "T43",
+   "title": "Analytic: a root is not simplified",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "BC=√8"
+   ],
+   "expectFigure": [
+    "√8"
+   ],
+   "lookFor": "«√8» on the segment.",
+   "before": "«2√2»."
+  },
+  {
+   "id": "T44",
+   "title": "2-D: a given row matches the canvas",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "משולש ABC",
+    "AB = √8"
+   ],
+   "lookFor": "After pressing «חשב ערכים», the «נתון» row and the canvas both read √8.",
+   "before": "The row read 2√2.",
+   "after": [
+    {
+     "click": "חשב ערכים"
+    }
+   ]
+  },
+  {
+   "id": "T45",
+   "title": "3-D: a vector typed with the arrow shows as one on its row",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "B(0,7,8)",
+    "BA→=(-3,4,5)"
+   ],
+   "lookFor": "The arrow spans BA on the third row.",
+   "before": "Flat text."
+  },
+  {
+   "id": "T46",
+   "title": "3-D: a perpendicularity between segments stays plain",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "AB מאונך ל-AD"
+   ],
+   "lookFor": "No arrows on the row.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T47",
+   "title": "Analytic: a correct AI answer for a circle given by its diameter",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל שקוטרו 6 ומרכזו (0,0)"
+   ],
+   "llm": {
+    "מעגל שקוטרו 6 ומרכזו (0,0)": [
+     "x^2 + y^2 = 9"
+    ]
+   },
+   "expectAbsent": [
+    "הבנתי רק חלקית"
+   ],
+   "lookFor": "Accepted, a circle of radius 3.",
+   "before": "Refused naming «6»."
+  },
+  {
+   "id": "T48",
+   "title": "Complex: a long decimal is two places, never a fraction",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "lines": [
+    "z = 7.9999"
+   ],
+   "lookFor": "z = 8 on the canvas and in the panel.",
+   "before": "z = 79999/10000."
+  },
+  {
+   "id": "T49",
+   "title": "Complex: a decimal is rounded to two places in the panel",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "lines": [
+    "z = 1.234"
+   ],
+   "lookFor": "z = 1.23 in the panel.",
+   "before": "z = 617/500."
+  },
+  {
+   "id": "T50",
+   "title": "Complex: a root alone keeps its panel reading",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "lines": [
+    "z = √8"
+   ],
+   "lookFor": "Panel z = 2√2, canvas z = √8.",
+   "before": "Panel unchanged."
+  },
+  {
+   "id": "T51",
+   "title": "3-D: a named circle shows its stated radius",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מעגל O ברדיוס 3"
+   ],
+   "lookFor": "Under «מדידות» the panel reads «רדיוס O = 3», correct in RTL.",
+   "before": "The panel read «אין עדיין נתונים יציבים להצגה», and no 3 appeared anywhere."
+  },
+  {
+   "id": "T52",
+   "title": "2-D: a decimal on an arc is unchanged",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 1.5"
+   ],
+   "expect": [
+    "∠AOB = 1.5"
+   ],
+   "lookFor": "The row reads «∠AOB = 1.5».",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T53",
+   "title": "PR #2723: a point on a diagonal with a free vector",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "E על AC' כך ש-AE = t·p"
+   ],
+   "cycles": 1,
+   "lookFor": "The cube stays still, p is parallel to the diagonal, and «הציגו תצורה אחרת» moves E and p's length.",
+   "before": "Refused as the tool's limit."
+  },
+  {
+   "id": "T54",
+   "title": "PR #2723: a letter on an existing segment",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "AD = k·p"
+   ],
+   "lookFor": "p parallel to AD, the cube unmoved.",
+   "before": "Refused as the tool's limit."
+  },
+  {
+   "id": "T55",
+   "title": "PR #2723: a span point over an undefined vector",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "מנסרה ישרה משולשת ABC",
+    "M אמצע B'C'",
+    "K על AA' כך ש-AK = 2KA'",
+    "נסמן: AA' = w, KC = v",
+    "וקטור u",
+    "P על AM כך ש-KP = αu + βv"
+   ],
+   "lookFor": "P sits on AM, and the givens list shows the line with its letters.",
+   "before": "Refused as the tool's limit."
+  },
+  {
+   "id": "T56",
+   "title": "PR #2723: perpendicular to a segment",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "p ⟂ AB"
+   ],
+   "cycles": 1,
+   "lookFor": "p is perpendicular to AB and still changes between configurations.",
+   "before": "Refused as the tool's limit."
+  },
+  {
+   "id": "T57",
+   "title": "PR #2723: the figure moves with the vector",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "פירמידה SABCD שבסיסה מרובע",
+    "וקטור p",
+    "AB = k·p",
+    "DC = m·p"
+   ],
+   "lookFor": "The base becomes a trapezoid with p along it.",
+   "before": "Refused as the tool's limit."
+  },
+  {
+   "id": "T58",
+   "title": "PR #2723: refusal, cannot hold",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "AB = k·p",
+    "AD = m·p"
+   ],
+   "lookFor": "The last line is refused as wrong, not as the tool's limit.",
+   "before": "Refused at «AB = k·p», as the tool's limit.",
+   "expectRefusal": "הטענה לא מתקיימת"
+  },
+  {
+   "id": "T59",
+   "title": "PR #2723: refusal, stays the tool's limit",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "p ⟂ מישור ABC"
+   ],
+   "lookFor": "The «מגבלה של הכלי» text.",
+   "before": "Unchanged.",
+   "expectRefusal": "הכלי עדיין לא יודע לפתור"
+  },
+  {
+   "id": "T60",
+   "title": "PR #2723: a stated sign (found in round)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "וקטור p",
+    "AD = k·p",
+    "k חיובי"
+   ],
+   "cycles": 1,
+   "lookFor": "Accepted, and k is positive in every configuration.",
+   "before": "Refused at «AD = k·p»."
+  },
+  {
+   "id": "T61",
+   "title": "PR #2724: the kite says which sides it chose",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD"
+   ],
+   "cycles": 1,
+   "expect": [
+    "הכלי לא יודע אילו צלעות שוות"
+   ],
+   "lookFor": "The note, no equal-side ticks at rest (a relation is never a mark at rest), and «הציגו תצורה אחרת» swaps the pair.",
+   "before": "No note, a fixed pair."
+  },
+  {
+   "id": "T62",
+   "title": "PR #2724: stating the pair settles it",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD",
+    "AB = AD"
+   ],
+   "lookFor": "The line is kept, the note goes, no more swapping.",
+   "before": "«כבר ידוע»."
+  },
+  {
+   "id": "T63",
+   "title": "PR #2724: the other pair draws a kite",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD",
+    "BA = BC"
+   ],
+   "lookFor": "Axis BD, a kite and not a rhombus.",
+   "before": "A rhombus."
+  },
+  {
+   "id": "T64",
+   "title": "PR #2724: main diagonal with the pair unstated",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD",
+    "משוואת האלכסון הראשי היא y=2x"
+   ],
+   "cycles": 1,
+   "lookFor": "It builds; the row reads «האלכסון הראשי: -2x + y = 0» with «y = 2x» under it, analytic's usual form. Cycling puts A,C or B,D on the line. No equal-side ticks at rest.",
+   "before": "Always AC."
+  },
+  {
+   "id": "T65",
+   "title": "PR #2724: pair stated after the line",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD",
+    "משוואת האלכסון הראשי היא y=2x",
+    "AB = AD"
+   ],
+   "lookFor": "The row becomes «AC: -2x + y = 0» with «y = 2x» under it, the note goes, A and C stay on the line, no ticks. No name on the line on the canvas, as for every line in analytic.",
+   "before": "The line is AC from the start, and the pair says «כבר ידוע»."
+  },
+  {
+   "id": "T66",
+   "title": "PR #2724: the other pair after the line",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "דלתון ABCD",
+    "משוואת האלכסון הראשי היא y=2x",
+    "BA = BC"
+   ],
+   "lookFor": "The row reads «BD: -2x + y = 0», no ticks. Never a rhombus.",
+   "before": "A line AC on a rhombus."
+  },
+  {
+   "id": "T67",
+   "title": "PR #2724: an open base in the panel and beside the side",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש שווה שוקיים ABC",
+    "משוואת הבסיס היא x-2y+6=0"
+   ],
+   "cycles": 1,
+   "lookFor": "The panel reads «הבסיס: x - 2y + 6 = 0»; the equation is beside the base and moves with it; the equal-sides note stays.",
+   "before": "Nothing shown."
+  },
+  {
+   "id": "T68",
+   "title": "PR #2724: equation and length on one side",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "BC = 5",
+    "משוואת הצלע BC היא x-2y+6=0"
+   ],
+   "lookFor": "Both are readable, not overlapping.",
+   "before": "No equation text."
+  }
+ ]
+}
