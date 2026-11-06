@@ -226,3 +226,20 @@ describe('#1542 — a plane equation restated follows #2341 (already known, no r
     expect(st().lastNotice).not.toEqual({ code: 'already-stated' });
   });
 });
+
+describe('#1542 Am. 1 — a digit glued to a variable is its coefficient, never the plane\'s index', () => {
+  it.each([
+    ['מישור π 2x+y=1', 'π', 2],
+    ['מישור π2x+y=1', 'π', 2],
+    ['מישור π 12x+y=1', 'π', 12],
+    ['מישור π 2.5x+y=1', 'π', 2.5],
+    ['מישור π2: x+y=1', 'π2', 1],
+    ['המישור π2 x-y+z=1', 'π2', 1],
+    ['מישור π1 - x+y+z=1', 'π1', 1],
+  ])('%s', (line, name, cx) => {
+    const c = (commands(parse3(line)) as Array<{ type: string; name: string; plane: { cx: { k: number } } }>)[0];
+    expect(c.type).toBe('plane3');
+    expect(c.name).toBe(name);
+    expect(c.plane.cx.k).toBe(cx);
+  });
+});

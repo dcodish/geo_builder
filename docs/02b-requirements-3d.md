@@ -615,6 +615,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   nothing and gives its real reason. No notice: the new row in the list is the signal.
   - Sources: ADR-3D-124, ADR-3D-206, [ADR-3D-388](06b-decisions-3d.md#adr-3d-388); #487, #2484.
 - **FR-EQ-9 (Must)** — **A plane's equation is read in every spelling of the sentence, with no model.** A plane named by
+  A dash after the name is a separator, and a digit glued to a variable is its coefficient: «מישור π 2x+y=1» is π: 2x+y=1, while «מישור π2: x+y=1» names π2 ([ADR-3D-429](06b-decisions-3d.md#adr-3d-429) Am. 1).
   its points or by π takes one head: the noun («מישור», «המישור», "plane"), the lead «משוואת», «המשוואה של», "the equation
   of", and a colon, the copula «הוא» / «היא» / "is", a spaced dash, or nothing, behind the framing «נתון כי» / "given that".
   «משוואת מישור A'B'C'D' היא x+4y-8z-126=0» and «המישור π הוא z-3=0» build like their colon forms. A dash after a bare

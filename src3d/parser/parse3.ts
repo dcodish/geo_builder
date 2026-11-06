@@ -2479,8 +2479,9 @@ const bareSegment: Rule = (s) => {
 // ---------------------------------------------------------------------------
 
 /** Plane names: π1 / pi1 / a bare π → canonical `π<digits?>`. #1542: the optional space belongs to the INDEX («π 1»):
- *  it used to sit outside it, so a bare «π» took the space that `defBody` reads before a copula or a dash. */
-const PLANE_NAME = /(?:π|pi|Pi|PI)(?:\s?(\d+))?/;
+ *  it used to sit outside it, so a bare «π» took the space that `defBody` reads before a copula or a dash. A digit glued to
+ *  a variable is that variable's coefficient, never the index: «מישור π 2x+y=1» is π: 2x+y=1 (operator 2026-11-06, ADR-3D-429 Am. 1). */
+const PLANE_NAME = /(?:π|pi|Pi|PI)(?:\s?(\d+)(?!\d|\.\d|[a-zA-Z(*·]))?/;
 const canonicalPlane = (s: string): string => `π${s.match(/\d+/)?.[0] ?? ''}`;
 /** #1542 — the noun of a plane's defining statement, with its optional "equation of" lead: every plane rule reads one
  *  head. A lead with no noun is not a head: «משוואת x+y=1» names nothing. */
