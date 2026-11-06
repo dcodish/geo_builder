@@ -2214,7 +2214,16 @@ const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean 
 /** #2674 (ADR-3D-415): a command as the student STATED it — a letter given to a tool's point by a later line is a
  *  naming, not part of «אמצע BB'», so the line typed again is still the same statement, and its utterance still
  *  lowers to it (the fixture drift net reads this). */
-export const statedCommand3 = (k: Command3): Command3 => (k.type === 'midpoint-auto' && k.id !== undefined ? { type: k.type, a: k.a, b: k.b } : k);
+export const statedCommand3 = (k: Command3): Command3 => {
+  if (k.type === 'midpoint-auto' && k.id !== undefined) return { type: k.type, a: k.a, b: k.b };
+  // #1549 (ADR-3D-430): `spelled` is how the line was written, not what it states: «cos(AB,AD)=0» after «AB ⟂ AD» is
+  // still a twin, and a file saved before the field is no drift
+  if (k.type === 'cos-angle' && k.spelled) {
+    const { spelled: _spelled, ...stated } = k;
+    return stated;
+  }
+  return k;
+};
 
 /**
  * A ring's identity up to rotation and reversal (ADR-W-121; 2-D's `ringKey`, copied by design — the engine

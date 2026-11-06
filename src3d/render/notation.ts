@@ -43,11 +43,11 @@ export function splitVectorClause3(row: string): { head: string; clause: string 
  * `mag-val` / `mag-rel`: a bare «|AB|» parses to `length-eq`, so these are reached only through a vector marking or
  * a named vector and never arrow a length.
  *
- * `cos-angle` IS NOT DECIDED HERE: it is 'plain' pending a ruling, and that is not an oversight. The 2026-09-29 ruling
- * names «cos(AB,AD)=0», but the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every
- * right-angled base lower to (measured, ADR-3D-425), so 'vector' here would arrow segments in rows #313 keeps plain.
+ * `cos-angle` IS THE ONE KIND THE KIND CANNOT ANSWER (ADR-3D-430). «cos(AB,AD)=0» wears arrows, while «AB ⟂ AD»,
+ * «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base lower to the same kind and stay plain (operator,
+ * 2026-11-06: arrows on the cos spelling only). So it reads as the command's `spelled` says.
  */
-type VectorReading3 = 'vector' | 'plain';
+type VectorReading3 = 'vector' | 'plain' | 'as-spelled';
 const VECTOR_READING_3: Record<Command3['type'], VectorReading3> = {
   'name-vector': 'vector',
   'vec-rel': 'vector',
@@ -61,7 +61,7 @@ const VECTOR_READING_3: Record<Command3['type'], VectorReading3> = {
   'vec-mag': 'vector',
   'draw-arrow': 'vector',
   'declare-vector': 'vector',
-  'cos-angle': 'plain', // see above: awaiting the operator's ruling (ADR-3D-425)
+  'cos-angle': 'as-spelled',
   claim: 'plain', // read through CLAIM_VECTOR_READING_3
   'mutual-rel': 'plain',
   'plane-rel': 'plain',
@@ -128,14 +128,14 @@ const VECTOR_READING_3: Record<Command3['type'], VectorReading3> = {
 };
 
 /** The same question over the claim union, the `claim` command's sub-kind (#1549). */
-const CLAIM_VECTOR_READING_3: Record<Claim3['type'], VectorReading3> = {
+const CLAIM_VECTOR_READING_3: Record<Claim3['type'], Exclude<VectorReading3, 'as-spelled'>> = {
   'vec-eq': 'vector',
   'vec-val': 'vector',
   'dot-val': 'vector',
   'dot-eq': 'vector',
   'mag-rel': 'vector',
   'mag-val': 'vector',
-  'cos-angle-eq': 'plain', // with `cos-angle`: awaiting the ruling
+  'cos-angle-eq': 'plain', // engine-made: no parser emits it, so no student spelling reaches a row
   'cos-eq': 'plain', // likewise
   'length-rel': 'plain',
   'length-letter': 'plain',
@@ -171,9 +171,10 @@ const CLAIM_VECTOR_READING_3: Record<Claim3['type'], VectorReading3> = {
 };
 
 /** One command's reading. The shape is structural (a test may pass a literal), so an unknown kind reads as prose. */
-const readsAsVector3 = (cmd: { type: string; claim?: { type: string } }): boolean => {
+const readsAsVector3 = (cmd: { type: string; claim?: { type: string }; spelled?: string }): boolean => {
   if (cmd.type === 'claim') return (CLAIM_VECTOR_READING_3 as Record<string, VectorReading3 | undefined>)[cmd.claim?.type ?? ''] === 'vector';
-  return (VECTOR_READING_3 as Record<string, VectorReading3 | undefined>)[cmd.type] === 'vector';
+  const reading = (VECTOR_READING_3 as Record<string, VectorReading3 | undefined>)[cmd.type];
+  return reading === 'vector' || (reading === 'as-spelled' && cmd.spelled !== undefined);
 };
 
 /** Apply textbook vector notation to a vector-statement utterance: pair arrows + name underlines. */
@@ -215,7 +216,7 @@ export function vectorNotation(utterance: string, vecNames: Set<string>): string
 /** Is this fact a VECTOR statement? (#313: the MathML layer applies only where this is true —
  *  an arrow on a segment name in a prose row would assert vector-ness the statement never had.)
  *  One vector command anywhere in the fact is enough (#1549). */
-export const isVectorFact3 = (f: { cmds: readonly { type: string; claim?: { type: string } }[] }): boolean =>
+export const isVectorFact3 = (f: { cmds: readonly { type: string; claim?: { type: string }; spelled?: string }[] }): boolean =>
   f.cmds.some(readsAsVector3);
 
 /**
@@ -224,7 +225,7 @@ export const isVectorFact3 = (f: { cmds: readonly { type: string; claim?: { type
  * the length spelling, `|AA'| = 3|BC|` (`lengthReadingText3`).
  */
 export function factDisplay3(
-  f: { utterance: string; cmds: { type: string; claim?: { type: string } }[] },
+  f: { utterance: string; cmds: { type: string; claim?: { type: string }; spelled?: string }[] },
   vecNames: Set<string>,
   reading?: SegmentEquationReading3,
 ): string {

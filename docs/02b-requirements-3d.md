@@ -556,8 +556,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   a single coordinate («y של A») stays undetermined, since a letter is a name, not a value.
   **The step list follows the same reading:** a line the tool reads as a vector shows vector notation on its row and
   in the strip under the box, whether or not the student typed an arrow («BA=(-3,4,5)» shows `BA⃗ = (−3, 4, 5)`);
-  a length stays plain (operator, 2026-09-29: *"Display follows meaning: always arrows."*).
-  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077; [ADR-3D-425](06b-decisions-3d.md#adr-3d-425), #1549.
+  a length stays plain (operator, 2026-09-29: *"Display follows meaning: always arrows."*). A row typed with cos of two
+  operands («cos(AB,AD)=0») shows arrows, while a perpendicularity («AB ⟂ AD») and a right-angled shape stay plain
+  (operator, 2026-11-06).
+  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077; [ADR-3D-425](06b-decisions-3d.md#adr-3d-425), [ADR-3D-430](06b-decisions-3d.md#adr-3d-430), #1549.
 
 ## Equations — the algebraic lane
 

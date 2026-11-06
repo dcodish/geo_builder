@@ -1120,9 +1120,11 @@ export default function App3() {
                     // override that lock exists to prevent; the bidi layer places an LTR run inside an
                     // RTL base correctly, and a section that decides for itself is how that stopped.
                     dir: 'app',
+                    // #1549 (ADR-3D-430): through `VecMath`, like the step rows and the vector rows below: a bare
+                    // combining arrow is a stub over the last letter, and `mover` spans the name
                     rows: (dataPanel?.stated ?? []).map((r) => (
                       <span key={r} className="font-medium">
-                        <MathRun>{r}</MathRun>
+                        <MathRun><VecMath text={r} vecNames={new Set(vectorNames3(derived.construction))} /></MathRun>
                       </span>
                     )),
                   },

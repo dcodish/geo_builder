@@ -4347,7 +4347,7 @@ const cosAngleGiven: Rule = (s) => {
     // the V1 convention: an operand the student named as a point pair is DRAWN
     const draw: Command3[] = [];
     for (const at of [u, v2]) if (at.kind === 'pair') draw.push({ type: 'segment3', a: at.from, b: at.to });
-    return [...draw, { type: 'cos-angle', u, v: v2, cos: v }];
+    return [...draw, { type: 'cos-angle', u, v: v2, cos: v, spelled: 'cos' }];
   }
   // vertex form: cos∠ACB / cos ACB / קוסינוס הזווית ACB = value — rays CA, CB from the middle vertex
   m = s.match(/(?:cos|קוסינוס(?:\s+ה?זו?וית)?)\s*(?:∠|∡)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:הוא|היא|שווה\s+ל-?|is|=)\s*(.+)$/i);
