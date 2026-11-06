@@ -802,14 +802,15 @@ export function normalizeShapeComposition(prev: Construction, cmd: Command): Com
 }
 
 /**
- * #2231 ([ADR-795](../../docs/06-decisions.md#adr-795)) — «MK ⟂ AB» whose M is a free rider and whose K is a free point nothing
- * else is about. The ⟂ drives M's slide (`driveOrCheck`'s first rung), and when no position on M's segment holds it the step
- * was refused «cannot place M on segment AC», though K alone can carry the relation: a false refusal. This returns the
- * figure with that rider HELD, so the same statement falls to the free-point rung; `applyStep` asks it only when the ⟂ form,
- * its whole failure ladder and the rider's foot have no figure, and gives the rider its slide back on the result.
+ * #2231 ([ADR-795](../../docs/06-decisions.md#adr-795), [ADR-796](../../docs/06-decisions.md#adr-796)) — «MK ⟂ AB» or «MK ∥ AB»
+ * whose M is a free rider and whose K is a free point nothing else is about. The relation drives M's slide (`driveOrCheck`'s
+ * first rung), and when no position on M's segment holds it the step was refused «cannot place M on segment AC», though K alone
+ * can carry the relation: a false refusal. This returns the figure with that rider HELD, so the same statement falls to the
+ * free-point rung; `applyStep` asks it only when the relation, its whole failure ladder and (for a ⟂) the rider's foot have no
+ * figure, and gives the rider its slide back on the result.
  */
-export function heldRiderOfPerpendicular(prev: Construction, cmd: Command): { held: Construction; rider: Id } | null {
-  if (cmd.type !== 'set-perpendicular') return null;
+export function heldRiderOfRelation(prev: Construction, cmd: Command): { held: Construction; rider: Id } | null {
+  if (cmd.type !== 'set-perpendicular' && cmd.type !== 'set-parallel') return null;
   const byId = (id: Id) => prev.objects.find((o) => o.id === id);
   const carries = (x: Id, p: Id): boolean => {
     const o = byId(x);

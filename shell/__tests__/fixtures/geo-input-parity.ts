@@ -601,6 +601,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
   // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
   { id: 'perp-piece-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'], expect: 'builds', note: 'the relation in every builder: K is not assumed on AB (operator ruling 2026-11-06, ADR-795, ADR-AG-421)' },
+  { id: 'parallel-rider-2231', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK ∥ AB'], expect: 'builds', note: 'the relation in every builder, drawn: K carries it when the rider has no position (judged 2026-11-06, ADR-796)' },
+  { id: 'parallel-rider-square-2231', family: 'cevians-centres', steps: ['ריבוע ABCD', 'G על AD', 'GK ∥ AB'], expect: 'builds', note: 'the same sentence where G has no position that holds it: the seat 2-D refused (ADR-796)' },
   { id: 'perp-foot-stated-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'K is the foot, because the sentence says so; 3-D does not read the clause (it reaches the AI), and it has no «רגל האנך» sentence either (#1679)' },
   { id: 'perp-to-base-flat-1944', family: 'cevians-centres', steps: ['משולש ABC', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }] },
   { id: 'perp-to-base-trapezoid-1944', family: 'cevians-centres', steps: ['טרפז ABCD', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }], note: 'the foot drops on the PARALLEL base (CD in 2-D, DC in 3-D), not on the first side of the ring' },
@@ -778,10 +780,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'an-1620-perp-03', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-04', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'דרך E עובר ישר מקביל ל-AC החותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-05', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-06', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
-  { id: 'an-1620-perp-06b', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'EF ∥ AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }], note: 'a bare pair mints its new end (#1670 row 4, ADR-AG-210)' },
-  { id: 'an-1620-perp-06c', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-06d', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר EF מקביל ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
+  { id: 'an-1620-perp-06', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], expect: 'builds' },
+  { id: 'an-1620-perp-06b', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'EF ∥ AC'], expect: 'builds', note: 'a bare pair mints its new end (#1670 row 4, ADR-AG-210)' },
+  { id: 'an-1620-perp-06c', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'an-1620-perp-06d', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר EF מקביל ל-AC'], expect: 'builds' },
   { id: 'an-1620-perp-07', family: 'tangents', steps: ['מעגל O', 'A על המעגל', 'המשיק למעגל בנקודה A', 'משולש BCE', 'האנך מ-B ל-CE', 'המשיק והאנך נחתכים בנקודה D'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
 
   // ── #1620 S7 (ADR-AG-213): the two tangents meet — 01–06 agree with 2-D; 08–13 are analytic-ahead (2-D owes them, #1677) ──

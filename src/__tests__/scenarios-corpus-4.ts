@@ -6393,6 +6393,32 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'A'), at(fig, 'C')) / dist(at(fig, 'B'), at(fig, 'D')), 'the ratio holds').toBeCloseTo(2, 6);
     },
   },
+  {
+    id: 'parallel-relation-rider-2231',
+    title: '«משולש ABC» · «M על AC» · «MK ∥ AB»: the relation, drawn (#2231, ADR-796)',
+    guards:
+      'Judged 2026-11-06 (q4), on the rule of 2026-10-09 "Refuse only when nothing the student wrote can save it". K can carry the relation, so the line is never refused «cannot place M on segment AC».',
+    steps: ['משולש ABC', 'M על AC', 'MK ∥ AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - M.x) * uy - (K.y - M.y) * ux) / (dist(M, K) * dist(A, B)), 'MK ∥ AB').toBeLessThan(1e-5);
+    },
+  },
+  {
+    id: 'parallel-relation-rider-square-2231',
+    title: '«ריבוע ABCD» · «G על AD» · «GK ∥ AB»: the rider has no position that holds it, K carries it (#2231, ADR-796)',
+    guards: "The seat that was refused at the round tip: K's default gives G no root on AD, so the slide alone had no figure (q4, 2026-11-06).",
+    steps: ['ריבוע ABCD', 'G על AD', 'GK ∥ AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, G, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'G'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - G.x) * uy - (K.y - G.y) * ux) / (dist(G, K) * dist(A, B)), 'GK ∥ AB').toBeLessThan(1e-5);
+      expect(fig.construction.objects.find((o) => o.id === 'G'), 'G keeps its slide').toMatchObject({ kind: 'on-segment', free: true });
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

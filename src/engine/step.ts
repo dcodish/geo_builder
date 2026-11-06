@@ -11,7 +11,7 @@ import { engineErrorDebugText } from './errors';
 import { statedSegmentRatio, statedSegmentT } from './verify';
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, heldRiderOfPerpendicular, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, heldRiderOfRelation, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { circlesTouch, oneCommonPointError } from './evaluate';
 import { circlesStatedTangent } from './structure';
@@ -1622,9 +1622,9 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
       const viaFoot = solveReinterpreted(prev, footed, prevPositions, [...trace, 'm1:rider-foot']);
       if (viaFoot.ok) return viaFoot;
     }
-    // #2231 (ADR-795): a free rider with no position that holds it leaves the ⟂ to its other end, a free point nothing else
+    // #2231 (ADR-795, ADR-796): a free rider with no position that holds it leaves the ⟂ or ∥ to its other end, a free point nothing else
     // is about; the rider keeps its slide. Only where every path above refused, so no figure that built can change.
-    const held = heldRiderOfPerpendicular(prev, ncmd);
+    const held = heldRiderOfRelation(prev, ncmd);
     if (held) {
       const viaEnd = applyStepLadder(held.held, ncmd);
       if (viaEnd.ok) {

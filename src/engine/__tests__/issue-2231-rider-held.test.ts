@@ -1,11 +1,11 @@
 /**
- * #2231 ([ADR-795](../../../docs/06-decisions.md#adr-795)) — «MK ⟂ AB» with M a free rider and K a free point nothing else is
- * about. Measured at prod/2026-11-05-2: refused «cannot place M on segment AC so that MK ⟂ AB», though K alone can carry the
+ * #2231 ([ADR-795](../../../docs/06-decisions.md#adr-795), [ADR-796](../../../docs/06-decisions.md#adr-796)) — «MK ⟂ AB» or
+ * «MK ∥ AB» with M a free rider and K a free point nothing else is about. Measured at prod/2026-11-05-2: refused «cannot place M on segment AC so that MK ⟂ AB», though K alone can carry the
  * relation. The student's path is the scenarios `perp-relation-rider-2231`.
  */
 import { describe, expect, it } from 'vitest';
 import { applyStep } from '../step';
-import { heldRiderOfPerpendicular } from '../apply';
+import { heldRiderOfRelation } from '../apply';
 import type { Command, Construction, Vec } from '../types';
 
 /** A triangle whose side AC has no point at the K below's perpendicular: M's slide alone has no root. */
@@ -51,27 +51,55 @@ describe('#2231 — the ⟂ falls to its free end when the rider has no position
   });
 });
 
-describe('#2231 — heldRiderOfPerpendicular, what it claims', () => {
+describe('#2231 — the ∥ falls to its free end the same way (ADR-796)', () => {
+  const PARALLEL: Command = { type: 'set-parallel', a: 'M', b: 'K', c: 'A', d: 'B' };
+  const cross = (p: Map<string, Vec>) => {
+    const [m, k, a, b] = ['M', 'K', 'A', 'B'].map((id) => p.get(id)!);
+    return (k.x - m.x) * (b.y - a.y) - (k.y - m.y) * (b.x - a.x);
+  };
+
+  it('builds, the relation holds, K carried it and M keeps its place and its slide', () => {
+    const r = applyStep(figure(), PARALLEL);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.ladder).toContain('main:rider-held');
+    expect(Math.abs(cross(r.positions))).toBeLessThan(1e-4);
+    expect(r.positions.get('M')).toMatchObject({ x: 1, y: 1.8 });
+    expect(r.construction.objects.find((o) => o.id === 'M')).toMatchObject({ kind: 'on-segment', free: true });
+  });
+
+  it('either side of the relation', () => {
+    expect(heldRiderOfRelation(figure(), { type: 'set-parallel', a: 'A', b: 'B', c: 'K', d: 'M' })?.rider).toBe('M');
+  });
+
+  it('with no free end, the refusal stands: no letter of the sentence can carry it', () => {
+    const r = applyStep(figure([{ kind: 'segment', id: 'seg-KB', a: 'K', b: 'B' }]), PARALLEL);
+    if (r.ok) expect(r.ladder).not.toContain('main:rider-held');
+    expect(heldRiderOfRelation(figure([{ kind: 'segment', id: 'seg-KB', a: 'K', b: 'B' }]), PARALLEL)).toBeNull();
+  });
+});
+
+describe('#2231 — heldRiderOfRelation, what it claims', () => {
   it('the rider, held', () => {
-    const h = heldRiderOfPerpendicular(figure(), CMD);
+    const h = heldRiderOfRelation(figure(), CMD);
     expect(h?.rider).toBe('M');
     expect(h?.held.objects.find((o) => o.id === 'M')).toMatchObject({ free: false });
   });
 
   it('either side of the relation', () => {
-    expect(heldRiderOfPerpendicular(figure(), { type: 'set-perpendicular', a: 'A', b: 'B', c: 'K', d: 'M' })?.rider).toBe('M');
+    expect(heldRiderOfRelation(figure(), { type: 'set-perpendicular', a: 'A', b: 'B', c: 'K', d: 'M' })?.rider).toBe('M');
   });
 
   it('never a vertex: an end something else is about is not a free end', () => {
-    expect(heldRiderOfPerpendicular(figure(), { type: 'set-perpendicular', a: 'M', b: 'B', c: 'A', d: 'C' })).toBeNull();
+    expect(heldRiderOfRelation(figure(), { type: 'set-perpendicular', a: 'M', b: 'B', c: 'A', d: 'C' })).toBeNull();
     const used = figure([{ kind: 'segment', id: 'seg-KB', a: 'K', b: 'B' }]);
-    expect(heldRiderOfPerpendicular(used, CMD)).toBeNull();
+    expect(heldRiderOfRelation(used, CMD)).toBeNull();
   });
 
-  it('never a rider with a stated place, and only the ⟂', () => {
+  it('never a rider with a stated place, and only a ⟂ or a ∥', () => {
     const stated = figure();
     stated.objects = stated.objects.map((o) => (o.id === 'M' ? { ...o, free: false } : o));
-    expect(heldRiderOfPerpendicular(stated, CMD)).toBeNull();
-    expect(heldRiderOfPerpendicular(figure(), { type: 'set-parallel', a: 'M', b: 'K', c: 'A', d: 'B' })).toBeNull();
+    expect(heldRiderOfRelation(stated, CMD)).toBeNull();
+    expect(heldRiderOfRelation(figure(), { type: 'set-ratio', a: 'M', b: 'K', c: 'A', d: 'B', k: 2 })).toBeNull();
   });
 });

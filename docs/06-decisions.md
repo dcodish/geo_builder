@@ -20451,7 +20451,7 @@ No new student text. Every sentence is an existing ruled string.
 
 ## ADR-795 — «MK אנך ל-AB» assumes nothing about K: the relation, and the foot only when the sentence says so (#2231, #2232)
 
-**Date:** 2026-11-06 · **Status:** accepted · operator ruling · bug (2-D) · round #2727, stream E · branch `fix/2231-no-assumed-foot` · **supersedes [ADR-786](#adr-786) in part**
+**Date:** 2026-11-06 · **Status:** accepted · operator ruling · bug (2-D) · round #2727, stream E · branch `fix/2231-no-assumed-foot` · **supersedes [ADR-786](#adr-786) in part** · **⚠ Partly superseded by [ADR-796](#adr-796) (2026-11-06):** point 3, the rung reads a ∥ too
 **Operator:** 2026-11-06: *"this is something I need to revert. We should assume anything about this cases. If user want the point to be on a, they will need to say so. This is true to all tools."* (He means should NOT assume.)
 **Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** [LADDER](LADDER.md) row 2i⁺⁺. Stage: 2i⁺⁺, after the failure ladder.
 
@@ -20462,10 +20462,26 @@ No new student text. Every sentence is an existing ruled string.
 **Decision.**
 1. `perpendicularPiece` reads only the sentence that says where K lands: «MK אנך ל-AB בנקודה K», "MK is a perpendicular to AB at K". ADR-786's catalog line goes: the sentence needs a placed M, and the catalog lines build on a fresh figure. «MK אנך ל-AB» goes back to `perpendicularConstraint`.
 2. The false refusal is not re-created. `driveOrCheck`'s first rung gives a ⟂ to a free rider, and with no root the step was lost. Stage 2i⁺⁺: when the failure ladder and the rider's foot (ADR-728) have no figure, `heldRiderOfPerpendicular` re-runs the step with the rider held, so the free-point rung drives K; the rider gets its slide back on the result. It claims only a free rider with, at its other end, a free point nothing else is about, so a vertex never moves for it. It runs only where every other path refused, so no figure that built can change. The refusal stands for a sentence with no such end. This is a third arm beside the recruit ladder because the recruiter cannot see a directive held inside an `on-segment-solved` object, which is ADR-728's finding too.
-3. The rung is the ⟂'s only: the same refusal on «MK ∥ AB» was not in the ruling (see the round report's question).
+3. The rung is the ⟂'s only: the same refusal on «MK ∥ AB» was not in the ruling (see the round report's question). **⚠ Superseded by [ADR-796](#adr-796)** (judged 2026-11-06): the rung reads a ∥ too.
 
 **Sibling check.** Analytic: [ADR-AG-421](06c-decisions-analytic.md#adr-ag-421). 3-D reads the relation already; it does not read «בנקודה K» (a known-gap cell on parity row `perp-foot-stated-2232`).
 
 **Locks.** `src/engine/__tests__/issue-2231-rider-held.test.ts`; scenarios `perp-relation-rider-2231`, `perp-relation-vertex-2231`, `perp-piece-foot-2232` (now the stated foot), `perp-piece-keeps-relation-2232`; parity rows `perp-piece-2232`, `perp-foot-stated-2232`.
 
 **Behaviour change for a student:** «MK אנך ל-AB» no longer puts K on AB, and with M on a side it builds where it used to be refused; «AK אנך ל-BC» is back to K off BC; the same relation written «מאונך» or «⊥» with M on a side builds too; «MK אנך ל-AB בנקודה K» keeps the foot.
+
+## ADR-796 — Found under the judge's rulings: a ∥ a free letter can carry is drawn (#2231)
+
+**Date:** 2026-11-06 · **Status:** accepted · judged · bug (2-D) · round #2727, stream F · branch `fix/2727-found-rulings` · **supersedes [ADR-795](#adr-795) point 3**
+**Judged (q4):** 2026-11-06, under *"Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it."* (operator, 2026-10-09, #1927).
+**Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** [LADDER](LADDER.md) row 2i⁺⁺.
+
+**1. A ∥ about a free rider (#2231, stage 2i⁺⁺).** **Class.** *A two-pair relation about a free rider and a free point was given to the rider alone, so a figure the point could hold was refused.* ADR-795 closed it for the ⟂ and left the ∥ as a question. `heldRiderOfPerpendicular` becomes `heldRiderOfRelation` and reads `set-parallel` by the same claim: a free rider, and at its other end a free point nothing else is about. The trace token stays `main:rider-held`.
+
+**Measured at the round tip `2aec59d8`.** «משולש ABC · M על AC · MK ∥ AB», the question's sentence, built at the app's seed: K's default gives M a root. The refusal was real one seat over, in the engine at any K with no root on M's side, and in the app on «ריבוע ABCD · G על AD · GK ∥ AB», «מלבן ABCD · G על AD · GK ∥ AB», «משולש ABC · M על AB · MK ∥ BC» and «משולש ABC · M על AC · MK ∥ BC»: the line stayed in the box. All four now build. Where the slide alone can hold the relation nothing changes, because the stage runs only after every other path refused.
+
+**Sibling check.** Analytic and 3-D build the sentence in both seats; parity rows `parallel-rider-2231`, `parallel-rider-square-2231`. The rows `an-1620-perp-06`, `06b`, `06c`, `06d` («E על BC · EF ∥ AC»), a 2-D gap parked under #1677, now build and drop their cell.
+
+**Locks.** `src/engine/__tests__/issue-2231-rider-held.test.ts`; scenarios `parallel-relation-rider-2231`, `parallel-relation-rider-square-2231`.
+
+**Behaviour change for a student:** «GK ∥ AB» with G on a side and K new is drawn where it used to be refused.
