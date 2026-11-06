@@ -1,0 +1,891 @@
+{
+ "name": "round-2727",
+ "title": "Fix round #2727",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Analytic teaches the exam's perpendicular, and the next sentence uses it",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(-2,1)",
+    "B(10,7)",
+    "P על הקטע AB",
+    "AP:PB = 1:2",
+    "דרך הנקודה P מעבירים אנך לישר AB",
+    "הישר העובר דרך הנקודה P מאונך ל-AB",
+    "האנך חותך את הישר y = 7 בנקודה C"
+   ],
+   "lookFor": "The box is taught «הישר העובר דרך הנקודה P מאונך ל-AB»; with that sentence, C = (0, 7) and the line is drawn.",
+   "before": "Not understood.",
+   "expect": [
+    "(0, 7)"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "A second perpendicular makes «האנך» ask, counting two",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "P(1,2)",
+    "Q(3,3)",
+    "הישר העובר דרך P מאונך ל-AB",
+    "הישר העובר דרך Q מאונך ל-AB",
+    "האנך חותך את הישר y = 7 בנקודה C"
+   ],
+   "lookFor": "The last line is refused and says there are two. No C.",
+   "before": "Refused, counting none.",
+   "expectRefusal": "יותר מעצם אחד"
+  },
+  {
+   "id": "T3",
+   "title": "2-D builds the exam's noun spelling",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "קטע AB",
+    "P על AB",
+    "דרך הנקודה P מעבירים אנך לישר AB"
+   ],
+   "lookFor": "A green step, no model call.",
+   "before": "Asked the model."
+  },
+  {
+   "id": "T4",
+   "title": "2-D drops a perpendicular to a line",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "מהנקודה A מורידים אנך לישר BC"
+   ],
+   "lookFor": "Foot F drawn, green step.",
+   "before": "Refused.",
+   "expectFigure": [
+    "F"
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "A described line inside a crossing",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(-2,1)",
+    "B(10,7)",
+    "P על הקטע AB",
+    "AP:PB = 1:2",
+    "C היא נקודת החיתוך של הישר דרך P המאונך ל-AB עם הישר y=7"
+   ],
+   "lookFor": "C = (0, 7).",
+   "before": "Refused.",
+   "expect": [
+    "(0, 7)"
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "The same crossing with the operands swapped",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(-2,1)",
+    "B(10,7)",
+    "P על הקטע AB",
+    "AP:PB = 1:2",
+    "הישר y=7 חותך את הישר דרך P המאונך ל-AB בנקודה C"
+   ],
+   "lookFor": "C = (0, 7).",
+   "before": "Not understood.",
+   "expect": [
+    "(0, 7)"
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "A line with no relation stays refused",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(-2,1)",
+    "B(10,7)",
+    "P על הקטע AB",
+    "AP:PB = 1:2",
+    "C נקודת החיתוך של הישר דרך P עם הישר y=7"
+   ],
+   "lookFor": "The operand refusal; no C.",
+   "before": "Unchanged.",
+   "expectRefusal": "הישר דרך P"
+  },
+  {
+   "id": "T8",
+   "title": "The reported rectangle with a colon ratio over a root",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מלבן ABCD",
+    "A(0,0)",
+    "C(4,7)",
+    "B ברביע הראשון",
+    "AC",
+    "AB:AC=3:√(13)"
+   ],
+   "lookFor": "B = (6, 3), D = (−2, 4).",
+   "before": "Not understood.",
+   "expect": [
+    "(6, 3)",
+    "(-2, 4)"
+   ]
+  },
+  {
+   "id": "T9",
+   "title": "2-D colon ratio over a root",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "AB:AC=3:√13"
+   ],
+   "lookFor": "A green step.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T10",
+   "title": "3-D colon ratio over a root",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "AB:AC=3:√13"
+   ],
+   "lookFor": "A green step.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T11",
+   "title": "2-D divider with a root",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "קטע AB",
+    "C מחלקת את AB ביחס 1:√2"
+   ],
+   "lookFor": "C on AB.",
+   "before": "Not understood.",
+   "expectFigure": [
+    "C"
+   ]
+  },
+  {
+   "id": "T12",
+   "title": "A stray tail after a ratio is not dropped",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "AB:AC=3:2.5x"
+   ],
+   "lookFor": "No green step; the line is not committed.",
+   "before": "Built, with the x dropped.",
+   "expectRefusal": "לא הבנתי"
+  },
+  {
+   "id": "T13",
+   "title": "A bare pair is taught as a point",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "y=3x+2",
+    "(3,5)"
+   ],
+   "lookFor": "The box reads «נתונה הנקודה (3,5)» with the note «זוג מספרים לבדו אינו משפט…».",
+   "before": "Not understood."
+  },
+  {
+   "id": "T14",
+   "title": "A triple is not taught",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "(1,2,3)"
+   ],
+   "lookFor": "«לא הבנתי את הבקשה», box unchanged.",
+   "before": "Unchanged.",
+   "expectRefusal": "לא הבנתי"
+  },
+  {
+   "id": "T15",
+   "title": "A point stated above a point the givens place",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמשוואתו x^2+(y-5)^2=25",
+    "C על המעגל",
+    "C על ציר ה-y",
+    "C מעל ציר ה-x",
+    "A מעל C"
+   ],
+   "lookFor": "The line records, A drawn above C = (0, 10), and «הציגו תצורה אחרת» keeps A above it.",
+   "before": "Refused «לא נמצאה תצורה».",
+   "cycles": 2,
+   "expect": [
+    "(0, 10)"
+   ]
+  },
+  {
+   "id": "T16",
+   "title": "A chain of orders over that point",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמשוואתו x^2+(y-5)^2=25",
+    "C על המעגל",
+    "C על ציר ה-y",
+    "C מעל ציר ה-x",
+    "A מעל C",
+    "B מעל A"
+   ],
+   "lookFor": "Records, B above A above C.",
+   "before": "Refused on «A מעל C»."
+  },
+  {
+   "id": "T17",
+   "title": "An order that cannot hold is refused",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמשוואתו x^2+(y-5)^2=25",
+    "C על המעגל",
+    "C על ציר ה-y",
+    "C מעל ציר ה-x",
+    "A מעל C",
+    "A מתחת ל-C"
+   ],
+   "lookFor": "Refused, figure unchanged.",
+   "before": "Refused on «A מעל C», so this line was never reached.",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T18",
+   "title": "A free point above a stated point",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "C(0,10)",
+    "A מעל C"
+   ],
+   "lookFor": "Records, A above C.",
+   "before": "Records, at another first position."
+  },
+  {
+   "id": "T19",
+   "title": "Bars around two lengths draw them",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AC| = 2|BD|"
+   ],
+   "lookFor": "Both diagonals drawn.",
+   "before": "Neither."
+  },
+  {
+   "id": "T20",
+   "title": "A single length in bars still draws nothing",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AC| = 5"
+   ],
+   "lookFor": "No diagonal.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T21",
+   "title": "The reported trapezoid draws both diagonals",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "טרפז שווה שוקיים ABCD",
+    "|AC| = |BD|"
+   ],
+   "lookFor": "AC and BD both drawn, no tick.",
+   "before": "AC only."
+  },
+  {
+   "id": "T22",
+   "title": "A ratio in 3-D draws both",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "|AC| = 2|BD|"
+   ],
+   "lookFor": "Both diagonals, AC about twice BD.",
+   "before": "AC only."
+  },
+  {
+   "id": "T23",
+   "title": "The trapezoid alone draws no diagonal",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "טרפז שווה שוקיים ABCD"
+   ],
+   "lookFor": "Four sides only.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T24",
+   "title": "No question when only lengths can be true",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "AC = 2BD"
+   ],
+   "lookFor": "No question, the row reads «|AC| = 2|BD|».",
+   "before": "«לא ברור אם הכוונה לווקטור או לאורך».",
+   "expectRows": [
+    "|AC| = 2|BD|"
+   ]
+  },
+  {
+   "id": "T25",
+   "title": "A ratio in 2-D draws both",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "מרובע ABCD",
+    "AC = 2BD"
+   ],
+   "lookFor": "AC and BD drawn, row green.",
+   "before": "Neither."
+  },
+  {
+   "id": "T26",
+   "title": "The colon form in 2-D draws both",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "מרובע ABCD",
+    "AC:BD = 2:1"
+   ],
+   "lookFor": "AC and BD drawn.",
+   "before": "Neither."
+  },
+  {
+   "id": "T27",
+   "title": "A ratio that cannot hold is still refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "D אמצע AB",
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Refusal shown.",
+   "before": "Unchanged.",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T28",
+   "title": "Letter lengths still draw nothing",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "מרובע ABCD",
+    "AC = 2x",
+    "BD = 3x"
+   ],
+   "lookFor": "No diagonals.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T29",
+   "title": "His plane sentence builds with no model",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "משוואת מישור A'B'C'D' היא x+4y-8z-126=0",
+    "B(0,7,8)"
+   ],
+   "lookFor": "All green, plane drawn, B at (0, 7, 8).",
+   "before": "Line 2 went to the model.",
+   "expect": [
+    "(0, 7, 8)"
+   ]
+  },
+  {
+   "id": "T30",
+   "title": "A plane equation that moved the figure leads with the green dot and its chip",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "משוואת מישור A'B'C'D' היא x+4y-8z-126=0",
+    "B(0,7,8)"
+   ],
+   "lookFor": "Line 2 shows the green dot, not ✓, and «פאה בלבד» on the row.",
+   "before": "✓ «הטענה אומתה מול הציור».",
+   "expect": [
+    "פאה בלבד"
+   ]
+  },
+  {
+   "id": "T31",
+   "title": "A checked equation keeps ✓",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "A(1,0,0)",
+    "B(0,1,0)",
+    "C(0,0,1)",
+    "מישור ABC: x+y+z=1"
+   ],
+   "lookFor": "✓ on the row.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T32",
+   "title": "«הוא» after a bare π",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "המישור π הוא x+4y-8z-126=0"
+   ],
+   "lookFor": "One row, panel reads π: x + 4y - 8z - 126 = 0.",
+   "before": "Model."
+  },
+  {
+   "id": "T33",
+   "title": "The English sentence",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "the equation of plane π is x+4y-8z-126=0"
+   ],
+   "lookFor": "Panel reads π: x + 4y - 8z - 126 = 0.",
+   "before": "Model."
+  },
+  {
+   "id": "T34",
+   "title": "A dash after π is a separator",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מישור π - x+y+z=1"
+   ],
+   "lookFor": "Panel reads π: x + y + z - 1 = 0.",
+   "before": "−x + y + z − 1 = 0."
+  },
+  {
+   "id": "T35",
+   "title": "A multiple in other letters is already known",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "משוואת מישור A'B'C'D' היא x+4y-8z-126=0",
+    "מישור C'D'A'B': 2x+8y-16z-252=0"
+   ],
+   "lookFor": "«זה כבר קיים באיור», one plane in the panel.",
+   "before": "A third row and a second plane.",
+   "expect": [
+    "כבר קיים"
+   ]
+  },
+  {
+   "id": "T36",
+   "title": "Not an equation is refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "משוואת מישור A'B'C'D' היא x+4y"
+   ],
+   "lookFor": "«לא הבנתי את הבקשה…», nothing added.",
+   "before": "Unchanged (prod asks the model).",
+   "expectRefusal": "לא הבנתי"
+  },
+  {
+   "id": "T37",
+   "title": "A row typed with cos shows arrows",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABD",
+    "cos(AB,AD)=1/2"
+   ],
+   "lookFor": "Arrows spanning AB and AD on the row.",
+   "before": "Flat `cos(AB,AD)=1/2`."
+  },
+  {
+   "id": "T38",
+   "title": "Typed arrows print no raw arrow",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "cos(AB→,AD→)=0"
+   ],
+   "lookFor": "Stretchy arrows and no spacing «→».",
+   "before": "Flat with raw «→»."
+  },
+  {
+   "id": "T39",
+   "title": "A perpendicularity stays plain",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "AB ⟂ AD"
+   ],
+   "lookFor": "No arrows.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T40",
+   "title": "A root over a number reads true",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABD",
+    "cos(AB,AD)=√3/2"
+   ],
+   "lookFor": "√3 over 2, never a root over the whole fraction.",
+   "before": "Flat text."
+  },
+  {
+   "id": "T41",
+   "title": "A stated vector's arrow spans the name in the data panel",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "B(0,7,8)",
+    "BA=(-3,4,5)"
+   ],
+   "lookFor": "Under «נתונים שנתתם», the arrow spans BA.",
+   "before": "A stub over the A."
+  },
+  {
+   "id": "T42",
+   "title": "With M on a side, the relation builds and K stays off AB",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "M על AC",
+    "MK אנך ל-AB"
+   ],
+   "lookFor": "Green row, the new-point notice, K not on AB, on every «הציגו תצורה אחרת».",
+   "before": "K on AB as the foot.",
+   "cycles": 2,
+   "expect": [
+    "נוצרה נקודה חדשה K"
+   ]
+  },
+  {
+   "id": "T43",
+   "title": "From a vertex, K is not on BC",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "AK אנך ל-BC"
+   ],
+   "lookFor": "K off line BC.",
+   "before": "K on BC."
+  },
+  {
+   "id": "T44",
+   "title": "The foot stays when the sentence says so",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "M על AC",
+    "MK אנך ל-AB בנקודה K"
+   ],
+   "lookFor": "K on AB.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T45",
+   "title": "The adjective no longer refuses",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "M על AC",
+    "MK מאונך ל-AB"
+   ],
+   "lookFor": "Builds, K off AB.",
+   "before": "Refused «cannot place M on segment AC»."
+  },
+  {
+   "id": "T46",
+   "title": "Analytic: K is free on the vertical",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "M(3,4)",
+    "MK אנך לציר x"
+   ],
+   "lookFor": "K = (3, y_K), one degree of freedom.",
+   "before": "K = (3, 0).",
+   "expect": [
+    "דרגות חופש: 1"
+   ]
+  },
+  {
+   "id": "T47",
+   "title": "Analytic: the stated foot",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "M(3,4)",
+    "MK אנך לציר x בנקודה K"
+   ],
+   "lookFor": "K = (3, 0), fully determined.",
+   "before": "Unchanged.",
+   "expect": [
+    "(3, 0)"
+   ]
+  },
+  {
+   "id": "T48",
+   "title": "A parallelogram's pair still asks",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "AB = DC"
+   ],
+   "lookFor": "The length-or-vector question, the line stays in the box.",
+   "before": "Unchanged.",
+   "expectRefusal": "לווקטור"
+  },
+  {
+   "id": "T49",
+   "title": "A quadrilateral's opposite sides, named in order, no longer ask",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "AB = CD"
+   ],
+   "lookFor": "No question: the row reads «|AB| = |CD|» and the figure is an uncrossed quadrilateral. As vectors this pair would cross the ring, so only lengths can be true. Your ruling of 2026-10-04 named this very line as one that asks, and your rule of 2026-10-30 says ask only when both readings can be true. Which one stands?",
+   "before": "Asks «לווקטור או לאורך».",
+   "expectRows": [
+    "|AB| = |CD|"
+   ]
+  },
+  {
+   "id": "T50",
+   "title": "A parallel a free letter can carry",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "ריבוע ABCD",
+    "G על AD",
+    "GK ∥ AB"
+   ],
+   "lookFor": "The row is green, K on the canvas.",
+   "before": "Stayed in the box, refused.",
+   "expectFigure": [
+    "K"
+   ]
+  },
+  {
+   "id": "T51",
+   "title": "«האנך» lands on the drawn perpendicular",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "P על AB",
+    "דרך P מעבירים אנך ל-AB",
+    "האנך חותך את AC בנקודה E"
+   ],
+   "lookFor": "E on the canvas.",
+   "before": "Went to the model.",
+   "expectFigure": [
+    "E"
+   ]
+  },
+  {
+   "id": "T52",
+   "title": "Two perpendiculars ask which",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "P על AB",
+    "Q על AC",
+    "דרך P מעבירים אנך ל-AB",
+    "דרך Q מעבירים אנך ל-AC",
+    "E על האנך"
+   ],
+   "lookFor": "Asks which, naming both; the line stays in the box.",
+   "before": "Went to the model.",
+   "expectRefusal": "כמה אפשרויות"
+  },
+  {
+   "id": "T53",
+   "title": "The exam's two-given line",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2"
+   ],
+   "lookFor": "Two rows, P on AB.",
+   "before": "«לא הבנתי את הבקשה».",
+   "expectRows": [
+    "AP:PB = 1:2"
+   ]
+  },
+  {
+   "id": "T54",
+   "title": "A lowercase point is taught",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "c(4,7)"
+   ],
+   "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה».",
+   "before": "«לא הבנתי את הבקשה»."
+  },
+  {
+   "id": "T55",
+   "title": "A claim that sized the figure is a given",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "AB = 3",
+    "AC = 3√2"
+   ],
+   "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row.",
+   "before": "✓ on «AB = 3»."
+  },
+  {
+   "id": "T56",
+   "title": "A digit glued to a variable is its coefficient",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מישור π 2x+y=1"
+   ],
+   "lookFor": "The panel reads π: 2x + y - 1 = 0.",
+   "before": "π2: x + y - 1 = 0, the 2x gone.",
+   "expect": [
+    "2x + y - 1 = 0"
+   ]
+  }
+ ]
+}
