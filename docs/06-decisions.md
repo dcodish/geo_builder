@@ -20470,11 +20470,11 @@ No new student text. Every sentence is an existing ruled string.
 
 **Behaviour change for a student:** «MK אנך ל-AB» no longer puts K on AB, and with M on a side it builds where it used to be refused; «AK אנך ל-BC» is back to K off BC; the same relation written «מאונך» or «⊥» with M on a side builds too; «MK אנך ל-AB בנקודה K» keeps the foot.
 
-## ADR-796 — Found under the judge's rulings: a ∥ a free letter can carry is drawn, and «האנך» binds the drawn perpendicular (#2231, #1775)
+## ADR-796 — Found under the judge's rulings: a ∥ a free letter can carry is drawn, «האנך» binds the drawn perpendicular, and an exam's two-given line is its two halves (#2231, #1775)
 
 **Date:** 2026-11-06 · **Status:** accepted · judged · bug (2-D) · round #2727, stream F · branch `fix/2727-found-rulings` · **supersedes [ADR-795](#adr-795) point 3**
 **Judged (q4):** 2026-11-06, under *"Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it."* (operator, 2026-10-09, #1927).
-**Requirements:** [02](02-requirements.md) FR-IN-2b, FR-IN-23 · **Design:** [LADDER](LADDER.md) row 2i⁺⁺; [17](17-design-rules.md) §3b, the field `perpendicularLines`.
+**Requirements:** [02](02-requirements.md) FR-IN-2b, FR-IN-23; [02w](02w-requirements-workspace.md) FR-SU-19 · **Design:** [LADDER](LADDER.md) row 2i⁺⁺; [17](17-design-rules.md) §3b, the field `perpendicularLines`.
 
 **1. A ∥ about a free rider (#2231, stage 2i⁺⁺).** **Class.** *A two-pair relation about a free rider and a free point was given to the rider alone, so a figure the point could hold was refused.* ADR-795 closed it for the ⟂ and left the ∥ as a question. `heldRiderOfPerpendicular` becomes `heldRiderOfRelation` and reads `set-parallel` by the same claim: a free rider, and at its other end a free point nothing else is about. The trace token stays `main:rider-held`.
 
@@ -20493,3 +20493,9 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/parser/__tests__/issue-1775-bare-perpendicular.test.ts`; scenarios `bare-perpendicular-binds-1775`, `bare-perpendicular-asks-1775`.
 
 **Behaviour change for a student:** «האנך» after a drawn perpendicular lands on it with no AI, and two perpendiculars get a question listing them.
+
+**3. The paste line (#1775).** **Judged (q12):** *"A construct the tool already reads, in another wording, is read"* (sr-06 A, ADR-W-174), for a form seen in the prod logs. **Measured.** Analytic: «לא הבנתי». 2-D: refused with the two-statements note, whose second half does not read alone. 3-D: the model. Each half reads alone in all three. **Decision.** `splitSentences`, the one place every builder's submit reads a line, takes this form as two sentences, two rows: «הנקודה P נמצאת על הקטע AB» and «AP:PB = 1:2». A bare ratio says who divides what: «P מחלקת את AB ביחס 1:2». Each half then meets the builder's own one-sentence submit, so a half that does not read stops the chain as any paste does. **Not a «ו» splitter:** the expression is anchored on the whole form, with «על הקטע» and «ומחלקת אותו ביחס» spelled out. Complex shares the seam and never meets the form.
+
+**Locks.** `shell/__tests__/sentences-1778.test.ts`; the shared paste row `P-on-divides`, run through each builder's real submit.
+
+**Behaviour change for a student:** that line, pasted or typed, builds two rows in 2-D, analytic and 3-D.

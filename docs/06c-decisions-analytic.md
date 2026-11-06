@@ -15681,7 +15681,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 
 **Sibling audit (docs/17 §1).** 2-D: ADR-792. 2-D has no bare «האנך» reference after a drawn line and hands that sentence to the model. 3-D reads no drawn line through a point in this frame in any spelling: an unscheduled known-gap cell. Complex: no such grammar.
 
-**Not read.** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2», the reported paste's second line, is `not-handled`, and each half reads alone. The issue does not report it, so the fixture states the two halves.
+**Not read.** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2», the reported paste's second line, is `not-handled`, and each half reads alone. The issue does not report it, so the fixture states the two halves. **(Read since [ADR-AG-423](#adr-ag-423).)**
 
 **Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts` (the spelling grid, the teach's lowering, the paste with its marks, C = (0, 7) at seeds 0–3, each refusal with its count); the fixture `through-perpendicular-1775.analytic.json`; rows `construction-operand-1775-*`, a known gap naming #1358.
 
@@ -15829,3 +15829,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts`; parity rows `bare-perp-binds-1775`, `bare-perp-asks-1775`.
 
 **Behaviour change for a student:** with two perpendiculars drawn, «E על האנך» lists them and shows the sentence to type.
+
+**2. The paste line (q12).** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2» reads as two rows, through the shared splitter ([ADR-796](06-decisions.md#adr-796) point 3).
+
+**Behaviour change for a student:** that line, which used to be «לא הבנתי», builds two rows.
