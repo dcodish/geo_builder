@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T16:13:25.998Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "u = (k,1,2)",
+      "cmds": [
+        {
+          "type": "inject-vector",
+          "name": "u",
+          "x": null,
+          "y": 1,
+          "z": 2,
+          "syms": [
+            "k",
+            null,
+            null
+          ],
+          "srcs": [
+            "k",
+            "1",
+            "2"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "AE = k·u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ],
+          "symbol": "k"
+        }
+      ]
+    }
+  ]
+}

@@ -14684,75 +14684,40 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/circle-radius-row-2611.test.ts` (the panel row). `src3d/__tests__/circle-created-by-reference-2611.test.ts` (every spelling at eight seeds, the DOF count, order, pins, the refusals that stay, placed members, the shared notice rows). Fixture `fixtures3/point-on-circle-blank-2611.geo3.json`. Parity row `blank-point-on-circle-2611`. The `#2611` row of `catalog-blank-canvas-1566.test.ts` and the `D על המעגל` allowlist line of `UNCOVERED_CATALOG` are gone. `circle-refusal-words-2611.test.ts`, `point-on-circle-2611.test.ts` and `free-circle-253.test.ts` are re-based on the ruling: their blank-canvas refusals were session verdicts carried over until #253, never a ruling.
 
 **Behaviour change for a student:** in 3-D, a line about «המעגל» on an empty canvas now draws a circle and says so. Before, it was refused.
-## ADR-3D-426 — A stated number carries its spelling: `src` replaces the `decimal` mark (#1497)
 
-**Status:** accepted · 2026-11-05 · bug (3d, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the 3-D half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179) · **amends** [ADR-3D-416](#adr-3d-416) (its mark is replaced, as its Decision 4 and the #1497 cross-link of 2026-11-04 planned)
+## ADR-3D-421 — The joint figure ↔ free-vector solve: the vector turns to meet the figure, and the figure moves only when it cannot (#2684, #2603 stage b3)
 
-**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 · **Design:** [04b](04b-design-3d.md) § "The stated-magnitude lane" · **LADDER stage:** none (display)
+**Status:** accepted · 2026-11-05 · feature (3d, P3) · fix round #2722, stream B · PR route · **completes** [ADR-3D-407](#adr-3d-407) (#2603 b3) and [ADR-3D-406](#adr-3d-406)'s coupling refusal; **amends** [ADR-3D-390](#adr-3d-390) · **Requirements:** [02b](02b-requirements-3d.md) FR-VC-1d · **Design:** [04b](04b-design-3d.md) "Free vectors", "The joint solve" and the unknown layout. **Stage:** the V4 pivot, after `resolve3Uncached` ([LADDER](LADDER.md)).
 
-**Root cause.** `parseCoeff` and `literalValue` returned a bare number, so `2/3` and `0.6667` were one value and `0.5` and `1/2` were one value. The panel then guessed: `cleanCoeff` at 4 decimals, `cleanNum`/`cleanMag` by fitting a fraction or a surd. #2361's `decimal` mark kept one bit of the spelling.
+**Ruling.** #2603's 2026-10-30 ruling (option b) put the stage in scope; the operator's 2026-11-03 ruling on #2684 took it off `later` ("the tool says its not supported yet but we need this on the roadmap"). The order row is ADR-3D-390 Am. 1's one statement, one verdict.
 
-**Decision.**
-1. The readers go through `shell/literal`: `evalRadical`, `magValue` and `parseCoeff` keep their contract (unsigned, signed, loose), so the parse-drift nets hold. `statedSrc(raw)` replaces `typedDecimal` and spreads `{ src }` onto the same commands (`length-eq`, `vec-mag`, `mag-val`; `lenSrc` on `perp-to-base`). An integer spells itself in every tier, so it carries nothing, and the integer corpus is byte-identical.
-2. **`statedMagText(value, src)`** is now `givenText` over `cleanMag`, so the canvas and the panel stay one text.
-3. **A coordinate:** a tuple of plain numbers records `srcs` when a component is spelled as more than an integer; a `coord` point keeps them. `statedCoordText` prints them in `points`, `pointCoords` and `pointComps`, the latest statement of the coordinate first, so the row and the canvas label read one text. A stated tuple row goes through the same printer, so its typed decimal reads the house decimals.
-4. **A coefficient:** `VecTerm` and `SymTerm` gain `src`; `mag-rel` gains it when the left side has no coefficient of its own. `vecSide` prints it, and `cleanCoeff` is deleted. A coefficient the tool computed reads `cleanNum`, so an eliminated relation reads «1/3» where it read «0.3333».
-5. `spellingOf` in `types.ts` is the one reader of the old mark, for a save made since #2361.
-
-**Measured after.** «SD = (2/3)u» → `SD⃗ = 2/3u`; «B(0.5,0,0)» → `B(0.5, 0, 0)`; «AB = √8» → «√8» on both surfaces; «AB = 4/6» → «4/6»; «7.9999» → «8» everywhere; AB² stays computed.
-
-**Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
-
-**Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.
-## ADR-3D-424 — The radian refusal in 3-D says «המרחב»: a space builder does not call itself plane geometry (#2335)
-
-**Status:** accepted · 2026-11-05 · bug (P2; 3-D) · fix round #2722, stream Q · **Issue:** #2335 · **Amends** [ADR-W-142](06w-decisions-workspace.md#adr-w-142) · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-21a · [02w](02w-requirements-workspace.md) FR-SU-20 and the behaviour-table row "An angle written with π" · **Design:** none (internal).
-
-**Context.** Operator, round #2291 T22, 2026-10-17, on «משולש ABC» · «∠ABC = π» at `/3d.html`: *"note should say בגיאומטריה של המרחב"*. Re-measured at 28dac0c3: `err.radianAngle` still read «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
-
-**Ruling.** The spelling, 2026-10-18: *"Use «גאומטריה» (the majority spelling)"*. The English is the translation of the asked sentence, and new text is the session's, reviewed after ([ADR-W-174](06w-decisions-workspace.md#adr-w-174)).
-
-**Class.** *A 3-D string that names a plane-geometry context, copied word for word under a cross-product parity rule.* ADR-W-142 copied the 2-D sentence, and the one-wording lock then held it in place.
+**Class.** A relation that ties a free vector to the figure through a letter, a span or a metric was refused, because the two solves ran in sequence and neither had a slot for the other's unknowns. Re-measured at 28dac0c3 through the store's submit: every row of the plan refused `free-vector-coupling`, plus «AB = p + q · |p| = 1» and the order row «|p| = 2 · AB = p». The capability added: such a relation is enrolled in the free-vector system and solved over the system's unknowns and the figure.
 
 **Decision.**
-1. `err.radianAngle` reads «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". The refusal itself, its code and its category are unchanged.
-2. **The lock moves, it does not lift.** Role `radianAngle` in `suite-vocabulary.test.ts` keeps 2-D and analytic; 3-D has its own role `radianAngleSpace`, with its ruled text. `null` alone would be false: it means "no such surface", and 3-D has one.
-3. `radian-angle-rows.ts` gains `RADIAN_SENTENCE_SPACE_HE/EN`, and 3-D's thin lock passes them to the shared rows. Every other row is untouched.
+1. **The record is `c.freeVecMetrics`, not a second list.** A metric's operand may now name the figure; `ratio` («AD = k·p») and `span` («KP = αu + βv», the point lowered to its host's rider, the coefficients hidden unknowns) join it. The plan named `c.enrolledFreeVecs` plus a new pin: what is enrolled is *derived* (`anchoredUnknowns` unions a metric's unknowns), so no stored list can drift.
+2. **Two rungs, in this order.** *Absorb:* `solveFreeVectors3` solves the enrolled block at the finished drawing, the figure a constant. The figure is bit-identical to the same figure without the relation, which is what "stability is structural" asks. *Drive:* only when that fails, `resolveJoint3` re-runs the resolve with a transient `free-joint` scalar pin: the enrolled unknowns ride the existing rider lane (unbounded, started at the seeded sample), so the plan's "fourth block" costs no new layout. The plan's always-in-the-pivot reading would have sent a bare cube into the pivot for «p ⟂ AB» and moved its dims.
+3. **`freeVecSystemVerdict3` refutes nothing against a sample.** An anchored leftover is a drive; only stated numbers conflict, at apply. What neither rung meets is its own `free-rel` claim, refuted at resolve, naming the newest such line because they fail together.
+4. **The gauge joins the drive only against a stated number.** With none every relation is similarity-invariant, and the frozen-gauge solve is about 8× cheaper; a second seeded start covers the basins it misses (5 of 24 seeds on the pyramid row from one start, 0 from two). A gauge-driven drawing keeps its frame (`freeDriven`): turning it onto the floor would break the relation.
+5. **One letter, one number.** A letter is the system's when it is new, valued, or already `free-sym` / a free vector's component. A new point scaled by such a letter reads its number (`pureFreeLetter3`, «u = (k,1,2)» · «AE = k·u»).
+6. **Order.** `freeVecEquation3` step 2 no longer skips a vector a metric names: it defines the vector and re-applies each earlier given (`reapplyMetric3`), so «|p| = 2 · AB = p» is «|AB| = 2» as the other order is.
+7. **The cue measures.** `freeVecDofCount3` takes the rank of the relations' gradient at the drawing (`Resolved3.freeX`), the ADR-3D-248 measurement. A `free-joint` drive is a scalar pin, so `scalarConsumed` already counts what it takes from the dims. **The panel** needed nothing for FR-SP-4: `vals.every(sameVec)` over the knowledge samples already gates a sampled vector; `freeMetricRow` prints the two new kinds as stated, the student's Greek letters carried on `point-in-span` for that row only.
 
-**Sibling audit.** The class has one member in 3-D. A grep of both 3-D locales for «של המישור», «גאומטריה» and "plane geometry" finds this key, `wrongSideOfPlane` (a real plane) and `cross-app`, which truthfully sends plane geometry to the 2-D tool. 2-D and analytic are plane-geometry builders, so the sentence is true there. Complex has no such refusal.
+**Measured.** 24/24 on every row, each relation within 1e-6 read off the figure (`issue-2684-free-vector-joint.test.ts`). Per line through submit: ≤ 56 ms on every issue row (control, a cube alone, under 25 ms). Absorb adds one small least-squares per resolve, up to 4 starts. The drive: one resolve 122 ms on «פירמידה · AB = k·p · DC = m·p» against 3.3 ms for its anchored twin «AB ∥ DC», 519 ms for the line; a refusal 324 ms on a cube, 225 ms on a prism. **Worst case per configuration:** 4 absorb starts × (1 + 3 retries: the frozen gauge from two seeded starts, then the free gauge), and a figure with no enrolled relation pays nothing.
 
-**Locks.** `src3d/__tests__/radian-angle-1837.test.ts` (the operator's exact two lines through `decideSubmit3` and `errorText3`, Hebrew and English, and all 16 shared spellings against the space sentence); `shell/__tests__/suite-vocabulary.test.ts` (both roles). Nothing is built, so there is no fixture.
+**Not built here, refused honestly as before** (`free-vector-coupling`, FR-VC-1d): a free vector against a plane, a line or a distance («p ⟂ מישור ABC» has no vector form); a letter another lane owns; a new point over a vector the figure reaches («p ⟂ AB · AE = p», either order: the point pass runs before that vector has a value). «∠(p, AB) = 60°» stays `not-understood`, as the plan says, a separate parse gap; «הזווית בין p ל-AB היא 60» builds.
 
-**Behaviour change for a student:** in 3-D, an angle written with π is refused with «…של המרחב…» instead of «…של המישור…». The verdict is unchanged, and the 2-D and analytic sentences are unchanged.
-## ADR-3D-425 — A line the tool reads as a vector is shown as one, from a total registry over the command kinds (#1549)
+**Rejected.** A determinant residual for the span: it holds falsely on u ∥ v. Hidden coefficients do not. Solving the block with the figure inside the first pass: see decision 2.
 
-**Status:** accepted · 2026-11-05 · bug (P2) · round #2722 · branch `fix/1549-vector-math-input` off `main` @ 28dac0c3 · operator rulings 2026-09-29 on #1549
+**Sibling audit.** The class needs a free vector, which is 3-D's by design (X7): `grep freeVector` over `src/`, `src-analytic/`, `src-complex/` finds none. Not a plane-geometry input. In this tree the other `free-vector-coupling` sites were each walked: `injectFreeVector3`'s second affine form on one component and the three "not built" rows above stay.
 
-**Requirements:** [02b](02b-requirements-3d.md) FR-VC-4a · **Design:** [04b](04b-design-3d.md) "The input preview composes", where the row gate is a registry and the preview reads the dry-run parse
+**Found in the round.** Same cause: a letter shared by a free vector and an anchored point, «u = (k,1,2) · AE = k·AB», drew E at a second, independently sampled k; it now reads the one number. And a scale-free relation could land a vector under the norm floor (a dot), or «AD = k·p» on the wrong side of «k חיובי»: the absorb rung takes the next start, the vectors turned round first. The sign verifier never read a free-vector letter (`resolved.freeSyms`), so a free letter's stated sign was refused `sign-unsatisfiable`; it reads it now.
 
-**Class.** A **display gate** that decides "is this a vector statement?" from a **hand-written list of kinds** silently renders every later vector kind as prose. Instance: on a cube with `B(0,7,8)`, the operator's «BA→=(-3,4,5)» previewed with the arrow and committed as flat text with his raw `→`, and «BA=(-3,4,5)» showed no arrow on either surface.
+**Locks.** `issue-2684-free-vector-joint.test.ts` (rows at 24 seeds, stability, letters, orders, the joint rung, refusals, cue, panel, save/load); the `free-vector-joint-*-2684` fixtures; rows moved out of `COUPLING` in `issue-1188-free-vector-step2.test.ts` and the coupling block of `issue-1188-free-vector-metric.test.ts`; the `issue-2603` refusal lock is now the agreement lock.
 
-**Context — re-measured at 28dac0c3.** Both reported rows are as the issue says: `inject-pair`, status ok, A at (−3, 11, 13), and a plain card. **The data-panel arm of ruling 2 is already delivered:** #2077 (ADR-3D-368) added `pairPins` to `statedVectorRows`, so «BA⃗ = (-3, 4, 5)» is listed today. This ADR adds only the lock. #1313, which the plan treated as a live neighbour, is parked.
+**Behaviour change for a student:** in 3-D, a free vector can now be tied to the figure by a letter, a span or a size, angle, ⟂ or ∥. Each such line builds, the vector turning to meet the figure. Before, each was refused as the tool's limit.
 
-**Root cause.** `render/notation.ts`'s `VEC_CMD_TYPES` was a hand-written `Set` from ADR-3D-013, and `factDisplay3` held a second inline copy of the predicate. `inject-pair` and every later vector kind were never added, and nothing made a new kind answer the question. The preview was gated on the typed text alone.
+**Amendment 1 (2026-11-06, found pre-playing PR #2723): a «כך ש-» sentence is prose, and only its clause is typeset.** Measured in the browser: «E על AC' כך ש-AE = t·p» drew a minus on AE, «pt ·» for t·p and an arrow on the segment AC', and «P על AM כך ש-KP = αu + βv» a minus on KP and an arrow on AM. The figures were right and the row stated a false sign. Three causes, one class: the display tokenizer took a Hebrew joiner for an operator, a Latin letter inside an expression for prose (so it left its island and the row reordered it), and every pair in a vector row for a vector. `splitVectorClause3` (`render/notation.ts`, the one reader for `vectorNotation` and `tokenizeRow`) makes everything up to «כך ש» / "such that" prose. A hyphen glued to a Hebrew word is its joiner everywhere in the tokenizer, and a Latin letter touching an expression stays in its island. This reaches every vector row with such a clause, including prod's anchored «E על AB כך ש-AE = AC - AD», whose host loses its arrow: that row asserted a vector the student never stated. A ratio on the host («K על AA' כך ש-AK = 2KA'») and a plain length («D על AB כך ש-AD = 1») never took this path and read as before. Locked in `src3d/render/__tests__/issue-2684-clause-row.test.tsx`. **Requirements:** none (a display defect). **Design:** none (internal).
 
-**Decision.**
-1. **`VECTOR_READING_3: Record<Command3['type'], 'vector' | 'plain'>`**, with `CLAIM_VECTOR_READING_3` over `Claim3['type']`, both total (the `COMMAND_SAVEABLE` shape, #288). A new kind does not compile until it answers. `isVectorFact3` reads them and `factDisplay3` calls `isVectorFact3`.
-2. **Read as vectors, added:** `inject-pair`, `mag-val`, `mag-rel` (the plan), `dot-eq-chain` (the plan's dot kinds, ruling 1), and `vec-mag`, `draw-arrow`, `declare-vector`, which the plan left under "everything else". Ruling 1 covers them: *"every other spelling that lowers to a vector command"*. `AB→` was the reported defect exactly: a `draw-arrow` row printing a raw arrow.
-3. **The preview asks the parse (ruling 1).** `app/previewReading3.ts` `previewReadsVector3(construction, raw)` runs `parse3` through the registry, and `App3` passes the answer to `inputPreviewNode3`, because `render` must not import the parser. `isVectorMarked3` stays for a marked line that does not parse yet, so a half-typed `DC→=` keeps its strip.
-
-**Not delivered: `cos-angle` reads `'plain'`, pending a ruling.** Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
-
-**Limits of "the card and the strip agree".**
-- An unmarked two-reading equation («DC=3AB» over existing points) stays unarrowed in the strip, as today. Its card follows the fold's verdict (ADR-3D-391 Am. 1), and trying both readings per keystroke is a fold on every key.
-- A line carrying a fraction or a root takes the strip's math branch first («AB=(1/2,1,0)»): #1313's parked divergence, unchanged.
-- A name the line itself introduces («u=(1,2,3)») is not yet in the strip's declared names, so it is underlined on the card only.
-
-**Sibling audit.** 2-D has no vector notation by design (#1184), and analytic and complex have no `VecMath`, so the class is 3-D's alone. The query-side twin is `vectorAtoms` (ADR-3D-301).
-
-**Locks.** `src3d/__tests__/issue-1549-vector-row-kind.test.tsx`, on rendered markup through the real `submit` and the same preview call `App3` makes: his exact sequence in both spellings, card ≡ strip per spelling, the kinds, the segment guard, the stated-vector row. Fixture `fixtures3/vector-pair-row-1549.geo3.json` (his sequence).
-
-**Behaviour change for a student:** a vector given as «BA=(-3,4,5)», with or without an arrow, now shows an arrow over BA on its row, and the strip under the box shows it while typing. The same holds for a vector magnitude, a dot-product chain, a bare «AB→» and «חץ A'C». A length, and a perpendicularity between segments, stays plain.
 ## ADR-3D-423 — Stated numbers restated in another spelling are already known (#2341)
 
 **Status:** accepted · 2026-11-05 · bug (P2, 3d) · fix round #2722, stream P · branch `fix/2341-restated-point-3d` from `main` @ `28dac0c3` · plan armed `auto-ok` 2026-10-17 · **partly built:** the plan's `[asked]` line and the restated length (`[judged]` q21, 2026-11-05: choice B); the general `[2-D]` line is **open** as q20, with the operator (below)
@@ -14788,3 +14753,75 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Locks.** `src3d/__tests__/known-line-2341.test.ts`: the operator's sequence, the reverse order, every spelling, the re-tick, both refusals, the new point, the answer on a derived point, the load; for the length, both letter orders, the value's spellings, a solid and placed points, «BA = 4» and «AB = 4», the re-tick, a first value. `issue-2081-held-slots.test.ts` re-based: its radical spellings now assert the restatement, and each also verifies as an answer on a midpoint.
 
 **Behaviour change for a student:** in 3-D, «B=(√2,0,0)» after «B(√2,0,0)», or the reverse, and «BA = 3» after «AB = 3», now answer «זה כבר קיים באיור — אין מה להוסיף.» and add no row. Before, each added a ✓ row.
+
+## ADR-3D-424 — The radian refusal in 3-D says «המרחב»: a space builder does not call itself plane geometry (#2335)
+
+**Status:** accepted · 2026-11-05 · bug (P2; 3-D) · fix round #2722, stream Q · **Issue:** #2335 · **Amends** [ADR-W-142](06w-decisions-workspace.md#adr-w-142) · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-21a · [02w](02w-requirements-workspace.md) FR-SU-20 and the behaviour-table row "An angle written with π" · **Design:** none (internal).
+
+**Context.** Operator, round #2291 T22, 2026-10-17, on «משולש ABC» · «∠ABC = π» at `/3d.html`: *"note should say בגיאומטריה של המרחב"*. Re-measured at 28dac0c3: `err.radianAngle` still read «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+
+**Ruling.** The spelling, 2026-10-18: *"Use «גאומטריה» (the majority spelling)"*. The English is the translation of the asked sentence, and new text is the session's, reviewed after ([ADR-W-174](06w-decisions-workspace.md#adr-w-174)).
+
+**Class.** *A 3-D string that names a plane-geometry context, copied word for word under a cross-product parity rule.* ADR-W-142 copied the 2-D sentence, and the one-wording lock then held it in place.
+
+**Decision.**
+1. `err.radianAngle` reads «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". The refusal itself, its code and its category are unchanged.
+2. **The lock moves, it does not lift.** Role `radianAngle` in `suite-vocabulary.test.ts` keeps 2-D and analytic; 3-D has its own role `radianAngleSpace`, with its ruled text. `null` alone would be false: it means "no such surface", and 3-D has one.
+3. `radian-angle-rows.ts` gains `RADIAN_SENTENCE_SPACE_HE/EN`, and 3-D's thin lock passes them to the shared rows. Every other row is untouched.
+
+**Sibling audit.** The class has one member in 3-D. A grep of both 3-D locales for «של המישור», «גאומטריה» and "plane geometry" finds this key, `wrongSideOfPlane` (a real plane) and `cross-app`, which truthfully sends plane geometry to the 2-D tool. 2-D and analytic are plane-geometry builders, so the sentence is true there. Complex has no such refusal.
+
+**Locks.** `src3d/__tests__/radian-angle-1837.test.ts` (the operator's exact two lines through `decideSubmit3` and `errorText3`, Hebrew and English, and all 16 shared spellings against the space sentence); `shell/__tests__/suite-vocabulary.test.ts` (both roles). Nothing is built, so there is no fixture.
+
+**Behaviour change for a student:** in 3-D, an angle written with π is refused with «…של המרחב…» instead of «…של המישור…». The verdict is unchanged, and the 2-D and analytic sentences are unchanged.
+
+## ADR-3D-425 — A line the tool reads as a vector is shown as one, from a total registry over the command kinds (#1549)
+
+**Status:** accepted · 2026-11-05 · bug (P2) · round #2722 · branch `fix/1549-vector-math-input` off `main` @ 28dac0c3 · operator rulings 2026-09-29 on #1549
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-4a · **Design:** [04b](04b-design-3d.md) "The input preview composes", where the row gate is a registry and the preview reads the dry-run parse
+
+**Class.** A **display gate** that decides "is this a vector statement?" from a **hand-written list of kinds** silently renders every later vector kind as prose. Instance: on a cube with `B(0,7,8)`, the operator's «BA→=(-3,4,5)» previewed with the arrow and committed as flat text with his raw `→`, and «BA=(-3,4,5)» showed no arrow on either surface.
+
+**Context — re-measured at 28dac0c3.** Both reported rows are as the issue says: `inject-pair`, status ok, A at (−3, 11, 13), and a plain card. **The data-panel arm of ruling 2 is already delivered:** #2077 (ADR-3D-368) added `pairPins` to `statedVectorRows`, so «BA⃗ = (-3, 4, 5)» is listed today. This ADR adds only the lock. #1313, which the plan treated as a live neighbour, is parked.
+
+**Root cause.** `render/notation.ts`'s `VEC_CMD_TYPES` was a hand-written `Set` from ADR-3D-013, and `factDisplay3` held a second inline copy of the predicate. `inject-pair` and every later vector kind were never added, and nothing made a new kind answer the question. The preview was gated on the typed text alone.
+
+**Decision.**
+1. **`VECTOR_READING_3: Record<Command3['type'], 'vector' | 'plain'>`**, with `CLAIM_VECTOR_READING_3` over `Claim3['type']`, both total (the `COMMAND_SAVEABLE` shape, #288). A new kind does not compile until it answers. `isVectorFact3` reads them and `factDisplay3` calls `isVectorFact3`.
+2. **Read as vectors, added:** `inject-pair`, `mag-val`, `mag-rel` (the plan), `dot-eq-chain` (the plan's dot kinds, ruling 1), and `vec-mag`, `draw-arrow`, `declare-vector`, which the plan left under "everything else". Ruling 1 covers them: *"every other spelling that lowers to a vector command"*. `AB→` was the reported defect exactly: a `draw-arrow` row printing a raw arrow.
+3. **The preview asks the parse (ruling 1).** `app/previewReading3.ts` `previewReadsVector3(construction, raw)` runs `parse3` through the registry, and `App3` passes the answer to `inputPreviewNode3`, because `render` must not import the parser. `isVectorMarked3` stays for a marked line that does not parse yet, so a half-typed `DC→=` keeps its strip.
+
+**Not delivered: `cos-angle` reads `'plain'`, pending a ruling.** Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
+
+**Limits of "the card and the strip agree".**
+- An unmarked two-reading equation («DC=3AB» over existing points) stays unarrowed in the strip, as today. Its card follows the fold's verdict (ADR-3D-391 Am. 1), and trying both readings per keystroke is a fold on every key.
+- A line carrying a fraction or a root takes the strip's math branch first («AB=(1/2,1,0)»): #1313's parked divergence, unchanged.
+- A name the line itself introduces («u=(1,2,3)») is not yet in the strip's declared names, so it is underlined on the card only.
+
+**Sibling audit.** 2-D has no vector notation by design (#1184), and analytic and complex have no `VecMath`, so the class is 3-D's alone. The query-side twin is `vectorAtoms` (ADR-3D-301).
+
+**Locks.** `src3d/__tests__/issue-1549-vector-row-kind.test.tsx`, on rendered markup through the real `submit` and the same preview call `App3` makes: his exact sequence in both spellings, card ≡ strip per spelling, the kinds, the segment guard, the stated-vector row. Fixture `fixtures3/vector-pair-row-1549.geo3.json` (his sequence).
+
+**Behaviour change for a student:** a vector given as «BA=(-3,4,5)», with or without an arrow, now shows an arrow over BA on its row, and the strip under the box shows it while typing. The same holds for a vector magnitude, a dot-product chain, a bare «AB→» and «חץ A'C». A length, and a perpendicularity between segments, stays plain.
+
+## ADR-3D-426 — A stated number carries its spelling: `src` replaces the `decimal` mark (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (3d, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the 3-D half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179) · **amends** [ADR-3D-416](#adr-3d-416) (its mark is replaced, as its Decision 4 and the #1497 cross-link of 2026-11-04 planned)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 · **Design:** [04b](04b-design-3d.md) § "The stated-magnitude lane" · **LADDER stage:** none (display)
+
+**Root cause.** `parseCoeff` and `literalValue` returned a bare number, so `2/3` and `0.6667` were one value and `0.5` and `1/2` were one value. The panel then guessed: `cleanCoeff` at 4 decimals, `cleanNum`/`cleanMag` by fitting a fraction or a surd. #2361's `decimal` mark kept one bit of the spelling.
+
+**Decision.**
+1. The readers go through `shell/literal`: `evalRadical`, `magValue` and `parseCoeff` keep their contract (unsigned, signed, loose), so the parse-drift nets hold. `statedSrc(raw)` replaces `typedDecimal` and spreads `{ src }` onto the same commands (`length-eq`, `vec-mag`, `mag-val`; `lenSrc` on `perp-to-base`). An integer spells itself in every tier, so it carries nothing, and the integer corpus is byte-identical.
+2. **`statedMagText(value, src)`** is now `givenText` over `cleanMag`, so the canvas and the panel stay one text.
+3. **A coordinate:** a tuple of plain numbers records `srcs` when a component is spelled as more than an integer; a `coord` point keeps them. `statedCoordText` prints them in `points`, `pointCoords` and `pointComps`, the latest statement of the coordinate first, so the row and the canvas label read one text. A stated tuple row goes through the same printer, so its typed decimal reads the house decimals.
+4. **A coefficient:** `VecTerm` and `SymTerm` gain `src`; `mag-rel` gains it when the left side has no coefficient of its own. `vecSide` prints it, and `cleanCoeff` is deleted. A coefficient the tool computed reads `cleanNum`, so an eliminated relation reads «1/3» where it read «0.3333».
+5. `spellingOf` in `types.ts` is the one reader of the old mark, for a save made since #2361.
+
+**Measured after.** «SD = (2/3)u» → `SD⃗ = 2/3u`; «B(0.5,0,0)» → `B(0.5, 0, 0)`; «AB = √8» → «√8» on both surfaces; «AB = 4/6» → «4/6»; «7.9999» → «8» everywhere; AB² stays computed.
+
+**Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
+
+**Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.

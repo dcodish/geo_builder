@@ -101,6 +101,9 @@ export type Claim3 =
    * panel prints the stated form; derive3 names the lines about those free vectors when the relation fails.
    */
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr; stated?: { lhs: VecExpr; rhs: VecExpr } }
+  /** #2684 ([ADR-3D-421](../../docs/06b-decisions-3d.md#adr-3d-421)): a relation the joint free-vector solve drives, as its
+   *  own arbiter — `m` that given, `null` the system's rows on the figure. Recorded by `settleFreeVectors3`. */
+  | { type: 'free-rel'; m: FreeVecMetric3 | null; given: true }
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true } // CA' ⊥ plane BC'D
   /**
    * #833 (ADR-3D-193): AB ∥ plane A'B'C'D'. The `perp` twin above has existed since #380; this one
@@ -207,6 +210,13 @@ export type MutualRel3 = 'coincident' | 'parallel' | 'intersecting' | 'skew';
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
+  /**
+   * #2684 ([ADR-3D-421](../../docs/06b-decisions-3d.md#adr-3d-421)) — THE JOINT FREE-VECTOR RUNG. Never stored: `resolve3`
+   * adds it to the construction of ONE retry, when the free vectors could not absorb a relation at the drawn figure.
+   * `unknowns` join the rider lane; `residuals` read the trial figure and their trial values. `gauge`: the placement
+   * joins too (a stated component is absolute); without it only the figure's shape moves, the far cheaper solve.
+   */
+  | { kind: 'free-joint'; gauge: boolean; unknowns: { key: string; t0: number }[]; residuals: (at: (id: Id) => Vec3 | null | undefined, y: (key: string) => number) => number[] }
   | { kind: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2| (similarity-INVARIANT)
   /**
    * #1183 — a VECTOR EQUATION that DRIVES: `Σ lhs = Σ rhs`, three signed component residuals.
@@ -605,6 +615,8 @@ export interface QuadDiagonalsCommand {
  */
 export interface PointInSpanCommand {
   type: 'point-in-span';
+  /** #2684 (ADR-3D-421): the student's two coefficient letters, for the givens row */
+  letters?: [string, string];
   id: Id;
   a: Id;
   b: Id;
@@ -739,15 +751,41 @@ export interface FreeVecEq3 {
  * #1188 step 4 (ADR-3D-406): a METRIC given over free vectors alone — a magnitude («|u| = 5», «|u + v| = 3»), a ratio
  * of magnitudes («|u| = |v|», «|w+u| = |w-u|»), a dot product («u·v = 3»), an angle («u ⟂ v», «הזווית בין u ל-v היא
  * 60»: its cosine) or parallelism («u ∥ v»). A nonlinear row of the free-vector system (`freeVecSystem.ts`), solved
- * after the linear one; every operand is a combination of free vectors (a pair or an anchored arrow is a joint
- * figure ↔ free solve, refused `free-vector-coupling`, #2603).
+ * after the linear one.
+ *
+ * #2684 ([ADR-3D-421](../../docs/06b-decisions-3d.md#adr-3d-421)): an operand may also name the FIGURE («p ⟂ AB»,
+ * «|AB| = |p|»), and two more relations join the list, both a vector residual over the system's unknowns:
+ *  - `ratio`: a letter over a free vector on an existing pair («AD = k·p», the terms and letter as parsed);
+ *  - `span`: «KP = αu + βv» for the point `id` on its host, over a free vector nothing defines. The coefficients are
+ *    the system's own hidden unknowns ({@link SPAN_LETTER}), the student's `letters` kept for the givens row only: two
+ *    relations may reuse «α», and a determinant residual would hold falsely on u ∥ v.
+ * A relation whose unknowns reach the figure is a DRIVE of the joint solve, never a check against a sample.
  */
 export type FreeVecMetric3 =
   | { kind: 'mag'; e: VecExpr; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
   | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
   | { kind: 'dot'; e1: VecExpr; e2: VecExpr; value: number }
   | { kind: 'cos'; e1: VecExpr; e2: VecExpr; cos: number }
-  | { kind: 'par'; e1: VecExpr; e2: VecExpr };
+  | { kind: 'par'; e1: VecExpr; e2: VecExpr }
+  | { kind: 'ratio'; from: Id; to: Id; terms: SymTerm[]; symbol?: string }
+  | { kind: 'span'; id: Id; from: Id; to: Id; span: [string, string]; letters: [string, string] };
+
+/** #2684 (ADR-3D-421): the hidden coefficient of a span relation's `i`-th vector — never a letter a student wrote. */
+export const SPAN_LETTER = (id: Id, i: 0 | 1): string => `#span:${id}:${i}`;
+
+/** #2684 (ADR-3D-421): every operand of a metric given, as combinations — the one reader of "what does it name". */
+export function freeMetricOperands3(m: FreeVecMetric3): VecExpr[] {
+  switch (m.kind) {
+    case 'mag':
+      return [m.e];
+    case 'ratio':
+      return [[{ coeff: 1, atom: { kind: 'pair', from: m.from, to: m.to } }], m.terms.map((t) => ({ coeff: 1, atom: t.atom }))];
+    case 'span':
+      return [[{ coeff: 1, atom: { kind: 'pair', from: m.from, to: m.to } }], m.span.map((name) => ({ coeff: 1, atom: { kind: 'named' as const, name } }))];
+    default:
+      return [m.e1, m.e2];
+  }
+}
 
 /** The distinct symbols an affine component names, in first-written order. */
 export const symsOfAffine = (e: SymAffine): string[] => {
@@ -1901,9 +1939,10 @@ export type SymbolOwner =
   | { kind: 'free-sym' };
 
 /** #1188 step 2 (ADR-3D-390): the letters the free vectors' affine components name, in first-written order. */
-export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'>): string[] {
+export function freeVecSymsOf(c: Pick<Construction3, 'freeVectors'> & Partial<Pick<Construction3, 'freeVecMetrics'>>): string[] {
   const out: string[] = [];
   for (const fv of c.freeVectors.values()) for (const e of fv.symComps ?? []) if (e) for (const s of symsOfAffine(e)) if (!out.includes(s)) out.push(s);
+  for (const m of c.freeVecMetrics ?? []) if (m.kind === 'ratio' && m.symbol && !out.includes(m.symbol)) out.push(m.symbol); // #2684 (ADR-3D-421)
   return out;
 }
 

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T16:13:25.970Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "וקטור p",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "p"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "E על AC' כך ש-AE = t·p",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "E",
+          "a": "A",
+          "b": "C'"
+        },
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "named",
+                "name": "p"
+              }
+            }
+          ],
+          "symbol": "t"
+        }
+      ]
+    }
+  ]
+}

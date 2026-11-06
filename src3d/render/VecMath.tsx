@@ -18,6 +18,7 @@
  */
 import React from 'react';
 import { isolateLtrRuns3, textDir3 } from '../i18n/bidi';
+import { splitVectorClause3 } from './notation';
 
 type Tok =
   | { k: 'pair'; text: string }
@@ -33,11 +34,15 @@ const NUM = /^\d+(?:\.\d+)?/;
 /** Tokenize one row into display tokens. `vecNames` = the declared vector letters (u, v, w…). */
 export function tokenizeRow(row: string, vecNames: Set<string>): Tok[] {
   const out: Tok[] = [];
-  let s = row;
+  // #2684 (ADR-3D-421 Am. 1): what stands before a «כך ש-» clause is prose, whatever letters it holds
+  const { head, clause } = splitVectorClause3(row);
+  if (head) out.push({ k: 'text', text: head.replace(/[̲⃗]/g, '') });
+  let s = clause;
   const isLetter = (ch: string | undefined) => !!ch && /[A-Za-z֐-׿]/.test(ch);
   while (s.length) {
     // prose word (Hebrew, or a Latin word that is not a pair/vector token) — longest letter run
-    const mWord = s.match(/^[֐-׿]+/);
+    // #2684: a hyphen glued to a Hebrew word is its joiner («ל-AB»), never a minus
+    const mWord = s.match(/^[֐-׿]+-?/);
     if (mWord) {
       out.push({ k: 'text', text: mWord[0] });
       s = s.slice(mWord[0].length);
@@ -226,6 +231,17 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
    *  - a space is math only when math stands on BOTH sides — that is the fix itself.
    */
   const isProse: boolean[] = toks.map((t) => t.k === 'text');
+  // #2684 (ADR-3D-421 Am. 1): a Latin letter touching an expression is a term of it («t·p»), not prose: split out, it
+  // leaves the island and the row reorders it. A Hebrew word, or a letter between words, stays prose.
+  const expressionTok = (t: Tok | undefined) => !!t && t.k !== 'text' && !(t.k === 'op' && SENTENCE_PUNCT.has(t.text));
+  toks.forEach((t, i) => {
+    if (t.k !== 'text' || !/^[A-Za-z]\d*'?$/.test(t.text)) return;
+    let a = i - 1;
+    while (a >= 0 && isSpace(toks[a])) a--;
+    let b = i + 1;
+    while (b < toks.length && isSpace(toks[b])) b++;
+    if (expressionTok(toks[a]) || expressionTok(toks[b])) isProse[i] = false;
+  });
   toks.forEach((t, i) => {
     if (t.k !== 'op' || !SENTENCE_PUNCT.has(t.text)) return; // a space is not sentence punctuation
     let a = i - 1;
@@ -245,11 +261,12 @@ export function VecMath({ text, vecNames }: { text: string; vecNames: Set<string
 
   const groups: { math: Tok[] | null; text: string }[] = [];
   toks.forEach((t, i) => {
-    const prose = t.k === 'text' || (t.k === 'op' && isProse[i]);
+    const prose = isProse[i];
     const last = groups[groups.length - 1];
     if (prose) {
-      if (last && last.math === null) last.text += t.text;
-      else groups.push({ math: null, text: t.text });
+      const text = t.k === 'text' || t.k === 'op' ? t.text : '';
+      if (last && last.math === null) last.text += text;
+      else groups.push({ math: null, text });
     } else if (last && last.math !== null) last.math.push(t);
     else groups.push({ math: [t], text: '' });
   });

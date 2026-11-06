@@ -13,6 +13,7 @@ import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
 import { symbolOwnersOf, type Claim3, type Construction3, type RevolutionObj } from './types';
+import { freeRelationHolds3 } from './freeVecSystem';
 import { pivotLetterValue3 } from './solve3';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
@@ -130,6 +131,8 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const values = letterNumbersAt3(c, claim.sym, resolved);
       return values.every((v) => v !== undefined && Number.isFinite(v) && Math.abs(len - claim.coef * v) <= REL_TOL * Math.max(Math.abs(len), 1));
     }
+    case 'free-rel': // #2684 (ADR-3D-421): the relation at this drawing and this configuration's free-vector solution
+      return freeRelationHolds3(c, claim.m, pos, resolved.freeX);
     case 'vec-eq': {
       const l = evalExpr(claim.lhs, c, pos);
       const r = evalExpr(claim.rhs, c, pos);

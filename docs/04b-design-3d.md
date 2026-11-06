@@ -590,7 +590,7 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   undefined vectors, affine letters — `SymbolOwner` `free-sym`), constants, and anchored endpoint coordinates; the
   equations are the rows, the stated components of defined vectors, and a component-naming letter that is also an
   affine unknown. `settleFreeVectors3` (the outermost apply, beside `settleLetters3`) eliminates once by modified
-  Gram-Schmidt, carrying the constants and anchored coefficients: anchored residue → `free-vector-coupling`, numeric
+  Gram-Schmidt, carrying the constants and anchored coefficients: anchored residue → the joint solve below (#2684), numeric
   residue → `free-vector-conflict` (`givens-contradict` naming the lines about those vectors); a free letter another
   lane owns → `already-defined`; a figure point over a free vector that is no longer PURE → `free-vector-coupling`.
   `solveFreeVectors3` projects the seeded sample onto the solution set (min-norm, x = s − Uᵀ(Us − β)); with no row it
@@ -602,19 +602,34 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
 - **Metric givens (step 4, [ADR-3D-406](06b-decisions-3d.md#adr-3d-406)).** `freeVecMetricOf3` reads one
   `FreeVecMetric3` (`mag`, `mag-rel`, `dot`, `cos`, `par`) off `vec-mag`, `mag-val`, `mag-rel`, `dot-given`,
   `cos-angle` (⟂ and angles) and a vector–vector `mutual-rel` ∥, at the one entry of `applyCommand3Inner`, whenever it
-  names a free vector; `freeVecMetric3` records it in `c.freeVecMetrics` when every operand is a combination of free
-  vectors (a pair or an anchored arrow: `free-vector-coupling`). The system carries each as a NONLINEAR row over the
+  names a free vector; `freeVecMetric3` records it in `c.freeVecMetrics`. The system carries each as a NONLINEAR row over the
   same unknowns (`FreeSystem3.metrics`). `settleFreeVectors3` asks `metricCheck3` (memoised per construction):
-  **pure** — no operand's form reaches an anchored point or an unknown an anchored equation taints, else
-  `free-vector-coupling`; **satisfiable** — `solveMetrics` converges from one of 8 seeded starts (the projected samples
-  of seeds 0–7), over the free unknowns only, else `free-vector-conflict` (`givens-contradict` naming the lines). At
-  resolve, after the linear projection, `solveMetrics` runs from THIS seed's projected sample: `leastSquares` first
+  **satisfiable** — over the givens that read stated numbers alone, `solveBlock` converges from one of 8 seeded starts (the projected samples
+  of seeds 0–7), else `free-vector-conflict` (`givens-contradict` naming the lines). At
+  resolve, after the linear projection, `solveBlock` runs from THIS seed's projected sample: `leastSquares` first
   with a 0.05 pull toward the start, then exactly; the variables are the unknowns the metrics reach, closed under the
   linear rows sharing them (which ride along as residuals). A start that does not converge takes the check's solution.
   Directions (∥, angles) are measured on unit vectors, so a zero operand never satisfies them. `freeVecDofCount3`
   subtracts the rank the metric gradients add to the linear rows' span at the check's solution. The panel prints
   `|u|` alone when the magnitude, not the value, agrees across the knowledge samples, and lists each given
   (`freeMetricRow`: «|u| = 5», «u · v = 3», «u ⟂ v», «u ∥ v», «∠(u, v) = 60°»).
+- **The joint solve (#2684, [ADR-3D-421](06b-decisions-3d.md#adr-3d-421)).** A relation that ties free unknowns to the
+  figure is ENROLLED in `c.freeVecMetrics`: a metric whose operand names a pair or an anchored arrow; `ratio` («AD = k·p»,
+  a letter on an existing pair); `span` («KP = αu + βv» over a vector nothing defines: the point is lowered to its
+  host's rider, and the two coefficients are hidden unknowns, `SPAN_LETTER`). `anchoredUnknowns` unions a metric's
+  unknowns, so everything it reaches leaves the pure block (`isPureFreeVector3` false). Two rungs: **absorb** —
+  `solveFreeVectors3` solves `jointBlock` at the drawing, the figure a constant (`solveBlock` with `coord`, up to 4 seeded
+  starts, a start that lands a vector under the norm floor giving way to the next), so a figure that absorbs is
+  bit-identical; **drive** — when that fails (`Resolved3.freeHolds` false) `resolveJoint3` re-runs `resolve3Uncached` on a
+  transient copy holding one `free-joint` scalar pin (`freeJointPin3`): the enrolled unknowns join the rider lane, unbounded,
+  started at their seeded sample (the ADR-3D-390 minimum-norm discipline), and the block's residuals join the scalar rows.
+  First with the gauge frozen (dims and riders only, from two seeded starts), then, only if a stated number is involved, with the gauge free
+  (`scalePinned` reads the pin's `gauge`). A gauge-driven solution sets `freeDriven`, so `drawnFrame3` leaves it unturned.
+  `settleFreeVectors3` records a `free-rel` claim per enrolled relation (`freeRelationHolds3`, 1e-6), its refusal naming
+  the newest one. `freeVecDofCount3` measures the gradient's rank at the drawing (`Resolved3.freeX`). A letter is the
+  system's own when it is new, valued, or already `free-sym` / a free vector's component (`freeLetter`); a new point
+  scaled by such a letter reads its number (`pureFreeLetter3`). «|p| = 2 · AB = p»: step 2 of `freeVecEquation3` no longer
+  skips a vector a metric names; it defines the vector and re-applies each earlier given (`reapplyMetric3`).
 - **Evaluate.** `resolveFreeVectors3(c, seed)` is a pure post-pivot stage of `resolve3` (`Resolved3.freeVectors`): it
   reads nothing positional, so a figure without free vectors resolves bit-identically. A stated component is kept; an
   unstated one is sampled in ±`FREE_VEC_RANGE` from the structural key `fvec-<name>-<axis>` (inside the half-range a
@@ -630,8 +645,8 @@ nothing for them to read. The remaining direct `c.vectors.has/get` reads are cou
   one inliner: `freeVecRel3` (both branches, the letter's part carried), `figureDefinedFreeVector3` and the metric door's `anchoredMetricTwin3` (a metric given over defined vectors alone is re-applied as its anchored command) read it. A
   ratio-letter relation with nothing free left after inlining is re-applied as its anchored twin («AB = p · AD = k·p»
   → «AD = k·AB»). A new point over a PURE free vector with a letter `symbolOwnersOf` does not know is a `vec-defined`
-  point like «AE = p», its letter the vec-def lane's free sampled ratio (b2). A letter on an existing pair over a free
-  vector, an owned letter, or an impure vector stays `free-vector-coupling` (b3).
+  point like «AE = p», its letter the vec-def lane's free sampled ratio (b2). What was left of b3 is the joint solve
+  above; a letter another lane owns and a new point over an impure vector stay `free-vector-coupling`.
 - **Panel and ask.** `statedVectorRows` prints a stated tuple as typed and a never-stated free vector as
   `u = (?, ?, ?)`; the measures rows carry `u = (1, 2, 3)`, `|u|`, `u²` only when the value agrees across
   `knowledgeSamples3`. A free vector's value is absolute, so no frame or scale gate applies to it. The ask lane's
@@ -784,6 +799,9 @@ no revolution or circle) is normalised onto the floor at the end of `resolve3` (
 the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, ADR-3D-400); any other figure takes its first three points. The solve is memoised in the solved frame, and the drawing is a memoised rigid motion of it (`drawnFrame3`). The knowledge gates (`knowledgeSamples3`) read the solved frame, so a placement-only number never passes as knowledge (ADR-3D-400 §3). The **landing
 funnel** classifies which gauge components are *provably* free, which licenses
 [`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
+
+**The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
+offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
 
 **The pivot's residual families are ONE list (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)).**
 `pivotFamilies3(c)` (evaluate.ts) names every residual family `solvePivot` consumes and its solve LANE:

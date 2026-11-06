@@ -1562,7 +1562,9 @@ function deriveCore3(
           }
         }
         if (!verifyClaim(claim, c, seed)) {
-          status[owner.factId] =
+          // #2684 (ADR-3D-421): relations of the joint solve fail TOGETHER, so the refusal names the newest of them
+          const newest = claim.type === 'free-rel' ? [...claimOwners].reverse().find((o) => c.claims.slice(o.from, o.to).some((cl) => cl.type === 'free-rel')) : undefined;
+          status[newest?.factId ?? owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
               : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
@@ -1882,6 +1884,7 @@ function deriveCore3(
             ? resolved.param.value
             : (resolved.pivot?.pinSymbols?.[cmd.sym] ??
                resolved.ratioSymbols?.[cmd.sym] ??
+               resolved.freeSyms.get(cmd.sym) ?? // #2684 (ADR-3D-421): a free-vector system's letter
                (bound ? componentValue(c, bound.target, bound.axis, (id) => positions.get(id), resolved.freeVectors) : undefined)); // #1188: a free vector's component
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };

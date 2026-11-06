@@ -43,7 +43,7 @@ import {
 import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
-import { freeVecDofCount3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
+import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
@@ -539,6 +539,12 @@ export interface Resolved3 {
   /** #1188 (ADR-3D-386) — every FREE vector's value at this configuration: its stated components verbatim, its
    *  unstated ones sampled (`resolveFreeVectors3`). Values, never positions — nothing positional reads this. */
   freeVectors: ReadonlyMap<string, Vec3>;
+  /** #2684 (ADR-3D-421): the free-vector system's unknowns at this drawing (the rank probe and the `free-rel` claims) */
+  freeX: readonly number[];
+  /** #2684: every relation the joint solve carries holds at this drawing */
+  freeHolds: boolean;
+  /** #2684: the joint rung moved the figure to meet a free vector, so its frame is stated — never re-normalised */
+  freeDriven?: true;
   /** #1188 step 2 (ADR-3D-390): each free-vector LETTER («u = (k-1, 2, k)») at this configuration — solved or sampled. */
   freeSyms: ReadonlyMap<string, number>;
 }
@@ -1230,7 +1236,7 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   // #1188 (ADR-3D-386): a free vector's unstated components are sampled DOF (the pass's own source: `comps` null)
   // #1188 step 2 (ADR-3D-390): the free-vector system's unknowns less its rank — a defined vector adds none
-  return freeVecDofCount3(c) + figureFreeDofCount3(c, resolved);
+  return freeVecDofCount3(c, resolved) + figureFreeDofCount3(c, resolved);
 }
 
 function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
@@ -1978,9 +1984,29 @@ export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}
   const solvedKey = `${base}|raw`;
   let solved = memo.get(solvedKey);
   if (solved) resolveStats3.hits++;
-  else solved = remember(solvedKey, resolve3Uncached(c, seed, opts));
+  else solved = remember(solvedKey, resolveJoint3(c, seed, opts));
   if (opts.solvedFrame) return solved;
   return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
+}
+
+/**
+ * #2684 ([ADR-3D-421](../../docs/06b-decisions-3d.md#adr-3d-421)) — THE JOINT RUNG. The figure is solved as if the free
+ * vectors were not there and they absorb what ties them to it (`solveFreeVectors3`), so a figure that can be met stays
+ * bit-identical. Only a relation the free vectors cannot absorb at that drawing re-enters the pivot, with the enrolled
+ * unknowns as rider-lane entries (`freeJointPin3`): first the shape alone from two seeded starts, then the placement too
+ * when a stated number can need it. The worst case is three extra solves per configuration; a figure with no such
+ * relation never gets here. What neither rung meets keeps the first drawing, and its claim refutes the line.
+ */
+function resolveJoint3(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
+  const first = resolve3Uncached(c, seed, opts);
+  if (first.freeHolds) return first;
+  for (const { gauge, start } of [{ gauge: false, start: seed }, { gauge: false, start: seed + 1009 }, { gauge: true, start: seed }]) {
+    const pin = freeJointPin3(c, start, gauge);
+    if (!pin) continue;
+    const retry = resolve3Uncached({ ...c, scalarPins: [...c.scalarPins, pin] }, seed, opts);
+    if (retry.freeHolds) return gauge ? { ...retry, freeDriven: true } : retry;
+  }
+  return first;
 }
 
 /** What a configuration is resolved at. */
@@ -3207,7 +3233,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     // #1188 (ADR-3D-386): the post-pivot free-vector pass; step 2 (ADR-3D-390): the system, at the drawn figure
     ...(() => {
       const fs3 = solveFreeVectors3(c, seed, pos);
-      return { freeVectors: fs3.values, freeSyms: fs3.syms };
+      return { freeVectors: fs3.values, freeSyms: fs3.syms, freeX: fs3.x, freeHolds: fs3.holds };
     })(),
   };
 }
@@ -3236,7 +3262,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
  * diagonal triple would lay a pyramid on its side, which is why solids were left out before.
  */
 function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
-  if (orientationStated3(c) || c.revolutions.length > 0 || c.circles3.length > 0) return solved;
+  if (solved.freeDriven || orientationStated3(c) || c.revolutions.length > 0 || c.circles3.length > 0) return solved;
   const pos = solved.positions;
   const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
   let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
@@ -3261,7 +3287,9 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
   const lines = new Map([...solved.lines].map(([name, ln]) => [name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) }]));
   // #1188 (ADR-3D-386): the free-vector pass runs at the drawn figure, as it always has
   const fs3 = solveFreeVectors3(c, solved.seed, positions);
-  return { ...solved, positions, planes, lines, freeVectors: fs3.values, freeSyms: fs3.syms };
+  // #2684 (ADR-3D-421): a relation held in the solved frame that a stated component cannot follow keeps that frame
+  if (solved.freeHolds && !fs3.holds) return solved;
+  return { ...solved, positions, planes, lines, freeVectors: fs3.values, freeSyms: fs3.syms, freeX: fs3.x, freeHolds: fs3.holds };
 }
 
 /**
@@ -3592,8 +3620,11 @@ function evaluateSolidsAndPoints(
       let k = 0;
       if (vd.symbol) {
         const pin = c.symbolPins.find((p) => p.sym === vd.symbol);
+        const freeLetter = pureFreeLetter3(c, vd.symbol, seed); // #2684 (ADR-3D-421): one letter, one number
         if (symbolOverride?.has(vd.symbol)) {
           k = symbolOverride.get(vd.symbol)!; // V8-c: the pivot solved this symbol jointly with a dim
+        } else if (freeLetter !== undefined) {
+          k = freeLetter;
         } else if (pin && pin.rel === 'value') {
           k = pin.value; // direct assignment (k = ½) — free even during the cheap pass
         } else if (pin && cheapSymbols) {

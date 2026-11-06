@@ -1817,13 +1817,13 @@ const collinearClaim: Rule = (s0) => {
  */
 const spanPoint: Rule = (s) => {
   const m = s.match(
-    /^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:על|on)\s+(?:הקטע\s+|segment\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:כך\s+ש-?|such\s+that\s+)\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*[α-ω]\s*·?\s*([a-z])\s*\+\s*[α-ω]\s*·?\s*([a-z])\s*$/,
+    /^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:על|on)\s+(?:הקטע\s+|segment\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:כך\s+ש-?|such\s+that\s+)\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([α-ω])\s*·?\s*([a-z])\s*\+\s*([α-ω])\s*·?\s*([a-z])\s*$/,
   );
   if (!m) return null;
-  const [, id, a, b, vFrom, vTo, n1, n2] = m;
+  const [, id, a, b, vFrom, vTo, l1, n1, l2, n2] = m;
   if (vTo !== id || n1 === n2 || id === a || id === b || a === b) return null;
   return [
-    { type: 'point-in-span', id, a, b, vecFrom: vFrom, span: [n1, n2] },
+    { type: 'point-in-span', id, a, b, vecFrom: vFrom, span: [n1, n2], letters: [l1, l2] },
     { type: 'segment3', a, b },
     { type: 'segment3', a: vFrom, b: id },
   ];
