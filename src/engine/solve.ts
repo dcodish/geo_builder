@@ -125,6 +125,22 @@ export function constraintRefs(con: Constraint): Id[] {
 }
 
 /**
+ * #2590 ([ADR-783](../../docs/06-decisions.md#adr-783)) — the points whose motion can CHANGE the residual in this
+ * figure, as against {@link constraintRefs}, the points it reads. Every question "which DOF could satisfy this
+ * constraint" asks here; reading the mention as the ability is how a carrier that cannot move the equation came to
+ * own it.
+ *
+ * The two lists differ for one kind: a `length-radius` reads its radius THROUGH `center` and `witness`
+ * (`|center·witness|`), and once the radius is a stated value that distance is a constant, so only the endpoints of
+ * the measured length move the residual. Decided by what the radius IS, never by who is busy (docs/17 §2.2).
+ */
+export function residualRefs(con: Constraint, objects: readonly { id: Id; kind: string; radius?: { via: string } }[]): Id[] {
+  if (con.type !== 'length-radius') return constraintRefs(con);
+  const circ = objects.find((o) => o.id === con.circle);
+  return circ?.kind === 'circle' && circ.radius?.via === 'free' ? constraintRefs(con) : [con.a, con.b];
+}
+
+/**
  * #2001 ([ADR-724](../../docs/06-decisions.md#adr-724)) — the point pairs whose COINCIDENCE collapses one of the
  * constraint's measured terms, i.e. satisfies it by 0 = 0 instead of by geometry. The vacuity gate
  * (`step.ts` `newConstraintsNonVacuous`, issue #7 / B13) reads these, not every pair of {@link constraintRefs}:

@@ -133,7 +133,7 @@ describe('ADR-3D-090 — the build NOTICE names what the shape became', () => {
   it('quad → a cyclic quad keeps its ADR-3D-090 notice, and no narrowing notice', () => {
     submit('פירמידה ישרה SABCD שבסיסה מרובע');
     const notices = derive3(state().facts, 0).notices;
-    expect(notices).toEqual([{ kind: 'base-constrained', ids: ['A', 'B', 'C', 'D', 'S'], from: 'quad', to: 'cyclicQuad' }]);
+    expect(notices).toEqual([{ kind: 'base-constrained', ids: ['A', 'B', 'C', 'D'], from: 'quad', to: 'cyclicQuad' }]);
   });
 
   it('a base that is ALREADY cyclic raises NO notice (nothing changed)', () => {

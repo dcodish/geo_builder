@@ -3,8 +3,8 @@
  *
  * Operator rulings, 2026-10-02 (#1620): (1) a point the student did not name takes 2-D's letter — M for a midpoint,
  * F for a foot, the next free letter when taken — except that analytic uses H for a foot (F is the focus letter,
- * #1167); announced on the row, renameable. (2) «תיכון ליתר» builds when a STATED right angle fixes the vertex, and
- * otherwise asks which side is the hypotenuse — never assumes C.
+ * #1167); announced on the row, renameable. (2) «תיכון ליתר» builds when a STATED right angle fixes the vertex; on the
+ * noun alone it draws on the shown triangle and cycles (#2074, ADR-AG-411, which reversed the question of that ruling).
  *
  * Every assertion goes through the real path — `derive` (the parser, the one letter resolver `engine/toolLetters.ts`,
  * the fold, the solve), `decideSubmit`, `decideRename` — and the geometry is measured on the drawn figure.
@@ -157,11 +157,11 @@ describe('the tool’s letter is the student’s to rename — the sentence is r
   });
 });
 
-describe('«תיכון ליתר» (#1222): a stated right angle fixes the hypotenuse; an open one is asked, never assumed', () => {
-  it('the right-triangle noun alone asks which side is the hypotenuse — for the median and the altitude', () => {
-    expect(verdictKey(['משולש ישר-זווית ABC', 'תיכון ליתר'])).toBe('ambiguous-hypotenuse');
-    expect(verdictKey(['משולש ישר-זווית ABC', 'גובה ליתר'])).toBe('ambiguous-hypotenuse');
-    expect(verdictKey(['משולש ישר-זווית ABC', 'the median to the hypotenuse'])).toBe('ambiguous-hypotenuse');
+describe('«תיכון ליתר» (#1222): a stated right angle fixes the hypotenuse; an open one is bound to the seat (#2074)', () => {
+  it('the right-triangle noun alone records — for the median and the altitude', () => {
+    expect(verdictKey(['משולש ישר-זווית ABC', 'תיכון ליתר'])).toBe('record');
+    expect(verdictKey(['משולש ישר-זווית ABC', 'גובה ליתר'])).toBe('record');
+    expect(verdictKey(['משולש ישר-זווית ABC', 'the median to the hypotenuse'])).toBe('record');
   });
 
   it('no right angle at all asks too (2-D asks: input.roleSideUnresolved)', () => {

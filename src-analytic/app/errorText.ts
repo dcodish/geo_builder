@@ -199,6 +199,8 @@ export function errorText(error: InputError, t: Translate): string {
     'proof-target': 'errProofTarget',
     // #1837 (ADR-W-142) — 2-D's ruled degrees sentence, verbatim
     'radian-angle': 'errRadianAngle',
+    // #2032 (ADR-AG-408) — an arc's length is refused, naming the sentence that is read, until #2710
+    'arc-length-unread': 'errArcLengthUnread',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
@@ -225,7 +227,6 @@ export function errorText(error: InputError, t: Translate): string {
     'coordinate-restriction': 'errCoordinateRestriction',
     'ambiguous-cevian': 'errAmbiguousCevian',
     'cevian-no-triangle': 'errCevianNoTriangle',
-    'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
     'ambiguous-no-right-angle': 'errCevianNoRightAngle',
     // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
     'ambiguous-role-side': 'errRoleSideUnresolved',
@@ -294,8 +295,8 @@ export function errorText(error: InputError, t: Translate): string {
       : error.key === 'radius-letter-taken' && error.declared ? 'errRadiusLetterIsPoint' : 'errRadiusLetterIsPointAlone',
     // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
     'forced-collinear': 'errForcedCollinear',
-    // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte
-    'no-common-tangent': 'errNoCommonTangent',
+    // #2390 (ADR-AG-314), #2408 / #2411 (ADR-AG-403) — 2-D's tangentsExhausted* sentences, one suite key each
+    'no-common-tangent': `suite.refusal.tangentsExhausted${(error.key === 'no-common-tangent' && error.tangents) || 'Contained'}`,
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -387,7 +388,7 @@ export function errorText(error: InputError, t: Translate): string {
     letter: error.key === 'capital-magnitude' ? error.letter : '',
     lineName: error.key === 'line-exists' ? error.lineName : '',
     corrected: error.key === 'capital-magnitude' ? error.corrected : '',
-    role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
+    role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : error.role === 'hypotenuse' ? 'roleWordHypotenuse' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',

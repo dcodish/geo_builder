@@ -65,7 +65,7 @@
  "scenario:diameter-on-existing-chord-is-a-constraint": "3a13b6fef2bc45f4",
  "scenario:order-only-solve-stays-samplable": "529c308ece37467e",
  "scenario:equality-recruitment-not-forced": "d4f86e5f71a011a6",
- "scenario:extension-onto-circle-side-inferred-from-circle": "b67d9f9e5662a368",
+ "scenario:extension-onto-circle-side-inferred-from-circle": "f6667f31708f1e90",
  "scenario:circumcircle-cuts-segment-d-on-side": "4c4022ee47a1b08d",
  "scenario:two-tangents-from-point-unnamed-touch": "e065ebe16b403734",
  "scenario:named-incenter-of-incircle": "d411b7735e105c43",

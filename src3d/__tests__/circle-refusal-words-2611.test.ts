@@ -26,9 +26,8 @@ beforeEach(() => useGeo3.setState({ facts: [], seed: 0, lastError: null, lastNot
 
 describe('#2611 — the refusal speaks of the circle', () => {
   const CASES: { lines: string[]; code: object; he: RegExp }[] = [
-    { lines: ['D על המעגל'], code: { code: 'unknown-circle' }, he: /עדיין אין מעגל בשרטוט/ },
-    { lines: ['D is on the circle'], code: { code: 'unknown-circle' }, he: /עדיין אין מעגל בשרטוט/ },
-    { lines: ['D על המעגל O'], code: { code: 'unknown-circle', name: 'O' }, he: /המעגל .?O.? עדיין לא הוגדר/ },
+    // ADR-3D-420 (stage B): on an empty canvas the circle is now created; a letter over a drawn unlettered circle is what stays refused
+    { lines: ['משולש ABC חסום במעגל', 'D על המעגל O'], code: { code: 'unknown-circle', name: 'O' }, he: /המעגל .?O.? עדיין לא הוגדר/ },
     { lines: ['משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC', 'D על המעגל'], code: { code: 'unknown-circle', several: true }, he: /כמה מעגלים.*מגבלה של הכלי/ },
     { lines: ["קובייה ABCDA'B'C'D'", 'משולש ABC חסום במעגל', "A' על המעגל"], code: { code: 'not-on-circle', id: "A'" }, he: /אינה על המעגל/ },
   ];

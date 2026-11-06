@@ -16,10 +16,14 @@
  * Every line speaks of A, B, C (and O for a circle), so each builder's setup is a triangle.
  */
 
-/** The ruled sentence (2026-10-07), Hebrew — every builder's refusal reads exactly this. */
+/** The ruled sentence (2026-10-07), Hebrew — 2-D's and analytic's refusal reads exactly this. */
 export const RADIAN_SENTENCE_HE = 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90';
 /** Its English locale twin (the plan: "the English locale carries the sentence's direct translation"). */
 export const RADIAN_SENTENCE_EN = 'In plane geometry, angles are written in degrees — for example ∠ABC = 90';
+/** 3-D's sentence (#2335, ADR-3D-424; operator 2026-10-17: "note should say בגיאומטריה של המרחב"; spelling ruled 2026-10-18). */
+export const RADIAN_SENTENCE_SPACE_HE = 'בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90';
+/** Its English locale twin. */
+export const RADIAN_SENTENCE_SPACE_EN = 'In solid geometry, angles are written in degrees — for example ∠ABC = 90';
 
 /** What a builder's REAL submit gate did with one line, in the vocabulary of these checks. */
 export interface RadianGateVerdict {

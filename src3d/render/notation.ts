@@ -14,13 +14,155 @@
  */
 
 import { COMBINING_ARROW, foldPrimes3, PRIME_GLYPHS3, SPACING_ARROWS, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import type { SegmentEquationReading3 } from '../engine/types';
+import type { Claim3, Command3, SegmentEquationReading3 } from '../engine/types';
 // #1195: the preview composes bidi isolation with the notation, so the display layer reads the
 // isolation transform. `i18n/bidi` imports NOTHING — it is a leaf — so this edge runs downward, the
 // direction `render` already depends in. The reverse (bidi importing render) would invert it.
 
-/** Command types whose rows read as vector statements (the word וקטור is decoration). */
-export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
+/**
+ * #1549 (ADR-3D-425) — DOES THE TOOL READ THIS COMMAND AS A VECTOR STATEMENT? (the word וקטור is decoration)
+ *
+ * Operator, 2026-09-29: *"Display follows meaning: always arrows."* A row whose command the tool reads as vectors
+ * wears them whether or not the student typed them, and the typed text plays no part.
+ *
+ * TOTAL over `Command3`, so a new command kind cannot compile without answering the question. This was a hand-written
+ * `Set` (ADR-3D-013), and it fell behind the grammar the way `COMMAND_SAVEABLE` once did (#288): `inject-pair`, the
+ * pair sibling of the listed `inject-vector`, printed «BA→=(-3,4,5)» as flat text with the student's raw arrow.
+ *
+ * `mag-val` / `mag-rel`: a bare «|AB|» parses to `length-eq`, so these are reached only through a vector marking or
+ * a named vector and never arrow a length.
+ *
+ * `cos-angle` IS NOT DECIDED HERE: it is 'plain' pending a ruling, and that is not an oversight. The 2026-09-29 ruling
+ * names «cos(AB,AD)=0», but the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every
+ * right-angled base lower to (measured, ADR-3D-425), so 'vector' here would arrow segments in rows #313 keeps plain.
+ */
+type VectorReading3 = 'vector' | 'plain';
+const VECTOR_READING_3: Record<Command3['type'], VectorReading3> = {
+  'name-vector': 'vector',
+  'vec-rel': 'vector',
+  'dot-given': 'vector',
+  'dot-eq-chain': 'vector',
+  'inject-vector': 'vector',
+  'inject-pair': 'vector',
+  'point-in-span': 'vector',
+  'mag-val': 'vector',
+  'mag-rel': 'vector',
+  'vec-mag': 'vector',
+  'draw-arrow': 'vector',
+  'declare-vector': 'vector',
+  'cos-angle': 'plain', // see above: awaiting the operator's ruling (ADR-3D-425)
+  claim: 'plain', // read through CLAIM_VECTOR_READING_3
+  'mutual-rel': 'plain',
+  'plane-rel': 'plain',
+  'distance-rel': 'plain',
+  'free-plane': 'plain',
+  'free-line': 'plain',
+  solid: 'plain',
+  'point-on-segment3': 'plain',
+  segment3: 'plain', // the companion «|AB→|=5» also emits; a vector command anywhere in the fact wins
+  centroid3: 'plain',
+  point3: 'plain',
+  'coord-plane-rel': 'plain',
+  'plane-line-perp': 'plain',
+  plane3: 'plain',
+  'plane-angle': 'plain',
+  'on-planes': 'plain',
+  'foot-on-plane': 'plain',
+  'plane-plane-line': 'plain',
+  'foot-on-line': 'plain',
+  line3: 'plain',
+  'line-perp-plane': 'plain',
+  'line-plane-point': 'plain',
+  'on-line': 'plain',
+  'sign-given': 'plain',
+  'plane-through': 'plain',
+  'line-through': 'plain',
+  revolution: 'plain',
+  'seg-plane-rel': 'plain',
+  'length-rel': 'plain',
+  'symbol-value': 'plain',
+  'midpoint-auto': 'plain',
+  'vertex-angle': 'plain',
+  'altitude-foot': 'plain',
+  'angle-bound3': 'plain',
+  'angle-eq': 'plain',
+  'angle-mark': 'plain',
+  'length-mark': 'plain',
+  'angle-pair-eq': 'plain',
+  'bisector-point': 'plain',
+  'bisector-ray': 'plain',
+  circle3: 'plain',
+  'diag-intersection': 'plain',
+  'seg-crossing3': 'plain',
+  'quad-diagonals': 'plain',
+  'height-to-face': 'plain',
+  'line-common-perp': 'plain',
+  'line-plane-angle': 'plain',
+  'line-projection': 'plain',
+  'param-sign': 'plain',
+  'param-decl': 'plain',
+  'perp-to-base': 'plain',
+  'plane-cut': 'plain',
+  'point-on-circle3': 'plain',
+  'circle-given': 'plain',
+  'rect-complete': 'plain',
+  'quad-shape': 'plain',
+  'shape-ref3': 'plain',
+  'rel-plane': 'plain',
+  'right-pyramid-point': 'plain',
+  'tetra-altitude': 'plain',
+  'make-right-prism': 'plain',
+  concyclic: 'plain',
+  'line-rel': 'plain',
+};
+
+/** The same question over the claim union, the `claim` command's sub-kind (#1549). */
+const CLAIM_VECTOR_READING_3: Record<Claim3['type'], VectorReading3> = {
+  'vec-eq': 'vector',
+  'vec-val': 'vector',
+  'dot-val': 'vector',
+  'dot-eq': 'vector',
+  'mag-rel': 'vector',
+  'mag-val': 'vector',
+  'cos-angle-eq': 'plain', // with `cos-angle`: awaiting the ruling
+  'cos-eq': 'plain', // likewise
+  'length-rel': 'plain',
+  'length-letter': 'plain',
+  'volume-eq-poly': 'plain',
+  'perp-plane': 'plain',
+  'par-plane': 'plain',
+  'collinear3': 'plain',
+  'polygon-open': 'plain',
+  'length-eq': 'plain',
+  'length-sum': 'plain',
+  'area-eq': 'plain',
+  'coords-eq': 'plain',
+  'never-parallel': 'plain',
+  'plane-eq': 'plain',
+  'angle-seg-eq': 'plain',
+  'vertex-angle-eq': 'plain',
+  'length-ratio': 'plain',
+  'volume-eq': 'plain',
+  'lateral-area-eq': 'plain',
+  'surface-area-eq': 'plain',
+  'lines-rel': 'plain',
+  'volume-poly': 'plain',
+  'concyclic': 'plain',
+  'bisector-dir': 'plain',
+  'line-plane-angle': 'plain',
+  'coord-plane-rel': 'plain',
+  'plane-line-perp': 'plain',
+  'line-rel': 'plain',
+  'mutual-rel': 'plain',
+  'plane-rel': 'plain',
+  'distance-rel': 'plain',
+};
+
+/** One command's reading. The shape is structural (a test may pass a literal), so an unknown kind reads as prose. */
+const readsAsVector3 = (cmd: { type: string; claim?: { type: string } }): boolean => {
+  if (cmd.type === 'claim') return (CLAIM_VECTOR_READING_3 as Record<string, VectorReading3 | undefined>)[cmd.claim?.type ?? ''] === 'vector';
+  return (VECTOR_READING_3 as Record<string, VectorReading3 | undefined>)[cmd.type] === 'vector';
+};
 
 /** Apply textbook vector notation to a vector-statement utterance: pair arrows + name underlines. */
 export function vectorNotation(utterance: string, vecNames: Set<string>): string {
@@ -57,9 +199,10 @@ export function vectorNotation(utterance: string, vecNames: Set<string>): string
 }
 
 /** Is this fact a VECTOR statement? (#313: the MathML layer applies only where this is true —
- *  an arrow on a segment name in a prose row would assert vector-ness the statement never had.) */
-export const isVectorFact3 = (f: { cmds: { type: string; claim?: { type: string } }[] }): boolean =>
-  f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
+ *  an arrow on a segment name in a prose row would assert vector-ness the statement never had.)
+ *  One vector command anywhere in the fact is enough (#1549). */
+export const isVectorFact3 = (f: { cmds: readonly { type: string; claim?: { type: string } }[] }): boolean =>
+  f.cmds.some(readsAsVector3);
 
 /**
  * The step-row display: vector facts get notation, everything else passes through verbatim — except a row whose
@@ -72,8 +215,7 @@ export function factDisplay3(
   reading?: SegmentEquationReading3,
 ): string {
   if (reading === 'length') return lengthReadingText3(f.utterance, f.cmds);
-  const isVec = f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
-  return isVec ? vectorNotation(f.utterance, vecNames) : f.utterance;
+  return isVectorFact3(f) ? vectorNotation(f.utterance, vecNames) : f.utterance;
 }
 
 /** The fields of a segment equation's `vec-rel` the length spelling reads (structural, so a test may pass a literal). */

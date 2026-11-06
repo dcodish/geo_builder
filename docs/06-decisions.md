@@ -1023,6 +1023,8 @@ Parsing is uppercase-labels-only after the keyword (so a lowercase word like "th
 
 ## ADR-071 — "AB = √2R" couples a length to a FREE radius (a `length-radius` constraint), not a frozen distance
 
+**Amended by** [ADR-783](#adr-783): against a stated radius the witness's angle is no carrier unless the witness is an endpoint.
+
 **Status:** Accepted (2026-06-20). Operator's tangent figure: `מעגל O` (a free-radius circle), tangent from external A touching at D, B on the circle, segments AB/AO/BO/DO, then **`AB=√2R`** and **`BO=R`**. It reported `over-constrained: |AB| = 7.07 cannot hold`.
 
 **Three stacked defects (each hid the next).** (1) **Parser** — `measureSqrt` wasn't anchored to end-of-input (unlike its sibling length rules), so `√2R` matched only the `√2` and **silently dropped the trailing R** (the [ADR-024](#adr-024)/[ADR-026](#adr-026) unanchored-rule class). The rule now consumes an optional trailing variable that multiplies the radical (`√2R` ⇒ `{coef: √2, var: R}`) and anchors the RHS. (2) **Lowering** — `buildSymTab` froze `R` to the circle's default radius (5) **even for a free-radius circle**, turning `AB=√2R` into a FIXED `set-distance 7.07` that fought the still-free radius DOF ([ADR-051](#adr-051)/[ADR-052](#adr-052): a default masquerading as fixed) → a **seed-fragile** over-constraint. It now leaves `R` unfrozen for a free-radius circle. (3) **Solver** — even coupled as a ratio against the radius witness `OB` (`|AB| = √2·|OB|`), `driveOrCheck` drove B's on-circle angle and the joint Nelder–Mead gave up from most seeds.
@@ -2085,6 +2087,8 @@ Today the kite macro emits **two HARD equalities** pinned to axis AC (`parse.ts`
 **Result.** The `DF=DB` figure reports **0 forced angles** (was 11); determined figures (square 4×90°, equilateral 3×60°) still report their genuine values (no false negative); `freeDofCount` unchanged. Locked by scenario `equality-recruitment-not-forced` (the operator's exact 8-utterance sequence). **Full suite green, build clean.**
 
 ## ADR-142 — A SHARED-ENDPOINT extension's side is inferred from the circle, not the letter order (a reversed "המשך BD" vs "DB" the geometry disambiguates)
+
+> **⚠ Superseded** by [ADR-784](#adr-784) (operator rulings 2026-11-04 on #2518: *"we need to refuse and say that the correct syntax would be המשך OA"*, *"the bagrut text would be wrong in that case so we dont need to stick to it."*): a reversed extension is no longer accepted on either side. It is refused and the right sentence is offered. The same ruling reverses #1843's (2026-10-07) "keep building silently".
 
 **Status.** Accepted (2026-06-28). Operator session `1dugj1cw` (bagrut Q4, two intersecting circles + tangent-secants). *Files: `src/engine/verify.ts`, `src/store/geoStore.ts`, `src/__tests__/scenarios.test.ts`.* Refines the directional-extension family ([ADR-054](#adr-054)/[ADR-098](#adr-098)/[ADR-124](#adr-124)).
 
@@ -3967,6 +3971,8 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 ## ADR-267
 
 ### ADR-267 — Extension-direction semantics as a preference ladder: STRICT letter order preferred wherever achievable, the ADR-142 shared-endpoint either-side bar as the ACCEPTANCE tier — searched in ONE budget-safe interleaved sweep, honoured by every consumer
+
+> **⚠ Superseded in part** by [ADR-784](#adr-784) (operator rulings 2026-11-04 on #2518): the acceptance tier is withdrawn, so the ladder has one rung, the stated letter order. `relax`, `okRelaxed`, `meetsRequirements`'s third argument and the `relaxed` config tier are gone. The rule that a fallback bar rides the same loop stands as a rule for any future bar.
 
 **Status:** Accepted (2026-07-10, dedicated fix session; issue #19). Operator session `eew5ezi5` — re-testing the ADR-124/#6 source question (booklet 571 2025, printed p.78, Q4) with the correct NEW extension point E. *Files: `src/store/geoStore.ts`, `src/__tests__/scenarios.test.ts`.*
 
@@ -17260,7 +17266,7 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 
 **Measured after** (the same path, plus «הציגו תצורה אחרת» through `searchAnotherView`). Every spelling commits bound at C; A, B, C do not move when the line is added; three presses walk the right angle C → A → B → C with the median's foot (or the altitude's) on the side opposite it each time, every view green with no violation. «CM / AM תיכון ליתר» and «גובה ליתר מ-C» put the right angle at the typed vertex, and no press moves it. «תיכון ליתר AB» unchanged (∠C = 90). «תיכון ליתר» · «זווית A ישרה» runs from A to BC at every view (ADR-596 / FR-ALT-7). Two open right triangles ask `roleSideUnresolved`.
 
-**Not delivered (measured).** «תיכון ליתר בנקודה K» now goes to the model, as «זווית C ישרה» · «תיכון ליתר בנקודה K» already does: 2-D has no reading of a median whose foot letter is given by «בנקודה K» («משולש ABC» · «תיכון לצלע AB בנקודה K» goes to the model too). Before it was asked. The plan expected it to bind; that needs the foot-letter reading, a separate capability (reported as found work). **The analytic half** waits for #2018 (its plan's item), so analytic still asks; parity rows carry the gap on #2074.
+**Not delivered (measured; ⚠ delivered by [ADR-790](#adr-790), 2026-11-05).** «תיכון ליתר בנקודה K» now goes to the model, as «זווית C ישרה» · «תיכון ליתר בנקודה K» already does: 2-D has no reading of a median whose foot letter is given by «בנקודה K» («משולש ABC» · «תיכון לצלע AB בנקודה K» goes to the model too). Before it was asked. The plan expected it to bind; that needs the foot-letter reading, a separate capability (reported as found work). **The analytic half** waits for #2018 (its plan's item), so analytic still asks; parity rows carry the gap on #2074.
 
 **Cost (docs/17 §7).** One pass over a triangle's objects/constraints per role read; no sampler, no solve, no new axis.
 
@@ -20100,7 +20106,7 @@ No new student text. Every sentence is an existing ruled string.
 
 ## ADR-780 — A shared-endpoint extension seats its other end on the stated side: «המשך AO» with A on the circle draws R beyond O when O can be put inside (#2518)
 
-**Status:** accepted · 2026-11-04 · bug (P2 + wrong-answer, 2-D) · fix round #2697 · branch `fix/2518-extension-past-second-letter` · operator ruling 2026-11-04 on #2518 (questions page of round #2678, card q1 = **A**: *"Push R past O when the figure allows; otherwise keep today's either-side rule"*) · **Amends** [ADR-142](#adr-142)'s premise ("with only one other crossing the direction is forced"; the side is forced only once the other end is placed) · **Keeps** [ADR-142](#adr-142) / [ADR-267](#adr-267) (the either-side acceptance tier and its two approved bagrut figures, unchanged)
+**Status:** accepted · 2026-11-04 · bug (P2 + wrong-answer, 2-D) · fix round #2697 · branch `fix/2518-extension-past-second-letter` · operator ruling 2026-11-04 on #2518 (questions page of round #2678, card q1 = **A**: *"Push R past O when the figure allows; otherwise keep today's either-side rule"*) · **Amends** [ADR-142](#adr-142)'s premise ("with only one other crossing the direction is forced"; the side is forced only once the other end is placed) · **Amended by** [ADR-784](#adr-784): the seat stays; "otherwise keep today's either-side rule" is withdrawn by the later ruling, and where the seat cannot give the stated side the line is refused
 
 **Requirements:** none (internal): directional «המשך» is already promised (ADR-054) · **Design:** [04](04-design.md) "A shared-endpoint extension seats its other end on the stated side"; [LADDER](LADDER.md) stage 2a · **LADDER stage:** 2a (an apply-time seat)
 
@@ -20148,3 +20154,189 @@ No new student text. Every sentence is an existing ruled string.
 **Locks re-pinned to the ruling.** `scenarios-corpus-1` `angle-alias-bare-digit-sign` («A₁») and `angle-alias-book-notation` («C₁», «E₁»); `parser/__tests__/angle-alias.test.ts`; `app/__tests__/issue-2191-second-alias.test.ts`. New: `src/__tests__/issue-1812-angle-alias-subscript.test.ts` (four spellings → «A₁», «B₂»); analytic's half over the same sentences is `src-analytic/__tests__/issue-1812-angle-label-subscript.test.ts`.
 
 **Behaviour change for a student:** «נסמן זוית CAB כ-A1» (and «כ 1») writes «A₁» on the wedge; before, a bare «1».
+
+## ADR-783 — An owner must be able to move what it owns: `residualRefs`, and a stated radius no longer lends its witness to a length (#2590)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D, wrong-answer) · fix round #2722 stream C · branch `fix/2590-pinned-radius-driver` · amends [ADR-071](#adr-071) ("plus the witness's on-circle angle") · reads with [ADR-399](#adr-399) and [ADR-281](#adr-281)
+
+**Requirements:** none (internal) · **Design:** [04](04-design.md) § Engine, "An owner must be able to move what it owns" · **LADDER stage:** 3 (`recruitFreeDofs`, the 3B row), and the apply-time pick ahead of 2d′
+
+**Measured before** (`main` 28dac0c3, `decideDeterministic2D` → store → `replay`, seeds 0–23, model mocked). «מעגל O ברדיוס r · קטע OR · OR=r · r = 5» green at seed 0 only, sole owner the hidden `~radw-circle-O`, and every other configuration empty. Same 1/24: «OR=2r · r = 2.5», the pin first, «AB=r», «AB=2r», «AB=r+1 · r = 4», «ריבוע ABCD · מעגל O ברדיוס r · AB=r · r = 5», two lengths against one radius. «קטע AB · AB=r · r = 3» was 24/24 with four owners (O, A, B, the witness) for one equation.
+
+**Class.** *Something counts as able to satisfy a constraint because the constraint mentions it, not because the residual can move with it.* `length-radius` is `|ab| − k·|centre·witness| − add`. The letter system puts «r = 5» on the circle, so the radius is pinned before «OR=r» applies, in either entry order, and `|centre·witness|` is then a constant. Two sites read the mention as ability. `driveOrCheck` marked the witness, so `ensureOwnership` saw a directive and never ran its probe: the figure held only where the default drawing satisfied it by coincidence. `recruitFreeDofs` walked newest-ref-first from that witness, so no singleton could help and the widest rung took four carriers, whose re-solve moved the accepted figure and failed ADR-399's stability check. These are one defect; docs/17 §2.2 and M2 law (i).
+
+**Decision.** `residualRefs(con, objects)`, beside `constraintRefs` in `engine/solve.ts`: the points whose motion can change the residual in this figure. For a `length-radius` against a stated radius it answers the endpoints; for every other case it answers `constraintRefs`. The test is what the radius IS (`via`), never who is busy. `driveOrCheck`'s witness marking and every carrier-choosing site of `recruitFreeDofs` read it: cases A, B, D (both the reach and K1's alternative), C, E and F. Case A's K is never a `length-radius` today, because the branch in `driveOrCheck` returns before an on-segment claim; it reads the predicate so no site asks the old question. `evaluate`, `dofRank`, `sample`, `verify` and `core`'s related-set keep `constraintRefs`: they need the positions the residual READS. `ensureOwnership` is unchanged: once no impotent directive is minted, its probe runs. No chokepoint list grows.
+
+**Not shipped.** The experiment's two inline checks (the plan's table), which asked one question twice. The escalation's per-owner derivative probe (cost on every accept). `orphanedBy` (a measured no-op).
+
+**A difference from the experiment.** The experiment dropped the witness marking whenever the witness was not an endpoint, free radius included. `residualRefs` keeps `witness` while the radius is free, because that ref is the route to the radius in the ancestor walk, so an UNPINNED «AB=r» keeps today's two owners (radius and witness): unchanged from `main`, not the plan's table entry "the radius". The witness's own angle still cannot move the residual there. It does no harm with the radius as a live co-owner, and no row reproduces a case where it is the only directive.
+
+**Kinds reviewed for the same shape** (a ref the residual treats as a constant). `length-radius` is the only one that measures a length through a reference pair. A whole-circle `area` / `perimeter` / `*-ratio` operand reads `[centre, member]`, but its residual depends on that pair as the size itself; the sentence that would pin it and drive it, «שטח המעגל שווה לשטח המשולש ABC», does not parse deterministically.
+
+**Measured after** (the same path). Every row above 24/24 with one endpoint owner per equation (R or B; B and D for two lengths), and the numeric twin «מעגל O ברדיוס 5 · קטע AB · AB=5» has the same owner. English spelling, a real on-circle witness («נקודה P על המעגל»), and «AB=r/2», «AB=r-1» likewise. Controls unchanged: no pin 24/24 with the radius moving; #2489 T34 24/24; «קטע AB · AB = k · k = 5» 24/24 by `distance`, not this path. The pin moves nothing at seed 0. A failing row cost ~1.9 s for 24 seeds and now costs ~330 ms; no solve was added to any figure.
+
+**Not this defect.** «קטע BC · נקודה M על BC · קטע OM · OM=r · r = 5» is 14/24 after the fix, exactly as its numeric twin «OM=5» is on the same tip: M's segment does not reach the circle in every sampled configuration. The letter form now matches the number; that row's seed rate is the numeric one's.
+
+**Ports (ADR-W-157).** 2-D only. `length-radius` exists in no other tree (grepped `src3d/`, `src-analytic/`, `src-complex/`): analytic solves jointly with no per-DOF owner table, and 3-D's pins carry their owner explicitly (ADR-3D-393). No parity row: the sentence's verdict did not change, only its reach across configurations.
+
+**Locks.** Fixture `src/__tests__/fixtures/issue-2590-pinned-radius-orphan.geo.json` (the report's four lines). `src/engine/__tests__/pinned-radius-owner-2590.test.ts`: every row above at seeds 0–23 with the owner asserted, both entry orders, both locales, two lengths, the numeric twin, the free-radius controls, stability at seed 0, and the predicate's own cases. `src/app/__tests__/issue-2489-symbolic-length-points.test.ts` stays green unedited.
+
+**Unblocks.** #2579's measure half: re-measure it with the segment carrier on.
+
+**Behaviour change for a student:** a length stated in a radius letter whose value is known («OR=r», «AB=2r», with «r = 5») draws in every configuration «הציגו תצורה אחרת» shows, as the same sentence with the number does. Before, every configuration but the first was empty and the row read "not determined".
+## ADR-784 — A stated extension side no figure has is refused and offers the reversed sentence; the either-side tier is withdrawn (#2518)
+
+**Status:** accepted · 2026-11-05 · bug (P2 + wrong-answer, 2-D) · fix round #2722 · branch `fix/2518-reversed-extension` · operator rulings 2026-11-04 on #2518 (*"what happens in this case is that we need to refuse and say that the correct syntax would be המשך OA. we can offer the correct syntax since its clear that it cannot be the other way around. This should be pretty fast to do."*; *"re 2518 - the bagrut text would be wrong in that case so we dont need to stick to it."*) · **Supersedes** [ADR-142](#adr-142), and [ADR-267](#adr-267)'s acceptance tier · **Reverses** #1843's ruling of 2026-10-07 (keep building silently) · **Amends** [ADR-780](#adr-780) (its seat stays)
+
+**Requirements:** [02](02-requirements.md) FR-EN-27 · **Design:** [04](04-design.md) "A typed extension whose side no figure has is refused" · **Stage:** [LADDER](LADDER.md), the extension-side check, read at the submit gate before the dry run, after the crossed-ring check
+
+**Measured before** (`main` 28dac0c3, `driveThroughGate`, `meetsRequirements` at seeds 0–7). The report built on the stated side (11111111, ADR-780). The reversed bagrut lines and a pinned control built green with the point on the other side: «המשך הצלע BD» and «המשך AC» on the two approved figures (relaxed 00101101, strict 00000000), and «המשך AO» with O 10 from a radius-3 circle (relaxed 10010000, strict 00000000).
+
+**Class.** *A statement of a side that no figure has is accepted on the other side.* ADR-142 read the shared-endpoint extension's letters as carrying no information when the side is impossible, so the student's wrong order drew green and was never corrected. The operator's ruling is the reverse: the letters are a statement, and a statement no figure can meet is refused.
+
+**Decision.**
+1. **One bar.** `extensionsClear`, the verifier, `firstSatisfyingSeed`, `meetsRequirements`, `findValidConfig`, `searchResample`, `searchAnotherView` and the sample filter hold the stated letter order only. `relax`, `okRelaxed`, the `relaxed` config tier and every `fallback` that served it are gone. `findValidConfig` still keeps a commit seed that meets every requirement: the relaxed check was what answered there, since strict implies relaxed, so the keep is now written out (the #1739 lock).
+2. **ADR-780's seat runs first and is unchanged.** A figure whose other end can move builds as it did.
+3. **`impossibleExtensionSide`** (`replay/core.ts`) refuses a typed shared-endpoint extension whose side holds at the drawn seed of the trial figure and at no sample of the prior figure's pool. It is `forcedCrossedRing`'s shape (M3, one sampler, no new search; fails open). It reads an extension only when the trial built it as branch (1)'s `line-circle`, because branches (0) and (2) carry `collinear-order` and the ladder owns them.
+4. **`extensionSideVerdict`** (`app/extensionSide.ts`) is the one verdict at the submit, ✎ and LLM seams. It offers the sentence with the two letters reversed only when that line parses to the reversed extension, passes the same gate and builds. When the point lies between the two letters neither extension reaches it, so the refusal stands alone.
+5. **A saved figure keeps loading.** The gate is on typed lines. Replay builds every row and the verifier flags the row, so the figure draws as it did, amber.
+
+**Found in round.** With the tier gone the verifier reaches a point past the FIRST letter, and `figure.v.orderBeyond` would have said it "landed between" the letters, which is false. `figure.v.orderBeyondOther` says where it landed (new text, ADR-W-174).
+
+**Deviation from the plan: the pool.** The first build read the trial figure's pool. It worked and cost 3.2–3.7 s on a refused line, because the verdict sampled twice (the line and its reversal). The prior pool is memoized between the two, and the crossing is computed from the two ends and the centre in each sample: the refused line now costs 0.25–0.35 s, the whole drive of the bagrut figure included..
+
+**The later line (plan step 5).** The plan said a later line goes through 2-D's existing contradiction refusal. Measured, it does not: the shared-endpoint branch carries no order constraint, so the report followed by «OP = 10» committed with every row `ok` and the row flagged. Pushing `collinear-order` is the method the operator declined (3.4 s on «המשך AC», and it grows circle P instead of refusing). Escalated, and **ruled by the judge on #2518 (ADR-W-173), option B**: the later line is refused, on the fast path. `impossibleExtensionSide` therefore also reads every standing shared-endpoint extension: on its side on the prior figure at the drawn seed, off it on the trial figure at that seed, and off it in every sample of the TRIAL figure. The prior pool cannot answer this one, because the line is what narrowed the figure. A figure already off its side at the drawn seed (a saved one) never blames a new line, so it stays editable. The refusal, `input.extensionSideBroken`, names the statement and the extension's line. It offers no sentence: the row to change is another row. A free-radius figure where a larger circle would have worked is refused too, as the ruling says: the samples do not reach that radius.
+
+**Cost of the later line, and the two mechanisms it needed.** The trial pool first cost 3.0–3.4 s where it fired, nearly all of it `firstSatisfyingSeed`'s futile sweep in `samplingJobs`' setup, so `samplingJobs` and `sharedSamples` take `atSeed` to skip that search. A valid line on an expensive figure then still cost 3.6 s («AB = 4» on the booklet figure, every sample re-solving), so `gateSamples` runs the pool's jobs in order, stops at the first sample on the side, and stops at a deterministic work cap (`extensionSideConfig.cap`, 150 000 evaluation units). A run the cap cuts answers nothing and the line commits, flagged by the verifier: on a figure that expensive, a later line that truly breaks the side is not refused.
+
+**Perf (docs/17 §7).** One fresh process per figure, in the book's order, parse included: the ADR-142 figure folds in 67 ms and `findValidConfig` takes 3 ms; the ADR-267 figure 102 ms and 38 ms. ADR-780 measured 69 ms and 58 ms for their reversed folds, parse excluded, so removing the tier costs nothing measurable. A figure with no extension pays one scan of the fact list, locked by reading no fact field. A line that leaves every standing extension on its side at the drawn seed pays one trial replay, which the dry run reuses (0.3–8 ms measured). Where it fires: 0.38–0.49 s for a refused later line on the measured figures. A valid line the prefilter sends to the pool costs at most about the cap: «AB = 4» on the booklet figure, 0.49–0.61 s, cut and committed, against 3.6 s uncapped.
+
+**Sibling audit.** Grepped every `relax` / `extensionsClear` / `meetsRequirements` third-argument consumer: all removed, and `tsc` proves none remains. **Analytic** already holds the side: its `beyond` selector is hard, so the pinned control is refused (`unsatisfiable`) and the report and the book's order build. It does not offer the reversed sentence; the parity row `ext-circle-side-impossible-2518` records that. **3-D** does not read this sentence (X8, `#1679` parked).
+
+**Locks.** `src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts`: each reversed form refused with its offer and nothing committed, the offered line building green, the no-offer case in both letter orders, English, the gate's pay-nothing paths, the saved figure, the later line on a pinned and on a free radius, and a valid later line committing. Parity rows `ext-circle-side-impossible-2518` and `ext-circle-side-book-order-2518`. Rewritten to the book's order, each attributed to this ruling: scenario `extension-onto-circle-side-inferred-from-circle` («המשך הצלע DB»), scenario `shared-endpoint-extension-either-side-default` («המשך CA», id kept for its index), `scenarios-props-budget.test.ts`, fixture `issue-1694-eew5ezi5-exact.geo.json`.
+
+**Behaviour change for a student:** a reversed «המשך» whose stated side is impossible, the two bagrut lines included, is refused and offers the right sentence. The figure stays as it was and the text stays in the box. A saved figure with such a line still opens, with the row flagged. A later line that makes a stated side impossible is refused, naming the extension line, even where a larger free circle would have allowed it.
+## ADR-785 — A definition is compared with its operands' spelling taken out: «D אמצע CB» takes the tool's M, as «D אמצע BC» does (#2674)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D + analytic) · round #2722 · branch `fix/2674-letter-takeover-reversed` · operator ruling 2026-11-04 (round #2697 questions page, card q3 = A): *"Rename for the reversed spelling too"* · amends [ADR-653](#adr-653) · analytic arm: [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404) · 3-D: already so ([ADR-3D-415](06b-decisions-3d.md#adr-3d-415))
+**Requirements:** [02](02-requirements.md) FR-EN-9 and FR-EN-20 · **Design:** [04](04-design.md) § the point naming's general criterion; [LADDER](LADDER.md) stage 1: `commandConflict` reads a restatement through `unspelled`, so it enters no stage.
+
+**Class.** *A statement about a point is compared with an existing definition by how its operands were written, not by what they name.* Two comparisons had it. Measured at `28dac0c3` through `decideDeterministic2D` → `commitVerdict` → `replay`:
+- Naming by use (`definitionKey`): «משולש ABC» · «אמצע BC» · «D אמצע CB» kept M and D with «M ו-D נפלו על אותה נקודה.»; «D אמצע BC» renamed M to D. The same for «תיכון מ-A במשולש ABC» · «D אמצע CB», for «אמצע CB» · «D אמצע BC», and for an altitude's foot («גובה מ-A לצלע BC» · «AD גובה לצלע CB»).
+- The idempotent restatement (`commandConflict`, FR-EN-9): «M אמצע BC» · «M אמצע CB» recorded a row and lowered it to a hidden twin `~M`, where the exact spelling answers «כבר קיים». The same for a foot and for «E נקודת החיתוך של AC ו-BD» restated as «…CA ו-DB» or «…BD ו-AC».
+
+**The second comparison is part of the first.** Changing `definitionKey` alone gave one visible point D, with a hidden twin `~D` behind it (the renamed D is midpoint BC, the line says midpoint CB, so M1 lowered it). The twin is not inert: `reinterpretAsConstraint` allows one twin per point, so «D אמצע AB» after it read «'D' is already defined» instead of the refusal the exact spelling gets, which names the statement. The ruling says *exactly as «D אמצע BC» does*, so both comparisons had to move.
+
+**Decision.** One reading, `unspelled` (`engine/step.ts`): an object with its operands' order taken out, for the kinds that read them as a set. A midpoint's and a foot's side, a circumcentre's vertices, and a line-line crossing's two lines (each sorted, then the pair sorted, each within-segment flag travelling with its own line). Every other kind stays as written, because its order means something (a square's corner, a rotation). `definitionKey` and `commandConflict` both read it; no second comparison was added. Restatement in `foldCommand` still compares commands exactly, which is right: it drops a duplicate row, and a reversed line reaches `commandConflict`.
+
+**Unchanged.** A letter the student typed stays theirs («AM = 3» before «D אמצע CB» keeps M, D and the notice). Two student letters on one point keep the notice. A different segment takes nothing over. Undo brings M back.
+
+**Sibling audit.** Analytic reads a reversed midpoint already (`sameDerivation`); locked, and its other remnants of this issue are [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404). 3-D reads a segment either way round in `toolLetterTakenOver3` (ADR-3D-415, locked); it has no other tool-lettered point. Complex: no tool-lettered point in its engine (grepped). **Not in this item:** «אלכסוני המקבילית נחתכים» · «E נקודת החיתוך של AC ו-BD» keeps M and E with the notice in EITHER spelling, because the line carries `onSeg` and the tool's point does not. That is a difference of statement, not of spelling, and is recorded on #2674.
+
+**Locks.** `src/app/__tests__/issue-2674-reversed-spelling.test.ts`; scenario `tool-midpoint-reversed-takes-letter-2674`.
+
+**Behaviour change for a student:** «משולש ABC» · «אמצע BC» · «D אמצע CB» shows one point D and no message, as does a foot named on the reversed side. A definition restated the other way round («M אמצע BC» · «M אמצע CB») now answers «כבר קיים», as the exact spelling does, instead of adding a row that changed nothing (FR-EN-9: *equivalent*, and the reversed-twin rule of #2209).
+## ADR-789 — An arc's plain fraction is degrees, and a length unit makes it the arc's length (#2032)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D + analytic, `wrong-answer`) · round #2722 · branch `fix/1774-bare-coordinate-point` · judged rulings q9 and q10 under the operator's words of 2026-11-02 ([ADR-W-175](06w-decisions-workspace.md#adr-w-175)): *"An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees."* · amends [ADR-664](#adr-664) · analytic arm: [ADR-AG-408](06c-decisions-analytic.md#adr-ag-408)
+**Requirements:** [02](02-requirements.md) FR-IN-16 · [02c](02c-requirements-analytic.md) R245 · **Design:** none (internal)
+
+**Measured before (`b754d9d5`, `decideDeterministic2D`).** «קשת AB = 2/3» committed `measure-length`, the chord AB = 2/3 (analytic: an arc of 0.67°). «קשת AB = 4 ס"מ» committed `set-angle 4` in both builders.
+
+**The class.** A value on an arc is read by what it happens to look like, not by what it says. ADR-664 left «anything else» to fall through, and a fraction fell through to the length rules; each builder's unit strip, right for every other value, erased the one word that said length.
+
+**Decision.** `arcValue` reads a plain fraction as a plain number. `shell/arcLengthUnit`, one reader for both builders, finds one arc with a length unit before either builder strips it: 2-D folds the line into «אורך הקשת AB הוא 4» at the strip boundary (`foldArcLengthUnit`), so it commits that sentence's command and answers as that sentence does with no drawn arc; analytic refuses it (ADR-AG-408). Unit words: the session's list, recorded with `judgments.mjs chose`; the one-letter «מ'» and "m" stay out, because «4m» is a coefficient. A π value stays a length, a root keeps going to the AI (#2174), and #2174's «אם התכוונת לאורך הקשת» note is untouched.
+
+**A fraction keeps its spelling (pre-play of round #2722, ADR-W-179).** `set-angle` kept the float and lost the spelling, so the step row read «∠AOB = 0.6666666666666666» and the hint would have taught it. `«∠ABC = 2/3»` had the same row, from the same printer. `set-angle` now carries `src` for a fraction, from both of its readers (`arcValue`, `angleValueOf`). `givenText` prints it on the row («∠AOB = 2/3°»), the hint and export («∠AOB = 2/3», a sentence the tool reads), the canvas («2/3°») and the given's panel row. A decimal or a whole number carries no `src` and prints as before. The row's degree sign is new text (ADR-W-174).
+
+**Sibling audit (docs/17 §1).** Analytic: already reads a fraction as degrees; the unit is ADR-AG-408's refusal. 3-D and complex have no arcs. Not changed, and reported: an arc SUM with a unit, «קשת AB + קשת CD = 4 ס"מ», keeps today's degrees in analytic and today's verdict in 2-D; the ruling names one arc's value. The row of a whole or decimal arc value («∠AOB = 40») keeps no degree sign, as before.
+
+**Locks.** New `src/app/__tests__/issue-2032-arc-plain-values.test.ts`; parity rows `arc-fraction-2032`, `arc-unit-length-2032`; analytic's `arc-length-refusal-2032.test.ts`.
+
+**Behaviour change for a student:** «קשת AB = 2/3» draws an arc of 2/3°, not a chord of length 2/3, and the row reads «∠AOB = 2/3°». «קשת AB = 4 ס"מ» makes the arc 4 long, not 4°.
+## ADR-786 — «MK אנך ל-AB» from a placed M to a new K draws K, the foot on AB (#2232, in #2231's family)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (2-D, closed into #2231's family) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: B → *"yes"* (analytic and 2-D)
+**Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** none (internal): a parser rule. Stage: parse, before the ladder.
+
+**Class.** *A segment named by a placed point and a new letter, stated as the noun «אנך» to a side, is read as a free relation or a line's name, so the foot the sentence states is not built.*
+
+**Measured at 28dac0c3; the plan's account is partly out of date.** #2232 measured «משולש ABC · M על AC · MK אנך ל-AB» refused «'M' is already defined». Today it is read by `perpendicularConstraint` and refused «cannot place M on segment AC so that MK ⟂ AB» on some figures, and with M a vertex («AK אנך ל-BC») it records a relation with K created **off** BC. «MK אנך ל-AB בנקודה K», which #2232 called the working spelling, is the one still refused «already defined» (`lineNameLabels` reads the leading «MK» as the line's name). The asked outcome is unchanged: K on AB, MK ⟂ AB.
+
+**Decision.** A rule, `perpendicularPiece`, ahead of `perpendicularLine`: with M placed, K new, A and B placed, the noun «אנך» (optionally «בנקודה K», or "MK is a perpendicular to AB") lowers to `foot` K from M on AB, named, plus the segment MK. Every other figure keeps its reading: both letters new («DE אנך ל-AB»), K placed, M a letter of AB, or M on AB, where the sentence is the perpendicular at M and a foot would be M itself. «מאונך / ניצב» keep the relation. The rule reads `ctx.points`, `onSegment`, `midpointOf` and `collinearWith`, all semantic fields (docs/17 §3b). Not an existing-object guard: it adds a reading for a NEW letter.
+
+**Sibling check.** Analytic: ADR-AG-410, the same sentence. 3-D reads it as a relation with K off AB: recorded on parity row `perp-piece-2232`, unported.
+
+**Locks.** Scenarios `perp-piece-foot-2232` (K on AB and MK ⟂ AB at every seed) and `perp-piece-keeps-relation-2232`; parity row `perp-piece-2232`; catalog line.
+
+**Behaviour change for a student:** «AK אנך ל-BC» on a triangle now puts K on BC, where it used to float beside it with the right angle kept; «MK אנך ל-AB» with M on AC builds instead of refusing.
+## ADR-787 — A vertex typed against a stated right angle is refused: «זווית A ישרה» · «CM תיכון ליתר» (#2074)
+
+**Status:** accepted · 2026-11-05 · bug (P2, `2d` + `analytic`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-659](#adr-659) · the 2-D side of [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411)
+**Requirements:** [02](02-requirements.md) FR-IN-9 · **Design:** [04](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** none (a parse refusal)
+
+**The ruling.** Judged 2026-11-05 (round #2722, q18, choice B, [ADR-W-173](06w-decisions-workspace.md)), on the precedents *"the idea of order is not relevant since the diagram should either respect all input or refuse to build"* (#1339, 2026-09-19) and *"Refuse only when nothing the student wrote can save it"* (#1927, 2026-10-09).
+
+**Measured before** (`5f315584`, `decideDeterministic2D`). «משולש ישר-זווית ABC» · «זווית A ישרה» · «CM תיכון ליתר» committed `midpoint, segment`, with no refusal. The same with «משולש ABC» first. The reverse order, «CM תיכון ליתר» · «זווית A ישרה», was refused. So the verdict depended on the order, and analytic refused both.
+
+**Class (docs/17 §1).** *A typed vertex that contradicts a stated right angle is lowered as a cevian to the stated hypotenuse, so the typed letter is kept and the claim «ליתר» silently is not.* Members: «CM …», «… מ-C», «… בנקודה C», median and altitude.
+
+**Decision.** In `roleSideLine`, when one hypotenuse is STATED and the sentence types exactly one ring vertex that is not its vertex, the line is refused with `role-claim` / `hypotenuse-apex`. The new sentence names the stated vertex, the hypotenuse it makes, and the typed vertex (new text, [ADR-W-174](06w-decisions-workspace.md)). The vertex of the stated right angle builds as before.
+
+**Measured after.** Both entry orders refuse, for the four spellings and on a plain triangle; «זווית A ישרה» · «AM תיכון ליתר» builds.
+
+**Cost (docs/17 §7).** One letter filter per hypotenuse line.
+
+**Sibling audit.** Analytic refuses both orders (`unsatisfiable`). 3-D reads no role nouns (#1679, parked).
+
+**Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts`, the refusal block.
+
+**Behaviour change for a student.** With the right angle stated at A, «CM תיכון ליתר» is refused and says why, instead of being drawn.
+
+## ADR-790 — A foot letter after a cevian noun names the foot: «תיכון לצלע AB בנקודה K», «תיכון ליתר בנקודה K» (#2166)
+
+**Status:** accepted · 2026-11-05 · bug (P2, `2d`, `analytic`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Delivers** [ADR-659](#adr-659)'s "Not delivered" line · analytic: [ADR-AG-411](06c-decisions-analytic.md#adr-ag-411)
+**Requirements:** [02](02-requirements.md) FR-ALT-7 and FR-IN-9 · **Design:** [04](04-design.md) § "A side named by its role follows the configuration" · **LADDER stage:** none (a parse rule)
+
+**The ruling.** 2026-10-15 on #2166: *"«תיכון לצלע AB בנקודה K» (and «ליתר», «מ-C») draws the median with its foot named K, and cycles like the bare noun on an open right triangle"*. The altitude, the bisector and an existing K are the armed plan's `[2-D]` lines (measured at `18e38e44`); the median in both builders is also judged q17, choice C, 2026-11-05.
+
+**Measured before** (`28dac0c3`). The median and altitude noun forms with «בנקודה K» escalated; «חוצה זווית C בנקודה K» escalated, and so does the bare «חוצה זווית C».
+
+**Class (docs/17 §1).** *A foot letter stated after a cevian noun is read by no rule.*
+
+**Decision.** One rule, `cevianFootLetter`, registered just before `roleSideLine`. It takes a closing `FOOT_LETTER_TAIL`, sends the rest through the grammar, requires exactly one foot (`midpoint` or `foot`), and renames it. Renaming keeps the bare noun's reading, so `roleSide` travels and an open right triangle cycles. It declines a vertex (the locative apex, or `split-statements`), a rest that names the segment, a foot the figure already holds under another letter, and a bound foot on a point the figure holds.
+
+**Plan contact, recorded.**
+- **The bisector** could not be renamed: its bare noun has no reading in 2-D. The rule reads it as its named form «CK חוצה זווית C», which is the plan's own comparison.
+- **A crossing.** The plan's rule named no guard, and measured, «התיכון לצלע AB חותך את המעגל בנקודה K» made K the midpoint, a stated crossing silently replaced. The rule declines when the rest carries `MEET_KW`, because the letter then closes another statement. This is a word test in a §3 chokepoint; the alternative, a leftover check on the rest, needs a parser that reports unread words, which 2-D's does not.
+
+**Cost (docs/17 §7).** One extra parse of the rest, on lines with a cevian head and a foot tail only.
+
+**Sibling audit.** Analytic: ADR-AG-411. 3-D does not read the bare noun, so a foot letter has nothing to name: unscheduled parity cells on `foot-letter-*-2166`. Complex has no cevians.
+
+**Locks.** `src/app/__tests__/issue-2074-hypotenuse-open.test.ts` (the foot-letter blocks, both locales, the refusals). Scenario `foot-letter-follows-the-seat-2166` (corpus 4). Parity rows `foot-letter-*-2166`, `hypotenuse-foot-letter-2074`.
+
+**Behaviour change for a student.** «תיכון לצלע AB בנקודה K», «תיכון מ-C בנקודה K», «תיכון ליתר בנקודה K», the same with «גובה», and «חוצה זווית C בנקודה K» draw at once with the foot named K. A K already on that side moves to the foot; a K on another side is refused.
+## ADR-788 — Submitting a question computes its answer, and the full panel stays on its button (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 2-D) · fix round #2722 · part of [ADR-W-181](06w-decisions-workspace.md#adr-w-181) · amends [ADR-134](#adr-134) and [ADR-433](#adr-433) for the ask lane only
+
+**Operator:** 2026-09-27, asked whether 2-D should compute on ask like its siblings: *"Compute on ask"*. Scope as recorded: the worker path, the same value and knowledge rules as the panel; a determined value prints, else its WHY row; the «חשב ערכים» button stays for the full values panel; a perf lock on the heaviest fixture within the production worker budget; the busy text «חושב…» (#1453).
+
+**Requirements:** [02](02-requirements.md) FR-RV-5 · [02w](02w-requirements-workspace.md) FR-DP-2 · **Design:** [04](04-design.md) § the values panel and the ask lane
+
+**Stage:** none. This is the store seam of a read-only layer; the ladder and the pool are untouched.
+
+**Measured at pickup.** The issue's account had moved: since #477 and #741 a submitted question already ran the compute, so the waiting row was not the state after asking. What was left of the ruling: the ask ran `viewValues`, so it filled the PANEL too. The values card opened and «חשב ערכים» left on every ask, and on removing a question. And the App's `computingValues` ended with the first of the two computes one ask started, so the row could flip to «ממתין לחישוב» with the answer still running.
+
+**Class.** A question and the panel shared one layer, so an answer could not exist without the panel.
+
+**Decision.** `asks` is a layer of its own beside `values`, tagged by facts the same way. `addQuery` calls `answerAsks`, which runs `geoValues` (the worker's values op, the one pool) and keeps its `queryRows`; `viewValues` stays the button's. No second answer path exists, so an answer cannot disagree with the panel. It costs the panel's row pass, measured below against the pool. `askLaneRows` (engine/valuesPanel) composes the rows: the ask's answer, else the panel's, else waiting. `asking` is the figure being answered; only the latest run clears it, and the row says «חושב…» for it. `removeQuery` computes nothing. `viewValues` drops only on a changed figure: a question added meanwhile has its own run, so it no longer discards the panel.
+
+**Not changed.** A saved question after a new fact still reads «ממתין לחישוב — לחצו «חשב ערכים»» (#882): the ruling covers submitting. Whether it should re-answer by itself is reported to the operator on the issue.
+
+**Sibling audit.** See [ADR-W-181](06w-decisions-workspace.md#adr-w-181). 3-D, complex and analytic derive their answers with the figure and have no such layer.
+
+**Perf.** All 160 fixtures measured, cold pool on the work PC: the heaviest by the clock is `issue-572-load-collapse` (12.7 s, 4.03M work), by work `issue-1771-semicircle-three-vertices` (10.1 s, 4.58M, cut by the cap); the row pass is at most 1 ms, so sharing `computeValues` costs nothing and needs no ask-only op. An ask behind the pool takes 0 ms and no new sweep, and that is the app's path: `detectCrossings` samples the same pool on every change of the facts, on the same lane. So the lock (`issue-1454-ask-budget.test.ts`) asserts the 12 s worker budget on that path, and counted work on a cold pool. **The ruled lock is not met on a cold pool by the clock:** 12.7 s against 12 s, 6% over, in vitest. That pool is the sweep's, unchanged by this ADR, and it cannot be cut by time: the operator's later ruling of 2026-09-30 (ADR-558) makes the pool a function of the input alone. Reported on the issue.
+
+**Behaviour change for a student:** asking prints the answer and leaves the values card closed, with «חשב ערכים» still offered; the row says «חושב…» while it computes.

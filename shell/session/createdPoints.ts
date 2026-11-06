@@ -28,12 +28,14 @@ export const CREATED_NOTICE_KEYS = {
    * again: a notice is either the points' or the circle's, never both.
    */
   circle: 'suite.notice.createdCircle',
+  /** #2611 stage B ([ADR-3D-420](../../docs/06b-decisions-3d.md#adr-3d-420)): the same notice for a circle with no centre letter («D על המעגל»). */
+  circleUnnamed: 'suite.notice.createdCircleUnnamed',
   undo: 'suite.notice.createdUndo',
 } as const;
 
 /**
  * What a builder's notice shows: the created labels, in the order the line named them — or, when the line created a
- * circle (`circle`, its centre's label), that circle; `names` is then empty.
+ * circle (`circle`, its centre's label, `''` for a circle with no letter), that circle; `names` is then empty.
  */
 export interface CreatedNotice {
   readonly names: readonly string[];
@@ -47,6 +49,7 @@ export function createdNoticeText(names: readonly string[]): { key: string; para
 
 /** The key and interpolation for any notice: the circle's when it names one, else the points' (`createdNoticeText`). */
 export function createdNoticeTextOf(n: CreatedNotice): { key: string; params: Record<string, string> } {
+  if (n.circle === '') return { key: CREATED_NOTICE_KEYS.circleUnnamed, params: {} };
   return n.circle !== undefined ? { key: CREATED_NOTICE_KEYS.circle, params: { centre: n.circle } } : createdNoticeText(n.names);
 }
 

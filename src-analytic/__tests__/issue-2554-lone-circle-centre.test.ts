@@ -86,8 +86,6 @@ describe('#2554 item 2 is unbuilt (D8 = B on #2552) — a pair’s centres offer
 describe('#2554 item 3 — the class guard over every circle the catalog draws', () => {
   /** Declared exception, ruled D8 = B on #2552 (2026-10-26): a pair circle has no sentence that names it alone. */
   const PAIR_EXCEPTION = /^circle-pair\d+-[12]$/;
-  /** KNOWN GAP #2566 (found by this guard): an equation circle with a free letter offers its equation sentence, which the typed path refuses. Remove when #2566 is fixed. */
-  const KNOWN_GAP = new Set(['נתון מעגל שמשוואתו (x-13)^2+y^2=R^2']);
   const extra = [['מעגל ברדיוס 5'], ['A(0,0)', 'B(4,0)', 'C(4,4)', 'D(0,4)', 'מעגל חסום במרובע ABCD']];
   const seqs = [...COMMAND_CATALOG_ANALYTIC.filter((e) => !e.lane).map((e) => [...(e.needs ?? []), e.he]), ...extra];
 
@@ -95,7 +93,6 @@ describe('#2554 item 3 — the class guard over every circle the catalog draws',
     const silent: string[] = [];
     const broken: string[] = [];
     let circlesSeen = 0;
-    const gapSeen: boolean[] = [];
     for (const lines of seqs) {
       const d = derive(lines, 0);
       const offers = offersOf(d.figure, d.construction).filter((o) => o.centreOf);
@@ -115,17 +112,11 @@ describe('#2554 item 3 — the class guard over every circle the catalog draws',
         const letter = offer.sentence.split(' ')[0];
         const p = after?.figure.points.find((q) => q.id === letter);
         const reads = !!p && Math.hypot(p.x - circle.cx, p.y - circle.cy) <= 1e-6;
-        if (KNOWN_GAP.has(lines.at(-1)!)) {
-          gapSeen.push(reads);
-          continue;
-        }
         if (!reads) broken.push(`${cu.id} «${offer.sentence}» :: ${lines.join(' | ')}`);
       }
     }
     expect(circlesSeen).toBeGreaterThan(20);
     expect(silent).toEqual([]);
     expect(broken).toEqual([]);
-    // the known gap is still a gap: when #2566 lands this fails, so the row is removed rather than left stale
-    expect(gapSeen).toEqual([false]);
   });
 });

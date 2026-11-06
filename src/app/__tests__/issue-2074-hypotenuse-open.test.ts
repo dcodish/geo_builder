@@ -125,6 +125,31 @@ describe('#2074 — a typed letter is a claim that forces the seat', () => {
   });
 });
 
+// Judged 2026-11-05: "the diagram either respects all input or refuses" (#1339), whichever line came first.
+describe('#2074 — a typed vertex against a stated right angle is refused, in both entry orders', () => {
+  for (const line of ['CM תיכון ליתר', 'גובה ליתר מ-C', 'תיכון ליתר מ-C', 'תיכון ליתר בנקודה C']) {
+    it(`«זווית A ישרה» · «${line}»: refused, naming the right angle and the typed vertex`, async () => {
+      const before = (await play([RT, 'זווית A ישרה'])).facts.length;
+      const g = await play([RT, 'זווית A ישרה', line]);
+      expect(g.last.kind).toBe('refuse');
+      expect(g.last.note?.key).toBe('input.roleClaim.hypotenuse-apex');
+      expect(g.facts).toHaveLength(before);
+    });
+    it(`«${line}» · «זווית A ישרה»: the second line is refused too`, async () => {
+      const before = (await play([RT, line])).facts.length;
+      const g = await play([RT, line, 'זווית A ישרה']);
+      expect(g.last.kind).toBe('refuse');
+      expect(g.facts).toHaveLength(before);
+    });
+  }
+  it('the same vertex builds: «זווית A ישרה» · «AM תיכון ליתר»', async () => {
+    expect((await play([RT, 'זווית A ישרה', 'AM תיכון ליתר'])).last.kind).toBe('commit');
+  });
+  it('a plain triangle reads the same', async () => {
+    expect((await play(['משולש ABC', 'זווית A ישרה', 'CM תיכון ליתר'])).last.note?.key).toBe('input.roleClaim.hypotenuse-apex');
+  });
+});
+
 describe('#2074 — a right angle stated AFTER the line settles the seat, and the median follows (ADR-596 / FR-ALT-7)', () => {
   it('«תיכון ליתר» · «זווית A ישרה»: the median runs from A to BC at every view', async () => {
     const g = await play([RT, 'תיכון ליתר', 'זווית A ישרה']);
@@ -144,9 +169,87 @@ describe('#2074 — what still asks', () => {
     expect(g.last.note?.key).toBe('input.roleSideUnresolved');
   });
 
-  it('«תיכון ליתר בנקודה K» gets the verdict its stated-angle twin gets (the foot-letter reading is a separate gap)', async () => {
-    const open = await play([RT, 'תיכון ליתר בנקודה K']);
-    const stated = await play([RT, 'זווית C ישרה', 'תיכון ליתר בנקודה K']);
-    expect(open.last.kind).toBe(stated.last.kind);
+  it('a foot the figure already holds is not read on an open seat: it stays with the model', async () => {
+    const g = await play(['משולש ישר-זווית ABC', 'K על AB', 'תיכון ליתר בנקודה K']);
+    expect(g.last.kind).not.toBe('commit');
+  });
+});
+
+// #2166 (ADR-790): the plan's [asked] spelling ADR-659 did not deliver — the foot's letter typed after the noun.
+describe('#2074 — «תיכון ליתר בנקודה K»: the foot takes the typed letter and follows the seat', () => {
+  for (const [noun, line, lang] of [
+    [RT, 'תיכון ליתר בנקודה K', 'he'],
+    [RT, 'גובה ליתר בנקודה K', 'he'],
+    ['right triangle ABC', 'the median to the hypotenuse at K', 'en'],
+    ['right triangle ABC', 'the altitude to the hypotenuse at the point K', 'en'],
+  ] as const) {
+    it(`«${line}»: K on the side opposite the right angle at every view, A/B/C unmoved`, async () => {
+      const g = await play([noun, line], lang);
+      expect(g.verdicts.map((v) => v.kind)).toEqual(['commit', 'commit']);
+      const before = replay(g.facts.slice(0, 1), 0).positions;
+      const after = replay(g.facts, 0).positions as Map<string, P>;
+      for (const id of TRI) expect(Math.hypot(after.get(id)!.x - before.get(id)!.x, after.get(id)!.y - before.get(id)!.y), `${id} unmoved`).toBeLessThan(1e-9);
+      const views = presses(g.facts, 'K');
+      expect(views.map((v) => v.seat)).toEqual(['C', 'A', 'B', 'C']);
+      for (const v of views) {
+        expect(v.green).toBe(true);
+        expect(v.side).toBe(opposite(v.seat));
+      }
+      expect(llmParseMock).not.toHaveBeenCalled();
+    });
+  }
+
+  it('a stated right angle: the same letter, on the side it faces', async () => {
+    const g = await play([RT, 'זווית A ישרה', 'תיכון ליתר בנקודה K']);
+    expect(g.last.kind).toBe('commit');
+    expect(presses(g.facts, 'K').map((v) => v.side)).toEqual(['BC', 'BC', 'BC', 'BC']);
+  });
+});
+
+describe('#2166 — a foot letter after a cevian noun: the foot is named K, and no M appears', () => {
+  const T = 'משולש ABC';
+  for (const [line, lang] of [
+    ['תיכון לצלע AB בנקודה K', 'he'],
+    ['תיכון מ-C בנקודה K', 'he'],
+    ['גובה לצלע AB בנקודה K', 'he'],
+    ['גובה מ-C בנקודה K', 'he'],
+    ['median to side AB at K', 'en'],
+    ['median from C at point K', 'en'],
+    ['altitude to side AB at K', 'en'],
+  ] as const) {
+    it(`«${line}»`, async () => {
+      const g = await play([T, line], lang);
+      expect(g.last.kind).toBe('commit');
+      const p = replay(g.facts, 0).positions as Map<string, P>;
+      expect(p.has('K')).toBe(true);
+      expect(p.has('M') || p.has('F')).toBe(false);
+      expect(sideOf(p, 'K'), 'K on AB').toBe('AB');
+      expect(llmParseMock).not.toHaveBeenCalled();
+    });
+  }
+  it('«חוצה זווית C בנקודה K»: the bisector with its foot named K, as «CK חוצה זווית C»', async () => {
+    const a = await play([T, 'חוצה זווית C בנקודה K']);
+    expect(a.last.kind).toBe('commit');
+    const pa = replay(a.facts, 0).positions as Map<string, P>;
+    const b = await play([T, 'CK חוצה זווית C']);
+    const pb = replay(b.facts, 0).positions as Map<string, P>;
+    expect(Math.hypot(pa.get('K')!.x - pb.get('K')!.x, pa.get('K')!.y - pb.get('K')!.y)).toBeLessThan(1e-9);
+  });
+  it('a point already on the side moves to the foot, as «K על AB» · «CK תיכון» does', async () => {
+    const g = await play([T, 'K על AB', 'תיכון לצלע AB בנקודה K']);
+    expect(g.last.kind).toBe('commit');
+    const p = replay(g.facts, 0).positions as Map<string, P>;
+    expect(Math.hypot(p.get('K')!.x - (p.get('A')!.x + p.get('B')!.x) / 2, p.get('K')!.y - (p.get('A')!.y + p.get('B')!.y) / 2)).toBeLessThan(1e-6);
+  });
+  it('REFUSAL: a point on another side cannot be that foot', async () => {
+    expect((await play([T, 'K על BC', 'תיכון לצלע AB בנקודה K'])).last.kind).toBe('refuse');
+  });
+  it('REFUSAL: a vertex letter stands as today', async () => {
+    const g = await play([T, 'תיכון לצלע AB בנקודה C']);
+    expect(g.last.note?.key).toBe('input.scope.split-statements');
+  });
+  it('a crossing is not a foot: the letter is not taken for the midpoint', async () => {
+    const g = await play(['מעגל O', T, 'התיכון לצלע AB חותך את המעגל בנקודה K']);
+    expect(g.last.kind).not.toBe('commit');
   });
 });

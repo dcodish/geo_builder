@@ -11,7 +11,7 @@
  * the NORMALIZED line (rules stamp `src` from their normalized input) — with consumption, so two
  * questions that normalize alike each get their own row.
  */
-import { parseAsk } from './deriveLines';
+import { parseLaneAsk } from './deriveLines';
 import type { KnowledgeRow } from '../model/knowledge';
 import type { ComplexScope } from '../parser/exprParse';
 
@@ -32,9 +32,10 @@ export function askRowsOf(
 ): AskRow[] {
   const consumed = new Set<number>();
   return asks.map((text) => {
-    // the ONE reading of a line as a question (parseAsk: the question frame removed, then
-    // askArtifacts) — the lane lowering uses the same, so the row model and the fold cannot disagree
-    const { parsed: r, ask: a } = parseAsk(text, scope);
+    // the ONE reading of a lane line as a question (parseLaneAsk: the question frame removed, then
+    // askArtifacts, then a bare name as its value question) — the lane lowering uses the same, so the
+    // row model and the fold cannot disagree
+    const { parsed: r, ask: a } = parseLaneAsk(text, scope);
     if (!r.ok) return { text, note: 'unreadable', row: null };
     if (!a) return { text, note: 'statement', row: null };
     const srcs = [...a.queries, ...a.ratios, ...a.exprQueries, ...a.argQueries].map((q) => q.src);

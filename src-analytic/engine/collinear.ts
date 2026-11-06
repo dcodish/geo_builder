@@ -73,6 +73,7 @@ function ruleCarriers(c: Construction, rule: DerivedRule): string[] {
     case 'parabola-focus':
     case 'ellipse-point':
     case 'touch-point':
+    case 'common-touch':
     case 'regular-vertex':
       return [];
     default: {

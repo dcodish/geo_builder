@@ -102,7 +102,7 @@ The list itself is the smell: each is a point where a general decision is being 
 | --- | --- |
 | `commandConflict` per-kind carve-outs (`src/engine/step.ts`) | M1 existing-id lowering |
 | Parser per-rule "existing object" guards (tangent/incircle/chord/inscribe rules in `parse.ts`) | M1 |
-| `recruitFreeDofs` case ladder (A–F) and its experiment ordering (`src/engine/step.ts`) | M2 carrier ownership |
+| `recruitFreeDofs` case ladder (A–F) and its experiment ordering (`src/engine/step.ts`) | M2 carrier ownership. Which refs can satisfy a constraint is `residualRefs` (`engine/solve.ts`), what can move its residual, never `constraintRefs`, what it mentions ([ADR-783](06-decisions.md#adr-783)) |
 | `keepTangencyDriven` / `applyRadiusGiven` routing (`src/engine/apply.ts`) | M2 |
 | Keyword bow-outs between parser rules (`return null` on a word test) | parser precedence + leftover guard (ADR-024). A rule reading a fixed-size `labelRun` checks the WHOLE body with `unclaimedLabels`, and a sentence-opening «במעגל» is the scene, not the operand (`circleIsOnlyLocative`). Both are statements about what the sentence says, not word tests ([ADR-601](06-decisions.md#adr-601)) |
 | Sampling loops (any new `for (seed…) replay/evaluate`) | M3 one sampler, budgeted |

@@ -96,8 +96,8 @@ describe('#2489 T45 — a line named with its noun is created free, as «ישר 
 
   it('a circle reported through the line code is never made a line («A נמצאת על המעגל»)', () => {
     run('קובייה ABCD', 'A נמצאת על המעגל');
-    expect(st().facts).toHaveLength(1);
     expect(d().construction.lines.size).toBe(0);
+    expect(d().construction.circles3).toHaveLength(1); // ADR-3D-420 (#2048 ruling A): it is created as a circle; before, the line was refused
   });
 
   it('a bare lowercase letter is still a vector, not a line («k מאונך למישור ABC»)', () => {

@@ -159,7 +159,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   - Sources: [ADR-W-125](06w-decisions-workspace.md#adr-w-125), #1778.
 - **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
   builders an angle measure written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at
-  once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+  once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». 3-D says it of its own subject, «של המרחב» ([ADR-3D-424](06b-decisions-3d.md#adr-3d-424), #2335).
   π as a number (a length, a circumference) and π as a name (3-D's planes π1, π2) are unchanged; the complex
   Builder keeps reading π inside «cis». The operator's rulings: «Refuse and teach degrees» (2026-10-07), «only
   the complex tool should» (2026-10-08).
@@ -177,6 +177,14 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   has no AI fallback. The operator's ruling (2026-10-08): «must survive into the AI answer's lowering, or the
   answer is refused».
   - Sources: [ADR-W-144](06w-decisions-workspace.md#adr-w-144), [ADR-722](06-decisions.md#adr-722), [ADR-3D-364](06b-decisions-3d.md#adr-3d-364), #1906.
+- **FR-SU-32 (Must)** — **An AI answer that loses a name the student typed is asked for once more.** When a line goes to
+  the AI fallback and the answer loses a point or line name the student typed, the tool asks the AI one more time,
+  naming what to keep. If the second answer still loses it, the student sees the builder's existing refusal naming the
+  name, and nothing is drawn: no figure is drawn without a letter the student typed. A lost number, relation or word is
+  not asked for again; it keeps its refusal. Holds in the 2-D, 3-D and analytic builders; the complex builder has no AI
+  fallback. The operator's rulings: 2026-10-16 («1b»), 2026-10-18 («Retry once. If K is still missing, keep today's
+  refusal naming K.»).
+  - Sources: [ADR-W-189](06w-decisions-workspace.md#adr-w-189), #2231.
 - **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** In every builder, the complex builder included (#1870, ADR-W-118 B14), a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. A BARE statement with no proof verb («w ממשי», «z1 ו-z2 צמודים») is not a proof target; how complex reads one is [02d](02d-requirements-complex.md) FR-KN-2's (ruled to change, #2338). Sources: [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666, #1649, #1618, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083) (#1870).
 - **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference — except where 2-D is the lenient tool and what it shows can never resolve (a pending row no later given can clear): then the builders agree on the honest refusal and 2-D changes (rulings 2026-10-09/10 on #1936, ADR-W-118 Amendment 2). The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. The operator's ruling: «analytics and 2d should have same user experience».
   - Sources: [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15 and Amendment 2, #1861, #1936.
@@ -185,6 +193,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 
 - **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B").
   - Sources: [ADR-W-105](06w-decisions-workspace.md#adr-w-105), [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192), #1631, #1861.
+- **FR-SU-30 (Must)** — **A given prints as the student typed it.** In every builder, a number the student stated reads in the spelling they typed wherever a given is printed: «2/3» stays «2/3», «√8» stays «√8», «4/6» stays «4/6». A decimal is never rewritten as a fraction, and reads at most two decimals, computed in full («7.9999» reads «8», sr-22). A value the tool derived reads the product's exact forms. ([ADR-W-179](06w-decisions-workspace.md#adr-w-179), #1497)
 - **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened.
   - Sources: [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653.
 
@@ -339,7 +348,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Restated fact said (an entailed given, no row) | yes | yes | yes | no | **Gap** — #1565 |
 | A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | refused whole, parts listed; the right-angle syntax taught (ADR-3D-316); «…בנקודה E…» not read (#1679) | refused whole, parts listed; the right-angle syntax taught; «…שהיא אמצע BD» reads both parts and builds (ADR-AG-251) | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); a dropped ROLE word the same way (#1904: 2-D ADR-604, 3-D ADR-3D-317) |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
-| Two letters on one dot the givens force | ⓘ «{{a}} ו-{{b}} נפלו על אותה נקודה.», while drawn | same | same | same (two named numbers with one value) | **Same** — ruled 2026-09-30 (#1595) and 2026-10-30 (T34); one suite key, `suite.notice.converge` ([ADR-W-176](06w-decisions-workspace.md#adr-w-176)) |
+| Two letters on one dot the givens force | ⓘ «{{a}} ו-{{b}} נפלו על אותה נקודה.», while drawn, on the blue information strip ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)) | same | same | same (two named numbers with one value) | **Same** — ruled 2026-09-30 (#1595) and 2026-10-30 (T34); one suite key, `suite.notice.converge` ([ADR-W-176](06w-decisions-workspace.md#adr-w-176)) |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
 | A declared polygon whose givens hold only in the limit («משולש ABC · AB = BC · AC ⊥ BC») | refused (ADR-746) | refused (ADR-3D-372) | refused (ADR-AG-143) | n/a | **Same** (ADR-W-146; 2-D [ADR-746](06-decisions.md#adr-746), #2344) |
 | A declared solid forced flat | n/a (no solids) | refused (ADR-3D-358) | n/a (no solids) | n/a | **Ruled** — refused, never noticed (#1860, 2026-10-07; ADR-W-115 Am. 1) |
@@ -350,7 +359,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A proof target «הוכיחו כי» | refused | refused | refused | refused | **Same** (B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)); a bare statement is not a proof target (02d FR-KN-2, ruled to change, #2338) |
 | A number written with a fraction glyph «AB = 2½», «A(2⅓, 0, 0)» | that number: a mixed number is one number, all 18 glyphs (ADR-635) | same (ADR-3D-374, #2255) | ½ ¼ ¾ only; «2⅓» goes to the AI | not measured | **Gap** — analytic #2349; one reader, `shell/vulgarFractions.ts` (ADR-W-147) |
 | Two numbers with only a space between them «AB = 2 3», «A(2 3, 1)» | refused, 2.3 / 23 / 6 taught | same | refused, 2.3 / 23 / 2*3 taught | refused (its own sentence, #2247) | **Same** — ruled 2026-11-03 (#2286, ADR-AG-397); one detector, `shell/juxtaposedNumbers.ts`, one suite sentence |
-| An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts` |
+| An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts`; 3-D's sentence says «של המרחב», the operator's 2026-10-17 (#2335, ADR-3D-424) |
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |
@@ -374,8 +383,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   computation having run, and it does not vanish when the student adds a fact.
   - Sources: [ADR-W-038](06w-decisions-workspace.md#adr-w-038).
 - **FR-DP-2 (Must)** — **Asking is the pull.** Nothing expensive is computed until the student actually
-  asks; opening the panel computes nothing.
-  - Sources: ADR-W-038.
+  asks; opening the panel computes nothing. Asking computes that question's answer and nothing else the
+  student did not ask for: a product with a full-panel button keeps it.
+  - Sources: ADR-W-038, [ADR-788](06-decisions.md#adr-788).
 - **FR-DP-3 (Must)** — **The panel reports what the FIGURE knows, never what one drawing happens to
   show.** A value is displayed only when it is invariant across the figure's residual freedom; a number
   true only of the current sample is not knowledge and must not be printed. A value the givens fix to exactly
@@ -388,8 +398,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
     B7, #1861; generalises the 2-D reveal contract, [FR-RV-5](02-requirements.md).
 - **FR-DP-4 (Must)** — **Answers are product-shaped; the lane is not.** A length with units, a vector
   equation and a complex modulus are genuinely different answers, and each product owns its rows. What is
-  shared is the box, the submit, the palette and the always-there rule.
-  - Sources: ADR-W-038.
+  shared is the box, the submit, the palette and the always-there rule. A question a product cannot read
+  says so with that product's own example phrasings; none may ship without them.
+  - Sources: ADR-W-038, [ADR-W-181](06w-decisions-workspace.md#adr-w-181).
 - **FR-DP-5 (Should)** — **The panel is opt-in** and never surfaces a geometric fact unbidden — the
   boundary that keeps students reaching their own conclusions ([10-pedagogy](10-pedagogy.md)).
 

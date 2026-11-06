@@ -118,7 +118,7 @@ const he = {
   // tool cannot itself answer is the #1156 failure mode.
   askLinesCross:
     'הישרים נחתכים, ולכן אין ביניהם מרחק אחד — הוא אפס בנקודת החיתוך וגדל ככל שמתרחקים ממנה. מרחק מוגדר רק בין ישרים מקבילים. אפשר לשאול על המרחק מנקודה לישר, למשל «המרחק מ-A לישר l1», או לסמן את נקודת החיתוך עצמה.',
-  askUnreadable: 'לא הבנתי את השאלה',
+  askUnreadable: 'לא זוהה — נסו A, AB, שטח ABC, שיפוע AB',
   // #2673 (ADR-AG-381) — a typed locus question points at the chip (the session's words, ADR-W-174)
   askLocusByChip: 'את המקום הגאומטרי מציגים בכפתור «{{chip}}» שליד הנקודה ברשימת הנתונים.',
   // #2673 — the guide's locus row teaches the chip: the givens it appears after, and where to press it
@@ -237,6 +237,7 @@ const he = {
   // #1919 — a WORD in another script: the operator's Hebrew-and-English sentence, the same in every builder.
   // #1837 (ADR-W-142) — an angle in radians: 2-D's ruled sentence (operator, 2026-10-07)
   errRadianAngle: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90',
+  errArcLengthUnread: 'הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת {{detail}} = 40',
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   // #2222 (ADR-AG-284, operator ruling 2026-10-16) — an ASCII mixed number: a decimal, the sum, or the product.
   errMixedNumber: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
@@ -358,8 +359,6 @@ const he = {
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
-  // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte.
-  errNoCommonTangent: 'למעגל המוכל בתוך מעגל אין אף משיק משותף.',
   // #2388 (ADR-AG-307; operator ruling 2026-10-20) — the radius capital as a point AND the radius parameter: both readings, the earlier line.
   errRadiusLetterIsPoint: '{{holder}} כבר שם של נקודה בשרטוט (בשורה «{{declared}}»), ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
   errRadiusLetterIsPointAlone: '{{holder}} כבר שם של נקודה בשרטוט, ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
@@ -438,7 +437,6 @@ const he = {
   errAmbiguousCevian:
     'הקודקוד או הצלע במשפט «{{detail}}» שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
     'אפשר לציין את הצלע או את המשולש, למשל «AD גובה לצלע BC» או «AD גובה במשולש ABC».',
-  // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
   errAmbiguousSide:
     'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: «{{detail}}». ' +
     'כתבו את הצלע עצמה, למשל «מלבן ABCD» ואחר כך «AB = 4», או את שתי המידות, למשל «מלבן ABCD במידות 4*6».',
@@ -457,9 +455,7 @@ const he = {
   roleLineHypotenuse: 'היתר',
   roleLineMainDiagonal: 'האלכסון הראשי',
   roleLineSecondaryDiagonal: 'האלכסון המשני',
-  errAmbiguousHypotenuse:
-    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: «{{detail}}». ' +
-    'כתבו איזו צלע היא היתר, למשל «תיכון ליתר AB», או איזו זווית ישרה, למשל «זווית C ישרה».',
+  roleWordHypotenuse: 'יתר',
   errCevianNoRightAngle:
     'במשפט «{{detail}}» אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
     'אפשר לציין קודם זווית ישרה, למשל «זווית C ישרה», או לכתוב את הצלע במפורש, למשל «תיכון לצלע AB».',
@@ -684,6 +680,9 @@ const he = {
    */
   noticeTeachCanonical:
     'בספר לא כותבים «{{verb}}» — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  // #1774 (ADR-AG-409) — «(3,5)A»: the letter comes first; the sentence is already in the box
+  noticeTeachPointOrder: 'שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  noticeTeachPointEquals: 'נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
   sessionContinue: 'המשך מהמקום שבו הפסקת',
@@ -769,7 +768,7 @@ const en: typeof he = {
   askPointMany: '{{count}} points',
   askLinesCross:
     'the lines intersect, so there is no single distance between them — it is zero at the crossing and grows away from it. A distance is defined only between PARALLEL lines. You can ask for the distance from a point to a line, for example "the distance from A to line l1", or name the crossing point itself.',
-  askUnreadable: 'I did not understand the question',
+  askUnreadable: 'not recognised — try A, AB, area ABC, slope AB',
   askLocusByChip: 'A locus is shown with the «{{chip}}» button beside the point in the givens list.',
   guideLocusChip: 'Type the givens {{lines}}, then press the button on the row of {{point}}.',
   askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
@@ -862,6 +861,7 @@ const en: typeof he = {
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
+  errArcLengthUnread: "This tool does not read an arc's length yet. An arc is written here in degrees — for example arc {{detail}} = 40",
   errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
   errMixedNumber: '«{{detail}}» could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
   errMixedNumberNoDecimal: '«{{detail}}» could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
@@ -967,7 +967,6 @@ const en: typeof he = {
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
-  errNoCommonTangent: 'A circle contained inside another has no common tangent at all.',
   errRadiusLetterIsPoint: '{{holder}} is already the name of a point in the figure (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
   errRadiusLetterIsPointAlone: '{{holder}} is already the name of a point in the figure, and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
   errRadiusLetterIsRadius: '{{holder}} already marks the radius parameter (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the name of a point. One name marks one thing: give the point another name.',
@@ -1052,9 +1051,7 @@ const en: typeof he = {
   roleLineHypotenuse: 'hypotenuse',
   roleLineMainDiagonal: 'main diagonal',
   roleLineSecondaryDiagonal: 'secondary diagonal',
-  errAmbiguousHypotenuse:
-    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: «{{detail}}». ' +
-    'Name the hypotenuse — for example «the median to the hypotenuse AB» — or the right angle, for example «angle C is right».',
+  roleWordHypotenuse: 'hypotenuse',
   errCevianNoRightAngle:
     'In «{{detail}}» there is no right triangle in your figure, so there is no hypotenuse. ' +
     'State a right angle first, for example «angle C is right», or name the side outright, for example «the median to side AB».',
@@ -1235,6 +1232,8 @@ const en: typeof he = {
   redo: 'Redo',
   noticeTeachCanonical:
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
+  noticeTeachPointOrder: "A point's letter comes before its coordinates. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
+  noticeTeachPointEquals: 'A point is written without an equals sign. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',

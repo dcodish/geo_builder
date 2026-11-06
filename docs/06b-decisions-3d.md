@@ -12836,6 +12836,8 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 ## ADR-3D-343 — One narrowing notice, in the shared family, replaces 3-D's two base-derived sentences: said when the givens forced a narrower kind, naming what did (#1996, #1915's re-attribution)
 
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the note opens with the ⓘ and sits on the suite's blue strip.
+
 **Status:** accepted · 2026-10-15 · feature (P2, 3-D) · round #2128 · PR `feat/1996-narrowing-note` · the 3-D half of [ADR-W-129](06w-decisions-workspace.md#adr-w-129) (rulings quoted there) · **Supersedes** the notice half of [ADR-3D-307](#adr-3d-307) (#1792's `inscribed-constrained`) and of ADR-3D-090's `base-constrained` (kept only for the plain «מרובע» base, below).
 **Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 (a notice when the shape is narrowed, naming the cause) · **Design:** [04b](04b-design-3d.md) "A declared ring the givens force narrower is said" · **LADDER stage:** none (derived after the fold).
 
@@ -14629,9 +14631,9 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 
 **Rejected.** A hidden `π` for each circle, reusing `resolveFreePlane` directly: ADR-3D-350 keeps a circle's plane out of the student's planes map, and that resolver's offset and relation machinery is not a circle's. Raising the radius as a pivot carrier: nothing needs it, since every radius given in the ruling is read directly.
 
-**Measured for 2-D (the reference, ADR-W-118 B1) at 20cfa5de.** «מעגל O ברדיוס 5» draws the circle at that size with `measures: []`: no number on the canvas. 3-D draws the same. **Known gap:** 3-D has no values row for a radius (2-D has `values.radius`), so a stated radius is shown by the circle's size and in the givens list only.
+**Measured for 2-D (the reference, ADR-W-118 B1) at 20cfa5de.** «מעגל O ברדיוס 5» draws the circle at that size with `measures: []`: no number on the canvas. 3-D draws the same. **Known gap, closed by [ADR-3D-420](#adr-3d-420):** 3-D had no values row for a radius (2-D has `values.radius`), so a stated radius was shown by the circle's size and in the givens list only.
 
-**Not built here.** «מעגל ABC»: the sighting was added to #253 as demand evidence and no ruling covers it, so it stays `not-understood`. A bare letterless «מעגל» keeps its `cross-app` guidance. «D על המעגל» on a blank canvas stays #2611's stage B. A radius or plane stated on a determined circle is refused `circle-given-determined`; driving a polygon's size from its circle's radius is not ruled.
+**Not built here.** «מעגל ABC»: the sighting was added to #253 as demand evidence and no ruling covers it, so it stays `not-understood`. A bare letterless «מעגל» keeps its `cross-app` guidance. «D על המעגל» on a blank canvas stays #2611's stage B ([ADR-3D-420](#adr-3d-420)). A radius or plane stated on a determined circle is refused `circle-given-determined`; driving a polygon's size from its circle's radius is not ruled.
 
 **Sibling audit.** The class needs a plane to be free, so it is 3-D's alone. 2-D reads «מעגל O ברדיוס 5» (measured at 20cfa5de); analytic records «נתון מעגל שמרכזו O.», «מעגל O», «מעגל O ברדיוס 5», «מעגל שמרכזו O ורדיוסו 5» and "a circle with center O" (same commit). Complex has no such object.
 
@@ -14640,3 +14642,149 @@ No parity row: an R³ pin-symbol membership drive is not a plane-geometry senten
 **Locks.** `src3d/__tests__/free-circle-253.test.ts` (the exact prod line, every spelling, both orders, each pin, stability, each refusal), the `free-circle-*-253` fixtures, `catalog3` +3.
 
 **Behaviour change for a student:** in 3-D, «נתון מעגל שמרכזו O» now draws a circle, and later lines can fix its radius and plane. Before, the line was not understood.
+
+## ADR-3D-420 — A line that refers to a circle the figure lacks creates it, with no invented letter (#2611, stage B)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 3-D) · fix round #2722, stream A · branch `fix/2611-point-on-circle-3d` · plan of 2026-11-03 on #2611, stage B, unblocked by #253 ([ADR-3D-419](#adr-3d-419))
+
+**Requirements:** [02b](02b-requirements-3d.md) the point-on-circle row · **Design:** [04b](04b-design-3d.md) § *The mint pass*, [04w](04w-design-shell.md) § *The created-points notice* · **LADDER stage:** none (the fold's mint pass, after the fixpoint; `placeUnnamedCentre3` sits in the free-object resolution of ADR-3D-419).
+
+**Re-measured at pickup (`28dac0c3`, `useGeo3.submit`).** Stage A holds: «משולש ABC חסום במעגל» · «D על המעגל» and «מעגל חסום במשולש ABC» · «D על המעגל» place D on the circle. The blank canvas is still refused, now `unknown-circle` (ADR-3D-414). #253 merged (PR #2717), so stage B is built. Two points differ from the plan: the code is `unknown-circle`, not `unknown-line circle`, and 2-D shows no notice for this line (`commitVerdict` returns `null`), so the notice below rests on #2048 ruling A, not on 2-D.
+
+**Ruling.** Operator, 2026-10-13, #2048 ruling A: *"A referenced circle that does not exist (e.g. «G חיתוך מעגל O ומעגל P») is created as a free circle, with the same notice."*
+
+**Class and root cause.** *A statement that refers to a circle the figure lacks is refused, where a referred point, line, plane or solid is created.* The mint pass read `unknown-point`, `unknown-line`, `unknown-plane` and `no-such-solid`, and never `unknown-circle`. `Circle3Def.free` also required a centre letter, so a circle with no letter had no representation.
+
+**Decision.**
+1. **`mintableCircle3`** (`engine/mintable.ts`) reads the engine's own `unknown-circle` answer, so every statement that resolves a circle is covered, never a list of command kinds (docs/17 §3). A letterless reference on a figure with no circle creates `{kind: 'free'}`. «המעגל O» creates the circle on O when every circle of the figure has its letter. `several` creates nothing (#2705).
+2. **The row carries the declaration**, the ADR-3D-399 solid lane, so a centre placed by an earlier row is read in list order. A centre letter the figure lacks is created with it.
+3. **`center` is optional on a free circle.** The centre of «המעגל» is a free DOF with no letter: no point is added, so no reader of `points` can show a name the student never gave (the V6 unnamed-centre rule; 2-D's `@ctr-` hidden point, FR-RN-8). It counts 3 in the DOF cue.
+4. **`placeUnnamedCentre3`** places that centre from the seed and the pins alone. It reads no spread off `pos`, because the point pass and the circle pass see `pos` at different moments and a rider must lie on the circle both see.
+5. **Placed points stated on the circle are all on it.** One gives a sampled reach, two the perpendicular bisector, three the circumcentre and the plane. A fourth off it stays `not-on-circle`.
+6. **A lettered `free3` centre takes the same placement from its second placed member** (`circle-centre3`), unless a pin drives it. ADR-3D-419 decision 4 left it a check, so «משולש ABC» · «מעגל O» · «A על המעגל» · «B על המעגל» refused a true figure. 2-D builds that sequence and «משולש ABC» · «A על המעגל O» · «B על המעגל O» · «C על המעגל O» (measured at `28dac0c3`, `run-sequence.mjs`). The verdict is the same and the drawing is not: 2-D reshapes the vertices onto the circle around O, and 3-D keeps the vertices and moves O.
+7. **The notice.** «D על המעגל O» shows the ruled `createdCircle` text. An unnamed circle has no centre to name, so `CreatedNotice.circle: ''` shows `suite.notice.createdCircleUnnamed`. 3-D now passes the shared circle row. Two `circle-given-conflict` texts cover the circle with no letter.
+
+**What the student sees.**
+- `[ruled]` #2048 ruling A: «D על המעגל» on an empty canvas draws a circle with D on it, with the notice. «הציגו תצורה אחרת» moves everything unstated.
+- `[ruled]` + `[2-D]` (`28dac0c3`): «D על המעגל O» creates circle O.
+- `[ruled]`: «רדיוס המעגל הוא 3» and «המעגל במישור π1» on an empty canvas create the circle. 2-D sends both to the model (not-handled), so 3-D is ahead of the reference here.
+- `[2-D]` (`28dac0c3`): several placed points stated on a circle whose centre nothing holds all land on it.
+- `[ruled]` ADR-W-174: the new wording, «נוצר מעגל חדש — אם זו טעות הקלדה, לחצו ✕ לביטול השורה» and the two letterless conflict sentences.
+
+**A stated radius has a panel row (found in the round's pre-play).** «רדיוס המעגל הוא 3» drew a circle with no 3 anywhere, and the panel read «אין עדיין נתונים יציבים להצגה». Measured at `d54bf9b8`: no free circle showed one, named or not, the ADR-3D-419 known gap; this ADR's new sentences reached it. `DataPanel.radii` is a reader of `def.radius`, with `panelIsEmpty` counting it. **`[2-D]`** (`computeValues` and `buildScene` at `d54bf9b8`): «מעגל O ברדיוס 3» reads «רדיוס O = 3», an unnamed circle reads «רדיוס המעגל = 3», «2.5» stays 2.5, and the canvas has no measure in any of them. A radius given as a length («OD = 3») keeps its existing `|OD|` row, so it is not shown twice. The words are 2-D's, so there is nothing to record under ADR-W-174.
+
+**Open, for the operator.** Whether a stated radius also gets a number on the canvas. The honesty invariant says a stated value is visible on the figure; 2-D draws none, and a circle has no segment to carry a label, so this is a product question and nothing was added. Two more differences from 2-D stand: 2-D also shows derived area and perimeter rows, which 3-D does not, and with a named and an unnamed circle side by side 3-D still says «רדיוס המעגל», since an unnamed circle has no token here. «רדיוס √8» has no route at all: 3-D's radius grammar reads plain numbers (not-handled, as in 2-D's «מעגל O ברדיוס √8» at the same commit), so a spelling carried on the definition has nothing to carry yet.
+
+**Not built here.** «משולש ABC חסום במעגל» · «D על המעגל O» stays refused `unknown-circle`. 2-D lets the letter name the drawn circle and draws O at its centre. 3-D has no point for a derived centre, and «O מרכז המעגל» is not read at all, so this is a new mechanism. The `{}` variant of `unknown-circle` («עדיין אין מעגל בשרטוט») now has no route from a typed line; it stays as the code a statement-only reader falls back on, and message-floor keeps it covered.
+
+**Sibling products (ADR-W-157).** 2-D builds these lines and shows no notice for them, which is ruling A's gap on 2-D, still owned by #2048. Analytic's blank-canvas row is #2048 card d5. Complex has no such membership.
+
+**Sibling audit.** `unknown-circle` is produced by two arms, `point-on-circle3` and `circle-given`, and the mint reads the code. Grepped `src3d/` for the `def.center` readers of a free circle: `tsc` flags each, and each now handles no letter.
+
+**Locks.** `src3d/__tests__/circle-radius-row-2611.test.ts` (the panel row). `src3d/__tests__/circle-created-by-reference-2611.test.ts` (every spelling at eight seeds, the DOF count, order, pins, the refusals that stay, placed members, the shared notice rows). Fixture `fixtures3/point-on-circle-blank-2611.geo3.json`. Parity row `blank-point-on-circle-2611`. The `#2611` row of `catalog-blank-canvas-1566.test.ts` and the `D על המעגל` allowlist line of `UNCOVERED_CATALOG` are gone. `circle-refusal-words-2611.test.ts`, `point-on-circle-2611.test.ts` and `free-circle-253.test.ts` are re-based on the ruling: their blank-canvas refusals were session verdicts carried over until #253, never a ruling.
+
+**Behaviour change for a student:** in 3-D, a line about «המעגל» on an empty canvas now draws a circle and says so. Before, it was refused.
+## ADR-3D-426 — A stated number carries its spelling: `src` replaces the `decimal` mark (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (3d, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the 3-D half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179) · **amends** [ADR-3D-416](#adr-3d-416) (its mark is replaced, as its Decision 4 and the #1497 cross-link of 2026-11-04 planned)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 · **Design:** [04b](04b-design-3d.md) § "The stated-magnitude lane" · **LADDER stage:** none (display)
+
+**Root cause.** `parseCoeff` and `literalValue` returned a bare number, so `2/3` and `0.6667` were one value and `0.5` and `1/2` were one value. The panel then guessed: `cleanCoeff` at 4 decimals, `cleanNum`/`cleanMag` by fitting a fraction or a surd. #2361's `decimal` mark kept one bit of the spelling.
+
+**Decision.**
+1. The readers go through `shell/literal`: `evalRadical`, `magValue` and `parseCoeff` keep their contract (unsigned, signed, loose), so the parse-drift nets hold. `statedSrc(raw)` replaces `typedDecimal` and spreads `{ src }` onto the same commands (`length-eq`, `vec-mag`, `mag-val`; `lenSrc` on `perp-to-base`). An integer spells itself in every tier, so it carries nothing, and the integer corpus is byte-identical.
+2. **`statedMagText(value, src)`** is now `givenText` over `cleanMag`, so the canvas and the panel stay one text.
+3. **A coordinate:** a tuple of plain numbers records `srcs` when a component is spelled as more than an integer; a `coord` point keeps them. `statedCoordText` prints them in `points`, `pointCoords` and `pointComps`, the latest statement of the coordinate first, so the row and the canvas label read one text. A stated tuple row goes through the same printer, so its typed decimal reads the house decimals.
+4. **A coefficient:** `VecTerm` and `SymTerm` gain `src`; `mag-rel` gains it when the left side has no coefficient of its own. `vecSide` prints it, and `cleanCoeff` is deleted. A coefficient the tool computed reads `cleanNum`, so an eliminated relation reads «1/3» where it read «0.3333».
+5. `spellingOf` in `types.ts` is the one reader of the old mark, for a save made since #2361.
+
+**Measured after.** «SD = (2/3)u» → `SD⃗ = 2/3u`; «B(0.5,0,0)» → `B(0.5, 0, 0)`; «AB = √8» → «√8» on both surfaces; «AB = 4/6» → «4/6»; «7.9999» → «8» everywhere; AB² stays computed.
+
+**Sibling audit.** 2-D, analytic, complex: ADR-W-179. A stated dot product («u·v = 2.5») still reads `cleanNum`: it is the question left open on #2361.
+
+**Locks.** `src3d/__tests__/issue-1497-format-of-entry.test.ts`; `issue-2361-stated-value-text.test.ts` re-based; fixture `format-of-entry-2-3u-1497.geo3.json` (the operator's four lines). Eleven stored fixtures gained `src` in place, by a one-off patch rather than `GEN_FIXTURES3_ALL`, so each keeps its schema version and the load coverage it holds.
+## ADR-3D-424 — The radian refusal in 3-D says «המרחב»: a space builder does not call itself plane geometry (#2335)
+
+**Status:** accepted · 2026-11-05 · bug (P2; 3-D) · fix round #2722, stream Q · **Issue:** #2335 · **Amends** [ADR-W-142](06w-decisions-workspace.md#adr-w-142) · **Requirements:** [02b](02b-requirements-3d.md) FR-SP-21a · [02w](02w-requirements-workspace.md) FR-SU-20 and the behaviour-table row "An angle written with π" · **Design:** none (internal).
+
+**Context.** Operator, round #2291 T22, 2026-10-17, on «משולש ABC» · «∠ABC = π» at `/3d.html`: *"note should say בגיאומטריה של המרחב"*. Re-measured at 28dac0c3: `err.radianAngle` still read «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+
+**Ruling.** The spelling, 2026-10-18: *"Use «גאומטריה» (the majority spelling)"*. The English is the translation of the asked sentence, and new text is the session's, reviewed after ([ADR-W-174](06w-decisions-workspace.md#adr-w-174)).
+
+**Class.** *A 3-D string that names a plane-geometry context, copied word for word under a cross-product parity rule.* ADR-W-142 copied the 2-D sentence, and the one-wording lock then held it in place.
+
+**Decision.**
+1. `err.radianAngle` reads «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". The refusal itself, its code and its category are unchanged.
+2. **The lock moves, it does not lift.** Role `radianAngle` in `suite-vocabulary.test.ts` keeps 2-D and analytic; 3-D has its own role `radianAngleSpace`, with its ruled text. `null` alone would be false: it means "no such surface", and 3-D has one.
+3. `radian-angle-rows.ts` gains `RADIAN_SENTENCE_SPACE_HE/EN`, and 3-D's thin lock passes them to the shared rows. Every other row is untouched.
+
+**Sibling audit.** The class has one member in 3-D. A grep of both 3-D locales for «של המישור», «גאומטריה» and "plane geometry" finds this key, `wrongSideOfPlane` (a real plane) and `cross-app`, which truthfully sends plane geometry to the 2-D tool. 2-D and analytic are plane-geometry builders, so the sentence is true there. Complex has no such refusal.
+
+**Locks.** `src3d/__tests__/radian-angle-1837.test.ts` (the operator's exact two lines through `decideSubmit3` and `errorText3`, Hebrew and English, and all 16 shared spellings against the space sentence); `shell/__tests__/suite-vocabulary.test.ts` (both roles). Nothing is built, so there is no fixture.
+
+**Behaviour change for a student:** in 3-D, an angle written with π is refused with «…של המרחב…» instead of «…של המישור…». The verdict is unchanged, and the 2-D and analytic sentences are unchanged.
+## ADR-3D-425 — A line the tool reads as a vector is shown as one, from a total registry over the command kinds (#1549)
+
+**Status:** accepted · 2026-11-05 · bug (P2) · round #2722 · branch `fix/1549-vector-math-input` off `main` @ 28dac0c3 · operator rulings 2026-09-29 on #1549
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-4a · **Design:** [04b](04b-design-3d.md) "The input preview composes", where the row gate is a registry and the preview reads the dry-run parse
+
+**Class.** A **display gate** that decides "is this a vector statement?" from a **hand-written list of kinds** silently renders every later vector kind as prose. Instance: on a cube with `B(0,7,8)`, the operator's «BA→=(-3,4,5)» previewed with the arrow and committed as flat text with his raw `→`, and «BA=(-3,4,5)» showed no arrow on either surface.
+
+**Context — re-measured at 28dac0c3.** Both reported rows are as the issue says: `inject-pair`, status ok, A at (−3, 11, 13), and a plain card. **The data-panel arm of ruling 2 is already delivered:** #2077 (ADR-3D-368) added `pairPins` to `statedVectorRows`, so «BA⃗ = (-3, 4, 5)» is listed today. This ADR adds only the lock. #1313, which the plan treated as a live neighbour, is parked.
+
+**Root cause.** `render/notation.ts`'s `VEC_CMD_TYPES` was a hand-written `Set` from ADR-3D-013, and `factDisplay3` held a second inline copy of the predicate. `inject-pair` and every later vector kind were never added, and nothing made a new kind answer the question. The preview was gated on the typed text alone.
+
+**Decision.**
+1. **`VECTOR_READING_3: Record<Command3['type'], 'vector' | 'plain'>`**, with `CLAIM_VECTOR_READING_3` over `Claim3['type']`, both total (the `COMMAND_SAVEABLE` shape, #288). A new kind does not compile until it answers. `isVectorFact3` reads them and `factDisplay3` calls `isVectorFact3`.
+2. **Read as vectors, added:** `inject-pair`, `mag-val`, `mag-rel` (the plan), `dot-eq-chain` (the plan's dot kinds, ruling 1), and `vec-mag`, `draw-arrow`, `declare-vector`, which the plan left under "everything else". Ruling 1 covers them: *"every other spelling that lowers to a vector command"*. `AB→` was the reported defect exactly: a `draw-arrow` row printing a raw arrow.
+3. **The preview asks the parse (ruling 1).** `app/previewReading3.ts` `previewReadsVector3(construction, raw)` runs `parse3` through the registry, and `App3` passes the answer to `inputPreviewNode3`, because `render` must not import the parser. `isVectorMarked3` stays for a marked line that does not parse yet, so a half-typed `DC→=` keeps its strip.
+
+**Not delivered: `cos-angle` reads `'plain'`, pending a ruling.** Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
+
+**Limits of "the card and the strip agree".**
+- An unmarked two-reading equation («DC=3AB» over existing points) stays unarrowed in the strip, as today. Its card follows the fold's verdict (ADR-3D-391 Am. 1), and trying both readings per keystroke is a fold on every key.
+- A line carrying a fraction or a root takes the strip's math branch first («AB=(1/2,1,0)»): #1313's parked divergence, unchanged.
+- A name the line itself introduces («u=(1,2,3)») is not yet in the strip's declared names, so it is underlined on the card only.
+
+**Sibling audit.** 2-D has no vector notation by design (#1184), and analytic and complex have no `VecMath`, so the class is 3-D's alone. The query-side twin is `vectorAtoms` (ADR-3D-301).
+
+**Locks.** `src3d/__tests__/issue-1549-vector-row-kind.test.tsx`, on rendered markup through the real `submit` and the same preview call `App3` makes: his exact sequence in both spellings, card ≡ strip per spelling, the kinds, the segment guard, the stated-vector row. Fixture `fixtures3/vector-pair-row-1549.geo3.json` (his sequence).
+
+**Behaviour change for a student:** a vector given as «BA=(-3,4,5)», with or without an arrow, now shows an arrow over BA on its row, and the strip under the box shows it while typing. The same holds for a vector magnitude, a dot-product chain, a bare «AB→» and «חץ A'C». A length, and a perpendicularity between segments, stays plain.
+## ADR-3D-423 — Stated numbers restated in another spelling are already known (#2341)
+
+**Status:** accepted · 2026-11-05 · bug (P2, 3d) · fix round #2722, stream P · branch `fix/2341-restated-point-3d` from `main` @ `28dac0c3` · plan armed `auto-ok` 2026-10-17 · **partly built:** the plan's `[asked]` line and the restated length (`[judged]` q21, 2026-11-05: choice B); the general `[2-D]` line is **open** as q20, with the operator (below)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a (new), FR-SP-5 (the restatement line) · **Design:** [04b](04b-design-3d.md) § "Stated numbers restated" · **Ladder:** none: the submit decision's twin rule, before the candidate derive; no solve stage changes
+
+**Operator:** round #2304 T29, 2026-10-17: *"the test passes but the 3rd line should not be accepted and we say that it is already known"*.
+
+**Ruling on the length** (`[judged]`, q21 choice B, 2026-11-05): «AB = 3» · «BA = 3» answers «זה כבר קיים באיור — אין מה להוסיף.» with no row, in either letter order and any spelling of the same value, as 2-D does; «BA = 4» stays a refusal.
+
+**Measured at pickup** (`28dac0c3`, `decideDeterministic3`). «A(0,0,0)» · «B(√2,0,0)» · «B=(√2,0,0)» recorded a ✓ row, as the issue says. So did «משולש ABC» · «AB = 3» · «BA = 3», «BA = 6/2», «|BA| = 3» and «BA = 3.0», while «AB = √9» was already a twin. «BA = 4» was refused `givens-contradict`.
+
+**The class.** *A statement of a point's coordinates or a segment's length, in a spelling other than the line that stated those numbers, is recorded as a new given instead of answered as already known.*
+
+**Root cause.** `sameStatement` compares lowered commands. «B(…)» lowers to `point3` and «B=(…)» to a `coords-eq` claim, and «BA = 3» to a `length-eq` with its letters swapped, so one statement in two spellings read as two.
+
+**Decision.** `numbersRestatementTwin3` joins `sameStatement` and `ringRestatementTwin3` at the twin rule in `decideCommands3`, so the verdict is the existing `already-stated`: no row, and the #1990 sentence, or the #613 silent re-tick of a muted twin. One comparison, `statedNumbers3`, reads what a command states as numbers, of what: a point's three coordinates, or a segment's length under its unordered pair. A line is a twin of an earlier one when it states only those numbers, they agree at the verifier's `CLAIM_REL_TOL`, and the earlier line already draws any ink the line asks for. It compares stated numbers and samples nothing. Different numbers are no twin and are refused as before. A first value on a segment has no twin and records, so it is drawn.
+
+**Open: q20, with the operator.** Whether 3-D answers «a relation the figure already holds» as 2-D does is not decided and is not built. The next paragraph is the evidence.
+
+**The plan's `[2-D]` line was built, measured, and withdrawn.** The plan asked for the general rule: any line the figure already satisfies adds no row. Built as `impliedByPrior` is built, it turned `test:fast` red in 14 files, 45 tests, and the red was the gate working (docs/17 §9), because the rule reverses standing locks:
+- **The exam gates**, «both answers verify»: `scenarios3.test.ts` (2019, 2020, 2023, 2024), `v7-gates.test.ts` (2021), `exam-2026-2.test.ts`. «F = (1.5, 3, 0)», a collinearity or a plane equation is the student's checked answer (FR-CL-1, ADR-3D-075, *"the tool's charter"* in ADR-3D-108).
+- **The stated ⊥ knee**, `right-angle-knee.test.ts`, `knee-screen-size.test.ts` (#307): the line that draws the knee would have been dropped.
+- **The stated skew relation in the panel**, `mutual-rel.test.ts` (operator, 2026-07-28), and `line-name-as-vector-2642.test.ts`.
+- **A first statement of a face**, `restate-dedupe-613.test.ts`: «פירמידה SABC» · «משולש ABC» would have recorded nothing.
+- **The ADR-3D-209 notices** (#396, #842, #850, #853), recorded with their own note. ADR-3D-377 kept them apart too.
+
+The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac0c3`: «ריבוע ABCD» · «AB ⊥ BC» / «AB ∥ CD» and «AB = 3» · «BA = 3» are noops, but a line adding a value or ink commits («ריבוע ABCD» · «זווית ABC = 90», «AB = 5» · «BC = 5», «מעוין ABCD» · «AC ⊥ BD»), and so does a given true only by the tool's default («טרפז ABCD» · «AB ∥ CD», «משולש ישר זווית ABC» · «AB ⊥ BC», ADR-605). The length noop is built above. Whether 3-D's relations should follow is q20, on #2341.
+
+**A load replays as saved.** `fixtures3/coords-claim-surd-2081.geo3.json` holds the old row and loads unchanged.
+
+**Sibling audit.** 2-D has no coordinates, and its length noop is what the ruling ports. Analytic: «A(0,0)» · «B(4,0)» · «B=(4,0)» is `not-handled`, so the class is absent; its spelling «B(4,0)» twice is `already-known`. Complex: ADR-CX-084 covers it. Grepped the twin rule: its two call sites are in `decideCommands3`, and the model lane asks without twins, as it always has.
+
+**Locks.** `src3d/__tests__/known-line-2341.test.ts`: the operator's sequence, the reverse order, every spelling, the re-tick, both refusals, the new point, the answer on a derived point, the load; for the length, both letter orders, the value's spellings, a solid and placed points, «BA = 4» and «AB = 4», the re-tick, a first value. `issue-2081-held-slots.test.ts` re-based: its radical spellings now assert the restatement, and each also verifies as an answer on a midpoint.
+
+**Behaviour change for a student:** in 3-D, «B=(√2,0,0)» after «B(√2,0,0)», or the reverse, and «BA = 3» after «AB = 3», now answer «זה כבר קיים באיור — אין מה להוסיף.» and add no row. Before, each added a ✓ row.

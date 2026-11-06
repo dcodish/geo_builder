@@ -25,6 +25,7 @@ import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
 import { clauseCoverageVerdict } from './clauseCoverage';
+import { extensionSideVerdict } from './extensionSide';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -243,6 +244,13 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   if (forcedCrossedRing(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-ring-contradicts-noun', commands: r.commands });
     setInputNote(t('input.ringContradictsNoun', { detail: editText.trim() }));
+    return false;
+  }
+  // #2518 (ADR-784): the impossible-side refusal, on this seam too, through the same verdict and against the same PREFIX facts.
+  const wrongSide = extensionSideVerdict(editText, editText, r.commands, ectx, prefixFacts, store().seed);
+  if (wrongSide) {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: `edit-${wrongSide.result}`, commands: r.commands });
+    setInputNote(t(wrongSide.messageKey, wrongSide.params));
     return false;
   }
   // #2122 (ADR-653): a MERGE naming made the statement true by construction — the submit seam's rule: a success, kept

@@ -30,7 +30,7 @@ identity, because "a fork wearing a shared file's name" ([ADR-W-016](06w-decisio
 rule 2) reintroduces the divergence the tree exists to remove.
 
 **How it is achieved in practice: slots, not flags.** Every frame component takes the product-shaped part
-as a prop it renders without inspecting — `AskLane` takes "the product's own answered rows",
+as a prop it renders without inspecting — `AskLane` takes "the product's own answered rows" and a required `unreadableHint`,
 `DataPanel` takes "extra product blocks below the skeleton", `FactList` takes "the product's row of list
 actions". The component owns the *shape*; the caller owns the *content*. There is no `product === '2d'`-style
 branch anywhere in `shell/` source, `shell/frame/` included.
@@ -51,7 +51,7 @@ reading, with one implementation and two consumers.
 | Layer | Modules | What they are |
 |---|---|---|
 | **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
-| **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
+| **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` (`error`, `notice`, `info`) · `InfoNote` (the ⓘ on the `info` strip, [ADR-W-180](06w-decisions-workspace.md#adr-w-180); `NarrowingNote` is its name for the narrowing family) · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
 | **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" — four consumers: every builder hands `questionDoc` its own givens list and bidi segmenter ([ADR-W-126](06w-decisions-workspace.md#adr-w-126)) |
 | **Also in the tree** | `ticks.ts` · `proofTarget.ts` · `studentText.ts` · `conjunction.ts` · `indexedName.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
 
@@ -193,6 +193,10 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 `shell/vulgarFractions.ts` `spellVulgarFractions` spells every Unicode vulgar-fraction glyph (all 18, ½ … ⅒) as the digits the number readers read — 2-D's ADR-635 reader, moved here unchanged when 3-D became its second caller (#2255). A MIXED number is one number: the exact decimal when the fraction terminates («2½» → `2.5`, «2 ½» too), else the improper fraction («2⅓» → `7/3`); the whole part is guarded by `indexedName`'s `UNGLUED`, so a subscripted label is never a mixed number. A glyph coefficient of a radical moves below it («½√3» → `√3/2`, «¾√3» → `3√3/4`), a glyph under a root is parenthesised («√½» → `√(1/2)`), and a lone glyph is `a/b`, spaced away from a glued letter or digit. It is a PARSER-boundary spelling, not a store one: 2-D `normalizeUtterance` (through its `src/parser/lexicon.ts` re-export) and 3-D `normalize3` call it, and the stored line keeps the glyph as typed. **Analytic is not a caller yet**: its `frameAnalytic.ts` folds ½ ¼ ¾ only, so «2⅓» goes to the AI there (#2349). The cross-builder lock is the parity rows `glyph-fraction-ratio-2008` and `vulgar-mixed-length-2255`, with 2-D's `vulgar-fraction-2008` and 3-D's `vulgar-fraction-2255` tests.
 
+### A stated number and its spelling ([ADR-W-179](06w-decisions-workspace.md#adr-w-179))
+
+`shell/literal.ts` is the one seam: `readLiteral(raw)` at the parser gives a literal's value and spelling, and `givenText(value, src, tier)` at every given printer gives the text. A decimal prints through `fmtNum` (sr-22); a fraction or a root prints as written; a literal that no longer reads as `value` falls back to the caller's `tier`; a non-literal expression («4π») prints as it stands. A derived row never calls it. 3-D carries `src` on its commands, 2-D reads `expr.text`, analytic reads `spelledText(e)`, complex reads `Constraint.src`.
+
 ### The input-script rule ([ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328))
 
 `shell/inputScript.ts` answers one question for all four builders: **is there a letter in this line the tool
@@ -251,7 +255,7 @@ Shell CODE holds no strings. The one exception, ruled by the operator on 2026-10
 - **Quote style ([ADR-W-149](06w-decisions-workspace.md#adr-w-149)).** A Hebrew message that quotes a value it inserts (`{{detail}}`, `{{line}}`) puts it in «…», in every builder; every quoted span of such a message follows. English follows the same rule since #2241 ([ADR-W-150](06w-decisions-workspace.md#adr-w-150)). `shell/__tests__/quote-style.test.ts` reads every table, Hebrew and English (the four products' and this file), and fails on a straight-quoted span around an interpolation. The shared table reader for these locks is `shell/__tests__/fixtures/locale-tables.ts`.
 - **Refusal voice ([ADR-W-151](06w-decisions-workspace.md#adr-w-151), #1868).** The "not understood" refusal is one suite key, `suite.refusal.notUnderstood`, with no interpolation (no echo of the line). Every builder's not-understood path reads it: 2-D's submit pipeline and `rightAngleVertexNote`, 3-D's `errorText3` for `not-understood`, analytic's and complex's `errorText` for `not-handled`. `<tree>/__tests__/not-understood-1868.test.ts` renders it through each builder's own refusal path (assertions in `shell/__tests__/fixtures/not-understood-1868.ts`); `suite-vocabulary.test.ts` holds the ruled text, the four retired keys, and the "tool's limit" frame (any message saying «מגבלה של הכלי» opens «הכלי עדיין לא יודע» and closes «— זו מגבלה של הכלי»).
 - **The already-there note ([ADR-W-152](06w-decisions-workspace.md#adr-w-152), #1990).** A line that adds nothing to the figure is answered with one suite key, `suite.notice.alreadyDrawn`, 2-D's «זה כבר קיים באיור — אין מה להוסיף.», with no interpolation. Every no-op path reads it: 2-D's `decideDeterministic` and `editPipeline`, 3-D's `already-stated` notice (none for a re-ticked muted twin), analytic's `already-known` and `already-follows`, complex's `known` note. `<tree>/__tests__/already-drawn-1990.test.ts` drives a restatement through each builder (assertions in `shell/__tests__/fixtures/already-drawn-1990.ts`); `suite-vocabulary.test.ts` holds the text and the five retired keys.
-- **The «same point» notice ([ADR-W-176](06w-decisions-workspace.md#adr-w-176), #1595).** Two letters the drawn figure puts on one dot are named in one suite key, `suite.notice.converge`, 2-D's ADR-123 «{{a}} ו-{{b}} נפלו על אותה נקודה.». `shell/converge.ts` holds the shared half: `coincidentPairs(points, same)` and `convergeText(pairs, t, name?)`. Each builder passes the points its canvas labels and its own identity test (2-D `LEN_EPS` with the forcedness split and the ADR-447 filter, 3-D `samePlace3`, analytic `crossings.apart`, complex the solver's `TOL`), and reads them from the drawn derivation on every render. Locked per tree by `<tree>/__tests__/converge-1595.test.ts` (assertions in `shell/__tests__/fixtures/converge-1595.ts`).
+- **The «same point» notice ([ADR-W-176](06w-decisions-workspace.md#adr-w-176), #1595; on `InfoNote` in every builder, [ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** Two letters the drawn figure puts on one dot are named in one suite key, `suite.notice.converge`, 2-D's ADR-123 «{{a}} ו-{{b}} נפלו על אותה נקודה.». `shell/converge.ts` holds the shared half: `coincidentPairs(points, same)` and `convergeText(pairs, t, name?)`. Each builder passes the points its canvas labels and its own identity test (2-D `LEN_EPS` with the forcedness split and the ADR-447 filter, 3-D `samePlace3`, analytic `crossings.apart`, complex the solver's `TOL`), and reads them from the drawn derivation on every render. Locked per tree by `<tree>/__tests__/converge-1595.test.ts` (assertions in `shell/__tests__/fixtures/converge-1595.ts`).
 
 ### Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
@@ -312,10 +316,19 @@ Read the last row of that table first. The products **differ** in what they emit
 kept (`prepareLine` returns `{ match, emit }`) rather than unified: unifying would change output in a
 shipped tool, a behaviour change wearing a refactor's clothes.
 
-**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `App3`, analytic in `runFallback`. In
+**Where each product runs it:** 2-D in `submitPipeline`, 3-D in `src3d/app/escalate3Flow.ts`, analytic in `runFallback`. In
 every case it runs on the model's lines and **before** the deterministic re-parse, because the restored
 spelling is what must be parsed, recorded and read back. Complex has no LLM lane yet
 ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B14, #1869).
+
+**The one retry ([ADR-W-189](06w-decisions-workspace.md#adr-w-189), #2231).** `shell/llm/retryLostNames.ts`
+`askKeepingNames(ask, lostNamesOf, usable)` calls the transport once and, when the builder's own name gate reports a lost
+name on a usable answer, once more with `keep`: exactly one retry. It decides which answer goes on and nothing else; the
+builder's full battery then judges that answer. The body field `keep` is validated by `readKeep` in
+`server/llm/harness.ts` (at most 8 name tokens, otherwise ignored), and `buildRequest` adds one line after the student
+request; without it the request is byte-identical. The gates injected: 2-D `droppedNewLabels`, 3-D `droppedNewLabels3`,
+analytic `faithfulnessAnalytic(...).droppedNames`. A retry logs one `llm-retry` action (`nameRetryEvent`), detail
+`K:recovered` or `K:lost`, which the lean sinks and the admin session view already carry.
 
 **The corrections are logged.** Each product puts `restored` (`WAS→WANT`) on the submit event. Without
 it, a submit that was silently corrected looks exactly like one that needed no correction.
@@ -463,7 +476,7 @@ shows the notice while that line is the last row (2-D `createdByReference` + `co
 A line that created a CIRCLE by its centre ([ADR-W-164](06w-decisions-workspace.md#adr-w-164), #2552 D9) shows
 `suite.notice.createdCircle` («נוצר מעגל חדש שמרכזו {{centre}} — …») instead: `CreatedNotice.circle` carries the centre,
 `createdNoticeTextOf(notice)` picks the key, and the ✕ is the same. The rows' sixth (circle) row runs for a builder that
-hands `CreatedNoticeSentences.circle`; today only analytic (`record.createdCircle`).
+hands `CreatedNoticeSentences.circle`: analytic (`record.createdCircle`) and 3-D (`Derived3.createdCircles`). A circle with no centre letter carries `circle: ''` and shows `suite.notice.createdCircleUnnamed` ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420)).
 
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 

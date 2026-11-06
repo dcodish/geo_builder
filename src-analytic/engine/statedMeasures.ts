@@ -32,15 +32,19 @@
  * A trig given prints the ANGLE it fixes, in degrees (operator ruling on #1718/#1719: «63.43°», never «tan=2»).
  * Formatting stays a DISPLAY concern: this hands the renderer a number or a text, never a rounded string.
  */
-import { exprText, evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { exprText, evalExpr, literalText, spelledText, symbolsOf, type Env, type Expr } from './expr';
 import { angleLabelName, isTermPlaceholder, symbolText, type LengthExpr } from './lengths';
 import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
 import type { FootLine } from './derived';
 import { lineIdOf } from './names';
 
-/** A stated value, as the renderer should write it: a NUMBER the givens fix, or the student's own TEXT. */
-export type StatedValue = { num: number } | { text: string };
+/**
+ * A stated value, as the renderer should write it: a NUMBER the givens fix, or the student's own TEXT. `src` (#1806,
+ * ADR-AG-407) is the number as the student spelled it («6√5», «√8», «4π»). A trig given's angle has no spelling of its
+ * own (ADR-AG-225 §3) and reads `fmtAnalytic`.
+ */
+export type StatedValue = { num: number; src?: string } | { text: string };
 
 export interface StatedMeasures {
   /** «AB = 5», «AB = 3a» — written at the segment's midpoint. */
@@ -94,7 +98,7 @@ export function statedText(e: Expr): string {
   // #1812 (ADR-AG-394): an angle's label is written as the book writes it — «A₁», never the internal «∠A1»
   if (e.kind === 'sym') return symbolText(e.name);
   if (e.kind === 'mul' && e.a.kind === 'num' && (e.b.kind === 'sym' || e.b.kind === 'sqrt')) return `${exprText(e.a)}${statedText(e.b)}`;
-  return exprText(e);
+  return spelledText(e);
 }
 
 /**
@@ -174,10 +178,12 @@ export function statedMeasures(
 ): StatedMeasures {
   const env = valuedSymbols(c.constraints);
   /** The student's value: a number when nothing in it is free, else their own text. */
-  const valueOf = (e: Expr, toNum: (v: number) => number = (v) => v): StatedValue => {
+  const asStated = (v: number): number => v;
+  const valueOf = (e: Expr, toNum: (v: number) => number = asStated): StatedValue => {
     if (symbolsOf(e).every((s) => s in env)) {
       const v = toNum(evalExpr(e, env));
-      if (Number.isFinite(v)) return { num: v };
+      const src = toNum === asStated ? literalText(e) : undefined; // #1806: a converted value is no longer what was typed
+      if (Number.isFinite(v)) return { num: v, ...(src !== undefined ? { src } : {}) };
     }
     return { text: statedText(e) };
   };

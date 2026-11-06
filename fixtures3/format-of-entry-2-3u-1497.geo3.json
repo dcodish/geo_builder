@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-05T19:42:43.887Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה משולשת ABCS",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "tetra",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "D על SB",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "D",
+          "a": "S",
+          "b": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: SB = u",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "S",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "S",
+          "to": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "SD = (2/3)u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "S",
+          "to": "D",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.6666666666666666,
+                "p": 0
+              },
+              "src": "2/3",
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

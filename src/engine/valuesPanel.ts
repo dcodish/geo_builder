@@ -49,6 +49,11 @@ export interface ValueRow extends TwoValues {
   /** נתון (stated by the student) vs נגזר (forced by the figure). */
   stated: boolean;
   /**
+   * #1497 (ADR-W-179): a given prints as the student typed it («√8», «2/3»), never re-spelled from the float. The text
+   * the canvas label prints; absent on a derived row and on a stated value with no spelling of its own.
+   */
+  given?: string;
+  /**
    * The value in the student's DECLARED unit (#427) — `a`, `a√2`, `a²`. Present only when the figure
    * carries a unit ({@link declaredLengthUnit}) and this row's ratio to it is seed-invariant; the UI
    * prints it INSTEAD of `value`, which under a free similarity gauge is only the drawing's scale.
@@ -229,6 +234,25 @@ export type QueryNote = (typeof QUERY_NOTES)[number];
  *  «מחשב…» while a values compute for this figure is running, «לחצו «חשב ערכים»» only when nothing is. */
 export function waitingNote(computing: boolean): QueryNote {
   return computing ? 'computing' : 'pending';
+}
+
+/**
+ * #1454 (ADR-788): the ask lane's rows — every saved question, in the order asked, with the answer the
+ * figure's current layers hold. An ask is answered on its own (`asks`); the «חשב ערכים» panel answers
+ * the saved questions too (`panel`), and both read the one pool. A question neither holds is waiting.
+ */
+export function askLaneRows(
+  queries: readonly string[],
+  asks: readonly QueryRow[] | null,
+  panel: readonly QueryRow[] | null,
+  computing: boolean,
+): QueryRow[] {
+  return queries.map(
+    (text) =>
+      asks?.find((r) => r.text === text) ??
+      panel?.find((r) => r.text === text) ??
+      { text, kind: null, label: null, ids: [], value: null, exact: null, note: waitingNote(computing) },
+  );
 }
 
 /** One answered (or honestly refused) query. */
@@ -745,5 +769,5 @@ export function rowOptions(row: ValueAnswer & TwoValues): ValueOptions<ValueAnsw
  * The answer half of «label = …» as plain text, under the W1 spelling (#1867): «6.21», «±3», «1.45 או AC = 6.21».
  * `words` carries the caller's joiner and the row's own label (the App typesets the same three shapes as MathML).
  */
-export const valueText = (row: ValueAnswer & TwoValues, words: ValueOptionsWords = { or: 'או' }): string =>
-  valueOptionsText(rowOptions(row), answerText, words) ?? `${answerText(row)} ${words.or} ${answerText(row.or ?? row)}`;
+export const valueText = (row: ValueAnswer & TwoValues & { given?: string }, words: ValueOptionsWords = { or: 'או' }): string =>
+  row.given ?? valueOptionsText(rowOptions(row), answerText, words) ?? `${answerText(row)} ${words.or} ${answerText(row.or ?? row)}`;

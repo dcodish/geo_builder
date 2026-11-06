@@ -148,8 +148,5 @@ describe('#2611 — what stage A leaves as it was', () => {
     expect(st().lastError).toEqual({ code: 'unknown-circle', several: true }); // ADR-3D-414: worded as a circle
   });
 
-  it('a blank canvas keeps today\'s refusal until #253 (stage B)', () => {
-    run('D על המעגל');
-    expect(st().lastError).toEqual({ code: 'unknown-circle' }); // ADR-3D-414: worded as a circle, no id
-  });
+  // a blank canvas: stage B, ADR-3D-420, circle-created-by-reference-2611.test.ts
 });

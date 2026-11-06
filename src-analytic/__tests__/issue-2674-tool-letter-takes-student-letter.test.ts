@@ -123,3 +123,75 @@ describe('typedLetters — the letters a sentence types (2-D’s autoNamedLabels
     expect([...typedLetters(src)].sort()).toEqual([...want].sort());
   });
 });
+
+/**
+ * The round #2722 remnants (ADR-AG-404). Card q3 = A (2026-11-04), *"Rename for the reversed spelling too"*: analytic already
+ * read it, through `sameDerivation`; locked here. The other two are the 2026-11-03 ruling's *"in every builder"*.
+ */
+describe('the reversed spelling (card q3 = A)', () => {
+  it.each([
+    ['a bare midpoint', ['משולש ABC', 'אמצע BC', 'D אמצע CB']],
+    ['the tool wrote it backwards', ['משולש ABC', 'אמצע CB', 'D אמצע BC']],
+    ['a median’s midpoint', ['משולש ABC', 'תיכון מ-A במשולש ABC', 'D אמצע CB']],
+  ])('%s: one point D, no notice', (_t, lines) => {
+    const d = figure(lines);
+    expect(ids(d)).toEqual(['A', 'B', 'C', 'D']);
+    expect(coincidencesOf(d)).toEqual([]);
+  });
+  it('a different segment does not take over', () => {
+    expect(ids(figure(['משולש ABC', 'אמצע BC', 'D אמצע AB']))).toEqual(['A', 'B', 'C', 'D', 'M']);
+  });
+  it('a typed letter is the student’s: the notice stays', () => {
+    expect(coincidencesOf(figure(['משולש ABC', 'תיכון מ-A במשולש ABC', 'AM = 3', 'D אמצע CB']))).toEqual([['M', 'D']]);
+  });
+});
+
+describe('the next free letter after a takeover is the one the student freed, as in 2-D', () => {
+  it.each(['D אמצע BC', 'D אמצע CB'])('«%s»: the next median’s midpoint is M again, and only that row announces it', (line) => {
+    const d = figure(['משולש ABC', 'תיכון מ-A במשולש ABC', line, 'תיכון מ-B במשולש ABC']);
+    expect(ids(d)).toEqual(['A', 'B', 'C', 'D', 'M']);
+    expect(d.minted).toEqual([{ index: 3, id: 'M' }]);
+    expect(coincidencesOf(d)).toEqual([]);
+  });
+  it('M typed in between stays taken: the next midpoint is N', () => {
+    const d = figure(['משולש ABC', 'תיכון מ-A במשולש ABC', 'AM = 3', 'D אמצע BC', 'תיכון מ-B במשולש ABC']);
+    expect(ids(d)).toEqual(['A', 'B', 'C', 'D', 'M', 'N']);
+  });
+  it('a second student letter on the point takes nothing over', () => {
+    const d = figure(['משולש ABC', 'תיכון מ-A במשולש ABC', 'D אמצע BC', 'E אמצע CB', 'תיכון מ-B במשולש ABC']);
+    expect(coincidencesOf(d)).toEqual([['D', 'E']]);
+    expect(ids(d)).toEqual(['A', 'B', 'C', 'D', 'E', 'M']);
+  });
+  it('the median stated again is about D, and adds no point', () => {
+    const lines = submitted(['משולש ABC', 'תיכון מ-A במשולש ABC', 'D אמצע BC']);
+    expect(decideSubmit('תיכון מ-A במשולש ABC', lines, 0).kind).toBe('already-known');
+  });
+});
+
+describe('the coordinate point: the tool’s P₁ yields to a student’s fresh letter at those coordinates', () => {
+  const T = ['טרפז ABCD', 'הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)'];
+  it('one point E, no notice, no row announcing P₁', () => {
+    const d = figure([...T, 'E(-3,7)']);
+    expect(ids(d)).toEqual(['A', 'B', 'C', 'D', 'E']);
+    expect(coincidencesOf(d)).toEqual([]);
+    expect(d.minted).toEqual([]);
+    expect(pt(d, 'E')).toMatchObject({ x: -3, y: 7 });
+  });
+  it('P₁ is back in the pool: the next coordinate point takes it', () => {
+    const d = figure([...T, 'E(-3,7)', 'נתונה הנקודה (2,2)']);
+    expect(d.minted).toEqual([{ index: 3, id: 'P₁' }]);
+  });
+  it('another point keeps P₁ with its row', () => {
+    const d = figure([...T, 'E(1,1)']);
+    expect(d.minted).toEqual([{ index: 1, id: 'P₁' }]);
+  });
+  it('a circle built on the coordinates follows the letter', () => {
+    const d = figure(['מעגל שמרכזו בנקודה (2,3) ורדיוסו 2', 'E(2,3)']);
+    expect(ids(d)).toContain('E');
+    expect(ids(d)).not.toContain('P₁');
+    expect(coincidencesOf(d)).toEqual([]);
+  });
+  it('a letter stated before the coordinates already wins, as it did', () => {
+    expect(decideSubmit('נתונה הנקודה (-3,7)', ['E(-3,7)'], 0).kind).toBe('already-known');
+  });
+});

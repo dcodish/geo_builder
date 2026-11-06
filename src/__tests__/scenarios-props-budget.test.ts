@@ -18,9 +18,8 @@ describe('reported scenarios — config search succeeds under the app PRODUCTION
     const facts = structuredClone(factsOf(sc.steps, sc.refusedSteps, { centresShown: sc.centresShown })) as Fact[];
     const found = findValidConfig(facts, 0, 2500);
     expect(found, 'the app-budgeted config search finds a valid configuration').not.toBeNull();
-    // The letter-order side is unachievable on this figure, so the found config lives on the RELAXED
-    // (shared-endpoint either-side, ADR-142) tier — and E genuinely lands beyond A (the book's C-A-E).
-    expect(meetsRequirements(found!.facts, found!.seed, true), 'the found config meets the acceptance bar').toBe(true);
+    // ADR-784: one bar. The scenario types the book's order, so the found config meets it with E beyond A (C-A-E).
+    expect(meetsRequirements(found!.facts, found!.seed), 'the found config meets the bar').toBe(true);
     const fig = replay(found!.facts, found!.seed);
     const C = at(fig, 'C'), A = at(fig, 'A'), E = at(fig, 'E');
     const t = ((E.x - C.x) * (A.x - C.x) + (E.y - C.y) * (A.y - C.y)) / ((A.x - C.x) ** 2 + (A.y - C.y) ** 2);

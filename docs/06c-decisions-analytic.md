@@ -9548,7 +9548,7 @@ Controls:
 
 ## ADR-AG-211 — The tool's letters are 2-D's, through one role → letter table; the cevian's tool foot is derived; «תיכון ליתר» asks unless the right angle is stated (#1620 S6, #1222)
 
-**Status:** accepted · 2026-10-02 · **⚠ Amended by [ADR-AG-345](#adr-ag-345) (2026-10-28, operator ruling «B» of 2026-10-27 on #2583):** a perpendicular bisector's midpoint is no longer lettered or drawn — it is a helper until a line letters it; every other role keeps its letter. · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
+**Status:** accepted · 2026-10-02 · **⚠ Partly superseded by [ADR-AG-411](#adr-ag-411) (2026-11-05, #2074):** «תיכון ליתר» on an open right triangle no longer asks; it draws on the shown triangle. · **⚠ Amended by [ADR-AG-345](#adr-ag-345) (2026-10-28, operator ruling «B» of 2026-10-27 on #2583):** a perpendicular bisector's midpoint is no longer lettered or drawn — it is a helper until a line letters it; every other role keeps its letter. · operator rulings on #1620, 2026-10-02: (1) *a point the student did not name takes 2-D's letter — M for a midpoint, F for a foot, the next free letter if taken; analytic uses H for a foot because F is the focus letter (#1167); announced on the row and renameable*; (2) *«תיכון ליתר»: build when a stated right angle fixes the vertex, otherwise ASK which side is the hypotenuse; never assume C.* Branch `feat/1620-s6-letters` off `feat/1620-construction-vocabulary` @ b1b1683d (S1–S4 integrated). A NEW ADR, not an amendment of ADR-AG-209: the change crosses three streams — S2's [ADR-AG-207](#adr-ag-207) (the perpendicular's foot and the perpendicular bisector's midpoint took `P₁`), S3's [ADR-AG-208](#adr-ag-208) (the midsegment's `FRESH_PREFIX`) and S4's [ADR-AG-209](#adr-ag-209) (`M₁`/`H₁`) — and supersedes each one's letter rule.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R103c (new); R103b's foot letters and its "not yet: «תיכון ליתר»" amended; the perpendicular-foot bullet (ADR-AG-207) amended: P₁ → H. · **Design:** [04c](04c-design-analytic.md) — new section "The tool's letters: one table, one resolver"; ADR-AG-209's "tool-named foot" paragraph superseded. · **LADDER stage:** the mint seam (`resolveToolLetters`, before `resolveMints`), M1 (`cevian-of` `toolFoot` / `hypotenuse`). No solver change.
 
@@ -12298,6 +12298,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-276 — Analytic says when the givens forced a narrower kind, in the shared sentence family, once its configuration pool completes (#1996, #1899)
 
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the note is the blue ⓘ strip, no longer amber.
+
 **Status:** accepted · 2026-10-15 · feature (P2, analytic) · round #2128 · PR `feat/1996-narrowing-note` · the analytic half of [ADR-W-129](06w-decisions-workspace.md#adr-w-129) (rulings quoted there; analytic follows 2-D under B1, #1899's 2026-10-08 ruling).
 **Requirements:** [02c](02c-requirements-analytic.md) R179 (new) · **Design:** [04c](04c-design-analytic.md) "A declared shape the givens force narrower is said" · **LADDER stage:** none (a derived layer after the pool completes).
 
@@ -12316,6 +12318,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** `src-analytic/__tests__/narrowing-note-1996.test.ts` (the shared rows through `decideSubmit` and `analyticI18n`; every 3- and 4-sided `SHAPES` row has a kind in the lattice; removing the cause removes the note; a deferred, incomplete pool says nothing and then the note arrives; the given text from the page's own line text); fixture `src-analytic/__tests__/fixtures/issue-1996-parallelogram-inscribed.analytic.json` (the circle note, he and en).
 
 ## ADR-AG-279 — The LLM lane accounts its answer against the student's sentence: a dropped name or number, or an invented name, refuses (#1355)
+
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-405](#adr-ag-405) (#2680, operator ruling 2026-11-04): an answer that computes a value is no longer refused when its curve really has that value, so `y=4x-5` for «(2,3), slope 4» now pays both. The gates themselves stand.
 
 **Status:** accepted · 2026-10-16 · feature (P1, analytic; raised from P2 by the operator 2026-10-15: «1355 is p1») · fix round #2245, stream E · PR `feat/1355-analytic-llm-honesty-gates`
 **Requirements:** [02c](02c-requirements-analytic.md) R104a (new) · **Design:** [04c](04c-design-analytic.md) "The LLM lane's faithfulness gates" · **LADDER stage:** none (the LLM seam, after the re-parse)
@@ -12721,6 +12725,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-302 — Every static discrete axis is one digit of one odometer: choices, region choices and crossing pairs (#2381)
 
+> **Amended by [ADR-AG-403](#adr-ag-403)** (#2408, 2026-11-05): the tangents of one pair of circles read one permutation: a tangent's digit has one base less for each family its pair has already taken.
+
 **Date:** 2026-10-20 · **Status:** accepted · P2 bug, fix round #2414 (stream A, item 1); branch `fix/2381-analytic-choice-odometer` from `main` @ `3cae7f25`. The analytic port of 2-D's [ADR-593](06-decisions.md#adr-593) (`src/replay/core.ts` `searchAnotherView`: *"every registered axis … as ONE odometer"*), copied, never imported. **Amends** [ADR-AG-197](#adr-ag-197) (the dead-choice retry walks combinations, not `seed + k < n`; the #1539 bit rule for crossing pairs is absorbed, identical for a pair-only figure) and [ADR-AG-227](#adr-ag-227) (the never-cross rule binds the spread preference, not the separated one). LADDER stage: none (configuration resolution, before any solve).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R14 (every combination of discrete choices is reachable) and R61 (stacked named points: the opening search may change a choice). · **Design:** [04c](04c-design-analytic.md), "The configuration search: validity, then preference" and "Only valid configurations are evidence".
@@ -12900,6 +12906,8 @@ No other sequence moved.
 
 ## ADR-AG-312 — A common tangent through the circles' stated touch point is the tangent at it: where «AB משיק משותף» touches is decided at M1 (#2385)
 
+> **Amended by [ADR-AG-403](#adr-ag-403)** (#2408, 2026-11-05): away from the touch arms, the two-`tangent-of` lowering retires: the line is a slot of the pair.
+
 **Date:** 2026-10-20 · **Status:** accepted · bug (P2, analytic) · fix round #2414, stream E · branch `fix/2385-analytic-tangent-at-touch` from `main` @ `3cae7f25` · LADDER stage: none (an M1 lowering and a pre-fold annotation; no solver change)
 **Requirements:** [02c](02c-requirements-analytic.md) R162 (the common-tangent bullet: through the circles' touch point it is the tangent there) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order" (`common-tangent`, `earlierOnCommonTangents`) · **Sibling:** #2407 (the 2-D port, P1)
 
@@ -13050,6 +13058,8 @@ No other sequence moved.
 **Consequences.** `engine/types.ts` (`common-tangent.name`, `name-line`, the `axis-cut` selector), `engine/apply.ts` (`common-tangent` draws its line, `name-line`, `lineOverPair`, `replaceId`, the selector's references), `engine/evaluate.ts` (`lineTriple`, the `axis-cut` judge), `parser/parseAnalytic.ts` (`commonTangentFacts`, `namedCommonTangent`, `parseNameLine`, `parseAxisCut`, `twoCircleSlots`), `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R180, 04c.
 
 ## ADR-AG-314 — The common-tangent object: every common tangent of a pair in one sentence, each named; the tangent at the touching circles' common point (#2390)
+
+> **Amended by [ADR-AG-403](#adr-ag-403)** (#2408, 2026-11-05): the letter-named sentence now reads this ADR's families; `errNoCommonTangent` became the suite's `tangentsExhaustedContained`.
 
 **Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic) · fix round #2414, stream E · branch `feat/2390-analytic-all-common-tangents`, stacked on `feat/2392-analytic-named-common-tangent` ([ADR-AG-313](#adr-ag-313)) · LADDER stage: none (a closed-form derived curve and an M1 reading of the construction; no solver change)
 **Requirements:** [02c](02c-requirements-analytic.md) R181 (new: the set sentence, the touch-tangent sentence, the counts by position, the naming rule, the unsettled case, 2-D's nested refusal, the taught Q2 ב line, the ask) · **Design:** [04c](04c-design-analytic.md) § "Common tangents" (new: the `common-tangent` object, its families and tolerance, `pairPositionOf`, the names) · **Builds on** [ADR-AG-312](#adr-ag-312), [ADR-AG-313](#adr-ag-313) · [ADR-AG-206](#adr-ag-206) (the exam register is taught)
@@ -13359,6 +13369,8 @@ No other sequence moved.
 **Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.
 
 ## ADR-AG-321 — A common tangent reads every line that pins it to the touch point, in any order; the pair's position decides the only tangent (#2418)
+
+> **Amended by [ADR-AG-403](#adr-ag-403)** (#2408, 2026-11-05): its touch arms stand; the fallback past them is a slot of the pair, not two free tangencies.
 
 **Date:** 2026-10-20 · **Status:** accepted · bug (P3, analytic) · fix round #2436, stream B · branch `fix/2418-reverse-order-touch-tangent` from `main` @ `17168818` · LADDER stage: none (an M1 lowering decision and the fold's pre-pass; no solver change)
 **Requirements:** [02c](02c-requirements-analytic.md) R189 (new), R162 (the common-tangent bullet: in either order) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order" (`statedOnCommonTangents`, `onLine` from any line, `touchByOnLine` / `reDecidedBy`, the position exit) · **Builds on:** [ADR-AG-312](#adr-ag-312), [ADR-AG-314](#adr-ag-314) · **Cites:** [ADR-AG-020](#adr-ag-020) · **Sibling:** #2430 (the 2-D twin, `needs-operator`)
@@ -14787,8 +14799,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 
 **Not in this item.**
 - **3-D** (ADR-W-157: "to 3-D if simple"): its one tool-minted derived letter is `midpoint-auto` («אמצע BB'» → M). «קובייה ABCDA'B'C'D'» · «אמצע BB'» · «E אמצע BB'» keeps M and E there. The letter is picked at apply and never enters a fact, so the port needs typed-letter tracking through `deriveCore3`'s several folds. This is recorded on #2674. The parity table cannot hold it, because the table measures verdicts and this is a drawing (ADR-W-170 §3). The reserved ADR-3D-412 is unused.
-- **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
-- **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **A coordinate mint** (P₁, #1281): «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» keeps P₁ and E with the notice. This is a different chokepoint: `resolveMints` embeds the letter in ids such as `circle-at-P₁`. Recorded on #2674.
+- **⚠ Superseded by [ADR-AG-404](#adr-ag-404).** **The next free letter after a takeover.** 2-D frees M once D takes it, so a second median is M again. Here it is N, because the tool's letters are chosen before the fold. Recorded on #2674.
 
 **Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the operator's two lines through `decideSubmit`; every tool family above; the controls); `issue-1620-tool-letters` (its #1595 assertion flipped to one point D, citing this ruling); fixture `median-student-names-foot-2674`.
 
@@ -14854,6 +14866,8 @@ Locks: `issue-2621-side-parallel.test.ts`; fixtures `side-of-origin-p6-2b-2621`,
 **Behaviour change for a student:** a parabola's and an ellipse's row carry a chip «הצג מדריך» / «הצג מדריכים»; pressing it cycles the directrix, the focus and both onto the figure, and back to nothing.
 
 ## ADR-AG-377 — An ellipse the givens make a circle is said to be one; its centre is a circle's (#1863, #2676)
+
+**⚠ Amended by [ADR-W-180](06w-decisions-workspace.md#adr-w-180) (2026-11-05):** the channel it joins is now the blue ⓘ strip; read `Banner kind="notice"` below accordingly.
 
 **Date:** 2026-11-03 · **Status:** accepted · feature (P2, analytic), branch `feat/1863-conic-annotations`. The conic → circle family of #2676's generic rule. LADDER stage: none (a knowledge read and a display).
 
@@ -15056,6 +15070,8 @@ It reads the scene as drawn, so it holds with every #2688 switch on or off (a le
 **Behaviour change for a student:** every point's letter is written beside its point, on the open side away from its lines, and moves off any line, dot or other letter that would cover it; before, it always sat up-right of the dot, often on a side.
 
 ## ADR-AG-391 — An answer's curve pays the parameters its canonical form leaves implicit: «x^2 + y^2 = 9» keeps a stated centre (0,0) (#2680)
+
+> **⚠ Superseded in part** 2026-11-05 by [ADR-AG-405](#adr-ag-405) (#2680, operator ruling 2026-11-04): "Nothing COMPUTED from the parameters pays" is replaced. A computed value now pays by its stated role, when the curve really has it. The parameters stay as decided here.
 
 **Date:** 2026-11-04 · **Status:** accepted · bug (P3, analytic) · fix round #2697 stream S2, branch `fix/2680-implicit-curve-values` (stacked on #2692's) · plan: the #2680 body (option 2 of #2646's list), auto-ok 2026-11-04. LADDER stage: none (the model-lane honesty gate). **Amends** [ADR-AG-384](#adr-ag-384) (its "Found, not this class" line is decided here).
 
@@ -15300,6 +15316,81 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 
 **Behaviour change for a student:** a length, angle or area the figure already satisfies is now kept in the list and drawn — «AB = 4» after a drawn AB of length 4 writes 4 on AB, «שטח המשולש ABC הוא 6» on fixed coordinates writes the area, A value already on the figure, or a line with no value, still answers «זה כבר קיים באיור — אין מה להוסיף.».
 
+## ADR-AG-403 — A letter-named common tangent takes a slot of the pair; the pair's tangents read one permutation (#2408, #2411)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2 #2408, P3 #2411, analytic) · round #2722, stream E · branch `fix/2408-2411-common-tangent-axis` from `main` @ `28dac0c3`, built on `wip/2408-2411-common-tangent-slots` @ `030a9299` (round #2678's escalation; its solve rules carry over, and this commit ran the hooks that one skipped) · plan: option B on #2408
+**Requirements:** [02c](02c-requirements-analytic.md) R181 (the count rule covers letter-named tangents, with 2-D's refusals) · **Design:** [04c](04c-design-analytic.md) "Common tangents" and "Only valid configurations are evidence" · **LADDER stage:** configuration choice (`discreteAxes`, before the solve) and the solve's seeding (`seedFreePairs`, beside #1071's region seeding)
+
+**Amends** [ADR-AG-302](#adr-ag-302) (a shrinking digit), [ADR-AG-312](#adr-ag-312) and [ADR-AG-321](#adr-ag-321) (the two-constraint lowering retires, the touch arms stand), and extends [ADR-AG-314](#adr-ag-314). Suite keys: [ADR-W-148](06w-decisions-workspace.md#adr-w-148).
+
+**Re-measured at pickup** (`28dac0c3`, the plan's sequences): five tangents record on disjoint circles and the fifth is drawn on the first's line; O, K and A move when CD is added to free circles; «AB משיק משותף …» on nested circles is refused «לא נמצאה תצורה». All as the issues say.
+
+**The class.** *A letter-named common tangent was two tangency constraints solved with the circles, not one of the pair's common tangents*, so nothing said which tangent it was, nothing counted them, the solve could move free circles for each new one, and a pair with none failed generically.
+
+**Decision.**
+1. **A slot, a choice of families.** Past the touch arms of ADR-AG-312 and ADR-AG-321, `case 'common-tangent'` emits a `choice` over the families the position has (the stated kind, less the lines «כל המשיקים המשותפים» drew). Each option places the two letters by `derived-at` a `common-touch` rule, ADR-AG-314's closed form, so which tangent is drawn stays the unstated choice of ADR-052: a later given picks it, «הציגו תצורה אחרת» cycles it, and the panel keeps its «… או …» row (#2392, #2553 unchanged).
+2. **One permutation per pair, read a digit at a time.** In `discreteAxes.ts` a slot's choice offers what its pair's earlier slots left, so a pair's digits have bases 4, 3, 2, 1: the Lehmer code of one permutation of the families, P(n, k) assignments where the WIP's separate axes had nᵏ. Seed 0 is 2-D's order, and the 24 seeds are the 24 permutations. The digit stays at the tangent's place in construction order, so a new tangent is a new slowest digit and cannot change an earlier one, of this pair or another, or any other axis met before it. A slot is recognised from its options' `common-touch` rows, read in the pair's sorted order (`reversedFamily`), so no type gained a field; a tangent settled to one family is held before any digit is read. The plan sketched an axis of radix 24 fixed up front. Reasoned against at pickup: it would push every axis after it past the pool's 24 seeds, so a later given about a second pair could no longer reach its option. The lazy reading is the same permutation with none of that.
+3. **Free circles start apart.** A permutation alone left the circles moving at every seed whose sample had them close (10 of 25): a third tangent needs them apart, the walk and the steered solve landed somewhere that depended on the tangent count. 2-D samples two free circles apart (measured at `28dac0c3`: «מעגל שמרכזו O» · «מעגל שמרכזו K», seeds 0–7). So `seedFreePairs` starts a pair with a tangent apart, reading the sample alone: a seed, never a verdict. A hard region was tried first and is wrong: two circles tangent at a point are not "apart", which refused #2392's exam route and #2418 (c). Nothing but the tangents may speak of either circle; any other row or selector naming it (a stated position, a tangency, a point on it) leaves the pair to its own sample.
+4. **Count and position refusals are 2-D's**, one for one (`tangentsExhaustedOf`, 2-D's `tangentsExhaustedKey`), moved to `suite.refusal.*` and read by both builders (ADR-W-148). #2411 is the 0-slot case. On a pair touching from outside with T named, a third tangent is the one at T, as in 2-D.
+5. **Solve rules carried from the WIP:** a family the configuration lacks is a residual, not a vacancy (`familyGap`, `residualRows`); a closed form about a later line's vertex is fitted by that vertex alone (`subjectLed`); `commonTouchOf` gives the tangent evidence `derive` reads.
+
+**Measured after.** Four tangents on free circles at seeds 0–24: no point and no circle moves from the first tangent on, at any seed; each of the four lines costs 4–27 ms (`decideSubmit` + `derive`), against 5–16 ms for a segment or parallel line on the same figure and 23–37 s per seed on the WIP. The 2 reds of the region attempt are green. Existing tests changed: only `issue-2418` control (g), and the 2-D key names.
+
+**Not delivered.** At a seed that sampled the two circles close, the FIRST tangent moves the second circle once (seeds 2–7, 9, 13, 14, 16, 19 of 0–24; never seed 0 for O and K). Only changing how bare free circles are sampled would avoid it, which is a visible change nobody ruled on. The stability promise is about adding another tangent, and that holds. [#2409](https://github.com/dcodish/geo_builder/issues/2409) is not in this round.
+
+**Sibling audit (docs/17 §1).** 2-D is the reference and unchanged but for the key move (`commonTangentCapacityError`, #197). 3-D has no plane circles (X8). Complex has no common-tangent grammar.
+
+**Locks.** Fixtures `issue-2408-four-tangents-fixed` and `-free`. `src-analytic/__tests__/issue-2408-2411-tangent-slots.test.ts`: four distinct lines measured from the circles; every refusal by position, byte for byte; the 24 permutations and prefix stability at each; stability of both pairs at seeds 0–5 and 0–24; a free pair drawn apart, a later «המעגלים נחתכים» and later equations honoured; the reversed pair. Parity rows `common-tangent-distinct-2408`, `common-tangent-fifth-2408`, `common-tangent-nested-2411`.
+
+**Behaviour change for a student:** in analytic each named common tangent of a pair is a different line, one past the pair's count is refused with 2-D's sentence, a circle inside another is refused naming the reason, and adding a tangent moves nothing already drawn. On an exam pair with no further given the first drawing may be the other external tangent than before (ADR-AG-314's `ext-a`), still one press of «הציגו תצורה אחרת» from it.
+## ADR-AG-404 — The rest of a tool's letter yielding: the letter returns to the pool, and P₁ yields too (#2674)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic) · round #2722 · branch `fix/2674-letter-takeover-reversed` · operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the student's, no message (2-D's way, in every builder)"*; ruling 2026-11-04, card q3 = A: *"Rename for the reversed spelling too"* · completes [ADR-AG-387](#adr-ag-387) · 2-D arm: [ADR-785](06-decisions.md#adr-785)
+**Requirements:** [02c](02c-requirements-analytic.md) R231 · **Design:** [04c](04c-design-analytic.md) § *A tool's letter yields to the student's*.
+
+**Re-measured at `28dac0c3` through `decideSubmit` → `derive`.** The reversed spelling already held here: «משולש ABC» · «אמצע BC» · «D אמצע CB» is one point D, through `sameDerivation`, which reads a midpoint's segment as a set. Only locks were added for it. Two of ADR-AG-387's *Not in this item* entries were still true.
+
+**Class.** *A tool's letter handed over to a student's stays spent.* The letters are chosen before the fold, so a rename the fold makes reached neither the pool nor the rows.
+
+**Decision.**
+1. **The next free letter** ([2-D], measured at `28dac0c3`: «תיכון מ-A במשולש ABC» · «D אמצע CB» · «תיכון מ-B במשולש ABC» gives D and M). `resolveToolLetters` recognises a takeover on the fold's own terms: a student's derivation under a fresh letter, the same derivation as an earlier `auto` fact, and a tool letter no line since has typed. It returns the letter to the pool, drops that `minted` row, and points every later placeholder of the point at the student's letter, so the median restated reads D. The fold still does the rename.
+2. **The coordinate mint.** `resolveMints` runs before any id is built from the name, so ADR-AG-387's worry about ids such as `circle-at-P₁` does not apply: the placeholder simply resolves to the student's letter. A fact stating a fresh letter later at the same coordinates takes the mint, unless a line in between typed the reserved name. The name goes back to the pool and no `minted` row is written. This is the #1270 rule (*a student's letter wins*) read in the other order.
+   The line itself is a restatement of a placed point, which the fold answers `known`, so `decideSubmit` first asks whether the line put a letter on the figure: one that did records, because it owns that letter (2-D's ADR-653).
+
+**Unchanged.** A letter stated before the coordinates wins, as it did. A letter already used before the mint does not take it. A typed tool letter is the student's: M typed in between keeps M taken, so the next midpoint is N.
+
+**Locks.** `src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts` (the round #2722 describes); fixtures `midpoint-reversed-takes-letter-2674`, `coordinate-letter-takes-mint-2674`.
+
+**Behaviour change for a student:** after D takes a median's M, the next median's midpoint is M, not N. «טרפז ABCD» · «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» shows one point E and no message; before, P₁ and E with «P₁ ו-E נפלו על אותה נקודה.».
+## ADR-AG-405 — An AI answer that computes a stated value is accepted when its curve really has that value, read by the value's stated role (#2680)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P3, analytic) · fix round #2722 stream G, branch `fix/2680-honesty-origin-centre` · operator ruling 2026-11-04, round #2697 questions page, card q2 = B: *"Accept when the answer's curve really has the value"*. LADDER stage: none (the model-lane honesty gate). **Replaces** the October rule that the model must copy the student's numbers, as a refusal: [ADR-AG-279](#adr-ag-279)'s `y=4x-5` line and [ADR-AG-391](#adr-ag-391)'s "Nothing COMPUTED from the parameters pays".
+
+**Requirements:** [02c](02c-requirements-analytic.md) R104a (amended: a computed value the curve has is not lost) · **Design:** [04c](04c-design-analytic.md) § "The LLM lane's faithfulness gates".
+
+**Measured before** (`28dac0c3`, `faithfulnessAnalytic`, the model mocked): every row #2680 left for the ruling was refused: «מעגל שקוטרו 6 ומרכזו (0,0)» answered «x^2 + y^2 = 9» dropped «6»; «מעגל שמרכזו (0,0) ועובר דרך (3,0)» dropped a «0»; «ישר ששיפועו 1 ועובר דרך (0,3)» answered «y = x + 3» dropped «0»; «פרבולה שמוקדה (1,0)» answered «y^2 = 4x» dropped «1»; «אליפסה שמוקדיה (4,0) ו-(-4,0) וצירה הגדול 10» answered «x^2/25 + y^2/9 = 1» dropped «4», «4», «10»; «ישר שעובר דרך (2,3) ושיפועו 4» answered «y=4x-5» dropped «3», «4». The same cause in a spelling with no equation: «מעגל O שקוטרו 6» answered «מעגל O ברדיוס 3» dropped «6», and «מעגל O שרדיוסו 3» answered «מעגל O בקוטר 6» dropped «3».
+
+**Class (docs/17 §1).** *A stated value that a correct answer holds in another form* looks dropped, because the number gate only looks a value up, and a computed value is not there to find.
+
+**Decision.**
+1. **The test is on the curve the engine draws.** `heldByCurves` (`parser/honestyAnalytic.ts`) reads the answer's curves through ADR-AG-391's seam, and tests them with the engine's own `isOn`, `parabolaFocus` and `ellipseFoci`. It is a comparison, never "the answer parses".
+2. **The test reads the value's stated ROLE**, from the words right before it. This is the part the plan did not spell out, and it is required by its second line: without it «x^2 + y^2 = 25» would pay a stated centre (3,4), because it passes through (3,4), and «x^2 + y^2 = 9» a stated radius 6, because its diameter is 6. Both are wrong answers refused today. The first version the #2697 session tried had no role, and that is why it was withdrawn. The roles: a point the curve passes through (`דרך`, `עובר`, `מכיל`, through, passes, contains, or an axis crossing given as a pair), a focus or foci, a diameter, a major or minor axis length (never a half axis, which is a parameter), the distance between the foci, a directrix `x = k`, an axis crossing given as a number. A list carries its role along: «(4,0) ו-(-4,0)».
+3. **A held value spends no account**, so it is taken out before the multiset runs. This is a deviation from the plan's "after the literal check". After it, the fix would have needed a slope role too: in «(2,3), slope 4» answered «y=4x-5» the stated 2 spends the 4 as its square before the stated 4 is reached.
+4. **A circle stated with no equation holds its radius**: `factAccounts` keeps a constant `radius-of` value or `r` slot («בקוטר 6» is 6/2), so it pays a stated diameter by its role and a stated radius directly.
+5. **The prompt is unchanged.** It still asks the model to copy the stated numbers, which gives the student's own form when it can. The ruling lifts the refusal, not the request, and a prompt change is a proxy deploy nobody asked for.
+
+A value with no role in the table goes to the number gate as before, and stays refused if nothing pays it: the safe direction, and today's behaviour. Known members left that way: an angle with the x-axis (slope = tan), the sum of the distances to the foci, a line a value is stated by reference to («מקביל ל-y=2x+1»).
+
+**The sweep.** Old and new gate side by side over every logged model answer (`logs/prod-events-analytic.jsonl`, `logs/debug-log-analytic.jsonl`, 37 distinct utterance and answer pairs): no verdict changed. No logged answer has hit this; the rows are the session's, as the oracle. The harness was removed before the commit.
+
+**Limit, unchanged and reported for a ruling.** A value the literal multiset already pays is accepted even when its stated role contradicts the curve: «מעגל שקוטרו 6 ומרכזו (0,0)» answered «x^2 + y^2 = 36» (a radius of 6), «פרבולה שמוקדה (2,0)» answered «y^2 = 4x» (p = 2, focus (1,0)), «אליפסה שמוקדיה (5,0) ו-(-5,0)» answered with a = 5. The role reader could refuse them, but a refusal there is a new outcome no ruling covers, and it can break a correct answer whose role-bearing curve has no equation.
+
+**Ports (ADR-W-157).** 2-D measured at `28dac0c3`: its gate already halves a number in a sentence that says «קוטר» (`droppedGivenNumbers`, ADR-259), so a diameter agrees; it has no equation curve, so the other roles have nothing to read. 3-D's number gate is #2285, and complex has no gate of this shape. The parity table runs the deterministic lanes and cannot hold a model-lane row, so there is no cell.
+
+**Locks.** `src-analytic/parser/__tests__/honesty-computed-values-2680.test.ts`: the rows above and each role's other spellings (paid); a wrong value in each role, and a value the curve holds in another role (refused, naming it); the mocked model lane end to end. `issue-1355-llm-honesty.test.ts` row O2b changes from dropped «3», «4» to nothing dropped; its invented `l1` still refuses. `honesty-implicit-curve-values-2680.test.ts` is unchanged and green.
+
+**Behaviour change for a student:** in analytic, a correct AI answer that computes a value from the sentence is accepted instead of refused: a diameter halved, a point the curve passes through, a focus, a directrix, an axis length, an intercept. A value the curve does not have is still refused with the existing dropped-given sentence.
+
 ## ADR-AG-406 — A statement that names part of a shape by its role is resolved per option: the kite's pair is a choice, its main diagonal follows it, and a role line is named, listed and written (#2006, #2057)
 
 **Date:** 2026-11-05 · **Status:** accepted · feature (P3, analytic) · round #2722 · branch `feat/2006-2057-open-role-sides`, one PR (`Closes #2006`, `Closes #2057`), operator ruling 2026-11-04 (card q4 = C): *"Fold #2057 into #2006's PR"*.
@@ -15344,3 +15435,181 @@ Option 1 (any equation pays a 0) and option 3 (leave it) stay rejected: an answe
 **Locks.** `src-analytic/__tests__/issue-2006-kite-pair-choice.test.ts` (W4 rows, the operator's sequence at 24 seeds, secondary, both, either order, English, restated, the twin line, refusals, the row) · `issue-2057-open-role-row.test.ts` (every role and form He and En, either order, #1078's carrier, the note, the canvas block, the values switch) · fixtures `issue-2006-kite-main-diagonal`, `issue-2057-open-role-base` · re-based: `diagonals.test.ts`, `shapes.test.ts`, `issue-1619-b2-inscribed.test.ts`, `issue-1864-choice-notes.test.ts`, each quoting its ruling.
 
 **Behaviour change for a student:** a bare isosceles triangle no longer draws ticks on the pair the tool chose. «דלתון ABCD» now shows the note and «הציגו תצורה אחרת» swaps which sides are equal; «AB = AD» records, where it said «כבר ידוע»; «BA = BC» draws a kite, not a rhombus. The main diagonal's line carries A and C in one drawing and B and D in another until the pair is stated, and its row reads «האלכסון הראשי: y = 2x» until then. An equation for a base, leg or hypotenuse is listed in the panel, and every stated side equation is written beside its side on the canvas.
+
+## ADR-AG-408 — An arc's length is refused until its reader exists: a π value on an arc is never degrees (#2032)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `wrong-answer`) · round #2722 · branch `fix/2032-arc-length-refusal` · operator, 2026-11-04, round #2697 questions page, card q5 = **B**: *"Refuse «קשת AB = 4π» honestly now, then build A"*, A being the arc-length reader (#2710). Earlier ruling, 2026-10-13: *"both read it as the arc's length"*.
+**Requirements:** [02c](02c-requirements-analytic.md) R245 · **Design:** none (internal)
+**Amends** [ADR-AG-220](#adr-ag-220) (its arc reader no longer reads a π value). The 2-D half is ADR-664, landed in round #2128; this is the analytic half. #2710 lifts this refusal when the reader lands.
+
+**Measured before (`28dac0c3`, `decideSubmit` against `decideDeterministic2D`), after «גזרה AOB».**
+
+| line | 2-D | analytic |
+| --- | --- | --- |
+| «קשת AB = 4π», «3π», «π», «0.5π», «4pi», «4*π», «⌢AB = 4π», "arc AB = 4π", «הקשת AB היא 4π» | the length (`measure-perimeter`) | a record: 4π **degrees** |
+| «קשת AB = 2π/3», «π/2» | not-handled | a record: 2.09°, 1.57° |
+| «אורך הקשת AB הוא 4π», «= 5», «= L», «… רבע מהיקף המעגל», "arc length AB = 4π" | the length | not-handled |
+| «קשת AB + קשת BA = π» | not-handled | a record: 3.14 degrees |
+| «קשת AB = 40», «40°» | degrees | degrees |
+
+With no drawn arc (a circle with A and B on it) 2-D does not understand the π lines; analytic drew the same arc.
+
+**The class.** A statement of an arc's length, or a π value on an arc, is read as something other than what it says: `arcSide` passed every value to `measureValue`, π is a plain number there (`engine/expr.ts`), and the arc reader's value is degrees. The spelled form had no reader, so it went to the model, which has nothing to say it with either.
+
+**Decision.** Two refusals at the arc family, no new mechanism, and no chokepoint list grows.
+- `parseArcMeasure`, once it has read the terms, tests the student's text for π (the `Expr` has lost it). One arc against a π value is the owned `arc-length-unread`. Every π value is refused, not only the ones 2-D reads as a length: option B of the escalation is *"a single arc set equal to a π value"*, and «2π/3» drawn as 2.09° is the same wrong figure. Its copulas admit a π value so «הקשת AB היא π» and "arc AB is 4π" reach the refusal.
+- `parseArcLengthStatement` claims the spelled statement in any value, the set 2-D reads. It reads the noun as 2-D's `ROUND_REF.arc` does, the letters case-sensitively. A question stays out of it: it needs a copula and a value.
+
+The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», with the student's own arc. The parser reads no figure, so the refusal is the same with or without a drawn arc: the row `arc-bare-pi-no-arc-2032` stays a gap (2-D not-handled, analytic refused) until #2710 resolves the arc.
+
+**Found in round: an arc sum written with π.** «קשת AB + קשת CD = π» drew as degrees: the same reader and the same cause. #1837 and #2032's plan both keep the rule (2026-10-13): *"any other arc measure with π is refused as radians"*, under the ruling *"analytics tool should not support radians at all"*. #1837's sweep did not list this reader. It now gives the `radian-angle` refusal. 2-D says not-handled there; its #1837 predicate covers only an angle noun.
+
+**Sibling audit (docs/17 §1).** 2-D: ADR-664 closed the π class. 3-D: outside circle geometry (X8). Complex: has no arcs. Not this class, and not changed: «קשת AB = 2√3» (degrees here, not-handled in 2-D) is #2174; «שטח הגזרה AOB הוא 12π» stays not-handled, as no degree reading exists for it.
+
+**Locks.** New `src-analytic/__tests__/arc-length-refusal-2032.test.ts`: the reported line, 31 spellings on a sector, a named circle and an equation circle, both locales, the taught line records, degree controls, the radian sums, a question. Parity rows `arc-bare-pi-2032`, `arc-bare-pi-no-arc-2032` and `arc-length-172` carry #2710 on analytic's cell.
+
+**Judged ruling q10 (ADR-789).** A length unit on one arc says length, so «קשת AB = 4 ס"מ» takes this refusal too. It is read in `parseLine` before `unwrap` strips the unit, through the shared `shell/arcLengthUnit`.
+
+**Behaviour change for a student:** in analytic, «קשת AB = 4π» no longer draws a tiny arc, and «קשת AB = 4 ס"מ» no longer draws a 4° one. Each is refused with a sentence that says arcs are read in degrees. «אורך הקשת AB הוא 4π» gets the same sentence, where it used to get "not understood".
+
+## ADR-AG-409 — «(3,5)A» and «A = (3,5)» are taught as «A(3,5)», and the definite «הישר» binds the drawn line (#1774)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/1774-bare-coordinate-point` (stacked on `fix/2032-arc-length-refusal`) · prod session `0c3paux9`, 2026-10-04: «y=3x+2» · «(3,5)» · «(3,5)A».
+**Requirements:** [02c](02c-requirements-analytic.md) R8, R246 · **Design:** none (internal)
+**Applies** [ADR-W-030](06w-decisions-workspace.md#adr-w-030) to a new slip.
+
+**Measured (`3ce5f8f9`, `decideSubmit`, after «y=3x+2»).** The issue's table still holds: «A(3,5)», «הנקודה (3,5)», «נתונה הנקודה (3,5)» record; «(3,5)», «(3,5)A», «A = (3,5)», «B:(3,5)» are `not-handled`. Of #1587, folded in here: «הנקודה P(1,3) נמצאת על הישר AB» and «הנקודה (1,3) על הישר AB» now record. «הנקודה (1,5) על הישר» did not, because «P על הישר» did not either: no rule read the bare definite line.
+
+**The class.** A point stated with its letter on the wrong side of its coordinates reached the model, a paid call that fails on a keyless server, for a line whose meaning the tool can read.
+
+**Decision.** `app/pointOrder.ts` rewrites a whole line of `(x,y)L` runs, and the not-handled branch of the submit decision teaches the result (`kind: 'teach'`, `note: 'point-order'`): the canonical goes in the box and one Enter records it, the same contract as an imperative wrapper, including that what is taught is a line the next Enter accepts here. The parser reads no new spelling, so «(3,5)A» never enters a fact list. The operator's words on ADR-W-030: *"I don't want the tool to support the wrong text input because it teaches them wrong."* The sentence is new text (ADR-W-174): «שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.»
+
+**Judged rulings of round #2722, which replace this ADR's first landing (`b754d9d5`).**
+- **`L = (x,y)` (q8).** The plan lowered it as `L(x,y)`, which reverses the operator's ruling on #1245, 2026-09-19: *"analytics should not accept E=()"*. So `=` never builds. It is taught through the same path, with its own note: «נקודה נכתבת בלי סימן שוויון». `app/pointOrder.ts` reads both shapes (`pointSpelling`). Other separators («B:(3,5)») are not decided and stay not understood.
+- **The definite «הישר» (q11).** ADR-W-175: *"a definite noun binds the drawn object of its kind."* The measurement here had found no rule reading it. It uses the existing `on-kind` seam, with `line` added as a kind noun, so no new mechanism: one line binds, two ask with `errHost`'s question, and a coordinate point reads through it too («הנקודה (1,5) על הישר»). No line stays `not-handled` at the apply boundary, and a side is not a line object, so a side alone does too: both are unruled and keep today's verdict.
+- **The bare tuple `(x,y)` (q7).** Not built. It goes to the operator, and the lock records today's `not-handled`.
+
+**Sibling audit (docs/17 §1).** 2-D: the class does not apply, since every coordinate point is refused to the analytic Builder; «(3,5)A» itself escalates rather than reaching that refusal. 3-D: measured, «(1,2,3)A» is `not-handled` and «A(1,2,3)» builds. Not changed: the teaching is analytic's item, and no ruling asks it of 3-D. Complex: has no named coordinate pairs.
+
+**Locks.** New `src-analytic/__tests__/point-order-1774.test.ts`: the reported line, both taught shapes spelling by spelling, each recording, both locales, lines that are not taught, the bare row, the neighbours, and «הישר» with one, two and no lines. Parity rows `ex-coordinate-letter-after-1774`, `ex-coordinate-equals-1774`.
+
+**Behaviour change for a student:** «(3,5)A» and «A = (3,5)» no longer say "not understood". The box fills with «A(3,5)» and a note says why; Enter draws it. «P על הישר» on a figure with one line puts P on it; with two lines the tool asks which.
+## ADR-AG-413 — A stated coordinate prints as typed, in the panel and on the canvas (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (analytic, P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the analytic half of [ADR-W-179](06w-decisions-workspace.md#adr-w-179)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 · **Design:** [04c](04c-design-analytic.md) § the stated-measure layer · **LADDER stage:** none (display)
+
+**Root cause.** A known coordinate reached both surfaces as a number and `fmtAnalytic` re-spelled it: «A(0.5,2/3)» read `(1/2, 2/3)`, «A(√8,1.25)» read `(2√2, 5/4)`. The `Expr` already held the structure; nothing read it once the value was known.
+
+**Decision.** `spelledText(e)` (`engine/expr.ts`) prints an `Expr` in the student's notation, juxtaposition at every depth. It is the analytic `src`, because the canvas reads the `Expr`, not the line. `provenanceOf` carries it on a stated coordinate with no letter in it; `pointText` and the canvas label print it through `givenText`, so a decimal reads the house decimals (sr-22). A coordinate through a letter, and any point the figure fixed, read the tiers. `statedText` now delegates to it, so «3√7/2» has no «·».
+
+**Sibling audit.** ADR-W-179. The stated-length canvas label is [ADR-AG-407](#adr-ag-407).
+
+**Locks.** `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`.
+
+## ADR-AG-407 — A stated value is labelled as typed, and π survives the expression layer (#1806, #2033)
+
+**Status:** accepted · 2026-11-05 · bug (analytic, P2 + P3) · fix round #2722, stream I · branch `fix/1806-2033-canvas-spelling`, stacked on [ADR-AG-413](#adr-ag-413) · the #1806 plan and the #2033 plan of 2026-10-13 · **amends** [ADR-AG-225](#adr-ag-225) §3 («a number prints through `fmtAnalytic`» becomes «a given prints as typed») · **amends** the #1129 reading of π (π still evaluates as a constant, and now prints as π)
+
+**Operator:** 2026-10-06: *"display on BC on canvas should be with the sqrt as entered by user"*. 2026-09-28 (#1497): a given prints as typed, in every tool; «√8» stays «√8». 2026-10-13 (#2033): *"A, Accept at P3, as 2-D does."* 2026-11-02 (sr-22): a decimal reads two decimals when needed.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R168 · **Design:** [04c](04c-design-analytic.md) § the stated-measure layer · **LADDER stage:** none (display)
+
+**Measured before** (`fded2a8c`, `derive` → `buildScene`): «BC=6√5» → «6√5» (the plan's «13.42» is gone: #2394's surd tier guesses it); «BC=√8» → «2√2»; «BC=0.5» → «1/2»; «BC=1.25» → «5/4»; «AB = 4π» → «12.57»; «שטח המשולש ABC הוא 12π» → «S=37.7»; «∢ABC = 22.5» → «45/2°».
+
+**Root cause.** **Class:** *a stated value is labelled by re-printing a float, or a lossy `Expr`, instead of the student's own spelling.* `valueOf` evaluated a symbol-free value and dropped its text, so `valueText` guessed through `fmtAnalytic`. π had a second root: `tokenize` made it a plain number, so no printer of the `Expr` could write it, and the #1806 plan as written would have turned «S=37.7» into «S=12·3.14».
+
+**Decision.**
+1. **`{ kind: 'num', value: Math.PI, pi: true }`.** The token remembers π; evaluation still reads `value`, so #1129's constant semantics hold and no solve changes. Every printer writes «π», and a number times π juxtaposes («12π») in `exprText` too.
+2. **One spelling-keeper.** `StatedValue` gains `src` from `literalText(e)`, the channel ADR-AG-413 built, and `valueText` prints it through the shared `givenText`. There is no second keeper: `literalText` is the `Expr`-side half `shell/literal` cannot supply, because the canvas reads the `Expr`, not the line. `shell/literal` reads no π, so `literalText` admits an expression that carries one.
+3. **What keeps the fallback (ADR-AG-225 §3):** a trig given's angle (a converted value is not what was typed), and arithmetic («BC = 2+3»).
+
+   **Not honoured from the plan, by measurement.** The plan kept the fallback for a value fixed through a letter, expecting «BC = a» · «a = √8» to read «2√2». The fold substitutes the letter, so the `length-eq` holds `√8` in either order, no letter reaches `valueOf`, and the plan's own mechanism prints «√8», the spelling the student gave the letter (docs/17 §9). Keeping «2√2» would need a new record of the substitution. It is a question for the operator, reported in round #2722.
+4. **The panel's length row** of a stated segment reads the same text (`segmentLengthText`); a derived length keeps the tiers.
+5. **Other printers of the `Expr`.** A typed π now prints «π» in curve equations (`curveText`), the circle row, point text, constraint descriptions and `carriers.ts`. The circle row reads `spelledText`, so «r = 2π».
+
+**Sibling audit.** 2-D's canvas writes «6√5», «√8», «2/3», «0.5», «4π» at `28dac0c3`, so analytic now agrees on every row. 3-D and complex are ADR-W-179; complex π is #2000. A radian angle keeps its refusal (#1837): the check reads the line, and the value is unchanged. #2013 reads `src` like every other lane, so its planned text field is not needed.
+
+**Locks.** `src-analytic/__tests__/issue-1806-2033-canvas-spelling.test.ts` (one row per spelling through the real `derive` → `buildScene`, the operator's `d_{BC}=6√5`, both fallbacks, the printers, |AB| = 4π at 24 seeds).
+
+**Behaviour change for a student:** a stated length, area or angle in analytic is labelled as typed: a root stays unsimplified, a decimal stays a decimal, and a π value reads with π.
+## ADR-AG-410 — «MK אנך לציר x» reads as K, the foot of the perpendicular from M: the noun, a placed point and a new letter (#2231)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/2231-keep-student-letter` · operator, 2026-10-16: *"despite me calling it K"*; ruling B: *"yes"*
+**Requirements:** [02c](02c-requirements-analytic.md) R247 · **Design:** [04c](04c-design-analytic.md) "«MK אנך לציר x»: a reading the figure decides". Stage: parse (F3), before the fold; the figure's half in `applyFact`.
+
+**Class.** *A segment named by a placed point and a new letter, stated as «אנך» to a line, has no reader, so the student's letter depends on what the AI answers.* The AI's reading of the operator's sentence, `האנך מהנקודה M לציר ה-x`, named no foot, and the tool coined H. Since ADR-AG-279 that is refused naming K; the sentence itself was still unread.
+
+**Measured at 28dac0c3.** «MK אנך לציר x», «… ה-x», «… y», «… ה-y»: `not-handled`. «K רגל האנך מ-M לציר ה-x» records. The plan's account of «MK מאונך לציר x» (refused `unknown-reference K`) is out of date: since ADR-W-162 it records and creates K; it stays what it is, a relation with K off the axis.
+
+**Decision.**
+1. The piece arm of `parsePerpendicular` reads `NAME NAME [הוא|היא] [ה]אנך ל<line>`, an optional trailing «בנקודה K» naming the same foot, and the English "MK is a perpendicular to the x-axis". It lowers through `perpendicularFacts`: the foot, named K, and the piece MK drawn.
+2. The target is any foot line, not only an axis: 2-D reads the same sentence over a pair (ADR-786), and a 2-D input change ports to analytic in the same item (ADR-W-157). The plan named the axis; the wider target is that port.
+3. `parseLine` takes no figure, so the fact carries `piece: true`, and the figure decides: `applyFact` answers `not-handled` when K is held or a parent is missing, `decideSubmit` when M lies on the line (the foot would be M). Those figures keep the verdict they had. A piece from a letter of the line is not this sentence.
+4. Only the noun. «מאונך / ניצב» keep the relation: they do not say K is on the axis.
+
+**Sibling check.** 2-D: ADR-786. 3-D reads «MK אנך ל-AB» as a relation, with K off AB; not ported (the plan did not judge it simple; 3-D has no «רגל האנך» sentence at all, #1679), recorded on the parity row.
+
+**Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` (the #2230 rhombus; M(3,4) is the test's point, the report does not give M's coordinates); catalog line «CD אנך לציר ה-x».
+
+**Behaviour change for a student:** «MK אנך לציר x» draws the foot named K, with no AI.
+## ADR-AG-411 — «תיכון ליתר» on a right triangle with no stated right angle draws on the shown triangle and follows the seat; a typed vertex states it (#2074)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, `analytic` + `2d`, `reported`) · fix round #2722, stream M · branch `fix/2074-median-hypotenuse-shown` · **Amends** [ADR-AG-211](#adr-ag-211) (the hypotenuse question) · **Extends** [ADR-AG-298](#adr-ag-298) to the hypotenuse · ports 2-D's [ADR-659](06-decisions.md#adr-659) and [ADR-790](06-decisions.md#adr-790) (#2166) · LADDER stage: none (M1 and the existing `resolvedAt` pass)
+**Requirements:** [02c](02c-requirements-analytic.md) R103c (rewritten) and R178 · **Design:** [04c](04c-design-analytic.md) "A cevian to a side named by its role", the hypotenuse paragraph
+
+**Rulings.** 2026-10-13: *"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show other option will create a different triangle with the constraints in place"*. 2026-10-14: *"Naming C («CM תיכון ליתר») or AB («תיכון ליתר AB») forces the seat"*; card `d14-2072-cross`: analytic follows 2-D.
+
+**Measured before** (`28dac0c3`, `decideSubmit`, as the 2026-10-14 plan measured it at `939b160a`; #2018 has landed). After «משולש ישר-זווית ABC»: «תיכון ליתר», «התיכון ליתר», «גובה ליתר» and "the median to the hypotenuse" asked `ambiguous-hypotenuse`; the typed-apex spellings and «… בנקודה K» were `not-handled`. Two right triangles, with both right angles stated, asked `ambiguous-hypotenuse`, whose text says no right angle was stated.
+
+**Class (docs/17 §1).** *A role statement about a right triangle whose right-angle vertex is an unstated, cyclable choice is refused instead of being bound to the current choice, and a typed letter that forces the choice is not read as the claim it is.* Members: median and altitude; the bare noun, the definite, English; a typed apex; a typed foot.
+
+**Root cause.** The `cevian-of { hypotenuse }` arm refused on `openRight`, and `RoleBinding` had no hypotenuse: the mechanism #2018 built for the isosceles apex was never offered the seat.
+
+**Decision.**
+1. `RoleBinding.role` gains `hypotenuse`; `roleVertexOf` reads it over `rightAngleKeys(ring)`, the noun's own keys, so `followObjects` rotates a bound cevian with no new pass.
+2. `applyHypotenuseCevian` owns the arm. One host: an open seat binds at choice seed 0's vertex through `boundCevian`, shared with `applyRoleCevian`; a stated right angle is the lettered twin, unbound.
+3. A typed apex states `rightAngleAt` and draws the lettered cevian, unbound. New readers: `… ליתר מ-C`, `גובה מ-C ליתר`, `CM תיכון ליתר`, «התיכון ליתר הוא CM» and the English forms. A segment typed foot-first is oriented by the ring; two ring letters, or none, ask.
+4. Several right triangles ask `ambiguous-role-side` with 2-D's sentence (`roleWordHypotenuse`). `ambiguous-hypotenuse` and `errAmbiguousHypotenuse` had no reader left and are deleted.
+5. `FOOT_TAIL_HE` required two whitespace runs, so the bare «… בנקודה K» that ADR-AG-211 documents never matched anywhere. Repaired at the constant, so «תיכון לצלע AB בנקודה K» and «גובה מ-A בנקודה H» read as that ADR says, the median judged (q17, choice C, 2026-11-05) and the altitude on #2166's armed `[2-D]` line. `FOOT_TAIL_EN` gains "at point K".
+6. A typed foot is `typedFoot`, so an existing point can never silently replace it: a tool's letter yields to it (#2674), a student's stays with the model. Before this it was dropped with «כבר ידוע».
+7. A vertex letter is the apex: «תיכון ליתר בנקודה C» as «CM תיכון ליתר», the foot the tool's. Judged q19, choice B, 2026-11-05; 2-D measured at `5f315584` (`set-angle` at C). The context-free parser cannot know the ring, so M1 picks the letter with `freeToolLetter`. Known cost: that letter is not announced on the row, unlike a parser-minted one.
+8. «חוצה זווית C בנקודה K» reads as «CK חוצה זווית C», 2-D's reading (#2166).
+
+**Deviation recorded.** The plan's reader list named the apex forms «CM …», «… מ-C» and English; «גובה מ-C ליתר», "the median from C to the hypotenuse" and «התיכון ליתר הוא CM» were added because 2-D reads them (measured) and the plan rules one verdict.
+
+**Not delivered (measured).** A stated length on an open seat («התיכון ליתר הוא 4») builds bound in 2-D and is `not-handled` here: the length would have to follow the moving median, a constraint binding analytic lacks, as for «תיכון לבסיס» (ADR-AG-298). Unscheduled parity cell `hypotenuse-median-length-open-2074`. A foot the figure already holds is `not-handled`, 2-D's verdict.
+
+**Measured after.** See the locks: at 24 seeds through `decideSubmit` + `derive`, M or H sits opposite the drawn right angle, all three seats appear, A, B, C do not move (≤1e-9), the constraints are unchanged.
+
+**Cost (docs/17 §7).** None new: one rotation per bound object per configuration, #2018's pass.
+
+**Sibling audit.** 2-D: ADR-659, ADR-787. 3-D reads no role nouns (#1679, parked). Complex has no plane hypotenuse. «משוואת היתר» (ADR-AG-266) shares the seat choice: locked in both orders.
+
+**Locks.** `src-analytic/__tests__/issue-2074-hypotenuse-open.test.ts`; fixture `issue-2074-hypotenuse-median-open.analytic.json`. Re-based: `issue-1620-tool-letters.test.ts`, `issue-2018-role-cevian.test.ts`, `message-floor-2028.test.ts`. Parity: the `#2074` gaps on `cat-2d-051`, `hypotenuse-altitude-open-2074`, `hypotenuse-apex-pins-2074` closed, and `#2074` left `GAP_ISSUES`.
+
+**Behaviour change for a student.** On «משולש ישר-זווית ABC», «תיכון ליתר» and «גובה ליתר» draw at once and follow the right angle through «הציגו תצורה אחרת». «CM תיכון ליתר» and «גובה ליתר מ-C» put the right angle at the typed vertex. With two right triangles the question is now 2-D's «אין בסרטוט צלע יחידה…».
+## ADR-AG-412 — An identity asked at the probes reads every letter a student can type (#2566)
+
+**Date:** 2026-11-05 · **Status:** accepted · bug (P2, analytic) · round #2722, stream N · branch `fix/2566-centre-click-letter` · LADDER stage: none (the apply boundary; analytic has no LADDER file and no solver stage changes).
+**Requirements:** none (internal): it restores [02c](02c-requirements-analytic.md) R130, its amendment and R44, which already promise this · **Design:** [04c](04c-design-analytic.md#curve-identity-at-the-m1-boundary-adr-ag-147) "The probe is total, keyed by name".
+**Completes** [ADR-AG-147](#adr-ag-147) (curve identity is the equation) for every letter, and closes the known gap [ADR-AG-338](#adr-ag-338) carried.
+
+**The class.** An identity or restatement question answered at the probes is false whenever the expression holds a parameter letter outside a fixed probe alphabet. The same curve or value then reads as a different one: a restatement is refused as a contradiction, a respelling mints a duplicate, an operand given by its equation is not found.
+
+**Root cause.** `PROBE_ENVS` in `apply.ts` was a constant over eight letters (`a b k m n p r t`). `evalExpr` answers NaN for a symbol its environment lacks, deliberately (*"never a guessed 0"*), so any other letter made every evaluation NaN and every comparison "different". «R», the textbook radius letter, was outside it. The issue's first guess (a free letter in the figure's circle) was close: a free letter inside the alphabet always worked.
+
+**Measured before (`28dac0c3`, `derive` → `offersOf` → the real store and `decideSubmit`).** Over R, c, s, q, d, h, α, β: the click on the + is refused, and so are the circle's own sentence typed twice, «משוואת המעגל היא …» after it, «M מרכז המעגל …», and «הישר y = 0 חותך את המעגל … בנקודות A ו-B». «…-R^2=0» after «…=R^2» records a second circle drawn on the first. The same rows with r, a, k were already right. The re-measure agrees with the triage table.
+
+**Decision.** `PROBE_ENVS` is gone. `engine/probes.ts` builds the two environments from the expressions a question asks about: `probeEnvs(...exprs)`, every read's one source. Each letter a student can type (`isStudentLetter`, the tokenizer's own letter class) gets one value per NAME, distinct across names, positive. The eight old letters keep their values, so no verdict over them moves. The other values are a mixed hash and not an arithmetic rule of the code point: evenly spaced values would make `R+T` and `2S` agree at every probe. The plane's `x`, `y`, the length placeholders and the tool's symbols (`r_O`, `θ_<id>`) stay absent, so they stay NaN as before; no read needs them (grepped at pickup: the reads over lengths and tool symbols treat NaN as "not a constant", and nothing changes for them). `centresOf`, the popover and the click are untouched.
+
+**Same cause, also closed.** Two more restatements moved, the same wrong outcome through `sameNumbers` and the radius claim: «רדיוס המעגל הוא c» on «…=c^2» was `ambiguous-shape` and is known; «A(c,1)» twice was a contradiction and is known; a linear radius-squared «…=c-5» typed twice likewise. Each now answers as its letter-inside-the-alphabet twin does.
+
+**Plan correction.** The plan's distinctness lock said «…=R^2» against «…=r^2» is a conflict. Measured, for the old-alphabet pair too, a second «נתון מעגל» with another equation is a second circle, and it records. The conflict is the same circle given another equation («משוואת המעגל היא …=r^2»). The lock asserts both, with `a`/`r` as the control.
+
+**Sibling audit (docs/17 §1).** 2-D: none, it has no equation circles and no probe-identity device. 3-D: grepped `src3d/engine`, no fixed-alphabet environment; planes and lines by equation do not ask through one. Complex: no equation-identity probe. Inside analytic, `carriers.ts` `SIZE_PROBES`, `conic.ts` `isCanonicalCircle` and `parseAnalytic` `isLinearInPlane` assign by position or one shared value over the expression's own symbols, which is right for a question about ONE expression and is not an identity question.
+
+**Locks.** `src-analytic/__tests__/probe-alphabet-2566.test.ts`: the click and rows 1–6 for eight letters and three controls (63 of 86 tests red before the fix), distinctness, a twin sweep over the other reads, and the probe itself. The #2554 class guard loses its known-gap row. Fixture `circle-centre-letter-radius-2566.analytic.json`: the circle, the click's exact line, the respelling.
+
+**Behaviour change for a student:** every letter now behaves as r always did. The + at the centre of «(x-13)^2+y^2=R^2» names it, and that circle retyped in any spelling is known, never refused and never drawn twice.

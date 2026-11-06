@@ -15,6 +15,7 @@ import type { LoadAudit } from '../../shell/save';
 import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
+import type { TangentsExhausted } from '../engine/apply';
 import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
@@ -112,6 +113,8 @@ export type InputError =
   | { key: 'proof-target'; detail: string }
   /** #1837 (ADR-W-142) — an angle measure written in radians (`shell/radianAngle`); `detail` is the π value as typed. */
   | { key: 'radian-angle'; detail: string }
+  /** #2032 (ADR-AG-408) — a statement of an arc's length, which this tool does not read yet (#2710); `detail` is the arc's letters. */
+  | { key: 'arc-length-unread'; detail: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
@@ -146,12 +149,10 @@ export type InputError =
   | { key: 'ambiguous-cevian'; detail: string }
   /** A cevian whose apex (or side) is in no triangle of the figure (#1240, ADR-AG-209). */
   | { key: 'cevian-no-triangle'; detail: string }
-  /** «תיכון ליתר» with the right angle open, or several right triangles — asks which side is the hypotenuse (#1222). */
-  | { key: 'ambiguous-hypotenuse'; detail: string }
   /** «תיכון ליתר» with no right angle in the figure (#1222). */
   | { key: 'ambiguous-no-right-angle'; detail: string }
-  /** «תיכון לבסיס» / «גובה לשוק» with no single isosceles triangle to read the role on — 2-D's question (#2018). */
-  | { key: 'ambiguous-role-side'; detail: string; role?: 'base' | 'leg' }
+  /** «תיכון לבסיס» / «גובה לשוק» / «תיכון ליתר» with no single triangle to read the role on — 2-D's question (#2018, #2074). */
+  | { key: 'ambiguous-role-side'; detail: string; role?: 'base' | 'leg' | 'hypotenuse' }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string; operands?: [string, string] }
   /**
@@ -232,8 +233,12 @@ export type InputError =
   | { key: 'ambiguous-side'; detail: string }
   /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */
   | { key: 'polygon-not-supported'; detail: string }
-  /** #2390 (ADR-AG-314) — «כל המשיקים המשותפים» about a circle inside the other: 2-D's `input.tangentsExhaustedContained`. */
-  | { key: 'no-common-tangent'; detail: string }
+  /**
+   * #2390 (ADR-AG-314) — «כל המשיקים המשותפים» about a circle inside the other; #2408 / #2411 (ADR-AG-403) — a
+   * letter-named common tangent with no free slot. `tangents` names which of the suite's tangentsExhausted* sentences
+   * (2-D's, moved to `shell/locales`); absent is `Contained`.
+   */
+  | { key: 'no-common-tangent'; detail: string; tangents?: TangentsExhausted }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

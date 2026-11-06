@@ -57,6 +57,7 @@ import { figureExplainer } from '@/app/studentVocabulary';
 import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
+import { parseValueQuery } from '@/parser/valueQuery';
 import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { roleReadings } from '@/app/roleReadings';
@@ -944,7 +945,7 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'shared-endpoint-extension-either-side-default',
-    title: 'booklet-571 p.78 Q4: "המשך AC חותך את מעגל P בנקודה E" on the two-tangent-chords figure lands E beyond A (C-A-E)',
+    title: 'booklet-571 p.78 Q4 in the book\'s order: "המשך CA חותך את מעגל P בנקודה E" lands E beyond A (C-A-E) (the reversed «AC» is refused, ADR-784)',
     guards:
       "operator session eew5ezi5 (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): two circles meet at A,B; chord AD in P tangent to O at A; chord CB in O tangent to P at B; 'המשך AC חותך את מעגל P בנקודה E' (the operator typed חותר — a typo the LLM corrected). Every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber-flagged orderBeyond — 'fails to create the C-A-E sequence'. Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived ONLY behind extensionsClear's `relax` flag, set solely by firstSatisfyingSeed's fallback pass — so (a) the strict primary sweep demanded E beyond C, which is geometrically impossible here at EVERY seed (CB tangent to circle P pins C outside P), burning the app's 2500ms wall budget before the fallback ever ran, and (b) meetsRequirements/`findValidConfig` used the STRICT form, rejecting the very seed the fallback found — the consumers disagreed. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wherever achievable (the ADR-098 free-DOF family, where the order genuinely SELECTS the config), the ADR-142 either-side bar as the ACCEPTANCE tier, searched in ONE interleaved budget-safe sweep (a fallback bar rides the same loop, never a second pass); meetsRequirements/findValidConfig/resample/the ADR-256 sample filter all honour the ladder.",
     steps: [
@@ -953,7 +954,7 @@ export const SCENARIOS_4: Scenario[] = [
       // chord's fresh «מעגל P» minted a THIRD circle through A, D (every row green); now it names the drawn circle A rides.
       'AD מיתר במעגל P משיק למעגל O בנקודה A',
       'CB מיתר במעגל O משיק למעגל P בנקודה B',
-      { llm: ['המשך AC חותך את מעגל P בנקודה E'] }, // the operator's חותר typo, as the LLM's corrected canonical line
+      { llm: ['המשך CA חותך את מעגל P בנקודה E'] }, // the book's order (ADR-784), as the LLM's corrected canonical line; «AC» is refused
       'CE',
     ],
     check(fig) {
@@ -6254,10 +6255,37 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'perp-piece-foot-2232',
+    title: '#2232: «MK אנך ל-AB» with M placed and K new draws K on AB with MK ⟂ AB (ADR-786)',
+    guards:
+      '#2232 (operator ruling 2026-10-16, B: yes). The noun «אנך» from a placed point to a new letter states a foot; it was refused, or read as a relation with K off the side.',
+    steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - A.x) * uy - (K.y - A.y) * ux), 'K on line AB').toBeLessThan(1e-6);
+      expect(Math.abs((M.x - K.x) * ux + (M.y - K.y) * uy), 'MK ⟂ AB').toBeLessThan(1e-6);
+      expect(dist(M, K), 'a real foot').toBeGreaterThan(1e-6);
+    },
+  },
+  {
+    id: 'perp-piece-keeps-relation-2232',
+    title: '#2232: «MK אנך ל-AB» with M ON AB stays the perpendicular at M: a foot would be M itself',
+    guards: '#2232: the foot reading never collapses K onto M; the relation it had stands.',
+    steps: ['משולש ABC', 'M על AB', 'MK אנך ל-AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      expect(dist(M, K), 'K is not M').toBeGreaterThan(1e-6);
+      expect(Math.abs((M.x - K.x) * (B.x - A.x) + (M.y - K.y) * (B.y - A.y)), 'MK ⟂ AB').toBeLessThan(1e-6);
+    },
+  },
+  {
     id: 'extension-shared-endpoint-past-second-2518',
     title: '#2518: «נקודה A על מעגל P» · «המשך AO חותך את מעגל P בנקודה R» draws R beyond O (O seated inside circle P), A–O–R in order (ADR-780)',
     guards:
-      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, the either-side control) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts; ADR-142's and ADR-267's scenarios lock the either-side tier.",
+      "#2518 (P2, wrong answer), operator ruling 2026-11-04 (card q1 = A: push R past O when the figure allows; otherwise keep the either-side rule). Measured at ebacadd1 through driveThroughGate: strict 00000000 at seeds 0–7 and the shown configuration (seed 1) had R beyond A, every row green. Root cause (ADR-780): the shared-endpoint branch of extend-onto-circle builds R as the deterministic second crossing, whose side depends on where the other end sits, and nothing placed that end where the stated side holds. Fix: seatExtensionBeyond seats a movable, unconstrained other end on the stated side (a default). The matrix («המשך OA» both figures, the presses, stability, and the refusals of ADR-784) is src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts.",
     steps: ['מעגל שמרכזו O', 'מעגל שמרכזו P', 'נקודה A על מעגל P', 'המשך AO חותך את מעגל P בנקודה R'],
     check(fig) {
       allStepsOk(fig);
@@ -6269,6 +6297,61 @@ export const SCENARIOS_4: Scenario[] = [
       const P = fig.circles.get('circle-P')!;
       expect(Math.abs(dist(R, P.center) - P.r), 'R on circle P').toBeLessThan(1e-6);
       expect(dist(O, P.center), 'O inside circle P').toBeLessThan(P.r);
+    },
+  },
+  {
+    id: 'tool-midpoint-reversed-takes-letter-2674',
+    title: '#2674: «משולש ABC» · «אמצע BC» · «D אמצע CB» shows one point D and no notice, as «D אמצע BC» does (ADR-785)',
+    guards:
+      '#2674, operator ruling 2026-11-04 (round #2697 questions page, card q3 = A: "Rename for the reversed spelling too"). Measured at 28dac0c3 through decideDeterministic2D: labels A B C D M, coincidences [[M, D]]. Root cause: definitionKey and commandConflict compared a definition by its operands spelling; both now read unspelled. Matrix: src/app/__tests__/issue-2674-reversed-spelling.test.ts.',
+    steps: ['משולש ABC', 'אמצע BC', 'D אמצע CB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.positions.has('M'), 'the tool letter M yielded to D').toBe(false);
+      expect(dist(at(fig, 'D'), { x: (at(fig, 'B').x + at(fig, 'C').x) / 2, y: (at(fig, 'B').y + at(fig, 'C').y) / 2 }), 'D is the midpoint').toBeLessThan(1e-9);
+      expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
+    },
+  },
+  {
+    id: 'foot-letter-follows-the-seat-2166',
+    title: '#2166 (ADR-790): «תיכון ליתר בנקודה K» and «תיכון לצלע AB בנקודה K» name the foot K; on an open right triangle K follows the right angle',
+    guards:
+      'A foot letter after a cevian noun read by no rule, so a sentence the tool understood went to the model. Ruling 2026-10-15: *"«תיכון לצלע AB בנקודה K» (and «ליתר», «מ-C») draws the median with its foot named K, and cycles like the bare noun on an open right triangle"*.',
+    steps: ['משולש ישר-זווית ABC', 'תיכון ליתר בנקודה K'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.positions.has('M'), 'the tool letter is not drawn').toBe(false);
+      const facts = factsOf(['משולש ישר-זווית ABC', 'תיכון ליתר בנקודה K']);
+      const seats = new Set<string>();
+      for (const view of pressAll(facts, 3)) {
+        expect(Object.values(view.status).every((st) => st === 'ok'), 'every view is green').toBe(true);
+        const K = at(view, 'K');
+        const [a, b, c] = (['A', 'B', 'C'] as const).map((v) => dist(K, at(view, v)));
+        expect(Math.abs(a - b) + Math.abs(b - c), 'the midpoint of a hypotenuse is equidistant from the three vertices').toBeLessThan(1e-6);
+        const seat = (['A', 'B', 'C'] as const).find((v) => {
+          const [p, q] = (['A', 'B', 'C'] as const).filter((x) => x !== v).map((x) => at(view, x));
+          const o = at(view, v);
+          return Math.abs((p.x - o.x) * (q.x - o.x) + (p.y - o.y) * (q.y - o.y)) < 1e-6;
+        });
+        seats.add(seat ?? '?');
+      }
+      expect([...seats].sort(), 'the right angle visits every vertex').toEqual(['A', 'B', 'C']);
+      const side = replay(factsOf(['משולש ABC', 'תיכון לצלע AB בנקודה K']), 0);
+      expect(dist(at(side, 'K'), { x: (at(side, 'A').x + at(side, 'B').x) / 2, y: (at(side, 'A').y + at(side, 'B').y) / 2 })).toBeLessThan(1e-9);
+    },
+  },
+  {
+    id: 'ask-computes-its-answer-1454',
+    title: '«ריבוע ABCD» · «G על AD» · «זווית GBA = 37»: «∠GBC» asked answers 53°, and «∠GBC» on the figure before the angle answers «לא נקבע» (#1454, ADR-788)',
+    guards:
+      '#1454 arm 4, operator 2026-09-27: "Compute on ask". The question is answered by the values path, the panel rules: a determined value prints, else its WHY. The store split (the ask leaves the panel behind its button) is src/__tests__/issue-1454-compute-on-ask.test.ts.',
+    steps: ['ריבוע ABCD', 'G על AD', 'זווית GBA = 37'],
+    check(fig) {
+      allStepsOk(fig);
+      const asked = (lines: string[]) => computeValues(factsOf(lines), [{ text: '∠GBC', q: parseValueQuery('∠GBC') }]).queryRows[0];
+      expect(asked(['ריבוע ABCD', 'G על AD', 'זווית GBA = 37']).value).toBeCloseTo(53, 4);
+      expect(asked(['ריבוע ABCD', 'G על AD']).note).toBe('undetermined');
     },
   },
 ];

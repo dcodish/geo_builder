@@ -5,7 +5,7 @@ import { AppFrame } from '../shell/frame/AppFrame';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
 import { inputPreviewNodeCx } from './ui/inputPreviewNodeCx';
-import { Banner } from '../shell/frame/Banner';
+import { Banner, InfoNote } from '../shell/frame/Banner';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
@@ -803,7 +803,9 @@ export function App() {
               {/* #1595 (ADR-CX-086, ADR-W-176): two named numbers on one dot are accepted, and the page always says so —
                   2-D's ADR-123 sentence through the suite key, read from the drawn figure while it has the pair */}
               {coincidences.length > 0 && (
-                <Banner kind="notice">ⓘ {convergeText(coincidences, (k, o) => t(k, o) as string)}</Banner>
+                <div data-testid="converge-note">
+                  <InfoNote>{convergeText(coincidences, (k, o) => t(k, o) as string)}</InfoNote>
+                </div>
               )}
             </InputArea>
           </>}
@@ -1152,6 +1154,7 @@ export function App() {
                   dir="auto"
                   placeholder={t('askPlaceholder')}
                   addLabel={t('askAdd')}
+                  unreadableHint={t('askUnreadable')}
                   onSubmit={(text) => submitQuery(text)}
                   palette={{
                     symbols: SYMBOLS,

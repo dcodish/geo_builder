@@ -32,7 +32,7 @@
  * is earned — and this function is what will fail first and say so.
  */
 import { curveParentOf, curveParentsOf, parentsOf } from './derived';
-import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
+import { evalExpr, exprText, literalText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 import { INDEXED_NAME_RE } from '../../shell/indexedName';
@@ -864,8 +864,8 @@ export function relabelSymbol(sym: string, relabelId: (id: Id) => Id): string {
  * one of them on its own, which is why `C` shows only its name even though the figure fixes it.
  */
 export type Component =
-  /** The givens fix it to a number. */
-  | { known: true; value: number }
+  /** The givens fix it to a number. `text` (#1497): the number as the student typed it, on a stated coordinate. */
+  | { known: true; value: number; text?: string }
   /**
    * The givens leave it open — shown as `x_B`, unless the student WROTE an expression for it.
    *
@@ -910,7 +910,7 @@ export function provenanceOf(
     const read = (e: Parameters<typeof evalExpr>[0]): Component => {
       const v = evalExpr(e, env);
       return Number.isFinite(v) && symbolsOf(e).every((s) => RESERVED_SYMBOLS.has(s))
-        ? { known: true, value: v }
+        ? { known: true, value: v, ...(literalText(e) !== undefined ? { text: literalText(e) } : {}) }
         // Open, but the student wrote it — carry the text so the canvas need not invent `x_A` (#1230).
         : { known: false, expr: exprText(e) };
     };

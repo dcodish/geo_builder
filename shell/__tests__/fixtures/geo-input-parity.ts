@@ -288,9 +288,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1839': 'closed', // #2018 (ADR-AG-298): analytic does not read a bare role with typed letters until 2-D's reading is ruled · closed as fixed in 2-D without this port: parked (ADR-W-119), found 2026-11-02
   '#2047': 'open',
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
+  '#2710': 'open', // ADR-AG-408 (#2032): analytic refuses an arc's length until its reader lands
   '#2174': 'open', // was #2041, merged into #2174 by the #2654 family sweep 2026-11-01: #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
-
-  '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
 
@@ -566,9 +565,16 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-048', family: 'points-incidence', steps: ['משולש ABC', 'ישר ABE'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-049', family: 'cevians-centres', steps: ['תיכון מ-A במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-050', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC'], expect: 'builds' },
-  { id: 'cat-2d-051', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659, reversing ADR-639): drawn on the shown triangle, the right-angle vertex a free choice «הציגו תצורה אחרת» cycles; analytic still asks until its half lands (waits on #2018)' },
-  { id: 'hypotenuse-altitude-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'גובה ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659): the altitude spelling' },
-  { id: 'hypotenuse-apex-pins-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'CM תיכון ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659), ruling 2026-10-14: a typed apex forces the seat' },
+  { id: 'cat-2d-051', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659, ADR-AG-411, reversing ADR-639): drawn on the shown triangle, the right-angle vertex a free choice «הציגו תצורה אחרת» cycles' },
+  { id: 'hypotenuse-altitude-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'גובה ליתר'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659, ADR-AG-411): the altitude spelling' },
+  { id: 'hypotenuse-apex-pins-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'CM תיכון ליתר'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659, ADR-AG-411), ruling 2026-10-14: a typed apex forces the seat' },
+  { id: 'hypotenuse-foot-letter-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר בנקודה K'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-787, ADR-AG-411): the foot letter typed after the noun' },
+  { id: 'foot-letter-median-side-2166', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע AB בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: '#2166 (ADR-790): 3-D does not read the bare noun, so a foot letter has nothing to name' },
+  { id: 'foot-letter-median-apex-2166', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון מ-C בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: '#2166 (ADR-790)' },
+  { id: 'foot-letter-altitude-side-2166', family: 'cevians-centres', steps: ['משולש ABC', 'גובה לצלע AB בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: '#2166 (ADR-790)' },
+  { id: 'foot-letter-altitude-apex-2166', family: 'cevians-centres', steps: ['משולש ABC', 'גובה מ-A בנקודה H'], expect: 'builds', knownGap: [{ product: '3d' }], note: '#2166 (ADR-790)' },
+  { id: 'foot-letter-bisector-2166', family: 'cevians-centres', steps: ['משולש ABC', 'חוצה זווית C בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: '#2166 (ADR-790)' },
+  { id: 'hypotenuse-median-length-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'התיכון ליתר הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074: 2-D binds the length with the seat; in analytic the length would have to follow the moving median, a constraint binding it lacks (the same limit as a length on «תיכון לבסיס», ADR-AG-298), so it goes to the model' },
   { id: 'hypotenuse-two-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'משולש ישר-זווית DEF', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659): two right triangles, no single host' },
   { id: 'hypotenuse-median-stated', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'זווית C ישרה', 'תיכון ליתר'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'hypotenuse-median-named', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -593,6 +599,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'hypotenuse-no-right-angle', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
   // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
+  { id: 'perp-piece-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'], expect: 'builds', note: 'the same verdict, not yet the same figure: 2-D and analytic put K on AB as the foot (ADR-786, ADR-AG-410); 3-D reads a relation with K off AB, unported (#2231)' },
   { id: 'perp-to-base-flat-1944', family: 'cevians-centres', steps: ['משולש ABC', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }] },
   { id: 'perp-to-base-trapezoid-1944', family: 'cevians-centres', steps: ['טרפז ABCD', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }], note: 'the foot drops on the PARALLEL base (CD in 2-D, DC in 3-D), not on the first side of the ring' },
   { id: 'cat-2d-052', family: 'cevians-centres', steps: ['גובה מ-A במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -673,8 +680,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-127', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קוטר AB במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-128', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'F על מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8' },
   { id: 'diameter-cut-end-2056', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2056): F, a stated end of the diameter, is put on circle O — cat-2d-128 without «F על מעגל O»' },
-  { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic builds it as 4π degrees until #2013 — the verdict row cannot see degrees against length, the class test does' },
-  { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic draws a 12.57° arc until #2013' },
+  { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic refuses it, never degrees (ADR-AG-408, operator 2026-11-04), until the reader #2710' },
+  { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic refuses it naming what it reads (ADR-AG-408) until the reader #2710 resolves the arc' },
+  { id: 'arc-fraction-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 2/3'], expect: 'builds', exception: 'X8', note: 'ADR-789: a plain fraction is degrees in both, never the chord (the verdict row cannot see which; the class tests do)' },
+  { id: 'arc-unit-length-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4 ס"מ'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'ADR-789: a length unit makes it the arc\x27s length; analytic refuses it (ADR-AG-408) until the reader #2710' },
   { id: 'arc-symbol-value-2041', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = x'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2174' }], note: 'ADR-664 (#2041): 2-D asks degrees or length with the ruled sentence; analytic\x27s half of the ruling is open' },
   { id: 'arc-fresh-2037-01', family: 'chords-arcs', steps: ['קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2037): 2-D creates circle O and puts A and B on it; analytic does the same since ADR-W-162 (#1467 closed #2129)' },
   { id: 'cat-2d-129', family: 'chords-arcs', steps: ['קוטר מנקודה F במעגל O'], expect: 'builds', exception: 'X8' },
@@ -946,6 +955,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'side-given-clause-1682', family: 'points-incidence', steps: ['משולש ABC', 'D על BC ונתון כי AD = AC'], expect: 'builds', note: '#1682 (ADR-570): the on-side twin of ext-given-clause-1682. The verdict alone passed in 3-D while AD = AC was dropped (#1730) — side-given-clause-holds-1730 checks the given is held' },
   { id: 'side-given-clause-holds-1730', family: 'points-incidence', steps: ['משולש ABC', 'AC = 2', 'D על BC ונתון כי AD = AC', 'AD = 1'], expect: 'refused', note: 'the CONTENT check of side-given-clause-1682 (#1730, ADR-3D-296): with AD = AC held, AD = 1 contradicts AC = 2; a builder that dropped the clause builds it (3-D on 4fbb3293 did)' },
   { id: 'ext-meet-each-1620', family: 'intersections', steps: ['מרובע ABCD', 'המשך הצלע AD והמשך הצלע BC נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'ext-circle-side-impossible-2518', family: 'circles', steps: ['מעגל שמרכזו P ברדיוס 3', 'נקודה A על מעגל P', 'נקודה O', 'OP = 10', 'המשך AO חותך את מעגל P בנקודה R'], expect: 'refused', exception: 'X8', note: 'ADR-784: no figure has R past O. Both builders refuse; 2-D also offers «המשך OA …», analytic (its `beyond` selector, unsatisfiable) does not yet' },
+  { id: 'ext-circle-side-book-order-2518', family: 'circles', steps: ['מעגל שמרכזו P ברדיוס 3', 'נקודה A על מעגל P', 'נקודה O', 'OP = 10', 'המשך OA חותך את מעגל P בנקודה R'], expect: 'builds', exception: 'X8' },
   { id: 'ext-circle-1620', family: 'circles', steps: ['מעגל O', 'משולש ABC', 'המשך AC חותך את מעגל O בנקודה E'], expect: 'builds', exception: 'X8' },
   { id: 'side-condition-1620', family: 'points-incidence', steps: ['משולש ABC', 'הנקודה E נמצאת על צלע BC כך ש-AE = AC'], expect: 'builds' },
   { id: 'diag-meet-crossing-1620', family: 'intersections', steps: ['דלתון ABCD', 'E היא נקודת החיתוך של אלכסוני הדלתון'], expect: 'builds' },
@@ -1145,7 +1156,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-sector-reflex', family: 'chords-arcs', steps: ['גזרה AOB בזווית 200'], expect: 'builds', exception: 'X8' },
   // #172 (ADR-632): a sector's area and an arc's length as measures — size, ratio to the circle, letter
   { id: 'sector-area-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB הוא 12π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
-  { id: 'arc-length-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
+  { id: 'arc-length-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2710' }], note: 'analytic refuses it (ADR-AG-408) until the reader #2710' },
   { id: 'sector-area-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB = ¼ משטח המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
   { id: 'arc-length-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא רבע מהיקף המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
   { id: 'sector-area-letter-172', family: 'chords-arcs', steps: ['גזרה AOB', 'נסמן את שטח הגזרה ב-S'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }] },
@@ -1159,8 +1170,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-diameter-from-contextual', family: 'chords-arcs', steps: ['מעגל O', 'F על מעגל O', 'קוטר מנקודה F'], expect: 'builds', exception: 'X8' },
   // ── exception rows: the builders outside the family must answer honestly, never build ──
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
+  { id: 'ex-coordinate-letter-after-1774', family: 'topic', steps: ['(3,5)A'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: right-to-left typing, taught as A(3,5) (ADR-W-030)' },
+  { id: 'ex-coordinate-equals-1774', family: 'topic', steps: ['A = (3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: never accepted, taught as A(3,5) (ADR-W-030, ruling 2026-09-19 on #1245)' },
   { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
+  { id: 'ex-perp-piece-axis-2231', family: 'topic', steps: ['C(4,6)', 'CD אנך לציר ה-x'], contextFor: { '2d': [] }, expect: 'builds', exception: 'X1', only: ['analytic'], note: 'D, the foot on the axis (ADR-AG-410); over a pair the sentence is the shared row perp-piece-2232' },
   { id: 'ex-origin', family: 'topic', steps: ['O ראשית הצירים'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-quadrant-1655', family: 'topic', steps: ['במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '#1655: 2-D used to draw the incircle and drop the quadrant' },
   { id: 'ex-slope-1654', family: 'topic', steps: ['משולש ABC', 'נתון: שיפוע הצלע AB הוא 3/4'], expect: 'builds', exception: 'X2', note: '#1654: 2-D used to commit |AB| = 0.75' },
@@ -1767,6 +1781,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'all-common-tangents-crossing-2405', family: 'tangents', steps: ['שני מעגלים נחתכים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: '2-D draws the two external tangents (ADR-751); before, one' },
   { id: 'all-common-tangents-ext-touch-2405', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2409' }], note: '2-D draws the two external tangents and the tangent at T (ADR-751); before, one; analytic does not read it on a touching pair' },
   { id: 'all-common-tangents-unstated-2405', family: 'tangents', steps: ['שני מעגלים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2442' }], note: '2-D asks which position (input.ambiguousConstruct, the P1 interim answer of ADR-751); analytic does not read it; the permanent answer for both is #2442' },
+  // ── #2408 / #2411 (ADR-AG-403): each letter-named common tangent is a different tangent of the pair, one past its count is refused ──
+  { id: 'common-tangent-distinct-2408', family: 'tangents', steps: ['שני מעגלים זרים', 'AB משיק משותף לשני המעגלים', 'CD משיק משותף לשני המעגלים', 'EF משיק משותף לשני המעגלים', 'GH משיק משותף לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'analytic solved them jointly with the circles before ADR-AG-403, so two names could share a line' },
+  { id: 'common-tangent-fifth-2408', family: 'tangents', steps: ['שני מעגלים זרים', 'AB משיק משותף לשני המעגלים', 'CD משיק משותף לשני המעגלים', 'EF משיק משותף לשני המעגלים', 'GH משיק משותף לשני המעגלים', 'IJ משיק משותף לשני המעגלים'], expect: 'refused', exception: 'X8', note: 'both tangentsExhaustedAny; analytic accepted a fifth before ADR-AG-403' },
+  { id: 'common-tangent-nested-2411', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'מעגל N מוכל בתוך מעגל M', 'AB משיק משותף למעגלים M ו-N'], expect: 'refused', exception: 'X8', note: 'both tangentsExhaustedContained; analytic said «לא נמצאה תצורה» before ADR-AG-403' },
   { id: 'touch-tangent-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק המשותף בנקודת ההשקה'], expect: 'builds', exception: 'X8', note: 'analytic did not read it before ADR-AG-314' },
   { id: 'touch-tangent-through-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; 2-D draws a two-touch tangent there, not the tangent at T (found work); analytic did not read it before ADR-AG-314' },
 
@@ -1898,6 +1916,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'indexed-name-polygon-2075', family: 'polygons', steps: ['משולש A_1B_1C_1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2458' }] },
   { id: 'indexed-name-multidigit-2075', family: 'points-incidence', steps: ['נקודה X12'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'analytic refused a two-digit index before ADR-AG-398; 3-D does not read «נקודה X12» (not-handled, measured), though «X12(1,2,3)» records' },
   // ── #2286 (ADR-AG-397, ruled 2026-11-03 «Refuse it, naming the line, in every builder»): two numbers with only a space between them ──
+  { id: 'blank-point-on-circle-2611', family: 'circles', steps: ['D על המעגל'], expect: 'builds', note: 'the circle the line refers to is created (#2048 ruling A, ADR-3D-420)' },
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
@@ -1910,11 +1929,10 @@ export const UNCOVERED_CATALOG: Readonly<Record<Product, readonly string[]>> = {
   analytic: ['O מרכז המעגל I'],
   '3d': [
     'BE/ED = 1:3', // 3-D builds it on its solid; no plane context makes the row type in every builder
-    'D על המעגל', // 3-D needs D to exist first; its catalog context is not a plane figure
     'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', // 2-D takes ~9 s to escalate it — too slow for a lock row
     '∠SDB', // a bare angle: 3-D draws it, 2-D refuses it as a question with no value — ruled 2026-10-04, owned by #1981
   ],
 };
 
 /** The ceiling of each allowlist. Raising one is a visible edit, which is the point. */
-export const UNCOVERED_CEILING: Readonly<Record<Product, number>> = { '2d': 0, analytic: 1, '3d': 4 };
+export const UNCOVERED_CEILING: Readonly<Record<Product, number>> = { '2d': 0, analytic: 1, '3d': 3 };

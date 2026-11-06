@@ -6,7 +6,8 @@ import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { domainText, type Construction, type LineRole, type ParamDecl, positionalOf } from '../engine/types';
-import { exprText, symbolsOf, type Expr } from '../engine/expr';
+import { spelledText, symbolsOf, type Expr } from '../engine/expr';
+import { givenText } from '../../shell/literal';
 import { symbolText } from '../engine/lengths';
 import { curveEquationOf, curveEquationText, curveParts, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
@@ -240,9 +241,17 @@ export interface SegmentKnowledge {
   readonly slope: PanelKnown;
   readonly angle: ReturnType<typeof lineAngleOf>;
   readonly length: PanelKnown;
+  /** #1806: the length as the student typed it, when they stated one (ADR-AG-407). */
+  readonly given?: string;
 }
 
-export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): SegmentKnowledge[] {
+/** #1806 (ADR-AG-407): a segment's length row. A stated length reads what its canvas label reads. */
+export function segmentLengthText(s: Pick<SegmentKnowledge, 'ends' | 'length' | 'given'>, fmt: (v: number) => string): string | null {
+  if (s.length.known && s.given !== undefined) return givenText(s.length.value as number, s.given, fmt);
+  return valueText(s.length, fmt, `${s.ends[0]}${s.ends[1]}`);
+}
+
+export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'> & Partial<Pick<Derivation, 'stated'>>): SegmentKnowledge[] {
   const c = d.construction;
   return uniqueSegments(d.figure.segments).map((seg) => {
     const [a, b] = seg.ends;
@@ -267,7 +276,9 @@ export function segmentKnowledge(d: Pick<Derivation, 'construction' | 'figure'>)
       const v = read(f);
       return v === null ? null : Math.hypot(v.dx, v.dy);
     });
-    return { id: seg.id, ends: seg.ends, vertical, slope, angle, length };
+    const stated = d.stated?.lengths.find((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a))?.value;
+    const given = stated && 'num' in stated ? stated.src : undefined;
+    return { id: seg.id, ends: seg.ends, vertical, slope, angle, length, ...(given !== undefined ? { given } : {}) };
   });
 }
 
@@ -293,7 +304,7 @@ export function openCurveText(c: Pick<Construction, 'objects'>, id: string): str
   // #1299 — notation has ONE owner (`curveText.ts`), and it delegates to `lineText` for a line whose
   // coefficients are numbers, so this row and a determined line's row cannot disagree.
   if (o?.kind === 'curve') return readsToolSymbol(o.curve.eq) ? '—' : curveEquationText(o.curve.eq);
-  if (o?.kind === 'circle-at') return readsToolSymbol(o.r) ? '—' : `O(${o.centre}), r = ${exprText(o.r)}`;
+  if (o?.kind === 'circle-at') return readsToolSymbol(o.r) ? '—' : `O(${o.centre}), r = ${spelledText(o.r)}`;
   // A computed circle (#1464, #1324) is written as what defines it: ⊙ through its points, ⌀ its diameter,
   // and the inscribed circle as the ring it is inscribed in (#1619 B2).
   if (o?.kind === 'circle-thru') {

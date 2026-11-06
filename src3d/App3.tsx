@@ -26,7 +26,7 @@ import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
-import { dataView, panelIsEmpty } from './engine/dataView';
+import { dataView, panelIsEmpty, radiusRowLabel3 } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
@@ -42,8 +42,10 @@ import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { SYMBOL_SPECS_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
-import { restoreStatedSequences3 } from './parser/honesty3';
+import { escalate3Flow } from './app/escalate3Flow';
+import { nameRetryEvent } from '../shell/llm/retryLostNames';
 import { decideDeterministic3 } from './app/decideDeterministic3';
+import { previewReadsVector3 } from './app/previewReading3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
@@ -56,9 +58,11 @@ import { MAX_FIGURE_STATEMENTS } from '../shell/save';
 // #1374: the SHORT link — upload the figure + its preview, get themathbible.com/g/<id> back.
 import { pngToBase64, shortLinkFor } from '../shell/session/shortLink';
 import { ShareSheet } from '../shell/frame/ShareSheet';
+import { NarrowingNote } from '../shell/frame/NarrowingNote';
+import { InfoNote } from '../shell/frame/Banner';
 import { Banner } from '../shell/frame/Banner';
 import { CreatedNotice } from '../shell/frame/CreatedNotice';
-import { CREATED_NOTICE_KEYS, createdNoticeText } from '../shell/session/createdPoints';
+import { CREATED_NOTICE_KEYS, createdNoticeTextOf } from '../shell/session/createdPoints';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
@@ -595,20 +599,15 @@ export default function App3() {
     if (err?.code === 'not-understood') {
       setBusy(true);
       try {
-        const live = useGeo3.getState();
-        const ctx = `Existing points: ${[...derive3(live.facts, live.seed).construction.points.keys()].join(', ') || '(none)'}.`;
-        const rawSteps = await escalate3(raw, ctx);
-        // #555 (ADR-3D-173) — the SEQUENCE gate, applied to the canonical lines BEFORE the re-parse:
-        // a stated point-run the model respelled is restored to the student's own spelling, so the
-        // tested grammar derives the semantics from what the student wrote (the 2-D #536 shape).
-        const seq = rawSteps ? restoreStatedSequences3(raw, rawSteps) : null;
-        const steps = seq ? seq.lines : rawSteps;
+        // #2231 (ADR-W-189): the ask, the one retry and the sequence gate, reachable from a test
+        const { steps, restored, retry } = await escalate3Flow(useGeo3.getState(), raw, escalate3);
+        if (retry) logDebug3(nameRetryEvent(retry));
         if (steps) submitSteps(raw, steps);
         err = useGeo3.getState().lastError;
         // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
         // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
         // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
-        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(seq && seq.restored.length > 0 ? { restored: seq.restored } : {}), result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, ...(restored.length > 0 ? { restored } : {}), result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }
@@ -801,7 +800,8 @@ export default function App3() {
              * bidi repair" and becomes "what you typed, typeset".
              */
             /**
-             * #1195 — and the VECTOR notation, for a line the student explicitly marked.
+             * #1195 — and the VECTOR notation, for a line the student marked or the parse reads as
+             * vectors (#1549: the card and the strip answer from one registry).
              *
              * #1312 — the whole three-way choice lives in `inputPreviewNode3`, beside the step row's
              * `FactRowText3`, and NOT as a ternary here. Writing it inline is what hid the defect:
@@ -814,7 +814,7 @@ export default function App3() {
              * second row. The direction stays on `textDir3` for BOTH box and preview (#868,
              * and #1314 owns the question that leaves).
              */
-            preview={(s) => inputPreviewNode3(s, new Set(vectorNames3(derived.construction)))}
+            preview={(s) => inputPreviewNode3(s, new Set(vectorNames3(derived.construction)), previewReadsVector3(derived.construction, s))}
             previewDir={(s) => textDir3(s)}
             boxDir={(s) => textDir3(s)}
           />
@@ -831,13 +831,19 @@ export default function App3() {
           {/* #305 (ADR-3D-090): a NON-error build notice — the step committed, and the figure was
               adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
               amber error strip: nothing failed, so it reads as information, not a warning. */}
-          {!busy && notices.map((n, i) => (
+          {!busy && notices.map((n, i) => n.kind === 'narrowed' ? (
+            // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family, on its one face (#2266)
+            <div key={`notice-${i}`} data-testid="narrowed-note">
+              <NarrowingNote>{narrowingText3(n.note, t as NarrowTranslate)}</NarrowingNote>
+            </div>
+          ) : n.kind === 'base-constrained' ? (
+            // ADR-3D-090, kept for the plain «מרובע» base only (#1996); on the narrowing note's face (ADR-W-180)
+            <div key={`notice-${i}`} data-testid="base-constrained-note">
+              <NarrowingNote>{t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })}</NarrowingNote>
+            </div>
+          ) : (
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {n.kind === 'narrowed' // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family
-                ? narrowingText3(n.note, t as NarrowTranslate)
-                : n.kind === 'base-constrained' // ADR-3D-090, kept for the plain «מרובע» base only (#1996)
-                  ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : n.kind === 'line-rel-noun'
+              {n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'line-auto-named'
                     ? t('notice.lineAutoNamed', { requested: n.requested, assigned: n.assigned })
@@ -857,8 +863,8 @@ export default function App3() {
           {/* #1595 (ADR-3D-404, ADR-W-176): two letters on one dot are accepted, and the page says so — 2-D's ADR-123
               sentence through the suite key, read from the DRAWN figure, so it holds while the drawing has the pair. */}
           {!busy && derived.coincidences.length > 0 && (
-            <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              ⓘ {convergeText(derived.coincidences, t as ConvergeTranslate)}
+            <div data-testid="converge-note">
+              <InfoNote>{convergeText(derived.coincidences, t as ConvergeTranslate)}</InfoNote>
             </div>
           )}
           {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared
@@ -877,7 +883,7 @@ export default function App3() {
           {/* #1467 (ADR-W-162): shown while its line is still the last row — any later row, ✕, undo or edit retires it */}
           {lastCreated && !lastError && !busy && facts[facts.length - 1]?.id === lastCreated.factId && (
             <CreatedNotice
-              text={t(createdNoticeText(lastCreated.ids).key, createdNoticeText(lastCreated.ids).params)}
+              text={t(createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).key, createdNoticeTextOf({ names: lastCreated.ids, circle: lastCreated.circle }).params)}
               undoLabel={t(CREATED_NOTICE_KEYS.undo)}
               onUndo={() => {
                 logDebug3({ kind: 'action', action: 'delete', detail: lastCreated.factId });
@@ -1167,6 +1173,11 @@ export default function App3() {
                     title: t('dataPanel.secMeasures'),
                     dir: 'app',
                     rows: [
+                      ...(dataPanel?.radii ?? []).map((r) => (
+                        <span key={`radius-${r.circle ?? ''}`}>
+                          {radiusRowLabel3(r, (k, p) => t(k, p) as string)} = <MathRun>{r.text}</MathRun>
+                        </span>
+                      )),
                       ...(dataPanel?.vectors ?? []).map((v) => (
                         <span key={v.label}>
                           {v.decomp && (
@@ -1297,6 +1308,7 @@ export default function App3() {
                   dir="ltr"
                   placeholder={t('query.placeholder')}
                   addLabel={t('query.add')}
+                  unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
                     addQuery(text);
                   }}
