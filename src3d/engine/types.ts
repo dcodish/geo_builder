@@ -1335,7 +1335,10 @@ export type Command3 =
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   // `ring` (#1792): the polygon a SOFT default right angle belongs to — a right trapezoid's. An explicit
   // right angle at any vertex of that ring retires it (derive3); absent, the ring is the angle's own three labels.
-  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean; ring?: Id[]; origin?: CommandOrigin3 }
+  // `spelled` (#1549, ADR-3D-430): the student wrote the cosine of two operands, «cos(AB,AD)=0». Perpendicularity and
+  // right-angled shapes lower to this kind too and stay prose, so the display reads this and the meaning never does.
+  // Optional: a file saved before it has none, and its row stays plain until the line is typed again.
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean; ring?: Id[]; origin?: CommandOrigin3; spelled?: 'cos' }
   | { type: 'concyclic'; ids: Id[]; origin?: CommandOrigin3 } // #305: A,B,C,D on one circle (the right-pyramid base fix) // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
   // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
   // pairwise dot-eq relations (drive on a free figure, else verify).

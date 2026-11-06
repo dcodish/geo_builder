@@ -14792,7 +14792,7 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 2. **Read as vectors, added:** `inject-pair`, `mag-val`, `mag-rel` (the plan), `dot-eq-chain` (the plan's dot kinds, ruling 1), and `vec-mag`, `draw-arrow`, `declare-vector`, which the plan left under "everything else". Ruling 1 covers them: *"every other spelling that lowers to a vector command"*. `AB→` was the reported defect exactly: a `draw-arrow` row printing a raw arrow.
 3. **The preview asks the parse (ruling 1).** `app/previewReading3.ts` `previewReadsVector3(construction, raw)` runs `parse3` through the registry, and `App3` passes the answer to `inputPreviewNode3`, because `render` must not import the parser. `isVectorMarked3` stays for a marked line that does not parse yet, so a half-typed `DC→=` keeps its strip.
 
-**Not delivered: `cos-angle` reads `'plain'`, pending a ruling.** Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
+**Not delivered: `cos-angle` reads `'plain'`, pending a ruling** (ruled 2026-11-06, delivered by [ADR-3D-430](#adr-3d-430)). Ruling 1 names «cos(AB,AD)=0» and says the registry decides by kind alone. Measured, the same kind is what «AB ⟂ AD», «SM מאונך ל-DB», «משולש ישר זווית ABC» and every right-angled base («מנסרה שבסיסה מלבן») lower to, which the ruling's account did not state. `'vector'` would put arrows on segments in a perpendicularity row, which #313 keeps plain and nobody ruled on. Telling the spellings apart needs a parser field, a new mechanism the plan rules out. So cos rows stay exactly as they are today, including the raw `→` on «cos(AB→,AD→)=0». `cos-angle-eq` and `cos-eq` wait with it.
 
 **Limits of "the card and the strip agree".**
 - An unmarked two-reading equation («DC=3AB» over existing points) stays unarrowed in the strip, as today. Its card follows the fold's verdict (ADR-3D-391 Am. 1), and trying both readings per keystroke is a fold on every key.
@@ -14893,3 +14893,25 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Locks.** `src3d/__tests__/issue-1542.test.ts`: both lanes' spelling table, the dash, every plane-name reader, the line lane; his sequence through the store (residual, B, chip), Q1's two arms, Q2's four arms including a stated side and a solid fixed by coordinates; the restatement matrix, both refusals, the re-tick, a parameter. Fixture `plane-equation-sentence-1542.geo3.json`.
 
 **Behaviour change for a student:** «משוואת המישור X היא …» and its spellings build at once, with no model. His row shows ●, not ✓, when the equation placed the figure. A plane equation restated, in other letters or as a multiple, answers «זה כבר קיים באיור — אין מה להוסיף.» and adds no row. «מישור π - x+y+z=1» now builds x+y+z=1, not −x+y+z=1.
+
+## ADR-3D-430 — A row typed with cos wears arrows; the kind it shares with perpendicularity does not (#1549)
+
+**Status:** accepted · 2026-11-06 · bug (P2) · round #2727 · branch `fix/1549-cos-spelling-arrows` off `main` @ c0029d25 · operator ruling 2026-11-06 on #1549 (*"I agree with recommendation"*: arrows on the cos spelling only)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-4a · **Design:** [04b](04b-design-3d.md) "The input preview composes"
+
+**Class.** A **display reading** that depends on the spelling cannot be answered by a **command kind several spellings share**. Instance: «cos(AB,AD)=0», «AB ⟂ AD» and every right-angled shape lower to `cos-angle`, so ADR-3D-425 left all of them plain.
+
+**Decision.**
+1. **`cos-angle` carries an optional `spelled: 'cos'`**, set by the operand form of `cosAngleGiven` alone: `cos(AB,AD)=…`, «קוסינוס הזווית בין …», "the cosine of the angle between …". The registry gains a third value, `'as-spelled'`, and `cos-angle` reads it. The vertex form («cos∠ABC = 1/2») names no pair, so it has nothing to arrow and stays as it was.
+2. **The field is how a line was written, never what it states.** `applyCommand3` ignores it, and `statedCommand3` drops it, so «cos(AB,AD)=0» after «AB ⟂ AD» is still a twin and the fixture drift net holds over stored files.
+3. **A stored file.** The field is optional and the file still loads. An old cos row has no field, so it stays plain until the line is typed again. Load replays commands (ADR-3D-005), so nothing rewrites it.
+4. **The strip takes the card's order for a line the parse reads as vectors**, vector before math. Without this, «cos(AB,AD)=1/2» previews with no arrow and commits with two. A line that only wears a mark keeps #1313's order.
+5. **Two `VecMath` tokens, because a cos row is the first to reach them.** «√3/2» tokenized as `√` · `3/2` and drew √(3/2), a false value: a root over a number is now the fraction's numerator. `cos` is one word, so its «s» is never a declared vector `s`.
+6. **The data panel's stated rows render through `VecMath`**, like the step rows and the vector rows beside them, so the arrow spans the name instead of a combining stub over its last letter (reported on #1549, round #2722). A declared name there gains its underline, and a typed «1/2» stays a fraction but is stacked.
+
+**Sibling audit.** Other kinds shared across spellings: `angle-eq`, `angle-pair-eq` and `angle-seg-eq` read as angles between segments and stay plain, as the ruling leaves them. 2-D has no vector notation (#1184), and analytic and complex have no `VecMath`, so the class is 3-D's alone.
+
+**Locks.** `src3d/__tests__/issue-1549-cos-spelling.test.tsx`, on rendered markup: both cos spellings, card ≡ strip, the perpendicular and shape guards, the twin, a saved file without the field, the root fraction, the panel row. `fixtures3.test.ts`'s drift net now compares stated commands on both sides. Fixture `fixtures3/cos-row-arrows-1549.geo3.json`.
+
+**Behaviour change for a student:** a line typed as «cos(AB,AD)=0» now shows arrows on its row and in the strip. A perpendicularity and a right-angled shape stay plain. In the data panel, a stated vector's arrow now spans the whole name.

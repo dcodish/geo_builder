@@ -1376,8 +1376,10 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 
 `vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate. A two-reading
 segment equation («DC=3AB» over existing points) is the one line a parse cannot answer: its card follows the fold's
-`readings` verdict (ADR-3D-391 Am. 1), so the preview leaves it unarrowed. `cos-angle` reads `'plain'` pending a
-ruling: «AB ⟂ AD» and right-angled shapes lower to it too (ADR-3D-425).
+`readings` verdict (ADR-3D-391 Am. 1), so the preview leaves it unarrowed. `cos-angle` is the one kind the kind cannot
+answer: «AB ⟂ AD» and right-angled shapes lower to it too, so the registry reads `as-spelled` and the parser's cos
+operand rule sets `spelled: 'cos'` (ADR-3D-430). `statedCommand3` drops the field: it is how a line was written, not
+what it states. A line the parse reads as vectors previews in the card's order, vector before math.
 
 ## Known gaps
 

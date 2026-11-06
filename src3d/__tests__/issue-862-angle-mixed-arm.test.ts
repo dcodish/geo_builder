@@ -94,7 +94,7 @@ describe('#862 — the neighbouring cells are untouched', () => {
 
   it('vector × vector still lowers to cos-angle over two named atoms', () => {
     expect(cmds('קוסינוס הזווית בין הוקטורים u ו-w הוא 1/2')).toEqual([
-      { type: 'cos-angle', u: { kind: 'named', name: 'u' }, v: { kind: 'named', name: 'w' }, cos: 0.5 },
+      { type: 'cos-angle', u: { kind: 'named', name: 'u' }, v: { kind: 'named', name: 'w' }, cos: 0.5, spelled: 'cos' },
     ]);
   });
 

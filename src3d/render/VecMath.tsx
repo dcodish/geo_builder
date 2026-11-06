@@ -24,6 +24,7 @@ type Tok =
   | { k: 'pair'; text: string }
   | { k: 'vec'; text: string }
   | { k: 'frac'; num: Tok; den: Tok }
+  | { k: 'root'; text: string }
   | { k: 'num'; text: string }
   | { k: 'op'; text: string }
   | { k: 'text'; text: string };
@@ -80,6 +81,13 @@ export function tokenizeRow(row: string, vecNames: Set<string>): Tok[] {
       continue;
     }
     if (s.startsWith('̲')) { s = s.slice(1); continue; } // stray combining underline
+    // #1549 (ADR-3D-430): the root is the fraction's numerator. Read as op · frac, «√3/2» drew √(3/2), a false value.
+    const mRootFrac = s.match(/^√(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)/);
+    if (mRootFrac && !isLetter(s[mRootFrac[0].length])) {
+      out.push({ k: 'frac', num: { k: 'root', text: mRootFrac[1] }, den: { k: 'num', text: mRootFrac[2] } });
+      s = s.slice(mRootFrac[0].length);
+      continue;
+    }
     const mNum = s.match(NUM);
     if (mNum) {
       const numTok: Tok = { k: 'num', text: mNum[0] };
@@ -89,6 +97,13 @@ export function tokenizeRow(row: string, vecNames: Set<string>): Tok[] {
         out.push({ k: 'frac', num: numTok, den: { k: 'num', text: mDen[1] } });
         s = s.slice(mDen[0].length);
       } else out.push(numTok);
+      continue;
+    }
+    // #1549 (ADR-3D-430): the function's name is one word, so its «s» is never a declared vector s
+    const mCos = s.match(/^cos(?![A-Za-z])/i);
+    if (mCos) {
+      out.push({ k: 'text', text: mCos[0] });
+      s = s.slice(mCos[0].length);
       continue;
     }
     if (/^[A-Za-z]/.test(s)) {
@@ -126,6 +141,8 @@ function tokEl(t: Tok, i: number): React.ReactNode {
       return m('munder', { key: i, accentunder: 'true' }, m('mi', null, t.text), m('mo', { stretchy: 'true' }, '_'));
     case 'frac':
       return m('mfrac', { key: i }, tokEl(t.num, 0), tokEl(t.den, 1));
+    case 'root':
+      return m('msqrt', { key: i }, m('mn', null, t.text));
     case 'num':
       return m('mn', { key: i }, t.text);
     case 'op':

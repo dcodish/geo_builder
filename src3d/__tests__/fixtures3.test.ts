@@ -611,7 +611,7 @@ describe('fixtures3 — the regression net', () => {
           const parsed = parse3(f.utterance);
           expect(parsed.ok, f.utterance).toBe(true);
           // #2674 (ADR-3D-415): a letter a later line gave a tool's point by use is history, not the parse
-          if (parsed.ok) expect(parsed.commands, f.utterance).toEqual(f.cmds.map(statedCommand3));
+          if (parsed.ok) expect(parsed.commands.map(statedCommand3), f.utterance).toEqual(f.cmds.map(statedCommand3));
         }
       });
     });

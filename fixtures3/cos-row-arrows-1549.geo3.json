@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-06T05:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קוביה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": ["A", "B", "C", "D", "A'", "B'", "C'", "D'"]
+        }
+      ]
+    },
+    {
+      "utterance": "cos(AB,AD)=0",
+      "cmds": [
+        { "type": "segment3", "a": "A", "b": "B" },
+        { "type": "segment3", "a": "A", "b": "D" },
+        {
+          "type": "cos-angle",
+          "u": { "kind": "pair", "from": "A", "to": "B" },
+          "v": { "kind": "pair", "from": "A", "to": "D" },
+          "cos": 0,
+          "spelled": "cos"
+        }
+      ]
+    }
+  ]
+}

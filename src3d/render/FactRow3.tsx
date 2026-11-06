@@ -36,7 +36,7 @@ import type { SegmentEquationReading3 } from '../engine/types';
 /** The structural shape a row needs — matching `isVectorFact3`, so a test may pass a literal. */
 export type FactRowFact3 = {
   utterance: string;
-  cmds: { type: string; claim?: { type: string } }[];
+  cmds: { type: string; claim?: { type: string }; spelled?: string }[];
 };
 
 /**
@@ -135,10 +135,10 @@ export function askEchoNode3(text: string, echo: QueryEcho3, vecNames: Set<strin
  * RENDERING rather than the string; see the note on the vector branch below.
  */
 export function inputPreviewNode3(text: string, vecNames: Set<string>, readAsVector = false): React.ReactElement | null {
-  // #1152 — a line carrying an equation is typeset, and this stays FIRST (see #1313, which owns the
-  // divergence that leaves: the step row puts the VECTOR branch first, and a line that is both is
-  // rendered lossily by either renderer. Ordering is left exactly as each surface already had it.)
-  if (hasMath(text)) return <MathText text={isolateLtrRuns3(text, true)} />;
+  // #1152 — a line carrying an equation is typeset, FIRST for a line that only WEARS a mark (#1313 owns that divergence).
+  // #1549 (ADR-3D-430): a line the parse reads as vectors takes the card's order instead, or «cos(AB,AD)=1/2» would
+  // preview with no arrow and commit with two.
+  if (!readAsVector && hasMath(text)) return <MathText text={isolateLtrRuns3(text, true)} />;
   /**
    * #1312 — THE NULL CONTRACT DOES NOT APPLY TO A LINE `VecMath` WILL TYPESET.
    *
