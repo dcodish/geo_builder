@@ -226,12 +226,12 @@
     },
     {
       "id": "7wsLSXM-vlCet2SW7RxqR",
-      "utterance": "המשך AC חותך את מעגל P בנקודה E",
+      "utterance": "המשך CA חותך את מעגל P בנקודה E",
       "cmd": {
         "type": "extend-onto-circle",
         "id": "E",
-        "a": "A",
-        "b": "C",
+        "a": "C",
+        "b": "A",
         "circle": "circle-P"
       },
       "enabled": true

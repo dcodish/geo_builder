@@ -15,7 +15,7 @@
  * it needs no plumbing through the submit path.
  */
 
-import { declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
+import { baseRingOf, declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
 import type { QuadBase } from './baseShapes';
 import type { RingNote } from '../../shell/narrowing';
 import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
@@ -431,7 +431,9 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   // ADR-3D-090's sentence for the one pair the family cannot name (see the `base-constrained` variant)
   for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
-    if (spec?.right && spec.base === 'quad') out.push({ kind: 'base-constrained', ids: [...s.ids], from: 'quad', to: 'cyclicQuad' });
+    // The note names the base ring and never prints the apex (operator 2026-10-13, #1996; judged q16, ADR-W-180).
+    const ring = baseRingOf(s);
+    if (ring && spec?.right && spec.base === 'quad') out.push({ kind: 'base-constrained', ids: ring, from: 'quad', to: 'cyclicQuad' });
   }
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
   // The four cases that used to live here inline (a redundant shape, a relation between two

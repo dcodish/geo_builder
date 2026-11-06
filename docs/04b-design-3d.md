@@ -377,7 +377,7 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   which apply uses instead of the pool), so history is rewritten as one undo step and the pool letter is free again.
   `sameStatement` compares `midpoint-auto` without that `id`, so «אמצע BB'» typed again is still already known.
 
-**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
+**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996), on the shared `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** `store/narrowing3.ts`
 `narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through
 the same function with `narrow = false`, so no recursion and no `deriveStats3` count). Declared kind: a `quad-shape`'s
 base + `adj` (`declaredKind3`), `rect-complete`, a `QUAD_PYRAMIDS` solid's base (its ring `ids[0..3]`), a flat
@@ -386,7 +386,7 @@ triangle's `readShapePhrase3` adjectives. Forced kinds: `ringKinds` over `knowle
 The cause search is capped at `NARROW_TRIALS_3D` subset trials (a COUNT — past it «בגלל הנתונים, …»). `buildNotices3`
 turns the result into `{ kind: 'narrowed', ids, note }`, rendered by `i18n/narrowingText3.ts` (`notice.narrowed.*`).
 `CYCLIC_MEMBER` is the solver's fix table only; the one pair the lattice cannot name — a right pyramid over a plain
-«מרובע» — keeps ADR-3D-090's `base-constrained` sentence.
+«מרובע» — keeps ADR-3D-090's `base-constrained` sentence, on the same `NarrowingNote` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)).
 **Both voices: the subject decides, and the ring is read past the circle's name (#1975, [ADR-3D-341](06b-decisions-3d.md#adr-3d-341)).**
 `circleContains3`'s fallback (no container marker) asks `circleEnclosesByVoice3` — the copy of 2-D's voice reader:
 the subject of «חוסם» / "circumscribe" is the outer figure, and a ring between the circle noun and the verb («מעגל
@@ -486,6 +486,8 @@ existence of points the line did not name, and the mint pass's refold places poi
 "The first vector on an empty canvas announces nothing" (FR-VC-1b) is the notice filter's rule (`startsFigure3`).
 
 ### The mint pass ([ADR-3D-382](06b-decisions-3d.md#adr-3d-382), #1467)
+
+**Circles** ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420), #2611): an `unknown-circle` that `mintableCircle3` accepts takes the #1566 solid lane: the row carries a `circle3` declaration (`MintedSolid3.circle`) applied at the row, so a centre an earlier row placed is read in list order. `Derived3.createdCircles` feeds the notice and such a row has no `created` entry. `DataPanel.radii` lists every free circle's `def.radius` for the panel (`radiusRowLabel3`); the canvas reads `statedLengths` and has no radius. `«המעגל»` creates `{kind: 'free'}` under `UNNAMED_CIRCLE_ID3`, with no centre point at all: `placeUnnamedCentre3` places the centre from the seed and the circle's pins only, because the point pass and the circle pass read `pos` at different moments and a rider must lie on the circle both see. From the second placed member on, a `free3` centre letter no pin drives becomes `circle-centre3` and takes the same placement.
 
 `deriveCore3`, after the post-pass fixpoint and the stale-message refresh: each still-red row (list order) whose latest
 dry run (`dryRunOn`) reports `unknown-point` / `two-unknowns` on a `mintableId3` id has that id minted `free3`
@@ -684,7 +686,7 @@ undeclared name are untouched (`unknown-vector` as before).
 
 ### A free-standing given circle ([ADR-3D-419](06b-decisions-3d.md#adr-3d-419), #253)
 
-`Circle3Def { kind: 'free'; center; plane?; radius? }` is resolved inside `circleGeom3` by `resolveFreeCircle`
+`Circle3Def { kind: 'free'; center?; plane?; radius? }` is resolved inside `circleGeom3` by `resolveFreeCircle`
 (`engine/freeCircle.ts`), the `resolveFreePlane` shape: pins are read from the recorded construction, the rest is
 sampled, and the returned `dof` feeds `freeDofCount3` through `circles3[].freeDof`.
 
@@ -781,6 +783,8 @@ The fact row reads the same record (Am. 2): `App3` hands `Derived3.readings[f.id
 (`render/FactRow3.tsx`), and a `'length'` row bypasses the command-kind vector gate — `factDisplay3` returns
 `lengthReadingText3` (`render/notation.ts`): the student's own text with each of the equation's two pair tokens
 wrapped in bars («AA'=3BC» → «|AA'|=3|BC|»), composed from the command when the text does not hold both pairs.
+
+**Stated numbers restated** (ADR-3D-423, #2341). `numbersRestatementTwin3` is the third test of the twin rule, after `sameStatement` and `ringRestatementTwin3`. `statedNumbers3` reads what a command states as numbers, of what: a point's coordinates (`point3`, the `coords-eq` claim) or a segment's length in either letter order (the `length-eq` claim). It compares them at `CLAIM_REL_TOL`, and the twin must already draw the line's `segment3` ink. A line with no stated numbers to match has no twin, so a coordinate answer or a first length stays a row.
 
 **A length sum** (ADR-3D-392, #1680) is the `length-sum` claim and `ScalarPin` (Σ cᵢ·|aᵢbᵢ| = value, the
 `lengthSum` rule, 2-D's `set-measure-sum`). It routes exactly as `length-eq`: the driving pin plus its recorded
@@ -1259,6 +1263,8 @@ the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expr
 
 ### The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
 
+A stated value carries its spelling: `src` on the `length-eq` claim, `vec-mag`, `mag-val`, `mag-rel`, `lenSrc` on `perp-to-base`, `srcs` on a tuple, `src` on `VecTerm`/`SymTerm` ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426)). `statedMagText` and `statedCoordText` print it through `shell/literal`. Display only: nothing solves from it. `spellingOf` reads the older `decimal` mark from a save.
+
 | kind | scene record | shape |
 | --- | --- | --- |
 | distance | `SceneWitness3` | dashed closest-point segment **+** value |
@@ -1333,12 +1339,13 @@ pair:
 | branch | gate | prepared how |
 | --- | --- | --- |
 | mathematics (#1152) | `hasMath` | isolated, then `MathText` |
-| vector (#1195) | `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
+| vector (#1195, #1549) | `previewReadsVector3` (the dry-run parse) or `isVectorMarked3` | `vectorNotation` on **raw** text, then `VecMath` |
 | plain | — | isolated, `null` when isolation changes nothing |
 
 **Every `VecMath` caller gates it, and the gate is the caller's** ([ADR-3D-301](06b-decisions-3d.md#adr-3d-301), #1543).
 `VecMath`'s `PAIR` regex arrows any two-label run, so each surface in `FactRow3.tsx` decides: the step row
-by its commands (`isVectorFact3`), the preview by the typed text (`isVectorMarked3`), the ask echo
+by its commands (`isVectorFact3`, a total registry over `Command3` and `Claim3`, ADR-3D-425), the preview by
+the dry-run parse through the same registry (`app/previewReading3.ts`), else the typed text (`isVectorMarked3`), the ask echo
 (`askEchoNode3`) by `QueryResult.echo` — `'vector'` iff `parseQuery` bound a vector atom (`|AB|`, `AB·CD`,
 `∠(AB,CD)`, bare `AB`), else `'plain'`.
 
@@ -1360,10 +1367,13 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 | surface | what it can ask | gate |
 | --- | --- | --- |
 | step row (`factDisplay3`) | the COMMANDS exist | `isVectorFact3` |
-| input preview (`inputPreviewNode3`) | only the RAW TEXT — no command yet | `isVectorMarked3` |
+| input preview (`inputPreviewNode3`) | the DRY-RUN PARSE, passed in by `App3` because `render` must not import the parser | `previewReadsVector3`, else `isVectorMarked3` on a line that does not parse yet |
 | `vectorNotation` itself | — | **none; it is unconditional** |
 
-`vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate.
+`vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate. A two-reading
+segment equation («DC=3AB» over existing points) is the one line a parse cannot answer: its card follows the fold's
+`readings` verdict (ADR-3D-391 Am. 1), so the preview leaves it unarrowed. `cos-angle` reads `'plain'` pending a
+ruling: «AB ⟂ AD» and right-angled shapes lower to it too (ADR-3D-425).
 
 ## Known gaps
 
@@ -1376,3 +1386,9 @@ depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 - A vector given by its COMPONENTS with no points at all («נתון: v = (10,-5,0)») cannot start a figure:
   `Construction3.vectors` is `Map<name, {from, to}>` — a vector IS a point pair — so this needs the
   positionless-vector design in [#1188](https://github.com/dcodish/geo_builder/issues/1188).
+
+## The LLM escalation is an `app/` module ([ADR-W-189](06w-decisions-workspace.md#adr-w-189), #2231)
+
+`src3d/app/escalate3Flow.ts` holds what `App3` did inline: the ask, the one retry (`askKeepingNames` over `droppedNewLabels3`)
+and the sequence gate, pure over the injected `escalate3`. It commits nothing: `App3` hands the steps to `submitSteps`, whose
+`decideSteps3` runs the battery.

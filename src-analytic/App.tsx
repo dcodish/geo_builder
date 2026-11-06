@@ -39,7 +39,8 @@ import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
+import { nameRetryEvent } from '../shell/llm/retryLostNames';
+import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, segmentLengthText, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
@@ -52,11 +53,12 @@ import { SYMBOLS } from './ui/symbols';
 import { logAnalytic, logAnalyticFigure } from './debug/sessionLogAnalytic';
 import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
-import { Banner } from '../shell/frame/Banner';
+import { Banner, InfoNote } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
 import { coincidencesOf } from './app/coincidences';
 import { convergeText } from '../shell/converge';
-import { narrowingKey, narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
+import { narrowingNotesOf, type AnalyticNarrowing } from './app/narrowing';
+import { NarrowingNotes } from './app/NarrowingNotes';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
@@ -98,7 +100,7 @@ import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { unstatedChoices } from './engine/unstatedChoices';
 import { unstatedChoiceText } from './app/unstatedChoice';
 import { locusChips } from './app/locusChip';
-import { circleNoteText, circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
+import { circleNotesOf, conicChipKey, conicChips, conicMarksOf, isCircleShaped, markAnchors, type CircleNote } from './app/conicMarks';
 import { withConic } from './app/annotations';
 import { displayPointName } from './engine/pointName';
 
@@ -976,7 +978,7 @@ export function App() {
        * intention as a mistake is the #1045 lesson.
        */
       case 'teach':
-        setNotice(t('noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
+        setNotice(t(verdict.note === 'point-order' ? 'noticeTeachPointOrder' : verdict.note === 'point-equals' ? 'noticeTeachPointEquals' : 'noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
         return sentenceOutcome(verdict); // the canonical goes INTO the box (ADR-W-030)
       /**
        * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names
@@ -1022,9 +1024,10 @@ export function App() {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, act, atSeed, (utterance, context) =>
-        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he' }),
+      const out = await runFallback(raw, act, atSeed, (utterance, context, keep) =>
+        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he', ...(keep ? { keep } : {}) }),
       );
+      if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**
        * THE ESCALATION'S OUTCOME (#1300) — the event that could not be answered when #1297 was triaged.
        *
@@ -1471,48 +1474,21 @@ export function App() {
                 </Banner>
               </div>
             ))}
-            {/*
-              #1996 — the forced-narrowing note (ⓘ, the notice family): the ring the givens narrowed, from which kind to
-              which, and the statement(s) that did it, as the student typed them.
-            */}
-            {narrowings.map((n) => (
-              <div key={narrowingKey(n)} style={{ marginTop: 8 }} data-testid="analytic-narrowing-note">
-                <Banner kind="notice">
-                  <span aria-hidden="true">ⓘ </span>
-                  {narrowingText(
-                    n,
-                    (k, o) => t(k, o) as string,
-                    (i) => analyticBidi.isolateLtrRuns(rowShownText(active[i] ?? '', spokenFor[rows[i]])),
-                    (ring) => analyticBidi.isolateLtrRuns(ring),
-                  )}
-                </Banner>
-              </div>
-            ))}
-            {/*
-              #1863 (ADR-AG-377) — an ellipse the givens make a circle: the narrowing note's ⓘ, naming the givens that do it.
-            */}
-            {circleNotes.map((n) => (
-              <div key={`round-note:${n.curve}`} style={{ marginTop: 8 }} data-testid="analytic-conic-circle-note">
-                <Banner kind="notice">
-                  <span aria-hidden="true">ⓘ </span>
-                  {circleNoteText(
-                    n,
-                    (k, o) => t(k, o) as string,
-                    (i) => analyticBidi.isolateLtrRuns(rowShownText(active[i] ?? '', spokenFor[rows[i]])),
-                  )}
-                </Banner>
-              </div>
-            ))}
+            {/* #1996 and #1863 — the givens forced a narrower kind, said on the one face (#2266). */}
+            <NarrowingNotes
+              notes={narrowings}
+              circles={circleNotes}
+              t={(k, o) => t(k, o) as string}
+              shownLine={(i) => analyticBidi.isolateLtrRuns(rowShownText(active[i] ?? '', spokenFor[rows[i]]))}
+              isolate={(ring) => analyticBidi.isolateLtrRuns(ring)}
+            />
             {/*
               #1595 (ADR-AG-366, ADR-W-176) — two letters on one dot are accepted, and the page always says so: 2-D's
               ADR-123 sentence through the suite key. Read from the drawn figure, so it holds while the drawing has the pair.
             */}
             {coincidences.length > 0 && (
               <div style={{ marginTop: 8 }} data-testid="analytic-converge-note">
-                <Banner kind="notice">
-                  <span aria-hidden="true">ⓘ </span>
-                  {convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}
-                </Banner>
+                <InfoNote>{convergeText(coincidences, (k, o) => t(k, o) as string, (id) => analyticBidi.isolateLtrRuns(id))}</InfoNote>
               </div>
             )}
           </div>
@@ -2155,7 +2131,7 @@ export function App() {
                   const [a, b] = s.ends;
                   const k = s.length;
                   return (
-                    <span key={s.id}><ValueRow text={`${a}${b} = ${valueText(k, fmt, `${a}${b}`) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${segmentLengthText(s, fmt) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
                   );
                 }),
               },
@@ -2284,6 +2260,7 @@ export function App() {
                 dir="auto"
                 placeholder={t('askPlaceholder')}
                 addLabel={t('askAdd')}
+                unreadableHint={t('askUnreadable')}
                 onSubmit={(text) => {
                   // Idempotent, not a toggle (#1118) — see `askOnce`.
                   askOnce(text);

@@ -269,6 +269,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.notOnCircle', { id: err.id });
     // #253 (ADR-3D-419): a size or plane stated about a circle that cannot take it
     case 'circle-given-conflict':
+      // #2611 stage B (ADR-3D-420): the circle «המעגל» created has no letter to name it by
+      if (err.name === undefined) return t(err.what === 'radius' ? 'err.circleRadiusConflictUnnamed' : 'err.circlePlaneConflictUnnamed');
       return t(err.what === 'radius' ? 'err.circleRadiusConflict' : 'err.circlePlaneConflict', { name: err.name });
     case 'circle-given-determined':
       return t(err.what === 'radius' ? 'err.circleRadiusDetermined' : 'err.circlePlaneDetermined');

@@ -196,11 +196,6 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
-  "analytic:ask askUnreadable": {
-   "key": "askUnreadable",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "analytic:bad-arity #1": {
    "key": "bad-arity",
    "reason": "queued",

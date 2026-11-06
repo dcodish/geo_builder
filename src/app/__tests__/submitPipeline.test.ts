@@ -468,11 +468,12 @@ describe('#1898 — the partial-reading notice names each unread item once', () 
     dropped: [],
   };
 
-  const droppedLabelsOf = async (utterance: string): Promise<string> => {
+  // A lost LETTER is asked once more (#2231, ADR-W-189); a lost number is not. Never a third call.
+  const droppedLabelsOf = async (utterance: string, modelCalls = 2): Promise<string> => {
     llmParseMock.mockResolvedValue(triangleABC);
     const { deps, calls, notes } = makeDeps();
     await runSubmit(utterance, deps);
-    expect(llmParseMock, 'exactly one model call — the second attempt, mocked').toHaveBeenCalledTimes(1);
+    expect(llmParseMock, 'the mocked model calls for this line').toHaveBeenCalledTimes(modelCalls);
     expect(useGeoStore.getState().facts.length, 'nothing is committed').toBe(0);
     expect(calls.cleared, 'the text stays so the student can edit it').toBe(0);
     expect(notes().length, `one note for «${utterance}»`).toBe(1);
@@ -490,7 +491,7 @@ describe('#1898 — the partial-reading notice names each unread item once', () 
   });
 
   it('a lost NUMBER is named once', async () => {
-    expect(await droppedLabelsOf('ABC הוא משולש שאורך הצלע שלו AB הוא 7 ס"מ שסימנו')).toBe('7');
+    expect(await droppedLabelsOf('ABC הוא משולש שאורך הצלע שלו AB הוא 7 ס"מ שסימנו', 1)).toBe('7');
   });
 
   it('a point the student typed twice is still named once', async () => {

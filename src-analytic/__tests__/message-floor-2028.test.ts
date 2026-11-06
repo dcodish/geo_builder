@@ -30,6 +30,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'out-of-scope': [{}],
   'proof-target': [{}],
   'radian-angle': [{ detail: 'π/2' }],
+  'arc-length-unread': [{ detail: 'AB' }], // #2032 (ADR-AG-408)
   'unread-name': [{}],
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
@@ -48,9 +49,8 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'coordinate-restriction': [{}],
   'ambiguous-cevian': [{}],
   'cevian-no-triangle': [{}],
-  'ambiguous-hypotenuse': [{}],
   'ambiguous-no-right-angle': [{}],
-  'ambiguous-role-side': [{ detail: 'תיכון לבסיס', role: 'base' }, { detail: 'גובה לשוק', role: 'leg' }], // #2018 (ADR-AG-298)
+  'ambiguous-role-side': [{ detail: 'תיכון לבסיס', role: 'base' }, { detail: 'גובה לשוק', role: 'leg' }, { detail: 'תיכון ליתר', role: 'hypotenuse' }], // #2018 (ADR-AG-298), #2074
   'crossing-already-named': [{ holder: 'P' }, { holder: 'P', operands: ['AB', 'CD'] }],
   'third-crossing': [{ line: 'AB', a: 'A', b: 'B' }],
   'tangent-no-second-crossing': [{ id: 'P' }],

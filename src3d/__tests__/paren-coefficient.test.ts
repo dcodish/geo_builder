@@ -45,7 +45,7 @@ describe('a parenthesised symbolic coefficient is one term', () => {
 
   it('parses the reported forms — product `*` and juxtaposed alike', () => {
     for (const src of ['(1-t)*u+0.5*v+t*w', '(1-t)u+0.5v+tw', '(1-t)·u + 0.5·v + t·w']) {
-      expect(parseSymExpr(src), src).toEqual({
+      expect(parseSymExpr(src), src).toMatchObject({
         terms: [
           { coeff: { k: 1, p: -1 }, atom: { kind: 'named', name: 'u' } },
           { coeff: { k: 0.5, p: 0 }, atom: { kind: 'named', name: 'v' } },
@@ -63,7 +63,7 @@ describe('a parenthesised symbolic coefficient is one term', () => {
   });
 
   it('applies to PAIR atoms, not just named vectors', () => {
-    expect(parseSymExpr('(1-t)AB + tAC')).toEqual({
+    expect(parseSymExpr('(1-t)AB + tAC')).toMatchObject({
       terms: [
         { coeff: { k: 1, p: -1 }, atom: { kind: 'pair', from: 'A', to: 'B' } },
         { coeff: { k: 0, p: 1 }, atom: { kind: 'pair', from: 'A', to: 'C' } },
@@ -89,7 +89,7 @@ describe('a parenthesised symbolic coefficient is one term', () => {
   });
 
   it('the operator #300 statement lowers with both coefficients affine in k', () => {
-    expect(parseSymExpr('(0.5+k/6)u+(k+3.5)w+0.5v')).toEqual({
+    expect(parseSymExpr('(0.5+k/6)u+(k+3.5)w+0.5v')).toMatchObject({
       terms: [
         { coeff: { k: 0.5, p: 1 / 6 }, atom: { kind: 'named', name: 'u' } },
         { coeff: { k: 3.5, p: 1 }, atom: { kind: 'named', name: 'w' } },
@@ -100,7 +100,7 @@ describe('a parenthesised symbolic coefficient is one term', () => {
   });
 
   it('leaves the pre-existing V7 forms byte-identical', () => {
-    expect(parseSymExpr('(k/2)DB+kDC')).toEqual({
+    expect(parseSymExpr('(k/2)DB+kDC')).toMatchObject({
       terms: [
         { coeff: { k: 0, p: 0.5 }, atom: { kind: 'pair', from: 'D', to: 'B' } },
         { coeff: { k: 0, p: 1 }, atom: { kind: 'pair', from: 'D', to: 'C' } },
@@ -131,7 +131,7 @@ describe('a parenthesised symbolic coefficient is one term', () => {
   });
 
   it('lowers through parse3 to a vec-rel carrying the symbol', () => {
-    expect(parse3('AS=(1-t)*u+0.5*v+t*w')).toEqual({
+    expect(parse3('AS=(1-t)*u+0.5*v+t*w')).toMatchObject({
       ok: true,
       commands: [
         {

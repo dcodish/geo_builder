@@ -32,6 +32,7 @@ import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
+import { pointSpelling } from './pointOrder';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
 import { isPointName, splitPointNames } from '../engine/pointName';
@@ -115,7 +116,8 @@ export type SubmitVerdict =
    * `canonical` is a string `parseLine` has just accepted, so this verdict can never teach a form the
    * tool would reject.
    */
-  | { kind: 'teach'; verb: string; canonical: string }
+  /** `note` picks the teaching line; with none, the imperative wrapper's, which names `verb`. */
+  | { kind: 'teach'; verb: string; canonical: string; note?: 'point-order' | 'point-equals' }
   /**
    * #1154 — a RENAME request («שנה שם A ל-G»). It edits the SESSION, not the figure: nothing is
    * recorded as a line. The caller hands it to `dispatchRename` (`app/rename.ts`), which needs the
@@ -389,6 +391,15 @@ function decideOnce(
     if (parsed.code === 'not-handled') {
       const capital = capitalSizeRetry(line, figureLabelsOf(current));
       if (capital) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capital } };
+      /**
+       * #1774 (ADR-AG-409) — «(3,5)A» AND «A = (3,5)»: never accepted, each taught as «A(3,5)» (ADR-W-030). As for a
+       * wrapper, what is taught is a line the next Enter accepts here, or the line stays as it was.
+       */
+      const spelling = pointSpelling(line);
+      if (spelling) {
+        const next = decideSubmit(spelling.canonical, lines, seed, current).kind;
+        if (next === 'record' || next === 'already-known') return { kind: 'teach', verb: '', ...spelling };
+      }
     }
     /**
      * #1888 / #1889 (ADR-AG-251) — A DECLINED LINE WHOSE REST IS A LOST PART. «משולש ABC ישר זווית ב-B» and «…בנקודה E
@@ -440,6 +451,16 @@ function decideOnce(
   // #2039 step 1 (ADR-AG-358): and the same CONFIGURATION — the one drawn, not the one asked for. The display walk may have
   // stepped past the session's seed; solving the line from there replaced the triangle on the screen with another one.
   const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {});
+  /**
+   * #2231 (ADR-AG-410) — «MK אנך לציר x» from a point OF the line: the foot would be M itself, so the sentence is not the
+   * dropped perpendicular it reads as, and it keeps the verdict an unread line gets (the model's seam, as 2-D's relation).
+   */
+  for (const f of parsed.facts) {
+    if (f.t !== 'derived' || !f.piece || f.rule.t !== 'foot') continue;
+    const foot = trial.figure.points.find((p) => p.id === f.id);
+    const from = trial.figure.points.find((p) => p.id === (f.rule as { from: string }).from);
+    if (foot && from && Math.hypot(foot.x - from.x, foot.y - from.y) < 1e-9) return { kind: 'refused', error: { code: 'not-handled', detail: line, key: 'not-handled' } as unknown as InputError };
+  }
   /**
    * #2427 (ADR-AG-325) — a capital the grammar READ as a parameter («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M»):
    * asked of the register, so every family is one question. R, S beside an area, and a point of the figure are not this.
@@ -515,6 +536,7 @@ function decideOnce(
       error: {
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
         ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
+        ...(fault.tangents ? { tangents: fault.tangents } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),
@@ -543,6 +565,10 @@ function decideOnce(
    * harmless (it reached here with no fault).
    */
   if (addsStatedValue(current, trial)) return recorded;
+
+  // A LINE THAT PUTS A LETTER ON THE FIGURE RECORDS (#2674, ADR-AG-404): «E(-3,7)» on the tool's P₁ states what the figure
+  // holds, but the letter is new, and P₁ yields to it. The line owns the letter, as 2-D's naming by use is its line's (ADR-653).
+  if (trial.figure.points.some((p) => !current.figure.points.some((q) => q.id === p.id))) return recorded;
 
   if (trial.outcomes[lines.length] === 'known') {
     return { kind: 'already-known', line };
@@ -736,6 +762,7 @@ export function decideToggle(
       error: {
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
         ...(fault.holderKind ? { holderKind: fault.holderKind } : {}),
+        ...(fault.tangents ? { tangents: fault.tangents } : {}),
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
         ...collapseFields(fault),

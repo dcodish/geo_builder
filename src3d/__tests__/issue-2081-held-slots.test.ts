@@ -38,14 +38,21 @@ function recordsGreen(lines: string[]): St {
 const BOX = "תיבה ABCDA'B'C'D'";
 
 describe('#2081 item 1 — a radical in the coordinate-claim slot «A = (…)»', () => {
-  it.each(['A=(√1,0,0)', 'A = (1,0,0)'])('«A(1,0,0)» ⏎ «%s» records and verifies', (claim) => {
-    recordsGreen(['A(1,0,0)', claim]);
+  it.each(['A=(√1,0,0)', 'A = (1,0,0)'])('«A(1,0,0)» ⏎ «%s» reads, and restates the point (#2341)', (claim) => {
+    expect(build(['A(1,0,0)', claim]).last.kind).toBe('already-stated');
   });
 
   it.each(['B=(√2,0,0)', 'B = (√(2),0,0)', 'B=(sqrt(2),0,0)', 'B=(2√2/2,0,0)'])(
-    'a TRUE radical claim verifies: «A(0,0,0)» ⏎ «B(√2,0,0)» ⏎ «%s»',
+    'every spelling of the radical reads: «A(0,0,0)» ⏎ «B(√2,0,0)» ⏎ «%s» restates the point (#2341)',
     (claim) => {
-      recordsGreen(['A(0,0,0)', 'B(√2,0,0)', claim]);
+      expect(build(['A(0,0,0)', 'B(√2,0,0)', claim]).last.kind).toBe('already-stated');
+    },
+  );
+
+  it.each(['M=(√2,0,0)', 'M = (√(2),0,0)', 'M=(sqrt(2),0,0)', 'M=(2√2/2,0,0)'])(
+    'a TRUE radical ANSWER verifies: «A(0,0,0)» ⏎ «B(2√2,0,0)» ⏎ «M אמצע AB» ⏎ «%s»',
+    (claim) => {
+      recordsGreen(['A(0,0,0)', 'B(2√2,0,0)', 'M אמצע AB', claim]);
     },
   );
 

@@ -6,14 +6,14 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, commonTouchOf, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
 import { collapsedByGivens, completingStatement, pairsMetByGivens, partnerStatement, crossingHasNoPoint, curveAtOf, drawableAt, drawnConfiguration, hardRingFaults, holdsOn, lineCompareNoSide, seedNumber, viewBox, type Configuration, type Figure, type Seed } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
-import { resolveToolLetters } from './toolLetters';
+import { resolveToolLetters, typedLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
@@ -32,6 +32,8 @@ export interface LineFault {
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
+  /** For `no-common-tangent` (#2408, ADR-AG-403): which of 2-D's tangentsExhausted* sentences. */
+  tangents?: ApplyError['tangents'];
   /** For an unknown reference: what KIND was expected, so the message uses the right noun (#1179). */
   expected?: ApplyError['expected'];
   /** For a second naming: WHO already holds the position, so the refusal shows it (#1153). */
@@ -67,7 +69,7 @@ export interface LineFault {
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
   /** For `ambiguous-role-side` (#2018, ADR-AG-298): the role the cevian named — the refusal words it. */
-  role?: 'base' | 'leg';
+  role?: 'base' | 'leg' | 'hypotenuse';
   /** For a bisector named by a polygon's side (#2115, ADR-AG-299): the angle's vertex and the host's kind (`pair` is the side). */
   vertex?: string;
   polygonKind?: string;
@@ -310,7 +312,7 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...lineExistsFields(e) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}), ...(e.holderKind ? { holderKind: e.holderKind } : {}), ...(e.tangents ? { tangents: e.tangents } : {}), ...lineExistsFields(e) });
   });
 
   /**
@@ -649,6 +651,9 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     const objectLine = (id: string) => pinnedBy.get(id) ?? lineOf.get(id) ?? -1;
     /** The line that put `p` on circle `K` for good — or null when it is not, in every configuration. */
     const onForGood = (K: (typeof construction.objects)[number], p: string): number | null => {
+      // A letter-named common tangent's touch is on its circle in every configuration (#2408, ADR-AG-403).
+      const touch = commonTouchOf(construction, p);
+      if (touch && touch.circle === K.id) return constraintOn[touch.index];
       if (onCurveByConstruction(construction, K, p)) {
         const at = construction.constraints.findIndex((k) => k.t === 'on-curve' && k.id === p && k.curve === K.id);
         return at >= 0 ? constraintOn[at] : objectLine(K.id);
@@ -743,6 +748,9 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
         (k) => k.t === 'relation' && k.rel === 'perpendicular' && ((isRadius(k.u) && isStraight(k.v)) || (isRadius(k.v) && isStraight(k.u))),
       );
       if (rel >= 0) return constraintOn[rel];
+      // A letter-named common tangent: the line through its two touches is the family's tangent at each (ADR-AG-403).
+      const slot = commonTouchOf(construction, Q);
+      if (slot && slot.circle === K.id && sameSet(s.pts, [Q, slot.partner])) return constraintOn[slot.index];
       const isTangentObject = (id: string) => {
         const T = objectById(construction, id);
         return (
@@ -1094,7 +1102,11 @@ const subscript = (n: number): string => String(n).replace(/[0-9]/g, (d) => Stri
  * a point the student already stated at exactly those coordinates keeps THEIR letter (the #1270 rule — a
  * student's letter wins); otherwise the next free reserved name, P₁, P₂, … — subscripted, so it is a letter a
  * student does not reach for first, and `NAME` reads it back. Earlier names never move when a line is added, so
- * the figure stays stable. Pure over the list, like everything `derive` does.
+ * the figure stays stable — but for one: the tool's reserved letter yields to a student's FRESH letter stated later at
+ * those coordinates (#2674, ADR-AG-404; operator ruling 2026-11-03, card d3 A: *"Rename the tool's letter to the
+ * student's, no message (2-D's way, in every builder)"*), unless a line in between typed it, which makes it the
+ * student's (ADR-AG-387's rule). Decided here, before any id is built from the name (`circle-at-…`, `r_…`), and the
+ * reserved letter goes back to the pool. Pure over the list, like everything `derive` does.
  */
 function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[]; minted: Array<{ index: number; id: string }> } {
   const text = JSON.stringify(facts);
@@ -1112,17 +1124,17 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
   facts.forEach((f, i) => {
     if (f.t !== 'point' || !f.id.startsWith(MINT_PREFIX) || names.has(f.id)) return;
     const at = numeric(f);
-    const own = at
-      ? facts.slice(0, i).find((g) => {
-          if (g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
-          const q = numeric(g);
-          return q !== null && Math.abs(q[0] - at[0]) < 1e-12 && Math.abs(q[1] - at[1]) < 1e-12;
-        })
-      : undefined;
-    if (own && own.t === 'point') {
+    const stated = (g: Fact): g is Extract<Fact, { t: 'point' }> => {
+      if (!at || g.t !== 'point' || g.id.startsWith(MINT_PREFIX)) return false;
+      const q = numeric(g);
+      return q !== null && Math.abs(q[0] - at[0]) < 1e-12 && Math.abs(q[1] - at[1]) < 1e-12;
+    };
+    const own = facts.slice(0, i).find(stated);
+    if (own) {
       names.set(f.id, own.id);
       return;
     }
+    const count = n;
     let name: string;
     // The ORIGIN is O when that letter is free (#1628) — the exam's own name for it, and the same default
     // that yields as the canonical circle's centre (ADR-AG-184): a point the student already called O keeps
@@ -1130,6 +1142,13 @@ function resolveMints(facts: Fact[], owner: readonly number[]): { facts: Fact[];
     if (at && at[0] === 0 && at[1] === 0 && !used.has(CENTRE_LETTER)) name = CENTRE_LETTER;
     else do name = `P${subscript(++n)}`;
     while (used.has(name));
+    const taker = facts.findIndex((g, j) => j > i && stated(g));
+    const to = taker >= 0 ? facts[taker] : undefined;
+    if (to?.t === 'point' && !facts.slice(0, i).some((g) => JSON.stringify(g).includes(`"${to.id}"`)) && !facts.slice(i, taker + 1).some((g) => g.src && typedLetters(g.src).has(name))) {
+      names.set(f.id, to.id);
+      n = count;
+      return;
+    }
     used.add(name);
     names.set(f.id, name);
     minted.push({ index: owner[i], id: name });

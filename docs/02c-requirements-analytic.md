@@ -184,7 +184,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «נתונה אליפסה שמשוואתה x²/9−y²/16=1» → "that is a hyperbola, and this tool does not draw those"
 - Sources: ADR-AG-170.
 
-**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form.
+**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form. A letter after its coordinates, «(3,5)A» (right-to-left typing), and an equals sign, «A = (3,5)», are taught, not accepted: «A(3,5)» goes in the input box with a note saying why (ADR-AG-409, #1774).
 - Sources: ADR-AG-187, #1618.
 
 **R9 — Picture references are recognised and ignored.** They parse to **nothing**, inline or trailing, and never fall through to `not-handled` (ADR-3D-214 D2).
@@ -571,15 +571,25 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «כל המשיקים המשותפים לשני המעגלים» (also «המשיקים המשותפים …», «… למעגלים M ו-N», English) draws every common tangent by how the circles sit: 4 apart, 3 externally tangent, 2 crossing, 1 internally tangent. Each is a full line with its equation row. Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0
 - the names are the student's («המשיקים המשותפים l1, l2 ו-l3 לשני המעגלים»), else the next free l1, l2, … external first («l1», «ישר 1» and «I» count as one name); they are on screen from the start, so a later «הישר l2 …» means that tangent and a new «הישר l1: …» is refused as a name already taken; a count of names that does not match is refused «לא נמצאה תצורה…»
 - a circle inside the other is refused «למעגל המוכל בתוך מעגל אין אף משיק משותף.» (2-D's sentence); when the givens do not say how the circles sit («שני מעגלים», «המעגלים משיקים» with no מבחוץ / מבפנים) the sentence goes to the AI, as before
+- a letter-named tangent («AB משיק משותף …», one sentence each) is one of those tangents: each name is a different line, «חיצוני» / «פנימי» keep to their kind, and which one is drawn stays an unstated choice a later given picks. One past the count is refused with 2-D's sentence for the position («כל ארבעת המשיקים המשותפים כבר מסורטטים — לשני מעגלים אין משיק משותף חמישי.»), and adding one never moves what is drawn. Two free circles with a common tangent start apart
 - «המשיק העובר בנקודה המשותפת לשני המעגלים», «המשיק בנקודת ההשקה של המעגלים», «המשיק המשותף בנקודת ההשקה» (English too, optionally named «המשיק l …») draw the tangent at the touching circles' common point; for circles that cross or are apart, the AI as before. The ask «משוואת המשיק העובר בנקודה המשותפת לשני המעגלים» answers its equation
 - the exam's «סרטטו במערכת צירים אחת סקיצה של שני המעגלים ושל כל המשיקים המשותפים לשני המעגלים», and «סרטטו …» spelled with ס, are taught as the sentence they wrap
-- Sources: ADR-AG-314, #2390, #2379.
+- Sources: ADR-AG-314, ADR-AG-403, #2390, #2379, #2408, #2411.
 
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»
 - «חצי מעגל שקוטרו AB», «גזרה AOB בזווית 80»
 - «רבע מעגל AOB» and «גזרה AOB» are centred at O, «גזרה OAB» too: the middle letter is the centre, or an O/P/Q letter written first, read as 2-D reads it
 - Sources: ADR-AG-220, #1622, ADR-AG-331, #2486.
+
+**R245 — an arc's length is refused, never read as degrees**. *(Operator ruling 2026-11-04 on #2032, card q5 = B: "Refuse «קשת AB = 4π» honestly now, then build A".)* The tool has no arc-length measure yet (#2710). A π value on one arc, a value with a length unit («קשת AB = 4 ס"מ»), and any statement of an arc's length, is refused with «הכלי עדיין לא קורא אורך של קשת. קשת נכתבת כאן במעלות — למשל קשת AB = 40», in the student's letters. An arc in degrees is unchanged (R163). An arc sum or ratio written with π is an angle in radians and is refused as one.
+- «קשת AB = 4π», «⌢AB = 3π», «קשת AB = 2π/3», "arc AB = 4π"
+- «אורך הקשת AB הוא 4π», «אורך הקשת AB = 5», "arc length AB is 4π", «קשת AB = 4 ס"מ»
+- Sources: ADR-AG-408, ADR-789, #2032, #2710, ADR-W-142.
+
+**R246 — the definite «הישר» binds the drawn line**. *(Operator, 2026-11-02, [ADR-W-175](06w-decisions-workspace.md#adr-w-175): "a definite noun binds the drawn object of its kind.")* In a point-on sentence, one line on the figure binds; two or more ask which with the existing question. No line, or only a side, stays not understood: those two cases are not ruled.
+- «y=3x+2» · «P על הישר», «הנקודה (1,5) על הישר», "P is on the line"
+- Sources: ADR-AG-409, #1774.
 
 **R74 — a conic is named by its KIND**. A figure holding two of a kind refuses the reference rather than inventing an ordinal.
 - «הנקודה A נמצאת על האליפסה», «P על הפרבולה»
@@ -612,7 +622,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
 - Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 
-**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one. Two sibling nouns on one ring («מלבן ABCD» · «מעוין ABCD») get 2-D's one note instead, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.» — read off the nouns, so it needs no pool ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2171).
+**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one. Two sibling nouns on one ring («מלבן ABCD» · «מעוין ABCD») get 2-D's one note instead, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.» — read off the nouns, so it needs no pool ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2171). The note is 2-D's blue ⓘ information strip, never the amber warning ([ADR-W-180](06w-decisions-workspace.md#adr-w-180), #2266).
 - «מקבילית ABCD» · «AB = BC» → «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.»
 - Sources: ADR-AG-276, ADR-W-129, #1996, #1899.
 
@@ -637,7 +647,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «מרובע ABCD» · «משולש ABC» · «AE גובה» → asks which shape · «נקודה A» · «AD גובה» → refused · «מקבילית ABCD» · «AE תיכון» → refused
 - Sources: ADR-AG-253, #1945, #1907, ADR-W-118, ADR-263, ADR-169.
 
-**R103c — the tool's letters are 2-D's, and «תיכון ליתר» never assumes the right angle**. **M** for a midpoint, **H** for a foot (F is the focus letter here); with only «משולש ישר-זווית ABC», «תיכון ליתר» ASKS which side is the hypotenuse.
+**R103c — the tool's letters are 2-D's, and «תיכון ליתר» draws on the shown triangle**. **M** for a midpoint, **H** for a foot (F is the focus letter here). With only «משולש ישר-זווית ABC», «תיכון ליתר» and «גובה ליתר» draw on the triangle as shown; which vertex holds the right angle is a degree of freedom «הציגו תצורה אחרת» cycles, and the line follows it ([ADR-AG-411](06c-decisions-analytic.md#adr-ag-411), #2074). A typed apex («CM תיכון ליתר», «גובה ליתר מ-C», «תיכון ליתר בנקודה C») or hypotenuse («תיכון ליתר AB») states the right angle and pins it; several right triangles ask which side is meant. A foot letter after a cevian noun («תיכון לצלע AB בנקודה K», «גובה מ-A בנקודה H», «חוצה זווית C בנקודה K») names the foot ([ADR-790](06-decisions.md#adr-790), #2166).
 - **A perpendicular bisector draws only its line** (operator ruling 2026-10-27, «B»): «אנך אמצעי ל-EK» and «l2 אנך אמצעי ל-EK» show no midpoint dot, no letter and no «הכלי קרא לנקודה …». «P אמצע EK» typed after the line shows its midpoint, lettered P (before it, the line runs through P); a sentence that refers to the midpoint («אמצע EK») letters it M, announced on that row. A foot, a median's foot and a midsegment's ends keep their letters. Analytic only: 2-D still draws M.
 - Sources: ADR-AG-211, #1620, #1222, #1281, #1689, ADR-AG-345, #2583.
 
@@ -652,7 +662,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «גובה המשולש 4» / «גובה המקבילית הוא 4» → asks · «מקבילית ABCD» · «האלכסון AB» → refused (a side) · «משולש ABC» · «גובה הטרפז 4» → «באיור אין טרפז»
 - Sources: ADR-AG-265, #1737, ADR-574, ADR-575, ADR-569.
 
-**R178 — a side named by its ROLE alone is the side the figure says; an open role is a degree of freedom**. *(Operator, 2026-10-06: "משוואת הבסיס should be understood. if the user defined the equal sides, this is easy to know what the base is but if he didn't the sentence can be used with dof"; "there is no base in parallelogram".)* «משוואת הבסיס היא …», «הבסיס מונח על הישר …», «משוואת השוק …», «משוואת היתר …», "the base lies on the line …": a stated equal pair or right angle settles the side, read as if its letters were typed; an open apex, right-angle seat or trapezoid base is cycled by «הציגו תצורה אחרת», one cycle, the side always matching the drawn apex. A shape with no such role (a parallelogram, a plain triangle) is refused, naming the sentence. **A median or altitude to a side named by its role follows the configuration** (#2018, operator 2026-10-06: *"תיכון לבסיס should be allowed and it should change with other configs"*): «תיכון לבסיס», «גובה לבסיס», «תיכון לשוק», «גובה לשוק» (a second one takes the other leg), «התיכון / הגובה …», "the median / altitude to the base / leg" draw the cevian from the drawn apex (or to a leg through it), its foot named M (a median) or H (an altitude), and each «הציגו תצורה אחרת» redraws it; a stated equal pair settles it as its letters would; «תיכון לבסיס BC» states the base and draws the median to it. With no single isosceles triangle (a plain or equilateral triangle, a trapezoid) the role cevian is ASKED, in 2-D's sentence.
+**R178 — a side named by its ROLE alone is the side the figure says; an open role is a degree of freedom**. *(Operator, 2026-10-06: "משוואת הבסיס should be understood. if the user defined the equal sides, this is easy to know what the base is but if he didn't the sentence can be used with dof"; "there is no base in parallelogram".)* «משוואת הבסיס היא …», «הבסיס מונח על הישר …», «משוואת השוק …», «משוואת היתר …», "the base lies on the line …": a stated equal pair or right angle settles the side, read as if its letters were typed; an open apex, right-angle seat or trapezoid base is cycled by «הציגו תצורה אחרת», one cycle, the side always matching the drawn apex. A shape with no such role (a parallelogram, a plain triangle) is refused, naming the sentence. **A median or altitude to a side named by its role follows the configuration** (#2018, operator 2026-10-06: *"תיכון לבסיס should be allowed and it should change with other configs"*): «תיכון לבסיס», «גובה לבסיס», «תיכון לשוק», «גובה לשוק» (a second one takes the other leg), «התיכון / הגובה …», "the median / altitude to the base / leg" draw the cevian from the drawn apex (or to a leg through it), its foot named M (a median) or H (an altitude), and each «הציגו תצורה אחרת» redraws it; a stated equal pair settles it as its letters would; «תיכון לבסיס BC» states the base and draws the median to it. The hypotenuse reads the same way (R103c). With no single isosceles triangle (a plain or equilateral triangle, a trapezoid) the role cevian is ASKED, in 2-D's sentence.
 - «משולש שווה שוקיים» · «AB=AC» · «משוואת הבסיס היא x-2y+6=0» · «A(3,2)» · «d_{BC}=6√5»
 - «משולש שווה שוקיים ABC» · «משוואת הבסיס היא x-2y+6=0» → the base cycles · «מקבילית ABCD» · «משוואת הבסיס …» → refused
 - «משולש שווה שוקיים ABC» · «תיכון לבסיס» → the median follows the apex · «משולש ABC» · «תיכון לבסיס» → asks
@@ -783,8 +793,9 @@ a sentence the tool parsed.
 **R104a — the fallback's answer must say what the student said: a dropped name or number, or an invented name, refuses it**. *(Operator: «1355 is p1», 2026-10-15, on a student who lost the stated leg 5.)* An answer that loses a name or a number the sentence stated, or names something the student did not name and the figure does not hold, records nothing; the text stays in the input. A loss names what was lost, in the student's own tokens; an invention names nothing (the model's letter is not the student's).
 - «משולש ישר זוית ABC … אורכי הניצבים 12 5 … B(10,-11) A(10,1)» answered without the legs → «הבנתי רק חלקית — לא הצלחתי למקם את 2, 3, 4, 12, 5, 1. …», nothing recorded
 - «גובה מנקודה M לצלע OG» answered «MH גובה לצלע OG» → «כדי לבנות את זה צריך לתת שם למשהו שלא נתתם לו שם — תנו לו שם משלכם ונסו שוב.»
+- A value the answer COMPUTED is not lost when its curve really has it *(operator, 2026-11-04, card q2 = B: "Accept when the answer's curve really has the value")*: «מעגל שקוטרו 6 ומרכזו (0,0)» answered «x^2 + y^2 = 9» records, and so do a point the curve passes through, a focus, a directrix, an axis length and an intercept; the value is read in the role the sentence states, so «מעגל שמרכזו (3,4) ורדיוסו 5» answered «x^2 + y^2 = 25» is refused, naming «3, 4», though that circle passes through (3,4)
 - A name already in the figure that the sentence never wrote counts too *(operator, 2026-10-16: "1 - yes")*: «ישר l» answered «דרך P עובר ישר l» → «כדי לבנות את זה הייתי צריך לקשר את המשפט ל-P, שלא מופיע בו — לא רשמתי כלום. …», nothing recorded
-- Sources: ADR-AG-279, ADR-AG-280, ADR-AG-281, #1355, #2225.
+- Sources: ADR-AG-279, ADR-AG-280, ADR-AG-281, ADR-AG-405, #1355, #2225, #2680.
 
 **R194 — a sentence the fallback answers with several lines shows one row per line, worded as that line**. *(Operator ruling (c), 2026-10-20, on #2424: "the part where an input is separated into 2 is not clear to users since they just see the same line twice".)* As 2-D does; each row keeps its own tick, ✕ and ✎. An answer of ONE line still shows the student's own sentence (#1297). The shape warning and the narrowing note name such a row by the same text. «הורידו שאלה» still prints the student's sentence once.
 - «נתון מעגל I שמשוואתו (x − 3)² + (y − 4)² = 9 , ומרכזו בנקודה K .» answered with two lines → «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» · «מרכז המעגל I הוא K», never the sentence twice with «(1/2)», «(2/2)»
@@ -1018,11 +1029,16 @@ a sentence the tool parsed.
   - «משולש ABC» · «A(8,-2)» · «משוואת הצלע BC היא x-y+2=0» · «P מפגש תיכונים» · «שיעור ה- x של P הוא 3» · «AD תיכון» · «AE גובה» · «שטח ABC הוא 18» → E falls on C: «C=E», never «CE»
 - Sources: ADR-AG-366, ADR-AG-372, ADR-W-176, ADR-W-177, #1595, #2401, ADR-AG-393, #2696.
 
-**R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice.
+**R231 — a student's letter on a point the tool lettered replaces the tool's letter, with no message**. *(Operator ruling 2026-11-03, card d3 A: "Rename the tool's letter to the student's, no message (2-D's way, in every builder)"; [ADR-AG-387](06c-decisions-analytic.md#adr-ag-387).)* Sometimes a new letter of the student's is the same point as one the tool lettered: a median's or a midsegment's midpoint, or an altitude's or a perpendicular's foot. The figure then has one point under the student's letter, and what the tool built through it follows. Once the student has typed the tool's letter, it is theirs, and two of their letters on one dot keep R214's notice. The segment may be written either way round. The letter then goes back to the pool for the next point the tool letters, as in 2-D. A coordinate point's reserved letter yields the same way to a fresh letter stated at those coordinates.
+**R247 — «MK אנך לציר x» with M placed and K new builds K, the foot of the perpendicular from M**, with the piece MK drawn and no AI; the target may be any line («MK אנך ל-AB», ADR-786's reading). The noun only: «MK מאונך לציר x» stays the relation. With K placed, M not placed, or M on the line, the line goes to the AI as before. A name the AI's answer loses is [FR-SU-32](02w-requirements-workspace.md). *(Operator ruling 2026-10-16, B: "yes"; [ADR-AG-410](06c-decisions-analytic.md#adr-ag-410), #2231.)*
+
 - «תיכון מ-A במשולש ABC» · «D אמצע BC» → one point D, no message
+- «אמצע BC» · «D אמצע CB» → one point D, no message
+- «תיכון מ-A במשולש ABC» · «D אמצע BC» · «תיכון מ-B במשולש ABC» → the second midpoint is M
+- «הבסיס CD נמצא על ישר העובר דרך הנקודה (-3,7)» · «E(-3,7)» → one point E, no message
 - «גובה מ-A במשולש ABC» · «AD גובה במשולש ABC» → one point D
 - «תיכון מ-A במשולש ABC» · «AM = 3» · «D אמצע BC» → recorded, «M ו-D נפלו על אותה נקודה.»
-- Sources: ADR-AG-387, #2674, sr-07 (ADR-W-175).
+- Sources: ADR-AG-387, ADR-AG-404, #2674, sr-07 (ADR-W-175).
 
 **R184 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
 - «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)
@@ -1149,7 +1165,9 @@ a sentence the tool parsed.
 - «∢ABC = 30» → «30°»; «tan∢BAO = 2» → «63.43°»
 - «AB = 3a» → «3a»
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality draws no mark at rest; it stays in the givens list, and is drawn only in an opt-in relations layer. The text below describes the code until that ships. A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
-- Sources: ADR-AG-225, #1714, ADR-W-047, #1241, ADR-AG-237, #1806, ADR-W-118, #1805, #1865, #1733, ADR-AG-228.
+- A stated value is written as typed: «BC=6√5» → «6√5», «BC=√8» → «√8», «BC=0.5» → «0.5», «AB = 4π» → «4π», «שטח המשולש ABC הוא 12π» → «S=12π» ([ADR-AG-407](06c-decisions-analytic.md#adr-ag-407)). A trig given's angle reads the tool's number. A letter the student valued reads the spelling they gave it («BC = a» · «a = √8» → «√8»).
+- A stated coordinate reads as typed in the panel and on the canvas: «A(0.5,2/3)» reads «(0.5, 2/3)», «A(√8,1.25)» reads «(√8, 1.25)»; a decimal reads at most two decimals (FR-SU-30).
+- Sources: ADR-AG-225, #1714, ADR-W-047, #1241, ADR-AG-237, #1806, ADR-W-118, #1805, #1865, #1733, ADR-AG-228, ADR-AG-413, #1497.
 
 **R176 — a construction point off the drawn ink gets its line extended, dashed, to meet it, as in the 2-D tool**. *(Operator rulings 2026-10-09 and 2026-10-10: "Lines, and show why".)* A point the construction puts on a line through two named points (a height's foot, a diagonal meet, a crossing) that lands beyond the drawn piece gets that line drawn on, dashed, from the end of the ink out to it. A point on the drawn piece gets nothing.
 - «טרפז ABCD» · «AE גובה» with E past D → DC extended, dashed, from D to E
@@ -1163,7 +1181,7 @@ a sentence the tool parsed.
 - «F(1,1)» · «y^2=8x», focus shown → «(2, 0)»
 - Sources: ADR-AG-376, #1863, ADR-W-175.
 
-**R223 — an ellipse the givens make a circle is said to be one, and its centre is a circle's centre**. *(Operator, 2026-11-03, card d2: "we should have a comment saying that the shape is now a circle … as for the focus, we dont show it as focus its the circle center.")* When a = b in every configuration — by its equation («x^2/9+y^2/9=1») or by a later given («x^2/a^2+y^2/9=1» · «a=3») — the ellipse gets no chip, no focus and no directrix; its centre is marked with the circle's centre cross, with «(0, 0)» when known, and a notice in the narrowing note's voice names the givens that do it: «בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.» No letter O is given automatically (R123 is a typed circle's): *"no letter but a clickable center"* (2026-11-03) — the centre is offered as a circle's is, and the letter the student picks records «K מרכז האליפסה». Its data-panel row lists «מרכז: (0, 0)» instead of the foci (*"Yes: the panel shows «מרכז: (0, 0)» instead of the foci"*, 2026-11-03). «O מרכז האליפסה» names any ellipse's centre (the origin).
+**R223 — an ellipse the givens make a circle is said to be one, and its centre is a circle's centre**. *(Operator, 2026-11-03, card d2: "we should have a comment saying that the shape is now a circle … as for the focus, we dont show it as focus its the circle center.")* When a = b in every configuration — by its equation («x^2/9+y^2/9=1») or by a later given («x^2/a^2+y^2/9=1» · «a=3») — the ellipse gets no chip, no focus and no directrix; its centre is marked with the circle's centre cross, with «(0, 0)» when known, and a notice in the narrowing note's voice and on its blue ⓘ strip (R179) names the givens that do it: «בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה.» No letter O is given automatically (R123 is a typed circle's): *"no letter but a clickable center"* (2026-11-03) — the centre is offered as a circle's is, and the letter the student picks records «K מרכז האליפסה». Its data-panel row lists «מרכז: (0, 0)» instead of the foci (*"Yes: the panel shows «מרכז: (0, 0)» instead of the foci"*, 2026-11-03). «O מרכז האליפסה» names any ellipse's centre (the origin).
 - Sources: ADR-AG-377, #1863, #2676.
 
 **R25a — the object the student asked for is ON SCREEN**. A collapsed trace does not widen the frame, and the frame stays put across «הציגו תצורה אחרת» (ADR-AG-137).

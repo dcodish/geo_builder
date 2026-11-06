@@ -515,6 +515,9 @@ const SEEDED: SeededCorpus = {
   // #2611 (ADR-3D-410) — a new point stated on a circle rides it (before: refused «not on the circle», the statement
   // only checked against a free point). The class rows and the refusals are asserted in point-on-circle-2611.test.ts.
   'point-on-circumcircle-2611.geo3.json': ['משולש ABC חסום במעגל', 'D על המעגל'],
+  // #2611 stage B (ADR-3D-420) — a blank canvas: the circle the line refers to is created (before: refused `unknown-circle`).
+  // The class, the notice and the refusals are asserted in circle-created-by-reference-2611.test.ts.
+  'point-on-circle-blank-2611.geo3.json': ['D על המעגל'],
   // #2681 (ADR-3D-413) — a plane named by four letters inside a relation, on a blank canvas: its letters are created in
   // one plane (before: built green in general position). The class and the refusals are asserted in plane-run-relation-2681.test.ts.
   'plane-run-parallel-blank-2681.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
@@ -527,6 +530,9 @@ const SEEDED: SeededCorpus = {
   // needed) and carries its typed-decimal mark. The labels on both surfaces are asserted in
   // issue-2361-stated-value-text.test.ts; this is the build + drift net.
   'stated-length-7-9999-2361.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9999'],
+  // #1497 (ADR-3D-426) — the operator's four lines: «SD = (2/3)u» keeps its spelling. The row is asserted in
+  // issue-1497-format-of-entry.test.ts; this is the build + drift net.
+  'format-of-entry-2-3u-1497.geo3.json': ['פירמידה משולשת ABCS', 'D על SB', 'נסמן: SB = u', 'SD = (2/3)u'],
   // #1986 (ADR-3D-418) — the issue's two reported rows: a second ring a dart saves, and a trapezoid a coordinate letter
   // saves past its default window. Both rings drawn simple, k > 4 and the seeds are asserted in
   // issue-1986-ring-search.test.ts; these are the build + drift net.

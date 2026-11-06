@@ -18,20 +18,21 @@
 import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
-import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
+import { FAMILIES_OF, positionOfCircles, reversedFamily, type PairPosition } from './commonTangents';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm, type RoleEnd } from './lengths';
 import { curveParentsOf, parentsOf, sameEllipseRole, type DerivedRule, type EllipseRole, type FootLine } from './derived';
 import { namesCurveFeature, sameDerivation } from './sameDerivation';
-import { isHelperId, typedLetters } from './toolLetters';
+import { freeToolLetter, isHelperId, typedLetters } from './toolLetters';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { EN_SHAPE, displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { probeEnvs } from './probes';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
 import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
-import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
+import { followObjects, isoscelesKeys, rightAngleKeys, roleVertexOf } from './roles';
 import { POINT_NAME, isPointName } from './pointName';
 import {
   CENTRE_SENTINEL,
@@ -63,10 +64,12 @@ import {
   type Fact,
   type Selector,
   type ArcDef,
+  type CommonTangentFamily,
   type GeoObject,
   type Id,
   type PointObject,
   type PolygonObject,
+  type RoleBinding,
   type OrderSide,
 } from './types';
 
@@ -236,15 +239,13 @@ export type ApplyErrorCode =
   | 'ambiguous-cevian'
   | 'cevian-no-triangle'
   /**
-   * «תיכון ליתר» where the figure leaves the right angle open (a right triangle's noun alone) or holds several right
-   * triangles — a QUESTION: which side is the hypotenuse (#1222, operator ruling 2026-10-02 on #1620). And
-   * `ambiguous-no-right-angle` where no triangle has a right angle at all: there is no hypotenuse.
+   * «תיכון ליתר» where no triangle has a right angle at all: there is no hypotenuse (#1222).
    */
-  | 'ambiguous-hypotenuse'
   | 'ambiguous-no-right-angle'
   /**
    * «תיכון לבסיס» / «גובה לשוק» where no single polygon gives the role a side (#2018, ADR-AG-298): a plain triangle,
-   * an equilateral one, a trapezoid (2-D reads the role on a triangle only), none, or several. 2-D's `clarify`
+   * an equilateral one, a trapezoid (2-D reads the role on a triangle only), none, or several; «תיכון ליתר» with
+   * several right triangles (#2074, ADR-AG-411). 2-D's `clarify`
    * (`input.roleSideUnresolved`), its sentence verbatim; `role` carries which role, for the locale to word.
    */
   | 'ambiguous-role-side'
@@ -273,7 +274,11 @@ export type ApplyErrorCode =
   /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
    *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
   | 'radius-contradicts'
-  /** #2390 (ADR-AG-314): «כל המשיקים המשותפים» about a circle inside the other — 2-D's `tangentsExhaustedContained`. */
+  /**
+   * #2390 (ADR-AG-314): «כל המשיקים המשותפים» about a circle inside the other — 2-D's `tangentsExhaustedContained`; and
+   * (#2408 / #2411, ADR-AG-403) a letter-named common tangent the pair has no free slot for, `tangents` naming which of
+   * 2-D's sentences.
+   */
   | 'no-common-tangent'
   /**
    * #2388 (ADR-AG-307; operator ruling 2026-10-20, *"Detect the clash and refuse, naming both readings"*): the radius
@@ -325,6 +330,8 @@ export interface ApplyError {
    * A TOKEN, never a sentence: the engine stays language-free, and He/En render it in `App.tsx`.
    */
   existing?: ExistingKind;
+  /** For `no-common-tangent` (#2408 / #2411, ADR-AG-403): WHICH of 2-D's tangentsExhausted* sentences — absent is `Contained`. */
+  tangents?: TangentsExhausted;
   /**
    * WHAT KIND of object the statement expected to find (#1179).
    *
@@ -375,7 +382,7 @@ export interface ApplyError {
   polygon?: string;
   pair?: string;
   /** For `ambiguous-role-side` (#2018): the role the sentence named. */
-  role?: 'base' | 'leg';
+  role?: 'base' | 'leg' | 'hypotenuse';
   /** For `name-taken` (#2054): the target as the refused line spells it (`ABC`, `AB`), and whether it is an angle or a segment. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -506,7 +513,7 @@ function admitStated(
     const merged = r.next.params.find((p) => p.sym === value.name)?.domain;
     return merged && emptyDomain(merged) ? refuse : { ok: true, next: r.next };
   }
-  const somewhere = PROBE_ENVS.some((env) => inDomain(domain, evalExpr(value, env)));
+  const somewhere = probeEnvs(value).some((env) => inDomain(domain, evalExpr(value, env)));
   return somewhere ? { ok: true, next: c } : refuse;
 }
 
@@ -839,12 +846,6 @@ export type ApplyOutcome =
  */
 const CURVE_BEARING: ReadonlySet<string> = new Set(['curve', 'circle-at', 'line-at', 'circle-thru', 'common-tangent']);
 
-/** The probe environment for restatement comparison — see `sameNumbers`. */
-const PROBE_ENVS: Env[] = [
-  { a: 1.7, b: 2.3, k: 1.3, m: 0.7, n: 2.1, p: 1.9, r: 1.1, t: 2.7 },
-  { a: 3.1, b: 1.1, k: 2.9, m: 1.3, n: 0.9, p: 3.3, r: 2.3, t: 1.3 },
-];
-
 /**
  * WHAT KIND OF CURVE an object is — one answer for every contextual reference (#1057, #1324).
  *
@@ -868,7 +869,7 @@ export function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'line-at' || o.kind === 'common-tangent') return 'line';
   if (o.kind !== 'curve') return null;
   if (o.curve.kind) return o.curve.kind;
-  const probe = resolveCurve(o.curve, PROBE_ENVS[0]);
+  const probe = resolveCurve(o.curve, probeEnvs(o.curve.eq)[0]);
   return probe.ok ? probe.curve.kind : null;
 }
 
@@ -964,7 +965,7 @@ function centresAlwaysCoincide(c: Construction, a: GeoObject, b: GeoObject): boo
     return 'moves';
   };
   let judged = 0;
-  for (const env of PROBE_ENVS) {
+  for (const env of probeEnvs(...circleExprs(c, a), ...circleExprs(c, b))) {
     const p = centreAt(a, env);
     const q = centreAt(b, env);
     if (p === 'moves' || q === 'moves') return false;
@@ -1111,7 +1112,7 @@ function resolveCurveByEq(c: Construction, eq: unknown): Id | null {
     Object.entries(a).every(([key, v]) => typeof v !== 'number' || (typeof b[key] === 'number' && close(v, b[key] as number)));
   for (const o of c.objects) {
     if (o.kind !== 'curve') continue;
-    const match = PROBE_ENVS.every((env) => {
+    const match = probeEnvs(eq as Expr, o.curve.eq).every((env) => {
       const mine = resolveCurve({ eq } as typeof o.curve, env);
       const theirs = resolveCurve(o.curve, env);
       return mine.ok && theirs.ok && same(mine.curve as unknown as Record<string, unknown>, theirs.curve as unknown as Record<string, unknown>);
@@ -1185,7 +1186,7 @@ const mintedEffect = (out: ApplyOutcome, minted: boolean): ApplyOutcome =>
 function sameNumbers(a: unknown, b: unknown): boolean {
   const ea = a as Parameters<typeof evalExpr>[0];
   const eb = b as Parameters<typeof evalExpr>[0];
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(ea, eb).every((env) => {
     const va = evalExpr(ea, env);
     const vb = evalExpr(eb, env);
     if (!Number.isFinite(va) || !Number.isFinite(vb)) return false;
@@ -1566,7 +1567,7 @@ function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: 
   let stated = standardCircleParts(eq);
   if (!stated && (spoken.a || spoken.b || spoken.r || usedElsewhere)) {
     // A circle with constant centre and radius needs no algebra: its parts are read at the probes.
-    const fits = PROBE_ENVS.map((env) => resolveCurve({ eq } as Curve, env));
+    const fits = probeEnvs(eq).map((env) => resolveCurve({ eq } as Curve, env));
     const first = fits[0];
     if (!first.ok || first.curve.kind !== 'circle') return null;
     const { cx, cy, r } = first.curve;
@@ -1592,7 +1593,7 @@ function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: 
   }
   const carriedFacts: Fact[] = [];
   if (spoken.r) {
-    const at = PROBE_ENVS.map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
+    const at = probeEnvs(carried.r).map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
     const constant = at.every((v) => Number.isFinite(v) && v === at[0]);
     carriedFacts.push(
       constant || !stated
@@ -2109,13 +2110,165 @@ function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
       if (k.t === 'tangent-circle' && sidesAre(k.a, k.b, o1, c1, o2, c2)) return k.branch === 'external' ? 'ext-tangent' : 'int-tangent';
     }
   }
-  const at = PROBE_ENVS.map((env) => [circleAtProbe(c, o1, env), circleAtProbe(c, o2, env)] as const);
+  const at = probeEnvs(...circleExprs(c, o1), ...circleExprs(c, o2)).map((env) => [circleAtProbe(c, o1, env), circleAtProbe(c, o2, env)] as const);
   const [p0, q0] = at[0];
   if (!p0 || !q0) return null;
   const same = (u: NumCircle | null, v: NumCircle) =>
     !!u && [u.cx - v.cx, u.cy - v.cy, u.r - v.r].every((d) => Math.abs(d) <= 1e-9 * Math.max(1, Math.abs(v.cx), Math.abs(v.cy), v.r));
   if (!at.every(([p, q]) => same(p, p0) && same(q, q0))) return null;
   return positionOfCircles(p0, q0);
+}
+
+/** 2-D's tangentsExhausted* sentence, by its suffix (`src/i18n/humanizeError.ts` `tangentsExhaustedKey`) — ADR-AG-403. */
+export type TangentsExhausted =
+  | 'Any' | 'External' | 'Internal' | 'ExtTangent' | 'Intersecting' | 'IntTangent' | 'TouchTaken' | 'NoInternal' | 'Contained';
+
+/** 2-D's mapping, one for one (`tangentsExhaustedKey`): the pair's position and the kind the sentence asked for. */
+export function tangentsExhaustedOf(kind: 'external' | 'internal' | undefined, position: PairPosition | null): TangentsExhausted {
+  if (position === 'inside') return 'Contained';
+  if (position === 'int-tangent') return kind === 'internal' ? 'NoInternal' : 'IntTangent';
+  if (position === 'cross') return kind === 'internal' ? 'NoInternal' : 'Intersecting';
+  if (position === 'ext-tangent') return kind === 'external' ? 'External' : kind === 'internal' ? 'TouchTaken' : 'ExtTangent';
+  return kind === 'external' ? 'External' : kind === 'internal' ? 'Internal' : 'Any';
+}
+
+/**
+ * The pair's TWO-TOUCH families by position (2-D's capacity rule: a tangent pair's third tangent is the one at T), in the
+ * order a letter-named tangent offers them: 2-D's (external before internal) in ADR-AG-314's naming order.
+ */
+const TWO_TOUCH_OF: Readonly<Record<PairPosition, readonly CommonTangentFamily[]>> = {
+  apart: FAMILIES_OF.apart,
+  'ext-tangent': ['ext-a', 'ext-b'],
+  cross: ['ext-a', 'ext-b'],
+  'int-tangent': [],
+  inside: [],
+};
+
+/** One letter-named common tangent of a pair, read off its `common-touch` conditions (#2408, ADR-AG-403). */
+interface PairTangent {
+  /** Its touch on the pair's FIRST circle (as this pair is named). */
+  touch: Id;
+  /** Its stated kind, read off the families it may be: all external, all internal, or either (`undefined`). */
+  kind?: 'external' | 'internal';
+}
+
+/**
+ * THE PAIR c1→c2'S COMMON TANGENTS THE FIGURE ALREADY HOLDS (#2408, ADR-AG-403): every letter-named one (its
+ * `common-touch` conditions, possibly a choice of families) and the families «כל המשיקים המשותפים» drew as lines, each
+ * read in this pair's order (`reversedFamily` when it was named the other way round). Read off the construction.
+ */
+function pairCommonTangents(c: Construction, c1: Id, c2: Id): { letters: PairTangent[]; lines: Set<CommonTangentFamily> } {
+  const lines = new Set<CommonTangentFamily>();
+  const ours = (circles: readonly [Id, Id]) => (circles[0] === c1 && circles[1] === c2 ? 1 : circles[0] === c2 && circles[1] === c1 ? -1 : 0);
+  for (const o of c.objects) {
+    if (o.kind !== 'common-tangent') continue;
+    const dir = ours(o.circles);
+    if (dir !== 0) lines.add(dir === 1 ? o.family : reversedFamily(o.family));
+  }
+  const byTouch = new Map<Id, Set<CommonTangentFamily>>();
+  const visit = (k: Constraint): void => {
+    if (k.t === 'choice') return k.options.forEach(visit);
+    if (k.t === 'all') return k.of.forEach(visit);
+    if (k.t !== 'derived-at' || k.rule.t !== 'common-touch') return;
+    const dir = ours(k.rule.circles);
+    if (dir === 0 || (dir === 1 ? k.rule.on !== 0 : k.rule.on !== 1)) return;
+    const set = byTouch.get(k.id) ?? new Set<CommonTangentFamily>();
+    set.add(dir === 1 ? k.rule.family : reversedFamily(k.rule.family));
+    byTouch.set(k.id, set);
+  };
+  c.constraints.forEach(visit);
+  const letters = [...byTouch].map(([touch, families]): PairTangent => {
+    const all = [...families];
+    const kind = all.every((g) => g.startsWith('ext')) ? 'external' : all.every((g) => g.startsWith('int')) ? 'internal' : undefined;
+    return kind ? { touch, kind } : { touch };
+  });
+  return { letters, lines };
+}
+
+/**
+ * WHERE A LETTER-NAMED COMMON TANGENT TOUCHES, BY CONSTRUCTION (#2408, ADR-AG-403) — for the point `q`: the circle it
+ * touches, the tangent's other touch, and the index of the constraint that says so. A slot is a `common-touch` pair of
+ * `derived-at` rows, or a `choice` of them over families; in every option `q` touches the same circle and the line
+ * through `q` and its partner is that family's tangent — so the line is tangent to the circle at `q` in every
+ * configuration. `null` when `q` is no such touch.
+ */
+export function commonTouchOf(c: Construction, q: Id): { circle: Id; partner: Id; index: number } | null {
+  const pairOf = (k: Constraint): { circle: Id; partner: Id } | null => {
+    if (k.t !== 'all' || k.of.length !== 2) return null;
+    const [u, v] = k.of;
+    if (u.t !== 'derived-at' || v.t !== 'derived-at' || u.rule.t !== 'common-touch' || v.rule.t !== 'common-touch') return null;
+    if (u.rule.family !== v.rule.family || u.rule.circles.join() !== v.rule.circles.join() || u.rule.on === v.rule.on) return null;
+    const mine = u.id === q ? u : v.id === q ? v : null;
+    if (!mine || mine.rule.t !== 'common-touch') return null;
+    return { circle: mine.rule.circles[mine.rule.on], partner: mine === u ? v.id : u.id };
+  };
+  for (let i = 0; i < c.constraints.length; i++) {
+    const k = c.constraints[i];
+    const options = k.t === 'choice' ? k.options : [];
+    if (options.length > 0) {
+      const each = options.map(pairOf);
+      const first = each[0];
+      if (first && each.every((e) => e && e.circle === first.circle && e.partner === first.partner)) return { ...first, index: i };
+      continue;
+    }
+    // One family: its two rows stand side by side at the top level.
+    if (k.t === 'derived-at' && k.id === q && k.rule.t === 'common-touch') {
+      const rule = k.rule;
+      const j = c.constraints.findIndex(
+        (m) => m.t === 'derived-at' && m.id !== q && m.rule.t === 'common-touch' && m.rule.family === rule.family && m.rule.circles.join() === rule.circles.join() && m.rule.on !== rule.on,
+      );
+      if (j >= 0) return { circle: rule.circles[rule.on], partner: (c.constraints[j] as { id: Id }).id, index: Math.max(i, j) };
+    }
+  }
+  return null;
+}
+
+/** Is the tangent at the circles' touch point `t` already drawn — a line stated perpendicular to the radius there? */
+function touchTangentDrawn(c: Construction, t: Id): boolean {
+  return (
+    c.constraints.some((k) => k.t === 'relation' && k.rel === 'perpendicular' && k.u.k === 'radius' && k.u.at === t) ||
+    c.objects.some((o) => o.kind === 'line-at' && o.perp && o.through === t && o.dir.k === 'radius')
+  );
+}
+
+type Slot =
+  | { families: CommonTangentFamily[]; apartFrom: Id[] }
+  | { touch: Id }
+  | { known: true }
+  | { error: ApplyError };
+
+/**
+ * WHICH OF THE PAIR'S COMMON TANGENTS A LETTER-NAMED ONE MAY BE (#2408 / #2411, ADR-AG-403) — 2-D's capacity rule
+ * (`src/parser/parse.ts` #197 Am. 4: `priorOfKind + 1 > capacity`) over the families of ADR-AG-314. The two-touch
+ * families the position has, of the stated kind, minus the lines «כל המשיקים המשותפים» drew
+ * (k earlier tangents of that kind); which one each takes is one permutation of the pair (`discreteAxes.ts`), so the first
+ * configuration draws 2-D's order; a pair the givens leave unsettled
+ * (`position` null) has all four (`seedFreePairs` starts it apart). None left: on a pair touching from outside
+ * with its touch point named and the line there not yet drawn, the tangent at it (2-D builds it); otherwise 2-D's
+ * refusal for the position.
+ */
+function commonTangentSlot(
+  c: Construction,
+  f: Extract<Fact, { t: 'common-tangent' }>,
+  position: PairPosition | null,
+  touch: Id | null,
+): Slot {
+  const [c1, c2] = f.circles;
+  const refuse = (): Slot => ({ error: { code: 'no-common-tangent', detail: f.src, tangents: tangentsExhaustedOf(f.kind, position) } });
+  if (position === 'inside') return refuse();
+  const { letters, lines } = pairCommonTangents(c, c1, c2);
+  // The same tangent stated again (its touch on the first circle already one of the pair's): known, never a second slot.
+  if (letters.some((e) => e.touch === f.a)) return { known: true };
+  const prior = letters;
+  const families = TWO_TOUCH_OF[position ?? 'apart']
+    .filter((g) => !f.kind || (f.kind === 'external') === g.startsWith('ext'))
+    .filter((g) => !lines.has(g));
+  const priorOfKind = f.kind ? prior.filter((e) => e.kind === f.kind).length : prior.length;
+  if (priorOfKind < families.length) {
+    return { families, apartFrom: prior.map((e) => e.touch) };
+  }
+  if (position === 'ext-tangent' && f.kind !== 'external' && touch !== null && !touchTangentDrawn(c, touch)) return { touch };
+  return refuse();
 }
 
 /**
@@ -2140,6 +2293,14 @@ function statedTangent(c: Construction, c1: Id, c2: Id): boolean {
 }
 
 type NumCircle = { kind: 'circle'; cx: number; cy: number; r: number };
+
+/** What `circleAtProbe` and `centresAlwaysCoincide` read of a circle: the expressions its probes must cover (#2566). */
+function circleExprs(c: Construction, o: GeoObject): Expr[] {
+  if (o.kind === 'curve') return [o.curve.eq];
+  if (o.kind !== 'circle-at') return [];
+  const centre = objectById(c, o.centre);
+  return centre && centre.kind === 'point' ? [centre.x as Expr, centre.y as Expr, o.r as Expr] : [o.r as Expr];
+}
 
 /** A circle's numbers at a probe, when they are read off its own statement (a centre given by coordinates, an equation). */
 function circleAtProbe(c: Construction, o: GeoObject, env: Env): NumCircle | null {
@@ -2330,7 +2491,7 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     const noun = o.noun ? normalizeShapeNoun(o.noun) : '';
     if (ring.length === 3) {
       let keys: Constraint[];
-      if (f.role === 'hypotenuse') keys = [rightAngleAt(ring[0], ring[1], ring[2]), rightAngleAt(ring[1], ring[0], ring[2]), rightAngleAt(ring[2], ring[0], ring[1])];
+      if (f.role === 'hypotenuse') keys = rightAngleKeys(ring);
       else if (noun === 'משולש שווה שוקיים') keys = isoscelesKeys(ring);
       else return null;
       const sidesAt = (i: number): Array<[Id, Id]> =>
@@ -2456,16 +2617,77 @@ function applyRoleCevian(c: Construction, role: 'base' | 'leg', g: Extract<Fact,
   }
   // OPEN. Which sides already carry a bound cevian of this kind.
   if (g.measure) return { ok: false, error: { code: 'not-handled', detail: src } };
+  return boundCevian(c, role, kind, g.foot, ring, apex, sides, src);
+}
+
+/**
+ * THE CEVIAN BOUND TO A ROLE ON AN OPEN VERTEX (#2018; #2074): built at the letters of `apex` (the vertex the choice
+ * takes at choice seed 0) on the first of `sides` not yet carrying a bound cevian of this kind, and carrying `follows`.
+ * The objects are 0-DOF and add no constraint, so the line never moves the triangle.
+ */
+function boundCevian(c: Construction, role: RoleBinding['role'], kind: 'median' | 'altitude', foot: Id, ring: [Id, Id, Id], apex: Id, sides: ReadonlyArray<[Id, Id]>, src: string): ApplyOutcome {
+  const shown = followObjects(c.objects, resolveChoices(c.constraints, 0));
+  const ruleFor = ([u, v]: [Id, Id]) => toolFootRule(kind, ring.find((x) => x !== u && x !== v)!, u, v);
   const taken = (sd: [Id, Id]) =>
     shown.some((o) => o.kind === 'derived' && o.follows?.role === role && sameDerivation(o.rule, ruleFor(sd)));
   const side = sides.find((sd) => !taken(sd));
   if (!side) return { ok: true, effect: 'known', next: c };
+  if (objectById(c, foot)) return { ok: false, error: { code: 'not-handled', detail: src } };
   const from = ring.find((x) => x !== side[0] && x !== side[1])!;
-  const follows = { role, ring: [...ring] as [Id, Id, Id], at: apex };
-  const facts = toolFootFacts(kind, from, g.foot, side[0], side[1], src).map((h): Fact =>
-    h.t === 'derived' ? { ...h, follows } : h.t === 'segment' ? { ...h, id: `seg-${role}-${anonOf([kind, g.foot, ring])}`, follows } : h,
+  const follows: RoleBinding = { role, ring: [...ring] as [Id, Id, Id], at: apex };
+  const facts = toolFootFacts(kind, from, foot, side[0], side[1], src).map((h): Fact =>
+    h.t === 'derived' ? { ...h, follows } : h.t === 'segment' ? { ...h, id: `seg-${role}-${anonOf([kind, foot, ring])}`, follows } : h,
   );
   return applyAll(c, facts);
+}
+
+/**
+ * A CEVIAN TO THE HYPOTENUSE (#1222, ADR-AG-211; #2074, ADR-AG-411, 2-D's ADR-659) — «תיכון ליתר», «גובה ליתר».
+ *
+ * Operator, 2026-10-13: *"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show
+ * other option will create a different triangle with the constraints in place"*; ruling 2026-10-14: *"Naming C
+ * («CM תיכון ליתר») or AB («תיכון ליתר AB») forces the seat"*, and analytic follows 2-D. The host is the figure's one
+ * right triangle: a triangle with a stated right angle, or whose noun's seat is still open.
+ *
+ * - No host → `ambiguous-no-right-angle`; several → 2-D's question, `ambiguous-role-side`.
+ * - A TYPED apex states the right angle at it (the claim «תיכון ליתר AB» states), and the rest is the lettered twin.
+ * - A STATED right angle → the lettered twin: the figure is the one the letters draw, and nothing rotates.
+ * - An OPEN seat → the cevian bound to the role at the seat of choice seed 0; `resolvedAt` re-letters it per
+ *   configuration, so the foot keeps its letter and always lies on the side opposite the drawn right angle. A foot
+ *   the figure already holds, or a stated length, is not read on an open seat (2-D's verdict: the model's).
+ */
+function applyHypotenuseCevian(c: Construction, f: Extract<Fact, { t: 'cevian-of' }>): ApplyOutcome {
+  const hosts = new Map<string, { ring: [Id, Id, Id]; at?: Id }>();
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
+    const ring = o.vertices as [Id, Id, Id];
+    const stated = roleVertexOf(c.constraints, ring, 'hypotenuse');
+    if (stated.length === 1) hosts.set([...ring].sort().join(), { ring, at: stated[0] });
+    else if (stated.length === 0 && o.noun && shapeRow(normalizeShapeNoun(o.noun))?.kind === 'right-triangle') hosts.set([...ring].sort().join(), { ring });
+  }
+  if (hosts.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
+  if (hosts.size > 1) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+  const [{ ring, at }] = [...hosts.values()];
+  const { hypotenuse: _hypotenuse, either: _either, ...cevian } = f;
+  const across = (v: Id): [Id, Id] => ring.filter((x) => x !== v) as [Id, Id];
+  // «תיכון ליתר בנקודה C» with C a vertex: the locative apex (2-D's LOCATIVE_APEX); the foot is then the tool's.
+  if (!f.apex && ring.includes(f.foot)) {
+    const foot = freeToolLetter(f.role === 'median' ? 'midpoint' : 'foot', new Set(c.objects.map((o) => o.id)));
+    if (foot) return applyFact(c, { ...f, apex: f.foot, foot });
+  }
+  if (f.apex) {
+    // The typed segment's end that is a vertex of the triangle is the apex; two, or none, name no vertex.
+    const swap = f.either && !ring.includes(f.apex) && ring.includes(f.foot);
+    const [apex, foot] = swap ? [f.foot, f.apex] : [f.apex, f.foot];
+    if (!ring.includes(apex) || (f.either && ring.includes(foot))) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+    const [u, v] = across(apex);
+    return applyAll(c, [{ t: 'constraint', k: rightAngleAt(apex, u, v), src: f.src }, { ...cevian, apex, foot, side: [u, v] }]);
+  }
+  if (at) return applyFact(c, { ...cevian, apex: at, side: across(at) });
+  if (f.measure) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+  const seats = roleVertexOf(resolveChoices(c.constraints, 0), ring, 'hypotenuse');
+  if (seats.length !== 1) return { ok: false, error: { code: 'ambiguous-role-side', detail: f.src, role: 'hypotenuse' } };
+  return boundCevian(c, 'hypotenuse', f.role, f.foot, ring, seats[0], [across(seats[0])], f.src);
 }
 
 /** A stable, content-derived suffix for the anonymous line a role sentence draws — the same line, the same id. */
@@ -3740,7 +3962,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'sector': {
       if (f.a === f.b || f.v === f.a || f.v === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
-      const deg = f.value ? evalExpr(f.value, PROBE_ENVS[0]) : null;
+      const deg = f.value ? evalExpr(f.value, probeEnvs(f.value)[0]) : null;
       if (deg !== null && !(deg > 0 && deg < 360)) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       const reflex = deg !== null && deg > 180;
       const central: Expr | undefined = f.value && reflex ? { kind: 'sub', a: { kind: 'num', value: 360 }, b: f.value } : f.value;
@@ -4015,6 +4237,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const bound = applyFact(created.next, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: TOUCHED_CIRCLE_ID }, src: f.src });
         return bound.ok ? { ...bound, effect: 'created' } : bound;
       }
+      // «הישר» with no line drawn: the definite noun's creation is not ruled here while a free line is unbuilt (#2226), so
+      // the line stays not understood (ADR-AG-409).
+      if (matches.length === 0 && f.kind === 'line') return { ok: false, error: { code: 'not-handled', detail: f.src } };
       if (matches.length !== 1) return { ok: false, error: noHost(f.src, f.kind === 'tangent' ? 'line' : f.kind, matches) };
       return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: matches[0].id }, src: f.src });
     }
@@ -4159,7 +4384,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       // The stated circle's centre and radius, read at the probes: a value that moves with the parameters
       // is not a constant this boundary can write down (no CAS) — refused by name, never dropped.
-      const fits = PROBE_ENVS.map((env) => resolveCurve({ eq: f.eq } as Curve, env));
+      const fits = probeEnvs(f.eq).map((env) => resolveCurve({ eq: f.eq } as Curve, env));
       const first = fits[0];
       if (!first.ok || first.curve.kind !== 'circle') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       const { cx, cy, r } = first.curve;
@@ -4176,7 +4401,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // different is the contradiction, said on this line (not left to the solve to miss).
       const centre = objectById(c, host.centre);
       if (centre && centre.kind === 'point') {
-        const at = PROBE_ENVS.map((env) => [evalExpr(centre.x as Parameters<typeof evalExpr>[0], env), evalExpr(centre.y as Parameters<typeof evalExpr>[0], env)]);
+        const at = probeEnvs(centre.x, centre.y).map((env) => [evalExpr(centre.x as Parameters<typeof evalExpr>[0], env), evalExpr(centre.y as Parameters<typeof evalExpr>[0], env)]);
         const fixed = at.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && close(x, at[0][0]) && close(y, at[0][1]));
         if (fixed && !(close(at[0][0], cx) && close(at[0][1], cy))) {
           return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
@@ -4352,7 +4577,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (host.kind === 'circle-at') r = host.r as Expr;
       else if (host.kind === 'curve') {
         const curve = host.curve;
-        const radii = PROBE_ENVS.map((env) => {
+        const radii = probeEnvs(curve.eq).map((env) => {
           const rc = resolveCurve(curve, env);
           return rc.ok && rc.curve.kind === 'circle' ? rc.curve.r : NaN;
         });
@@ -4560,7 +4785,33 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
               { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
             ];
-      const touched = applyAll(c, touches);
+      /*
+       * A SLOT OF THE PAIR, NOT TWO FREE TANGENCIES (#2408 / #2411, ADR-AG-403). Away from the touch arms above, the line
+       * is ONE OF THE PAIR'S COMMON-TANGENT FAMILIES (ADR-AG-314's closed form): its letters are that family's touches
+       * (`derived-at` a `common-touch`), so no circle is moved to fit it (the stability rule). WHICH family is the
+       * unstated choice it always was (ADR-052: a later given — «… חותך את ציר ה-y מתחת לציר ה-x» — picks it, «הציגו
+       * תצורה אחרת» cycles it), over the families the pair has, of the stated kind; the k-th tangent of the pair offers
+       * them from the k-th on, so the configuration drawn first is 2-D's order (external a, external b, internal a,
+       * internal b), and its touch on the first circle is kept apart from every earlier one's: two names never share a
+       * line. One past the pair's count is refused with 2-D's sentence for the position.
+       */
+      const slot = figureSays || linesSay ? null : commonTangentSlot(c, f, position ?? pairPositionOf(c, c1, c2), touch);
+      if (slot && 'error' in slot) return { ok: false, error: slot.error };
+      if (slot && 'known' in slot) return { ok: true, effect: 'known', next: c };
+      let placed: Fact[] = touches;
+      if (slot && 'touch' in slot) {
+        placed = [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: slot.touch, src: f.src }];
+      } else if (slot) {
+        const at = (id: Id, family: CommonTangentFamily, on: 0 | 1): Constraint => ({ t: 'derived-at', id, rule: { t: 'common-touch', circles: [c1, c2], family, on } });
+        const options: Constraint[] = slot.families.map((g) => ({ t: 'all', of: [at(f.a, g, 0), at(f.b, g, 1)] }));
+        placed = [
+          ...(options.length === 1
+            ? [at(f.a, slot.families[0], 0), at(f.b, slot.families[0], 1)].map((k): Fact => ({ t: 'constraint', k, src: f.src }))
+            : [{ t: 'constraint' as const, k: { t: 'choice' as const, options }, src: f.src }]),
+          ...(slot.apartFrom.length > 0 ? [{ t: 'selector' as const, sel: { kind: 'distinct' as const, ids: [f.a, ...slot.apartFrom] }, src: f.src }] : []),
+        ];
+      }
+      const touched = applyAll(c, placed);
       if (!touched.ok) return touched;
       const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
       return drawn.ok ? { ...drawn, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) } : drawn;
@@ -4793,7 +5044,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       if (host.kind === 'curve') {
         // An equation circle's radius is determined by its equation — the sentence is a claim.
-        const agrees = PROBE_ENVS.every((env) => {
+        const agrees = probeEnvs(host.curve.eq, f.value).every((env) => {
           const rc = resolveCurve(host!.kind === 'curve' ? host!.curve : { eq: undefined as never }, env);
           const v = evalExpr(f.value as Parameters<typeof evalExpr>[0], env);
           return rc.ok && rc.curve.kind === 'circle' && Number.isFinite(v) && Math.abs(rc.curve.r - v) <= 1e-9 * Math.max(1, rc.curve.r, Math.abs(v));
@@ -4938,7 +5189,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       const own: Array<[number, number, number]> = [];
       let agrees = true;
-      for (const env of PROBE_ENVS) {
+      for (const env of probeEnvs(host.curve.eq, f.eq)) {
         const pc = resolveCurve(host.curve, env);
         const gl = resolveCurve({ eq: f.eq }, env);
         if (!pc.ok || pc.curve.kind !== 'parabola' || !gl.ok || gl.curve.kind !== 'line') {
@@ -5293,6 +5544,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * the apex. Only when the written first letter does not qualify and the second does are they swapped, so every
        * vertex-first sentence, and every sentence whose letters name no vertex, resolves exactly as before.
        */
+      if (f.hypotenuse) return applyHypotenuseCevian(c, f);
       if (f.either && f.apex) {
         const isVertex = (id: Id): boolean =>
           c.objects.some(
@@ -5307,11 +5559,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         }
       }
       const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
-      let openRight = false;
       // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.
       if (f.apex && f.side) targets.set('named', { apex: f.apex, u: f.side[0], v: f.side[1] });
       /** A height named from its apex, which any ring can host; every other cevian resolves in a triangle. */
-      const ringHost = f.role === 'altitude' && f.apex !== undefined && !f.side && !f.hypotenuse;
+      const ringHost = f.role === 'altitude' && f.apex !== undefined && !f.side;
       /** Per shape holding the apex: its opposite sides, as a signature — two shapes that disagree are an ask. */
       const shapes = new Map<string, string>();
       /** Every candidate side, deduped, in declaration order — the union 2-D's `cevianShapeEdges` draws one from. */
@@ -5321,18 +5572,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
         if (o.vertices.length !== 3 && !ringHost) continue;
         const ring = o.vertices;
-        if (f.hypotenuse) {
-          // The right angle the figure STATES — a constraint, never the noun's open choice (ADR-052: never assume C).
-          const right = ring.filter((v) => {
-            const [p, q] = ring.filter((x) => x !== v);
-            const k = rightAngleAt(v, p, q);
-            return c.constraints.some((g) => g.t !== 'choice' && sameConstraint(g, k));
-          });
-          if (right.length === 1) {
-            const [u, v] = ring.filter((x) => x !== right[0]);
-            targets.set(`${right[0]}|${[u, v].sort().join('')}`, { apex: right[0], u, v });
-          } else if (right.length === 0 && o.noun && /ישר/.test(o.noun)) openRight = true;
-        } else if (f.side) {
+        if (f.side) {
           const [u, v] = f.side;
           if (!ring.includes(u) || !ring.includes(v) || u === v) continue;
           const apex = ring.find((x) => x !== u && x !== v)!;
@@ -5372,16 +5612,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const pick = onFoot.length === 1 ? onFoot[0] : parallelBase ?? (new Set(shapes.values()).size > 1 ? 'ask' : union[0]);
         if (pick === 'ask') return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
         if (pick) targets.set(`${f.apex}|${edgeKey(pick)}`, { apex: f.apex!, u: pick[0], v: pick[1] });
-      } else if (f.apex && !f.side && !f.hypotenuse && targets.size > 1) {
+      } else if (f.apex && !f.side && targets.size > 1) {
         const onSide = [...targets].filter(([, t]) => footOnPair(c, f.foot, t.u, t.v));
         if (onSide.length > 0) {
           targets.clear();
           for (const [k, t] of onSide) targets.set(k, t);
         }
       }
-      if (f.hypotenuse && (openRight ? targets.size === 0 : false)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
-      if (f.hypotenuse && targets.size === 0) return { ok: false, error: { code: 'ambiguous-no-right-angle', detail: f.src } };
-      if (f.hypotenuse && (targets.size > 1 || openRight)) return { ok: false, error: { code: 'ambiguous-hypotenuse', detail: f.src } };
       if (targets.size === 0) return { ok: false, error: { code: 'cevian-no-triangle', detail: f.src } };
       if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
       const [{ apex, u, v }] = [...targets.values()];
@@ -5392,6 +5629,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // The same point derived the same way already has a name (#1153): the cevian runs to IT.
         const rule = toolFootRule(f.role, apex, u, v);
         const same = c.objects.find((o) => o.kind === 'derived' && !o.follows && sameDerivation(o.rule, rule));
+        // #2166 (ADR-790): the typed letter is never dropped: the tool's letter yields to it (#2674), a student's is the model's.
+        if (same && f.typedFoot) {
+          if (same.kind === 'derived' && same.tool) return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
+          return { ok: false, error: { code: 'not-handled', detail: f.src } };
+        }
         if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]);
         // The foot's letter is the tool's (#2674): `auto`, so a student's fresh letter for the same point takes it over.
         const tool = toolFootFacts(f.role, apex, f.foot, u, v, f.src).map((h): Fact => (h.t === 'derived' ? { ...h, auto: true } : h));
@@ -5714,6 +5956,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       if (f.t === 'derived') {
         const standing = objectById(c, f.id);
+        /*
+         * #2231 (ADR-AG-410): «MK אנך לציר x» reads as a foot only from a placed M to a new K. `parseLine` takes no figure, so
+         * the decision is here; any other figure keeps HEAD's verdict, `not-handled`, the LLM seam.
+         */
+        if (f.piece && (standing || !parentsOf(f.rule).every((p) => objectById(c, p)))) return { ok: false, error: { code: 'not-handled', detail: f.src } };
         // A name the TOOL offers (#1270, ADR-AG-184) never takes a letter that is already held, and is
         // never a condition on its holder: the default yields, and the figure is left as it was (M4).
         if (standing && f.auto) return { ok: true, effect: 'known', next: c };
@@ -5738,7 +5985,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const o = objectById(c, curveRef);
         // A centre names an equation curve; a touch point names two circles of any construction (#1504), and
         // a side's touch point one circle of any construction (#1619 B2).
-        const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch');
+        const anyCircle = f.t === 'derived' && (f.rule.t === 'touch-point' || f.rule.t === 'side-touch' || f.rule.t === 'common-touch');
         // A foot is dropped onto any LINE object — stated by its equation, constructed, a tangent (#1620, ADR-AG-207).
         const anyLine = f.t === 'derived' && f.rule.t === 'foot';
         const ok = anyCircle ? !!o && curveKindOf(o) === 'circle' : anyLine ? !!o && curveKindOf(o) === 'line' : !!o && o.kind === 'curve';
@@ -6335,7 +6582,7 @@ function sameCurve(a: Curve, b: Curve): boolean {
   // an unclaimed family agrees with whatever the other one claimed. Identity is the equation; the
   // kind is an expectation the classifier will settle either way.
   if (a.kind && b.kind && a.kind !== b.kind) return false;
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(a.eq, b.eq).every((env) => {
     const ka = fitConic(a.eq, env);
     const kb = fitConic(b.eq, env);
     if (!ka || !kb) return false;
@@ -6377,7 +6624,7 @@ const IDENTICAL_COEF_TOL = 1e-12;
 
 function identicalCurve(a: Curve, b: Curve): boolean {
   if (a.kind && b.kind && a.kind !== b.kind) return false;
-  return PROBE_ENVS.every((env) => {
+  return probeEnvs(a.eq, b.eq).every((env) => {
     const ka = fitConic(a.eq, env);
     const kb = fitConic(b.eq, env);
     if (!ka || !kb) return false;

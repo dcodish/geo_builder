@@ -65,6 +65,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { readArcUnitValue } from '../../shell/arcLengthUnit';
 import { foldIndexedName } from '../../shell/indexedName';
 import { arcRunRoles } from '../../shell/arcRun';
 import { POINT_NAME, splitPointNames } from '../engine/pointName';
@@ -125,6 +126,13 @@ export type ParseFailure =
    * The shared rule is `shell/radianAngle`; `detail` is the π value as typed.
    */
   | { code: 'radian-angle'; detail: string }
+  /**
+   * #2032 (ADR-AG-408, operator ruling 2026-11-04, card q5 = B: *"Refuse «קשת AB = 4π» honestly now, then build A"*) — a
+   * statement of an arc's LENGTH, which this tool has no reader for until #2710: «קשת AB = 4π» (2-D's length, ADR-664,
+   * which this reader used to draw as 4π DEGREES) and «אורך הקשת AB הוא 4π». `detail` is the arc's letters — the refusal
+   * teaches «קשת AB = 40» with the student's own arc — or «AB» for a sentence that names none.
+   */
+  | { code: 'arc-length-unread'; detail: string }
   /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
@@ -5923,8 +5931,8 @@ const FROM_HE = `(?:ה?יוצא\\s+)?מ(?:ן\\s+|-\\s*)?(?:ה?(?:קודקוד|נ
  * «… פוגש את הצלע בנקודה M» · «… בנקודה H» · "… at H" — the foot NAMED after the fact (ADR-AG-211): the form a
  * renamed tool letter is written into, lowered exactly as the tool's own foot (a derived point, at M1). Last group.
  */
-const FOOT_TAIL_HE = `(?:\\s+(?:ש?(?:פוגש|חותך)\\s+(?:אותה|אותו|את\\s+ה?צלע))?\\s+ב(?:ה)?נקודה\\s+(${NAME}))?`;
-const FOOT_TAIL_EN = `(?:\\s+(?:(?:meets|cuts)\\s+(?:it|the\\s+side)\\s+)?at\\s+(?:the\\s+point\\s+)?(${NAME}))?`;
+const FOOT_TAIL_HE = `(?:\\s+(?:ש?(?:פוגש|חותך)\\s+(?:אותה|אותו|את\\s+ה?צלע)\\s+)?ב(?:ה)?נקודה\\s+(${NAME}))?`;
+const FOOT_TAIL_EN = `(?:\\s+(?:(?:meets|cuts)\\s+(?:it|the\\s+side)\\s+)?at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME}))?`;
 const FROM_APEX_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})(?:\\s+${ROLE_TARGET_HE})?${FOOT_TAIL_HE}$`);
 const FROM_APEX_EN = new RegExp(
   `^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})(?:\\s+${ROLE_TARGET_EN})?${FOOT_TAIL_EN}$`,
@@ -5934,12 +5942,24 @@ const FROM_APEX_EN = new RegExp(
 const TO_SIDE_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+ה?)-?\\s*(?:ה?צלע\\s+)?(${NAME})(${NAME})${FOOT_TAIL_HE}$`);
 const TO_SIDE_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+(?:the\\s+)?(?:side\\s+)?(${NAME})(${NAME})${FOOT_TAIL_EN}$`, 'i');
 /**
- * «תיכון ליתר» · «הגובה ליתר AB» · "the median to the hypotenuse" (#1222, operator ruling 2026-10-02 on #1620): the side
- * is the hypotenuse — named («ליתר AB», which also STATES that it is, ADR-AG-200's claim), or the one the figure's
- * stated right angle faces (M1). Groups: role, side u, side v.
+ * «תיכון ליתר» · «הגובה ליתר AB» · «גובה ליתר מ-C» · "the median to the hypotenuse" (#1222; #2074, ADR-AG-411): the side
+ * is the hypotenuse — named («ליתר AB», which also STATES that it is, ADR-AG-200's claim), the one opposite a typed
+ * apex (which states the right angle there), or the one the figure's right triangle says (M1). Groups: role, side u,
+ * side v, apex, foot.
  */
-const TO_HYP_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_HE}$`);
-const TO_HYP_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+the\\s+hypotenuse(?:\\s+(${NAME})(${NAME}))?${FOOT_TAIL_EN}$`, 'i');
+const TO_HYP_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר(?:\\s+(${NAME})(${NAME}))?(?:\\s+${FROM_HE}(${NAME}))?${FOOT_TAIL_HE}$`);
+const TO_HYP_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+to\\s+the\\s+hypotenuse(?:\\s+(${NAME})(${NAME}))?(?:\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME}))?${FOOT_TAIL_EN}$`, 'i');
+/** «גובה מ-C ליתר» · "the median from C to the hypotenuse" (#2074): the apex before the noun. Groups: role, apex, foot. */
+const HYP_FROM_HE = new RegExp(`^${HE_GIVEN}ה?${MA_ROLE_HE}\\s+${FROM_HE}(${NAME})\\s+(?:ל|אל\\s+)-?\\s*ה?יתר${FOOT_TAIL_HE}$`);
+const HYP_FROM_EN = new RegExp(`^(?:the\\s+|an?\\s+)?(median|altitude|height)\\s+from\\s+(?:(?:the\\s+)?(?:vertex|point)\\s+)?(${NAME})\\s+to\\s+the\\s+hypotenuse${FOOT_TAIL_EN}$`, 'i');
+/** «חוצה זווית C בנקודה K» · "the bisector of angle C at K" (#2166, ADR-790): the foot typed after the bisector. Groups: the sentence, its angle, foot. */
+const BIS_FOOT_HE = new RegExp(`^(${HE_GIVEN}${BISECTOR_HE}\\s+((?:${NAME}){1,3}))\\s+ב(?:ה)?נקודה\\s+(${NAME})$`);
+const BIS_FOOT_EN = new RegExp(`^((?:the\\s+|an?\\s+)?(?:angle\\s+)?bisector\\s+of\\s+(?:the\\s+)?(?:angle\\s+)?((?:${NAME}){1,3}))\\s+at\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`, 'i');
+/** «התיכון ליתר הוא CM» (#2074): the noun first. Groups: role, end, end. */
+const HYP_NOUN_FIRST_HE = new RegExp(`^${HE_GIVEN}ה${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר${HE_IS}\\s+(${NAME})(${NAME})$`);
+/** «CM תיכון ליתר» · "CM is the median to the hypotenuse" (#2074): the cevian's two letters typed. Groups: end, end, role. */
+const HYP_NAMED_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}\\s+(?:ל|אל\\s+)-?\\s*ה?יתר$`);
+const HYP_NAMED_EN = new RegExp(`^${CEVIAN_LEAD_EN}(${NAME})(${NAME})\\s+${CEVIAN_SUBJECT_EN}(${CEVIAN_ROLE_EN})\\s+to\\s+the\\s+hypotenuse$`, 'i');
 /** «AD גובה» · «AD הוא התיכון» · "AD is the altitude" · "AD median" — the cevian named, its target not (#1240). */
 const NAMED_ONLY_HE = new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})${HE_IS}\\s*ה?${MA_ROLE_HE}$`);
 const NAMED_ONLY_EN = new RegExp(`^${CEVIAN_LEAD_EN}(${NAME})(${NAME})\\s+${CEVIAN_SUBJECT_EN}(${CEVIAN_ROLE_EN})$`, 'i');
@@ -6270,7 +6290,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     const [, roleSrc, apex, u0, v0, triRun, named] = fa;
     const role = roleOf(roleSrc);
     if (named === apex) return refuse('degenerate-role', line);
-    if (!u0 && !triRun) return made([{ t: 'cevian-of', role, apex, foot: named ?? footMint(role, apex), toolFoot: true, src: line }]);
+    if (!u0 && !triRun) return made([{ t: 'cevian-of', role, apex, foot: named ?? footMint(role, apex), toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
     const side = cevianSide(apex, u0, v0, triRun);
     if (typeof side === 'string') return refuse(side, line);
     const { u, v, ring } = side;
@@ -6278,7 +6298,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     const tri = ring ? namedShapeFacts('משולש', ring, line) : [];
     if (tri === 'bad-arity') return refuse('bad-arity', line);
     // A foot the sentence names may already be a point of the figure — M1 decides (derived when new, ADR-AG-211).
-    if (named) return made([...tri, { t: 'cevian-of', role, apex, side: [u, v], foot: named, toolFoot: true, src: line }]);
+    if (named) return made([...tri, { t: 'cevian-of', role, apex, side: [u, v], foot: named, toolFoot: true, typedFoot: true, src: line }]);
     // The key says what the foot IS — the side's midpoint, the perpendicular's foot — in the forms the midsegment
     // (ADR-AG-208) and the perpendicular (ADR-AG-207) key theirs, so one point reached two ways is one placeholder.
     const sorted = [u, v].sort();
@@ -6287,17 +6307,39 @@ function parseCevianFamily(line: string): RuleOutcome {
   }
   const hyp = TO_HYP_HE.exec(line) ?? TO_HYP_EN.exec(line);
   if (hyp) {
-    const [, roleSrc, u, v, named] = hyp;
+    const [, roleSrc, u, v, apex, named] = hyp;
     const role = roleOf(roleSrc);
     if (u && u === v) return refuse('repeated-vertex', line);
-    if (named && (named === u || named === v)) return refuse('degenerate-role', line);
-    const foot = named ?? footMint(role, u ? `hyp-${[u, v].sort().join('')}` : 'hyp');
+    if (named && (named === u || named === v || named === apex)) return refuse('degenerate-role', line);
+    if (apex && (apex === u || apex === v)) return refuse('degenerate-role', line);
+    const foot = named ?? footMint(role, u ? `hyp-${[u, v].sort().join('')}` : apex ? `hyp-${apex}` : 'hyp');
     // A named hypotenuse is a claim (ADR-AG-200's «היתר AB»: the right angle faces it), stated before the cevian.
     const claim = u ? claimFacts(nounRow('יתר'), u, v, line) ?? [] : [];
+    const from = apex ? { apex } : {};
     return made([
       ...claim,
-      u ? { t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line } : { t: 'cevian-of', role, hypotenuse: true, foot, toolFoot: true, src: line },
+      { t: 'cevian-of', role, ...from, ...(u ? { side: [u, v] as [Id, Id] } : { hypotenuse: true as const }), foot, toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line },
     ]);
+  }
+  const bf = BIS_FOOT_HE.exec(line) ?? BIS_FOOT_EN.exec(line);
+  if (bf) {
+    const letters = bf[2].match(new RegExp(NAME, 'g')) ?? [];
+    const vertex = letters.length === 3 ? letters[1] : letters.length === 1 ? letters[0] : null;
+    if (vertex && vertex !== bf[3]) return viaSentences(line, [`${vertex}${bf[3]} ${bf[1]}`]);
+  }
+  const hf = HYP_FROM_HE.exec(line) ?? HYP_FROM_EN.exec(line);
+  if (hf) {
+    const [, roleSrc, apex, named] = hf;
+    if (named === apex) return refuse('degenerate-role', line);
+    const role = roleOf(roleSrc);
+    return made([{ t: 'cevian-of', role, apex, hypotenuse: true, foot: named ?? footMint(role, `hyp-${apex}`), toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
+  }
+  const hnf = HYP_NOUN_FIRST_HE.exec(line);
+  const hn = hnf ? [hnf[0], hnf[2], hnf[3], hnf[1]] : HYP_NAMED_HE.exec(line) ?? HYP_NAMED_EN.exec(line);
+  if (hn) {
+    const [, apex, foot, roleSrc] = hn;
+    if (apex === foot) return refuse('degenerate-role', line);
+    return made([{ t: 'cevian-of', role: roleOf(roleSrc), apex, foot, hypotenuse: true, either: true, src: line }]);
   }
   const ts = TO_SIDE_HE.exec(line) ?? TO_SIDE_EN.exec(line);
   if (ts) {
@@ -6306,7 +6348,7 @@ function parseCevianFamily(line: string): RuleOutcome {
     if (named === u || named === v) return refuse('degenerate-role', line);
     const role = roleOf(roleSrc);
     const foot = named ?? footMint(role, `-${[u, v].sort().join('')}`);
-    return made([{ t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, src: line }]);
+    return made([{ t: 'cevian-of', role, side: [u, v], foot, toolFoot: true, ...(named ? { typedFoot: true as const } : {}), src: line }]);
   }
 
   // ── the cevian named, its target not ──
@@ -7148,10 +7190,10 @@ const COMPONENT_EN = new RegExp(
  * the exam never uses is a phrase the student has never seen (ADR-AG-005 D8).
  */
 const ON_KIND_HE = new RegExp(
-  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה)|(מעגל))$`
+  `^${HE_GIVEN}${HE_POINT}(${NAME})${HE_IS}\\s*(?:נמצא(?:ת|ים|ות)?\\s+)?על\\s+(?:ה(מעגל|פרבולה|אליפסה|ישר)|(מעגל))$`
 );
 const ON_KIND_EN = new RegExp(
-  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse)|a\\s+(circle))$`
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+(circle|parabola|ellipse|line)|a\\s+(circle))$`
 ,  'i',
 );
 
@@ -7160,9 +7202,11 @@ const KIND_NOUNS: Record<string, CurveKind> = {
   מעגל: 'circle',
   פרבולה: 'parabola',
   אליפסה: 'ellipse',
+  ישר: 'line',
   circle: 'circle',
   parabola: 'parabola',
   ellipse: 'ellipse',
+  line: 'line',
 };
 
 const ON_AXIS_HE = new RegExp(
@@ -7929,6 +7973,14 @@ const PERP_PLURAL_EN = new RegExp(
 const PERP_FOOT_EN = new RegExp(
   `^(?:(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+foot\\s+of\\s+the\\s+perpendicular${PERP_FROM_EN}\\s+(?:on)?to\\s+(.+)$`,
 );
+/**
+ * #2231 ([ADR-AG-410](../../docs/06c-decisions-analytic.md#adr-ag-410)) — «MK אנך לציר x» · «MK אנך ל-AB» · «MK הוא אנך לציר
+ * ה-y» · «MK אנך ל-AB בנקודה K» · "MK is a perpendicular to the x-axis": the NOUN, the piece that ends on the line, so its
+ * second letter is the foot. The adjectives «מאונך / ניצב» keep the relation: «MK מאונך לציר x» does not say K is on the
+ * axis. A trailing point, when written, is that foot, or it is not this sentence.
+ */
+const PERP_PIECE_HE = new RegExp(`^(${NAME})(${NAME})\\s+(?:(?:הוא|היא)\\s+)?ה?אנך${PERP_TO_HE}(?:\\s+בנקודה\\s+(${NAME}))?$`);
+const PERP_PIECE_EN = new RegExp(`^(${NAME})(${NAME})\\s+is\\s+(?:a|the)\\s+perpendicular\\s+(?:on)?to\\s+(.+?)(?:\\s+at\\s+(${NAME}))?$`);
 /** «האנך» as an OPERAND — bare, or by its description («האנך שהורידו מנקודה B לציר ה-x»). */
 const PERP_REF_HE = new RegExp(`^ה?אנך(?:${PERP_VERB_CLAUSE}${PERP_FROM_HE}(?:${PERP_TO_HE})?)?$`);
 const PERP_REF_EN = new RegExp(`^(?:[Tt]he\\s+)?[Pp]erpendicular(?:${PERP_FROM_EN}(?:\\s+(?:on)?to\\s+(.+?))?)?$`);
@@ -8030,6 +8082,16 @@ function parsePerpendicular(line: string): RuleOutcome {
   if (foot) {
     const [, id, from, onto] = foot;
     return perpendicularFacts(from, onto, id, false, line);
+  }
+  const piece = PERP_PIECE_HE.exec(line) ?? PERP_PIECE_EN.exec(line);
+  if (piece) {
+    const [, from, to, onto, at] = piece;
+    if (from === to || (at && at !== to)) return null;
+    const target = footLineOf(onto, { out: [], src: '' });
+    // A piece from a point of the line, or ending on one of its letters, has no foot: not this sentence.
+    if (!target || (target.k === 'points' && [target.a, target.b].some((p) => p === from || p === to))) return null;
+    const read = perpendicularFacts(from, onto, to, true, line);
+    return read.ok ? made(read.facts.map((f) => (f.t === 'derived' && f.id === to ? { ...f, piece: true } : f))) : read;
   }
   const one = PERP_HE.exec(line) ?? PERP_EN.exec(line);
   if (one) {
@@ -9039,6 +9101,10 @@ export function parseLine(raw: string): ParseResult {
   // the complex builder's notation only. π as a number («AB = π», «מעגל שהיקפו 6π») is not an angle and still reads.
   const radian = findRadianAngle(line);
   if (radian) return { ok: false, code: 'radian-angle', detail: radian.value };
+  // ADR-789 (#2032): a length unit on an arc says it is the arc's LENGTH, read here before `unwrap` strips the unit, after
+  // which «קשת AB = 4 ס"מ» is 4 degrees. The same refusal as «אורך הקשת AB הוא 4» until #2710 (ADR-AG-408).
+  const arcUnit = readArcUnitValue(line);
+  if (arcUnit) return { ok: false, code: 'arc-length-unread', detail: arcUnit.a + arcUnit.b };
   // #1919: the shared input-script rule, called where the proof target is — before every rule and before
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);
@@ -9717,6 +9783,30 @@ function arcSide(side: string): Array<{ k: Expr; a: Id; b: Id } | { value: Expr 
   return out;
 }
 
+/** π written in a value, glyph or word — not the «pi» inside a longer word. */
+const PI_WRITTEN = /π|(?<![A-Za-z])pi(?![A-Za-z0-9])/i;
+
+/** The noun of an arc's length, as 2-D's `ROUND_REF.arc` reads it: «אורך הקשת», «אורך קשת», «אורך של הקשת», "arc length", "the length of the arc". */
+const ARC_LENGTH_NOUN = /^(?:אורך\s+(?:של\s+)?ה?קשת|(?:the\s+)?(?:length\s+of\s+(?:the\s+)?arc|arc(?:'s)?\s+length)\b)/i;
+/** What follows that noun in a STATEMENT: the arc's letters if any, a copula, a value. Case-sensitive: a vertex is a capital, and "is" is not the labels I, S. */
+const ARC_LENGTH_REST = new RegExp(`^\\s*(?:של\\s+)?[⌢⏜]?\\s*\\{?\\s*(?:(${NAME})\\s*(${NAME}))?\\s*\\}?\\s*(?:=|(?<![א-ת])(?:הוא|היא|שווה)(?![א-ת])|\\b(?:is|equals?)\\b)\\s*\\S`);
+
+/**
+ * «אורך הקשת AB הוא 4π» · «אורך הקשת = 4π» · "arc length AB is 4π" — a statement of an arc's length, in any value: 2-D
+ * reads it (ADR-632) and this tool has no such measure yet. An owned refusal (ADR-AG-408, #2032), which says so and
+ * names what IS read; #2710 replaces it with the reader. A question («מהו אורך הקשת AB») is not a statement, and stays
+ * out of this rule.
+ */
+function parseArcLengthStatement(line: string): RuleOutcome {
+  const ref = ARC_CIRCLE_REF.exec(line);
+  const body = ref ? line.slice(0, ref.index) + line.slice(ref.index + ref[0].length) : line;
+  const noun = ARC_LENGTH_NOUN.exec(body);
+  if (!noun) return null;
+  const rest = ARC_LENGTH_REST.exec(body.slice(noun[0].length));
+  if (!rest) return null;
+  return { ok: false, code: 'arc-length-unread', detail: rest[1] && rest[2] ? rest[1] + rest[2] : 'AB' };
+}
+
 /**
  * «קשת AB = 40 במעגל O» · «⌢{AC} = 60°» · «קשת DE = 2 קשת CE» · «קשת CD שווה לקשת DE» · «קשת AC + קשת BE = קשת AD +
  * קשת BC במעגל O» · "arc AB = 40 in circle O" — ARC MEASURES (2-D's `arcValue`, `arcEquality`, `measureSum`). Every
@@ -9731,8 +9821,10 @@ function parseArcMeasure(line: string): RuleOutcome {
     .replace(/(?<![א-ת])שוו(?:ה|ות)\s+ל-?\s*(?=ה?קשת|⌢|⏜)/g, '= ')
     // «הקשת AC שווה ל-60» · «קשת AC היא 60 מעלות» — a copula before a NUMBER is the value (between two arcs it is
     // 2-D's taught «arc-copula», not read here).
-    .replace(/(?<![א-ת])(?:שוו(?:ה|ות)(?:\s*ל-?)?|היא|הוא)\s*(?=[0-9])/g, '= ')
-    .replace(/\bequals?\b|\bis\s+equal\s+to\b/gi, '=');
+    .replace(/(?<![א-ת])(?:שוו(?:ה|ות)(?:\s*ל-?)?|היא|הוא)\s*(?=[0-9π]|pi\b)/g, '= ')
+    .replace(/\bequals?\b|\bis\s+equal\s+to\b/gi, '=')
+    // "arc AB is 4π": 2-D reads this copula too; only a π value needs it here, to reach the refusal below
+    .replace(/\bis\s+(?=[0-9.]*\s*\*?\s*(?:π|pi\b))/gi, '= ');
   const sides = body.split('=');
   if (sides.length !== 2) return null;
   const left = arcSide(sides[0]);
@@ -9746,6 +9838,12 @@ function parseArcMeasure(line: string): RuleOutcome {
   const values = [...left.filter((t): t is { value: Expr } => 'value' in t).map((t) => neg(t.value)), ...right.filter((t): t is { value: Expr } => 'value' in t).map((t) => t.value)];
   if (terms.length === 0 || values.length > 1) return null;
   if (terms.some((t) => t.a === t.b)) return refuse('repeated-vertex', line);
+  // π IN THE VALUE (the Expr has lost it, so it is read off the student's text) is never degrees: one arc against a π
+  // value is its LENGTH (the 2026-10-13 ruling), refused until #2710 reads it (ADR-AG-408); an arc sum written with π is
+  // an angle in radians, #1837's refusal (the rule #1837 and #2032's plan both keep).
+  if (PI_WRITTEN.test(sides.join('='))) {
+    return terms.length === 1 ? { ok: false, code: 'arc-length-unread', detail: terms[0].a + terms[0].b } : { ok: false, code: 'radian-angle', detail: line };
+  }
   let value: Expr = values[0] ?? { kind: 'num', value: 0 };
   // A lone arc of more than 180° is the major arc: its central angle (unsigned) is the minor arc's, 360 − value.
   if (terms.length === 1 && values.length === 1) {
@@ -9976,6 +10074,7 @@ function parseArcFamily(line: string): RuleOutcome {
     parseSemicircle(line) ??
     parseSector(line) ??
     parseDiameterFrom(line) ??
+    parseArcLengthStatement(line) ??
     parseArcMeasure(line)
   );
 }

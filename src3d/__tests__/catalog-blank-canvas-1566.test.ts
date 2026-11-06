@@ -32,8 +32,6 @@ const STILL_FAILS: Record<string, string> = {
   // a crossing placed off the segment, and the right-pyramid point's own no-solution: not a drive decision
   "הישר A'C חותך את המישור BC'D בנקודה K": '#2609',
   'T על הקטע SC כך ש-TABCD היא פירמידה ישרה': '#2609',
-  // #2611 — «D על המעגל» creates no circle (C6)
-  'D על המעגל': '#2611',
   // #2563 — a new point with letter coordinates
   'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)': '#2563',
 };

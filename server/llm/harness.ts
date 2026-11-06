@@ -136,15 +136,38 @@ export function buildSystemPrompt(spec: PromptSpec, locale?: 'he' | 'en'): strin
   ].join('\n');
 }
 
-/** The full Messages-API request body (model, tool, forced tool_choice, message). Pure + testable. */
-export function buildRequest(spec: PromptSpec, utterance: string, context: string, locale?: 'he' | 'en') {
+/** At most this many names travel in one retry (#2231); the shared helper trims to the same bound. */
+export const KEEP_MAX = 8;
+/** A name token: Latin, Greek, `ℓ`, digits, subscripts, a prime, an underscore, or a numeral line's «ישר 3» — never a sentence (#2231). */
+const KEEP_NAME = /^[A-Za-zͰ-Ͽא-תℓ0-9₀-₉'′_ ]{1,8}$/u;
+
+/**
+ * #2231 ([ADR-W-189](../../docs/06w-decisions-workspace.md#adr-w-189)) — the `keep` field of a retry, validated. It reaches
+ * the model's message, so it is never free text: at most {@link KEEP_MAX} name tokens, otherwise the whole field is
+ * ignored and the request is an ordinary one. An absent or malformed field is `undefined`.
+ */
+export function readKeep(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > KEEP_MAX) return undefined;
+  return raw.every((n) => typeof n === 'string' && KEEP_NAME.test(n)) ? (raw as string[]) : undefined;
+}
+
+/**
+ * The full Messages-API request body (model, tool, forced tool_choice, message). Pure + testable.
+ *
+ * `keep` (#2231, ADR-W-189): the names the model's previous answer lost. It adds one line after the student's request;
+ * without it the body is byte-identical to what it always was (`issue-1359-prompt-identity.test.ts`).
+ */
+export function buildRequest(spec: PromptSpec, utterance: string, context: string, locale?: 'he' | 'en', keep?: readonly string[]) {
+  const retry = keep?.length
+    ? `\n\nYour previous answer lost these names the student typed: ${keep.join(', ')}. Every one of them must appear in your steps, spelled exactly as typed.`
+    : '';
   return {
     model: LLM_MODEL,
     max_tokens: LLM_MAX_TOKENS,
     system: buildSystemPrompt(spec, locale),
     tools: [buildStepsTool(spec)],
     tool_choice: { type: 'tool' as const, name: TOOL_NAME },
-    messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"` }],
+    messages: [{ role: 'user' as const, content: `${context}\n\nStudent request: "${utterance}"${retry}` }],
   };
 }
 

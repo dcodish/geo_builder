@@ -7,7 +7,8 @@
  *  - a typed DECIMAL was dressed by the exact-form tier: «AC = 4.1» read «41/10», «2.5» read «5/2»;
  *  - the canvas printed a stated value at 3 places and the panel at 2: «4.005» vs «4.01».
  * Root: the stated value reached both surfaces as a bare number, and each re-formatted it on its own. Now the
- * parser marks a value typed as a decimal, and `statedLengths` carries the one text both surfaces print.
+ * parser keeps the spelling (#1497 / ADR-3D-426 replaced this file's `decimal` mark with `src`), and `statedLengths`
+ * carries the one text both surfaces print.
  *
  * Driven through the real store (`submit`), the real canvas (`buildScene3`) and the real panel (`dataView`).
  */
@@ -49,7 +50,7 @@ describe('#2361 — the operator’s sequence', () => {
   it('…and is computed with the full value: AC² is 7.9999², not 64', () => {
     const { rows } = read([...TRI, 'AC = 7.9999'], 'AC');
     const sq = rows.vectors.find((v) => v.label === 'AC')?.sq;
-    expect(sq).toBe(`AC² = ${statedMagText(7.9999 * 7.9999, true)}`); // 63.9984 → «64» at two places, from the full value
+    expect(sq).toBe(`AC² = ${statedMagText(7.9999 * 7.9999, String(7.9999 * 7.9999))}`); // 63.9984 → «64» at two places, from the full value
   });
 });
 
@@ -111,7 +112,7 @@ describe('#2361 — controls: an exact form as typed is unchanged', () => {
 
   it.each([
     ['AC = 7', '7'],
-    ['AC = √20', '2√5'],
+    ['AC = √20', '√20'], // #1497: was «2√5»; a typed root stays as typed (ruling 2026-09-28)
     ['AC = 2√3', '2√3'],
     ['AC = 9/2', '9/2'],
     ['AC = 3√7/2', '3√7/2'],
@@ -121,24 +122,27 @@ describe('#2361 — controls: an exact form as typed is unchanged', () => {
 
   it('a computed magnitude («2|AB| = 5» states |AB| = 5/2) keeps the exact tier', () => {
     const r = parse3('2|u| = 5');
-    expect(r.ok && r.commands.some((c) => 'decimal' in c)).toBe(false);
+    expect(r.ok && r.commands.some((c) => 'src' in c || 'decimal' in c)).toBe(false);
   });
 });
 
-describe('#2361 — the parser marks exactly a typed decimal', () => {
+describe('#2361 → #1497 — the parser carries the spelling of what was typed', () => {
   const claimOf = (line: string) => {
     const r = parse3(line);
     if (!r.ok) throw new Error(line);
     return r.commands.find((c) => c.type === 'claim' || c.type === 'vec-mag' || c.type === 'mag-val' || c.type === 'perp-to-base');
   };
-  it.each(['AB = 4.1', '|AB| = 4.1', 'אורך AB הוא 4.1', 'AB = -4.1', 'AS גובה הפירמידה = 4.1'])('«%s» is marked', (line) => {
-    expect(JSON.stringify(claimOf(line))).toContain('"decimal":true');
+  it.each(['AB = 4.1', '|AB| = 4.1', 'אורך AB הוא 4.1', 'AB = -4.1', 'AS גובה הפירמידה = 4.1'])('«%s» carries it', (line) => {
+    expect(JSON.stringify(claimOf(line))).toContain('"src":');
   });
-  it.each(['AB = 4', 'AB = 41/10', 'AB = √2', 'AB = 2.5√2', '|AB| = 3/4'])('«%s» is not', (line) => {
-    expect(JSON.stringify(claimOf(line))).not.toContain('decimal');
+  it.each([['AB = 41/10', '41/10'], ['AB = √2', '√2'], ['AB = 2.5√2', '2.5√2'], ['|AB| = 3/4', '3/4']])('«%s» carries «%s»', (line, src) => {
+    expect(JSON.stringify(claimOf(line))).toContain(`"src":"${src}"`);
+  });
+  it('an integer spells itself in every tier, so it carries nothing', () => {
+    expect(JSON.stringify(claimOf('AB = 4'))).not.toContain('src');
   });
   it('«|w| = 2.5» on a named vector and «גובה הפירמידה 2.5» carry it to their own command', () => {
-    expect(claimOf('|w| = 2.5')).toMatchObject({ type: 'vec-mag', decimal: true });
-    expect(claimOf('גובה הפירמידה 2.5')).toMatchObject({ type: 'perp-to-base', lenDecimal: true });
+    expect(claimOf('|w| = 2.5')).toMatchObject({ type: 'vec-mag', src: '2.5' });
+    expect(claimOf('גובה הפירמידה 2.5')).toMatchObject({ type: 'perp-to-base', lenSrc: '2.5' });
   });
 });

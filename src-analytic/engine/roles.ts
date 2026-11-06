@@ -1,19 +1,20 @@
 /**
- * WHICH VERTEX CARRIES A TRIANGLE'S ROLE, AND THE OBJECTS THAT FOLLOW IT (#2018, ADR-AG-298 — 2-D's `roleSides.ts`,
- * ADR-596).
+ * WHICH VERTEX CARRIES A TRIANGLE'S ROLE, AND THE OBJECTS THAT FOLLOW IT (#2018, ADR-AG-298; #2074, ADR-AG-411 —
+ * 2-D's `roleSides.ts`, ADR-596, ADR-659).
  *
- * An isosceles triangle's base and legs are named by its APEX: the vertex whose two sides are stated equal. The noun
- * alone leaves the apex an open `choice` (one option per vertex, cycled by «הציגו תצורה אחרת»); a stated «AB = AC»
- * settles it. This module is the ONE reading of that, over a list of constraints:
+ * An isosceles triangle's base and legs are named by its APEX, the vertex whose two sides are stated equal; a right
+ * triangle's hypotenuse by its SEAT, the vertex holding the right angle. The noun alone leaves that vertex an open
+ * `choice` (one option per vertex, cycled by «הציגו תצורה אחרת»); a stated «AB = AC» or «זווית C ישרה» settles it.
+ * This module is the ONE reading of that, over a list of constraints:
  *
- * - over a construction's raw constraints it answers the apex the student STATED (an equal pair outside any choice);
- * - over a configuration's RESOLVED constraints (`resolveChoices`) it answers the apex THAT configuration draws.
+ * - over a construction's raw constraints it answers the vertex the student STATED (a key outside any choice);
+ * - over a configuration's RESOLVED constraints (`resolveChoices`) it answers the vertex THAT configuration draws.
  *
  * `applyRoleSide` (M1) asks the first question to tell a settled role from an open one, and `resolvedAt` (the one
  * configuration seam, ADR-AG-245) asks the second to re-letter every object a role-named cevian minted, so the median
  * «תיכון לבסיס» drew always runs to the side opposite the apex the canvas shows.
  */
-import { shapeRow } from './shapes';
+import { rightAngleAt, shapeRow } from './shapes';
 import { sameConstraint, type Constraint } from './solve';
 import type { GeoObject, Id, RoleBinding } from './types';
 
@@ -31,15 +32,23 @@ export function isoscelesKeys(ring: readonly Id[]): Constraint[] {
   return given.t === 'choice' ? given.options : [given];
 }
 
+/** The right-angle keys over `ring`, in ring order: option `i` is the right angle at `ring[i]`, the noun's own seat. */
+export function rightAngleKeys(ring: readonly Id[]): Constraint[] {
+  return ring.map((v) => {
+    const [p, q] = ring.filter((x) => x !== v);
+    return rightAngleAt(v, p, q);
+  });
+}
+
 /**
  * The vertices of `ring` that carry `role` under `constraints` — for the base and the legs, the apex: a vertex whose
- * two sides are equal there. Several (an equilateral by its givens) and none (nothing states a pair) are both
- * answers, and the caller decides what each means.
+ * two sides are equal there; for the hypotenuse, the seat: a vertex holding the right angle. Several (an equilateral
+ * by its givens) and none (nothing states a pair) are both answers, and the caller decides what each means.
  */
 export function roleVertexOf(constraints: readonly Constraint[], ring: readonly Id[], role: RoleBinding['role']): Id[] {
-  void role; // the base and the legs are both read off the apex
   const ks = held(constraints);
-  return isoscelesKeys(ring).flatMap((key, i) => (ks.some((k) => sameConstraint(k, key)) ? [ring[i]] : []));
+  const keys = role === 'hypotenuse' ? rightAngleKeys(ring) : isoscelesKeys(ring);
+  return keys.flatMap((key, i) => (ks.some((k) => sameConstraint(k, key)) ? [ring[i]] : []));
 }
 
 /** `x` with every vertex letter of `ring` carried `step` places along it; any other value unchanged. */

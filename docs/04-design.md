@@ -104,6 +104,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **What the shape fingerprint reads (ADR-065, ADR-514, #1005).** A candidate is offered only when it is a different drawing under a similarity-invariant fingerprint: every pairwise distance between named points and each drawn (non-`hidden`) circle's radius, over their mean — the only objects with an extent of their own.
 - **Stability:** DOF parameters (free-point coords, on-object `t`) and branch indices **persist across steps**. A new constraint re-evaluates only what depends on it; unrelated objects keep their parameters, so the figure does not jump.
 - **The re-stated given yields ([ADR-623](06-decisions.md#adr-623), #1943/#1819).** `driveOrCheck` picks a constraint's carrier EAGERLY, before anything is solved. For a row the figure is already FORCED to satisfy that pick both re-opens the configuration choice (the driven re-solve lands in another valid drawing — the jump) and removes the carrier from `freeDofs` (a freedom the figure never lost stops being sampled — the ADR-052 smell). `releaseImpliedOwnership` (`engine/step.ts`) wraps every ladder exit of `applyStep`/`applyCoupledStep` and gives the claim back when, on the prior figure, the row already holds (`isSatisfied`) **and** is forced — `impliedByFigure` (`engine/dofRank.ts`), ADR-536's own rank Jacobian, so the DOF count and the ownership decision read one definition of "this row adds nothing". The mirror of ADR-399's `ensureOwnership`, which states the same rule for the branch the eager pick did not claim. Try-and-verify, failing open at every rung: the released figure must evaluate (which checks the re-stated row), be a figure, sit exactly where it sat, and survive re-sampling. The constraint is never dropped — it stays a listed check the evaluator, the verifier, the givens list and the DOF count all read. Ladder token `implied:release`.
+- **An owner must be able to move what it owns ([ADR-783](06-decisions.md#adr-783), #2590).** `constraintRefs` says what a constraint READS; `residualRefs` (`engine/solve.ts`) says what can CHANGE its residual, and every carrier choice reads the second: `driveOrCheck`'s witness marking and all of `recruitFreeDofs`. They differ for a `length-radius` against a stated radius: `|centre·witness|` is then a constant, so only the endpoints of the measured length count. A directive on anything else would make `ensureOwnership` read the constraint as owned and skip its probe, and the figure would hold only where the default drawing satisfies it by coincidence.
 - **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message.
 - **A fact whose subject is gone (ADR-483, #926):** the fold asks `isSymbolBound` (`engine/lower.ts`) before applying a `set-var`; a value for an unbound letter is stamped into the "no longer available" register, and a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) names the rows an edit orphaned while committing it.
 - **A second letter, or another coefficient, for a measured angle or segment (ADR-661, #2023/#2061).** `measureRestatement` (`engine/lower.ts`) reads a symbolic `measure-angle`/`measure-length` against the EARLIER statements: the target is the angle as its vertex plus an unordered ray pair, the segment as an unordered pair. The same letter in the same form with another coefficient is `coef-conflict`; a fresh letter (no value, not a radius letter, bound to no other quantity earlier) on a target whose earlier letters all differ is `name-taken`; the identical measure is `same`. The fold pre-scans the list in order (`computeFoldInScope`, beside the soft-equal pre-scan) and stamps a refused restatement with `measureRestatementStatus` — the over-constrained frame, or `name-taken: angle|segment <name> is already named <letter>` — plus a `[vs #i]` tail naming the earlier statement's first row by provenance (the drop-one search could never find it: a representative measure owns no constraint). The stamped fact is skipped as `prior`, never retried and never waits. `lowerOne` reads the representative's target unordered too, so «∠CBA = 3α» no longer lowers to a self-ratio. `humanizeError` renders `name-taken` with `errors.angleNameTaken`/`errors.lengthNameTaken` (`_vs` with the earlier line — the `namesOtherLine` family, not #943's `namesOther`). **The alias arm (ADR-720, #2191):** an `angle-alias` is judged by the same predicate against the EARLIER `angle-alias` commands only, on the same vertex + unordered ray key — another name is `name-taken` at the first alias (status `name-taken: angle <ray1><vertex><ray2> is already named <name>`, the same render path), the identical name `same`; a measure letter and an alias never compare (ruling #2113 B). The alias line's two idempotent segment facts stay green, so the door's dry run refuses the line on its alias fact alone.
@@ -211,7 +212,8 @@ src/
                constraintKey identity), apply (applyCommand reducer), evaluate (topological sweep + the
                driven solvers), step (applyStep/applyCoupledStep + the failure ladder, docs/LADDER.md),
                sample, verify (givens verifier), relations/detectShapes, inscribe/variants, solveBudget,
-               valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool)
+               valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool; an ask
+                            fills the store's `asks` layer, «חשב ערכים» fills `values`, ADR-788)
   parser/      parse.ts (bilingual grammar: ordered rules + post-pass chokepoints + honesty gates), catalog,
                context (buildParseCtx — the docs/17 §3b registry), scope, llm/llmShared (the LLM-fallback seam)
   app/         submitPipeline.ts (the text→command orchestration), decideDeterministic.ts (the whole pre-LLM
@@ -765,7 +767,7 @@ aside, `withAnonymousAutoCentres` re-picks a held token; `withMetricCentreBindin
 
 **The point naming has a general criterion** ([ADR-653](06-decisions.md#adr-653), #2122): beside ADR-440's line-slot
 arm, `impliedIdentityBinding` (`replay/core.ts`) trial-applies the line and names by use an auto-named point M that the
-line leaves with the same definition (`definitionKey`: kind, parents, parameters; never a free DOF) as exactly one
+line leaves with the same definition (`definitionKey`: kind, parents, parameters, read through `unspelled`, which also serves `commandConflict`'s idempotent restatement, [ADR-785](06-decisions.md#adr-785); never a free DOF) as exactly one
 student point L — the touch point M that `tangentTouchCopy` copies into X. A fresh L is the `point` rename; an existing
 L is a `merge` naming (`mergeFacts`): M takes L's letter in the facts before the line, valid only while M is defined
 before L first appears. A merge makes the line's statement true by construction, so both commit seams commit it as a
@@ -1053,9 +1055,30 @@ beyond O exactly when O is inside the circle; «המשך OA» puts R beyond A ex
 the ray from O meets first. `seatExtensionBeyond` (LADDER stage 2a) moves the other end's SEED there when it is a
 movable free point that no constraint references and the side does not already hold: inside, at `0.45·r` from the
 centre along its own direction, or outside, at `0.8·r` along the outward normal at the shared end. A default only
-(M4): seeds still sample it, the configuration search's strict tier (ADR-267) keeps a configuration on the stated side
-whenever one exists, and a pinned, derived or constrained other end is never moved, so the ADR-142 either-side
-acceptance answers exactly as before.
+(M4): seeds still sample it, the configuration search keeps a configuration on the stated side whenever one exists, and
+a pinned, derived or constrained other end is never moved.
+
+### A typed extension whose side no figure has is refused ([ADR-784](06-decisions.md#adr-784))
+
+`extensionsClear`, the verifier and every search hold one bar, the stated letter order; ADR-142's either-side tier is
+gone. The shared-endpoint branch still carries no `collinear-order`, so the ladder cannot refuse it: a typed line is
+judged by `impossibleExtensionSide` (`replay/core.ts`, beside `forcedCrossedRing`), which asks only about an extension
+built as that branch's `line-circle`. On the stated side at the drawn seed of the trial figure, it passes, which is how
+ADR-780's seat answers at no cost. Otherwise it reads the prior figure's `sharedSamples` pool, computes the crossing in
+each sample from the two ends and the centre, and refutes at the verifier's bar (`t > 1`) when no sample has the side; it
+fails open like its twin. `extensionSideVerdict` (`app/extensionSide.ts`)
+is the one verdict the submit decision, the ✎ edit and the LLM lane ask. It offers the student's sentence with the two
+letters reversed only if that line parses to the reversed extension, passes the same gate and builds, so a point between
+the two letters gets the refusal alone.
+
+The same gate reads every STANDING shared-endpoint extension on each typed line. One on its side at the drawn seed before
+the line, off it after, and off it in every sample of the trial figure is refused as `input.extensionSideBroken`, naming
+the line and the extension. The prior pool cannot answer this, so `gateSamples` runs the trial's sampling jobs at the drawn
+seed (`atSeed`, skipping the display-seed search), stops at the first sample on the side, and stops at a deterministic work
+cap; a run that stops either way answers nothing and the line commits. A figure with no extension pays one scan of the
+fact list. A saved figure never passes through this gate: it replays with every row built, the verifier flags the row
+(`figure.v.orderBeyond`, or `figure.v.orderBeyondOther` when the point is past the first letter), and being already off
+its side, it never blames a new line.
 
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 
@@ -1566,7 +1589,10 @@ letter typed (the noun alone, or a foot outside the ring) → the commands BIND 
 typed («CM תיכון ליתר», «גובה ליתר מ-C») → the cevian to the opposite side plus `set-angle` 90° at that vertex,
 unbound (the claim «תיכון ליתר AB» states); more than one host (another right triangle, open or stated) →
 `role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
-triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse.
+triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse. One ring vertex typed against a
+STATED right angle is `role-claim` / `hypotenuse-apex` ([ADR-787](06-decisions.md#adr-787)). A foot letter closing a
+cevian sentence is `cevianFootLetter`, just before `roleSideLine`: the rest goes through the grammar and its one foot
+is renamed, so `roleSide` travels and the line still follows the seat ([ADR-790](06-decisions.md#adr-790)).
 
 **A role stated about typed letters is a claim, in every spelling ([ADR-708](06-decisions.md#adr-708), #1839).** Typed
 letters stay literal (no binding), and the sentence also states its role through one lowering, `isoscelesRoleClaim`
@@ -1728,6 +1754,7 @@ The relations layer's definite values, the values panel and the forced crossing 
   number). It rides `detectAll` into the store's `determinacy` slot (facts-keyed, like `crossings`), and
   `figureStatus` (`app/figureStatus.ts`) maps it to the status line (FR-ALT-6). The values panel reads the same
   `complete` flag.
+- **A «נתון» row prints the spelling** ([ADR-W-179](06w-decisions-workspace.md#adr-w-179), #1497): `computeValues` (`withGivenSpelling`) sets `ValueRow.given` from the `measure-*` command's `expr.text`, the text the canvas label prints; `MathValues` typesets it with `MathText`. A row in the student's unit, or with two values, keeps its own form.
 - **The values panel's one value gate** ([ADR-634](06-decisions.md#adr-634), #1867): every row and every question in
   `computeValuesPanel` asks `optionsOf` — one value when the pool agrees; the quantity's TWO values (classified by
   `shell/valueOptions`, at `REL_TOL`) when the pool is `determined` and `complete` and each value is seen at two

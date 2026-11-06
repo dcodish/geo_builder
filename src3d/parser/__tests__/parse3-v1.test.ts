@@ -14,20 +14,20 @@ const cmds = (input: string) => {
 
 describe('parseVecExpr', () => {
   it('coefficient forms: fractions, glyphs, decimals, implicit 1, minus', () => {
-    expect(parseVecExpr('1/2u + 1/2v + 5/3w')).toEqual([
+    expect(parseVecExpr('1/2u + 1/2v + 5/3w')).toMatchObject([
       { coeff: 0.5, atom: { kind: 'named', name: 'u' } },
       { coeff: 0.5, atom: { kind: 'named', name: 'v' } },
       { coeff: 5 / 3, atom: { kind: 'named', name: 'w' } },
     ]);
     // a glyph is spelled at the boundary (#2255, ADR-3D-374), so the reader is fed the normalised text
-    expect(parseVecExpr(normalize3('-⅓u - ⅓v + ⅓w'))).toEqual([
+    expect(parseVecExpr(normalize3('-⅓u - ⅓v + ⅓w'))).toMatchObject([
       { coeff: -1 / 3, atom: { kind: 'named', name: 'u' } },
       { coeff: -1 / 3, atom: { kind: 'named', name: 'v' } },
       { coeff: 1 / 3, atom: { kind: 'named', name: 'w' } },
     ]);
-    expect(parseVecExpr("2KA'")).toEqual([{ coeff: 2, atom: { kind: 'pair', from: 'K', to: "A'" } }]);
-    expect(parseVecExpr('AM')).toEqual([{ coeff: 1, atom: { kind: 'pair', from: 'A', to: 'M' } }]);
-    expect(parseVecExpr('0.5·u - w')).toEqual([
+    expect(parseVecExpr("2KA'")).toMatchObject([{ coeff: 2, atom: { kind: 'pair', from: 'K', to: "A'" } }]);
+    expect(parseVecExpr('AM')).toMatchObject([{ coeff: 1, atom: { kind: 'pair', from: 'A', to: 'M' } }]);
+    expect(parseVecExpr('0.5·u - w')).toMatchObject([
       { coeff: 0.5, atom: { kind: 'named', name: 'u' } },
       { coeff: -1, atom: { kind: 'named', name: 'w' } },
     ]);

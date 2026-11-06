@@ -301,6 +301,14 @@ nothing.
 be written (`הישר y-3=4(x-2)`). Steps must be catalogue commands. `fallbackRefusal` (`app/fallback.ts`) words a
 non-recording answer (ADR-AG-170).
 
+### «MK אנך לציר x»: a reading the figure decides ([ADR-AG-410](06c-decisions-analytic.md#adr-ag-410))
+
+`parsePerpendicular`'s piece arm (`PERP_PIECE_HE` / `_EN`) reads the noun with two names and any foot line, and lowers
+through `perpendicularFacts` to what «האנך מ-M …» builds, with the second name as the foot. `parseLine` takes no figure, so
+the foot fact carries `piece: true`, and `applyFact` answers `not-handled` when the foot's letter is held or a parent is
+missing; `decideSubmit` does the same when the trial puts the foot on its own point. Those figures keep the verdict an
+unread line gets, so the sentence still reaches the model there.
+
 ### The LLM lane's faithfulness gates ([ADR-AG-279](06c-decisions-analytic.md#adr-ag-279))
 
 `runFallback` runs `faithfulnessAnalytic` (`parser/honestyAnalytic.ts`) after the all-or-nothing re-decide and
@@ -322,9 +330,9 @@ that mention them), each stated number by its own stretch of the sentence, and v
 other tag, so a radius r pays an equation's r² and «AB = 3» is not paid by «AB = 9»
 ([ADR-AG-384](06c-decisions-analytic.md#adr-ag-384)). A count is a BARE integer before a plural noun that is not a
 unit word (`UNIT_WORD`: «יחידות», «מטרים», «מעלות», "units", "degrees" and the singular and abbreviated units), so
-«√2 יחידות» and «30 מעלות» keep their stated values (ADR-AG-384 amendment 1). The unit words and the bare-integer atom are the shell's, shared with 2-D ([ADR-781](06-decisions.md#adr-781)). An answer's CURVES pay the parameters their canonical form leaves implicit ([ADR-AG-391](06c-decisions-analytic.md#adr-ag-391)): every parameter-free equation in a model line's facts is fitted as the engine fits it (`curveFromEquation`), and its parameters (a line's slope and intercept, or its `x = k`; a circle's centre and radius; a canonical ellipse's centre (0,0) and semi-axes; a canonical parabola's vertex (0,0) and p) are one more source of that line's union, so «x^2 + y^2 = 9» pays a stated centre (0,0) and «y = x + 3» a stated slope 1, while an answer centred elsewhere still drops the stated centre. Nothing computed from the parameters pays (a diameter, a focus, a point the curve passes through).
+«√2 יחידות» and «30 מעלות» keep their stated values (ADR-AG-384 amendment 1). The unit words and the bare-integer atom are the shell's, shared with 2-D ([ADR-781](06-decisions.md#adr-781)). An answer's CURVES pay the parameters their canonical form leaves implicit ([ADR-AG-391](06c-decisions-analytic.md#adr-ag-391)): every parameter-free equation in a model line's facts is fitted as the engine fits it (`curveFromEquation`), and its parameters (a line's slope and intercept, or its `x = k`; a circle's centre and radius; a canonical ellipse's centre (0,0) and semi-axes; a canonical parabola's vertex (0,0) and p) are one more source of that line's union, so «x^2 + y^2 = 9» pays a stated centre (0,0) and «y = x + 3» a stated slope 1, while an answer centred elsewhere still drops the stated centre. A value COMPUTED from the curve is read by its stated role ([ADR-AG-405](06c-decisions-analytic.md#adr-ag-405)): `heldByCurves` reads the words right before a stated number or coordinate pair (`SCALAR_ROLES`, `PAIR_ROLES`; a list carries its role along) and tests the role on the answer's curves with the engine's `isOn`, `parabolaFocus` and `ellipseFoci`, and on the radii of circles stated with no equation. A value proven held is taken out before the multiset, needing no account and spending none. A value with no role goes to the multiset as before, so a stated centre is never paid by a curve that merely passes through it.
 
-*Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
+*Identifiers:* `faithfulnessAnalytic` · `heldByCurves` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
 ## The sentence frame
 
@@ -478,6 +486,12 @@ reading** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183)): `nameReading` (`
 (`apply.ts`, around `applyStatement` in `applyFact`) raise an `ApplyNotice`, carried by `fold`, `derive`
 (`Derivation.notices`) and the record verdict, and set with the line (`recordLine(line, notice)`,
 `recordLlmLines(…, notice)`; `commitRecord` / `noticeText`).
+
+**The probe is total, keyed by name** ([ADR-AG-412](06c-decisions-analytic.md#adr-ag-412), #2566). Every identity or
+restatement question is answered at `probeEnvs(...exprs)` (`engine/probes.ts`): two environments built from the
+expressions asked about, assigning each letter a student can type one value per NAME, distinct across names. A fixed
+alphabet cannot return: `evalExpr` answers NaN for an absent letter, which reads as "different". The plane's `x`, `y`, a
+length placeholder and a tool symbol stay absent.
 
 *Identifiers:* `\|cos\|` · `III`
 
@@ -817,6 +831,8 @@ A cevian MINTS a point whose definition differs per option of the isosceles `cho
 
 *Identifiers:* `parseRoleCevian` · `ROLE_CEVIAN_HE/EN` · `applyRoleCevian` · `RoleBinding` · `follows` · `engine/roles.ts` (`isoscelesKeys`, `roleVertexOf`, `followObjects`) · `resolvedAt` · `drawnOption` · `ambiguous-role-side` · `errRoleSideUnresolved`
 
+**The hypotenuse ([ADR-AG-411](06c-decisions-analytic.md#adr-ag-411), #2074).** `RoleBinding.role` takes `hypotenuse`, and `roleVertexOf` answers the seat over `rightAngleKeys(ring)`, so the same `followObjects` pass rotates a cevian with the right-triangle noun's choice. `applyHypotenuseCevian` owns `cevian-of { hypotenuse }`: it finds the one host (a triangle with a stated right angle, or the noun with its seat open); a typed apex lowers to `rightAngleAt` plus the lettered cevian; a stated seat lowers to the lettered cevian; an open seat goes through `boundCevian`, shared with `applyRoleCevian`. No host is `ambiguous-no-right-angle`, several are `ambiguous-role-side`. A foot the figure already holds, or a stated length, is `not-handled` on an open seat: a constraint cannot follow. A foot letter that is a ring vertex is the apex, with `freeToolLetter` choosing the foot. `typedFoot` marks a foot the sentence typed, so the same-derivation reuse cannot drop it.
+
 ### The perpendicular from a point, and the line through a point that cuts a side ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), #1620)
 
 The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.ts`, `footOn`, `curveParentsOf`).
@@ -1095,7 +1111,15 @@ one `touch` (`statedTangent` admits a tangency of unstated kind). Names: the stu
 numeral taken in any notation by `nameReading`). The ask lane resolves the touch tangent by `touchTangentNoun`; the exam's
 sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
 
-*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
+**A letter-named tangent is a slot of the pair ([ADR-AG-403](06c-decisions-analytic.md#adr-ag-403), #2408).** Past the touch
+arms above, `commonTangentSlot` reads what the pair holds (`pairCommonTangents`) and answers a `choice` of families, each
+option a `common-touch` pair of `derived-at` rows (`evalRule` over `commonTangentLine`), `known` for a restatement, the tangent
+at T on a pair touching from outside, or the refusal `tangentsExhaustedOf` names. `discreteAxes.ts` offers each slot what
+its pair's earlier slots left (`openOptions`, `settledSlots`), so the pair's digits are one permutation's Lehmer code and a new
+tangent is a new slowest digit. A `distinct` beside the slot rejects a dead assignment. `seedFreePairs` starts two circles
+nothing else speaks of apart. A missing family is a residual (`familyGap`). `subjectLed` fits a later vertex alone.
+
+*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `tangentsExhausted` · `commonTangentSlot` · `pairCommonTangents` · `commonTouchOf` · `common-touch` · `reversedFamily` · `familyGap` · `openOptions` · `settledSlots` · `seedFreePairs` · `subjectLed`
 
 **The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
 `unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,
@@ -1425,8 +1449,8 @@ kind is `SHAPES[…].kind` of a polygon whose noun the line's OWN text names (`n
 admitted figures of `drawableAt(c, 0..POOL_SIZE-1)`, only once `configurationPool(c).complete()`; a deferred pool
 reports pending and returns nothing, so `poolScheduler`'s re-render brings the note. Subset trials re-derive the
 anchors plus the chosen lines, settled "not forced" at the first counterexample. `App.tsx` computes it in a passive
-effect after paint (never in render) and shows one `Banner kind="notice"` per note under the shape warnings; the
-given text is the line as the page shows it (`rowShownText`, below).
+effect after paint (never in render) and shows one shared `NarrowingNote` per note under the shape warnings, through
+`app/NarrowingNotes.tsx` ([ADR-W-180](06w-decisions-workspace.md#adr-w-180)); the given text is the line as the page shows it (`rowShownText`, below).
 
 **A row's shown text** ([ADR-AG-326](06c-decisions-analytic.md#adr-ag-326), #2424). `rowShownText(line, spokenFor[i])` in
 `store/useAnalyticStore.ts`, beside the marker's writer `spokenPart` and reader `spokenSentence`: the stored sentence
@@ -1438,7 +1462,7 @@ shape warning and the narrowing note all read it; the marker stays stored for th
 A configuration the givens contradict is never knowledge. Every static discrete axis is one digit of one odometer
 (`engine/discreteAxes.ts` `assignmentAt`, [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)): constraint `choice`s in
 construction order (nested ones depth first on the chosen branch), then region `choice`s, then the `crossing-nth { both }`
-pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. `evaluateTryingChoices` walks the next
+pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. A pair's common tangents read one permutation, each digit's base one less than its predecessor's ([ADR-AG-403](06c-decisions-analytic.md#adr-ag-403)). `evaluateTryingChoices` walks the next
 combinations at the same samples (`Figure.choiceSeed`, `choiceSeedOf(c, seed)`; `max(min(total, CHOICE_TRIES), largest n)`
 of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions-analytic.md#adr-ag-303)): `engine/pinRoots.ts`
 `walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over
@@ -1516,7 +1540,7 @@ straights meet once: `maxCrossings`' cap of 1 no longer refuses a second name fo
 returns no partner for a straight × straight pair, so `crossing-distinct` holds on it. What stays is the structural
 refusal in the parser and ADR-AG-349's one-line pair; the text below records how the retired arm worked.
 
-**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), #2674). A derived point the
+**A tool's letter yields to the student's** ([ADR-AG-387](06c-decisions-analytic.md#adr-ag-387), [ADR-AG-404](06c-decisions-analytic.md#adr-ag-404), #2674). Letters are chosen before the fold, so `resolveToolLetters` reads a takeover on the fold's own terms and returns the letter to the pool, and `resolveMints` gives a coordinate point's placeholder a later fresh letter at those coordinates. A derived point the
 tool lettered is applied with `auto`, and its object carries `tool`. That covers a fresh mint in `resolveToolLetters`,
 a `toolFoot` cevian and the canonical centre. `foldPass` drops the mark when a fact's sentence types the letter
 (`typedLetters`). ONE POSITION, ONE NAME then treats a `tool` holder as it treats a helper: a student's derivation of
@@ -1791,6 +1815,8 @@ agree on where a letter is.
 
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality (two plain lengths, an `angle-ratio` with k = 1) draws no tick or arc at rest; it stays in the givens list, drawn only in an opt-in relations layer. The text below describes the code until that ships.
 
+`engine/expr.ts` `spelledText(e)` prints an `Expr` in the student's notation; `literalText(e)` is the same text for a stated literal or a typed π, and is this tree's `src` ([ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)), printed through `shell/literal` `givenText`. `StatedValue` is `{ num, src? }` or `{ text }`, and a `num` node carries `pi: true` for a typed π ([ADR-AG-407](06c-decisions-analytic.md#adr-ag-407)).
+
 `engine/statedMeasures.ts` `statedMeasures(construction, origin, choiceSeed)` reads what a SENTENCE stated — a plain
 length or an equality, an `angle` (or a `tan` / `cos` angle), a ⊥ knee (the cevian's at its FOOT, #1241,
 ADR-AG-237), an `area`, an arc — and never a noun's definition (`Fact.definition`). It travels `derive` →
@@ -1839,7 +1865,7 @@ through `lbl`. The frame takes them in: `markAnchors` feeds `drawnBox`'s extra p
 configuration. Such an ellipse has no chip and no marks; `SceneKnowledge.circleShaped` gives it a circle's centre cross
 at the origin, labelled `(0, 0)` under the circle's own rule. `circleNotesOf(lines, d, rederive)` finds the cause as
 the narrowing note does — every other line whose removal stops it being round, else its own line — and `App.tsx`
-computes it in a passive effect after paint and renders it as an ⓘ `Banner kind="notice"` after the narrowing notes
+computes it in a passive effect after paint and renders it as a `NarrowingNote` after the narrowing notes
 (`circleNoteText`, the narrowing note's `cause` keys and voice). `isCircleShaped` is the engine's `isRoundEllipse` (`engine/crossings.ts`), so the offer list reads it too: `roundEllipseCentresOf` offers the centre on the circle centre's path (`offersOf` → the letter popover → `decideCentreName` → `centreSentenceOf(…, construction)`), recording «<letter> מרכז האליפסה» — the `centre` role of `readRoleRef`, lowered (`ellipse-centre-of`) by `nameEllipseRole` to `ellipse-point` `{ k: 'centre' }`. `curveParts` prints such an ellipse's row with «מרכז: (0, 0)» (`curveRoundCentreLabel`) instead of its foci.
 
 ### The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))

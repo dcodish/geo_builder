@@ -24,10 +24,12 @@
  */
 import { findJuxtaposedNumbers } from '../../shell/juxtaposedNumbers';
 import { fmtNum } from '../../shell/format';
+import { readLiteral } from '../../shell/literal';
 
 
 export type Expr =
-  | { kind: 'num'; value: number }
+  /** `pi` (#2033, ADR-AG-407): this number IS π. It still evaluates as `value`; the mark only lets a printer write «π». */
+  | { kind: 'num'; value: number; pi?: true }
   | { kind: 'sym'; name: string }
   | { kind: 'neg'; a: Expr }
   | { kind: 'add'; a: Expr; b: Expr }
@@ -87,7 +89,7 @@ export { findMixedNumber, findJuxtaposedNumbers, type MixedNumber, type NumberPa
 // ---------------------------------------------------------------------------
 
 type Tok =
-  | { t: 'num'; v: number }
+  | { t: 'num'; v: number; pi?: true }
   | { t: 'sym'; v: string }
   | { t: 'op'; v: '+' | '-' | '*' | '/' | '^' }
   | { t: 'lp' }
@@ -122,6 +124,8 @@ const LATIN_RE = /[A-Za-z]/;
 
 /** The letters a student can index (Latin and Greek — never the private-use length encoding), and what starts an index (#1785). */
 const INDEXED_LETTER_RE = /[A-Za-zα-ορ-ω]/;
+/** Is this symbol a letter a student wrote — never a tool symbol (`r_O`, `θ_<id>`) or a private-use length placeholder? (#2566) */
+export const isStudentLetter = (name: string): boolean => name.length === 1 && INDEXED_LETTER_RE.test(name);
 const INDEX_START_RE = /[0-9_₀-₉]/;
 
 function tokenize(src: string): Tok[] | null {
@@ -226,9 +230,12 @@ function tokenize(src: string): Tok[] | null {
      * parameter the figure may SAMPLE, so `AB = 2π` as a symbol would make the length free and let
      * the solver choose it. π is a constant, so it is tokenised as its value and the juxtaposition
      * rule that already reads `2a` and `4√5` reads `2π` for free.
+     *
+     * #2033 (ADR-AG-407): the token remembers it was π, so a printer can write what the student wrote. Its value is
+     * still `Math.PI`: #1129's constant semantics hold and no solve changes.
      */
     if (c === 'π') {
-      out.push({ t: 'num', v: Math.PI });
+      out.push({ t: 'num', v: Math.PI, pi: true });
       i += 1;
       continue;
     }
@@ -321,7 +328,7 @@ class P {
   atom(): Expr | null {
     const t = this.next();
     if (!t) return null;
-    if (t.t === 'num') return { kind: 'num', value: t.v };
+    if (t.t === 'num') return { kind: 'num', value: t.v, ...(t.pi ? { pi: true as const } : {}) };
     if (t.t === 'sym') return { kind: 'sym', name: t.v };
     if (t.t === 'sqrt') {
       // √5, √(x+1) — binds tighter than multiplication, so `4√5` is 4·√5 and not √20.
@@ -418,6 +425,15 @@ export function exprText(e: Expr): string {
   return print(e, 0);
 }
 
+/**
+ * The same expression in the student's notation (#1497, ADR-W-179): the exam multiplies a number by JUXTAPOSITION
+ * (`6√5`, `3a`, `3√7/2`), so a stated value reads that way wherever it sits in the expression. `exprText` keeps `·`,
+ * which an equation's reader needs.
+ */
+export function spelledText(e: Expr): string {
+  return print(e, 0, true);
+}
+
 /** Binding power, matching the parser's own levels: add/sub < mul/div < pow < atom. */
 const POW: Record<Expr['kind'], number> = {
   num: 9,
@@ -431,29 +447,30 @@ const POW: Record<Expr['kind'], number> = {
   sub: 1,
 };
 
-function print(e: Expr, need: number): string {
+function print(e: Expr, need: number, spelled = false): string {
   const body = ((): string => {
     switch (e.kind) {
       case 'num':
-        // The SHARED formatter, never a local rounder — the #723 chokepoint.
-        return fmtNum(e.value);
+        // The SHARED formatter, never a local rounder — the #723 chokepoint. A π prints as π (#2033).
+        return e.pi ? 'π' : fmtNum(e.value);
       case 'sym':
         return e.name;
       case 'neg':
-        return `-${print(e.a, POW.neg)}`;
+        return `-${print(e.a, POW.neg, spelled)}`;
       case 'sqrt':
-        return `√${print(e.a, 9)}`;
+        return `√${print(e.a, 9, spelled)}`;
       case 'add':
-        return `${print(e.a, POW.add)} + ${print(e.b, POW.add)}`;
+        return `${print(e.a, POW.add, spelled)} + ${print(e.b, POW.add, spelled)}`;
       case 'sub':
         // The right operand binds tighter: `a - (b - c)` must keep its parentheses.
-        return `${print(e.a, POW.sub)} - ${print(e.b, POW.sub + 1)}`;
+        return `${print(e.a, POW.sub, spelled)} - ${print(e.b, POW.sub + 1, spelled)}`;
       case 'mul':
-        return `${print(e.a, POW.mul)}·${print(e.b, POW.mul)}`;
+        if (e.a.kind === 'num' && ((spelled && (e.b.kind === 'sym' || e.b.kind === 'sqrt')) || (e.b.kind === 'num' && e.b.pi))) return `${print(e.a, POW.mul, spelled)}${print(e.b, POW.mul, spelled)}`;
+        return `${print(e.a, POW.mul, spelled)}·${print(e.b, POW.mul, spelled)}`;
       case 'div':
-        return `${print(e.a, POW.div)}/${print(e.b, POW.div + 1)}`;
+        return `${print(e.a, POW.div, spelled)}/${print(e.b, POW.div + 1, spelled)}`;
       case 'pow':
-        return `${print(e.a, POW.pow + 1)}^${print(e.b, POW.pow)}`;
+        return `${print(e.a, POW.pow + 1, spelled)}^${print(e.b, POW.pow, spelled)}`;
       default: {
         const unprinted: never = e;
         throw new Error(`expression kind has no text: ${JSON.stringify(unprinted)}`);
@@ -461,6 +478,22 @@ function print(e: Expr, need: number): string {
     }
   })();
   return POW[e.kind] < need ? `(${body})` : body;
+}
+
+/**
+ * A number the student wrote as a literal, in their spelling, or undefined (#1497, ADR-AG-413). The parse substitutes a
+ * valued letter, so «t = 0.5» · «A(2t,1)» holds the constant `2·0.5`: that is arithmetic, not a spelling, and reads the tiers.
+ */
+export function literalText(e: Expr): string | undefined {
+  const text = spelledText(e);
+  return symbolsOf(e).length === 0 && (readLiteral(text) !== null || carriesPi(e)) && !/^-?\d+$/.test(text) ? text : undefined; // an integer spells itself
+}
+
+/** Does the expression hold a typed π? `shell/literal` reads no π: the `Expr` is the half it cannot supply (#2033). */
+function carriesPi(e: Expr): boolean {
+  if (e.kind === 'num') return e.pi === true;
+  if (e.kind === 'sym') return false;
+  return carriesPi(e.a) || ('b' in e && carriesPi(e.b));
 }
 
 /** A constant expression — no parameters — which is the common case and worth asking about. */

@@ -70,7 +70,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   - Sources: [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465
 - **FR-GP-7 (Must)** — **A number the givens determine always shows its value.** Exact form when the
   value is exact; otherwise ≈ decimals — never the bare name, and never a fraction standing in for a
-  value that is not one. «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°»)
+  value that is not one. A number typed as a decimal reads as a decimal, computed in full and shown to
+  two decimals when needed: «z = 7.9999» reads «z = 8», «z = 1.234» reads «z = 1.23», «z = 1.5 + 2.25i» reads
+  «z = 1.5+2.25i» ([ADR-CX-088](06d-decisions-complex.md#adr-cx-088)). «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°»)
   in the panel and, being typed with no parameter, on the canvas. "Determined" is the same test a
   question («|z1|») is answered by, so the panel prints a number exactly when that question would get one;
   a number with freedom left keeps its bare name.
@@ -237,7 +239,8 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   solution-set letter reports its spread; the argument of a number KNOWN to be 0 says 0 has no
   direction, never «not determined». **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The rest of this requirement describes the code until that ships. Every question may carry a frame — «מהו …», «חשבו את …», «what is …»
   before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
-  given.
+  given. A bare name in the ask box («w») asks that number's value, or why it has none; the same line in the
+  givens box declares it ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087)).
   - Sources: [ADR-CX-055](06d-decisions-complex.md#adr-cx-055) Amendment 1, #1437
 - **FR-KN-1 (Must)** — **A quantity with exactly two possible values shows both**, as in every other tool — here too for a question about a solution-set letter (FR-CN-6): «Im(z1) = ±3» when they are opposites, otherwise «Re(z1) = -1 או Re(z1) = 2» (ADR-W-118 B12, W1, [ADR-CX-066](06d-decisions-complex.md#adr-cx-066), #1867). Three or more values, or a set the tool cannot prove complete, show none. **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
@@ -279,8 +282,10 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   — the same figure reads «z₂ = 18r» on the canvas — and a number the tool computed («w = z1·i», the roots
   of «z^2 = 2i») shows its name alone, its value in the panel. A number the student typed shows as typed,
   in the view's own form (D1), including one fixed by its own stated modulus and argument («|z| = 2» ·
-  «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). An accepted given never leaves nothing on screen.
-  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862)
+  «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). That is its own spelling, not a re-spelling of its value:
+  «z = 0.5+1.25i» reads «z = 0.5+1.25i», «z = √8cis45» reads «z = √8·cis45°», and a decimal reads at most two
+  decimals (FR-SU-30). An accepted given never leaves nothing on screen.
+  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862), [ADR-W-179](06w-decisions-workspace.md#adr-w-179) (#1497)
 - **FR-KN-6 (Should)** — **The exported question prints the givens, never the claims.** «הורידו שאלה»
   (02w FR-EX-2) lists every active line as typed, in entry order, and leaves out a line that only states a
   claim (✓/✗) — a claim is the student's answer, and a question sheet does not print its answers. A line

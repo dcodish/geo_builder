@@ -54,6 +54,7 @@ import {
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { clauseCoverageVerdict, compoundNotHonoured, joinedSubject, splitStatements } from './clauseCoverage';
+import { extensionSideVerdict } from './extensionSide';
 import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { lostRingNote } from './unreadRingRole';
@@ -823,6 +824,12 @@ export async function decideFromParse(
           { source: 'parser', result: 'ring-contradicts-noun', detail: crossedRing.join(''), commands: r.commands },
           { key: 'input.ringContradictsNoun', params: { detail: utterance.trim() } },
         );
+      }
+      // #2518 (ADR-784): an extension whose stated side no configuration has is refused naming the line, offering the
+      // reversed sentence when it builds. Never escalated: the parse was right, and the model could only draw the other side.
+      const wrongSide = extensionSideVerdict(utterance, utterance, r.commands, pctx, facts, seed);
+      if (wrongSide) {
+        return refuse('conflict', { source: 'parser', result: wrongSide.result, commands: r.commands }, { key: wrongSide.messageKey, params: wrongSide.params });
       }
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread

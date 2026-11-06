@@ -4026,6 +4026,8 @@ figure) joins the saved-session net.
 
 ## ADR-CX-065 — The canvas shows what the student typed; computed values go to the panel (#1862)
 
+> **⚠ Superseded in part** 2026-11-05 by [ADR-CX-088](#adr-cx-088): "the panel's readings do not change" no longer holds for a number typed as a decimal, which reads as a decimal in the panel.
+
 **Status:** accepted, 2026-10-12 · **Issue:** [#1862](https://github.com/dcodish/geo_builder/issues/1862) (feature, P2, `complex`, PR) · round #1998 ·
 supersedes the canvas half of [ADR-CX-015](#adr-cx-015) and the 2026-08-18 ruling that the reading returns to the canvas; partly supersedes [ADR-CX-043](#adr-cx-043) ("substituted", canvas clause) and [ADR-CX-058](#adr-cx-058) (canvas substitution)
 **Requirements:** [02d](02d-requirements-complex.md) FR-KN-5 and FR-CN-10 (rewritten); [02w](02w-requirements-workspace.md) rows "A computed value on the canvas" and "Letter ↔ value chip" ·
@@ -4473,3 +4475,37 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Sibling audit.** 2-D is the reference (ADR-123). 3-D and analytic: same item, ADR-3D-404 and ADR-AG-366.
 
 **Behaviour change for a student:** two named numbers with one value now show «z₁ ו-z₂ נפלו על אותה נקודה.» while both are on the figure.
+
+## ADR-CX-087 — A bare name in the ask box is a question about it (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2) · fix round #2722 · part of [ADR-W-181](06w-decisions-workspace.md#adr-w-181)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-0 · **Design:** [04d](04d-design-complex.md) § the ask lane reading
+
+**Class.** A line that names one object and states nothing is a declaration in the givens box, and the ask lane read it by the givens' rule, so the student was told it was a given.
+
+**Decision.** `parseLaneAsk` is `parseAsk` plus the one thing the lane knows: nothing can be declared there, so a line that only names one number asks about it. It lowers through the existing `bareNameValue` (the reading «מהו w» already had), and stage 5d answers: the value when the givens force one, else the WHY. `lowerAsks` and `askRowsOf` take it; `readAsk`, which routes the GIVENS box, stays on `parseAsk`, so «z2» there still declares, and a line that states («w = 3») stays `statement` in both. The marked origin «O» (ADR-CX-085) is the same case in another parse: an object, not a declared name; the lane reads it as the number 0. The test `readAsk('z2')` is unchanged on purpose.
+
+**Sibling audit.** See [ADR-W-181](06w-decisions-workspace.md#adr-w-181).
+
+**Behaviour change for a student:** «w» in the ask box prints w's value, or why it has none, instead of «זהו נתון, לא שאלה».
+
+## ADR-CX-088 — A number typed as a decimal reads as a decimal in the panel (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (complex) · fix round #2722, stream I · branch `fix/1497-complex-panel-decimal` · judge ruling q27, choice B `[judged]` · **amends** [ADR-CX-065](#adr-cx-065) (the panel's readings) · builds on [ADR-W-179](06w-decisions-workspace.md#adr-w-179) · precedent sr-22 ([ADR-W-175](06w-decisions-workspace.md#adr-w-175))
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-GP-7 · **Design:** [04d](04d-design-complex.md) § "The typed spelling on the canvas" · **LADDER stage:** 5d (the reading), [LADDER-CX](LADDER-CX.md)
+
+**Measured before** (`b3514ed0`): «z = 7.9999» read «z = 79999/10000» and «z = 1.234» read «z = 617/500» in the panel, in both views; ADR-W-179 had fixed the canvas's cartesian view only, and a typed decimal's polar label still read the fraction.
+
+**Root cause.** The value layer holds an exact Rat, so a typed decimal is indistinguishable from the fraction it equals, and the reading prints the fraction. **Class:** a number typed as a decimal is dressed as a fraction in a printer that cannot see how it was typed.
+
+**Decision.** `typedDecimalReadings` (`replay/typedSpelling.ts`) asks the line, through the shared `givenText` and `readLiteral`, so it is the same spelling-keeper and adds **no threshold**. A reading changes only where the decimal IS that view's number: the cartesian parts, a typed modulus, or the modulus of a number on one axis. A line with a decimal keeps any fraction beside it («z = 2/3+1.5i» reads «z = 2/3+1.5i»).
+
+**What it does not reach.** A fraction or a root alone keeps the reading it had («z = √8» reads «z = 2√2» in the panel). A conversion to the other view stays computed («z = 0.5cis30» reads `√3/4+(1/4)i` in the cartesian view). A value computed from a decimal («w = 2z») is not decided, and is left.
+
+**Sibling audit.** Only complex holds exact Rats in a reading. 2-D, 3-D and analytic print a decimal through `fmtNum` already (ADR-W-179).
+
+**Locks.** `src-complex/__tests__/canvas-spelling-1497.test.ts`; `issue-1435-sqrt-input.test.ts` re-based («z1 = 1.5 + 2.5i» read «3/2+(5/2)i»).
+
+**Behaviour change for a student:** in the complex panel a number typed as a decimal reads as a decimal in at most two places, never as a fraction.

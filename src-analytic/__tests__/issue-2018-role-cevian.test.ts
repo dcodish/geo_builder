@@ -288,9 +288,8 @@ describe('#2018 — no single isosceles triangle: 2-D’s question, 2-D’s sent
   it('TAUGHT REMEDY: every spelling the sentence names is one the tool reads', () => {
     expect(submit([ISO, 'תיכון לבסיס']).map((v) => v.kind)).toEqual(['record', 'record']);
     expect(submit(['משולש ABC', 'תיכון לצלע AB']).map((v) => v.kind)).toEqual(['record', 'record']);
-    // the hypotenuse example reaches analytic's RULED question (#1620, 2026-10-02), not a dead end
-    const [, hyp] = submit(['משולש ישר זווית ABC', 'תיכון ליתר']);
-    expect(hyp.kind === 'refused' && hyp.error.key).toBe('ambiguous-hypotenuse');
+    // the hypotenuse example draws on the shown triangle (#2074, ADR-AG-411)
+    expect(submit(['משולש ישר זווית ABC', 'תיכון ליתר']).map((v) => v.kind)).toEqual(['record', 'record']);
   });
 });
 

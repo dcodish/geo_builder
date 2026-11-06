@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -37,6 +37,7 @@ import { readFrame } from './frame';
 import { withImpliedPoints } from './impliedPoints';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting, RADICAL, radicalTerm, evalRadicalTerm, COUNT_DIGITS, UNIT_WORD } from '../../shell/llm/honestyCore';
+import { readArcUnitValue } from '../../shell/arcLengthUnit';
 import { resolvePairRoles } from './pairRoles';
 import { dropRingRefs, resolveRingRoles } from './ringRoles';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
@@ -2912,7 +2913,7 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
  * leaving the value half split is what let #831's stated guarantee be true and this bug exist anyway.
  */
 type AngleValue =
-  | { kind: 'num'; value: number; rest: string }
+  | { kind: 'num'; value: number; rest: string; src?: string }
   /** #1851 (ADR-662): `konst` / `text` — a symbol plus a constant («α + 40»), read by the shared {@link AFFINE_TAIL}. */
   | { kind: 'sym'; coef: number; sym: string; rest: string; konst?: number; text?: string };
 
@@ -2983,7 +2984,7 @@ function angleValueOf(stripped: string): AngleValue | null {
     // drew 40°. A value symbol still standing beside the number means the value is not a number, and this
     // rule cannot represent `symbol ± number`; decline, and the line escalates whole.
     if (VALUE_SYMBOL_LEFT.test(rest)) return null;
-    return { kind: 'num', value: parseFloat(numM[1]) / den, rest };
+    return { kind: 'num', value: parseFloat(numM[1]) / den, rest, ...(numM[2] !== undefined ? { src: `${numM[1]}/${numM[2]}` } : {}) };
   }
   return null;
 }
@@ -3035,7 +3036,7 @@ const angle: Rule = (s, ctx) => {
   return [
     { type: 'segment', a: v, b: r1 },
     { type: 'segment', a: v, b: r2 },
-    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value },
+    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value, ...(val?.kind === 'num' && val.src ? { src: val.src } : {}) },
   ];
 };
 
@@ -3458,16 +3459,17 @@ const arcValue: Rule = (s, ctx) => {
   if (!/arc|קשת|⌢|⏜/i.test(s)) return null;
   if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
   // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
-  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
+  // A plain fraction is degrees too (ADR-789): with no unit, nothing in the line says length.
+  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
   if (!m) return arcSize(s, ctx); // not a degree number: a π value is the arc's LENGTH, a symbol is asked about (ADR-664)
   const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
   const pair = labelRun(stripped, 2);
   if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
   const center = resolveCenter(s, ctx);
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
-  const value = parseFloat(m[2]);
+  const value = parseFloat(m[2]) / (m[3] ? parseFloat(m[3]) : 1);
   if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
-  return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
+  return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center), ...(m[3] ? { src: `${m[2]}/${m[3]}` } : {}) }];
 };
 
 /**
@@ -10799,6 +10801,31 @@ const cutTargetOrder = (cutText: string, c1: Id, c2: Id, e: Id): Id[] | undefine
  *  that's the reposition/foot form the plain construct handles (its through-point IS the cut). */
 const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}[A-Za-z]\d*\s*[A-Za-z]\d*\b`, 'i');
 
+/**
+ * #2232 ([ADR-786](../../docs/06-decisions.md#adr-786)) — «MK אנך ל-AB» · «MK הוא אנך ל-AB» · «MK אנך ל-AB בנקודה K» ·
+ * "MK is a perpendicular to AB", with M placed and K new: the NOUN, the piece that ends on the line, so K is the foot from M
+ * (the same construction as «K רגל האנך מ-M ל-AB», with the piece drawn). The adjectives «מאונך / ניצב» keep the relation,
+ * and so does every other figure: both letters new («DE אנך ל-AB»), K placed (`perpendicularConstraint`), or M on AB, where
+ * the foot would be M itself and the sentence is the perpendicular at M.
+ */
+const perpendicularPiece: Rule = (s, ctx) => {
+  const m =
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+(?:${COPULA_HE}\s+)?ה?אנ${KAF}\s+ל-?\s*(${ULABEL})(${ULABEL})(?:\s+בנקודה\s+(${ULABEL}))?\s*\.?\s*$`)) ??
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})\s+is\s+(?:a|the)\s+perpendicular\s+(?:on)?to\s+(${ULABEL})(${ULABEL})(?:\s+at\s+(${ULABEL}))?\s*\.?\s*$`));
+  if (!m) return null;
+  const [from, to, a, b, at] = [m[1], m[2], m[3], m[4], m[5]];
+  const have = new Set(ctx.points ?? []);
+  if ((at && at !== to) || !have.has(from) || have.has(to) || !have.has(a) || !have.has(b)) return null;
+  if (from === a || from === b) return null;
+  const isTarget = ([x, y]: readonly [string, string]) => (x === a && y === b) || (x === b && y === a);
+  const hosts = [ctx.onSegment?.[from], ctx.midpointOf?.[from], ...(ctx.collinearWith?.[from] ?? [])];
+  if (hosts.some((h) => h && isTarget(h))) return null;
+  return [
+    { type: 'foot', id: to, from, a, b, named: true },
+    { type: 'segment', a: from, b: to },
+  ];
+};
+
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s, ctx) => {
   if (!/perpendicular|⊥|מאונ[כך]|אנ[כך]/i.test(s)) return null;
@@ -11053,6 +11080,49 @@ const existingFootOf = (ctx: ParseContext, from: Id | null, a: Id, b: Id): Id | 
 
 const SPECIAL_LINE_HEAD = /תיכון|גובה|\bmedian\b|\bheight\b|\baltitude\b/i;
 const ROLE_NOUN_RX = /(?<![א-ת])(?:ל|על\s+|אל\s+)ה?(יתר|בסיס(?!\s*ה?(?:גדול|קטן))|שוקיים|שוק)(?![א-ת])|\b(?:to|onto|on)\s+the\s+(hypotenuse|base|legs?)\b/i;
+/** The foot's letter closing a cevian sentence: «… בנקודה K», "… at K", "… at the point K" (#2166, ADR-790). */
+const FOOT_LETTER_TAIL = rx(String.raw`\s(?:ב-?\s*ה?נקודה\s+|at\s+(?:the\s+)?(?:point\s+)?)(${LABEL})\s*$`);
+/** A cevian head, the bisector's included (the role reader's heads never read a bisector). */
+const FOOT_LETTER_HEAD = rx(String.raw`${SPECIAL_LINE_HEAD.source}|${BISECT_KW}`);
+
+/**
+ * A FOOT LETTER STATED AFTER A CEVIAN NOUN (#2166, [ADR-790](../../docs/06-decisions.md#adr-790)) — «תיכון לצלע AB בנקודה K»,
+ * «תיכון ליתר בנקודה K», «תיכון מ-C בנקודה K», «גובה מ-C בנקודה K», «חוצה זווית C בנקודה K», "median to side AB at K".
+ *
+ * Every cevian rule reads the foot only in the named-segment form («CK תיכון»); in the noun forms the tool letters the
+ * foot and «בנקודה K» stays unread. One reader, not one per rule: the rest of the line goes through the real grammar,
+ * and the one foot it mints takes the typed letter. Renaming is what keeps the reading the bare noun's, so `roleSide`
+ * travels unchanged and an open right triangle cycles. It declines a letter that is a vertex (a locative apex, or
+ * `split-statements`), a crossing, a rest that names the segment itself, a foot the figure already holds under another
+ * letter, and a bound foot on a point the figure holds: an existing point cannot follow the seat.
+ */
+const cevianFootLetter: Rule = (s, ctx) => {
+  if (!FOOT_LETTER_HEAD.test(s)) return null;
+  const tail = s.match(FOOT_LETTER_TAIL);
+  if (!tail) return null;
+  const name = up(tail[1]);
+  if ((ctx.polygons ?? []).some((ring) => ring.map(up).includes(name))) return null;
+  const rest = s.slice(0, tail.index).trim();
+  // «התיכון לצלע AB חותך את המעגל בנקודה K»: the letter closes a crossing, another statement's point, not the foot.
+  if (rx(MEET_KW).test(rest)) return null;
+  if (!SPECIAL_LINE_HEAD.test(s)) {
+    // The bare bisector noun has no reading of its own to rename: it is its named-segment form, «CK חוצה זווית C».
+    const letters = statedLabelTokens(rest);
+    const vertex = letters.length === 1 ? letters[0] : letters.length === 3 ? letters[1] : null;
+    if (!vertex || vertex === name) return null;
+    const named = parse(`${vertex}${name} ${rest}`, ctx);
+    return named.ok ? named.commands : null;
+  }
+  const r = parse(rest, ctx);
+  if (!r.ok) return null;
+  const feet = r.commands.filter((c): c is Extract<Command, { type: 'midpoint' | 'foot' }> => c.type === 'midpoint' || c.type === 'foot');
+  if (feet.length !== 1 || feet[0].id === name) return null;
+  const old = feet[0].id;
+  if (statedLabelTokens(rest).includes(old) || ctx.points?.includes(old)) return null;
+  if (ctx.points?.includes(name) && r.commands.some((c) => c.roleSide)) return null;
+  return JSON.parse(JSON.stringify(r.commands), (_k, v) => (v === old ? name : v)) as Command[];
+};
+
 const roleSideLine: Rule = (s, ctx) => {
   if (!SPECIAL_LINE_HEAD.test(s)) return null;
   const m = s.match(ROLE_NOUN_RX);
@@ -11066,7 +11136,8 @@ const roleSideLine: Rule = (s, ctx) => {
   const unstatedHosts = roleAll.filter((r) => r.unstated);
   // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
   // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
-  const afterNoun = s.slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
+  // (#2166: the foot tail is not a pair — "… at K" would read as the side AT.)
+  const afterNoun = s.replace(FOOT_LETTER_TAIL, '').slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
   const selected = afterNoun
     ? cands.find((r) => sameSide(r.edge[0], r.edge[1], up(afterNoun[1]), up(afterNoun[2]))) ?? null
     : null;
@@ -11128,6 +11199,13 @@ const roleSideLine: Rule = (s, ctx) => {
     });
     if (hits.length === 1) typedIso = hits[0];
   }
+  // #2074 (ADR-787, judged 2026-11-05: "the diagram either respects all input or refuses"): a STATED right angle, and
+  // the one ring vertex the sentence typed is another vertex — no reading makes that line a cevian to the hypotenuse.
+  if (role === 'hypotenuse' && !afterNoun && cands.length === 1 && cands[0].ring && cands[0].at) {
+    const typed = [...new Set(statedLabelTokens(s).filter((l) => cands[0].ring!.map(up).includes(l)))];
+    if (typed.length === 1 && typed[0] !== up(cands[0].at))
+      return { clarify: 'role-claim', why: 'hypotenuse-apex', noun, a: cands[0].edge[0], b: cands[0].edge[1], other: up(cands[0].at), options: typed };
+  }
   const pick =
     namedOpenSide || apexClaim || typedIso ? null
     : bindOpen ?? selected ??
@@ -11141,6 +11219,8 @@ const roleSideLine: Rule = (s, ctx) => {
   // any other letters stay untouched for the letter-form rules to read
   const restated = rx(String.raw`(?:${ROLE_NOUN_RX.source})\s*(?:${p}${q}|${q}${p})(?![A-Za-z\d])`, 'i');
   const target = heb ? ` לצלע ${p}${q} ` : ` to side ${p}${q} `;
+  // #2166: a foot letter `cevianFootLetter` declined on an open seat stays declined here: it could not follow the seat.
+  if (bindOpen && FOOT_LETTER_TAIL.test(s)) return null;
   const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
   const r = parse(rewritten, ctx);
   if (!r.ok) return null;
@@ -12800,6 +12880,7 @@ export const RULES: Rule[] = [
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed
   shapeHeight, // #1443: «גובה הטרפז 4» — a height magnitude with no segment named: mint + draw the foot, or ASK which height
   roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
+  cevianFootLetter, // #2166: «תיכון לצלע AB בנקודה K» — the rest through the grammar, its one foot takes the typed letter
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   pairEqualSize, // #2149 «רדיוסי המעגלים O ו-P שווים» — equal size of a named pair (ADR-671); before radiusRatio/setRadius
@@ -12876,6 +12957,7 @@ export const RULES: Rule[] = [
   // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then
   // models the foot as a second definition of C and over-constrains it. These only fire on a
   // perpendicular/parallel keyword + an explicit through-point, so a plain intersection falls through.
+  perpendicularPiece, // #2232: «MK אנך ל-AB» from a placed M to a new K — before `perpendicularLine` reads «MK» as a line's name
   perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint & line∩line)
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
   dashCollinear, // "A-O1-O2-B" — a dash-separated ordered collinear list (before segment/collinear rules)
@@ -13275,7 +13357,7 @@ function withConcentricResolution(
  *  - `several-polygons` — the pair is a side of several polygons the role could be about;
  *  - `leg-apex` — a leg of a triangle: the apex is one of its two ends and the words do not say which.
  */
-export type RoleClaimWhy = 'centre-end' | 'no-centre-end' | 'no-circle' | 'no-polygon' | 'several-polygons' | 'leg-apex';
+export type RoleClaimWhy = 'centre-end' | 'no-centre-end' | 'no-circle' | 'no-polygon' | 'several-polygons' | 'leg-apex' | 'hypotenuse-apex';
 
 /** Command kinds that put a point on a circle (or define a circle through it) — the forms a rule uses
  *  when IT modelled a chord end's membership. */
@@ -14074,6 +14156,12 @@ const VALUE_UNIT = String.raw`(?:יחידות|יחידה|יח['׳]|ס"?מ|מ"?מ
 const VALUE_UNIT_RX = new RegExp(String.raw`(?<=\d)\s*${VALUE_UNIT}(?![א-תA-Za-z])`, 'gi');
 const stripValueUnits = (s: string): string => s.replace(VALUE_UNIT_RX, '');
 
+/** A length unit on an arc is the one unit that is not noise: it says the value is the arc's LENGTH (ADR-789), so the line is that sentence. */
+const foldArcLengthUnit = (s: string): string => {
+  const arc = readArcUnitValue(s);
+  return arc ? `אורך הקשת ${arc.a}${arc.b} הוא ${arc.value}` : s;
+};
+
 /**
  * THE COPULA IS NOT PART OF THE LENGTH VALUE'S VOCABULARY (#1157) — the length twin of
  * [ADR-498](../../docs/06-decisions.md)'s `angleValueOf`, and the same defect one construct over.
@@ -14420,7 +14508,7 @@ export function normalizeUtterance(raw: string): string {
   // downstream sees one shape.
   // #1691 (ADR-AG-239): «F ו- G», «F ו -G», «F ו - G» are «F ו-G» — the shared fold every builder's boundary calls.
   // #2553 (ADR-AG-337): «משיק משותף ששני המעגלים נמצאים באותו צד שלו» is «… חיצוני לשני המעגלים» — one fold (copied to analytic).
-  const lengths = normalizeVerboseLength(stripValueUnits(foldTangentSide(foldConjunctionSpacing(orth))));
+  const lengths = normalizeVerboseLength(stripValueUnits(foldArcLengthUnit(foldTangentSide(foldConjunctionSpacing(orth)))));
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
   const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
   // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read

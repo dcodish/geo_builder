@@ -542,6 +542,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "arc-midpoint",
     ],
   },
+  "MK is a perpendicular to AB": {
+    "en": [
+      "segment",
+      "segment",
+      "set-perpendicular",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-perpendicular",
+    ],
+  },
   "O is the centre of the circle": {
     "en": [
       "circle",

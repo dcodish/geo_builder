@@ -148,6 +148,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'lines', family: 'F3', he: 'האנך מהנקודה B לציר ה-x', en: 'the perpendicular from B to the x-axis', needs: ['B(1,14)'] },
   { category: 'lines', family: 'F3', he: 'האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D', en: 'the perpendicular from C to the x-axis meets it at D', needs: ['C(4,6)'] },
   { category: 'lines', family: 'F3', he: 'D רגל האנך מ-C לציר ה-x', en: 'D is the foot of the perpendicular from C to the x-axis', needs: ['C(4,6)'] },
+  { category: 'lines', family: 'F3', he: 'CD אנך לציר ה-x', en: 'CD is a perpendicular to the x-axis', needs: ['C(4,6)'] },
   {
     category: 'lines',
     family: 'F3',
@@ -1344,7 +1345,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F16',
     he: 'תיכון ליתר AB',
     en: 'the median to the hypotenuse AB',
-    // ADR-AG-211 (#1222): the hypotenuse is named — or faces a STATED right angle; an open one is asked, never assumed.
+    // ADR-AG-411 (#2074): the letters state the hypotenuse; «תיכון ליתר» alone draws on the shown triangle and cycles.
     needs: ['A(4,0)', 'B(0,3)', 'C(0,0)', 'משולש ישר-זווית ABC'],
   },
   {

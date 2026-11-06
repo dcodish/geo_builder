@@ -1163,6 +1163,36 @@
       "status": "escalated"
     },
     {
+      "id": "t-1863-parabola-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the parabola chip's four labels (each names the next press)",
+      "choice": "הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר (Show directrix · Show focus · Show focus and directrix · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-ellipse-chip",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the ellipse chip's four labels, plural (two foci, two directrices)",
+      "choice": "הצג מדריכים · הצג מוקדים · הצג מוקדים ומדריכים · הסתר (Show directrices · Show foci · Show foci and directrices · Hide)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
+      "id": "t-1863-circle-notice",
+      "kind": "text",
+      "issue": "#1863",
+      "what": "the notice when an ellipse's givens make it a circle (the narrowing note's voice, cause first)",
+      "choice": "בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה. (Because of the given …, the ellipse is now a circle — a circle is a kind of ellipse.)",
+      "chosen": true,
+      "at": "2026-11-03T08:45:03.398Z",
+      "status": "pending"
+    },
+    {
       "id": "chose-2402-unknown-symbol",
       "kind": "text",
       "issue": "#2402",
@@ -1273,36 +1303,6 @@
       "status": "pending"
     },
     {
-      "id": "t-1863-parabola-chip",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the parabola chip's four labels (each names the next press)",
-      "choice": "הצג מדריך · הצג מוקד · הצג מוקד ומדריך · הסתר (Show directrix · Show focus · Show focus and directrix · Hide)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
-      "id": "t-1863-ellipse-chip",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the ellipse chip's four labels, plural (two foci, two directrices)",
-      "choice": "הצג מדריכים · הצג מוקדים · הצג מוקדים ומדריכים · הסתר (Show directrices · Show foci · Show foci and directrices · Hide)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
-      "id": "t-1863-circle-notice",
-      "kind": "text",
-      "issue": "#1863",
-      "what": "the notice when an ellipse's givens make it a circle (the narrowing note's voice, cause first)",
-      "choice": "בגלל הנתון …, האליפסה היא כעת מעגל — מעגל הוא סוג של אליפסה. (Because of the given …, the ellipse is now a circle — a circle is a kind of ellipse.)",
-      "chosen": true,
-      "at": "2026-11-03T08:45:03.398Z",
-      "status": "pending"
-    },
-    {
       "id": "chose-2688-display-labels",
       "kind": "text",
       "issue": "#2688",
@@ -1310,26 +1310,6 @@
       "choice": "«הסתר רשת» ⇄ «הצג רשת» · «הסתר מספרים» ⇄ «הצג מספרים» · «הסתר ערכים» ⇄ «הצג ערכים» (en: \"Hide grid\" / \"Show grid\" · \"Hide numbers\" / \"Show numbers\" · \"Hide values\" / \"Show values\")",
       "chosen": true,
       "at": "2026-11-03T18:55:50.589Z",
-      "status": "pending"
-    },
-    {
-      "id": "text-2677-pair-position-reasons",
-      "kind": "text",
-      "issue": "#2677",
-      "what": "The reason clause of the refusal when two stated positions of one circle pair exclude each other (errors.pairPositionReason.*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
-      "choice": "contained-ext-tangent: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו יכול להשיק לו מבחוץ · contained-crossing: מעגל שמוכל בתוך מעגל אחר נמצא כולו בתוכו, ולכן אין להם נקודות חיתוך · contained-disjoint: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו מחוץ לו · contained-contained: מעגל שמוכל בתוך מעגל אחר קטן ממנו, ולכן המעגל האחר אינו מוכל בתוכו",
-      "chosen": true,
-      "at": "2026-11-04T06:50:46.591Z",
-      "status": "pending"
-    },
-    {
-      "id": "chose-2611-circle-refusals",
-      "kind": "text",
-      "issue": "#2611",
-      "what": "the 3-D refusals for a point stated on a circle: a missing named circle, no circle, several circles (with/without a centre-lettered one), and a point off the circle — replacing the line sentence that showed «circle»/«circle-O»",
-      "choice": "«D אינה על המעגל — בדקו את הנתונים» · «המעגל O עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מעגל שמרכזו O משיק לישר AB בנקודה T» — ואז כתבו את השורה שוב.» · «עדיין אין מעגל בשרטוט, ולכן «המעגל» לא מציין דבר. הגדירו מעגל תחילה — למשל «משולש ABC חסום במעגל» — ואז כתבו את השורה שוב.» · «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».» / «הכלי עדיין לא יודע לבחור בין כמה מעגלים כשכתוב רק «המעגל», ולאף אחד מהם אין מרכז בשם — זו מגבלה של הכלי.» (en mirrors)",
-      "chosen": true,
-      "at": "2026-11-04T06:35:27.642Z",
       "status": "pending"
     },
     {
@@ -1370,6 +1350,26 @@
       "choice": "«לא ניתן: «AC ⊥ BC» סותר את «AB = BC» — אי אפשר לקיים את שניהם יחד. הסיבה: AC ⊥ BC.» (the existing errMeasureContradicts frame; what = the typed line)",
       "chosen": true,
       "at": "2026-11-04T06:11:02.623Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2611-circle-refusals",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "the 3-D refusals for a point stated on a circle: a missing named circle, no circle, several circles (with/without a centre-lettered one), and a point off the circle — replacing the line sentence that showed «circle»/«circle-O»",
+      "choice": "«D אינה על המעגל — בדקו את הנתונים» · «המעגל O עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מעגל שמרכזו O משיק לישר AB בנקודה T» — ואז כתבו את השורה שוב.» · «עדיין אין מעגל בשרטוט, ולכן «המעגל» לא מציין דבר. הגדירו מעגל תחילה — למשל «משולש ABC חסום במעגל» — ואז כתבו את השורה שוב.» · «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».» / «הכלי עדיין לא יודע לבחור בין כמה מעגלים כשכתוב רק «המעגל», ולאף אחד מהם אין מרכז בשם — זו מגבלה של הכלי.» (en mirrors)",
+      "chosen": true,
+      "at": "2026-11-04T06:35:27.642Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2677-pair-position-reasons",
+      "kind": "text",
+      "issue": "#2677",
+      "what": "The reason clause of the refusal when two stated positions of one circle pair exclude each other (errors.pairPositionReason.*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
+      "choice": "contained-ext-tangent: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו יכול להשיק לו מבחוץ · contained-crossing: מעגל שמוכל בתוך מעגל אחר נמצא כולו בתוכו, ולכן אין להם נקודות חיתוך · contained-disjoint: מעגל שמוכל בתוך מעגל אחר נמצא בתוכו, ולכן אינו מחוץ לו · contained-contained: מעגל שמוכל בתוך מעגל אחר קטן ממנו, ולכן המעגל האחר אינו מוכל בתוכו",
+      "chosen": true,
+      "at": "2026-11-04T06:50:46.591Z",
       "status": "pending"
     },
     {
@@ -1879,6 +1879,640 @@
         }
       ],
       "at": "2026-11-05T10:14:56.720Z",
+      "status": "escalated"
+    },
+    {
+      "id": "chose-2611-unnamed-circle-notice",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "the created notice for a circle with no centre letter («D על המעגל» on an empty canvas), since «נוצר מעגל חדש שמרכזו X» has no X to name",
+      "choice": "נוצר מעגל חדש — אם זו טעות הקלדה, לחצו ✕ לביטול השורה",
+      "chosen": true,
+      "at": "2026-11-05T15:45:16.431Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2611-unnamed-circle-conflict",
+      "kind": "text",
+      "issue": "#2611",
+      "what": "a radius or plane contradicting the one a circle with no letter already holds",
+      "choice": "למעגל כבר נתון רדיוס אחר — בדקו את הנתונים / המעגל כבר נמצא במישור אחר — בדקו את הנתונים",
+      "chosen": true,
+      "at": "2026-11-05T15:45:16.431Z",
+      "status": "pending"
+    },
+    {
+      "id": "round-2722-arc-unit-words",
+      "kind": "text",
+      "issue": "#2032",
+      "what": "the length-unit words that make an arc's value its length (ADR-789, judged q10)",
+      "choice": "ס\"מ, ס״מ, סמ', סנטימטר(ים), מ\"מ, מילימטר(ים), מטר(ים), יחידה, יחידות (אורך), יח', cm, mm, unit(s), centimeter(s), millimeter(s), meter(s), with the -metre spellings. The one-letter מ' and m stay out: 4m is a coefficient.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
+      "status": "pending"
+    },
+    {
+      "id": "round-2722-point-equals-note",
+      "kind": "text",
+      "issue": "#1774",
+      "what": "the note on «A = (3,5)» when it is taught (judged q8)",
+      "choice": "נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «A(3,5)» — לחצו Enter כדי לשרטט.",
+      "chosen": true,
+      "at": "2026-11-05T19:15:51.333Z",
+      "status": "pending"
+    },
+    {
+      "id": "q1",
+      "question": "#2518, 2-D: a later line such as «OP = 10» makes a stated «המשך AO» side impossible. A keep drawn and flagged; B refuse the later line by re-checking standing extensions; C add the order as a solved constraint.",
+      "class": "later-line-breaks-stated-extension-side",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "A later typed line that makes a stated «המשך» side impossible is refused, not left drawn and amber, and the fast path stays: no solved-order drive.",
+      "precedents": [
+        {
+          "quote": "what happens in this case is that we need to refuse and say that the correct syntax would be המשך OA. we can offer the correct syntax since its clear that it cannot be the other way around. This should be pretty fast to do.",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2518#issuecomment-6641715238"
+        },
+        {
+          "quote": "Keep the fast placement",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2518#issuecomment-6641715238"
+        },
+        {
+          "quote": "All three tools refuse immediately, naming both statements. A pending row that can never clear is not really pending.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not decide the later line's text or offer (session's, ADR-W-174), saved figures, or the free-radius case, which goes in the Heads-up with a play case.",
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "pending"
+    },
+    {
+      "id": "q2",
+      "question": "#2680, analytic: a value the honesty gate finds literally in the AI's answer but whose stated role contradicts the curve is accepted today. A leave; B refuse when a role is read and the curve contradicts it.",
+      "class": "ai-answer-role-contradiction-gate",
+      "verdict": "escalate",
+      "reason": "No precedent decides this and the nearest pull apart: the 2026-11-04 card only decides accepting a value the curve has; the honesty invariant points to B; the 2026-10-23 parking of unbuilt faithfulness gates points to A. It is a new gate with a stated cost, so a scope decision.",
+      "nearest": [
+        {
+          "quote": "Accept when the answer's curve really has the value",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2680#issuecomment-6641694062"
+        },
+        {
+          "quote": "Close as parked (icebox). The log-triage pass reopens it the first time a log shows one of these slipping through.",
+          "date": "2026-10-23",
+          "link": "https://github.com/dcodish/geo_builder/issues/2252#issuecomment-6364218120"
+        }
+      ],
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q3",
+      "question": "#2611, 3-D: «משולש ABC חסום במעגל» · «D על המעגל O» is refused; 2-D names the drawn circle O. A keep the refusal; B follow 2-D, needing a new 3-D mechanism.",
+      "class": "3d-port-needing-new-mechanism",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A 2-D behaviour whose 3-D port needs a mechanism 3-D does not have stays out of 3-D as a known-gap parity cell, so the line keeps its refusal.",
+      "precedents": [
+        {
+          "quote": "yes - and we need you to have some judgement as to the 3d tool. we dont need a full 2d case for the 3d tool but there will be cases where the issue is so simple that we should let 3d support it.",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-157"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Keeps the refusal now; does not forbid building it later. Record the gap as a parity cell (ADR-W-170).",
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "pending"
+    },
+    {
+      "id": "q4",
+      "question": "#2611, 3-D: on a blank canvas 3-D creates a circle for «רדיוס המעגל הוא 3», while 2-D sends it to the AI lane. A keep; B match 2-D.",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "«המעגל» with no circle drawn creates the circle, in every builder that has circles, so 3-D keeps creating it; 2-D's AI lane is the lagging tool.",
+      "precedents": [
+        {
+          "quote": "With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "A referenced circle that does not exist (e.g. «G חיתוך מעגל O ומעגל P») is created as a free circle, with the same notice.",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/2048#issuecomment-6149836571"
+        }
+      ],
+      "confidence": "high",
+      "limits": "2-D's difference is tracked as a parity cell. With two or more circles the line asks which (#2705).",
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "pending"
+    },
+    {
+      "id": "q5",
+      "question": "#2408, analytic: with two free circles the FIRST letter-named tangent moves one circle once at 11 of 25 seeds. A keep; B sample all bare free circles apart.",
+      "class": "bare-free-circles-sampling-vs-stability",
+      "verdict": "escalate",
+      "reason": "His standing rules conflict: sr-27 (free objects move minimally) argues against A; ADR-052 argues against B, since an unstated position would never vary. B also changes the first drawing of every two-circle figure in analytic.",
+      "nearest": [
+        {
+          "quote": "When a student adds a line, those objects do not move at all, and free objects move minimally.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "Accept at P2: Q moves, O and P stay where they are, and no unstated relation is drawn between them.",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-742"
+        }
+      ],
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q6",
+      "question": "#2408, analytic: on an exam pair with no later given, the first drawing of a letter-named tangent can be the other external tangent than prod draws. A accept; B keep prod's first drawing.",
+      "class": "unstated-choice-first-drawing",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "Which external tangent is drawn first is an unstated choice, and a default for it is only a starting drawing, so it may change as long as «הציגו תצורה אחרת» reaches the other one and a later given still picks it.",
+      "precedents": [
+        {
+          "quote": "A default is fine as a *starting* value so the figure can be drawn, but it must be a **free degree of freedom, not a fixed value**: it changes the moment the student asks for an alternative (\"show another configuration\") OR a later constraint forces it.",
+          "date": "2026-06-17",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-052"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A later given must still pick it and the «… או …» panel row must stay. It stays in the Heads-up.",
+      "at": "2026-11-05T21:48:35.994Z",
+      "status": "pending"
+    },
+    {
+      "id": "q7",
+      "question": "#1774, analytic: a bare «(3,5)». A accept and name the point; B teach «נתונה הנקודה (3,5)»; C leave to the model lane.",
+      "class": "bare-coordinate-tuple",
+      "verdict": "escalate",
+      "reason": "Nothing he said decides a line that is only a tuple; sr-06 lists word order, voice, synonym and typo, and dropping the noun is none of these; ADR-W-030 needs the tuple to be wrong input, and no ruling says so; his LLM-net remark supports C.",
+      "nearest": [
+        {
+          "quote": "there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        },
+        {
+          "quote": "I don't want the tool to support the wrong text input because it teaches them wrong",
+          "date": "2026-08-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-030"
+        }
+      ],
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q8",
+      "question": "#1774, analytic: «A = (3,5)». A keep the refusal; B teach «A(3,5)», with = never accepted; C accept.",
+      "class": "non-canonical-input-taught",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "Analytic never accepts «A = (3,5)» and teaches the one spelling he named, «A(3,5)», because wrong input is guided to the right form and never built as typed.",
+      "precedents": [
+        {
+          "quote": "analytics should not accept E=()",
+          "date": "2026-09-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/1245#issuecomment-5744581911"
+        },
+        {
+          "quote": "we need to tell him to add the input as a textbook would — so we need to guide them so they learn. I don't want the tool to support the wrong text input because it teaches them wrong",
+          "date": "2026-08-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-030"
+        }
+      ],
+      "confidence": "high",
+      "limits": "= never builds. Does not decide other separators or 2-D's message. Note wording is the session's.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q9",
+      "question": "#2032: «קשת AB = 2/3», a plain fraction: 2-D draws the chord, analytic an arc of 0.67°. A degrees; B a length; C ask.",
+      "class": "arc-value-reading",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "An arc value with no unit that says nothing about length is degrees, in 2-D and analytic, and never the chord.",
+      "precedents": [
+        {
+          "quote": "An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A π value stays a length. A root keeps going to the AI (#2174). The visible change is 2-D's chord.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q10",
+      "question": "#2032: «קשת AB = 4 ס\"מ» reads as 4 degrees in both builders. A leave; B a stated length unit counts as a length.",
+      "class": "arc-value-reading",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "An arc is degrees only when it says nothing about length, so a stated length unit makes the value the arc's length, the reading of «אורך הקשת AB הוא 4».",
+      "precedents": [
+        {
+          "quote": "An arc is in degrees, unless specifically says something about the length of an arc. So if no units are given an arc is degrees.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "Refuse «קשת AB = 4π» honestly now, then build A",
+          "date": "2026-11-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/2032#issuecomment-6641703809"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Analytic takes the honest refusal until #2710. The list of unit words is the session's, for his review.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q11",
+      "question": "#1774, analytic: «הנקודה (1,5) על הישר» and «P על הישר» are not read. A leave; B resolve to the one line on the figure.",
+      "class": "sr-12",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "Under sr-12 the definite noun «הישר» binds the drawn line of its kind: one line binds, two ask which with the existing question, none creates the object.",
+      "precedents": [
+        {
+          "quote": "a definite noun binds the drawn object of its kind.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "With one such object, the noun binds to it. With two, the tool asks which, using the existing question. With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/issues/2619#issuecomment-6580873425"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not say whether a drawn side counts as a line, or the none-drawn case in analytic while a free line is unbuilt (#2226). Bring those back if they change what a student sees.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q12",
+      "question": "#1774: English «the point A(3,5)» is not read. A leave; B add the article.",
+      "class": "sibling-wording",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A variant wording is built only when it is a textbook form or seen in the prod logs; this occurs in neither, so it stays with the LLM fallback.",
+      "precedents": [
+        {
+          "quote": "there's also some kind of a limit of how many variations of the text we can support. … if it goes to the LLM, we would probably get it right.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-174"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A prod log or textbook sighting makes it a P3 reading with no card.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q13",
+      "question": "#2266: the two-letters-on-one-dot note differs by builder. A the same blue ⓘ strip everywhere; B leave.",
+      "class": "note-face-across-builders",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "The two-letters note takes 2-D's face, the blue ⓘ strip, in every builder that shows it.",
+      "precedents": [
+        {
+          "quote": "2266 - no other tool as that symbol so we need same messages across tools",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2266#issuecomment-6222613699"
+        },
+        {
+          "quote": "B1 — 2-D is the reference for display too, for plane geometry. This covers marks, labels, label text and status wording, as well as input verdicts.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Reaches only this note. 3-D already prints the ⓘ on it (App3.tsx:861), so it needs only the shared strip.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q14",
+      "question": "#2266, 3-D: the base-constrained forced-narrowing sentence stays on the old box. A move to the shared note; B leave.",
+      "class": "note-face-across-builders",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "3-D's base-constrained sentence is a forced-narrowing note, so it takes the shared blue ⓘ strip like every other one.",
+      "precedents": [
+        {
+          "quote": "2266 - A",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2266#issuecomment-6222697963"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The face only. Does not change the words or the shared kind lattice.",
+      "at": "2026-11-05T21:48:36.069Z",
+      "status": "pending"
+    },
+    {
+      "id": "q15",
+      "question": "#2006, analytic: after «דלתון ABCD» · «משוואת האלכסון הראשי היא y=2x» · «AB = AD» the panel reads «AC: y = 2x» but the canvas line stays unnamed; with the pair first the canvas names it AC. A leave; B name it in the second order too.",
+      "class": "entry-order-independence",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The same givens build the same diagram in any order, so once «AB = AD» has fixed the pair the canvas names the line AC, as it does when the pair is stated first.",
+      "precedents": [
+        {
+          "quote": "the idea of order is not relevant since the diagram should either respect all input or refuse to build",
+          "date": "2026-09-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/1242#issuecomment-5743471435"
+        },
+        {
+          "quote": "the diagram should build the same no matter what order the data was entered",
+          "date": "2026-06-23",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-104"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Covers only the state after a stated pair has fixed the letters. Does not decide naming while the pair is open.",
+      "at": "2026-11-05T21:48:36.122Z",
+      "status": "pending"
+    },
+    {
+      "id": "q16",
+      "question": "#2266, 3-D: the pyramid note prints «הבסיס (ABCDS)», the apex as part of the base. A drop the apex; B leave.",
+      "class": "narrowing-note-ring-letters",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "The pyramid narrowing note names the base ring ABCD and never prints the apex.",
+      "precedents": [
+        {
+          "quote": "3-D's circle and pyramid notes | A, join the family in every builder. The pyramid note names «ABCD», not «(ABCDS)».",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/1996#issuecomment-6142484794"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Decides only the letters, not whether the pair joins the cause-naming family.",
+      "at": "2026-11-05T21:48:36.196Z",
+      "status": "pending"
+    },
+    {
+      "id": "q17",
+      "question": "#2074: analytic now reads «תיכון לצלע AB בנקודה K» and «גובה מ-A בנקודה H», while 2-D sends both to the AI lane. A keep; B restrict analytic; C keep and make 2-D read them.",
+      "class": "cevian-foot-letter-parity",
+      "verdict": "ruled",
+      "choice": "C",
+      "ruling": "For the MEDIAN only: «תיכון לצלע AB בנקודה K» draws the median with its foot named K in both 2-D and analytic.",
+      "precedents": [
+        {
+          "quote": "Accepted at **P2** (raised from the proposed P3). Outcome as filed: «תיכון לצלע AB בנקודה K» (and «ליתר», «מ-C») draws the median with its foot named K, and cycles like the bare noun on an open right triangle.",
+          "date": "2026-10-15",
+          "link": "https://github.com/dcodish/geo_builder/issues/2166#issuecomment-6187844165"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The altitude is not ruled; its only cover is #2166's armed plan. The 2-D half belongs to #2166.",
+      "at": "2026-11-05T21:48:36.196Z",
+      "status": "pending"
+    },
+    {
+      "id": "q18",
+      "question": "#2074, 2-D: with the right angle stated at A, «CM תיכון ליתר» commits. A leave; B refuse as analytic does.",
+      "class": "contradicting-given-refused",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The diagram either respects all input or refuses, and with the right angle stated at A nothing can make CM a median to the hypotenuse, so 2-D refuses the line.",
+      "precedents": [
+        {
+          "quote": "the idea of order is not relevant since the diagram should either respect all input or refuse to build",
+          "date": "2026-09-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/1339#issuecomment-5761527951"
+        },
+        {
+          "quote": "When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        }
+      ],
+      "confidence": "high",
+      "limits": "The opposite entry order must reach the same verdict. Refusal wording is the session's.",
+      "at": "2026-11-05T21:48:36.196Z",
+      "status": "pending"
+    },
+    {
+      "id": "q19",
+      "question": "#2074: «תיכון ליתר בנקודה C», a vertex letter: 2-D reads C as the apex; analytic sends it to the model. A leave; B analytic follows.",
+      "class": "analytic-follows-2d-verdict",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "2-D's verdict is the reference and a reading a 2-D fix changed ports to analytic in the same item, so within #2074 analytic reads C as the apex.",
+      "precedents": [
+        {
+          "quote": "analytics and 2d should have same user experience",
+          "date": "2026-10-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-108"
+        },
+        {
+          "quote": "why do we build for 2d and not for analytics in the same run? wouldnt it be better?",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-157"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Confirm 2-D's reading at pickup. Does not touch «תיכון לצלע AB בנקודה C».",
+      "at": "2026-11-05T21:48:36.196Z",
+      "status": "pending"
+    },
+    {
+      "id": "q20",
+      "question": "#2341, 3-D: should a relation the figure already holds, stated over ink already drawn, stop being a ✓ row? A keep 3-D; B follow 2-D for plane sentences only; C follow 2-D everywhere.",
+      "class": "given-vs-claim",
+      "verdict": "ruled",
+      "choice": "C",
+      "ruling": "sr-19 applied to every builder by sr-05: a statement the givens already decide, adding no value and no ink, is «כבר קיים» with no row, and no ✓ appears. NOT built in round #2722: it reverses shipped 3-D behaviour across exam gates and leaves the knee and value-answer marks open, so it goes to the operator's decisions list.",
+      "precedents": [
+        {
+          "quote": "sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure. «הוכיחו» is refused in every builder. No ✓ \"verified\" ever appears on a given.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "sr-05, A: a ruling applies to every builder by default. A ruling on a plane-geometry or display behaviour applies to every builder that has that element, unless he names one builder.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not decide a stated ⊥ that would draw a knee, the mark on a value-carrying answer line, or «משולש ABC» on a pyramid face. Those go to him.",
+      "at": "2026-11-05T21:48:36.250Z",
+      "status": "pending"
+    },
+    {
+      "id": "q21",
+      "question": "#2341, 3-D: «AB = 3» · «BA = 3» adds a second row; 2-D answers «כבר קיים». A leave; B answer as 2-D does.",
+      "class": "given-vs-claim",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "The same statement stated twice is answered «זה כבר קיים באיור — אין מה להוסיף.» with no row, in 3-D as in 2-D.",
+      "precedents": [
+        {
+          "quote": "we need to reject this as we do with all cases where we state the same thing twice.",
+          "date": "2026-10-29",
+          "link": "https://github.com/dcodish/geo_builder/issues/2595#issuecomment-6501772193"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A different value stays a refusal.",
+      "at": "2026-11-05T21:48:36.250Z",
+      "status": "pending"
+    },
+    {
+      "id": "q22",
+      "question": "#1454, 2-D: a saved question after a new fact reads «ממתין לחישוב», while siblings re-answer. A leave; B re-answer.",
+      "class": "2d-values-keep-up",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "On 2026-10-07 he chose that 2-D's values keep up automatically while the «נתונים» box is ticked, and the pending text goes; a saved question rides that same compute. Delivered by #1871, which is open and unbuilt.",
+      "precedents": [
+        {
+          "quote": "Keep up automatically",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/issues/1871#issuecomment-6046367534"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Conditional on the box being ticked. The button's removal is #1871's to deliver.",
+      "at": "2026-11-05T21:48:36.250Z",
+      "status": "pending"
+    },
+    {
+      "id": "q23",
+      "question": "#1454: the cold ask on the heaviest fixture takes 12.7 s against a 12 s budget, inside the shared sweep. A accept the lock on the app's path; B require the cold number to meet it.",
+      "class": "knowledge-pool-budget",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "The knowledge sweep's bar is a fixed amount of work, never a 12 s clock, so the ask's lock is on the app's path plus counted work on a cold pool.",
+      "precedents": [
+        {
+          "quote": "Operator ruling 2026-09-30: pool bounded by OPERATION count, not wall-clock (see #1599).",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1601#issuecomment-5907502165"
+        }
+      ],
+      "confidence": "high",
+      "limits": "If the ask ever starts a second sweep or adds counted work, the lock must fail.",
+      "at": "2026-11-05T21:48:36.250Z",
+      "status": "pending"
+    },
+    {
+      "id": "q24",
+      "question": "#2231, 3-D: «MK אנך ל-AB» stays a relation with K off AB while 2-D and analytic place K as the foot. A leave; B place K on AB in 3-D.",
+      "class": "3d-port-of-2d-plane-change",
+      "verdict": "escalate",
+      "reason": "His words give a test (ADR-W-157), not this outcome. 3-D has the construct, so OUT is not met; but parse3 lowers אנך and מאונך alike, and no precedent says whether the foot applies on solids. Options to show him: keep the relation, foot on flat figures only, or foot everywhere.",
+      "nearest": [
+        {
+          "quote": "yes - and we need you to have some judgement as to the 3d tool. we dont need a full 2d case for the 3d tool but there will be cases where the issue is so simple that we should let 3d support it.",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-157"
+        }
+      ],
+      "at": "2026-11-05T21:48:36.310Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q25",
+      "question": "#1549, 3-D: `cos(AB,AD)=0` shares the cos-angle kind with every perpendicular row. a) all read as vectors; b) only the cos spelling; c) cos rows stay plain.",
+      "class": "3d-vector-row-notation",
+      "verdict": "escalate",
+      "reason": "The ruling's clauses conflict once measured; each option breaks one, and (c) reverses a ruling. He was not told the kind is shared when he ruled.",
+      "nearest": [
+        {
+          "quote": "A row whose command the tool reads as vectors shows vector arrows **whether or not the student typed them**. That covers `BA=(-3,4,5)`, `cos(AB,AD)=0` and every other spelling that lowers to a vector command. The registry decides by command kind alone; the typed text plays no part.",
+          "date": "2026-09-29",
+          "link": "https://github.com/dcodish/geo_builder/issues/1549#issuecomment-5890006441"
+        }
+      ],
+      "at": "2026-11-05T21:48:36.310Z",
+      "status": "escalated"
+    },
+    {
+      "id": "q26",
+      "question": "#1806, analytic: «BC = a» · «a = √8» now reads «√8», the spelling given to the letter. A keep; B restore «2√2».",
+      "class": "typed-number-display",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "A length stated as a bare letter whose value the student typed shows that value on the segment in the format he entered it.",
+      "precedents": [
+        {
+          "quote": "display on BC on canvas should be with the sqrt as entered by user",
+          "date": "2026-10-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/1806"
+        },
+        {
+          "quote": "we need to keep the format of entry",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Only a measure stated as one bare letter; not a scaled letter.",
+      "at": "2026-11-05T22:39:15.033Z",
+      "status": "pending"
+    },
+    {
+      "id": "q27",
+      "question": "#1497, complex: the panel reads «79999/10000» for a typed decimal. A leave; B read as decimals.",
+      "class": "number-display",
+      "verdict": "ruled",
+      "choice": "B",
+      "ruling": "In complex, a number typed as a decimal reads as a decimal in the data panel under sr-22: «7.9999» reads «8», «1.234» reads «1.23», never a fraction, no new threshold.",
+      "precedents": [
+        {
+          "quote": "the tool should display to decimals after the point whenever needed. But it should calculate the full number. Now, if a number is 7.999, we would round it to 8.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "should apply to all tools.",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1497#issuecomment-5865099634"
+        }
+      ],
+      "confidence": "high",
+      "limits": "A typed decimal's own panel value only, not a value computed from one. A typed fraction or root keeps its form.",
+      "at": "2026-11-05T22:39:15.033Z",
+      "status": "pending"
+    },
+    {
+      "id": "q28",
+      "question": "complex: «z = 2/3cis30» reads as 2/(3cis30). A leave; B read as (2/3)cis30.",
+      "class": "fraction-before-cis-reading",
+      "verdict": "escalate",
+      "reason": "B reverses a promise in accepted ADR-CX-056 Am. 1 with no ruling, and nothing he said decides it; sr-16 suggests a third outcome, refuse and teach, that no option states.",
+      "nearest": [
+        {
+          "quote": "So I would say in general, if you don't know ask, it's always better to ask and tell the user how to write each specific item.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "at": "2026-11-05T22:39:15.033Z",
       "status": "escalated"
     }
   ],

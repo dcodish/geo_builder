@@ -17,7 +17,8 @@
  * caller record an honest vacancy instead of drawing a point at `NaN` or, worse, at some default —
  * which would be [ADR-052](../../docs/06-decisions.md#adr-052)'s sin in derived clothing.
  */
-import type { Id } from './types';
+import type { CommonTangentFamily, Id } from './types';
+import { commonTangentLine } from './commonTangents';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 
 export interface Pt {
@@ -108,7 +109,15 @@ export type DerivedRule =
    * Determined, not solved — measured, the constraint form (equal sides and (n−2)·180°/n angles) left a hexagon
    * unsatisfiable from a sampled start. The ring runs counter-clockwise, as 2-D's increasing angles do.
    */
-  | { t: 'regular-vertex'; a: Id; b: Id; n: number; k: number };
+  | { t: 'regular-vertex'; a: Id; b: Id; n: number; k: number }
+  /**
+   * «AB משיק משותף למעגלים O ו-K» — WHERE ONE SLOT OF A PAIR'S COMMON TANGENTS TOUCHES ONE OF ITS CIRCLES (#2408,
+   * ADR-AG-403): the foot of `circles[on]`'s centre on the pair's `family` line (`commonTangentLine`, ADR-AG-314), with
+   * `circles` in the order the family is read in. Its parents are the two CIRCLES (curves, like `touch-point`).
+   * Determined, not solved: a letter-named common tangent takes a slot of the pair, so its touches are 0-DOF and no
+   * circle is moved to fit it. A family the configuration lacks is a vacancy, never a guess.
+   */
+  | { t: 'common-touch'; circles: [Id, Id]; family: CommonTangentFamily; on: 0 | 1 };
 
 /** Which end of an ellipse's axes a vertex is: «הימני» (+x), «השמאלי» (−x), «העליון» (+y), «התחתון» (−y). */
 export type EllipseSide = 'right' | 'left' | 'top' | 'bottom';
@@ -181,6 +190,7 @@ export function parentsOf(r: DerivedRule): Id[] {
     case 'parabola-focus':
     case 'ellipse-point':
     case 'touch-point':
+    case 'common-touch':
       return [];
     default: {
       const unparented: never = r;
@@ -213,6 +223,7 @@ export function ruleLabel(r: DerivedRule): string {
     case 'ellipse-point':
       return r.role.k === 'focus' ? CONIC_ROLE_WORDS.ellipseFocus : CONIC_ROLE_WORDS.ellipseVertex;
     case 'touch-point':
+    case 'common-touch':
       return 'נקודת ההשקה';
     case 'side-touch':
       return `נקודת ההשקה על ${r.a}${r.b}`;
@@ -407,6 +418,7 @@ export function curveParentOf(r: DerivedRule): Id | null {
 export function curveParentsOf(r: DerivedRule): Id[] {
   if (r.t === 'circle-centre' || r.t === 'parabola-focus' || r.t === 'ellipse-point') return [r.curve];
   if (r.t === 'touch-point') return [r.a, r.b];
+  if (r.t === 'common-touch') return [...r.circles];
   if (r.t === 'side-touch') return [r.circle];
   if (r.t === 'foot' && r.onto.k === 'curve') return [r.onto.id];
   return [];
@@ -471,6 +483,23 @@ export function evalRule(
       const k = circle(r.a);
       const m = circle(r.b);
       return k && m ? touchPoint(k, m) : null;
+    }
+    case 'common-touch': {
+      const circle = (id: Id) => {
+        const c = curveAt?.(id);
+        return c && c.kind === 'circle' && c.cx !== undefined && c.cy !== undefined && c.r !== undefined
+          ? { kind: 'circle' as const, cx: c.cx, cy: c.cy, r: c.r }
+          : null;
+      };
+      const p = circle(r.circles[0]);
+      const q = circle(r.circles[1]);
+      const l = p && q ? commonTangentLine(p, q, r.family) : null;
+      const o = r.on === 0 ? p : q;
+      if (!l || !o) return null;
+      const nn = l.a * l.a + l.b * l.b;
+      if (!(nn > 1e-24)) return null;
+      const k = (l.a * o.cx + l.b * o.cy + l.c) / nn;
+      return { x: o.cx - k * l.a, y: o.cy - k * l.b };
     }
     case 'side-touch': {
       const c = curveAt?.(r.circle);
@@ -696,6 +725,9 @@ export function constructionOf(
 
     // Its scaffolding would be the line of centres; the parents are curves, so none is drawn here.
     case 'touch-point':
+      return null;
+    // The tangent line itself is drawn as the line through the two touches; no auxiliary line.
+    case 'common-touch':
       return null;
     // The radius to the touch is the whole construction, and the centre is a curve parent this walk
     // does not resolve — the point's own mark is the answer, as for the centre.

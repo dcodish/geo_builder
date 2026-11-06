@@ -16,12 +16,14 @@
  */
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
+import { givenText } from '../../shell/literal';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { knowledgeSamples3, letterIsGaugeLength3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { spellingOf } from './types';
 import type { Construction3, FreeVec3, FreeVecMetric3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -94,6 +96,14 @@ export interface DataPanel {
    *  still-free one prints open (`t = ?`), so the stated given visibly took effect. #1746 (ADR-3D-339):
    *  `value` is the text after «<sym> = » (`-3`, `?`) — what the ask row prints after its own echo. */
   params: { sym: string; text: string; value: string; open: boolean }[];
+  /** #2611 (ADR-3D-420): each free circle's STATED radius, a given true at every configuration like `stated`. `circle` is
+   *  its centre's letter, `null` for the circle with none; the words are {@link radiusRowLabel3}'s. */
+  radii: { circle: string | null; text: string }[];
+}
+
+/** The label of a radius row, 2-D's words (`valueRowText`): «רדיוס O», or «רדיוס המעגל» for a circle with no letter. */
+export function radiusRowLabel3(r: DataPanel['radii'][number], t: (key: string, params?: Record<string, string>) => string): string {
+  return r.circle === null ? t('dataPanel.radiusSole') : t('dataPanel.radius', { c: r.circle });
 }
 
 /**
@@ -114,7 +124,8 @@ export function panelIsEmpty(p: DataPanel): boolean {
     p.vectors.length === 0 &&
     p.points.length === 0 &&
     p.planes.length === 0 &&
-    p.params.length === 0
+    p.params.length === 0 &&
+    p.radii.length === 0
   );
 }
 
@@ -739,7 +750,7 @@ export function statedLengths(c: Construction3): Map<string, StatedLength3> {
   const out = new Map<string, StatedLength3>();
   const key = (a: Id, b: Id) => [a, b].sort().join('|');
   for (const pin of c.scalarPins) if (pin.kind === 'length') out.set(key(pin.a, pin.b), { value: pin.value, text: statedMagText(pin.value) });
-  for (const cl of c.claims) if (cl.type === 'length-eq') out.set(key(cl.a, cl.b), { value: cl.value, text: statedMagText(cl.value, cl.decimal) });
+  for (const cl of c.claims) if (cl.type === 'length-eq') out.set(key(cl.a, cl.b), { value: cl.value, text: statedMagText(cl.value, spellingOf(cl).src) });
   return out;
 }
 
@@ -748,10 +759,14 @@ export function statedLengths(c: Construction3): Map<string, StatedLength3> {
  * 2026-11-02): two decimals when needed, computed with the full value — «7.9999» reads «8», as in 2-D. A value the
  * student wrote as a DECIMAL prints in exactly those house decimals; the exact-form tiers of {@link cleanMag} exist
  * for numbers the tool computes, and on a typed decimal they rewrote the student's «4.1» as «41/10» («2.5» as
- * «5/2»). An integer, a fraction or a root as typed keeps its exact form, as before.
+ * «5/2»).
+ *
+ * #1497 ([ADR-3D-426](../../docs/06b-decisions-3d.md#adr-3d-426)): the value carries its spelling, so a fraction or a
+ * root prints as typed too («√8» stays «√8», ruling 2026-09-28), through the one given printer of `shell/literal`.
+ * With no spelling (an old save, a pin nobody typed) it keeps the tiers.
  */
-export function statedMagText(value: number, decimal?: boolean): string {
-  return decimal ? fmtNum(value) : cleanMag(value);
+export function statedMagText(value: number, src?: string): string {
+  return givenText(value, src, cleanMag);
 }
 
 /**
@@ -919,7 +934,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const statedFreeMag = new Map<string, StatedLength3>();
   for (const fm of c.freeVecMetrics ?? []) {
     if (fm.kind !== 'mag' || fm.e.length !== 1 || fm.e[0].coeff !== 1 || fm.e[0].atom.kind !== 'named') continue;
-    statedFreeMag.set(fm.e[0].atom.name, { value: fm.value, text: statedMagText(fm.value, fm.decimal) });
+    statedFreeMag.set(fm.e[0].atom.name, { value: fm.value, text: statedMagText(fm.value, spellingOf({ ...fm }).src) });
   }
   const freeMagText = (name: string, m: number) => {
     const st = statedFreeMag.get(name);
@@ -1361,9 +1376,10 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         points.push(`${id}${text}`);
       }
       if (nStable === 3) {
-        const cs = coordStr(ps[0]!);
+        const typed = axes.map((ax, i) => statedCoordText(c, id, i, ps[0]![ax])) as [string, string, string]; // #1497
+        const cs = `(${typed.join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'fact' };
-        pointComps[id] = [cleanMag(ps[0]!.x), cleanMag(ps[0]!.y), cleanMag(ps[0]!.z)];
+        pointComps[id] = typed;
         points.push(`${id}${cs}`);
       } else if (nStable > 0) {
         // PARTIALLY determined (S with only A,B injected: y = 0 is a fact while the
@@ -1374,7 +1390,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
           return sg ? (sg.positive ? '+?' : '−?') : '?';
         };
-        const comps = axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))) as [string, string, string];
+        const comps = axes.map((ax, i) => (stableAx[i] ? statedCoordText(c, id, i, ps[0]![ax]) : free(ax))) as [string, string, string];
         // #2077 (ADR-3D-079 Am. 3): a free axis the student wrote a LETTER in prints that letter as typed:
         // «A(1, t, 2)», like analytic, never «?». The letter is a name, not a value, so `pointComps` (what a
         // single-coordinate question reads) keeps «?»; once the letter is known the axis is stable above.
@@ -1551,7 +1567,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.
-  return { stated: statedVectorRows(c, known), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params };
+  // The radius grammar reads plain numbers only, so the value's own digits are what was typed: a decimal stays one.
+  const radii = c.circles3.flatMap((k) =>
+    k.def.kind === 'free' && k.def.radius !== undefined ? [{ circle: k.def.center ?? null, text: statedMagText(k.def.radius, String(k.def.radius)) }] : [],
+  );
+  return { stated: statedVectorRows(c, known), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params, radii };
 }
 
 /**
@@ -1646,15 +1666,17 @@ type StatedPin = {
 /**
  * #2077 (ADR-3D-368): one stated tuple's components for display. As typed, except a component whose
  * letters are ALL known, which prints its value: an affine form evaluated by {@link evalAffine}, or a bare
- * letter (which the pin holds as a null) at the letter's own value. A numeric component stays as typed.
+ * letter (which the pin holds as a null) at the letter's own value. A numeric component stays as typed (#1497).
  */
 function statedTupleText(p: StatedPin, known: ReadonlyMap<string, number>): string[] {
   const st = p.stated!;
   const comps = [p.x, p.y, p.z];
   return st.texts.map((text, i) => {
     const letters = st.letters[i];
-    if (letters.length === 0 || !letters.every((l) => known.has(l))) return text;
     const comp = comps[i];
+    // #1497: a typed number is a given, through the one printer (a decimal reads the house decimals, sr-22)
+    if (letters.length === 0) return typeof comp === 'number' ? givenText(comp, text, cleanMag) : text;
+    if (!letters.every((l) => known.has(l))) return text;
     const v =
       comp !== null && typeof comp === 'object' ? evalAffine(comp, (l) => known.get(l)!)
       : comp === null && letters.length === 1 ? known.get(letters[0])!
@@ -1681,8 +1703,23 @@ function statedLetterText(c: Construction3, id: Id, i: number): string | null {
   return null;
 }
 
+/**
+ * #1497 (ADR-3D-426): a coordinate the student stated prints as typed, the latest statement of it first; any other
+ * prints by the tiers. Only a NUMBER qualifies: a component naming a letter is {@link statedLetterText}'s.
+ */
+function statedCoordText(c: Construction3, id: Id, i: number, value: number): string {
+  const def = c.points.get(id);
+  const typed: (string | undefined)[] = [
+    def?.kind === 'coord' ? def.srcs?.[i] : undefined,
+    ...[def?.kind === 'coord-sym' ? def.stated : undefined, ...c.pins.filter((p) => p.id === id).map((p) => p.stated)].map((st) =>
+      st && st.letters[i].length === 0 ? st.texts[i] : undefined,
+    ),
+  ].filter((t) => t !== undefined);
+  return givenText(value, typed.at(-1), cleanMag);
+}
+
 /** One side of a vector equation: `3u`, `DC⃗`, `2AB⃗ + v`. */
-type VecTermLike = { coeff: number; atom: { kind: string; name?: string; from?: string; to?: string } };
+type VecTermLike = { coeff: number; src?: string; atom: { kind: string; name?: string; from?: string; to?: string } };
 
 /** #1188 step 4 (ADR-3D-406): a metric given over free vectors as a stated row — «|u| = 5», «u ⟂ v», «∠(u, v) = 60°». */
 function freeMetricRow(m: FreeVecMetric3): string {
@@ -1693,7 +1730,7 @@ function freeMetricRow(m: FreeVecMetric3): string {
       return `${pairArrow(m.from, m.to)} = ${m.terms
         .map((t, i) => {
           const name = t.atom.kind === 'named' ? t.atom.name : pairArrow(t.atom.from, t.atom.to);
-          const part = t.coeff.p !== 0 ? `${Math.abs(t.coeff.p) === 1 ? '' : cleanCoeff(Math.abs(t.coeff.p))}${m.symbol ?? ''}` : cleanCoeff(Math.abs(t.coeff.k));
+          const part = t.coeff.p !== 0 ? `${Math.abs(t.coeff.p) === 1 ? '' : cleanCoef(Math.abs(t.coeff.p))}${m.symbol ?? ''}` : cleanCoef(Math.abs(t.coeff.k));
           const neg = (t.coeff.p !== 0 ? t.coeff.p : t.coeff.k) < 0;
           return `${i === 0 ? (neg ? '−' : '') : neg ? ' − ' : ' + '}${part}${name}`;
         })
@@ -1701,9 +1738,9 @@ function freeMetricRow(m: FreeVecMetric3): string {
     case 'span':
       return `${pairArrow(m.from, m.to)} = ${m.letters[0]}${m.span[0]} + ${m.letters[1]}${m.span[1]}`;
     case 'mag':
-      return `${mag(m.e)} = ${statedMagText(m.value, m.decimal)}`; // #2361: a stated magnitude, as every surface prints one
+      return `${mag(m.e)} = ${statedMagText(m.value, spellingOf(m).src)}`; // #2361: a stated magnitude, as every surface prints one
     case 'mag-rel':
-      return `${mag(m.e1)} = ${m.c === 1 ? '' : cleanCoeff(m.c)}${mag(m.e2)}`;
+      return `${mag(m.e1)} = ${m.c === 1 ? '' : givenText(m.c, m.src, cleanNum)}${mag(m.e2)}`;
     case 'dot':
       return `${side(m.e1)} · ${side(m.e2)} = ${cleanNum(m.value)}`;
     case 'par':
@@ -1721,7 +1758,8 @@ function vecSide(terms: readonly VecTermLike[]): string {
         t.atom.kind === 'named' ? (t.atom.name ?? '?') : pairArrow(t.atom.from ?? '?', t.atom.to ?? '?');
       const mag = Math.abs(t.coeff);
       // A coefficient of 1 is written by being absent, as every textbook writes it.
-      const scaled = mag === 1 ? body : `${cleanCoeff(mag)}${body}`;
+      // #1497: a coefficient is a given, so it prints as typed; one the tool computed reads the tiers
+      const scaled = mag === 1 ? body : `${givenText(mag, t.src?.replace(/^-/, ''), cleanNum)}${body}`;
       if (i === 0) return t.coeff < 0 ? `−${scaled}` : scaled;
       return t.coeff < 0 ? ` − ${scaled}` : ` + ${scaled}`;
     })
@@ -1731,5 +1769,3 @@ function vecSide(terms: readonly VecTermLike[]): string {
 /** The arrow rides OVER the pair, which is what `vectorNotation` produces for a typed one. */
 const pairArrow = (from: string, to: string): string => `${from}${to}${COMBINING_ARROW}`;
 
-/** `3`, not `3.0000001` — a coefficient the student typed, printed as they typed it. */
-const cleanCoeff = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4))));

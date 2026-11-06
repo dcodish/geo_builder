@@ -225,3 +225,13 @@ export function statedAs(
   }
   return mod && arg ? 'polar' : 'computed';
 }
+
+/** #1497 (ADR-W-179): the line that typed `name` as a number of its own, «z = 0.5+1.25i», for its spelling. Null otherwise. */
+export function typedLineOf(name: string, constraints: readonly Constraint[]): string | null {
+  for (const c of constraints) {
+    if ((c.kind ?? 'eq') !== 'eq') continue;
+    const other = c.lhs.t === 'ref' && c.lhs.name === name ? c.rhs : c.rhs.t === 'ref' && c.rhs.name === name ? c.lhs : null;
+    if (other && refsOf(other).length === 0) return c.src;
+  }
+  return null;
+}

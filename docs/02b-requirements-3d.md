@@ -119,8 +119,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
     never ignored**, and a coordinate that pins a point's free freedom places the point, whatever it sits on
     («K על AB · K(1,0,0)» puts K at the midpoint).
   - **A length, angle, ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.**
-  - For the coordinate, vector and measure rules: a true restatement stays green, an unstated or symbolic
-    component is not checked, and on a solid or a free figure the statement drives instead.
+  - For the coordinate, vector and measure rules: a true restatement stays green, except that stated coordinates or
+    a stated length in another spelling add no row (FR-SP-19a); an unstated or symbolic component is not checked, and
+    on a solid or a free figure the statement drives instead.
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
     yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
     «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363); «בדקו את החישוב» is kept for a given the student's own data contradicts.
@@ -212,9 +213,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-21a (Must)** — **A plane-geometry angle written in radians is refused and taught in degrees**
   ([FR-SU-20](02w-requirements-workspace.md)). «∠ABC = π» recorded an angle mark labelled π; «∠ABC = π/2» and the
   other spellings went to the model. Each is now refused at the one statement reader submit and the ✎ edit share,
-  with 2-D's sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». π as a plane name («B על המישור π2») and a space angle
+  with 2-D's sentence in space's words: «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90». π as a plane name («B על המישור π2») and a space angle
   with a plane operand are unchanged.
-  - Sources: [ADR-W-142](06w-decisions-workspace.md#adr-w-142), [ADR-710](06-decisions.md#adr-710), #1837.
+  - Sources: [ADR-W-142](06w-decisions-workspace.md#adr-w-142), [ADR-710](06-decisions.md#adr-710), #1837, [ADR-3D-424](06b-decisions-3d.md#adr-3d-424), #2335.
 
 - **FR-SP-23 (Must)** — **A point given with TWO coordinates sends the student to the analytic Builder, in
   2-D's words.** «A(0,0)», «A = (1, 2)», «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)», «A(2;10)» and «A = 3,4»
@@ -229,7 +230,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
   "this is not supported" sends them away from a form that works. A clarification names the alternatives
-  in the student's notation and never escalates to the LLM lane; the tool asks only when the figure really
+  in the student's notation and never escalates to the LLM lane (a name an LLM answer loses is asked for once more, [FR-SU-32](02w-requirements-workspace.md)); the tool asks only when the figure really
   is ambiguous.
   - Sources: ADR-3D-131, ADR-3D-239; #467, #836, #866.
 - **FR-SP-10 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
@@ -292,7 +293,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   family (2-D's FR-HS-14, ADR-W-129: «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.»;
   a right pyramid over a base it narrows: «כדי שהפירמידה תהיה ישרה, ABCD הוגבל …»; a given typed first is named instead;
   nothing when the declared noun is already the cyclic one, «טרפז שווה שוקיים»); every other forced narrowing the
-  givens make is said in the same family, as in 2-D; a right trapezoid in a circle is refused — in one sentence,
+  givens make is said in the same family, as in 2-D, on 2-D's blue ⓘ information strip ([ADR-W-180](06w-decisions-workspace.md#adr-w-180), #2266); a right trapezoid in a circle is refused — in one sentence,
   and also when «טרפז ישר זווית ABCD» and the circle («ABCD חסום במעגל», «מעגל חוסם את ABCD», a pyramid's
   right-trapezoid base) are stated on two lines, in either order: the second line is refused, naming both. A
   shape's own condition draws no segment the student did not name. The 2-D twin is FR-EN-14. A circle inscribed in a pentagon
@@ -322,9 +323,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   "D is on the circle" puts a new D on the circle (any of the figure's one circle: through a polygon, inside it, or
   tangent to a line), free to move along it, and «הציגו תצורה אחרת» moves it. A letter an earlier line created as a
   free point is placed on the circle the same way. A point the figure already places (a vertex, a midpoint) is
-  checked, and refused (today with «D אינה על הישר», the line wording) when it is not on it. With two circles,
-  «המעגל» names neither, as before.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350, ADR-3D-410; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126, #2611.
+  checked, and refused («D אינה על המעגל») when it is not on it. With two circles, «המעגל» names neither, as before.
+  **A line that refers to a circle the figure lacks creates it** (#2048 ruling A, ADR-3D-420): on a figure with no
+  circle, «D על המעגל» / «רדיוס המעגל הוא 3» / «המעגל במישור π1» create a free circle with no centre letter, and
+  «D על המעגל O» creates the circle on centre O, with the notice «נוצר מעגל חדש …». Placed points stated on such a
+  circle are all on it (its centre, while nothing else holds it, stands where they say). A letter over a drawn circle
+  that has no letter stays refused.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342, ADR-3D-350, ADR-3D-410, ADR-3D-420; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125, #2126, #2611.
 - **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's
@@ -355,6 +360,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
   makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
   - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346, ADR-3D-377; #1953, #1988, #1990, #2171, #2180.
+- **FR-SP-19a (Must)** — **Stated numbers restated are already known.** «B(√2,0,0)» · «B=(√2,0,0)», in either order and
+  any spelling of the same numbers, adds no row and shows the note of FR-SP-19 (operator 2026-10-17: *"the 3rd line
+  should not be accepted and we say that it is already known"*). So does a stated length in the other letter order or
+  any spelling of the same value («AB = 3» · «BA = 3», «BA = 6/2»), as in 2-D. Different numbers are refused as before.
+  A coordinate line on a point the student never gave coordinates, or a first length on a segment, is their answer or
+  a value to draw, and it stays a verified row (FR-CL-1).
+  - Sources: ADR-3D-423; #2341.
 - **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
   indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
   "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
@@ -542,7 +554,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A stated **point** keeps the letter the student wrote on a free axis — «A(1,t,2)» reads `A(1, t, 2)`, never
   `A(1, ?, 2)`, like analytic — and its value once the letter is known; asking «A» answers the same text, while
   a single coordinate («y של A») stays undetermined, since a letter is a name, not a value.
-  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077.
+  **The step list follows the same reading:** a line the tool reads as a vector shows vector notation on its row and
+  in the strip under the box, whether or not the student typed an arrow («BA=(-3,4,5)» shows `BA⃗ = (−3, 4, 5)`);
+  a length stays plain (operator, 2026-09-29: *"Display follows meaning: always arrows."*).
+  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077; [ADR-3D-425](06b-decisions-3d.md#adr-3d-425), #1549.
 
 ## Equations — the algebraic lane
 
@@ -709,8 +724,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - **One text, two decimals when needed** (#2361, operator ruling sr-22 / ADR-W-175, 2026-11-02). The label on the
     edge and the `|AB| = …` row in the data panel print the same text. A value written as a decimal reads in at most
     two decimals and is computed with the full value («AC = 7.9999» reads «8», «AC = 4.005» reads «4.01»), and is
-    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. An integer, a fraction or a root
-    keeps its exact form («9/2», «2√3»; «√20» reads «2√5»). The same holds for a free vector's stated «|u| = 2.5».
+    never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. A fraction or a root reads as typed
+    («9/2», «2√3», «√20», «√8», #1497, [ADR-3D-426](06b-decisions-3d.md#adr-3d-426)), and so does a stated coordinate
+    («B(0.5,0,0)», «B(2/3,0,0)») and a vector coefficient («SD = (2/3)u» reads «2/3u»). The same holds for a free
+    vector's stated «|u| = 2.5».
   - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
@@ -832,7 +849,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   Later lines pin the same circle, in any order: «רדיוס המעגל הוא 5», «המעגל במישור π1», a placed point on it («A על
   המעגל», two determine the circle), a length from the centre to a point on it («OD = 4» is the radius), and tangency
   («מעגל O משיק לישר AB בנקודה T»). A second, different radius or plane is refused naming the circle, and a radius or
-  plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126).
+  plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126). A stated
+  radius shows in the data panel, «רדיוס O = 3», or «רדיוס המעגל = 3» for a circle with no letter, as in 2-D; no number
+  is drawn on the canvas (ADR-3D-420).
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

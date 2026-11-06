@@ -5927,6 +5927,8 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 
 ## ADR-W-129 — The givens forced a narrower kind: one cause-naming sentence in every builder, from one shared decision (#1996, #1899)
 
+**⚠ Amended by [ADR-W-180](#adr-w-180) (2026-11-05):** the note's face is shared too, the blue ⓘ strip in every builder.
+
 **Status:** accepted · 2026-10-15 · **Issue:** #1996 (feature, P2, workspace) and #1899 (folded in) · round #2128 · PR `feat/1996-narrowing-note` · builder entries [ADR-655](06-decisions.md#adr-655) (2-D), [ADR-3D-343](06b-decisions-3d.md#adr-3d-343) (3-D), [ADR-AG-276](06c-decisions-analytic.md#adr-ag-276) (analytic).
 **Operator rulings (cited verbatim; each is the authority for a line of the decision):**
 - 2026-10-08, #1899 (`/decisions`): *"Add it to 2-D"* — *"2-D shows 3-D's notice, in 3-D's words, whenever an inscription forces a declared quadrilateral into a narrower shape"*; analytic follows under B1.
@@ -6058,6 +6060,8 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 
 **Slow-tier goldens that may drift (batch's to re-record):** `decide-submit3-parity-1394` if a case types a π angle (`record`/`not-understood` → `refused`); `decide-parity-1395-*` as ADR-710 says.
 
+**Amendment 1 (2026-11-05, #2335) — 3-D says «המרחב».** The verdict stays one in every builder; the plane sentence stays one voice in 2-D and analytic. 3-D's sentence is «בגאומטריה של המרחב זוויות נכתבות במעלות — למשל ∠ABC = 90» / "In solid geometry, angles are written in degrees — for example ∠ABC = 90". This is a recorded exception to [ADR-W-118](#adr-w-118) B1, by the operator's own request: round #2291 T22, 2026-10-17, *"note should say בגיאומטריה של המרחב"*; spelling ruled 2026-10-18, *"Use «גאומטריה» (the majority spelling)"*. See [ADR-3D-424](06b-decisions-3d.md#adr-3d-424).
+
 ## ADR-W-144 — An AI answer keeps every shape and role word the student typed: one shared word reader, a product evidence check (#1906)
 
 **Status:** accepted · 2026-10-17 · bug (P2; 2d + 3d, analytic to follow) · fix round #2304, stream Q · **Extends** [ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)'s honesty core (`shell/llm/honestyCore.ts`) and [ADR-W-016](#adr-w-016) (no vocabulary in `shell/`) · product sides: [ADR-722](06-decisions.md#adr-722) (2-D), [ADR-3D-364](06b-decisions-3d.md#adr-3d-364) (3-D)
@@ -6127,6 +6131,8 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 **Behaviour change for a student:** none in 2-D; 3-D's is ADR-3D-374's.
 
 ## ADR-W-148 — Suite-wide text lives once, in `shell/locales`: the narrow exception to "shell holds no strings" (#2201 phase 1; amends ADR-W-016)
+
+> **Extended by [ADR-AG-403](06c-decisions-analytic.md#adr-ag-403)** (#2408, 2026-11-05): the nine `tangentsExhausted*` sentences 2-D and analytic both show moved to `suite.refusal.*`; analytic's `errNoCommonTangent` is the suite's `tangentsExhaustedContained`. 2-D's `tangentsExhaustedTouch` hint stays 2-D's.
 
 **Status:** accepted · 2026-10-23 · debt (P3, workspace) · fix round #2466, stream C · branch `fix/2201-p1-suite-locales` · **Amends:** [ADR-W-016](#adr-w-016) rule 2 · **Operator ruling** 2026-10-16
 **Requirements:** none (internal) · **Design:** [04w](04w-design-shell.md) § *Suite-wide text*
@@ -6411,6 +6417,8 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Consequences.** The page is at most a day behind the queue; it shows the date of its snapshot. A refresh costs about a minute of `gh` calls, and the routine one short cloud run a day.
 
 **Amendment 1 (2026-11-01, #2652) — open issues over time.** Operator: *"I want to get a better insight as to how many issues exist over time for the entire system but also broken down to tools and infrastrucutre. so i see some progress."* The daily snapshots start on 26 Oct, so they cannot show a trend. The script now also writes `history.json` (db doc `history/open`), rebuilt on every refresh from every issue's `created_at` and `closed_at` (REST, so the daily cloud run keeps it too). It holds the count open at the end of each day since the first issue (10 Jul 2026), for the whole system and per group (2-D, 3-D, analytic, complex, and infrastructure = `server` + `workspace`), plus the issues opened and closed per week (weeks start Monday). The page draws it as one line per group, plus the weekly opened and closed counts. The history is rebuilt, never accumulated, so it needs no baseline and cannot drift. Its limits are shown on the page: an issue counts under the tool labels it carries today and by its last close, and one with two tool labels counts under each. It reads the end of each day, while the stored snapshots are taken at 04:00 UTC, so the two differ by a few on busy days (measured: equal on 26, 29 and 31 Oct; within 15 on the others).
+
+**Amendment 2 (2026-11-05, #2725) — one status per row, by pace.** Operator: *"this roadmap is hard to understand. for instance locus you can find is a not very informative name. is says 8/8 done +3 so is it 11/11? the color coding of on trach/ watch/etc. is not used well."* Asked whether a row should turn amber or red by pace before its deadline, and whether a bar should show progress instead of its name, he ruled *"yes"* to both; on the names, *"you can name them better yourself."* Root cause: the page had two status systems, a pace check on the tiles and a date-only check on the rows, and its key described the first while sitting above the second. Now one `wsStatus` drives each row's pill and bar, the key with its live counts, and the tile's "behind" count. A row is Done when every issue is closed; Not started, or Started early if work is already closed, before its first week; On track, Watch or Behind by closed issues against the issues its elapsed days call for, with Behind under 60% of that pace or past its last week with work open. A row's first seven days never count against it, so a row cannot turn red on the day it starts. Pace is measured by the day and the tile sums the same figure, so the two cannot disagree. A readiness check is Not started, then Watch while its weeks are open, then Behind, until `played` holds the date he played it. The tool's colour stays on the group heading; a bar's colour means its state, and a strip inside it shows the share done. "+3 new" read as extra work on top of the count; it is now "8 of 8 done · 3 added since 26 Oct". Rows are named for what a student can do; ids and issues are unchanged. Found on the way: `curWeek` returned a fixed 6 after the plan's end, left from the five-week plan, and the row text ran together ("1/3 done2 features open"). The page also gains a today line on the board and the status with its reason in each row's dialog.
 
 ## ADR-W-160 — Priority follows who hit it and where it sits in the teaching plan; `wrong-answer` and `reported` record severity (#2556)
 
@@ -6847,6 +6855,8 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 
 ## ADR-W-176 — Two letters on one dot are accepted, and every builder says so in 2-D's sentence, one suite key (#1595)
 
+**⚠ Amended by [ADR-W-180](#adr-w-180) (2026-11-05):** the notice sits on the blue ⓘ strip in every builder.
+
 > **⚠ Superseded in part** 2026-11-02 by [ADR-W-177](#adr-w-177) (operator ruling 2026-11-02 on #1595 ([comment](https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507)), answering the 2026-11-02 question: *"accept with message"*): the first bullet of *How the rulings fit together* — a NEW letter whose definition puts it on a point already there is refused — no longer holds for a coincidence the definition FORCES; that is accepted with this ADR's notice in every builder.
 
 **Status:** accepted · 2026-11-02 · feature (P2, all four builders) · fix round #2665, stream T · branch `feat/1595-coincidence-notice` · **Operator rulings:** 2026-09-30 (#1595, playing round #1571 T23: *"when 2 dots are on top of each other we should accept but always give a message about it. this is correct for all tools"*); 2026-10-30 (PR #2605 T34: *"whenever 2 letters fall on each other and there is no other option but them to do so, we give a message to the user. this needs to happen here too"*) · plan of 2026-10-07 (#1595), armed `auto-ok` 2026-10-04 · **Extends:** [ADR-W-148](#adr-w-148) (a notice joins the suite text), [ADR-W-152](#adr-w-152)'s shape · per-product: 2-D unchanged (ADR-123, ADR-447 Am. 1), [ADR-3D-404](06b-decisions-3d.md#adr-3d-404), [ADR-AG-366](06c-decisions-analytic.md#adr-ag-366), [ADR-CX-086](06d-decisions-complex.md#adr-cx-086)
@@ -6922,3 +6932,115 @@ His review of the 14 and his answers to the 17 are on the standing-rulings page.
 **Measured (2026-11-03, 32 closed rounds since 1 Oct).** 471 closed: 376 changes on main, 95 housekeeping. Round #2665: 2 on main, 15 housekeeping (13 parked, 2 already fixed). A refresh reads its timelines eight at a time: 1 min 48 s, where one at a time took 5 min 44 s.
 
 **Consequences.** The number the operator reads first is what a student can now see change, and the second is what his sitting will close. Parks still shrink the queue, on their own line. Not built: the roadmap page's "Fix rounds" panel shows the new row fields only when the page is next republished.
+
+## ADR-W-179 — A given prints as the student typed it, through one shared reader and one shared printer, in every builder (#1497)
+
+**Status:** accepted · 2026-11-05 · bug (workspace, 2d, 3d, analytic, complex; P2) · fix round #2722, stream I · branch `fix/1497-shared-literal` · the #1497 fix plan of 2026-09-28 · product ADRs [ADR-3D-426](06b-decisions-3d.md#adr-3d-426), [ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)
+
+**Operator:** 2026-09-28 (3-D): *"data was entered as 2/3 and datapanel shows 0.666 - we need to keep the format of entry"*. The same day, on reach: *"should apply to all tools"*; on the root: *"sqrt(8) can stay as it is for now"*. Newer, and binding on decimals: sr-22 ([ADR-W-175](#adr-w-175), 2026-11-02): «7.9999» reads «8», computed in full, *"Typed and computed values follow the same rule"*.
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-30; [02](02-requirements.md) FR-RV-17; [02b](02b-requirements-3d.md) FR-RD-8; [02c](02c-requirements-analytic.md) R168; [02d](02d-requirements-complex.md) the canvas rule of ADR-CX-065 · **Design:** [04w](04w-design-shell.md) § "A stated number and its spelling"; [04b](04b-design-3d.md) § "The stated-magnitude lane"; [04](04-design.md) § the values panel; [04d](04d-design-complex.md) · **LADDER stage:** none (display)
+
+**Measured before** (`28dac0c3`, each product's real path):
+
+| typed | 2-D canvas | 2-D «נתון» row | 3-D panel | analytic coordinate | complex canvas |
+|---|---|---|---|---|---|
+| `2/3` | 2/3 | **0.67** | 2/3 (`0.6667u` as a coefficient) | 2/3 | 2/3 |
+| `0.5` | 0.5 | 0.5 | **1/2** as a coordinate | **1/2** | **1/2** |
+| `1.25` | 1.25 | 1.25 | **5/4** as a coordinate | **5/4** | **5/4** |
+| `√8` | √8 | **2√2** | **2√2** | **2√2** | **2√2** |
+
+The complex rows are the student's own lines and were always right. Complex «z = 7.9999» read «79999/10000» on the canvas.
+
+**Root cause.** **Class:** *a stated number is printed by re-spelling a float, because the parse kept its value and lost its spelling.* Every printer guessed, so each product guessed differently, and a printer that happened to guess right only looked correct.
+
+**Decision.**
+1. **`shell/literal.ts`: one reader, one printer.** `readLiteral(raw) → { value, src, decimal } | null` reads the family every builder's value slot admits: `p/q`, a decimal, `√n`, `k√n`, `√n/q`, `√(a/b)`, a glyph through the shared `spellVulgarFractions`, and a sign. `givenText(value, src, tier)` is the printer every given row calls. `src` is text, not chrome, and it names no product, so it passes the shell test ([ADR-W-016](#adr-w-016)): 3-D, 2-D, analytic and complex all call it.
+2. **sr-22 narrows "as typed" for a decimal.** A decimal spelling prints through `fmtNum`, never as the raw text: «7.9999» reads «8», «0.6667» reads «0.67». A fraction or a root prints exactly as written, unreduced («4/6», «√8»), because no rule of his touches those.
+3. **A spelling can never print a number the figure does not hold.** A literal `src` that no longer reads as `value` falls back to `tier`, so a term rescaled after the parse (an inlined free vector, an eliminated coefficient) reads the tiers.
+4. **Derived rows are untouched.** A given row prints `src`; a derived row prints the product's tiers. In a square with «AB = √8» the panel shows `√8` beside a derived `2√2`. #1460 hoists the recognizer for derived values and must keep this split.
+5. **Each product.**
+   - **3-D** ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426)): `parseCoeff`, `evalRadical` and `magValue` read through `readLiteral`; `src` replaces #2361's `decimal` mark on every command that carried it, and joins coordinates and vector coefficients. `cleanCoeff` is deleted.
+   - **2-D:** the canvas already printed the spelling. Its parser keeps `expr.text`, the same channel under an older name, so `computeValues` hands the «נתון» rows that text (`withGivenSpelling`) and they print it through `givenText`, typeset by `MathText`.
+   - **Analytic** ([ADR-AG-413](06c-decisions-analytic.md#adr-ag-413)): the `Expr` keeps the structure, so `spelledText(e)` is its `src`; a stated coordinate prints it in the panel and on the canvas.
+   - **Complex:** a number typed with no parameter reads as typed on the canvas, in the view it was typed in (D1). `Constraint.src` already quotes the line; `replay/typedSpelling.ts` reads the parts from it through `readLiteral`. The panel's readings stay computed, except a typed decimal's own value ([ADR-CX-088](06d-decisions-complex.md#adr-cx-088)) (ADR-CX-065).
+6. **Old saves** with no `src` keep the tiers. A 3-D save made since #2361 holds a `decimal` mark, which `spellingOf` reads as the decimal it was.
+
+**Sibling audit.** Grepped each tree's stated-number printers and measured them (table above). The analytic canvas length label is #1806 / [ADR-AG-407](06c-decisions-analytic.md#adr-ag-407), stacked on this. Not changed, by the plan's scope: an equation's canonical form (a curve row is the tool's normal form, not a given row), a stated angle (a degree value, always decimal), and 2-D's circle radius, which has no spelled form to keep («ברדיוס √8» does not parse deterministically). No third copy remains: 2-D's parser keeps its own reader, held to this one by `issue-1497-given-spelling.test.tsx` (the canvas label equals `givenText` over `readLiteral`, per spelling).
+
+**Deviation from the plan.** The plan had every parser call `readLiteral` in place of its private reader. 3-D does. 2-D's `numexprVal` and its radical readers are entangled with the symbolic branches and already keep the text, so rerouting them would risk verdicts to gain nothing a student sees; the agreement lock holds them instead. Analytic and complex read expressions, not literals, and their parsers are unchanged.
+
+**Locks.** `shell/__tests__/literal-1497.test.ts`; `src3d/__tests__/issue-1497-format-of-entry.test.ts` (the operator's sequence, every table row); `src/__tests__/issue-1497-given-spelling.test.tsx`; `src-analytic/__tests__/issue-1497-stated-coordinates.test.ts`; `src-complex/__tests__/canvas-spelling-1497.test.ts`; `issue-2361-stated-value-text.test.ts` re-based («√20» now reads «√20», which ADR-3D-416 left to this issue).
+
+**Behaviour change for a student:** a fraction or a root reads as typed wherever a given is printed, in every builder; a decimal is never rewritten as a fraction; a decimal past two places reads the house decimals.
+## ADR-W-189 — An AI answer that loses a name the student typed is asked for once more; still lost, the refusal naming it stands (#2231)
+
+**Status:** accepted · 2026-11-05 · operator ruling · bug (P2, `reported`, 2d + 3d + analytic + server) · round #2722 · branch `fix/2231-keep-student-letter` · **supersedes ruling (c) of 2026-10-16** on #2231 (accept with a notice), which was never built
+
+**Operator:** 2026-10-16: *"1b"* (retry once, naming the letter); 2026-10-18, the decisions page: **A**, *"Retry once. If K is still missing, keep today's refusal naming K."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-32; [02](02-requirements.md) FR-IN-2b and [02b](02b-requirements-3d.md) point to it · **Design:** [04w](04w-design-shell.md) "The one retry"; [04b](04b-design-3d.md) "The LLM escalation is an `app/` module". Not a ladder mechanism: it sits at the LLM seam, before any stage.
+
+**Class.** *When the AI's reading of a sentence loses a name the student typed (a point or a line), each builder refuses at once, although one more request naming what to keep usually recovers the student's own figure.* The refusals are right (ADR-240, ADR-3D-147, ADR-AG-279) and stay. Every builder with an AI fallback lacked the retry in the same way; complex has no AI fallback, so nothing to retry.
+
+**Measured at 28dac0c3 (mocked model).** Analytic `runFallback('MK אנך לציר x')` with the logged answer `האנך מהנקודה M לציר ה-x`: `unfaithful, dropped: ['K']`, one call; `l3 הוא אנך אמצעי של EK` with `אנך אמצעי ל-EK`: `dropped: ['l3']`. That second sentence is now read by the grammar on a figure holding E and K (#1138), so it no longer reaches the model there; the seam lock keeps it as the line-name case.
+
+**Decision.**
+1. `shell/llm/retryLostNames.ts`: `askKeepingNames` asks once, and once more with `keep` when the builder's own name gate reports a lost name on a usable answer. Exactly one retry. A retry that fails (no answer, busy, empty) leaves the first answer. No strings, no product knowledge (ADR-W-016).
+2. The trigger is NAMES only: 2-D `droppedNewLabels`, 3-D `droppedNewLabels3`, analytic `faithfulnessAnalytic`'s new `droppedNames`, which counts line names through the tree's own lexing. A lost number, relation or word keeps today's refusal on the first answer.
+3. After the retry nothing new decides: the answer goes through the full battery, unchanged. A name still lost gets 2-D `input.labelsDropped`, 3-D `dropped-given`, analytic `llm-dropped`. No figure is drawn without a typed letter; the notice of ruling (c) is not built.
+4. Server: the body's optional `keep` is validated by `readKeep` (at most 8 name tokens, otherwise ignored) and adds one line after the student request. A retry is an ordinary request: it counts against the per-IP limit and the daily cap. Without `keep` the request is byte-identical. Shared server, parameterized by `tool:`, never forked.
+5. 3-D's escalation moves out of `App3` into `src3d/app/escalate3Flow.ts`, so the decision is reachable from a test (docs/17 §3, the seam registry's second half).
+
+**Deviations from the plan, mechanism only.** The retry logs one `llm-retry` `action` event (`nameRetryEvent`), not a `retry` field on the `llm` event: 2-D ends a submit at a dozen log sites, and the lean sinks drop unknown submit fields, while an action reaches the admin session view unchanged. The name token also admits Hebrew letters and a space, up to 8 characters, because a numeral line's shown name is «ישר 3». A timeout or a cancel during the retry leaves the first answer, so the student reads the refusal naming the letter, not «service busy». A dashboard counter is not built; the action rows are its data.
+
+**Cost.** One more model call, only after a name loss, at most once per submit, under the existing limits and the existing 15 s bound (2-D and analytic share one abort across both calls).
+
+**Locks.** `shell/__tests__/retryLostNames.test.ts`, `server/__tests__/issue-2231-keep.test.ts`, `src/app/__tests__/issue-2231-llm-retry.test.ts` (through `runSubmit`), `src3d/__tests__/issue-2231-llm-retry3.test.ts` (through `escalate3Flow` and `decideSteps3`), `src-analytic/__tests__/issue-2231-llm-retry.test.ts` (through `runFallback`). All mocked (standing rule 2).
+
+**Behaviour change for a student:** a line whose AI reading lost a typed name may now build with that name, after a second request; a line that stays lost reads the same refusal as before, a moment later.
+## ADR-W-180 — The forced-narrowing note has one face in every builder: the blue ⓘ strip, 2-D's (#2266)
+
+**Status:** accepted · 2026-11-05 · bug (P2, analytic + 3-D, complex for item 5) · round #2722 · branch `fix/2266-narrowing-note` · amends the display line of [ADR-W-129](#adr-w-129), [ADR-AG-276](06c-decisions-analytic.md#adr-ag-276), [ADR-3D-343](06b-decisions-3d.md#adr-3d-343) and [ADR-AG-377](06c-decisions-analytic.md#adr-ag-377) item 4. LADDER stage: none (display only; no fold, solve or sampling change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R179, R223; [02b](02b-requirements-3d.md) FR-SP-15; [02w](02w-requirements-workspace.md) the two-letters row. · **Design:** [04w](04w-design-shell.md) (`Banner`'s `info` kind, `InfoNote`, `NarrowingNote`), [04c](04c-design-analytic.md), [04b](04b-design-3d.md).
+
+**Operator:** 2026-10-16, #2266, playing T64: *"2266 - no other tool as that symbol so we need same messages across tools"*. Told that 2-D does carry the ⓘ, and shown keeping it against dropping it: *"2266 - A"*, keep the ⓘ everywhere, as 2-D has it.
+
+**Measured (28dac0c3, a real browser, «מלבן ABCD» · «מעוין ABCD»).** 2-D: ⓘ, text `#1d4ed8` on `#eff6ff`, border `#bfdbfe`, padding 8/12, radius 8, 13 px, 37.5 px tall. Analytic: ⓘ, amber `Banner kind="notice"`, padding 6/10. 3-D: no ⓘ, Tailwind blue box, radius 12, 14 px. The issue's table held; the sentence was already one.
+
+**Class.** A note one decision produces in every builder (`shell/narrowing.ts`) had its mark and its colour written per builder, so each drifted by itself. Nothing in `shell/` could say what the note looks like: the banner family had no information kind.
+
+**Decision.**
+1. **`Banner` gains `kind="info"`**, with the tokens `color.info`, `infoSoft`, `infoBorder` and 2-D's padding, `role="note"`. 2-D's `infoBanner` reads the same tokens.
+2. **`shell/frame/NarrowingNote`** is the note's one face: the ⓘ and the `info` strip around the caller's sentence. 2-D, 3-D and analytic all render it, so neither the mark nor the colour can differ per builder again. For a student 2-D is unchanged: after the change it measures the same colours, padding, radius, size and height as before.
+3. **Analytic's ellipse-made-a-circle note goes with it.** ADR-AG-377 put it "in the narrowing note's channel and voice", and the operator's ruling there calls it the same message as the quadrilateral and triangle ones (*"we have such messages when a quad becomes a specific quad or a triangle becomes a right triangle. so this ruling is a generic ruling"*). Left amber it would have been the one note of the family off the strip, a split this fix caused.
+4. **`src-analytic/app/NarrowingNotes.tsx`** holds analytic's two note lists: they arrive after paint, so a server render of the App never reaches them, and a lock needs to render them.
+5. **Two letters on one dot takes the same face** (judged 2026-11-05, round #2722, q13, choice A). Measured at this branch: 2-D blue strip with ⓘ; analytic and complex amber with ⓘ; 3-D its blue box with ⓘ. All four now render `InfoNote`, so analytic and complex turn blue and 3-D takes the shared strip. The words are unchanged (`suite.notice.converge`).
+6. **3-D's `base-constrained` sentence moves to `NarrowingNote`** (judged 2026-11-05, round #2722, q14, choice A). Only the face changes: the sentence stays ADR-3D-090's and the shared kind lattice is untouched.
+   Its letters are the base ring (judged 2026-11-05, round #2722, q16, choice A, from the operator's 2026-10-13 ruling on #1996: the pyramid narrowing note names the base ring and never prints the apex). `notices.ts` passed the solid's ids, so it read «(ABCDS)»; it now passes `baseRingOf`, so it reads «(ABCD)». Nothing else reads this notice's ids.
+7. **`InfoNote`** (`shell/frame/Banner.tsx`) is the ⓘ strip itself. `NarrowingNote` is its name for the narrowing family, so a two-letters note is not called a narrowing note.
+
+**Sibling audit (docs/17 §1).** Complex has no shape nouns and no narrowing note. 3-D's other notices stay on their box. The two notes this audit first left out are items 5 and 6.
+
+**Locks.** `noteFaceFaults` in `shell/__tests__/fixtures/narrowing-note-rows.ts` is the one check. `src/__tests__/narrowing-note-face-2266.test.tsx` and `src3d/__tests__/narrowing-note-face-2266.test.tsx` server-render the real App; `src-analytic/__tests__/narrowing-note-face-2266.test.tsx` renders `NarrowingNotes` over the real note readers and checks the App mounts it. `src-complex/__tests__/narrowing-note-face-2266.test.tsx` server-renders the real App for the two-letters note; the 2-D, 3-D and analytic locks cover that note too, through the real App, and 3-D's covers `base-constrained`. `shell/__tests__/narrowing-note-face-meta-2266.test.tsx` shows the check catches the amber strip, the missing ⓘ, a note that is absent and a blue neighbour.
+
+**Behaviour change for a student:** in analytic the «ABCD הוא כעת ריבוע…» and «ABCD הוגבל…» notes, and «האליפסה היא כעת מעגל…», are blue instead of amber. In 3-D the same notes open with ⓘ and match 2-D's strip, and the right pyramid's «כדי שהפירמידה תהיה ישרה, הבסיס…» sentence gains the ⓘ and the strip. «A ו-B נפלו על אותה נקודה.» is blue in analytic and complex, and in 3-D sits on the shared strip. 2-D looks as it did.
+## ADR-W-181 — A question is answered, and a question the tool cannot read is told what it can (#1454)
+
+**Status:** accepted · 2026-11-05 · bug (P2, all four builders) · fix round #2722 · branch `fix/1454-ask-a-value`
+
+**Operator:** the /decisions pass of 2026-09-27: *"Approve all 38"*, which took this issue's arms 1–3, and *"Compute on ask"* for arm 4. External review, relayed the same day: *"Asking about a defined object ('w', 'A') should return its value, not «זהו נתון, לא שאלה». 'Not understood' should suggest valid phrasings, as 3D already does."*
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-DP-2, FR-DP-4 · **Design:** [04w](04w-design-shell.md) § the frame components (`AskLane`'s required `unreadableHint`)
+
+**Class.** A question typed in the ask lane is answered by a different rule in each builder: what counts as a question, what an unreadable one says, and what must happen before it gets an answer.
+
+**Decision.**
+1. **`AskLane` requires `unreadableHint`**, the product's own "not understood" text with its examples, the way `AppFrame` requires its privacy text. The answered rows are the product's (ADR-W-038), so the lane cannot print the text itself; a required prop is the seam at which a builder must have examples, and `ask-lane-parity.test.ts` (now all four builders) asserts the row prints the same key. In the lane it is the box's `aria-description`, which draws nothing.
+2. **The copy:** complex «לא זוהה — נסו |z1|, arg(z1), Re(w), r», analytic «לא זוהה — נסו A, AB, שטח ABC, שיפוע AB»; 2-D and 3-D already had theirs.
+3. **Per product:** complex reads a bare name in the lane as its value question ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087)); 2-D's ask computes its own answer ([ADR-788](06-decisions.md#adr-788)).
+
+**Sibling audit.** 3-D's bare name is a supported query and analytic has a point rule, so neither says «this is a given»; 2-D's bare letter is a symbol lookup and a point has no value there (no coordinates), so its row keeps «לא זוהה». Analytic carries only the copy, so it needs no ADR of its own.
+
+**Behaviour change for a student:** in complex and analytic a question the tool cannot read now names phrasings that work.

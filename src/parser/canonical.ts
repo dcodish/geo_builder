@@ -15,6 +15,7 @@
  * renderer here simply produces no hint; silence is always safe, a wrong hint is not.
  */
 import type { AnyCommand, Id } from '@/engine';
+import { givenText } from '../../shell/literal';
 
 export type Locale = 'he' | 'en';
 
@@ -35,8 +36,8 @@ const NAMES_ANGLE = /זוו?ית|\bangle\b|∠/i;
  *  because `∠` isn't on a keyboard), tolerated input rather than a canonical form, so nudging it toward
  *  the glyph is this module doing its job. Teaching a student out of the approximation and onto the
  *  button is the whole point; suppressing that hint would strand them on it. */
-function angleText(vertex: Id, ray1: Id, ray2: Id, value: number, _locale: Locale): string {
-  return `∠${ray1}${vertex}${ray2} = ${value}`;
+function angleText(vertex: Id, ray1: Id, ray2: Id, value: number, src: string | undefined, _locale: Locale): string {
+  return `∠${ray1}${vertex}${ray2} = ${givenText(value, src, String)}`; // a fraction as typed, never its float (ADR-W-179)
 }
 
 /**
@@ -51,7 +52,7 @@ export function canonicalText(cmds: AnyCommand[], locale: Locale): string | null
   const meaningful = cmds.filter((c) => c.type !== 'segment' && c.type !== 'name-by-use');
   if (meaningful.length !== 1) return null;
   const c = meaningful[0];
-  if (c.type === 'set-angle') return angleText(c.vertex, c.ray1, c.ray2, c.value, locale);
+  if (c.type === 'set-angle') return angleText(c.vertex, c.ray1, c.ray2, c.value, c.src, locale);
   return null;
 }
 
@@ -72,7 +73,10 @@ export function canonicalText(cmds: AnyCommand[], locale: Locale): string | null
  * disagree about what "canonical" means — they now share one renderer.
  */
 export function stepLabel(cmds: AnyCommand[], utterance: string | undefined, locale: Locale): string {
-  return canonicalText(cmds, locale) ?? utterance ?? cmds.map((c) => c.type).join(' + ');
+  const text = canonicalText(cmds, locale);
+  // A fraction has no unit of its own on the row, so it carries its degree sign (ADR-789). The hint teaches the sentence, without it.
+  if (text && cmds.some((c) => c.type === 'set-angle' && c.src)) return `${text}°`;
+  return text ?? utterance ?? cmds.map((c) => c.type).join(' + ');
 }
 
 export function teachCanonical(utterance: string, cmds: AnyCommand[], locale: Locale): string | null {

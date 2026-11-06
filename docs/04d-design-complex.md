@@ -116,7 +116,9 @@ never as a contradiction or a refutation.
   unknown and the reserved-constant refusal is untouched. `resolveObjects` turns it into a `point`
   object at (0,0), known; `buildScene` lifts point objects out of `shapes` into `marks` (one per label),
   and the renderer draws a mark in the point layer's ink and drops the axis letter O while one is shown.
-  Because a bare «O» now parses as a statement, the ask lane (#789) never sees it — no routing change.
+  A bare «O» parses as a statement, so the givens box marks it; the ask lane reads it as the number 0 (next line).
+- **The ask lane's reading** ([ADR-CX-087](06d-decisions-complex.md#adr-cx-087), #1454). `parseLaneAsk` is `parseAsk` plus a bare name, or the
+  marked origin, as its value question; `lowerAsks` and `askRowsOf` read it, `readAsk` (the givens box) does not.
 - **Two named numbers on one dot are said** ([ADR-CX-086](06d-decisions-complex.md#adr-cx-086), #1595). `app/coincidences.ts`
   `coincidencesCx(d)` pairs the plotted points whose values agree within the solver's `TOL` relative to their size, named by
   `display`, through `shell/converge`; the App renders `convergeText` (`suite.notice.converge`) per render. A bound letter is
@@ -406,3 +408,7 @@ behave.
 - **`/complex-builder/api/*` is reverse-proxied in production** by the directives in
   `deploy/apache-complex-builder.conf`; the gap [#903](https://github.com/dcodish/geo_builder/issues/903)
   recorded is closed.
+
+## The typed spelling on the canvas ([ADR-W-179](06w-decisions-workspace.md#adr-w-179))
+
+A number typed with no parameter takes its canvas label from `replay/typedSpelling.ts`, which reads the parts out of `Constraint.src` through `shell/literal`. Only the view the line was typed in changes. A part that does not read as the fold's value gives no label, so the reading stands. The fold never reads it. `typedDecimalReadings` applies the same read to the panel for a line with a decimal in it ([ADR-CX-088](06d-decisions-complex.md#adr-cx-088)): the Rat cannot tell 1.234 from 617/500, so the rule asks the line, with no denominator threshold.
