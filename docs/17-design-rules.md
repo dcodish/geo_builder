@@ -124,7 +124,7 @@ The list itself is the smell: each is a point where a general decision is being 
 §3 lists. Its fields split into two regimes with different rules:
 
 - **Semantic fields** are derived from the CONSTRUCTION (objects/constraints), never from drawn
-  coordinates: `circles, centrePoint, points, circleMembers, concentric` (its `resolved` flag is parse-local, set only inside `resolvePairRoles`'s aliased parse, never by `buildParseCtx` — [ADR-760](06-decisions.md#adr-760)), `neighbors, onSegment,
+  coordinates: `perpendicularLines` ([ADR-796](06-decisions.md#adr-796)), `circles, centrePoint, points, circleMembers, concentric` (its `resolved` flag is parse-local, set only inside `resolvePairRoles`'s aliased parse, never by `buildParseCtx` — [ADR-760](06-decisions.md#adr-760)), `neighbors, onSegment,
   midpointOf, lines, tangentAuxes, polygons, autoCenters, radiusSymbols, angleAliases,
   commonTangents, radiusOrder, arcs` (the drawn arcs and their identity — [ADR-632](06-decisions.md#adr-632)), `statedTangencies` (each
   circle pair the construction STATES tangent, with its touch point and stated kind — [ADR-671](06-decisions.md#adr-671); the only source of an

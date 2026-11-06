@@ -15665,7 +15665,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 
 ## ADR-AG-416 — «דרך הנקודה P מעבירים אנך לישר AB» is taught as the line through P, and «האנך» names that line (#1775)
 
-**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic + 2-D, `reported`) · round #2727 · branch `fix/1775-construction-imperative` from `main` @ `c0029d25` · the operator's revised arms of 2026-10-05 on #1775; ADR-W-030; his ruling of 2026-10-01 on #1620
+**Date:** 2026-11-06 · **Status:** accepted · **⚠ Partly superseded by [ADR-AG-423](#adr-ag-423) (2026-11-06):** Decision 3's several perpendiculars ask which, they are not refused by count · bug (P2, analytic + 2-D, `reported`) · round #2727 · branch `fix/1775-construction-imperative` from `main` @ `c0029d25` · the operator's revised arms of 2026-10-05 on #1775; ADR-W-030; his ruling of 2026-10-01 on #1620
 **Requirements:** [02c](02c-requirements-analytic.md) R114 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (internal to the parser and M1's `on-kind`)
 
 **Twin:** [ADR-792](06-decisions.md#adr-792), the 2-D arm.
@@ -15817,3 +15817,15 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` now states the foot; parity rows `perp-piece-2232`, `perp-foot-stated-2232`, `ex-perp-piece-axis-2231`.
 
 **Behaviour change for a student:** «MK אנך לציר x» creates K off the axis, with the «נוצרה נקודה חדשה» notice, and no AI; «MK אנך לציר x בנקודה K» keeps the foot.
+
+## ADR-AG-423 — Found under the judge's rulings: «האנך» with two drawn asks which (#1775)
+
+**Date:** 2026-11-06 · **Status:** accepted · judged · bug (analytic) · round #2727, stream F · branch `fix/2727-found-rulings` · **partly supersedes [ADR-AG-416](#adr-ag-416)**
+**Requirements:** [02c](02c-requirements-analytic.md) R253 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (M1's `on-kind`)
+**Twin:** [ADR-796](06-decisions.md#adr-796), the 2-D arm.
+
+**1. Two perpendiculars ask (q15, q16).** sr-12, ADR-W-175: *"With two, the tool asks which, using the existing question."* The existing question is `errHost.named`, which lists candidates and shows the student's own sentence with the first one in it. `on-kind perpendicular` passed a count, so it could only reach the counted sentence. It now carries each perpendicular's description as `from:onto`, and `errorText` words it, because the engine holds no locale. The description reads back: «האנך מ-P ל-AB» now binds a drawn line through P perpendicular to AB, where it used to build a second perpendicular. That is ADR-AG-229's "never duplicated", extended to the line. A candidate with no description (a perpendicular to a curve or a named line) keeps the counted sentence, and so does a named altitude, because a partial list would misstate the figure.
+
+**Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts`; parity rows `bare-perp-binds-1775`, `bare-perp-asks-1775`.
+
+**Behaviour change for a student:** with two perpendiculars drawn, «E על האנך» lists them and shows the sentence to type.

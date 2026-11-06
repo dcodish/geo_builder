@@ -20470,11 +20470,11 @@ No new student text. Every sentence is an existing ruled string.
 
 **Behaviour change for a student:** «MK אנך ל-AB» no longer puts K on AB, and with M on a side it builds where it used to be refused; «AK אנך ל-BC» is back to K off BC; the same relation written «מאונך» or «⊥» with M on a side builds too; «MK אנך ל-AB בנקודה K» keeps the foot.
 
-## ADR-796 — Found under the judge's rulings: a ∥ a free letter can carry is drawn (#2231)
+## ADR-796 — Found under the judge's rulings: a ∥ a free letter can carry is drawn, and «האנך» binds the drawn perpendicular (#2231, #1775)
 
 **Date:** 2026-11-06 · **Status:** accepted · judged · bug (2-D) · round #2727, stream F · branch `fix/2727-found-rulings` · **supersedes [ADR-795](#adr-795) point 3**
 **Judged (q4):** 2026-11-06, under *"Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it."* (operator, 2026-10-09, #1927).
-**Requirements:** [02](02-requirements.md) FR-IN-2b · **Design:** [LADDER](LADDER.md) row 2i⁺⁺.
+**Requirements:** [02](02-requirements.md) FR-IN-2b, FR-IN-23 · **Design:** [LADDER](LADDER.md) row 2i⁺⁺; [17](17-design-rules.md) §3b, the field `perpendicularLines`.
 
 **1. A ∥ about a free rider (#2231, stage 2i⁺⁺).** **Class.** *A two-pair relation about a free rider and a free point was given to the rider alone, so a figure the point could hold was refused.* ADR-795 closed it for the ⟂ and left the ∥ as a question. `heldRiderOfPerpendicular` becomes `heldRiderOfRelation` and reads `set-parallel` by the same claim: a free rider, and at its other end a free point nothing else is about. The trace token stays `main:rider-held`.
 
@@ -20485,3 +20485,11 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/engine/__tests__/issue-2231-rider-held.test.ts`; scenarios `parallel-relation-rider-2231`, `parallel-relation-rider-square-2231`.
 
 **Behaviour change for a student:** «GK ∥ AB» with G on a side and K new is drawn where it used to be refused.
+
+**2. Bare «האנך» (#1775).** **Judged (q15):** sr-12, ADR-W-175, *"a definite noun binds the drawn object of its kind … With one such object, the noun binds to it. With two, the tool asks which, using the existing question."* **Class.** *A definite noun whose object is drawn had no reader, so a sentence about the figure went to the model.* The rule `drawnPerpendicularRef`, at the head of `RULES`, reads two frames: «האנך חותך את AC בנקודה E» and «E על האנך». «המשך», «הישר» and a bare pair in the cut clause mean what `cutTargetOrder` says they mean everywhere. The drawn objects are the semantic field `perpendicularLines` (a visible perpendicular line that is not a bisector) and the existing `feet` (a named foot's line is its point through the foot). An anonymous foot is the tool's own and stays out. With several, the existing `ambiguous-construct` question lists «האנך מ-P ל-AB», and that narrowing is read by the same rule, so the question's answer lands on the drawn line rather than building a second one. With none, the rule does not apply: the sentence goes to the model as before. The rule sits at the head of the table because «E על האנך מ-P ל-AB» is otherwise read further down as a new foot.
+
+**Sibling check.** Analytic reads it ([ADR-AG-423](06c-decisions-analytic.md#adr-ag-423)). 3-D draws no line through a point in this frame: a known-gap cell on `bare-perp-binds-1775`, `bare-perp-asks-1775`.
+
+**Locks.** `src/parser/__tests__/issue-1775-bare-perpendicular.test.ts`; scenarios `bare-perpendicular-binds-1775`, `bare-perpendicular-asks-1775`.
+
+**Behaviour change for a student:** «האנך» after a drawn perpendicular lands on it with no AI, and two perpendiculars get a question listing them.

@@ -2293,3 +2293,9 @@ over all four (ADR-041).
 ### `parallel-relation-rider-square-2231` — «ריבוע ABCD» · «G על AD» · «GK ∥ AB»: K carries the relation (#2231, ADR-796)
 
 **Guards against:** the same refusal where G's slide has no root. **Asserts** every step green, GK ∥ AB, and G keeps its slide.
+### `bare-perpendicular-binds-1775` — «דרך P מעבירים אנך ל-AB» · «האנך חותך את AC בנקודה E»: the noun binds the drawn perpendicular (#1775, ADR-796)
+
+**Guards against:** a definite noun going to the model beside the one object it names. **Asserts** every step green, PE ⟂ AB, E on AC.
+### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
+
+**Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.

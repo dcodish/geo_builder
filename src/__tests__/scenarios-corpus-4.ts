@@ -6419,6 +6419,30 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.construction.objects.find((o) => o.id === 'G'), 'G keeps its slide').toMatchObject({ kind: 'on-segment', free: true });
     },
   },
+  {
+    id: 'bare-perpendicular-binds-1775',
+    title: '«דרך P מעבירים אנך ל-AB» · «האנך חותך את AC בנקודה E»: the noun binds the drawn perpendicular (#1775, ADR-796)',
+    guards: 'Judged 2026-11-06 (q15), sr-12: a definite noun binds the drawn object of its kind, in every builder. 2-D sent the line to the model.',
+    steps: ['משולש ABC', 'P על AB', 'דרך P מעבירים אנך ל-AB', 'האנך חותך את AC בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, P, E] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'C'), at(fig, 'P'), at(fig, 'E')];
+      expect(Math.abs((E.x - P.x) * (B.x - A.x) + (E.y - P.y) * (B.y - A.y)) / (dist(E, P) * dist(A, B)), 'PE ⟂ AB').toBeLessThan(1e-6);
+      expect(Math.abs((E.x - A.x) * (C.y - A.y) - (E.y - A.y) * (C.x - A.x)) / (dist(E, A) * dist(A, C)), 'E on AC').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'bare-perpendicular-asks-1775',
+    title: 'Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)',
+    guards: 'sr-12, "With two, the tool asks which, using the existing question". The answer reads, and it lands on the drawn line.',
+    steps: ['משולש ABC', 'P על AB', 'Q על AC', 'דרך P מעבירים אנך ל-AB', 'דרך Q מעבירים אנך ל-AC', 'E על האנך', 'E על האנך מ-Q ל-AC'],
+    refusedSteps: [{ step: 6, reason: 'ambiguous-construct', with: { noun: 'האנך', options: ['האנך מ-P ל-AB', 'האנך מ-Q ל-AC'] }, why: 'sr-12 (ADR-W-175): two drawn perpendiculars ask which' }],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, C, Q, E] = [at(fig, 'A'), at(fig, 'C'), at(fig, 'Q'), at(fig, 'E')];
+      expect(Math.abs((E.x - Q.x) * (C.x - A.x) + (E.y - Q.y) * (C.y - A.y)) / (dist(E, Q) * dist(A, C)), 'QE ⟂ AC').toBeLessThan(1e-6);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
