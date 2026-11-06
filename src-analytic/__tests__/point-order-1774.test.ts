@@ -93,6 +93,46 @@ describe('#1774 — a bare pair is taught (the operator, 2026-11-06: "Teach it")
   });
 });
 
+describe('#1808 — a lowercase name is taught (judged q13, ADR-AG-423)', () => {
+  it.each([
+    ['c(4,7)', 'C(4,7)'],
+    ['c(4, 7)', 'C(4, 7)'],
+    ['c1(4,7)', 'C1(4,7)'],
+    ['הנקודה c(4,7)', 'הנקודה C(4,7)'],
+    ['נתונה הנקודה c(4,7)', 'נתונה הנקודה C(4,7)'],
+    ['c(4,7), d(1,2)', 'C(4,7), D(1,2)'],
+  ])('«%s» → «%s», and one Enter records it', (typed, canonical) => {
+    expect(submit(typed)).toEqual({ kind: 'teach', verb: '', canonical, note: 'point-case' });
+    expect(sentenceOutcome(submit(typed))).toEqual({ prefill: canonical });
+    expect(submit(canonical).kind).toBe('record');
+  });
+
+  it.each<[string, string[]]>([
+    ['a(4,7)', ['y = ax + 2']],
+    ['k(4,7)', ['y=x+k']],
+    ['l(4,7)', ['l: y=2x']],
+    ['a(4,7)', ['a הוא פרמטר']],
+    ['c(4,7)', ['c: y=x']],
+    ['x(4,7)', []],
+    ['y(4,7)', []],
+  ])('a letter that means something else is not taught: «%s» after %j', (typed, lines) => {
+    expect(keyOf(submit(typed, lines))).not.toBe('teach');
+  });
+
+  it('a capital already placed elsewhere is not taught', () => {
+    expect(keyOf(submit('c(4,7)', ['C(1,2)']))).not.toBe('teach');
+  });
+
+  it('other shapes stay out', () => {
+    for (const line of ['c(4)', 'cc(4,7)', 'c(4,7) על הישר AB', '2c(4,7)']) expect([line, keyOf(submit(line))]).not.toEqual([line, 'teach']);
+  });
+
+  it('the note says why, in both locales', () => {
+    expect(he('noticeTeachPointCase', { canonical: 'C(4,7)' })).toContain('שם של נקודה נכתב באות גדולה');
+    expect(en('noticeTeachPointCase', { canonical: 'C(4,7)' })).toContain("A point's name is written with a capital letter");
+  });
+});
+
 describe('#1774 — «A = (3,5)» is taught, and = never builds (judged q8)', () => {
   it.each([
     ['A = (3,5)', 'A(3,5)'],

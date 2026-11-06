@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3, type ParseResult3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { planeChipsByFact } from '../store/planeChips';
-import { derive3, factLead3, planeEquationGivens3, useGeo3 } from '../store/store3';
+import { claimGivens3, derive3, factLead3, takeLeadFolds3, useGeo3 } from '../store/store3';
 
 const st = () => useGeo3.getState();
 const EQ = 'x+4y-8z-126=0';
@@ -33,7 +33,7 @@ const chips = () => {
 };
 const leads = () => {
   const d = view();
-  const givens = planeEquationGivens3(st().facts, st().seed);
+  const givens = claimGivens3(st().facts);
   return st().facts.map((f) => factLead3(f, d.status[f.id], givens));
 };
 const commands = (r: ParseResult3) => (r.ok ? r.commands : r);
@@ -241,5 +241,29 @@ describe('#1542 Am. 1 — a digit glued to a variable is its coefficient, never 
     expect(c.type).toBe('plane3');
     expect(c.name).toBe(name);
     expect(c.plane.cx.k).toBe(cx);
+
+describe('#1542 — every claim row that moved the figure leads with ● (judged q20, sr-19, ADR-3D-431)', () => {
+  it('«AB = 3» on a free cube is a given', () => {
+    build(["קוביה ABCDA'B'C'D'", 'AB = 3']);
+    expect(leads()).toEqual(['status', 'status']);
+  });
+
+  it('a statement the figure already held keeps its ✓ (that is #2341\'s, unchanged)', () => {
+    build(["קוביה ABCDA'B'C'D'", 'AB = 3', 'AC = 3√2']);
+    expect(leads()[2]).toBe('verified');
+  });
+
+  it('a row only is the memo: a commit pays for its own row, a second read and another seed pay nothing', () => {
+    build(["קוביה ABCDA'B'C'D'", 'AB = 3', 'AC ⟂ BD']);
+    claimGivens3(st().facts);
+    takeLeadFolds3();
+    st().submit("BC = 3");
+    const before = st().facts;
+    claimGivens3(before);
+    expect(takeLeadFolds3()).toBeLessThanOrEqual(1);
+    claimGivens3(before);
+    useGeo3.setState({ seed: 3 });
+    claimGivens3(st().facts);
+    expect(takeLeadFolds3()).toBe(0);
   });
 });

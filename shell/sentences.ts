@@ -41,6 +41,22 @@ const OPEN = '([{';
 const CLOSE = ')]}';
 
 /**
+ * #1775 ([ADR-796](../docs/06-decisions.md#adr-796), [ADR-AG-423](../docs/06c-decisions-analytic.md#adr-ag-423)) — one exam form that
+ * states two givens in one sentence: «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2». Each half reads alone, so the form
+ * is its two halves, two rows. Only this form: «ו» is not a sentence boundary, and nothing else here splits on it.
+ */
+const ON_AND_DIVIDES = /^((?:הנקודה\s+)?([A-Z]\d*)\s+(?:נמצאת\s+)?על\s+הקטע\s+([A-Z]\d*)([A-Z]\d*))\s+ומחלקת\s+אותו\s+ביחס\s+(\S.*)$/;
+
+/** The sentence, or its two halves when it is that form. A stated ratio is its own sentence; a bare one is written over the point. */
+function halves(s: Sentence, next: Sentence | undefined): Sentence[] {
+  const m = s.text.match(ON_AND_DIVIDES);
+  if (!m) return [s];
+  const [, on, point, a, b, ratio] = m;
+  const second = ratio.includes('=') ? ratio : `${a}${point}:${point}${b} = ${ratio}`;
+  return [{ text: on, rest: s.rest }, { text: second, rest: joinSentences(second, next?.rest ?? '') }];
+}
+
+/**
  * WHERE THE SENTENCES ARE — or `null` when the text is one sentence (the caller submits it as today).
  *
  * A boundary is a run of «.», «?», «!» at bracket depth 0, followed by whitespace or the end of the text, with
@@ -87,7 +103,8 @@ export function splitSentences(input: string): Sentence[] | null {
     i = j - 1;
   }
   if (stripFormatControls(input.slice(start)).trim()) push(start, input.length);
-  return out.length >= 2 ? out : null;
+  const read = out.flatMap((s, i) => halves(s, out[i + 1]));
+  return read.length >= 2 ? read : null;
 }
 
 /**

@@ -633,7 +633,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or line («A(1, 2, 3)» · «π: mx + z − 1 = 0» · «A על המישור π» gives m = −2, shown as «m = −2»); one that
   holds for every value leaves it free.
   - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396; #508, #512, #552, #1311, #1439, #1472, #1528.
-- **FR-CL-8 (Must)** — **A plane equation that moved the figure is a given, one that was checked is a claim.** A plane
+- **FR-VC-10 (Must)** — **A segment equation is asked about only when both readings can be true.** As vectors, «AC = 2BD» over «מרובע ABCD» makes the diagonals parallel, which crosses the ring, and a crossed ring is not a quadrilateral. So it builds as lengths with no question, shows «|AC| = 2|BD|» and draws both segments. «AB = DC», a parallelogram as vectors, keeps asking ([ADR-3D-431](06b-decisions-3d.md#adr-3d-431)).
+- **FR-CL-8 (Must)** — **A claim row that moved the figure is a given, one that was checked is a claim** (every claim since [ADR-3D-431](06b-decisions-3d.md#adr-3d-431): «AB = 3» on a free cube leads with ●). **A plane equation that moved the figure is a given, one that was checked is a claim.** A plane
   equation that did not already hold on the figure before its row (a free cube, a cube of a stated side, points the row
   creates) places the plane and shows the status dot ● like every other given. One that held on every sample of the
   figure before its row, the plane already fixed, keeps ✓ «הטענה אומתה מול הציור» (operator 2026-09-29; whether that row

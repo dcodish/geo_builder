@@ -184,7 +184,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «נתונה אליפסה שמשוואתה x²/9−y²/16=1» → "that is a hyperbola, and this tool does not draw those"
 - Sources: ADR-AG-170.
 
-**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form. A letter after its coordinates, «(3,5)A» (right-to-left typing), and an equals sign, «A = (3,5)», are taught, not accepted: «A(3,5)» goes in the input box with a note saying why (ADR-AG-409, #1774). A bare «(3,5)» is taught too, as «נתונה הנקודה (3,5)» (*operator, 2026-11-06: "Teach it"*, ADR-AG-422).
+**R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)* The exam's `A(2;10)` also parses; the comma stays the taught form. A letter after its coordinates, «(3,5)A» (right-to-left typing), and an equals sign, «A = (3,5)», are taught, not accepted: «A(3,5)» goes in the input box with a note saying why (ADR-AG-409, #1774). A bare «(3,5)» is taught too, as «נתונה הנקודה (3,5)» (*operator, 2026-11-06: "Teach it"*, ADR-AG-422). A lowercase «c(4,7)» is taught as «C(4,7)», only when no line of the figure already uses that letter (judged 2026-11-06, ADR-AG-423).
 - Sources: ADR-AG-187, #1618.
 
 **R9 — Picture references are recognised and ignored.** They parse to **nothing**, inline or trailing, and never fall through to `not-handled` (ADR-3D-214 D2).
@@ -235,6 +235,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מעבירים משיק למעגל I דרך הנקודה A ומשיק למעגל II דרך הנקודה B» (the through-phrase after the noun, two tangents in one sentence) → «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B» (ADR-AG-315, #2391)
 - «דרך הנקודה P מעבירים אנך לישר AB» → «הישר העובר דרך הנקודה P מאונך ל-AB», pasted with an exam's bidi marks too; a following «האנך …» means that line, when it is the figure's one perpendicular (ADR-AG-416, #1775)
 - Sources: ADR-AG-150, #1353, ADR-W-030, ADR-AG-206, #1620, ADR-AG-315, ADR-AG-416.
+
+**R253 — a definite noun binds the drawn perpendicular, and two ask which**. *(sr-12, judged 2026-11-06.)* With one perpendicular drawn, «האנך» lands on it. With several, the tool lists each as «האנך מ-P ל-AB», and that sentence lands on the drawn line ([ADR-AG-423](06c-decisions-analytic.md#adr-ag-423)).
 
 **R219 — the book's «מעבירים ישר … ש…» and «הן נקודות על … בהתאמה» are its sentences**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (R114's card); a relative clause with «ש» after the object reads as the one with «ה». «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» (also «… נקודות על …», "A and B are points on … respectively") states what «A ו-B נמצאות על … בהתאמה» states.
 - Sources: ADR-AG-371, #2620.

@@ -117,4 +117,17 @@ describe('#1775 — «האנך» names the one perpendicular the figure drew thr
     expect(v.kind === 'refused' && v.error.key).toBe('ambiguous-shape');
     expect(v.kind === 'refused' && v.error.key === 'ambiguous-shape' && (v.error as { host?: { found: number } }).host?.found).toBe(found);
   });
+
+  it('sr-12 (ADR-AG-423): two ask which, each by the description that reads back', () => {
+    const lines = ['A(0,0)', 'B(4,0)', 'P(1,2)', 'Q(3,3)', 'הישר העובר דרך P מאונך ל-AB', 'הישר העובר דרך Q מאונך ל-AB'];
+    const v = verdict('E על האנך', lines);
+    expect(v.kind === 'refused' && (v.error as { host?: { candidates?: string[] } }).host?.candidates).toEqual(['P:AB', 'Q:AB']);
+    expect(verdict('E על האנך מ-Q ל-AB', lines).kind).toBe('record');
+  });
+
+  it('a line to an axis is called by the axis', () => {
+    const lines = ['C(1,3)', 'D(2,5)', 'האנך מ-C לציר ה-x', 'האנך מ-D לציר ה-x'];
+    const v = verdict('E על האנך', lines);
+    expect(v.kind === 'refused' && (v.error as { host?: { candidates?: string[] } }).host?.candidates).toEqual(['C:x', 'D:x']);
+  });
 });

@@ -19,6 +19,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { claimSeeds } from '../engine/claims';
 import { derive3, useGeo3 } from '../store/store3';
+import { factRowText3 } from '../render/FactRow3';
 
 const st = () => useGeo3.getState();
 const P = "מקבילון ABCDA'B'C'D'";
@@ -91,11 +92,31 @@ describe('#1680 Am. 1 — only ONE reading can hold: it is taken and built, no q
   });
 });
 
+describe('#1848 (judged q1, ADR-3D-431) — a vector reading that crosses a declared ring cannot be true: lengths, no question', () => {
+  it.each([
+    ['AC = 2BD', '|AC| = 2|BD|'],
+    ['AC = BD', '|AC| = |BD|'],
+    ['AB = CD', '|AB| = |CD|'],
+    ['AB = 2CD', '|AB| = 2|CD|'],
+  ])('«מרובע ABCD» · «%s» builds as lengths', (line, row) => {
+    const { err, facts } = run(['מרובע ABCD', line]);
+    expect(err).toBeNull();
+    expect(facts).toBe(2);
+    const d = derive3(st().facts, st().seed);
+    expect(Object.values(d.status).every((x) => x === 'ok')).toBe(true);
+    expect(factRowText3(st().facts[1], new Set(), d.readings[st().facts[1].id]).replace(/[⁦-⁩]/g, '')).toBe(row);
+  });
+
+  it('a parallelogram\'s pair is not crossed: both readings hold, and it keeps asking', () => {
+    for (const line of ['AB = DC', 'AD = BC', 'AB = 2DC']) expect(run(['מרובע ABCD', line]).err).toMatchObject({ code: 'ambiguous-vector-length' });
+  });
+});
+
 describe('#1680 Am. 1 — both readings can hold and DIFFER: it asks, and commits nothing', () => {
   it.each([
     // a parallelogram (vectors) or two equal sides (lengths)
     [['מרובע ABCD', 'AB = DC'], { code: 'ambiguous-vector-length' }],
-    [['מרובע ABCD', 'AB = CD'], { code: 'ambiguous-vector-length' }],
+    [['מרובע ABCD', 'AD = BC'], { code: 'ambiguous-vector-length' }],
     // the engine draws a quadrilateral with A, B, D in line, so both readings build, and they differ
     [['מרובע ABCD', 'AB = 2 AD'], { code: 'ambiguous-vector-length', a1: 'A', b1: 'B', a2: 'A', b2: 'D', c: 2 }],
   ])('%j asks', (lines, expected) => {

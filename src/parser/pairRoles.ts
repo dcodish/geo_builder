@@ -88,6 +88,7 @@ export const PAIR_ALIAS_FIELDS: { [K in keyof Required<ParseContext>]: 'untouche
   midpointOf: 'untouched',
   parallels: 'untouched',
   lines: 'untouched',
+  perpendicularLines: 'untouched',
   polygons: 'untouched',
   declaredPolygons: 'untouched',
   freePoints: 'untouched',

@@ -35,14 +35,8 @@ const QUAD: Command3[] = [{ type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C'
 const keysOf = (c: Construction3) => c.segments.map(([a, b]) => inkKey(a, b)).sort();
 
 describe('#1848 — a stated relation between two lengths draws both segments (3-D)', () => {
-  it.each(STATED_LENGTH_RELATION_INK.filter((r) => !r.asks3d).map((r) => [r.steps.join(' · '), r] as const))('%s', (_name, row) => {
+  it.each(STATED_LENGTH_RELATION_INK.map((r) => [r.steps.join(' · '), r] as const))('%s', (_name, row) => {
     expect(play(row.steps)).toEqual({ verdicts: ['record'], drawn: row.drawn });
-  });
-
-  it('«AC = 2BD» still asks «length or vector?» over points already drawn (ADR-3D-391); the length answer draws both', () => {
-    const row = STATED_LENGTH_RELATION_INK.find((r) => r.asks3d)!;
-    expect(play(row.steps).verdicts).toContain('refused');
-    expect(play(['מרובע ABCD', '|AC| = 2|BD|']).drawn).toEqual(row.drawn); // what the length answer lowers to
   });
 
   it.each(['AD = 2DB', '|AD| = 2|DB|', 'AD:DB = 2:1'])('a ratio that places a rider draws both halves: «%s»', (line) => {

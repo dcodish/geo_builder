@@ -312,6 +312,9 @@ const he = {
   'errHost.none.line': 'אין בשרטוט ישר שהמשפט יכול להתייחס אליו: «{{detail}}». הגדירו קודם את הישר, למשל «הישר l1: y=2x+1».',
   'errHost.many.line': 'יש בשרטוט יותר מישר אחד, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו במשפט את שם הישר, למשל «הישר l1».',
   'errHost.none.perpendicular': 'אין בשרטוט אנך שהמשפט יכול להתייחס אליו: «{{detail}}». הורידו קודם את האנך, למשל «האנך מהנקודה B לציר ה-x».',
+  perpTheNoun: 'האנך',
+  perpCandidate: 'האנך מ-{{from}} ל-{{onto}}',
+  perpCandidateAxis: 'האנך מ-{{from}} לציר ה-{{onto}}',
   'errHost.many.perpendicular': 'יש בשרטוט יותר מאנך אחד, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו מאיזו נקודה ואל איזה ישר, למשל «האנך מהנקודה B לציר ה-x».',
   'errHost.none.polygon': 'אין בשרטוט מצולע שהמשפט יכול להתייחס אליו: «{{detail}}». כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
   'errHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
@@ -683,6 +686,7 @@ const he = {
   // #1774 (ADR-AG-409) — «(3,5)A»: the letter comes first; the sentence is already in the box
   noticeTeachPointOrder: 'שם הנקודה נכתב לפני השיעורים. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   noticeTeachPointEquals: 'נקודה נכתבת בלי סימן שוויון. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
+  noticeTeachPointCase: 'שם של נקודה נכתב באות גדולה. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   noticeTeachPointBare: 'זוג מספרים לבדו אינו משפט. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
@@ -925,6 +929,9 @@ const en: typeof he = {
   'errHost.none.line': 'There is no line in your figure for this sentence to refer to: «{{detail}}». Define the line first, e.g. «line l1: y=2x+1».',
   'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: «{{detail}}». Name the line, e.g. «line l1».',
   'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: «{{detail}}». Drop the perpendicular first, e.g. «the perpendicular from B to the x-axis».',
+  perpTheNoun: 'the perpendicular',
+  perpCandidate: 'the perpendicular from {{from}} to {{onto}}',
+  perpCandidateAxis: 'the perpendicular from {{from}} to the {{onto}}-axis',
   'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: «{{detail}}». Say from which point and onto which line, e.g. «the perpendicular from B to the x-axis».',
   'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
   'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
@@ -1235,6 +1242,7 @@ const en: typeof he = {
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   noticeTeachPointOrder: "A point's letter comes before its coordinates. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
   noticeTeachPointEquals: 'A point is written without an equals sign. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
+  noticeTeachPointCase: "A point's name is written with a capital letter. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.",
   noticeTeachPointBare: 'A pair of numbers alone is not a sentence. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',

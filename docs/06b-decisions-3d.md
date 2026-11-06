@@ -13839,7 +13839,7 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 
 ## ADR-3D-391 — One reading for an unmarked segment equation: a sentence that defines a point or places a rider is a vector, every other one asks, and a rider is never refuted as arithmetic (#1680, #1783)
 
-**Status:** accepted · 2026-10-29 · **amended 2026-10-30 (Am. 1, below: ask only when both readings hold and differ) and 2026-10-31 (Am. 2: a sentence whose vector reading cannot hold is a length statement; a length-read row shows the length spelling)** · feature (3d) · fix round #2602 · branch `feat/1680-length-or-vector` · **amends** [ADR-3D-249](#adr-3d-249) (its "five conditions") · the 3-D half of the [ADR-W-108](06w-decisions-workspace.md#adr-w-108) amendment (family X12) · **LADDER stage:** the apply-boundary pre-gate (outermost `applyCommand3`); the store's claim verdict for the rider arm
+**Status:** accepted · 2026-10-29 · **amended 2026-10-30 (Am. 1, below: ask only when both readings hold and differ) and 2026-10-31 (Am. 2: a sentence whose vector reading cannot hold is a length statement; a length-read row shows the length spelling)** · **⚠ Partly superseded by [ADR-3D-431](#adr-3d-431) (2026-11-06):** a vector reading that crosses a declared ring cannot hold, so «מרובע ABCD» · «AB = CD» no longer asks · feature (3d) · fix round #2602 · branch `feat/1680-length-or-vector` · **amends** [ADR-3D-249](#adr-3d-249) (its "five conditions") · the 3-D half of the [ADR-W-108](06w-decisions-workspace.md#adr-w-108) amendment (family X12) · **LADDER stage:** the apply-boundary pre-gate (outermost `applyCommand3`); the store's claim verdict for the rider arm
 **Operator:** rulings on #1680 — 2026-10-04 (*"keep asking"*, a deliberate 3-D exception; and *"ask too"*: «AB = AC», «AB = CD», «AB = 2AD», «AB = ½CD» ask, a vector only when marked); 2026-10-13 card 12, option A (*"A new point or a point on a segment never asks"*, «AK = AD» builds like «AK = 2AD»; *"Every other unmarked segment equation keeps asking"*); 2026-10-13 card 11 («E על AA'» · «AE = AB» keeps asking: *"the 'point on a segment never asks' exemption applies only when the vector reading can hold"*). #1783's plan (2026-10-06) is built inside it, as it asked.
 **Requirements:** [02b](02b-requirements-3d.md) FR-VC-1a (an unmarked segment equation is read by what it does to the figure) · **Design:** [04b](04b-design-3d.md) § "A rider's ratio clause is read by the RIDER" (the directed `vec-rel` and the one reading)
 
@@ -14867,7 +14867,7 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 
 ## ADR-3D-429 — A plane's equation is read in every spelling of the sentence; a row that moved the figure is a given (#1542)
 
-**Status:** accepted · 2026-11-06 · bug (P2, 3d) · fix round #2727, stream D · branch `fix/1542-plane-equation-sentence` from `main` @ `c0029d25` · plan armed `auto-ok` 2026-10-04 · **amends** [ADR-3D-423](#adr-3d-423) (the twin reads a plane's equation)
+**Status:** accepted · 2026-11-06 · bug (P2, 3d) · fix round #2727, stream D · branch `fix/1542-plane-equation-sentence` from `main` @ `c0029d25` · plan armed `auto-ok` 2026-10-04 · **amends** [ADR-3D-423](#adr-3d-423) (the twin reads a plane's equation) · **⚠ Partly superseded by [ADR-3D-431](#adr-3d-431) (2026-11-06):** the lead reads every claim row, and `planeEquationGivens3` is `claimGivens3`
 **Requirements:** [02b](02b-requirements-3d.md) FR-EQ-9 (new), FR-CL-8 (new), FR-SP-19a · **Design:** [04b](04b-design-3d.md) § "Stated numbers restated", "A row's lead", "One plane head" · **Ladder:** none: a parser head, the twin rule and a view read; no solve stage changes
 
 **Operator:** 2026-09-29: *"משוואת מישור A'B'C'D' היא x+4y-8z-126=0 doesnt show the chip to to play with the plane view. also - did this go to llm?"*. Rulings the same day: Q1 *the equation declares*: the row owns the chip unless an earlier row declared the plane. Q2: when the equation moved the figure the row shows ●; ✓ is kept only when the plane was already fixed and the equation was genuinely checked. 2026-11-02, [ADR-W-175](06w-decisions-workspace.md#adr-w-175) sr-19: *"No ✓ "verified" ever appears on a given."*
@@ -14917,3 +14917,26 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Locks.** `src3d/__tests__/issue-1549-cos-spelling.test.tsx`, on rendered markup: both cos spellings, card ≡ strip, the perpendicular and shape guards, the twin, a saved file without the field, the root fraction, the panel row. `fixtures3.test.ts`'s drift net now compares stated commands on both sides. Fixture `fixtures3/cos-row-arrows-1549.geo3.json`.
 
 **Behaviour change for a student:** a line typed as «cos(AB,AD)=0» now shows arrows on its row and in the strip. A perpendicularity and a right-angled shape stay plain. In the data panel, a stated vector's arrow now spans the whole name.
+
+## ADR-3D-431 — Found under the judge's rulings: a claim row that moved the figure leads with ● (#1542)
+
+**Status:** accepted · 2026-11-06 · judged · bug (3d) · fix round #2727, stream F · branch `fix/2727-found-rulings` · **partly supersedes [ADR-3D-429](#adr-3d-429)**
+**Requirements:** [02b](02b-requirements-3d.md) FR-CL-8, FR-VC-10 · **Design:** [04b](04b-design-3d.md) § "A row's lead", § "A rider's ratio clause is read by the RIDER" · **Ladder:** none: a view read, and the store's reading trial
+
+**1. The lead (q20).** sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given."* ADR-3D-429 read that for a plane equation; the reader was general. `planeEquationGivens3` becomes `claimGivens3` and asks every claim of a row, so «AB = 3» on a free cube leads with ●. A statement the figure already held keeps today's ✓: whether it has a row at all is #2341's.
+
+**Cost, measured.** One fold of the prefix per claim row. A 24-row figure with 12 claim rows on a cube: one `derive3` of the whole list 190 ms, the cold pass 957 ms and 12 folds, the warm pass 0.015 ms and 0 folds. Cold is what opening a saved figure pays once, and what an edit of the first row pays. So the verdict is memoised on a trie keyed on the fact objects: a store action reuses every unchanged fact, so a commit pays for its own row only. It is asked at seed 0, because `verifyClaim` asks every sample and the answer is the facts': «הציגו תצורה אחרת» pays nothing, and a row's mark cannot change on a press. A view read, never part of `derive3`.
+
+**Locks.** `src3d/__tests__/issue-1542.test.ts`, with the counter seam `takeLeadFolds3`.
+
+**Behaviour change for a student:** a claim row that placed or sized the figure, such as «AB = 3» on a free cube, shows ● where it showed ✓.
+
+**2. No question when only one reading can be true (q1, #1848).** **Judged:** *"in general, if something is not sure if its a vecotor or length, we should ask if both can be true and if only one can be true, we will assume this is the case"* (2026-10-30), with *"a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration"* (2026-10-08). **Class.** *The vector trial of a segment equation read only its own line's status, so a reading that made an earlier line false still counted as a reading that can be true.* `readSegmentEquation3`'s trial asked `status[line]`. The fold's `ring-crossed` verdict lands on the DECLARING row: measured, «מרובע ABCD» · «AC⃗ = 2BD⃗» reads `status = [ring-crossed, ok]` at seeds 0, 1 and 2. The trial now also fails when the vector reading adds a `ring-crossed` row, and Am. 2's path takes the length reading, showing «|AC| = 2|BD|» and drawing both segments. Nothing matches a sentence.
+
+**Measured, 3-D on «מרובע ABCD».** No longer asks: «AC = 2BD», «AC = BD», **«AB = CD»** (named in the 2026-10-04 "ask too" ruling, so a Heads-up), «AB = 2CD», and the same on «טרפז ABCD». Still asks: «AB = DC», «AD = BC», «AB = 2DC» (the ring is simple as vectors). «AB = 2 AD» still asks: as vectors A, D, B lie in line, which the fold accepts, and the ruling is about a crossed ring, so a collapsed one is left as it is.
+
+**Limit.** The marked «AC⃗ = 2BD⃗» is unchanged: this ruling does not decide what it should do. Family X12's example is now «AB = DC».
+
+**Locks.** `src3d/__tests__/issue-1680-segment-equation.test.ts`; parity rows `cat-2d-075`, `cat-2d-075b`, `length-only-reading-1848`; `shell/__tests__/fixtures/stated-length-relation-ink.ts`.
+
+**Behaviour change for a student:** «מרובע ABCD» · «AC = 2BD» builds as lengths with no question, and so does «AB = CD». The old question asked about a reading that could not be true.

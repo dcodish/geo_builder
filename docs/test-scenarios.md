@@ -2287,3 +2287,15 @@ over all four (ADR-041).
 ### `stated-ratio-draws-both-1848` — «מרובע ABCD» · «AC = 2BD»: a stated ratio between two lengths draws AC and BD (#1848, ADR-794)
 
 **Guards against:** the same sentence with a 2 in it leaving the compared segments off the figure. **Asserts** every step green, AC and BD drawn, and |AC|/|BD| = 2.
+### `parallel-relation-rider-2231` — «משולש ABC» · «M על AC» · «MK ∥ AB»: the relation, drawn (#2231, ADR-796)
+
+**Guards against:** the false refusal «cannot place M» on a sentence K can carry. **Asserts** every step green and MK ∥ AB.
+### `parallel-relation-rider-square-2231` — «ריבוע ABCD» · «G על AD» · «GK ∥ AB»: K carries the relation (#2231, ADR-796)
+
+**Guards against:** the same refusal where G's slide has no root. **Asserts** every step green, GK ∥ AB, and G keeps its slide.
+### `bare-perpendicular-binds-1775` — «דרך P מעבירים אנך ל-AB» · «האנך חותך את AC בנקודה E»: the noun binds the drawn perpendicular (#1775, ADR-796)
+
+**Guards against:** a definite noun going to the model beside the one object it names. **Asserts** every step green, PE ⟂ AB, E on AC.
+### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
+
+**Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.

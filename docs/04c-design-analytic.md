@@ -408,6 +408,7 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 A relative clause written with «ש» at the head of the rest («ישר l1 שמקביל ל-PO») is read as the «ה» clause
 (`SHE_RELATIVE`, in `predicate`), and «ישר» takes a line's own name (`LINE_LABEL_AFTER_NOUN`): through a point it is
 taught as «דרך N עובר ישר l1 …» ([ADR-AG-371](06c-decisions-analytic.md#adr-ag-371), #2620 C).
+Several drawn perpendiculars ask which: `on-kind perpendicular` carries each as `from:onto` on `host.candidates`, `errorText` words it, and «האנך מ-P ל-AB» binds the drawn line through P ([ADR-AG-423](06c-decisions-analytic.md#adr-ag-423)).
 Through a point, the noun «אנך» is the LINE: `case 'אנך'` teaches «הישר העובר דרך … מאונך …», and M1's `on-kind perpendicular` counts `isPerpendicularLine` beside the feet, so bare «האנך» reaches it. `imperativeCandidates` strips format controls first, because a single sentence reaches it as typed ([ADR-AG-416](06c-decisions-analytic.md#adr-ag-416), #1775).
 `pointSpelling` (`app/pointOrder.ts`) teaches a point in a spelling the book does not use: «(3,5)A», «A = (3,5)» and a bare «(3,5)» ([ADR-AG-422](06c-decisions-analytic.md#adr-ag-422), #1774).
 `confirmTaught(lines, seed)` (`app/submit.ts`) is what the 471 ratchet calls.

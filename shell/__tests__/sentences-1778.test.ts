@@ -47,6 +47,16 @@ describe('#1778 — splitSentences: a sentence end, and only a sentence end', ()
     expect(splitSentences(input)).toBeNull();
   });
 
+  it('#1775: «X על הקטע AB ומחלקת אותו ביחס …» is its two halves, and nothing else splits on «ו»', () => {
+    const texts = (s: string) => splitSentences(s)?.map((x) => x.text) ?? null;
+    expect(texts('הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2')).toEqual(['הנקודה P נמצאת על הקטע AB', 'AP:PB = 1:2']);
+    expect(texts('P על הקטע AB ומחלקת אותו ביחס 1:2')).toEqual(['P על הקטע AB', 'AP:PB = 1:2']);
+    expect(texts(`הנקודה ${LRM}P${LRM} נמצאת על הקטע ${LRM}AB${LRM} ומחלקת אותו ביחס 1:2.`)).toEqual(['הנקודה P נמצאת על הקטע AB', 'AP:PB = 1:2']);
+    expect(texts('P על הקטע AB ומחלקת אותו ביחס 1:2. C(1,1)')).toEqual(['P על הקטע AB', 'AP:PB = 1:2', 'C(1,1)']);
+    expect(splitSentences('P על הקטע AB ומחלקת אותו ביחס 1:2. C(1,1)')![1].rest).toBe('AP:PB = 1:2. C(1,1)');
+    for (const other of ['P על הקטע AB ו-Q על הקטע CD', 'P על AB ומחלקת אותו ביחס 1:2', 'הנקודה P נמצאת על הקטע AB ומאונכת ל-CD']) expect(texts(other)).toBeNull();
+  });
+
   it('each sentence carries the paste from it on, as typed: what the box holds when the chain stops there', () => {
     const s = splitSentences(`משולש ${LRM}ABC${LRM}. שלום. M אמצע BC.`)!;
     expect(s.map((x) => x.rest)).toEqual([`משולש ${LRM}ABC${LRM}. שלום. M אמצע BC.`, 'שלום. M אמצע BC.', 'M אמצע BC.']);

@@ -13,8 +13,6 @@
 export interface InkRow {
   steps: readonly string[];
   drawn: readonly string[];
-  /** a sentence 3-D reads only once the student answers its «length or vector?» question (ADR-3D-391) */
-  asks3d?: boolean;
 }
 
 const QUAD = 'מרובע ABCD';
@@ -25,7 +23,7 @@ export const STATED_LENGTH_RELATION_INK: readonly InkRow[] = [
   { steps: [ISO_TRAPEZOID, '|AC| = |BD|'], drawn: BOTH }, // the operator's report
   { steps: [QUAD, '|AC| = |BD|'], drawn: BOTH },
   { steps: [QUAD, '|AC| = 2|BD|'], drawn: BOTH },
-  { steps: [QUAD, 'AC = 2BD'], drawn: BOTH, asks3d: true },
+  { steps: [QUAD, 'AC = 2BD'], drawn: BOTH },
   { steps: [QUAD, 'AC:BD = 2:1'], drawn: BOTH },
   { steps: [QUAD, 'AC/BD = 2'], drawn: BOTH },
   { steps: [ISO_TRAPEZOID], drawn: [] }, // #1844: the noun's own condition names no diagonal

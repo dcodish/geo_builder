@@ -6393,6 +6393,56 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(at(fig, 'A'), at(fig, 'C')) / dist(at(fig, 'B'), at(fig, 'D')), 'the ratio holds').toBeCloseTo(2, 6);
     },
   },
+  {
+    id: 'parallel-relation-rider-2231',
+    title: '«משולש ABC» · «M על AC» · «MK ∥ AB»: the relation, drawn (#2231, ADR-796)',
+    guards:
+      'Judged 2026-11-06 (q4), on the rule of 2026-10-09 "Refuse only when nothing the student wrote can save it". K can carry the relation, so the line is never refused «cannot place M on segment AC».',
+    steps: ['משולש ABC', 'M על AC', 'MK ∥ AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, M, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'M'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - M.x) * uy - (K.y - M.y) * ux) / (dist(M, K) * dist(A, B)), 'MK ∥ AB').toBeLessThan(1e-5);
+    },
+  },
+  {
+    id: 'parallel-relation-rider-square-2231',
+    title: '«ריבוע ABCD» · «G על AD» · «GK ∥ AB»: the rider has no position that holds it, K carries it (#2231, ADR-796)',
+    guards: "The seat that was refused at the round tip: K's default gives G no root on AD, so the slide alone had no figure (q4, 2026-11-06).",
+    steps: ['ריבוע ABCD', 'G על AD', 'GK ∥ AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, G, K] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'G'), at(fig, 'K')];
+      const [ux, uy] = [B.x - A.x, B.y - A.y];
+      expect(Math.abs((K.x - G.x) * uy - (K.y - G.y) * ux) / (dist(G, K) * dist(A, B)), 'GK ∥ AB').toBeLessThan(1e-5);
+      expect(fig.construction.objects.find((o) => o.id === 'G'), 'G keeps its slide').toMatchObject({ kind: 'on-segment', free: true });
+    },
+  },
+  {
+    id: 'bare-perpendicular-binds-1775',
+    title: '«דרך P מעבירים אנך ל-AB» · «האנך חותך את AC בנקודה E»: the noun binds the drawn perpendicular (#1775, ADR-796)',
+    guards: 'Judged 2026-11-06 (q15), sr-12: a definite noun binds the drawn object of its kind, in every builder. 2-D sent the line to the model.',
+    steps: ['משולש ABC', 'P על AB', 'דרך P מעבירים אנך ל-AB', 'האנך חותך את AC בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, P, E] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'C'), at(fig, 'P'), at(fig, 'E')];
+      expect(Math.abs((E.x - P.x) * (B.x - A.x) + (E.y - P.y) * (B.y - A.y)) / (dist(E, P) * dist(A, B)), 'PE ⟂ AB').toBeLessThan(1e-6);
+      expect(Math.abs((E.x - A.x) * (C.y - A.y) - (E.y - A.y) * (C.x - A.x)) / (dist(E, A) * dist(A, C)), 'E on AC').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'bare-perpendicular-asks-1775',
+    title: 'Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)',
+    guards: 'sr-12, "With two, the tool asks which, using the existing question". The answer reads, and it lands on the drawn line.',
+    steps: ['משולש ABC', 'P על AB', 'Q על AC', 'דרך P מעבירים אנך ל-AB', 'דרך Q מעבירים אנך ל-AC', 'E על האנך', 'E על האנך מ-Q ל-AC'],
+    refusedSteps: [{ step: 6, reason: 'ambiguous-construct', with: { noun: 'האנך', options: ['האנך מ-P ל-AB', 'האנך מ-Q ל-AC'] }, why: 'sr-12 (ADR-W-175): two drawn perpendiculars ask which' }],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, C, Q, E] = [at(fig, 'A'), at(fig, 'C'), at(fig, 'Q'), at(fig, 'E')];
+      expect(Math.abs((E.x - Q.x) * (C.x - A.x) + (E.y - Q.y) * (C.y - A.y)) / (dist(E, Q) * dist(A, C)), 'QE ⟂ AC').toBeLessThan(1e-6);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

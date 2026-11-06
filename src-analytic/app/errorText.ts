@@ -185,7 +185,13 @@ const SIDE_WORD_KEY = { above: 'sideWordAbove', below: 'sideWordBelow', right: '
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
   const host = error.key === 'ambiguous-shape' ? error.host : undefined;
-  const candidates = host?.candidates ?? [];
+  // #1775 (ADR-AG-423): a perpendicular's candidate is its description, `from:onto`, worded here. The engine holds no locale.
+  const perpendicular = host?.kind === 'perpendicular';
+  const candidates = (host?.candidates ?? []).map((n) => {
+    if (!perpendicular) return n;
+    const [from, onto] = n.split(':');
+    return t(onto === 'x' || onto === 'y' ? 'perpCandidateAxis' : 'perpCandidate', { from, onto });
+  });
   // The noun a candidate's name follows is the HOST's kind when a host is carried (a curve kind there).
   const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind === 'perpendicular' ? 'line' : (host.kind as RefKind)) : (kind ?? 'curve');
   const theNoun = t(THE_NOUN_KEY[nounKind]);
@@ -328,9 +334,11 @@ export function errorText(error: InputError, t: Translate): string {
     claimed: t(KIND_NOUN_KEY[kind ?? 'curve']),
     noun: t(KIND_NOUN_KEY[kind ?? 'curve']),
     numNoun: t(NUMERAL_NOUN_KEY[kind ?? 'curve']),
-    candidates: candidates.map((n, i) => `${nounOf(i)} ${n}`).join(', '),
+    candidates: (perpendicular ? candidates : candidates.map((n, i) => `${nounOf(i)} ${n}`)).join(', '),
     example: candidates.length > 0
-      ? ambiguousCurveExample(error.detail, nounOf(0), candidates[0])
+      ? perpendicular
+        ? error.detail.replace(t('perpTheNoun'), candidates[0])
+        : ambiguousCurveExample(error.detail, nounOf(0), candidates[0])
       : 'example' in error ? (error.example ?? '') : '',
     found: host ? host.found : 0,
     options: error.key === 'ambiguous-angle' && error.options

@@ -177,6 +177,9 @@ function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed:
  *   and write them as such"*). A length reading that cannot hold either goes through the ordinary length path and
  *   gets that path's own verdict — the contradiction naming the statement — so no sentence is ever asked about
  *   when only one of its readings was ever possible.
+ * - a vector reading that CROSSES a declared ring cannot hold either (ADR-3D-431, judged q1): the fold's own `ring-crossed`
+ *   verdict lands on the declaring row, not on this line, so the trial reads the whole list. «מרובע ABCD» · «AC = 2BD» as
+ *   vectors makes the diagonals parallel, and a crossed ring is not a quadrilateral (#1927). «AB = DC» is not crossed and asks.
  * The trials run at one canonical seed, so a line's reading never changes with «הציגו תצורה אחרת»; the verdict
  * depends only on the list up to the line, so a later line never re-reads an earlier one. Memoized by that prefix.
  */
@@ -190,7 +193,12 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
   const trial = (reading: SegmentEquationReading3): Derived3 | null => {
     const forced: Fact3 = { ...line, cmds: line.cmds.map((k, i) => (i === at && k.type === 'vec-rel' ? { ...k, reading } : k)) };
     const d = deriveCore3([...prefix.slice(0, -1), forced], READING_SEED, true);
-    return d.status[line.id] === 'ok' ? d : null;
+    if (d.status[line.id] !== 'ok') return null;
+    if (reading === 'vector') {
+      const crossed = (of: Derived3): number => Object.values(of.status).filter((s) => s !== 'ok' && s !== 'disabled' && s.code === 'ring-crossed').length;
+      if (crossed(d) > 0 && crossed(d) > crossed(deriveCore3(prefix.slice(0, -1), READING_SEED, true))) return null;
+    }
+    return d;
   };
   const asVector = trial('vector');
   const asLength = asVector ? trial('length') : null; // Am. 2: with no vector reading, the length one is taken as is
@@ -2746,32 +2754,63 @@ function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: number, fact: 
   return [...enabled].reverse().find(names) ?? enabled[enabled.length - 1] ?? null;
 }
 
+/** One step of the fact list, by object identity, so a prefix shared between two commits is one node (the claim-lead memo). */
+interface LeadNode3 {
+  next: WeakMap<Fact3, LeadNode3>;
+  /** Did this row's claims all hold on the figure before it? Unset until asked. */
+  held?: boolean;
+}
+const leadRoot3: LeadNode3 = { next: new WeakMap() };
+let leadFolds3 = 0;
+/** The memo's counter lock seam (the 2-D `conflictSearchStats` idiom): how many rows paid a fold since the last read. */
+export function takeLeadFolds3(): number {
+  const n = leadFolds3;
+  leadFolds3 = 0;
+  return n;
+}
+
 /**
- * #1542 (ADR-3D-429, operator ruling Q2, 2026-09-29) — THE ROWS WHOSE PLANE EQUATION WAS A GIVEN, NOT A CHECK. A plane
- * equation is a pin and a claim (ADR-3D-030): *"When the plane equation moved the figure (it pinned), the row is a given
- * and shows ● like every other given. ✓ ... is kept only when the plane was already fixed and the equation was genuinely
- * checked against the figure."*
+ * #1542 (ADR-3D-429, operator ruling Q2, 2026-09-29; widened by ADR-3D-431, sr-19) — THE CLAIM ROWS THAT WERE A GIVEN, NOT A
+ * CHECK. A claim that pins is a pin and a claim (ADR-3D-030): *"When the plane equation moved the figure (it pinned), the row
+ * is a given and shows ● like every other given."* sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given."* So it is
+ * every claim row, not only a plane equation: «AB = 3» on a free cube is a given.
  *
- * Judged on the figure before the row, the way `knownSegmentEquationTwin3` judges: the equation was CHECKED when it
- * already held there in every sample (`verifyClaim`), and otherwise the row is what made it true. Not `freeDims` or
+ * Judged on the figure before the row, the way `knownSegmentEquationTwin3` judges: the claim was CHECKED when it already held
+ * there in every sample (`verifyClaim`), and otherwise the row is what made it true. Not `freeDims` or
  * `statementReachesFreeDof3`: those ask what COULD move, and a cube of a stated side still floats in space while a cube
- * fixed by its vertices still counts its side. A view read, never part of `derive3`: only a row wearing a mark pays.
+ * fixed by its vertices still counts its side. A view read, never part of `derive3`.
+ *
+ * COST. One fold of the prefix per claim row, so it is memoised: the walk descends a trie keyed on the fact OBJECTS (a store
+ * action reuses every unchanged fact), and a row's verdict lives on its node. A commit pays for the new row only; an edit
+ * pays for the claim rows after it. `verifyClaim` asks every sample, so the answer is the facts', not the display seed's: it is
+ * asked at seed 0, «הציגו תצורה אחרת» pays nothing, and a row's mark never changes on a press. Measured in ADR-3D-431.
  */
-export function planeEquationGivens3(facts: readonly Fact3[], seed: number): ReadonlySet<string> {
+export function claimGivens3(facts: readonly Fact3[]): ReadonlySet<string> {
   const givens = new Set<string>();
+  let node = leadRoot3;
   facts.forEach((f, i) => {
-    const said = f.enabled ? f.cmds.flatMap((k) => (k.type === 'claim' && k.claim.type === 'plane-eq' ? [k.claim] : [])) : [];
+    let step = node.next.get(f);
+    if (!step) {
+      step = { next: new WeakMap() };
+      node.next.set(f, step);
+    }
+    node = step;
+    const said = f.enabled ? f.cmds.flatMap((k) => (k.type === 'claim' ? [k.claim] : [])) : [];
     if (said.length === 0) return;
-    const before = derive3(facts.slice(0, i) as Fact3[], seed).construction;
-    if (!said.every((claim) => verifyClaim(claim, before, seed))) givens.add(f.id);
+    if (step.held === undefined) {
+      leadFolds3++;
+      const before = derive3(facts.slice(0, i) as Fact3[], 0).construction;
+      step.held = said.every((claim) => verifyClaim(claim, before, 0));
+    }
+    if (!step.held) givens.add(f.id);
   });
   return givens;
 }
 
 /** The mark a row leads with: ✓ for a claim verified against the figure, else the status dot (a row's whole rule, so a
- *  test reaches it). A row holding only a plane equation that drove the figure is a given ({@link planeEquationGivens3}). */
-export function factLead3(f: Pick<Fact3, 'id' | 'cmds'>, status: FactStatus3 | undefined, planeGivens: ReadonlySet<string>): 'verified' | 'status' {
-  return status === 'ok' && f.cmds.some((k) => k.type === 'claim') && !planeGivens.has(f.id) ? 'verified' : 'status';
+ *  test reaches it). A row whose claim drove the figure is a given ({@link claimGivens3}). */
+export function factLead3(f: Pick<Fact3, 'id' | 'cmds'>, status: FactStatus3 | undefined, claimGivens: ReadonlySet<string>): 'verified' | 'status' {
+  return status === 'ok' && f.cmds.some((k) => k.type === 'claim') && !claimGivens.has(f.id) ? 'verified' : 'status';
 }
 
 /**

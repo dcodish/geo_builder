@@ -196,7 +196,7 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     patterns: [/(?:רדיוס\S*|radius)\s+[A-QS-Z](?![A-Za-z0-9₀-₉_'])/, /[=+−-]\s*\d*[A-QS-Z](?![A-Za-z0-9₀-₉_'])\s*$/],
   },
   X12: {
-    title: 'a bare XY = k·ZW whose vector and length readings both hold and differ asks length-or-vector in 3-D («מרובע ABCD» · «AB = CD»)',
+    title: 'a bare XY = k·ZW whose vector and length readings both hold and differ asks length-or-vector in 3-D («מרובע ABCD» · «AB = DC»)',
     reason:
       'operator rulings 2026-10-04 and 2026-10-13 on #1680 (ADR-3D-391, ADR-W-108 Am.): 3-D is the builder with vectors, so an unmarked segment equation over points already drawn asks «length or vector?»; one that defines a new point builds. Narrowed by the operator rule of 2026-10-30 on PR #2605 (ADR-3D-391 Am. 1): it asks only when BOTH readings can hold and give different figures; where only the length reading can hold («משולש ABC» · «AB = AC», «D על AB» · «AD = 3BD») 3-D builds like 2-D. 2-D and analytic have no vector reading (X7) and read equal lengths',
     products: ['2d', 'analytic'],
@@ -601,6 +601,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
   // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
   { id: 'perp-piece-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB'], expect: 'builds', note: 'the relation in every builder: K is not assumed on AB (operator ruling 2026-11-06, ADR-795, ADR-AG-421)' },
+  { id: 'parallel-rider-2231', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK ∥ AB'], expect: 'builds', note: 'the relation in every builder, drawn: K carries it when the rider has no position (judged 2026-11-06, ADR-796)' },
+  { id: 'parallel-rider-square-2231', family: 'cevians-centres', steps: ['ריבוע ABCD', 'G על AD', 'GK ∥ AB'], expect: 'builds', note: 'the same sentence where G has no position that holds it: the seat 2-D refused (ADR-796)' },
+  { id: 'bare-perp-binds-1775', family: 'cevians-centres', steps: ['משולש ABC', 'P על AB', 'הישר העובר דרך הנקודה P מאונך ל-AB', 'האנך חותך את AC בנקודה E'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'sr-12: «האנך» binds the one drawn perpendicular (judged 2026-11-06, ADR-796, ADR-AG-423); 3-D reads no drawn line through a point in this frame' },
+  { id: 'bare-perp-asks-1775', family: 'cevians-centres', steps: ['משולש ABC', 'P על AB', 'Q על AC', 'הישר העובר דרך הנקודה P מאונך ל-AB', 'הישר העובר דרך הנקודה Q מאונך ל-AC', 'E על האנך'], expect: 'asks', knownGap: [{ product: '3d' }], note: 'sr-12: two drawn perpendiculars ask which, each builder with its existing question' },
   { id: 'perp-foot-stated-2232', family: 'cevians-centres', steps: ['משולש ABC', 'M על AC', 'MK אנך ל-AB בנקודה K'], expect: 'builds', knownGap: [{ product: '3d' }], note: 'K is the foot, because the sentence says so; 3-D does not read the clause (it reaches the AI), and it has no «רגל האנך» sentence either (#1679)' },
   { id: 'perp-to-base-flat-1944', family: 'cevians-centres', steps: ['משולש ABC', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }] },
   { id: 'perp-to-base-trapezoid-1944', family: 'cevians-centres', steps: ['טרפז ABCD', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic' }], note: 'the foot drops on the PARALLEL base (CD in 2-D, DC in 3-D), not on the first side of the ring' },
@@ -627,7 +631,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-072', family: 'area-perimeter', steps: ['נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-073', family: 'area-perimeter', steps: ['משולש ABC', 'היקף המשולש ABC = 20'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-074', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds' },
-  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', exception: 'X12' },
+  { id: 'cat-2d-075', family: 'lengths', steps: ['מרובע ABCD', 'AB = CD'], expect: 'builds', note: 'as vectors the ring crosses, so only the length reading can be true: no question in 3-D either (judged 2026-11-06, ADR-3D-431)' },
+  { id: 'cat-2d-075b', family: 'lengths', steps: ['מרובע ABCD', 'AB = DC'], expect: 'builds', exception: 'X12' },
+  { id: 'length-only-reading-1848', family: 'lengths', steps: ['מרובע ABCD', 'AC = 2BD'], expect: 'builds', note: 'the diagonals as vectors would cross the ring (judged 2026-11-06, ADR-3D-431)' },
   { id: 'cat-2d-076', family: 'lengths', steps: ['מרובע ABCD', 'AB = 2 AD'], expect: 'builds', exception: 'X12' },
   { id: 'cat-2d-077', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'AD:DB = 1:2'], expect: 'builds' },
   { id: 'cat-2d-078', family: 'midpoint-ratio', steps: ['מרובע ABCD', 'G מחלקת את DC ביחס 1:2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -775,13 +781,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1620 S2 (ADR-AG-207): the perpendicular from a point, its foot, the line through a point cutting a side.
   { id: 'an-1620-perp-01', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מ-C ל-AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-02', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מהקודקוד C לצלע AB חותך אותה בנקודה D'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-03', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
+  { id: 'an-1620-perp-03', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-04', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'דרך E עובר ישר מקביל ל-AC החותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-05', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-06', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
-  { id: 'an-1620-perp-06b', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'EF ∥ AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }], note: 'a bare pair mints its new end (#1670 row 4, ADR-AG-210)' },
-  { id: 'an-1620-perp-06c', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-06d', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר EF מקביל ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
+  { id: 'an-1620-perp-06', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], expect: 'builds' },
+  { id: 'an-1620-perp-06b', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'EF ∥ AC'], expect: 'builds', note: 'a bare pair mints its new end (#1670 row 4, ADR-AG-210)' },
+  { id: 'an-1620-perp-06c', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'an-1620-perp-06d', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר EF מקביל ל-AC'], expect: 'builds' },
   { id: 'an-1620-perp-07', family: 'tangents', steps: ['מעגל O', 'A על המעגל', 'המשיק למעגל בנקודה A', 'משולש BCE', 'האנך מ-B ל-CE', 'המשיק והאנך נחתכים בנקודה D'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
 
   // ── #1620 S7 (ADR-AG-213): the two tangents meet — 01–06 agree with 2-D; 08–13 are analytic-ahead (2-D owes them, #1677) ──
@@ -1176,6 +1182,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
   { id: 'ex-coordinate-letter-after-1774', family: 'topic', steps: ['(3,5)A'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: right-to-left typing, taught as A(3,5) (ADR-W-030)' },
   { id: 'ex-coordinate-equals-1774', family: 'topic', steps: ['A = (3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-409: never accepted, taught as A(3,5) (ADR-W-030, ruling 2026-09-19 on #1245)' },
+  { id: 'ex-coordinate-case-1808', family: 'topic', steps: ['c(4,7)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-423: taught as «C(4,7)» (judged q13 under ADR-W-030)' },
   { id: 'ex-coordinate-bare-1774', family: 'topic', steps: ['(3,5)'], expect: 'asks', exception: 'X1', only: ['analytic'], note: 'ADR-AG-422: taught as «נתונה הנקודה (3,5)» (the operator, 2026-11-06: "Teach it")' },
   { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },

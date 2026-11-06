@@ -15665,7 +15665,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 
 ## ADR-AG-416 — «דרך הנקודה P מעבירים אנך לישר AB» is taught as the line through P, and «האנך» names that line (#1775)
 
-**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic + 2-D, `reported`) · round #2727 · branch `fix/1775-construction-imperative` from `main` @ `c0029d25` · the operator's revised arms of 2026-10-05 on #1775; ADR-W-030; his ruling of 2026-10-01 on #1620
+**Date:** 2026-11-06 · **Status:** accepted · **⚠ Partly superseded by [ADR-AG-423](#adr-ag-423) (2026-11-06):** Decision 3's several perpendiculars ask which, they are not refused by count · bug (P2, analytic + 2-D, `reported`) · round #2727 · branch `fix/1775-construction-imperative` from `main` @ `c0029d25` · the operator's revised arms of 2026-10-05 on #1775; ADR-W-030; his ruling of 2026-10-01 on #1620
 **Requirements:** [02c](02c-requirements-analytic.md) R114 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (internal to the parser and M1's `on-kind`)
 
 **Twin:** [ADR-792](06-decisions.md#adr-792), the 2-D arm.
@@ -15681,7 +15681,7 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 
 **Sibling audit (docs/17 §1).** 2-D: ADR-792. 2-D has no bare «האנך» reference after a drawn line and hands that sentence to the model. 3-D reads no drawn line through a point in this frame in any spelling: an unscheduled known-gap cell. Complex: no such grammar.
 
-**Not read.** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2», the reported paste's second line, is `not-handled`, and each half reads alone. The issue does not report it, so the fixture states the two halves.
+**Not read.** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2», the reported paste's second line, is `not-handled`, and each half reads alone. The issue does not report it, so the fixture states the two halves. **(Read since [ADR-AG-423](#adr-ag-423).)**
 
 **Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts` (the spelling grid, the teach's lowering, the paste with its marks, C = (0, 7) at seeds 0–3, each refusal with its count); the fixture `through-perpendicular-1775.analytic.json`; rows `construction-operand-1775-*`, a known gap naming #1358.
 
@@ -15817,3 +15817,25 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-2231-perp-to-axis.test.ts`; fixture `issue-2231-rhombus-perp-foot.analytic.json` now states the foot; parity rows `perp-piece-2232`, `perp-foot-stated-2232`, `ex-perp-piece-axis-2231`.
 
 **Behaviour change for a student:** «MK אנך לציר x» creates K off the axis, with the «נוצרה נקודה חדשה» notice, and no AI; «MK אנך לציר x בנקודה K» keeps the foot.
+
+## ADR-AG-423 — Found under the judge's rulings: «האנך» with two drawn asks which (#1775)
+
+**Date:** 2026-11-06 · **Status:** accepted · judged · bug (analytic) · round #2727, stream F · branch `fix/2727-found-rulings` · **partly supersedes [ADR-AG-416](#adr-ag-416)**
+**Requirements:** [02c](02c-requirements-analytic.md) R253, R8 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (M1's `on-kind`, the parser)
+**Twin:** [ADR-796](06-decisions.md#adr-796), the 2-D arm.
+
+**1. Two perpendiculars ask (q15, q16).** sr-12, ADR-W-175: *"With two, the tool asks which, using the existing question."* The existing question is `errHost.named`, which lists candidates and shows the student's own sentence with the first one in it. `on-kind perpendicular` passed a count, so it could only reach the counted sentence. It now carries each perpendicular's description as `from:onto`, and `errorText` words it, because the engine holds no locale. The description reads back: «האנך מ-P ל-AB» now binds a drawn line through P perpendicular to AB, where it used to build a second perpendicular. That is ADR-AG-229's "never duplicated", extended to the line. A candidate with no description (a perpendicular to a curve or a named line) keeps the counted sentence, and so does a named altitude, because a partial list would misstate the figure.
+
+**Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts`; parity rows `bare-perp-binds-1775`, `bare-perp-asks-1775`.
+
+**Behaviour change for a student:** with two perpendiculars drawn, «E על האנך» lists them and shows the sentence to type.
+
+**2. The paste line (q12).** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2» reads as two rows, through the shared splitter ([ADR-796](06-decisions.md#adr-796) point 3).
+
+**Behaviour change for a student:** that line, which used to be «לא הבנתי», builds two rows.
+
+**3. A lowercase point (q13, #1808).** ADR-W-030 lists a label in the other case as a member of the class: *"I don't want the tool to support the wrong text input because it teaches them wrong"*. **Measured:** «c(4,7)» was `not-handled`, reaching the model. `pointSpelling` gains a fourth shape, `point-case`, through #1774's path: pre-filled, and only when the next Enter accepts it. The rewrite is taught only when it is certain. A letter any typed line of the figure already uses (a parameter «y = ax + 2», a line's name «l: y=2x») is left as it was, and so are x and y, which are the plane's. An equation line is read whole, because «ax» uses a; in a sentence a word of three letters or more is not a use of its letters. The comma keeps a pair: «c(4)» stays out. The note is new text (ADR-W-174), recorded with `scripts/judgments.mjs chose`.
+
+**Locks.** `src-analytic/__tests__/point-order-1774.test.ts`; row `ex-coordinate-case-1808`.
+
+**Behaviour change for a student:** «c(4,7)» fills the box with «C(4,7)» and a note; Enter draws the point.

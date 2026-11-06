@@ -147,7 +147,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   english or hebrew so any letter or mention of anything that is not in these languages is rejected. in all
   tools».
   - Sources: [ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), #1919.
-- **FR-SU-19 (Must)** — **A pasted paragraph is read sentence by sentence, one row per sentence.** In all four
+- **FR-SU-19 (Must)** — **A pasted paragraph is read sentence by sentence, one row per sentence.** The exam's «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס …» is two sentences, its two halves ([ADR-796](06-decisions.md#adr-796)); no other «ו» splits a line. In all four
   builders, text holding two or more sentences (each ending in «.», «?» or «!» before a space or the end) is
   submitted one sentence at a time, in order, each as its own row, so a later sentence reads the figure the
   earlier ones built. A decimal point, a dot inside a coordinate or parentheses and a dotted abbreviation are

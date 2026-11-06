@@ -281,6 +281,8 @@ export interface ParseContext {
   tangentAuxes?: string[];
   /** #554: the drawn tangent-at-point lines — id, circle, touch point (`tangentsAtPointsMeet`). */
   tangentLines?: { id: string; circle: string; at: string }[];
+  /** #1775 (ADR-796): the DRAWN perpendicular lines, for a bare «האנך» (a bisector has its own noun). Semantic: read off the objects. */
+  perpendicularLines?: { id: string; through: string; a: string; b: string }[];
   /** Vertex lists of polygons already in the figure — lets a DEFINITE unnamed shape reference
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
@@ -10846,6 +10848,48 @@ const perpendicularPiece: Rule = (s, ctx) => {
   ];
 };
 
+/**
+ * #1775 ([ADR-796](../../docs/06-decisions.md#adr-796)) — sr-12 (ADR-W-175): a definite noun binds the drawn object of its kind.
+ * «האנך» is the one perpendicular the figure drew: a drawn line through a point, or a foot's own line from its point. With one, the
+ * noun lands on it: «האנך חותך את AC בנקודה E», «E על האנך». With several, the tool asks with the existing `ambiguous-construct`
+ * question, whose options are this rule's own narrowing («האנך מ-P ל-AB»), so the answer reads. With none, the rule does not apply.
+ * A perpendicular bisector has its own noun, and an anonymous foot is the tool's own (a tangency's touch), so neither counts.
+ */
+const DRAWN_PERP = String.raw`(?:האנ${KAF}|the\s+perpendicular)(?:\s+(?:מהנקודה\s+|מנקודה\s+|מ-?\s*|from\s+(?:point\s+)?)(${ULABEL})(?:\s+(?:אל\s+|ל-?\s*|to\s+)(${ULABEL})(${ULABEL}))?)?`;
+const DRAWN_PERP_ON = new RegExp(String.raw`^\s*(?:(?:ה?נקודה|(?:the\s+)?point)\s+)?(${ULABEL})\s+(?:(?:נמצאת|נמצא|מונחת|מונח)\s+)?(?:על|on|is\s+on|lies\s+on)\s+${DRAWN_PERP}\s*\.?\s*$`, 'i');
+const DRAWN_PERP_CUT = new RegExp(String.raw`^\s*${DRAWN_PERP}\s+(?=${CUT_VERB})`, 'i');
+const drawnPerpendicularRef: Rule = (s, ctx) => {
+  const on = s.match(DRAWN_PERP_ON);
+  const cutAt = on ? null : s.match(DRAWN_PERP_CUT);
+  if (!on && !cutAt) return null;
+  const [from, a, b] = on ? [on[2], on[3], on[4]] : [cutAt![1], cutAt![2], cutAt![3]];
+  const drawn = [
+    ...(ctx.perpendicularLines ?? []).map((l) => ({ from: l.through, a: l.a, b: l.b, line: l.id as string | undefined, foot: undefined as string | undefined })),
+    ...(ctx.feet ?? []).filter((f) => !f.id.startsWith('@')).map((f) => ({ from: f.from, a: f.a, b: f.b, line: undefined as string | undefined, foot: f.id as string | undefined })),
+  ];
+  const sameOnto = (d: { a: string; b: string }) => !a || (d.a === up(a) && d.b === up(b)) || (d.a === up(b) && d.b === up(a));
+  const meant = drawn.filter((d) => (!from || d.from === up(from)) && sameOnto(d));
+  if (meant.length === 0) return null;
+  const he = /[א-ת]/.test(s);
+  if (meant.length > 1) {
+    return { clarify: 'ambiguous-construct', noun: he ? 'האנך' : 'the perpendicular', options: meant.map((d) => (he ? `האנך מ-${d.from} ל-${d.a}${d.b}` : `the perpendicular from ${d.from} to ${d.a}${d.b}`)) };
+  }
+  const d = meant[0];
+  const carrier = d.line ?? `line-${d.from}${d.foot}`;
+  const consumed = { verbs: [VERB_PERPENDICULAR] }; // ADR-462: the perpendicular is the line this lands on, so the «אנך» gate's verb is paid by construction
+  const own: AnyCommand[] = d.line ? [] : [{ type: 'line-through', id: carrier, a: d.from, b: d.foot! }];
+  if (on) return [...own, { type: 'point-on-line', id: up(on[1]), line: carrier, offset: LINE_MARK, consumed }];
+  const rest = s.slice(cutAt![0].length);
+  const cut = rest.match(LINE_CUT);
+  if (!cut || cut.index !== 0 || !/^\s*\.?\s*$/.test(rest.slice(cut[0].length))) return null;
+  const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
+  const have = new Set(ctx.points ?? []);
+  if (!have.has(c1) || !have.has(c2)) return null;
+  const hostId = `line-${c1}${c2}`;
+  const ord = cutTargetOrder(cut[0], c1, c2, e);
+  return [...own, { type: 'line-through', id: hostId, a: c1, b: c2 }, { type: 'line-intersection', id: e, line1: carrier, line2: hostId, ...(ord ? { order: ord } : {}), consumed }];
+};
+
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s, ctx) => {
   if (!/perpendicular|⊥|מאונ[כך]|אנ[כך]/i.test(s)) return null;
@@ -12898,6 +12942,7 @@ const showCenter: Rule = (s, ctx) => {
 const LAST_RESORT_ASKS: Rule[] = [ambiguousCircleAsk, ambiguousShapeAsk];
 
 export const RULES: Rule[] = [
+  drawnPerpendicularRef, // #1775: «האנך» binds the drawn perpendicular, before any rule reads its noun as a new one
   shapeWithConstruct, // #461: «<shape> ABCD עם <construct>» — SPLIT, so every shape and every construct come along by construction
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   compoundAtDistance, // #760: "<point> on <carrier> at distance N from X" — membership + set-distance, composed

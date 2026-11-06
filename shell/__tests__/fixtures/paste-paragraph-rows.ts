@@ -47,6 +47,15 @@ const PLANE: readonly PasteProduct[] = ['2d', 'analytic', '3d'];
 
 export const PASTE_ROWS: readonly PasteRow[] = [
   {
+    id: 'P-on-divides',
+    what: '#1775: «X על הקטע AB ומחלקת אותו ביחס …» is its two halves (judged 2026-11-06, ADR-796)',
+    products: PLANE,
+    setup: ['משולש ABC'],
+    paste: 'הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2',
+    rows: ['הנקודה P נמצאת על הקטע AB', 'AP:PB = 1:2'],
+    box: '',
+  },
+  {
     id: 'P1',
     what: 'two sentences become two rows, in order, and the box empties',
     products: PLANE,

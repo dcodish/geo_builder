@@ -464,6 +464,12 @@ function isPerpendicularLine(c: Construction, o: GeoObject): boolean {
   return o.kind === 'line-at' && o.perp && o.drawn !== false && (o.dir.k === 'points' || o.dir.k === 'axis' || o.dir.k === 'curve') && !isPerpBisector(c, o);
 }
 
+/** How a student calls a perpendicular by its description, as `from:onto`: a pair of points or an axis (#1775, ADR-AG-423). */
+function perpendicularCall(from: Id, onto: Direction | FootLine): string {
+  if (onto.k === 'points') return `${statedName(from)}:${statedName(onto.a)}${statedName(onto.b)}`;
+  return onto.k === 'axis' ? `${statedName(from)}:${onto.axis}` : '';
+}
+
 /**
  * THE ONE REFUSAL for a contextual reference that found `found` objects of `kind` where it needed
  * `need` (default 1) — #1432's host seam, which #1514's ambiguous-curve refusal now rides: pass the
@@ -4291,6 +4297,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
          * `mint`) and the piece from the point to it.
          */
         const full = f.foot?.onto ? f.foot : undefined;
+        /*
+         * #1775 (ADR-AG-416, ADR-AG-423) — «האנך» also names a perpendicular LINE the figure drew through a point. A tangent and a
+         * perpendicular bisector each have their own noun and stay out (`isPerpendicularLine`). A description narrows it: «האנך
+         * מ-P ל-AB» is the drawn line through P, the answer to the which-one question below, and never a second one (ADR-AG-229).
+         */
+        const lines = c.objects.filter(
+          (o): o is Extract<GeoObject, { kind: 'line-at' }> =>
+            isPerpendicularLine(c, o) &&
+            o.kind === 'line-at' &&
+            (!f.foot || (o.through === f.foot.from && (!f.foot.onto || sameDerivation({ t: 'foot', from: o.through, onto: o.dir as FootLine }, { t: 'foot', from: f.foot.from, onto: f.foot.onto })))),
+        );
         const named: Id[] =
           full && full.onto?.k === 'points'
             ? c.constraints.flatMap((k) => {
@@ -4303,7 +4320,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                 return onPair && footOn && !feet.some((o) => o.id === k.b) ? [k.b] : [];
               })
             : [];
-        if (feet.length + named.length === 0 && full?.onto && full.mint) {
+        if (feet.length + named.length + lines.length === 0 && full?.onto && full.mint) {
           const built = applyAll(c, [
             { t: 'derived', id: full.mint, rule: { t: 'foot', from: full.from, onto: full.onto }, src: f.src },
             { t: 'segment', id: segmentIdOf(full.from, full.mint), a: full.from, b: full.mint, ref: true, src: f.src },
@@ -4312,13 +4329,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           const bound = applyFact(built.next, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full.from, b: full.mint }, src: f.src });
           return bound.ok ? { ...bound, effect: 'created' } : bound;
         }
-        /*
-         * #1775 (ADR-AG-416) — bare «האנך» also names the one perpendicular LINE the figure drew through a point: «הישר העובר דרך
-         * הנקודה P מאונך ל-AB» is the sentence «דרך P מעבירים אנך ל-AB» teaches, and the exam's next sentence is «האנך חותך …».
-         * A tangent and a perpendicular bisector each have their own noun and stay out (`isPerpendicularLine`).
-         */
-        const lines = f.foot ? [] : c.objects.filter((o) => isPerpendicularLine(c, o));
-        if (feet.length + named.length + lines.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length + named.length + lines.length) };
+        // A line and a foot of the same description are one perpendicular: the description binds the line.
+        const meant = full && lines.length === 1 ? 1 : feet.length + named.length + lines.length;
+        if (meant !== 1) {
+          const error = noHost(f.src, 'perpendicular', meant);
+          // sr-12: several ASK which, with the question that lists the candidates (`errHost.named`). Each is the description that
+          // reads back to it, carried as `from:onto`; the words are the locale's. One that has none keeps the counted sentence.
+          const calls = [...feet.map((o) => (o.rule.t === 'foot' ? perpendicularCall(o.rule.from, o.rule.onto) : '')), ...lines.map((o) => perpendicularCall(o.through, o.dir))];
+          if (meant > 1 && named.length === 0 && error.host && calls.every((x) => x !== '')) error.host.candidates = [...new Set(calls)];
+          return { ok: false, error };
+        }
         if (lines.length === 1) return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: lines[0].id }, src: f.src });
         if (named.length === 1) {
           return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full!.from, b: named[0] }, src: f.src });
