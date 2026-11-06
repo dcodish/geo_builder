@@ -45,13 +45,17 @@ describe('#1778 — the reported paste (prod session 4v5jun3l, 2026-10-04)', () 
   const LRM = '‎';
   const REPORTED = `דרך הנקודה ${LRM}P${LRM} מעבירים אנך לישר ${LRM}AB${LRM}. האנך חותך את הישר ${LRM}y = 7${LRM} בנקודה ${LRM}C${LRM}.`;
 
-  it('is read as two sentences; the first is the open #1775 gap, so the chain stops there and keeps the whole paste', async () => {
+  it('is read as two sentences; the first is taught (#1775), so the chain stops there with the lesson and the rest in the box', async () => {
     const r = await run(['A(0,0)', 'B(4,2)', 'P(1,3)'], REPORTED);
     expect(r.rows).toEqual([]);
-    expect(r.box).toBe(REPORTED);
-    // the sentence that stopped it is decided ALONE — its refusal (or its model call) names it, never the paragraph
-    const v = decideSubmit('דרך הנקודה P מעבירים אנך לישר AB', ['A(0,0)', 'B(4,2)', 'P(1,3)'], 0);
-    expect(v.kind === 'refused' && v.error.detail).toBe('דרך הנקודה P מעבירים אנך לישר AB');
+    expect(r.box).toBe(`הישר העובר דרך הנקודה P מאונך ל-AB. האנך חותך את הישר ${LRM}y = 7${LRM} בנקודה ${LRM}C${LRM}.`);
+  });
+
+  it('confirming the lesson builds the rest of the paste', async () => {
+    const box = (await run(['A(0,0)', 'B(4,2)', 'P(1,3)'], REPORTED)).box;
+    const r = await run(['A(0,0)', 'B(4,2)', 'P(1,3)'], box);
+    expect(r.rows).toEqual(['הישר העובר דרך הנקודה P מאונך ל-AB', 'האנך חותך את הישר y = 7 בנקודה C']);
+    expect(r.box).toBe('');
   });
 
   it('with its first sentence in a spelling the builder reads, the same paste builds the perpendicular and C', async () => {

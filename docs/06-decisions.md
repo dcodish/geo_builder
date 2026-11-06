@@ -20370,3 +20370,27 @@ No new student text. Every sentence is an existing ruled string.
 **Locks.** `src/engine/__tests__/extension-free-quantity-2518.test.ts`: T5 and its next view, 13 further builds, 8 kept refusals, both bagrut lines, the stated positions, the cost and saved paths. ADR-784's free-radius refusal is removed. Fixture `src/__tests__/fixtures/issue-2518-free-radius-holds-side.geo.json`, the operator's exact lines. Parity rows `ext-circle-later-free-radius-2518`, `ext-circle-typed-free-radius-2518`. Driven in a real browser through `browser-harness.mjs`: T5, the typed form, the pinned refusal.
 
 **Behaviour change for a student:** a sentence a free size or place can satisfy now draws, with the circle adapting, instead of being refused. A saved figure of that kind redraws correctly. A figure nothing can save is refused as before, and a stated side of O now counts.
+
+## ADR-792 — The construction frames read an operand with its noun: «דרך הנקודה P», «לישר AB» (#1775)
+
+**Status:** accepted · 2026-11-06 · bug (P2, 2-D + analytic, reported) · fix round #2727 · branch `fix/1775-construction-imperative` · the operator's revised arm 2 of 2026-10-05 on #1775
+
+**Requirements:** [02](02-requirements.md) FR-IN-2 · **Design:** [04](04-design.md) "Parser chokepoints and gates" · **Stage:** none (parser)
+
+**Twin:** [ADR-AG-416](06c-decisions-analytic.md#adr-ag-416), the analytic arm. The verdict stays 2-D's: the teach is #1358's, so the parity rows are a known gap naming it.
+
+**Measured before** (`c0029d25`, `decideDeterministic2D`). `דרך P מעבירים אנך ל-AB` committed and `דרך הנקודה P מעבירים אנך לישר AB` escalated, as did each mix, and `ישר המקביל` the same. `מ-P מורידים אנך ל-AB` committed and `… לישר AB` was refused as an unread part, not escalated as the issue measured on 791f3f96.
+
+**The class.** *A ⊥/∥ construction statement whose operand carries its own noun does not reach the operand reader.* Each frame's pattern read a bare label: `THROUGH_PT`, the line slot of `perpendicularLine` and of `parallelLine`, and `altitude`'s side.
+
+**Decision.**
+1. **Two lexicon atoms, composed by the frames.** `POINT_OPERAND_NOUN` («הנקודה», «הקודקוד», "point", "vertex") sits in `THROUGH_PT`, so both drawn-line rules read it; `LINE_OPERAND_NOUN` («ישר», «צלע», «קטע», "line", "side", "segment") sits in their line slots. The noun states nothing about which line a ⊥ or ∥ is taken to.
+2. **A perpendicular FROM a point takes a line.** `altitude`'s perpendicular branch reads «לישר AB» / "to line AB" before `statedSide`. The shared side reader is unchanged, so a cevian noun takes what it took: «תיכון מ-A לישר BC» stays refused.
+
+**Beyond the two nouns the issue names.** `לצלע`, `לקטע`, `הקודקוד` and the English twins are the same wrong outcome in another spelling (docs/17 §1). The parity row `an-1620-perp-05` closes with them: «הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F» now builds in 2-D, its #1677 cell gone.
+
+**Sibling audit (docs/17 §1).** Analytic: ADR-AG-416; its register already reads these nouns. 3-D reads no drawn line through a point in this frame in any spelling: an unscheduled known-gap cell, the port not being simple. Complex: no such grammar. No §3 list grew: the frames compose lexicon atoms.
+
+**Locks.** `src/app/__tests__/issue-1775-construction-operands.test.ts` (point × line noun × frame, each equal to the short spelling's commands; the English twins; the stated line against the figure's side; the refusals); rows `construction-operand-1775-*`.
+
+**Behaviour change for a student:** in 2-D the exam's own wording of these constructions builds at once, as the short spelling does.

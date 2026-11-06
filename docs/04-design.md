@@ -338,6 +338,10 @@ Historical: current risks and the decisions that answer them live in the ADR log
 
 ## Parser chokepoints and gates
 
+### An operand's noun is read where the operand is ([ADR-792](06-decisions.md#adr-792), #1775)
+
+A ⊥/∥ construction statement composes the lexicon's `POINT_OPERAND_NOUN` (in `THROUGH_PT`) and `LINE_OPERAND_NOUN` (in the line slots of `perpendicularLine` and `parallelLine`); a frame never spells «הנקודה» or «לישר» itself. `altitude`'s perpendicular branch reads «לישר AB» before `statedSide`, which stays the cevian nouns' reader.
+
 ### The clarification family, and where an ASK beats an escalation (#777, [ADR-490](06-decisions.md#adr-490))
 
 `not-handled` is the escalation seam: whatever reaches it becomes a paid LLM call — right for a sentence the

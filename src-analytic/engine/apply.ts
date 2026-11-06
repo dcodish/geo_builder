@@ -457,6 +457,14 @@ function isPerpBisector(c: Construction, o: GeoObject): boolean {
 }
 
 /**
+ * A LINE DRAWN PERPENDICULAR TO A STATED LINE through a point (#1775): to a pair, an axis or a named line. A tangent is
+ * perpendicular to a radius and a normal to a curve, and each has its noun; so has a perpendicular bisector.
+ */
+function isPerpendicularLine(c: Construction, o: GeoObject): boolean {
+  return o.kind === 'line-at' && o.perp && o.drawn !== false && (o.dir.k === 'points' || o.dir.k === 'axis' || o.dir.k === 'curve') && !isPerpBisector(c, o);
+}
+
+/**
  * THE ONE REFUSAL for a contextual reference that found `found` objects of `kind` where it needed
  * `need` (default 1) — #1432's host seam, which #1514's ambiguous-curve refusal now rides: pass the
  * objects themselves and, when more than one was found, the refusal carries how to CALL each.
@@ -4304,7 +4312,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           const bound = applyFact(built.next, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full.from, b: full.mint }, src: f.src });
           return bound.ok ? { ...bound, effect: 'created' } : bound;
         }
-        if (feet.length + named.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length + named.length) };
+        /*
+         * #1775 (ADR-AG-416) — bare «האנך» also names the one perpendicular LINE the figure drew through a point: «הישר העובר דרך
+         * הנקודה P מאונך ל-AB» is the sentence «דרך P מעבירים אנך ל-AB» teaches, and the exam's next sentence is «האנך חותך …».
+         * A tangent and a perpendicular bisector each have their own noun and stay out (`isPerpendicularLine`).
+         */
+        const lines = f.foot ? [] : c.objects.filter((o) => isPerpendicularLine(c, o));
+        if (feet.length + named.length + lines.length !== 1) return { ok: false, error: noHost(f.src, 'perpendicular', feet.length + named.length + lines.length) };
+        if (lines.length === 1) return applyFact(c, { t: 'constraint', k: { t: 'on-curve', id: f.id, curve: lines[0].id }, src: f.src });
         if (named.length === 1) {
           return applyFact(c, { t: 'constraint', k: { t: 'on-line-2pt', id: f.id, a: full!.from, b: named[0] }, src: f.src });
         }

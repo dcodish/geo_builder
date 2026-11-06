@@ -309,6 +309,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
+  '#1358': 'open', // #1775 (ADR-792 / ADR-AG-416): analytic teaches the construction imperatives, 2-D still builds them; #1358 converges them on the teach
   '#2626': 'open', // #2621 E (ADR-AG-396): 2-D does not read the rhombus height or the three side lengths
   '#2624': 'open', // #2621 C (ADR-AG-395): 2-D drops a point name's prime
   '#2629': 'open', // #2618 (ADR-AG-355): 2-D does not read «קודקודי ה<noun> ABCD נמצאים על המעגל» (analytic reads it as the inscribed sentence)
@@ -775,7 +776,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'an-1620-perp-02', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מהקודקוד C לצלע AB חותך אותה בנקודה D'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-03', family: 'cevians-centres', steps: ['משולש ABC', 'האנך מ-A ל-BC', 'E על האנך'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-04', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'דרך E עובר ישר מקביל ל-AC החותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'an-1620-perp-05', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
+  { id: 'an-1620-perp-05', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הישר העובר דרך הנקודה E מקביל ל-AC וחותך את הצלע AB בנקודה F'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'an-1620-perp-06', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הקטע EF מקביל ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }] },
   { id: 'an-1620-perp-06b', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'EF ∥ AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }], note: 'a bare pair mints its new end (#1670 row 4, ADR-AG-210)' },
   { id: 'an-1620-perp-06c', family: 'parallel-perpendicular', steps: ['משולש ABC', 'E על BC', 'הצלע EF מקבילה ל-AC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
@@ -1922,6 +1923,15 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'juxtaposed-numbers-2286-01', family: 'lengths', steps: ['משולש ABC', 'AB = 2 3'], expect: 'refused', note: 'analytic recorded AB = 6, 2-D and 3-D asked the model (measured ebacadd1)' },
   { id: 'juxtaposed-numbers-2286-02', family: 'angles', steps: ['משולש ABC', '∠ABC = 2 3'], expect: 'refused', note: '2-D asked the model' },
   { id: 'juxtaposed-numbers-2286-03', family: 'lengths', steps: ['משולש ABC', 'AB = 2.5 3'], expect: 'refused' },
+  // ── #1775 (ADR-792 / ADR-AG-416): the exam's construction frames, with their operands' nouns. 2-D's verdict → teach is #1358 ──
+  ...[
+    'דרך הנקודה P מעבירים אנך לישר AB',
+    'דרך P מעבירים אנך לישר AB',
+    'דרך הנקודה P מעבירים אנך ל-AB',
+    'דרך הנקודה P מעבירים ישר המאונך ל-AB',
+    'דרך הנקודה P מעבירים ישר המקביל לישר AB',
+    'מהנקודה P מורידים אנך לישר AB',
+  ].map((line, i): ParityRow => ({ id: `construction-operand-1775-0${i + 1}`, family: 'cevians-centres', steps: ['קטע AB', 'P על AB', line], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1358' }, { product: '3d' }], note: 'analytic teaches it, 2-D builds it until #1358 converges them; 3-D reads no drawn line through a point in this frame, in any spelling (measured c0029d25)' })),
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

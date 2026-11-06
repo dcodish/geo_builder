@@ -233,7 +233,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «הוסף C מחלקת את AB ביחס 3:2» → pre-fills «C מחלקת את AB ביחס 3:2»
 - «העבירו משיק למעגל בנקודה C» → «המשיק למעגל בנקודה C»
 - «מעבירים משיק למעגל I דרך הנקודה A ומשיק למעגל II דרך הנקודה B» (the through-phrase after the noun, two tangents in one sentence) → «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B» (ADR-AG-315, #2391)
-- Sources: ADR-AG-150, #1353, ADR-W-030, ADR-AG-206, #1620, ADR-AG-315.
+- «דרך הנקודה P מעבירים אנך לישר AB» → «הישר העובר דרך הנקודה P מאונך ל-AB», pasted with an exam's bidi marks too; a following «האנך …» means that line, when it is the figure's one perpendicular (ADR-AG-416, #1775)
+- Sources: ADR-AG-150, #1353, ADR-W-030, ADR-AG-206, #1620, ADR-AG-315, ADR-AG-416.
 
 **R219 — the book's «מעבירים ישר … ש…» and «הן נקודות על … בהתאמה» are its sentences**. *(Operator, 2026-10-30 on #2620: "now we need to build all capabilities".)* «דרך N מעבירים ישר l1 שמקביל ל-PO» is taught as «דרך N עובר ישר l1 מקביל ל-PO» (R114's card); a relative clause with «ש» after the object reads as the one with «ה». «A ו-B הן נקודות על ציר ה-x ועל ציר ה-y בהתאמה» (also «… נקודות על …», "A and B are points on … respectively") states what «A ו-B נמצאות על … בהתאמה» states.
 - Sources: ADR-AG-371, #2620.

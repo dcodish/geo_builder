@@ -15660,3 +15660,27 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/issue-2408-common-tangent-segment.test.ts` (each spelling, the operator's four at seeds 0–4, the no-twin paths, every later-line path, the set by position, both ways of addressing a set tangent, the found cases). Fixture `issue-2408-set-then-line.analytic.json`. `issue-2418` (d) is re-stated by this ruling: «T על הישר AB» now records.
 
 **Behaviour change for a student:** «AB משיק משותף …» and «כל המשיקים המשותפים» draw segments between the touch points, with their equations still in the panel. Saying «הישר …» about one draws that line. The set letters its segments AB, CD, EF, GH. Repeating the set is refused instead of doubling it.
+
+## ADR-AG-416 — «דרך הנקודה P מעבירים אנך לישר AB» is taught as the line through P, and «האנך» names that line (#1775)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic + 2-D, `reported`) · round #2727 · branch `fix/1775-construction-imperative` from `main` @ `c0029d25` · the operator's revised arms of 2026-10-05 on #1775; ADR-W-030; his ruling of 2026-10-01 on #1620
+**Requirements:** [02c](02c-requirements-analytic.md) R114 · **Design:** [04c](04c-design-analytic.md) "The exam's construction register" · **LADDER stage:** none (internal to the parser and M1's `on-kind`)
+
+**Twin:** [ADR-792](06-decisions.md#adr-792), the 2-D arm.
+
+**Measured at pickup** (`c0029d25`, `decideSubmit`, A, B, P on AB). `דרך הנקודה P מעבירים אנך לישר AB`, `דרך P מעבירים אנך ל-AB` and their mixes were `not-handled`, while `דרך P מעבירים ישר המאונך ל-AB` and `מ-P מורידים אנך ל-AB` were taught.
+
+**The class.** *An exam construction sentence through a point, whose object is the noun «אנך», has no reading in the register.* `case 'אנך'` returned nothing for `through`.
+
+**Decision.**
+1. **Through a point the perpendicular is the line.** `constructionCandidates` teaches «הישר העובר דרך הנקודה P מאונך ל-AB», the ruled string and the one «ישר המאונך» already teaches. It is honest when P lies on AB, where a foot from P would be P itself. A line named by two points drops its noun («לישר AB» → «ל-AB»); «לישר y = 7» keeps it. A plural, a named piece, a rider on the anchor, and from + through stay unread.
+2. **The bidi marks of a copied exam are not words.** `imperativeCandidates` strips format controls first. A single sentence reaches it as typed, because `splitSentences` returns `null` and strips nothing, so the reported line with its LRM marks was not taught.
+3. **Bare «האנך» names the one perpendicular line too.** Found at pickup: the plan's "anaphora works" was measured on «האנך מהנקודה P …», and with the ruled through-line the exam's next sentence was refused `ambiguous-shape`. `on-kind perpendicular` now counts feet and `isPerpendicularLine` together: a `line-at` perpendicular to a pair, an axis or a named line. One lands on it; none or several is the same refusal, with the count. A tangent and a perpendicular bisector have their own nouns and stay out. «האנך מ-P …» is unchanged: a description still names a foot.
+
+**Sibling audit (docs/17 §1).** 2-D: ADR-792. 2-D has no bare «האנך» reference after a drawn line and hands that sentence to the model. 3-D reads no drawn line through a point in this frame in any spelling: an unscheduled known-gap cell. Complex: no such grammar.
+
+**Not read.** «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2», the reported paste's second line, is `not-handled`, and each half reads alone. The issue does not report it, so the fixture states the two halves.
+
+**Locks.** `src-analytic/__tests__/issue-1775-through-perpendicular.test.ts` (the spelling grid, the teach's lowering, the paste with its marks, C = (0, 7) at seeds 0–3, each refusal with its count); the fixture `through-perpendicular-1775.analytic.json`; rows `construction-operand-1775-*`, a known gap naming #1358.
+
+**Behaviour change for a student:** in the analytic builder, the exam's «דרך הנקודה P מעבירים אנך לישר AB» pre-fills the line through P, and «האנך» in the next sentence means that line.

@@ -300,6 +300,17 @@ export const MEET_KW = String.raw`intersect|∩|חיתוך|נחתך|נחתכ|נ�
  * right-angled adjective, {@link RIGHT_ANGLED}).
  */
 export const LINE_NOUN = String.raw`${enWord('line|ray')}|הישר|הקו|${heWord('קרן|קרנ')}`;
+/**
+ * #1775 ([ADR-792](../../docs/06-decisions.md#adr-792)) — THE NOUN BEFORE A POINT OPERAND, optional: «דרך **הנקודה** P», "through **point** P",
+ * «דרך **הקודקוד** A». It names the kind of the operand and states nothing, so a frame reads it and moves on.
+ */
+export const POINT_OPERAND_NOUN = String.raw`(?:(?:(?:the\s+)?(?:point|vertex)|ה?נקודה|ה?קודקוד)\s+)?`;
+/**
+ * #1775 ([ADR-792](../../docs/06-decisions.md#adr-792)) — THE NOUN BEFORE A LINE OPERAND of a ⊥/∥ frame, optional, after the preposition has been read:
+ * «מאונך ל**ישר** AB», «מקביל ל**צלע** BC», "perpendicular to **line** AB". Which of them was written never changes the
+ * line a ⊥ or ∥ is taken to.
+ */
+export const LINE_OPERAND_NOUN = String.raw`(?:(?:(?:the\s+)?(?:line|side|segment)|ה?ישר|ה?צלע|ה?קטע)\s+)?`;
 /** The EXTENSION reference of a crossing operand («המשך», «המשכי», "extension", "extended") — the twin of
  *  {@link LINE_NOUN}, moved from the crossing rule bit-identical (#2533): it reads the operand as directional (ADR-054). */
 export const EXTENSION_REF = String.raw`המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended`;

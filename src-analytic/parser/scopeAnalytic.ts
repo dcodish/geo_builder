@@ -32,6 +32,7 @@
  */
 import { respectively, unwrap } from './frameAnalytic';
 import { POINT_NAME } from '../engine/pointName';
+import { stripFormatControls } from '../../shell/bidi';
 
 /**
  * The closed imperative lexicon.
@@ -130,6 +131,8 @@ const SETTING_NOUN = '(?:משולש|מרובע|ריבוע|מלבן|מעוי?י?�
 const FROM_ADV = new RegExp(String.raw`^(?:מן\s+|מ-?)(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL_LIST})(?=[\s,]|$)\s*,?\s*`);
 /** «דרך E», «דרך הנקודה D», «דרך הנקודה D שעל המעגל». The rider is kept: a frame decides what it implies. */
 const THROUGH_ADV = new RegExp(String.raw`^דרך\s+(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL})(?=[\s,]|$)(?:\s+ש(?:על|נמצאת\s+על)\s+(ה[א-ת]+))?\s*,?\s*`);
+/** «לישר AB» at the head of a predicate: the noun before a line named by two points, never «לישר y = 7» (#1775). */
+const NAMED_LINE_OPERAND = new RegExp(String.raw`^לישר\s+(?=${LBL}${LBL}(?:\s|$))`);
 /** «… דרך הנקודה A» at the END of the object (#2391 B2): what precedes it, and the anchor. */
 const TRAILING_THROUGH = new RegExp(String.raw`^(.*?)\s*,?\s*(?:^|\s)דרך\s+(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL})$`);
 /** A circle's name in the register — a numeral (Roman or digit) or a centre letter. */
@@ -333,6 +336,15 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
     }
     case 'אנך':
     case 'אנכים': {
+      /*
+       * #1775 (ADR-AG-416) — THROUGH a point the perpendicular is the LINE, not the piece «מ-P … אנך» drops: «דרך הנקודה P
+       * מעבירים אנך לישר AB» → «הישר העובר דרך הנקודה P מאונך ל-AB», the sentence «… ישר המאונך ל-AB» already teaches, and
+       * honest when P lies on AB, where a foot from P is P itself. The operand keeps its letters, not its noun («לישר AB» → «ל-AB»).
+       */
+      if (through && !from && noun === 'אנך' && !labels && !through.on) {
+        out.push(join(`הישר העובר דרך ${throughNp} מאונך`, rest.replace(NAMED_LINE_OPERAND, 'ל-'), tail));
+        break;
+      }
       if (through || !from) return [];
       out.push(join(spec.def, labels, `מ${fromNp}`, rest, tail));
       break;
@@ -360,7 +372,9 @@ const EN_PARTICLE = new Set(PARTICLES_EN);
  * Most-stripped first matters: «draw me a triangle ABC» should be read as «triangle ABC» before
  * «me a triangle ABC», so the first candidate the parser accepts is the tightest sentence.
  */
-export function imperativeCandidates(raw: string): ImperativeCandidate[] {
+export function imperativeCandidates(typed: string): ImperativeCandidate[] {
+  // #1775 (ADR-AG-416): the bidi marks a copied exam carries around its tokens are not words of the sentence.
+  const raw = stripFormatControls(typed);
   // The exam's construction frames first (#1620): their textbook sentence is the one to teach, and the
   // verb-first strip below would offer the bare indefinite «משיק למעגל בנקודה C» ahead of it.
   const framed = constructionCandidates(raw);

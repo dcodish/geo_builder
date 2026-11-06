@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, EXTENSION_REF } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -10766,7 +10766,8 @@ const bisectorLine: Rule = (s) => {
 
 // The point a drawn line passes through: "through P" / "at P" / "דרך P" / "בנקודה P" (at point P).
 // "at"/"בנקודה" lets "DE ⟂ AB at C" / "DE אנך ל-AB בנקודה C" name the foot as the through-point.
-const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]\d*)\b`;
+// #1775 (ADR-792): the operand's own noun («דרך הנקודה P») is read here, by every frame that takes a through-point.
+const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+${POINT_OPERAND_NOUN}([A-Za-z]\d*)\b`;
 
 // The "from a point" origin students write for a drawn PARALLEL line — "from point A" / "from A" /
 // "מנקודה A" / "מ-A" (issue #127). Used ONLY by the parallel-line rule: the perpendicular "from a point"
@@ -10833,7 +10834,7 @@ const perpendicularLine: Rule = (s, ctx) => {
   if (!thr) return null; // no through-point ⇒ it's the ⟂ constraint or a foot, not a drawn line
   const seg = s
     .replace(new RegExp(THROUGH_PT, 'gi'), ' ') // drop the through-clause so its point isn't read as the segment
-    .match(/(?:perpendicular\s*to|⊥|מאונ[כך]\s*ל-?|אנ[כך]\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    .match(new RegExp(String.raw`(?:perpendicular\s*to|⊥|מאונ[כך]\s*ל-?|אנ[כך]\s*ל-?)\s*${LINE_OPERAND_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'));
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const have = new Set(ctx.points ?? []);
@@ -10885,7 +10886,7 @@ const parallelLine: Rule = (s, ctx) => {
   if (!thr) return null; // no through-point ⇒ it's the ∥ constraint, not a drawn line
   const seg = s
     .replace(thr[0], ' ') // drop the anchor clause so its point isn't read as the parallel-to segment
-    .match(/(?:parallel\s*to|∥|מקביל\s*ל[-=]?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // ל[-=] tolerates the ל=AB typo (#127)
+    .match(new RegExp(String.raw`(?:parallel\s*to|∥|מקביל\s*ל[-=]?)\s*${LINE_OPERAND_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i')); // ל[-=] tolerates the ל=AB typo (#127)
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const lineIdCut = `par-${P}-${a}${b}`;
@@ -11861,7 +11862,10 @@ const altitude: Rule = (s, ctx) => {
     ];
   }
   // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "על צלע BC" / "לקטע BC" (descriptor noun tolerated).
-  const sideM = statedSide(s); // #1267: the ONE reader — this rule’s copy is where it came from
+  // #1775 (ADR-792): a perpendicular FROM a point takes a LINE as well as a side, «מ-P מורידים אנך לישר AB». The noun is
+  // the frame's operand and states nothing; a cevian noun («גובה», «תיכון») keeps the side reader's own nouns.
+  const onLine = isPerpFrom && !isHeight ? s.match(new RegExp(String.raw`(?:\bto\s+(?:the\s+)?line\s+|ל-?\s*ה?ישר\s+)(${LABEL})\s*(${LABEL})\b`, 'i')) : null;
+  const sideM = onLine ? { side: [up(onLine[1]), up(onLine[2])] as [Id, Id], match: onLine[0] } : statedSide(s); // #1267: the ONE reader — this rule’s copy is where it came from
   let p: string, q: string;
   let tri: Id[] | null = null;
   // #1233 — this used to read `sideM && up(sideM[1]) !== apex`: a HALF gate that checked only the
