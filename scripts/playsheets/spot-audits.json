@@ -1,5 +1,57 @@
 {
-  "pending": [],
+  "pending": [
+    {
+      "sheet": "round-2722",
+      "id": "T38",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "מלבן ABCD",
+        "מעוין ABCD"
+      ],
+      "lookFor": "The ⓘ opens the note."
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T39",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "פירמידה ישרה SABCD שבסיסה מרובע"
+      ],
+      "lookFor": "«הבסיס (ABCD)», ⓘ strip."
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T71",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "AB = AC"
+      ],
+      "lookFor": "The row is kept, with 2 ticks."
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T72",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "אורך השוק AB הוא 5"
+      ],
+      "lookFor": "«5» on AB, no ticks."
+    }
+  ],
   "results": [
     {
       "sheet": "round-2665",

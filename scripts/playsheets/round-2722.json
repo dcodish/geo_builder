@@ -173,7 +173,7 @@
     "גזרה AOB",
     "קשת AB = 2/3"
    ],
-   "lookFor": "The row reads ∠AOB = 2/3° as a typeset fraction, the arc is labelled 2/3°, no chord label, no raw decimal.",
+   "lookFor": "The row reads ∠AOB = 2/3° as a typeset fraction, the arc is labelled 2/3°, no chord label, no raw decimal. The label is cramped on a sliver this thin: say if that is not good enough.",
    "before": "Chord AB = 2/3."
   },
   {
@@ -830,7 +830,7 @@
     "E על AC' כך ש-AE = t·p"
    ],
    "cycles": 1,
-   "lookFor": "The cube stays still, p is parallel to the diagonal, and «הציגו תצורה אחרת» moves E and p's length.",
+   "lookFor": "The row reads as a sentence with «AE = t·p» typeset in order, no minus, no arrow on AC'. p is parallel to the diagonal. «הציגו תצורה אחרת» moves E and p's length; the cube keeps its size, though the view may refit to p's length.",
    "before": "Refused as the tool's limit."
   },
   {
@@ -861,7 +861,7 @@
     "וקטור u",
     "P על AM כך ש-KP = αu + βv"
    ],
-   "lookFor": "P sits on AM, and the givens list shows the line with its letters.",
+   "lookFor": "The last row reads with «KP = αu + βv» in order, no minus, no arrow on AM. P sits on AM.",
    "before": "Refused as the tool's limit."
   },
   {
@@ -943,6 +943,19 @@
   },
   {
    "id": "T61",
+   "title": "PR #2723: an anchored row reads as a sentence (found in round)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "E על AB כך ש-AE = AC - AD"
+   ],
+   "lookFor": "The row reads as a sentence with one real minus between AC and AD, no minus on AE, no arrow on AB.",
+   "before": "A false minus on AE and an arrow on AB."
+  },
+  {
+   "id": "T62",
    "title": "PR #2724: the kite says which sides it chose",
    "class": "play",
    "product": "analytic",
@@ -958,7 +971,7 @@
    "before": "No note, a fixed pair."
   },
   {
-   "id": "T62",
+   "id": "T63",
    "title": "PR #2724: stating the pair settles it",
    "class": "play",
    "product": "analytic",
@@ -971,7 +984,7 @@
    "before": "«כבר ידוע»."
   },
   {
-   "id": "T63",
+   "id": "T64",
    "title": "PR #2724: the other pair draws a kite",
    "class": "play",
    "product": "analytic",
@@ -984,7 +997,7 @@
    "before": "A rhombus."
   },
   {
-   "id": "T64",
+   "id": "T65",
    "title": "PR #2724: main diagonal with the pair unstated",
    "class": "play",
    "product": "analytic",
@@ -994,11 +1007,11 @@
     "משוואת האלכסון הראשי היא y=2x"
    ],
    "cycles": 1,
-   "lookFor": "It builds; the row reads «האלכסון הראשי: -2x + y = 0» with «y = 2x» under it, analytic's usual form. Cycling puts A,C or B,D on the line. No equal-side ticks at rest.",
+   "lookFor": "It builds; the row reads «האלכסון הראשי: -2x + y = 0» with «y = 2x» under it, analytic's usual form. Cycling puts A,C or B,D on the line. No equal-side ticks at rest. At this seed the kite can look nearly like a rhombus: press «הציגו תצורה אחרת» to see a clear kite, and say if that first drawing bothers you.",
    "before": "Always AC."
   },
   {
-   "id": "T65",
+   "id": "T66",
    "title": "PR #2724: pair stated after the line",
    "class": "play",
    "product": "analytic",
@@ -1008,11 +1021,11 @@
     "משוואת האלכסון הראשי היא y=2x",
     "AB = AD"
    ],
-   "lookFor": "The row becomes «AC: -2x + y = 0» with «y = 2x» under it, the note goes, A and C stay on the line, no ticks. No name on the line on the canvas, as for every line in analytic.",
+   "lookFor": "The row becomes «AC: -2x + y = 0» with «y = 2x» under it, the note goes, A and C stay on the line, no ticks. No name on the line on the canvas, as for every line in analytic. At this seed the kite can look nearly like a rhombus: press «הציגו תצורה אחרת» to see a clear kite, and say if that first drawing bothers you.",
    "before": "The line is AC from the start, and the pair says «כבר ידוע»."
   },
   {
-   "id": "T66",
+   "id": "T67",
    "title": "PR #2724: the other pair after the line",
    "class": "play",
    "product": "analytic",
@@ -1026,7 +1039,7 @@
    "before": "A line AC on a rhombus."
   },
   {
-   "id": "T67",
+   "id": "T68",
    "title": "PR #2724: an open base in the panel and beside the side",
    "class": "play",
    "product": "analytic",
@@ -1040,7 +1053,7 @@
    "before": "Nothing shown."
   },
   {
-   "id": "T68",
+   "id": "T69",
    "title": "PR #2724: equation and length on one side",
    "class": "play",
    "product": "analytic",
@@ -1050,8 +1063,50 @@
     "BC = 5",
     "משוואת הצלע BC היא x-2y+6=0"
    ],
-   "lookFor": "Both are readable, not overlapping.",
+   "lookFor": "Both are readable and do not overlap each other.",
    "before": "No equation text."
+  },
+  {
+   "id": "T70",
+   "title": "PR #2724: a bare isosceles triangle shows no ticks",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש שווה שוקיים ABC"
+   ],
+   "cycles": 1,
+   "lookFor": "No ticks on any side; the note naming the drawn pair stays; «הציגו תצורה אחרת» still changes the pair. This changes a shape you know, so it is yours to see.",
+   "before": "2 ticks on the pair the tool chose."
+  },
+  {
+   "id": "T71",
+   "title": "PR #2724: a stated equality keeps its ticks",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "AB = AC"
+   ],
+   "expectRows": [
+    "AB = AC"
+   ],
+   "lookFor": "The row is kept, with 2 ticks.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T72",
+   "title": "PR #2724: a value on an open seat stays",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "אורך השוק AB הוא 5"
+   ],
+   "lookFor": "«5» on AB, no ticks.",
+   "before": "«5» with 2 ticks."
   }
  ]
 }
