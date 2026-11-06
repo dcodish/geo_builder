@@ -814,11 +814,9 @@
     "גזרה AOB",
     "קשת AB = 1.5"
    ],
-   "expect": [
-    "∠AOB = 1.5"
-   ],
-   "lookFor": "The row reads «∠AOB = 1.5».",
-   "before": "Unchanged."
+   "lookFor": "The row reads ∠AOB = 1.5, and the teaching hint offers «∠AOB = 1.5».",
+   "before": "Unchanged.",
+   "expectRefusal": "∠AOB = 1.5"
   },
   {
    "id": "T53",
