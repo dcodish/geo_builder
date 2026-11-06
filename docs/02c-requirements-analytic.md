@@ -929,9 +929,10 @@ a sentence the tool parsed.
 - Not a size, and unchanged: a coordinate or a slope («M(a,0)», «y=mx+n») keeps both signs; a squared radius that also places the centre («(x−a)²+y²=a²» with A(−2,2) on it draws a = −2); a squared radius declared negative («a < 0» · «x²+y²=a²») is accepted, a circle of radius |a|; a ratio and an angle
 - Sources: ADR-AG-323, #2419 (#2379, the operator's exam questions).
 
-**R118 — a comparison of coordinates chooses the configuration**. It consumes no freedom; an unsatisfiable comparison is refused, naming the sentence.
+**R118 — a comparison of coordinates chooses the configuration**. It consumes no freedom; an unsatisfiable comparison is refused, naming the sentence. A comparison that can hold is never refused because the other point is placed by the givens: the free point is drawn on the named side of it, at every configuration, and what stood before the line does not move.
 - «שיעור ה-x של B גדול משיעור ה-x של D», `x_B > 3`, «שיעור ה-x של B חיובי»
-- Sources: ADR-AG-161, #1462.
+- «x²+(y−5)²=25» · «C על המעגל» · «C על ציר ה-y» · «C מעל ציר ה-x» · «A מעל C» → C = (0, 10), A above it; a chain («B מעל A») and two bounds («A מתחת ל-D») read the same way; «A מעל C» · «A מתחת ל-C» → refused
+- Sources: ADR-AG-161, #1462; ADR-AG-419, #2639.
 
 **R134 — a value is printed only when the drawings whose givens hold agree on it, and «הציגו תצורה אחרת» always reaches another drawing when there is one**. *(Operator: «הציגו תצורה אחרת» "should always swap if there are more than 1 option".)* A drawing that breaks a given is never a source of a value.
 - «משולש AOB ישר זווית» with its incentre free → A «(x_A, 0)», C «—»

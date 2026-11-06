@@ -1,0 +1,13 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "נתון מעגל שמשוואתו x^2+(y-5)^2=25",
+    "C על המעגל",
+    "C על ציר ה-y",
+    "C מעל ציר ה-x",
+    "A מעל C"
+  ],
+  "seed": 0,
+  "name": "#2639 — a free point stated above a solved point"
+}
