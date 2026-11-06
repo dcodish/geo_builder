@@ -260,6 +260,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { featured: true, category: 'claims', he: 'שטח המשולש ABC = 4.5', en: 'the area of triangle ABC = 4.5' },
   { category: 'claims', he: 'A = (2, 0, -10)', en: 'A = (2, 0, -10)' },
   { category: 'claims', he: 'המישור KBC: x + 2y + 3z - 26 = 0', en: 'plane KBC: x + 2y + 3z - 26 = 0' },
+  // #1542 (ADR-3D-429): the book's sentence for the same statement; every plane head reads the "equation of" lead
+  { category: 'claims', he: 'משוואת המישור KBC היא x + 2y + 3z - 26 = 0', en: 'the equation of plane KBC is x + 2y + 3z - 26 = 0' },
   { category: 'claims', he: "הזווית בין A'C לבין BC' היא 90", en: "the angle between A'C and BC' is 90" },
   { category: 'claims', he: "A'K : A'C = 2 : 3", en: "A'K : A'C = 2 : 3" },
   // #1163: the `/`-form sibling of the line above — one notation, two separators. Listed because the

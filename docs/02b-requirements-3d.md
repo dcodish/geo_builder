@@ -363,10 +363,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-19a (Must)** — **Stated numbers restated are already known.** «B(√2,0,0)» · «B=(√2,0,0)», in either order and
   any spelling of the same numbers, adds no row and shows the note of FR-SP-19 (operator 2026-10-17: *"the 3rd line
   should not be accepted and we say that it is already known"*). So does a stated length in the other letter order or
-  any spelling of the same value («AB = 3» · «BA = 3», «BA = 6/2»), as in 2-D. Different numbers are refused as before.
+  any spelling of the same value («AB = 3» · «BA = 3», «BA = 6/2»), as in 2-D. So does a plane's equation restated: the
+  same plane in any letter order, and any multiple of its equation («מישור ABC: x+y=1» · «משוואת המישור CBA היא 2x+2y-2=0»,
+  «π: x+y=1» · «π: x+y-1=0»). Different numbers are refused as before.
   A coordinate line on a point the student never gave coordinates, or a first length on a segment, is their answer or
   a value to draw, and it stays a verified row (FR-CL-1).
-  - Sources: ADR-3D-423; #2341.
+  - Sources: ADR-3D-423, [ADR-3D-429](06b-decisions-3d.md#adr-3d-429); #2341, #1542.
 - **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
   indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
   "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
@@ -610,6 +612,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the DOF cue counts that. A plane declared on any line of the list is used first. A line that still fails creates
   nothing and gives its real reason. No notice: the new row in the list is the signal.
   - Sources: ADR-3D-124, ADR-3D-206, [ADR-3D-388](06b-decisions-3d.md#adr-3d-388); #487, #2484.
+- **FR-EQ-9 (Must)** — **A plane's equation is read in every spelling of the sentence, with no model.** A plane named by
+  its points or by π takes one head: the noun («מישור», «המישור», "plane"), the lead «משוואת», «המשוואה של», "the equation
+  of", and a colon, the copula «הוא» / «היא» / "is", a spaced dash, or nothing, behind the framing «נתון כי» / "given that".
+  «משוואת מישור A'B'C'D' היא x+4y-8z-126=0» and «המישור π הוא z-3=0» build like their colon forms. A dash after a bare
+  «π» is the separator, never a minus. A plane named by its points takes an equation with «=» only.
+  - Sources: [ADR-3D-429](06b-decisions-3d.md#adr-3d-429); #1542.
 
 ## Claims — the student's answer, never a driver
 
@@ -622,6 +630,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or line («A(1, 2, 3)» · «π: mx + z − 1 = 0» · «A על המישור π» gives m = −2, shown as «m = −2»); one that
   holds for every value leaves it free.
   - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396; #508, #512, #552, #1311, #1439, #1472, #1528.
+- **FR-CL-8 (Must)** — **A plane equation that moved the figure is a given, one that was checked is a claim.** A plane
+  equation that did not already hold on the figure before its row (a free cube, a cube of a stated side, points the row
+  creates) places the plane and shows the status dot ● like every other given. One that held on every sample of the
+  figure before its row, the plane already fixed, keeps ✓ «הטענה אומתה מול הציור» (operator 2026-09-29; whether that row
+  stays one is the open question on #2341).
+  - Sources: [ADR-3D-429](06b-decisions-3d.md#adr-3d-429), ADR-3D-030, ADR-W-175 sr-19; #1542.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
   like any other. A role noun («אלכסון AB») is a claim too, judged again on the final figure; named

@@ -349,7 +349,7 @@ function matchDefHead(s: string, nounSrc: string, nameSrc: string): RegExpMatchA
 function defBody(rest: string, named: boolean): string | null {
   const colon = rest.match(/^\s*:\s*(\S.*)$/); // `:` — always a separator
   if (colon) return colon[1];
-  const copula = rest.match(/^\s+(?:הוא|is)\s+(\S.*)$/i); // the copula
+  const copula = rest.match(/^\s+(?:הוא|היא|is)\s+(\S.*)$/i); // the copula, in either gender: «משוואה» is feminine (#1542)
   if (copula) return copula[1];
   if (named) {
     const dash = rest.match(/^\s+[-–—]\s+(\S.*)$/); // a SPACED dash after a NAME
@@ -358,6 +358,14 @@ function defBody(rest: string, named: boolean): string | null {
   const bare = rest.match(/^\s*(\S.*)$/); // nothing at all: the body follows the name directly
   return bare ? bare[1] : null;
 }
+
+/**
+ * #1542 (ADR-3D-429) — the "equation of" LEAD, shared. «משוואת הישר …» and «משוואת המישור …» open a defining statement
+ * with the same words, and the plane rules never read them, so the line lane built the sentence and the plane lane
+ * sent it to the model. One lead per language; a rule composes it, it never spells it.
+ */
+const EQ_OF_HE = String.raw`משוואת|ה?משוואה\s+של`;
+const EQ_OF_EN = String.raw`(?:the\s+|a\s+)?equation\s+of`;
 
 /** The optional «is / lies» copula that can precede a membership verb, in either language. */
 const IS_AT = String.raw`(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?`;
@@ -2470,9 +2478,13 @@ const bareSegment: Rule = (s) => {
 // V2 — the algebraic lane (docs/20 §6.3, ADR-3D-004)
 // ---------------------------------------------------------------------------
 
-/** Plane names: π1 / pi1 / a bare π → canonical `π<digits?>`. */
-const PLANE_NAME = /(?:π|pi|Pi|PI)\s?(\d*)/;
+/** Plane names: π1 / pi1 / a bare π → canonical `π<digits?>`. #1542: the optional space belongs to the INDEX («π 1»):
+ *  it used to sit outside it, so a bare «π» took the space that `defBody` reads before a copula or a dash. */
+const PLANE_NAME = /(?:π|pi|Pi|PI)(?:\s?(\d+))?/;
 const canonicalPlane = (s: string): string => `π${s.match(/\d+/)?.[0] ?? ''}`;
+/** #1542 — the noun of a plane's defining statement, with its optional "equation of" lead: every plane rule reads one
+ *  head. A lead with no noun is not a head: «משוואת x+y=1» names nothing. */
+const PLANE_DEF_NOUN = String.raw`(?:(?:${EQ_OF_HE}|${EQ_OF_EN})\s+)?(?:${HE_PLANE}\s+|(?:the\s+)?plane\s+)`;
 /** Line names (#69, multi-line): ℓ/l + an optional digit index (`ℓ1`, `l2`, subscript `ℓ₂`)
  *  → canonical `ℓ<digits?>`. Digit-indexed by operator ruling — prime forms (ℓ') are NOT in
  *  the vocabulary. NOTE: ℓ is not a `\w` character — never `\b` after a line name, use an
@@ -2583,12 +2595,13 @@ export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinEx
 }
 
 /** `המישור π1: z - 3 = 0` / `plane π2: ay + z - 8 = 0`. */
-const planeByEquation: Rule = (s) => {
+const planeByEquation: Rule = (s0) => {
+  const s = stripStatementPrefix(s0); // #1542: «נתון כי משוואת המישור π היא …» is the framed statement
   // name OPTIONAL (unnamed ⇒ π) and the separator OPTIONAL — `:` or the copula
   // `הוא`/`is` (`המישור x-y+z=1`, `המישור π2 x-y+z=1`, `מישור π1 הוא z-3=0`); the tail
   // must contain `=` so a point-run plane (`מישור ABC`, no `=`) is never stolen, and
   // parseLinearEq strictly validates it (all-or-nothing).
-  const m = matchDefHead(s, `(?:${HE_PLANE}\\s+|(?:the\\s+)?plane\\s+)?`, `(${PLANE_NAME.source})?`);
+  const m = matchDefHead(s, `(?:${PLANE_DEF_NOUN})?`, `(${PLANE_NAME.source})?`);
   if (!m) return null;
   // #504: the equation may be stated with the `= 0` LEFT OFF — the book prints a plane both ways and
   // they name the same plane. `parseLinearEq` stays the gate: it is all-or-nothing and demands a real
@@ -2896,11 +2909,11 @@ const angleBetweenPlanes: Rule = (s) => {
 /** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` / `from A drop a perpendicular to plane π1, it cuts it at B`. */
 const dropPerpToPlane: Rule = (s) => {
   const he = s.match(
-    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+ל${HE_PLANE}\\s+(${PLANE_NAME.source})\\b.*?${AT_POINT}([A-Z]\\d*'?)$`),
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+ל${HE_PLANE}\\s+(${PLANE_NAME.source})(?!\\w).*?${AT_POINT}([A-Z]\\d*'?)$`),
   );
   const en =
     he ??
-    s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?plane (${PLANE_NAME.source})\\b.*? at ([A-Z]\\d*'?)$`));
+    s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?plane (${PLANE_NAME.source})(?!\\w).*? at ([A-Z]\\d*'?)$`));
   if (!en) return null;
   const [, from, plane, , foot] = en;
   return [{ type: 'foot-on-plane', id: foot, from, plane: canonicalPlane(plane) }];
@@ -3182,12 +3195,12 @@ const parametricLine: Rule = (s) => {
     matchDefHead(s, `(?:${HE_LINE}\\s+|line\\s+)?`, NAME) ??
     s.match(
       new RegExp(
-        `^(?:נתון\\s+(?:כי\\s+|ש))?(?:משוואת|ה?משוואה\\s+של|ה?הצגה\\s+ה?פרמטרית\\s+של)\\s+(?:ה?ישר\\s+)?${NAME}\\s+(?:היא|הוא)\\s*:?\\s*(.+)$`,
+        `^(?:נתון\\s+(?:כי\\s+|ש))?(?:${EQ_OF_HE}|ה?הצגה\\s+ה?פרמטרית\\s+של)\\s+(?:ה?ישר\\s+)?${NAME}\\s+(?:היא|הוא)\\s*:?\\s*(.+)$`,
       ),
     ) ??
     s.match(
       new RegExp(
-        `^(?:given\\s+that\\s+)?(?:the\\s+|a\\s+)?(?:equation|parametric\\s+(?:representation|form|equation))\\s+of\\s+(?:the\\s+)?(?:line\\s+)?${NAME}\\s+is\\s*:?\\s*(.+)$`,
+        `^(?:given\\s+that\\s+)?(?:${EQ_OF_EN}|(?:the\\s+|a\\s+)?parametric\\s+(?:representation|form|equation)\\s+of)\\s+(?:the\\s+)?(?:line\\s+)?${NAME}\\s+is\\s*:?\\s*(.+)$`,
       ),
     );
   // #275: the BARE form «x = (a,b,c) + t(d,e,f)» typed with NO «הישר ℓ:» prefix (the textbook's exact
@@ -3836,9 +3849,11 @@ export function componentAskOf(raw: string): { id: string; axis: 'x' | 'y' | 'z'
 // shrank by a rule (the ADR-3D-103 outcome, repeated).
 
 /** `המישור KBC: x + 2y + 3z - 26 = 0` / `מישור A'B'C'D' הוא x-4y-8z-142=0` — a
- *  plane-EQUATION claim on a plane through points; separator `:` or the copula `הוא`/`is`. */
-const planeEqClaim: Rule = (s) => {
-  const m = s.match(/^(?:ה?מישור\s+|(?:the\s+)?plane\s+)((?:[A-Z]\d*'?){3,4})\s*(?::|הוא\s|is\s)\s*(.+)$/);
+ *  plane-EQUATION claim on a plane through points. #1542: the head is `planeByEquation`'s, so the two lanes read the
+ *  same spellings («משוואת המישור ABC היא …», a spaced dash, no separator at all); the body stays this rule's gate. */
+const planeEqClaim: Rule = (s0) => {
+  const s = stripStatementPrefix(s0);
+  const m = matchDefHead(s, PLANE_DEF_NOUN, `((?:[A-Z]\\d*'?){3,4})`);
   if (!m) return null;
   const eq = parseLinearEq(m[2]);
   if (!eq || eq.param) return null; // a claimed equation must be numeric

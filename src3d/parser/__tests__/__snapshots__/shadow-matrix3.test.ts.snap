@@ -1535,6 +1535,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the equation of plane KBC is x + 2y + 3z - 26 = 0",
+    "winner": "planeEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "משוואת המישור KBC היא x + 2y + 3z - 26 = 0",
+    "winner": "planeEqClaim",
+  },
+  {
+    "lang": "en",
     "text": "the angle between A'C and BC' is 90",
     "winner": "angleSegClaim",
   },

@@ -67,7 +67,7 @@ import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
 import { auditLoad3 } from './store/loadAudit3';
 import { useStore } from 'zustand';
-import { derive3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
+import { derive3, factLead3, planeEquationGivens3, redo3, undo3, useGeo3, type Fact3, type FactStatus3 } from './store/store3';
 import { letterRename3 } from './store/rename3';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { planeChipsByFact } from './store/planeChips';
@@ -181,6 +181,8 @@ export default function App3() {
   // #842 (ADR-3D-192) → #1550 (ADR-3D-281): which row owns each plane's display chip — the FIRST ok row
   // whose sentence names the plane, declaration or relation; one chip per plane. Derived from the fact list.
   // #847: a row that is not `ok` owns nothing. #1550: a plane the figure does not draw has no chip.
+  // #1542 (ADR-3D-429): a plane equation that drove the figure leads with the given's dot, never the verified ✓
+  const planeGivens = useMemo(() => planeEquationGivens3(facts, seed), [facts, seed]);
   const planeChips = useMemo(
     () => planeChipsByFact(facts, (id) => derived.status[id] === 'ok', (name) => derived.resolved.planes.has(name)),
     [facts, derived.status, derived.resolved.planes],
@@ -944,7 +946,7 @@ export default function App3() {
               // derived with `textDir3` from this text — this callback used to set `dir` itself.
               text: factRowText3(f, new Set(vectorNames3(derived.construction)), derived.readings[f.id]),
               lead:
-                f.cmds.some((c) => c.type === 'claim') && derived.status[f.id] === 'ok' ? (
+                factLead3(f, derived.status[f.id], planeGivens) === 'verified' ? (
                   <span className="text-xs font-bold text-emerald-600" title={t('facts.claimVerified')}>
                     ✓
                   </span>

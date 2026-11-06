@@ -2326,7 +2326,9 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
 
 /**
  * What a command states as NUMBERS, and of what: a point's three coordinates, in either spelling («B(1,2,3)», «B = (1,2,3)»),
- * or a segment's length, in either letter order («AB = 3», «BA = 3»). Null for anything else.
+ * a segment's length, in either letter order («AB = 3», «BA = 3»), or a plane's equation, read as the plane it names:
+ * a multiple of the equation is another spelling of the same plane («x+y=1», «2x+2y-2=0»), and a point-run plane is the
+ * same plane in any letter order (#1542). Null for anything else, a plane whose equation carries a parameter included.
  */
 const statedNumbers3 = (k: Command3): { of: string; values: readonly number[] } | null => {
   if (k.type === 'point3' || (k.type === 'claim' && k.claim.type === 'coords-eq')) {
@@ -2334,7 +2336,21 @@ const statedNumbers3 = (k: Command3): { of: string; values: readonly number[] } 
     return c.x !== null && c.y !== null && c.z !== null ? { of: `point:${c.id}`, values: [c.x, c.y, c.z] } : null;
   }
   if (k.type === 'claim' && k.claim.type === 'length-eq') return { of: `length:${inkKey3(k.claim.a, k.claim.b)}`, values: [k.claim.value] };
+  if (k.type === 'claim' && k.claim.type === 'plane-eq') {
+    const { ids, cx, cy, cz, d } = k.claim;
+    return { of: `plane:${[...ids].sort().join('|')}`, values: planeOfEquation3([cx, cy, cz, d]) };
+  }
+  if (k.type === 'plane3' && !k.param) {
+    const { cx, cy, cz, d } = k.plane;
+    return { of: `plane:${k.name}`, values: planeOfEquation3([cx.k, cy.k, cz.k, d.k]) };
+  }
   return null;
+};
+/** One plane, one reading of its equation: a unit normal, its first nonzero coefficient positive. */
+const planeOfEquation3 = (eq: readonly number[]): number[] => {
+  const size = Math.hypot(eq[0], eq[1], eq[2]);
+  const sign = Math.sign(eq.slice(0, 3).find((v) => Math.abs(v) > 1e-12 * size) ?? 1);
+  return eq.map((v) => (sign * v) / size);
 };
 const inkKey3 = (a: Id, b: Id): string => [a, b].sort().join('|');
 /** The pairs a line asks to draw (`segment3`), and the rest: what it STATES. */
@@ -2719,6 +2735,34 @@ function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: number, fact: 
   };
   const enabled = facts.filter((f) => f.enabled);
   return [...enabled].reverse().find(names) ?? enabled[enabled.length - 1] ?? null;
+}
+
+/**
+ * #1542 (ADR-3D-429, operator ruling Q2, 2026-09-29) — THE ROWS WHOSE PLANE EQUATION WAS A GIVEN, NOT A CHECK. A plane
+ * equation is a pin and a claim (ADR-3D-030): *"When the plane equation moved the figure (it pinned), the row is a given
+ * and shows ● like every other given. ✓ ... is kept only when the plane was already fixed and the equation was genuinely
+ * checked against the figure."*
+ *
+ * Judged on the figure before the row, the way `knownSegmentEquationTwin3` judges: the equation was CHECKED when it
+ * already held there in every sample (`verifyClaim`), and otherwise the row is what made it true. Not `freeDims` or
+ * `statementReachesFreeDof3`: those ask what COULD move, and a cube of a stated side still floats in space while a cube
+ * fixed by its vertices still counts its side. A view read, never part of `derive3`: only a row wearing a mark pays.
+ */
+export function planeEquationGivens3(facts: readonly Fact3[], seed: number): ReadonlySet<string> {
+  const givens = new Set<string>();
+  facts.forEach((f, i) => {
+    const said = f.enabled ? f.cmds.flatMap((k) => (k.type === 'claim' && k.claim.type === 'plane-eq' ? [k.claim] : [])) : [];
+    if (said.length === 0) return;
+    const before = derive3(facts.slice(0, i) as Fact3[], seed).construction;
+    if (!said.every((claim) => verifyClaim(claim, before, seed))) givens.add(f.id);
+  });
+  return givens;
+}
+
+/** The mark a row leads with: ✓ for a claim verified against the figure, else the status dot (a row's whole rule, so a
+ *  test reaches it). A row holding only a plane equation that drove the figure is a given ({@link planeEquationGivens3}). */
+export function factLead3(f: Pick<Fact3, 'id' | 'cmds'>, status: FactStatus3 | undefined, planeGivens: ReadonlySet<string>): 'verified' | 'status' {
+  return status === 'ok' && f.cmds.some((k) => k.type === 'claim') && !planeGivens.has(f.id) ? 'verified' : 'status';
 }
 
 /**
