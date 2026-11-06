@@ -920,6 +920,15 @@ circle «BD קוטר» means is M1's `diameter-of` (`curveKindOf`; Thales on a t
 `coord-compare {id, axis, greater, rhs: {point} | {value: Expr}}` and `axis-side` are selectors read by `compareOf`,
 with `swappedStarts` restarts.
 
+**The free side of an order is placed after its bound** ([ADR-AG-419](06c-decisions-analytic.md#adr-ag-419), #2639).
+The seeding has three arms. Against a value, or a bound `pointAtId` can read before the solve, the subject is folded to
+the named side, keeping its offset. Two free points both reached by givens, or both reached by none, swap starts
+(#1462). A pair with one side reached and the other not (`orderWaitsForSolve`) is left alone by both swaps, the seeding's
+and `swappedStarts`, because the reached side's start belongs to the solve. The unreached side is placed by
+`placeOrderFree` after the solve, before the check, and `selectorsHoldAt` judges through the same placement, so the
+solve never rejects a root for a point that has not been placed yet. It reads both directions, takes a seed-varied
+fraction of the gap between two bounds, and settles a chain link by link. A point whose orders hold does not move.
+
 **A strict side is judged at the solver's resolution** ([ADR-AG-291](06c-decisions-analytic.md#adr-ag-291), #2230).
 Every strict arm of `failingSelectors` reads one predicate, `sideOfBound(v, bound, scale)`: a value within
 `SOLVE_RESOLUTION × scale` of its bound is ON it (`0`), so a strict comparison fails there and a closed one holds. The

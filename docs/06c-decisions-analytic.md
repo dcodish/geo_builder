@@ -15751,3 +15751,28 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/point-order-1774.test.ts`: the shape, the marks, the note in both locales, the shapes that stay out; row `ex-coordinate-bare-1774`.
 
 **Behaviour change for a student:** in the analytic builder a bare «(3,5)» fills the box with «נתונה הנקודה (3,5)» and a note; Enter draws the point.
+
+## ADR-AG-419 — The free side of an order is placed after its bound (#2639)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P3, analytic) · round #2727 · branch `fix/2639-free-above-solved` from `main` @ `c0029d25` · plan on #2526 corrected by the escalation on #2639 (option A); operator, 2026-11-06, on its start change at configuration 0: *"accept it"*
+**Requirements:** [02c](02c-requirements-analytic.md) R118 · **Design:** [04c](04c-design-analytic.md#a-coordinate-compared-adr-ag-161) · **LADDER stage:** seeding (a start, never a verdict); no solver change
+
+**Amends** [ADR-AG-161](#adr-ag-161): the swap no longer acts on a pair with one side reached by a given and the other not. **Reads** [ADR-AG-324](#adr-ag-324)'s `reachedByGivens`.
+
+**The class.** *A free point held only by an order is sampled blind to a bound the solve settles, so a satisfiable order is refused «לא נמצאה תצורה».*
+
+**Measured at pickup** (`c0029d25`). «x²+(y−5)²=25» · «C על המעגל» · «C על ציר ה-y» · «C מעל ציר ה-x» · «A מעל C» was refused `unsatisfiable` at seeds 0–4. The plan said C is not in `seeded`, so the swap skips it. It is: C is a free vertex and the swap fires. The swap gives C A's lower start, C descends to the root (0, 0) its own region excludes, and raw `evaluate` put C on the origin at 30 of 30 seeds. The plan's `posOf` fold and post-solve re-seed, built as written, changed nothing. «A מתחת ל-C» recorded only because its swap happened to hand C the higher start. `swappedStarts` is a second copy of the swap: with only the seeding one stood down, «A מתחת ל-C» drew A exactly on (0, 0), the circle's other root.
+
+**Decision.**
+1. **`placeOrderFree`.** After the solve and before the check, a free point no constraint reaches is placed on the named side of what it is compared with, keeping its sampled offset. It reads both directions («C מעל A» too). Between two bounds it takes a seed-varied fraction of the gap. A chain settles link by link: another such point counts as a bound only once it has been placed. A point whose orders hold does not move, so a configuration that was accepted is unchanged by this step. An order with no room is left for the judge.
+2. **Neither swap acts on a mixed pair** (`orderWaitsForSolve`). The reached side's start belongs to the solve, so adding the order does not move what stood before it. Pairs both reached (the kite) or both unreached keep #1462's swap.
+3. **`selectorsHoldAt` judges through the placement.** Otherwise a point that has not been placed yet makes the solve reject a good root.
+4. **The seeding folds against a bound it can already read** (a stated or derived point, `pointAtId`): `coord-compare`'s against-a-value rule, that coordinate the value. This is the plan's step 1.
+
+**Not done here.** #2526's symbols arm («R > r») is untouched and that issue stays open; its plan's point step is this ADR.
+
+**Sibling audit (docs/17 §1).** Position words between points are analytic grammar (R165): a grep of `src/parser` finds no «A מעל C» rule, 3-D reads «מעל» only of a plane, complex has no such grammar. No port (the plan says the same).
+
+**Locks.** `src-analytic/__tests__/issue-2639-order-free-side.test.ts` (the reported case at seeds 0–4 and across 24 configurations, stability, the other spellings and directions, a crossing's bound, two bounds, the chain in both line orders, a stated bound, two free points, and three refusals: the contradiction, a cycle, two bounds with no room). Fixtures `issue-2639-above-solved-point.analytic.json`, `issue-2639-order-chain.analytic.json`.
+
+**Behaviour change for a student:** «A מעל C» over a point the givens place now records, with A drawn above it at every configuration. A free point stated above a stated point can be drawn at a different first position than before (the operator accepted this, 2026-11-06), still on the named side. An order that cannot hold is refused as before.

@@ -3065,6 +3065,73 @@ function reachedByLine(c: Construction): ReadonlySet<Id> {
   return new Set([...all].filter((id) => !free.has(id) || moved.has(id)));
 }
 
+/** One side of the pair no given reaches and the other reached: that order waits for the solve (`placeOrderFree`). */
+const orderWaitsForSolve = (c: Construction, a: Id, b: Id): boolean => reachedByGivens(c).ids.has(a) !== reachedByGivens(c).ids.has(b);
+
+/**
+ * THE FREE SIDE OF AN ORDER IS PLACED AFTER ITS BOUND (#2639, ADR-AG-419).
+ *
+ * «C על המעגל» · «C על ציר ה-y» · «C מעל ציר ה-x» · «A מעל C»: no given reaches A, only the order does, so A's sample IS
+ * its drawn value, and nothing the solve does tells it where C went. A point no constraint reaches (`reachedByGivens`,
+ * ADR-AG-324) can wait, so it is placed once the solve is over: on the named side of what it is compared with, keeping
+ * its sampled offset, so «הציגו תצורה אחרת» still moves it. Between two bounds it takes a seed-varied fraction of the gap.
+ * A point whose orders hold does not move. A chain («A מעל C» · «B מעל A») settles link by link: another such point counts
+ * as a bound only once it has been placed itself. An order with no room is left alone. A start, never a verdict: the
+ * judge keeps the last word. Two such points with no other bound are #1462's swap, before the solve.
+ */
+function placeOrderFree(c: Construction, env: Env, free: Map<Id, Pt>, seed: number): Map<Id, Pt> | null {
+  const orders = c.selectors.flatMap((s) => compareOf(s) ?? []);
+  if (!orders.some((k) => 'point' in k.rhs)) return null;
+  const reached = reachedByGivens(c).ids;
+  const involved = (k: CoordCompare, id: Id) => k.id === id || ('point' in k.rhs && k.rhs.point === id);
+  const waiting = freeIds(c).filter((id) => !reached.has(id) && orders.some((k) => involved(k, id)));
+  if (waiting.length === 0) return null;
+  const pending = new Set(waiting);
+  const out = new Map(free);
+  const pos = place(c, env, out);
+  const at = (id: Id) => pos.get(id) ?? null;
+  for (let pass = 0; pass <= waiting.length; pass += 1) {
+    let progressed = false;
+    for (const id of waiting) {
+      const counted = orders.filter((k) => {
+        if (!involved(k, id)) return false;
+        const other = k.id === id ? ('point' in k.rhs ? k.rhs.point : null) : k.id;
+        return other === null || !pending.has(other);
+      });
+      if (counted.length === 0) continue;
+      if (pending.delete(id)) progressed = true;
+      for (const axis of ['x', 'y'] as const) {
+        const mine = counted.filter((k) => k.axis === axis);
+        if (failingSelectors({ ...c, selectors: mine }, pos, env).length === 0) continue;
+        let lo = Number.NEGATIVE_INFINITY;
+        let hi = Number.POSITIVE_INFINITY;
+        for (const k of mine) {
+          const subject = k.id === id;
+          const q = subject ? null : at(k.id);
+          const bound = subject ? rhsOf(k, at, env) : q && (axis === 'x' ? q.x : q.y);
+          if (bound === null) continue;
+          if (subject === k.greater) lo = Math.max(lo, bound);
+          else hi = Math.min(hi, bound);
+        }
+        if (!(lo < hi)) continue;
+        const p = out.get(id)!;
+        const v = axis === 'x' ? p.x : p.y;
+        const near = Number.isFinite(lo) ? lo : hi;
+        const mag = Math.abs(v - near) < 1e-6 ? 1 : Math.abs(v - near);
+        const want = Number.isFinite(lo) && Number.isFinite(hi)
+          ? lo + (hi - lo) * (0.25 + 0.5 * jitter(seed, axis === 'x' ? 0x2639 : 0x263a))
+          : near + (Number.isFinite(lo) ? mag : -mag);
+        const q = axis === 'x' ? { x: want, y: p.y } : { x: p.x, y: want };
+        out.set(id, q);
+        pos.set(id, q);
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  return out;
+}
+
 interface CreatedFit {
   env: Env;
   seeded: Map<Id, Pt>;
@@ -3687,7 +3754,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * «x_B > x_D»: where both points are free and the seed put them the wrong way round, their seeded
    * positions are SWAPPED — the magnitudes the seed chose are kept, so «הציגו תצורה אחרת» still moves the
    * figure, and the descent starts in the basin the sentence names (the kite's B and D are the two roots
-   * of one pair of equations; each goes to the nearer one). Against a VALUE — `axis-side` is the value 0 —
+   * of one pair of equations; each goes to the nearer one). A pair one side of which no given reaches is not swapped:
+   * that side waits for the solve (#2639, ADR-AG-419, `placeOrderFree`). Against a VALUE — `axis-side` is the value 0 —
    * the coordinate is folded to the named side of it, keeping its distance, exactly as #1071 did.
    * A start, never a verdict: the post-hoc judge keeps the last word.
    */
@@ -3699,13 +3767,19 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     const coord = (p: Pt) => (sel.axis === 'x' ? p.x : p.y);
     if ('point' in sel.rhs) {
       const other = seeded.get(sel.rhs.point);
-      if (!other) continue;
-      if (sel.greater ? coord(at0) > coord(other) : coord(at0) < coord(other)) continue;
-      seeded.set(sel.id, other);
-      seeded.set(sel.rhs.point, at0);
-      continue;
+      if (other) {
+        if (sel.greater ? coord(at0) > coord(other) : coord(at0) < coord(other)) continue;
+        // The start of a side a given reaches belongs to the solve (#2639): the swap threw C onto the root its region excludes.
+        if (orderWaitsForSolve(c, sel.id, sel.rhs.point)) continue;
+        seeded.set(sel.id, other);
+        seeded.set(sel.rhs.point, at0);
+        continue;
+      }
     }
-    const v = evalExpr(sel.rhs.value, env);
+    // A bound the seed already knows (a stated or derived point, #2639): the against-a-value rule, its coordinate the value.
+    const bound = 'point' in sel.rhs ? pointAtId(c, env, sel.rhs.point) : null;
+    if ('point' in sel.rhs && !bound) continue;
+    const v = 'value' in sel.rhs ? evalExpr(sel.rhs.value, env) : coord(bound!);
     if (!Number.isFinite(v)) continue;
     // A coordinate that sampled onto the value is on NEITHER side; the comparison is strict, so nudge.
     const d = coord(at0) - v;
@@ -3968,8 +4042,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const ownFree = new Set(ids);
   /** The free vertices lead the vector (`carrierSystem`); the parameters after them stay on the plain step (#1182). */
   const anchorAt = (system: CarrierSystem): number => 2 * system.ids.length;
-  const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
-    c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
+  // …judged as drawn (#2639): a point placed after the solve (`placeOrderFree`) cannot make the solve reject a good root.
+  const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean => {
+    if (c.selectors.length === 0) return true;
+    const pos = system.positionsAt(x);
+    const e = system.envAt(x);
+    return selectorsHold(c, placeOrderFree(c, e, pos, seed) ?? pos, e);
+  };
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
     ...chordStarts(system, x),
@@ -4046,6 +4125,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const p = m.get(cmp.id);
       const q = m.get(cmp.rhs.point);
       if (!p || !q) continue;
+      if (orderWaitsForSolve(c, cmp.id, cmp.rhs.point)) continue;
       m.set(cmp.id, q);
       m.set(cmp.rhs.point, p);
       swapped = true;
@@ -4357,6 +4437,13 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       env = solved.envAt(res.values);
       solvedVec = res.values;
     }
+  }
+
+  // The free side of an order is placed after its bound (#2639, ADR-AG-419).
+  const ordered = placeOrderFree(c, env, free, seed);
+  if (ordered) {
+    free = ordered;
+    solvedVec = sys.toVec(free, env);
   }
 
   /**
