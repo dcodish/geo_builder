@@ -14867,7 +14867,7 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 
 ## ADR-3D-429 — A plane's equation is read in every spelling of the sentence; a row that moved the figure is a given (#1542)
 
-**Status:** accepted · 2026-11-06 · bug (P2, 3d) · fix round #2727, stream D · branch `fix/1542-plane-equation-sentence` from `main` @ `c0029d25` · plan armed `auto-ok` 2026-10-04 · **amends** [ADR-3D-423](#adr-3d-423) (the twin reads a plane's equation)
+**Status:** accepted · 2026-11-06 · bug (P2, 3d) · fix round #2727, stream D · branch `fix/1542-plane-equation-sentence` from `main` @ `c0029d25` · plan armed `auto-ok` 2026-10-04 · **amends** [ADR-3D-423](#adr-3d-423) (the twin reads a plane's equation) · **⚠ Partly superseded by [ADR-3D-431](#adr-3d-431) (2026-11-06):** the lead reads every claim row, and `planeEquationGivens3` is `claimGivens3`
 **Requirements:** [02b](02b-requirements-3d.md) FR-EQ-9 (new), FR-CL-8 (new), FR-SP-19a · **Design:** [04b](04b-design-3d.md) § "Stated numbers restated", "A row's lead", "One plane head" · **Ladder:** none: a parser head, the twin rule and a view read; no solve stage changes
 
 **Operator:** 2026-09-29: *"משוואת מישור A'B'C'D' היא x+4y-8z-126=0 doesnt show the chip to to play with the plane view. also - did this go to llm?"*. Rulings the same day: Q1 *the equation declares*: the row owns the chip unless an earlier row declared the plane. Q2: when the equation moved the figure the row shows ●; ✓ is kept only when the plane was already fixed and the equation was genuinely checked. 2026-11-02, [ADR-W-175](06w-decisions-workspace.md#adr-w-175) sr-19: *"No ✓ "verified" ever appears on a given."*
@@ -14915,3 +14915,16 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Locks.** `src3d/__tests__/issue-1549-cos-spelling.test.tsx`, on rendered markup: both cos spellings, card ≡ strip, the perpendicular and shape guards, the twin, a saved file without the field, the root fraction, the panel row. `fixtures3.test.ts`'s drift net now compares stated commands on both sides. Fixture `fixtures3/cos-row-arrows-1549.geo3.json`.
 
 **Behaviour change for a student:** a line typed as «cos(AB,AD)=0» now shows arrows on its row and in the strip. A perpendicularity and a right-angled shape stay plain. In the data panel, a stated vector's arrow now spans the whole name.
+
+## ADR-3D-431 — Found under the judge's rulings: a claim row that moved the figure leads with ● (#1542)
+
+**Status:** accepted · 2026-11-06 · judged · bug (3d) · fix round #2727, stream F · branch `fix/2727-found-rulings` · **partly supersedes [ADR-3D-429](#adr-3d-429)**
+**Requirements:** [02b](02b-requirements-3d.md) FR-CL-8 · **Design:** [04b](04b-design-3d.md) § "A row's lead" · **Ladder:** none: a view read
+
+**1. The lead (q20).** sr-19, ADR-W-175: *"No ✓ "verified" ever appears on a given."* ADR-3D-429 read that for a plane equation; the reader was general. `planeEquationGivens3` becomes `claimGivens3` and asks every claim of a row, so «AB = 3» on a free cube leads with ●. A statement the figure already held keeps today's ✓: whether it has a row at all is #2341's.
+
+**Cost, measured.** One fold of the prefix per claim row. A 24-row figure with 12 claim rows on a cube: one `derive3` of the whole list 190 ms, the cold pass 957 ms and 12 folds, the warm pass 0.015 ms and 0 folds. Cold is what opening a saved figure pays once, and what an edit of the first row pays. So the verdict is memoised on a trie keyed on the fact objects: a store action reuses every unchanged fact, so a commit pays for its own row only. It is asked at seed 0, because `verifyClaim` asks every sample and the answer is the facts': «הציגו תצורה אחרת» pays nothing, and a row's mark cannot change on a press. A view read, never part of `derive3`.
+
+**Locks.** `src3d/__tests__/issue-1542.test.ts`, with the counter seam `takeLeadFolds3`.
+
+**Behaviour change for a student:** a claim row that placed or sized the figure, such as «AB = 3» on a free cube, shows ● where it showed ✓.
