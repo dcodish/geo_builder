@@ -45,14 +45,14 @@ const CLOSE = ')]}';
  * states two givens in one sentence: «הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2». Each half reads alone, so the form
  * is its two halves, two rows. Only this form: «ו» is not a sentence boundary, and nothing else here splits on it.
  */
-const ON_AND_DIVIDES = /^((?:הנקודה\s+)?([A-Z]\d*)\s+(?:נמצאת\s+)?על\s+הקטע\s+([A-Z]\d*[A-Z]\d*))\s+ומחלקת\s+אותו\s+ביחס\s+(\S.*)$/;
+const ON_AND_DIVIDES = /^((?:הנקודה\s+)?([A-Z]\d*)\s+(?:נמצאת\s+)?על\s+הקטע\s+([A-Z]\d*)([A-Z]\d*))\s+ומחלקת\s+אותו\s+ביחס\s+(\S.*)$/;
 
-/** The sentence, or its two halves when it is that form. A stated ratio is its own sentence; a bare one says who divides what. */
+/** The sentence, or its two halves when it is that form. A stated ratio is its own sentence; a bare one is written over the point. */
 function halves(s: Sentence, next: Sentence | undefined): Sentence[] {
   const m = s.text.match(ON_AND_DIVIDES);
   if (!m) return [s];
-  const [, on, point, segment, ratio] = m;
-  const second = ratio.includes('=') ? ratio : `${point} מחלקת את ${segment} ביחס ${ratio}`;
+  const [, on, point, a, b, ratio] = m;
+  const second = ratio.includes('=') ? ratio : `${a}${point}:${point}${b} = ${ratio}`;
   return [{ text: on, rest: s.rest }, { text: second, rest: joinSentences(second, next?.rest ?? '') }];
 }
 
