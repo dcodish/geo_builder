@@ -26,7 +26,7 @@ import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
-import { dataView, panelIsEmpty } from './engine/dataView';
+import { dataView, panelIsEmpty, radiusRowLabel3 } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
@@ -1173,6 +1173,11 @@ export default function App3() {
                     title: t('dataPanel.secMeasures'),
                     dir: 'app',
                     rows: [
+                      ...(dataPanel?.radii ?? []).map((r) => (
+                        <span key={`radius-${r.circle ?? ''}`}>
+                          {radiusRowLabel3(r, (k, p) => t(k, p) as string)} = <MathRun>{r.text}</MathRun>
+                        </span>
+                      )),
                       ...(dataPanel?.vectors ?? []).map((v) => (
                         <span key={v.label}>
                           {v.decomp && (

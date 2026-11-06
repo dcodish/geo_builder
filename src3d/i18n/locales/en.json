@@ -232,6 +232,8 @@
     "openParam": "free parameter — pinned once more data arrives",
     "secPoints": "Points",
     "secMeasures": "Measures",
+    "radius": "radius {{c}}",
+    "radiusSole": "radius of the circle",
     "secPlanes": "Planes",
     "planesHint": "Click to show the plane in full, as its face only, or to hide it",
     "secStated": "What you stated",

@@ -96,6 +96,14 @@ export interface DataPanel {
    *  still-free one prints open (`t = ?`), so the stated given visibly took effect. #1746 (ADR-3D-339):
    *  `value` is the text after «<sym> = » (`-3`, `?`) — what the ask row prints after its own echo. */
   params: { sym: string; text: string; value: string; open: boolean }[];
+  /** #2611 (ADR-3D-420): each free circle's STATED radius, a given true at every configuration like `stated`. `circle` is
+   *  its centre's letter, `null` for the circle with none; the words are {@link radiusRowLabel3}'s. */
+  radii: { circle: string | null; text: string }[];
+}
+
+/** The label of a radius row, 2-D's words (`valueRowText`): «רדיוס O», or «רדיוס המעגל» for a circle with no letter. */
+export function radiusRowLabel3(r: DataPanel['radii'][number], t: (key: string, params?: Record<string, string>) => string): string {
+  return r.circle === null ? t('dataPanel.radiusSole') : t('dataPanel.radius', { c: r.circle });
 }
 
 /**
@@ -116,7 +124,8 @@ export function panelIsEmpty(p: DataPanel): boolean {
     p.vectors.length === 0 &&
     p.points.length === 0 &&
     p.planes.length === 0 &&
-    p.params.length === 0
+    p.params.length === 0 &&
+    p.radii.length === 0
   );
 }
 
@@ -1558,7 +1567,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.
-  return { stated: statedVectorRows(c, known), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params };
+  // The radius grammar reads plain numbers only, so the value's own digits are what was typed: a decimal stays one.
+  const radii = c.circles3.flatMap((k) =>
+    k.def.kind === 'free' && k.def.radius !== undefined ? [{ circle: k.def.center ?? null, text: statedMagText(k.def.radius, String(k.def.radius)) }] : [],
+  );
+  return { stated: statedVectorRows(c, known), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params, radii };
 }
 
 /**
