@@ -241,8 +241,9 @@ describe('#1542 Am. 1 — a digit glued to a variable is its coefficient, never 
     expect(c.type).toBe('plane3');
     expect(c.name).toBe(name);
     expect(c.plane.cx.k).toBe(cx);
-
+  });
 });
+
 describe('#1542 — every claim row that moved the figure leads with ● (judged q20, sr-19, ADR-3D-431)', () => {
   it('«AB = 3» on a free cube is a given', () => {
     build(["קוביה ABCDA'B'C'D'", 'AB = 3']);
