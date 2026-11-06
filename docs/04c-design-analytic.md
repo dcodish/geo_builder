@@ -1090,7 +1090,7 @@ pair's points (an earlier «T על AB» lands after the line that declares A and
 pins the drawn tangent). When `onLine` alone decided the touch, M1 says so (`touchByOnLine`), and `reDecidedBy` records
 each later contributing line whose facts came out `known` as `narrowed`, so it records instead of «already known»
 ([ADR-AG-321](06c-decisions-analytic.md#adr-ag-321), #2418).
-The common tangent is a LINE: M1 draws it through `name-line { a, b, name }` (the sentence's name, «הישר l משיק …»
+The common tangent is a LINE object: M1 builds it through `name-line { a, b, name }` (the sentence's name, «הישר l משיק …»
 `namedCommonTangent`, or the pair's), the `line-at` through a along a→b, listed by its name. `name-line` («נסמן את הישר
 PQ ב-l», `parseNameLine`) re-names the figure's line over the pair (`lineOverPair`), re-identifying it as `lineIdOf(name)`
 with its references (`replaceId`), or draws the line on a segment. The `axis-cut { line, axis, greater }` selector
@@ -1119,7 +1119,9 @@ its pair's earlier slots left (`openOptions`, `settledSlots`), so the pair's dig
 tangent is a new slowest digit. A `distinct` beside the slot rejects a dead assignment. `seedFreePairs` starts two circles
 nothing else speaks of apart. A missing family is a residual (`familyGap`). `subjectLed` fits a later vertex alone.
 
-*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `tangentsExhausted` · `commonTangentSlot` · `pairCommonTangents` · `commonTouchOf` · `common-touch` · `reversedFamily` · `familyGap` · `openOptions` · `settledSlots` · `seedFreePairs` · `subjectLed`
+**The ink follows what the sentence names ([ADR-AG-415](06c-decisions-analytic.md#adr-ag-415), #2408).** With no line named the line stays a carrier (`drawn: false`, `segmentInk`) beside its segment, and `evaluate`'s `stated` keeps it off the canvas while `panelListsCurve` lists it. `lineDrawn` draws the same object, from `line-2pt`, `name-line` and `drawLinesSpokenOf` (the fold's commit: a new row naming the id, an `axis-cut` / `line-compare` over the pair, an `on-line-2pt` with `saysLine`). The set takes reserved `vertex` letters (`touches`), the `common-tangent` object keeps them, `lineOverPair` reads them, and a student's letter for a touch renames the tool's (`tangent-of`). Tangents already drawn count toward the set (`pairCommonTangents`).
+
+*Identifiers:* `lineDrawn` · `drawLinesSpokenOf` · `segmentInk` · `saysLine` · `touches` · `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `tangentsExhausted` · `commonTangentSlot` · `pairCommonTangents` · `commonTouchOf` · `common-touch` · `reversedFamily` · `familyGap` · `openOptions` · `settledSlots` · `seedFreePairs` · `subjectLed`
 
 **The unlettered common tangent, the kind as its definition, the named touch ([ADR-AG-337](06c-decisions-analytic.md#adr-ag-337), #2553).**
 `unnamedCommonTangent` reads «(ה)משיק (משותף)? (חיצוני|פנימי|אלכסוני)? (משותף)? <two circles>», optionally led by «הישר l»,

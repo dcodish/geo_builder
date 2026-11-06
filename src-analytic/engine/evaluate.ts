@@ -4641,7 +4641,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       /** A common tangent of two circles (#2390, ADR-AG-314), named by the student or the tool — listed by that name. */
       case 'common-tangent': {
         const curve = commonTangentAt(c, env, at, o);
-        if (curve) curves.push({ id: o.id, label: { name: o.name, kind: 'line' }, curve, stated: true });
+        if (curve) curves.push({ id: o.id, label: { name: o.name, kind: 'line' }, curve, stated: o.drawn !== false });
         else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }

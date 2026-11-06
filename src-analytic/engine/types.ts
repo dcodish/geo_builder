@@ -531,7 +531,8 @@ export type Fact =
    * circle-slot sentinels inside `circles-about`. M1 reads how the pair sits (`pairPositionOf`) and draws the families
    * that position has, each a `common-tangent` object named by `names` (the student's) or the next free l1, l2, ….
    */
-  | (FactBase & { t: 'common-tangents'; circles: [Id, Id]; names?: string[] })
+  /** `touches` (#2408, ADR-AG-415): the tool's letters for the ends, two per tangent; only M1 knows how many are used. */
+  | (FactBase & { t: 'common-tangents'; circles: [Id, Id]; names?: string[]; touches?: Id[] })
   /**
    * «המשיק העובר בנקודה המשותפת לשני המעגלים» — THE COMMON TANGENT AT THE TOUCHING CIRCLES' COMMON POINT (#2390,
    * ADR-AG-314): the `touch` family, for a pair the figure says is tangent; `name` the student's («המשיק l …»).
@@ -1076,7 +1077,17 @@ export type GeoObject =
    * `name` is how the student refers to it («ישר l3»), so a crossing can name it; absent for an
    * anonymous line.
    */
-  | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false }
+  | {
+      kind: 'line-at';
+      id: Id;
+      through: Id;
+      dir: Direction;
+      perp: boolean;
+      name?: string;
+      drawn?: false;
+      /** A common tangent whose sentence named no line (#2408, ADR-AG-415): the segment is the ink, and a later sentence about the line draws it. */
+      segmentInk?: true;
+    }
   /**
    * ONE COMMON TANGENT OF TWO CIRCLES, AS AN OBJECT (#2390, ADR-AG-314) — a straight line in CLOSED FORM from the two
    * solved circles, 0 DOF and solver-free (the `derived.ts` discipline). With d the distance between the centres and u
@@ -1084,9 +1095,11 @@ export type GeoObject =
    * −(r₁ + r₂)/d for the INTERNAL pair; `a` / `b` is the normal's side of u (left, right), stable across configurations.
    * `touch` is the double root of a TANGENT pair (the merged internal pair of externally tangent circles, the merged
    * external pair of internally tangent ones). A family the configuration lacks is a vacancy. `name` is the student's
-   * or the tool's («l1»), shown on the figure and in the panel.
+   * or the tool's («l1»), shown in the panel. `touches` (#2408, ADR-AG-415) are its two touch points, on `circles` in
+   * order, joined by the segment that is its ink (`drawn: false`, `segmentInk`) until a later sentence speaks of the line.
+   * The `touch` family has one touch point and no segment, so it is drawn as the line it always was (2-D's tangent at T).
    */
-  | { kind: 'common-tangent'; id: Id; circles: [Id, Id]; family: CommonTangentFamily; name: string }
+  | { kind: 'common-tangent'; id: Id; circles: [Id, Id]; family: CommonTangentFamily; name: string; touches?: [Id, Id]; drawn?: false; segmentInk?: true }
   /**
    * A circle COMPUTED FROM POINTS (#1464, #1324, [ADR-AG-160](../../docs/06c-decisions-analytic.md#adr-ag-160))
    * — «מעגל ABD», the circle through three points, and «BD קוטר במעגל», the circle on a diameter.

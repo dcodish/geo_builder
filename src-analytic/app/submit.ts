@@ -566,6 +566,10 @@ function decideOnce(
    */
   if (addsStatedValue(current, trial)) return recorded;
 
+  // A LINE THAT DRAWS A LINE RECORDS (#2408, ADR-AG-415): «T על הישר AB» may hold already, but it speaks of the line under
+  // the segment, and that line now shows.
+  if (trial.figure.curves.some((u) => u.stated && !current.figure.curves.some((v) => v.id === u.id && v.stated))) return recorded;
+
   // A LINE THAT PUTS A LETTER ON THE FIGURE RECORDS (#2674, ADR-AG-404): «E(-3,7)» on the tool's P₁ states what the figure
   // holds, but the letter is new, and P₁ yields to it. The line owns the letter, as 2-D's naming by use is its line's (ADR-653).
   if (trial.figure.points.some((p) => !current.figure.points.some((q) => q.id === p.id))) return recorded;

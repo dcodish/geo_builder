@@ -2082,8 +2082,49 @@ function lineOverPair(c: Construction, a: Id, b: Id): GeoObject | undefined {
   return c.objects.find(
     (o) =>
       (o.kind === 'line-at' && !o.perp && o.dir.k === 'points' && pair(o.dir.a, o.dir.b) && (o.through === a || o.through === b)) ||
-      ((o.kind === 'line-at' || o.kind === 'curve') && (o.id === lineIdOf(`${a}${b}`) || o.id === lineIdOf(`${b}${a}`))),
+      ((o.kind === 'line-at' || o.kind === 'curve') && (o.id === lineIdOf(`${a}${b}`) || o.id === lineIdOf(`${b}${a}`))) ||
+      (o.kind === 'common-tangent' && !!o.touches && pair(o.touches[0], o.touches[1])),
   );
+}
+
+/**
+ * THE LINE UNDER A SEGMENT IS DRAWN ONCE A SENTENCE SPEAKS OF IT (#2408, ADR-AG-415; operator, 2026-11-06: *"if later we
+ * talk about a line - we draw the line"*). ADR-AG-207's upgrade: the same object, so nothing re-solves and no twin is made.
+ */
+function lineDrawn(c: Construction, o: GeoObject): Construction {
+  if ((o.kind !== 'line-at' && o.kind !== 'common-tangent') || o.drawn !== false) return c;
+  const { drawn: _ink, segmentInk: _segment, ...line } = o;
+  return { ...c, objects: c.objects.map((x) => (x === o ? (line as GeoObject) : x)) };
+}
+
+/**
+ * WHICH LINE A LINE'S NEW ROWS SPEAK OF (#2408, ADR-AG-415) — one reading for every later sentence: a row, selector or
+ * object this fact added that names a tangent's undrawn line by its id («הישר l2 …», «C על l2»), or a region over the
+ * pair's line («הישר AB חותך את ציר ה-y …», which keeps the two letters). Read here, at the one commit every fact passes,
+ * so no sentence kind has to remember it. A row about the segment («AB ⟂ CD», «T על AB») names neither, and an ask adds nothing.
+ */
+function drawLinesSpokenOf(before: Construction, next: Construction): Construction {
+  const held = before.objects.filter((o) => (o.kind === 'line-at' || o.kind === 'common-tangent') && o.segmentInk);
+  if (held.length === 0) return next;
+  const fresh = JSON.stringify([
+    next.constraints.filter((k) => !before.constraints.includes(k)),
+    next.selectors.filter((q) => !before.selectors.includes(q)),
+    next.objects.filter((o) => !before.objects.includes(o) && !held.some((h) => h.id === o.id)),
+  ]);
+  let out = next;
+  for (const h of held) {
+    const now = out.objects.find((o) => o.id === h.id);
+    if (now && fresh.includes(`"${h.id}"`)) out = lineDrawn(out, now);
+  }
+  const pairs = [
+    ...next.selectors.flatMap((q) => (!before.selectors.includes(q) && (q.kind === 'axis-cut' || q.kind === 'line-compare') && q.line.k === 'points' ? [q.line] : [])),
+    ...next.constraints.flatMap((k) => (!before.constraints.includes(k) && k.t === 'on-line-2pt' && k.saysLine ? [k] : [])),
+  ];
+  for (const { a, b } of pairs) {
+    const over = lineOverPair(out, a, b);
+    if (over) out = lineDrawn(out, over);
+  }
+  return out;
 }
 
 /**
@@ -2165,11 +2206,13 @@ function pairCommonTangents(c: Construction, c1: Id, c2: Id): { letters: PairTan
     const dir = ours(o.circles);
     if (dir !== 0) lines.add(dir === 1 ? o.family : reversedFamily(o.family));
   }
+  // The ends of a tangent «כל המשיקים» drew are that line, already in `lines`: never a second tangent of the pair.
+  const ofLines = new Set(c.objects.flatMap((o) => (o.kind === 'common-tangent' ? (o.touches ?? []) : [])));
   const byTouch = new Map<Id, Set<CommonTangentFamily>>();
   const visit = (k: Constraint): void => {
     if (k.t === 'choice') return k.options.forEach(visit);
     if (k.t === 'all') return k.of.forEach(visit);
-    if (k.t !== 'derived-at' || k.rule.t !== 'common-touch') return;
+    if (k.t !== 'derived-at' || k.rule.t !== 'common-touch' || ofLines.has(k.id)) return;
     const dir = ours(k.rule.circles);
     if (dir === 0 || (dir === 1 ? k.rule.on !== 0 : k.rule.on !== 1)) return;
     const set = byTouch.get(k.id) ?? new Set<CommonTangentFamily>();
@@ -4634,6 +4677,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const tangentLines = (f.lines ?? []) as TangentLineRef[];
       /*
+       * THE STUDENT'S LETTER FOR A TOUCH THE TOOL LETTERED (#2408, ADR-AG-415) — «P נקודת ההשקה של l2 עם מעגל O_1» after
+       * «כל המשיקים המשותפים»: the tool's letter yields (the operator's 2026-11-03 ruling, ADR-AG-387: *"Rename the tool's
+       * letter to the student's, no message"*), so one touch keeps one name.
+       */
+      const onLine = tangentLines.length === 1 && tangentLines[0].kind === 'curve' ? objectById(c, tangentLines[0].id) : undefined;
+      const touched = f.circleId ?? (f.circle !== undefined ? circleByName(c, f.circle)?.id : undefined);
+      if (onLine?.kind === 'common-tangent' && onLine.touches && f.at !== undefined && touched !== undefined && onLine.circles.includes(touched)) {
+        const tool = onLine.touches[onLine.circles.indexOf(touched)];
+        const held = objectById(c, f.at);
+        if (tool === f.at) return { ok: true, effect: 'known', next: c };
+        if (held?.kind === 'free') {
+          const shown = lineDrawn(c, onLine);
+          return { ok: true, effect: 'created', next: renamePoint({ ...shown, objects: shown.objects.filter((o) => o.id !== f.at) }, tool, f.at) };
+        }
+      }
+      /*
        * A NAMED LINE THE FIGURE DOES NOT HAVE, TANGENT AT A NAMED POINT (#2621 A, [ADR-AG-368](../../docs/06c-decisions-analytic.md#adr-ag-368))
        * — «הישר l משיק למעגל בנקודה A» with no l: the sentence states the tangent AT A, named l (M1: new object vs existing).
        * It was `unknown-reference` l. With l in the figure the sentence stays the statement about l, below.
@@ -4813,8 +4872,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const touched = applyAll(c, placed);
       if (!touched.ok) return touched;
+      const held = lineOverPair(c, f.a, f.b);
       const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
-      return drawn.ok ? { ...drawn, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) } : drawn;
+      if (!drawn.ok) return drawn;
+      /*
+       * A SENTENCE THAT NAMES NO LINE DRAWS THE SEGMENT (#2408, ADR-AG-415; operator, 2026-11-06: *"the inputs dont say a
+       * line so only the segments should be drawn"*, 2-D's drawing). «הישר l …» has a name and keeps its line. Without one the
+       * line stays as the carrier ADR-AG-207 made (`drawn: false`): its equation row, the axis side and the ask lane read
+       * it, and a later sentence about the line draws it. A line the student already drew stays drawn.
+       */
+      let inked = drawn.next;
+      if (f.name === undefined && (!held || (held.kind === 'line-at' && held.drawn === false))) {
+        const carrier = lineOverPair(inked, f.a, f.b);
+        if (carrier?.kind === 'line-at') inked = { ...inked, objects: inked.objects.map((o) => (o === carrier ? { ...carrier, drawn: false as const, segmentInk: true as const } : o)) };
+        const piece = applyFact(inked, { t: 'segment', id: segmentIdOf(f.a, f.b), a: f.a, b: f.b, ref: true, src: f.src });
+        if (!piece.ok) return piece;
+        inked = piece.next;
+      }
+      return { ok: true, next: inked, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) };
     }
 
     /**
@@ -4834,7 +4909,35 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.t === 'common-touch-tangent' && !touching) return { ok: false, error: { code: 'not-handled', detail: f.src } };
       if (f.t === 'common-tangents' && position === null) return { ok: false, error: { code: 'not-handled', detail: f.src } };
       if (position === 'inside') return { ok: false, error: { code: 'no-common-tangent', detail: f.src } };
-      const families = f.t === 'common-touch-tangent' ? (['touch'] as const) : FAMILIES_OF[position!];
+      /*
+       * TANGENTS ALREADY DRAWN COUNT TOWARD THE SET (#2408, ADR-AG-415), as in 2-D (`issue-2405`): the lines the set drew
+       * before and the letter-named tangents. With nothing left it is 2-D's refusal, never four more lines on the same four.
+       */
+      const given0 = f.t === 'common-tangents' ? f.names : undefined;
+      const prior = f.t === 'common-tangents' && !given0 ? pairCommonTangents(c, c1, c2) : null;
+      const open = FAMILIES_OF[position!]?.filter((g) => !prior?.lines.has(g)) ?? [];
+      const lettered = prior?.letters.length ?? 0;
+      if (prior && open.filter((g) => g !== 'touch').length <= lettered && !open.includes('touch')) {
+        return { ok: false, error: { code: 'no-common-tangent', detail: f.src, tangents: tangentsExhaustedOf(undefined, position) } };
+      }
+      if (f.t === 'common-tangents' && lettered > 0) {
+        // The rest are more tangents of the pair, the slots a letter-named one takes, lettered by the tool.
+        const rest = open.filter((g) => g !== 'touch').length - lettered;
+        let out: Construction = c;
+        for (let i = 0; i < rest; i++) {
+          const [a, b] = [f.touches?.[2 * i], f.touches?.[2 * i + 1]];
+          if (a === undefined || b === undefined) break;
+          const more = applyAll(out, [{ t: 'declare', id: a, src: f.src }, { t: 'declare', id: b, src: f.src }, { t: 'common-tangent', a, b, circles: [c1, c2], src: f.src }]);
+          if (!more.ok) return more;
+          out = more.next;
+        }
+        if (open.includes('touch')) {
+          const [name] = freeLineNames(out, 1);
+          out = { ...out, objects: [...out.objects, { kind: 'common-tangent', id: lineIdOf(name), circles: [c1, c2], family: 'touch', name }] };
+        }
+        return { ok: true, next: out, effect: 'created' };
+      }
+      const families: readonly CommonTangentFamily[] = f.t === 'common-touch-tangent' ? ['touch'] : prior ? open : FAMILIES_OF[position!];
       const given = f.t === 'common-tangents' ? f.names : f.name !== undefined ? [f.name] : undefined;
       if (given && given.length !== families.length) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
       const names = given ?? freeLineNames(c, families.length);
@@ -4847,7 +4950,28 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           if (held.kind === 'common-tangent' && held.family === families[i] && held.circles.join() === f.circles.join()) continue;
           return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(held) } };
         }
-        next = { ...next, objects: [...next.objects, { kind: 'common-tangent', id, circles: [c1, c2], family: families[i], name: names[i] }] };
+        /*
+         * THE SET DRAWS SEGMENTS TOO (#2408, ADR-AG-415; operator, 2026-11-06: *"they should also just be the segments. if a
+         * user want the line he can later say that in a later input"*): each two-touch tangent's ends are the tool's next
+         * letters, 2-D's AB, CD, EF, GH, placed by the family's closed form, and the tangent keeps its line as the carrier of
+         * its name and equation row. The touch tangent has one touch and no segment: a line, as 2-D draws it.
+         */
+        const family = families[i];
+        const [a, b] = [f.t === 'common-tangents' ? f.touches?.[2 * i] : undefined, f.t === 'common-tangents' ? f.touches?.[2 * i + 1] : undefined];
+        if (a === undefined || b === undefined || family === 'touch') {
+          next = { ...next, objects: [...next.objects, { kind: 'common-tangent', id, circles: [c1, c2], family, name: names[i] }] };
+          continue;
+        }
+        const at = (p: Id, on: 0 | 1): Fact => ({ t: 'constraint', k: { t: 'derived-at', id: p, rule: { t: 'common-touch', circles: [c1, c2], family, on } }, src: f.src });
+        const placed = applyAll({ ...next, objects: [...next.objects, { kind: 'common-tangent', id, circles: [c1, c2], family, name: names[i], touches: [a, b], drawn: false, segmentInk: true }] }, [
+          { t: 'declare', id: a, src: f.src },
+          { t: 'declare', id: b, src: f.src },
+          at(a, 0),
+          at(b, 1),
+          { t: 'segment', id: segmentIdOf(a, b), a, b, ref: true, src: f.src },
+        ]);
+        if (!placed.ok) return placed;
+        next = placed.next;
       }
       return { ok: true, next, effect: next === c ? 'known' : 'created' };
     }
@@ -4874,11 +4998,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(c, { t: 'line-at', id, through: f.a, dir: { k: 'points', a: f.a, b: f.b }, perp: false, name: f.name, src: f.src });
       }
       const letters = (n: string | undefined) => n === undefined || n === '' || n === `${f.a}${f.b}` || n === `${f.b}${f.a}`;
-      const own = prior.kind === 'line-at' ? prior.name : prior.kind === 'curve' ? prior.label.name : undefined;
-      if (prior.id === id && own === f.name) return { ok: true, effect: 'known', next: c };
+      const own = prior.kind === 'line-at' || prior.kind === 'common-tangent' ? prior.name : prior.kind === 'curve' ? prior.label.name : undefined;
+      if (prior.id === id && own === f.name) {
+        const shown = lineDrawn(c, prior);
+        return { ok: true, effect: shown === c ? 'known' : 'narrowed', next: shown };
+      }
       if (!letters(own)) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+      const { drawn: _ink, segmentInk: _segment, ...shown } = prior as Extract<GeoObject, { kind: 'line-at' }>;
       const renamed: GeoObject =
-        prior.kind === 'line-at' ? { ...prior, id, name: f.name } : prior.kind === 'curve' ? { ...prior, id, label: { ...prior.label, name: f.name } } : prior;
+        prior.kind === 'line-at' ? { ...shown, id, name: f.name } : prior.kind === 'curve' ? { ...prior, id, label: { ...prior.label, name: f.name } } : prior;
       if (renamed === prior) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       const next: Construction = {
         ...c,
@@ -5727,6 +5855,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
       if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      // «הישר AB» about a tangent's segment: its line, drawn (#2408, ADR-AG-415).
+      const under = lineOverPair(c, f.a, f.b);
+      if (under && (under.kind === 'line-at' || under.kind === 'common-tangent') && under.segmentInk) return { ok: true, effect: 'narrowed', next: lineDrawn(c, under) };
       const prior = objectById(c, lineIdOf(`${f.a}${f.b}`)) ?? objectById(c, lineIdOf(`${f.b}${f.a}`));
       if (prior?.kind === 'curve') {
         if (prior.stated) return { ok: true, effect: 'known', next: c };
@@ -6730,13 +6861,14 @@ function statedOnCommonTangents(
         for (const k of factsWithin(h)) {
           if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) put(k.k.id, j);
           if (k.t === 'tangent-of' && k.at !== undefined && (k.lines ?? []).some((l) => l.kind === 'points' && pair(l.a, l.b, g.a, g.b))) put(k.at, j);
+          if (k.t === 'common-tangent' && pair(k.a, k.b, g.a, g.b)) for (const id of k.onLine ?? []) put(id, j);
         }
       });
       if (on.size === 0) return g;
       const prior = from.get(i) ?? new Map<Id, Set<number>>();
       on.forEach((lines, id) => prior.set(id, new Set([...(prior.get(id) ?? []), ...lines])));
       from.set(i, prior);
-      return { ...g, onLine: [...on.keys()] };
+      return { ...g, onLine: [...new Set([...(g.onLine ?? []), ...on.keys()])] };
     });
     return { ...f, about };
   });
@@ -6899,7 +7031,8 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   const selectorFact: number[] = [];
   const touchByOnLine: boolean[] = facts.map(() => false);
   const objectFact = new Map<Id, number>();
-  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
+  const commit = (i: number, committed: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
+    const next = drawLinesSpokenOf(c, committed);
     touchByOnLine[i] = byOnLine === true;
     // #1687 (ADR-AG-348): the first fact that brought each object in — the object's provenance.
     for (const o of next.objects) if (!objectFact.has(o.id)) objectFact.set(o.id, i);

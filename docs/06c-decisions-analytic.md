@@ -13021,6 +13021,8 @@ No other sequence moved.
 
 ## ADR-AG-313 — The common tangent is a named line: «הישר l משיק … בנקודות P ו-Q בהתאמה», «נסמן את הישר PQ ב-l», and where a line crosses an axis with no point made (#2392, #2390 §3)
 
+> **⚠ Superseded in part by [ADR-AG-415](#adr-ag-415)** (#2408, operator 2026-11-06): decision 1's ink. A sentence that names no line draws the segment; the line stays as its undrawn carrier, with its equation row.
+
 **Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic) · fix round #2414, stream E · branch `feat/2392-analytic-named-common-tangent`, stacked on `fix/2385-analytic-tangent-at-touch` ([ADR-AG-312](#adr-ag-312)) · LADDER stage: none (M1 lowerings and a branch selector; no solver change)
 **Requirements:** [02c](02c-requirements-analytic.md) R182 (new: the named common tangent, «נסמן את הישר PQ ב-l», the axis side of a line's crossing) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order" (the common tangent's line, `name-line`, `axis-cut`) · **Builds on** [ADR-AG-312](#adr-ag-312) (the `common-tangent` fact) · ADR-W-118 B1 (exceptions X4 / X1)
 
@@ -13052,6 +13054,8 @@ No other sequence moved.
 **Consequences.** `engine/types.ts` (`common-tangent.name`, `name-line`, the `axis-cut` selector), `engine/apply.ts` (`common-tangent` draws its line, `name-line`, `lineOverPair`, `replaceId`, the selector's references), `engine/evaluate.ts` (`lineTriple`, the `axis-cut` judge), `parser/parseAnalytic.ts` (`commonTangentFacts`, `namedCommonTangent`, `parseNameLine`, `parseAxisCut`, `twoCircleSlots`), `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R180, 04c.
 
 ## ADR-AG-314 — The common-tangent object: every common tangent of a pair in one sentence, each named; the tangent at the touching circles' common point (#2390)
+
+> **⚠ Superseded in part by [ADR-AG-415](#adr-ag-415)** (#2408, operator 2026-11-06): the set draws segments with 2-D's letters, keeps its names and rows, and counts the tangents already drawn.
 
 > **Amended by [ADR-AG-403](#adr-ag-403)** (#2408, 2026-11-05): the letter-named sentence now reads this ADR's families; `errNoCommonTangent` became the suite's `tangentsExhaustedContained`.
 
@@ -15561,3 +15565,32 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/probe-alphabet-2566.test.ts`: the click and rows 1–6 for eight letters and three controls (63 of 86 tests red before the fix), distinctness, a twin sweep over the other reads, and the probe itself. The #2554 class guard loses its known-gap row. Fixture `circle-centre-letter-radius-2566.analytic.json`: the circle, the click's exact line, the respelling.
 
 **Behaviour change for a student:** every letter now behaves as r always did. The + at the centre of «(x-13)^2+y^2=R^2» names it, and that circle retyped in any spelling is known, never refused and never drawn twice.
+
+## ADR-AG-415 — A sentence that names no line draws the segment; a later sentence about the line draws it (#2408)
+
+**Date:** 2026-11-06 · **Status:** accepted · bug (P2, analytic, `reported`) · round #2722 · branch `fix/2408-tangent-segments` from `main` @ `10331c78` · operator, 2026-11-06, on «AB משיק משותף …»: *"the inputs dont say a line so only the segments should be drawn"*; on a later line: *"yes - if later we talk about a line - we draw the line"*; on «כל המשיקים המשותפים»: *"they should also just be the segments. if a user want the line he can later say that in a later input"*
+**Requirements:** [02c](02c-requirements-analytic.md) R181 and R182 (the ink; the rows stay) · **Design:** [04c](04c-design-analytic.md) "Circles a sentence draws" and "Common tangents" · **LADDER stage:** none (M1 lowerings and the fold's commit; no solver change)
+
+**Supersedes in part** [ADR-AG-313](#adr-ag-313) decision 1 and [ADR-AG-314](#adr-ag-314)'s ink. **Builds on** [ADR-AG-207](#adr-ag-207) (the carrier line) and [ADR-AG-403](#adr-ag-403) (the slots).
+
+**Measured at pickup** (`10331c78`, `prod/2026-11-05-2`; the table is on #2408). 2-D draws segment AB for every lettered and unlettered spelling, and segments AB, CD, EF, GH for the set. Analytic drew an infinite line, on prod too. The chord, «PT משיק …» and «AB משיק למעגל» were already segments in analytic. 3-D does not read the sentence (X8).
+
+**The class.** *A sentence that names two letters and no line drew an infinite line.* Swept over the 4,613-figure corpus: the common-tangent family only.
+
+**Decision.**
+1. **The ink follows what the sentence names.** With no line named, `case 'common-tangent'` keeps its line as the carrier (`drawn: false`, marked `segmentInk`) and draws the segment. The equation row, «… או …», the axis side and the ask lane read the carrier as before, so #2392 and #2553 are unchanged. «הישר l …» and «הישר AB …» keep the line. The at-form («CD … בנקודה M») goes through the same arm.
+2. **A later sentence about the line draws it, the same object.** `lineDrawn` is ADR-AG-207's upgrade. It is reached from `line-2pt` («הישר AB»), `name-line`, and `drawLinesSpokenOf` at the fold's one commit: any new row, selector or object that names the carrier's id, a region over the pair (`axis-cut`, `line-compare`), or an incidence on the line by its noun («C על הישר AB», `saysLine`, no part of the given's identity). So no sentence kind has to remember, and no twin is minted. A sentence about the segment («T על AB», «AB ⟂ CD») and a question draw nothing.
+3. **A line that draws a line records**, even when its statement already holds (`decideOnce`): «T על הישר AB» was «already known»; with nothing recorded the line could not appear.
+4. **The set draws segments.** The parser reserves tool letters (`vertex`, line-scoped: 2-D's AB, CD, EF, GH); M1 uses two per two-touch family, placed by the family's closed form (`common-touch`). The `common-tangent` object keeps its name, row and id as the carrier, and holds its `touches`, so «הישר AB» and «הישר l2» reach the one line. The `touch` family has one touch and no segment: it stays a line, as 2-D's `tan-T`.
+5. **A set tangent is addressable both ways.** «הישר l2 …» by the name in the panel, «הישר CD …» by its letters. The row's name is ADR-AG-314's and the operator's (*"we should name them so the user can refer to them later"*). No reading was invented.
+6. **A student's letter for a touch takes the tool's** («P נקודת ההשקה של l2 עם מעגל O_1»), the operator's ruling of 2026-11-03 (ADR-AG-387), and the sentence speaks of l2, so l2 is drawn.
+
+**Found in round, fixed here.** The set restated drew four MORE lines (l5–l8), and a set after «AB משיק משותף …» drew four beside AB: a fifth tangent on two circles, ADR-AG-403's class. Now tangents already drawn count toward the set, 2-D's rule (`issue-2405`): AB and then the three missing, and with none left 2-D's refusal.
+
+**The letters a figure gains.** The set's ends are real points of the figure, with coordinate rows, as in 2-D. A later sentence that types such a letter means that point (#1153's rule for every tool letter).
+
+**Sibling audit (docs/17 §1).** 2-D is the reference and unchanged. 3-D: X8. Complex: no such grammar. Other direction, unchanged: 2-D draws «AB משיק למעגל O» as its tangent line, analytic the segment.
+
+**Locks.** `src-analytic/__tests__/issue-2408-common-tangent-segment.test.ts` (each spelling, the operator's four at seeds 0–4, the no-twin paths, every later-line path, the set by position, both ways of addressing a set tangent, the found cases). Fixture `issue-2408-set-then-line.analytic.json`. `issue-2418` (d) is re-stated by this ruling: «T על הישר AB» now records.
+
+**Behaviour change for a student:** «AB משיק משותף …» and «כל המשיקים המשותפים» draw segments between the touch points, with their equations still in the panel. Saying «הישר …» about one draws that line. The set letters its segments AB, CD, EF, GH. Repeating the set is refused instead of doubling it.
