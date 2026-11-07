@@ -9,8 +9,9 @@
  *
  * A file that is both is a CASE FILE: one fix's figure, replayed whole, in its own cold worker. The
  * operator ruled on 2026-11-07 that a fix's own test is a unit test of the module that was fixed, and
- * that its figure is locked once, in a fixture or the scenario corpus (#2739). The case files are what
- * that ruling folds away, and `server/__tests__/fix-test-shape.test.ts` stops new ones appearing
+ * that its figure is locked once, in a fixture or the scenario corpus (#2739). A fix-round item's check skips the
+ * case files it did not touch, those whose figure is already locked are folded away, and
+ * `server/__tests__/fix-test-shape.test.ts` stops new ones appearing
  * without a stated reason (`pipeline-lock: <why a shared net cannot make this check>`).
  *
  * The front doors are per builder. They are listed here, once; a new builder adds its own.
@@ -73,7 +74,7 @@ export function entersFrontDoor(source) {
 
 /**
  * Pure: the file's kind.
- *  - `case`     named after a fix and enters through a front door (what #2739 folds away)
+ *  - `case`     named after a fix and enters through a front door (what an item's check skips, #2739)
  *  - `pipeline` enters through a front door but is not named after a fix (nets, corpora, module suites)
  *  - `unit`     does not enter through a front door
  */

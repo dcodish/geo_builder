@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { llmProxyPlugin } from './server/llmProxy';
 import { shareProxyPlugin } from './server/shareProxy';
 import { logProxyPlugin } from './server/logProxy';
@@ -22,6 +23,23 @@ const BUILD_ID = (() => {
     return 'dev';
   }
 })();
+
+/**
+ * #2739 (ADR-W-191): a run's own excludes (the slow tier, and in a fix-round item's check the case files), written by
+ * `scripts/test-tiers.mjs` to a JSON file named in GEO_TEST_EXCLUDE_FILE. They are too many for a command line:
+ * cmd.exe caps one at 8,191 characters. An unreadable file excludes nothing more, so a run can only test MORE.
+ */
+function runExcludes(): string[] {
+  const file = process.env.GEO_TEST_EXCLUDE_FILE;
+  if (!file) return [];
+  try {
+    const list: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    return Array.isArray(list) ? list.filter((g): g is string => typeof g === 'string') : [];
+  } catch {
+    console.warn(`GEO_TEST_EXCLUDE_FILE ${file} is unreadable: nothing extra is excluded`);
+    return [];
+  }
+}
 
 export default defineConfig(({ command }) => ({
   define: { __BUILD__: JSON.stringify(BUILD_ID) },
@@ -58,6 +76,6 @@ export default defineConfig(({ command }) => ({
     // dist-3d/ is the 3-D app's build output — not covered by the default `**/dist/**` — and
     // .claude/ holds assistant worktrees (stale full repo copies); a Dropbox dehydrated
     // placeholder inside either EPERMs vitest's crawl before a single test runs.
-    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'dist-3d/**', 'dist-next/**', 'dist-3d-next/**', '**/.claude/**', 'archive/**', '**/*.tmp.*'],
+    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'dist-3d/**', 'dist-next/**', 'dist-3d-next/**', '**/.claude/**', 'archive/**', '**/*.tmp.*', ...runExcludes()],
   },
 }));

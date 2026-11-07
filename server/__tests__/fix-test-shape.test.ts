@@ -2,7 +2,8 @@
  * #2739 ([ADR-W-191](../../docs/06w-decisions-workspace.md#adr-w-191)) — A FIX'S OWN TEST IS A UNIT TEST.
  *
  * Operator, 2026-11-07: a fix's own test is a real unit test of the module that was fixed, and the figure is
- * locked once, in a fixture or the scenario corpus; the existing whole-figure fix files are folded away.
+ * locked once, in a fixture or the scenario corpus. Then: an item's check skips the existing whole-figure fix files, and
+ * those whose figure is already locked are folded away.
  *
  * A CASE FILE is a test file named after one fix (`issue-1234-…`, `…-1234.test.ts`) that enters its builder's
  * "sentences in, figure out" route (`scripts/lib/test-kind.mjs` lists those front doors, once). Each one replays a

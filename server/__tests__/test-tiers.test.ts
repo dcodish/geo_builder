@@ -536,3 +536,17 @@ describe('#2739 — every file’s cost is kept, and read by kind of test (ADR-W
     expect(rows['src3d · unit']).toEqual({ files: 1, ms: 10 });
   });
 });
+
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { caseExcludes } from '../../scripts/test-tiers.mjs';
+
+describe('#2739 — an item\u2019s check skips the case files it did not touch (ADR-W-191, option A)', () => {
+  const kind = (f: string) => (f.includes('issue-') ? 'case' : 'unit');
+  const files = ['src/app/__tests__/issue-1918-x.test.ts', 'src/app/__tests__/issue-2001-y.test.ts', 'src/engine/__tests__/geometry.test.ts'];
+  it('every case file is skipped, unit tests never are', () => {
+    expect(caseExcludes(files, kind, [])).toEqual(['src/app/__tests__/issue-1918-x.test.ts', 'src/app/__tests__/issue-2001-y.test.ts']);
+  });
+  it('the case files the change touched always run, whichever slash the diff used', () => {
+    expect(caseExcludes(files, kind, ['src\\app\\__tests__\\issue-2001-y.test.ts', 'src/engine/geometry.ts'])).toEqual(['src/app/__tests__/issue-1918-x.test.ts']);
+  });
+});

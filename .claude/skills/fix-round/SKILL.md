@@ -222,8 +222,10 @@ Each item, inside its stream:
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; **`npm run test:fast -- --changed` green** (only the test trees the
-   diff can break, read from BOUNDARIES.json: an analytic item runs analytic + server, ~26 of the tier's 90
-   CPU-minutes; [ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190)) plus
+   diff can break, read from BOUNDARIES.json, [ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190);
+   and without the case files the diff did not touch, which replay whole figures and run in the batch's full
+   suite, [ADR-W-191](../../../docs/06w-decisions-workspace.md#adr-w-191): a 2-D item ~13 CPU-minutes,
+   3-D ~3.6, analytic ~2.3) plus
    **every test file the item added or changed, run by path** (a slow-tier file is excluded from
    `test:fast`, so the item's own heavy locks must be named), plus **`npm run test:exams -- --changed`**
    (the exams of the builders the diff touches; [ADR-W-172](../../../docs/06w-decisions-workspace.md#adr-w-172)). **Not the product lane:** a lane

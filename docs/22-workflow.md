@@ -190,7 +190,7 @@ opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-w
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item
 is fixed **at the root, per its plan**, in its own worktree under the item gates (ADR + rule-4
-regression lock + `tsc` + build + `test:fast -- --changed` + `test:exams -- --changed`; the full suite runs once per batch, see "Gating and landing" below).
+regression lock + `tsc` + build + `test:fast -- --changed` (which skips the case files the diff did not touch, ADR-W-191) + `test:exams -- --changed`; the full suite runs once per batch, see "Gating and landing" below).
 A plan armed before 2026-10-07 has no outcome section: the round writes it at pickup from the issue
 thread, and any line it cannot tag `[asked]`/`[ruled]`/`[2-D]`/`[judged]` escalates. **A round never takes a default
 on an open question** — the item waits for the operator; a P1 session may
@@ -245,7 +245,7 @@ awaiting play, rounds in flight, rounds awaiting validation.
 - **What nobody hit is parked, not kept open** ([ADR-W-169](06w-decisions-workspace.md#adr-w-169)). When it composes, a round runs `node scripts/known-gaps.mjs --apply --plan <plan/current.json>`. It parks every P3 feature or debt item a session found that no student and not the operator hit, idle 30 days and outside the plan: `icebox`, closed, listed in [known-gaps.md](known-gaps.md), with any parity gap it owns parked in the same batch. Bugs, `reported`, `wrong-answer`, `needs-operator` and plan items are never parked. A later hit **reopens** the original issue with `--reopen <N>`, never a new one.
 
 **Gating and landing (ADR-W-034, operator ruling 2026-08-30; per-item gate amended by ADR-W-113):** each
-item is gated on `tsc`, build, `npm run test:fast -- --changed` (the test trees its diff can break, ADR-W-190) and its own new or changed test files
+item is gated on `tsc`, build, `npm run test:fast -- --changed` (the test trees its diff can break, ADR-W-190, without the case files it did not touch, ADR-W-191) and its own new or changed test files
 run by path, not on its product lane; the FULL suite runs once per batch, on the merged staging tip, and
 the batch lands on `main` in ONE push. Round #822 measured the per-item full-suite alternative at ~5 hours
 for 8 items, and round #1776 spent ≥170 min on 47 per-item lane runs (#1813).

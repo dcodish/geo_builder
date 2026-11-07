@@ -287,6 +287,31 @@ function changedFiles(base) {
   return [...new Set(`${committed}\n${working}\n${untracked}`.split('\n').map((s) => s.trim()).filter(Boolean))];
 }
 
+/**
+ * Pure (#2739, ADR-W-191): the case files an item's check skips — every test file `kindOf` calls a case file,
+ * except those the change itself touched (the item's own locks always run). Repo-relative POSIX paths.
+ */
+export function caseExcludes(testFiles, kindOf, changed) {
+  const touched = new Set(changed.map((f) => f.replace(/\\/g, '/')));
+  return testFiles.filter((f) => !touched.has(f) && kindOf(f) === 'case');
+}
+
+/** Every tracked test file, repo-relative. */
+function trackedTests() {
+  const out = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 }).stdout ?? '';
+  return out.split('\n').filter((f) => /\.test\.tsx?$/.test(f));
+}
+
+let testKindOf = null;
+/** `scripts/lib/test-kind.mjs` over the file's source; an unreadable file is never skipped. */
+function kindOfFile(file) {
+  try {
+    return testKindOf(file, readFileSync(join(ROOT, file), 'utf8'));
+  } catch {
+    return 'unknown';
+  }
+}
+
 // ── fast ───────────────────────────────────────────────────────────────────
 function fast(argv = []) {
   const at = argv.indexOf('--changed');
@@ -310,7 +335,11 @@ function fast(argv = []) {
     const { status } = runAndRecord('fast', scope, trees);
     process.exit(status);
   }
-  const excludes = [...scope, ...slowFiles(tiers).flatMap((f) => ['--exclude', `**/${base(f)}`])];
+  const slowGlobs = slowFiles(tiers).map((f) => `**/${base(f)}`);
+  // #2739 (ADR-W-191, operator 2026-11-07, option A): an item's check skips the case files it did not touch. They
+  // replay whole figures and were 78% of the fast tier's CPU; the batch's full suite still runs every one.
+  const skipped = against ? caseExcludes(trackedTests(), kindOfFile, changedFiles(against)) : [];
+  if (against) console.log(`test:fast --changed — skipping ${skipped.length} case file(s) the change did not touch (ADR-W-191); the full suite runs them.`);
   // #484: membership is a SHARE of suite time, not a wall-clock cutoff, so the message reports the rule.
   // `thresholdMs` is the pre-#484 field — still read so an older tier file prints something sensible.
   const how = tiers.rule?.kind === 'top-share'
@@ -323,7 +352,7 @@ function fast(argv = []) {
   // The verdict stamps `mode: "fast"` even on the no-membership path above, where this mode really did run
   // every file: under-claiming is the safe direction, and a consumer gating on `mode === 'full'` must never
   // be handed a full verdict by a command the workflow declares is not a gate.
-  const { status } = runAndRecord('fast', excludes, trees);
+  const { status } = runAndRecord('fast', scope, trees, [...slowGlobs, ...skipped]);
   process.exit(status);
 }
 
@@ -333,7 +362,7 @@ function fast(argv = []) {
  * The verdict is written FIRST - before tier/catch bookkeeping - so a fault in that bookkeeping cannot
  * leave a completed run with no record of whether it was green.
  */
-function runAndRecord(mode, extraArgs, scope = null) {
+function runAndRecord(mode, extraArgs, scope = null, excludeGlobs = []) {
   // ADR-W-114: queue behind any other worktree's run instead of overlapping it. Taken BEFORE the tree
   // state is read, so the verdict describes the tree as it was when this run actually started.
   const asked = Date.now();
@@ -344,9 +373,12 @@ function runAndRecord(mode, extraArgs, scope = null) {
   const out = join(tmpdir(), `geo-suite-${process.pid}.json`);
   const timesOut = join(tmpdir(), `geo-file-times-${process.pid}.json`);
   const plannedOut = join(tmpdir(), `geo-planned-files-${process.pid}.json`);
+  // #2739: the excludes go through a file `vite.config.ts` reads — a command line holds 8,191 characters on cmd.exe
+  const excludeOut = join(tmpdir(), `geo-excludes-${process.pid}.json`);
+  writeFileSync(excludeOut, JSON.stringify(excludeGlobs));
   const status = runVitest(
     ['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, `--reporter=${FILE_TIME_REPORTER}`, ...extraArgs],
-    { GEO_FILE_TIMES_OUT: timesOut, GEO_PLANNED_FILES_OUT: plannedOut },
+    { GEO_FILE_TIMES_OUT: timesOut, GEO_PLANNED_FILES_OUT: plannedOut, GEO_TEST_EXCLUDE_FILE: excludeOut },
   );
   const ended = Date.now();
   release();
@@ -357,6 +389,7 @@ function runAndRecord(mode, extraArgs, scope = null) {
     rmSync(out, { force: true });
     rmSync(timesOut, { force: true });
     rmSync(plannedOut, { force: true });
+    rmSync(excludeOut, { force: true });
   } catch {
     /* best effort */
   }
@@ -740,6 +773,7 @@ function report() {
 // function and its invariance is unit-tested, which requires importing the module without dispatching).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
+  testKindOf = (await import('./lib/test-kind.mjs')).testKind;
   if (mode === 'fast') fast(process.argv.slice(3));
   else if (mode === 'full') full();
   else if (mode === 'report') report();
