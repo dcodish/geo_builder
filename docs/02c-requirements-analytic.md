@@ -205,6 +205,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «M אמצע AB» above «A(0,0)» · «B(4,0)» → M at (2, 0)
 - Sources: #1242, ADR-AG-133, #1339, #1340, ADR-AG-156, ADR-W-089.
 
+**R254 — Shapes that share nothing are drawn and judged as if each stood alone** ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737). *(Operator, 2026-11-07: "there is nothing wrong with shapes landing different places so i have no issue with this. in reality it would be rare to have so many on the same page but this can happen and these numbers are not something we can live with.")* A shape beside unrelated shapes is accepted, refused and drawn valid exactly as it would be alone; a new line never moves a shape it does not touch, and answers about as fast as a line on a figure of that shape alone. Where each separate shape lands is free, like any unstated position (R14).
+
 **R31 — A point's COMPONENTS are addressable and comparable: `Ax > Bx`.** *(Operator ruling.)* The typed form of «שיעור ה-x של קדקוד A גדול משיעור ה-x של קדקוד B».
 
 **R31a — SEMANTICS first, because it decides correctness.** A strict comparison is a **selector** among configurations that satisfy the givens; an equality (`Ax = Bx`) constrains.

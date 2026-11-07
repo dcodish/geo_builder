@@ -138,6 +138,23 @@
         "האנך חותך את AC בנקודה E"
       ],
       "lookFor": "E on the canvas."
+    },
+    {
+      "sheet": "fix-2737",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-07",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(6,0)",
+        "C(2,4)",
+        "משולש ABC",
+        "M אמצע BC"
+      ],
+      "lookFor": "M = (4, 2), as before."
     }
   ],
   "results": [

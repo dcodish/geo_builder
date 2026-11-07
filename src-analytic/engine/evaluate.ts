@@ -10,7 +10,7 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
@@ -25,12 +25,13 @@ import { closePairsOf, COLLAPSED_SIN_TOL, cornerKey, legibilityFaults, ringFault
 import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, SOLVE_TOL, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
-import { assignmentAt } from './discreteAxes';
+import { assignmentAt, joinChoiceSeeds, splitChoiceSeed } from './discreteAxes';
+import { partIndexOf, partsOf } from './components';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
 import { followObjects } from './roles';
 import { offInkExtensions } from '../../shell/offInk';
-import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
+import { curveByName, inDomain, isFree, isPositional, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
   id: Id;
@@ -305,7 +306,8 @@ function pointAtId(c: Construction, env: Env, id: Id): Pt | null {
 function searchSpan(c: Construction, env: Env, floor = 6): Span {
   const xs: number[] = [];
   const ys: number[] = [];
-  for (const o of c.objects) {
+  // #2737 (ADR-AG-425): a part of a split figure is sampled in the WHOLE figure's frame, so it starts where it started inside it
+  for (const o of frameOf(c).objects) {
     if (o.kind !== 'point') continue;
     const x = evalExpr(o.x, env);
     const y = evalExpr(o.y, env);
@@ -322,6 +324,19 @@ function searchSpan(c: Construction, env: Env, floor = 6): Span {
     return { lo: lo - grow, hi: hi + grow };
   };
   return { x: axis(xs), y: axis(ys) };
+}
+
+/** The figure whose frame a construction is drawn in: itself, or the whole a part was split from (#2737, ADR-AG-425). */
+const frameOf = (c: Construction): Construction => c.whole ?? c;
+
+/**
+ * The salt a parameter is sampled with — its place in the FRAME's register (#2737), so a parameter of a part draws the value
+ * it drew inside the whole figure. For a figure that is not a part this is its own register, as it always was.
+ */
+function saltOf(c: Construction): (sym: string) => number {
+  const at = new Map(paramRegister(frameOf(c)).map((p, i) => [p.sym, i + 1] as const));
+  const own = new Map(paramRegister(c).map((p, i) => [p.sym, i + 1] as const));
+  return (sym) => at.get(sym) ?? own.get(sym) ?? 1;
 }
 
 /**
@@ -448,12 +463,13 @@ export function sampleEnv(c: Construction, seed = 0, reach = 1, wide = seed !== 
    * reaches is solved, and its sample is the solve's starting point: it keeps the window the solve was tuned on. A
    * free line's direction is an angle, not a figure unit.
    */
-  const scale = wide ? statedScale(c.objects, c.constraints) : 1;
+  const scale = wide ? statedScale(frameOf(c).objects, frameOf(c).constraints) : 1;
   const reached = scale > 1 ? reachedByGivens(c).syms : null;
-  paramRegister(c).forEach((p, i) => {
+  const salt = saltOf(c);
+  paramRegister(c).forEach((p) => {
     const units = !reached || reached.has(p.sym) || (isDirectionSymbol(p.sym) && shapedObjectOf(p.sym) === null) ? 1 : scale;
     // #1621 (ADR-AG-215): a symbol a stated angle holds is sampled inside the range that angle allows.
-    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, i + 1, reach, units);
+    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, salt(p.sym), reach, units);
   });
   return env;
 }
@@ -1980,6 +1996,71 @@ function deflatedStarts(
 /** The free vertices, in a stable order — the solver's unknown vector is two entries each. */
 const freeIds = (c: Construction): Id[] => c.objects.filter(isFree).map((o) => o.id);
 
+/**
+ * WHAT EACH CONSTRAINT'S RESIDUAL READS (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)) — every point,
+ * curve and named line the residual actually looks up, recorded by evaluating it once at the first configuration's samples
+ * through recording lookups. Every option of a choice is read. The splitter (`components.ts`) links each constraint to what
+ * it read as well as to what its text names, so a reference spelled in a way the text walk does not resolve is still a link:
+ * the residual is the one thing the solve couples, so it is the one authority on what a constraint couples.
+ */
+function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet<Id>> {
+  const out = new Map<Constraint, Set<Id>>();
+  const env = sampleEnv(raw, 0);
+  const span = searchSpan(raw, env);
+  const free = new Map(freeIds(raw).map((id) => [id, { x: freeCoord(0, id, 0, span), y: freeCoord(0, id, 1, span) }] as const));
+  const pos = place(raw, env, free);
+  const scale = residualScale(raw, env);
+  const leaves = (k: Constraint): Constraint[] => (k.t === 'choice' ? k.options.flatMap(leaves) : k.t === 'all' ? k.of.flatMap(leaves) : [k]);
+  for (const k of raw.constraints) {
+    const seen = new Set<Id>();
+    const at = (id: Id): Pt | null => {
+      seen.add(id);
+      return pos.get(id) ?? null;
+    };
+    const curves = curveAtOf(raw, env, at);
+    const lines = lineAtOf(raw, env, at);
+    for (const q of leaves(k)) {
+      try {
+        residual(
+          q,
+          at,
+          env,
+          (id) => {
+            seen.add(id);
+            return curves(id);
+          },
+          (name) => {
+            const o = curveByName(raw, name) ?? objectById(raw, name);
+            if (o) seen.add(o.id);
+            return lines(name);
+          },
+          scale,
+        );
+      } catch {
+        /* a residual that cannot be read here links by its text alone */
+      }
+    }
+    out.set(k, seen);
+  }
+  /*
+   * …and a CROSSING reads every earlier point its statement fixes (`crossingPartners`, #2615): the judge keeps the crossing
+   * off any earlier point on both of its carriers, and a point no freedom reaches («A(3,4)») sits there in EVERY configuration
+   * when it sits there once — a coupling by position that no text names (#1917's «הישר l1 חותך את המעגל בנקודה E» beside
+   * A on both). A fixed point adds no unknown, so the link costs nothing. A free point of another part lands on both
+   * carriers only by chance, and the walk's separation keeps it apart from the crossing on the canvas (`drawableParts`).
+   */
+  raw.objects.forEach((o, i) => {
+    const pair = crossingIncidences(raw, o.id);
+    if (!pair) return;
+    const fixed = raw.objects.slice(0, i).filter((q) => isPositional(q) && noFreedomReaches(raw, q.id)).map((q) => q.id);
+    if (fixed.length === 0) return;
+    for (const k of pair) for (const id of fixed) out.get(k)?.add(id);
+  });
+  return out;
+}
+/** The independent parts of a figure, linked by text and by what each residual reads. */
+const splitOf = (c: Construction): Construction[] => partsOf(c, constraintReads);
+
 export interface SolveReport {
   /** A constraint that could not be met, named for the student. */
   unsatisfied: Constraint[];
@@ -2048,7 +2129,7 @@ function foldSignSelectors(c: Construction, env: Env): Env {
  */
 function seedExtensionRadii(c: Construction, env: Env): Env {
   let out = env;
-  const scale = statedScale(c.objects, c.constraints);
+  const scale = statedScale(frameOf(c).objects, frameOf(c).constraints);
   for (const sel of c.selectors) {
     if (sel.kind !== 'beyond') continue;
     const circles = (id: Id) => c.constraints.flatMap((k) => (k.t === 'on-curve' && k.id === id ? [k.curve] : []));
@@ -2184,7 +2265,9 @@ export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !==
   const key = (reach === 1 ? `${seed}` : `${seed}@${reach}`) + (wide === (seed !== 0) ? '' : '~first');
   const hit = perSeed.get(key);
   if (hit) return hit;
-  const out = evaluateTryingChoices(raw, seed, reach, wide);
+  // #2737 (ADR-AG-425): independent parts are evaluated apart and the figure is their union; one part takes the old path.
+  const parts = splitOf(raw);
+  const out = parts.length > 1 ? evaluateParts(raw, parts, seed, reach, wide) : evaluateTryingChoices(raw, seed, reach, wide);
   perSeed.set(key, out);
   // #2039 (ADR-AG-358): which configuration this figure is — first writer wins, so a figure two keys share keeps one name
   if (!evaluatedAt.has(out)) evaluatedAt.set(out, { seed, reach, wide });
@@ -2221,20 +2304,149 @@ function choiceOptions(c: Construction, choiceSeed: number): string {
 function admittedFigure(f: Figure): boolean {
   return f.unsatisfied.length === 0 && f.selectorsOk && hardRingFaults(f).length === 0;
 }
-function evaluateTryingChoices(raw: Construction, seed: number, reach = 1, wide = seed !== 0): Figure {
+function evaluateTryingChoices(raw: Construction, seed: number, reach = 1, wide = seed !== 0, choiceStart = seed): Figure {
   evaluateStats.uncached += 1;
-  const first = evaluateUncached(raw, seed, seed, reach, wide);
+  const first = evaluateUncached(raw, seed, choiceStart, reach, wide);
   if (admittedFigure(first)) return first;
   // Never fewer tries than one axis has options: a single choice of n options still walks all n (as before), and
   // the cap only bounds the walk over a PRODUCT of axes.
-  const { total, radices } = assignmentAt(raw, seed);
+  const { total, radices } = assignmentAt(raw, choiceStart);
   const n = Math.max(Math.min(total, CHOICE_TRIES), ...radices);
   for (let k = 1; k < n; k += 1) {
     evaluateStats.uncached += 1;
-    const f = evaluateUncached(raw, seed, seed + k, reach, wide);
+    const f = evaluateUncached(raw, seed, choiceStart + k, reach, wide);
     if (admittedFigure(f)) return f;
   }
   return first;
+}
+
+/**
+ * A FIGURE OF INDEPENDENT PARTS, EVALUATED PART BY PART (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)).
+ *
+ * Each part takes, at this seed, the options the whole figure's odometer gives it (`splitChoiceSeed`), so seed `s` still
+ * names the combination it always named, and every combination stays reachable (ADR-AG-302). From there each part walks
+ * its OWN choices when its option fails — a dead option of one shape no longer re-solves every other shape under the next
+ * combination — and is solved, deflated and judged on its own unknowns. The figure is the union of the parts' figures;
+ * its `choiceSeed` spells the combination the parts chose (`joinChoiceSeeds`), so every reader of it resolves exactly the
+ * options drawn. Per-part results are memoised per (part, seed, choice start), so the configuration walks reuse them.
+ */
+function evaluateParts(raw: Construction, parts: Construction[], seed: number, reach: number, wide: boolean): Figure {
+  const partOf = partIndexOf(parts);
+  const starts = splitChoiceSeed(raw, parts.length, partOf, seed);
+  const figures = parts.map((part, i) => evaluatePart(part, seed, reach, wide, starts[i]));
+  // A part's figure names its choice seed only when it differs from the seed it was evaluated at (`evaluateUncached`).
+  return mergeParts(raw, parts, figures, seed, figures.map((f) => f.choiceSeed ?? seed), partOf, false);
+}
+
+const partMemo = new WeakMap<Construction, Map<string, Figure>>();
+function evaluatePart(part: Construction, seed: number, reach: number, wide: boolean, choiceStart: number): Figure {
+  let perKey = partMemo.get(part);
+  if (!perKey) {
+    perKey = new Map();
+    partMemo.set(part, perKey);
+  }
+  const key = `${seed}@${reach}:${wide ? 1 : 0}#${choiceStart}`;
+  const hit = perKey.get(key);
+  if (hit) return hit;
+  const f = evaluateTryingChoices(part, seed, reach, wide, choiceStart);
+  perKey.set(key, f);
+  return f;
+}
+
+/** The parts' figures as one figure — every list in the order the student stated its objects and rows. */
+function mergeParts(
+  raw: Construction,
+  parts: Construction[],
+  figures: Figure[],
+  seed: number,
+  /** The choice seed each part's figure resolved its options at (its own odometer). */
+  choices: readonly number[],
+  partOf: (owner: unknown) => number,
+  /** Always name the choice seed — a figure assembled from parts drawn at DIFFERENT seeds has no seed it could default to. */
+  always: boolean,
+): Figure {
+  const objectAt = new Map(raw.objects.map((o, i) => [o.id, i] as const));
+  const byObject = <T extends { id: Id }>(xs: T[]): T[] =>
+    xs.map((x, i) => [x, i] as const).sort((a, b) => (objectAt.get(a[0].id) ?? 1e9 + a[1]) - (objectAt.get(b[0].id) ?? 1e9 + b[1])).map(([x]) => x);
+  const rowAt = new Map(raw.constraints.map((k, i) => [k, i] as const));
+  const byRow = (ks: Constraint[]): Constraint[] =>
+    ks.map((k, i) => [k, i] as const).sort((a, b) => (rowAt.get(a[0]) ?? 1e9 + a[1]) - (rowAt.get(b[0]) ?? 1e9 + b[1])).map(([k]) => k);
+  const all = <T>(read: (f: Figure) => T[] | undefined): T[] => figures.flatMap((f) => read(f) ?? []);
+  const choiceSeed = joinChoiceSeeds(raw, parts, partOf, choices);
+  const forcedCrossed = all((f) => f.forcedCrossed);
+  const env: Env = Object.assign({}, ...figures.map((f) => f.env));
+  const collapsedRings = all((f) => f.collapsedRings);
+  const metPairs = all((f) => f.metPairs);
+  const rootKeyed = figures.some((f) => f.rootKey !== undefined);
+  const selectorsFailing = all((f) => f.selectorsFailing);
+  const points = byObject(all((f) => f.points));
+  const merged: Figure = {
+    env,
+    points,
+    curves: byObject(all((f) => f.curves)),
+    segments: byObject(all((f) => f.segments)),
+    arcs: byObject(all((f) => f.arcs)),
+    construction: byObject(all((f) => f.construction)),
+    extensions: all((f) => f.extensions),
+    vacant: byObject(all((f) => f.vacant)),
+    unsatisfied: byRow(all((f) => f.unsatisfied)),
+    selectorsOk: figures.every((f) => f.selectorsOk),
+    ...(selectorsFailing.length > 0 ? { selectorsFailing } : {}),
+    ringFaults: all((f) => f.ringFaults),
+    carrierDof: figures.reduce((n, f) => n + f.carrierDof, 0),
+    ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
+    ...(metPairs.length > 0 ? { metPairs } : {}),
+    usedSymbols: [...new Set(all((f) => f.usedSymbols))],
+    ...(always || choiceSeed !== seed ? { choiceSeed } : {}),
+    ...(rootKeyed ? { rootKey: figures.map((f) => f.rootKey ?? '').join('|') } : {}),
+    ...(forcedCrossed.length > 0 ? { forcedCrossed } : {}),
+    provenance: Object.assign({}, ...figures.map((f) => f.provenance)),
+  };
+  /*
+   * The two lazy freedom readers, asked of the WHOLE system at the merged solution (`withSeparationDof`'s meaning, unchanged):
+   * a pair inside one part asks that part, which is the same answer on fewer unknowns.
+   */
+  const partOfPoint = new Map<Id, number>();
+  figures.forEach((f, i) => f.points.forEach((p) => partOfPoint.set(p.id, i)));
+  let whole: { c: Construction; sys: CarrierSystem; x: number[] } | null | undefined;
+  const wholeSystem = () => {
+    if (whole !== undefined) return whole;
+    const c = resolvedAt(raw, seed, choiceSeed);
+    const sys = carrierSystem(c, env);
+    const at = new Map(points.map((p) => [p.id, { x: p.x, y: p.y }] as const));
+    whole = sys.ids.every((id) => at.has(id)) ? { c, sys, x: sys.toVec(at, env) } : null;
+    return whole;
+  };
+  const pairMemo = new Map<string, number | undefined>();
+  Object.defineProperty(merged, 'separationDof', {
+    enumerable: false,
+    value: (a: Id, b: Id): number | undefined => {
+      const pa = partOfPoint.get(a);
+      if (pa !== undefined && pa === partOfPoint.get(b)) return figures[pa].separationDof?.(a, b);
+      const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+      if (!pairMemo.has(key)) {
+        const w = wholeSystem();
+        const dof = w
+          ? freedomOf(w.c, w.sys, w.x, (pos) => {
+              const p = pos.get(a);
+              const q = pos.get(b);
+              return p && q ? [q.x - p.x, q.y - p.y] : [Number.NaN, Number.NaN];
+            })
+          : null;
+        pairMemo.set(key, dof === null ? undefined : dof);
+      }
+      return pairMemo.get(key);
+    },
+  });
+  Object.defineProperty(merged, 'freedomOfRead', {
+    enumerable: false,
+    value: (read: (pos: Map<Id, Pt>, env: Env) => number[]): number | undefined => {
+      const w = wholeSystem();
+      const dof = w ? freedomOf(w.c, w.sys, w.x, read) : null;
+      return dof === null ? undefined : dof;
+    },
+  });
+  return merged;
 }
 
 /** The seed this configuration resolved its discrete choices at (#1642) — what the locus walk must resolve them at too. */
@@ -2277,6 +2489,15 @@ export function arcOf(
 
 export function choiceSeedOf(c: Construction, seed: number): number {
   return evaluate(c, seed).choiceSeed ?? seed;
+}
+
+/**
+ * THE OPTIONS A DRAWN FIGURE TOOK (#2737, ADR-AG-425), as a choice seed of its construction — read off the figure, not off a
+ * seed: a walk can land on another seed, and a figure of independent parts can draw each part at its own. `seed` is the
+ * configuration it was asked for, the reading of a figure that names none.
+ */
+export function drawnChoiceSeed(f: Figure, seed: number): number {
+  return f.choiceSeed ?? evaluatedAt.get(f)?.seed ?? seed;
 }
 
 /**
@@ -3305,7 +3526,8 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
   const register = paramRegister(c);
   const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
   if (scope.size === 0 || c.constraints.length === 0) return { env, pins: [] };
-  const salt = new Map(register.map((p, i) => [p.sym, i + 1] as const));
+  const saltFn = saltOf(c);
+  const salt = new Map(register.map((p) => [p.sym, saltFn(p.sym)] as const));
   let perRaw = pinMemo.get(raw);
   if (!perRaw) {
     perRaw = new Map();
@@ -3530,7 +3752,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * only: the residuals' scale (`residualScale`) keeps the ruled span.
    */
   const span = searchSpan(c, env);
-  const stated = wide ? Math.max(6, 1.5 * statedScale(c.objects, c.constraints)) : 6;
+  const stated = wide ? Math.max(6, 1.5 * statedScale(frameOf(c).objects, frameOf(c).constraints)) : 6;
   const wideSpan = stated > 6 ? searchSpan(c, env, stated) : span;
   /*
    * #1687 (ADR-AG-348): a row reaches the vertices it moves, its latest line's (`lineGroupsOf`) — «D על BC» places D,
@@ -3552,8 +3774,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     let box = boxAt.get(L);
     if (!box) {
       const upTo = 1.5 * statedScale(
-        c.objects.filter((o) => (lineOf?.[o.id] ?? Number.POSITIVE_INFINITY) <= L),
-        c.constraints.filter((k) => (rowLineOf.get(k) ?? Number.POSITIVE_INFINITY) <= L),
+        frameOf(c).objects.filter((o) => (lineOf?.[o.id] ?? Number.POSITIVE_INFINITY) <= L),
+        frameOf(c).constraints.filter((k) => (rowLineOf.get(k) ?? Number.POSITIVE_INFINITY) <= L),
       );
       box = upTo > 6 ? searchSpan(c, env, Math.min(stated, upTo)) : span;
       boxAt.set(L, box);
@@ -4937,6 +5159,20 @@ export interface Configuration {
   seed: number;
   reach: number;
   wide: boolean;
+  /**
+   * WHERE EACH INDEPENDENT PART LANDED (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)) — keyed by the
+   * part's first object (`partKey`). Absent on every figure that is one part, and on a configuration nobody walked: a part
+   * with no entry walks from `seed` as the whole does. Recorded by `drawnConfiguration` so the next line redraws every part
+   * the student is looking at exactly where it is, while «הציגו תצורה אחרת» (a plain seed) moves them all.
+   */
+  parts?: Readonly<Record<string, PartConfiguration>>;
+}
+/** One part's configuration: the sample it was drawn at and the option of each of its choices (its own odometer). */
+export interface PartConfiguration {
+  seed: number;
+  reach: number;
+  wide: boolean;
+  choice: number;
 }
 /** A seed, or a configuration the walk landed on — what `derive`, `drawableAt` and the session store take. */
 export type Seed = number | Configuration;
@@ -4949,13 +5185,15 @@ export const seedNumber = (at: Seed): number => (typeof at === 'number' ? at : a
  *  the undo slice then hold exactly what they held before this existed). */
 export const canonicalSeed = (at: Seed): Seed => {
   const k = configurationOf(at);
+  // #2737: a configuration that records where its parts landed is spelled in full — the parts are what keep them in place.
+  if (k.parts && Object.keys(k.parts).length > 0) return { seed: k.seed, reach: k.reach, wide: k.wide, parts: k.parts };
   return k.reach === 1 && k.wide === (k.seed !== 0) ? k.seed : { seed: k.seed, reach: k.reach, wide: k.wide };
 };
 /** Do two seeds name the same configuration? */
 export const sameSeed = (a: Seed, b: Seed): boolean => {
   const x = configurationOf(a);
   const y = configurationOf(b);
-  return x.seed === y.seed && x.reach === y.reach && x.wide === y.wide;
+  return x.seed === y.seed && x.reach === y.reach && x.wide === y.wide && partsKey(x.parts ?? {}) === partsKey(y.parts ?? {});
 };
 /** Every figure `evaluate` computed, with the configuration it is the figure OF — read back by `drawnConfiguration`. */
 const evaluatedAt = new WeakMap<Figure, Configuration>();
@@ -4966,11 +5204,86 @@ const evaluatedAt = new WeakMap<Figure, Configuration>();
  * the same configuration to a student. `undefined` for a figure `evaluate` did not compute (a hand-built one).
  */
 export function drawnSampleOf(f: Figure): string | undefined {
+  const merged = mergedSample.get(f);
+  if (merged !== undefined) return merged;
   const k = evaluatedAt.get(f);
   return k ? `${k.seed}:${f.choiceSeed ?? k.seed}:${f.rootKey ?? ''}` : undefined;
 }
 /** Per construction and requested configuration: the configuration `drawableAt` drew (set beside `drawableCache`). */
 const drawnCache = new WeakMap<Construction, Map<string, Configuration>>();
+
+/** The key a part's landing is recorded under: its first object, stable while lines are added to other parts. */
+export function partKey(part: Construction): string {
+  return part.objects[0]?.id ?? `param:${part.params[0]?.sym ?? ''}`;
+}
+/** Every figure `evaluatePart` computed for a walk, with the part configuration that draws it again. */
+const partConfigOf = new WeakMap<Figure, PartConfiguration>();
+/** A figure assembled from parts: the parts' samples, as `drawnSampleOf` spells one (#2633's "same sample" test). */
+const mergedSample = new WeakMap<Figure, string>();
+
+/**
+ * THE CONFIGURATION WALK OF A FIGURE OF INDEPENDENT PARTS (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)).
+ *
+ * Each part walks its own configurations with `drawableAt`'s walk and is drawn at the first one where IT is whole. Walking
+ * them together asked for one seed at which every part was whole at once: measured, an isosceles trapezoid and a parallelogram
+ * each whole at six to ten of the 24 seeds shared none, so beside three other shapes the figure was drawn with a trapezoid
+ * crossed and «מקבילית» was refused `unsatisfiable` though it was the next line alone. A part starts from the configuration the
+ * request recorded for it (`Configuration.parts`), else from the requested seed with the options the whole figure's odometer
+ * gives it there; the walk's display preferences (spread, the diagonals' meet) are judged within the part, and separation on
+ * the canvas the parts share: a part is walked until its points are visibly apart from every point the parts before it drew
+ * (R61, operator 2026-09-20 — a point riding a line through another part's point lands on it often, never by chance alone).
+ * The configuration recorded for the next line names every part's landing.
+ */
+function drawableParts(c: Construction, at: Seed, preferSpread: boolean): Figure {
+  let perSeed = drawableCache.get(c);
+  if (!perSeed) {
+    perSeed = new Map();
+    drawableCache.set(c, perSeed);
+  }
+  const key = drawableKey(at, preferSpread);
+  const hit = perSeed.get(key);
+  if (hit) return hit;
+  const base = configurationOf(at);
+  const parts = splitOf(c);
+  const partOf = partIndexOf(parts);
+  const figures: Figure[] = [];
+  const choices: number[] = [];
+  const samples: string[] = [];
+  const landed: Record<string, PartConfiguration> = {};
+  parts.forEach((part, i) => {
+    const k = partKey(part);
+    const rec = base.parts?.[k];
+    const choiceFor = (seed: number): number => (rec && seed === rec.seed ? rec.choice : splitChoiceSeed(c, parts.length, partOf, seed)[i]);
+    const evalAt = (seed: number, reach: number, wide: boolean): Figure => {
+      const f = evaluatePart(part, seed, reach, wide, choiceFor(seed));
+      // The options it took, as a start that draws it again (its first attempt is then the option it ended on).
+      if (!partConfigOf.has(f)) partConfigOf.set(f, { seed, reach, wide, choice: f.choiceSeed ?? seed });
+      return f;
+    };
+    const partAt: Configuration = rec ? { seed: rec.seed, reach: rec.reach, wide: rec.wide } : { seed: base.seed, reach: base.reach, wide: base.wide };
+    const drawnStore = new WeakMap<Construction, Map<string, PartConfiguration | Configuration>>();
+    const beside: Figure | undefined = figures.length > 0
+      ? { ...figures[0], points: figures.flatMap((g) => g.points), curves: figures.flatMap((g) => g.curves), segments: figures.flatMap((g) => g.segments), arcs: figures.flatMap((g) => g.arcs ?? []) }
+      : undefined;
+    const f = walkDrawable(part, partAt, preferSpread, evalAt, (g) => partConfigOf.get(g), new WeakMap(), drawnStore, beside);
+    const drawn = drawnStore.get(part)?.get(drawableKey(partAt, preferSpread));
+    landed[k] = drawn && 'choice' in drawn ? drawn : { seed: partAt.seed, reach: partAt.reach, wide: partAt.wide, choice: choiceFor(partAt.seed) };
+    const own = partConfigOf.get(f);
+    figures.push(f);
+    choices.push(f.choiceSeed ?? own?.seed ?? partAt.seed);
+    samples.push(own ? `${own.seed}:${f.choiceSeed ?? own.seed}:${f.rootKey ?? ''}` : '?');
+  });
+  const merged = mergeParts(c, parts, figures, base.seed, choices, partOf, true);
+  mergedSample.set(merged, samples.join('|'));
+  perSeed.set(key, merged);
+  let drawn = drawnCache.get(c);
+  if (!drawn) {
+    drawn = new Map();
+    drawnCache.set(c, drawn);
+  }
+  drawn.set(key, { seed: base.seed, reach: base.reach, wide: base.wide, parts: landed });
+  return merged;
+}
 
 /**
  * THE CONFIGURATION `drawableAt` DREW, as a value that draws it again (#2039 step 1, ADR-AG-358): `drawableAt(c, drawn)`
@@ -4988,8 +5301,14 @@ export function drawnConfiguration(c: Construction, at: Seed, preferSpread = fal
 }
 const drawableKey = (at: Seed, preferSpread: boolean): string => {
   const k = configurationOf(at);
-  return `${k.seed}:${k.reach}:${k.wide ? 1 : 0}:${preferSpread ? 1 : 0}`;
+  return `${k.seed}:${k.reach}:${k.wide ? 1 : 0}:${preferSpread ? 1 : 0}${k.parts ? `:${partsKey(k.parts)}` : ''}`;
 };
+/** The parts of a configuration as one stable string (sorted by part key). */
+const partsKey = (parts: Readonly<Record<string, PartConfiguration>>): string =>
+  Object.keys(parts)
+    .sort()
+    .map((k) => `${k}=${parts[k].seed},${parts[k].reach},${parts[k].wide ? 1 : 0},${parts[k].choice}`)
+    .join(';');
 
 /**
  * The figure the tool would SHOW at this seed (#1083).
@@ -5027,10 +5346,34 @@ export function drawableAt(
    */
   preferSpread = false,
 ): Figure {
-  let perSeed = drawableCache.get(c);
+  // #2737 (ADR-AG-425): a figure of independent parts walks each part's configurations apart; one part walks as it always did.
+  if (splitOf(c).length > 1) return drawableParts(c, at, preferSpread);
+  return walkDrawable(c, at, preferSpread, (s, r, w) => evaluate(c, s, r, w), (f) => evaluatedAt.get(f), drawableCache, drawnCache);
+}
+
+/**
+ * THE CONFIGURATION WALK (`drawableAt`'s body, #2737): from the requested configuration, the figure the tool shows. `evalAt`
+ * evaluates one configuration and `landedOf` names the configuration a figure it returned is OF; the caches are the caller's.
+ * `drawableAt` walks a whole figure through `evaluate`; `drawableParts` walks each independent part through `evaluatePart`.
+ */
+function walkDrawable<K>(
+  c: Construction,
+  at: Seed,
+  preferSpread: boolean,
+  evalAt: (seed: number, reach: number, wide: boolean) => Figure,
+  landedOf: (f: Figure) => K | undefined,
+  cache: WeakMap<Construction, Map<string, Figure>>,
+  drawnStore: WeakMap<Construction, Map<string, K | Configuration>>,
+  /**
+   * The parts already drawn beside this one (#2737): its points are kept visibly apart from theirs too, on the canvas they
+   * share, so a point riding a carrier through another part's point («Y על הישר y=x» beside V(0,0)) is never opened on it.
+   */
+  beside?: Figure,
+): Figure {
+  let perSeed = cache.get(c);
   if (!perSeed) {
     perSeed = new Map();
-    drawableCache.set(c, perSeed);
+    cache.set(c, perSeed);
   }
   const key = drawableKey(at, preferSpread);
   const hit = perSeed.get(key);
@@ -5125,7 +5468,12 @@ export function drawableAt(
    * it judges the drawing, not the sampler that produced it. Still a preference: a coincidence the givens
    * force («שיעור ה-x של Y הוא 0») stacks at every seed and is drawn from the remembered tier.
    */
-  const separated = (f: Figure) => stackedPairs(f).length === 0;
+  const separated = (f: Figure) => {
+    if (!beside) return stackedPairs(f).length === 0;
+    const own = new Set(f.points.map((q) => q.id));
+    const shared: Figure = { ...f, points: [...beside.points, ...f.points], curves: [...beside.curves, ...f.curves], segments: [...beside.segments, ...f.segments], arcs: [...(beside.arcs ?? []), ...(f.arcs ?? [])] };
+    return !stackedPairs(shared).some(([a, b]) => own.has(a) || own.has(b));
+  };
   /**
    * …and A DIAGONAL MEET THAT LIES ON BOTH DIAGONALS IS PREFERRED, never required (#1937, ADR-AG-255).
    *
@@ -5143,7 +5491,7 @@ export function drawableAt(
   const wholeOn = (f: Figure) => whole(f) && meetsOnDiagonals(f);
   const preferred = (f: Figure) => wholeOn(f) && (!preferSpread || (spread(f) && separated(f)));
 
-  const first = evaluate(c, seed, atReach, wide);
+  const first = evalAt(seed, atReach, wide);
   let chosen = first;
   // The tiers, weakest last: a whole SEPARATED figure beats a whole stacked one, which is merely narrow
   // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
@@ -5218,7 +5566,7 @@ export function drawableAt(
   let crossSeparated: Figure | null = null;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
-      const candidate = evaluate(c, seed + extra, 1, wide);
+      const candidate = evalAt(seed + extra, 1, wide);
       if (!sameChoices(candidate, seed + extra)) {
         if (mayCross && !crossSeparated && wholeOn(candidate) && separated(candidate)) crossSeparated = candidate;
         continue;
@@ -5261,7 +5609,7 @@ export function drawableAt(
       if (unproven.length > 0 && paramRegister(c).length > 0) {
         search: for (const reach of RING_REACHES) {
           for (let extra = 0; extra < RING_REACH_TRIES; extra += 1) {
-            const candidate = evaluate(c, seed + extra, reach, wide);
+            const candidate = evalAt(seed + extra, reach, wide);
             noteRings(candidate);
             if (whole(candidate)) {
               chosen = candidate;
@@ -5285,14 +5633,14 @@ export function drawableAt(
     }
   }
   perSeed.set(key, chosen);
-  let drawn = drawnCache.get(c);
+  let drawn = drawnStore.get(c);
   if (!drawn) {
     drawn = new Map();
-    drawnCache.set(c, drawn);
+    drawnStore.set(c, drawn);
   }
   // #2039 (ADR-AG-358): a walk that landed on a PREFERRED figure is recorded as that figure's own configuration (asked
   // there, it is taken at once); anything else is the requested configuration, which draws the same figure by purity.
-  const landed = chosen !== first && preferred(chosen) ? evaluatedAt.get(chosen) : undefined;
+  const landed = chosen !== first && preferred(chosen) ? landedOf(chosen) : undefined;
   drawn.set(key, landed ?? configurationOf(at));
   return chosen;
 }

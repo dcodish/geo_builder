@@ -36,7 +36,7 @@
  */
 import { ask, type Answer } from './ask';
 import type { Derivation } from '../engine/derive';
-import { drawableAt } from '../engine/evaluate';
+import { drawableAt, drawnChoiceSeed } from '../engine/evaluate';
 import { hasLocus } from '../engine/locus';
 import { isFree, type Id } from '../engine/types';
 import { locusSentence } from '../parser/locusPhrases';
@@ -85,7 +85,7 @@ export function locusChips(d: Derivation): LocusChip[] {
   for (const p of d.figure.points) {
     const line = d.construction.objectLine?.[p.id];
     if (line === undefined) continue;
-    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed)) continue;
+    if (!hasLocus(d.construction, f.env, p.id, start, d.configuration.seed, drawnChoiceSeed(f, d.configuration.seed))) continue;
     chips.push({ line, id: p.id, sentence: locusSentence(p.id) });
   }
   return chips;

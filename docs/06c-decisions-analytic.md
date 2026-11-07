@@ -15854,3 +15854,39 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Measured.** 45 of 126 printed givens record, `main` @ 7d485d14. The model lane is out of the count by rule 2, so the floor measures the deterministic grammar, not what a student ends up with. Cost: 1.6 s.
 
 **Behaviour change for a student:** none.
+
+## ADR-AG-425 — A figure of independent parts is solved, walked and judged part by part (#2737)
+
+**Date:** 2026-11-07 · **Status:** accepted · bug (analytic, P2) · operator ruling · **LADDER stage:** none (the evaluation around the ladder, not a rung)
+**Requirements:** [02c](02c-requirements-analytic.md) R254 (new), R14, R19 · **Design:** [04c](04c-design-analytic.md) "Independent parts are evaluated and walked apart"
+**Operator:** 2026-11-07, *"so you should fix this"*, then *"there is nothing wrong with shapes landing different places so i have no issue with this. in reality it would be rare to have so many on the same page but this can happen and these numbers are not something we can live with. so we need to fully understand how this works today and how to fix this."*
+
+**Context, measured on `main` @ 036e907c.** Nine shapes that share nothing, typed one per line («מרובע» … «דלתון»): the ninth took **73 s** to accept (2-D 0.3 s, 3-D 36 s). One line (the eighth, «ריבוע») ran 50 whole-figure evaluations (25 configurations before the line, 25 after), each trying ~4 choice combinations: 194 evaluations, 1,471 solves of all 52 unknowns, 4.2 M residual evaluations. A CPU profile put 85% in `solveLM`, 47% of it in `deflatedStarts`. Three multipliers, one cause:
+- every solve ran over every shape's unknowns, and the numerical Jacobian evaluates every residual once per unknown;
+- a collapsed pair in ONE shape deflated and re-solved ALL of them four times;
+- a choice option one shape could not take re-solved every shape under the next combination (seven right trapezoids: 8 combinations at every configuration, 400 evaluations).
+
+The same coupling broke three things a student sees, each confirmed against the old path:
+- **crossed shapes drawn**: each shape is whole at some configurations, but the walk wanted ONE configuration where all were whole; with five free quadrilaterals none existed, and two were drawn as bow-ties, silently;
+- **a false refusal**: «מקבילית» beside four shapes was refused `unsatisfiable` (alone it records);
+- **jumping shapes**: adding an unrelated shape re-walked the whole figure and moved shapes already on the screen.
+
+**Class.** *A figure whose parts share no unknown is solved, retried, walked and judged as one system*, so its cost compounds with every part and a part's validity depends on its neighbours'.
+
+**Found and NOT changed (a question for the operator).** «המקום הגיאומטרי של M» (MA = MB) answers nothing beside an unrelated free shape, because the locus walk follows the whole figure's freedom. Walking only M's part answers `x − 2 = 0`, but it also gives a chip to each of #1177's «two independent movers», which ADR-AG-352 measured and locked as getting none. What a student is offered there is his to rule (CLAUDE.md rule 7), so the walk is unchanged; it only reads the drawn figure's own options (`drawnChoiceSeed`), which a figure drawn part by part needs.
+
+**Decision.**
+1. **The parts** (`engine/components.ts` `partsOf`): a union–find over objects and parameters, linked by every name a statement holds (ids, curve names `curveByName`, two-point line names `asPair`, symbols; a generic deep walk, so no kind can slip past), by what each constraint's residual actually READS (`constraintReads`, recorded through recording lookups), and a crossing to every earlier point no freedom reaches (`crossingPartners`' coupling by position, #1917). Linking too much costs speed; never too little. A part with no unknown rides with the first part that has one (splitting it buys nothing; measured, it doubled #1473's render-path count). One part returns the construction itself: a connected figure, or one its statements fix, takes the old path, untouched.
+2. **Evaluate** (`evaluateParts`): each part is solved, deflated and judged on its own unknowns, in the whole's frame (`Construction.whole`: span, stated scale, residual scale, parameter salts), so it starts where it started inside the whole. At seed `s` it takes its digits of the whole's odometer (`splitChoiceSeed`), so every combination stays reachable (ADR-AG-302), then walks its own choices. The figure is the union (`mergeParts`), its options spelled as one choice seed of the whole (`joinChoiceSeeds`).
+3. **Walk** (`drawableParts`): each part runs `drawableAt`'s walk (`walkDrawable`, the old body, now parameterised) and lands where IT is whole, separation judged on the shared canvas (R61: a point riding a line through another part's point is walked off it). `Configuration.parts` records every part's landing `{ seed, reach, wide, choice }`, so the next line redraws each part where it is (ADR-AG-358's promise, now per part). A plain seed moves them all. `cleanSeed` loads the parts back.
+4. **Locus**: the walk resolves the drawn figure's own options (`drawnChoiceSeed`): a part may have landed at another seed than the configuration's.
+
+**Measured after.** The nine lines: every line 30 ms or less (from 0.1–73 s); evaluations per line 1–21 (from up to 290). Every line records; the figure is whole. Five, seven and nine free quadrilaterals drawn simple. Six shapes line by line: no point moved.
+
+**Not done here.**
+- **3-D has the same class** (36 s on the ninth shape) in its own copied engine; measured on #2737, not ported.
+- **The test harness reads loop lists as figures** (233 in `src-analytic/__tests__`). Those multi-shape "figures" are kept: they are now coverage of this path.
+
+**Locks.** `src-analytic/__tests__/issue-2737-independent-parts.test.ts` (14): the nine lines (all record, ≤ 42 evaluations a line, whole); 5/7/9 free quadrilaterals simple; six shapes, nothing moves; the recorded configuration and its load; one part is the construction itself; label and two-point links; split and join over every combination of a three-part figure. With the split disabled, 10 of the 14 fail.
+
+**Behaviour change for a student:** several separate shapes on one canvas answer at once, are each drawn valid, are accepted as they would be alone, and stay put when another shape is added. Where a separate shape lands may differ from before.

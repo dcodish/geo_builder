@@ -16,7 +16,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { cleanSegDisplay, toggleSegFlag, type SegDisplayMap } from '../../shell/frame/segmentDisplay';
 import type { RefKind } from '../engine/names';
 import type { TangentsExhausted } from '../engine/apply';
-import { canonicalSeed, sameSeed, type Seed } from '../engine/evaluate';
+import { canonicalSeed, sameSeed, type PartConfiguration, type Seed } from '../engine/evaluate';
 import { cleanAnnotations, type AnnotationMap } from '../app/annotations';
 import { ALL_SHOWN, cleanCanvasDisplay, displayForSave, type CanvasDisplay } from '../render/canvasDisplay';
 import { isPointName } from '../engine/pointName';
@@ -507,10 +507,27 @@ const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveSty
 export function cleanSeed(raw: unknown): Seed {
   if (typeof raw === 'number') return Number.isInteger(raw) && raw >= 0 ? raw : 0;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 0;
-  const { seed, reach, wide } = raw as Record<string, unknown>;
+  const { seed, reach, wide, parts } = raw as Record<string, unknown>;
   if (typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0) return 0;
   if (typeof reach !== 'number' || ![1, 4, 16, 64].includes(reach) || typeof wide !== 'boolean') return seed;
-  return canonicalSeed({ seed, reach, wide });
+  return canonicalSeed({ seed, reach, wide, ...cleanParts(parts) });
+}
+
+/**
+ * WHERE EACH INDEPENDENT PART LANDED (#2737, ADR-AG-425): `{ key: { seed, reach, wide, choice } }`, each entry checked like the
+ * seed itself. An entry that fails is dropped (that part walks from the seed, as an unrecorded part does); nothing else loads.
+ */
+function cleanParts(raw: unknown): { parts?: Record<string, PartConfiguration> } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, PartConfiguration> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const { seed, reach, wide, choice } = value as Record<string, unknown>;
+    const count = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+    if (!count(seed) || !count(choice) || typeof reach !== 'number' || ![1, 4, 16, 64].includes(reach) || typeof wide !== 'boolean') continue;
+    out[key] = { seed, reach, wide, choice };
+  }
+  return Object.keys(out).length > 0 ? { parts: out } : {};
 }
 
 function cleanSeedNames(raw: unknown): Record<string, string> {

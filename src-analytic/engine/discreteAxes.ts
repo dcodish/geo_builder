@@ -36,6 +36,14 @@ export class Odometer {
   readonly digits: number[] = [];
   /** Each digit's radix. */
   readonly radices: number[] = [];
+  /**
+   * WHICH STATEMENT each digit belongs to (#2737): the top-level constraint or selector whose options the digit picks
+   * (a nested choice belongs to its top-level row). Read by {@link splitChoiceSeed} to hand each independent part of a
+   * figure its own digits.
+   */
+  readonly owners: Array<Constraint | Selector | null> = [];
+  /** The top-level statement being resolved now — set by the traversal before each one. */
+  owner: Constraint | Selector | null = null;
   /** The families of each pair of circles the tangents met so far hold (#2408, ADR-AG-403); null before the walk starts. */
   taken: Map<string, Set<CommonTangentFamily>> | null = null;
   constructor(choiceSeed: number) {
@@ -43,10 +51,16 @@ export class Odometer {
   }
   next(n: number): number {
     if (n <= 1) return 0;
-    const d = ((this.rest % n) + n) % n;
-    this.rest = (this.rest - d) / n;
+    const d = this.read(n);
     this.digits.push(d);
     this.radices.push(n);
+    this.owners.push(this.owner);
+    return d;
+  }
+  /** The next digit, base n. A scripted odometer overrides this to replay digits it was handed. */
+  protected read(n: number): number {
+    const d = ((this.rest % n) + n) % n;
+    this.rest = (this.rest - d) / n;
     return d;
   }
   /** How many combinations the axes met so far span — the period of the walk over them. */
@@ -138,7 +152,10 @@ function cyclePairsWith(selectors: readonly Selector[], odo: Odometer): Selector
   const out = selectors.map((s) => {
     if (s.kind !== 'crossing-nth' || !s.both) return s;
     const key = JSON.stringify(s.pair.map((k) => ({ ...k, id: '' })));
-    if (!flip.has(key)) flip.set(key, odo.next(2));
+    if (!flip.has(key)) {
+      odo.owner = s;
+      flip.set(key, odo.next(2));
+    }
     if (flip.get(key) === 0) return s;
     changed = true;
     return { ...s, nth: (1 - s.nth) as 0 | 1 };
@@ -160,17 +177,32 @@ export interface Assignment {
   picked: Map<Constraint, Constraint>;
   /** Which option each region choice took. */
   pickedRegions: Map<Selector, Selector>;
+  /** The top-level statement each digit belongs to, parallel to `digits` (#2737). */
+  owners: Array<Constraint | Selector | null>;
 }
 
 /** THE ASSIGNMENT AT A CHOICE SEED — every static discrete axis resolved from one odometer, in one traversal. */
 export function assignmentAt(raw: Pick<Construction, 'constraints' | 'selectors'>, choiceSeed: number): Assignment {
-  const odo = new Odometer(choiceSeed);
+  return assignmentWith(raw, new Odometer(choiceSeed));
+}
+
+/** The traversal behind {@link assignmentAt}, over any odometer — a reading one, or a scripted one (#2737). */
+function assignmentWith(raw: Pick<Construction, 'constraints' | 'selectors'>, odo: Odometer): Assignment {
   const picked = new Map<Constraint, Constraint>();
   const pickedRegions = new Map<Selector, Selector>();
-  const constraints = resolveConstraintChoices(raw.constraints, odo, picked);
+  // One top-level row at a time, so each digit knows its row (`owners`). The families are settled over the WHOLE
+  // list first, exactly as one call over the list settles them, so the digits are the ones it reads.
+  odo.taken ??= settledSlots(raw.constraints);
+  const constraints = raw.constraints.flatMap((k) => {
+    odo.owner = k;
+    return resolveConstraintChoices([k], odo, picked);
+  });
   // Region choices take their digits before the pairs, but the pairs are cycled among the TOP-LEVEL selectors only
   // (as before): resolve each top-level choice in place, then cycle the pairs over the selectors the student stated.
-  const top = raw.selectors.map((s) => (s.kind === 'choice' ? resolveSelectorChoicesWith([s], odo, pickedRegions) : null));
+  const top = raw.selectors.map((s) => {
+    odo.owner = s;
+    return s.kind === 'choice' ? resolveSelectorChoicesWith([s], odo, pickedRegions) : null;
+  });
   const plain = raw.selectors.filter((s) => s.kind !== 'choice');
   const cycled = cyclePairsWith(plain, odo);
   let at = 0;
@@ -178,7 +210,7 @@ export function assignmentAt(raw: Pick<Construction, 'constraints' | 'selectors'
     plain.length < raw.selectors.length || cycled !== plain
       ? raw.selectors.flatMap((s, i) => (s.kind === 'choice' ? top[i]! : [cycled[at++]]))
       : (raw.selectors as Selector[]);
-  return { constraints, selectors, digits: odo.digits, radices: odo.radices, total: odo.total, key: odo.digits.join(','), picked, pickedRegions };
+  return { constraints, selectors, digits: odo.digits, radices: odo.radices, total: odo.total, key: odo.digits.join(','), picked, pickedRegions, owners: odo.owners };
 }
 
 /**
@@ -190,4 +222,71 @@ export function flattenPicked(k: Constraint, a: Pick<Assignment, 'picked'>): Con
   if (k.t !== 'choice') return [k];
   const option = a.picked.get(k) ?? k.options[0];
   return option ? flattenPicked(option, a) : [];
+}
+
+/**
+ * AN ODOMETER THAT REPLAYS DIGITS (#2737): each axis takes the next digit its statement's PART was handed, so one traversal
+ * of the whole figure spells, as one choice seed, the combination several independent parts chose separately.
+ */
+class ScriptedOdometer extends Odometer {
+  constructor(private readonly feed: (owner: Constraint | Selector | null) => number | undefined) {
+    super(0);
+  }
+  protected override read(n: number): number {
+    const d = this.feed(this.owner) ?? 0;
+    return ((d % n) + n) % n;
+  }
+}
+
+/** The mixed-radix number whose digits these are — what an `Odometer` reads back as exactly these digits. */
+const numberOf = (digits: readonly number[], radices: readonly number[]): number => {
+  let n = 0;
+  let mult = 1;
+  digits.forEach((d, i) => {
+    n += d * mult;
+    mult *= radices[i];
+  });
+  return n;
+};
+
+/**
+ * ONE CHOICE SEED, SPLIT ACROSS THE INDEPENDENT PARTS OF A FIGURE (#2737, ADR-AG-425 — the analytic solve of separate parts).
+ *
+ * A part's statements keep the relative order they have in the whole, so a part's own traversal meets its axes in the order
+ * the whole meets them, with the same radices. Each part's seed is therefore the number spelled by ITS digits of the whole's
+ * assignment: the part draws, at that seed, exactly the options the whole would draw at `choiceSeed`. `partOf` names the part a
+ * top-level statement belongs to.
+ */
+export function splitChoiceSeed(
+  raw: Pick<Construction, 'constraints' | 'selectors'>,
+  parts: number,
+  partOf: (owner: Constraint | Selector | null) => number,
+  choiceSeed: number,
+): number[] {
+  const a = assignmentAt(raw, choiceSeed);
+  const digits: number[][] = Array.from({ length: parts }, () => []);
+  const radices: number[][] = Array.from({ length: parts }, () => []);
+  a.digits.forEach((d, i) => {
+    const p = partOf(a.owners[i]);
+    digits[p].push(d);
+    radices[p].push(a.radices[i]);
+  });
+  return digits.map((ds, p) => numberOf(ds, radices[p]));
+}
+
+/**
+ * …and back: the choice seed of the WHOLE whose assignment is each part's own (#2737). Every reader that resolves a figure's
+ * options from `Figure.choiceSeed` (`resolvedAt`, the locus walk, `unstatedChoices`, `drawableAt`'s assignment key) then
+ * reads exactly the options each part drew, though the parts walked their choices separately.
+ */
+export function joinChoiceSeeds(
+  raw: Pick<Construction, 'constraints' | 'selectors'>,
+  parts: ReadonlyArray<Pick<Construction, 'constraints' | 'selectors'>>,
+  partOf: (owner: Constraint | Selector | null) => number,
+  seeds: readonly number[],
+): number {
+  const queues = parts.map((sub, p) => [...assignmentAt(sub, seeds[p]).digits]);
+  const odo = new ScriptedOdometer((owner) => queues[partOf(owner)].shift());
+  const a = assignmentWith(raw, odo);
+  return numberOf(a.digits, a.radices);
 }

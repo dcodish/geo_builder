@@ -1269,6 +1269,14 @@ export interface Construction {
    * Absent on a construction built without a fold. Pure over the lines; never saved.
    */
   rowLine?: ReadonlyMap<Constraint, number>;
+  /**
+   * THE WHOLE FIGURE THIS PART WAS SPLIT FROM (#2737, [ADR-AG-425](../../docs/06c-decisions-analytic.md#adr-ag-425)) — set only on
+   * an independent part `components.ts` `partsOf` cut out of a figure, absent everywhere else. A part is solved on its own,
+   * but it is still drawn in the whole figure's FRAME: the span its free vertices are sampled in, the stated scale of the
+   * wide box, the residuals' scale and the salt each parameter is sampled with are read off `whole`, so a part starts
+   * exactly where it started inside the whole.
+   */
+  whole?: Construction;
 }
 
 /**

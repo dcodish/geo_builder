@@ -1,0 +1,99 @@
+{
+  "name": "fix-2737",
+  "title": "#2737 — separate shapes in analytic: fast, each drawn valid, nothing moves",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "Nine separate shapes, one per line, each answers at once",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "מרובע",
+        "טרפז",
+        "טרפז שווה שוקיים",
+        "טרפז ישר זווית",
+        "מקבילית",
+        "מלבן",
+        "מעוין",
+        "ריבוע",
+        "דלתון"
+      ],
+      "lookFor": "Every line draws its shape within a moment, the last as fast as the first. All nine shapes on the canvas, none of them crossed (no bow-tie).",
+      "before": "Each line slower than the last: «מעוין» about 17 s, «דלתון» about 73 s. «מקבילית» refused, and two quadrilaterals drawn crossed.",
+      "expectFigure": [
+        "A",
+        "E",
+        "I",
+        "M",
+        "Q"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "A parallelogram beside four other shapes is accepted",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "מרובע",
+        "טרפז",
+        "טרפז שווה שוקיים",
+        "טרפז ישר זווית",
+        "מקבילית"
+      ],
+      "lookFor": "«מקבילית» draws a fifth shape; no refusal.",
+      "before": "Refused: the parallelogram was said to be impossible.",
+      "expectAbsent": [
+        "לא ניתן"
+      ],
+      "expectFigure": [
+        "Q",
+        "R",
+        "S",
+        "T"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Seven free quadrilaterals are all drawn as simple shapes",
+      "class": "look",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "מרובע",
+        "מרובע",
+        "מרובע",
+        "מרובע",
+        "מרובע",
+        "מרובע",
+        "מרובע"
+      ],
+      "lookFor": "Seven quadrilaterals, every one a simple four-sided shape: no sides crossing each other inside one shape.",
+      "before": "From the fifth on, two of them drawn crossed (a bow-tie)."
+    },
+    {
+      "id": "T4",
+      "title": "A connected figure is unchanged",
+      "class": "verified",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(6,0)",
+        "C(2,4)",
+        "משולש ABC",
+        "M אמצע BC"
+      ],
+      "lookFor": "M = (4, 2), as before.",
+      "before": "Unchanged.",
+      "expect": [
+        "(4, 2)"
+      ]
+    }
+  ]
+}

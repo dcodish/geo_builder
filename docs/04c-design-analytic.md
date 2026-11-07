@@ -1425,6 +1425,31 @@ the other root, and a ring is offered only on the piece, its sentence saying «�
 
 ## Evaluate and the configuration pool
 
+### Independent parts are evaluated and walked apart ([ADR-AG-425](06c-decisions-analytic.md#adr-ag-425), #2737)
+
+A figure whose statements share no unknown is several independent PARTS. `components.ts` `partsOf` finds them with a
+union–find over objects and parameters: an object links to its `objectDeps`, `symbolDeps` and every id, curve name
+(`curveByName`) or two-point line name (`asPair`) in its definition; a constraint, selector or parameter declaration to
+every such name anywhere inside it; and a constraint to every point and curve its residual READS (`evaluate.ts`
+`constraintReads`, recorded once at the first configuration's samples), plus, for a crossing, every earlier point no
+freedom reaches (`crossingPartners`' coupling by position). A part with no unknown (no free vertex, no parameter) rides
+with the first part that has one. A figure that is one part is returned as itself and takes the old path untouched.
+
+- **Evaluate** (`evaluateParts`): each part is a sub-construction that keeps the whole's statements by identity and carries
+  `whole`, so it is sampled in the whole's FRAME (`frameOf`: `searchSpan`, the stated scale, `residualScale`, and each
+  parameter's salt from the whole's register). At seed `s` each part starts from its digits of the whole's odometer
+  (`discreteAxes.ts` `splitChoiceSeed`), walks its own choices on failure (`evaluateTryingChoices`' `choiceStart`), and is
+  memoised per (part, seed, choice start). `mergeParts` unions the figures in stated order and spells their options as one
+  choice seed of the whole (`joinChoiceSeeds`); the lazy freedom readers ask the part a pair lies in, or the whole system at
+  the merged solution.
+- **Walk** (`drawableParts`): each part runs `drawableAt`'s walk (`walkDrawable`) from its recorded landing
+  (`Configuration.parts`, keyed by `partKey`, the part's first object) or from the requested seed, with its separation judged
+  on the canvas shared with the parts before it. The recorded configuration names every part's landing — `{ seed, reach,
+  wide, choice }` — so the next line redraws each part where it is; a plain seed («הציגו תצורה אחרת») moves them all.
+  `useAnalyticStore` `cleanSeed` loads the parts back.
+- **Locus**: the walk resolves the drawn figure's own options (`drawnChoiceSeed`), which a figure drawn part by part needs;
+  it still walks the whole figure's freedom (whether a point's locus beside an unrelated free shape is answered is open, #2737).
+
 ### The configuration search: validity, then preference ([ADR-AG-128](06c-decisions-analytic.md#adr-ag-128))
 
 `drawableAt` alone chooses the shown configuration, sweeping four tiers: **preferred** (whole, every ring at least

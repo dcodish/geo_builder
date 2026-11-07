@@ -31,7 +31,7 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, resolvedAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, drawnChoiceSeed, resolvedAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
 import {
   agreeingUnion,
   conicPointsIn,
@@ -84,6 +84,11 @@ export interface TraceOptions {
   bounds?: { minX: number; minY: number; maxX: number; maxY: number };
   /** The configuration being traced — resolves discrete choices exactly as `evaluate` does. */
   seed?: number;
+  /**
+   * The choice seed of the FIGURE being walked (#2737, ADR-AG-425): the options it was drawn with. A figure whose independent
+   * parts landed at different seeds draws options no single seed's `evaluate` names, so the walk reads them off the figure.
+   */
+  choiceSeed?: number;
 }
 
 const DEFAULTS = { step: 0.35, maxSteps: 220 };
@@ -179,7 +184,7 @@ export function traceLocus(
    * the walk is judged against the region givens the canvas was judged with.
    */
   const seed = opts.seed ?? 0;
-  const c: Construction = resolvedAt(raw, seed, choiceSeedOf(raw, seed));
+  const c: Construction = resolvedAt(raw, seed, opts.choiceSeed ?? choiceSeedOf(raw, seed));
   /**
    * THE STEP IS A FRACTION OF THE VIEW, not a fixed number of units.
    *
@@ -396,8 +401,8 @@ export function traceLocus(
  * The cheap question the ask lane asks before tracing anything: a point that does not move has no
  * locus, and «המקום הגיאומטרי של A» about a pinned `A` should say so rather than draw a dot.
  */
-export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0): boolean {
-  const c: Construction = resolvedAt(raw, seed, choiceSeedOf(raw, seed));
+export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): boolean {
+  const c: Construction = resolvedAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed));
   const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return false;
   const x0 = sys.toVec(start);
@@ -646,7 +651,8 @@ function walkedLocusOf(
     const start = freeStart(f);
     if (!start) return null;
     const room = roomOf(f);
-    const first = traceLocus(c, f.env, id, start, { bounds: room, seed });
+    const choiceSeed = drawnChoiceSeed(f, seed);
+    const first = traceLocus(c, f.env, id, start, { bounds: room, seed, choiceSeed });
     if (!first || first.points.length < 2) return null;
     /**
      * ONE COMPONENT PER CARRIER CURVE (#2384, ADR-AG-308) — its pieces are every reachable stretch of it.
@@ -658,7 +664,7 @@ function walkedLocusOf(
      * 4x + y + 3 = 0».
      */
     const comps: Comp[] = [{ walks: [first], curve: curveOfTrace(first.points) }];
-    const resolved: Construction = resolvedAt(c, seed, choiceSeedOf(c, seed));
+    const resolved: Construction = resolvedAt(c, seed, choiceSeed);
     const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
     if (sys.ids.length === 0) return comps.map(asTrace);
     const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;
@@ -676,7 +682,7 @@ function walkedLocusOf(
         if (!finite(q)) return;
         start2.set(key, { x: q.x, y: q.y });
       }
-      const extra = traceLocus(c, f.env, id, start2, { bounds: room, seed });
+      const extra = traceLocus(c, f.env, id, start2, { bounds: room, seed, choiceSeed });
       if (!extra || extra.points.length < 2) return;
       // The same component reached from farther out walks back into view and re-traces it — drop it.
       const overlapping = extra.points.filter(covered).length;

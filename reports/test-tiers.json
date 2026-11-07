@@ -24,6 +24,7 @@
     "src-analytic/__tests__/issue-1473-pool-invariant-8.test.ts",
     "src-analytic/__tests__/issue-1473-pool-invariant.test.ts",
     "src-analytic/__tests__/issue-1556-freerank-equality-rows.test.ts",
+    "src-analytic/__tests__/issue-1616-rulings-0310.test.ts",
     "src-analytic/__tests__/issue-1618-corpus471-ratchet.test.ts",
     "src-analytic/__tests__/issue-1620-tangents-meet.test.ts",
     "src-analytic/__tests__/issue-1621-ratios-areas.test.ts",
