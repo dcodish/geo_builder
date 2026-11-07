@@ -127,7 +127,8 @@ export function sideEquationText(d: Pick<Derivation, 'construction' | 'figure'>,
  * `isKnowledge` / `knownCurve` itself. A corpus invariant over "what the panel prints as unknown" could
  * then only REPRODUCE those calls, and a lock that reproduces its subject stays green through the change
  * that breaks it ([ADR-W-053](../../docs/06w-decisions-workspace.md)). So the decisions live here, the
- * panel renders from them, and `panel-freedom-invariant-1289.test.ts` asks the same function.
+ * panel renders from them, and #1289's corpus sweep asks the same function (on the analytic corpus walk,
+ * `issue-1473-pool-invariant.shard.ts`; its predicate self-test is `panel-freedom-invariant-1289.test.ts`).
  */
 /**
  * A row's verdict. `pending` (#1473, ADR-AG-180) is the page's third state: the configuration pool is

@@ -22,47 +22,23 @@
  * stay green through the change that broke them.
  *
  * Measured when it landed: 531 figures built, 237 with freedom, **0 violations**.
+ *
+ * ## The sweep rides the analytic corpus walk (#2739, ADR-W-191)
+ *
+ * The corpus sweep asks `panelKnowledge(derive(lines, 0))`, exactly what #1473's pool invariant asks of the
+ * same corpus. It ran as its own walk in its own cold worker, deriving every item a second time; it now runs
+ * on #1473's walk, which derives each item once (`issue-1473-pool-invariant.shard.ts`, its third describe:
+ * the same predicate, the same green filter, the floor of 100 free figures split across the shards). This file
+ * keeps the two checks that need no corpus.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { derive } from '../engine/derive';
-import { reportedDof } from '../engine/carriers';
-import { panelKnowledge, panelShowsUnknown } from '../app/panelRows';
-import { analyticCorpus } from './analyticCorpus';
+import { panelShowsUnknown } from '../app/panelRows';
 
 const HERE = __dirname;
-// The harvest moved to `analyticCorpus.ts` so the #1473 knowledge-pool invariant sweeps the same set.
-const corpus = analyticCorpus;
-
-/** Every GREEN figure with freedom whose panel prints nothing as unknown. */
-function violations(seqs: readonly string[][]): { bad: string[]; free: number } {
-  const bad: string[] = [];
-  let free = 0;
-  for (const lines of seqs) {
-    let d;
-    try {
-      d = derive(lines, 0);
-    } catch {
-      continue; // not a figure (a list of refusals, say) — other tests own that
-    }
-    if (d.faults.length > 0 || d.figure.unsatisfied.length > 0) continue;
-    if (d.figure.points.length + d.figure.curves.length === 0) continue;
-    if (reportedDof(d.construction, d.figure.carrierDof) <= 0) continue;
-    free++;
-    if (!panelShowsUnknown(panelKnowledge(d))) bad.push(JSON.stringify(lines));
-  }
-  return { bad, free };
-}
 
 describe('#1289 — freedom in the panel means something in the panel is unknown', () => {
-  it('holds over every figure the analytic suite and catalog build', () => {
-    const { bad, free } = violations(corpus());
-    expect(bad).toEqual([]);
-    // the net actually exercised free figures — a sweep that checks nothing passes by default
-    expect(free).toBeGreaterThan(100);
-  }, 600_000);
-
   it('the predicate FIRES on the #1282 state: every value known, freedom reported', () => {
     const allKnown = { params: [], points: [{ id: 'A', x: { known: true as const, value: 1 }, y: { known: true as const, value: 2 } }], curves: [], angles: [] };
     expect(panelShowsUnknown(allKnown)).toBe(false);
