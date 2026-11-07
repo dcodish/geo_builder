@@ -15839,3 +15839,18 @@ The sentence is new text (ADR-W-174): «הכלי עדיין לא קורא אור
 **Locks.** `src-analytic/__tests__/point-order-1774.test.ts`; row `ex-coordinate-case-1808`.
 
 **Behaviour change for a student:** «c(4,7)» fills the box with «C(4,7)» and a note; Enter draws the point.
+
+## ADR-AG-424 — The 572 corpus ratchet walks the student's path (#2730)
+
+**Date:** 2026-11-07 · **Status:** accepted · operator ruling · test infrastructure (analytic)
+**Requirements:** none (internal) · **Design:** none (internal) · **LADDER stage:** none
+
+**Context.** The audit of #2730 read question 1 of the 16 exams in `אוסף בגרויות 572 Logify 2026.pdf`, scanned pages, and replayed them. Operator, 2026-11-07, on keeping that as a test: *"yes - but we need to discuss testing time so more tests and coverage is always better but we need to be aware that we cannot add an hour of test time to every change"*.
+
+**Decision.** `fixtures/corpus572.json` holds the 16 questions as printed, each line tagged `given`, `locus` or `question`. `issue-2730-corpus572-ratchet.test.ts` types the givens one at a time through `decideSubmit`, in the configuration the previous line was drawn in, and holds a floor that can only rise. It is a member of the exam corpus (`scripts/lib/exam-corpus.mjs`).
+
+**Why not the 471 shape.** The 471 ratchet derives all lines at once, so it reports 45 of 46 questions where the student path gives 42 (23/5 lands whole and is refused line by line). This one counts what a student gets.
+
+**Measured.** 45 of 126 printed givens record, `main` @ 7d485d14. The model lane is out of the count by rule 2, so the floor measures the deterministic grammar, not what a student ends up with. Cost: 1.6 s.
+
+**Behaviour change for a student:** none.

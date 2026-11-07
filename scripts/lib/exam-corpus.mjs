@@ -47,6 +47,7 @@ export const EXAM_SETS = {
     roots: [],
     whole: [
       'src-analytic/__tests__/issue-1618-corpus471-ratchet.test.ts',
+      'src-analytic/__tests__/issue-2730-corpus572-ratchet.test.ts',
       'src-analytic/__tests__/issue-2391-exam-fixtures.test.ts',
       'src-analytic/__tests__/issue-2393-exam-asks.test.ts',
     ],
