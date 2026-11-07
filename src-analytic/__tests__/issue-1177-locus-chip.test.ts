@@ -44,7 +44,8 @@ describe('#1177 — which points get a chip: the engine\'s `hasLocus`, on the ro
     ['the circle', CIRCLE, [['M', 1]]],
     ['a midpoint downstream of the mover', CHAIN, [['M', 1], ['N', 4]]],
     ['two 2-DOF points', TWO_DOF, []],
-    ['two independent movers', TWO_MOVERS, []],
+    // #2738 (ADR-AG-426), operator 2026-11-07: "when there is more than 1 point with a locus, allpoints shoudl get the chip".
+    ['two independent movers: each has its chip', TWO_MOVERS, [['M', 1], ['N', 3]]],
     ['a determined triangle', DETERMINED, []],
     // A point CREATED by reference («MA = 5» with no «נקודה M») sits on the line that created it.
     ['a point created by reference', ['A(0,0)', 'MA = 5'], [['M', 1]]],
@@ -75,6 +76,9 @@ const LOCUS_FIXTURES = [
   'issue-2383-q1-locus-line',
   'issue-2384-q1-area-locus',
   'issue-1177-locus-chip-t9',
+  // #2738: points that slide along a stated line while the rest of the figure moves too (one part, several free directions).
+  'issue-2006-kite-main-diagonal',
+  'issue-2385-tangent-at-touch',
 ];
 
 describe('#1177 — the chip and the ask agree', () => {
@@ -84,6 +88,10 @@ describe('#1177 — the chip and the ask agree', () => {
     ['chain', CHAIN, []],
     ['two-dof', TWO_DOF, []],
     ['two-movers', TWO_MOVERS, []],
+    // #2738: two movers on ONE circle (one part, two free directions), their midpoint (a region), a locus beside a free shape.
+    ['one-circle-movers', ['נתון מעגל I שמשוואתו x^2+y^2=4', 'M על המעגל I', 'N על המעגל I'], []],
+    ['movers-midpoint', [...TWO_MOVERS, 'K אמצע MN'], []],
+    ['bisector-beside-quad', [...BISECTOR, 'מרובע'], []],
     ...LOCUS_FIXTURES.map((n): [string, string[], string[]] => [n, fixture(n), []]),
   ];
   it.each(cases.flatMap(([n, lines]) => [0, 1, 2].map((seed) => [n, seed, lines] as const)))(
