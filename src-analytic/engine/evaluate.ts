@@ -2061,6 +2061,35 @@ function constraintReads(raw: Construction): ReadonlyMap<Constraint, ReadonlySet
 /** The independent parts of a figure, linked by text and by what each residual reads. */
 const splitOf = (c: Construction): Construction[] => partsOf(c, constraintReads);
 
+/** Per construction and configuration: its resolved parts (`locusPartAt`). */
+const locusPartsMemo = new WeakMap<Construction, Map<string, Construction[]>>();
+
+/**
+ * THE PART A POINT MOVES IN, AS ONE CONFIGURATION JUDGES IT (#2738, [ADR-AG-426](../../docs/06c-decisions-analytic.md#adr-ag-426)) —
+ * `resolvedAt`, restricted to the independent part (`splitOf`) that holds `id`.
+ *
+ * A point's locus is where IT can go, so it is asked of the part it moves in: another part's freedom moves nothing of it, its
+ * validity does not depend on where the point is, and its unknowns are only cost. Before this the locus walk and the chip
+ * took the WHOLE figure's freedom, so «M על המעגל I» beside «N על המעגל II», or beside an unrelated «מרובע», answered no locus
+ * at all. The split is of the RESOLVED construction: an option this configuration did not take links nothing. A figure of
+ * one part is the resolved construction itself, the path it always took.
+ */
+export function locusPartAt(raw: Construction, seed: number, choiceSeed: number, id: Id): Construction {
+  let per = locusPartsMemo.get(raw);
+  if (!per) {
+    per = new Map();
+    locusPartsMemo.set(raw, per);
+  }
+  const key = `${seed}:${choiceSeed}`;
+  let parts = per.get(key);
+  if (!parts) {
+    parts = splitOf(resolvedAt(raw, seed, choiceSeed));
+    per.set(key, parts);
+  }
+  // A name no part holds is answered by the whole (it traces nothing either way).
+  return parts.find((p) => p.objects.some((o) => o.id === id)) ?? (parts.length === 1 ? parts[0] : (parts[0].whole ?? parts[0]));
+}
+
 export interface SolveReport {
   /** A constraint that could not be met, named for the student. */
   unsatisfied: Constraint[];

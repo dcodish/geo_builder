@@ -21,10 +21,11 @@
  *
  * ## Which points get one: `hasLocus`, never a second predicate
  *
- * "Not fully defined" and "has a locus" are different sets. A point with TWO degrees of freedom («נקודה M» alone)
- * is not fully defined and has no curve for a locus; a point that moves on its own circle while another point is
- * independently free has no one-dimensional freedom either. The chip's condition is the engine's own
- * `hasLocus` — one Newton direction at the configuration being shown, measured at 0.0–0.3 ms for a whole figure —
+ * "Not fully defined" and "has a locus" are different sets. A point with TWO degrees of freedom («נקודה M» alone, or
+ * the midpoint of two independent movers) is not fully defined and has no curve for a locus. A point that moves along
+ * ONE curve has one however many other points move (#2738, ADR-AG-426, operator 2026-11-07: *"when there is more than 1
+ * point with a locus, allpoints shoudl get the chip"*): two points on two circles each get a chip. The chip's condition
+ * is the engine's own `hasLocus` — the point's own motion over its part's freedom, at the configuration being shown —
  * started from the free positions `drawableAt` gives, which is the same start `locusOf` walks from.
  *
  * ## Where it sits: the row that INTRODUCED the point

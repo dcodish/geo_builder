@@ -31,7 +31,7 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, drawnChoiceSeed, resolvedAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
+import { admissibleAt, carrierSystem, choiceSeedOf, configurationOf, drawableAt, drawnChoiceSeed, locusPartAt, seedNumber, someCrossingHasNoPoint, viewBox, type CarrierSystem, type Seed } from './evaluate';
 import {
   agreeingUnion,
   conicPointsIn,
@@ -155,6 +155,108 @@ export function nullDirection(x: number[], residuals: (v: number[]) => number[])
 }
 
 /**
+ * How fast a point must move along the figure's freedom to be moving at all: the old `hasLocus` bar (a displacement over
+ * 1e-9 at a step of 1e-4), as a speed.
+ */
+const MOVES = 1e-5;
+/**
+ * How large the point's SECOND direction of motion may be, relative to its first, and still be read as none (#2738). A point
+ * that moves along one direction only has a second singular value of the central-difference error alone, ~1e-8 of the first
+ * at h = 1e-4; a point that genuinely moves two ways has one of order one. Three decades from each.
+ */
+const SECOND_DIRECTION = 1e-5;
+/** The step the point's motion is measured at (central differences, along each free direction). */
+const MOTION_STEP = 1e-4;
+
+/** What the walk solves, and whether the point moves along it. */
+interface LocusWalk {
+  /** The residuals every step of the walk is corrected onto. */
+  residuals: (x: number[]) => number[];
+  /** Does the point move at the start? (`hasLocus`'s question; the walk itself filters a still trace later, `moves`.) */
+  moves: boolean;
+}
+
+/**
+ * THE POINT'S OWN FREEDOM (#2738, [ADR-AG-426](../../docs/06c-decisions-analytic.md#adr-ag-426)) — the equations a walk of
+ * `id`'s locus solves, or `null` when its positions are not a curve.
+ *
+ * A point has a locus when, over every way the figure can still move, IT moves in exactly one direction. One free direction
+ * for the whole figure is the case the tracer was built for, and it takes the path it always took. When the figure is free in
+ * more ways than that («M על המעגל I» and «N על המעגל I»: two), the point's motion is measured along each free direction
+ * (`jacobianRank`'s orthonormal null basis): a 2×k matrix whose rank is the number of directions the point moves in. Rank one
+ * is a curve: every free direction the point does not see is PINNED at the shown configuration (one linear row each, the
+ * complement of the point's direction in the null space), which leaves the walk exactly one direction, the one the point
+ * moves along. The other points hold still while it is traced, as they do on the canvas. Rank two is a region and has no
+ * curve, so a midpoint of two independent movers has none.
+ */
+function locusWalk(sys: CarrierSystem, x0: number[], id: Id): LocusWalk | null {
+  if (x0.length === 0 || sys.residualsAt(x0).length === 0) return null;
+  const { nullBasis } = jacobianRank(x0, sys.residualsAt);
+  const at = (x: number[]): Pt | null => {
+    const p = sys.positionsAt(x).get(id);
+    return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : null;
+  };
+  if (nullBasis.length === 0) return null;
+  if (nullBasis.length === 1) {
+    // ONE freedom — the tracer's own case, unchanged: `nullDirection`'s direction, and the old "does THIS point move" test.
+    const norm = Math.hypot(...nullBasis[0]);
+    if (!(norm > 1e-12)) return null;
+    const d = nullBasis[0].map((v) => v / norm);
+    const p0 = at(x0);
+    const p1 = at(x0.map((v, k) => v + MOTION_STEP * d[k]));
+    return { residuals: sys.residualsAt, moves: !!p0 && !!p1 && Math.hypot(p1.x - p0.x, p1.y - p0.y) > MOVES * MOTION_STEP };
+  }
+  // The point's velocity along each free direction: the columns of A (2×k).
+  const cols: Array<[number, number]> = [];
+  for (const b of nullBasis) {
+    const up = at(x0.map((v, k) => v + MOTION_STEP * b[k]));
+    const dn = at(x0.map((v, k) => v - MOTION_STEP * b[k]));
+    if (!up || !dn) return null;
+    cols.push([(up.x - dn.x) / (2 * MOTION_STEP), (up.y - dn.y) / (2 * MOTION_STEP)]);
+  }
+  // A's singular values, from the 2×2 matrix A·Aᵀ.
+  let gxx = 0;
+  let gxy = 0;
+  let gyy = 0;
+  for (const [ax, ay] of cols) {
+    gxx += ax * ax;
+    gxy += ax * ay;
+    gyy += ay * ay;
+  }
+  const half = (gxx + gyy) / 2;
+  const disc = Math.sqrt(Math.max(0, half * half - (gxx * gyy - gxy * gxy)));
+  const s1 = Math.sqrt(half + disc);
+  const s2 = Math.sqrt(Math.max(0, half - disc));
+  if (!(s1 > MOVES)) return null; // the point does not move
+  if (s2 > SECOND_DIRECTION * s1) return null; // it moves two ways: a region, not a curve
+  // The point's direction in the plane (A·Aᵀ's top eigenvector), and the combination of free directions that moves it.
+  const ux0 = Math.abs(gxy) > 1e-300 ? half + disc - gyy : gxx >= gyy ? 1 : 0;
+  const uy0 = Math.abs(gxy) > 1e-300 ? gxy : gxx >= gyy ? 0 : 1;
+  const un = Math.hypot(ux0, uy0);
+  const v = cols.map(([ax, ay]) => (ax * ux0 + ay * uy0) / (un * s1));
+  // The rest of the null space: v's orthonormal complement (Gram–Schmidt, least-aligned axes first), carried into carrier space.
+  const k = nullBasis.length;
+  const kept: number[][] = [v];
+  const order = Array.from({ length: k }, (_, j) => j).sort((a, b) => Math.abs(v[a]) - Math.abs(v[b]));
+  for (const j of order) {
+    if (kept.length === k) break;
+    const w = Array.from({ length: k }, (_, i) => (i === j ? 1 : 0));
+    for (const q of kept) {
+      const c = dot(w, q);
+      for (let i = 0; i < k; i += 1) w[i] -= c * q[i];
+    }
+    const n = Math.hypot(...w);
+    if (n > 1e-6) kept.push(w.map((x) => x / n));
+  }
+  const pins = kept.slice(1).map((w) => x0.map((_, i) => w.reduce((s, wj, j) => s + wj * nullBasis[j][i], 0)));
+  const held = pins.map((p) => dot(p, x0));
+  return {
+    residuals: (x) => [...sys.residualsAt(x), ...pins.map((p, i) => dot(p, x) - held[i])],
+    moves: true,
+  };
+}
+
+/**
  * Walk the figure's one remaining freedom and record where `id` goes.
  *
  * Returns `null` when there is no locus to draw — the figure is determined, its freedom is not
@@ -184,7 +286,8 @@ export function traceLocus(
    * the walk is judged against the region givens the canvas was judged with.
    */
   const seed = opts.seed ?? 0;
-  const c: Construction = resolvedAt(raw, seed, opts.choiceSeed ?? choiceSeedOf(raw, seed));
+  // …in the part the point moves in (#2738, ADR-AG-426): another part's freedom moves nothing of it.
+  const c: Construction = locusPartAt(raw, seed, opts.choiceSeed ?? choiceSeedOf(raw, seed), id);
   /**
    * THE STEP IS A FRACTION OF THE VIEW, not a fixed number of units.
    *
@@ -205,7 +308,10 @@ export function traceLocus(
 
   const x0 = sys.toVec(start);
   if (x0.some((v) => !Number.isFinite(v))) return null;
-  if (nullDirection(x0, sys.residualsAt) === null) return null;
+  // The point's own freedom (#2738): the figure's residuals, with every free direction the point does not move in pinned.
+  const lw = locusWalk(sys, x0, id);
+  if (!lw) return null;
+  const residualsAt = lw.residuals;
 
   /**
    * One position of the walk, JUDGED (#1817, ADR-AG-245): the traced point, and whether the figure there is one the
@@ -244,7 +350,7 @@ export function traceLocus(
     // into itself and stall after one step.
     let prev: number[] | null = null;
     for (let i = 0; i < maxSteps; i += 1) {
-      const dRaw = nullDirection(x, sys.residualsAt);
+      const dRaw = nullDirection(x, residualsAt);
       if (!dRaw) break;
       const d: number[] = prev && dot(dRaw, prev) < 0 ? dRaw.map((v) => -v) : dRaw;
       prev = d;
@@ -256,12 +362,12 @@ export function traceLocus(
       // At the TIGHT tolerance (#2613, ADR-AG-349): beside a configuration where a crossing's two lines coincide, the
       // crossing of two nearly parallel lines is ill-conditioned — a residual of SOLVE_TOL places it only to
       // SOLVE_TOL / sin θ — and the fit re-verifies its equation against every walked point.
-      const res = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(predicted, sys.residualsAt, 40));
+      const res = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(predicted, residualsAt, 40));
       if (!res.ok) {
         // The corrector could not get back. A smaller step is the honest retry — the curve may be
         // turning sharply — and giving up after one is what would leave a trace ending in mid-air.
         const half = x.map((v, k) => v + sign * step * 0.25 * d[k]);
-        const res2 = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(half, sys.residualsAt, 40));
+        const res2 = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(half, residualsAt, 40));
         if (!res2.ok) break;
         x = res2.values;
       } else {
@@ -319,7 +425,7 @@ export function traceLocus(
     let best: Pt | null = null;
     for (let k = 0; k < BISECT_STEPS; k += 1) {
       const mid = a.map((v, i) => (v + b[i]) / 2);
-      const r = solveLM(mid, sys.residualsAt, 40);
+      const r = solveLM(mid, residualsAt, 40);
       if (!r.ok) break;
       const j = judge(r.values);
       if (!j.p) break;
@@ -396,24 +502,18 @@ export function traceLocus(
 
 
 /**
- * Is the figure's remaining freedom exactly one-dimensional, with `id` moving in it?
+ * Does `id` move along exactly one direction, over every way its part of the figure can still move? (#2738, ADR-AG-426.)
  *
- * The cheap question the ask lane asks before tracing anything: a point that does not move has no
- * locus, and «המקום הגיאומטרי של A» about a pinned `A` should say so rather than draw a dot.
+ * The chip's question (`locusChips`), asked of the walk's own equations (`locusWalk`), so a chip appears exactly where the
+ * walk has a curve to trace. A point that does not move has no locus, and neither does one that moves two ways.
  */
 export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0, choiceSeed?: number): boolean {
-  const c: Construction = resolvedAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed));
+  const c: Construction = locusPartAt(raw, seed, choiceSeed ?? choiceSeedOf(raw, seed), id);
   const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return false;
   const x0 = sys.toVec(start);
-  const d = nullDirection(x0, sys.residualsAt);
-  if (!d) return false;
-  // Does THIS point actually move along that direction? A figure can be free in a way that leaves a
-  // particular point where it is, and tracing that would draw a locus of one position.
-  const p0 = sys.positionsAt(x0).get(id);
-  const p1 = sys.positionsAt(x0.map((v, k) => v + 1e-4 * d[k])).get(id);
-  if (!p0 || !p1) return false;
-  return Math.hypot(p1.x - p0.x, p1.y - p0.y) > 1e-9;
+  if (x0.some((v) => !Number.isFinite(v))) return false;
+  return locusWalk(sys, x0, id)?.moves ?? false;
 }
 
 /**
@@ -664,7 +764,7 @@ function walkedLocusOf(
      * 4x + y + 3 = 0».
      */
     const comps: Comp[] = [{ walks: [first], curve: curveOfTrace(first.points) }];
-    const resolved: Construction = resolvedAt(c, seed, choiceSeed);
+    const resolved: Construction = locusPartAt(c, seed, choiceSeed, id);
     const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
     if (sys.ids.length === 0) return comps.map(asTrace);
     const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;
@@ -676,8 +776,9 @@ function walkedLocusOf(
       const pos = sys.positionsAt(values);
       const p = pos.get(id);
       if (!finite(p) || covered(p)) return;
-      const start2 = new Map<Id, Pt>();
-      for (const key of start.keys()) {
+      // The walked part's free points move to the corrected vector; another part's keep the shown positions (#2738).
+      const start2 = new Map<Id, Pt>(start);
+      for (const key of sys.ids) {
         const q = pos.get(key);
         if (!finite(q)) return;
         start2.set(key, { x: q.x, y: q.y });
@@ -770,7 +871,9 @@ function walkedLocusOf(
    * and every later gate configuration that measures as ONE component of the same family. A union, or a family that
    * changes, at any of them ends it — the kind alone stands.
    */
-  const letters = paramRegister(c)
+  // The letters of the part the point moves in (#2738): another part's letter cannot be in this curve's equation.
+  const shownSeed = seedNumber(seeds[0]);
+  const letters = paramRegister(locusPartAt(c, shownSeed, drawnChoiceSeed(figAt(seeds[0]), shownSeed), id))
     .map((p) => p.sym)
     .filter((sym) => !isDirectionSymbol(sym) && !isRadiusSymbol(sym));
   const symbolicLocus = (

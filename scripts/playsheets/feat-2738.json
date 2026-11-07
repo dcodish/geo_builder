@@ -1,0 +1,151 @@
+{
+  "name": "feat-2738",
+  "title": "#2738 — every point that moves on a curve gets the locus chip, even when other points move too (PR, port 5174)",
+  "cases": [
+    {
+      "id": "T5",
+      "title": "Two points on two separate circles: each has the chip and shows its own circle",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל I שמשוואתו x^2+y^2=4",
+        "M על המעגל I",
+        "נתון מעגל II שמשוואתו (x-6)^2+y^2=1",
+        "N על המעגל II"
+      ],
+      "after": [
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של M\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של M"
+        },
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של N\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של N"
+        }
+      ],
+      "lookFor": "«הצג מקום גאומטרי» on the row of M and on the row of N. Pressing both: M answers «מעגל · x² + y² = 2²» and N answers «מעגל · (x − 6)² + y² = 1²», each circle traced.",
+      "before": "No chip on either row.",
+      "expect": [
+        "x² + y² = 2²",
+        "(x − 6)² + y² = 1²"
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "Two points on the same circle: each has the chip",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל I שמשוואתו x^2+y^2=4",
+        "M על המעגל I",
+        "N על המעגל I"
+      ],
+      "after": [
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של M\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של M"
+        }
+      ],
+      "lookFor": "A chip on the row of M and on the row of N; pressing M's answers «מעגל · x² + y² = 2²», and N stays where it is while M's circle is traced.",
+      "before": "No chip on either row.",
+      "expect": [
+        "x² + y² = 2²"
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "A locus point beside an unrelated quadrilateral keeps its chip",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "נקודה M",
+        "MA = MB",
+        "מרובע"
+      ],
+      "after": [
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של M\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של M"
+        }
+      ],
+      "lookFor": "The chip stays on «נקודה M» after «מרובע»; pressing it answers «ישר · x - 2 = 0», the same as without the quadrilateral.",
+      "before": "The chip disappeared as soon as «מרובע» was typed.",
+      "expect": [
+        "x - 2 = 0"
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "The midpoint of two moving points has no chip (its positions fill a region)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל I שמשוואתו x^2+y^2=4",
+        "M על המעגל I",
+        "N על המעגל I",
+        "K אמצע MN"
+      ],
+      "lookFor": "Chips on M's and N's rows; NO chip on the row «K אמצע MN».",
+      "before": "No chip on any row."
+    },
+    {
+      "id": "T9",
+      "title": "…and a chord length gives the midpoint its chip",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "נתון מעגל I שמשוואתו x^2+y^2=4",
+        "M על המעגל I",
+        "N על המעגל I",
+        "K אמצע MN",
+        "MN = 2"
+      ],
+      "lookFor": "Continue from T8 by typing «MN = 2». K's row now has the chip; pressing it answers «מעגל · x² + y² = 3».",
+      "before": "Unchanged (K's chip appeared here before too).",
+      "after": [
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של K\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של K"
+        }
+      ],
+      "expect": [
+        "x² + y² = 3"
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "A kite on a stated diagonal: A and C get chips (they slide along the diagonal)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5174",
+      "path": "/analytic.html",
+      "lines": [
+        "דלתון ABCD",
+        "משוואת האלכסון הראשי היא y=2x"
+      ],
+      "after": [
+        {
+          "clickOn": "[data-testid=\"locus-chip\"][title=\"המקום הגיאומטרי של A\"]",
+          "say": "לחצו «הצג מקום גאומטרי» בשורה של A"
+        }
+      ],
+      "lookFor": "Two chips on the «דלתון ABCD» row, ending with A and with C. Pressing A's answers «ישר · 2x - y = 0», the diagonal.",
+      "before": "No chip.",
+      "expect": [
+        "2x - y = 0"
+      ]
+    }
+  ]
+}

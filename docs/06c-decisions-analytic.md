@@ -14277,6 +14277,8 @@ The sign stays attached (`y² = -2.5x`, `y² = -5/3x`). The parser reads the pri
 ## ADR-AG-352 — The locus has a way in: a chip beside a point that has one, and a guide row; the one-line point is taught as its two lines (#1177)
 
 > **⚠ Superseded in part** 2026-11-03 by [ADR-AG-381](#adr-ag-381) (#2673): the chip is the ONLY way in, and the guide row teaches the chip rather than the question. The chip itself (which points, which row, its labels and lifetime) is unchanged.
+>
+> **⚠ Superseded in part** 2026-11-07 by [ADR-AG-426](#adr-ag-426) (#2738): WHICH points get a chip. Every point that moves along one curve has one, however many other points move; «two independent movers get none» no longer holds.
 
 **Status:** accepted · 2026-10-30 · feature (analytic) · fix round #2627 (stream D) · branch `feat/1177-locus-chip` · **supersedes [ADR-AG-072](#adr-ag-072) §2** (the ask lane as *the* surface) · LADDER stage: none (an affordance over `hasLocus` and the ask lane; no solver change)
 
@@ -15890,3 +15892,36 @@ The same coupling broke three things a student sees, each confirmed against the 
 **Locks.** `src-analytic/__tests__/issue-2737-independent-parts.test.ts` (14): the nine lines (all record, ≤ 42 evaluations a line, whole); 5/7/9 free quadrilaterals simple; six shapes, nothing moves; the recorded configuration and its load; one part is the construction itself; label and two-point links; split and join over every combination of a three-part figure. With the split disabled, 10 of the 14 fail.
 
 **Behaviour change for a student:** several separate shapes on one canvas answer at once, are each drawn valid, are accepted as they would be alone, and stay put when another shape is added. Where a separate shape lands may differ from before.
+
+## ADR-AG-426 — Every point that moves along one curve has its locus, however many other points move (#2738)
+
+**Date:** 2026-11-07 · **Status:** accepted · feature (analytic, P2) · operator ruling · branch `feat/2738-locus-every-mover` · **supersedes in part [ADR-AG-352](#adr-ag-352)** (which points get a chip) · **LADDER stage:** none (the locus walk over the solved figure, not a rung)
+**Requirements:** [02c](02c-requirements-analytic.md) R87 (amended: the point's own freedom), R200 (amended: every such point has a chip) · **Design:** [04c](04c-design-analytic.md) § "The locus lane" → "The point's own freedom: its part, and the directions it does not move in pinned"
+**Operator:** 2026-11-07, answering the question ADR-AG-425 left open: *"when there is more than 1 point with a locus, allpoints shoudl get the chip of showing the locus."*
+
+**Context, measured on `main` @ 564a9fb9.** The chip (`hasLocus`) and the walk (`traceLocus`) asked one question: is the WHOLE figure's freedom exactly one direction (`nullDirection` over every unknown)? That is sufficient for a locus, not what a locus is. So:
+- «נתון מעגל I …» · «M על המעגל I» · «נתון מעגל II …» · «N על המעגל II»: no chip for either (locked by #1177 as «two independent movers get none»);
+- «M על המעגל I» · «N על המעגל I»: no chip for either;
+- «A(0,0)» · «B(4,0)» · «נקודה M» · «MA = MB», then «מרובע»: M lost its chip, because the unrelated quadrilateral added eight free directions.
+
+Each of those points moves along a curve.
+
+**Class.** *A point's locus was judged by the figure's freedom rather than by the point's own motion*, so any freedom anywhere else in the figure took a point's locus away.
+
+**Decision.**
+1. **The point's part** (`locusPartAt`, `engine/evaluate.ts`): every locus question is asked of the construction resolved at the configuration (`resolvedAt`), split into its independent parts (`splitOf`, ADR-AG-425), and narrowed to the part holding the point. The chip, the walk, discovery's probes and the fit's letters all read that part. A discovered start keeps the other parts where they are drawn. A figure of one part is the resolved construction itself.
+2. **The point's direction** (`locusWalk`, `engine/locus.ts`): inside the part, the residual Jacobian's null basis (`jacobianRank`) gives the part's free directions. One direction is the old case, untouched. With k > 1, the point's velocity along each direction (central differences) forms a 2×k matrix:
+   - rank 0: the point does not move, so it has no locus;
+   - rank 2: its positions fill a region, so it has no locus (the midpoint of two independent movers);
+   - rank 1: a curve. The k − 1 combinations orthogonal to the point's direction are pinned at the shown configuration, one linear row each, so the walk has exactly one direction and every other point holds still while it is traced.
+
+   Thresholds: `MOVES` 1e-5 (the old `hasLocus` bar as a speed) and `SECOND_DIRECTION` 1e-5 (three decades above the difference error, ~1e-8, and below any genuine second direction).
+3. **One predicate**: the chip and the walk read the same `locusWalk`, so #1177's agreement lock (a chip exactly where the chip's ask draws a curve) holds, now over the new figures too.
+
+**Measured after.** The new lock: 14 of its 19 cases fail on `main` @ 564a9fb9 (the five that pass are the controls meant to stay the same). The 37 analytic test files that mention the locus (1,991 tests) pass unchanged. Over the 143 saved analytic figures, 139 have exactly the chips they had. Four gain chips, every one a point sliding along a stated line while the rest of the figure moves too, and each answers that line: «דלתון ABCD» · «משוואת האלכסון הראשי היא y=2x» (A and C: `2x − y = 0`), «משולש שווה שוקיים ABC» · «משוואת הבסיס היא x-2y+6=0» (B and C), and the two tangent-circle figures of #2385 / #2418 (A and B on the tangent at T: `x − 7 = 0`).
+
+**Locks.**
+- `src-analytic/__tests__/issue-2738-locus-every-mover.test.ts` covers: two circles (both chips, each its circle, three seeds); one circle (one part, both chips, both the circle); the midpoint of two movers (no chip, no curve); a free point beside a mover; the bisector beside «מרובע» / «טרפז» / «מעוין» and beside a second mover (same chip, same answer); one-freedom figures unchanged.
+- `issue-1177-locus-chip.test.ts`: «two independent movers» now expects both chips, and the agreement lock gains the three new figures and two of the four saved figures that gained chips (the kite, the tangent at T).
+
+**Behaviour change for a student:** a point that moves on a curve offers «הצג מקום גאומטרי» even while other points move too: two movers on two circles or on one circle, or a locus beside another shape. A point whose positions fill a region (a free point, the midpoint of two independent movers) still has none.

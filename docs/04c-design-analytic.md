@@ -2074,6 +2074,14 @@ A locus is asked and drawn, named and equated by the lane below.
 
 *Identifiers:* `משולש ABM` · `MA = MB` · `x=4` · `MA = 5`
 
+#### The point's own freedom: its part, and the directions it does not move in pinned ([ADR-AG-426](06c-decisions-analytic.md#adr-ag-426), #2738)
+
+The carrier count above is the POINT's, not the figure's. Every locus question (`hasLocus` for the chip, `traceLocus` and `walkedLocusOf`'s discovery for the ask) builds its carrier system on `locusPartAt(raw, seed, choiceSeed, id)` (`engine/evaluate.ts`): the construction resolved at the configuration (`resolvedAt`), split into its independent parts (`splitOf`, ADR-AG-425), and the part that holds the point. Another part's freedom, validity and unknowns never enter the walk; a discovered start keeps their shown positions; the fit's letters are the part's own (`paramRegister` of the part). A figure of one part is the resolved construction itself.
+
+Inside the part, `locusWalk(sys, x0, id)` (`engine/locus.ts`) reads the null basis of the residual Jacobian (`jacobianRank`). One free direction is the original case, unchanged. With `k > 1`, the point's velocity along each basis vector (central differences at `1e-4`) makes a 2×k matrix whose singular values come from its 2×2 Gram matrix. No motion (`σ₁ ≤ 1e-5`) or two directions (`σ₂ > 1e-5·σ₁`, a region) means no locus. Rank one is a curve: the `k − 1` combinations orthogonal to the point's direction are pinned at `x0`, one linear row each, appended to the residuals. Every walk step, corrector and boundary bisection solves those residuals, so the walk has exactly one direction and every other point holds still. The chip and the ask read the same `locusWalk`, so #1177's agreement lock holds.
+
+*Identifiers:* `locusPartAt` · `locusWalk` · `MOVES` · `SECOND_DIRECTION` · `M על המעגל I` · `N על המעגל I`
+
 #### What is genuinely new: an ORDERED sweep
 
 The tracer is **continuation** along the residual Jacobian's null space, re-corrected with `solveLM`: ordered, and
