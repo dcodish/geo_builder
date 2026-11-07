@@ -7081,3 +7081,22 @@ The complex rows are the student's own lines and were always right. Complex «z 
 
 **Behaviour change for a student:** none.
 
+
+## ADR-W-191 — A fix's own test is a unit test; the figure is locked once; every run keeps each file's cost by kind (#2739)
+
+**Status:** accepted · 2026-11-07 · operator ruling · debt (workspace) · amends CLAUDE.md rule 4's "per-fix unit test" · restores [ADR-394](06-decisions.md#adr-394)'s one walk per corpus
+**Operator:** 2026-11-07, on #2739: *"for the 2 rulings: 1 - yes 2 - yes … I expect this to reduce testing time withing the fix by 3x. yes also for the making tests cheaper"*. Earlier the same day: *"strategy - i want to avoid using github."*
+**Requirements:** none (internal) · **Design:** [08](08-testing-strategy.md) "Kinds of test" · **Product:** workspace (test tooling and the fix workflow).
+
+**Context, measured (#2739, HEAD `564a9fb9`).** After [ADR-W-190](#adr-w-190) the full suite took 28 min and ~425 CPU-minutes. Of its 1,767 test files, 945 were **case files**: named after one fix and entering their builder's sentences-in, figure-out route, so each replays a whole figure in its own cold worker. They came with the fix rounds: 7 in July, 62 in August, 304 in September, 496 in October. In the 86 full-suite failures recorded since 2026-07-27 they were the only failing kind 3 times; the 89 corpus sweeps were the only failing kind 32 times. For 435 of the 854 issues with their own test file, the issue also appears in a saved fixture or a corpus scenario: the figure was locked twice. Rule 4 always asked for a per-fix **unit** test (docs/test-scenarios.md: "those assert at the parser/engine level"); in practice it became a second whole-figure replay. In the fast tier, which a fix-round item's check runs, case files were **64.3 of 82.5 CPU-minutes (78%)**: 2-D 25.3 of 37.8, analytic 21.7 of 23.2, 3-D 16.7 of 19.6 (`test:fast`, 2026-11-07). Without them an item's check would cost about 3× less in 2-D, 5× in 3-D and 10× in analytic; that is the measured basis of the operator's 3× target.
+
+**Decision.**
+1. **A fix's own test is a unit test of the module that was fixed**, in that module's existing test file where one exists. The figure is locked once: a fixture, or a scenario in the corpus when the lock needs a bespoke check.
+2. **A case file needs a reason.** `scripts/lib/test-kind.mjs` names each builder's front doors once (2-D `decideDeterministic`, `submitPipeline`, `editPipeline`, `submit-gate`, `scenario-pipeline`, the scenario harness and corpus; 3-D `store3`, `decideDeterministic3`; analytic `engine/derive`, `app/submit`, its store; complex `app/deriveLines`, `app/submit`, its store), plus a parser and a replay imported together. A test file named after a fix that enters one is a case file. `server/__tests__/fix-test-shape.test.ts` fails a case file that is neither in its baseline (`server/__tests__/fixtures/fix-case-files-baseline.json`, the 945 of 2026-11-07) nor carries `pipeline-lock: <why a shared net cannot make this check>`. The baseline only shrinks: `UPDATE_BASELINE=1` drops rows and never adds one.
+3. **The existing case files are folded** (the operator's second ruling): per builder, in batches, what is unique in a case file moves into the shared net (fixture or corpus scenario) and the file goes. Tracked on #2739.
+4. **A corpus-wide check is an oracle on the corpus's one walk**, never its own file: ADR-394's rule, which the nets of #1888, #1906, #1936 and others had drifted from. The heavy files are made cheaper on that line first.
+5. **Every run keeps each file's cost.** `test:fast` and `test:full` write the latest run's per-file times beside the times log (`<git common dir>/geo-file-times-<mode>[-<trees>].json`), and `node scripts/test-tiers.mjs kinds` prints CPU by kind and by tree, so the operator's target (3× less test time per fix-round item) is measured before and after each step.
+
+**Locks.** `server/__tests__/fix-test-shape.test.ts` (the classifier's cases, and no new unexplained case file); `server/__tests__/test-tiers.test.ts` (`fileTimesPath`, `costByKind`).
+
+**Behaviour change for a student:** none.

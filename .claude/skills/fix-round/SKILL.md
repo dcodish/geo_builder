@@ -215,7 +215,10 @@ Each item, inside its stream:
    ([ADR-W-170](../../../docs/06w-decisions-workspace.md#adr-w-170), docs/22 §10): a port left out, or a
    sibling builder found differing while fixing, is an unscheduled `knownGap: [{ product }]` cell with
    a `note` naming what that builder lacks. It names an issue only when an open one already owns the port.
-   A port item, when the plan carries one, takes its cells from `npm run parity-table -- --product <p> --state unscheduled`. ADR entry in the product's log; per-fix unit test; the
+   A port item, when the plan carries one, takes its cells from `npm run parity-table -- --product <p> --state unscheduled`. ADR entry in the product's log; per-fix **unit** test (the module that was fixed, in its
+   existing test file where one exists — never a second whole-figure replay, which
+   `server/__tests__/fix-test-shape.test.ts` refuses without a `pipeline-lock:` reason;
+   [ADR-W-191](../../../docs/06w-decisions-workspace.md#adr-w-191)); the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
    is needed); `tsc -b` + build clean; **`npm run test:fast -- --changed` green** (only the test trees the

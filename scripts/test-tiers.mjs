@@ -365,6 +365,9 @@ function runAndRecord(mode, extraArgs, scope = null) {
   const rec = timesRecord({ mode, at, sha, dirty, status, scope, waitMs: started - asked, wallMs: ended - started, files });
   try {
     appendFileSync(TIMES, `${JSON.stringify(rec)}\n`);
+    // #2739: every file's cost, not only the five slowest, so the cost of each KIND of test can be read
+    // and a change to the suite's shape measured before and after. The latest run of each mode and scope.
+    writeFileSync(fileTimesPath(mode, scope), JSON.stringify({ at, mode, sha, dirty, green: status === 0, scope, files: files.map((f) => ({ file: f.file, ms: Math.round(f.ms) })) }));
   } catch {
     /* tracking is best-effort: it must never fail a run */
   }
@@ -381,6 +384,10 @@ function runAndRecord(mode, extraArgs, scope = null) {
  * times` prints the trend (ADR-W-190).
  */
 const TIMES = process.env.GEO_SUITE_TIMES_PATH || join(dirname(lockPath(ROOT)), 'geo-suite-times.jsonl');
+/** #2739: the latest run's per-file costs for one mode and scope, beside the times log. */
+export function fileTimesPath(mode, scope = null) {
+  return join(dirname(TIMES), `geo-file-times-${mode}${scope?.length ? `-${[...scope].sort().join('+')}` : ''}.json`);
+}
 /** A new test file over this needs a reason in its source: `test-budget: <why>`. */
 export const NEW_FILE_BUDGET_MS = 30_000;
 
@@ -434,6 +441,49 @@ function times(n = 15) {
         `  ${x.at.slice(0, 16)} ${x.sha}${x.dirty ? '*' : ' '} ${x.green ? 'green' : 'RED  '} ${fmtMin(x.wallMs).padStart(9)} wall ` +
           `${fmtMin(x.cpuMs).padStart(10)} CPU ${String(x.files).padStart(5)} files  wait ${fmtMin(x.waitMs)}${x.scope ? `  [${x.scope.join(',')}]` : ''}`,
       );
+    }
+  }
+}
+
+/**
+ * Pure (#2739): CPU and file counts by test kind and by tree. `files` are `{ file, ms }`; `kindOf(file)` is
+ * `scripts/lib/test-kind.mjs`'s `testKind` over the file's source.
+ */
+export function costByKind(files, kindOf) {
+  const rows = {};
+  for (const f of files) {
+    const tree = f.file.split('/')[0];
+    for (const key of [`all · ${kindOf(f.file)}`, `${tree} · ${kindOf(f.file)}`]) {
+      rows[key] ??= { files: 0, ms: 0 };
+      rows[key].files++;
+      rows[key].ms += f.ms;
+    }
+  }
+  return rows;
+}
+
+/** `node scripts/test-tiers.mjs kinds [full|fast]` — where the latest run's time went, by kind of test (#2739). */
+async function kinds(mode) {
+  const { testKind } = await import('./lib/test-kind.mjs');
+  const modes = mode ? [mode] : ['full', 'fast'];
+  for (const m of modes) {
+    const run = readJson(fileTimesPath(m), null);
+    if (!run) {
+      console.log(`${m}: no per-file times yet (${fileTimesPath(m)}); they are kept from the next ${m} run on.`);
+      continue;
+    }
+    const kindOf = (file) => {
+      try {
+        return testKind(file, readFileSync(join(ROOT, file), 'utf8'));
+      } catch {
+        return 'gone';
+      }
+    };
+    const rows = costByKind(run.files, kindOf);
+    const total = run.files.reduce((n, f) => n + f.ms, 0);
+    console.log(`\n${m} run ${run.at.slice(0, 16)} ${run.sha}${run.dirty ? '*' : ''}: ${run.files.length} files, ${fmtMin(total)} CPU`);
+    for (const [k, v] of Object.entries(rows).sort(([a], [b]) => a.localeCompare(b))) {
+      console.log(`  ${k.padEnd(24)} ${String(v.files).padStart(5)} files ${fmtMin(v.ms).padStart(10)} CPU  ${((100 * v.ms) / total).toFixed(0).padStart(3)}%`);
     }
   }
 }
@@ -694,8 +744,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   else if (mode === 'full') full();
   else if (mode === 'report') report();
   else if (mode === 'times') times(Number(process.argv[3]) || 15);
+  else if (mode === 'kinds') kinds(process.argv[3]);
   else {
-    console.error('usage: node scripts/test-tiers.mjs <full|fast [--changed [base]]|report|times [n]>');
+    console.error('usage: node scripts/test-tiers.mjs <full|fast [--changed [base]]|report|times [n]|kinds [full|fast]>');
     process.exit(2);
   }
 }

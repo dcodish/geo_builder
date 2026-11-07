@@ -512,3 +512,27 @@ describe('#2736 — every run records its cost, and a new heavy file must say wh
     expect(budgetOverruns(files, [], source)).toEqual([]);
   });
 });
+
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { costByKind, fileTimesPath } from '../../scripts/test-tiers.mjs';
+
+describe('#2739 — every file’s cost is kept, and read by kind of test (ADR-W-191)', () => {
+  it('the latest per-file times live beside the times log, one file per mode and scope', () => {
+    expect(fileTimesPath('full')).toMatch(/geo-file-times-full\.json$/);
+    expect(fileTimesPath('fast', ['src', 'server'])).toMatch(/geo-file-times-fast-server\+src\.json$/);
+    expect(fileTimesPath('fast', ['server', 'src'])).toBe(fileTimesPath('fast', ['src', 'server']));
+  });
+  it('cost is summed by kind, overall and per tree', () => {
+    const rows = costByKind(
+      [
+        { file: 'src/a.test.ts', ms: 100 },
+        { file: 'src/b.test.ts', ms: 50 },
+        { file: 'src3d/c.test.ts', ms: 10 },
+      ],
+      (f: string) => (f === 'src/a.test.ts' ? 'case' : 'unit'),
+    );
+    expect(rows['all · case']).toEqual({ files: 1, ms: 100 });
+    expect(rows['all · unit']).toEqual({ files: 2, ms: 60 });
+    expect(rows['src3d · unit']).toEqual({ files: 1, ms: 10 });
+  });
+});

@@ -86,12 +86,11 @@ prod-honesty emergencies preempt, announced first.
 **4 — Reported bugs become regression scenarios.** A fix is not complete until the operator's *exact
 utterance sequence* is permanent coverage. **Fixtures-first:** when the essence is "this figure now builds
 green and verifies", the default lock is a saved fixture in the product's fixtures folder (2-D: `src/__tests__/fixtures/`;
-the others: the "Fixtures" row of [docs/22 §9](docs/22-workflow.md)) (zero authoring, full verifier +
-parser-drift net). Write a hand-authored scenario only when the lock needs a bespoke assertion
+the others: the "Fixtures" row of [docs/22 §9](docs/22-workflow.md)). Write a hand-authored scenario only when the lock needs a bespoke assertion
 (a specific relation, ordering, refusal, or branch) — those live in `src/__tests__/scenarios-corpus-{1..4}.ts`
 (**append to the LAST chunk**), with the harness in `scenarios-harness.ts`, run by the sharded
 `scenarios-e2e-*.test.ts` slices, indexed in [`docs/test-scenarios.md`](docs/test-scenarios.md). This is in
-addition to, never a replacement for, the per-fix unit test.
+addition to the per-fix **unit** test of the fixed module, never a second whole-figure file (ADR-W-191).
 
 **5 — Readiness gate: a fix is not done until the operator can PLAY it.** Do not report anything "ready" until
 its acceptance gate passes — tests green, `tsc`/build clean, results reported honestly (no skipped or `.only`

@@ -34,6 +34,7 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | `npm run test:fast` | every file not in the measured slow tier, all products | **~5.6 min** measured 2026-11-07 (90 CPU-min) | The development loop. **Never a commit or deploy gate.** |
 | `npm run test:fast -- --changed [base]` | the fast tier of only the test trees the diff can break ([ADR-W-190](06w-decisions-workspace.md#adr-w-190)) | analytic ~26 CPU-min, 2-D ~42, 3-D ~21 | A fix round's **per-item** check |
 | `node scripts/test-tiers.mjs times` | — | instant | Every `test:fast` and `test:full` run's wall time, CPU time, wait for the lock and slowest files, from `<git common dir>/geo-suite-times.jsonl` |
+| `node scripts/test-tiers.mjs kinds [full\|fast]` | — | instant | The latest run's CPU by kind of test and by tree ([ADR-W-191](06w-decisions-workspace.md#adr-w-191)), from the per-file times every run keeps beside the log |
 | `npm run test:tiers` | — | instant | Which slow files have actually caught something |
 | `npm run test:exams` | the exam corpus: every replayed exam/textbook sequence, all builders (`-- --changed` = only the builders the diff touches) | **~90 s** all four, measured; per builder in [ADR-W-172](06w-decisions-workspace.md#adr-w-172) | A fix round's **per-item** exam check. Not a separate batch gate: every member already runs in `test:full`. Writes `reports/exam-run.json` |
 | **`npm run test:docs`** | the `DOCS.json` doc-gate set | **~2 s**, 674 tests | **The gate for a DOC-ONLY change** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Anything touching `.ts`/`.tsx` pays `test:full`. Five product tests read a document at runtime — two BYTE-MATCH one against a code table — and `ci.yml` ignores `docs/`, so `.github/workflows/docs.yml` runs this set on the paths CI declines (#905) |
@@ -51,6 +52,16 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 **Why the fast tier is not a gate.** Measured by mutation: blinding `meetsRequirements` or `checkGivens` is caught in the fast tier within 42 s, but blinding `requirementSamples` (the [ADR-256](06-decisions.md#adr-256)/[ADR-295](06-decisions.md#adr-295) detection filter) passes 5007 fast tests and is caught by **exactly one** slow-tier test. The fast tier is a fast *signal*, not a proof.
 
 **Unique catches are tracked.** When a full run fails and every failure is in a slow-only file, the fast tier would have been green — that is appended to `reports/tier-catches.jsonl`. `npm run test:tiers` ranks the slow files by how often they were the only thing that caught a regression, and lists those that never have (candidates to speed up or fold into a shard). The tier split is a coverage/speed trade, so it should be re-argued from evidence rather than assumed.
+
+**Kinds of test ([ADR-W-191](06w-decisions-workspace.md#adr-w-191), #2739).** The tiers above sort files by cost; this sorts them by what they replay. `scripts/lib/test-kind.mjs` reads it from a file's name and imports:
+
+| Kind | What it is | Where a new one goes |
+|---|---|---|
+| **unit** | Does not enter a front door: tests one module | The per-fix test. In the fixed module's existing test file where one exists |
+| **case** | Named after one fix (`issue-1234-…`, `…-1234.test.ts`) and enters a front door: one figure, replayed whole, in its own cold worker | Nowhere new. The figure is a fixture, or a scenario in the corpus for a bespoke check. A file that must be one says why: `pipeline-lock: <why>` |
+| **pipeline** | Enters a front door, not named after a fix: the corpus walks, nets, fixture nets, module suites driven by sentences | A new corpus-wide check is an oracle on the corpus's existing walk (the corollary below), never a new walk |
+
+A **front door** is a module whose job is the whole sentences-in, figure-out route of its builder (listed once in `test-kind.mjs`), or a parser and a replay imported together. On 2026-11-07 there were 945 case files (55% of the files), and they were the only failing kind in 3 of the 86 recorded full-suite failures. `server/__tests__/fix-test-shape.test.ts` keeps new ones out; the old ones are folded into the shared nets (#2739). `node scripts/test-tiers.mjs kinds` prints the latest run's CPU by kind and tree.
 
 **Corollary for new tests — put a scenario's oracles in ONE test.** vitest isolates each *file* in its own worker, so the [ADR-280](06-decisions.md#adr-280) fold memo cannot cross files: a second oracle in a second file re-pays the entire cold solve (measured: repeat replay of the same content **0 ms** in-process, a different seed **4.9%**, a cold one **100%**). Adding a new corpus-wide property as its own file is how the suite got to 13 minutes. Add it to `scenarios-harness.ts` and call it from the shard's per-scenario test instead.
 
