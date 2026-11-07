@@ -7059,3 +7059,25 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Its reach.** It concerns a statement the figure cannot yet place, not one it can never satisfy: a contradiction, a shape with no such part, and a truly ambiguous reference keep their refusals. Each builder's own ruling bounds the case: a plain triangle has no base, so a cevian to it asks (#2018, ADR-AG-298). This is the discrete twin of [ADR-052](06-decisions.md#adr-052), every unstated magnitude is a free DOF.
 
 **Consequences.** A session that wants a refusal because a choice is still open needs a dated ruling of his for that case. Other builders are not changed by this entry: where one refuses such a sentence today, that is a finding for its own queue.
+
+## ADR-W-190 — A fix round waits on its tests less: light runs share the machine, an item tests what it can break, the batch runs the full suite once, and every run's cost is kept (#2736)
+
+**Status:** accepted · 2026-11-07 · operator ruling · debt (workspace) · amends [ADR-W-114](#adr-w-114) and [ADR-W-113](#adr-w-113)'s per-item gate
+**Operator:** 2026-11-07, on #2736: *"do items 1-5 now. item 5 is mostly for the tracking we need to have on this."* Earlier the same day: *"we cannot add an hour of test time to every change"*.
+**Requirements:** none (internal) · **Design:** [08](08-testing-strategy.md) "Two tiers" and the lock paragraph · **Product:** workspace (test tooling and the fix-round workflow).
+
+**Context, measured (#2736).** A 20-item round took 3–4 h in mid-October and 7–19 h in November. In the 36 agent transcripts of rounds #2722 and #2727, 3.9 of 123 agent-hours were thinking and writing; about 100 were waiting for a test run. Every run in every worktree took one machine-wide lock, so 10–17 streams queued one behind another even for a single named file. Meanwhile the suite grew from 1,194 test files (7 Oct) to 1,746: `test:fast` took 5 m 37 s alone (1 m 45 s on 6 Oct), `test:full` 42 min (457 CPU-minutes), and one file, `issue-1473-pool-invariant`, 30 min by itself. #2722's batch ran the full suite four times.
+
+**Decision.**
+1. **Light runs.** `test:locked -- npx vitest run <1–8 named test files>` takes one of four slot files beside the lock and runs at four workers. Light runs share the machine; a light run waits while the exclusive lock is held, and an exclusive run that wins the lock waits for the slots to drain. Same hard-link exclusion and stale rule as the lock.
+2. **An item tests what it can break.** `test:fast -- --changed [base]` runs the fast tier of the trees the diff touches, plus every tree that imports one of them by BOUNDARIES.json's `imports.allowed` edges. Toolchain files run everything; files outside the trees run `server/` and `scripts/`. This is the per-item gate. The full suite on the batch tip still checks everything, as ruled on 2026-10-06.
+3. **One full run per batch.** On the staging tip, `tsc -b`, `test:fast` and the parity golden files run first, and the goldens are attributed there. The full suite then runs once.
+4. **The slowest files are sharded**, same tests and same data, so they run side by side. The first file keeps its name; the others are `-2`, `-3` …
+5. **Every run's cost is kept.** `test:fast` and `test:full` append wall time, CPU time, the wait for the lock and the five slowest files to `<git common dir>/geo-suite-times.jsonl`; `node scripts/test-tiers.mjs times` prints the trend, and each run prints a `suite time` line for the round report. A NEW test file over 30 s is named after a full run unless its source says why with `test-budget:`. It is reported, not failed.
+
+**What this does not do.** The suite's 457 CPU-minutes stay; on 20 cores the full suite cannot finish under about 24 min. Below that needs fewer or cheaper tests, or other machines, and either is a later decision.
+
+**Locks.** `server/__tests__/suite-lock.test.ts` (light runs overlap each other and never an exclusive run, in real processes); `server/__tests__/test-tiers.test.ts` (`treesForChange`, `timesRecord`, `budgetOverruns`).
+
+**Behaviour change for a student:** none.
+

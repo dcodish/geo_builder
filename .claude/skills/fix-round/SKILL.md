@@ -163,10 +163,13 @@ each in its own worktree. That is what makes parallel safe: "one tree" was the r
 sequential rule, and it no longer holds. Round #1776 ran its 16 items one after another (~12.5 agent-hours
 over ~21 h); the parallel rounds #1721/#1736/#1767 built 5–12 items in 1.5–3 h.
 
-- **Test runs queue, never overlap.** `test:fast`, `test:full` and the `test:run:<product>` lanes take the
+- **Test runs queue, never overlap — except small ones.** `test:fast`, `test:full` and the `test:run:<product>` lanes take the
   shared suite lock themselves (`scripts/suite-lock.mjs`, in the git common dir every worktree sees). Any
   other vitest run an agent makes that takes more than a few seconds goes through
   `npm run test:locked -- npx vitest run <files>`. Waiting is printed; a dead holder is taken over.
+  **A run of 1–8 named test files is LIGHT** ([ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190), #2736):
+  up to 4 share the machine at 4 workers each, and they never overlap a `test:fast` or `test:full`. Rounds
+  #2722 and #2727 spent 82% of agent time waiting in the one line; name your files, and the line is gone.
 - **Pre-allocate ids per stream at dispatch.** Give each stream its own ADR ids (and requirement ids
   where its product numbers them) in its brief, because parallel streams take the same next id. Expect
   two streams to build the same sentence, and converge the duplicates onto one lowering when they are
@@ -215,7 +218,9 @@ Each item, inside its stream:
    A port item, when the plan carries one, takes its cells from `npm run parity-table -- --product <p> --state unscheduled`. ADR entry in the product's log; per-fix unit test; the
    regression lock per standing rule 4 (fixtures-first — a `.geo.json` fixture when the essence
    is "builds green and verifies", a scenario in the LAST corpus chunk when a bespoke assertion
-   is needed); `tsc -b` + build clean; **`npm run test:fast` green** (every product, ~2 min) plus
+   is needed); `tsc -b` + build clean; **`npm run test:fast -- --changed` green** (only the test trees the
+   diff can break, read from BOUNDARIES.json: an analytic item runs analytic + server, ~26 of the tier's 90
+   CPU-minutes; [ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190)) plus
    **every test file the item added or changed, run by path** (a slow-tier file is excluded from
    `test:fast`, so the item's own heavy locks must be named), plus **`npm run test:exams -- --changed`**
    (the exams of the builders the diff touches; [ADR-W-172](../../../docs/06w-decisions-workspace.md#adr-w-172)). **Not the product lane:** a lane
@@ -225,7 +230,8 @@ Each item, inside its stream:
    FULL suite is the BATCH gate (Step 3), not a per-item one
    ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite runs** — a
    `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822. The
-   suite lock enforces it (above); run the item's own heavy files through `npm run test:locked --`.
+   suite lock enforces it (above); run the item's own files through `npm run test:locked --`, by name,
+   so the run is light.
    **`tsc -b` runs last, after every file the item touches exists, the lock included**: `vitest`
    type-checks nothing, so a `tsc` run before the test file was written let test-only type errors reach
    the batch gate (round #869).
@@ -253,8 +259,13 @@ Each item, inside its stream:
   unannounced.
 - **Bugs/debt — one push at the end** ([ADR-W-034](../../../docs/06w-decisions-workspace.md)):
   item branches merge, in composition order, into a STAGING tip (`round/<date>`, its own worktree);
-  conflicts are reconciled there (ADR-log tails always collide — keep both, in order); the batch's
-  **`npm run test:full` runs once on that tip** (again only if red — fix on the staging tip, re-run);
+  conflicts are reconciled there (ADR-log tails always collide — keep both, in order). **Before the
+  full suite, clear what it would only find late** ([ADR-W-190](../../../docs/06w-decisions-workspace.md#adr-w-190), #2736;
+  #2722 ran it four times, 5.3 h, on merge artefacts and golden drift): `npx tsc -b`, `npm run test:fast`,
+  then the parity golden files by name (`npm run test:locked -- npx vitest run` on `decide-parity-1395-*`
+  and `decide-submit3-parity-1394`), attributing and re-recording their drift as below. Then the batch's
+  **`npm run test:full` runs once on that tip** (again only if red — re-run the failing files by name, then
+  one full run); its `suite time` line goes in the round report;
   then `main` fast-forwards to it and pushes ONCE. **Parity goldens are the batch's to judge**
   ([ADR-W-113](../../../docs/06w-decisions-workspace.md#adr-w-113)): `decide-parity-1395-*` and
   `decide-submit3-parity-1394` are slow-tier, so items no longer see their drift. A red golden on the

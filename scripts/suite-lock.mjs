@@ -25,6 +25,15 @@
  * ORDER: exclusion is still the hard link alone, so a lost or duplicated ticket can never let two runs
  * overlap. `<lock>.queue/` is left in place when the queue empties; it costs one empty directory.
  *
+ * LIGHT RUNS SHARE THE MACHINE (#2736, ADR-W-190): a run of a few named test files uses one or two
+ * cores, yet it held the whole machine while 10–17 streams queued behind it. Round agents spent 82% of
+ * their time waiting in that line. So `test:locked -- npx vitest run <≤ LIGHT_MAX_FILES test files>` is
+ * LIGHT: it takes one of `LIGHT_SLOTS` slot files (`<lock>.light.<i>`), runs with its workers capped at
+ * `LIGHT_WORKERS`, and never queues behind other light runs. The two kinds still never overlap: a light
+ * run waits while the exclusive lock is held, and an exclusive run that wins the lock waits for the light
+ * slots to drain before it starts. A slot is taken by the same hard link and freed by the same
+ * dead-or-overdue rule as the lock itself.
+ *
  * STALE LOCKS: a holder that died (its pid no longer exists) or that has held past `MAX_HOLD_MS` is
  * taken over, and the takeover is printed. A crashed agent must never wedge the next round.
  *
@@ -49,6 +58,10 @@ const HERE = resolve(fileURLToPath(import.meta.url), '..', '..');
 /** A full suite is ~15 min; a holder past this is treated as dead (its process may have been orphaned). */
 export const MAX_HOLD_MS = Number(process.env.GEO_SUITE_LOCK_MAX_HOLD_MS) || 2 * 60 * 60 * 1000;
 const POLL_MS = Number(process.env.GEO_SUITE_LOCK_POLL_MS) || 2000;
+/** How many light runs may share the machine, each with how many workers, and how many files makes a run light. */
+export const LIGHT_SLOTS = Number(process.env.GEO_SUITE_LIGHT_SLOTS) || 4;
+export const LIGHT_WORKERS = Number(process.env.GEO_SUITE_LIGHT_WORKERS) || 4;
+export const LIGHT_MAX_FILES = 8;
 
 /** The lock path: an explicit override (tests), else the git common dir shared by all worktrees. */
 export function lockPath(cwd = HERE) {
@@ -204,6 +217,7 @@ export function acquireSync(label, { path = lockPath(), log = console.error } = 
       }
       rmSync(draft, { force: true });
       if (won) {
+        waitForLightsToDrain(path, log);
         let released = false;
         const release = () => {
           if (released) return;
@@ -252,14 +266,131 @@ export function acquireSync(label, { path = lockPath(), log = console.error } = 
   }
 }
 
+// ── light runs (#2736) ───────────────────────────────
+
+/** The slot files beside the lock. */
+export const lightSlotPath = (path, i) => `${path}.light.${i}`;
+
+/** The light slots currently held by a live run. A dead or overdue holder's slot is freed here. */
+export function liveLightSlots(path, slots = LIGHT_SLOTS) {
+  const live = [];
+  for (let i = 0; i < slots; i += 1) {
+    const p = lightSlotPath(path, i);
+    if (!existsSync(p)) continue;
+    const h = readHolder(p);
+    if (isStale(h)) rmSync(p, { force: true });
+    else live.push(h);
+  }
+  return live;
+}
+
+/** An exclusive run that has won the lock starts only when no light run is still going. */
+function waitForLightsToDrain(path, log) {
+  let announced = false;
+  for (;;) {
+    const live = liveLightSlots(path);
+    if (!live.length) return;
+    if (!announced) {
+      announced = true;
+      log(`suite-lock: holding the lock; waiting for ${live.length} light run(s) to finish first (ADR-W-190).`);
+    }
+    sleepSync(POLL_MS);
+  }
+}
+
+const TEST_FILE = /\.test\.[cm]?[jt]sx?$/;
+/** vitest flags that take a value, so the value is not mistaken for a file. */
+const VALUE_FLAGS = new Set(['-t', '--testNamePattern', '--reporter', '--outputFile', '--config', '-c', '--project', '--root', '-r', '--dir', '--maxWorkers', '--minWorkers', '--pool', '--environment']);
+
+/**
+ * Pure: is this command a LIGHT run — `vitest run` over 1…LIGHT_MAX_FILES named test files? Anything else
+ * (a directory, a pattern, no file at all, a lane or a tier) is a full-machine run and stays exclusive.
+ */
+export function isLightCommand(cmd) {
+  const at = cmd.findIndex((t) => /(^|[\\/])vitest(\.m?js)?$/.test(t));
+  if (at < 0 || cmd[at + 1] !== 'run') return false;
+  const files = [];
+  for (let i = at + 2; i < cmd.length; i += 1) {
+    const t = cmd[i];
+    if (t.startsWith('-')) {
+      if (VALUE_FLAGS.has(t)) i += 1;
+      continue;
+    }
+    files.push(t);
+  }
+  return files.length >= 1 && files.length <= LIGHT_MAX_FILES && files.every((f) => TEST_FILE.test(f));
+}
+
+/** Pure: the command with its workers capped, unless the caller already set them. */
+export function withWorkerCap(cmd, workers = LIGHT_WORKERS) {
+  if (cmd.some((t) => t === '--maxWorkers' || t.startsWith('--maxWorkers='))) return cmd;
+  return [...cmd, `--maxWorkers=${workers}`, '--minWorkers=1'];
+}
+
+/** Block until a light slot is ours; return its release. Never while the exclusive lock is held. */
+export function acquireLightSync(label, { path = lockPath(), log = console.error, slots = LIGHT_SLOTS } = {}) {
+  if (process.env.GEO_SUITE_LOCK_HELD === '1') return () => {};
+  let announced = false;
+  for (;;) {
+    const held = readHolder(path);
+    const exclusive = existsSync(path) && !isStale(held);
+    if (!exclusive) {
+      liveLightSlots(path, slots); // frees the slots of the dead before we look for a free one
+      for (let i = 0; i < slots; i += 1) {
+        const slot = lightSlotPath(path, i);
+        const draft = `${slot}.${process.pid}.${Date.now()}.draft`;
+        writeFileSync(draft, JSON.stringify({ pid: process.pid, label, at: Date.now() }));
+        let won = false;
+        try {
+          linkSync(draft, slot);
+          won = true;
+        } catch (e) {
+          if (e.code !== 'EEXIST') {
+            rmSync(draft, { force: true });
+            throw e;
+          }
+        }
+        rmSync(draft, { force: true });
+        if (won) {
+          // Re-check AFTER the slot is ours: an exclusive run that linked the lock between our check and our
+          // slot may already have drained the slots and started. Then we step back out; it never waits on us
+          // unseen, and the two never overlap whichever order the links landed in.
+          const now = readHolder(path);
+          if (existsSync(path) && !isStale(now)) {
+            rmSync(slot, { force: true });
+            break;
+          }
+          let released = false;
+          const release = () => {
+            if (released) return;
+            released = true;
+            if (readHolder(slot)?.pid === process.pid) rmSync(slot, { force: true });
+          };
+          process.once('exit', release);
+          return release;
+        }
+      }
+    }
+    if (!announced) {
+      announced = true;
+      log(exclusive
+        ? `suite-lock: light run waiting — "${held.label}" holds the machine (ADR-W-190).`
+        : `suite-lock: light run waiting — all ${slots} light slots are busy (ADR-W-190).`);
+    }
+    sleepSync(POLL_MS);
+  }
+}
+
 /** CLI: hold the lock for the duration of one command. Exit status is the command's own. */
 function main(argv) {
-  const cmd = argv[0] === '--' ? argv.slice(1) : argv;
+  let cmd = argv[0] === '--' ? argv.slice(1) : argv;
   if (!cmd.length) {
     console.error('usage: node scripts/suite-lock.mjs <command…>');
     process.exit(2);
   }
-  const release = acquireSync(cmd.join(' '));
+  const light = process.env.GEO_SUITE_LOCK_HELD !== '1' && isLightCommand(cmd);
+  if (light) cmd = withWorkerCap(cmd);
+  const release = light ? acquireLightSync(cmd.join(' ')) : acquireSync(cmd.join(' '));
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(sig, () => { release(); process.exit(130); });
   const r = spawnSync(cmd[0], cmd.slice(1), {
     stdio: 'inherit',

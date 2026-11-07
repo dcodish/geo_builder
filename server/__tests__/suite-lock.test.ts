@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
-import { MAX_HOLD_MS, acquireSync, isStale, nextInLine, parseTicket, pruneQueue } from '../../scripts/suite-lock.mjs';
+import { MAX_HOLD_MS, acquireSync, isLightCommand, isStale, nextInLine, parseTicket, pruneQueue, withWorkerCap } from '../../scripts/suite-lock.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(ROOT, 'scripts', 'suite-lock.mjs');
@@ -261,4 +261,68 @@ describe('#1949 — the queue is first come, first served', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+describe('#2736 — a run of a few named test files shares the machine (ADR-W-190)', () => {
+  it('only `vitest run` over 1–8 named test files is light; a lane, a tier, a directory or a pattern is not', () => {
+    expect(isLightCommand(['npx', 'vitest', 'run', 'src/a.test.ts'])).toBe(true);
+    expect(isLightCommand(['npx', 'vitest', 'run', 'src/a.test.ts', 'src/b.test.tsx', '-t', 'name'])).toBe(true);
+    expect(isLightCommand(['node', 'node_modules/vitest/vitest.mjs', 'run', 'src/a.test.ts'])).toBe(true);
+    expect(isLightCommand(['npx', 'vitest', 'run', 'src-analytic'])).toBe(false);
+    expect(isLightCommand(['npx', 'vitest', 'run'])).toBe(false);
+    expect(isLightCommand(['npx', 'vitest', 'run', ...Array.from({ length: 9 }, (_, i) => `f${i}.test.ts`)])).toBe(false);
+    expect(isLightCommand(['npm', 'run', 'test:fast'])).toBe(false);
+    expect(isLightCommand(['npx', 'vitest', 'src/a.test.ts'])).toBe(false); // watch mode never exits
+  });
+
+  it('a light run is capped in workers, unless the caller set them', () => {
+    expect(withWorkerCap(['npx', 'vitest', 'run', 'a.test.ts'], 4)).toEqual(['npx', 'vitest', 'run', 'a.test.ts', '--maxWorkers=4', '--minWorkers=1']);
+    expect(withWorkerCap(['npx', 'vitest', 'run', 'a.test.ts', '--maxWorkers=2'], 4)).toEqual(['npx', 'vitest', 'run', 'a.test.ts', '--maxWorkers=2']);
+  });
+
+  it('light runs overlap each other, and never overlap an exclusive run', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
+    const lock = join(dir, 'geo-suite.lock');
+    const log = join(dir, 'log.txt');
+    // A stand-in for vitest: `vitest.mjs run <id>.test.ts …` records its interval around a busy period.
+    const fake = join(dir, 'vitest.mjs');
+    const body = (ms: number) =>
+      `import fs from 'node:fs';const id=process.argv.find(a=>a.endsWith('.test.ts'))??process.argv[2];const s=Date.now();` +
+      `while(Date.now()-s<${ms}){}fs.appendFileSync(${JSON.stringify(log)},id+' '+s+' '+Date.now()+String.fromCharCode(10));`;
+    writeFileSync(fake, body(600));
+    const heavy = join(dir, 'heavy.mjs');
+    writeFileSync(heavy, body(400));
+    const env: NodeJS.ProcessEnv = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_POLL_MS: '25' };
+    delete env.GEO_SUITE_LOCK_HELD;
+    const run = (args: string[], delay = 0) =>
+      new Promise<number>((done) =>
+        setTimeout(() => {
+          const p = spawn(process.execPath, [CLI, ...args], { env, stdio: 'ignore' });
+          p.on('exit', (code) => done(code ?? 1));
+        }, delay),
+      );
+    try {
+      const codes = await Promise.all([
+        run(['node', fake, 'run', 'l1.test.ts']),
+        run(['node', fake, 'run', 'l2.test.ts']),
+        run(['node', heavy, 'EX'], 150),
+        run(['node', fake, 'run', 'l3.test.ts'], 300),
+      ]);
+      expect(codes).toEqual([0, 0, 0, 0]);
+      const spans = Object.fromEntries(
+        readFileSync(log, 'utf8').trim().split('\n').map((l) => {
+          const [id, s, e] = l.split(' ');
+          return [id, [Number(s), Number(e)]];
+        }),
+      ) as Record<string, [number, number]>;
+      const overlap = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
+      expect(Object.keys(spans).sort()).toEqual(['EX', 'l1.test.ts', 'l2.test.ts', 'l3.test.ts']);
+      expect(overlap(spans['l1.test.ts'], spans['l2.test.ts']), 'two light runs share the machine').toBe(true);
+      for (const l of ['l1.test.ts', 'l2.test.ts', 'l3.test.ts']) expect(overlap(spans[l], spans.EX), `${l} vs the exclusive run`).toBe(false);
+      expect(existsSync(lock)).toBe(false);
+      for (let i = 0; i < 4; i += 1) expect(existsSync(`${lock}.light.${i}`), `slot ${i} released`).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

@@ -199,8 +199,8 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 - `npm run dev` — Vite dev server: 2-D at `/`, 3-D at `/3d.html`, complex at `/complex.html`, analytic at `/analytic.html`
 - `npm run build` — `tsc -b` then `vite build`; `build:3d` / `build:complex` / `build:analytic` for the siblings
 - `npm test` — Vitest (watch); one file or name: `npx vitest run <path>` / `-t "<name>"`
-- **`npm run test:full`** — the FULL suite (~10 min) — **the bar before any commit and any deploy**. Claim green by READING `reports/suite-verdict.json`, never an exit code ([ADR-W-033](docs/06w-decisions-workspace.md#adr-w-033)); on red read `failingFiles`, `collectErrors`, `missingFiles` ([ADR-W-128](docs/06w-decisions-workspace.md#adr-w-128)).
-- **`npm run test:fast`** — every file outside the measured slow tier, all products (~2 min) — the development loop and a fix round's per-item check, **never a commit or deploy gate** ([ADR-W-113](docs/06w-decisions-workspace.md#adr-w-113)).
+- **`npm run test:full`** — the FULL suite (~42 min) — **the bar before any commit and any deploy**. Claim green by READING `reports/suite-verdict.json`, never an exit code ([ADR-W-033](docs/06w-decisions-workspace.md#adr-w-033)); on red read `failingFiles`, `collectErrors`, `missingFiles` ([ADR-W-128](docs/06w-decisions-workspace.md#adr-w-128)).
+- **`npm run test:fast`** — every file outside the measured slow tier, all products (~6 min) — the development loop; `-- --changed`: a round item's check, **never a commit or deploy gate** ([ADR-W-113](docs/06w-decisions-workspace.md#adr-w-113)).
 - **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
 - `npm run test:tiers` — which slow files caught what the fast tier missed.
 - `npm run find-message -- "<text|key|code>"` — where a message lives (docs/22 §8).

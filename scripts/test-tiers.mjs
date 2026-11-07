@@ -34,7 +34,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmS
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
-import { acquireSync } from './suite-lock.mjs';
+import { acquireSync, lockPath } from './suite-lock.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIERS = join(ROOT, 'reports', 'test-tiers.json');
@@ -233,8 +233,73 @@ export function timedFiles(report, trueTimes) {
  */
 const slowFiles = (tiers) => (tiers?.slow ?? []).map((s) => (typeof s === 'string' ? s : s.file));
 
+// ── fast, scoped to a change (#2736) ───────────────────────────────────────
+
+/** Every top-level directory that holds test files. */
+export const TEST_TREES = ['src', 'src3d', 'src-analytic', 'src-complex', 'shell', 'server', 'scripts'];
+/** Files whose change can move ANY test: the toolchain, the runner's configuration and the import map. */
+const EVERY_TREE = /^(package(-lock)?\.json|tsconfig[^/]*\.json|vite[^/]*\.config\.[cm]?[jt]s|vitest[^/]*\.[cm]?[jt]s|BOUNDARIES\.json)$/;
+/** A top-level directory that is not a test tree but feeds one: 3-D's fixtures. */
+const FEEDS = { fixtures3: 'src3d' };
+
+/**
+ * Pure: the test trees a change can break (#2736, ADR-W-190). A tree is in when the change touches it, or a
+ * tree it imports — the `imports.allowed` edges of BOUNDARIES.json, followed to a fixed point, never restated
+ * here (so a `shell/` change runs every product that consumes it, and a product change runs `server/`, which
+ * binds every product's prompt). Anything outside the trees (docs, root files, skills) runs the workspace
+ * trees, `server/` and `scripts/`, which hold the doc, hygiene and tooling tests.
+ */
+export function treesForChange(changedFiles, boundaries) {
+  const edges = (boundaries?.imports?.allowed ?? []).filter((e) => e && typeof e.from === 'string');
+  const hit = new Set();
+  for (const raw of changedFiles) {
+    const f = String(raw).replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!f) continue;
+    if (EVERY_TREE.test(f)) return [...TEST_TREES];
+    const top = f.includes('/') ? f.split('/')[0] : '';
+    if (TEST_TREES.includes(top)) hit.add(top);
+    else if (FEEDS[top]) hit.add(FEEDS[top]);
+    else {
+      hit.add('server');
+      hit.add('scripts');
+    }
+    if (top === 'scripts') hit.add('server'); // the tooling's own locks live in server/__tests__ (suite-lock, test-tiers)
+  }
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const e of edges) {
+      if (hit.has(e.to) && !hit.has(e.from) && TEST_TREES.includes(e.from)) {
+        hit.add(e.from);
+        grew = true;
+      }
+    }
+  }
+  return TEST_TREES.filter((t) => hit.has(t));
+}
+
+/** The files changed against `base`: committed since the merge base, uncommitted, and untracked. */
+function changedFiles(base) {
+  const git = (args) => spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' }).stdout ?? '';
+  const mergeBase = git(['merge-base', base, 'HEAD']).trim();
+  const committed = mergeBase ? git(['diff', '--name-only', `${mergeBase}...HEAD`]) : '';
+  const working = git(['diff', '--name-only', 'HEAD']);
+  const untracked = git(['ls-files', '--others', '--exclude-standard']);
+  return [...new Set(`${committed}\n${working}\n${untracked}`.split('\n').map((s) => s.trim()).filter(Boolean))];
+}
+
 // ── fast ───────────────────────────────────────────────────────────────────
-function fast() {
+function fast(argv = []) {
+  const at = argv.indexOf('--changed');
+  const against = at < 0 ? null : argv[at + 1] && !argv[at + 1].startsWith('--') ? argv[at + 1] : 'origin/main';
+  let scope = [];
+  let trees = null;
+  if (against) {
+    const files = changedFiles(against);
+    trees = treesForChange(files, readJson(join(ROOT, 'BOUNDARIES.json'), null));
+    console.log(`test:fast --changed ${against} — ${files.length} file(s) changed; running ${trees.length ? trees.join(', ') : 'nothing'}.`);
+    if (!trees.length) process.exit(0);
+    scope = TEST_TREES.filter((t) => !trees.includes(t)).flatMap((t) => ['--exclude', `${t}/**`]);
+  }
   const tiers = readJson(TIERS, null);
   if (!tiers?.slow?.length) {
     console.error(
@@ -242,10 +307,10 @@ function fast() {
         'Running the FULL suite instead: a "fast" run with an unknown split would silently skip nothing,\n' +
         'or worse, pretend to be a tier. Run `npm run test:full` once to record timings.',
     );
-    const { status } = runAndRecord('fast', []);
+    const { status } = runAndRecord('fast', scope, trees);
     process.exit(status);
   }
-  const excludes = slowFiles(tiers).flatMap((f) => ['--exclude', `**/${base(f)}`]);
+  const excludes = [...scope, ...slowFiles(tiers).flatMap((f) => ['--exclude', `**/${base(f)}`])];
   // #484: membership is a SHARE of suite time, not a wall-clock cutoff, so the message reports the rule.
   // `thresholdMs` is the pre-#484 field — still read so an older tier file prints something sensible.
   const how = tiers.rule?.kind === 'top-share'
@@ -258,7 +323,7 @@ function fast() {
   // The verdict stamps `mode: "fast"` even on the no-membership path above, where this mode really did run
   // every file: under-claiming is the safe direction, and a consumer gating on `mode === 'full'` must never
   // be handed a full verdict by a command the workflow declares is not a gate.
-  const { status } = runAndRecord('fast', excludes);
+  const { status } = runAndRecord('fast', excludes, trees);
   process.exit(status);
 }
 
@@ -268,10 +333,12 @@ function fast() {
  * The verdict is written FIRST - before tier/catch bookkeeping - so a fault in that bookkeeping cannot
  * leave a completed run with no record of whether it was green.
  */
-function runAndRecord(mode, extraArgs) {
+function runAndRecord(mode, extraArgs, scope = null) {
   // ADR-W-114: queue behind any other worktree's run instead of overlapping it. Taken BEFORE the tree
   // state is read, so the verdict describes the tree as it was when this run actually started.
+  const asked = Date.now();
   const release = acquireSync(`test:${mode} in ${ROOT}`);
+  const started = Date.now();
   const { sha, dirty } = treeState();
   const at = new Date().toISOString();
   const out = join(tmpdir(), `geo-suite-${process.pid}.json`);
@@ -281,6 +348,7 @@ function runAndRecord(mode, extraArgs) {
     ['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, `--reporter=${FILE_TIME_REPORTER}`, ...extraArgs],
     { GEO_FILE_TIMES_OUT: timesOut, GEO_PLANNED_FILES_OUT: plannedOut },
   );
+  const ended = Date.now();
   release();
   const report = readJson(out, null);
   const trueTimes = readJson(timesOut, null);
@@ -293,7 +361,81 @@ function runAndRecord(mode, extraArgs) {
     /* best effort */
   }
   writeVerdict(buildVerdict({ mode, status, report, at, sha, dirty, planned }));
-  return { status, report, trueTimes };
+  const files = report?.testResults ? timedFiles(report, trueTimes) : [];
+  const rec = timesRecord({ mode, at, sha, dirty, status, scope, waitMs: started - asked, wallMs: ended - started, files });
+  try {
+    appendFileSync(TIMES, `${JSON.stringify(rec)}\n`);
+  } catch {
+    /* tracking is best-effort: it must never fail a run */
+  }
+  printTimes(rec);
+  return { status, report, trueTimes, files };
+}
+
+// ── suite time tracking (#2736) ──────────────────────
+
+/**
+ * Every run's cost, appended to `<git common dir>/geo-suite-times.jsonl`, beside the lock: every worktree of
+ * this machine writes one log, and git never commits it. Wall time excludes the wait for the lock, which is
+ * recorded apart, so a run's own cost and the queue it stood in can be told apart. `node scripts/test-tiers.mjs
+ * times` prints the trend (ADR-W-190).
+ */
+const TIMES = process.env.GEO_SUITE_TIMES_PATH || join(dirname(lockPath(ROOT)), 'geo-suite-times.jsonl');
+/** A new test file over this needs a reason in its source: `test-budget: <why>`. */
+export const NEW_FILE_BUDGET_MS = 30_000;
+
+/** Pure: the record of one run. `files` is `timedFiles`' output. */
+export function timesRecord({ mode, at, sha, dirty, status, scope, waitMs, wallMs, files }) {
+  const cpuMs = files.reduce((n, f) => n + (f.ms ?? 0), 0);
+  const slowest = [...files].sort((a, b) => b.ms - a.ms).slice(0, 5).map((f) => ({ file: f.file, ms: Math.round(f.ms) }));
+  return { at, mode, sha, dirty, green: status === 0, scope, files: files.length, waitMs, wallMs, cpuMs: Math.round(cpuMs), slowest };
+}
+
+/**
+ * Pure: the new test files that cost more than the budget and give no reason. `added` are the paths added since
+ * the last full run; `source(file)` reads one. A file states its reason with a `test-budget:` comment.
+ */
+export function budgetOverruns(files, added, source, budget = NEW_FILE_BUDGET_MS) {
+  const isNew = new Set(added.map((f) => f.replace(/\\/g, '/')));
+  return files.filter((f) => isNew.has(f.file) && f.ms > budget && !/test-budget:/.test(source(f.file) ?? '')).map((f) => ({ file: f.file, ms: Math.round(f.ms) }));
+}
+
+const fmtMin = (ms) => `${(ms / 60000).toFixed(1)} min`;
+
+function printTimes(rec) {
+  console.log(
+    `\nsuite time (${rec.mode}${rec.scope ? ` on ${rec.scope.join(', ')}` : ''}): ${fmtMin(rec.wallMs)} wall, ` +
+      `${fmtMin(rec.cpuMs)} CPU over ${rec.files} files, ${fmtMin(rec.waitMs)} waiting for the lock. ` +
+      `Slowest: ${rec.slowest[0] ? `${rec.slowest[0].file} ${fmtMin(rec.slowest[0].ms)}` : 'none'}.`,
+  );
+}
+
+function readTimes() {
+  try {
+    return readFileSync(TIMES, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  } catch {
+    return [];
+  }
+}
+
+/** `node scripts/test-tiers.mjs times [n]` — the last n runs of each mode, oldest first. */
+function times(n = 15) {
+  const rows = readTimes();
+  if (!rows.length) {
+    console.log(`No runs recorded yet (${TIMES}).`);
+    return;
+  }
+  for (const mode of ['full', 'fast']) {
+    const r = rows.filter((x) => x.mode === mode).slice(-n);
+    if (!r.length) continue;
+    console.log(`\n${mode}: ${r.length} run(s)`);
+    for (const x of r) {
+      console.log(
+        `  ${x.at.slice(0, 16)} ${x.sha}${x.dirty ? '*' : ' '} ${x.green ? 'green' : 'RED  '} ${fmtMin(x.wallMs).padStart(9)} wall ` +
+          `${fmtMin(x.cpuMs).padStart(10)} CPU ${String(x.files).padStart(5)} files  wait ${fmtMin(x.waitMs)}${x.scope ? `  [${x.scope.join(',')}]` : ''}`,
+      );
+    }
+  }
 }
 
 function full() {
@@ -308,6 +450,20 @@ function full() {
 
   updateTiers(files);
   trackCatches(files);
+  // #2736: a new file over the budget must say why. Reported, never failed: the budget is tracking.
+  const previous = readTimes().filter((x) => x.mode === 'full' && x.sha).slice(-2, -1)[0];
+  if (previous) {
+    const added = spawnSync('git', ['diff', '--diff-filter=A', '--name-only', `${previous.sha}`, 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout ?? '';
+    const untracked = spawnSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' }).stdout ?? '';
+    const over = budgetOverruns(files, `${added}\n${untracked}`.split('\n').filter(Boolean), (f) => {
+      try {
+        return readFileSync(join(ROOT, f), 'utf8');
+      } catch {
+        return null;
+      }
+    });
+    for (const o of over) console.log(`test budget: new file ${o.file} took ${fmtMin(o.ms)} (> ${NEW_FILE_BUDGET_MS / 1000} s) with no \`test-budget:\` reason in its source.`);
+  }
   process.exit(status);
 }
 
@@ -534,11 +690,12 @@ function report() {
 // function and its invariance is unit-tested, which requires importing the module without dispatching).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const mode = process.argv[2];
-  if (mode === 'fast') fast();
+  if (mode === 'fast') fast(process.argv.slice(3));
   else if (mode === 'full') full();
   else if (mode === 'report') report();
+  else if (mode === 'times') times(Number(process.argv[3]) || 15);
   else {
-    console.error('usage: node scripts/test-tiers.mjs <full|fast|report>');
+    console.error('usage: node scripts/test-tiers.mjs <full|fast [--changed [base]]|report|times [n]>');
     process.exit(2);
   }
 }

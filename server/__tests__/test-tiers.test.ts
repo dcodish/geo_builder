@@ -468,3 +468,47 @@ describe('#1557 — the verdict names a file that failed at collection', () => {
     }
   });
 });
+
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { treesForChange } from '../../scripts/test-tiers.mjs';
+import boundaries from '../../BOUNDARIES.json';
+
+describe('#2736 — test:fast --changed runs the trees a change can break (ADR-W-190)', () => {
+  const trees = (files: string[]) => treesForChange(files, boundaries);
+  it('a product change runs its own tree and the server, which binds its prompt', () => {
+    expect(trees(['src-analytic/app/ask.ts'])).toEqual(['src-analytic', 'server']);
+    expect(trees(['src/engine/apply.ts'])).toEqual(['src', 'server']);
+    expect(trees(['fixtures3/cube.geo3.json'])).toEqual(['src3d', 'server']);
+  });
+  it('a shared-chrome change runs every product that imports it, read from BOUNDARIES.json', () => {
+    expect(trees(['shell/frame.tsx'])).toEqual(['src', 'src3d', 'src-analytic', 'src-complex', 'shell', 'server']);
+  });
+  it('the toolchain runs everything; a doc runs the workspace trees; tooling runs its own locks', () => {
+    expect(trees(['package.json'])).toHaveLength(7);
+    expect(trees(['BOUNDARIES.json'])).toHaveLength(7);
+    expect(trees(['.claude/skills/fix-round/SKILL.md'])).toEqual(['server', 'scripts']);
+    expect(trees(['scripts/suite-lock.mjs'])).toEqual(['server', 'scripts']);
+    expect(trees([])).toEqual([]);
+  });
+});
+
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { budgetOverruns, timesRecord } from '../../scripts/test-tiers.mjs';
+
+describe('#2736 — every run records its cost, and a new heavy file must say why (ADR-W-190)', () => {
+  const files = [
+    { file: 'src/a.test.ts', ms: 45_000, failures: [] },
+    { file: 'src/b.test.ts', ms: 5_000, failures: [] },
+    { file: 'src/c.test.ts', ms: 90_000, failures: [] },
+  ];
+  it('a record carries wall, CPU, the wait for the lock and the slowest files', () => {
+    const r = timesRecord({ mode: 'full', at: 't', sha: 'abc', dirty: false, status: 0, scope: null, waitMs: 1000, wallMs: 60_000, files });
+    expect(r).toMatchObject({ mode: 'full', green: true, files: 3, cpuMs: 140_000, waitMs: 1000, wallMs: 60_000 });
+    expect(r.slowest.map((s: { file: string }) => s.file)).toEqual(['src/c.test.ts', 'src/a.test.ts', 'src/b.test.ts']);
+  });
+  it('only a NEW file over the budget with no `test-budget:` reason is reported', () => {
+    const source = (f: string) => (f === 'src/c.test.ts' ? '// test-budget: sweeps every fixture at 24 seeds' : '');
+    expect(budgetOverruns(files, ['src/a.test.ts', 'src/b.test.ts', 'src/c.test.ts'], source)).toEqual([{ file: 'src/a.test.ts', ms: 45_000 }]);
+    expect(budgetOverruns(files, [], source)).toEqual([]);
+  });
+});
