@@ -30,7 +30,7 @@ function ctxAfter(utterances: string[]) {
 
 describe('#775 — the prod session: a right triangle, then the median to the hypotenuse', () => {
   // #1689 (ADR-639): the noun alone does not say WHICH angle is right, so these locks state it («זווית C ישרה»);
-  // the noun alone binds to the shown seat (#2074) — locked below and in src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts.
+  // the noun alone binds to the shown seat (#2074) — locked below and in src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts (folded, #2739).
   const rt = ctxAfter(['משולש ישר זווית ABC', 'זווית C ישרה']); // the stated right angle at C ⇒ hypotenuse AB
 
   // #2074 (ADR-659) re-based ADR-639's question: on the noun ALONE the line draws on the triangle as shown, BOUND to

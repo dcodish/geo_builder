@@ -4,7 +4,7 @@
  * Each row folds its twin onto the symbol it renders as, and each guard holds: a `<` between two
  * operands is still less-than, a letter-like degree glyph away from a digit is still a letter, and
  * «שורש» with no value after it is left to the rules. The product locks are
- * `src3d/__tests__/issue-1912-glyph-fold.test.ts` and the parity rows `glyph-*-1912`.
+ * `src3d/__tests__/issue-1912-glyph-fold.test.ts` (folded, #2739) and the parity rows `glyph-*-1912`.
  */
 import { describe, expect, it } from 'vitest';
 import { GLYPH_FOLDS, foldGlyphs } from '../glyphFold';

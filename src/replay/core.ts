@@ -2876,7 +2876,7 @@ function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
  * and no utterance can build the figure described above. This predicate stays because `rename` and `merge`
  * can still drive two carriers onto one letter AFTER the crossing exists — and then the margin rule would
  * flag a structurally exact intersection, which is the #944 defect arriving by a different road. Locked at
- * the unit level in `src/__tests__/issue-944-shared-endpoint.test.ts` on a construction assembled directly,
+ * the unit level in `src/__tests__/issue-944-shared-endpoint.test.ts` (folded, #2739) on a construction assembled directly,
  * since the sentence that used to reach it is now a refusal.
  */
 function shareEndpoint(a: Id, b: Id, c: Id, d: Id): boolean {

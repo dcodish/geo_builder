@@ -8,6 +8,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
+import { foldedSequences } from './foldedSequences';
 
 const HERE = __dirname;
 const STR = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
@@ -24,6 +25,8 @@ export function analyticCorpus(): string[][] {
       seqs.set(JSON.stringify(items), items);
     }
   }
+  // #2739: the arrays of the case files folded away, frozen so the corpus does not shrink with them
+  for (const items of foldedSequences()) seqs.set(JSON.stringify(items), items);
   // #1154: a `rewrite` entry (rename) is a session edit, and #1177 an `ask` entry a question — not figure lines.
   for (const e of COMMAND_CATALOG_ANALYTIC.filter((x) => !x.lane)) {
     const s = [...(e.needs ?? []), e.he];

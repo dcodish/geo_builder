@@ -1,0 +1,3380 @@
+{
+ "about": "#2739 (ADR-W-191): case files folded because their figure is already locked by a same-builder fixture or corpus scenario that carries the issue number and at least half of whose lines the file itself submitted. Restore one with `git checkout e4c9c05b -- <file>` (and re-add its row to server/__tests__/fixtures/fix-case-files-baseline.json).",
+ "foldedFrom": "e4c9c05b",
+ "files": [
+  {
+   "file": "src-analytic/__tests__/display-toggles-2688.test.tsx",
+   "product": "analytic",
+   "issue": "2688",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/display-toggles-textbook-2688.analytic.json",
+    "src-analytic/__tests__/fixtures/operator-textbook-print-2688.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1138-construction-locus.test.ts",
+   "product": "analytic",
+   "issue": "1138",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2024sB-locus-1138.analytic.json"
+   ],
+   "fullRunCpuSec": 11
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1177-locus-chip.test.ts",
+   "product": "analytic",
+   "issue": "1177",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1177-locus-chip-t9.analytic.json"
+   ],
+   "fullRunCpuSec": 96
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1182-free-point-near-figure.test.ts",
+   "product": "analytic",
+   "issue": "1182",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1182-free-point-near-figure.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-1733-thin-legible-triangle.analytic.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1186-locus-in-a.test.ts",
+   "product": "analytic",
+   "issue": "1186",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1186-winter25-in-a.analytic.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1687-stability.test.ts",
+   "product": "analytic",
+   "issue": "1687",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1687-point-on-side.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1772-described-line-operand.test.ts",
+   "product": "analytic",
+   "issue": "1772",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/described-line-operand-1772.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1775-through-perpendicular.test.ts",
+   "product": "analytic",
+   "issue": "1775",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/through-perpendicular-1775.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1808-colon-ratio-radical.test.ts",
+   "product": "analytic",
+   "issue": "1808",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/colon-ratio-radical-1808.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1863-conic-marks.test.ts",
+   "product": "analytic",
+   "issue": "1863",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1863-circle-ellipse.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-1863-ellipse.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-1863-parabola.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-1863-student-f.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-1963-vacancy-own-freedom.test.ts",
+   "product": "analytic",
+   "issue": "1963",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-1963-circle-through-collinear.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2006-kite-pair-choice.test.ts",
+   "product": "analytic",
+   "issue": "2006",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2006-kite-main-diagonal.analytic.json"
+   ],
+   "fullRunCpuSec": 10
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2039-drawn-configuration.test.ts",
+   "product": "analytic",
+   "issue": "2039",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2039-length-moves-latest.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2039-sector-resize.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2039-resize-in-place.test.ts",
+   "product": "analytic",
+   "issue": "2039",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2039-length-moves-latest.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2039-sector-resize.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2057-open-role-row.test.ts",
+   "product": "analytic",
+   "issue": "2057",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2057-open-role-base.analytic.json"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2074-hypotenuse-open.test.ts",
+   "product": "analytic",
+   "issue": "2074",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2074-hypotenuse-median-open.analytic.json"
+   ],
+   "fullRunCpuSec": 22
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2108-plural-circle-crossing.test.ts",
+   "product": "analytic",
+   "issue": "2108",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2108-plural-circle-crossing.analytic.json"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2115-bisector-on-side.test.ts",
+   "product": "analytic",
+   "issue": "2115",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2115-bisector-on-side.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2130-2376-inscription-binding.test.ts",
+   "product": "analytic",
+   "issue": "2130",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/incircle-then-circumcircle-2130.analytic.json"
+   ],
+   "fullRunCpuSec": 17
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2199-point-on-carrier-list.test.ts",
+   "product": "analytic",
+   "issue": "2199",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/point-on-two-circles-2199.analytic.json",
+    "src-analytic/__tests__/fixtures/two-points-on-two-circles-2199.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2380-pin-roots.test.ts",
+   "product": "analytic",
+   "issue": "2380",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2380-q2-two-tangent-circles.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2385-common-tangent-letters.test.ts",
+   "product": "analytic",
+   "issue": "2385",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2385-tangent-at-touch.analytic.json"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2388-parameter-relations.test.ts",
+   "product": "analytic",
+   "issue": "2388",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2388-q2-exam-equations.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2388-q2-relations.analytic.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2391-exam-twins.test.ts",
+   "product": "analytic",
+   "issue": "2391",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2391-q1-exam-wording.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2391-q2-centres.analytic.json"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2392-named-common-tangent.test.ts",
+   "product": "analytic",
+   "issue": "2392",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2379-q3-c-named-tangent-2392.analytic.json"
+   ],
+   "fullRunCpuSec": 28
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2394-paired-exact.test.ts",
+   "product": "analytic",
+   "issue": "2394",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2394-q2-d-paired.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2397-pair-first.test.ts",
+   "product": "analytic",
+   "issue": "2397",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2379-q2-printed-order-2397.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2391-q2-exam-wording.analytic.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2408-2411-tangent-slots.test.ts",
+   "product": "analytic",
+   "issue": "2408",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2408-four-tangents-fixed.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2408-four-tangents-free.analytic.json"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2408-common-tangent-segment.test.ts",
+   "product": "analytic",
+   "issue": "2408",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2408-four-tangents-fixed.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2408-four-tangents-free.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2408-set-then-line.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2418-common-tangent-later-pin.test.ts",
+   "product": "analytic",
+   "issue": "2418",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2418-reverse-order.analytic.json"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2424-split-answer-rows.test.tsx",
+   "product": "analytic",
+   "issue": "2424",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2424-split-answer-t21.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2429-equation-line-operand.test.ts",
+   "product": "analytic",
+   "issue": "2429",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2429-distance-equation.analytic.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts",
+   "product": "analytic",
+   "issue": "2521",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2521-radius-letter-binds.analytic.json"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2552-d9-new-circle.test.ts",
+   "product": "analytic",
+   "issue": "2552",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2552-q6-pair-joined.analytic.json",
+    "src-analytic/__tests__/fixtures/exam-2552-q6-pair-split.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2552-d9-new-circle-after-pair.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2552-d9-new-circle-beside-one.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2552-pair-circle-sentences.test.ts",
+   "product": "analytic",
+   "issue": "2552",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2552-q6-pair-joined.analytic.json",
+    "src-analytic/__tests__/fixtures/exam-2552-q6-pair-split.analytic.json",
+    "src-analytic/__tests__/fixtures/issue-2552-d9-new-circle-after-pair.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2553-unnamed-common-tangent.test.ts",
+   "product": "analytic",
+   "issue": "2553",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/exam-2553-q6-external-tangent.analytic.json",
+    "src-analytic/__tests__/fixtures/exam-2553-q6-same-side.analytic.json",
+    "src-analytic/__tests__/fixtures/exam-2553-q6-touch-points.analytic.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2615-taken-root-verdict.test.ts",
+   "product": "analytic",
+   "issue": "2615",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2615-p3-21-chord.analytic.json"
+   ],
+   "fullRunCpuSec": 22
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2616-2617-ellipse-roles.test.ts",
+   "product": "analytic",
+   "issue": "2616",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/ellipse-book-p1-3-2616.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p1-4-2616.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p2-16-2616.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p3-21-2616.analytic.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2618-circle-conic.test.ts",
+   "product": "analytic",
+   "issue": "2618",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-around.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-inscribed.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p5-26b.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2618-conic-relations.test.ts",
+   "product": "analytic",
+   "issue": "2618",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-around.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p5-26b-inscribed.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p6-1b.analytic.json"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2619-pronoun-subject.test.ts",
+   "product": "analytic",
+   "issue": "2619",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/ellipse-book-p4-24-2619.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2620-book-measures.test.ts",
+   "product": "analytic",
+   "issue": "2620",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/ellipse-book-p10-8-2620.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p9-5-2620.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p9-6-2620.analytic.json",
+    "src-analytic/__tests__/fixtures/ellipse-book-p9-7-2620.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2621-side-parallel.test.ts",
+   "product": "analytic",
+   "issue": "2621",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/parallel-to-ab-2621.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2621e-shape-parts.test.ts",
+   "product": "analytic",
+   "issue": "2621",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/rhombus-height-p5-26a-2621.analytic.json",
+    "src-analytic/__tests__/fixtures/triangle-sides-p5-28-2621.analytic.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2632-symbol-from-figure.test.ts",
+   "product": "analytic",
+   "issue": "2632",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2632-label-keeps-figure.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2673-locus-chip-only.test.ts",
+   "product": "analytic",
+   "issue": "2673",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/issue-2673-conditional-locus-givens.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/issue-2674-tool-letter-takes-student-letter.test.ts",
+   "product": "analytic",
+   "issue": "2674",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/coordinate-letter-takes-mint-2674.analytic.json",
+    "src-analytic/__tests__/fixtures/median-student-names-foot-2674.analytic.json",
+    "src-analytic/__tests__/fixtures/midpoint-reversed-takes-letter-2674.analytic.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-analytic/__tests__/question-export-1872.test.ts",
+   "product": "analytic",
+   "issue": "1872",
+   "lockedIn": [
+    "src-analytic/__tests__/fixtures/question-export-1872.analytic.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/accepted-line-visible-1390.test.ts",
+   "product": "complex",
+   "issue": "1390",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/param-u-solved-1390.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/all-roots-1434.test.ts",
+   "product": "complex",
+   "issue": "1434",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/all-roots-binomial-spelling-1434.complex.json",
+    "src-complex/__tests__/fixtures/all-roots-corpus-witness-1434.complex.json",
+    "src-complex/__tests__/fixtures/all-roots-member-1434.complex.json",
+    "src-complex/__tests__/fixtures/all-roots-member-poly-1434.complex.json",
+    "src-complex/__tests__/fixtures/all-roots-quadratic-1434.complex.json",
+    "src-complex/__tests__/fixtures/all-roots-quartic-1434.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/approx-reading-2269.test.ts",
+   "product": "complex",
+   "issue": "2269",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/approx-reading-2269.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/canvas-typed-1862.test.tsx",
+   "product": "complex",
+   "issue": "1862",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/canvas-letter-kept-1862.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/circle-drawn-1895.test.ts",
+   "product": "complex",
+   "issue": "1895",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/exam-2021wB-circle-1895.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/flat-polygon-2212.test.ts",
+   "product": "complex",
+   "issue": "2212",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/triangle-not-flat-2212.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/knowledge-invariance-1427.test.ts",
+   "product": "complex",
+   "issue": "1427",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/knowledge-branch-invariant-1427.complex.json",
+    "src-complex/__tests__/fixtures/knowledge-floor-withheld-1427.complex.json",
+    "src-complex/__tests__/fixtures/knowledge-quadratic-1427.complex.json",
+    "src-complex/__tests__/fixtures/knowledge-roots-shared-1427.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/literal-angles-1481.test.ts",
+   "product": "complex",
+   "issue": "1481",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/issue-1481-literal-product.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/literal-exact-2134.test.ts",
+   "product": "complex",
+   "issue": "2134",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/cis-modulus-exact-2134.complex.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src-complex/__tests__/origin-marker-2021.test.tsx",
+   "product": "complex",
+   "issue": "2021",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/origin-marked-2021.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/param-definition-closed-1818.test.ts",
+   "product": "complex",
+   "issue": "1818",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/exam-2022w-a-quadratic-1818.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/param-modulus-1366.test.ts",
+   "product": "complex",
+   "issue": "1366",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/param-modulus-1366.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/param-sign-1387.test.ts",
+   "product": "complex",
+   "issue": "1387",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/param-sign-modulus-1387.complex.json",
+    "src-complex/__tests__/fixtures/param-sign-quadrant-1387.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/polar-letter-modulus-2029.test.ts",
+   "product": "complex",
+   "issue": "2029",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/polar-letter-modulus-2029.complex.json",
+    "src-complex/__tests__/fixtures/polar-letter-modulus-trig-2029.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/polar-modulus-positive-2078.test.ts",
+   "product": "complex",
+   "issue": "2078",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/cartesian-ri-2078.complex.json",
+    "src-complex/__tests__/fixtures/polar-cis90-2078.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/question-export-1872.test.ts",
+   "product": "complex",
+   "issue": "1872",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/question-export-1872.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/roots-set-membership-1396.test.ts",
+   "product": "complex",
+   "issue": "1396",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/roots-set-membership-1396.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src-complex/__tests__/symbolic-cartesian-1365.test.ts",
+   "product": "complex",
+   "issue": "1365",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/symbolic-cartesian-forced-1365.complex.json",
+    "src-complex/__tests__/fixtures/symbolic-cartesian-ib-1365.complex.json",
+    "src-complex/__tests__/fixtures/symbolic-cartesian-modulus-1365.complex.json",
+    "src-complex/__tests__/fixtures/symbolic-cartesian-quadrant-1365.complex.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src-complex/__tests__/trig-form-1534.test.ts",
+   "product": "complex",
+   "issue": "1534",
+   "lockedIn": [
+    "src-complex/__tests__/fixtures/trig-form-1534.complex.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/__tests__/inscription-voices-1975.test.ts",
+   "product": "2d",
+   "issue": "1975",
+   "lockedIn": [
+    "src/__tests__/fixtures/inscription-voices-1975-named-square.geo.json",
+    "src/__tests__/fixtures/inscription-voices-1975-pentagon.geo.json",
+    "src/__tests__/fixtures/inscription-voices-1975-triangle-incircle.geo.json"
+   ],
+   "fullRunCpuSec": 21
+  },
+  {
+   "file": "src/__tests__/issue-1000-arc-copula.test.ts",
+   "product": "2d",
+   "issue": "1000",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#arc-equality-canonical-spelling-1000"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-1012-role-readings.test.ts",
+   "product": "2d",
+   "issue": "1012",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#issue-2486-reread-teaches-middle-spelling"
+   ],
+   "fullRunCpuSec": 280
+  },
+  {
+   "file": "src/__tests__/issue-1443-height-magnitude.test.ts",
+   "product": "2d",
+   "issue": "1443",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1443-trapezoid-height.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-1445-polygon-angle-default.test.ts",
+   "product": "2d",
+   "issue": "1445",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1445-triangle-angle-by-vertex.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/__tests__/issue-1454-compute-on-ask.test.ts",
+   "product": "2d",
+   "issue": "1454",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#ask-computes-its-answer-1454"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/__tests__/issue-1599-1601-knowledge-pool.test.ts",
+   "product": "2d",
+   "issue": "1599",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#ssa-triangle-two-shapes-status-and-values-1599"
+   ],
+   "fullRunCpuSec": 60
+  },
+  {
+   "file": "src/__tests__/issue-1600-choice-registry.test.ts",
+   "product": "2d",
+   "issue": "1600",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#line-circle-avoid-off-circle-two-configs-1600",
+    "src/__tests__/scenarios-corpus-4.ts#segment-secant-both-roots-two-configs-1600",
+    "src/__tests__/scenarios-corpus-4.ts#equilateral-on-square-side-two-sides-1600",
+    "src/__tests__/scenarios-corpus-4.ts#square-on-triangle-side-two-sides-1600",
+    "src/__tests__/scenarios-corpus-4.ts#two-independent-crossings-four-configs-1600",
+    "src/__tests__/scenarios-corpus-4.ts#point-inside-triangle-two-presses-1739"
+   ],
+   "fullRunCpuSec": 44
+  },
+  {
+   "file": "src/__tests__/issue-1602-independent-carriers.test.ts",
+   "product": "2d",
+   "issue": "1602",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangents-perpendicular-foot-values-1601"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src/__tests__/issue-1607-role-noun-length.test.ts",
+   "product": "2d",
+   "issue": "1607",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1607-diagonal-length.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#median-on-a-side-refused-1742"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/__tests__/issue-1673-hidden-centre.test.ts",
+   "product": "2d",
+   "issue": "1673",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-1.ts#gxccyt2n-hidden-centre-never-squats-letter",
+    "src/__tests__/scenarios-corpus-2.ts#stated-meet-relocates-loose-point",
+    "src/__tests__/scenarios-corpus-2.ts#two-circles-kite-surfaces-kite-and-isosceles-theorems",
+    "src/__tests__/scenarios-corpus-2.ts#two-tangent-circles-then-size-given-flexes-radii",
+    "src/__tests__/scenarios-corpus-4.ts#hidden-centre-letter-steps-aside-1673"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src/__tests__/issue-1678-cyclic-order-seat.test.ts",
+   "product": "2d",
+   "issue": "1678",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1678-chords-cross-in-the-circle.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-1698-trig-ratio.test.ts",
+   "product": "2d",
+   "issue": "1698",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#trig-given-is-a-ratio-1698"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/__tests__/issue-1709-nested-circles-ask.test.ts",
+   "product": "2d",
+   "issue": "1709",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#nested-circles-new-letter-asks-1709"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-1711-sine-choice.test.ts",
+   "product": "2d",
+   "issue": "1711",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#sine-is-a-two-angle-choice-1711"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src/__tests__/issue-1718-trig-angle-label.test.ts",
+   "product": "2d",
+   "issue": "1718",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#trig-given-is-a-ratio-1698",
+    "src/__tests__/scenarios-corpus-4.ts#trig-given-label-is-the-angle-1718"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/__tests__/issue-1722-no-angle-yet.test.ts",
+   "product": "2d",
+   "issue": "1722",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#no-angle-yet-at-a-bare-vertex-1722"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/__tests__/issue-1812-angle-alias-subscript.test.ts",
+   "product": "2d",
+   "issue": "1812",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-alias-refused-2191"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/__tests__/issue-1943-restated-given-stability.test.ts",
+   "product": "2d",
+   "issue": "1943",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#restated-right-angle-trapezoid-stays-put-1943",
+    "src/__tests__/scenarios-corpus-4.ts#restated-perpendicular-as-angle-stays-put-1819"
+   ],
+   "fullRunCpuSec": 13
+  },
+  {
+   "file": "src/__tests__/issue-1971-off-ink-extension.test.ts",
+   "product": "2d",
+   "issue": "1971",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#height-foot-beyond-side-dashed-1971"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-1999-cevian-letter-order.test.ts",
+   "product": "2d",
+   "issue": "1999",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1999-bisector-english.geo.json",
+    "src/__tests__/fixtures/issue-1999-bisector-vertex-last.geo.json",
+    "src/__tests__/fixtures/issue-1999-height-vertex-last.geo.json",
+    "src/__tests__/fixtures/issue-1999-median-vertex-last.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/__tests__/issue-2001-tangent-touch.test.ts",
+   "product": "2d",
+   "issue": "2001",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2001-touch-on-incircle.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-2037-arc-endpoints.test.ts",
+   "product": "2d",
+   "issue": "2037",
+   "lockedIn": [
+    "src/__tests__/fixtures/arc-endpoints-2037.geo.json"
+   ],
+   "fullRunCpuSec": 12
+  },
+  {
+   "file": "src/__tests__/issue-2257-inscribe-existing-inner.test.ts",
+   "product": "2d",
+   "issue": "2257",
+   "lockedIn": [
+    "src/__tests__/fixtures/inscribe-existing-square-2257.geo.json",
+    "src/__tests__/fixtures/inscribe-existing-square-named-2257.geo.json",
+    "src/__tests__/fixtures/inscribe-square-in-quad-2257.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-existing-square-no-second-2257",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-two-squares-asks-2257",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-existing-square-refused-named-2257"
+   ],
+   "fullRunCpuSec": 176
+  },
+  {
+   "file": "src/__tests__/issue-2264-concentric-circle-names.test.ts",
+   "product": "2d",
+   "issue": "2264",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#concentric-circle-names-2264",
+    "src/__tests__/scenarios-corpus-4.ts#concentric-circle-names-sentences-2305"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-2305-circle-names-every-surface.test.ts",
+   "product": "2d",
+   "issue": "2305",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#concentric-circle-names-sentences-2305"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/__tests__/issue-2344-impossible-right-isosceles.test.ts",
+   "product": "2d",
+   "issue": "2344",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#contradictory-right-angles-refused-not-drawn-1328",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-right-isosceles-refused-2344",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-right-isosceles-angle-refused-2344"
+   ],
+   "fullRunCpuSec": 186
+  },
+  {
+   "file": "src/__tests__/issue-2405-all-common-tangents.test.ts",
+   "product": "2d",
+   "issue": "2405",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2405-all-common-tangents-apart.geo.json",
+    "src/__tests__/fixtures/issue-2405-all-common-tangents-ext-touch.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#all-common-tangents-unstated-position-refused-2405"
+   ],
+   "fullRunCpuSec": 81
+  },
+  {
+   "file": "src/__tests__/issue-2407-common-tangent-at-touch.test.ts",
+   "product": "2d",
+   "issue": "2407",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2407-tangent-at-touch.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#common-tangent-external-through-touch-refused-2407"
+   ],
+   "fullRunCpuSec": 39
+  },
+  {
+   "file": "src/__tests__/issue-2430-common-tangent-later-pin.test.ts",
+   "product": "2d",
+   "issue": "2430",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2430-reverse-order-tangent-at-t.geo.json"
+   ],
+   "fullRunCpuSec": 94
+  },
+  {
+   "file": "src/__tests__/issue-2480-row-immutability.test.ts",
+   "product": "2d",
+   "issue": "2480",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#later-line-keeps-earlier-row-2480",
+    "src/__tests__/scenarios-corpus-4.ts#square-in-circle-after-square-around-2454"
+   ],
+   "fullRunCpuSec": 213
+  },
+  {
+   "file": "src/__tests__/issue-2512-second-ring-on-circle.test.ts",
+   "product": "2d",
+   "issue": "2512",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-triangle-around-circle-2512"
+   ],
+   "fullRunCpuSec": 127
+  },
+  {
+   "file": "src/__tests__/issue-2538-ring-around-circle-inscribed.test.ts",
+   "product": "2d",
+   "issue": "2538",
+   "lockedIn": [
+    "src/__tests__/fixtures/equilateral-around-circle-incircle-2538.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#second-triangle-around-circle-2512",
+    "src/__tests__/scenarios-corpus-4.ts#ring-around-circle-is-incircle-2538",
+    "src/__tests__/scenarios-corpus-4.ts#incircle-given-only-an-excircle-meets-2538"
+   ],
+   "fullRunCpuSec": 100
+  },
+  {
+   "file": "src/__tests__/issue-942-coincident-views.test.ts",
+   "product": "2d",
+   "issue": "942",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#over-constrained-refusal-attributes-to-the-typed-step-943",
+    "src/__tests__/scenarios-corpus-4.ts#shared-endpoint-crossing-refused-944"
+   ],
+   "fullRunCpuSec": 103
+  },
+  {
+   "file": "src/__tests__/issue-944-shared-endpoint.test.ts",
+   "product": "2d",
+   "issue": "944",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#shared-endpoint-crossing-refused-944"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/__tests__/issue-955-refused-label.test.ts",
+   "product": "2d",
+   "issue": "955",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#refused-measure-writes-nothing-955",
+    "src/__tests__/scenarios-corpus-4.ts#refused-symbolic-length-writes-nothing-955",
+    "src/__tests__/scenarios-corpus-4.ts#blame-lands-on-the-value-line-956"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src/__tests__/issue-956-blame-later-fact.test.ts",
+   "product": "2d",
+   "issue": "956",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#refused-measure-writes-nothing-955",
+    "src/__tests__/scenarios-corpus-4.ts#blame-lands-on-the-value-line-956"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src/__tests__/teach-fraction-1611.test.ts",
+   "product": "2d",
+   "issue": "1611",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1611-taught-fraction.geo.json"
+   ],
+   "fullRunCpuSec": 59
+  },
+  {
+   "file": "src/__tests__/values-panel-labels-1442.test.ts",
+   "product": "2d",
+   "issue": "1442",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#values-panel-names-circles-1442"
+   ],
+   "fullRunCpuSec": 202
+  },
+  {
+   "file": "src/app/__tests__/edit-pipeline-782.test.ts",
+   "product": "2d",
+   "issue": "782",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-alias-refused-2191"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/app/__tests__/issue-1274-crossing-already-named.test.ts",
+   "product": "2d",
+   "issue": "1274",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#shared-endpoint-crossing-refused-944"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1351-bound-aim-yields.test.ts",
+   "product": "2d",
+   "issue": "1351",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#bound-with-its-value-on-the-boundary-samples-1351"
+   ],
+   "fullRunCpuSec": 44
+  },
+  {
+   "file": "src/app/__tests__/issue-1444-config-status.test.ts",
+   "product": "2d",
+   "issue": "1444",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#zero-dof-configurations-status-1444"
+   ],
+   "fullRunCpuSec": 22
+  },
+  {
+   "file": "src/app/__tests__/issue-1470-side-refusal.test.ts",
+   "product": "2d",
+   "issue": "1470",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#stated-side-vs-incidence-refused-1470"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1650-tangency-creates-circle.test.ts",
+   "product": "2d",
+   "issue": "1650",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangency-first-creates-the-circle-1650"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-1658-waiting-row.test.ts",
+   "product": "2d",
+   "issue": "1658",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#variable-bound-waits-then-binds-1658",
+    "src/__tests__/scenarios-corpus-4.ts#variable-bound-scaled-coefficient-1658"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1660-touch-list-incircle.test.ts",
+   "product": "2d",
+   "issue": "1660",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#touch-list-builds-the-incircle-1660"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src/app/__tests__/issue-1661-role-noun-claims.test.ts",
+   "product": "2d",
+   "issue": "1661",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#chord-and-diameter-as-relation-operands-1661",
+    "src/__tests__/scenarios-corpus-4.ts#chord-claim-contradiction-refused-in-every-spelling-1668"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src/app/__tests__/issue-1668-claim-gate-parity.test.ts",
+   "product": "2d",
+   "issue": "1668",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#chord-claim-contradiction-refused-in-every-spelling-1668"
+   ],
+   "fullRunCpuSec": 33
+  },
+  {
+   "file": "src/app/__tests__/issue-1671-seat-sweep.test.ts",
+   "product": "2d",
+   "issue": "1671",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#impossible-chord-refused-beside-unstated-right-angle-1671"
+   ],
+   "fullRunCpuSec": 57
+  },
+  {
+   "file": "src/app/__tests__/issue-1676-sentence-frame.test.ts",
+   "product": "2d",
+   "issue": "1676",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1676-framed-figure-and-centre.geo.json",
+    "src/__tests__/fixtures/issue-1676-framed-right-trapezoid.geo.json",
+    "src/__tests__/fixtures/issue-1676-framed-trapezoid.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1682-point-placement-tail.test.ts",
+   "product": "2d",
+   "issue": "1682",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#point-placement-keeps-its-tail-1682"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-1683-lettered-lines.test.ts",
+   "product": "2d",
+   "issue": "1683",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#diagonals-named-by-letters-1683"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1684-cevian-stated-vertex.test.ts",
+   "product": "2d",
+   "issue": "1684",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#cevian-stated-vertex-and-shape-1684"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1685-respectively-cevians.test.ts",
+   "product": "2d",
+   "issue": "1685",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1685-altitudes-respectively.geo.json",
+    "src/__tests__/fixtures/issue-1685-medians-respectively.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts",
+   "product": "2d",
+   "issue": "1689",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#open-right-triangle-median-follows-the-seat-2074"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1690-construction-midpoint-ids.test.ts",
+   "product": "2d",
+   "issue": "1690",
+   "lockedIn": [
+    "src/__tests__/fixtures/bisector-beside-vertex-m-1690.geo.json",
+    "src/__tests__/fixtures/two-unnamed-medians-1690.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1697-naming-is-a-fact.test.ts",
+   "product": "2d",
+   "issue": "1697",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1697-naming-by-use-is-a-fact.geo.json"
+   ],
+   "fullRunCpuSec": 15
+  },
+  {
+   "file": "src/app/__tests__/issue-172-sector-area-arc-length.test.ts",
+   "product": "2d",
+   "issue": "172",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-172-sector-area-and-arc-length.geo.json"
+   ],
+   "fullRunCpuSec": 17
+  },
+  {
+   "file": "src/app/__tests__/issue-1720-cevian-triangle.test.ts",
+   "product": "2d",
+   "issue": "1720",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#triangle-form-cevian-introduces-triangle-1720"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1742-median-on-side.test.ts",
+   "product": "2d",
+   "issue": "1742",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#median-on-a-side-refused-1742",
+    "src/__tests__/scenarios-corpus-4.ts#altitude-on-a-side-is-a-right-angle-1742"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1742-singular-diagonal.test.ts",
+   "product": "2d",
+   "issue": "1742",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#singular-diagonal-draws-one-1742"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1748-untick-retype.test.ts",
+   "product": "2d",
+   "issue": "1748",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#untick-then-retype-reenables-1748"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1751-meet-draws-segments.test.ts",
+   "product": "2d",
+   "issue": "1751",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#meet-verb-draws-noun-does-not-1751"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-1771-semicircle-thales.test.ts",
+   "product": "2d",
+   "issue": "1771",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1771-semicircle-three-vertices.geo.json"
+   ],
+   "fullRunCpuSec": 183
+  },
+  {
+   "file": "src/app/__tests__/issue-1775-construction-operands.test.ts",
+   "product": "2d",
+   "issue": "1775",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#bare-perpendicular-binds-1775"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1790-shape-phrase.test.ts",
+   "product": "2d",
+   "issue": "1790",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1790-incircle-right-triangle.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#right-trapezoid-inscribed-refused-names-both-nouns-1790"
+   ],
+   "fullRunCpuSec": 135
+  },
+  {
+   "file": "src/app/__tests__/issue-1795-existing-label-tail.test.ts",
+   "product": "2d",
+   "issue": "1795",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#existing-label-clause-never-dropped-1795"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src/app/__tests__/issue-1798-compound-all-or-none.test.ts",
+   "product": "2d",
+   "issue": "1798",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#compound-line-all-or-none-1798"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1814-indexed-name-value.test.ts",
+   "product": "2d",
+   "issue": "1814",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#indexed-angle-names-decline-1814"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-1834-chord-third-crossing.test.ts",
+   "product": "2d",
+   "issue": "1834",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#chord-third-crossing-1834"
+   ],
+   "fullRunCpuSec": 48
+  },
+  {
+   "file": "src/app/__tests__/issue-1849-flat-polygon-refused.test.ts",
+   "product": "2d",
+   "issue": "1849",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#flat-triangle-refused-1849"
+   ],
+   "fullRunCpuSec": 20
+  },
+  {
+   "file": "src/app/__tests__/issue-1851-angle-symbol-constant.test.ts",
+   "product": "2d",
+   "issue": "1851",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1851-angle-symbol-constant.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-1857-variant-rescue-work-cap.test.ts",
+   "product": "2d",
+   "issue": "1857",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#isosceles-apex-rescue-deterministic-1857"
+   ],
+   "fullRunCpuSec": 45
+  },
+  {
+   "file": "src/app/__tests__/issue-1891-ngon-incircle.test.ts",
+   "product": "2d",
+   "issue": "1891",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#pentagon-incircle-refused-1891",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-reveals-hidden-circle-1972"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/app/__tests__/issue-1913-cyclic-member-lowering.test.ts",
+   "product": "2d",
+   "issue": "1913",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1913-parallelogram-on-circle-sides.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#parallelogram-on-circle-is-its-rectangle-1913",
+    "src/__tests__/scenarios-corpus-4.ts#narrowing-note-circle-points-parallelogram-1996"
+   ],
+   "fullRunCpuSec": 53
+  },
+  {
+   "file": "src/app/__tests__/issue-1914-1993-noun-refines-ring.test.ts",
+   "product": "2d",
+   "issue": "1914",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1914-inscribed-then-parallelogram.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#second-shape-noun-over-a-ring-1988-1985"
+   ],
+   "fullRunCpuSec": 41
+  },
+  {
+   "file": "src/app/__tests__/issue-1918-right-trapezoid-circle.test.ts",
+   "product": "2d",
+   "issue": "1918",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#right-trapezoid-circle-refused-1918"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/app/__tests__/issue-1921-cyclic-kite.test.ts",
+   "product": "2d",
+   "issue": "1921",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#parallelogram-on-circle-is-its-rectangle-1913"
+   ],
+   "fullRunCpuSec": 39
+  },
+  {
+   "file": "src/app/__tests__/issue-1927-crossed-ring.test.ts",
+   "product": "2d",
+   "issue": "1927",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#crossed-ring-over-placed-points-1927",
+    "src/__tests__/scenarios-corpus-4.ts#restated-ring-any-reading-1953",
+    "src/__tests__/scenarios-corpus-4.ts#crossed-ring-search-first-1927",
+    "src/__tests__/scenarios-corpus-4.ts#concave-quad-second-ring-1987",
+    "src/__tests__/scenarios-corpus-4.ts#quad-straight-corner-refused-2064"
+   ],
+   "fullRunCpuSec": 17
+  },
+  {
+   "file": "src/app/__tests__/issue-1931-relation-tangent.test.ts",
+   "product": "2d",
+   "issue": "1931",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#relation-tangent-has-no-second-crossing-1931",
+    "src/__tests__/scenarios-corpus-4.ts#perpendicular-tangent-has-no-second-crossing-1931"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/app/__tests__/issue-1934-search-before-flat.test.ts",
+   "product": "2d",
+   "issue": "1934",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1934-four-bare-points-quad.geo.json",
+    "src/__tests__/fixtures/issue-1934-three-bare-points-triangle.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-1936-second-right-angle.test.ts",
+   "product": "2d",
+   "issue": "1936",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-right-angle-refused-1936"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src/app/__tests__/issue-1952-untick-independent-row.test.ts",
+   "product": "2d",
+   "issue": "1952",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#untick-leaves-an-independent-row-building-1952"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-1953-restated-ring.test.ts",
+   "product": "2d",
+   "issue": "1953",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#crossed-ring-over-placed-points-1927",
+    "src/__tests__/scenarios-corpus-4.ts#restated-ring-any-reading-1953"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-1972-reveal-hidden-circle.test.ts",
+   "product": "2d",
+   "issue": "1972",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1972-cyclic-triangle-reveals-its-circle.geo.json",
+    "src/__tests__/fixtures/issue-1972-pentagon-reveals-its-circle.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-reveals-hidden-circle-1972"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-1987-concave-quad.test.ts",
+   "product": "2d",
+   "issue": "1987",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#concave-quad-second-ring-1987"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts",
+   "product": "2d",
+   "issue": "1988",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-shape-noun-over-a-ring-1988-1985"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src/app/__tests__/issue-2023-second-symbol.test.ts",
+   "product": "2d",
+   "issue": "2023",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-symbol-refused-2023",
+    "src/__tests__/scenarios-corpus-4.ts#angle-coef-restated-refused-2061"
+   ],
+   "fullRunCpuSec": 10
+  },
+  {
+   "file": "src/app/__tests__/issue-2024-symbol-endpoint-letter.test.ts",
+   "product": "2d",
+   "issue": "2024",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2024-symbol-endpoint-angle.geo.json",
+    "src/__tests__/fixtures/issue-2024-symbol-endpoint-length.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2027-similarity-ratio.test.ts",
+   "product": "2d",
+   "issue": "2027",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2027-similarity-ratio.geo.json"
+   ],
+   "fullRunCpuSec": 21
+  },
+  {
+   "file": "src/app/__tests__/issue-2032-arc-plain-values.test.ts",
+   "product": "2d",
+   "issue": "2032",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2032-bare-arc-length.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2032-bare-arc-length.test.ts",
+   "product": "2d",
+   "issue": "2032",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2032-bare-arc-length.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2064-vertex-pair-cevian.test.ts",
+   "product": "2d",
+   "issue": "2064",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#altitude-on-existing-side-already-drawn-2064",
+    "src/__tests__/scenarios-corpus-4.ts#altitude-reversed-side-already-drawn-2064",
+    "src/__tests__/scenarios-corpus-4.ts#altitude-long-form-already-drawn-2064",
+    "src/__tests__/scenarios-corpus-4.ts#altitude-two-vertex-not-true-2064",
+    "src/__tests__/scenarios-corpus-4.ts#square-midpoint-collapse-refused-2064",
+    "src/__tests__/scenarios-corpus-4.ts#quad-straight-corner-refused-2064",
+    "src/__tests__/scenarios-corpus-4.ts#narrowing-note-parallelogram-height-t41-1996"
+   ],
+   "fullRunCpuSec": 32
+  },
+  {
+   "file": "src/app/__tests__/issue-2065-similarity-k.test.ts",
+   "product": "2d",
+   "issue": "2065",
+   "lockedIn": [
+    "src/__tests__/fixtures/similarity-ratio-in-words-2065.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2066-bisector-on-side.test.ts",
+   "product": "2d",
+   "issue": "2066",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#bisector-on-a-side-refused-2066"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2074-hypotenuse-open.test.ts",
+   "product": "2d",
+   "issue": "2074",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2074-hypotenuse-median-open.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#open-right-triangle-median-follows-the-seat-2074"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2080-tangent-circles-cross.test.ts",
+   "product": "2d",
+   "issue": "2080",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangent-circles-have-no-two-crossings-2080",
+    "src/__tests__/scenarios-corpus-4.ts#tangent-by-lengths-cross-refused-2083"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2082-perp-reseat.test.ts",
+   "product": "2d",
+   "issue": "2082",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2082-right-triangle-perp-reseats.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#second-right-angle-refused-1936"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2083-circle-reference.test.ts",
+   "product": "2d",
+   "issue": "2083",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2083-named-crossing-keeps-radii.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#tangent-by-lengths-cross-refused-2083"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts",
+   "product": "2d",
+   "issue": "2084",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#point-on-two-tangent-circles-is-the-touch-2084",
+    "src/__tests__/scenarios-corpus-4.ts#touch-letter-yields-stated-radii-2122"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-2089-rider-foot.test.ts",
+   "product": "2d",
+   "issue": "2089",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2089-rider-foot-quad.geo.json",
+    "src/__tests__/fixtures/issue-2089-rider-perp-quad.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2098-bare-run-circumscribes.test.ts",
+   "product": "2d",
+   "issue": "2098",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2098-bare-run-circumscribes-quad.geo.json",
+    "src/__tests__/fixtures/issue-2098-bare-run-circumscribes-tri.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2099-collinear-circle.test.ts",
+   "product": "2d",
+   "issue": "2099",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#collinear-circle-refused-2099"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2111.test.ts",
+   "product": "2d",
+   "issue": "2111",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2111-reserved-r-valued.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2112-radius-ratio-reason.test.ts",
+   "product": "2d",
+   "issue": "2112",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#radius-ratio-refusal-names-radii-2112"
+   ],
+   "fullRunCpuSec": 28
+  },
+  {
+   "file": "src/app/__tests__/issue-2117-diagonal-height.test.ts",
+   "product": "2d",
+   "issue": "2117",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#merged-ring-third-noun-restates-2193"
+   ],
+   "fullRunCpuSec": 125
+  },
+  {
+   "file": "src/app/__tests__/issue-2119-radius-restated.test.ts",
+   "product": "2d",
+   "issue": "2119",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#radius-restated-refused-2119",
+    "src/__tests__/scenarios-corpus-4.ts#stated-radius-never-changed-2239"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2122-touch-letter-yields.test.ts",
+   "product": "2d",
+   "issue": "2122",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-2.ts#height-from-vertex-never-drops-onto-a-diagonal",
+    "src/__tests__/scenarios-corpus-4.ts#point-on-two-tangent-circles-is-the-touch-2084",
+    "src/__tests__/scenarios-corpus-4.ts#touch-letter-yields-stated-radii-2122",
+    "src/__tests__/scenarios-corpus-4.ts#touch-point-named-2123"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2127-indefinite-shape-fresh-letters.test.ts",
+   "product": "2d",
+   "issue": "2127",
+   "lockedIn": [
+    "src/__tests__/fixtures/indefinite-second-triangle-2127.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#indefinite-second-triangle-other-order-2127"
+   ],
+   "fullRunCpuSec": 56
+  },
+  {
+   "file": "src/app/__tests__/issue-2149-plural-circle-pair.test.ts",
+   "product": "2d",
+   "issue": "2149",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#centres-segment-named-pair-2149",
+    "src/__tests__/scenarios-corpus-4.ts#equal-radii-named-pair-2149",
+    "src/__tests__/scenarios-corpus-4.ts#equal-radii-singular-2149",
+    "src/__tests__/scenarios-corpus-4.ts#touch-point-states-tangency-2149",
+    "src/__tests__/scenarios-corpus-4.ts#touch-point-named-2123"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src/app/__tests__/issue-2165-letter-system.test.ts",
+   "product": "2d",
+   "issue": "2165",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2165-letter-equation.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#refused-symbolic-length-writes-nothing-955",
+    "src/__tests__/scenarios-corpus-4.ts#letter-value-contradiction-2135"
+   ],
+   "fullRunCpuSec": 11
+  },
+  {
+   "file": "src/app/__tests__/issue-2173-latin-angle-note.test.ts",
+   "product": "2d",
+   "issue": "2173",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#latin-angle-letter-2173"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2177-reserved-r-several-circles.test.ts",
+   "product": "2d",
+   "issue": "2177",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#reserved-r-several-circles-2177"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2185-point-on-carrier-list.test.ts",
+   "product": "2d",
+   "issue": "2185",
+   "lockedIn": [
+    "src/__tests__/fixtures/point-on-two-circles-2185.geo.json",
+    "src/__tests__/fixtures/point-per-circle-2185.geo.json",
+    "src/__tests__/fixtures/two-points-on-two-circles-2185.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2186-equal-size-two-circle-family.test.ts",
+   "product": "2d",
+   "issue": "2186",
+   "lockedIn": [
+    "src/__tests__/fixtures/equal-radii-intersecting-2186.geo.json",
+    "src/__tests__/fixtures/equal-radii-intersecting-points-2186.geo.json",
+    "src/__tests__/fixtures/equal-radii-named-intersecting-2186.geo.json"
+   ],
+   "fullRunCpuSec": 14
+  },
+  {
+   "file": "src/app/__tests__/issue-2188-tangent-kind-inherited.test.ts",
+   "product": "2d",
+   "issue": "2188",
+   "lockedIn": [
+    "src/__tests__/fixtures/tangent-twin-internal-2188.geo.json"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src/app/__tests__/issue-2191-second-alias.test.ts",
+   "product": "2d",
+   "issue": "2191",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-alias-refused-2191"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2193-merged-ring-restated.test.ts",
+   "product": "2d",
+   "issue": "2193",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#merged-ring-third-noun-restates-2193"
+   ],
+   "fullRunCpuSec": 33
+  },
+  {
+   "file": "src/app/__tests__/issue-2195-latin-prose-labels.test.ts",
+   "product": "2d",
+   "issue": "2195",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#english-shape-word-not-labels-2234",
+    "src/__tests__/scenarios-corpus-4.ts#english-words-not-labels-2195"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2197-role-pair-two-circles.test.ts",
+   "product": "2d",
+   "issue": "2197",
+   "lockedIn": [
+    "src/__tests__/fixtures/chord-tangent-other-circle-2197.geo.json",
+    "src/__tests__/fixtures/diameter-tangent-other-circle-2197.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#compound-line-all-or-none-1798"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src/app/__tests__/issue-2200-equal-circles.test.ts",
+   "product": "2d",
+   "issue": "2200",
+   "lockedIn": [
+    "src/__tests__/fixtures/equal-circles-bare-2200.geo.json",
+    "src/__tests__/fixtures/equal-circles-bare-area-2200.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#equal-circles-nested-2200"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src/app/__tests__/issue-2205-definite-shape-reference.test.ts",
+   "product": "2d",
+   "issue": "2205",
+   "lockedIn": [
+    "src/__tests__/fixtures/definite-triangle-predicate-2205.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#definite-triangle-two-triangles-2205"
+   ],
+   "fullRunCpuSec": 45
+  },
+  {
+   "file": "src/app/__tests__/issue-2206-equal-nested.test.ts",
+   "product": "2d",
+   "issue": "2206",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#stated-radius-never-changed-2239",
+    "src/__tests__/scenarios-corpus-4.ts#equal-circles-nested-values-2206"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src/app/__tests__/issue-2208-circle-subject-tangent.test.ts",
+   "product": "2d",
+   "issue": "2208",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-subject-internal-2208.geo.json",
+    "src/__tests__/fixtures/circle-subject-internal-at-2208.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-2209-tangency-restatement.test.ts",
+   "product": "2d",
+   "issue": "2209",
+   "lockedIn": [
+    "src/__tests__/fixtures/catalog-tangent-drawn-2209.geo.json",
+    "src/__tests__/fixtures/catalog-tangent-drawn-at-2209.geo.json",
+    "src/__tests__/fixtures/tangent-reversed-twin-2209.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#tangent-restated-idempotent-2209"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2210-tangency-record.test.ts",
+   "product": "2d",
+   "issue": "2210",
+   "lockedIn": [
+    "src/__tests__/fixtures/contained-then-tangent-2210.geo.json",
+    "src/__tests__/fixtures/tangent-later-internal-2210.geo.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/app/__tests__/issue-2211-circle-beside-pair.test.ts",
+   "product": "2d",
+   "issue": "2211",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-tangent-to-pair-2211.geo.json",
+    "src/__tests__/fixtures/circle-tangent-to-pair-external-2211.geo.json",
+    "src/__tests__/fixtures/circle-tangent-to-two-circles-2211.geo.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/app/__tests__/issue-2215-entry-order-markers.test.ts",
+   "product": "2d",
+   "issue": "2215",
+   "lockedIn": [
+    "src/__tests__/fixtures/diameter-and-chord-2215.geo.json",
+    "src/__tests__/fixtures/tangent-then-chord-2215.geo.json"
+   ],
+   "fullRunCpuSec": 15
+  },
+  {
+   "file": "src/app/__tests__/issue-2217-equal-pair-named-by-use.test.ts",
+   "product": "2d",
+   "issue": "2217",
+   "lockedIn": [
+    "src/__tests__/fixtures/equal-radii-named-by-use-2217.geo.json"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src/app/__tests__/issue-2219-relation-object-list.test.ts",
+   "product": "2d",
+   "issue": "2219",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-tangent-to-two-sides-2219.geo.json",
+    "src/__tests__/fixtures/perpendicular-to-two-2219.geo.json",
+    "src/__tests__/fixtures/perpendicular-to-two-he-2219.geo.json"
+   ],
+   "fullRunCpuSec": 35
+  },
+  {
+   "file": "src/app/__tests__/issue-2231-llm-retry.test.ts",
+   "product": "2d",
+   "issue": "2231",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#perp-piece-foot-2232",
+    "src/__tests__/scenarios-corpus-4.ts#perp-relation-rider-2231",
+    "src/__tests__/scenarios-corpus-4.ts#perp-relation-vertex-2231",
+    "src/__tests__/scenarios-corpus-4.ts#parallel-relation-rider-2231"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2234-right-angled-at-vertex.test.ts",
+   "product": "2d",
+   "issue": "2234",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#right-angled-at-vertex-refused-2234",
+    "src/__tests__/scenarios-corpus-4.ts#english-shape-word-not-labels-2234",
+    "src/__tests__/scenarios-corpus-4.ts#english-words-not-labels-2195"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2239-stated-radius-held.test.ts",
+   "product": "2d",
+   "issue": "2239",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#stated-radius-never-changed-2239"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src/app/__tests__/issue-2242-definite-circle-size.test.ts",
+   "product": "2d",
+   "issue": "2242",
+   "lockedIn": [
+    "src/__tests__/fixtures/definite-circle-area-2242.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#definite-circle-size-two-circles-2242"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2262-tangency-distance-label.test.ts",
+   "product": "2d",
+   "issue": "2262",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangency-distance-unlabelled-2262"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-2263-nested-pair-radius.test.ts",
+   "product": "2d",
+   "issue": "2263",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#concentric-pair-radius-refused-2263"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2265-regular-polygon-sides.test.ts",
+   "product": "2d",
+   "issue": "2265",
+   "lockedIn": [
+    "src/__tests__/fixtures/regular-pentagon-definite-2265.geo.json",
+    "src/__tests__/fixtures/regular-pentagon-named-2265.geo.json"
+   ],
+   "fullRunCpuSec": 325
+  },
+  {
+   "file": "src/app/__tests__/issue-2339-tangency-kind-refused.test.ts",
+   "product": "2d",
+   "issue": "2339",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangency-kind-contradiction-refused-2339"
+   ],
+   "fullRunCpuSec": 38
+  },
+  {
+   "file": "src/app/__tests__/issue-2355-inscribed-shape-stated.test.ts",
+   "product": "2d",
+   "issue": "2355",
+   "lockedIn": [
+    "src/__tests__/fixtures/rectangle-inscribed-existing-2355.geo.json",
+    "src/__tests__/fixtures/right-triangle-inscribed-existing-2355.geo.json",
+    "src/__tests__/fixtures/square-inscribed-existing-2355.geo.json"
+   ],
+   "fullRunCpuSec": 150
+  },
+  {
+   "file": "src/app/__tests__/issue-2398-second-centre-letter.test.ts",
+   "product": "2d",
+   "issue": "2398",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#second-centre-letter-refused-2398",
+    "src/__tests__/scenarios-corpus-4.ts#second-centre-letter-names-holder-2398"
+   ],
+   "fullRunCpuSec": 10
+  },
+  {
+   "file": "src/app/__tests__/issue-2459-radius-ratio-role.test.ts",
+   "product": "2d",
+   "issue": "2459",
+   "lockedIn": [
+    "src/__tests__/fixtures/concentric-radius-ratio-2459.geo.json"
+   ],
+   "fullRunCpuSec": 17
+  },
+  {
+   "file": "src/app/__tests__/issue-2477-definite-diameter.test.ts",
+   "product": "2d",
+   "issue": "2477",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2477-diameter-of-the-circle.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#issue-2477-diameter-of-the-drawn-circle",
+    "src/__tests__/scenarios-corpus-4.ts#issue-2477-diameter-of-the-circle-en",
+    "src/__tests__/scenarios-corpus-4.ts#issue-2477-diameter-of-the-circle-two-circles-asks"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2483-arc-never-contradicts.test.ts",
+   "product": "2d",
+   "issue": "2483",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#quarter-arc-contradicts-span-2483",
+    "src/__tests__/scenarios-corpus-4.ts#half-circle-holds-180-2483",
+    "src/__tests__/scenarios-corpus-4.ts#arc-end-is-centre-2345"
+   ],
+   "fullRunCpuSec": 142
+  },
+  {
+   "file": "src/app/__tests__/issue-2486-arc-run-centre.test.ts",
+   "product": "2d",
+   "issue": "2486",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#issue-2486-quarter-AOB-existing-ends"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/app/__tests__/issue-2489-symbolic-length-points.test.ts",
+   "product": "2d",
+   "issue": "2489",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-radius-point-2489.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2532-unread-through.test.ts",
+   "product": "2d",
+   "issue": "2532",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#chord-through-centre-two-lines-2532"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/app/__tests__/issue-2674-reversed-spelling.test.ts",
+   "product": "2d",
+   "issue": "2674",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tool-midpoint-reversed-takes-letter-2674"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/app/__tests__/issue-2677-pair-position-conflict.test.ts",
+   "product": "2d",
+   "issue": "2677",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#contained-pair-relations-2677"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/engine/__tests__/adr-276.test.ts",
+   "product": "2d",
+   "issue": "276",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangent-rider-collinear-solves-own-offset"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/engine/__tests__/existing-point-stated-t-2591.test.ts",
+   "product": "2d",
+   "issue": "2591",
+   "lockedIn": [
+    "src/__tests__/fixtures/divides-bisector-foot-2591.geo.json",
+    "src/__tests__/fixtures/divides-existing-point-2591.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#divides-existing-point-2591"
+   ],
+   "fullRunCpuSec": 14
+  },
+  {
+   "file": "src/engine/__tests__/extension-free-quantity-2518.test.ts",
+   "product": "2d",
+   "issue": "2518",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2518-extension-through-circle-point.geo.json",
+    "src/__tests__/fixtures/issue-2518-free-radius-holds-side.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#extension-shared-endpoint-past-second-2518"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src/engine/__tests__/extension-shared-endpoint-order-2518.test.ts",
+   "product": "2d",
+   "issue": "2518",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2518-extension-through-circle-point.geo.json",
+    "src/__tests__/fixtures/issue-2518-free-radius-holds-side.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#extension-shared-endpoint-past-second-2518"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src/engine/__tests__/issue-1264-dof-rank.test.ts",
+   "product": "2d",
+   "issue": "1264",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#redundant-restatement-keeps-the-dof-count-1264",
+    "src/__tests__/scenarios-corpus-4.ts#contradictory-right-angles-refused-not-drawn-1328"
+   ],
+   "fullRunCpuSec": 30
+  },
+  {
+   "file": "src/engine/__tests__/issue-1328-tolerance-artefact.test.ts",
+   "product": "2d",
+   "issue": "1328",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#anonymous-circle-binds-by-membership-beside-second-circle",
+    "src/__tests__/scenarios-corpus-4.ts#contradictory-right-angles-refused-not-drawn-1328"
+   ],
+   "fullRunCpuSec": 106
+  },
+  {
+   "file": "src/engine/__tests__/issue-1471-free-circle-seat.test.ts",
+   "product": "2d",
+   "issue": "1471",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1471-circumcircle-by-membership.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/engine/__tests__/issue-1739-side-everywhere.test.ts",
+   "product": "2d",
+   "issue": "1739",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#point-inside-triangle-two-presses-1739"
+   ],
+   "fullRunCpuSec": 14
+  },
+  {
+   "file": "src/engine/__tests__/issue-2237-circle-seat-newer-moves.test.ts",
+   "product": "2d",
+   "issue": "2237",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-tangent-moves-newer-2237.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#circle-tangent-moves-newer-2237"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/engine/__tests__/issue-2237-tangency-sample-feasible.test.ts",
+   "product": "2d",
+   "issue": "2237",
+   "lockedIn": [
+    "src/__tests__/fixtures/circle-tangent-moves-newer-2237.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#circle-tangent-moves-newer-2237"
+   ],
+   "fullRunCpuSec": 42
+  },
+  {
+   "file": "src/engine/__tests__/issue-2344-limit-collapse.test.ts",
+   "product": "2d",
+   "issue": "2344",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#contradictory-right-angles-refused-not-drawn-1328",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-right-isosceles-refused-2344",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-right-isosceles-angle-refused-2344"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts",
+   "product": "2d",
+   "issue": "2443",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#impossible-isosceles-quad-refused-2443",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-isosceles-quad-angle-refused-2443",
+    "src/__tests__/scenarios-corpus-4.ts#impossible-isosceles-quad-numeric-refused-2443"
+   ],
+   "fullRunCpuSec": 116
+  },
+  {
+   "file": "src/engine/__tests__/issue-2499-earlier-given-rehomed.test.ts",
+   "product": "2d",
+   "issue": "2499",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2499-diameter-after-pinned-distance.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#common-tangent-external-through-touch-refused-2407",
+    "src/__tests__/scenarios-corpus-4.ts#diameter-after-pinned-distance-2499"
+   ],
+   "fullRunCpuSec": 74
+  },
+  {
+   "file": "src/engine/__tests__/issue-260-meeting-reseat.test.ts",
+   "product": "2d",
+   "issue": "260",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-260-two-host-membership.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/engine/__tests__/issue-541.test.ts",
+   "product": "2d",
+   "issue": "541",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#two-tangent-circles-sizes-bind-touch-named-centre-line-builds"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src/engine/__tests__/issue-855.test.ts",
+   "product": "2d",
+   "issue": "855",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-855-tangency-sampled-seat.geo.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src/engine/__tests__/issue-989-trapezoid-pair.test.ts",
+   "product": "2d",
+   "issue": "989",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-989-isosceles-trapezoid-pinned.geo.json",
+    "src/__tests__/fixtures/issue-989-trapezoid-after-triangle.geo.json",
+    "src/__tests__/fixtures/issue-989-trapezoid-stated-pair.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/engine/__tests__/measure-range-1712.test.ts",
+   "product": "2d",
+   "issue": "1712",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#angle-out-of-range-refused-1712"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/engine/__tests__/pinned-radius-owner-2590.test.ts",
+   "product": "2d",
+   "issue": "2590",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2590-pinned-radius-orphan.geo.json"
+   ],
+   "fullRunCpuSec": 20
+  },
+  {
+   "file": "src/parser/__tests__/autos-interchangeable-2217.test.ts",
+   "product": "2d",
+   "issue": "2217",
+   "lockedIn": [
+    "src/__tests__/fixtures/equal-radii-named-by-use-2217.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/parser/__tests__/comparative-ratio-2040.test.ts",
+   "product": "2d",
+   "issue": "2040",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2040-smaller-by-factor-area.geo.json",
+    "src/__tests__/fixtures/issue-2040-smaller-by-factor-length.geo.json",
+    "src/__tests__/fixtures/issue-2040-three-quarters-area.geo.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/parser/__tests__/definite-circle-through-1438.test.ts",
+   "product": "2d",
+   "issue": "1438",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#definite-circle-passes-through-binds-existing",
+    "src/__tests__/scenarios-corpus-4.ts#stated-side-vs-incidence-refused-1470"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/diag-shape-noun-770.test.ts",
+   "product": "2d",
+   "issue": "770",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#diag-shape-noun-binds-declared-kind"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/gate-word-boundary-771.test.ts",
+   "product": "2d",
+   "issue": "771",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#parallelogram-altitude-not-false-blocked-771"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/issue-100.test.ts",
+   "product": "2d",
+   "issue": "100",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#tangent-through-oncircle-point-then-back-reference"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-1285-bisector-triangle.test.ts",
+   "product": "2d",
+   "issue": "1285",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#bisector-reads-the-triangle-operand-1285"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-1678-locative-circle-whole-body.test.ts",
+   "product": "2d",
+   "issue": "1678",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1678-chords-cross-in-the-circle.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-1775-bare-perpendicular.test.ts",
+   "product": "2d",
+   "issue": "1775",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#bare-perpendicular-binds-1775",
+    "src/__tests__/scenarios-corpus-4.ts#bare-perpendicular-asks-1775"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-1891-inscribed-ngon.test.ts",
+   "product": "2d",
+   "issue": "1891",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1891-hexagon-in-circle.geo.json",
+    "src/__tests__/fixtures/issue-1891-octagon-in-circle.geo.json",
+    "src/__tests__/fixtures/issue-1891-pentagon-cyclic-hidden-circle.geo.json",
+    "src/__tests__/fixtures/issue-1891-pentagon-in-circle-en.geo.json",
+    "src/__tests__/fixtures/issue-1891-pentagon-in-circle-radius.geo.json",
+    "src/__tests__/fixtures/issue-1891-pentagon-in-circle.geo.json",
+    "src/__tests__/fixtures/issue-1891-regular-pentagon-in-circle-en.geo.json",
+    "src/__tests__/fixtures/issue-1891-regular-pentagon-in-circle.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#pentagon-incircle-refused-1891",
+    "src/__tests__/scenarios-corpus-4.ts#inscribed-ngon-draws-its-circle-1891",
+    "src/__tests__/scenarios-corpus-4.ts#inscribe-reveals-hidden-circle-1972"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/parser/__tests__/issue-1941-bare-run-incircle.test.ts",
+   "product": "2d",
+   "issue": "1941",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1941-bare-run-incircle-en-quad.geo.json",
+    "src/__tests__/fixtures/issue-1941-bare-run-incircle-en-tri.geo.json",
+    "src/__tests__/fixtures/issue-1941-bare-run-incircle-quad.geo.json",
+    "src/__tests__/fixtures/issue-1941-bare-run-incircle-tri.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#bare-run-incircle-1941"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-1965-ring-parallel-base.test.ts",
+   "product": "2d",
+   "issue": "1965",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1965-height-ignores-foreign-parallel.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#height-ignores-foreign-parallel-1965",
+    "src/__tests__/scenarios-corpus-4.ts#trapezoid-bases-ignore-foreign-parallel-2090"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src/parser/__tests__/issue-1966-placed-foot-order.test.ts",
+   "product": "2d",
+   "issue": "1966",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1966-placed-foot-trapezoid.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#height-keeps-placed-foot-1966"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-2097-abs-length.test.ts",
+   "product": "2d",
+   "issue": "2097",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2097-abs-length.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/issue-2545-ai-ring-gate.test.ts",
+   "product": "2d",
+   "issue": "2545",
+   "lockedIn": [
+    "src/__tests__/fixtures/chord-of-circumcircle-2545.geo.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/issue-554-tangents-meet.test.ts",
+   "product": "2d",
+   "issue": "554",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#incremental-tangent-pair-crossing-554"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/issue-975-maqaf-not-sign.test.ts",
+   "product": "2d",
+   "issue": "975",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-975-maqaf-not-sign.geo.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/issue-976-relation-copula.test.ts",
+   "product": "2d",
+   "issue": "976",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-976-angle-equality-copula.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/plural-line-operands-2533.test.ts",
+   "product": "2d",
+   "issue": "2533",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2533-plural-lines-quad.geo.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/parser/__tests__/role-distribution-2215.test.ts",
+   "product": "2d",
+   "issue": "2215",
+   "lockedIn": [
+    "src/__tests__/fixtures/diameter-and-chord-2215.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/parser/__tests__/vulgar-fraction-2008.test.ts",
+   "product": "2d",
+   "issue": "2008",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2008-glyph-area-ratio-cevian.geo.json",
+    "src/__tests__/fixtures/issue-2008-glyph-area-ratio.geo.json",
+    "src/__tests__/fixtures/issue-2008-glyph-perimeter-ratio.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/render/__tests__/issue-1946-knee-at-named-foot.test.ts",
+   "product": "2d",
+   "issue": "1946",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1946-perp-knee-at-foot.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/render/__tests__/issue-2175-angle-value-fit.test.ts",
+   "product": "2d",
+   "issue": "2175",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2175-long-angle-label-thin-angle.geo.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src/render/__tests__/label-collision-2172.test.ts",
+   "product": "2d",
+   "issue": "2172",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2172-chord-arc-labels.geo.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src/replay/__tests__/issue-1203-forward-blame.test.ts",
+   "product": "2d",
+   "issue": "1203",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#overconstrained-names-the-completing-statement-1203",
+    "src/__tests__/scenarios-corpus-4.ts#quarter-circle-conflict-names-no-innocent-given-1203"
+   ],
+   "fullRunCpuSec": 48
+  },
+  {
+   "file": "src/replay/__tests__/issue-1922-choice-entailment.test.ts",
+   "product": "2d",
+   "issue": "1922",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#restated-default-pair-is-recorded-1922",
+    "src/__tests__/scenarios-corpus-4.ts#restated-right-angle-trapezoid-stays-put-1943"
+   ],
+   "fullRunCpuSec": 92
+  },
+  {
+   "file": "src/replay/__tests__/issue-1968-ring-simple-floor.test.ts",
+   "product": "2d",
+   "issue": "1968",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#inscribed-octagon-never-crossed-1968"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/replay/__tests__/issue-556-apex-region.test.ts",
+   "product": "2d",
+   "issue": "556",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-556-two-tangents-free-apex.geo.json"
+   ],
+   "fullRunCpuSec": 23
+  },
+  {
+   "file": "src/replay/__tests__/issue-943-other-side.test.ts",
+   "product": "2d",
+   "issue": "943",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#over-constrained-refusal-attributes-to-the-typed-step-943",
+    "src/__tests__/scenarios-corpus-4.ts#over-constrained-refusal-names-the-other-side-943"
+   ],
+   "fullRunCpuSec": 58
+  },
+  {
+   "file": "src/replay/__tests__/issue-999-implied-restatement.test.ts",
+   "product": "2d",
+   "issue": "999",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#redundant-restatement-keeps-the-dof-count-1264"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src/replay/__tests__/minted-centre-letters-2362.test.ts",
+   "product": "2d",
+   "issue": "2362",
+   "lockedIn": [
+    "src/__tests__/fixtures/arc-on-minted-circle-name-2362.geo.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src/store/__tests__/adr-238-239.test.ts",
+   "product": "2d",
+   "issue": "238",
+   "lockedIn": [
+    "src/__tests__/scenarios-corpus-4.ts#shared-touch-tangents-sizes-last"
+   ],
+   "fullRunCpuSec": 55
+  },
+  {
+   "file": "src/store/__tests__/issue-1604-load-roundtrip.test.ts",
+   "product": "2d",
+   "issue": "1604",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-1604-saved-reload.geo.json"
+   ],
+   "fullRunCpuSec": 75
+  },
+  {
+   "file": "src/store/__tests__/issue-2114-configuration-survives-load.test.ts",
+   "product": "2d",
+   "issue": "2114",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2114-cycled-configuration.geo.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src/store/__tests__/load-refresh-2486.test.ts",
+   "product": "2d",
+   "issue": "2486",
+   "lockedIn": [
+    "src/__tests__/fixtures/issue-2486-half-AOB.geo.json",
+    "src/__tests__/fixtures/issue-2486-quarter-AOB.geo.json",
+    "src/__tests__/scenarios-corpus-4.ts#quarter-arc-contradicts-span-2483",
+    "src/__tests__/scenarios-corpus-4.ts#arc-end-is-centre-2345",
+    "src/__tests__/scenarios-corpus-4.ts#issue-2486-quarter-AOB-middle-centre",
+    "src/__tests__/scenarios-corpus-4.ts#issue-2486-half-AOB-middle-centre"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/blank-canvas-drive-2609.test.ts",
+   "product": "3d",
+   "issue": "2609",
+   "lockedIn": [
+    "fixtures3/blank-area-triangle-2609.geo3.json",
+    "fixtures3/blank-line-parallel-plane-2609.geo3.json"
+   ],
+   "fullRunCpuSec": 159
+  },
+  {
+   "file": "src3d/__tests__/cevian-on-existing-point-1942.test.ts",
+   "product": "3d",
+   "issue": "1942",
+   "lockedIn": [
+    "fixtures3/altitude-on-existing-d-1942.geo3.json",
+    "fixtures3/median-then-altitude-1942.geo3.json"
+   ],
+   "fullRunCpuSec": 15
+  },
+  {
+   "file": "src3d/__tests__/circle-radius-row-2611.test.ts",
+   "product": "3d",
+   "issue": "2611",
+   "lockedIn": [
+    "fixtures3/point-on-circle-blank-2611.geo3.json",
+    "fixtures3/point-on-circumcircle-2611.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/circle-refusal-words-2611.test.ts",
+   "product": "3d",
+   "issue": "2611",
+   "lockedIn": [
+    "fixtures3/point-on-circle-blank-2611.geo3.json",
+    "fixtures3/point-on-circumcircle-2611.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/coplanar-mint-2610.test.ts",
+   "product": "3d",
+   "issue": "2610",
+   "lockedIn": [
+    "fixtures3/face-diagonals-blank-2610.geo3.json",
+    "fixtures3/plane-cut-four-letters-blank-2610.geo3.json",
+    "fixtures3/projection-on-four-letter-plane-blank-2610.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/free-circle-253.test.ts",
+   "product": "3d",
+   "issue": "253",
+   "lockedIn": [
+    "fixtures3/free-circle-bare-253.geo3.json",
+    "fixtures3/free-circle-members-253.geo3.json",
+    "fixtures3/free-circle-pinned-253.geo3.json"
+   ],
+   "fullRunCpuSec": 10
+  },
+  {
+   "file": "src3d/__tests__/free-line-create-2489.test.ts",
+   "product": "3d",
+   "issue": "2489",
+   "lockedIn": [
+    "fixtures3/free-line-created-2489.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/free-plane-relations-2484.test.ts",
+   "product": "3d",
+   "issue": "2484",
+   "lockedIn": [
+    "fixtures3/free-plane-perp-2484-declared.geo3.json",
+    "fixtures3/free-plane-perp-2484-undeclared.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/gauge-length-letter-2594.test.ts",
+   "product": "3d",
+   "issue": "2594",
+   "lockedIn": [
+    "fixtures3/gauge-length-letter-2594.geo3.json",
+    "fixtures3/gauge-length-letter-tie-2594.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/guide-needs-1566.test.ts",
+   "product": "3d",
+   "issue": "1566",
+   "lockedIn": [
+    "fixtures3/common-perp-created-1566.geo3.json",
+    "fixtures3/guide-needs-height-1566.geo3.json",
+    "fixtures3/pyramid-volume-created-1566.geo3.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src3d/__tests__/inscription-voices-1975.test.ts",
+   "product": "3d",
+   "issue": "1975",
+   "lockedIn": [
+    "fixtures3/named-circle-circumscribes-1975.geo3.json",
+    "fixtures3/relative-clause-incircle-1975.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1188-free-vector-metric.test.ts",
+   "product": "3d",
+   "issue": "1188",
+   "lockedIn": [
+    "fixtures3/free-vector-coupling-1188.geo3.json",
+    "fixtures3/free-vector-declare-1188.geo3.json",
+    "fixtures3/free-vector-metric-1188.geo3.json",
+    "fixtures3/free-vector-perp-1188.geo3.json",
+    "fixtures3/free-vector-sum-1188.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1188-free-vector-step2.test.ts",
+   "product": "3d",
+   "issue": "1188",
+   "lockedIn": [
+    "fixtures3/free-vector-coupling-1188.geo3.json",
+    "fixtures3/free-vector-declare-1188.geo3.json",
+    "fixtures3/free-vector-metric-1188.geo3.json",
+    "fixtures3/free-vector-parallelogram-1188.geo3.json",
+    "fixtures3/free-vector-perp-1188.geo3.json",
+    "fixtures3/free-vector-sum-1188.geo3.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src3d/__tests__/issue-1311-free-pair-length-drive.test.ts",
+   "product": "3d",
+   "issue": "1311",
+   "lockedIn": [
+    "fixtures3/free-vector-length-1311.geo3.json",
+    "fixtures3/free-vector-length-oneline-1311.geo3.json"
+   ],
+   "fullRunCpuSec": 80
+  },
+  {
+   "file": "src3d/__tests__/issue-1472-param-position-pins.test.ts",
+   "product": "3d",
+   "issue": "1472",
+   "lockedIn": [
+    "fixtures3/plane-coincident-param-1472.geo3.json",
+    "fixtures3/plane-distance-param-1472.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1474-branch-coverage.test.ts",
+   "product": "3d",
+   "issue": "1474",
+   "lockedIn": [
+    "fixtures3/param-three-branches-1474.geo3.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src3d/__tests__/issue-1497-format-of-entry.test.ts",
+   "product": "3d",
+   "issue": "1497",
+   "lockedIn": [
+    "fixtures3/format-of-entry-2-3u-1497.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1528-absolute-member-pins.test.ts",
+   "product": "3d",
+   "issue": "1528",
+   "lockedIn": [
+    "fixtures3/point-on-param-line-1528.geo3.json",
+    "fixtures3/point-on-param-plane-1528.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1542.test.ts",
+   "product": "3d",
+   "issue": "1542",
+   "lockedIn": [
+    "fixtures3/plane-equation-sentence-1542.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1547-component-given.test.ts",
+   "product": "3d",
+   "issue": "1547",
+   "lockedIn": [
+    "fixtures3/component-given-1547.geo3.json",
+    "fixtures3/component-given-he-1547.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1549-cos-spelling.test.tsx",
+   "product": "3d",
+   "issue": "1549",
+   "lockedIn": [
+    "fixtures3/cos-row-arrows-1549.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1549-vector-row-kind.test.tsx",
+   "product": "3d",
+   "issue": "1549",
+   "lockedIn": [
+    "fixtures3/cos-row-arrows-1549.geo3.json",
+    "fixtures3/vector-pair-row-1549.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1550.test.ts",
+   "product": "3d",
+   "issue": "1550",
+   "lockedIn": [
+    "fixtures3/coord-frame-axis-drive-1550.geo3.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src3d/__tests__/issue-1613-vector-creates-head.test.ts",
+   "product": "3d",
+   "issue": "1613",
+   "lockedIn": [
+    "fixtures3/vector-creates-head-1613.geo3.json",
+    "fixtures3/vector-creates-head-sym-1613.geo3.json"
+   ],
+   "fullRunCpuSec": 19
+  },
+  {
+   "file": "src3d/__tests__/issue-1680-length-reading-row.test.ts",
+   "product": "3d",
+   "issue": "1680",
+   "lockedIn": [
+    "fixtures3/edge-point-lengths-only-1680.geo3.json",
+    "fixtures3/length-sum-1680.geo3.json",
+    "fixtures3/new-point-plain-1680.geo3.json",
+    "fixtures3/rider-halves-1680.geo3.json",
+    "fixtures3/rider-lengths-only-1680.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1680-segment-equation.test.ts",
+   "product": "3d",
+   "issue": "1680",
+   "lockedIn": [
+    "fixtures3/edge-point-lengths-only-1680.geo3.json",
+    "fixtures3/length-sum-1680.geo3.json",
+    "fixtures3/new-point-plain-1680.geo3.json",
+    "fixtures3/rider-halves-1680.geo3.json",
+    "fixtures3/rider-lengths-only-1680.geo3.json"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src3d/__tests__/issue-1728-diagonals-meet.test.ts",
+   "product": "3d",
+   "issue": "1728",
+   "lockedIn": [
+    "fixtures3/diagonals-named-meet-1728.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/issue-1730-placement-tail.test.ts",
+   "product": "3d",
+   "issue": "1730",
+   "lockedIn": [
+    "fixtures3/placement-condition-1730.geo3.json"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src3d/__tests__/issue-1735-rider-host-reseat.test.ts",
+   "product": "3d",
+   "issue": "1735",
+   "lockedIn": [
+    "fixtures3/rider-length-1735.geo3.json"
+   ],
+   "fullRunCpuSec": 461
+  },
+  {
+   "file": "src3d/__tests__/issue-1782-rigid-rider-drive.test.ts",
+   "product": "3d",
+   "issue": "1782",
+   "lockedIn": [
+    "fixtures3/cube-rider-length-1782.geo3.json",
+    "fixtures3/cube-rider-length-reversed-1782.geo3.json"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src3d/__tests__/issue-1792-shape-phrase.test.ts",
+   "product": "3d",
+   "issue": "1792",
+   "lockedIn": [
+    "fixtures3/trapezoid-circumcircle-1792.geo3.json"
+   ],
+   "fullRunCpuSec": 59
+  },
+  {
+   "file": "src3d/__tests__/issue-1855-separate-figures.test.ts",
+   "product": "3d",
+   "issue": "1855",
+   "lockedIn": [
+    "fixtures3/two-triangle-lengths-1855.geo3.json"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src3d/__tests__/issue-1907-flat-height.test.ts",
+   "product": "3d",
+   "issue": "1907",
+   "lockedIn": [
+    "fixtures3/triangle-bare-height-1907.geo3.json"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src3d/__tests__/issue-1912-glyph-fold.test.ts",
+   "product": "3d",
+   "issue": "1912",
+   "lockedIn": [
+    "fixtures3/perp-glyph-u27c2-1912.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-1944-perp-to-base-flat.test.ts",
+   "product": "3d",
+   "issue": "1944",
+   "lockedIn": [
+    "fixtures3/trapezoid-perp-to-base-1944.geo3.json",
+    "fixtures3/triangle-perp-to-base-1944.geo3.json"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src3d/__tests__/issue-1946-knee-at-named-foot.test.ts",
+   "product": "3d",
+   "issue": "1946",
+   "lockedIn": [
+    "fixtures3/perp-knee-at-foot-1946.geo3.json"
+   ],
+   "fullRunCpuSec": 6
+  },
+  {
+   "file": "src3d/__tests__/issue-1986-ring-search.test.ts",
+   "product": "3d",
+   "issue": "1986",
+   "lockedIn": [
+    "fixtures3/coord-letter-trapezoid-1986.geo3.json",
+    "fixtures3/kite-dart-second-ring-1986.geo3.json"
+   ],
+   "fullRunCpuSec": 7
+  },
+  {
+   "file": "src3d/__tests__/issue-2069-value-readers.test.ts",
+   "product": "3d",
+   "issue": "2069",
+   "lockedIn": [
+    "fixtures3/quad-parallel-lookalike-2069.geo3.json",
+    "fixtures3/rect-root-product-2069.geo3.json",
+    "fixtures3/triangle-sign-area-copula-2069.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-2077-stated-vector-rows.test.ts",
+   "product": "3d",
+   "issue": "2077",
+   "lockedIn": [
+    "fixtures3/pyramid-param-pair-vector-2077.geo3.json"
+   ],
+   "fullRunCpuSec": 15
+  },
+  {
+   "file": "src3d/__tests__/issue-2081-held-slots.test.ts",
+   "product": "3d",
+   "issue": "2081",
+   "lockedIn": [
+    "fixtures3/coords-claim-surd-2081.geo3.json",
+    "fixtures3/distance-surd-2081.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-2091-unnamed-crossing-knee.test.ts",
+   "product": "3d",
+   "issue": "2091",
+   "lockedIn": [
+    "fixtures3/no-knee-unnamed-crossing-2091.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-2125-incircle-id.test.ts",
+   "product": "3d",
+   "issue": "2125",
+   "lockedIn": [
+    "fixtures3/circum-and-incircle-2125.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-2126-circle-plane.test.ts",
+   "product": "3d",
+   "issue": "2126",
+   "lockedIn": [
+    "fixtures3/circle-no-plane-2126.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/issue-2235-shape-ref.test.ts",
+   "product": "3d",
+   "issue": "2235",
+   "lockedIn": [
+    "fixtures3/definite-triangle-one-2235.geo3.json",
+    "fixtures3/indefinite-triangle-new-2235.geo3.json"
+   ],
+   "fullRunCpuSec": 2
+  },
+  {
+   "file": "src3d/__tests__/issue-2361-stated-value-text.test.ts",
+   "product": "3d",
+   "issue": "2361",
+   "lockedIn": [
+    "fixtures3/stated-length-7-9999-2361.geo3.json"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src3d/__tests__/issue-2378-leftover-turn-sampled.test.ts",
+   "product": "3d",
+   "issue": "2378",
+   "lockedIn": [
+    "fixtures3/cube-turn-about-ab-2378.geo3.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src3d/__tests__/issue-2603-free-vector-joint.test.ts",
+   "product": "3d",
+   "issue": "2603",
+   "lockedIn": [
+    "fixtures3/free-vector-ratio-2603.geo3.json",
+    "fixtures3/free-vector-span-2603.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-2674-tool-letter.test.ts",
+   "product": "3d",
+   "issue": "2674",
+   "lockedIn": [
+    "fixtures3/tool-letter-2674.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/issue-2684-free-vector-joint.test.ts",
+   "product": "3d",
+   "issue": "2684",
+   "lockedIn": [
+    "fixtures3/free-vector-joint-letter-2684.geo3.json",
+    "fixtures3/free-vector-joint-letter-owned-2684.geo3.json",
+    "fixtures3/free-vector-joint-metric-2684.geo3.json",
+    "fixtures3/free-vector-joint-order-2684.geo3.json",
+    "fixtures3/free-vector-joint-pair-2684.geo3.json",
+    "fixtures3/free-vector-joint-size-2684.geo3.json",
+    "fixtures3/free-vector-joint-span-2684.geo3.json"
+   ],
+   "fullRunCpuSec": 27
+  },
+  {
+   "file": "src3d/__tests__/issue-571-plane-run-order.test.ts",
+   "product": "3d",
+   "issue": "571",
+   "lockedIn": [
+    "fixtures3/plane-run-order-571.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/issue-587-quad-shape.test.ts",
+   "product": "3d",
+   "issue": "587",
+   "lockedIn": [
+    "fixtures3/quad-shape-587.geo3.json"
+   ],
+   "fullRunCpuSec": 3
+  },
+  {
+   "file": "src3d/__tests__/issue-601.test.ts",
+   "product": "3d",
+   "issue": "601",
+   "lockedIn": [
+    "fixtures3/kite-corner-completion-601.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-754.test.ts",
+   "product": "3d",
+   "issue": "754",
+   "lockedIn": [
+    "fixtures3/cube-stated-size-754.geo3.json"
+   ],
+   "fullRunCpuSec": 4
+  },
+  {
+   "file": "src3d/__tests__/issue-794.test.ts",
+   "product": "3d",
+   "issue": "794",
+   "lockedIn": [
+    "fixtures3/prism-sym-pair-794.geo3.json"
+   ],
+   "fullRunCpuSec": 9
+  },
+  {
+   "file": "src3d/__tests__/issue-801.test.ts",
+   "product": "3d",
+   "issue": "801",
+   "lockedIn": [
+    "fixtures3/prism-sym-line-801.geo3.json"
+   ],
+   "fullRunCpuSec": 11
+  },
+  {
+   "file": "src3d/__tests__/issue-803.test.ts",
+   "product": "3d",
+   "issue": "803",
+   "lockedIn": [
+    "fixtures3/prism-pin-driven-803.geo3.json"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src3d/__tests__/issue-814.test.ts",
+   "product": "3d",
+   "issue": "814",
+   "lockedIn": [
+    "fixtures3/pyramid-named-comp-814.geo3.json"
+   ],
+   "fullRunCpuSec": 29
+  },
+  {
+   "file": "src3d/__tests__/issue-815.test.ts",
+   "product": "3d",
+   "issue": "815",
+   "lockedIn": [
+    "fixtures3/prism-eq-first-815.geo3.json"
+   ],
+   "fullRunCpuSec": 28
+  },
+  {
+   "file": "src3d/__tests__/issue-818.test.ts",
+   "product": "3d",
+   "issue": "818",
+   "lockedIn": [
+    "fixtures3/pyramid-sign-branch-818.geo3.json"
+   ],
+   "fullRunCpuSec": 19
+  },
+  {
+   "file": "src3d/__tests__/issue-820-rider-drive.test.ts",
+   "product": "3d",
+   "issue": "820",
+   "lockedIn": [
+    "fixtures3/pyramid-rider-drive-820.geo3.json"
+   ],
+   "fullRunCpuSec": 43
+  },
+  {
+   "file": "src3d/__tests__/issue-902.test.ts",
+   "product": "3d",
+   "issue": "902",
+   "lockedIn": [
+    "fixtures3/coord-symbol-value-902.geo3.json"
+   ],
+   "fullRunCpuSec": 29
+  },
+  {
+   "file": "src3d/__tests__/issue-923-917.test.ts",
+   "product": "3d",
+   "issue": "923",
+   "lockedIn": [
+    "fixtures3/pyramid-named-valued-angle-923.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-977.test.ts",
+   "product": "3d",
+   "issue": "977",
+   "lockedIn": [
+    "fixtures3/angle-coef-symbol-977.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/issue-978-diagonal-verifier.test.ts",
+   "product": "3d",
+   "issue": "978",
+   "lockedIn": [
+    "fixtures3/diagonal-after-solid-978.geo3.json",
+    "fixtures3/diagonal-two-solids-978.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/issue-985.test.ts",
+   "product": "3d",
+   "issue": "985",
+   "lockedIn": [
+    "fixtures3/trapezoid-corner-completion-985.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/line-name-as-vector-2642.test.ts",
+   "product": "3d",
+   "issue": "2642",
+   "lockedIn": [
+    "fixtures3/line-lowercase-perp-2642.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/multi-symbol-affine-509.test.ts",
+   "product": "3d",
+   "issue": "509",
+   "lockedIn": [
+    "fixtures3/prism-two-symbol-component-509.geo3.json"
+   ],
+   "fullRunCpuSec": 11
+  },
+  {
+   "file": "src3d/__tests__/plane-run-relation-2681.test.ts",
+   "product": "3d",
+   "issue": "2681",
+   "lockedIn": [
+    "fixtures3/plane-run-parallel-blank-2681.geo3.json",
+    "fixtures3/plane-run-perp-line-blank-2681.geo3.json"
+   ],
+   "fullRunCpuSec": 75
+  },
+  {
+   "file": "src3d/__tests__/point-on-circle-2611.test.ts",
+   "product": "3d",
+   "issue": "2611",
+   "lockedIn": [
+    "fixtures3/point-on-circle-blank-2611.geo3.json",
+    "fixtures3/point-on-circumcircle-2611.geo3.json"
+   ],
+   "fullRunCpuSec": 8
+  },
+  {
+   "file": "src3d/__tests__/ring-free-vertex-1935.test.ts",
+   "product": "3d",
+   "issue": "1935",
+   "lockedIn": [
+    "fixtures3/ring-free-vertex-1935.geo3.json"
+   ],
+   "fullRunCpuSec": 5
+  },
+  {
+   "file": "src3d/__tests__/seg-angle-drive-909.test.ts",
+   "product": "3d",
+   "issue": "909",
+   "lockedIn": [
+    "fixtures3/box-seg-angle-909.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  },
+  {
+   "file": "src3d/__tests__/shown-names-2610.test.ts",
+   "product": "3d",
+   "issue": "2610",
+   "lockedIn": [
+    "fixtures3/projection-on-four-letter-plane-blank-2610.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/__tests__/vector-or-length-2092.test.ts",
+   "product": "3d",
+   "issue": "2092",
+   "lockedIn": [
+    "fixtures3/length-letter-2092.geo3.json"
+   ],
+   "fullRunCpuSec": 16
+  },
+  {
+   "file": "src3d/__tests__/vulgar-fraction-2255.test.ts",
+   "product": "3d",
+   "issue": "2255",
+   "lockedIn": [
+    "fixtures3/mixed-fraction-2255.geo3.json"
+   ],
+   "fullRunCpuSec": 0
+  },
+  {
+   "file": "src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts",
+   "product": "3d",
+   "issue": "1827",
+   "lockedIn": [
+    "fixtures3/rect-surd-side-1827.geo3.json"
+   ],
+   "fullRunCpuSec": 1
+  }
+ ]
+}

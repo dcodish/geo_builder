@@ -20,7 +20,7 @@
  * and the operator has since ruled that such a sentence is REFUSED BY NAME before it becomes a fact —
  * so it can no longer scaffold an over-constraint. «D = חיתוך AB ו-EF» redefines the same square vertex
  * and was measured to produce the identical refusal, subject and other-side attribution. His original
- * sentence is covered as a refusal in src/app/__tests__/issue-1274-crossing-already-named.test.ts.
+ * sentence is covered as a refusal in src/app/__tests__/issue-1274-crossing-already-named.test.ts (folded, #2739).
  */
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';

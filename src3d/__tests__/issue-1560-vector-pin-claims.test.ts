@@ -21,6 +21,7 @@ import { resolve3 } from '../engine/evaluate';
 import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { emptyConstruction3, type Claim3, type Command3, type Construction3 } from '../engine/types';
+import { foldedSequences } from './foldedSequences';
 
 type St = { facts: Fact3[]; seed: number };
 
@@ -242,6 +243,8 @@ describe('#1560/#1567 — invariant: no pin of any family without an arbiter whe
       const src = readFileSync(path.join(HERE, f), 'utf8');
       for (const m of src.matchAll(ARRAY)) out.push([...m[1].matchAll(ITEM)].map((x) => x[0].slice(1, -1).replace(/\\(['"\\])/g, '$1')));
     }
+    out.push(...foldedSequences()); // #2739: the folded case files' arrays, frozen
+
     // this file's rows as whole sequences (setup + line), so the counter sees the reported cases
     for (const [setup, line] of [
       [TYPED, 'u = (7,7,7)'], [TYPED, 'u = (7, n, p)'], [PAIR, 'AB = (5,5,5)'], [PAIR, 'BA = (5,5,5)'],

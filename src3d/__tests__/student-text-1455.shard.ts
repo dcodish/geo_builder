@@ -24,6 +24,7 @@ import { errorText3 } from '../i18n/errorText3';
 import { derive3, useGeo3 } from '../store/store3';
 import { hasEngineToken, studentFacingViolations } from '../../shell/studentText';
 import { shownNames3 } from './shownNames3';
+import { foldedSequences } from './foldedSequences';
 
 const STR = String.raw`'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"`;
 const ARRAY = new RegExp(String.raw`\[\s*((?:${STR})(?:\s*,\s*(?:${STR}))*)\s*,?\s*\]`, 'g');
@@ -41,6 +42,8 @@ function corpus(): string[][] {
     const src = readFileSync(path.join(__dirname, f), 'utf8');
     for (const m of src.matchAll(ARRAY)) seqs.push([...m[1].matchAll(ITEM)].map((x) => x[0].slice(1, -1).replace(/\\(['"\\])/g, '$1')));
   }
+  // #2739: the arrays of the case files folded away, frozen so the corpus does not shrink with them
+  seqs.push(...foldedSequences());
   // #2610: every saved fixture's utterances, in order
   for (const f of readdirSync(FIXTURES).filter((n) => n.endsWith('.geo3.json'))) {
     const file = JSON.parse(readFileSync(path.join(FIXTURES, f), 'utf8')) as { facts?: { utterance?: string }[] };

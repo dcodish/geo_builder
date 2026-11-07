@@ -374,7 +374,7 @@ const SEEDED: SeededCorpus = {
   // #1827 (ADR-3D-337) — the operator's exact sequence: a bare side given as a RADICAL. Before: «לא הצלחתי להבין
   // את הנתון» on «AD=√7» while «|AD|=√7» built. The two sibling slots that read the same magnitude atom (a height's
   // stated length, a triangle's area) and the `sqrt` spelling ride along; every rule × spelling is swept in
-  // src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts.
+  // src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts (folded, #2739).
   'rect-surd-side-1827.geo3.json': ['מלבן ABCD', 'AB=1', 'AD=√7'],
   'pyramid-surd-height-1827.geo3.json': ['פירמידה SABCD', 'SO גובה הפירמידה = √7', 'AB = sqrt(2)'],
   'triangle-surd-area-1827.geo3.json': ['משולש ABC', 'שטח המשולש ABC = √3'],

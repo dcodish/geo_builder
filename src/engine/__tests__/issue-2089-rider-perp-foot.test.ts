@@ -5,7 +5,7 @@
  * Measured on `main` 688dfb96: «מרובע ABCD» · «E על CD» · «AE ⟂ CD» was refused «cannot place E on segment CD so that
  * AE ⟂ CD» — the ⟂ form drove only E's slide and its recruiter never offered the free vertex A — while «AE גובה לצלע CD»
  * built (the foot placement's M1 path lets A yield). The engine half is locked here; the student's path is in
- * `src/app/__tests__/issue-2089-rider-foot.test.ts`.
+ * `src/app/__tests__/issue-2089-rider-foot.test.ts` (folded, #2739).
  */
 import { describe, expect, it } from 'vitest';
 import { applyStep } from '../step';

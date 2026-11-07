@@ -1,6 +1,6 @@
 /**
  * #2234 / #2143 ([ADR-737](../../../docs/06-decisions.md#adr-737)) and #2195 ([ADR-738](../../../docs/06-decisions.md#adr-738)) —
- * the units under the two class tests (`src/app/__tests__/issue-2234-right-angled-at-vertex.test.ts`,
+ * the units under the two class tests (`src/app/__tests__/issue-2234-right-angled-at-vertex.test.ts` (folded, #2739),
  * `issue-2195-latin-prose-labels.test.ts`):
  *  - the recognizer of "right-angled at X" (`rightAngledAtVertex`): every ruled spelling, and none of the forms that
  *    state a right ANGLE (the noun) or a right triangle with no vertex;

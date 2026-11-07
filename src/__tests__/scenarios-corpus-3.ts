@@ -1417,7 +1417,7 @@ export const SCENARIOS_3: Scenario[] = [
     id: 'arc-resolves-to-circle-holding-both-endpoints',
     title: '"arc BC" with no circle named picks the circle that actually contains both B and C',
     guards:
-      'with two circles present (O through A,B,E,D; P through A,B,C) the arc-midpoint of BC was placed on circle O — but C is not on O, so F landed in a meaningless spot. With no circle named, the arc rule resolves to the circle containing BOTH endpoints (P). The old override of a WRONGLY NAMED circle («… במעגל O» redrawn on P) is withdrawn (#2185, ADR-735, operator ruling 2026-10-18: a named circle is never swapped — that line is not drawn and goes to the AI; locked in src/app/__tests__/issue-2185-point-on-carrier-list.test.ts).',
+      'with two circles present (O through A,B,E,D; P through A,B,C) the arc-midpoint of BC was placed on circle O — but C is not on O, so F landed in a meaningless spot. With no circle named, the arc rule resolves to the circle containing BOTH endpoints (P). The old override of a WRONGLY NAMED circle («… במעגל O» redrawn on P) is withdrawn (#2185, ADR-735, operator ruling 2026-10-18: a named circle is never swapped — that line is not drawn and goes to the AI; locked in src/app/__tests__/issue-2185-point-on-carrier-list.test.ts) (folded, #2739).',
     steps: [
       'משולש CDE',
       'A על CD',

@@ -12,7 +12,7 @@
  *
  * #1673 / #1688 (ADR-565, operator ruling 2026-10-02) withdrew the ADR-342 metric amendment: the hidden letter
  * STEPS ASIDE when the student types it, so «OA=5» draws a free O; «O מרכז המעגל» then places it at the centre.
- * The full matrix is locked in `src/__tests__/issue-1673-hidden-centre.test.ts`.
+ * The full matrix is locked in `src/__tests__/issue-1673-hidden-centre.test.ts` (folded, #2739).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { parse, buildParseCtx, parseNameCenter } from '@/parser';

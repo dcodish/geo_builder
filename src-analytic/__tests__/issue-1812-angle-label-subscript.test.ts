@@ -84,7 +84,7 @@ describe('#1812 — the class: every spelling of the label, every surface', () =
 });
 
 describe('#1812 — one sentence, one drawing: analytic writes what 2-D writes', () => {
-  // 2-D's half is src/__tests__/issue-1812-angle-alias-subscript.test.ts — the same sentences, the same «A₁» (product trees never import each other)
+  // 2-D's half is src/__tests__/issue-1812-angle-alias-subscript.test.ts (folded, #2739) — the same sentences, the same «A₁» (product trees never import each other)
   it.each(['נסמן ∠CAB=A1', 'נסמן זוית CAB כ-A1', 'נסמן זוית CAB כ 1'])('«%s»', (line) => {
     expect(canvasAngleTexts(['משולש ABC', line])).toEqual(['A₁']);
   });

@@ -103,7 +103,7 @@ describe('#2083 — foldCommand: a sizeless restatement leaves the list unchange
     expect(foldCommand(facts, ensureOnly, mint)).toBe(facts);
   });
 
-  // The step-aside reading (resolveBinds) is locked at the real door: src/__tests__/issue-1673-hidden-centre.test.ts
+  // The step-aside reading (resolveBinds) is locked at the real door: src/__tests__/issue-1673-hidden-centre.test.ts (folded, #2739)
   // («AB קוטר» · «מעגל O» declares a NEW circle O).
 
   it('an UNTICKED definition is not a reference target: the old in-place rule stands', () => {
