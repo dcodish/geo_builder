@@ -59,7 +59,7 @@ import { unreadRingRole, type RingReport } from './unreadRingRole';
  * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`, and #1888's
  * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers` / #2532's `unreadThrough` / #2545's `unreadRingRole`, which re-read the line in the seam's own parse context)
  * are deliberately out — they need the figure, which is not this map's input shape. The read-extent members are
- * netted over the corpus by `issue-1888-unread-corpus-net.test.ts`.
+ * netted over the corpus by `src/__tests__/step-nets.ts`, on the scenario shards' and the fixture net's walk (#2739).
  */
 export const CONTEXT_FREE_GATES: Record<string, (u: string, cmds: AnyCommand[]) => unknown[] | boolean> = {
   droppedComparison,

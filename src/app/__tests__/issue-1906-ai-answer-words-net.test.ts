@@ -5,71 +5,22 @@
  * faithful answer it calls unfaithful — a lowering its evidence families miss. So every faithful lowering we have
  * is run through it, standing in for the answer:
  *  - every committed step of the scenario corpus and of the saved fixtures, against its REAL prefix context, with
- *    the commands the grammar committed for it (an AI answer that says exactly what the grammar said must pass);
+ *    the commands the grammar committed for it (an AI answer that says exactly what the grammar said must pass).
+ *    That half rides the corpus's one walk since #2739 (ADR-W-191, restoring ADR-394): `src/__tests__/step-nets.ts`,
+ *    called from the scenario shards and the fixture net, where every prefix replay is a fold-memo hit;
  *  - every supported catalog example, both locales, on an empty figure and parsed by the grammar.
  * A step this flags is a working line the member would refuse: a red test, never a row to silence. Floors keep the
  * net from passing by checking nothing.
  */
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { SCENARIOS } from '@/__tests__/scenarios-corpus';
-import { ctxOf, scenarioFacts } from '@/__tests__/scenarios-harness';
 import { parse } from '@/parser';
 import { COMMAND_CATALOG } from '@/parser/catalog';
 import { droppedPropertyWords, propertyOccurrences2 } from '@/parser/propertyWords';
-import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
-import { loweringKey } from '../unreadParts';
-
-const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
-
-function groups(facts: Fact[]): { utterance: string; cmds: AnyCommand[]; before: Fact[] }[] {
-  const out: { utterance: string; cmds: AnyCommand[]; before: Fact[] }[] = [];
-  let key: string | null = null;
-  facts.forEach((f, i) => {
-    const k = f.group ?? f.id;
-    if (k !== key) {
-      key = k;
-      out.push({ utterance: f.utterance ?? '', cmds: [], before: facts.slice(0, i) });
-    }
-    out[out.length - 1].cmds.push(f.cmd);
-  });
-  return out;
-}
 
 describe('#1906 — the AI-answer word member refuses no faithful lowering', () => {
-  it('every committed scenario and fixture step, as an answer to its own line, keeps every word', () => {
-    const cases: { name: string; facts: Fact[]; typed: Set<string> }[] = [
-      ...SCENARIOS.map((sc) => ({ name: `scenario:${sc.id}`, facts: scenarioFacts(sc), typed: new Set(sc.steps.filter((s): s is string => typeof s === 'string')) })),
-      ...readdirSync(FIXTURES)
-        .filter((n) => n.endsWith('.geo.json'))
-        .map((file) => {
-          const saved = JSON.parse(readFileSync(path.join(FIXTURES, file), 'utf8')) as { facts: Fact[] };
-          return { name: `fixture:${file}`, facts: saved.facts, typed: new Set(saved.facts.map((f) => f.utterance ?? '')) };
-        }),
-    ];
-    let checked = 0;
-    let withWord = 0;
-    const flagged: string[] = [];
-    for (const c of cases) {
-      for (const g of groups(c.facts)) {
-        if (!c.typed.has(g.utterance)) continue;
-        const ctx = ctxOf(g.before);
-        const r = parse(g.utterance, ctx);
-        if (!r.ok || loweringKey(r.commands) !== loweringKey(g.cmds)) continue;
-        checked++;
-        if (propertyOccurrences2(g.utterance).length > 0) withWord++;
-        const lost = droppedPropertyWords(g.utterance, g.cmds, ctx);
-        if (lost.length) flagged.push(`[${c.name}] «${g.utterance}» → ${lost.join(', ')}`);
-      }
-    }
-    console.info(`#1906 corpus net: ${checked} committed steps checked (${withWord} with a property word), ${flagged.length} flagged`);
-    expect(flagged).toEqual([]);
-    expect(checked, 'the net exercised the corpus').toBeGreaterThanOrEqual(1400);
-    expect(withWord, 'the member met real property words').toBeGreaterThanOrEqual(400);
-  }, 600_000);
-
   /**
    * A catalog example is read standalone, so a sentence that PRESUPPOSES its polygon («חצי מעגל על צלע AB מחוץ
    * למשולש ABC») names a triangle no command draws: on an empty figure the polygon name is unaccounted, exactly as a

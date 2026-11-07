@@ -24,7 +24,7 @@
  * could in principle re-parse differently; if a promoted fixture ever trips only on the drift
  * check, compare the commands by hand before assuming a parser regression.
  */
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
 import { replay, groupKey } from '@/store/geoStore';
 import { findValidConfig, meetsRequirements } from '@/replay/core';
@@ -34,6 +34,11 @@ import type { AnyCommand } from '@/engine';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { canonicalStepCommands, lowersAsSaved } from '@/store/loadAudit';
 import { rowImmutability } from './scenarios-harness';
+import { newStepNetCounters, stepNets } from './step-nets';
+import { noRoom, noRoomOutsideClass } from './no-room-spy';
+
+// #1936 (ADR-W-191): the no-room prover is watched on this walk; the spy records and never changes a verdict.
+vi.mock('@/engine/metricFeasibility', async (importOriginal) => (await import('./no-room-spy')).spyOnProver(await importOriginal()));
 
 const files = import.meta.glob('./fixtures/*.geo.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -74,6 +79,7 @@ const FIXTURE_DEGENERATE: Record<string, string[]> = {
 const FIXTURE_LOAD_RESCUED = new Set<string>(['issue-572-load-collapse']);
 
 describe('figure-file fixtures net', () => {
+  const sn = newStepNetCounters();
   it('the net is not empty', () => {
     expect(Object.keys(files).length).toBeGreaterThan(0);
   });
@@ -82,6 +88,11 @@ describe('figure-file fixtures net', () => {
     const name = file.replace('./fixtures/', '').replace('.geo.json', '');
 
     describe(name, () => {
+      // #1936: everything this fixture folds, at load (the rescue below) and in its tests, is recorded under its name
+      noRoom.current = `fixture:${name}`;
+      beforeAll(() => {
+        noRoom.current = `fixture:${name}`;
+      });
       const r = deserializeFigure(text);
 
       it('deserializes through the real load path', () => {
@@ -122,6 +133,18 @@ describe('figure-file fixtures net', () => {
         rowImmutability(facts, name);
       });
 
+      // #1888 / #1906 (ADR-W-191, restoring ADR-394): the step nets ride this walk. A fixture's saved facts are what
+      // was committed (some steps by the model, which no re-parse reproduces), so only its typed lines are judged.
+      // #1936 (ADR-658, ADR-746): its saved fold (the old net's replay) never meets the no-room verdict
+      it('the no-room verdict does not fire on its fold (#1936)', () => {
+        replay(facts, savedSeed);
+        expect(noRoomOutsideClass(`fixture:${name}`), 'the no-room verdict fired outside the class').toEqual([]);
+      });
+
+      it('no honesty member refuses one of its committed steps (#1888, #1906)', () => {
+        expect(stepNets(`fixture:${name}`, facts, new Set(facts.map((f) => f.utterance ?? '')), sn)).toEqual([]);
+      });
+
       it('its utterances still lower to the same commands (parser drift)', () => {
         const steps = stepsOf(facts);
         steps.forEach((step, i) => {
@@ -145,4 +168,13 @@ describe('figure-file fixtures net', () => {
       });
     });
   }
+
+  // Runs last (vitest keeps declaration order): the step nets judged real steps here, so they cannot pass empty.
+  it('the step nets were exercised on the fixtures (no silent vacuum)', () => {
+    expect(sn.checked, 'committed fixture steps judged').toBeGreaterThan(0);
+    expect(sn.withNumber, 'the number member met stated numbers').toBeGreaterThan(0);
+    expect(sn.withWord, 'the AI-answer word member met property words').toBeGreaterThan(0);
+    expect(noRoom.calls, 'the angle-sum prover was asked on the fixtures (#1936)').toBeGreaterThan(0);
+    console.info(`step nets, fixtures: ${JSON.stringify(sn)}; no-room prover calls ${noRoom.calls}`);
+  });
 });

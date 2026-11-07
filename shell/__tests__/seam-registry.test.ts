@@ -297,7 +297,10 @@ const testFiles = (): string[] => {
     for (const entry of readdirSync(abs)) {
       const rel = path.join(dir, entry);
       if (statSync(path.join(ROOT, rel)).isDirectory()) walk(rel);
-      else if (/\.test\.tsx?$/.test(entry)) out.push(rel);
+      // A test file, or a test-support module beside it (#2739): a corpus-wide net is an oracle on the corpus's one
+      // walk (ADR-394, ADR-W-191), so the honesty members it calls are imported by `src/__tests__/step-nets.ts`,
+      // which the scenario shards call — test code calling the module directly, which is what this check asks for.
+      else if (/\.test\.tsx?$/.test(entry) || (/[\\/]__tests__[\\/]/.test(rel) && /\.tsx?$/.test(entry))) out.push(rel);
     }
   };
   for (const d of ['src', 'src3d', 'src-complex', 'src-analytic', 'shell']) walk(d);
