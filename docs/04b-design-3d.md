@@ -839,7 +839,8 @@ ordinary dims: a length on each figure, or a relation between them («AB ∥ DE�
 stated they resample. A one-solid figure appends nothing and is bit-identical.
 
 **A pyramid over an existing base is a BOUND solid (#2490, [ADR-3D-434](06b-decisions-3d.md#adr-3d-434)).** It is the
-one solid that shares points: `SolidObj.bound` lists its base ids, which keep their own `PointDef` (a cube's vertices,
+one solid that shares points, and only over letters the row's text spells (the fold marks a run the parser lettered by
+default `lettersUnstated`, which never binds): `SolidObj.bound` lists its base ids, which keep their own `PointDef` (a cube's vertices,
 a stated square's), and only the apex is its `solid-vertex`. It has no layout and no similarity of its own. Its dims
 are the apex's (`boundSolidDims3`): the foot's in-plane offset `(u, v)` and the height `h`, in units of the ring's RMS
 radius, `h` sampled on either side of a solid's face; over a flat host (a stated polygon, `flatHostOf3`) the sides

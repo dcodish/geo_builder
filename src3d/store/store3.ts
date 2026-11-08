@@ -680,6 +680,23 @@ function vectorsNamedBy3(k: Command3): string[] {
   return [];
 }
 
+/** #2490 (ADR-3D-434): a pyramid-family solid kind (a triangular or a quad base, any rightness). */
+const isPyramidKind3 = (kind: string): boolean =>
+  kind === 'tetra' || kind === 'pyramid3' || kind === 'pyramid3e' || Object.prototype.hasOwnProperty.call(QUAD_PYRAMIDS, kind);
+
+/**
+ * #2490 (ADR-3D-434): does the row's own text SPELL these letters — one letter run naming exactly them, in any order
+ * («פירמידה SABCD» spells A, B, C, D, S)? An unlettered noun the parser lettered by default spells none. Primes fold as
+ * at the parse seam (`foldPrimes3`), and a lowercase run counts as typed (the parser reads it as letters).
+ */
+function spellsLetters3(utterance: string, ids: readonly string[]): boolean {
+  const want = [...ids].sort().join('|');
+  return (foldPrimes3(utterance).toUpperCase().match(/(?:[A-Z]\d*'*)+/g) ?? []).some((run) => {
+    const tokens = run.match(/[A-Z]\d*'*/g) ?? [];
+    return tokens.length === ids.length && [...tokens].sort().join('|') === want;
+  });
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
   const hit = per?.get(seed);
@@ -751,12 +768,19 @@ function deriveCore3(
   /** #1680 (ADR-3D-391 Am. 1): the reading each line's two-reading segment equation took */
   const readings: Record<string, SegmentEquationReading3> = {};
   /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
-  const expandFact = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
+  const expandFactRaw = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
     const solid = presolids?.[f.id]; // #1566: a solid the mint pass created for this row is declared by it, first
     if (!f.cmds.some((k) => k.type === 'shape-ref3')) return solid ? { ok: true, cmds: [...solid.cmds, ...f.cmds] } : { ok: true, cmds: f.cmds };
     const r = expandShapeRefs3(at, f.cmds);
     if (!r.ok) return { ok: false, error: withShapeSentence3(r.error, f.utterance) };
     return solid ? { ok: true, cmds: [...solid.cmds, ...r.cmds] } : r;
+  };
+  /** #2490 (ADR-3D-434): a pyramid run the row's own text does not spell was lettered by the parser — marked, so it
+   *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged. */
+  const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
+    const r = expandFactRaw(at, f);
+    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids))) return r;
+    return { ok: true, cmds: r.cmds.map((k) => (k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids) ? { ...k, lettersUnstated: true as const } : k)) };
   };
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold

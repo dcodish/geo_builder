@@ -885,7 +885,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for
   that, naming the line and what placed the letters, never «"A" כבר מוגדר»; a base whose letters lie on one line is
   refused as a flat pyramid (FR-RD-7's sentence). No created-point notice is shown for the
-  apex. Unchanged: «טטראדר ABCD» inside one face, a base only partly drawn, and a pyramid over letters that all exist.
+  apex. Unchanged: «טטראדר ABCD» inside one face, a base only partly drawn, a pyramid over letters that all exist, and
+  an unlettered pyramid («פירמידה ישרה שבסיסה ריבוע» over an existing ABCD): only letters the student typed bind.
   - Sources: ADR-3D-434, ADR-3D-080, ADR-3D-172; #2490, #2478.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The

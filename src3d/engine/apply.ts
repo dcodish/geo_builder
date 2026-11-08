@@ -2301,7 +2301,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #2490 (ADR-3D-434): a pyramid whose BASE already exists and whose apex is its own — a new letter, or a
       // placeholder that yields (#841) — is a BOUND solid. Owned here, before the all-existing statement below and the
       // `taken` refusal, which blamed a base label that was fine («A» כבר מוגדר — ADR-3D-172's defect, solid edition).
-      if (baseN !== undefined && cmd.ids.length === baseN + 1) {
+      // Only over letters the student TYPED: an unlettered noun the parser lettered by default keeps today's reading.
+      if (baseN !== undefined && cmd.ids.length === baseN + 1 && !cmd.lettersUnstated) {
         const run = boundPyramidRun3(c, cmd.ids);
         if (run) return applyBoundPyramid3(c, cmd, run.base, run.apex);
       }

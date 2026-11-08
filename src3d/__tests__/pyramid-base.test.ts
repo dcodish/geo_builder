@@ -255,4 +255,16 @@ describe('#2490 — a pyramid over an existing base', () => {
     expectAllOk();
     expect(derived().construction.solids).toHaveLength(1);
   });
+
+  it('an UNLETTERED pyramid never binds to the letters the parser gave it: today\'s reading stands (FR-SP-24 is the operator\'s)', () => {
+    for (const lines of [
+      ['משולש ABC', 'פירמידה ישרה שבסיסה משולש שווה שוקיים'],
+      [CUBE, 'פירמידה ישרה שבסיסה ריבוע'],
+      ['ריבוע ABCD', 'פירמידה ישרה שבסיסה טרפז שווה שוקיים'],
+    ]) {
+      build(lines);
+      expect(state().lastError, lines.join(' · ')).toEqual({ code: 'already-defined', id: 'A' });
+      expect(state().facts, lines.join(' · ')).toHaveLength(1);
+    }
+  });
 });
