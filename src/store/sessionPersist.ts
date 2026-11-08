@@ -20,6 +20,8 @@
 import type { SessionAdapter } from '../../shell/session/adapter';
 import type { SessionSpec } from '../../shell/session/persist';
 import { clearSession, readSession, writeSession } from '../../shell/session/persist';
+import type { CrashSession } from '../../shell/session/crash';
+import { crashSessionOf, sliceChanged } from '../../shell/session/crash';
 import type { FigureLoadOpts, FigureLoadOutcome } from './figureLoad';
 import { loadFigureText } from './figureLoad';
 import { figureStateOf, serializeFigure } from './figureFile';
@@ -57,9 +59,11 @@ export function persistSession(state: GeoState = useGeoStore.getState(), now: Da
  * The fields the payload is made of. A zustand listener fires on every state change — selection,
  * the busy flag, a detection result — and re-serializing the whole figure on each of those would
  * put a JSON encode in front of every interaction. Reference equality over the persisted slice is
- * enough, because every store action replaces the arrays/objects it changes.
+ * enough, because every store action replaces the arrays/objects it changes. The slice also covers
+ * every field the undo history tracks (the store's `partialize`), so a crash rollback (#1507) puts
+ * back what undo would.
  */
-const SLICE = [
+export const SESSION_SLICE = [
   'facts',
   'seed',
   'queries',
@@ -72,14 +76,10 @@ const SLICE = [
   'figureName',
 ] as const satisfies readonly (keyof GeoState)[];
 
-function sliceChanged(a: GeoState, b: GeoState): boolean {
-  return SLICE.some((k) => a[k] !== b[k]);
-}
-
 /** Start mirroring the session to storage. Returns the unsubscribe, for the caller's effect. */
 export function startSessionPersist(): () => void {
   return useGeoStore.subscribe((state, prev) => {
-    if (sliceChanged(state, prev)) persistSession(state);
+    if (sliceChanged(SESSION_SLICE, state, prev)) persistSession(state);
   });
 }
 
@@ -101,6 +101,17 @@ export function forgetSession(): void {
 export async function restoreSession(payload: string, opts: FigureLoadOpts = {}): Promise<FigureLoadOutcome> {
   return loadFigureText(payload, { ...opts, resetHistory: true });
 }
+
+/**
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
+ * that failed. 2-D's undo clears nothing transient, so neither does the rollback; the detection
+ * results each carry the facts they were computed for, so a rolled-back figure never reads them.
+ */
+export const geoCrashSession: CrashSession<GeoState> = crashSessionOf(useGeoStore, {
+  slice: SESSION_SLICE,
+  persist: () => persistSession(),
+});
 
 /** The §5c cross-product subject — the real wiring, exposed as a value so a lock can drive it. */
 export const geoSessionAdapter: SessionAdapter = {

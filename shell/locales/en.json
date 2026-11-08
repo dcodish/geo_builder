@@ -53,6 +53,11 @@
       "createdCircle": "New circle centred at {{centre}} was created — if this is a typo, press ✕ to undo the line.",
       "createdCircleUnnamed": "A new circle was created — if this is a typo, press ✕ to undo the line.",
       "createdUndo": "Undo the line"
+    },
+    "crash": {
+      "notice": "Something went wrong while showing the figure. Your construction was not erased — press Restore to continue.",
+      "noticeUndone": "Something went wrong while showing the figure after your last change, so that change was undone. The rest of your construction was not erased — press Restore to continue.",
+      "recover": "Restore"
     }
   }
 }

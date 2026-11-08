@@ -23,6 +23,7 @@ let sessionAnnounced = false; // PROD: emit the `session` marker exactly once pe
 // PROD event so the admin dashboard can filter outcomes by release (ADR-146/ADR-148 follow-up) — `typeof`
 // guard so a context without the define (some test runners) degrades to 'dev' instead of throwing.
 import { makeUsagePoster } from '../../shell/usageLog';
+import type { CrashReport } from '../../shell/session/crash';
 
 const REL = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
 
@@ -95,4 +96,14 @@ export function logDebug(event: Record<string, unknown>): void {
     post({ ev: 'session', sid: sessionId, t, rel: REL });
   }
   post({ ...lean, sid: sessionId, t, rel: REL });
+}
+
+/**
+ * #1507 (ADR-W-195): the crash boundary's caught error — its text, its stack, the component that was
+ * rendering, and whether the change before it was undone — as one line of the DEV trace, so a crash is
+ * reconstructable even when the page is reloaded before anyone reports it. A production build sends
+ * nothing: `crash` is not a usage kind.
+ */
+export function logCrash(report: CrashReport): void {
+  logDebug({ kind: 'crash', ...report });
 }

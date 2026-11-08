@@ -71,6 +71,14 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   - Sources: [ADR-W-112](06w-decisions-workspace.md#adr-w-112), #1459 (supersedes ruling D10), #1861.
 - **FR-SU-10 (Should)** — **The figure's name is one component**, mounted identically everywhere, so
   naming, renaming and the saved-file name agree across builders.
+- **FR-SU-33 (Must)** — **A crash never erases the construction.** When showing the figure fails with an
+  error, no builder goes blank: a notice says something went wrong and the construction is kept, shows the
+  error's text, and offers «שחזור». «שחזור» brings the builder back with the construction **as it last
+  showed without an error**; when the error came right after a change (a line, a ✕, a chip), that change is
+  undone, the notice says so before the click, and the change stays on the redo side. Nothing is retried on
+  its own: the notice waits for the click. A reload after a crash offers (FR-SL-6) the construction as it
+  last showed, not the state that failed. The error is written to the builder's development log.
+  - Sources: [ADR-W-195](06w-decisions-workspace.md#adr-w-195), #1507.
 
 ### The words a student reads
 

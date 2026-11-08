@@ -6,7 +6,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadAnalyticSession } from '../app/loadSession';
-import { restoreSessionAn, sessionAnAdapter, sessionPayloadAn } from '../app/sessionPersistAn';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { crashSessionAn, restoreSessionAn, sessionAnAdapter, sessionPayloadAn } from '../app/sessionPersistAn';
+import { logCrashAnalytic } from '../debug/sessionLogAnalytic';
+import { crashMountFaults, crashRecoveryFaults } from '../../shell/__tests__/fixtures/crash-recovery-rows';
 import { useAnalyticStore } from '../store/useAnalyticStore';
 import { sessionOfferFaults } from '../../shell/__tests__/fixtures/session-offer-rows';
 import { installFakeStorage, uninstallFakeStorage } from '../../shell/__tests__/fixtures/fakeStorage';
@@ -94,5 +98,31 @@ describe('#1238 — the extracted load core is what BOTH entry points call', () 
     const out = loadAnalyticSession({ lines: ['A(0,0)', 'שורה שאינה נבנית'] }, '');
     expect(out.failed).toBeGreaterThan(0);
     expect(useAnalyticStore.getState().lines.length).toBe(2);
+  });
+});
+
+/**
+ * #1507 (ADR-W-195) — a crash costs a notice, never the construction. The shared crash rows over this
+ * tree's REAL wiring: the store and its undo history, `crashSessionAn`, the session-offer adapter (the
+ * reload path), `logCrashAnalytic`, and the builder's own line commit. Plus the mount: `main.tsx` puts
+ * the boundary around the app, with this session and log, and the dev trigger gated on DEV.
+ */
+describe('#1507 — a crash rolls back to the last figure that drew, and a reload offers it', () => {
+  it('no faults against the shared crash-recovery checks', async () => {
+    const faults = await crashRecoveryFaults({
+      session: crashSessionAn,
+      store: useAnalyticStore,
+      adapter: sessionAnAdapter,
+      onCrash: logCrashAnalytic,
+      populate: () => build(['A(0,0)', 'B(4,0)']),
+      step: () => build(['C(0,3)']),
+      construction: () => [...useAnalyticStore.getState().lines],
+    });
+    expect(faults).toEqual([]);
+  });
+
+  it('main.tsx mounts the boundary around the app, with this session and log, and a DEV-only trigger', () => {
+    const main = readFileSync(join(__dirname, '..', 'main.tsx'), 'utf8');
+    expect(crashMountFaults(main, { session: 'crashSessionAn', log: 'logCrashAnalytic', app: 'App' })).toEqual([]);
   });
 });

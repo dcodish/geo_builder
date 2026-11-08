@@ -37,6 +37,7 @@
  */
 
 import { makeUsagePoster } from '../../shell/usageLog';
+import type { CrashReport } from '../../shell/session/crash';
 
 /** One id per page load, so a session's events group without anything being stored between loads. */
 const sessionId = Math.random().toString(36).slice(2, 10);
@@ -142,4 +143,14 @@ export function logAnalyticFigure(figure: Record<string, unknown>): void {
   if (payload === lastFigure) return;
   lastFigure = payload;
   logAnalytic({ kind: 'figure', ...figure });
+}
+
+/**
+ * #1507 (ADR-W-195): the crash boundary's caught error — its text, its stack, the component that was
+ * rendering, and whether the change before it was undone — as one line of the DEV trace, so a crash is
+ * reconstructable even when the page is reloaded before anyone reports it. A production build sends
+ * nothing: `crash` is not a usage kind.
+ */
+export function logCrashAnalytic(report: CrashReport): void {
+  logAnalytic({ kind: 'crash', ...report });
 }
