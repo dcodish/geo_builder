@@ -1672,8 +1672,9 @@ function deriveCore3(
   const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
   const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
     ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring)) ||
-    // #2490 (ADR-3D-434): a pyramid declared over the ring (its base, the run less its apex) — a bound base is declared
-    (k.type === 'solid' && k.ids.length === ring.length + 1 && ring.every((id) => k.ids.includes(id)));
+    // #2490 (ADR-3D-434): the line that declared a BOUND pyramid over this very ring — its base, and nothing else. A
+    // ring that merely shares letters with a solid's run («מרובע SABC» on pyramid SABCD) is declared by its own line.
+    (k.type === 'solid' && c.solids.some((s) => s.bound !== undefined && sameRing3(s.bound, ring) && sameRing3(s.ids, k.ids)));
   /**
    * The LINE THAT COMPLETED this ring: the latest enabled fact among its declaration and the statements that
    * placed its vertices. Returns it with the others it conflicts with, or null when some vertex is not placed in
