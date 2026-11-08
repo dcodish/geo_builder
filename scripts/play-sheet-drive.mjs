@@ -26,6 +26,23 @@ import { APPS, auditImages, dismissModal, judgeCapture, refusals, waitForSettle 
 import { caseVerdict, renderReport, validateSheet } from './lib/play-sheet-core.mjs';
 import { closureOf, reviewPacket, REVIEW_BRIEF } from './lib/case-closure.mjs';
 
+/**
+ * Wait until the app has TAKEN the line: the box no longer holds it (accepted and cleared), or a new
+ * refusal is on the page. `waitForSettle` alone watches the figure, and the figure is quiet while a
+ * submit is still in flight: on the live site 2-D's first line waits ~0.5 s for the geometry worker
+ * to download, so the driver typed the next line into a busy pipeline, which drops it (prod smoke
+ * 2026-11-08; the drop itself is #2782). Gives up quietly after `timeout`; the settle and the case's
+ * own assertions then judge what happened.
+ */
+async function waitForAccepted(page, input, line, seen, timeout = 15000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    if ((await input.inputValue().catch(() => '')) !== line) return;
+    if ((await refusals(page)).some((r) => !seen.has(r))) return;
+    await page.waitForTimeout(50);
+  }
+}
+
 /** Where each product's ASK box lives — a distinctive substring of its placeholder, like
  *  `APPS[*].inputHint`. Read from the locales on 2026-09-28; a copy change fails loudly. */
 // complex: the placeholder wraps its examples in bidi ISOLATES («שטח ⁦Oz1z2⁩»), so a hint that
@@ -136,6 +153,7 @@ async function driveCase(browser, spec, outDir, prefix) {
       const typeLine = async (line) => {
         await input.fill(line);
         await input.press('Enter');
+        await waitForAccepted(page, input, line, seen);
         await waitForSettle(page);
         const fresh = await freshRefusals();
         steps.push({ line, refusals: fresh });
