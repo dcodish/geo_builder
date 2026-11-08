@@ -42,7 +42,8 @@ import { PRODUCTS, isStale, newestSource, preflightVerdict } from './preflight-t
 import { routeRows } from './preflight-routes.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const HOST = process.env.GEO_DEPLOY_HOST ?? 'root@themathbible.com';
+// The deploy user (#2780, ADR-W-196): every read below is one it may make.
+const HOST = process.env.GEO_DEPLOY_HOST ?? 'deploy@themathbible.com';
 const PROXY_LIVE = '/var/www/geo-proxy/proxy.mjs';
 
 const offline = process.argv.includes('--offline');

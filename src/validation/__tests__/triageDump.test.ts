@@ -1,7 +1,7 @@
 /**
  * Triage step 1 — REPLAY (slow). Env-gated tool, skipped in the normal suite.
  *
- *   1. pull the prod log:  scp root@themathbible.com:/var/www/geo-proxy/events.jsonl /tmp/events.jsonl
+ *   1. pull the prod log:  scp deploy@themathbible.com:/var/www/geo-proxy/events.jsonl /tmp/events.jsonl
  *   2. run:                EVENTS_FILE=/tmp/events.jsonl OUT_FILE=/tmp/triage-data.jsonl \
  *                            npx vitest run src/validation/__tests__/triageDump.test.ts
  *

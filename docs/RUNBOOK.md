@@ -16,7 +16,7 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | **Page metadata + preview images** (#1383) | the builds themselves: each builder's `seo/` (icon, touch icon, `og.png`) is emitted into its `dist*/seo/` and ships with the ordinary `scp -r dist*/*`. The PNGs are REGENERATED, never edited: `node scripts/render-icons.mjs <product>/seo/icon.svg <product>/seo` and, against a running dev server, `node scripts/render-og.mjs --base http://localhost:5173` (also writes `deploy/homepage/og.png`) | `…/httpdocs/<builder>/seo/`, `…/httpdocs/og.png` | `https://themathbible.com/geo-builder/seo/og.png` etc. |
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
-- **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
+- **Server:** themathbible.com (74.208.61.39). Plesk on Ubuntu 22.04. **Deploys log in as `deploy@themathbible.com`**, a user that can write only what a deploy writes (*The deploy user*, below); `root@` is for setup and asks the operator. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
 - **One proxy serves all four builders** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, the body's `tool:` selects the builder's prompt), usage-event sinks (one `events*.jsonl` per builder that logs — see *Logs & data*), and the two admin dashboards.
 - **Admin dashboards:** `https://themathbible.com/geo-builder/admin` and `…/3d-builder/admin` (→ proxy path `/admin3`, `ADMIN_3D_BASE`). Same credentials (in the env file).
 - **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf) + [deploy/apache-complex-builder.conf](../deploy/apache-complex-builder.conf) + [deploy/apache-analytic-builder.conf](../deploy/apache-analytic-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
@@ -68,7 +68,8 @@ deploy. you have the permissions and tools for that"*). The commands are allowli
 operator first, by design. A session reads public issue comments and raw student text, so it must never hold
 an unprompted root shell on the box that also serves other sites and holds the student logs and the key.
 `server/__tests__/prod-allowlist-2753.test.ts` fails when a rule is broader than a line here, or is missing from
-here.
+here. **Every allowed line logs in as `deploy`, never as root** ([ADR-W-196](06w-decisions-workspace.md#adr-w-196), #2780),
+and the same test fails on an allowed `root@` line.
 
 The one
 terminal case is the work PC: `Connection refused` on port 22 while 443 serves is the work network
@@ -122,25 +123,26 @@ npm run build:proxy      # the proxy (~30 ms)
 npm run deploy:preflight # re-run after building
 
 # 1. 2-D static
-scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
+scp -r dist/* deploy@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
 
 # 2. 3-D static (note the rename)
-scp -r dist-3d/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder/
-ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/3d-builder/3d.html /var/www/vhosts/themathbible.com/httpdocs/3d-builder/index.html'
+scp -r dist-3d/* deploy@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder/
+ssh deploy@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/3d-builder/3d.html /var/www/vhosts/themathbible.com/httpdocs/3d-builder/index.html'
 
 # 2b. complex static (same rename pattern). The directory was created at the prod/2026-08-15-2
 #     deploy: mkdir + chown root:root + chmod 755, matching its siblings.
-scp -r dist-complex/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
-ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/complex-builder/complex.html /var/www/vhosts/themathbible.com/httpdocs/complex-builder/index.html'
+scp -r dist-complex/* deploy@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
+ssh deploy@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/complex-builder/complex.html /var/www/vhosts/themathbible.com/httpdocs/complex-builder/index.html'
 
 # 2c. analytic static (same rename pattern). The directory was created at the prod/2026-09-16
 #     deploy — its FIRST: mkdir + chown root:root + chmod 755, matching its siblings.
-scp -r dist-analytic/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/analytic-builder/
-ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/analytic.html /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/index.html'
+scp -r dist-analytic/* deploy@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/analytic-builder/
+ssh deploy@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/analytic.html /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/index.html'
 
 # 2d. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
 #     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
 #     or the repo copy silently stops being canonical (adopted 2026-08-15, complex-card link):
+#     These write the site root, which the deploy user cannot: they log in as root and ask the operator.
 scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
 #     …and the site-root crawl files whenever they changed (#1384). robots.txt names the sitemap; the
 #     sitemap must list every builder (a lock checks it against products.json, not the server copy):
@@ -149,12 +151,12 @@ scp deploy/homepage/robots.txt deploy/homepage/sitemap.xml deploy/homepage/favic
 ssh root@themathbible.com 'mkdir -p /var/www/vhosts/themathbible.com/httpdocs/geogebra'
 scp deploy/homepage/geogebra/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geogebra/index.html
 
-# 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
-ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
+# 3. perms (static files 644, owned by deploy — scp usually preserves this; verify)
+ssh deploy@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder /var/www/vhosts/themathbible.com/httpdocs/complex-builder /var/www/vhosts/themathbible.com/httpdocs/analytic-builder'
 
 # 4. proxy — when the preflight says it DIFFERS
-scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
-ssh root@themathbible.com 'systemctl restart geo-proxy'
+scp dist-server/proxy.mjs deploy@themathbible.com:/var/www/geo-proxy/
+ssh deploy@themathbible.com 'sudo systemctl restart geo-proxy'
 
 # 4b. the unit file — ONLY when deploy/geo-proxy.service changed. Not allowlisted, so it asks the operator.
 #     NOT YET (#2754): the live unit predates the repo's SEC-9 hardening, so installing the repo's file switches
@@ -163,6 +165,41 @@ scp deploy/geo-proxy.service root@themathbible.com:/etc/systemd/system/geo-proxy
 ssh root@themathbible.com 'systemctl daemon-reload'
 ssh root@themathbible.com 'systemctl restart geo-proxy'
 ```
+
+## The deploy user ([ADR-W-196](06w-decisions-workspace.md#adr-w-196), #2780)
+
+Every deploy and verify line above logs in as `deploy`, never as root. A key that can deploy can do nothing
+else on the box: it cannot read the other sites or the env file.
+
+| `deploy` can | It cannot |
+| --- | --- |
+| Write the four builder directories, `/var/www/geo-proxy/proxy.mjs` and the triage `verdicts-*.json` | List or read the rest of `httpdocs`: an ACL lets it pass through the vhost directories by name, nothing more |
+| `sudo systemctl restart geo-proxy`, its one sudo rule | Any other sudo, a password login, port forwarding, a terminal |
+| Read the usage logs, which are world-readable (#2754) | Add a key of its own: its `authorized_keys` belongs to root |
+
+**What stays root and asks the operator:** the homepage and site-root files (2d), the unit file (4b), the
+Apache directives, and the setup below.
+
+**A new PC, once.** Each PC has its own deploy-only key, so a lost one is revoked alone. In PowerShell:
+
+1. Make the key:
+   ```powershell
+   ssh-keygen -t ed25519 -f "$HOME\.ssh\geo_deploy_ed25519" -C "geo-deploy@$env:COMPUTERNAME" -N '""'
+   ```
+2. Add to `~/.ssh/config`, so `deploy@` uses that key and only it, and `root@` keeps the default one:
+   ```
+   Match host themathbible.com user deploy
+     IdentityFile ~/.ssh/geo_deploy_ed25519
+     IdentitiesOnly yes
+   ```
+3. Install it as root. The operator runs this, or approves it. The script is idempotent: it creates the user
+   on first use and adds only a key it does not already have.
+   ```powershell
+   Get-Content -Raw deploy/setup-deploy-user.sh | ssh root@themathbible.com "tr -d '\r' | bash -s -- '$(Get-Content $HOME\.ssh\geo_deploy_ed25519.pub)'"
+   ```
+4. Prove it: `ssh deploy@themathbible.com 'systemctl is-active geo-proxy'` answers `active`.
+
+**A new builder directory** goes into the script's `DIRS`, and the script is run again.
 
 ## The `-next` channel — RETIRED 2026-08-18 ([ADR-W-025](06w-decisions-workspace.md#adr-w-025), #747)
 
@@ -235,8 +272,8 @@ curl -sI https://themathbible.com/g/aaaaaaaaaaaa | grep -i x-robots-tag   # noin
 
 ## Verify (every deploy)
 
-- `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`
-- `ssh root@themathbible.com 'systemctl is-active geo-proxy'` → `active`
+- `ssh deploy@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`
+- `ssh deploy@themathbible.com 'systemctl is-active geo-proxy'` → `active`
 - Every deployed builder's page loads over HTTPS; its `index.html` references the **new** bundle hash and the bundle returns 200.
 - A quick in-grammar utterance builds (no proxy call); if the proxy changed, an out-of-grammar utterance builds too (and shows in the Anthropic Console usage).
 - Admin dashboards log in and show the visit.
@@ -266,7 +303,8 @@ git push origin --tags
 | Local feature server: BLANK page, `#root` empty, JS request returns `Content-Type: text/html` | **Base-path mismatch.** `vite build` bakes `base:'/geo-builder/'` into `index.html`, but `vite preview` serves at `/` (`command==='serve'`), so the browser fetches `/geo-builder/assets/*.js` → SPA-fallback `index.html`. HTTP is 200 (misleading) — **check the JS `Content-Type`, not the status.** → rebuild with `--base=/`. |
 | A `/`-leading CLI arg becomes `/Program Files/Git/...` | **git-bash MSYS path conversion** mangles `--base=/`. → run it from **PowerShell** (or `MSYS_NO_PATHCONV=1`, or `--base=./`). |
 | Local git weirdness (phantom modified files, fsck errors) | `git fetch` from GitHub to backfill; GitHub is the source of truth (the repo left Dropbox on 2026-07-23 for exactly this) |
-| `scp -r dist*/*` dies mid-upload (`Connection closed … port 22`) while `ssh` works | Transient (prod/2026-09-18). **Check the server before retrying**: a half-written tree serves a page whose bundle 404s, so compare its `index.html` with the local one. Fallback, one stream: `tar cz -C dist-3d . \| ssh -o ServerAliveInterval=15 root@themathbible.com 'tar xz -C <dir>'`. It carries the LOCAL uid (`197608`), so then run `chown -R root:root .` and `find . -type f -exec chmod 644 {} \;` in `<dir>`; `scp` needs neither |
+| `scp -r dist*/*` dies mid-upload (`Connection closed … port 22`) while `ssh` works | Transient (prod/2026-09-18). **Check the server before retrying**: a half-written tree serves a page whose bundle 404s, so compare its `index.html` with the local one. Fallback, one stream: `tar cz -C dist-3d . \| ssh -o ServerAliveInterval=15 deploy@themathbible.com 'tar xz -C <dir>'`. Extracted by `deploy`, the files are owned by it; then run `find . -type f -exec chmod 644 {} \;` in `<dir>`; `scp` needs neither |
+| `deploy@themathbible.com: Permission denied (publickey)` | **This PC has no deploy key yet** → *The deploy user*, "A new PC". Never retry the deploy lines as `root@`: only the `deploy@` lines are allowlisted, and that is the point (ADR-W-196) |
 
 ## Serving a feature-branch worktree locally (for operator play-testing)
 
