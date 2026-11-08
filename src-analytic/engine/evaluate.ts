@@ -1169,11 +1169,26 @@ export function curvesCoincide(p: NumCurve, q: NumCurve, at: Map<Id, Pt>, apart:
  * is about what a reader can SEE, so it is set where seeing stops.
  *
  * One function for the judge and for the solve's separation restart (#1463), so the solve moves a
- * point exactly when the judge would have rejected it. A hundredth of {@link spanOf}, the figure's extent with its
- * curves (#2732, ADR-AG-427).
+ * point exactly when the judge would have rejected it.
+ *
+ * **Never below the solver's resolution of the figure's extent with its curves** (#2732, ADR-AG-427): a hundredth of the
+ * points' spread shrinks with the points, so a crossing pair collapsed onto one root (the figure's only points) judged
+ * itself apart. The floor is measured on {@link spanOf}, which the curves keep from collapsing. "Where seeing stops"
+ * stays on the points: a hundredth of the curve-wide extent refused a stated arc of 2/3° («גזרה AOB · קשת AB = 2/3»,
+ * |AB| 0.040 on a circle of radius 3.46), which 2-D builds.
  */
 function apartOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
-  return spanOf(c, at, env) * VISIBLE_FRACTION;
+  return apartWithin(at, spanOf(c, at, env));
+}
+
+/**
+ * `apartOf` with the figure's extent already measured (`failingSelectors` measures it once per configuration): a hundredth of
+ * the POINTS' spread, where seeing stops (#1077), never less than the solver's resolution of the figure's extent WITH ITS
+ * CURVES (#2732, ADR-AG-427). The floor is R60's "two positions the solver cannot tell apart are one position"
+ * (ADR-AG-136's `SOLVE_RESOLUTION`), and the curves keep it from vanishing when the judged points collapse together.
+ */
+function apartWithin(at: Map<Id, Pt>, extent: number): number {
+  return Math.max(pointSpread(at) * VISIBLE_FRACTION, extent * SOLVE_RESOLUTION);
 }
 
 /**
@@ -1208,18 +1223,18 @@ export function stackedPairs(f: Figure): Array<[Id, Id]> {
 }
 
 /**
- * THE FIGURE'S EXTENT, the ruler every validity judgement of a configuration is measured against (#1077; #2732,
+ * THE FIGURE'S EXTENT, the resolution ruler of every validity judgement of a configuration (#2732,
  * [ADR-AG-427](../../docs/06c-decisions-analytic.md#adr-ag-427)): the larger coordinate spread of the solved points
  * TOGETHER WITH every resolved curve. A circle or an ellipse adds its box (`curveExtent`), a canonical parabola its
  * vertex and focus, a straight nothing (it has no extent). 1 when fewer than two positions are read.
  *
  * It was the points' spread alone, and a ruler taken from the judged points shrinks with them. On a bare ellipse whose
- * only points are the two crossings A and B, a configuration with both on one root spread 1e-11, so "apart" (a hundredth
- * of that) let A and B 2e-10 apart pass `crossing-distinct`, and «A מעל B» held by 1e-10: the collapsed configuration
- * was admitted to the knowledge pool and «A» answered «(-1, -3/2) או [(-1, 3/2)]». A circle's centre kept the old ruler
- * honest only because the centre is a point. The curves are drawn, and they do not shrink when the points collapse.
- * No origin term (unlike `viewBox`), so the ruler stays translation-invariant. Every reader takes it: `apartOf`, the
- * strict-side bands of `failingSelectors`, `collapsedPairs` and the deflation, the #1917 start and `legiblePositions`.
+ * only points are the two crossings A and B, a configuration with both on one root spread 1e-11, so "apart" let A and B
+ * 2e-10 apart pass `crossing-distinct`, and «A מעל B» held by 1e-10: the collapsed configuration was admitted to the
+ * knowledge pool and «A» answered «(-1, -3/2) או [(-1, 3/2)]». A circle's centre kept the old ruler honest only because
+ * the centre is a point. The curves are drawn, and they do not shrink when the points collapse. No origin term (unlike
+ * `viewBox`), so the ruler stays translation-invariant. Its readers: the floor of `apartOf` (the solver's resolution of
+ * it), the strict-side bands of `failingSelectors` (`sideOfBound`, the same resolution), and the deflation's push.
  */
 export function spanOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
   let x0 = Infinity;
@@ -1294,11 +1309,11 @@ export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[
  * to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the
  * sample's own extent is the reference — and a figure whose givens keep its size never comes near it.
  *
- * **The points, not the curves** (#2732, ADR-AG-427): unlike {@link spanOf}, the validity ruler, this is the solver's
- * resolution and the whole-figure collapse check above. Points that all collapse onto one place on a FIXED curve are
+ * **The points, not the curves** (#2732, ADR-AG-427): unlike {@link spanOf}, the validity judges' resolution ruler, this
+ * is the open-bound floor and the whole-figure collapse check above. Points that all collapse onto one place on a FIXED curve are
  * still a collapse it must see (two named points on one position is what #1113 forbids), and a curve whose size is
- * free already enters as its parameters. Measured: reading the curves here as well changed no verdict and no drawing
- * of the 4,874 corpus sequences at seed 0.
+ * free already enters as its parameters. Measured while ADR-AG-427 was built: reading the curves here as well changed no
+ * verdict and no drawing of the 4,874 corpus sequences at seed 0.
  */
 export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
   let scale = pointSpread(at);
@@ -1687,7 +1702,7 @@ function lineTriple(d: Direction, at: (id: Id) => Pt | null, curveAt: (id: Id) =
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   // The ruler, once per judged configuration (#2732, ADR-AG-427): the points and the curves.
   const span = spanOf(c, at, env);
-  const apart = span * VISIBLE_FRACTION;
+  const apart = apartWithin(at, span);
 
   const holds = (s: Selector): boolean => {
     // A region choice that reaches here unresolved (#1708) holds when one of its options does — the constraint
@@ -2679,8 +2694,8 @@ export function legibleAt(c: Construction, at: (id: Id) => Pt | undefined, exten
   return legibilityFaults(c, at, statedCornersOf(c), fixed, extent).length === 0;
 }
 /** `legibleAt` over a position map, its extent the map's own. */
-function legiblePositions(c: Construction, pos: Map<Id, Pt>, env: Env): boolean {
-  return legibleAt(c, (id) => pos.get(id), spanOf(c, pos, env));
+function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
+  return legibleAt(c, (id) => pos.get(id), pointSpread(pos));
 }
 
 /**
@@ -3095,7 +3110,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
        */
       const keeps = (q: SolveResult) => {
         const pos = place(c, env, asMap(q.values));
-        return q.ok && admissible(pos) && legiblePositions(c, pos, env);
+        return q.ok && admissible(pos) && legiblePositions(c, pos);
       };
       if (!keeps(r)) {
         const plain = tight(0);
@@ -3228,7 +3243,7 @@ function fitLater(
     const solve = (anchored: number) => withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveLM(x0, (x) => rowsAt(ks, asMap(x)), budget, anchored));
     let r = solve(x0.length);
     // stage one's keep-test, as a replay group's (above)
-    if (r.ok && !legiblePositions(c, place(c, env, asMap(r.values)), env)) r = solve(0);
+    if (r.ok && !legiblePositions(c, place(c, env, asMap(r.values)))) r = solve(0);
     r = finished(r, (x) => rowsAt(ks, asMap(x)));
     if (!r.ok) return false;
     const m = asMap(r.values);
@@ -3309,7 +3324,7 @@ function fitLater(
         !ringFaultsOf(c, (id) => pos.get(id)).some(isHardRingFault) &&
         (selectors.length === 0 || failingSelectors({ ...c, selectors }, pos, env).length === 0)
       )
-        out = { m, legible: legiblePositions(c, pos, env) };
+        out = { m, legible: legiblePositions(c, pos) };
     }
     fits.set(k, out);
     return out;
@@ -4513,7 +4528,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       // …and LEGIBLE (ADR-W-175 sr-25): the nearest solution to a random start can be a sliver — the cheapest way to make
       // ∢ABC = 10° is to slide a vertex toward the apex (round #2645's pictures) — so a nearest solution the bound
       // rejects is not drawn, and the solve the figure had before the anchored step is taken instead.
-      const kept = near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env) && legiblePositions(c, place(c, env, stageOne.positionsAt(near.values)), env);
+      const kept = near.ok && admissibleAt(c, stageOne.positionsAt(near.values), env) && legiblePositions(c, place(c, env, stageOne.positionsAt(near.values)));
       // A start the anchored solve did not anchor (no free direction) and could not bring home is not re-run: the plain
       // step from it is the same computation (#1874, "we cannot slow down anything"); its failure still counts as one.
       const rest = !kept && !near.ok && near.anchored === false ? vertexStarts.slice(1) : vertexStarts;

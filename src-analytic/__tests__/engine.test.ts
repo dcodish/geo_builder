@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { classify, fitConic } from '../engine/conic';
 import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } from '../engine/curves';
-import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox, VISIBLE_FRACTION } from '../engine/evaluate';
+import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
@@ -764,7 +764,7 @@ describe('#2732 — the validity ruler is the figure\'s extent, its curves inclu
     expect(spanOf(lines, pts([0, 0], [1, 0]), {})).toBeCloseTo(1, 9);
   });
 
-  it('on the reported figure every admitted pool configuration keeps A and B a hundredth of the ruler apart', () => {
+  it('on the reported figure every admitted pool configuration holds A and B on the two crossings, 3 apart', () => {
     let admitted = 0;
     for (let seed = 0; seed < POOL_SIZE; seed += 1) {
       const f = drawableAt(c, seed);
@@ -772,9 +772,14 @@ describe('#2732 — the validity ruler is the figure\'s extent, its curves inclu
       admitted += 1;
       const a = f.points.find((p) => p.id === 'A')!;
       const b = f.points.find((p) => p.id === 'B')!;
-      const at = new Map(f.points.map((p) => [p.id, { x: p.x, y: p.y }] as const));
-      expect(Math.hypot(a.x - b.x, a.y - b.y), `seed ${seed}`).toBeGreaterThanOrEqual(VISIBLE_FRACTION * spanOf(c, at, f.env));
+      expect(Math.hypot(a.x - b.x, a.y - b.y), `seed ${seed}`).toBeCloseTo(3, 6);
     }
     expect(admitted).toBeGreaterThan(0);
+  });
+
+  it("the floor is the solver's resolution of that ruler, so a stated small arc beside its circle is no collapse", () => {
+    // «קשת AB = 2/3» (2/3°): |AB| ≈ 0.040 on a circle of radius ≈ 3.46. A hundredth of the curve-wide extent (0.069) refused
+    // it; a hundredth of the points' spread, floored at SOLVE_RESOLUTION × the extent (0.022), keeps 2-D's verdict.
+    expect(derive(['גזרה AOB', 'קשת AB = 2/3'], 0).faults).toEqual([]);
   });
 });
