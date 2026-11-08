@@ -9,7 +9,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { submitLine } from '../app/submit';
-import { restoreSessionCx, sessionCxAdapter, sessionPayloadCx } from '../app/sessionPersistCx';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { crashSessionCx, restoreSessionCx, sessionCxAdapter, sessionPayloadCx } from '../app/sessionPersistCx';
+import { logCrashComplex } from '../debug/sessionLogComplex';
+import { crashMountFaults, crashRecoveryFaults } from '../../shell/__tests__/fixtures/crash-recovery-rows';
 import { useComplexStore } from '../store/useComplexStore';
 import { sessionOfferFaults } from '../../shell/__tests__/fixtures/session-offer-rows';
 import { installFakeStorage, uninstallFakeStorage } from '../../shell/__tests__/fixtures/fakeStorage';
@@ -65,5 +69,31 @@ describe('#1238 — an empty canvas never overwrites the stored session', () => 
   it('a fresh boot state produces no payload at all', () => {
     expect(useComplexStore.getState().lines).toEqual([]);
     expect(sessionPayloadCx()).toBeNull();
+  });
+});
+
+/**
+ * #1507 (ADR-W-193) — a crash costs a notice, never the construction. The shared crash rows over this
+ * tree's REAL wiring: the store and its undo history, `crashSessionCx`, the session-offer adapter (the
+ * reload path), `logCrashComplex`, and the builder's own submit. Plus the mount: `main.tsx` puts the
+ * boundary around the app, with this session and log, and the dev trigger gated on DEV.
+ */
+describe('#1507 — a crash rolls back to the last figure that drew, and a reload offers it', () => {
+  it('no faults against the shared crash-recovery checks', async () => {
+    const faults = await crashRecoveryFaults({
+      session: crashSessionCx,
+      store: useComplexStore,
+      adapter: sessionCxAdapter,
+      onCrash: logCrashComplex,
+      populate: () => build(['z1 = 3 + 4i']),
+      step: () => build(['z2 = 1 - 2i']),
+      construction: () => [...useComplexStore.getState().lines],
+    });
+    expect(faults).toEqual([]);
+  });
+
+  it('main.tsx mounts the boundary around the app, with this session and log, and a DEV-only trigger', () => {
+    const main = readFileSync(join(__dirname, '..', 'main.tsx'), 'utf8');
+    expect(crashMountFaults(main, { session: 'crashSessionCx', log: 'logCrashComplex', app: 'App' })).toEqual([]);
   });
 });

@@ -16,8 +16,13 @@
 import type { SessionAdapter } from '../../shell/session/adapter';
 import type { SessionSpec } from '../../shell/session/persist';
 import { clearSession, readSession, writeSession } from '../../shell/session/persist';
+import type { CrashSession } from '../../shell/session/crash';
+import { crashSessionOf, sliceChanged } from '../../shell/session/crash';
 import { hydrateSession } from './submit';
 import { useComplexStore } from '../store/useComplexStore';
+
+/** The store's state, as the slice lists below name its fields. */
+type ComplexState = ReturnType<typeof useComplexStore.getState>;
 
 /** Namespaced per builder — four tools share one origin in dev. NOT the #919 key: that one is dead,
  *  and reusing it would resurrect prototype sessions into a mechanism with different rules. */
@@ -37,11 +42,13 @@ export function persistSessionCx(now: Date = new Date()): void {
   writeSession(SESSION_CX, payload, now);
 }
 
+/** The fields whose change writes the session. */
+export const SESSION_SLICE_CX = ['lines', 'queries', 'seed', 'freePos', 'name', 'display'] as const satisfies readonly (keyof ComplexState)[];
+
 /** Start mirroring the session to storage. Returns the unsubscribe, for the caller's effect. */
 export function startSessionPersistCx(): () => void {
   return useComplexStore.subscribe((s, p) => {
-    if (s.lines !== p.lines || s.queries !== p.queries || s.seed !== p.seed || s.freePos !== p.freePos || s.name !== p.name || s.display !== p.display)
-      persistSessionCx();
+    if (sliceChanged(SESSION_SLICE_CX, s, p)) persistSessionCx();
   });
 }
 
@@ -69,6 +76,18 @@ export function restoreSessionCx(payload: string): boolean {
   }
   return hydrateSession(parsed);
 }
+
+/**
+ * #1507 (ADR-W-193) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
+ * that failed. The rollback restores the persisted slice plus `disabled`, which the undo history
+ * tracks, and clears what this builder's undo clears.
+ */
+export const crashSessionCx: CrashSession<ComplexState> = crashSessionOf(useComplexStore, {
+  slice: [...SESSION_SLICE_CX, 'disabled'],
+  clear: { lastError: null, lastNote: null },
+  persist: () => persistSessionCx(),
+});
 
 /** The §5c cross-product subject — the real wiring, exposed as a value so a lock can drive it. */
 export const sessionCxAdapter: SessionAdapter = {

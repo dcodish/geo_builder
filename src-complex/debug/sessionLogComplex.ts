@@ -13,6 +13,7 @@
  * Best-effort everywhere: never throws, never blocks the app.
  */
 import { makeUsagePoster } from '../../shell/usageLog';
+import type { CrashReport } from '../../shell/session/crash';
 
 /** One id per page load, so a session's events group without anything stored between loads. */
 const sessionId = Math.random().toString(36).slice(2, 10);
@@ -66,4 +67,14 @@ export function logComplex(event: Record<string, unknown>): void {
     post({ ev: 'session', sid: sessionId, t, rel: REL });
   }
   post({ ...lean, sid: sessionId, t, rel: REL });
+}
+
+/**
+ * #1507 (ADR-W-193): the crash boundary's caught error — its text, its stack, the component that was
+ * rendering, and whether the change before it was undone — as one line of the DEV trace, so a crash is
+ * reconstructable even when the page is reloaded before anyone reports it. A production build sends
+ * nothing: `crash` is not a usage kind.
+ */
+export function logCrashComplex(report: CrashReport): void {
+  logComplex({ kind: 'crash', ...report });
 }
