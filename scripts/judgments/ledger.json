@@ -3188,6 +3188,207 @@
       "chosen": true,
       "at": "2026-11-08T07:43:55.061Z",
       "status": "pending"
+    },
+    {
+      "id": "r2745-q1",
+      "question": "In the 3-D builder, «A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 4» (D would sit exactly on B) is refused «הטענה לא מתקיימת בציור — בדקו את החישוב». 2-D builds the coordinate-free analogue with D on B. Options: (a) 3-D accepts a point on a segment at its endpoint, D drawn on B; (b) keep refusing it.",
+      "class": "new-name-on-forced-coincident-point",
+      "verdict": "escalate",
+      "reason": "Rule 5, demoted class: D is a new letter its own definition forces onto the named point B in every configuration, which is exactly new-name-on-forced-coincident-point (0 clean judgments since the q-2631 overrule). The nearest ruling, ADR-W-177 ('accept with message'), lists the 2-D twin as accepted WITH the coincidence notice, which is neither option as worded.",
+      "nearest": [
+        {
+          "quote": "1955 - accept with message",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507"
+        },
+        {
+          "quote": "A new letter its definition forces onto a named point is accepted, with the notice, in every builder",
+          "date": "2026-11-03",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-177"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q2",
+      "question": "In 3-D, «A(0,0,0) · B(4,0,0) · C(0,3,0) · D על AB · E על AC · DE = 2», a length between two points that each slide on a segment, is refused «… בדקו את החישוב», although positions satisfying it exist. Options: (a) solve it and draw one valid position; (b) refuse it with the tool-limit message; (c) keep today's refusal.",
+      "class": "search-first-refuse-last",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A length between points that slide on segments is a given that shapes the figure when the givens do not decide it and some positions satisfy it. The tool finds positions where it holds and draws one. It is refused only when no position can meet it, and «בדקו את החישוב» is used only when the student's own givens contradict it.",
+      "precedents": [
+        {
+          "quote": "sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        },
+        {
+          "quote": "T13 - this is an error. why cant K be (1,0,0)??",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1561#issuecomment-5918510793"
+        },
+        {
+          "quote": "«בדקו את החישוב» stays only where the student's own givens really contradict each other.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/issues/1868#issuecomment-6046345112"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not set priority or mechanism (#2157's armed rider drive may carry it). Until the solve ships, any refusal of this satisfiable line uses the tool-limit sentence, never «בדקו את החישוב», as a stopgap only. A length no position can meet stays refused.",
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2745-q3",
+      "question": "In 3-D, «A(0,0,0) · B(4,0,0) · C(0,3,0) · D על AB · זווית ACD = 30», an angle that fixes a point sliding on a coordinate segment, is refused «… בדקו את החישוב» although a position exists. Options: (a) solve it and place D; (b) refuse with the tool-limit message; (c) keep today's refusal.",
+      "class": "search-first-refuse-last",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "An angle that a point sliding on a segment can make true is a given that shapes the figure: the tool slides the point to where the angle holds and draws it there. The line is refused only when no position can meet the angle, and «בדקו את החישוב» only when the student's own givens contradict it.",
+      "precedents": [
+        {
+          "quote": "Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        },
+        {
+          "quote": "T13 - this is an error. why cant K be (1,0,0)??",
+          "date": "2026-09-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/1561#issuecomment-5918510793"
+        },
+        {
+          "quote": "«בדקו את החישוב» stays only where the student's own givens really contradict each other.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/issues/1868#issuecomment-6046345112"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Does not set priority or mechanism (#2157 already plans the rider drive on solid-free figures). If two positions fit, ADR-052 decides which is drawn first. Until the solve ships, a refusal uses the tool-limit sentence, never «בדקו את החישוב». An angle no position can meet stays refused.",
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "pending"
+    },
+    {
+      "id": "r2745-q4",
+      "question": "In 3-D, «מרובע ABCD» then «פירמידה ABCDS» (a plain pyramid, no base shape stated) builds the pyramid on ABCD and makes ABCD a rectangle; «מנסרה ABCA'B'C'» then «פירמידה ABB'A'S» makes the prism's side face a rectangle (it straightens an oblique prism). Options: (a) keep this; (b) a pyramid built on an existing ring keeps the ring's shape; (c) refuse the pyramid when the ring is not already a rectangle.",
+      "class": "bound-pyramid-base-shape",
+      "verdict": "escalate",
+      "reason": "Precedents in conflict and none reach the case: ADR-3D-011's rectangle reading points to (a), ADR-052 (no unstated proportion) points to (b), and on an oblique prism (a) straightens a face 02b FR-SP-3 promises stays oblique unless stated right.",
+      "nearest": [
+        {
+          "quote": "פירמידה ישרה is not the same as a pyramid with a square base",
+          "date": "2026-07-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-011"
+        },
+        {
+          "quote": "The tool must therefore make no assumption about any size, angle, position, or proportion unless the student stated it",
+          "date": "2026-06-17",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-052"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q5",
+      "question": "In 3-D, with «משולש ABC» (or a cube) on the canvas, a pyramid typed with NO letters, «פירמידה ישרה שבסיסה משולש שווה שוקיים», is refused ««A» כבר מוגדר בציור…». Options: (a) draw a new pyramid on the first free letters; (b) build the pyramid on the existing ABC; (c) keep the refusal.",
+      "class": "unlettered-solid-over-existing-letters",
+      "verdict": "escalate",
+      "reason": "No precedent: FR-SP-24 ('3-D follows 2-D', 2026-10-16) was ruled on triangles; 2-D has no solids, and ADR-3D-351 kept solid default lettering outside its class.",
+      "nearest": [
+        {
+          "quote": "3-D follows 2-D, at P2.",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2235#issuecomment-6217509331"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q6",
+      "question": "In 3-D, «קובייה ABCDA'B'C'D'» then «פירמידה ABCDS» builds the pyramid on face ABCD and shows the note «בגלל הנתונים, ABCD הוגבל ממלבן לריבוע — ריבוע הוא סוג של מלבן.». Options: (a) keep the note; (b) no note when the ring was already a square before the pyramid line.",
+      "class": "narrowing-note-ring-already-narrow",
+      "verdict": "escalate",
+      "reason": "Precedents point both ways (P16 / card 10 toward (b), card 1 'every forced narrowing' toward (a)), and it rests on q4's unruled reading; (b) would also change the note shipped today for cube · «פירמידה ABCDA'».",
+      "nearest": [
+        {
+          "quote": "Every forced narrowing, whatever caused it",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/1996#issuecomment-6141540122"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q7",
+      "question": "An accepted height «AE גובה» now shows the shape it was drawn in beside the student's words («במשולש ABC»). Should an angle bisector named by its vertex, «AE חוצה זווית A», also show such a tag? Options: (a) yes; (b) no tag.",
+      "class": "cevian-host-tag-scope",
+      "verdict": "escalate",
+      "reason": "#1973's ruling concerns a height whose side the tool took from the figure; a vertex-named bisector is read through the vertex angle (ruled separately), and neither ruling decides a shape tag for it.",
+      "nearest": [
+        {
+          "quote": "persist the host, and show it beside the student's words rather than inside them",
+          "date": "2026-10-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/1973#issuecomment-6095759370"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q8",
+      "question": "With «משולש ABC» · «מרובע ABCD» · «E על BC» · «AE גובה», the foot is on BC, which both shapes share, so no tag is shown. Options: (a) no tag; (b) both shapes; (c) the first-declared shape.",
+      "class": "cevian-host-tag-shared-side",
+      "verdict": "escalate",
+      "reason": "No precedent: the #1973 ruling assumes one host.",
+      "nearest": [
+        {
+          "quote": "persist the host, and show it beside the student's words rather than inside them",
+          "date": "2026-10-10",
+          "link": "https://github.com/dcodish/geo_builder/issues/1973#issuecomment-6095759370"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q9",
+      "question": "Two quick clicks on a row's ✕ delete two rows, because the list moves up under the pointer. Options: (a) confirm a delete; (b) animate the removal; (c) leave it.",
+      "class": "row-delete-double-click",
+      "verdict": "escalate",
+      "reason": "No precedent; a confirm step would be new student-facing UI.",
+      "nearest": [
+        {
+          "quote": "I entered the whole diagram and then deleted the row נקודה E נמצאת במישור ABC. the system crashed and restarted and erased everything",
+          "date": "2026-09-28",
+          "link": "https://github.com/dcodish/geo_builder/issues/1507"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
+    },
+    {
+      "id": "r2745-q10",
+      "question": "When the new crash safety net catches a drawing error, it writes it to the developer log only. Options: (a) also send it to the production usage log (a new event kind; privacy notes updated); (b) developer log only.",
+      "class": "feature-scope-or-priority",
+      "verdict": "escalate",
+      "reason": "A new production event kind and its privacy notes extend the capability's reach; no ruling takes the crash net beyond the developer log.",
+      "nearest": [
+        {
+          "quote": "Fix + add AI clause",
+          "date": "2026-09-27",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-090"
+        }
+      ],
+      "at": "2026-11-08T08:50:38.002Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
