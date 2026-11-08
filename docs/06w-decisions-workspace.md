@@ -7127,7 +7127,7 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 
 **Behaviour change for a student:** none.
 
-## ADR-W-193 — A crash never erases the construction: one boundary in the shell, a rollback to what last drew, and the reload offers that (#1507)
+## ADR-W-195 — A crash never erases the construction: one boundary in the shell, a rollback to what last drew, and the reload offers that (#1507)
 
 **Status:** accepted · 2026-11-08 · feature (P2, `workspace` + all four builders) · fix round #2745, stream H · branch `feat/1507-crash-recovery` · **Operator:** the fix plan on #1507, approved as written on 2026-10-05 ([auto-ok audit](https://github.com/dcodish/geo_builder/issues/1507#issuecomment-5996556577)); `What the student will see` posted at pickup ([comment](https://github.com/dcodish/geo_builder/issues/1507#issuecomment-6717921013)) · **Builds on:** [ADR-W-078](#adr-w-078) (the session offer)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-33 (new) · **Design:** [04w](04w-design-shell.md) § *The crash boundary* (new) · **Product:** workspace; wired in 2-D, 3-D, analytic and complex.

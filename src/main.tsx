@@ -14,7 +14,7 @@ import { logCrash } from './debug/sessionLog';
 const StepPanel = import.meta.env.DEV ? lazy(() => import('./debug/StepPanel')) : null;
 const showSteps = StepPanel !== null && new URLSearchParams(window.location.search).has('steps');
 
-// #1507 (ADR-W-193): an error while drawing costs a notice and «שחזור», never the construction. The
+// #1507 (ADR-W-195): an error while drawing costs a notice and «שחזור», never the construction. The
 // boundary goes around the whole app; its notice reads the suite's keys through the instance `./i18n` registers.
 // `devCrash` is DEV ONLY: `import.meta.env.DEV` is a build-time false in production, so the ?crash
 // trigger is never rendered there.

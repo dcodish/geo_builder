@@ -87,7 +87,7 @@ export function restoreSession3(payload: string) {
 }
 
 /**
- * #1507 (ADR-W-193) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
  * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
  * that failed. 3-D's undo clears nothing transient, so neither does the rollback.
  */

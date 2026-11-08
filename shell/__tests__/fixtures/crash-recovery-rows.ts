@@ -1,5 +1,5 @@
 /**
- * The cross-product checks for crash recovery (#1507, ADR-W-193), written per docs/28 §5c.
+ * The cross-product checks for crash recovery (#1507, ADR-W-195), written per docs/28 §5c.
  *
  * `shell/` may never import a product tree, so "every builder comes back from a crash with the last
  * figure that drew, and a reload offers that one" cannot be checked by calling all four. The §5c

@@ -146,7 +146,7 @@ export function logAnalyticFigure(figure: Record<string, unknown>): void {
 }
 
 /**
- * #1507 (ADR-W-193): the crash boundary's caught error — its text, its stack, the component that was
+ * #1507 (ADR-W-195): the crash boundary's caught error — its text, its stack, the component that was
  * rendering, and whether the change before it was undone — as one line of the DEV trace, so a crash is
  * reconstructable even when the page is reloaded before anyone reports it. A production build sends
  * nothing: `crash` is not a usage kind.

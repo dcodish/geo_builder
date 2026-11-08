@@ -1,5 +1,5 @@
 /**
- * #1507 (ADR-W-193) — the crash boundary and its rollback, as units.
+ * #1507 (ADR-W-195) — the crash boundary and its rollback, as units.
  *
  * `shell/session/crash.ts` is pure and is called here. The boundary is a React class; the repo's tests
  * have no DOM renderer and a static render has no error boundaries, so its lifecycle is driven the way

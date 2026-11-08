@@ -113,7 +113,7 @@ describe('#1238 — an empty canvas never overwrites the stored session', () => 
 });
 
 /**
- * #1507 (ADR-W-193) — a crash costs a notice, never the construction. The shared crash rows over this
+ * #1507 (ADR-W-195) — a crash costs a notice, never the construction. The shared crash rows over this
  * tree's REAL wiring: the store and its undo history, `geoCrashSession`, the session-offer adapter (the
  * reload path), `logCrash`, and the builder's own parse + commit. Plus the mount: `main.tsx` puts the
  * boundary around the app, with this session and log, and the dev trigger gated on DEV.

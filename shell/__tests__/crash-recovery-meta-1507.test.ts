@@ -1,5 +1,5 @@
 /**
- * The META-lock for the crash-recovery checks (#1507, ADR-W-193; docs/28 §5c rule 5).
+ * The META-lock for the crash-recovery checks (#1507, ADR-W-195; docs/28 §5c rule 5).
  *
  * The four per-tree locks all call `crashRecoveryFaults`, so a check that silently stops checking
  * turns four green tests into four that prove nothing. This runs the SAME function against a

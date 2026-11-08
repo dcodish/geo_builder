@@ -1,5 +1,5 @@
 /**
- * A crash never erases the construction (#1507, ADR-W-193) — what a builder hands the crash boundary.
+ * A crash never erases the construction (#1507, ADR-W-195) — what a builder hands the crash boundary.
  *
  * React 18 unmounts the WHOLE root when a render throws and no boundary catches it: a white page,
  * the error only in the console, and the only way forward a reload. `shell/frame/CrashBoundary.tsx`
@@ -140,7 +140,7 @@ export function crashSessionOf<S extends object>(store: UndoableStore<S>, spec: 
 }
 
 /**
- * The dev-only trigger's mode, read from the page's query string (ADR-W-193). The CALLER gates it on
+ * The dev-only trigger's mode, read from the page's query string (ADR-W-195). The CALLER gates it on
  * `import.meta.env.DEV`, so a production build never reads it:
  *
  *  - `?crash` (or `?crash=now`): a 💥 button whose click makes the next render throw — a crash with

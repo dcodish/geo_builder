@@ -78,7 +78,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   undone, the notice says so before the click, and the change stays on the redo side. Nothing is retried on
   its own: the notice waits for the click. A reload after a crash offers (FR-SL-6) the construction as it
   last showed, not the state that failed. The error is written to the builder's development log.
-  - Sources: [ADR-W-193](06w-decisions-workspace.md#adr-w-193), #1507.
+  - Sources: [ADR-W-195](06w-decisions-workspace.md#adr-w-195), #1507.
 
 ### The words a student reads
 

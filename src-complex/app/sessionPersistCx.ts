@@ -78,7 +78,7 @@ export function restoreSessionCx(payload: string): boolean {
 }
 
 /**
- * #1507 (ADR-W-193) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
  * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
  * that failed. The rollback restores the persisted slice plus `disabled`, which the undo history
  * tracks, and clears what this builder's undo clears.

@@ -598,7 +598,7 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/segment-display-rows.ts`. Each builder's thin lock hands over a subject: `setup`, its real toggles, `ink()` read off its real rendered canvas, `measurable()` through its own measure path, `statements()`, an optional `undo` (present only where the display choice is in the undo slice: analytic yes, 2-D no), and its real save → load. The meta-lock proves each row can fail.
 
-### The crash boundary ([ADR-W-193](06w-decisions-workspace.md#adr-w-193))
+### The crash boundary ([ADR-W-195](06w-decisions-workspace.md#adr-w-195))
 
 One error boundary for the suite, mounted by each builder's `main.tsx` around its whole app, inside its
 i18n provider. It replaces React 18's default (unmount the root: a white page) with a notice, and it is

@@ -1,5 +1,5 @@
 /**
- * The crash boundary (#1507, ADR-W-193): an error while drawing costs a notice, never the construction.
+ * The crash boundary (#1507, ADR-W-195): an error while drawing costs a notice, never the construction.
  *
  * Without it, React 18 unmounts the whole root when a render throws: a white page, and the student's
  * only way forward is a reload. Each builder mounts this ONCE, around its app, inside its i18n
@@ -140,7 +140,7 @@ export function CrashNotice({ text, undone, onRecover }: { text: string; undone:
 }
 
 /**
- * DEV ONLY (ADR-W-193): a 💥 button that crashes the drawing on purpose, so the operator can play the
+ * DEV ONLY (ADR-W-195): a 💥 button that crashes the drawing on purpose, so the operator can play the
  * notice. Never rendered unless the caller passes a mode, which it does only under
  * `import.meta.env.DEV`. It stays armed until the boundary has caught the throw — React retries a
  * failed render once before giving up, so a one-shot throw would be swallowed by the retry.

@@ -103,7 +103,7 @@ export async function restoreSession(payload: string, opts: FigureLoadOpts = {})
 }
 
 /**
- * #1507 (ADR-W-193) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
  * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
  * that failed. 2-D's undo clears nothing transient, so neither does the rollback; the detection
  * results each carry the facts they were computed for, so a rolled-back figure never reads them.

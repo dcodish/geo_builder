@@ -9,7 +9,7 @@ import { crashSessionAn } from './app/sessionPersistAn';
 import { logCrashAnalytic } from './debug/sessionLogAnalytic';
 import './styles.css';
 
-// #1507 (ADR-W-193): an error while drawing costs a notice and «שחזור», never the construction. The
+// #1507 (ADR-W-195): an error while drawing costs a notice and «שחזור», never the construction. The
 // boundary sits inside the i18n provider (its notice reads the suite's keys) and around the whole app.
 // `devCrash` is DEV ONLY: `import.meta.env.DEV` is a build-time false in production, so the ?crash
 // trigger is never rendered there.
