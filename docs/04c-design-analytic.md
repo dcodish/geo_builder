@@ -862,7 +862,7 @@ a line described by a point and a relation is `lineObjectOperand` behind `isDesc
 
 ### Extensions, named diagonals, the midsegment, a condition after a placement ([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), #1620)
 
-`Selector.beyond { id, a, b }` is `between`'s complement on the same line: the point is past `b`, away from `a`, judged by the projection parameter (`t > 1`) and the figure's visible resolution (`apartOf`, as `distinct`). The collinearity beside it (`on-line-2pt`, unbounded) consumes the one DOF; the selector consumes none.
+`Selector.beyond { id, a, b }` is `between`'s complement on the same line: the point is past `b`, away from `a`, judged by the projection parameter (`t > 1`) and the figure's visible resolution (`apartOf`, a hundredth of the figure's extent with its curves, as `distinct`). The collinearity beside it (`on-line-2pt`, unbounded) consumes the one DOF; the selector consumes none.
 `extensionFacts` lowers «על המשך …»; `conditionClauses` reads «כך ש-»; `meet-of` gains `noun` and `named`
 (`ringsNamed`, `not-a-diagonal`); midsegment points use `FRESH_PREFIX` (`resolveFresh`); `vertices-on-axes` is one
 `choice` over 2ⁿ assignments (`Constraint.all`).
@@ -930,10 +930,21 @@ and `swappedStarts`, because the reached side's start belongs to the solve. The 
 solve never rejects a root for a point that has not been placed yet. It reads both directions, takes a seed-varied
 fraction of the gap between two bounds, and settles a chain link by link. A point whose orders hold does not move.
 
+**The ruler a configuration is judged by is the figure's extent, its curves included** ([ADR-AG-427](06c-decisions-analytic.md#adr-ag-427),
+#2732; amending [ADR-AG-039](06c-decisions-analytic.md#adr-ag-039)). `spanOf(c, at, env)` is the larger coordinate spread of
+the solved points together with every resolved curve: a circle's or an ellipse's box (`curveExtent`), a canonical
+parabola's vertex and focus, nothing for a straight. It has no origin term, so it is translation-invariant (unlike
+`viewBox`). `failingSelectors` computes it once per judged configuration; `apartOf` is a hundredth of it, and its readers
+are the `distinct` family, `crossingHasNoPoint`, `crossingPartners`, `collapsedPairs` and the deflation, the #1917 start,
+`fitLineByLine`'s admissible fit and `legiblePositions`. A ruler of the points alone shrank with a collapsed crossing pair
+when those were the figure's only points, so the pair judged itself apart. `figureScale` (the open-bound floor and the
+whole-figure collapse check) keeps the points' spread and the parameters (`pointSpread`): it is the solver's resolution,
+and points that all collapse on a fixed curve are still a collapse it must see.
+
 **A strict side is judged at the solver's resolution** ([ADR-AG-291](06c-decisions-analytic.md#adr-ag-291), #2230).
 Every strict arm of `failingSelectors` reads one predicate, `sideOfBound(v, bound, scale)`: a value within
 `SOLVE_RESOLUTION × scale` of its bound is ON it (`0`), so a strict comparison fails there and a closed one holds. The
-scale is the quantity's own size: the figure's span (`spanOf`) for a coordinate, `max(1, |v|)` for a parameter order,
+scale is the quantity's own size: the figure's extent with its curves (`spanOf`) for a coordinate, `max(1, |v|)` for a parameter order,
 the sides for `acute`'s dot product, the direction's length for a slope sign (within it of horizontal or vertical,
 no sign). The region quantities (`circleQuantity`, `circlePairQuantity`, `orderQuantity`) band where they are
 measured, and `signHolds` reads their sign.
@@ -944,7 +955,7 @@ measured, and `signHolds` reads their sign.
 family with the line's value at the point as the bound: `line-compare {id, line: points | curve, axis, greater}`.
 `parseCompare` reads it after the point and axis forms (`POSITION_LINE_HE` / `_EN`, the operand through `direction()`).
 `lineCompareLine` resolves the line in the configuration (two points, or `curveAtOf` for a named line); the judge
-compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf`.
+compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf` (the figure's extent with its curves).
 `lineHasNoSide` (on `isVerticalLine` / `isHorizontal`) makes a y-side selector false on a vertical line and an x-side one
 false on a horizontal line. The seeding loop folds a free subject to the named side, keeping its offset. In `derive`'s
 selector arm, a failing `line-compare` whose line has no such side IN THE DRAWN FIGURE (`lineCompareNoSide`) is refused
@@ -956,7 +967,7 @@ sorts a two-letter line's ends.
 parameter domains, before `parseCompare`) emits `distinct-of {names, noun?}`; M1 (`case 'distinct-of'`) resolves the
 names: a written noun decides, else a name that is a point reads them all as points, else the first curve's kind.
 Points lower to the existing `distinct`; circles and lines to `distinct-curves {ids}`, judged in `failingSelectors` by
-`curvesCoincide` at `apartOf` (lines: unit normals within `SOLVE_RESOLUTION` and the figure centre's foot on one within
+`curvesCoincide` at `apartOf` (a hundredth of `spanOf`; lines: unit normals within `SOLVE_RESOLUTION` and the figure centre's foot on one within
 `apart` of the other; circles: centres and radii within `apart`). No mover: `drawableAt`'s walk finds the other roots.
 `selectorIdentity` sorts both kinds' ids.
 

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { classify, fitConic } from '../engine/conic';
 import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } from '../engine/curves';
-import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate';
+import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox, VISIBLE_FRACTION } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
@@ -726,5 +726,55 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   it('#1076 does not regress — a promotion is recorded, never called entailed', () => {
     expect(verdict(['נקודה B על הישר y=x'], 'נתון הישר l1: y=x')).toBe('recorded');
     expect(verdict(['נקודה B על הישר y=x'], 'y=x')).toBe('recorded');
+  });
+});
+
+/**
+ * #2732 ([ADR-AG-427](../../docs/06c-decisions-analytic.md#adr-ag-427)) — THE RULER A CONFIGURATION IS JUDGED BY
+ * INCLUDES ITS CURVES.
+ *
+ * `spanOf` was the solved points' spread alone. On a bare ellipse whose only points are the two crossings, a
+ * configuration with both on one root spread 1e-11, so "apart" shrank with the pair and the collapse passed
+ * `crossing-distinct` and «A מעל B» (by 1e-10). The pool admitted it, and «A» answered «(-1, -3/2) או [(-1, 3/2)]».
+ */
+describe('#2732 — the validity ruler is the figure\'s extent, its curves included', () => {
+  const ELLIPSE = ['נתונה אליפסה שמשוואתה x^2/4+y^2/3=1', 'הישר x=-1 חותך את האליפסה בנקודות A ו-B', 'A מעל B'];
+  const c = derive(ELLIPSE, 0).construction;
+  const pts = (a: [number, number], b: [number, number]) =>
+    new Map([['A', { x: a[0], y: a[1] }], ['B', { x: b[0], y: b[1] }]]);
+
+  it('two coincident points on x²/4+y²/3=1 get a ruler of 4, not 1e-9', () => {
+    expect(spanOf(c, pts([-1, -1.5], [-1, -1.5]), {})).toBeCloseTo(4, 9);
+    expect(spanOf(c, pts([-1, -1.5], [-1, -1.5 + 2.3e-10]), {})).toBeCloseTo(4, 9);
+  });
+
+  it('the collapsed pair fails the judge; the two crossings, in the stated order, pass it', () => {
+    expect(selectorsHold(c, pts([-1, -1.5 + 2.3e-10], [-1, -1.5]), {})).toBe(false);
+    expect(selectorsHold(c, pts([-1, 1.5], [-1, -1.5]), {})).toBe(true);
+    expect(selectorsHold(c, pts([-1, -1.5], [-1, 1.5]), {})).toBe(false); // «A מעל B» still judged
+  });
+
+  it('a parabola adds its vertex and focus, a circle its box, a straight nothing', () => {
+    const parabola = derive(['y^2=4x', 'הישר x=1 חותך את הפרבולה בנקודות A ו-B'], 0).construction;
+    // A and B on one point; the vertex (0, 0) and the focus (1, 0) widen it to x 0…1, y 0…2.
+    expect(spanOf(parabola, pts([1, 2], [1, 2]), {})).toBeCloseTo(2, 9);
+    const circle = derive(['(x-1)^2+(y-2)^2=9', 'הישר x=1 חותך את המעגל בנקודות A ו-B'], 0).construction;
+    expect(spanOf(circle, pts([1, 5], [1, 5]), {})).toBeCloseTo(6, 9);
+    const lines = derive(['A(0,0)', 'B(1,0)', 'הישר y=2x'], 0).construction;
+    expect(spanOf(lines, pts([0, 0], [1, 0]), {})).toBeCloseTo(1, 9);
+  });
+
+  it('on the reported figure every admitted pool configuration keeps A and B a hundredth of the ruler apart', () => {
+    let admitted = 0;
+    for (let seed = 0; seed < POOL_SIZE; seed += 1) {
+      const f = drawableAt(c, seed);
+      if (!admittedToPool(f)) continue;
+      admitted += 1;
+      const a = f.points.find((p) => p.id === 'A')!;
+      const b = f.points.find((p) => p.id === 'B')!;
+      const at = new Map(f.points.map((p) => [p.id, { x: p.x, y: p.y }] as const));
+      expect(Math.hypot(a.x - b.x, a.y - b.y), `seed ${seed}`).toBeGreaterThanOrEqual(VISIBLE_FRACTION * spanOf(c, at, f.env));
+    }
+    expect(admitted).toBeGreaterThan(0);
   });
 });
