@@ -157,6 +157,8 @@ scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
 
 # 4b. the unit file — ONLY when deploy/geo-proxy.service changed. Not allowlisted, so it asks the operator.
+#     NOT YET (#2754): the live unit predates the repo's SEC-9 hardening, so installing the repo's file switches
+#     that hardening on for the first time. Do #2754's path check first; until then the live unit stays as it is.
 scp deploy/geo-proxy.service root@themathbible.com:/etc/systemd/system/geo-proxy.service
 ssh root@themathbible.com 'systemctl daemon-reload'
 ssh root@themathbible.com 'systemctl restart geo-proxy'
