@@ -3158,6 +3158,36 @@
       "limits": "1. The rule is assembled from his rulings on #1242, #2061, ADR-743 (#2339), #1936 and #1896. None of them decides a stated parameter value against a pinning given; #1896 itself ruled only the case where no k works at all. 2. It covers only givens that #1896 routes to pin k: the ⊥ and its 90° twin, and, by #1896's own ruling, an impossible area or ratio on such points. 3. It does not decide a stated k that satisfies the given (k = 2 or k = −5 must simply be honoured), a contradicting sign («k > 0») or a contradicting second value of k. 4. It does not decide analytic's plane analogue or any other builder; 2-D has no coordinate parameter. 5. It reuses an existing 3-D sentence and adds no new text. If a new sentence turns out to be needed, it is the session's under ADR-W-174 and is shown in full for his review.",
       "at": "2026-11-08T06:23:48.746Z",
       "status": "pending"
+    },
+    {
+      "id": "chose-1507-crash-notice",
+      "kind": "text",
+      "issue": "#1507",
+      "what": "The crash notice's sentence when nothing was undone (suite.crash.notice, every builder)",
+      "choice": "משהו השתבש בהצגת השרטוט. הבנייה שלכם לא נמחקה — לחצו «שחזור» כדי להמשיך.",
+      "chosen": true,
+      "at": "2026-11-08T07:43:55.001Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-1507-crash-notice-undone",
+      "kind": "text",
+      "issue": "#1507",
+      "what": "The crash notice's sentence when the change before the error was undone (suite.crash.noticeUndone, every builder)",
+      "choice": "משהו השתבש בהצגת השרטוט אחרי השינוי האחרון, ולכן השינוי הזה בוטל. שאר הבנייה לא נמחקה — לחצו «שחזור» כדי להמשיך.",
+      "chosen": true,
+      "at": "2026-11-08T07:43:55.001Z",
+      "status": "pending"
+    },
+    {
+      "id": "chose-2492-panel-pointer",
+      "kind": "text",
+      "issue": "#2492",
+      "what": "The «הוכיחו…» refusal's second line in analytic and complex (suite.refusal.proofTargetCheckPanel, PR #2747): where the claim can be checked, sent to its quantities because the ask box does not judge a typed claim",
+      "choice": "ניתן לבדוק את נכונות הטענה בחלונית «{{panel}}»: הקלידו שם כל גודל שבטענה ולחצו «{{ask}}», והשוו בין התשובות — למשל, עבור AB = AC שאלו על AB ועל AC.",
+      "chosen": true,
+      "at": "2026-11-08T07:43:55.061Z",
+      "status": "pending"
     }
   ],
   "demoted": {
