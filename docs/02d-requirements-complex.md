@@ -254,8 +254,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
 - **FR-KN-2 (Must)** — **A claim is the student's answer: verified, never obeyed.** A claim never
   reshapes the figure to become true. A line
   that asks the student to PROVE something («הוכיחו כי …», "prove that …", also after a given on the same line)
-  is refused like in the other builders, quoting the proof sentence, and nothing of it is recorded
-  ([FR-SU-15](02w-requirements-workspace.md); ADR-W-118 B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)).
+  is refused like in the other builders, quoting the proof sentence, and nothing of it is recorded; the refusal then
+  sends the student to the claim's quantities in the «נתונים» panel
+  ([FR-SU-15](02w-requirements-workspace.md); ADR-W-118 B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083), [ADR-W-194](06w-decisions-workspace.md#adr-w-194)).
   **⚠ Ruled to change (2026-10-17, #2338):** a bare statement («w ממשי», «w מדומה טהור») is a given, not a claim to
   check, and the one that contradicts the givens is refused (changes ruling ADR-W-118 D3). The rest of this
   requirement describes the code until that ships.
