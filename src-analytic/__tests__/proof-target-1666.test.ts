@@ -7,7 +7,13 @@
  * e92b671f through `decideSubmit`: «יש להוכיח כי …», «צריך להוכיח כי …», «א. הוכיחו כי …», «(1) …», «1. …» and
  * the mixed line «נתון AB = AC. הוכיחו כי …» were refused as `bad-operand` — never recorded, but the message
  * blamed the operand instead of saying it is a claim to prove. Now each is `proof-target`, quoting the claim.
+ *
+ * #2492 ([ADR-W-192](../../docs/06w-decisions-workspace.md#adr-w-192)): the refusal ends by saying where the claim can be
+ * checked: the data panel, whose ask box answers the claim's quantities (operator ruling 2026-10-24, ballot e19). The
+ * panel and its button are named by the keys the App draws them with.
  */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { errorText } from '../app/errorText';
@@ -16,10 +22,12 @@ import { derive } from '../engine/derive';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import { findProofTarget } from '../../shell/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../shell/__tests__/fixtures/proof-target-rows';
+import { PANEL_POINTER, PROOF_TARGET_SENTENCE, panelDrawnFaults } from '../../shell/__tests__/fixtures/proof-target-check-2492';
 
 type T = (k: string, o?: Record<string, unknown>) => string;
 const plain = (f: T): T => (k, o) => f(k, o).replace(/[⁦-⁩]/g, '');
 const t = plain(analyticI18n.getFixedT('he') as unknown as T);
+const tEn = plain(analyticI18n.getFixedT('en') as unknown as T);
 
 const LINES = ['A(0,0)', 'B(4,0)', 'C(0,3)'];
 const current = derive(LINES, 0);
@@ -39,7 +47,22 @@ describe('#1666 — analytic refuses a proof target at the submit gate (the shar
   it('the mixed line quotes only the claim', () => {
     const v = decideSubmit('נתון B(4,0). הוכיחו כי AB ⊥ AC', LINES, 0, current);
     expect(v.kind).toBe('refused');
-    if (v.kind === 'refused') expect(errorText(v.error, t)).toBe('זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «הוכיחו כי AB ⊥ AC»');
+    if (v.kind === 'refused') {
+      expect(errorText(v.error, t)).toBe(`${PROOF_TARGET_SENTENCE.he('הוכיחו כי AB ⊥ AC')} ${PANEL_POINTER.he('נתונים', 'שאלו')}`);
+      expect(errorText(v.error, tEn)).toBe(`${PROOF_TARGET_SENTENCE.en('הוכיחו כי AB ⊥ AC')} ${PANEL_POINTER.en('Data', 'Ask')}`);
+    }
+  });
+
+  // #2492: the panel and the button the refusal names are this App's, read from the keys it draws them with
+  it.each([
+    ['he', t],
+    ['en', tEn],
+  ] as const)('the refusal names the panel and the ask button by their own labels (%s)', (_lng, tr) => {
+    const v = decideSubmit('הוכיחו כי AB = AC', LINES, 0, current);
+    expect(v.kind).toBe('refused');
+    if (v.kind === 'refused') expect(errorText(v.error, tr).endsWith(tr('suite.refusal.proofTargetCheckPanel', { panel: tr('dataTitle'), ask: tr('askAdd') }))).toBe(true);
+    const app = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf8');
+    expect(panelDrawnFaults(app, { panel: 'dataTitle', ask: 'askAdd' })).toEqual([]);
   });
 
   it('no line of the analytic catalog reads as a proof target', () => {

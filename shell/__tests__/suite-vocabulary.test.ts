@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { RETIRED_ALREADY_THERE_KEYS, RULED_ALREADY_DRAWN } from './fixtures/already-drawn-1990';
+import { PANEL_POINTER, PROOF_TARGET_SENTENCE, RULED_2D_CHECK_HE } from './fixtures/proof-target-check-2492';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/^﻿/, '');
@@ -94,10 +95,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // a measured wording difference outside this issue, reported as found work, so it is not asserted here.
   vertexAngleReadAs: { '2d': ['input.vertexAngleReadAs'], '3d': ['notice.vertexAngleReadAs'], complex: null, analytic: null },
 
-  // #1870 (ADR-CX-083, ADR-W-107; ruling B14, wording B13): a claim to prove is refused in every builder, in 2-D's
-  // sentence. 3-D's quote marks differed until #2202 / #2241 (ADR-W-149, ADR-W-150) made «…» the rule in both
-  // languages; #1868 (ADR-W-151) closes the gap it owned by putting 3-D's key in the row.
-  proofTarget: { '2d': ['input.scope.proof-target'], '3d': ['err.proofTarget'], complex: ['errProofTarget'], analytic: ['errProofTarget'] },
+  // `proofTarget` (#1870, ADR-CX-083, ADR-W-107) left this table in #2492 (ADR-W-192): it is ONE key now,
+  // `suite.refusal.proofTarget`, so it cannot differ. Its ruled text and the retired keys are held below.
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
@@ -126,11 +125,6 @@ const RULED: Record<string, Record<Lang, string>> = {
   lengthNameTaken: {
     he: 'לקטע {{N}} כבר יש שם: {{N}} (בשורה «{{N}}»). לכל קטע שם אחד — המשיכו עם {{N}}.',
     en: 'Segment {{N}} already has a name: {{N}} (in the line «{{N}}»). A segment has one name — keep using {{N}}.',
-  },
-  proofTarget: {
-    // #2202 (ADR-W-149, ruling d1 2026-10-16): a quoted value is «…» in Hebrew; in English too since #2241 (ADR-W-150)
-    he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{N}}»',
-    en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{N}}»',
   },
   measureContradicts: {
     he: 'לא ניתן: «{{N}}» סותר את «{{N}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{N}}.',
@@ -161,7 +155,7 @@ describe('#1453 — one wording per role, in every builder', () => {
   }
 
   it('the reader is not vacuous: it finds a known key in each locale form', () => {
-    expect(valueOf('3d', 'he', 'err.proofTarget')).toContain('זו טענה להוכחה');
+    expect(valueOf('3d', 'he', 'err.radianAngle')).toContain('במעלות');
     expect(valueOf('complex', 'he', 'undo')).toBe('בטל');
     expect(valueOf('analytic', 'en', 'undo')).toBe('Undo');
     expect(valueOf('2d', 'he', 'actions.undo')).toBe('בטל');
@@ -240,5 +234,36 @@ describe('#1990 — one already-there note', () => {
       // nor its old wordings under another name
       expect(allMessages(p, 'he').filter((m) => /כבר נאמר \(|כבר ידוע מהנתונים|כבר נובע מהנתונים/.test(m)), p).toEqual([]);
     }
+  });
+});
+
+/**
+ * #2492 (ADR-W-192; operator 2026-10-24 and his ruling the same day, ballot e19) — the proof-target refusal: one suite
+ * sentence in every builder (#1870's role, ADR-W-107's wording), then where the claim can be checked. 2-D names its
+ * relations button (the operator's sentence); a builder that sends the student to its data panel reads ONE suite line
+ * whose two names are its own labels. The per-builder rendering is each tree's `proof-target-1666.test.ts`.
+ */
+describe('#2492 — one proof-target refusal, and where to check the claim', () => {
+  it('the suite sentence is the ruled one, Hebrew and English', () => {
+    expect(suiteValue('he', 'suite.refusal.proofTarget')).toBe(PROOF_TARGET_SENTENCE.he('{{sentence}}'));
+    expect(suiteValue('en', 'suite.refusal.proofTarget')).toBe(PROOF_TARGET_SENTENCE.en('{{sentence}}'));
+  });
+
+  it('no builder keeps a key of its own for it', () => {
+    const retired: Record<Product, string> = { '2d': 'input.scope.proof-target', '3d': 'err.proofTarget', complex: 'errProofTarget', analytic: 'errProofTarget' };
+    for (const p of PRODUCTS) for (const lang of ['he', 'en'] as const) expect(valueOf(p, lang, retired[p]), `${p} ${lang} ${retired[p]}`).toBeUndefined();
+  });
+
+  it('the data-panel line names the panel and its ask button by slots, never by a typed label', () => {
+    expect(suiteValue('he', 'suite.refusal.proofTargetCheckPanel')).toBe(PANEL_POINTER.he('{{panel}}', '{{ask}}'));
+    expect(suiteValue('en', 'suite.refusal.proofTargetCheckPanel')).toBe(PANEL_POINTER.en('{{panel}}', '{{ask}}'));
+  });
+
+  it("2-D's line nests its button's label; no other table names that button", () => {
+    expect(valueOf('2d', 'he', 'input.scope.proofTargetCheck')).toBe(RULED_2D_CHECK_HE.replace('הצג צלעות וזוויות שוות', '$t(actions.viewRelations)'));
+    expect(valueOf('2d', 'en', 'input.scope.proofTargetCheck')).toContain('$t(actions.viewRelations)');
+    // a refusal names only a button its builder draws: only 2-D draws «הצג צלעות וזוויות שוות» (#2181 may bring it elsewhere)
+    for (const p of PRODUCTS.filter((x) => x !== '2d')) expect(allMessages(p, 'he').filter((m) => m.includes('הצג צלעות וזוויות שוות')), p).toEqual([]);
+    expect(JSON.stringify(suiteTable('he'))).not.toContain('הצג צלעות וזוויות שוות');
   });
 });

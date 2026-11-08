@@ -151,7 +151,8 @@ A student types on a keyboard and the exam is typeset. Both reach one internal f
 
 - Any curve outside R174's closed family.
 - A request to prove («הוכיחו כי …», «הראו כי …»). It is refused as a claim to prove and never recorded
-  as a given ([FR-SU-15](02w-requirements-workspace.md)).
+  as a given, and the refusal sends the student to the claim's quantities in the «נתונים» panel
+  ([FR-SU-15](02w-requirements-workspace.md), [ADR-W-192](06w-decisions-workspace.md#adr-w-192)).
 - A letter or a word in a script this tool does not read — Cyrillic with no Latin twin, Arabic, an
   accented Latin letter. It is refused quoting the letters as typed, in the same two sentences every builder
   uses ([FR-SU-18](02w-requirements-workspace.md)), and no longer handed to the model. A look-alike letter

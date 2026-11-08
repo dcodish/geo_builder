@@ -9,7 +9,13 @@
  * (On 5edeeca1 «prove that w is real» was even RECORDED as a ✓ claim about a number named "prove".)
  * Now each is refused as `proof-target`, quoting the proof sentence, and nothing of it is recorded. How a BARE
  * statement («w ממשי») is read is not this file's to lock: ruled to change (#2338, 2026-10-17).
+ *
+ * #2492 ([ADR-W-192](../../docs/06w-decisions-workspace.md#adr-w-192)): the refusal ends by saying where the claim can be
+ * checked: the data panel, whose ask box answers the claim's quantities (operator ruling 2026-10-24, ballot e19). The
+ * panel and its button are named by the keys the App draws them with.
  */
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { editLine, submitLine, toggleLine } from '../app/submit';
 import { errorText } from '../app/errorText';
@@ -18,6 +24,7 @@ import { CATALOG } from '../parser/catalog';
 import { useComplexStore } from '../store/useComplexStore';
 import { findProofTarget } from '../../shell/proofTarget';
 import { proofTargetFaults, type ProofGate } from '../../shell/__tests__/fixtures/proof-target-rows';
+import { PANEL_POINTER, PROOF_TARGET_SENTENCE, panelDrawnFaults } from '../../shell/__tests__/fixtures/proof-target-check-2492';
 
 type T = (k: string, o?: Record<string, unknown>) => string;
 const plain = (f: T): T => (k, o) => f(k, o).replace(/[⁦-⁩]/g, '');
@@ -52,8 +59,7 @@ const gate: ProofGate = (line) => {
   return { proof: v.err?.key === 'proof-target', recorded: v.recorded, text: v.text };
 };
 
-const REFUSAL = (sentence: string) =>
-  `זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «${sentence}»`;
+const REFUSAL = (sentence: string) => `${PROOF_TARGET_SENTENCE.he(sentence)} ${PANEL_POINTER.he('נתונים', 'שאלו')}`;
 
 beforeEach(() => st().resetSession());
 
@@ -78,11 +84,20 @@ describe('#1870 — complex refuses a proof target at the submit gate (the share
     expect(st().lines).toEqual(BASE);
   });
 
-  it('the English refusal is 2-D\'s English sentence', () => {
+  it("the English refusal is 2-D's English sentence, then the data-panel pointer", () => {
     verdict('prove that w is real');
-    expect(errorText(st().lastError!, tEn)).toBe(
-      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «prove that w is real»',
-    );
+    expect(errorText(st().lastError!, tEn)).toBe(`${PROOF_TARGET_SENTENCE.en('prove that w is real')} ${PANEL_POINTER.en('Data', 'Ask')}`);
+  });
+
+  // #2492: the panel and the button the refusal names are this App's, read from the keys it draws them with
+  it.each([
+    ['he', t],
+    ['en', tEn],
+  ] as const)('the refusal names the panel and the ask button by their own labels (%s)', (_lng, tr) => {
+    verdict('הוכיחו כי |z1| = |z2|');
+    expect(errorText(st().lastError!, tr).endsWith(tr('suite.refusal.proofTargetCheckPanel', { panel: tr('dataTitle'), ask: tr('askAdd') }))).toBe(true);
+    const app = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf8');
+    expect(panelDrawnFaults(app, { panel: 'dataTitle', ask: 'askAdd' })).toEqual([]);
   });
 
   it('no line of the complex catalog reads as a proof target', () => {

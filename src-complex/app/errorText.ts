@@ -7,19 +7,22 @@
  * where the strip, the load audit and the tests all call the same function.
  */
 import type { ReservedConstant } from '../model/naming';
+import { proofTargetPanelText } from '../../shell/proofTarget';
 import type { Translate } from '../model/why';
 import { whyText } from '../replay/scene2';
 import type { InputError } from '../store/useComplexStore';
 
+/** A refusal worded by one key: every refusal but the reserved constants and the mixed number (two sentences each, below)
+ *  and the claim to prove (two sentences, `errorText`). */
+type OneKeyError = Exclude<InputError, { key: 'proof-target' }>;
+
 /** Every refusal but the reserved constants, which choose between two sentences below. */
-const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-number'>, string> = {
+const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-number' | 'proof-target'>, string> = {
   // #1868 (ADR-W-151) — the one ruled sentence, in every builder, with no echo of the line: a suite key
   'not-handled': 'suite.refusal.notUnderstood',
   // #1919 — the two ruled sentences for a script this tool does not read, 2-D's wording verbatim
   'unread-name': 'errUnreadName',
   'unread-word': 'errUnreadWord',
-  // #1870 (ADR-CX-083) — a claim to prove: 2-D's sentence verbatim, as the other three builders say it
-  'proof-target': 'errProofTarget',
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
   'wrong-app': 'errWrongApp',
@@ -47,7 +50,7 @@ const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-
 const RESERVED_KEY: Record<ReservedConstant, string> = { i: 'errReservedI', o: 'errReservedO' };
 
 /** The locale key a refusal is worded by. */
-const keyOf = (e: InputError): string =>
+const keyOf = (e: OneKeyError): string =>
   e.key === 'reserved-constant'
     ? RESERVED_KEY[e.constant]
     : // #2247 (ADR-CX-081) — analytic's two sentences: a decimal is offered only when the fraction terminates
@@ -78,4 +81,9 @@ const errParams = (e: InputError, t: Translate): Record<string, string> =>
       ? { detail: e.detail, reason: whyText(e.why, t) }
       : { detail: e.detail };
 
-export const errorText = (e: InputError, t: Translate): string => t(keyOf(e), errParams(e, t));
+/**
+ * The sentence a refusal reaches the student as. A claim to prove (#1870, ADR-CX-083) reads the suite's sentence, then where
+ * the claim can be checked (#2492, ADR-W-192): this panel's ask box, named by the labels the panel and its button carry.
+ */
+export const errorText = (e: InputError, t: Translate): string =>
+  e.key === 'proof-target' ? proofTargetPanelText(t, e.detail, { panel: t('dataTitle'), ask: t('askAdd') }) : t(keyOf(e), errParams(e, t));

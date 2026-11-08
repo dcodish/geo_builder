@@ -13510,6 +13510,8 @@ A centre named in the sentence («למעגל O») is visible as before.
 
 ## ADR-561 — «הוכיחו כי …» is refused as a claim to prove, never committed as a given (#1666, 2-D side)
 
+**⚠ Amended by [ADR-W-192](06w-decisions-workspace.md#adr-w-192) (2026-11-08, #2492):** the note is `proofTargetNote(sentence)`: the suite sentence `suite.refusal.proofTarget`, then the operator's line `input.scope.proofTargetCheck`, «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות.», the button's label nested from `actions.viewRelations`. The ✎ edit seam renders the same note with `renderNote`. `input.scope.proof-target` is deleted.
+
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*
 
 **Requirements:** docs/02w FR-SU-15 (new — the workspace promise, realised here for 2-D) · **Design:** docs/04w — "Proof targets" (the shared rule); none beyond it here

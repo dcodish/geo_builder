@@ -3,6 +3,7 @@
  * test can drive it: every message must name only what the student wrote, `shell/studentText`).
  */
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
+import { PROOF_TARGET_KEY } from '../../shell/proofTarget';
 import type { StoreError3 } from '../store/store3';
 
 /** ADR-3D-318: an engine id's student-facing letters — `circle-ABCD` → `ABCD`; a bare label is itself.
@@ -84,9 +85,11 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // two-key branch, and with it the «ואחר כך:» connective and the hard-coded offset, are gone.
     case 'right-angle-vertex':
       return t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle, more: err.more });
-    // #1666: the tool draws the givens; a claim to prove is named and left out.
+    // #1666: the tool draws the givens; a claim to prove is named and left out. #2492 (ADR-W-192): the suite's sentence.
+    // No «where to check it» line here yet: 3-D's ask box shows no length on a figure with no stated size, so an
+    // equal-lengths claim has nothing to compare there; that arm waits for the operator (#2492).
     case 'proof-target':
-      return t('err.proofTarget', { sentence: err.sentence });
+      return t(PROOF_TARGET_KEY, { sentence: err.sentence });
     // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
     case 'radian-angle':
       return t('err.radianAngle');

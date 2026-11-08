@@ -5151,6 +5151,8 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 
 ## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
 
+**⚠ Amended by [ADR-W-192](#adr-w-192) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
+
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
 
 **Requirements:** docs/02w FR-SU-15 (new — one promise for every builder); docs/02c R124 notes the shared rule · **Design:** docs/04w — "Proof targets" (new section). **Product:** workspace (2d + 3d + analytic).
@@ -7126,3 +7128,45 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 **Locks.** `server/__tests__/fix-test-shape.test.ts` (the classifier's cases, and no new unexplained case file); `server/__tests__/test-tiers.test.ts` (`fileTimesPath`, `costByKind`, `caseExcludes`); the scenario shards and `src/__tests__/fixtures.test.ts` (the step nets and the no-room verdict, per scenario and per fixture); `src3d/__tests__/decide-submit3-parity-1394-1.test.ts` (the four goldens partition the corpus); the goldens and floors of every harvest, which the frozen `folded-sequences.json` keeps whole.
 
 **Behaviour change for a student:** none.
+
+## ADR-W-192 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
+
+**Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»*; [02](02-requirements.md) FR-RV-1 (the refusal names the control); [02c](02c-requirements-analytic.md) *Out of the language*; [02d](02d-requirements-complex.md) FR-KN-2 · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* and § *Proof targets*; [04d](04d-design-complex.md) (the complex wording site)
+
+**Context, measured at pickup (`0b7edbe4`).**
+- **The four refusals were still byte-identical**, Hebrew and English: «זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «…»». The slot was `{{sentence}}` in 2-D and 3-D and `{{detail}}` in analytic and complex. 2-D worded it in two places (`decidePreParse` and the ✎ edit seam, which called `t()` itself).
+- **2-D's button** is `actions.viewRelations`, «הצג צלעות וזוויות שוות» / "Show equal sides & angles", rendered in `src/App.tsx` inside the data panel once a given exists. #2181 (the marks panel that may replace it) is still open, and the button has not been renamed or replaced.
+- **The other three have no such button.** Each has a data panel headed «נתונים» / "Data" (`dataPanel.title` in 3-D, `dataTitle` in analytic and complex) with an ask box whose button reads «שאלו» / "Ask" (`query.add`, `askAdd`).
+- **No ask box judges a typed claim.** Each answers the claim's QUANTITIES, where the givens fix them. Measured through each builder's real readers (3-D `answerQuery` on `submit`'s figure, analytic `ask` on `derive`, complex `askRowsOf` on `deriveLines`), as the row reads:
+
+| builder | figure | typed in the ask box → what the row says |
+| --- | --- | --- |
+| 3-D | «משולש ABC» | «AB = AC» → «לא זוהה — נסו A, מישור ABC, …» · «\|AB\|» → «תלוי בקנה המידה (קבעו גודל)» · «\|AC\|» → «לא נקבע על ידי הנתונים» |
+| 3-D | «משולש ABC · AB = 5 · AC = 5 · BC = 6» | «\|AB\| = 5», «\|AC\| = 5»; the relations section lists «\|AB\| = \|AC\| = 5» |
+| 3-D | «פירמידה ישרה ABCDS שבסיסה ריבוע» (SA = SB is forced) | «\|SA\|», «\|SB\|» → «לא נקבע על ידי הנתונים»; «\|SA\| - \|SB\|», «\|SA\| / \|SB\|» → «לא זוהה» |
+| 3-D | «מקבילית ABCD» / «תיבה ABCDA'B'C'D'» | «∠(AB, CD) = 180°» · «∠(AB, D'C') = 0°» |
+| 3-D | «פירמידה SABCD שבסיסה ריבוע · SA מאונך למישור ABCD» | «∠SBC = 90°» |
+| analytic | «משולש ABC» | «AB = AC» → «לא זוהה — נסו A, AB, שטח ABC, שיפוע AB» · «AB», «AC» → «עדיין לא נקבע מהנתונים» |
+| analytic | «A(0,0) · B(4,0) · C(2,5) · משולש ABC» | «AC = √29», «BC = √29» |
+| analytic | «A(0,0) · B(4,0) · C(5,3) · D(1,3) · מרובע ABCD» | «שיפוע AB = 0», «שיפוע CD = 0» |
+| analytic | «מקבילית ABCD» (no coordinates) | «שיפוע AB», «שיפוע CD» → «עדיין לא נקבע מהנתונים»; «AB - CD = 0» |
+| complex | «z1 = 3+4i · z2 = 4+3i» | «\|z1\| = \|z2\|» → «זהו נתון, לא שאלה — הקלידו אותו בתיבת הנתונים» · «\|z1\| = 5», «\|z2\| = 5» |
+| complex | «z1 = 0 · z2 = 4 · z3 = 5+3i · z4 = 1+3i» | «Im((z2-z1)/(z3-z4)) = 0»; «arg(z2 - z1)» → «לא זוהה» |
+
+So in analytic and complex, the claims their questions carry (lengths and slopes from coordinates, moduli and parts of numbers) have quantities the panel shows. In 3-D, angle, perpendicular and parallel claims do, but an equal-lengths claim on a figure with no stated size does not: every length reads «תלוי בקנה המידה» or «לא נקבע על ידי הנתונים», and no comparison of two lengths is read.
+
+**Class.** *Every* proof-target refusal should tell the student where the claim can be checked, and name only what that builder draws. One member per builder. The scope message `input.scope.proof` (2-D's answer to a failed parse with no claim, e.g. «הוכחה») quotes no claim, so it has nothing to point at and is not a member.
+
+**Decision.**
+1. **One suite sentence.** `suite.refusal.proofTarget` in `shell/locales/{he,en}.json`, the claim in `{{sentence}}`, ADR-W-107's text unchanged. Every builder reads it: 2-D through its note, 3-D's `errorText3`, analytic's and complex's `errorText`. The four product keys are deleted (`input.scope.proof-target`, `err.proofTarget`, `errProofTarget` ×2). `suite-locale.test.ts` forbids a copy coming back.
+2. **2-D's line, the operator's sentence.** `input.scope.proofTargetCheck`: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור $t(actions.viewRelations).» / "You can check whether the claim is true by pressing the $t(actions.viewRelations) button." The label is NESTED from the key that labels the button, so it renders byte for byte as his sentence and follows the button if #2181 renames it. `proofTargetNote(sentence)` (`src/app/decideDeterministic.ts`) builds the note, the line as its `also`. The submit seam and the ✎ edit seam both render it with `renderNote`, so they cannot word it apart.
+3. **The data-panel line, one suite key.** `suite.refusal.proofTargetCheckPanel` (wording by the session, ADR-W-174): «ניתן לבדוק את נכונות הטענה בחלונית «{{panel}}»: הקלידו שם כל גודל שבטענה ולחצו «{{ask}}», והשוו בין התשובות — למשל, עבור AB = AC שאלו על AB ועל AC.» / "You can check whether the claim is true in the «{{panel}}» panel: type each quantity in the claim there, press «{{ask}}», and compare the answers — for example, for AB = AC ask for AB and for AC." It sends the student to the claim's QUANTITIES, because no ask box judges the claim itself (above). `{{panel}}` and `{{ask}}` are the builder's OWN labels, read from the keys its App draws them with; nothing retypes them. `shell/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`, which analytic's and complex's `errorText` call with `t('dataTitle')` and `t('askAdd')`. The line reads the same in both builders today, so it is one key.
+4. **3-D: the suite sentence alone, for now.** The ruling sends 3-D to its data panel too, and the pickup check required escalating any builder whose panel cannot answer a typical claim. 3-D's cannot answer an equal-lengths claim on a figure with no stated size, so its arm is with the operator on #2492 (the options are there). Its refusal text is unchanged; it reads the suite key.
+5. **Typed first, on an empty canvas** (pickup check 5): the refusal is the same in every builder. In 2-D the button is not on screen until a given exists (the data panel shows it with the first given). No carve-out: the operator asked for "all cases". It is a play-sheet case.
+
+**Sibling audit.** All four builders were measured at their real wording sites (above). No other refusal quotes a claim. The shared quote check (`proof-target-rows.ts`) now reads the claim with its closing guillemet, so a pointer that teaches with the same symbols («AB = AC») cannot pass for the quote.
+
+**Locks.** `src/app/__tests__/proof-target-1666.test.ts` (2-D: both seams render the whole refusal; the nested label, both languages, through the real instance; the operator's sentence byte for byte; `App.tsx` draws `t('actions.viewRelations')`; the empty canvas). `src-analytic/__tests__/proof-target-1666.test.ts` and `src-complex/__tests__/proof-target-1666.test.ts` (the panel line with each builder's own labels, both languages; the App draws `<DataPanel title={t('dataTitle')}>` and `<AskLane addLabel={t('askAdd')}>`, through `shell/__tests__/fixtures/proof-target-check-2492.ts`). `src3d/__tests__/proof-target-1666.test.ts` unchanged (the sentence, now from the suite key). `shell/__tests__/suite-vocabulary.test.ts` (the `proofTarget` role leaves the table: the suite texts, the four retired keys, and no table outside 2-D naming «הצג צלעות וזוויות שוות»).
+
+**Behaviour change for a student:** a «הוכיחו…» line is refused as before, and the message now ends by saying how to check the claim. In 2-D: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות.» In analytic and complex: ask the claim's quantities in the «נתונים» panel and compare. In 3-D: unchanged until the operator rules.

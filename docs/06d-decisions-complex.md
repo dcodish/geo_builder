@@ -4373,6 +4373,8 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 
 ## ADR-CX-083 — A claim to prove is refused, never read: complex adopts ADR-W-107 (#1870)
 
+**⚠ Amended by [ADR-W-192](06w-decisions-workspace.md#adr-w-192) (2026-11-08, #2492):** the refusal is the suite sentence `suite.refusal.proofTarget`, then `suite.refusal.proofTargetCheckPanel` naming this builder's «נתונים» panel and «שאלו» button by their own keys (`errorText` → `proofTargetPanelText`). `errProofTarget` is deleted.
+
 **Status:** accepted, 2026-10-17 · **Issue:** [#1870](https://github.com/dcodish/geo_builder/issues/1870) (feature, `P2`, `complex`) · fix round #2291, stream O · branch `feat/1870-complex-proof-verb` from `main` @ `b0e9dbea` · adopts [ADR-W-107](06w-decisions-workspace.md#adr-w-107) (Amendment 1)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 (the ⚠ marker drops; D3's carve-out stated) and its parity row (now **Same**) · [02d](02d-requirements-complex.md) FR-KN-2 and G8 (the #1870 markers drop; both stamped «⚠ Ruled to change» for #2338, see the pre-merge note) ·
 **Design:** [04d](04d-design-complex.md), Boundaries — "A claim to prove" ·
