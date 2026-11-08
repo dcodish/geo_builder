@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-08T00:00:00.000Z",
+  "name": "free-plane-membership-2592",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור π3",
+      "cmds": [
+        {
+          "type": "free-plane",
+          "name": "π3"
+        }
+      ]
+    },
+    {
+      "utterance": "A על המישור π3",
+      "cmds": [
+        {
+          "type": "on-planes",
+          "id": "A",
+          "plane": "π3"
+        }
+      ]
+    }
+  ]
+}

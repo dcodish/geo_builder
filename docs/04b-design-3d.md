@@ -826,6 +826,14 @@ the frame of the first solid's base, apex or top above it (`solidFloorFrame3`, A
 funnel** classifies which gauge components are *provably* free, which licenses
 [`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
 
+**What places the figure: `hasAbsoluteFrameObject` (#367, ADR-3D-095; #2592, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435)).**
+The placement stops being a gauge only when something is stated in absolute coordinates: an equation plane, a typed
+parametric line, a coordinate point or pin, a relation to a coordinate plane or axis. Then it is sampled
+(`placementSampled3`), counted (+6) and the axes are drawn (`scene3`'s `laneA` asks the same predicate). A **free**
+object is never one: a free plane (`PlaneDef.free`) and a free line have their own DOFs sampled relative to the figure
+by their resolvers, so sampling the figure's six as well would sample one relative pose twice. Declaring or pinning
+one leaves the figure where it was. A free plane given an equation stops being free and counts.
+
 **The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
 offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
 

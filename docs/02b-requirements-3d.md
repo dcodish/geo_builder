@@ -103,13 +103,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   An unanchored figure is normalised onto the floor, so «הציגו תצורה אחרת» changes only its shape (operator:
   *"Keep it flat on the floor"*). A solid is no exception: its base stays on the floor and its apex or top above it,
   "until they are placed by user somewhere" (operator 2026-10-31, #2630). A figure whose orientation the student stated
-  (a coordinate, a component given such as «AB = (1,2,3)», an equation, a component sign) is never turned. **A number drawn on the canvas must be seed-invariant knowledge** — the
+  (a coordinate, a component given such as «AB = (1,2,3)», an equation, a component sign) is never turned. A plane
+  declared by name only («מישור π3») places nothing: declaring it, or tying it to the figure («A על המישור π3»,
+  «π3 ∥ ABC»), never moves the figure and draws no axes; only the plane moves (#2592). **A number drawn on the canvas must be seed-invariant knowledge** — the
   shared statement is [FR-DP-3](02w-requirements-workspace.md).
   An **anchored** figure (an absolute object, a coordinate, or a stated vector fixes it in space) that the givens
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
   AB to a new angle. The first drawing may no longer sit square on the floor."*; 2026-10-24, #2504 d03b).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400.
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435).
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:
@@ -756,13 +758,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
-  on the canvas are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated
+  on the canvas (a coordinate, an equation, a typed line; a plane declared by name only is not one) are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated
   relation consumes is **measured on the resolved figure, never inferred from a count** — a relation the
   construction already satisfies (a parallelogram's second parallel pair, a kite's mirrored sides)
   consumes nothing. An anchored figure's **leftover turn or size**, measured on the resolved figure, is
   counted too («קובייה …» · «A(0,0,0)» reads «דרגות חופש: 4»: three for turning, one for size); a pure
   slide of the whole figure is not (operator 2026-10-24, #2505 e23, #2504 d03a).
-  - Sources: ADR-3D-247, ADR-3D-248, ADR-3D-379.
+  - Sources: ADR-3D-247, ADR-3D-248, ADR-3D-379, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435).
 - **FR-RD-10 (Must)** — **A stated right angle against a PLANE is the knee.** «π1 ניצב ל-π2», «המישור
   ABC ניצב למישור ABB'», «הזווית בין המישורים π1 ו-π2 היא 90» — and the line × plane spellings at 90°
   («הזווית בין AA' למישור ABC היא 90», «הזווית בין הישר ℓ1 למישור π1 היא 90») — draw the textbook knee:
