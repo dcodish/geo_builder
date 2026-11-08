@@ -549,6 +549,11 @@ const SEEDED: SeededCorpus = {
   'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
   // #1542 (ADR-3D-429): the operator's exact sequence; the geometry, the chip and the lead are asserted in issue-1542.test.ts
   'plane-equation-sentence-1542.geo3.json': ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'],
+  // #2490 (ADR-3D-434): the operator's exact sequence (round #2466 T38) and #2478's — a pyramid over a base that already
+  // exists is a bound solid (before: refused «A» כבר מוגדר). The bound representation, the apex's freedom and the host's
+  // stability are asserted in engine3.test.ts; these are the build + drift net.
+  'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
+  'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

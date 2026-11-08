@@ -861,12 +861,30 @@ rotation separately (`placementSampled` is their disjunction); a frame claim sof
 `placement-not-fixed` only when a component it READS was sampled.
 
 **A figure that shares no point with another carries its own similarity (#1855, [ADR-3D-355](06b-decisions-3d.md#adr-3d-355)).**
-Two solids never share a vertex (`apply` refuses a solid over existing ids), so every solid is its own connected
-component. Solid 0 rides the construction's gauge; every further solid appends seven dims, `[ln s, w, t]`
+A solid that owns all its vertices is its own connected component. Solid 0 rides the construction's gauge; every
+further such solid appends seven dims, `[ln s, w, t]`
 (`componentSimilarityDims`, applied about its canonical centroid by `evaluateSolidsAndPoints`), read through
 `solidDimsAt` by the sampler, the pivot's `perSolidDims` and `freeDofCount3`, and counted by `freeDims`. They are
 ordinary dims: a length on each figure, or a relation between them («AB ∥ DE»), is driven, and with nothing
 stated they resample. A one-solid figure appends nothing and is bit-identical.
+
+**A pyramid over an existing base is a BOUND solid (#2490, [ADR-3D-434](06b-decisions-3d.md#adr-3d-434)).** It is the
+one solid that shares points, and only over letters the row's text spells (the fold marks a run the parser lettered by
+default `lettersUnstated`, which never binds): `SolidObj.bound` lists its base ids, which keep their own `PointDef` (a cube's vertices,
+a stated square's), and only the apex is its `solid-vertex`. It has no layout and no similarity of its own. Its dims
+are the apex's (`boundSolidDims3`): the foot's in-plane offset `(u, v)` and the height `h`, in units of the ring's RMS
+radius, `h` sampled on either side of a solid's face; over a flat host (a stated polygon, `flatHostOf3`) the sides
+are mirror images, so `h` stays on the polygon's up side and the floor normalisation lays the pyramid's base on the
+floor, apex above (`floorSolid3`); a right kind keeps `h` alone and seats the foot at the ring's
+circumcentre (`boundSolidDimCount3`, the count `freeDims` reads). `boundApexPosition3` fits the frame to the ring's
+resolved positions (centroid, Newell normal, the first side as `e1`), so the apex rides the host's gauge. The solid
+pass places it when its ring is solid vertices or coordinates; otherwise the point pass places it at the apex's turn,
+which follows every ring point because the apex was declared after them. The pivot needs no layout of its own: the
+three dims join the flat dim vector like any shape dim, so a bound pyramid contributes 0 gauge unknowns and 3 dims.
+`pointParents3` gives the apex its ring as parents, `placementFixers3` adds the ring's fixers, and `declaredRings3`
+counts the bound base as a declared ring, so the ring checks (skew, crossing) judge it. The renderer draws a shared
+edge once, lets no face both solids carry decide an edge's dashing, and dashes an edge inside a solid it shares
+vertices with (`hiddenEdgeKeys`).
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 

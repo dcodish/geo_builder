@@ -879,6 +879,24 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   plane stated on a circle the figure determines is refused. A circle draws no plane of its own (#2126). A stated
   radius shows in the data panel, «רדיוס O = 3», or «רדיוס המעגל = 3» for a circle with no letter, as in 2-D; no number
   is drawn on the canvas (ADR-3D-420).
+- **FR-SP-29 (Must)** — **A pyramid may be declared over a base that already exists** (#2490, #2478, operator
+  2026-10-24: *"there is no reason a pyramid cannot be drawn here"*). «קובייה ABCDA'B'C'D'» · «פירמידה ABCDS» builds a
+  pyramid on the cube's face ABCD, and so does every spelling («פירמידה SABCD», "the pyramid ABCDS", «פירמידה ישרה
+  ABCDS» with S over the face's centre, «… שבסיסה ריבוע») and every base that already exists: another face of a cube,
+  box, prism or pyramid, a planar ring such as «ABC'D'», a triangle inside a face («פירמידה ABCS»), or a stated
+  polygon («ריבוע ABCD» · «פירמידה ABCDS שבסיסה ריבוע», «מלבן ABCD», «משולש ABC» · «טטראדר ABCD»). The apex is new and
+  free (3 DOF, 1 when «ישרה») and resampled by «הציגו תצורה אחרת» (ADR-052): on a solid's face, on either side of it
+  (outside the cube or inside it); on a stated polygon, above it, the base on the floor (FR-SP-4). The existing figure
+  does not move. The base shape the pyramid's words state is a given about the ring (FR-SP-5): it drives a free
+  ring («מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» makes it a square) and verifies a determined one. Height, volume, an
+  edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
+  ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
+  solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for
+  that, naming the line and what placed the letters, never «"A" כבר מוגדר»; a base whose letters lie on one line is
+  refused as a flat pyramid (FR-RD-7's sentence). No created-point notice is shown for the
+  apex. Unchanged: «טטראדר ABCD» inside one face, a base only partly drawn, a pyramid over letters that all exist, and
+  an unlettered pyramid («פירמידה ישרה שבסיסה ריבוע» over an existing ABCD): only letters the student typed bind.
+  - Sources: ADR-3D-434, ADR-3D-080, ADR-3D-172; #2490, #2478.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

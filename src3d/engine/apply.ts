@@ -12,7 +12,7 @@ import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -297,7 +297,8 @@ export function freeDims(c: Construction3): number {
   let n = 0;
   // #1855 (ADR-3D-355): every solid after the first carries its own similarity (7 dims) — separate
   // figures' relative size and orientation are free (`componentSimilarityDims`, evaluate.ts).
-  c.solids.forEach((s, i) => { n += solidDimCount(s) + (i > 0 ? 7 : 0); });
+  // #2490 (ADR-3D-434): a BOUND solid carries its apex's dims alone — its frame is its ring's, so no similarity either
+  c.solids.forEach((s, i) => { n += s.bound ? boundSolidDimCount3(s.kind) : solidDimCount(s) + (i > 0 ? 7 : 0); });
   for (const r of c.revolutions) {
     if (r.radius === undefined) n++;
     if (r.kind !== 'sphere' && r.height === undefined) n++;
@@ -1871,6 +1872,105 @@ function placeholderYields(c: Construction3, cmd: Command3): Construction3 | nul
 }
 
 /**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — the run of a pyramid declared over a base that
+ * ALREADY EXISTS: every letter but one is a point of the figure, and that one — the APEX — is new, or (with none new) the
+ * run's one placeholder (`free3`, or a #841 `implied` rider: "no position yet", never a definition) in the apex slot. A
+ * new apex is identified by being new, never by its position in the run (ADR-3D-080 Am. 1's rule). Null when the run is not that: all
+ * new (a standalone solid), all defined (ADR-3D-080's statement), or a base only partly existing (a run with two new
+ * letters has no owner here — it keeps the `taken` refusal).
+ */
+function boundPyramidRun3(c: Construction3, ids: readonly Id[]): { base: Id[]; apex: Id } | null {
+  const absent = ids.filter((id) => !c.points.has(id));
+  const holders = ids.filter((id) => isRingPlaceholder3(c, id));
+  // a placeholder is the apex only where the template puts it (apex last): one in a base slot, with the apex letter
+  // defined, is ADR-3D-080's statement over a free corner, and that reading stands (Am. 1's fallback)
+  const holderApex = absent.length === 0 && holders.length === 1 && holders[0] === ids[ids.length - 1] ? holders[0] : undefined;
+  const apex = absent.length === 1 ? absent[0] : holderApex;
+  if (apex === undefined) return null;
+  return { base: ids.filter((id) => id !== apex), apex };
+}
+
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — A PYRAMID OVER AN EXISTING BASE IS A BOUND SOLID.
+ *
+ * «קובייה ABCDA'B'C'D'» · «פירמידה ABCDS» (the operator, round #2466 T38: *"there is no reason a pyramid cannot be drawn
+ * here"*), and «ריבוע ABCD» · «פירמידה ABCDS שבסיסה ריבוע» (#2478). The base points keep their own definitions — the
+ * cube's vertices stay the cube's, the square's stay the square's — and the solid owns its apex alone. So:
+ *
+ *  1. **The base is a flat ring over existing points**, exactly as «מרובע ABCD» states one: a free corner rides the
+ *     plane of the placed ones (#1935), and a determined ring that is not flat is the store's `ring-not-flat` refusal
+ *     (the bound base is a declared ring, `declaredRings3`), naming this line — never a label that was fine.
+ *  2. **The base SHAPE the kind states is a statement about that ring** (M1): the family's relations (`quadShapeConstraints`,
+ *     an equilateral triangle's two equal sides) drive a free ring and verify a determined one — «מלבן ABCD» · «פירמידה
+ *     ABCDS שבסיסה ריבוע» makes the rectangle a square; a ring already KNOWN as that kind takes nothing new; a disjoint
+ *     kind is refused `shape-disjoint`, as a flat «X ABCD» over it would be.
+ *  3. **The solid**: its stated kind, its ids in template order (base, then apex), `bound` = the base, and the apex a
+ *     `solid-vertex` of it. Placed in the ring's frame with the apex's own dims (evaluate's `boundApexPosition3`).
+ *
+ * A right kind's rightness is the placement's (the foot at the ring's circumcentre); what «ישרה» entails about the base
+ * — the cyclic fix — rides the parser's own commands after this one, as on a standalone pyramid.
+ */
+function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], apex: Id): ApplyResult3 {
+  const ids = [...base, apex];
+  const next = clone(c);
+  // 1. the base is flat: a free corner rides the placed corners' plane
+  flattenRingFreeVertices3(next, base);
+  // 2. the base shape the kind states
+  const spec = QUAD_PYRAMIDS[cmd.kind];
+  const stated = spec && spec.base !== 'quad' && base.length === 4 ? declaredKind3({ base: spec.base, ...(cmd.baseAdj ? { adj: cmd.baseAdj } : {}) }) : null;
+  let lowered: Command3[] = [];
+  if (spec && stated) {
+    const known = knownQuadKind(next, base);
+    const rel = known ? kindRelation(known, stated) : null;
+    if (known && rel === 'excludes') return { ok: false, error: { code: 'shape-disjoint', stated, actual: known } };
+    const holds = rel === 'implies' || (known !== null && narrowImplies(known, baseKind3(spec.base)));
+    const pairRing = cmd.baseSeat ? [base[1], base[2], base[3], base[0]] : base;
+    if (!holds) lowered = quadShapeConstraints(spec.base, pairRing);
+  } else if (cmd.kind === 'pyramid3e') {
+    const [a, b, d] = base;
+    lowered = shapeInternal3([
+      { type: 'length-rel', a1: a, b1: b, rhs: { pair: [b, d] }, c: 1 },
+      { type: 'length-rel', a1: b, b1: d, rhs: { pair: [d, a] }, c: 1 },
+    ]);
+  }
+  let r: ApplyResult3 = { ok: true, next };
+  for (const k of lowered) {
+    r = applyCommand3(r.next, k);
+    if (!r.ok) return r;
+  }
+  // ...and the ring's DRAWING PREFERENCE is judged against what is now stated over it in total (#1792's rule for a
+  // circle through a ring): «מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» is a square, so the rectangle's "never look like
+  // a square" fails at every seed and the seed sweep paid its whole budget on every later line (8 s for «|SA| = 5»).
+  // The narrower kind's preference replaces it; a square has none. The seed drawn is the one the sweep fell back to.
+  const requirements = !stated
+    ? r.next.requirements
+    : r.next.requirements.flatMap((req) => {
+        if (req.kind !== 'quad-general' || !sameRing(req.ids, base)) return [req];
+        const meet = declaredKindOf([declaredKind3(req), stated], false);
+        if (!meet || meet === declaredKind3(req)) return [req];
+        const narrower = (Object.keys(QUAD_BASE_DIMS) as QuadBase[]).find((b) => baseKind3(b) === meet);
+        if (!narrower) return [req];
+        return QUAD_BASE_DIMS[narrower] === 0 ? [] : [{ ...req, base: narrower }];
+      });
+  // 3. the solid — on fresh arrays: a memo keyed by the lowering's own `solids` / `points` (`solidDimsAll3`) stays true
+  const at = (i: number): Id => ids[i];
+  const solid: SolidObj = {
+    kind: cmd.kind,
+    ids,
+    edges: edgeIndices(cmd.kind).map(([i, j]) => [at(i), at(j)] as [Id, Id]),
+    faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
+    ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}),
+    ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}),
+    bound: [...base],
+  };
+  const out: Construction3 = { ...r.next, solids: [...r.next.solids, solid], points: new Map(r.next.points), requirements };
+  // a yielding placeholder keeps its slot in the point order (a point defined from it later still follows it); a new
+  // apex is appended, after every base point it is placed from
+  out.points.set(apex, { kind: 'solid-vertex', solid: out.solids.length - 1, index: base.length });
+  return { ok: true, next: out };
+}
+
+/**
  * How deep the reducer is inside its own lowerings.
  *
  * The ambiguity question below is about **the sentence the student submitted**, and several commands
@@ -2249,6 +2349,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         ...(Object.fromEntries((Object.keys(VERTEX_COUNT) as SolidKind[]).filter(isQuadPyramid).map((k) => [k, 4])) as Partial<Record<SolidKind, number>>),
       };
       const baseN = PYR_BASE[cmd.kind];
+      // #2490 (ADR-3D-434): a pyramid whose BASE already exists and whose apex is its own — a new letter, or a
+      // placeholder that yields (#841) — is a BOUND solid. Owned here, before the all-existing statement below and the
+      // `taken` refusal, which blamed a base label that was fine («A» כבר מוגדר — ADR-3D-172's defect, solid edition).
+      // Only over letters the student TYPED: an unlettered noun the parser lettered by default keeps today's reading.
+      if (baseN !== undefined && cmd.ids.length === baseN + 1 && !cmd.lettersUnstated) {
+        const run = boundPyramidRun3(c, cmd.ids);
+        if (run) return applyBoundPyramid3(c, cmd, run.base, run.apex);
+      }
       // NOT a statement: ids that are exactly an existing solid's id SET (a CONTRADICTING
       // re-declare — pyramidPar vs pyramid4g on SABCD) or that lie within ONE FACE of an
       // existing solid (flat by construction — «טטראדר ABCD» over a cube's base) keep the
@@ -2753,10 +2861,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ambiguity refusal, and a solid with no derivable apex (prism/box) refuses `bad-solid` —
       // its height is not a vertex-to-base perpendicular, and guessing a vertex would assert a
       // figure the student never stated (ADR-052).
-      if (!cmd.from && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      //
+      // #2490 (ADR-3D-434): the apex-less height names THE PYRAMID (the parser admits it only with that noun, or with a
+      // value and no noun), so with several solids it is the figure's ONE pyramid when there is one — the 2026-08-26
+      // ruling every noun-only solid statement already follows (`resolveSolidSubject`): «קובייה ABCDA'B'C'D'» ·
+      // «פירמידה ABCDS» · «גובה הפירמידה». Several pyramids, or none, stay the honest refusal.
+      let subject: SolidObj | null = c.solids.length === 1 ? c.solids[0] : null;
+      if (!cmd.from && !subject) {
+        const one = resolveSolidSubject(c, 'pyramid', []);
+        if (one.kind !== 'solid') return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+        subject = one.solid;
+      }
       let from = cmd.from;
       if (!from) {
-        const s0 = c.solids[0];
+        const s0 = subject!;
         const ring = baseRingOf(s0);
         if (!ring || ring.length !== s0.ids.length - 1) return { ok: false, error: { code: 'bad-solid', kind: s0.kind } };
         from = s0.ids[s0.ids.length - 1];
@@ -2766,8 +2884,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // A STATED base wins (#448): «גובה מנקודה D לבסיס ABC» names the face, so resolving the solid's
       // first face instead would silently drop the student's own words onto a different plane. Only the
       // UNSTATED case needs the figure, and it stays honest about ambiguity — several solids, no answer.
-      if (!cmd.face && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
-      const face = cmd.face ?? c.solids[0].ids.slice(0, 3);
+      if (!cmd.face && !subject) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const face = cmd.face ?? subject!.ids.slice(0, 3);
       let foot: Id | null = null;
       for (const ch of 'EFGHKLMNPQRSTUVWXYZABCD') {
         if (!c.points.has(ch)) {
