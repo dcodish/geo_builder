@@ -1602,9 +1602,18 @@ export function orientationStated3(c: Construction3): boolean {
  * UNSTATED degree of freedom: where the solid sits relative to the absolute object is something the
  * student never said, so it must be sampled (ADR-052 / M4), not frozen at a value that happens to
  * put the canonical origin exactly on a line through the origin.
+ *
+ * #2592 (ADR-3D-435): a FREE plane («מישור π3», `PlaneDef.free`) is not an absolute object. It carries
+ * no absolute data: its three DOFs are sampled by `resolveFreePlane` relative to the figure, so sampling
+ * the figure's six as well samples one relative pose twice. Counting it threw an unplaced solid off the
+ * floor (and drew the axes) the moment a bare plane was declared, and the first membership or ∥/⊥ put
+ * it back: two jumps. It is the free line's rule (never counted) stated for planes. A free plane later
+ * given an equation stops being `free` and counts; one related to a coordinate plane, an axis or an
+ * equation plane counts through that other object, which this predicate reads already.
  */
 export function hasAbsoluteFrameObject(c: Construction3): boolean {
-  if (c.planes.size > 0 || c.pins.length > 0) return true;
+  if (c.pins.length > 0) return true;
+  for (const def of c.planes.values()) if (!def.free) return true;
   for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
   // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
   // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
