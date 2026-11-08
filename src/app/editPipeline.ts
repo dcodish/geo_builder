@@ -20,7 +20,8 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { ambiguousDefiniteShapeNote, juxtaposedPairNote, lettersOnScreen, proofTargetNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { renderNote } from './renderNote';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
@@ -90,10 +91,11 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     const before = replay(work.filter((f) => !afterIds.has(f.id)));
     return buildParseCtx(before.construction, before.positions);
   };
-  // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit.
+  // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit. #2492 (ADR-W-194):
+  // the same note, rendered the same way (`renderNote`, its `also` line included), so the two seams cannot word it apart.
   const proof = findProofTarget(editText);
   if (proof) {
-    setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
+    setInputNote(renderNote(proofTargetNote(proof.sentence), { t, said: editText, explain: (raw) => raw }));
     return false;
   }
   // #1837 (ADR-710): an angle written in radians is refused here exactly as at submit.
@@ -262,7 +264,8 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const wasOk = replay(store().facts, store().seed).status;
   // #1697: the edit's naming goes in its own group; LATER facts were read in the world before it, so they follow
   // the naming now (the working copy's rewrite of them — exactly what the old store-wide rename did to them)
-  store().replaceGroup(key, [...bindCmds, ...r.commands], editText.trim(), bindCmds.length ? work.filter((f) => afterIds.has(f.id)) : undefined);
+  // #1973 (ADR-797): an edit is an accept — the edited row carries the host its cevian now resolves to (or none)
+  store().replaceGroup(key, [...bindCmds, ...r.commands], editText.trim(), bindCmds.length ? work.filter((f) => afterIds.has(f.id)) : undefined, r.host);
   logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
   const after = replay(store().facts, store().seed).status;
   const orphaned = store().facts.filter((f) => wasOk[f.id] === 'ok' && after[f.id] !== 'ok' && after[f.id] !== 'disabled');

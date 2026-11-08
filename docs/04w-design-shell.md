@@ -171,8 +171,9 @@ so a migration of 3-D onto the shared core has to decide about it rather than lo
 statement's string, and `content`, its rendering. The chrome wraps `content` in
 `<div dir={textDir(text)} data-fact-text>`, using the `textDir` the product passes (required). The
 edit-in-place box takes its `dir` from the same function, per keystroke. The row's other parts sit
-outside that scope and follow the UI's direction: `lead` (the status mark), `trail` (3-D's plane
-chips), `notes` (advisories and readouts, each with its own `dir`) and `error`. A product still
+outside that scope and follow the UI's direction: `lead` (the status mark), `tag` (a quiet label beside the
+statement in its own `dir`, the cevian host of #1973), `trail` (3-D's plane chips), `notes` (advisories and readouts,
+each with its own `dir`) and `error`. A product still
 decides WHICH string is the statement (3-D: `factRowText3`) and HOW it is typeset. Shell only decides
 that the direction comes from that string. The rows and checks live in
 `shell/__tests__/fixtures/fact-row-dir-rows.tsx`, and each tree runs them against its own `textDir`.
@@ -256,6 +257,7 @@ Shell CODE holds no strings. The one exception, ruled by the operator on 2026-10
 - **Refusal voice ([ADR-W-151](06w-decisions-workspace.md#adr-w-151), #1868).** The "not understood" refusal is one suite key, `suite.refusal.notUnderstood`, with no interpolation (no echo of the line). Every builder's not-understood path reads it: 2-D's submit pipeline and `rightAngleVertexNote`, 3-D's `errorText3` for `not-understood`, analytic's and complex's `errorText` for `not-handled`. `<tree>/__tests__/not-understood-1868.test.ts` renders it through each builder's own refusal path (assertions in `shell/__tests__/fixtures/not-understood-1868.ts`); `suite-vocabulary.test.ts` holds the ruled text, the four retired keys, and the "tool's limit" frame (any message saying «מגבלה של הכלי» opens «הכלי עדיין לא יודע» and closes «— זו מגבלה של הכלי»).
 - **The already-there note ([ADR-W-152](06w-decisions-workspace.md#adr-w-152), #1990).** A line that adds nothing to the figure is answered with one suite key, `suite.notice.alreadyDrawn`, 2-D's «זה כבר קיים באיור — אין מה להוסיף.», with no interpolation. Every no-op path reads it: 2-D's `decideDeterministic` and `editPipeline`, 3-D's `already-stated` notice (none for a re-ticked muted twin), analytic's `already-known` and `already-follows`, complex's `known` note. `<tree>/__tests__/already-drawn-1990.test.ts` drives a restatement through each builder (assertions in `shell/__tests__/fixtures/already-drawn-1990.ts`); `suite-vocabulary.test.ts` holds the text and the five retired keys.
 - **The «same point» notice ([ADR-W-176](06w-decisions-workspace.md#adr-w-176), #1595; on `InfoNote` in every builder, [ADR-W-180](06w-decisions-workspace.md#adr-w-180)).** Two letters the drawn figure puts on one dot are named in one suite key, `suite.notice.converge`, 2-D's ADR-123 «{{a}} ו-{{b}} נפלו על אותה נקודה.». `shell/converge.ts` holds the shared half: `coincidentPairs(points, same)` and `convergeText(pairs, t, name?)`. Each builder passes the points its canvas labels and its own identity test (2-D `LEN_EPS` with the forcedness split and the ADR-447 filter, 3-D `samePlace3`, analytic `crossings.apart`, complex the solver's `TOL`), and reads them from the drawn derivation on every render. Locked per tree by `<tree>/__tests__/converge-1595.test.ts` (assertions in `shell/__tests__/fixtures/converge-1595.ts`).
+- **The proof-target refusal ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** One suite key, `suite.refusal.proofTarget` (ADR-W-107's sentence, the claim in `{{sentence}}`), read by every builder; the four product keys are retired. A second sentence says where the claim can be checked: 2-D's own `input.scope.proofTargetCheck` (the operator's sentence, the button's label nested as `$t(actions.viewRelations)`), and `suite.refusal.proofTargetCheckPanel` for a builder that sends the student to its data panel, whose `{{panel}}` and `{{ask}}` are that builder's own labels. `shell/proofTarget.ts` holds the two key names and `proofTargetPanelText(t, sentence, labels)`. Details under *Proof targets* below.
 
 ### Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
@@ -387,12 +389,23 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 **Not matched:** a show-verb without its complementizer («הראו את הזוויות», «הראו שני גבהים»: the "show me" imperative), «כיצד» ("how"), and «כי» / «ש» anywhere except directly after a proof verb («נתון כי», «ידוע ש-», «כך ש-»). Invisible paste controls (bidi isolates and marks) are skipped like spaces. `sentence` runs from the verb to the next sentence end (`. ; ! ?` before a space, or a line break) and leaves out an item marker, so in «נתון AB = AC. הוכיחו כי AB ⊥ AC» it is the claim alone.
 
-**Each builder calls it before its grammar** and words its own refusal (same meaning in all three: a claim to prove, not a given; the tool draws the givens and does not check proofs; type only what is given; quoting `sentence`). Nothing of the line is recorded.
+**Each builder calls it before its grammar** and refuses the line with one suite sentence, `suite.refusal.proofTarget` (a claim to prove, not a given; the tool draws the givens and does not check proofs; type only what is given; quoting `sentence` in `{{sentence}}`). Nothing of the line is recorded.
 - 2-D: `decidePreParse`, the edit seam, and `parse()`.
 - 3-D: `readStatement3`.
 - Analytic: `parseLine`.
+- Complex: `decideSubmitCx` and the edit seam.
 
-**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
+**Where the claim can be checked ([ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492).** The refusal goes on with one more sentence, composed at each builder's one wording site:
+
+| builder | the second sentence | composed in |
+| --- | --- | --- |
+| 2-D | `input.scope.proofTargetCheck`: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור $t(actions.viewRelations).», the label nested from the key that labels the button | `proofTargetNote(sentence)` (`src/app/decideDeterministic.ts`): a `DecideNote` whose `also` is the line. The submit seam and the ✎ edit seam both render it with `renderNote` |
+| analytic, complex | `suite.refusal.proofTargetCheckPanel`, with `panel` = `t('dataTitle')` and `ask` = `t('askAdd')`: the panel's heading and its ask button, as that App draws them | `proofTargetPanelText` (`shell/proofTarget.ts`), called by each `errorText` |
+| 3-D | none yet (the 3-D arm is with the operator, #2492): its ask box shows no length on a figure with no stated size | `errorText3` reads `suite.refusal.proofTarget` alone |
+
+The panel line sends the student to the claim's QUANTITIES («עבור AB = AC שאלו על AB ועל AC»), because no ask box judges a typed claim. A builder that adopts it passes its own labels; it never retypes them.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail. The quote is checked with its closing guillemet («…AB = AC»), so a pointer that teaches with the same symbols cannot pass for the quote (#2492). The pointer is locked per tree in `proof-target-1666.test.ts`: 2-D renders the operator's sentence with the label nested and checks that `App.tsx` draws `t('actions.viewRelations')`; analytic and complex render the panel line with their own labels and check that their App draws `<DataPanel title={t('dataTitle')}>` and `<AskLane addLabel={t('askAdd')}>` (`shell/__tests__/fixtures/proof-target-check-2492.ts`). `suite-vocabulary.test.ts` holds both suite texts, the retired keys, and that no table outside 2-D names «הצג צלעות וזוויות שוות».
 
 ### Angles in radians ([ADR-W-142](06w-decisions-workspace.md#adr-w-142))
 
@@ -477,6 +490,21 @@ A line that created a CIRCLE by its centre ([ADR-W-164](06w-decisions-workspace.
 `suite.notice.createdCircle` («נוצר מעגל חדש שמרכזו {{centre}} — …») instead: `CreatedNotice.circle` carries the centre,
 `createdNoticeTextOf(notice)` picks the key, and the ✕ is the same. The rows' sixth (circle) row runs for a builder that
 hands `CreatedNoticeSentences.circle`: analytic (`record.createdCircle`) and 3-D (`Derived3.createdCircles`). A circle with no centre letter carries `circle: ''` and shows `suite.notice.createdCircleUnnamed` ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420)).
+
+### The cevian host tag ([ADR-797](06-decisions.md#adr-797), [ADR-AG-430](06c-decisions-analytic.md#adr-ag-430), #1973)
+
+`shell/cevianHost.ts` words the shape a cevian was resolved in, for every builder that records one. A `CevianHost` is
+`{ ring, kind }`, where `kind` is a `HostNoun`: the ring's base noun from `hostNounOf(arity, declared kind)`. Every
+triangle is `triangle`, a quadrilateral keeps its specific noun (the adjective variants fold to it), and a larger
+ring is `n5`…`n10` or `polygon`. `hostTag(host, t)` returns the fact list's `tag` from the suite strings
+`suite.host.<kind>` («במשולש {{ring}}», "in triangle {{ring}}") and its tooltip `suite.host.title`. `cleanHost`
+is the one reader of a saved host. `heldHost(host, rings)` keeps a stored host only while the figure holds its ring
+(2-D's rows ask it, because a 2-D fact keeps its host after its ring is muted or edited away; analytic's derivation
+reports no host for such a line). Each builder decides WHICH ring (2-D in the parser, analytic at M1) and calls
+this, so the tag is one text in both (ADR-W-118 B1). The shared literal `CEVIAN_HOST_TAG` in the parity fixtures is
+what both builders' locks render.
+
+*Identifiers:* `CevianHost` · `HostNoun` · `hostNounOf` · `hostTag` · `hostTagText` · `heldHost` · `cleanHost` · `suite.host.*` · `CEVIAN_HOST_TAG`
 
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 
@@ -597,6 +625,40 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 **A hidden segment has no ink, never no existence.** Where segments are clickable, a faint dashed ghost (`data-noexport`) stays on the line so the menu can bring it back. A product's store keeps the segment in the construction.
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/segment-display-rows.ts`. Each builder's thin lock hands over a subject: `setup`, its real toggles, `ink()` read off its real rendered canvas, `measurable()` through its own measure path, `statements()`, an optional `undo` (present only where the display choice is in the undo slice: analytic yes, 2-D no), and its real save → load. The meta-lock proves each row can fail.
+
+### The crash boundary ([ADR-W-195](06w-decisions-workspace.md#adr-w-195))
+
+One error boundary for the suite, mounted by each builder's `main.tsx` around its whole app, inside its
+i18n provider. It replaces React 18's default (unmount the root: a white page) with a notice, and it is
+built ON the session seam below rather than beside it.
+
+| file | what it owns |
+| --- | --- |
+| `shell/frame/CrashBoundary.tsx` | the class boundary; the probe that records the store state of every COMMITTED render; the notice (`CrashNotice`: sentence, the error's text on a left-to-right line, «שחזור»); the dev-only 💥 trigger |
+| `shell/session/crash.ts` | the `CrashSession` contract a builder hands over (`subscribe`, `getState`, `changed`, `rollback`), the one rollback `crashSessionOf` over a zustand + zundo store, `sliceChanged`, the suite keys `CRASH_KEYS`, the dev flag `devCrashMode` |
+
+**"The last good state" is the last state a render COMMITTED.** The probe sits last inside the boundary
+and subscribes to the builder's store with `useSyncExternalStore`, so it re-renders in the same pass as
+the app and records the state in a layout effect. A pass that throws never commits, so the recorded state
+is the one that last drew. On a crash the boundary asks the builder to roll back to it.
+
+**The rollback restores the session slice, not the whole state**, by reference, through the builder's
+undo history where it can: when the failing state is one undo step past the last good one, it steps
+back through the history (the failing step lands on the redo side), and otherwise it sets the slice
+directly, as undo does. Each builder's slice is its autosave's key list (`SESSION_SLICE*`) plus any
+field its undo tracks that the autosave does not watch; the rollback also clears what that builder's own
+undo clears. It then writes the session through the builder's `persistSession…`, because the boundary
+has just unmounted the component whose effect runs the autosave; that write is what makes a reload offer
+what last drew.
+
+**Each builder wires three things**: its `crashSession…` (beside its session adapter), its `logCrash…`
+(one `kind: 'crash'` line in its DEV trace; production sends nothing), and the dev trigger gated on
+`import.meta.env.DEV` at the call site. The §5c rows (`shell/__tests__/fixtures/crash-recovery-rows.ts`)
+drive each builder's real wiring; their meta-lock runs them against broken builders, and the same file
+checks each `main.tsx` mount.
+
+**Nothing retries on its own.** «שחזור» bumps a key and re-mounts the app once; an error that recurs shows
+the notice again.
 
 ## Session, links and sharing
 

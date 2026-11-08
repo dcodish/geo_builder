@@ -151,7 +151,8 @@ A student types on a keyboard and the exam is typeset. Both reach one internal f
 
 - Any curve outside R174's closed family.
 - A request to prove («הוכיחו כי …», «הראו כי …»). It is refused as a claim to prove and never recorded
-  as a given ([FR-SU-15](02w-requirements-workspace.md)).
+  as a given, and the refusal sends the student to the claim's quantities in the «נתונים» panel
+  ([FR-SU-15](02w-requirements-workspace.md), [ADR-W-194](06w-decisions-workspace.md#adr-w-194)).
 - A letter or a word in a script this tool does not read — Cyrillic with no Latin twin, Arabic, an
   accented Latin letter. It is refused quoting the letters as typed, in the same two sentences every builder
   uses ([FR-SU-18](02w-requirements-workspace.md)), and no longer handed to the model. A look-alike letter
@@ -653,7 +654,9 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R103d — a HEIGHT is drawn on any ring that has a side opposite the apex, and which side is 2-D's choice**. *(ADR-W-118 B1: 2-D is the reference for the verdict and for the drawing.)* The trapezoid's parallel base ([ADR-169](06-decisions.md#adr-169)), else the ring's first opposite side (the draw-one steer, [ADR-263](06-decisions.md#adr-263)); a diagonal is never a target. Two shapes giving the apex different sides ASK. `cevian-no-triangle` is kept for a figure with no such side, and the **median** keeps the triangle-only host, because 2-D defers it on a ring.
 - «טרפז ABCD» · «AE גובה» → the foot on DC · «מקבילית ABCD» · «AE גובה» → the foot on BC
 - «מרובע ABCD» · «משולש ABC» · «AE גובה» → asks which shape · «נקודה A» · «AD גובה» → refused · «מקבילית ABCD» · «AE תיכון» → refused
-- Sources: ADR-AG-253, #1945, #1907, ADR-W-118, ADR-263, ADR-169.
+- **The accepted line keeps the shape it was resolved in, and says it** ([ADR-AG-430](06c-decisions-analytic.md#adr-ag-430), #1973; 2-D's FR-IN-9 wording, operator 2026-10-10). A height or median whose sentence named neither its side nor its triangle records its shape with the line: the row keeps the student's words and shows the shape beside them, and a shape that later reaches the line's position (an earlier row edited or un-muted) does not change which height it is. Undo/redo, a save and a share link carry it. A sentence that states its side or triangle records nothing extra.
+- «משולש ABC» · «AE גובה» · «מרובע ABCD» → the row «AE גובה» with «במשולש ABC» beside it
+- Sources: ADR-AG-253, #1945, #1907, ADR-W-118, ADR-263, ADR-169, ADR-AG-430, #1973.
 
 **R103c — the tool's letters are 2-D's, and «תיכון ליתר» draws on the shown triangle**. **M** for a midpoint, **H** for a foot (F is the focus letter here). With only «משולש ישר-זווית ABC», «תיכון ליתר» and «גובה ליתר» draw on the triangle as shown; which vertex holds the right angle is a degree of freedom «הציגו תצורה אחרת» cycles, and the line follows it ([ADR-AG-411](06c-decisions-analytic.md#adr-ag-411), #2074). A typed apex («CM תיכון ליתר», «גובה ליתר מ-C», «תיכון ליתר בנקודה C») or hypotenuse («תיכון ליתר AB») states the right angle and pins it; several right triangles ask which side is meant. A foot letter after a cevian noun («תיכון לצלע AB בנקודה K», «גובה מ-A בנקודה H», «חוצה זווית C בנקודה K») names the foot ([ADR-790](06-decisions.md#adr-790), #2166).
 - **A perpendicular bisector draws only its line** (operator ruling 2026-10-27, «B»): «אנך אמצעי ל-EK» and «l2 אנך אמצעי ל-EK» show no midpoint dot, no letter and no «הכלי קרא לנקודה …». «P אמצע EK» typed after the line shows its midpoint, lettered P (before it, the line runs through P); a sentence that refers to the midpoint («אמצע EK») letters it M, announced on that row. A foot, a median's foot and a midsegment's ends keep their letters. Analytic only: 2-D still draws M.

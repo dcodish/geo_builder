@@ -11699,6 +11699,8 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 
 ## ADR-3D-295 — «הוכיחו כי …» / "prove that …" is refused, no longer stripped and read as a claim (#1666, 3-D side)
 
+**⚠ Amended by [ADR-W-194](06w-decisions-workspace.md#adr-w-194) (2026-11-08, #2492):** `errorText3` reads the suite sentence `suite.refusal.proofTarget`; `err.proofTarget` is deleted and the text is unchanged. The «where to check the claim» line the operator ruled for 3-D is with him on #2492: 3-D's ask box shows no length on a figure with no stated size.
+
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Withdraws** [ADR-3D-002](#adr-3d-002) decision 1's last clause ("optional proof-verb prefixes … accepted and ignored"). **Shares** the rule with 2-D and analytic through `shell/` ([ADR-W-107](06w-decisions-workspace.md#adr-w-107)).
 
 **Requirements:** docs/02w FR-SU-15 (new — the workspace promise, realised here for 3-D) · **Design:** docs/04w — "Proof targets"; none beyond it here (internal)

@@ -13,6 +13,7 @@ vi.mock('@/parser/llm', () => ({
 }));
 
 import { runSubmit } from '../submitPipeline';
+import { runEditCommit } from '../editPipeline';
 import type { SubmitDeps } from '../submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
 
@@ -496,5 +497,41 @@ describe('#1898 — the partial-reading notice names each unread item once', () 
 
   it('a point the student typed twice is still named once', async () => {
     expect(await droppedLabelsOf('ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו כך ש-D רחוקה')).toBe('D');
+  });
+});
+
+/**
+ * #1973 (ADR-797) — THE COMMIT STAMPS THE HOST. The parser reports the shape a cevian whose sentence named none was
+ * resolved in; the one place a verdict reaches the store (`commitVerdict`) writes it on the line's facts, and the ✎ edit
+ * (`runEditCommit`) writes the edited line's. The operator's sequence, through the real submit and edit seams.
+ */
+describe('#1973 — an accepted cevian records the shape it was resolved in', () => {
+  const editDeps = { t: (k: string) => k, setInputNote: () => {}, resolveAfterCommit: () => {} };
+  const hostsOf = (said: string) => [...new Set(useGeoStore.getState().facts.filter((f) => f.utterance === said).map((f) => JSON.stringify(f.host ?? null)))];
+
+  it('«AE גובה» keeps its words and carries triangle ABC on every fact, through the second shape', async () => {
+    const { deps } = makeDeps();
+    for (const line of ['משולש ABC', 'AE גובה', 'מרובע ABCD']) await runSubmit(line, deps);
+    expect(hostsOf('AE גובה')).toEqual([JSON.stringify({ ring: ['A', 'B', 'C'], kind: 'triangle' })]);
+    expect(hostsOf('משולש ABC')).toEqual(['null']);
+    expect(hostsOf('מרובע ABCD')).toEqual(['null']);
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
+
+  it('a sentence that states its side records none', async () => {
+    const { deps } = makeDeps();
+    for (const line of ['משולש ABC', 'AE גובה לצלע BC']) await runSubmit(line, deps);
+    expect(hostsOf('AE גובה לצלע BC')).toEqual(['null']);
+  });
+
+  it('an edit is an accept: the edited row records the host its new sentence resolves to, and drops the old one', async () => {
+    const { deps } = makeDeps();
+    for (const line of ['משולש ABC', 'AE גובה לצלע BC']) await runSubmit(line, deps);
+    const key = useGeoStore.getState().facts.find((f) => f.utterance === 'AE גובה לצלע BC')!.group!;
+    expect(runEditCommit(key, 'AE גובה', editDeps)).toBe(true);
+    expect(hostsOf('AE גובה')).toEqual([JSON.stringify({ ring: ['A', 'B', 'C'], kind: 'triangle' })]);
+    const again = useGeoStore.getState().facts.find((f) => f.utterance === 'AE גובה')!.group!;
+    expect(runEditCommit(again, 'AE גובה לצלע BC', editDeps)).toBe(true);
+    expect(hostsOf('AE גובה לצלע BC')).toEqual(['null']);
   });
 });

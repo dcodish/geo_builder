@@ -592,6 +592,7 @@
  "suite:[\"labelled pyramid\",\"פירמידה SABC שבסיסה משולש ישר זווית ABC\"]": "8e521c5973962662",
  "suite:[\"EN pyramid\",\"pyramid SABC with a right triangle base ABC\"]": "3cc373bd87c98c3d",
  "suite:[\"תיבה ABCDA1B1C1D1\"]": "65c73ed561ba4afc",
+ "suite:[\"נקודה E נמצאת במישור ABC\"]": "feaaa3c98e313baf",
  "suite:[\"pyramid\"]": "e84bba4416b2adfb",
  "suite:[\"נפח הפירמידה ABCD = 11\",\"נפח הפירמידה ABCDS = 11\",\"נפח SABCD שווה ל 11\",\"נפח SABCD = 11\",\"נפח הפירמידה = 11\"]": "ae28a25c534e2041",
  "suite:[\"AB ⊥ ACD\"]": "0ae656b28a2f47a9",

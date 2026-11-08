@@ -267,7 +267,8 @@ describe('#2039 — analytic: every seam that writes the lines is declared (ADR-
   it('every wired seam takes the configuration in the same set', () => {
     const src = read(ANALYTIC_STORE);
     for (const sm of ANALYTIC_LINE_SEAMS.filter((x) => x.status === 'wired' && x.action !== 'restore')) {
-      expect(src, `«${sm.action}» is wired but does not record a seed`).toMatch(new RegExp(`${sm.action}: \\([^)]*\\bat\\)`));
+      // `at` among the action's parameters, not necessarily the last: #1973 (ADR-AG-430) records `host` after it, in the same set
+      expect(src, `«${sm.action}» is wired but does not record a seed`).toMatch(new RegExp(`${sm.action}: \\([^)]*\\bat\\b[^)]*\\)`));
     }
   });
   it('every non-wired analytic seam carries a reason', () => {

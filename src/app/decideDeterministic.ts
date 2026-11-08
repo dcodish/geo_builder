@@ -76,10 +76,11 @@ import {
   trialFacts,
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
-import { findProofTarget } from '../../shell/proofTarget';
+import { findProofTarget, PROOF_TARGET_KEY } from '../../shell/proofTarget';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { findNumberPair, teachPair, type NumberPair } from '../../shell/juxtaposedNumbers';
 import { unreadScript } from '../../shell/inputScript';
+import type { CevianHost } from '../../shell/cevianHost';
 import { honestyGateReport } from './honestyGates';
 import { tangentsExhaustedKey } from '@/i18n/humanizeError';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
@@ -206,6 +207,8 @@ export type Verdict2D =
       readonly commands: readonly AnyCommand[];
       readonly logs: readonly DecideLog[];
       readonly note: DecideNote | null;
+      /** #1973 (ADR-797): the shape a cevian whose sentence named none was resolved in — stamped on the line's facts */
+      readonly host?: CevianHost;
     }
   /** nothing to add (already drawn, a restatement, or a name the auto-bind already gave): the text clears */
   | {
@@ -291,10 +294,10 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   // SHOW, never a given. Refused here, PRE-parse, for the negation's reason: the relation rules matched the
   // claim inside the sentence and committed it as a constraint, so the figure was forced to satisfy what
   // was to be proved. The `proof` scope category below only ever ran after a FAILED parse. The rule is
-  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence.
+  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence (#2492: `proofTargetNote`).
   const proof = findProofTarget(utterance);
   if (proof) {
-    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: proofTargetNote(proof.sentence) };
   }
   // AN ANGLE WRITTEN IN RADIANS (#1837, ADR-710 / ADR-W-142) — «∠ABC = π/2»: radians are the complex builder's
   // notation only (operator rulings 2026-10-07 "Refuse and teach degrees", 2026-10-08). Refused here, PRE-parse
@@ -330,6 +333,17 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:negation' }], note: { key: 'input.scope.negation', params: { word: negated } } };
   }
   return null;
+}
+
+/**
+ * #2492 ([ADR-W-194](../../docs/06w-decisions-workspace.md#adr-w-194)) — THE PROOF-TARGET NOTE, one spelling for the
+ * submit and the edit seam: the suite's sentence quoting the claim, then where 2-D checks a claim. Operator, 2026-10-24:
+ * *"For all cases of הוכיחו we should add to the message … ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות
+ * וזוויות שוות."* The button's name is NESTED in `input.scope.proofTargetCheck` from `actions.viewRelations`, the key
+ * that labels the button, so the refusal names the button by the text it carries.
+ */
+export function proofTargetNote(sentence: string): DecideNote {
+  return { key: PROOF_TARGET_KEY, params: { sentence }, also: { key: 'input.scope.proofTargetCheck' } };
 }
 
 /**
@@ -970,7 +984,7 @@ export async function decideFromParse(
           const lm = lowercaseMeasureLetters(r.commands);
           if (lm.length) note = { key: 'input.measureCaseNote', params: { letter: lm.join(', ') } };
         }
-        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note: withGreekAngleTip(note, r.commands, facts) };
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note: withGreekAngleTip(note, r.commands, facts), ...(r.host ? { host: r.host } : {}) };
       }
       // A cleanly-parsed CONSTRAINT that errored only because it can't be satisfied AT THIS POSITION (an
       // under-determined coupled solve before its pinning givens arrive — e.g. "CE⟂AB" before "CD=36,
@@ -982,7 +996,7 @@ export async function decideFromParse(
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
       if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
-          kind: 'commit', deferred: true, binds, commands: r.commands, note: withGreekAngleTip(readAsNote(r.angleReadings), r.commands, facts),
+          kind: 'commit', deferred: true, binds, commands: r.commands, note: withGreekAngleTip(readAsNote(r.angleReadings), r.commands, facts), ...(r.host ? { host: r.host } : {}),
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
         };
       }
@@ -1050,7 +1064,7 @@ export async function decideFromParse(
       // a foot G took E — a merge or a fresh rename), so its statement now holds by construction. It is a plain success, never «כבר קיים», and the statement is kept
       // as the line's own fact: it still holds X on that circle if the earlier line about X is deleted.
       if ((outcome.reason === 'implied' || outcome.reason === 'empty') && identityBound) {
-        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null };
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null, ...(r.host ? { host: r.host } : {}) };
       }
       if (outcome.reason === 'implied') {
         return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };

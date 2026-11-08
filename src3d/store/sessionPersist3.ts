@@ -14,8 +14,10 @@
 import type { SessionAdapter } from '../../shell/session/adapter';
 import type { SessionSpec } from '../../shell/session/persist';
 import { clearSession, readSession, writeSession } from '../../shell/session/persist';
+import type { CrashSession } from '../../shell/session/crash';
+import { crashSessionOf, sliceChanged } from '../../shell/session/crash';
 import { deserializeFigure3, serializeFigure3 } from './figureFile3';
-import { useGeo3 } from './store3';
+import { useGeo3, type Geo3State } from './store3';
 
 /** This product's key — namespaced per builder, since four tools share one origin in dev. */
 export const SESSION_3D: SessionSpec = { key: '3d-builder:session' };
@@ -36,22 +38,27 @@ export function persistSession3(now: Date = new Date()): void {
 }
 
 /**
- * The persisted slice. A zustand listener fires on every change — selection, a panel result — and
- * re-serializing the figure on each would put a JSON encode in front of every interaction;
- * reference equality is enough, because each action replaces what it changes.
+ * The persisted slice: every field the payload is made of. It also covers every field the undo
+ * history tracks (the store's `partialize`), so a crash rollback (#1507) puts back what undo would.
+ */
+export const SESSION_SLICE3 = [
+  'facts',
+  'seed',
+  'queries',
+  'planeDisplay',
+  'displayMode',
+  'dihedralShown',
+  'figureName',
+] as const satisfies readonly (keyof Geo3State)[];
+
+/**
+ * A zustand listener fires on every change — selection, a panel result — and re-serializing the
+ * figure on each would put a JSON encode in front of every interaction; reference equality over
+ * the slice is enough, because each action replaces what it changes.
  */
 export function startSessionPersist3(): () => void {
   return useGeo3.subscribe((s, p) => {
-    if (
-      s.facts !== p.facts ||
-      s.seed !== p.seed ||
-      s.queries !== p.queries ||
-      s.planeDisplay !== p.planeDisplay ||
-      s.displayMode !== p.displayMode ||
-      s.dihedralShown !== p.dihedralShown ||
-      s.figureName !== p.figureName
-    )
-      persistSession3();
+    if (sliceChanged(SESSION_SLICE3, s, p)) persistSession3();
   });
 }
 
@@ -78,6 +85,16 @@ export function restoreSession3(payload: string) {
   useGeo3.temporal.getState().clear();
   return r;
 }
+
+/**
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
+ * that failed. 3-D's undo clears nothing transient, so neither does the rollback.
+ */
+export const crashSession3: CrashSession<Geo3State> = crashSessionOf(useGeo3, {
+  slice: SESSION_SLICE3,
+  persist: () => persistSession3(),
+});
 
 /** The §5c cross-product subject — the real wiring, exposed as a value so a lock can drive it. */
 export const session3Adapter: SessionAdapter = {

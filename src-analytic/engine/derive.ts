@@ -24,6 +24,7 @@ import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { convexWhenSimple, shapeRow } from './shapes';
 import { POINT_NAME } from './pointName';
+import type { CevianHost } from '../../shell/cevianHost';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 export interface LineFault {
@@ -168,6 +169,17 @@ export interface Derivation {
    */
   createdCircles: Array<{ index: number; centre: string }>;
   /**
+   * #1973 ([ADR-AG-430](../../docs/06c-decisions-analytic.md#adr-ag-430)) — THE SHAPE EACH CEVIAN LINE WAS DRAWN IN, one
+   * entry per landed line whose cevian named neither its side nor its triangle («AE גובה» → triangle ABC). The row shows
+   * it beside the student's words (2-D's tag, ADR-797), and the submit path records the new line's entry as its host.
+   */
+  hosts: Array<{ index: number; host: CevianHost }>;
+  /**
+   * #1973 — THE HOSTS THIS DERIVATION WAS PINNED TO, by its own line index: carried, as `seed` is (#1176), so a trial that
+   * appends a line («decideSubmit») resolves the earlier lines exactly as this figure did.
+   */
+  pins: Readonly<Record<number, readonly string[]>>;
+  /**
    * WHAT A LINE THAT LANDED SHOULD TELL THE STUDENT (#1350, ADR-AG-183) — one entry per line whose
    * statement was accepted with a notice (`applyFact`'s `ApplyNotice`), never on a faulted line. The
    * submit path reads the new line's entry and carries it into the commit that records the line.
@@ -194,7 +206,17 @@ export interface Derivation {
  * every evaluation of THIS figure — the drawn one, the gates, the pool — starts its free vertices from
  * the same places. Empty for a figure no letter change touched, which is then byte-for-byte the old fold.
  */
-export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readonly<Record<string, string>> = {}): Derivation {
+/**
+ * `pins` (#1973, ADR-AG-430): per line INDEX of `lines`, the ring a cevian line was accepted in (the session's recorded
+ * `hosts`, projected onto these lines). Its cevian resolves in that ring while the figure holds it. Empty for a figure
+ * with no recorded host, which is then byte-for-byte the old fold.
+ */
+export function derive(
+  lines: readonly string[],
+  at: Seed = 0,
+  seedNames: Readonly<Record<string, string>> = {},
+  pins: Readonly<Record<number, readonly string[]>> = {},
+): Derivation {
   /** #2039 (ADR-AG-358): `at` is a seed or a configuration a walk landed on; `seed` is its number. */
   const seed = seedNumber(at);
   const facts: Fact[] = [];
@@ -209,8 +231,10 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
       faults.push({ index, code: r.code, detail: r.detail, ...('side' in r ? { side: r.side } : {}) });
       return;
     }
+    const pin = pins[index];
     for (const f of r.facts) {
-      parsed.push(f);
+      // #1973 (ADR-AG-430): a recorded host pins the line's open cevian — one that named neither its side nor a triangle
+      parsed.push(pin && f.t === 'cevian-of' && f.apex !== undefined && !f.side && !f.hypotenuse ? { ...f, pin: [...pin] } : f);
       owner.push(index);
     }
   });
@@ -225,7 +249,7 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
 
   // The LINE is the fold's unit of application (#1242, ADR-AG-133): every fact of a faulted line carries
   // the line's error, so the line is reported ONCE — the same error repeated per fact is one refusal.
-  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles } = fold(facts, owner);
+  const { construction: folded, errors, effects, constraintFact, selectorFact, notices: factNotices, created: factCreated, createdCircles: factCircles, hosts: factHosts } = fold(facts, owner);
   const construction: Construction = Object.keys(seedNames).length > 0 ? { ...folded, seedNames: { ...seedNames } } : folded;
   // A tool letter whose point the fold did not create — the cevian ran to a point the figure already named the same
   // way (ADR-AG-211), or its line was refused — named nothing, and the row must not claim it did (#1263's rule).
@@ -1056,6 +1080,16 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
   factCircles.forEach((centre, i) => {
     if (centre && outcomes[owner[i]] !== 'faulted' && !createdCircles.some((k) => k.index === owner[i])) createdCircles.push({ index: owner[i], centre });
   });
+  /** #1973 (ADR-AG-430): one host per landed line — the ring its cevian was resolved in, when its facts agree on one. */
+  const hosts: Derivation['hosts'] = [];
+  const hostsOf = new Map<number, Map<string, CevianHost>>();
+  factHosts.forEach((host, i) => {
+    if (!host || outcomes[owner[i]] === 'faulted') return;
+    const at = hostsOf.get(owner[i]) ?? new Map<string, CevianHost>();
+    at.set([...host.ring].sort().join(','), host);
+    hostsOf.set(owner[i], at);
+  });
+  for (const [index, rings] of hostsOf) if (rings.size === 1) hosts.push({ index, host: [...rings.values()][0] });
 
   // One notice per line, and none on a line that faulted — a refusal already says everything (#1350).
   const notices: Derivation['notices'] = [];
@@ -1094,7 +1128,7 @@ export function derive(lines: readonly string[], at: Seed = 0, seedNames: Readon
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, configuration: drawnConfiguration(construction, at, true), lines: [...lines], faults, outcomes, minted, created, createdCircles, hosts, pins: { ...pins }, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -1313,6 +1347,8 @@ export const EMPTY_DERIVATION: Derivation = {
   minted: [],
   created: [],
   createdCircles: [],
+  hosts: [],
+  pins: {},
   notices: [],
   constraintLine: [],
   selectorLine: [],

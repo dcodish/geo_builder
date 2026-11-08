@@ -2246,7 +2246,7 @@ curve-parented (`curveParentOf`).
 
 ### A load restores every field the save writes ([ADR-AG-199](06c-decisions-analytic.md#adr-ag-199), #1632)
 
-`serialize()` writes `app · version · lines · seed · name? · spokenFor? · disabled? · seedNames?`, and
+`serialize()` writes `app · version · lines · seed · name? · spokenFor? · disabled? · seedNames? · hosts?` (#1973), and
 `loadAnalyticSession` passes every field to `restore`, which sanitises them; the round-trip lock pins the key list.
 
 *Identifiers:* `disabled` · `seedNames`
@@ -2272,3 +2272,26 @@ through the shared `shell/frame/LetterPopover`.
 unknown tag, and logging never throws.
 
 *Identifiers:* `${BASE_URL}api/log` · `tool:'analytic'` · `(lines, seed)` · `source: 'parser' \| 'llm'` · `result` · `intermediate` · `seed` · `outcomes` · `clear` · `undo` · `redo` · `show-another` · `edit` · `delete` · `toggle` · `index:on\|off` · `load` · `llm` · `StrictMode` · `useMemo` · `debug-log.jsonl` · `src/debug/sessionLog.ts`
+
+### A cevian line keeps the shape it was accepted in ([ADR-AG-430](06c-decisions-analytic.md#adr-ag-430), #1973)
+
+This is 2-D's ADR-797, ported, plus the pin a LINES store needs: lines re-derive in order, so an earlier row edited or
+un-muted into a second shape would otherwise re-resolve «AE גובה».
+
+- **M1 records the host.** The `cevian-of` arm, for a fact with an apex and no side, calls `cevianHostOf(c, apex, u, v,
+  anyRing, only)` once the target is chosen: the one ring holding the apex with `u v` opposite it (any ring for a
+  height, a triangle otherwise). The outcome carries it as `host`, the fold keeps it per fact (`FoldResult.hosts`),
+  and `derive` rolls it up per landed line (`Derivation.hosts: { index, host }[]`, one distinct ring per line).
+- **The session records it.** `useAnalyticStore.hosts: Record<row, ring>` is captured from the decision that recorded the
+  line: `decideSubmit`'s `record.host` → `commitRecord` → `recordLine(…, host)`, and `decideEditHost` → `replaceLine(…, host)`
+  for an edit. Keys follow their lines as `spokenFor`'s do (`shiftHosts` on delete, dropped on edit, `partialize` for
+  undo, relabelled in `relabelSession`). `cleanHosts` filters a loaded map.
+- **`derive` honours it.** `derive(lines, at, seedNames, pins)` takes the hosts by its own line index (`activePins`
+  projects rows onto the active lines) and writes `pin` on that line's open `cevian-of`. While the construction holds
+  a polygon over the pinned letters, the arm's ring loop considers it alone, and that ring is the host. Otherwise the
+  pin is inert. `Derivation.pins` is carried so `decideSubmit`'s trial resolves the earlier lines as the canvas did.
+  The session's derivations pass them: the canvas, the submit, `decideToggle(…, hosts)`, the edit, `anotherConfiguration`,
+  rename and centre naming, and `loadAnalyticSession`'s audit.
+- **The row** passes `tag: hostTag(d.hosts[row], t)` to the shared `FactList`: the same strings and nouns as 2-D.
+
+*Identifiers:* `cevianHostOf` · `ApplyOutcome.host` · `FoldResult.hosts` · `Derivation.hosts` · `Derivation.pins` · `pin` · `activePins` · `hosts` · `cleanHosts` · `shiftHosts` · `decideEditHost` · `record.host`

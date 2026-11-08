@@ -28,13 +28,14 @@ import { holdsInEveryConfiguration, type Seed } from '../engine/evaluate';
 import { circleByName, type ApplyNotice } from '../engine/apply';
 import { RING_OF_FIGURE } from '../engine/names';
 import { factsWithin, type Fact } from '../engine/types';
-import { activeOf, rowOf } from './active';
+import { activeOf, activePins, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, declinedPointProperty, declinedThrough, unreadPart, type LostPart } from './lostPart';
 import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import { pointSpelling } from './pointOrder';
 import { lineOfferCandidate } from '../parser/lineOffer';
 import type { SentenceOutcome } from '../../shell/sentences';
+import type { CevianHost } from '../../shell/cevianHost';
 import { isPointName, splitPointNames } from '../engine/pointName';
 import type { StatedMeasures } from '../engine/statedMeasures';
 
@@ -106,7 +107,8 @@ export type SubmitVerdict =
    * `configuration` (#2039 step 1, ADR-AG-358): the configuration the new figure was DRAWN in — the trial starts from the
    * one on the screen, and the session records where it landed in the same set as the line.
    */
-  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string; configuration?: Seed }
+  /** `host` (#1973, ADR-AG-430): the shape the line's cevian was resolved in — recorded with the line, shown beside its row. */
+  | { kind: 'record'; line: string; notice?: RecordNotice; created?: string[]; createdCircle?: string; configuration?: Seed; host?: CevianHost }
   /**
    * #1353 / ADR-W-030 — the line is an IMPERATIVE WRAPPER over a sentence the tool does understand.
    *
@@ -412,7 +414,7 @@ function decideOnce(
       const records = (piece: string, before: readonly string[]): boolean => {
         // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
         const held = before.length ? [...lines, ...before] : lines;
-        const k = decideOnce(piece, held, seed, before.length ? derive(held, seed) : current).kind;
+        const k = decideOnce(piece, held, seed, before.length ? derive(held, seed, {}, current.pins) : current).kind;
         return k === 'record' || k === 'already-known' || k === 'already-follows';
       };
       // #2547 (ADR-AG-334) — arm 3, after arm 2 so a co-reference it refuses keeps its parts: a through-clause on a
@@ -451,7 +453,8 @@ function decideOnce(
   // #1631: the trial is THIS figure plus the line — the same seed names, so it starts where the canvas drew.
   // #2039 step 1 (ADR-AG-358): and the same CONFIGURATION — the one drawn, not the one asked for. The display walk may have
   // stepped past the session's seed; solving the line from there replaced the triangle on the screen with another one.
-  const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {});
+  // #1973 (ADR-AG-430): and the same recorded hosts — the earlier lines resolve exactly as the figure on the screen did
+  const trial = derive([...lines, line], current.configuration, current.construction.seedNames ?? {}, current.pins);
   /**
    * #2231 (ADR-AG-421) — «MK אנך לציר x בנקודה K» from a point OF the line: the foot would be M itself, so the sentence is not the
    * dropped perpendicular it reads as, and it keeps the verdict an unread line gets (the model's seam, as 2-D's relation).
@@ -477,12 +480,15 @@ function decideOnce(
   const made = trial.created.find((c) => c.index === lines.length)?.ids.slice().sort((x, y) => typedAt(line, x) - typedAt(line, y));
   /** #2552 D9 (ADR-AG-344): the new circle this line stated, by its centre — its notice replaces the points' one. */
   const circle = trial.createdCircles.find((c) => c.index === lines.length)?.centre;
+  /** #1973 (ADR-AG-430): the shape this line's cevian was resolved in — recorded with it, so it keeps meaning that shape. */
+  const host = trial.hosts.find((h) => h.index === lines.length)?.host;
   const recorded: SubmitVerdict = {
     kind: 'record',
     line,
     configuration: trial.configuration,
     ...(raised ? { notice: { code: raised.code, detail: raised.detail, holder: raised.holder } } : {}),
     ...(circle ? { createdCircle: circle } : made?.length ? { created: made } : {}),
+    ...(host ? { host } : {}),
   };
   /**
    * WHICH fault is this line's (#1334, ADR-AG-143 — ADR-492's rule, at the one chokepoint every typed
@@ -703,11 +709,11 @@ function decideOnce(
  */
 export function commitRecord(
   verdict: Extract<SubmitVerdict, { kind: 'record' }>,
-  recordLine: (line: string, notice?: string | null, at?: Seed) => void,
+  recordLine: (line: string, notice?: string | null, at?: Seed, host?: readonly string[]) => void,
   t: NoticeT,
 ): void {
-  // #2039 (ADR-AG-358): the configuration the decision drew rides in the same commit
-  recordLine(verdict.line, noticeText(verdict.notice, t), verdict.configuration);
+  // #2039 (ADR-AG-358): the configuration the decision drew rides in the same commit — and #1973 (ADR-AG-430) the host
+  recordLine(verdict.line, noticeText(verdict.notice, t), verdict.configuration, verdict.host?.ring);
 }
 
 /** The translate function a notice is worded with — `i18next`'s `t`, narrowed to what is used here. */
@@ -741,8 +747,8 @@ export type ToggleVerdict =
  * is refused and the refusal names THIS sentence. A fault is compared by the sentence it sits on and
  * its code, not by index — un-muting shifts every later active index by one.
  *
- * Pure over `(index, lines, disabled, seed, current)`; `current` is the caller's memoized derivation
- * of the ACTIVE lines, exactly as `decideSubmit` takes it.
+ * Pure over `(index, lines, disabled, seed, current, hosts)`; `current` is the caller's memoized derivation
+ * of the ACTIVE lines, exactly as `decideSubmit` takes it, and `hosts` the session's recorded hosts by row (#1973).
  */
 export function decideToggle(
   index: number,
@@ -750,13 +756,15 @@ export function decideToggle(
   disabled: readonly number[],
   seed: Seed,
   current: Derivation = derive(activeOf(lines, disabled), seed),
+  hosts: Readonly<Record<number, readonly string[]>> = {},
 ): ToggleVerdict {
   if (!disabled.includes(index)) return { kind: 'apply', disabled: [...disabled, index].sort((a, b) => a - b) };
   const next = disabled.filter((d) => d !== index);
   const before = activeOf(lines, disabled);
   const after = activeOf(lines, next);
   const at = rowOf(lines.length, next).indexOf(index);
-  const trial = derive(after, seed, current.construction.seedNames ?? {});
+  // #1973 (ADR-AG-430): the session's recorded hosts (by row), the returning line's own included, on the un-muted projection
+  const trial = derive(after, seed, current.construction.seedNames ?? {}, activePins(hosts, lines.length, next));
   const was = new Set(current.faults.map((f) => `${before[f.index]}\u0000${f.code}`));
   const fault =
     trial.faults.find((f) => f.index === at) ??
@@ -794,22 +802,43 @@ export function decideEdit(
   seed: Seed,
   seedNames: Readonly<Record<string, string>> = {},
 ): boolean {
+  return decideEditHost(index, next, lines, disabled, seed, seedNames).ok;
+}
+
+/**
+ * #1973 ([ADR-AG-430](../../docs/06c-decisions-analytic.md#adr-ag-430)) — {@link decideEdit}, with the HOST the edited
+ * line's cevian resolves to. An edit is an accept: the row records the shape its new sentence was resolved in, read in
+ * the edited figure with every OTHER line's recorded host honoured (`hosts`, by row); the edited row's old host goes
+ * with its old sentence. A muted row is not in the figure, so it records none.
+ */
+export function decideEditHost(
+  index: number,
+  next: string,
+  lines: readonly string[],
+  disabled: readonly number[],
+  seed: Seed,
+  seedNames: Readonly<Record<string, string>> = {},
+  hosts: Readonly<Record<number, readonly string[]>> = {},
+): { ok: boolean; host?: CevianHost } {
   // #1888 / #1889 (ADR-AG-251): an edit that loses a part is refused, as the typed line is (ADR-W-006: one gate, both seams).
   const parsed = parseLine(next.trim());
-  if (!parsed.ok) return false;
+  if (!parsed.ok) return { ok: false };
   // the other rows' letters keep the probe's stand-in fresh (no fold needed: they are only excluded)
   const letters = lines.flatMap((l, j) => (j === index ? [] : splitPointNames(l)));
-  if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return false;
-  if (disabled.includes(index)) return true;
+  if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return { ok: false };
+  if (disabled.includes(index)) return { ok: true };
   const edited = lines.map((l, j) => (j === index ? next : l));
   const at = rowOf(lines.length, disabled).indexOf(index);
-  const after = derive(activeOf(edited, disabled), seed, seedNames);
+  const { [index]: _edited, ...others } = hosts;
+  const after = derive(activeOf(edited, disabled), seed, seedNames, activePins(others, lines.length, disabled));
   // #2427 (ADR-AG-325): the typed line's capital-size question, asked of the edit too (ADR-W-006: one gate, both seams)
   if (mayHoldCapitalSize(next)) {
-    const before = derive(activeOf(lines, disabled), seed, seedNames);
-    if (capitalParamOf(next.trim(), parsed.facts, before.construction, after.construction, figureLabelsOf(before))) return false;
+    const before = derive(activeOf(lines, disabled), seed, seedNames, activePins(hosts, lines.length, disabled));
+    if (capitalParamOf(next.trim(), parsed.facts, before.construction, after.construction, figureLabelsOf(before))) return { ok: false };
   }
-  return !after.faults.some((f) => f.index === at);
+  if (after.faults.some((f) => f.index === at)) return { ok: false };
+  const host = after.hosts.find((h) => h.index === at)?.host;
+  return host ? { ok: true, host } : { ok: true };
 }
 
 /**

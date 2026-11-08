@@ -8581,6 +8581,8 @@ A subject whose tail the reader cannot account for, or with a capital letter bef
 
 ## ADR-AG-187 — The exam's sentence frame is read once, at `parseLine`; a proof target is refused; a right trapezoid does not fix its leg (#1618)
 
+**⚠ Amended by [ADR-W-194](06w-decisions-workspace.md#adr-w-194) (2026-11-08, #2492):** the proof-target refusal is the suite sentence `suite.refusal.proofTarget`, then `suite.refusal.proofTargetCheckPanel` naming this builder's «נתונים» panel and «שאלו» button by their own keys (`errorText` → `proofTargetPanelText`). `errProofTarget` is deleted.
+
 **Status:** accepted · 2026-10-01 · operator rulings 2026-10-01 on #1616 (full 2-D parity first; proof targets refused, "this is not a proof engine"; chords lifted) · slice A of #1616
 
 **Requirements:** [02c](02c-requirements-analytic.md) R124 — new: a given typed in the exam's textbook frame is understood as the bare given; a proof target is refused with a reason · **Design:** [04c](04c-design-analytic.md) — "The sentence frame" (new section)
@@ -16046,3 +16048,34 @@ Each of those points moves along a curve.
 - `src-analytic/__tests__/issue-1224-slanted-locus.test.ts` gains `#2734`: the fixture through the chip at seeds 0–23, and the class (the plan's six siblings, the two found in this round, three rational controls and four typed-decimal counters) at seeds 0–2. The existing `x = 40` refusal sits in the same file, untouched.
 
 **Behaviour change for a student:** a locus whose equation has a square root in it now prints its equation, where it printed only its kind. The exam's circle reads «מעגל · (x + 2.12)² + y² = 6²». The numbers inside the equation stay decimals, as every equation in the tree prints them. A locus centred on a decimal the student typed (1.4142) still answers its kind alone.
+
+## ADR-AG-430 — An accepted cevian line records the shape it was resolved in; `derive` honours it, and the row shows it beside the student's words (#1973)
+
+**Date:** 2026-11-08 · **Status:** accepted · feature (analytic + 2-D, P2) · round #2745, stream F · branch `feat/1973-cevian-host` · **sibling:** [ADR-797](06-decisions.md#adr-797) (2-D, the reference wording) · **LADDER stage:** none (M1's `cevian-of` arm, the store and the row)
+**Operator:** 2026-10-10, option C: *"persist the host, and show it beside the student's words rather than inside them"*. He reported the case here, playing round #1959: *"when we accepted it, we should have added במשולש ABC so it sticks even if the shape later adds more inputs"*.
+**Requirements:** [02c](02c-requirements-analytic.md) R103d (amended: the accepted line keeps its host and shows it) · **Design:** [04c](04c-design-analytic.md) § "A load restores every field the save writes" (`hosts?`) and § "A cevian line keeps the shape it was accepted in"
+
+**Measured before** (`main` @ `0b7edbe4`, `decideSubmit` then `derive`). «A(0,0)» · «B(6,0)» · «C(5,4)» · «D(1,3)» · «משולש ABC» · «AE גובה» · «מרובע ABCD»: every line records, `faults: []`, E = (5.647, 1.412) with the knee on BC, as in the operator's screenshot. «AF גובה» re-read on the final figure asks (`ambiguous-cevian`). The store keeps lines and re-derives them in order, so «AE גובה» re-resolves on every derive, and it is stable only because it resolves against its own prefix. Two operations put a second shape INTO that prefix: editing an earlier row («D(1,3)» → «מרובע ABCD»), which today faults «AE גובה» `ambiguous-cevian`, and un-muting a shape row above it, which today is refused with the same question. Nothing on the row said which height had been drawn.
+
+**Class.** *A line whose meaning M1 resolved against the figure is stored without that resolution, so it can change meaning when an earlier row changes, and its row reads ambiguously once the figure grows.* This is 2-D's ADR-797 class. 2-D stores the lowered command, so it already held the side and lacked only the record. Analytic stores the sentence, so it lacked both.
+
+**Decision (2-D's ADR-797, ported, with the pin that a lines store needs).**
+1. **M1 records it** (`engine/apply.ts`). After the `cevian-of` arm chooses its side from the figure (the fact has an apex and no side: «AE גובה», «תיכון מ-A», «גובה מ-A»), `cevianHostOf` names the one ring that holds the apex with that side opposite it. That is any ring for a height and a triangle for every other cevian, the rings the arm resolves in. A side two rings share records nothing. The outcome carries it as `host`, the fold keeps it per fact (`FoldResult.hosts`), and `derive` rolls it up per landed line (`Derivation.hosts`).
+2. **The session records it at accept time** (`useAnalyticStore.hosts`, per line index). `decideSubmit`'s `record` verdict carries the new line's host and `commitRecord` writes it in the same set as the line. An edit records the host its new sentence resolves to (`decideEditHost`; `decideEdit` keeps its boolean). Keys follow their lines, as `spokenFor`'s do: a delete shifts them, an edit replaces the row's, undo/redo carry them (`partialize`), a letter change relabels the ring (`relabelSession`), and `clearAll` drops them. `serialize` writes `hosts?` when there are any, and `restore` keeps only rings that name a line (`cleanHosts`). The save file, the restored session and the share link share the envelope, so all three keep it. A file without the field loads unchanged.
+3. **`derive` honours it** (`pins`, by derive's own line index; `activePins` projects the store's rows onto the active lines). A pinned `cevian-of` resolves in that ring alone while the figure holds it, so a shape that reaches the line's position later cannot change which height the row means. A ring the figure no longer holds pins nothing, and the line resolves as it always did. The derivation carries its `pins`, so `decideSubmit`'s trial resolves the earlier lines exactly as the figure on the screen did. The session's derivations pass them: the canvas, the submit decision, un-mute (`decideToggle(…, hosts)`), edit, «הציגו תצורה אחרת», rename and centre naming, and the load audit.
+4. **The row shows it beside the student's words**, through the shared fact list's `tag` and `shell/cevianHost`'s `hostTag`: the same strings (`suite.host.*`) and the same noun table as 2-D. The text is therefore equal by construction (ADR-W-118 B1), and both builders' locks render the shared literal `CEVIAN_HOST_TAG`: «במשולש ⁦ABC⁩», "in triangle ABC".
+
+**Measured after.** The operator's seven lines record `hosts: { 5: [A, B, C] }`, and E is unchanged at (5.65, 1.41). With «D(1,3)» edited to «מרובע ABCD», «AE גובה» stays the triangle's height; unpinned, the same lines fault `ambiguous-cevian`. Un-muting «מרובע ABCD» above a recorded «AE גובה» applies; unpinned, it is refused.
+
+**Sibling audit.** The `cevian-of` arm is the one place analytic resolves a cevian's side from the figure. A side named («לצלע BC»), a triangle named (whose parse states the side), the hypotenuse arm (#2074) and the role arms (`applyRoleCevian`, which follow the configuration by design) record nothing. The bisector names its angle (`resolveAngleName`), not a ring, as in 2-D (ADR-797's question). 2-D: ADR-797.
+
+**Locks.**
+- `src-analytic/__tests__/cevian-host-1973.test.ts` (unit, `parseLine` + `fold`): the host per open cevian and ring, none for a stated side or triangle, the pin resolving in its ring whichever shape came first, a missing ring pinning nothing, and no pin on a stated side.
+- `src-analytic/__tests__/history.test.ts`: the operator's lines through `decideSubmit` → `commitRecord`, the tag through analytic's i18n equal to `CEVIAN_HOST_TAG`, undo/redo, a delete above it, the edit above it (pinned vs. unpinned), the edit of the row itself, and the un-mute above it (pinned vs. unpinned).
+- `src-analytic/__tests__/session.test.ts`: `serialize` → `loadAnalyticSession` round trip, no field when there is no host, a pre-change file, and malformed rings dropped.
+- Fixture `issue-1973-cevian-host.analytic.json`, the operator's seven lines with their host. The fixtures net now asserts that every recorded host is the shape its line resolves in.
+- Parity row `cevian-host-second-shape-1973`.
+- `shell/__tests__/seam-registry.test.ts` (#2039): its check that a wired line seam takes the configuration now reads `at` anywhere among the action's parameters, because `recordLine` takes `host` after it and writes both in the same set. The guard still fails an action that does not take `at`.
+
+**Behaviour change for a student:** «AE גובה» keeps the student's words on its row and shows «במשולש ABC» beside it. An earlier row edited or un-muted into a second shape no longer turns it into a question: it stays the triangle's height, as in 2-D.
+
