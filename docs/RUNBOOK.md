@@ -61,7 +61,16 @@ Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
 
 **A session runs the deploy itself and never hands it back** (operator, 2026-08-19: *"never ask me to
 deploy. you have the permissions and tools for that"*). The commands are allowlisted in
-`.claude/settings.json`; a denial is retried in its canonical minimal form, more than once. The one
+`.claude/settings.json`; a denial is retried in its canonical minimal form, more than once.
+
+**The allowlist holds exactly the deploy and verify lines below, and nothing broader**
+([ADR-W-193](06w-decisions-workspace.md#adr-w-193), #2753). Every other command on the prod host asks the
+operator first, by design. A session reads public issue comments and raw student text, so it must never hold
+an unprompted root shell on the box that also serves other sites and holds the student logs and the key.
+`server/__tests__/prod-allowlist-2753.test.ts` fails when a rule is broader than a line here, or is missing from
+here.
+
+The one
 terminal case is the work PC: `Connection refused` on port 22 while 443 serves is the work network
 (2026-09-02). Finish everything up to the upload, hand off through git, and deploy from home. Write no
 `prod/*` tag and no DEPLOY-LOG entry until the upload has happened.
@@ -117,17 +126,17 @@ scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/ge
 
 # 2. 3-D static (note the rename)
 scp -r dist-3d/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder/
-ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-builder && mv -f 3d.html index.html'
+ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/3d-builder/3d.html /var/www/vhosts/themathbible.com/httpdocs/3d-builder/index.html'
 
 # 2b. complex static (same rename pattern). The directory was created at the prod/2026-08-15-2
 #     deploy: mkdir + chown root:root + chmod 755, matching its siblings.
 scp -r dist-complex/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/complex-builder/
-ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/complex-builder && mv -f complex.html index.html'
+ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/complex-builder/complex.html /var/www/vhosts/themathbible.com/httpdocs/complex-builder/index.html'
 
 # 2c. analytic static (same rename pattern). The directory was created at the prod/2026-09-16
 #     deploy — its FIRST: mkdir + chown root:root + chmod 755, matching its siblings.
 scp -r dist-analytic/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/analytic-builder/
-ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/analytic-builder && mv -f analytic.html index.html'
+ssh root@themathbible.com 'mv -f /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/analytic.html /var/www/vhosts/themathbible.com/httpdocs/analytic-builder/index.html'
 
 # 2d. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
 #     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
@@ -225,6 +234,7 @@ curl -sI https://themathbible.com/g/aaaaaaaaaaaa | grep -i x-robots-tag   # noin
 ## Verify (every deploy)
 
 - `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`
+- `ssh root@themathbible.com 'systemctl is-active geo-proxy'` → `active`
 - Every deployed builder's page loads over HTTPS; its `index.html` references the **new** bundle hash and the bundle returns 200.
 - A quick in-grammar utterance builds (no proxy call); if the proxy changed, an out-of-grammar utterance builds too (and shows in the Anthropic Console usage).
 - Admin dashboards log in and show the visit.

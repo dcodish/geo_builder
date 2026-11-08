@@ -7159,3 +7159,31 @@ Each crash also reset the daily AI cap, the concurrency cap and the per-IP limit
 
 **Behaviour change for a student:** none while the server is up. A dropped upload no longer takes the server away from everyone else.
 
+## ADR-W-193 — The prod allowlist is the RUNBOOK's exact deploy lines, and nothing broader (#2753)
+
+**Status:** accepted · 2026-11-08 · security (workspace) · amends the RUNBOOK's "Standard deploy" allowlist sentence
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** none (internal), [RUNBOOK](RUNBOOK.md) "Standard deploy" · **Product:** workspace.
+
+**Context.** `.claude/settings.json` allowed `ssh root@themathbible.com:*`, and the build uploads to any remote path. Any session could therefore run any command as root on the production host without a prompt.
+- **How it could be steered:** sessions read public issue comments, which anyone can write, and raw student text in log triage. An instruction planted in either could steer a session into a root command nobody sees.
+- **What's on the box:** the host also serves other sites, and holds the student logs and the AI key.
+
+**Decision.**
+1. **Exact lines only.** The allowlist holds the RUNBOOK's deploy and verify lines exactly:
+   - the four static uploads and the proxy upload;
+   - the three renames and the permission fix;
+   - the restart, the health check and `systemctl is-active`.
+
+   Any other command on the prod host asks the operator.
+2. **One command per rename.** The renames are now single `mv` commands with full paths, not `cd … &&` chains, so each matches its rule as written.
+3. **A guard.** `server/__tests__/prod-allowlist-2753.test.ts` fails on a rule naming the host that:
+   - is a prefix rule;
+   - has a wildcard after the host;
+   - does not appear verbatim in the RUNBOOK;
+
+   and on a Bash/PowerShell pair that differs.
+
+**Not decided here.** The SSH key is still root and unrestricted, so this limits what a session runs without asking, not what the key can do. A non-root deploy user with a forced command is the stronger fix. It changes how both PCs reach production, so it waits for the operator.
+
+**Behaviour change for a student:** none.

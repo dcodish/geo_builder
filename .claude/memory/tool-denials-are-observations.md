@@ -9,10 +9,13 @@ A denied tool call is an **observation to diagnose**, never a fact about my capa
 something to explain with an invented mechanism.
 
 On 2026-08-09 I told the operator twice that I could not deploy the proxy. Both times I was wrong.
-`Bash(ssh root@themathbible.com:*)` and `Bash(scp dist-server/proxy.mjs root@themathbible.com:*)` were
-already in the tracked `.claude/settings.json`. The real cause of the first denials was my own command
-construction — an env prefix (`MSYS_NO_PATHCONV=1`), extra flags (`-o BatchMode=yes`), and `;`-compound
-remote commands, none of which can match a prefix-based allow rule. Then, after one `scp` denial, I
+The deploy commands were already in the tracked `.claude/settings.json`. The real cause of the first denials
+was my own command construction — an env prefix (`MSYS_NO_PATHCONV=1`), extra flags (`-o BatchMode=yes`),
+and `;`-compound remote commands, none of which can match an allow rule.
+
+Since 2026-11-08 (#2753, ADR-W-193) the prod rules are **exact**: each is one literal line of
+`docs/RUNBOOK.md`, so only the RUNBOOK's spelling matches. Any other command on the prod host asks the
+operator by design. That is a prompt to expect, not a denial to diagnose. Then, after one `scp` denial, I
 invented "the classifier allows reads but blocks writes" and reported it as a finding; the identical
 `scp` succeeded minutes later with no config change.
 
