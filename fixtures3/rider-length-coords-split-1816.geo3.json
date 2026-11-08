@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-08T05:55:19.690Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B(4,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 4,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "D על AB",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "D",
+          "a": "A",
+          "b": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "AD = 1",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "D",
+            "value": 1
+          }
+        }
+      ]
+    }
+  ]
+}

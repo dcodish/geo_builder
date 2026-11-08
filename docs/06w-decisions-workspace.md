@@ -7127,6 +7127,67 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 
 **Behaviour change for a student:** none.
 
+## ADR-W-192 — A request's failure ends that request, never the shared server: one boundary per request, one body reader (#2752)
+
+**Status:** accepted · 2026-11-08 · bug fix (server)
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** [04s](04s-design-server.md) "A request's failure ends that request, never the process" · **Product:** server.
+
+**Context, measured at `0b7edbe4`.** One Node process serves the AI fallback, the usage log, sharing and the dashboards for all four builders.
+- A client that dropped mid-upload made `readBody` reject, and its callers awaited it outside any `try`.
+- The admin forms read their bodies with their own uncapped loop.
+- `standalone.ts` started every handler as `void handleX(...)`.
+- On loopback, the first aborted POST to `/api/log` ended the process (`Error: aborted`, `ECONNRESET`).
+
+Each crash also reset the daily AI cap, the concurrency cap and the per-IP limiters. systemd stops restarting a unit after five starts in ten seconds.
+
+**Class.** A request handler's failure (a throw or a rejected promise) escapes its request and ends the shared process. The dev server's four mounts had the same shape. No product tree runs a server.
+
+**Decision.**
+1. **`serveSafely` (`server/http.ts`) is the one failure boundary per request.** The production router (`dispatch`) and every dev mount run inside it, and a handler is returned into it. A failure is logged with its method and path, and ends its own request: 500 if nothing was sent, a closed connection otherwise.
+2. **`readBody` is the one body reader.** It resolves `null`, never rejects, when the client goes away or the body exceeds its cap. The admin login form (8 KB), the config form (256 KB) and the dev log mount use it.
+3. **A last net.** A process-level `unhandledRejection` handler logs and keeps serving.
+4. **Restarts never stop.** `deploy/geo-proxy.service` sets `StartLimitIntervalSec=0`.
+
+**Found in the same reader.** It decoded each chunk on its own, so a Hebrew letter whose two bytes arrived in different chunks became two replacement characters. It now decodes the bytes once.
+
+**Locks.** `server/__tests__/request-boundary-2752.test.ts`:
+- aborted bodies on every body-reading route of the real proxy, with the model SDK tripwired;
+- the boundary's three failure shapes;
+- the reader;
+- a ratchet: no `void handleX(`, no body loop outside `http.ts`, and every dev mount inside `serveSafely`.
+
+**Behaviour change for a student:** none while the server is up. A dropped upload no longer takes the server away from everyone else.
+
+## ADR-W-193 — The prod allowlist is the RUNBOOK's exact deploy lines, and nothing broader (#2753)
+
+**Status:** accepted · 2026-11-08 · security (workspace) · amends the RUNBOOK's "Standard deploy" allowlist sentence
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** none (internal), [RUNBOOK](RUNBOOK.md) "Standard deploy" · **Product:** workspace.
+
+**Context.** `.claude/settings.json` allowed `ssh root@themathbible.com:*`, and the build uploads to any remote path. Any session could therefore run any command as root on the production host without a prompt.
+- **How it could be steered:** sessions read public issue comments, which anyone can write, and raw student text in log triage. An instruction planted in either could steer a session into a root command nobody sees.
+- **What's on the box:** the host also serves other sites, and holds the student logs and the AI key.
+
+**Decision.**
+1. **Exact lines only.** The allowlist holds the RUNBOOK's deploy and verify lines exactly:
+   - the four static uploads and the proxy upload;
+   - the three renames and the permission fix;
+   - the restart, the health check and `systemctl is-active`.
+
+   Any other command on the prod host asks the operator.
+2. **One command per rename.** The renames are now single `mv` commands with full paths, not `cd … &&` chains, so each matches its rule as written.
+3. **A guard.** `server/__tests__/prod-allowlist-2753.test.ts` fails on a rule naming the host that:
+   - is a prefix rule;
+   - has a wildcard after the host;
+   - does not appear verbatim in the RUNBOOK;
+
+   and on a Bash/PowerShell pair that differs.
+
+**Not decided here.** The SSH key is still root and unrestricted, so this limits what a session runs without asking, not what the key can do. A non-root deploy user with a forced command is the stronger fix. It changes how both PCs reach production, so it waits for the operator.
+
+**Behaviour change for a student:** none.
+
 ## ADR-W-195 — A crash never erases the construction: one boundary in the shell, a rollback to what last drew, and the reload offers that (#1507)
 
 **Status:** accepted · 2026-11-08 · feature (P2, `workspace` + all four builders) · fix round #2745, stream H · branch `feat/1507-crash-recovery` · **Operator:** the fix plan on #1507, approved as written on 2026-10-05 ([auto-ok audit](https://github.com/dcodish/geo_builder/issues/1507#issuecomment-5996556577)); `What the student will see` posted at pickup ([comment](https://github.com/dcodish/geo_builder/issues/1507#issuecomment-6717921013)) · **Builds on:** [ADR-W-078](#adr-w-078) (the session offer)
@@ -7161,3 +7222,4 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 **Performance.** The probe renders `null` once per store change; the rollback runs only on a crash. No replay or evaluate loop is added.
 
 **Behaviour change for a student:** in every builder, an error while drawing shows a notice with the error's text and «שחזור» instead of a blank page; «שחזור» comes back with the construction as it last drew, undoing the change the error followed (and saying so); a reload after a crash offers that construction.
+

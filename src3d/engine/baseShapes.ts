@@ -529,6 +529,18 @@ export const QUAD_PYRAMIDS: Partial<Record<SolidKind, { base: QuadBase; right: b
   pyramidQuadR: { base: 'quad', right: true },
 };
 
+/** Is this a RIGHT pyramid kind — its apex over the base's circumcentre (ADR-3D-090), triangle or quad base? */
+export const isRightPyramidKind3 = (kind: SolidKind): boolean =>
+  kind === 'pyramid3' || kind === 'pyramid3e' || QUAD_PYRAMIDS[kind]?.right === true;
+
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — how many free dims a BOUND solid carries: its apex's
+ * foot offset and height (3), or the height alone when the kind is right (the foot is the ring's circumcentre). It
+ * has no layout and no similarity of its own — its frame is its ring's. The count `freeDims` and the sampler
+ * (`boundSolidDims3`) both read it.
+ */
+export const boundSolidDimCount3 = (kind: SolidKind): number => (isRightPyramidKind3(kind) ? 1 : 3);
+
 /**
  * #1918 (ADR-3D-313, the 3-D port of 2-D's ADR-506 / analytic's R93) — WHICH pair of a declared trapezoid is
  * its parallel pair. The noun names a ring, not a pair: by default the pair is sides 0/2 of the ring as named
@@ -583,6 +595,8 @@ export function declaredRings3(c: Pick<Construction3, 'quadShapes' | 'solids' | 
     ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
     ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
     ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
+    // #2490 (ADR-3D-434): a BOUND pyramid's base is not generated — the student named it over existing letters
+    ...c.solids.flatMap((s) => (s.bound && s.bound.length >= 4 ? [s.bound] : [])),
   ];
   const seen = new Set<string>();
   const out: Id[][] = [];

@@ -1,0 +1,590 @@
+{
+ "name": "round-2745",
+ "title": "Fix round #2745",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Analytic: «A מעל B» on an ellipse crossing gives the one stated point",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/4+y^2/3=1",
+    "הישר x=-1 חותך את האליפסה בנקודות A ו-B",
+    "A מעל B"
+   ],
+   "asks": [
+    "A",
+    "AB"
+   ],
+   "lookFor": "«A» answers (-1, 3/2) alone (one point, no «או [ … ]»); «AB» answers 3.",
+   "before": "«A» answered «(-1, -3/2) או [(-1, 3/2)]» and «AB» «0 או 3».",
+   "expect": [
+    "AB = 3"
+   ],
+   "expectAbsent": [
+    "או [",
+    "0 או 3"
+   ]
+  },
+  {
+   "id": "T2",
+   "title": "Analytic: a line touching the parabola at its vertex is refused as two crossings",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "y^2=4x",
+    "הישר x=0 חותך את הפרבולה בנקודות K ו-L"
+   ],
+   "lookFor": "The second line is refused: «לא נמצאה תצורה שבה מתקיים: «הישר x=0 חותך את הפרבולה בנקודות K ו-L»».",
+   "before": "Recorded, with K and L on one dot.",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T3",
+   "title": "Analytic: a crossing that lands on a point already there is accepted",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל שמרכזו M(0,3) ורדיוסו 5",
+    "P(-4,0)",
+    "הישר x=-4 חותך את המעגל בנקודות K ו-L"
+   ],
+   "lookFor": "The line records: one of K, L sits on P, the other at (-4, 6), and the page says «P ו-K נפלו על אותה נקודה.» (or «P ו-L …»).",
+   "before": "Refused «לא נמצאה תצורה שבה מתקיים: «הישר x=-4 חותך את המעגל בנקודות K ו-L»».",
+   "expect": [
+    "נפלו על אותה נקודה"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "Analytic: a tangent stated at a point already there is accepted",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "T(0,5)",
+    "הישר y=5 משיק למעגל בנקודה K"
+   ],
+   "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»",
+   "before": "Refused «לא ניתן למקם את K: הישר משיק למעגל בנקודה אחת בלבד…».",
+   "expect": [
+    "T ו-K נפלו על אותה נקודה"
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "Analytic: a tangent line asked for two crossings is still refused",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "T(0,5)",
+    "הישר y=5 חותך את המעגל בנקודות K ו-L"
+   ],
+   "lookFor": "The last line is refused: «לא ניתן למקם את K: הישר משיק למעגל בנקודה אחת בלבד…».",
+   "before": "unchanged",
+   "expectRefusal": "משיק למעגל בנקודה אחת בלבד"
+  },
+  {
+   "id": "T6",
+   "title": "Analytic: the exam's locus circle shows its equation",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נתונה אליפסה שמשוואתה x^2/9+y^2/4.5=1",
+    "F1 הוא המוקד השמאלי של האליפסה",
+    "F2 הוא המוקד הימני של האליפסה",
+    "E על האליפסה",
+    "M על המשך הקטע F1E",
+    "EM = EF2"
+   ],
+   "after": [
+    {
+     "clickOn": "button:has-text(\"הצג מקום גאומטרי\") >> nth=1",
+     "say": "לחצו «הצג מקום גאומטרי» בשורה «M על המשך הקטע F1E»"
+    }
+   ],
+   "lookFor": "M's «הצג מקום גאומטרי» chip answers «מעגל · (x + 2.12)² + y² = 6²» and draws the circle.",
+   "before": "«מעגל» with no equation.",
+   "expect": [
+    "2.12"
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "3-D: a length places a point on a coordinate segment",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(4,0,0)",
+    "D על AB כך ש-AD = 1"
+   ],
+   "asks": [
+    "D"
+   ],
+   "lookFor": "Every row green; D is at (1, 0, 0).",
+   "before": "Refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "expect": [
+    "(1, 0, 0)"
+   ]
+  },
+  {
+   "id": "T8",
+   "title": "3-D: a length no point of the segment can have is still refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(4,0,0)",
+    "D על AB כך ש-AD = 5"
+   ],
+   "lookFor": "The last line is refused «… בדקו את החישוב».",
+   "before": "unchanged",
+   "expectRefusal": "בדקו את החישוב"
+  },
+  {
+   "id": "T9",
+   "title": "3-D: «AB ⊥ AC» on points that carry k finds both values of k",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(k-1,k,3)",
+    "C(k+1,0,k-3)",
+    "AB ⊥ AC"
+   ],
+   "asks": [
+    "k"
+   ],
+   "cycles": 1,
+   "expectConfigsDiffer": true,
+   "lookFor": "Accepted; «k» answers k = -5 or k = 2; «הציגו תצורה אחרת» switches between the two figures.",
+   "before": "Refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "expect": [
+    "-5"
+   ]
+  },
+  {
+   "id": "T10",
+   "title": "3-D: when no k makes «AB ⊥ AC» true, the refusal says so",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(k,1,0)",
+    "C(k,2,0)",
+    "AB ⊥ AC"
+   ],
+   "lookFor": "Refused «אין אף ערך ממשי של k שבו «AB ⊥ AC» מתקיים — ההצהרה סותרת את הציור כפי שנתון, ולא רק את התצורה המצוירת».",
+   "before": "Refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "expectRefusal": "אין אף ערך ממשי של k"
+  },
+  {
+   "id": "T11",
+   "title": "3-D: a stated k that «AB ⊥ AC» rules out is refused, naming both lines",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(k-1,k,3)",
+    "C(k+1,0,k-3)",
+    "k = 3",
+    "AB ⊥ AC"
+   ],
+   "lookFor": "The last line is refused «אין אף ערך ממשי של k שבו «AB ⊥ AC» מתקיים יחד עם «k = 3» — הנתונים האלה סותרים זה את זה».",
+   "before": "Refused «הטענה לא מתקיימת בציור — בדקו את החישוב».",
+   "expectRefusal": "סותרים זה את זה"
+  },
+  {
+   "id": "T12",
+   "title": "3-D: «k = 3» after the 90° twin is refused instead of drawn green",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(k-1,k,3)",
+    "C(k+1,0,k-3)",
+    "זווית BAC = 90",
+    "k = 3"
+   ],
+   "lookFor": "«k = 3» is refused, and the refusal names «זווית BAC = 90».",
+   "before": "Both rows green while k = −5 or 2 was drawn: the stated k = 3 silently vanished.",
+   "expectRefusal": "זווית BAC = 90"
+  },
+  {
+   "id": "T13",
+   "title": "3-D: a pyramid on the cube's face ABCD (your T38)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "פירמידה ABCDS"
+   ],
+   "cycles": 1,
+   "lookFor": "Pyramid ABCDS drawn on face ABCD; the cube does not move; «הציגו תצורה אחרת» moves S (sometimes inside the cube, drawn dashed). The note «בגלל הנתונים, ABCD הוגבל ממלבן לריבוע…» may show (see Heads-up).",
+   "before": "Refused ««A» כבר מוגדר בציור…».",
+   "expectFigure": [
+    "S"
+   ]
+  },
+  {
+   "id": "T14",
+   "title": "3-D: a pyramid on a stated square, then «|SA| = 5»",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "פירמידה ABCDS שבסיסה ריבוע",
+    "|SA| = 5"
+   ],
+   "asks": [
+    "|SA|"
+   ],
+   "lookFor": "The square stays on the floor with the apex above it; |SA| reads 5; the freedom cue reads 2.",
+   "before": "Line 2 refused ««A» כבר מוגדר בציור…».",
+   "expect": [
+    "5"
+   ]
+  },
+  {
+   "id": "T15",
+   "title": "3-D: a plain pyramid over a free quadrilateral makes it a rectangle",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "פירמידה ABCDS"
+   ],
+   "lookFor": "It builds, and ABCD is now drawn as a rectangle, because a plain «פירמידה» states a rectangle base in 3-D. Is that what a student should see, or should the quadrilateral keep its shape?",
+   "before": "Refused ««A» כבר מוגדר בציור…»."
+  },
+  {
+   "id": "T16",
+   "title": "3-D: a pyramid on a skew base is refused, naming both statements",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "פירמידה ABCA'S"
+   ],
+   "lookFor": "Refused «מרובע הוא צורה שטוחה, והקודקודים A, B, C, A' אינם נמצאים במישור אחד — ולכן «פירמידה ABCA'S» לא מתקיים יחד עם «קובייה ABCDA'B'C'D'».».",
+   "before": "Refused ««A» כבר מוגדר בציור…».",
+   "expectRefusal": "אינם נמצאים במישור אחד"
+  },
+  {
+   "id": "T17",
+   "title": "3-D: an unlettered pyramid is not put on existing letters",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "פירמידה ישרה שבסיסה משולש שווה שוקיים"
+   ],
+   "lookFor": "Refused ««A» כבר מוגדר בציור…», no pyramid drawn (unchanged; see Questions).",
+   "before": "unchanged",
+   "expectRefusal": "כבר מוגדר"
+  },
+  {
+   "id": "T18",
+   "title": "3-D: a plane beside a cube leaves the cube on the floor",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מישור π3"
+   ],
+   "lookFor": "The cube stays on the floor with no x/y/z axes; only the plane appears; the freedom cue reads 3 (the plane own freedom). The no-move claim itself is locked by placement-gauge.test.ts (every earlier point unchanged to 1e-9 at five seeds).",
+   "before": "«מישור π3» threw the cube off the floor, drew the axes, and the cue read 9; «A על המישור π3» then made it jump back.",
+   "expect": [
+    "דרגות חופש: 3"
+   ]
+  },
+  {
+   "id": "T19",
+   "title": "3-D: asking a free plane's equation on a cube gives the no-axes note",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' מאונך למישור π3"
+   ],
+   "asks": [
+    "משוואת המישור π3"
+   ],
+   "lookFor": "The answer is the note «אין מערכת צירים, ולכן אין משוואה — מוצג מה שכן ידוע על המישור…» with «AC' ⟂ π3».",
+   "before": "«לא נקבע על ידי הנתונים».",
+   "expect": [
+    "אין מערכת צירים"
+   ]
+  },
+  {
+   "id": "T20",
+   "title": "PR #2751 · 2-D: an accepted height keeps its words and shows its triangle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AE גובה",
+    "מרובע ABCD"
+   ],
+   "lookFor": "The row still reads «AE גובה», with a grey «במשולש ABC» beside it on the same line, still there after the quadrilateral.",
+   "before": "No tag.",
+   "expect": [
+    "במשולש ABC"
+   ]
+  },
+  {
+   "id": "T21",
+   "title": "PR #2751 · Analytic: the same tag beside «AE גובה»",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(5,4)",
+    "D(1,3)",
+    "משולש ABC",
+    "AE גובה",
+    "מרובע ABCD"
+   ],
+   "lookFor": "The same grey «במשולש ABC» beside «AE גובה»; E at (5.65, 1.41).",
+   "before": "No tag.",
+   "expect": [
+    "במשולש ABC"
+   ]
+  },
+  {
+   "id": "T22",
+   "title": "PR #2751 · Analytic: un-muting a quadrilateral above the height keeps it the triangle's",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(5,4)",
+    "D(1,3)",
+    "משולש ABC",
+    "מרובע ABCD"
+   ],
+   "after": [
+    {
+     "toggle": 6
+    },
+    {
+     "type": "AE גובה"
+    },
+    {
+     "toggle": 6
+    }
+   ],
+   "lookFor": "Untick «מרובע ABCD», type «AE גובה», tick «מרובע ABCD» back: it returns with no error, and AE stays on BC with «במשולש ABC».",
+   "before": "Ticking the quadrilateral back was refused with the which-shape question.",
+   "expect": [
+    "במשולש ABC"
+   ]
+  },
+  {
+   "id": "T23",
+   "title": "PR #2751 · 2-D: a height that names its side shows no tag",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AE גובה לצלע BC",
+    "מרובע ABCD"
+   ],
+   "lookFor": "No «במשולש …» tag on any row.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "במשולש ABC"
+   ]
+  },
+  {
+   "id": "T24",
+   "title": "PR #2751 · 2-D: a new bare height after the second shape still asks which shape",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AE גובה",
+    "מרובע ABCD",
+    "AF גובה"
+   ],
+   "lookFor": "The last line is refused with the which-shape question naming ABC and ABCD.",
+   "before": "unchanged",
+   "expectRefusal": "ABCD"
+  },
+  {
+   "id": "T25",
+   "title": "PR #2747 · 2-D: «הוכיחו…» says which button checks the claim",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "הוכיחו כי AB = AC"
+   ],
+   "lookFor": "The refusal, then «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות.»",
+   "before": "The refusal only.",
+   "expectRefusal": "על ידי לחיצה על כפתור הצג צלעות וזוויות שוות"
+  },
+  {
+   "id": "T26",
+   "title": "PR #2747 · 2-D: the same line on an empty canvas, before the button exists",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "path": "/",
+   "lines": [
+    "הוכיחו כי AB = AC"
+   ],
+   "lookFor": "The same refusal and line. The button is not on screen yet (it shows once a given exists). Is that acceptable?",
+   "before": "The refusal only.",
+   "expectRefusal": "הצג צלעות וזוויות שוות"
+  },
+  {
+   "id": "T27",
+   "title": "PR #2747 · Analytic: «הוכיחו…» points to the data panel, and the lengths there settle it",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(2,5)",
+    "משולש ABC",
+    "הוכיחו כי AC = BC"
+   ],
+   "asks": [
+    "AC",
+    "BC"
+   ],
+   "lookFor": "The refusal, then «ניתן לבדוק את נכונות הטענה בחלונית «נתונים»: הקלידו שם כל גודל שבטענה ולחצו «שאלו», והשוו בין התשובות — למשל, עבור AB = AC שאלו על AB ועל AC.» Asking «AC» and «BC» shows √29 for each.",
+   "before": "The refusal only.",
+   "expectRefusal": "בחלונית"
+  },
+  {
+   "id": "T28",
+   "title": "PR #2747 · Analytic: the same on a triangle with no coordinates",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "הוכיחו כי AB = AC"
+   ],
+   "asks": [
+    "AB"
+   ],
+   "lookFor": "The refusal and the panel line; asking «AB» answers «עדיין לא נקבע מהנתונים». Does that read well after a pointer that says to compare the answers?",
+   "before": "The refusal only.",
+   "expectRefusal": "בחלונית"
+  },
+  {
+   "id": "T29",
+   "title": "PR #2747 · Complex: «הוכיחו…» points to the panel, and the moduli settle it",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5175",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "z2 = 4+3i",
+    "הוכיחו כי |z1| = |z2|"
+   ],
+   "asks": [
+    "|z1|",
+    "|z2|"
+   ],
+   "lookFor": "The refusal and the panel line; «|z1|» and «|z2|» answer 5 each.",
+   "before": "The refusal only.",
+   "expectRefusal": "בחלונית"
+  },
+  {
+   "id": "T30",
+   "title": "PR #2747 · 3-D: the refusal is unchanged (that arm waits for your ruling)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה ABCD",
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "lookFor": "The refusal sentence alone, quoting the claim, with no pointer.",
+   "before": "unchanged",
+   "expectRefusal": "זו טענה להוכחה",
+   "expectAbsent": [
+    "ניתן לבדוק"
+   ]
+  },
+  {
+   "id": "T35",
+   "title": "PR #2750 · Without the flag nothing changes",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5176",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA1B1C1D1"
+   ],
+   "lookFor": "No 💥 button anywhere; the builder looks as it does today.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "💥"
+   ]
+  }
+ ]
+}
