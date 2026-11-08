@@ -45,7 +45,9 @@ beforeEach(() => {
 describe('#1995 batch 1 — 3-D: the refusal names the statement and gives one next step', () => {
   it('already-defined: edit or delete the row that defined it', () => {
     setUp([CUBE]);
-    expect(submit('פירמידה ABCDS')).toBe('«A» כבר מוגדר בציור, ולא ניתן להגדיר אותו מחדש. כדי לשנות אותו, ערכו או מחקו את השורה שהגדירה אותו.');
+    // #2490 (ADR-3D-434): this row's specimen was «פירמידה ABCDS», which now BUILDS (a pyramid on the face ABCD). A
+    // tetrahedron on four corners of one face is still the honest conflict, with the same sentence.
+    expect(submit('טטראדר ABCD')).toBe('«A» כבר מוגדר בציור, ולא ניתן להגדיר אותו מחדש. כדי לשנות אותו, ערכו או מחקו את השורה שהגדירה אותו.');
   });
 
   it('rename with no such point: says plainly there is nothing to rename', () => {

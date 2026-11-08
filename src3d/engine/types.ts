@@ -1395,6 +1395,13 @@ export interface SolidObj {
    *  generator's vertex `(i + 3) % 4` — so the generator's parallel pair lands on sides 1/3 of the ring as
    *  named. The ids, faces and every name stay as the student wrote them. See {@link SolidCommand.baseSeat}. */
   seat?: 1;
+  /**
+   * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — a BOUND solid: a pyramid declared over a base whose
+   * points already exist (a face of another solid, a stated polygon). These are its base ids, in `ids` order; each keeps
+   * its OWN `PointDef`, so only the apex is this solid's `solid-vertex`. The solid has no gauge of its own: it is placed
+   * in its ring's frame (`boundApexPosition3`) and its dims are the apex's alone (`boundSolidDims3`).
+   */
+  bound?: Id[];
 }
 
 export type PointDef =

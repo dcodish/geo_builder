@@ -630,6 +630,12 @@ function placementFixers3(
     // first enabled fact that names the letter in a ring is that declaration.
     const decl = facts.find((f) => f.enabled && f.cmds.some((k) => 'ids' in k && Array.isArray(k.ids) && (k.ids as unknown[]).includes(id)));
     if (decl) by.add(decl.id);
+    // #2490 (ADR-3D-434): a BOUND solid's apex stands on its ring — what placed the ring placed it too
+    for (const q of owner.bound ?? []) {
+      const sub = placementFixers3(c, facts, q, solidVertex, seen, flatSolid);
+      if (!sub) return null;
+      sub.forEach((x) => by.add(x));
+    }
     return by;
   }
   if (!DERIVED_POINT_KINDS3.has(def.kind)) return null;
@@ -1641,20 +1647,27 @@ function deriveCore3(
   const declaredRings3: Id[][] = declaredRingsOf3(c); // #1986: the one enumeration, shared with the seed search
   const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
   const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
-    ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring));
+    ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring)) ||
+    // #2490 (ADR-3D-434): a pyramid declared over the ring (its base, the run less its apex) — a bound base is declared
+    (k.type === 'solid' && k.ids.length === ring.length + 1 && ring.every((id) => k.ids.includes(id)));
   /**
    * The LINE THAT COMPLETED this ring: the latest enabled fact among its declaration and the statements that
    * placed its vertices. Returns it with the others it conflicts with, or null when some vertex is not placed in
    * the requested scope (`solidVertex`) — a ring with a free vertex is the configuration's business, never a refusal.
    */
-  const ringBlame3 = (ring: readonly Id[], solidVertex: boolean): { blamed: Fact3; by: Set<string> } | null => {
+  const ringBlame3 = (
+    ring: readonly Id[],
+    solidVertex: boolean,
+    /** #2490: which status a DECLARING line may hold to be blamed (an ok line, by default) */
+    admit: (st: FactStatus3) => boolean = (st) => st === 'ok',
+  ): { blamed: Fact3; by: Set<string> } | null => {
     const by = new Set<string>();
     for (const id of ring) {
       const f = placementFixers3(c, facts, id, solidVertex);
       if (!f) return null;
       f.forEach((x) => by.add(x));
     }
-    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declaresRing3(k, ring)));
+    const declaring = facts.find((f) => f.enabled && admit(status[f.id]) && f.cmds.some((k) => declaresRing3(k, ring)));
     if (declaring) by.add(declaring.id);
     const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
     return blamed ? { blamed, by } : null;
@@ -1687,8 +1700,13 @@ function deriveCore3(
   for (const ring of declaredRings3) {
     const pts = ring.map((id) => positions.get(id));
     if (pts.some((p) => !p) || ringSkew3(pts as Vec3[]) <= CLAIM_REL_TOL) continue;
-    const blame = ringBlame3(ring, true);
-    if (!blame || status[blame.blamed.id] !== 'ok') continue;
+    // #2490 (ADR-3D-434): a pyramid's BOUND base that is skew is the line's whole fault — the base-shape claim its kind
+    // lowered («פירמידה ABCA'S»: a rectangle) is refuted only because no flat ring stands on those corners, so the skew
+    // is what the refusal names, never the generic «בדקו את החישוב» (honesty: an error names the conflicting statement)
+    const boundBase = c.solids.some((s) => s.bound !== undefined && sameRing3(s.bound, ring));
+    const admit = (st: FactStatus3): boolean => st === 'ok' || (boundBase && typeof st === 'object' && st.code === 'claim-refuted');
+    const blame = ringBlame3(ring, true, admit);
+    if (!blame || !admit(status[blame.blamed.id])) continue;
     let placed = 0;
     let flatSomewhere = false;
     for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
@@ -1707,6 +1725,26 @@ function deriveCore3(
       others: namedStatements(blame.by, blame.blamed.id),
       sides: ring.length,
       vertices: [...ring],
+    };
+  }
+
+  // #2490 (ADR-3D-434): a pyramid BOUND over existing points whose base lies on ONE LINE has no plane to stand on, so
+  // its apex is left unplaced (`boundApexPosition3`). That is no pyramid: the declaring line is refused as the flattened
+  // solid it is, naming the lines that placed the base (#1860's sentence) — never drawn with a vertex missing. It speaks
+  // over a base-shape claim the kind lowered, which fails only because the ring is degenerate (as the skew check does).
+  for (const solid of c.solids) {
+    if (!solid.bound || solid.ids.every((id) => solid.bound!.includes(id) || positions.has(id))) continue;
+    const want = [...solid.ids].sort().join('|');
+    const decl = facts.find(
+      (f) => f.enabled && (status[f.id] === 'ok' || (typeof status[f.id] === 'object' && (status[f.id] as { code: string }).code === 'claim-refuted')) &&
+        f.cmds.some((k) => k.type === 'solid' && [...k.ids].sort().join('|') === want),
+    );
+    if (!decl) continue;
+    const by = new Set<string>();
+    for (const id of solid.bound) placementFixers3(c, facts, id, true)?.forEach((x) => by.add(x));
+    status[decl.id] = {
+      code: 'polygon-collapsed', stated: decl.utterance, others: namedStatements(by, decl.id),
+      sides: solid.bound.length, ring: solidAsWritten(solid.ids), solid: 'pyramid',
     };
   }
 

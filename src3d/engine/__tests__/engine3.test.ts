@@ -5,8 +5,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { applyCommand3 } from '../apply';
+import { applyCommand3, freeDims } from '../apply';
 import { evaluate3 } from '../evaluate';
+import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3 } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
 
@@ -156,6 +157,119 @@ describe('evaluate — on-segment points', () => {
     expect(t(0)).toBeGreaterThan(0.05);
     expect(t(0)).toBeLessThan(0.95);
     expect(t(1)).not.toBeCloseTo(t(0), 4);
+  });
+});
+
+/**
+ * #2490 (ADR-3D-434) — a pyramid over a base that already exists is a BOUND solid: the base keeps its own points, the
+ * solid owns its apex, and the apex's three numbers are its only dims, placed in the ring's frame.
+ */
+describe('#2490 — a pyramid over an existing base is a bound solid', () => {
+  const cube = (): Construction3 => build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
+  const plane = (c: Construction3, seed: number, ring: string[]) => {
+    const p = evaluate3(c, seed);
+    const [a, b, d] = ring.map((id) => p.get(id)!);
+    const n = cross3(sub3(b, a), sub3(d, a));
+    return { p, off: (id: string) => dot3(n, sub3(p.get(id)!, a)) / norm3(n) };
+  };
+
+  it('owns only its apex: bound = the base, the apex its solid-vertex, the cube untouched', () => {
+    const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(c.solids).toHaveLength(2);
+    expect(c.solids[1].bound).toEqual(['A', 'B', 'C', 'D']);
+    expect(c.points.get('S')).toEqual({ kind: 'solid-vertex', solid: 1, index: 4 });
+    for (const [i, id] of CUBE_IDS.entries()) expect(c.points.get(id)).toEqual({ kind: 'solid-vertex', solid: 0, index: i });
+    expect(pointParents3(c, c.points.get('S')!)).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  it('carries the apex dims alone: host + 3, host + 1 when right (no similarity of its own)', () => {
+    expect(freeDims(cube())).toBe(0);
+    expect(freeDims(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] }))).toBe(3);
+    expect(freeDims(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] }))).toBe(1);
+    expect(freeDims(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] }))).toBe(3);
+  });
+
+  it('the apex is off the base at every seed, moves with the seed, and stands on either side (ADR-052)', () => {
+    const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] });
+    const offs = Array.from({ length: 24 }, (_, seed) => plane(c, seed, ['A', 'B', 'D']).off('S'));
+    for (const o of offs.slice(0, 6)) expect(Math.abs(o)).toBeGreaterThan(0.3);
+    expect(new Set(offs.map((o) => o.toFixed(6))).size).toBe(24);
+    expect(offs.some((o) => o > 0)).toBe(true);
+    expect(offs.some((o) => o < 0)).toBe(true);
+  });
+
+  it('over a FLAT host the sides are one figure mirrored: the apex stands up, on the floor frame\'s side (FR-SP-4)', () => {
+    const c = build({ type: 'quad-shape', base: 'square', ids: ['A', 'B', 'C', 'D'] }, { type: 'solid', kind: 'pyramid4g', ids: ['A', 'B', 'C', 'D', 'S'] });
+    for (let seed = 0; seed < 12; seed++) {
+      const p = evaluate3(c, seed);
+      for (const id of ['A', 'B', 'C', 'D']) expect(Math.abs(p.get(id)!.z)).toBeLessThan(1e-9);
+      expect(p.get('S')!.z).toBeGreaterThan(0.3);
+    }
+  });
+
+  it('adding it never moves the host (stability)', () => {
+    const before = cube();
+    const after = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] });
+    for (const seed of [0, 7]) {
+      const p0 = evaluate3(before, seed);
+      const p1 = evaluate3(after, seed);
+      for (const id of CUBE_IDS) expect(p1.get(id)).toEqual(p0.get(id));
+    }
+  });
+
+  it('a right kind stands over the ring\'s centre', () => {
+    const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] });
+    for (const seed of [0, 1, 2]) {
+      const p = evaluate3(c, seed);
+      const S = p.get('S')!;
+      const ctr = lerp3(p.get('A')!, p.get('C')!, 0.5);
+      const n = cross3(sub3(p.get('B')!, p.get('A')!), sub3(p.get('D')!, p.get('A')!));
+      const along = dot3(sub3(S, ctr), n) / norm3(n);
+      expect(dist3(S, ctr)).toBeCloseTo(Math.abs(along), 9);
+    }
+  });
+
+  it('a ring of free points places the apex at its turn in the point pass', () => {
+    const c = emptyConstruction3();
+    for (const id of ['A', 'B', 'C']) c.points.set(id, { kind: 'free3' });
+    const r = applyCommand3(c, { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.solids[0].bound).toEqual(['A', 'B', 'C']);
+    for (const seed of [0, 3]) expect(Math.abs(plane(r.next, seed, ['A', 'B', 'C']).off('S'))).toBeGreaterThan(1e-3);
+  });
+
+  it('a placeholder apex yields (#841) and keeps its slot in the point order', () => {
+    const c = cube();
+    c.points.set('S', { kind: 'free3' });
+    c.points.set('M', { kind: 'on-segment', a: 'A', b: 'S', t: 0.5 });
+    const r = applyCommand3(c, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.points.get('S')).toEqual({ kind: 'solid-vertex', solid: 1, index: 4 });
+    expect([...r.next.points.keys()].indexOf('S')).toBeLessThan([...r.next.points.keys()].indexOf('M'));
+    const p = evaluate3(r.next, 0);
+    expect(dist3(p.get('M')!, lerp3(p.get('A')!, p.get('S')!, 0.5))).toBeLessThan(1e-12);
+  });
+
+  it('keeps the refusals that are not this run: a base only partly there, a tetra inside one face', () => {
+    const tri = build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
+    expect(applyCommand3(tri, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] })).toEqual({ ok: false, error: { code: 'already-defined', id: 'A' } });
+    expect(applyCommand3(cube(), { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'D'] })).toEqual({ ok: false, error: { code: 'already-defined', id: 'A' } });
+  });
+
+  it('a base shape the kind states is a statement about the ring: a disjoint one refuses naming both', () => {
+    const par = build({ type: 'quad-shape', base: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
+    const r = applyCommand3(par, { type: 'solid', kind: 'pyramidTrap', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(r).toEqual({ ok: false, error: { code: 'shape-disjoint', stated: 'trapezoid', actual: 'parallelogram' } });
+  });
+
+  it('a stated narrower base retires the ring\'s drawing preference it now contradicts (rectangle → square)', () => {
+    const rect = build({ type: 'quad-shape', base: 'rectangle', ids: ['A', 'B', 'C', 'D'] });
+    expect(rect.requirements.some((q) => q.kind === 'quad-general')).toBe(true);
+    const r = applyCommand3(rect, { type: 'solid', kind: 'pyramid4g', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.next.requirements.some((q) => q.kind === 'quad-general')).toBe(false);
   });
 });
 

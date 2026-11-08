@@ -138,9 +138,13 @@ describe('#503 (ADR-3D-142) — the apex-less form and the imperative/relative-c
     }
   });
 
-  it('the apex-less form beside TWO solids refuses as ambiguous', () => {
-    const { st } = build(['פירמידה ABCD', "תיבה EFGHE'F'G'H'", 'גובה הפירמידה']);
-    expect(st.lastError, 'two solids — no honest apex/base').not.toBeNull();
+  // #2490 (ADR-3D-434, amends ADR-3D-142): the noun names THE pyramid — beside a box it is the figure's one pyramid
+  // (the operator's 2026-08-26 ruling for a noun-only solid statement, `resolveSolidSubject`); two pyramids stay a question
+  it('the apex-less form beside another solid names the one pyramid; beside TWO pyramids it refuses as ambiguous', () => {
+    const one = build(['פירמידה ABCD', "תיבה EFGHE'F'G'H'", 'גובה הפירמידה']);
+    expect(one.st.lastError, 'one pyramid beside a box — it is the pyramid').toBeNull();
+    const two = build(['פירמידה ABCD', 'פירמידה EFGH', 'גובה הפירמידה']);
+    expect(two.st.lastError, 'two pyramids — no honest apex/base').not.toBeNull();
   });
 });
 

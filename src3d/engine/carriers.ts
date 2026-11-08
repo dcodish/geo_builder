@@ -126,6 +126,8 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
   };
   switch (def.kind) {
     case 'solid-vertex':
+      // #2490 (ADR-3D-434): a BOUND solid's apex is placed in its ring's frame — it reads every base point
+      return [...(c.solids[def.solid]?.bound ?? [])];
     case 'coord':
     case 'partial':
     case 'coord-sym':

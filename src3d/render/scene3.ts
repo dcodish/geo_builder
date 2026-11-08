@@ -17,7 +17,7 @@ import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { freeDofCount3, hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
-import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3 } from '../engine/types';
+import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3, type SolidObj } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
@@ -244,26 +244,61 @@ function outwardNormal(ring: Vec3[], center: Vec3): Vec3 {
   return dot3(n, toFace) >= 0 ? n : { x: -n.x, y: -n.y, z: -n.z };
 }
 
-/** Set of edge keys hidden from this camera (both bordering faces back-facing). */
+/**
+ * Is `p` strictly inside the convex solid `solid` (every face's outward side strictly behind it)? Faces with no area
+ * decide nothing (#817).
+ */
+function strictlyInside(solid: SolidObj, positions: Positions3, p: Vec3): boolean {
+  if (!solid.ids.every((id) => positions.has(id))) return false; // an unplaced vertex: no body to be inside
+  const center = centroid3(solid.ids.map((id) => positions.get(id)!));
+  for (const face of solid.faces) {
+    const ring = face.map((id) => positions.get(id)!);
+    const raw = outwardNormal(ring, center);
+    if (norm3(raw) < 1e-12) continue;
+    if (dot3(normalize3(raw), sub3(p, ring[0])) > -1e-7) return false;
+  }
+  return true;
+}
+
+/**
+ * Set of edge keys hidden from this camera (every bordering face back-facing).
+ *
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)): two solids may now SHARE vertices — a pyramid bound on a
+ * cube's face. A face both carry is inside their union, so it is no surface and votes for no edge; a face (or an edge)
+ * that runs through the body of a solid it shares vertices with is behind that solid's surface. An edge is drawn when
+ * any face bordering it, in any solid, is a front-facing surface. Solids that share no vertex vote exactly as before.
+ */
 export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Camera3): Set<string> {
   const { eye } = cameraFrame(cam);
   const hidden = new Set<string>();
+  const faceKey = (f: readonly Id[]): string => [...f].sort().join('|');
+  const faceCount = new Map<string, number>();
+  for (const s of c.solids) for (const f of s.faces) faceCount.set(faceKey(f), (faceCount.get(faceKey(f)) ?? 0) + 1);
+  /** the other solids `solid` shares vertices with — the only ones whose body can hold its faces */
+  const partners = (solid: SolidObj): SolidObj[] => c.solids.filter((o) => o !== solid && o.ids.filter((id) => solid.ids.includes(id)).length >= 3);
+  const inPartner = (solid: SolidObj, p: Vec3): boolean => partners(solid).some((o) => strictlyInside(o, positions, p));
 
+  // edge key → is any bordering face a front-facing surface?
+  const anyFront = new Map<string, boolean>();
   for (const solid of c.solids) {
+    if (!solid.ids.every((id) => positions.has(id))) continue; // a bound apex its degenerate ring left unplaced draws nothing
     const center = centroid3(solid.ids.map((id) => positions.get(id)!));
-    // edge key → is any bordering face front-facing?
-    const anyFront = new Map<string, boolean>();
     for (const face of solid.faces) {
       const ring = face.map((id) => positions.get(id)!);
-      const front = dot3(outwardNormal(ring, center), eye) > 1e-12;
+      const surface = (faceCount.get(faceKey(face)) ?? 0) < 2 && !inPartner(solid, centroid3(ring));
+      const front = surface && dot3(outwardNormal(ring, center), eye) > 1e-12;
       for (let i = 0; i < face.length; i++) {
         const k = edgeKey(face[i], face[(i + 1) % face.length]);
         anyFront.set(k, (anyFront.get(k) ?? false) || front);
       }
     }
+  }
+  for (const solid of c.solids) {
     for (const [a, b] of solid.edges) {
       const k = edgeKey(a, b);
-      if (anyFront.get(k) === false) hidden.add(k);
+      const [pa, pb] = [positions.get(a), positions.get(b)];
+      if (!pa || !pb) continue;
+      if (anyFront.get(k) === false || inPartner(solid, lerp3(pa, pb, 0.5))) hidden.add(k);
     }
   }
   return hidden;
@@ -285,6 +320,7 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
   const EPS = 1e-7;
 
   for (const solid of c.solids) {
+    if (!solid.ids.every((id) => positions.has(id))) continue; // #2490: an unplaced bound apex has no body to occlude
     const center = centroid3(solid.ids.map((id) => positions.get(id)!));
     let inside = true;
     let onAnyFrontFace = false;
@@ -1273,10 +1309,15 @@ export function buildScene3(
   // auxiliary segments (hidden = interior / on a hidden face — `auxSegmentHidden`).
   const hidden = hiddenEdgeKeys(c, positions, cam);
   const edges: SceneEdge3[] = [];
+  // #2490 (ADR-3D-434): an edge two solids share (a bound pyramid's base on a cube's face) is ONE line of ink
+  const drawnEdge = new Set<string>();
   for (const solid of c.solids) {
     for (const [a, b] of solid.edges) {
-      const pa = screen.get(a)!;
-      const pb = screen.get(b)!;
+      if (drawnEdge.has(edgeKey(a, b))) continue;
+      drawnEdge.add(edgeKey(a, b));
+      const pa = screen.get(a);
+      const pb = screen.get(b);
+      if (!pa || !pb) continue; // #2490: a bound apex its degenerate ring could not place draws nothing (the store refuses it)
       edges.push({ id: `edge-${edgeKey(a, b)}`, a, b, x1: pa.x, y1: pa.y, x2: pb.x, y2: pb.y, hidden: hidden.has(edgeKey(a, b)) });
     }
   }
@@ -1300,8 +1341,11 @@ export function buildScene3(
     list.push({ dx: q.x - p.x, dy: q.y - p.y });
     incident.set(at, list);
   };
+  const countedEdge = new Set<string>();
   for (const solid of c.solids) {
     for (const [a, b] of solid.edges) {
+      if (countedEdge.has(edgeKey(a, b)) || !screen.has(a) || !screen.has(b)) continue; // #2490: a shared edge is one direction, not two
+      countedEdge.add(edgeKey(a, b));
       addIncident(a, b);
       addIncident(b, a);
     }

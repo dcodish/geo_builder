@@ -40,7 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
+import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
@@ -55,7 +55,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, r
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
-import { baseRingOf, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
+import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -258,6 +258,8 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   let all = bySeed.get(memoKey);
   if (!all) {
     all = c.solids.map((solid, i) => {
+      // #2490 (ADR-3D-434): a bound solid's dims are its apex's alone — no layout, no similarity of its own
+      if (solid.bound) return boundSolidDims3(solid.kind, `bound-${solid.kind}-${solid.ids.join('')}`, seed, !flatHostOf3(c, solid));
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
       const seat = concave[i];
       const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
@@ -442,6 +444,62 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3, oblique?:
   }
   // Every prism kind rides the shared base-ring + lateral path at the top of this function.
   return [];
+}
+
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — A BOUND SOLID IS PLACED IN ITS RING'S FRAME.
+ *
+ * A pyramid declared over a base that already exists («קובייה ABCDA'B'C'D'» · «פירמידה ABCDS») owns only its apex: the
+ * base points keep their own definitions. So it has no canonical layout and no gauge of its own — its frame is FITTED
+ * to the ring's resolved positions (the centroid g, the unit normal n by Newell's rule, the in-plane axis e1 along the
+ * ring's first side, e2 = n × e1, and the ring's RMS radius L as its unit), and its dims are the apex's three numbers:
+ * the foot's in-plane offset (u, v) and the height h, all in units of L, so the placement is similarity-covariant and
+ * rides the host's gauge. Each is a free sampled DOF (ADR-052): «הציגו תצורה אחרת» moves the apex, to either side of
+ * the base — the sign of h is a free choice, never a default. A RIGHT kind seats the foot at the ring's circumcentre
+ * (equal lateral edges, the ADR-3D-090 convention every right pyramid follows), so only h is free.
+ *
+ * Over a FLAT host — a stated polygon («ריבוע ABCD» · «פירמידה ABCDS שבסיסה ריבוע») — the two sides are mirror images
+ * of one figure, a gauge rather than a configuration: the apex stands on the side the polygon's floor frame calls up
+ * (`flatHostOf3`, the polygon's own ring normal), as a standalone pyramid's does (FR-SP-4, operator 2026-10-31), and the
+ * polygon never turns over when the pyramid is added. Over a solid's face the sides differ (outside the cube or inside
+ * it), so there the side is sampled.
+ *
+ * The apex is placed after its ring, so adding it can never move the host (stability).
+ */
+export function flatHostOf3(c: Pick<Construction3, 'solids'>, solid: SolidObj): SolidObj | undefined {
+  return c.solids.find((o) => o !== solid && FLAT_SOLID_KINDS.has(o.kind) && (solid.bound ?? []).every((id) => o.ids.includes(id)));
+}
+export function boundSolidDims3(kind: SolidKind, key: string, seed: number, sideFree = true): number[] {
+  const side = !sideFree || sample(seed, `${key}-side`, -1, 1) >= 0 ? 1 : -1;
+  const h = side * sample(seed, `${key}-h`, 0.8, 1.6);
+  if (boundSolidDimCount3(kind) === 1) return [h];
+  return [sample(seed, `${key}-u`, -0.35, 0.35), sample(seed, `${key}-v`, -0.35, 0.35), h];
+}
+/** The apex of bound solid `solid` from its dims, or null while its ring is unplaced or degenerate (honest: unplaced). */
+export function boundApexPosition3(solid: SolidObj, dims: readonly number[], pos: Positions3, host?: SolidObj): Vec3 | null {
+  const ring = (solid.bound ?? []).map((id) => pos.get(id));
+  if (ring.length < 3 || ring.some((p) => !p)) return null;
+  const pts = ring as Vec3[];
+  const nn = newellNormal(pts);
+  if (norm3(nn) < 1e-12) return null; // a collinear ring has no plane — no pyramid stands on it
+  // over a flat host, h > 0 is the side its floor frame calls up (the host ring's own normal)
+  const hostPts = host?.ids.map((id) => pos.get(id));
+  const up = hostPts && hostPts.every((p) => !!p) ? newellNormal(hostPts as Vec3[]) : null;
+  const n = normalize3(up && dot3(up, nn) < 0 ? scale3(nn, -1) : nn);
+  const g = centroid3(pts);
+  const L = Math.sqrt(pts.reduce((s, p) => s + dot3(sub3(p, g), sub3(p, g)), 0) / pts.length);
+  if (!(L > 1e-12)) return null;
+  if (boundSolidDimCount3(solid.kind) === 1) {
+    const foot = ringCircumcentre3(pts) ?? g;
+    return add3(foot, scale3(n, L * dims[0]));
+  }
+  const side = sub3(pts[1], pts[0]);
+  const along = sub3(side, scale3(n, dot3(side, n)));
+  if (norm3(along) < 1e-12) return null;
+  const e1 = normalize3(along);
+  const e2 = cross3(n, e1);
+  const [u, v, h] = dims;
+  return add3(g, scale3(add3(add3(scale3(e1, u), scale3(e2, v)), scale3(n, h)), L));
 }
 
 // ---------------------------------------------------------------------------
@@ -3239,6 +3297,17 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
 }
 
 /**
+ * #2490 (ADR-3D-434): the solid whose base lies on the floor — the first solid, except that a flat polygon a BOUND solid
+ * stands on is that solid's base: «ריבוע ABCD» · «פירמידה ABCDS» lies on the floor with its apex above, as a standalone
+ * pyramid does (FR-SP-4), whichever mirror image the pivot chose. A polygon nothing stands on keeps its own frame.
+ */
+function floorSolid3(c: Construction3): SolidObj {
+  const s0 = c.solids[0];
+  if (!FLAT_SOLID_KINDS.has(s0.kind)) return s0;
+  return c.solids.find((s) => s.bound !== undefined && flatHostOf3(c, s) === s0) ?? s0;
+}
+
+/**
  * THE GAUGE IS NOT A CONFIGURATION (#1421, ADR-3D-272 — operator ruling 2026-09-27, twice:
  * "keep it flat on the floor").
  *
@@ -3265,7 +3334,7 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
   if (solved.freeDriven || orientationStated3(c) || c.revolutions.length > 0 || c.circles3.length > 0) return solved;
   const pos = solved.positions;
   const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-  let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
+  let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(floorSolid3(c), pos) : null;
   for (let i = 1; i < ordered.length && !frame; i += 1) {
     const d1 = sub3(ordered[i], ordered[0]);
     if (norm3(d1) < 1e-9) continue;
@@ -3482,11 +3551,35 @@ function evaluateSolidsAndPoints(
   sampledSolidDims?: readonly number[][],
 ): void {
   let dimCursor = 0;
+  /**
+   * #2490 (ADR-3D-434): the BOUND solids whose ring is not all placed by the solid pass (a ring of free or derived
+   * points) — by index, with their dims. Each is placed in the point pass at its apex's turn: the apex was declared
+   * after every ring point, so they precede it there. A ring of solid vertices and coordinates is placed here.
+   */
+  const boundLater = new Map<number, readonly number[]>();
+  /** the ids this solid pass has placed (a stale position from an earlier pass is never a ring's frame) */
+  const solidPlaced = new Set<Id>();
+  const placeBound = (i: number, dims: readonly number[]): void => {
+    const solid = c.solids[i];
+    const at = boundApexPosition3(solid, dims, pos, flatHostOf3(c, solid));
+    if (!at) return; // unplaced, honestly — the derive reads a missing apex
+    for (const id of solid.ids) {
+      if (solid.bound!.includes(id)) continue;
+      pos.set(id, at);
+      solidPlaced.add(id);
+    }
+  };
   c.solids.forEach((solid, i) => {
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
     const own = sampledSolidDims?.[i] ?? solidDimsAll3(c, seed)[i];
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
+    if (solid.bound) {
+      const ringPlaced = solid.bound.every((id) => solidPlaced.has(id) || (c.points.get(id)?.kind === 'coord' && pos.has(id)));
+      if (ringPlaced) placeBound(i, dims);
+      else boundLater.set(i, dims);
+      return;
+    }
     const nShape = i === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
     let ps = solidPositions(solid.kind, dims.slice(0, nShape), origin, solid.oblique);
     if (i > 0) {
@@ -3498,7 +3591,10 @@ function evaluateSolidsAndPoints(
     }
     // #1918 (ADR-3D-313): a SEATED base takes the generator's ring one place round, so its parallel pair
     // (a trapezoid's) lands on the sides the student stated parallel. Only the base ring moves.
-    solid.ids.forEach((id, j) => pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]));
+    solid.ids.forEach((id, j) => {
+      pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]);
+      solidPlaced.add(id);
+    });
   });
 
   c.revolutions.forEach((rev, i) => {
@@ -3523,7 +3619,16 @@ function evaluateSolidsAndPoints(
   const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void =>
     seatOnPlaneRider(c, seed, pos, planes, id, def, riderTOverride);
   for (const [id, def] of c.points) {
-    if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
+    if (def.kind === 'solid-vertex') {
+      // #2490 (ADR-3D-434): a bound solid over a ring of free or derived points is placed at its apex's turn
+      const later = boundLater.get(def.solid);
+      if (later) {
+        boundLater.delete(def.solid);
+        placeBound(def.solid, later);
+      }
+      continue;
+    }
+    if (def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
       const a = pos.get(def.a);
       const b = pos.get(def.b);
@@ -3882,7 +3987,8 @@ function evaluateSolidsAndPoints(
     const P = solveVecDef(c, vd, pos, chosen);
     if (P) pos.set(id, P);
   }
-
+  // #2490 (ADR-3D-434): a bound solid whose ring finished only in the deferred pass
+  for (const [i, dims] of boundLater) placeBound(i, dims);
 }
 
 /** A free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame centred on the
