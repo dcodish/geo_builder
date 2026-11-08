@@ -11,6 +11,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { loadEnv, type Plugin } from 'vite';
 import { handleParse } from './parseHandler';
+import { serveSafely } from './http';
 
 /**
  * #1955 (ADR-W-127) — is this request from a HEADLESS browser? CLAUDE.md rule 2: only the operator
@@ -38,19 +39,24 @@ export function llmProxyPlugin(): Plugin {
       apiKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
     },
     configureServer(server) {
-      server.middlewares.use('/api/parse', (req, res) => {
-        // DEV HOST ONLY (#1955): a headless caller is answered as a keyless server — 503, which every
-        // client reads as "the deterministic refusal stands" — before the handler can dispatch.
-        // Production (`standalone.ts`) is unchanged: there the caller is a student.
-        if (apiKey && isHeadlessCaller(req.headers)) {
-          server.config.logger.warn('[geo-llm-proxy] refused a model call from a headless browser (rule 2, ADR-W-127)');
-          res.statusCode = 503;
-          res.setHeader('content-type', 'application/json');
-          res.end(JSON.stringify({ error: 'no-api-key' }));
-          return;
-        }
-        return handleParse(req, res, { apiKey, logError: (m) => server.config.logger.error(m) });
-      });
+      const logError = (m: string) => server.config.logger.error(m);
+      // Inside the one request boundary (#2752, ADR-W-192): a failure ends this request, never the dev server.
+      server.middlewares.use(
+        '/api/parse',
+        serveSafely((req, res) => {
+          // DEV HOST ONLY (#1955): a headless caller is answered as a keyless server — 503, which every
+          // client reads as "the deterministic refusal stands" — before the handler can dispatch.
+          // Production (`standalone.ts`) is unchanged: there the caller is a student.
+          if (apiKey && isHeadlessCaller(req.headers)) {
+            server.config.logger.warn('[geo-llm-proxy] refused a model call from a headless browser (rule 2, ADR-W-127)');
+            res.statusCode = 503;
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({ error: 'no-api-key' }));
+            return;
+          }
+          return handleParse(req, res, { apiKey, logError });
+        }, logError),
+      );
     },
   };
 }

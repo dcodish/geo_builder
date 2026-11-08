@@ -146,6 +146,11 @@ ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdo
 # 4. proxy — when the preflight says it DIFFERS
 scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
+
+# 4b. the unit file — ONLY when deploy/geo-proxy.service changed. Not allowlisted, so it asks the operator.
+scp deploy/geo-proxy.service root@themathbible.com:/etc/systemd/system/geo-proxy.service
+ssh root@themathbible.com 'systemctl daemon-reload'
+ssh root@themathbible.com 'systemctl restart geo-proxy'
 ```
 
 ## The `-next` channel — RETIRED 2026-08-18 ([ADR-W-025](06w-decisions-workspace.md#adr-w-025), #747)

@@ -7126,3 +7126,36 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 **Locks.** `server/__tests__/fix-test-shape.test.ts` (the classifier's cases, and no new unexplained case file); `server/__tests__/test-tiers.test.ts` (`fileTimesPath`, `costByKind`, `caseExcludes`); the scenario shards and `src/__tests__/fixtures.test.ts` (the step nets and the no-room verdict, per scenario and per fixture); `src3d/__tests__/decide-submit3-parity-1394-1.test.ts` (the four goldens partition the corpus); the goldens and floors of every harvest, which the frozen `folded-sequences.json` keeps whole.
 
 **Behaviour change for a student:** none.
+
+## ADR-W-192 — A request's failure ends that request, never the shared server: one boundary per request, one body reader (#2752)
+
+**Status:** accepted · 2026-11-08 · bug fix (server)
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** [04s](04s-design-server.md) "A request's failure ends that request, never the process" · **Product:** server.
+
+**Context, measured at `0b7edbe4`.** One Node process serves the AI fallback, the usage log, sharing and the dashboards for all four builders.
+- A client that dropped mid-upload made `readBody` reject, and its callers awaited it outside any `try`.
+- The admin forms read their bodies with their own uncapped loop.
+- `standalone.ts` started every handler as `void handleX(...)`.
+- On loopback, the first aborted POST to `/api/log` ended the process (`Error: aborted`, `ECONNRESET`).
+
+Each crash also reset the daily AI cap, the concurrency cap and the per-IP limiters. systemd stops restarting a unit after five starts in ten seconds.
+
+**Class.** A request handler's failure (a throw or a rejected promise) escapes its request and ends the shared process. The dev server's four mounts had the same shape. No product tree runs a server.
+
+**Decision.**
+1. **`serveSafely` (`server/http.ts`) is the one failure boundary per request.** The production router (`dispatch`) and every dev mount run inside it, and a handler is returned into it. A failure is logged with its method and path, and ends its own request: 500 if nothing was sent, a closed connection otherwise.
+2. **`readBody` is the one body reader.** It resolves `null`, never rejects, when the client goes away or the body exceeds its cap. The admin login form (8 KB), the config form (256 KB) and the dev log mount use it.
+3. **A last net.** A process-level `unhandledRejection` handler logs and keeps serving.
+4. **Restarts never stop.** `deploy/geo-proxy.service` sets `StartLimitIntervalSec=0`.
+
+**Found in the same reader.** It decoded each chunk on its own, so a Hebrew letter whose two bytes arrived in different chunks became two replacement characters. It now decodes the bytes once.
+
+**Locks.** `server/__tests__/request-boundary-2752.test.ts`:
+- aborted bodies on every body-reading route of the real proxy, with the model SDK tripwired;
+- the boundary's three failure shapes;
+- the reader;
+- a ratchet: no `void handleX(`, no body loop outside `http.ts`, and every dev mount inside `serveSafely`.
+
+**Behaviour change for a student:** none while the server is up. A dropped upload no longer takes the server away from everyone else.
+
