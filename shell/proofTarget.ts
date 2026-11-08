@@ -141,3 +141,32 @@ export function findProofTarget(text: string): ProofTarget | null {
 
 /** Convenience: does `text` carry a proof target at all? */
 export const isProofTarget = (text: string): boolean => findProofTarget(text) !== null;
+
+/**
+ * #2492 ([ADR-W-194](../docs/06w-decisions-workspace.md#adr-w-194)) — THE REFUSAL'S SUITE KEYS, and the line that says
+ * where the claim CAN be checked.
+ *
+ * Operator, 2026-10-24: *"For all cases of הוכיחו we should add to the message that they can check if its true …"*, and
+ * his ruling the same day (ballot e19): *"for non-2d tools, we tell them to check the claim in the data panel"*. So the
+ * refusal is two sentences: the one every builder says (`suite.refusal.proofTarget`, the claim quoted in `{{sentence}}`),
+ * then where to check it. 2-D names its relations button (its own key, `input.scope.proofTargetCheck`, which nests the
+ * button's label key). A builder whose data panel answers the quantities a claim is about says so in the line below,
+ * one suite key whose `{{panel}}` and `{{ask}}` are that builder's OWN labels, read from the keys that label the panel and
+ * its ask button, so a renamed panel renames the refusal and no label is ever retyped.
+ */
+export const PROOF_TARGET_KEY = 'suite.refusal.proofTarget';
+export const PROOF_TARGET_CHECK_PANEL_KEY = 'suite.refusal.proofTargetCheckPanel';
+
+/** The translator the refusal needs — each product's `t`, narrowed. */
+export type ProofTargetTranslate = (key: string, vars: Record<string, string>) => string;
+
+/** The labels a builder's data panel is drawn with: its heading and its ask button, each as the builder's `t` reads it. */
+export interface PanelLabels {
+  readonly panel: string;
+  readonly ask: string;
+}
+
+/** The refusal in a builder that checks a claim in its data panel: the suite sentence quoting the claim, then the pointer. */
+export function proofTargetPanelText(t: ProofTargetTranslate, sentence: string, labels: PanelLabels): string {
+  return `${t(PROOF_TARGET_KEY, { sentence })} ${t(PROOF_TARGET_CHECK_PANEL_KEY, { panel: labels.panel, ask: labels.ask })}`;
+}

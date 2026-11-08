@@ -83,7 +83,9 @@ export async function proofTargetFaults(gate: ProofGate): Promise<string[]> {
     const v = await gate(line);
     if (!v.proof) faults.push(`«${line}» was not refused as a proof target`);
     if (v.recorded) faults.push(`«${line}» was recorded — a claim to prove became a given`);
-    if (v.proof && !(v.text ?? '').includes(quotes)) {
+    // the claim as QUOTED — its closing guillemet included — so a refusal whose own text happens to carry the same
+    // symbols (#2492's pointer teaches with «AB = AC») cannot pass for one that quotes the student's claim
+    if (v.proof && !(v.text ?? '').includes(`${quotes}»`)) {
       faults.push(`the refusal of «${line}» does not quote the claim «${quotes}»: ${JSON.stringify(v.text)}`);
     }
   }

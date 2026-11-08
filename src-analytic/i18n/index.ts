@@ -197,8 +197,6 @@ const he = {
   // #1947 (ADR-AG-301) — 2-D's `input.scope.right-angle-vertex`, byte for byte (ADR-611 / ADR-3D-331); locked by
   // shell/__tests__/one-fact-per-line-parity-1962.test.ts
   errRightAngleVertex: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
-  errProofTarget:
-    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{detail}}»',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: «{{detail}}»',
   errNameClash:
     'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט «{{detail}}». ' +
@@ -838,8 +836,6 @@ const en: typeof he = {
   errOutOfScope: 'Understood, but not supported in this tool: «{{detail}}»',
   errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
   errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
-  errProofTarget:
-    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{detail}}»',
   errConflict: 'Not added — it contradicts what is already fixed: «{{detail}}»',
   errNameClash:
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +

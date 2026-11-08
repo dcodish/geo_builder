@@ -76,7 +76,7 @@ import {
   trialFacts,
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
-import { findProofTarget } from '../../shell/proofTarget';
+import { findProofTarget, PROOF_TARGET_KEY } from '../../shell/proofTarget';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { findNumberPair, teachPair, type NumberPair } from '../../shell/juxtaposedNumbers';
 import { unreadScript } from '../../shell/inputScript';
@@ -291,10 +291,10 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
   // SHOW, never a given. Refused here, PRE-parse, for the negation's reason: the relation rules matched the
   // claim inside the sentence and committed it as a constraint, so the figure was forced to satisfy what
   // was to be proved. The `proof` scope category below only ever ran after a FAILED parse. The rule is
-  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence.
+  // shared by all three builders (`shell/proofTarget`); the note quotes the proof sentence (#2492: `proofTargetNote`).
   const proof = findProofTarget(utterance);
   if (proof) {
-    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: proofTargetNote(proof.sentence) };
   }
   // AN ANGLE WRITTEN IN RADIANS (#1837, ADR-710 / ADR-W-142) — «∠ABC = π/2»: radians are the complex builder's
   // notation only (operator rulings 2026-10-07 "Refuse and teach degrees", 2026-10-08). Refused here, PRE-parse
@@ -330,6 +330,17 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:negation' }], note: { key: 'input.scope.negation', params: { word: negated } } };
   }
   return null;
+}
+
+/**
+ * #2492 ([ADR-W-194](../../docs/06w-decisions-workspace.md#adr-w-194)) — THE PROOF-TARGET NOTE, one spelling for the
+ * submit and the edit seam: the suite's sentence quoting the claim, then where 2-D checks a claim. Operator, 2026-10-24:
+ * *"For all cases of הוכיחו we should add to the message … ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות
+ * וזוויות שוות."* The button's name is NESTED in `input.scope.proofTargetCheck` from `actions.viewRelations`, the key
+ * that labels the button, so the refusal names the button by the text it carries.
+ */
+export function proofTargetNote(sentence: string): DecideNote {
+  return { key: PROOF_TARGET_KEY, params: { sentence }, also: { key: 'input.scope.proofTargetCheck' } };
 }
 
 /**
