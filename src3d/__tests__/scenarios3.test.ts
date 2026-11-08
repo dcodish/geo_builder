@@ -654,3 +654,32 @@ describe('crossed-ring-search-1986 — the ruled kite and quadrilateral pairs dr
     expect(crossed('ABDC')).toBe(false);
   });
 });
+
+// pyramid-keeps-quad-2490 (#2490, ADR-3D-436) — the operator's lines and ruling of 2026-11-08 (round #2745 Question 1:
+// "Keep its shape"): a pyramid on a quadrilateral that already exists keeps the quadrilateral's shape. The figure built
+// green before the fix too, as a rectangle, so the lock is bespoke: ABCD is no rectangle at any configuration
+// «הציגו תצורה אחרת» reaches, and its four shape DOFs stay beside the apex's three.
+describe('pyramid-keeps-quad-2490 — «מרובע ABCD» · «פירמידה ABCDS» keeps the quadrilateral general', () => {
+  beforeEach(reset);
+  it('builds, binds the pyramid to ABCD, 7 DOF, and ABCD is never a rectangle across ten presses', () => {
+    submit('מרובע ABCD');
+    submit('פירמידה ABCDS');
+    expectAllOk();
+    expect(derived().construction.solids[1]?.bound).toEqual(['A', 'B', 'C', 'D']);
+    expect(freeDofCount3(derived().construction, derived().resolved)).toBe(7);
+    const ring = ['A', 'B', 'C', 'D'];
+    for (let press = 0; press < 10; press++) {
+      const pos = derived().positions;
+      const corners = ring.map((v, i) => {
+        const at = pos.get(v)!;
+        const a = pos.get(ring[(i + 3) % 4])!;
+        const b = pos.get(ring[(i + 1) % 4])!;
+        const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
+        return Math.abs(dot) / (dist3(at, a) * dist3(at, b));
+      });
+      expect(Math.max(...corners), `press ${press}`).toBeGreaterThan(1e-3);
+      useGeo3.getState().resample();
+      expectAllOk();
+    }
+  });
+});

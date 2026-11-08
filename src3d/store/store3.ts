@@ -36,7 +36,7 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidBase3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
@@ -53,11 +53,11 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
-import { isBareAltitude3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
+import { isBareAltitude3, namesQuadBase3, parse3, parseRewrite3, polygonDeclaration3, solidDeclaration3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -776,11 +776,25 @@ function deriveCore3(
     return solid ? { ok: true, cmds: [...solid.cmds, ...r.cmds] } : r;
   };
   /** #2490 (ADR-3D-434): a pyramid run the row's own text does not spell was lettered by the parser — marked, so it
-   *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged. */
+   *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged.
+   *  #2490 (ADR-3D-436): and a pyramid whose base SHAPE goes unnamed, over a ring the figure `at` already holds, is read
+   *  as the quadrilateral its letters name (`unstatedPyramidBase3`): the ring keeps its shape. The row's own text says
+   *  whether a shape was named (`namesQuadBase3`); a solid the mint pass declared for the row is its bare declaration
+   *  («פירמידה ABCDS», listed first), which names none. Every reader after the fold reads this, as `resolvedCmds`. */
   const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
     const r = expandFactRaw(at, f);
-    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids))) return r;
-    return { ok: true, cmds: r.cmds.map((k) => (k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids) ? { ...k, lettersUnstated: true as const } : k)) };
+    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind))) return r;
+    const minted = presolids?.[f.id]?.cmds.length ?? 0;
+    let named: boolean | undefined;
+    let changed = false;
+    const cmds = r.cmds.map((k, i) => {
+      if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return k;
+      let out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
+      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) out = unstatedPyramidBase3(at, out);
+      if (out !== k) changed = true;
+      return out;
+    });
+    return changed ? { ok: true, cmds } : r;
   };
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
@@ -1150,7 +1164,9 @@ function deriveCore3(
           let made = probe;
           let refused: FactStatus3 | null = null;
           for (const cmd of declCmds) {
-            const r = applyCommand3(made, seated(cmd));
+            // #2490 (ADR-3D-436): a minted solid is its bare declaration, whose base shape is unstated — tried as the
+            // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`)
+            const r = applyCommand3(made, seated(m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidBase3(made, cmd) : cmd));
             if (!r.ok) {
               refused = r.error;
               break;
@@ -2728,7 +2744,10 @@ export function decideCommands3(
     if (!exp.ok) return { kind: 'refused', error: withShapeSentence3(exp.error, utterance) };
     stated = exp.cmds;
   }
-  const statedFacts = view ? facts.map((f) => (view.resolvedCmds[f.id] ? { ...f, cmds: [...view.resolvedCmds[f.id]] } : f)) : facts;
+  // #2490 (ADR-3D-436): only a row HOLDING a reference is read as applied. The fold also reads a pyramid row against the
+  // figure (its unstated base over an existing ring, its unspelled letters), and that reading is the first application's:
+  // the same sentence typed again over the same letters is the same statement, so every other row is compared as typed.
+  const statedFacts = view ? facts.map((f) => (view.resolvedCmds[f.id] && f.cmds.some((k) => k.type === 'shape-ref3') ? { ...f, cmds: [...view.resolvedCmds[f.id]] } : f)) : facts;
   // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
   // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
   // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part

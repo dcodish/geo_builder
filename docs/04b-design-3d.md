@@ -886,6 +886,16 @@ counts the bound base as a declared ring, so the ring checks (skew, crossing) ju
 edge once, lets no face both solids carry decide an edge's dashing, and dashes an edge inside a solid it shares
 vertices with (`hiddenEdgeKeys`).
 
+The base SHAPE a bound pyramid carries is only a stated one ([ADR-3D-436](06b-decisions-3d.md#adr-3d-436)). The parser
+reads «פירמידה ABCDS» and «… שבסיסה מלבן» as one command (ADR-3D-011's rectangle is the default that draws a base the
+pyramid makes), so the fold decides from the row's own text (`namesQuadBase3`, the rule's own reader): a non-right pyramid
+whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate the solid apply also asks) is read in
+`expandFact` as the general-quadrilateral kind (`unstatedPyramidBase3`), the twin «… שבסיסה מרובע». A minted bare
+declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
+`resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
+fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
+otherwise. A right kind is left as read, because its cyclic fix is the parser's for the base it read.
+
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
 A `free3` point («וקטור AB» on an empty canvas, «קטע BE» from a known B, a mixed shape run) carries three

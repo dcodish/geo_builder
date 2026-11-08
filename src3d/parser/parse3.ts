@@ -891,6 +891,17 @@ function statedQuadBase(s: string): QuadBase | null {
 }
 
 /**
+ * #2490 ([ADR-3D-436](../../docs/06b-decisions-3d.md#adr-3d-436)) — does this sentence NAME a quad base's shape? `false`
+ * is `rightPyramid`'s `statedQuadBase(s) ?? 'rectangle'`: ADR-3D-011's default, which draws a NEW base. The command is
+ * the same either way («פירמידה ABCDS» and «… שבסיסה מלבן» both read `pyramid4gr`), and this parser is context-free, so
+ * the fold asks this of the row's own text when the base already exists (`unstatedPyramidBase3`): the same reader on
+ * the same normalized text as the rule, never a second vocabulary.
+ */
+export function namesQuadBase3(utterance: string): boolean {
+  return statedQuadBase(normalize3(utterance)) !== null;
+}
+
+/**
  * #424: the TRIANGLE shape a stated qualifier names — the triangle sibling of {@link statedQuadBase},
  * carrying the same doctrine: ONE vocabulary, so a qualifier a rule RECOGNISES is exactly a qualifier
  * it can LOWER. Before this existed each position tested for `שווה צלעות` inline (three copies) and

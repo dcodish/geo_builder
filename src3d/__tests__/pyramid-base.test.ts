@@ -268,3 +268,131 @@ describe('#2490 — a pyramid over an existing base', () => {
     }
   });
 });
+
+/**
+ * #2490 (ADR-3D-436) — a pyramid whose base shape is unstated KEEPS the shape of a base that already exists (operator
+ * 2026-11-08: *"Keep its shape"*; ADR-052). Through the store, every host and spelling of the class: the ring is drawn
+ * exactly as it was before the pyramid line, its DOFs stay (host + 3), no rectangle is imposed, so no narrowing note
+ * says one was. The default rectangle stays where the pyramid makes its own base, a stated shape stays a given, and the
+ * right pyramid is unchanged (its question is the operator's). The unit is engine3.test.ts's `unstatedPyramidBase3`.
+ */
+describe('#2490 — an unstated pyramid base keeps the shape of the ring it stands on', () => {
+  beforeEach(reset);
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const build = (lines: readonly string[]) => {
+    reset();
+    for (const u of lines) submit(u);
+  };
+  const dofOf = (facts = state().facts, seed = state().seed) => {
+    const d = derive3(facts, seed);
+    return freeDofCount3(d.construction, d.resolved);
+  };
+  const narrowed = () => derived().notices.filter((n) => n.kind === 'narrowed');
+  const isRectangle = (p: ReadonlyMap<string, { x: number; y: number; z: number }>, ring: readonly string[]) =>
+    ring.every((v, i) => {
+      const at = p.get(v)!;
+      const a = p.get(ring[(i + 3) % 4])!;
+      const b = p.get(ring[(i + 1) % 4])!;
+      const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
+      return Math.abs(dot) / (dist(at, a) * dist(at, b)) < 1e-6;
+    });
+
+  // [host lines, the pyramid line, the base ring as the pyramid names it]
+  const HOSTS: [string[], string, string[]][] = [
+    [['מרובע ABCD'], 'פירמידה ABCDS', ['A', 'B', 'C', 'D']],
+    [['מרובע ABCD'], 'פירמידה SABCD', ['A', 'B', 'C', 'D']],
+    [['quadrilateral ABCD'], 'pyramid ABCDS', ['A', 'B', 'C', 'D']],
+    [['מקבילית ABCD'], 'פירמידה ABCDS', ['A', 'B', 'C', 'D']],
+    [['מעוין ABCD'], 'פירמידה ABCDS', ['A', 'B', 'C', 'D']],
+    [['טרפז ABCD'], 'פירמידה ABCDS', ['A', 'B', 'C', 'D']],
+    [["מנסרה ABCDA'B'C'D'"], "פירמידה ABB'A'S", ['A', 'B', "B'", "A'"]],
+    [["מנסרה ABCA'B'C'"], "פירמידה ABB'A'S", ['A', 'B', "B'", "A'"]],
+    [['מרובע ABCD'], 'נפח הפירמידה ABCDS = 11', ['A', 'B', 'C', 'D']],
+  ];
+
+  it('every host and spelling: builds, the ring drawn exactly as before the line, host + 3 DOF, never a rectangle', () => {
+    for (const [host, line, ring] of HOSTS) {
+      const label = [...host, line].join(' · ');
+      build(host);
+      const hostFacts = state().facts;
+      const hostDof = dofOf();
+      submit(line);
+      expectAllOk();
+      expect(derived().construction.solids.at(-1), label).toMatchObject({ kind: 'pyramidQuad', bound: ring });
+      const pyramidFacts = state().facts;
+      expect(dofOf(), label).toBe(hostDof + 3); // the apex's three numbers (a volume fixes the scale, which is a gauge)
+      expect(narrowed(), label).toEqual([]);
+      for (let seed = 0; seed < 6; seed++) {
+        const p = derive3(pyramidFacts, seed).positions;
+        const q = derive3(hostFacts, seed).positions;
+        // a volume sizes the figure (the ring is scaled, never reshaped); every other line moves no point of it
+        if (!line.startsWith('נפח')) for (const id of ring) expect(p.get(id), `${label} @${seed}: ${id}`).toEqual(q.get(id));
+        expect(isRectangle(p, ring), `${label} @${seed}`).toBe(false);
+      }
+    }
+  });
+
+  it('«הציגו תצורה אחרת» never reaches a rectangle: the oblique prism stays oblique, the quadrilateral stays general', () => {
+    for (const [host, line, ring] of [HOSTS[0], HOSTS[6]]) {
+      build([...host, line]);
+      for (let press = 0; press < 10; press++) {
+        expect(isRectangle(derived().positions, ring), `${[...host, line].join(' · ')}, press ${press}`).toBe(false);
+        useGeo3.getState().resample();
+      }
+    }
+  });
+
+  it('on a cube face nothing is imposed, so nothing is said: no «הוגבל ממלבן לריבוע» note (the volume path too)', () => {
+    for (const line of ['פירמידה ABCDS', 'נפח הפירמידה ABCDS = 11']) {
+      build([CUBE, line]);
+      expectAllOk();
+      expect(derived().construction.solids[1]).toMatchObject({ kind: 'pyramidQuad', bound: ['A', 'B', 'C', 'D'] });
+      expect(narrowed(), line).toEqual([]);
+    }
+  });
+
+  it('UNCHANGED: a standalone pyramid draws ADR-3D-011\'s rectangle, in either entry order', () => {
+    for (const lines of [['פירמידה ABCDS'], ['פירמידה ABCDS', 'מרובע ABCD']]) {
+      build(lines);
+      expectAllOk();
+      expect(derived().construction.solids[0].kind).toBe('pyramid4gr');
+      for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D'])).toBe(true);
+    }
+  });
+
+  it('UNCHANGED: a STATED base shape stays a given about the ring — it drives a free one and refuses a disjoint one', () => {
+    for (const { line, kind } of [
+      { line: 'פירמידה ABCDS שבסיסה מלבן', kind: 'pyramid4gr' },
+      { line: 'pyramid ABCDS with a rectangle base', kind: 'pyramid4gr' },
+      { line: 'פירמידה ABCDS שבסיסה ריבוע', kind: 'pyramid4g' },
+    ]) {
+      build(['מרובע ABCD', line]);
+      expectAllOk();
+      expect(derived().construction.solids[1].kind, line).toBe(kind);
+      for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D']), line).toBe(true);
+    }
+    build(['טרפז ABCD', 'פירמידה ABCDS שבסיסה מלבן']);
+    expect(state().lastError).toEqual({ code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' });
+  });
+
+  it('UNCHANGED: the right pyramid keeps today\'s reading (a rectangle base; on the cube, its note)', () => {
+    build(['מרובע ABCD', 'פירמידה ישרה ABCDS']);
+    expectAllOk();
+    expect(derived().construction.solids[1].kind).toBe('pyramid4r');
+    for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D'])).toBe(true);
+    build([CUBE, 'פירמידה ישרה ABCDS']);
+    expectAllOk();
+    expect(narrowed()).toHaveLength(1);
+  });
+
+  it('the pyramid typed again is still «already stated», with a shape reference elsewhere in the figure too', () => {
+    for (const lines of [['מרובע ABCD', 'פירמידה ABCDS'], ['משולש EFG', 'המשולש ישר זווית', 'מרובע ABCD', 'פירמידה ABCDS']]) {
+      build(lines);
+      const n = state().facts.length;
+      submit('פירמידה ABCDS');
+      expect(state().lastError, lines.join(' · ')).toBeNull();
+      expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-stated' });
+      expect(state().facts, lines.join(' · ')).toHaveLength(n);
+    }
+  });
+});

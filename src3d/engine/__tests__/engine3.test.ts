@@ -5,11 +5,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { applyCommand3, freeDims } from '../apply';
+import { applyCommand3, freeDims, unstatedPyramidBase3 } from '../apply';
 import { verifyClaim } from '../claims';
 import { evaluate3, freeDofCount3, resolve3 } from '../evaluate';
 import { pointParents3 } from '../carriers';
-import { emptyConstruction3, type Command3, type Construction3 } from '../types';
+import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
@@ -381,6 +381,63 @@ describe('#2490 — a pyramid over an existing base is a bound solid', () => {
     const r = applyCommand3(rect, { type: 'solid', kind: 'pyramid4g', ids: ['A', 'B', 'C', 'D', 'S'] });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.next.requirements.some((q) => q.kind === 'quad-general')).toBe(false);
+  });
+});
+
+/**
+ * #2490 (ADR-3D-436) — `unstatedPyramidBase3`: a pyramid whose base shape is unstated reads, over a ring that already
+ * exists, as the quadrilateral its letters name (operator 2026-11-08: *"Keep its shape"*). The read command applied over
+ * a free quadrilateral leaves its four shape DOFs free; the default rectangle stays where the pyramid makes its base.
+ */
+describe('#2490 — an unstated pyramid base over an existing ring keeps the ring\'s shape', () => {
+  const PYR = ['A', 'B', 'C', 'D', 'S'];
+  const plain: SolidCommand = { type: 'solid', kind: 'pyramid4gr', ids: PYR };
+  const quad = (): Construction3 => build({ type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] });
+  const cornerCos = (c: Construction3, seed: number) => {
+    const p = evaluate3(c, seed);
+    const ring = ['A', 'B', 'C', 'D'].map((id) => p.get(id)!);
+    return ring.map((v, i) => {
+      const a = sub3(ring[(i + 3) % 4], v);
+      const b = sub3(ring[(i + 1) % 4], v);
+      return dot3(a, b) / (norm3(a) * norm3(b));
+    });
+  };
+
+  it('over an existing ring the default yields: the general-quadrilateral kind, every other field kept', () => {
+    expect(unstatedPyramidBase3(quad(), plain)).toEqual({ ...plain, kind: 'pyramidQuad' });
+    expect(unstatedPyramidBase3(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }), plain).kind).toBe('pyramidQuad');
+    const prism = build({ type: 'solid', kind: 'prism4g', ids: CUBE_IDS, oblique: true });
+    expect(unstatedPyramidBase3(prism, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', "B'", "A'", 'S'] }).kind).toBe('pyramidQuad');
+  });
+
+  it('applied, the ring keeps its shape and its DOFs: a free quadrilateral is never a rectangle, host + 3', () => {
+    const before = quad();
+    const r = applyCommand3(before, unstatedPyramidBase3(before, plain));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.solids[1]).toMatchObject({ kind: 'pyramidQuad', bound: ['A', 'B', 'C', 'D'] });
+    expect(freeDims(r.next)).toBe(freeDims(before) + 3);
+    for (let seed = 0; seed < 8; seed++) expect(Math.max(...cornerCos(r.next, seed).map(Math.abs))).toBeGreaterThan(0.01);
+    // the ring is drawn exactly as it was: the pyramid adds an apex and moves nothing
+    for (const seed of [0, 3]) for (const id of ['A', 'B', 'C', 'D']) expect(evaluate3(r.next, seed).get(id)).toEqual(evaluate3(before, seed).get(id));
+  });
+
+  it('a trapezoid keeps its shape instead of being refused against the default rectangle', () => {
+    const trap = build({ type: 'quad-shape', base: 'trapezoid', ids: ['A', 'B', 'C', 'D'] });
+    expect(applyCommand3(trap, plain)).toEqual({ ok: false, error: { code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' } });
+    expect(applyCommand3(trap, unstatedPyramidBase3(trap, plain)).ok).toBe(true);
+  });
+
+  it('left as read: a pyramid that makes its own base, a right kind, a run that does not bind, an unlettered run', () => {
+    expect(unstatedPyramidBase3(emptyConstruction3(), plain)).toBe(plain); // standalone: ADR-3D-011's rectangle draws the base
+    const right: SolidCommand = { type: 'solid', kind: 'pyramid4r', ids: PYR };
+    expect(unstatedPyramidBase3(quad(), right)).toBe(right); // the right pyramid over an existing ring is the operator's question
+    const tri = build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
+    expect(unstatedPyramidBase3(tri, plain)).toBe(plain); // a base only partly there: no binding, today's refusal
+    const unlettered: SolidCommand = { ...plain, lettersUnstated: true };
+    expect(unstatedPyramidBase3(quad(), unlettered)).toBe(unlettered); // FR-SP-24: never binds by default letters
+    const tetra: SolidCommand = { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] };
+    expect(unstatedPyramidBase3(tri, tetra)).toBe(tetra); // a triangular base has no default shape to yield
   });
 });
 

@@ -619,6 +619,7 @@
  "suite:[\"טרפז שווה שוקיים ABCD חסום במעגל\",\"trapezoid\",\"isosceles\"]": "0f9cb4dfa343549b",
  "suite:[\"prism4\",\"pyramidPar\",\"parallelepiped\"]": "6fd659dadcb57d01",
  "suite:[\"ABC: 6x + 3y + 2z - 6 = 0\",\"ABC: π = (1, 0, 0) + t·(-1, 2, 0) + s·(-1, 0, 3)\"]": "d2134fe468507c99",
+ "suite:[\"משולש EFG\",\"המשולש ישר זווית\",\"מרובע ABCD\",\"פירמידה ABCDS\"]": "216b581bb3009804",
  "suite:[\"מעוין\"]": "6c52ac62f3af89ee",
  "suite:[\"מעוין\",\"parallelogram-point\"]": "82dd9009a1e4f89c",
  "suite:[\"שיעורי A\",\"שיעורים של A\",\"קואורדינט A\",\"קואורדינטות A\",\"קואורדינטים של A\",\"coordinates of A\"]": "138709dfe95278a8",

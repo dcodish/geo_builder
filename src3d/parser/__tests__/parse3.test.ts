@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { labelTokens, normalize3, parse3 } from '../parse3';
+import { labelTokens, namesQuadBase3, normalize3, parse3 } from '../parse3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 
@@ -111,5 +111,23 @@ describe('refusals', () => {
     expect(parse3('שלום עולם')).toEqual({ ok: false, reason: 'not-handled' });
     expect(parse3('')).toEqual({ ok: false, reason: 'not-handled' });
     expect(parse3('פירמידה משושה ABCDEFG')).toEqual({ ok: false, reason: 'not-handled' }); // hex pyramid — out of scope
+  });
+});
+
+/**
+ * #2490 (ADR-3D-436) — `namesQuadBase3`: whether a sentence names its quad base's shape, the same reader the pyramid rule
+ * defaults by (`statedQuadBase(s) ?? 'rectangle'`). The plain and the stated-rectangle sentences parse to ONE command, so
+ * this is what tells the fold that the rectangle was a default.
+ */
+describe('#2490 — does a pyramid sentence name its base shape?', () => {
+  it('unnamed: the plain noun, any letter order, English, a volume naming the pyramid', () => {
+    for (const s of ['פירמידה ABCDS', 'פירמידה SABCD', 'הפירמידה ABCDS', 'pyramid ABCDS', 'the pyramid ABCDS', 'נפח הפירמידה ABCDS = 11', 'פירמידה ישרה ABCDS'])
+      expect(namesQuadBase3(s), s).toBe(false);
+  });
+  it('named: every base noun, in both languages, including the rectangle the default would have given', () => {
+    for (const s of ['פירמידה ABCDS שבסיסה מלבן', 'פירמידה ABCDS שבסיסה ריבוע', 'פירמידה ABCDS שבסיסה מרובע', 'פירמידה ABCDS שבסיסה טרפז', 'pyramid ABCDS with a rectangle base', 'pyramid ABCDS with a square base'])
+      expect(namesQuadBase3(s), s).toBe(true);
+    // and the two readings really are one command: only the text tells them apart
+    expect(parse3('פירמידה ABCDS')).toEqual(parse3('פירמידה ABCDS שבסיסה מלבן'));
   });
 });

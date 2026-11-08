@@ -98,7 +98,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
-  - Sources: ADR-052 (this is its 3-D form).
+  - Sources: ADR-052 (this is its 3-D form); ADR-3D-436 (a pyramid's unstated base over an existing ring).
 - **FR-SP-4 (Must)** — **Gauge is not knowledge.** A figure's placement, rotation and scale are a gauge.
   An unanchored figure is normalised onto the floor, so «הציגו תצורה אחרת» changes only its shape (operator:
   *"Keep it flat on the floor"*). A solid is no exception: its base stays on the floor and its apex or top above it,
@@ -888,7 +888,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   free (3 DOF, 1 when «ישרה») and resampled by «הציגו תצורה אחרת» (ADR-052): on a solid's face, on either side of it
   (outside the cube or inside it); on a stated polygon, above it, the base on the floor (FR-SP-4). The existing figure
   does not move. The base shape the pyramid's words state is a given about the ring (FR-SP-5): it drives a free
-  ring («מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» makes it a square) and verifies a determined one. Height, volume, an
+  ring («מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» makes it a square) and verifies a determined one. A pyramid whose words
+  state no base shape («פירמידה ABCDS») keeps the shape of the base it stands on, and no proportion is assumed (operator
+  2026-11-08: *"Keep its shape"*, ADR-052): «מרובע ABCD» · «פירמידה ABCDS» stays a general quadrilateral that «הציגו תצורה
+  אחרת» keeps varying, a rhombus or a trapezoid keeps its kind, an oblique prism's side face stays oblique (FR-SP-3), and
+  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base, and
+  «פירמידה ישרה ABCDS» over an existing quadrilateral is unchanged. Height, volume, an
   edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
   ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for
@@ -896,7 +901,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   refused as a flat pyramid (FR-RD-7's sentence). No created-point notice is shown for the
   apex. Unchanged: «טטראדר ABCD» inside one face, a base only partly drawn, a pyramid over letters that all exist, and
   an unlettered pyramid («פירמידה ישרה שבסיסה ריבוע» over an existing ABCD): only letters the student typed bind.
-  - Sources: ADR-3D-434, ADR-3D-080, ADR-3D-172; #2490, #2478.
+  - Sources: ADR-3D-434, ADR-3D-436, ADR-3D-080, ADR-3D-172; #2490, #2478.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

@@ -1890,6 +1890,54 @@ function boundPyramidRun3(c: Construction3, ids: readonly Id[]): { base: Id[]; a
   return { base: ids.filter((id) => id !== apex), apex };
 }
 
+/** The base vertex count of each pyramid-family kind (ADR-3D-080's run shape: base, then the apex). */
+const PYR_BASE: Partial<Record<SolidKind, number>> = {
+  tetra: 3, pyramid3: 3, pyramid3e: 3,
+  ...(Object.fromEntries((Object.keys(VERTEX_COUNT) as SolidKind[]).filter(isQuadPyramid).map((k) => [k, 4])) as Partial<Record<SolidKind, number>>),
+};
+
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — the ONE gate of the bound solid: a pyramid-family
+ * declaration whose run is a base the figure holds plus an apex of its own (`boundPyramidRun3`), over letters the student
+ * TYPED (an unlettered noun the parser lettered keeps today's reading). The solid apply and the fold's reading of an
+ * unstated base (`unstatedPyramidBase3`) both ask it, so the two can never disagree about which pyramids bind.
+ */
+function boundPyramidOf3(c: Construction3, cmd: SolidCommand): { base: Id[]; apex: Id } | null {
+  const baseN = PYR_BASE[cmd.kind];
+  if (baseN === undefined || cmd.ids.length !== baseN + 1 || cmd.lettersUnstated) return null;
+  return boundPyramidRun3(c, cmd.ids);
+}
+
+/** The quad-pyramid kind whose base is a general quadrilateral and whose apex is free: «פירמידה ABCDS שבסיסה מרובע». */
+const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && !QUAD_PYRAMIDS[k]?.right)!;
+
+/**
+ * #2490 ([ADR-3D-436](../../docs/06b-decisions-3d.md#adr-3d-436)) — A PYRAMID WHOSE BASE SHAPE IS UNSTATED KEEPS THE SHAPE
+ * OF A BASE THAT ALREADY EXISTS (operator, 2026-11-08: *"Keep its shape"*; ADR-052).
+ *
+ * «פירמידה ABCDS» names no base shape. The parser reads it with ADR-3D-011's free-aspect RECTANGLE, which is how a NEW
+ * base is drawn: a default for a ring the pyramid creates. Over a ring that already exists (`boundPyramidOf3`) there is
+ * nothing to create, and lowering that default onto the ring states a given the student never gave: «מרובע ABCD» ·
+ * «פירמידה ABCDS» drew a rectangle at every seed, an oblique prism's lateral face was straightened, a trapezoid was
+ * refused `shape-disjoint`, and a cube's face read «… הוגבל ממלבן לריבוע». So the declaration reads as its stated twin,
+ * «פירמידה ABCDS שבסיסה מרובע»: the quadrilateral its letters name, and nothing about its shape. The ring keeps every
+ * relation it had and every degree of freedom it had.
+ *
+ * The CALLER knows the shape is unstated: the parser is context-free and its command is the same for «פירמידה ABCDS» and
+ * «… שבסיסה מלבן», so the fold asks the row's own text (`namesQuadBase3`), and a minted bare declaration names none. A
+ * pyramid that does not bind (a standalone one, a base only partly drawn) keeps the rectangle: there the default draws
+ * the base the pyramid makes. A stated shape is never read here, and stays a given about the ring (ADR-3D-434 §3).
+ *
+ * A RIGHT kind is returned as read. Its rightness entails a cyclic base, and the parser lowered the cyclic fix of the
+ * base it read (none for a rectangle), so the general quadrilateral would leave the right foot over a ring with no
+ * circumcentre. What «פירמידה ישרה ABCDS» should make of an existing quadrilateral is a separate question for the operator.
+ */
+export function unstatedPyramidBase3(c: Construction3, cmd: SolidCommand): SolidCommand {
+  const spec = QUAD_PYRAMIDS[cmd.kind];
+  if (!spec || spec.right || spec.base === 'quad' || !boundPyramidOf3(c, cmd)) return cmd;
+  return { ...cmd, kind: GENERAL_QUAD_PYRAMID };
+}
+
 /**
  * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — A PYRAMID OVER AN EXISTING BASE IS A BOUND SOLID.
  *
@@ -2344,19 +2392,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // the closed-form right-apex (the ⊥ line through the base's centre cut with its carrier
       // plane — the ADR-255 reseat pattern), any other apex takes equal-lateral-edge givens
       // (apex over the circumcentre ⇔ |apex·bᵢ| all equal), M1-routed to drive or verify.
-      const PYR_BASE: Partial<Record<SolidKind, number>> = {
-        tetra: 3, pyramid3: 3, pyramid3e: 3,
-        ...(Object.fromEntries((Object.keys(VERTEX_COUNT) as SolidKind[]).filter(isQuadPyramid).map((k) => [k, 4])) as Partial<Record<SolidKind, number>>),
-      };
       const baseN = PYR_BASE[cmd.kind];
       // #2490 (ADR-3D-434): a pyramid whose BASE already exists and whose apex is its own — a new letter, or a
       // placeholder that yields (#841) — is a BOUND solid. Owned here, before the all-existing statement below and the
       // `taken` refusal, which blamed a base label that was fine («A» כבר מוגדר — ADR-3D-172's defect, solid edition).
       // Only over letters the student TYPED: an unlettered noun the parser lettered by default keeps today's reading.
-      if (baseN !== undefined && cmd.ids.length === baseN + 1 && !cmd.lettersUnstated) {
-        const run = boundPyramidRun3(c, cmd.ids);
-        if (run) return applyBoundPyramid3(c, cmd, run.base, run.apex);
-      }
+      const run = boundPyramidOf3(c, cmd);
+      if (run) return applyBoundPyramid3(c, cmd, run.base, run.apex);
       // NOT a statement: ids that are exactly an existing solid's id SET (a CONTRADICTING
       // re-declare — pyramidPar vs pyramid4g on SABCD) or that lie within ONE FACE of an
       // existing solid (flat by construction — «טטראדר ABCD» over a cube's base) keep the
