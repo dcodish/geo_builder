@@ -17,7 +17,7 @@ import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '..
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
-import { builtFrom3, carrierParams3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
+import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { freeMetricOperands3, spellingOf, symbolValueOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
@@ -184,7 +184,7 @@ function clone(c: Construction3): Construction3 {
     pairPins: [...c.pairPins],
     planePins: [...c.planePins],
     paramGivens: [...c.paramGivens],
-    coordDeterminations: [...c.coordDeterminations],
+    determinations: [...c.determinations],
     paramSigns: [...c.paramSigns],
     coordPlanePins: [...c.coordPlanePins],
     planeLinePerps: [...c.planeLinePerps],
@@ -2831,6 +2831,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.claims.push({ ...cmd.claim, given: true });
         return { ok: true, next };
       }
+      // #1816 (ADR-3D-432): a stated LENGTH whose reach holds a solvable carrier parameter (a rider's `t`, a line rider's
+      // offset, an axis point's unstated coordinate) is recorded as a DETERMINATION, beside whatever lane takes it below —
+      // the ADR-3D-293 pattern, recorded at the event. `resolve3` solves it where the pivot does not run: a figure of
+      // coordinates and riders on them («A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1»), where it used to be judged against
+      // the rider's random sample and refused «בדקו את החישוב». Where the pivot runs, its pin drives and this stays idle.
+      // The claim recorded below stays the arbiter.
+      if (cmd.claim.type === 'length-eq' && determinationReach3(c, [cmd.claim.a, cmd.claim.b]).length > 0)
+        next.determinations.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
@@ -3095,7 +3103,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           defNow && defNow.kind !== 'free3' &&
           carrierParams3(next, cmd.id, defNow).some((p) => p.solvable)
         )
-          next.coordDeterminations.push({ id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
+          next.determinations.push({ kind: 'coords', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
         bindPartialNames(next, { kind: 'point', id: cmd.id }, cmd.syms, comps); // #814
         return { ok: true, next };
       }

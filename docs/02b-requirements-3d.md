@@ -90,8 +90,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   placement: a length on each builds, a relation between them («AB ∥ DE») is driven, and «הציגו תצורה אחרת»
   varies them (#1855). **A stated length, angle or relation on a free point of a rigid solid moves that point:**
   «קובייה ABCD · AB = 2 · E על AB · AE = 1» puts E at AB's midpoint, in either order, as it does on a box and as
-  2-D does on a square; a given no position of the point can meet is still refused (#1782).
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour).
+  2-D does on a square; a given no position of the point can meet is still refused (#1782). **The same holds on a
+  figure of coordinates:** a stated length on a point that sits on something places it — «A(0,0,0) · B(4,0,0) · D על AB
+  כך ש-AD = 1» (or «D על AB · AD = 1») puts D at (1,0,0), as 2-D and analytic do; when two positions meet the length,
+  one is drawn and «הציגו תצורה אחרת» reaches the other; a length no position of the point can meet («AD = 5» on AB = 4)
+  is still refused (#1816).
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form).
