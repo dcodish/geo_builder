@@ -3089,6 +3089,36 @@
       "reason": "No precedent covers a surd that multiplies no letter inside an equation, and his precedents point both ways: his exactness words («exact forms» 2026-09-16, «Exact when the numbers are exact.» 2026-09-17) lean to (b); his «2394 - option a» (2026-10-20), written as 02c R94 «an equation's coefficients do not [print a radical]», and ADR-AG-304 §2 (every number inside an equation goes to the no-surd formatter) lean to (a). Whether a bracket offset or a line's constant is a 'coefficient' was never put to him; (b) would change what R94 and an accepted ADR arguably promise today. 2-D prints no equations, so there is no 2-D reference.",
       "at": "2026-11-08T04:45:02.846Z",
       "status": "escalated"
+    },
+    {
+      "id": "2731-q2",
+      "issue": "#2731",
+      "question": "A student types the exam's parabola figure: «נתונה פרבולה שמשוואתה y^2=4px · p > 0 · K על הפרבולה · y_K = 12 · F מוקד הפרבולה · KF = 20». Two values fit: p = 2 (K at (18, 12)) and p = 18 (K at (2, 12)). The operator ruled on 2026-11-08 that the tool will find both. The student then adds «x_K < 10», which holds only for p = 18. (A second figure gives the same: four circles tangent to a line and both axes, and «x_M < 0», which holds for exactly one of them.) Today the tool knows only p = 2, so it refuses «x_K < 10» with «לא נמצאה תצורה שבה מתקיים: «x_K < 10»», although a figure that satisfies it exists. What should happen once both values are found?",
+      "class": "search-first-refuse-last",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Search first, refuse last. Once the tool has found the other root, a coordinate comparison that only that root satisfies («x_K < 10», «x_M < 0») is a given that some drawing satisfies, so it is never refused: it is recorded and selects the configurations where it holds (p = 18 with K at (2, 12), or the one circle with x_M < 0); the figure redraws there and values are read from those configurations only, so «p» answers «18». «לא נמצאה תצורה שבה מתקיים: …» stays for a comparison no found configuration satisfies (e.g. «x_K < 1»). This is what 02c R118 and R125 already promise.",
+      "precedents": [
+        {
+          "quote": "Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/1927#issuecomment-6087842149"
+        },
+        {
+          "quote": "its not right to refuse. this shape is possible",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2518#issuecomment-6678779949"
+        },
+        {
+          "quote": "T4 — fails on last statement",
+          "date": "2026-10-01",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-188"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Not decided: the scope and cost of finding the roots (the operator's 2731-a); the first drawing before the comparison (p = 2 at seed 0); how «p» and «K» print while both roots stand (P8); «x_K = 18» (R125); the wording of any refusal when the listing still misses a root (P9 / #1590); a comparison typed before the givens (not measured).",
+      "at": "2026-11-08T05:33:28.753Z",
+      "status": "pending"
     }
   ],
   "demoted": {
