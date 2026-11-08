@@ -45,7 +45,9 @@ import { derive } from '../engine/derive';
 import { ask } from '../app/ask';
 import { locusOf } from '../engine/locus';
 import { snapAndVerify } from '../engine/locusFit';
+import { askLocus } from '../app/locusChip';
 import { fmtAnalytic } from '../format';
+import fixture from './fixtures/issue-2734-winter23-surd-centre.analytic.json';
 
 const HE: Record<string, string> = { line: 'ישר', circle: 'מעגל' };
 const kind = ((k: string) => HE[k] ?? k) as never;
@@ -122,5 +124,49 @@ describe('#1224 — a locus states its equation whatever its slope or scale', ()
      * play-verified at all. This is what unblocks it.
      */
     expect(bisector('B(6,8)')).toContain('3x + 4y - 25 = 0');
+  });
+});
+
+/**
+ * #2734 ([ADR-AG-429](../../docs/06c-decisions-analytic.md#adr-ag-429)) — A LOCUS STATES ITS EQUATION WHEN A
+ * COEFFICIENT IS A SURD.
+ *
+ * Exam חורף 2023 Q1: on x²/9 + y²/4.5 = 1, M on F1E extended with EM = EF2 traces the circle about F1 = (−3√2/2, 0) of
+ * radius 6. The trace found it exactly and two configurations agreed to 1e-9, but the snap knew only rationals, so the
+ * chip answered «מעגל» alone while x²/25 + y²/9 = 1 answered its equation. An equation's numbers stay decimals
+ * (ADR-AG-304 D2): the surd was computed from the typed «4.5», never typed (#2741's ruling).
+ */
+describe('#2734 — a locus states its equation when a coefficient is a surd', () => {
+  const chip = (lines: readonly string[], seed: number) =>
+    askLocus(derive(lines, seed), 'M', fmtAnalytic, kind).value;
+  const winter23 = (fixture as { lines: string[] }).lines;
+
+  it.each(Array.from({ length: 24 }, (_, s) => s))('the operator’s sequence, seed %i: the circle with its equation', (seed) => {
+    expect(chip(winter23, seed)).toBe('מעגל · (x + 2.12)² + y² = 6²');
+  });
+
+  const ELLIPSE = (eq: string) => [`נתונה אליפסה שמשוואתה ${eq}`, ...winter23.slice(1)];
+  const CLASS: Array<[string, readonly string[], string]> = [
+    ['a circle about (√2, 0)', ['A(√2,0)', 'נקודה M', 'MA = 3'], 'מעגל · (x − 1.41)² + y² = 3²'],
+    ['a circle about (0, √3)', ['A(0,√3)', 'נקודה M', 'MA = 3'], 'מעגל · x² + (y − 1.73)² = 3²'],
+    ['the same exam sentences on x²/6 + y²/4 = 1 (centre −√2, r = 2√6)', ELLIPSE('x^2/6+y^2/4=1'), 'מעגל · (x + 1.41)² + y² = 24'],
+    ['the bisector of (0,0), (√2,0)', ['A(0,0)', 'B(√2,0)', 'נקודה M', 'MA = MB'], 'ישר · x - 0.71 = 0'],
+    ['the bisector of (0,0), (1,√3)', ['A(0,0)', 'B(1,√3)', 'נקודה M', 'MA = MB'], 'ישר · x + 1.73y - 2 = 0'],
+    ['the parametric arm: a centre at (√2·a, 0)', ['A(√2a,0)', 'נקודה M', 'MA = 3'], 'מעגל · (x − 1.41a)² + y² = 3²'],
+    // Found in round: a surd ratio the loose rational bar alone took (3√2/2 as 70/33), and a surd constant beside a letter.
+    ['the parametric arm: a centre at (3√2/2·a, 0)', ['A(3√2a/2,0)', 'נקודה M', 'MA = 3'], 'מעגל · (x − 2.12a)² + y² = 3²'],
+    ['the parametric arm: a centre at (√2·a, √3)', ['A(√2a,√3)', 'נקודה M', 'MA = 3'], 'מעגל · (x − 1.41a)² + (y − 1.73)² = 3²'],
+    // Controls: rational loci do not move.
+    ['control: x²/25 + y²/9 = 1', ELLIPSE('x^2/25+y^2/9=1'), 'מעגל · (x + 4)² + y² = 10²'],
+    ['control: a surd radius with a rational r²', ['A(0,0)', 'נקודה M', 'MA = √2'], 'מעגל · x² + y² = 2'],
+    ['control: the bisector of (0,0), (8,0)', ['A(0,0)', 'B(8,0)', 'נקודה M', 'MA = MB'], 'ישר · x - 4 = 0'],
+    // Counter-direction: a TYPED decimal is the student's number, not a surd (#2742 decides its vocabulary).
+    ['counter: a centre at a typed 1.4142', ['A(1.4142,0)', 'נקודה M', 'MA = 3'], 'מעגל'],
+    ['counter: a centre at a typed 1.732', ['A(1.732,0)', 'נקודה M', 'MA = 3'], 'מעגל'],
+    ['counter: a centre at a typed 3.14159265', ['A(3.14159265,0)', 'נקודה M', 'MA = 3'], 'מעגל'],
+    ['counter: the bisector of (0,0), (1.4142,0) — x = 0.7071', ['A(0,0)', 'B(1.4142,0)', 'נקודה M', 'MA = MB'], 'ישר'],
+  ];
+  it.each(CLASS)('%s', (_label, lines, want) => {
+    for (const seed of [0, 1, 2]) expect(chip(lines, seed), `seed ${seed}`).toBe(want);
   });
 });

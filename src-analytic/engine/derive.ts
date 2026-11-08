@@ -816,6 +816,13 @@ export function derive(
         if (tangentCrossed.has(P) || li === ki || (k as { id?: string }).id !== P) return;
         const s = straightOf(k, li);
         if (!s || s.pts.includes(P)) return;
+        /*
+         * #2733 (ADR-AG-428; ADR-W-177, operator 2026-11-02 "accept with message"): a point the statement makes ℓ's OWN
+         * touch point on K («הישר y=5 משיק למעגל בנקודה K») is never ℓ's "second crossing". With T already at the touch,
+         * K is forced onto T — a coincidence ADR-W-177 accepts with «T ו-K נפלו על אותה נקודה.» — not a crossing that
+         * cannot exist. The tangency constraint naming P (⊥ the radius, or the conic's normal, at P) is the evidence.
+         */
+        if (tangentByConstruction(s, K, P) !== null) return;
         const earlier = construction.objects.filter((q) => q.id !== P && (declaredAt.get(q.id) ?? Infinity) < mine && posOf.has(q.id));
         for (const q of earlier) {
           const Q = q.id;

@@ -20,7 +20,7 @@ import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { eventsLogPath, type UsageEvent } from './eventLog';
-import { clientIp, makeRateLimiter } from './http';
+import { clientIp, makeRateLimiter, readBody } from './http';
 import { readToolConfig, validateToolConfig, writeToolConfig, type ConfigRefusal, type ToolConfig } from './adminConfig';
 import productRegistry from '../products.json';
 
@@ -30,6 +30,11 @@ const COOKIE = 'geo_admin';
 // Throttle admin login attempts per client IP (SEC-6): the password compare is constant-time, but an
 // unthrottled endpoint still allows online brute-force at full speed. 10 attempts/min/IP.
 const loginLimited = makeRateLimiter(10, 60_000);
+
+// Form bodies go through the one body reader (#2752, ADR-W-192): capped, and `null` when the client went
+// away mid-body. A login is two short fields; the config form is a page of choices.
+const MAX_LOGIN_BODY = 8 * 1024;
+const MAX_CONFIG_BODY = 256 * 1024;
 
 // Anthropic Console usage/cost page — the LLM fallback (Haiku) spend lives here.
 const API_COST_URL = 'https://console.anthropic.com/settings/usage';
@@ -1359,8 +1364,8 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // login POST
   if (path.endsWith('/login') && req.method === 'POST') {
     if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, true, profile.title)); // brute-force throttle (SEC-6)
-    let body = '';
-    for await (const chunk of req) body += chunk;
+    const body = await readBody(req, MAX_LOGIN_BODY);
+    if (body === null) return send(res, 413, loginPage(base, true, profile.title));
     const params = new URLSearchParams(body);
     // Only authenticate when securely configured (username + password + cookie secret); else 401, so an
     // unconfigured dashboard never issues a session (SEC-3).
@@ -1393,8 +1398,8 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     const q0 = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
     const known = new Set(productRegistry.products.map((p) => p.id));
     if (req.method === 'POST') {
-      let body = '';
-      for await (const chunk of req) body += chunk;
+      const body = await readBody(req, MAX_CONFIG_BODY);
+      if (body === null) return send(res, 413, 'too large');
       const params = new URLSearchParams(body);
       const tool = known.has(params.get('tool') ?? '') ? (params.get('tool') as string) : profile.tool;
       const cfg = configFromForm(params);

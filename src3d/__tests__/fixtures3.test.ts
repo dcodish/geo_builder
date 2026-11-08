@@ -29,6 +29,15 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1896 (ADR-3D-433) — the report: a ⟂ on points whose coordinates carry k pins k (k = 2 or k = −5, one drawn), where it
+  // was refused «בדקו את החישוב». The roots, the census of arms and the stated-k rule are asserted in algebraic3.test.ts;
+  // this is the build + drift + load net.
+  'coord-sym-perp-1896.geo3.json': ['A(0,0,0)', 'B(k-1,k,3)', 'C(k+1,0,k-3)', 'AB ⊥ AC'],
+  // #1816 (ADR-3D-432) — the report and its split form: a length on a rider of a coordinate segment places the rider
+  // (D = (1,0,0)), where it was refused «בדקו את החישוב». The geometry is asserted in engine3.test.ts (resolve3's
+  // determination step); this is the build + drift + load net.
+  'rider-length-coords-1816.geo3.json': ['A(0,0,0)', 'B(4,0,0)', 'D על AB כך ש-AD = 1'],
+  'rider-length-coords-split-1816.geo3.json': ['A(0,0,0)', 'B(4,0,0)', 'D על AB', 'AD = 1'],
   // #253 (ADR-3D-419) — the exact prod line, then the textbook's order: the bare circle first, what pins it later. The
   // geometry is asserted in free-circle-253.test.ts; this is the build + drift + load net.
   'free-circle-bare-253.geo3.json': ['נתון מעגל שמרכזו O.'],
@@ -540,6 +549,11 @@ const SEEDED: SeededCorpus = {
   'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
   // #1542 (ADR-3D-429): the operator's exact sequence; the geometry, the chip and the lead are asserted in issue-1542.test.ts
   'plane-equation-sentence-1542.geo3.json': ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'],
+  // #2490 (ADR-3D-434): the operator's exact sequence (round #2466 T38) and #2478's — a pyramid over a base that already
+  // exists is a bound solid (before: refused «A» כבר מוגדר). The bound representation, the apex's freedom and the host's
+  // stability are asserted in engine3.test.ts; these are the build + drift net.
+  'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
+  'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

@@ -448,6 +448,10 @@ export interface SolidCommand {
   /** #1918 (ADR-3D-313): a trapezoid pyramid's parallel pair re-seated onto sides 1/3 of the base ring — set
    *  only by `derive3`'s pre-scan (see `quad-shape`'s `seat`), never typed or saved. */
   baseSeat?: 1;
+  /** #2490 (ADR-3D-434): the row's own text spells NONE of these letters — the parser lettered an unlettered noun
+   *  («פירמידה ישרה שבסיסה ריבוע» → ABCDS by default). Such a run never binds to existing points as a bound solid
+   *  (FR-SP-24's indefinite-noun question is the operator's). Set only by `derive3`'s fold, never typed or saved. */
+  lettersUnstated?: true;
 }
 
 /**
@@ -1395,6 +1399,13 @@ export interface SolidObj {
    *  generator's vertex `(i + 3) % 4` — so the generator's parallel pair lands on sides 1/3 of the ring as
    *  named. The ids, faces and every name stay as the student wrote them. See {@link SolidCommand.baseSeat}. */
   seat?: 1;
+  /**
+   * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — a BOUND solid: a pyramid declared over a base whose
+   * points already exist (a face of another solid, a stated polygon). These are its base ids, in `ids` order; each keeps
+   * its OWN `PointDef`, so only the apex is this solid's `solid-vertex`. The solid has no gauge of its own: it is placed
+   * in its ring's frame (`boundApexPosition3`) and its dims are the apex's alone (`boundSolidDims3`).
+   */
+  bound?: Id[];
 }
 
 export type PointDef =
@@ -1662,13 +1673,17 @@ export interface Construction3 {
    *  branches; the D3 numeric-only boundary). */
   paramGivens: Claim3[];
   /**
-   * #1615 (ADR-3D-293) — a coordinate given on an existing point whose position carries free parameters in
-   * the sampled-carrier table (`carrierParams3`): the STATED components (numeric only; null is unstated). The
-   * stated coordinates are stored, never a parameter value — a line or plane rider's offset is measured from
-   * a seat that moves with the seed. `resolve3` solves the parameters from them on a figure the pivot does not
-   * run on, and publishes the outcome (`Resolved3.coordDetermined`).
+   * #1615 (ADR-3D-293), #1816 (ADR-3D-432) — the givens that determine a free carrier parameter (`carrierParams3`'s
+   * `solvable` entries: a rider's `t`, a line's or a plane's offset, a partial point's missing coordinate), in
+   * statement order. `resolve3` solves them on a figure the pivot does not run on (`pivotRuns3`), and publishes
+   * the outcome per placed point (`Resolved3.determined`); where the pivot runs, its own pin drives instead.
+   *  - `coords`: a coordinate given on an existing point, its STATED components (numeric only; null is
+   *    unstated). The coordinates are stored, never a parameter value — a line or plane rider's offset is
+   *    measured from a seat that moves with the seed.
+   *  - `length`: a stated length |ab| = value whose reach holds a solvable parameter — solved as a 1-DOF
+   *    root-find when exactly one such parameter is still unsolved.
    */
-  coordDeterminations: { id: Id; x: number | null; y: number | null; z: number | null }[];
+  determinations: Determination3[];
   /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
    *  among the root branches. #325: also on a pin symbol (selects among pivot solutions). */
   paramSigns: ParamSignCommand[];
@@ -1700,6 +1715,18 @@ export interface Construction3 {
  */
 /** #1311 (ADR-3D-260): does the figure hold a never-positioned (`free3`) point — DOF the pivot can drive? */
 export const hasFreePoint3 = (c: Construction3): boolean => [...c.points.values()].some((def) => def.kind === 'free3');
+
+/**
+ * #1816 (ADR-3D-432) — DOES THE PIVOT RUN ON THIS FIGURE? A solid, or a never-positioned point (#1311). The one entry
+ * gate, read by the pivot itself, by the drive predicate's carrier reach (#2609, ADR-3D-408) and by the determination
+ * step, which runs exactly where the pivot does not: one driver per figure.
+ */
+export const pivotRuns3 = (c: Construction3): boolean => c.solids.length > 0 || hasFreePoint3(c);
+
+/** #1615 (ADR-3D-293), #1816 (ADR-3D-432) — one given that determines a free carrier parameter (`Construction3.determinations`). */
+export type Determination3 =
+  | { kind: 'coords'; id: Id; x: number | null; y: number | null; z: number | null }
+  | { kind: 'length'; a: Id; b: Id; value: number };
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
 export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'seg-cross', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
@@ -1803,7 +1830,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   pairPins: [],
   planePins: [],
   paramGivens: [],
-  coordDeterminations: [],
+  determinations: [],
   paramSigns: [],
   coordPlanePins: [],
   planeLinePerps: [],

@@ -12,15 +12,16 @@ import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
-import { builtFrom3, carrierParams3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
+import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { freeMetricOperands3, spellingOf, symbolValueOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
+import { hasClaimResidual3 } from './claims';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -184,7 +185,7 @@ function clone(c: Construction3): Construction3 {
     pairPins: [...c.pairPins],
     planePins: [...c.planePins],
     paramGivens: [...c.paramGivens],
-    coordDeterminations: [...c.coordDeterminations],
+    determinations: [...c.determinations],
     paramSigns: [...c.paramSigns],
     coordPlanePins: [...c.coordPlanePins],
     planeLinePerps: [...c.planeLinePerps],
@@ -230,7 +231,12 @@ export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true })
  */
 export function statementReachesFreeDof3(c: Construction3, statement: unknown): boolean {
   if (freeDims(c) > 0) return true;
-  // a declared vector atom («cos(u, AE)») reads the points it spans
+  return reachesFreeCarrier3(c, statementPointIds3(c, statement));
+}
+
+/** The points a statement names, wherever they sit in its shape — a declared vector atom («cos(u, AE)») reads the points
+ *  it spans. The one reach read by the drive predicate and by the parameter lane's routing ({@link pinsCoordParam3}). */
+function statementPointIds3(c: Construction3, statement: unknown): Id[] {
   const named: Id[] = [];
   const walk = (v: unknown): void => {
     if (Array.isArray(v)) v.forEach(walk);
@@ -241,14 +247,58 @@ export function statementReachesFreeDof3(c: Construction3, statement: unknown): 
     }
   };
   walk(statement);
-  return reachesFreeCarrier3(c, [...claimPointIds(c, statement), ...named]);
+  return [...claimPointIds(c, statement), ...named];
+}
+
+/**
+ * #1896 (ADR-3D-433) — DOES THIS CLAIM PIN THE FIGURE'S COORD-SYM PARAMETER? The one routing decision of the parameter
+ * lane (ADR-3D-032), asked at the event by the one recorder ({@link recordClaim3}) BEFORE any drive: a coord-sym given
+ * never enters the pivot, where the point rides a provisional k. True when the claim's reach names a coord-sym point
+ * (the parameter is its letter) and its kind is ONE scalar equation (`CLAIM_RESIDUALS3`, the residual the post-pivot
+ * root-find solves). ADR-3D-032 listed three kinds here (`length-eq`, `angle-seg-eq`, `vertex-angle-eq`) and only the
+ * `claim` arm asked, so «AB ⊥ AC» (a `cos-angle` command), an area or a length ratio on such points was judged at the
+ * sampled k and refused «בדקו את החישוב» although k = 2 and k = −5 satisfy it. A `length-letter` tie keeps its
+ * owner-routed lowering (`lowerLengthLetter3`, ADR-3D-384), which already sends the parameter's tie to this lane.
+ */
+export function pinsCoordParam3(c: Construction3, claim: Claim3): boolean {
+  if (!c.param || !hasClaimResidual3(claim.type)) return false;
+  return statementPointIds3(c, claim).some((id) => c.points.get(id)?.kind === 'coord-sym');
+}
+
+/**
+ * #1896 (ADR-3D-433) — THE ONE CLAIM RECORDER. Every arm that records a claim calls it, so the parameter lane's routing
+ * cannot be bound to one code path again (src3d/CLAUDE.md: "a guard bound to a code path rather than to the event it
+ * guards will be bypassed"). In order:
+ *  - the parameter lane: a claim that pins the coord-sym parameter ({@link pinsCoordParam3}) is recorded as the claim
+ *    (the final arbiter) AND as a parameter given, the same object, and is never driven;
+ *  - else `drive`, the arm's pivot pin where its statement reaches a free DOF, recorded in the arm's historic shape: the
+ *    pin alone (`pin-only`), the pin and the claim (`claim`, the ADR-3D-030 pin-and-claim pattern), or the pin and its
+ *    claim as the given's arbiter (`arbiter`, `recordPinGiven`, #1567);
+ *  - else the claim alone, the answer the verifier checks.
+ */
+type Drive3 = { pin: () => void; record: 'pin-only' | 'claim' | 'arbiter' };
+function recordClaim3(next: Construction3, c: Construction3, claim: Claim3, drive?: Drive3 | null): 'param' | 'pin' | 'claim' {
+  if (pinsCoordParam3(c, claim)) {
+    next.claims.push(claim);
+    next.paramGivens.push(claim);
+    return 'param';
+  }
+  if (drive) {
+    drive.pin();
+    if (drive.record === 'arbiter') recordPinGiven(next, claim as PinGivenClaim);
+    else if (drive.record === 'claim') next.claims.push(claim);
+    return 'pin';
+  }
+  next.claims.push(claim);
+  return 'claim';
 }
 
 export function freeDims(c: Construction3): number {
   let n = 0;
   // #1855 (ADR-3D-355): every solid after the first carries its own similarity (7 dims) — separate
   // figures' relative size and orientation are free (`componentSimilarityDims`, evaluate.ts).
-  c.solids.forEach((s, i) => { n += solidDimCount(s) + (i > 0 ? 7 : 0); });
+  // #2490 (ADR-3D-434): a BOUND solid carries its apex's dims alone — its frame is its ring's, so no similarity either
+  c.solids.forEach((s, i) => { n += s.bound ? boundSolidDimCount3(s.kind) : solidDimCount(s) + (i > 0 ? 7 : 0); });
   for (const r of c.revolutions) {
     if (r.radius === undefined) n++;
     if (r.kind !== 'sphere' && r.height === undefined) n++;
@@ -1130,7 +1180,7 @@ function settleFreeVectors3(before: Construction3, next: Construction3): ApplyRe
   const driven = freeRelationsDriven3(next).filter((m) => !next.claims.some((cl) => cl.type === 'free-rel' && cl.m === m));
   if (driven.length === 0) return { ok: true, next };
   const withClaims = clone(next);
-  for (const m of driven) withClaims.claims.push({ type: 'free-rel', m, given: true });
+  for (const m of driven) recordClaim3(withClaims, next, { type: 'free-rel', m, given: true });
   return { ok: true, next: withClaims };
 }
 
@@ -1822,6 +1872,105 @@ function placeholderYields(c: Construction3, cmd: Command3): Construction3 | nul
 }
 
 /**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — the run of a pyramid declared over a base that
+ * ALREADY EXISTS: every letter but one is a point of the figure, and that one — the APEX — is new, or (with none new) the
+ * run's one placeholder (`free3`, or a #841 `implied` rider: "no position yet", never a definition) in the apex slot. A
+ * new apex is identified by being new, never by its position in the run (ADR-3D-080 Am. 1's rule). Null when the run is not that: all
+ * new (a standalone solid), all defined (ADR-3D-080's statement), or a base only partly existing (a run with two new
+ * letters has no owner here — it keeps the `taken` refusal).
+ */
+function boundPyramidRun3(c: Construction3, ids: readonly Id[]): { base: Id[]; apex: Id } | null {
+  const absent = ids.filter((id) => !c.points.has(id));
+  const holders = ids.filter((id) => isRingPlaceholder3(c, id));
+  // a placeholder is the apex only where the template puts it (apex last): one in a base slot, with the apex letter
+  // defined, is ADR-3D-080's statement over a free corner, and that reading stands (Am. 1's fallback)
+  const holderApex = absent.length === 0 && holders.length === 1 && holders[0] === ids[ids.length - 1] ? holders[0] : undefined;
+  const apex = absent.length === 1 ? absent[0] : holderApex;
+  if (apex === undefined) return null;
+  return { base: ids.filter((id) => id !== apex), apex };
+}
+
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — A PYRAMID OVER AN EXISTING BASE IS A BOUND SOLID.
+ *
+ * «קובייה ABCDA'B'C'D'» · «פירמידה ABCDS» (the operator, round #2466 T38: *"there is no reason a pyramid cannot be drawn
+ * here"*), and «ריבוע ABCD» · «פירמידה ABCDS שבסיסה ריבוע» (#2478). The base points keep their own definitions — the
+ * cube's vertices stay the cube's, the square's stay the square's — and the solid owns its apex alone. So:
+ *
+ *  1. **The base is a flat ring over existing points**, exactly as «מרובע ABCD» states one: a free corner rides the
+ *     plane of the placed ones (#1935), and a determined ring that is not flat is the store's `ring-not-flat` refusal
+ *     (the bound base is a declared ring, `declaredRings3`), naming this line — never a label that was fine.
+ *  2. **The base SHAPE the kind states is a statement about that ring** (M1): the family's relations (`quadShapeConstraints`,
+ *     an equilateral triangle's two equal sides) drive a free ring and verify a determined one — «מלבן ABCD» · «פירמידה
+ *     ABCDS שבסיסה ריבוע» makes the rectangle a square; a ring already KNOWN as that kind takes nothing new; a disjoint
+ *     kind is refused `shape-disjoint`, as a flat «X ABCD» over it would be.
+ *  3. **The solid**: its stated kind, its ids in template order (base, then apex), `bound` = the base, and the apex a
+ *     `solid-vertex` of it. Placed in the ring's frame with the apex's own dims (evaluate's `boundApexPosition3`).
+ *
+ * A right kind's rightness is the placement's (the foot at the ring's circumcentre); what «ישרה» entails about the base
+ * — the cyclic fix — rides the parser's own commands after this one, as on a standalone pyramid.
+ */
+function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], apex: Id): ApplyResult3 {
+  const ids = [...base, apex];
+  const next = clone(c);
+  // 1. the base is flat: a free corner rides the placed corners' plane
+  flattenRingFreeVertices3(next, base);
+  // 2. the base shape the kind states
+  const spec = QUAD_PYRAMIDS[cmd.kind];
+  const stated = spec && spec.base !== 'quad' && base.length === 4 ? declaredKind3({ base: spec.base, ...(cmd.baseAdj ? { adj: cmd.baseAdj } : {}) }) : null;
+  let lowered: Command3[] = [];
+  if (spec && stated) {
+    const known = knownQuadKind(next, base);
+    const rel = known ? kindRelation(known, stated) : null;
+    if (known && rel === 'excludes') return { ok: false, error: { code: 'shape-disjoint', stated, actual: known } };
+    const holds = rel === 'implies' || (known !== null && narrowImplies(known, baseKind3(spec.base)));
+    const pairRing = cmd.baseSeat ? [base[1], base[2], base[3], base[0]] : base;
+    if (!holds) lowered = quadShapeConstraints(spec.base, pairRing);
+  } else if (cmd.kind === 'pyramid3e') {
+    const [a, b, d] = base;
+    lowered = shapeInternal3([
+      { type: 'length-rel', a1: a, b1: b, rhs: { pair: [b, d] }, c: 1 },
+      { type: 'length-rel', a1: b, b1: d, rhs: { pair: [d, a] }, c: 1 },
+    ]);
+  }
+  let r: ApplyResult3 = { ok: true, next };
+  for (const k of lowered) {
+    r = applyCommand3(r.next, k);
+    if (!r.ok) return r;
+  }
+  // ...and the ring's DRAWING PREFERENCE is judged against what is now stated over it in total (#1792's rule for a
+  // circle through a ring): «מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» is a square, so the rectangle's "never look like
+  // a square" fails at every seed and the seed sweep paid its whole budget on every later line (8 s for «|SA| = 5»).
+  // The narrower kind's preference replaces it; a square has none. The seed drawn is the one the sweep fell back to.
+  const requirements = !stated
+    ? r.next.requirements
+    : r.next.requirements.flatMap((req) => {
+        if (req.kind !== 'quad-general' || !sameRing(req.ids, base)) return [req];
+        const meet = declaredKindOf([declaredKind3(req), stated], false);
+        if (!meet || meet === declaredKind3(req)) return [req];
+        const narrower = (Object.keys(QUAD_BASE_DIMS) as QuadBase[]).find((b) => baseKind3(b) === meet);
+        if (!narrower) return [req];
+        return QUAD_BASE_DIMS[narrower] === 0 ? [] : [{ ...req, base: narrower }];
+      });
+  // 3. the solid — on fresh arrays: a memo keyed by the lowering's own `solids` / `points` (`solidDimsAll3`) stays true
+  const at = (i: number): Id => ids[i];
+  const solid: SolidObj = {
+    kind: cmd.kind,
+    ids,
+    edges: edgeIndices(cmd.kind).map(([i, j]) => [at(i), at(j)] as [Id, Id]),
+    faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
+    ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}),
+    ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}),
+    bound: [...base],
+  };
+  const out: Construction3 = { ...r.next, solids: [...r.next.solids, solid], points: new Map(r.next.points), requirements };
+  // a yielding placeholder keeps its slot in the point order (a point defined from it later still follows it); a new
+  // apex is appended, after every base point it is placed from
+  out.points.set(apex, { kind: 'solid-vertex', solid: out.solids.length - 1, index: base.length });
+  return { ok: true, next: out };
+}
+
+/**
  * How deep the reducer is inside its own lowerings.
  *
  * The ambiguity question below is about **the sentence the student submitted**, and several commands
@@ -2008,6 +2157,8 @@ function settleLetters3(before: Construction3, next: Construction3): ApplyResult
  */
 function lowerLengthLetter3(c: Construction3, cl: Extract<Claim3, { type: 'length-letter' }>): Construction3 {
   const next = clone(c);
+  // #1896 (ADR-3D-433): the one claim record the recorder does not make — the tie names the LETTER, so its lane is chosen by
+  // the letter's owner below (the parameter's tie already goes to `paramGivens` here), not by a coord-sym point in its reach
   next.claims.push(cl);
   const typed = (id: Id) => {
     const k = c.points.get(id)?.kind;
@@ -2126,7 +2277,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (c.claims.some((k) => k.type === 'polygon-open' && sameRing(k.ids)) || c.solids.some((s) => sameRing(s.ids))) {
           return { ok: true, next: drew ? nextRef : c };
         }
-        nextRef.claims.push({ type: 'polygon-open', ids: [...cmd.ids], given: true });
+        recordClaim3(nextRef, c, { type: 'polygon-open', ids: [...cmd.ids], given: true });
         // #1935 (ADR-3D-356): ...and the ring is FLAT — a free vertex rides the plane of the placed ones
         flattenRingFreeVertices3(nextRef, cmd.ids);
         return { ok: true, next: nextRef };
@@ -2198,6 +2349,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         ...(Object.fromEntries((Object.keys(VERTEX_COUNT) as SolidKind[]).filter(isQuadPyramid).map((k) => [k, 4])) as Partial<Record<SolidKind, number>>),
       };
       const baseN = PYR_BASE[cmd.kind];
+      // #2490 (ADR-3D-434): a pyramid whose BASE already exists and whose apex is its own — a new letter, or a
+      // placeholder that yields (#841) — is a BOUND solid. Owned here, before the all-existing statement below and the
+      // `taken` refusal, which blamed a base label that was fine («A» כבר מוגדר — ADR-3D-172's defect, solid edition).
+      // Only over letters the student TYPED: an unlettered noun the parser lettered by default keeps today's reading.
+      if (baseN !== undefined && cmd.ids.length === baseN + 1 && !cmd.lettersUnstated) {
+        const run = boundPyramidRun3(c, cmd.ids);
+        if (run) return applyBoundPyramid3(c, cmd, run.base, run.apex);
+      }
       // NOT a statement: ids that are exactly an existing solid's id SET (a CONTRADICTING
       // re-declare — pyramidPar vs pyramid4g on SABCD) or that lie within ONE FACE of an
       // existing solid (flat by construction — «טטראדר ABCD» over a cube's base) keep the
@@ -2573,8 +2732,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (prior) {
           const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
           const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
-          if (statementReachesFreeDof3(c, [a, b, cc, d])) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
-          else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
+          recordClaim3(next, c, { type: 'cos-eq', a, b, c: cc, d }, statementReachesFreeDof3(c, [a, b, cc, d]) ? { pin: () => next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d }), record: 'pin-only' } : null);
         }
       }
       return { ok: true, next };
@@ -2703,10 +2861,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ambiguity refusal, and a solid with no derivable apex (prism/box) refuses `bad-solid` —
       // its height is not a vertex-to-base perpendicular, and guessing a vertex would assert a
       // figure the student never stated (ADR-052).
-      if (!cmd.from && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      //
+      // #2490 (ADR-3D-434): the apex-less height names THE PYRAMID (the parser admits it only with that noun, or with a
+      // value and no noun), so with several solids it is the figure's ONE pyramid when there is one — the 2026-08-26
+      // ruling every noun-only solid statement already follows (`resolveSolidSubject`): «קובייה ABCDA'B'C'D'» ·
+      // «פירמידה ABCDS» · «גובה הפירמידה». Several pyramids, or none, stay the honest refusal.
+      let subject: SolidObj | null = c.solids.length === 1 ? c.solids[0] : null;
+      if (!cmd.from && !subject) {
+        const one = resolveSolidSubject(c, 'pyramid', []);
+        if (one.kind !== 'solid') return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+        subject = one.solid;
+      }
       let from = cmd.from;
       if (!from) {
-        const s0 = c.solids[0];
+        const s0 = subject!;
         const ring = baseRingOf(s0);
         if (!ring || ring.length !== s0.ids.length - 1) return { ok: false, error: { code: 'bad-solid', kind: s0.kind } };
         from = s0.ids[s0.ids.length - 1];
@@ -2716,8 +2884,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // A STATED base wins (#448): «גובה מנקודה D לבסיס ABC» names the face, so resolving the solid's
       // first face instead would silently drop the student's own words onto a different plane. Only the
       // UNSTATED case needs the figure, and it stays honest about ambiguity — several solids, no answer.
-      if (!cmd.face && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
-      const face = cmd.face ?? c.solids[0].ids.slice(0, 3);
+      if (!cmd.face && !subject) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const face = cmd.face ?? subject!.ids.slice(0, 3);
       let foot: Id | null = null;
       for (const ch of 'EFGHKLMNPQRSTUVWXYZABCD') {
         if (!c.points.has(ch)) {
@@ -2801,15 +2969,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ADR-3D-032: a given referencing a coord-sym point PINS the figure parameter —
       // it must NOT enter the pivot (M rides a provisional sampled k there); it is
       // root-found post-pivot over final positions (1-DOF, the D3 boundary). Recorded
-      // as a claim too — the final verification stays the arbiter.
-      const refsCoordSym = (ids: Id[]): boolean => ids.some((id) => c.points.get(id)?.kind === 'coord-sym');
-      if (
-        (cmd.claim.type === 'length-eq' && refsCoordSym([cmd.claim.a, cmd.claim.b])) ||
-        (cmd.claim.type === 'angle-seg-eq' && refsCoordSym([cmd.claim.a1, cmd.claim.b1, cmd.claim.a2, cmd.claim.b2])) ||
-        (cmd.claim.type === 'vertex-angle-eq' && refsCoordSym([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]))
-      ) {
-        next.paramGivens.push(cmd.claim);
-        next.claims.push(cmd.claim);
+      // as a claim too — the final verification stays the arbiter. #1896 (ADR-3D-433): asked of
+      // every scalar kind by the one recorder, before any lane below may drive it.
+      if (pinsCoordParam3(c, cmd.claim)) {
+        recordClaim3(next, c, cmd.claim);
         return { ok: true, next };
       }
       // #754 (ADR-3D-171): a stated MAGNITUDE on a gauge-frozen figure pins the SCALE — a given,
@@ -2828,9 +2991,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.claim.type === 'length-eq' && radiusOf?.def.kind === 'free') {
         const held = heldRadius3(c, radiusOf.id, radiusOf.def);
         if (held !== undefined && Math.abs(held - cmd.claim.value) > 1e-9) return { ok: false, error: { code: 'circle-given-conflict', name: radiusOf.def.center, what: 'radius' } };
-        next.claims.push({ ...cmd.claim, given: true });
+        recordClaim3(next, c, { ...cmd.claim, given: true });
         return { ok: true, next };
       }
+      // #1816 (ADR-3D-432): a stated LENGTH whose reach holds a solvable carrier parameter (a rider's `t`, a line rider's
+      // offset, an axis point's unstated coordinate) is recorded as a DETERMINATION, beside whatever lane takes it below —
+      // the ADR-3D-293 pattern, recorded at the event. `resolve3` solves it where the pivot does not run: a figure of
+      // coordinates and riders on them («A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1»), where it used to be judged against
+      // the rider's random sample and refused «בדקו את החישוב». Where the pivot runs, its pin drives and this stays idle.
+      // The claim recorded below stays the arbiter.
+      if (cmd.claim.type === 'length-eq' && determinationReach3(c, [cmd.claim.a, cmd.claim.b]).length > 0)
+        next.determinations.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
       if (
         isScaleGivenClaim(cmd.claim) &&
         scaleGivenSafe(c) &&
@@ -2838,7 +3009,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         ((cmd.claim.type !== 'length-eq' && cmd.claim.type !== 'length-sum') || freeDims(c) === 0)
       ) {
         next.scaleGivens.push(cmd.claim);
-        next.claims.push(cmd.claim);
+        recordClaim3(next, c, cmd.claim);
         return { ok: true, next };
       }
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
@@ -2886,8 +3057,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // figure toward the stated coords; the recorded claim stays the FINAL ARBITER, so an
           // inconsistent statement (the 2020 wrong-K gate) still refuses with the claim register
           // even where the pivot only best-efforts its pins.
-          next.pins.push({ id: cl.id, x: cl.x, y: cl.y, z: cl.z });
-          next.claims.push(cl);
+          recordClaim3(next, c, cl, { pin: () => next.pins.push({ id: cl.id, x: cl.x, y: cl.y, z: cl.z }), record: 'claim' });
           return { ok: true, next };
         }
         /**
@@ -2937,9 +3107,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
               if (g.type === 'length-eq' && at >= 0) next.claims[at] = { ...g, given: true };
             }
           }
-          next.scalarPins.push(mag);
-          if (cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum') recordPinGiven(next, cmd.claim);
-          else next.claims.push(cmd.claim); // #1567 (ADR-3D-285): the length pin records its arbiter
+          // #1567 (ADR-3D-285): the length pin records its arbiter; a volume or an area keeps its plain claim
+          const lengthPin = cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum';
+          recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push(mag), record: lengthPin ? 'arbiter' : 'claim' });
           return { ok: true, next };
         }
         // #754: once a scale given is in force the rescale owns the figure's size — a second
@@ -2948,12 +3118,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // against still-free dims and checks it exactly against a rigid one. (#1447: with free
         // dims the demotion above now takes it; this arm keeps the free3-only reach.)
         if ((cmd.claim.type === 'length-eq' || cmd.claim.type === 'length-sum') && c.scaleGivens.length === 0) {
-          next.scalarPins.push(
-            cmd.claim.type === 'length-eq'
-              ? { kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value }
-              : { kind: 'length-sum', terms: cmd.claim.terms, value: cmd.claim.value },
-          );
-          recordPinGiven(next, cmd.claim); // #1567 (ADR-3D-285)
+          const cl = cmd.claim;
+          const pin: ScalarPin = cl.type === 'length-eq' ? { kind: 'length', a: cl.a, b: cl.b, value: cl.value } : { kind: 'length-sum', terms: cl.terms, value: cl.value };
+          recordClaim3(next, c, cl, { pin: () => next.scalarPins.push(pin), record: 'arbiter' }); // #1567 (ADR-3D-285)
           return { ok: true, next };
         }
         /**
@@ -2990,15 +3157,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
          * figure truly cannot satisfy it rather than because one sample did not.
          */
         if (cmd.claim.type === 'vec-eq') {
-          next.scalarPins.push({ kind: 'vec-eq', lhs: cmd.claim.lhs, rhs: cmd.claim.rhs });
-          next.claims.push(cmd.claim);
+          const { lhs, rhs } = cmd.claim;
+          recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push({ kind: 'vec-eq', lhs, rhs }), record: 'claim' });
           return { ok: true, next };
         }
         if (cmd.claim.type === 'length-ratio' && cmd.claim.q !== 0) {
           const { a1, b1, a2, b2, p, q } = cmd.claim;
-          next.scalarPins.push({ kind: 'length-rel', a1, b1, a2, b2, c: p / q });
           // Recorded as a claim too — the final verification stays the arbiter, the ADR-3D-030 pattern.
-          next.claims.push(cmd.claim);
+          recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push({ kind: 'length-rel', a1, b1, a2, b2, c: p / q }), record: 'claim' });
           return { ok: true, next };
         }
         // #909 — a stated angle between two SEGMENTS is a GIVEN, whatever the two segments' spelling.
@@ -3018,14 +3184,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // #1567 (ADR-3D-285): each pin records its arbiter, which judges the SAME quantity the pin drives.
         if (cmd.claim.type === 'vertex-angle-eq') {
           const { vertex, p, q, deg } = cmd.claim;
-          next.scalarPins.push({ kind: 'vangle', vertex, p, q, deg });
-          recordPinGiven(next, cmd.claim);
+          recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push({ kind: 'vangle', vertex, p, q, deg }), record: 'arbiter' });
           return { ok: true, next };
         }
         if (cmd.claim.type === 'angle-seg-eq') {
           const { a1, b1, a2, b2, deg } = cmd.claim;
-          next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg });
-          recordPinGiven(next, cmd.claim);
+          recordClaim3(next, c, cmd.claim, { pin: () => next.scalarPins.push({ kind: 'seg-angle', a1, b1, a2, b2, deg }), record: 'arbiter' });
           return { ok: true, next };
         }
       }
@@ -3044,7 +3208,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #584 (ADR-3D-148): a claim naming an explicit plane RUN («המישור ABS: x=0») references a
       // plane the student stated — materialise it so the patch draws and carries the display cycle.
       if (cmd.claim.type === 'plane-eq' || cmd.claim.type === 'coord-plane-rel') materializePlaneRun(next, cmd.claim.ids);
-      next.claims.push(cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
+      recordClaim3(next, c, cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
       return { ok: true, next };
     }
 
@@ -3083,7 +3247,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // false restatement read green over a figure that contradicts it. The claim carries the NUMERIC
         // components only — a symbolic one («B(2t, t, k)») is the pivot's to satisfy, and null is unchecked.
         if (cmd.x !== null || cmd.y !== null || cmd.z !== null)
-          next.claims.push({ type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, given: true });
+          recordClaim3(next, c, { type: 'coords-eq', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z, given: true });
         // #1615 (ADR-3D-293): ONE mechanism for every point that sits on something. If the point's position
         // carries drivable parameters in the sampled-carrier table — a segment's `t`, a line's or a plane's
         // offset, a partial point's missing coordinate, … — the STATED components are recorded, and `resolve3`
@@ -3095,7 +3259,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           defNow && defNow.kind !== 'free3' &&
           carrierParams3(next, cmd.id, defNow).some((p) => p.solvable)
         )
-          next.coordDeterminations.push({ id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
+          next.determinations.push({ kind: 'coords', id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
         bindPartialNames(next, { kind: 'point', id: cmd.id }, cmd.syms, comps); // #814
         return { ok: true, next };
       }
@@ -3184,7 +3348,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // «הבסיס» form named no plane and the solid's base is already visible as its face — excluded.
       if (cmd.ids.length > 0) materializePlaneRun(next, ids);
       next.coordPlanePins.push({ ids, axis: cmd.axis, mode: cmd.mode });
-      next.claims.push({ type: 'coord-plane-rel', ids, axis: cmd.axis, mode: cmd.mode });
+      recordClaim3(next, c, { type: 'coord-plane-rel', ids, axis: cmd.axis, mode: cmd.mode });
       return { ok: true, next };
     }
 
@@ -3203,7 +3367,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // to the crossing and the relation leaves no visible trace where the objects meet.
       materializePlaneRun(next, cmd.ids);
       next.planeLinePerps.push({ ids: [...cmd.ids], line: cmd.line, ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}) });
-      next.claims.push({ type: 'plane-line-perp', ids: [...cmd.ids], line: cmd.line });
+      recordClaim3(next, c, { type: 'plane-line-perp', ids: [...cmd.ids], line: cmd.line });
       return { ok: true, next };
     }
 
@@ -3240,7 +3404,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         line: cmd.line,
         ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}),
       });
-      next.claims.push({ type: 'line-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), op: cmd.op, line: cmd.line });
+      recordClaim3(next, c, { type: 'line-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), op: cmd.op, line: cmd.line });
       return { ok: true, next };
     }
 
@@ -3271,7 +3435,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
 
       // (3) the CLAIM — the final arbiter on the finished figure, per the ADR-3D-079 shape
-      next.claims.push({ type: 'mutual-rel', rel: cmd.rel, a: cmd.a, b: cmd.b });
+      recordClaim3(next, c, { type: 'mutual-rel', rel: cmd.rel, a: cmd.a, b: cmd.b });
       return { ok: true, next };
     }
 
@@ -3331,7 +3495,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (!isAbsolute(cmd.a) && !isAbsolute(cmd.b)) {
         next.scalarPins.push({ kind: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
       }
-      next.claims.push({ type: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
+      recordClaim3(next, c, { type: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
       return { ok: true, next };
     }
 
@@ -3347,7 +3511,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // A distance carries UNITS, so it is meaningful against an absolute object too — but the
       // gauge×absolute DRIVE is the pivot's lane (#386); those instances stay claim-verified.
       if (!isAbsolute(cmd.a) && !isAbsolute(cmd.b)) next.scalarPins.push({ kind: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
-      next.claims.push({ type: 'distance-rel', a: cmd.a, b: cmd.b, value: cmd.value });
+      recordClaim3(next, c, { type: 'distance-rel', a: cmd.a, b: cmd.b, value: cmd.value });
       return { ok: true, next };
     }
 
@@ -3430,8 +3594,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
-      next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) });
-      recordPinGiven(next, { type: 'vec-val', atom: { kind: 'named', name: cmd.name }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
+      recordClaim3(next, c, { type: 'vec-val', atom: { kind: 'named', name: cmd.name }, x: cmd.x, y: cmd.y, z: cmd.z }, { // #1560
+        pin: () => next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) }),
+        record: 'arbiter',
+      });
       bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps); // #814
       return { ok: true, next };
     }
@@ -3649,7 +3815,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // `claim-refuted` instead of silently passing. With a parameter in play the root-find's
       // `no-roots` refusal is the arbiter, and a recorded claim would double-report.
       if (!lineDirCarriesParam(c, cmd.line) && !planeNormalCarriesParam(c, cmd.plane)) {
-        next.claims.push({ type: 'line-rel', rel: 'perp', op: { kind: 'plane-named', name: cmd.plane }, line: cmd.line });
+        recordClaim3(next, c, { type: 'line-rel', rel: 'perp', op: { kind: 'plane-named', name: cmd.plane }, line: cmd.line });
       }
       return { ok: true, next };
     }
@@ -3889,9 +4055,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // records its arbiter: the free dims may be a revolution's size, which no pivot drives.
       if (statementReachesFreeDof3(c, [cmd.a, cmd.b, plane])) {
         const next = clone(c);
-        next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane });
+        const pin = () => next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane });
         if (plane.length >= 3)
-          recordPinGiven(next, { type: cmd.rel === 'perp' ? 'perp-plane' : 'par-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] });
+          recordClaim3(next, c, { type: cmd.rel === 'perp' ? 'perp-plane' : 'par-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] }, { pin, record: 'arbiter' });
+        else pin();
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };
       }
@@ -3963,11 +4130,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #2609 (ADR-3D-408): the statement's reach, as at every sibling drive site — this arm still asked `freeDims`, so
       // «אורך AS שווה לאורך AB» over created points (and a rider's ratio on a rigid cube) was judged on the sample
       if (statementReachesFreeDof3(next, [cmd.a1, cmd.b1, ...pair2])) {
-        next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
-        recordPinGiven(next, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }); // #1567 (ADR-3D-285)
+        recordClaim3(next, c, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }, { // #1567 (ADR-3D-285)
+          pin: () => next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c }),
+          record: 'arbiter',
+        });
         return { ok: true, next };
       }
-      next.claims.push({ type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
+      recordClaim3(next, c, { type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
       return { ok: true, next };
     }
 
@@ -4183,8 +4352,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const dotErr = vectorRefsError3(c, [cmd.v1, cmd.v2]);
       if (dotErr) return { ok: false, error: dotErr };
       const next = clone(c);
-      next.scalarPins.push({ kind: 'dot', v1: cmd.v1, v2: cmd.v2, value: cmd.value });
-      recordPinGiven(next, { type: 'dot-val', a: { kind: 'named', name: cmd.v1 }, b: { kind: 'named', name: cmd.v2 }, value: cmd.value }); // #1560
+      recordClaim3(next, c, { type: 'dot-val', a: { kind: 'named', name: cmd.v1 }, b: { kind: 'named', name: cmd.v2 }, value: cmd.value }, { // #1560
+        pin: () => next.scalarPins.push({ kind: 'dot', v1: cmd.v1, v2: cmd.v2, value: cmd.value }),
+        record: 'arbiter',
+      });
       return { ok: true, next };
     }
 
@@ -4200,8 +4371,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
-      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) });
-      recordPinGiven(next, { type: 'vec-val', atom: { kind: 'pair', from: cmd.a, to: cmd.b }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
+      recordClaim3(next, c, { type: 'vec-val', atom: { kind: 'pair', from: cmd.a, to: cmd.b }, x: cmd.x, y: cmd.y, z: cmd.z }, { // #1560
+        pin: () => next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) }),
+        record: 'arbiter',
+      });
       bindPartialNames(next, { kind: 'pair', a: cmd.a, b: cmd.b }, cmd.syms, comps); // #814
       return { ok: true, next };
     }
@@ -4243,8 +4416,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.circles3 = next.circles3.map((k) => (k.id === cmd.id ? { id: cmd.id, def: cmd.def } : k));
         // what the free circle already held is still stated: it stays a verified claim on the tangent form
         const line: Operand3 = { kind: 'line', name: (cmd.def as { line: string }).line };
-        if (freeTangent.radius !== undefined) next.claims.push({ type: 'distance-rel', a: { kind: 'point', id: (cmd.def as { center: Id }).center }, b: line, value: freeTangent.radius });
-        if (freeTangent.plane !== undefined) next.claims.push({ type: 'plane-rel', rel: 'contained', a: line, b: { kind: 'plane-named', name: freeTangent.plane } });
+        if (freeTangent.radius !== undefined) recordClaim3(next, c, { type: 'distance-rel', a: { kind: 'point', id: (cmd.def as { center: Id }).center }, b: line, value: freeTangent.radius });
+        if (freeTangent.plane !== undefined) recordClaim3(next, c, { type: 'plane-rel', rel: 'contained', a: line, b: { kind: 'plane-named', name: freeTangent.plane } });
       } else next.circles3.push({ id: cmd.id, def: cmd.def });
       if (cmd.def.kind === 'free' && cmd.def.plane !== undefined && cmd.def.center !== undefined)
         return applyCommand3Inner(next, { type: 'on-planes', id: cmd.def.center, plane: cmd.def.plane }); // the centre lies on the plane
@@ -4256,7 +4429,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // One 4-point claim per vertex past the third, on the circle through the first three.
       if (cmd.def.kind === 'circum' && cmd.def.ring.length >= 4) {
         const r = cmd.def.ring;
-        for (const v of r.slice(3)) next.claims.push({ type: 'concyclic', ids: [r[0], r[1], r[2], v] });
+        for (const v of r.slice(3)) recordClaim3(next, c, { type: 'concyclic', ids: [r[0], r[1], r[2], v] });
         if (r.length === 4) noteInscribedQuad(next, r);
       }
       if (cmd.touch && cmd.def.kind === 'tangent-line') {
@@ -4357,8 +4530,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: true, next };
         }
       }
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
-      else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      recordClaim3(next, c, { type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4387,8 +4559,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of [...cmd.e1, ...cmd.e2]) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
-      else next.claims.push({ type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      recordClaim3(next, c, { type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4407,8 +4578,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (const t of cmd.e) {
         if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
       }
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
-      else next.claims.push({ type: 'mag-val', e: cmd.e, value: cmd.value });
+      recordClaim3(next, c, { type: 'mag-val', e: cmd.e, value: cmd.value }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4420,8 +4590,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (miss) return { ok: false, error: miss };
       if (cmd.ids.length !== 4) return { ok: false, error: { code: 'bad-solid', kind: 'pyramidQuadR' } };
       const next = clone(c);
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
-      else next.claims.push({ type: 'concyclic', ids: cmd.ids });
+      recordClaim3(next, c, { type: 'concyclic', ids: cmd.ids }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4439,8 +4608,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       for (let i = 1; i < cmd.ops.length; i++) {
         const [a, b] = cmd.ops[i - 1];
         const [cc, d] = cmd.ops[i];
-        if (drive) next.scalarPins.push({ kind: 'dot-eq', a, b, c: cc, d });
-        else next.claims.push({ type: 'dot-eq', a, b, c: cc, d });
+        recordClaim3(next, c, { type: 'dot-eq', a, b, c: cc, d }, drive ? { pin: () => next.scalarPins.push({ kind: 'dot-eq', a, b, c: cc, d }), record: 'pin-only' } : null);
       }
       return { ok: true, next };
     }
@@ -4453,8 +4621,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.base);
       drawAtom(next, cmd.a);
       drawAtom(next, cmd.b);
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
-      else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      recordClaim3(next, c, { type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4493,8 +4660,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (err) return { ok: false, error: err };
       const next = clone(c);
       for (const at of [cmd.a, cmd.b, cmd.c, cmd.d]) drawAtom(next, at);
-      if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
-      else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      recordClaim3(next, c, { type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d }), record: 'pin-only' } : null);
       return { ok: true, next };
     }
 
@@ -4539,8 +4705,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: false, error: { code: 'no-solution', id: cmd.apex } };
         const next = clone(c);
         const pin = { apex: cmd.apex, a: cmd.a, b: cmd.b, tip: cmd.id } as const;
-        if (statementReachesFreeDof3(c, cmd)) next.scalarPins.push({ kind: 'bisector-dir', ...pin });
-        else next.claims.push({ type: 'bisector-dir', ...pin });
+        recordClaim3(next, c, { type: 'bisector-dir', ...pin }, statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'bisector-dir', ...pin }), record: 'pin-only' } : null);
         if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // the stated ray is drawn
         return { ok: true, next };
       }
@@ -4589,9 +4754,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       const deg = cmd.deg!;
-      if (statementReachesFreeDof3(c, cmd))
-        next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
-      else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
+      recordClaim3(
+        next,
+        c,
+        { type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg },
+        statementReachesFreeDof3(c, cmd) ? { pin: () => next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg }), record: 'pin-only' } : null,
+      );
       return { ok: true, next };
     }
 

@@ -15,6 +15,9 @@
 [Unit]
 Description=Geo Builder LLM-fallback proxy (POST /api/parse)
 After=network.target
+# Never stop restarting (#2752, ADR-W-192). systemd's default gives up after 5 starts in 10 s and leaves
+# the unit down for every builder until someone restarts it by hand.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

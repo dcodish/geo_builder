@@ -14,6 +14,7 @@
 import { type Plugin } from 'vite';
 import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { readBody, serveSafely } from './http';
 
 const MAX_BODY = 512_000; // a snapshot of a large figure can be sizeable; cap to be safe
 
@@ -65,34 +66,36 @@ export function logProxyPlugin(): Plugin {
       logDir = path.resolve(config.root, 'logs');
     },
     configureServer(server) {
-      server.middlewares.use('/api/log', async (req, res) => {
-        const end = (code: number) => {
-          res.statusCode = code;
-          res.end();
-        };
-        if (req.method !== 'POST') return end(405);
+      // Inside the one request boundary, reading through the one body reader (#2752, ADR-W-192).
+      server.middlewares.use(
+        '/api/log',
+        serveSafely(
+          async (req, res) => {
+            const end = (code: number) => {
+              res.statusCode = code;
+              res.end();
+            };
+            if (req.method !== 'POST') return end(405);
 
-        let body = '';
-        let size = 0;
-        for await (const chunk of req) {
-          size += (chunk as Buffer).length;
-          if (size > MAX_BODY) return end(413);
-          body += chunk;
-        }
-        try {
-          const obj = JSON.parse(body) as Record<string, unknown>; // validate it's JSON
-          // Each tool tags its events and gets its OWN file, so traces never mix. An unknown tag is
-          // refused rather than defaulted — see TOOL_LOGS.
-          const file = logFileFor(obj.tool);
-          if (!file) return end(400);
-          const line = JSON.stringify({ serverTs: new Date().toISOString(), ...obj }) + '\n';
-          await mkdir(logDir, { recursive: true });
-          await appendFile(path.join(logDir, file), line, 'utf8');
-          return end(204);
-        } catch {
-          return end(400);
-        }
-      });
+            const body = await readBody(req, MAX_BODY);
+            if (body === null) return end(413);
+            try {
+              const obj = JSON.parse(body) as Record<string, unknown>; // validate it's JSON
+              // Each tool tags its events and gets its OWN file, so traces never mix. An unknown tag is
+              // refused rather than defaulted — see TOOL_LOGS.
+              const file = logFileFor(obj.tool);
+              if (!file) return end(400);
+              const line = JSON.stringify({ serverTs: new Date().toISOString(), ...obj }) + '\n';
+              await mkdir(logDir, { recursive: true });
+              await appendFile(path.join(logDir, file), line, 'utf8');
+              return end(204);
+            } catch {
+              return end(400);
+            }
+          },
+          (m) => server.config.logger.error(m),
+        ),
+      );
     },
   };
 }

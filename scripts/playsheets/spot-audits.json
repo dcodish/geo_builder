@@ -155,6 +155,21 @@
         "M אמצע BC"
       ],
       "lookFor": "M = (4, 2), as before."
+    },
+    {
+      "sheet": "round-2745",
+      "id": "T4",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-08",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+y^2=25",
+        "T(0,5)",
+        "הישר y=5 משיק למעגל בנקודה K"
+      ],
+      "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
     }
   ],
   "results": [

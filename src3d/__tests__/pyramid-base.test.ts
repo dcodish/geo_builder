@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { derive3, useGeo3 } from '../store/store3';
+import { freeDofCount3 } from '../engine/evaluate';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -139,5 +140,131 @@ describe('pyramid base shape is a stated given, not a default', () => {
     submit('AS ניצב לבסיס');
     expect(state().facts).toHaveLength(0);
     expect(state().lastError).toEqual({ code: 'unknown-plane', id: 'base' });
+  });
+});
+
+/**
+ * #2490 / #2478 (ADR-3D-434) — a pyramid over a base that ALREADY EXISTS is a bound solid. Through the store: every
+ * spelling and host of the class builds, the lines a standalone pyramid accepts are accepted, entry order and a
+ * placeholder apex do not change the verdict, and the refusals name the statement (never «A» כבר מוגדר). The
+ * representation, the apex's freedom and the host's stability are engine3.test.ts's unit locks.
+ */
+describe('#2490 — a pyramid over an existing base', () => {
+  beforeEach(reset);
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const build = (lines: readonly string[]) => {
+    reset();
+    for (const u of lines) submit(u);
+  };
+  const dof = () => {
+    const d = derived();
+    return freeDofCount3(d.construction, d.resolved);
+  };
+
+  it('every spelling and every host builds, the apex its own (host + 3 DOF, host + 1 when right)', () => {
+    const rows: [string[], number][] = [
+      [[CUBE, 'פירמידה ABCDS'], 3],
+      [[CUBE, 'פירמידה SABCD'], 3],
+      [[CUBE, 'the pyramid ABCDS'], 3],
+      [[CUBE, 'פירמידה ישרה ABCDS'], 1],
+      [[CUBE, 'פירמידה ABCDS שבסיסה ריבוע'], 3],
+      [[CUBE, "פירמידה A'B'C'D'S"], 3],
+      [[CUBE, "פירמידה ABB'A'S"], 3],
+      [[CUBE, "פירמידה ABC'D'S"], 3],
+      [[CUBE, 'פירמידה ABCS'], 3],
+      [["תיבה ABCDA'B'C'D'", 'פירמידה ABCDS'], 5],
+      [['פירמידה SABCD', 'פירמידה TABCD'], 7],
+      [['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'], 3],
+      [['מלבן ABCD', 'פירמידה ABCDS'], 4],
+      [['משולש ABC', 'פירמידה ABCS'], 5],
+      [['משולש ABC', 'טטראדר ABCD'], 5],
+    ];
+    for (const [lines, n] of rows) {
+      build(lines);
+      expectAllOk();
+      expect(derived().construction.solids.at(-1)!.bound, lines.join(' · ')).toBeDefined();
+      expect(dof(), lines.join(' · ')).toBe(n);
+    }
+  });
+
+  it('a stated base shape the ring does not yet have drives it: the rectangle becomes a square', () => {
+    build(['מלבן ABCD', 'פירמידה ABCDS שבסיסה ריבוע']);
+    expectAllOk();
+    for (const seed of [0, 1, 2]) {
+      const p = derived(seed).positions;
+      expect(dist(p.get('A')!, p.get('B')!)).toBeCloseTo(dist(p.get('B')!, p.get('C')!), 6);
+    }
+  });
+
+  it('the lines a standalone pyramid accepts are accepted on the bound one', () => {
+    build([CUBE, 'פירמידה ABCDS', 'גובה הפירמידה', 'נפח הפירמידה ABCDS = 5', '|SA| = 5', 'הזווית בין SC למישור ABCD היא 40']);
+    expectAllOk();
+    const p = derived().positions;
+    expect(dist(p.get('S')!, p.get('A')!)).toBeCloseTo(5, 6);
+    build(['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע', '|SA| = 5']);
+    expectAllOk();
+    expect(dist(derived().positions.get('S')!, derived().positions.get('A')!)).toBeCloseTo(5, 6);
+  });
+
+  it('entry order and a placeholder apex do not change the verdict', () => {
+    build(['פירמידה ABCDS שבסיסה ריבוע', 'ריבוע ABCD']);
+    expectAllOk();
+    build(['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע']);
+    expectAllOk();
+    build([CUBE, 'קטע AS', 'פירמידה ABCDS']);
+    expectAllOk();
+    expect(derived().construction.solids[1]?.bound).toEqual(['A', 'B', 'C', 'D']);
+    expect(dof()).toBe(3);
+  });
+
+  it('«גובה הפירמידה» names the figure\'s one pyramid among several solids; two pyramids stay a question', () => {
+    build([CUBE, 'פירמידה EFGHS', 'גובה הפירמידה']);
+    expectAllOk();
+    build([CUBE, 'פירמידה ABCDS', "פירמידה A'B'C'D'T", 'גובה הפירמידה']);
+    expect(state().lastError).toEqual({ code: 'unknown-plane', id: 'base' });
+  });
+
+  it('found in round: a volume naming the pyramid creates its apex over the existing base (FR-SP-25), with the notice', () => {
+    build([CUBE, 'נפח הפירמידה ABCDS = 11']);
+    expectAllOk();
+    const d = derived();
+    expect(d.construction.solids[1]?.bound).toEqual(['A', 'B', 'C', 'D']);
+    expect(Object.values(d.created)).toEqual([['S']]);
+  });
+
+  it('REFUSAL: a base whose letters are not in one plane is refused for that, naming the line', () => {
+    build([CUBE, "פירמידה ABCA'S"]);
+    expect(state().facts).toHaveLength(1);
+    expect(state().lastError).toMatchObject({ code: 'ring-not-flat', stated: "פירמידה ABCA'S", vertices: ['A', 'B', 'C', "A'"] });
+  });
+
+  it('REFUSAL: a base whose letters lie on one line is refused as a flattened pyramid, never drawn without its apex', () => {
+    build(['A(0,0,0)', 'B(1,0,0)', 'C(2,0,0)', 'פירמידה ABCS']);
+    expect(state().facts).toHaveLength(3);
+    expect(state().lastError).toMatchObject({ code: 'polygon-collapsed', stated: 'פירמידה ABCS', solid: 'pyramid' });
+  });
+
+  it('keeps the refusals that are not this run, and ADR-3D-080\'s all-existing statement', () => {
+    build([CUBE, 'טטראדר ABCD']);
+    expect(state().lastError).toEqual({ code: 'already-defined', id: 'A' });
+    build(['פירמידה SABCD', 'פירמידה ABCDS שבסיסה ריבוע']);
+    expect(state().lastError).toEqual({ code: 'already-defined', id: 'A' });
+    build(['משולש ABC', 'פירמידה ABCDS']);
+    expect(state().lastError).toEqual({ code: 'already-defined', id: 'A' });
+    build([CUBE, "פירמידה ABCDA'"]);
+    expectAllOk();
+    expect(derived().construction.solids).toHaveLength(1);
+  });
+
+  it('an UNLETTERED pyramid never binds to the letters the parser gave it: today\'s reading stands (FR-SP-24 is the operator\'s)', () => {
+    for (const lines of [
+      ['משולש ABC', 'פירמידה ישרה שבסיסה משולש שווה שוקיים'],
+      [CUBE, 'פירמידה ישרה שבסיסה ריבוע'],
+      ['ריבוע ABCD', 'פירמידה ישרה שבסיסה טרפז שווה שוקיים'],
+    ]) {
+      build(lines);
+      expect(state().lastError, lines.join(' · ')).toEqual({ code: 'already-defined', id: 'A' });
+      expect(state().facts, lines.join(' · ')).toHaveLength(1);
+    }
   });
 });

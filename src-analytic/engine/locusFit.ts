@@ -25,11 +25,16 @@
  * over-eager rational snap and the tool printing a confident wrong equation**, which is the one thing
  * this product may not do. So the pipeline is
  *
- *     fit → snap to rationals → RE-VERIFY the snapped equation against the trace → print, or print nothing
+ *     fit → snap to the tree's exact forms → RE-VERIFY the snapped equation against the trace → print, or print nothing
  *
  * and that last step is the tool checking itself. `x² + y² − 32.0000001x − 224.9998 = 0` is not an
  * answer. **If it will not snap, print nothing** — the kind still shows, and that is the honest half.
+ *
+ * The exact forms are the tree's own vocabulary (#2734, ADR-AG-429, amending ADR-AG-072 §7's "snap to rationals"): a
+ * small rational first, then a (p/q)·√n — `format.ts`'s `surdOf`, the one recogniser the display tier spells — held
+ * to the tight bar. A locus whose centre is `−3√2/2` is as determinate as one whose centre is `−4`.
  */
+import { surdOf, surdValue } from '../format';
 import { classify, type Conic } from './conic';
 import type { NumCurve } from './types';
 
@@ -52,7 +57,10 @@ export interface LocusShape {
   symbolic?: SymbolicCurve;
 }
 
-/** `c · ∏ sym^e` — `c` a small rational, each exponent 1 or 2, total degree ≤ 2 (#1186). `pow` holds no zero. */
+/**
+ * `c · ∏ sym^e` — `c` an exact form (a small rational, or a (p/q)·√n since #2734), each exponent 1 or 2, total degree
+ * ≤ 2 (#1186). `pow` holds no zero.
+ */
 export interface Monomial {
   c: number;
   pow: Readonly<Record<string, number>>;
@@ -116,11 +124,43 @@ function snapRational(v: number, tol = SNAP_TOL): number | null {
   return (sign * bestNum) / bestDen;
 }
 
-/** Every coefficient snapped at one tolerance, or `null` if any will not. */
-function snapConic(k: Conic, tol: number): Conic | null {
+/**
+ * A COEFFICIENT SNAPPED TO THE TREE'S EXACT-FORM VOCABULARY (#2734, ADR-AG-429): a small rational, else a (p/q)·√n
+ * — `format.ts`'s `surdOf`, the recogniser the display tier spells.
+ *
+ * Measured on חורף 2023 Q1 (x²/9 + y²/4.5 = 1, M on F1E extended with EM = EF2): the trace fits `D = 4.242640692`
+ * against `3√2 = 4.242640687` — the set found exactly, two configurations agreeing to 1e-9 — and the rational-only
+ * snap had no candidate, so a determinate circle printed «מעגל» alone.
+ *
+ * **The surd arm is held to the TIGHT bar, and only data that holds to it may reach it.** The candidates are dense —
+ * some forty radicands × twelve denominators — so a bar widened to a noisy trace's scatter would dress almost any
+ * float as a surd. So:
+ *  - `precise` (the caller's data holds to `SNAP_TOL`): the rational at `SNAP_TOL`, then the surd at `SNAP_TOL`
+ *    RELATIVE TO `v` (the rational snap's own bar, not the display tier's, which floors at √n and would read a typed
+ *    `0.7071` as `√50/10`), then the rational at the caller's `tol`, as before;
+ *  - not precise: the rational at `tol`, exactly as before — a noisy trace never snaps to a surd.
+ *
+ * Rationals keep their place: the tight rational takes what the wider bar took (measured: no saved locus chip
+ * changed), and the wider bar stays the last resort. The surd only goes before a WIDER rational, which on precise data is a wrong snap the
+ * self-check refuses (`3√2/2` read as `70/33` at `MONO_TOL`). A typed `1.4142` (1e-5 from √2), `1.732` or
+ * `3.14159265` is not a surd at the tight bar, and stays unsnapped.
+ */
+export function snapExact(v: number, tol: number, precise: boolean): number | null {
+  if (precise) {
+    const tight = snapRational(v, SNAP_TOL);
+    if (tight !== null) return tight;
+    const bar = SNAP_TOL * Math.max(1, Math.abs(v));
+    const s = surdOf(v, (_x, rootN) => bar / rootN);
+    if (s) return surdValue(s);
+  }
+  return snapRational(v, tol);
+}
+
+/** Every coefficient snapped by one rule, or `null` if any will not. */
+function snapConic(k: Conic, snap: (v: number) => number | null): Conic | null {
   const out: Partial<Conic> = {};
   for (const key of ['A', 'B', 'C', 'D', 'E', 'F'] as const) {
-    const v = snapRational(k[key], tol);
+    const v = snap(k[key]);
     if (v === null) return null;
     out[key] = v;
   }
@@ -398,7 +438,10 @@ export function snapAndVerify(k: Conic, pts: readonly LocusPt[]): Conic | null {
    * snaps exactly.
    */
   const scatter = Math.max(0, ...pts.map((p) => Math.abs(evalConic(norm, p))));
-  const out = snapConic(norm, Math.max(SNAP_TOL, scatter));
+  // The rational at the trace's own bar; a surd only when that bar is the tight one (`snapExact`, #2734). Measured: the
+  // eleven traced loci of #2734's audit and controls scatter by 1e-10 to 2e-7, so their bar is `SNAP_TOL`.
+  const bar = Math.max(SNAP_TOL, scatter);
+  const out = snapConic(norm, (v) => snapExact(v, bar, scatter <= SNAP_TOL));
   if (!out) return null; // will not snap ⇒ print nothing
   /**
    * A TOLERANCE WIDE ENOUGH TO ERASE EVERY COEFFICIENT IS NOT AN EQUATION.
@@ -451,7 +494,8 @@ export function shapeOfTrace(pts: readonly LocusPt[]): LocusShape | null {
    * and «מעגל» at the rest. Naming the family never needed rational coefficients.
    */
   const norm = normalized(raw);
-  const forKind = snapped ?? (norm ? snapConic(norm, KIND_TOL) ?? kindConic(norm) : null);
+  // Naming never needs exact coefficients (#2608), so the kind's coarse snap stays rational-only (#2734).
+  const forKind = snapped ?? (norm ? snapConic(norm, (v) => snapRational(v, KIND_TOL)) ?? kindConic(norm) : null);
   if (!forKind) return null;
   const res = classify(forKind);
   if (!res.ok) return null;
@@ -655,7 +699,10 @@ function exponentVectors(letters: readonly string[]): Array<Record<string, numbe
   return out;
 }
 
-/** The lowest-degree monomial reproducing `vals` at every sample, its ratio one small rational — or `null`. */
+/**
+ * The lowest-degree monomial reproducing `vals` at every sample, its ratio ONE exact form — a small rational, or a
+ * (p/q)·√n when the samples agree on the ratio to the tight bar (#2734) — or `null`.
+ */
 function fitMonomial(
   vals: readonly number[],
   envs: ReadonlyArray<Readonly<Record<string, number>>>,
@@ -665,7 +712,13 @@ function fitMonomial(
     const ratios = vals.map((v, i) => v / monomialAt({ c: 1, pow }, envs[i]));
     if (ratios.some((r) => !Number.isFinite(r))) continue;
     const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length;
-    const c = snapRational(mean, MONO_TOL);
+    /*
+     * The tree's exact forms, as the numeric snap (#2734, ADR-AG-429): `√2·a` is a monomial as surely as `2a` is. The
+     * samples' own agreement is the precision: measured, the ratios of `A(3√2a/2, 0)` · `MA = 3` agree to 7e-12, and
+     * `MONO_TOL`'s rational alone took them as 70/33, which `verifySymbolic` then refused.
+     */
+    const spread = Math.max(...ratios.map((r) => Math.abs(r - mean)));
+    const c = snapExact(mean, MONO_TOL, spread <= SNAP_TOL * Math.max(1, Math.abs(mean)));
     if (c === null) continue;
     if (!ratios.every((r) => Math.abs(r - c) <= MONO_TOL * Math.max(1, Math.abs(c)))) continue;
     return c === 0 ? { c: 0, pow: {} } : { c, pow };

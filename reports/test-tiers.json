@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-11-07",
+  "updatedAt": "2026-11-08",
   "slow": [
     "src-analytic/__tests__/geo-input-parity.test.ts",
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
@@ -31,6 +31,7 @@
     "src-analytic/__tests__/issue-1637-g1-knowledge-3.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge-4.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge-5.test.ts",
+    "src-analytic/__tests__/issue-1637-g1-knowledge-6.test.ts",
     "src-analytic/__tests__/issue-1637-g1-knowledge.test.ts",
     "src-analytic/__tests__/issue-1699-blame-first-unsat.test.ts",
     "src-analytic/__tests__/issue-1888-lost-part.test.ts",

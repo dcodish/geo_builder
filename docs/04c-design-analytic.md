@@ -862,7 +862,7 @@ a line described by a point and a relation is `lineObjectOperand` behind `isDesc
 
 ### Extensions, named diagonals, the midsegment, a condition after a placement ([ADR-AG-208](06c-decisions-analytic.md#adr-ag-208), #1620)
 
-`Selector.beyond { id, a, b }` is `between`'s complement on the same line: the point is past `b`, away from `a`, judged by the projection parameter (`t > 1`) and the figure's visible resolution (`apartOf`, as `distinct`). The collinearity beside it (`on-line-2pt`, unbounded) consumes the one DOF; the selector consumes none.
+`Selector.beyond { id, a, b }` is `between`'s complement on the same line: the point is past `b`, away from `a`, judged by the projection parameter (`t > 1`) and the figure's visible resolution (`apartOf`, as `distinct`: a hundredth of the points' spread, floored at the solver's resolution of the figure with its curves). The collinearity beside it (`on-line-2pt`, unbounded) consumes the one DOF; the selector consumes none.
 `extensionFacts` lowers «על המשך …»; `conditionClauses` reads «כך ש-»; `meet-of` gains `noun` and `named`
 (`ringsNamed`, `not-a-diagonal`); midsegment points use `FRESH_PREFIX` (`resolveFresh`); `vertices-on-axes` is one
 `choice` over 2ⁿ assignments (`Constraint.all`).
@@ -930,10 +930,23 @@ and `swappedStarts`, because the reached side's start belongs to the solve. The 
 solve never rejects a root for a point that has not been placed yet. It reads both directions, takes a seed-varied
 fraction of the gap between two bounds, and settles a chain link by link. A point whose orders hold does not move.
 
+**The apart ruler never falls below the solver's resolution of the figure with its curves** ([ADR-AG-427](06c-decisions-analytic.md#adr-ag-427),
+#2732; amending [ADR-AG-039](06c-decisions-analytic.md#adr-ag-039)). `spanOf(c, at, env)` is the larger coordinate spread of
+the solved points together with every resolved curve: a circle's or an ellipse's box (`curveExtent`), a canonical
+parabola's vertex and focus, nothing for a straight. It has no origin term, so it is translation-invariant (unlike
+`viewBox`). `failingSelectors` computes it once per judged configuration. `apartOf` (`apartWithin`) is a hundredth of the
+points' spread (where seeing stops), never less than `SOLVE_RESOLUTION` × `spanOf` (two positions the solver cannot tell
+apart are one); its readers are the `distinct` family, `crossingHasNoPoint`, `crossingPartners`, `collapsedPairs`, the
+#1917 start and `fitLineByLine`'s admissible fit. The strict-side bands read `spanOf` at the same resolution, and the
+deflation pushes by it. A ruler of the points alone shrank with a collapsed crossing pair when those were the figure's
+only points, so the pair judged itself apart; a hundredth of the curve-wide extent would refuse a stated arc shorter than
+1 % of its circle. `legiblePositions` and `figureScale` (the open-bound floor and the whole-figure collapse check) keep the
+points' spread (`pointSpread`); points that all collapse on a fixed curve are still a collapse the latter must see.
+
 **A strict side is judged at the solver's resolution** ([ADR-AG-291](06c-decisions-analytic.md#adr-ag-291), #2230).
 Every strict arm of `failingSelectors` reads one predicate, `sideOfBound(v, bound, scale)`: a value within
 `SOLVE_RESOLUTION × scale` of its bound is ON it (`0`), so a strict comparison fails there and a closed one holds. The
-scale is the quantity's own size: the figure's span (`spanOf`) for a coordinate, `max(1, |v|)` for a parameter order,
+scale is the quantity's own size: the figure's extent with its curves (`spanOf`) for a coordinate, `max(1, |v|)` for a parameter order,
 the sides for `acute`'s dot product, the direction's length for a slope sign (within it of horizontal or vertical,
 no sign). The region quantities (`circleQuantity`, `circlePairQuantity`, `orderQuantity`) band where they are
 measured, and `signHolds` reads their sign.
@@ -944,7 +957,7 @@ measured, and `signHolds` reads their sign.
 family with the line's value at the point as the bound: `line-compare {id, line: points | curve, axis, greater}`.
 `parseCompare` reads it after the point and axis forms (`POSITION_LINE_HE` / `_EN`, the operand through `direction()`).
 `lineCompareLine` resolves the line in the configuration (two points, or `curveAtOf` for a named line); the judge
-compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf`.
+compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf` (the figure's extent with its curves).
 `lineHasNoSide` (on `isVerticalLine` / `isHorizontal`) makes a y-side selector false on a vertical line and an x-side one
 false on a horizontal line. The seeding loop folds a free subject to the named side, keeping its offset. In `derive`'s
 selector arm, a failing `line-compare` whose line has no such side IN THE DRAWN FIGURE (`lineCompareNoSide`) is refused
@@ -1407,9 +1420,13 @@ the start only when a root was dropped and exactly one admissible root is left �
 «הציגו תצורה אחרת» cycles.
 **The judge reads the same rule at the JUDGED positions** ([ADR-AG-350](06c-decisions-analytic.md#adr-ag-350), #2615): `crossingPartners`
 (`evaluate.ts`) is the signature siblings plus every point declared before the crossing that lies on both of its carriers
-(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds.
-`crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation) reads the same
-set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other root.
+(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds
+**and no sibling holds** ([ADR-AG-428](06c-decisions-analytic.md#adr-ag-428), #2733): once «בנקודות K ו-L»'s K holds the root P
+does not, L's partners are K alone and L is forced onto P (ADR-W-177's accepted coincidence), counted per root at the
+judged positions. `crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation)
+reads the same set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other
+root. `collapsedPairs` takes ONE mover per unordered pair: two crossings list each other, and moving both nudged them
+alike in `deflatedStarts`, so they never parted (ADR-AG-428).
 An ordinal lowers to `crossing-nth {id, nth, pair}`, otherwise `crossing-distinct`. Two conics are ordered by the
 reading direction ([ADR-AG-236](06c-decisions-analytic.md#adr-ag-236): `orderedCrossings`, `conicsMeet`), and the
 duplicate fault names its operands (`incidenceWords`, `errCrossingAlreadyNamedOperands`). **Both crossings in one
@@ -1644,7 +1661,10 @@ before P. Two ways, mirroring the chord member: **nothing can move** (`noFreedom
 `touchPointOf` (`crossing-order.ts`; the chord ℓ would cut is within `meetsTwice`'s `SOLVE_RESOLUTION` floor) puts the touch
 within that floor of Q; or **by construction** — Q on K for good, Q on ℓ, and a stated `relation perpendicular` between ℓ
 and K's radius at Q (`{radius, K, Q}` or K's centre and Q, via `centreIdOf`), or ℓ is K's tangent object at Q, or runs
-through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member.
+through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member. **P is never
+its own straight's second crossing** ([ADR-AG-428](06c-decisions-analytic.md#adr-ag-428), #2733): when `tangentByConstruction(ℓ, K, P)`
+holds — the statement made ℓ tangent to K AT P («הישר y=5 משיק למעגל בנקודה K») — P is skipped, and a Q already at the touch
+is a forced coincidence the figure reports, not a refusal.
 
 **Both members reach every curve a line meets at most twice** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909,
 #1932). The gate is `maxCrossings('line', curveKindOf(K)) === 2` (`apply.ts`, the Bézout bound #1114 counts by) — a circle, a
@@ -1764,7 +1784,9 @@ shown in the `<details>` disclosure (ADR-AG-094); numbers go through `fmtAnalyti
 
 `src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? surdText(v) ?? fmtNum(v)`,
 above `shell/format.ts`. `surdText` is 2-D's `exactFormOf` rational·√n search, copied (q ≤ 12, p ≤ 999, n ≤ 50
-ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). A number inside an equation goes through
+ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). The search itself is `surdOf(v, bar)`, which returns
+`{sign, num, den, n}` at the caller's bar: `surdText` passes 2-D's display bar, and the locus snap passes its own
+relative one ([ADR-AG-429](06c-decisions-analytic.md#adr-ag-429)). A number inside an equation goes through
 `fmtCoefficient` (fraction, then `fmtNum`, never a surd): `curveText.ts`'s `fmt` and the locus equation; a curve's
 details (centre, radius, slope, focus) are standalone and use `fmtAnalytic` (`val`).
 
@@ -2104,7 +2126,8 @@ differ, one component at every configuration: the gate's own configurations (the
 rest of `sampleSeeds` — no new sweep) go with their `env` to `parametricShape` (`locusFit.ts`). Per configuration:
 fit → `kindConic` → the canonical parameters; per parameter the lowest-degree monomial `c·∏ letterᵉ` (total degree
 ≤ 2, at most `MAX_LETTERS = 2` varying letters, every varying `env` key a student letter) whose ratio snaps to one
-rational; then `verifySymbolic` substitutes each configuration's letters and checks its traced points to
+exact form (`snapExact`: a small rational, or a (p/q)·√n when the samples agree on the ratio to `SNAP_TOL`, #2734, so
+`√2·a` is a monomial); then `verifySymbolic` substitutes each configuration's letters and checks its traced points to
 `snapAndVerify`'s bar. `LocusShape.symbolic` carries it; `locusEquation` prints it (`symbolicLocusEquation`). Not
 CAS: measure → snap → verify on a ratio. The kind itself is read by `kindConic` when the coarse rational snap fails
 (#2608): the same `KIND_TOL`, without demanding rational coefficients. So חורף 25 now reads
@@ -2140,8 +2163,20 @@ unions (`agreeingUnion`), and `fitLine` / `normalized` do not out-claim the data
 
 #### The fit is a claim, so it is checked — against the trace, not against a student
 
-`sweep → least-squares fit over the four kinds → snap to rationals → RE-VERIFY the snapped equation against the
-traced points → print, or print nothing`.
+`sweep → least-squares fit over the four kinds → snap to the tree's exact forms → RE-VERIFY the snapped equation
+against the traced points → print, or print nothing`.
+
+**The snap's vocabulary is the tree's exact forms** ([ADR-AG-429](06c-decisions-analytic.md#adr-ag-429), #2734).
+`snapExact(v, tol, precise)` (`locusFit.ts`) snaps one coefficient. On precise data it tries the rational at
+`SNAP_TOL`, then a (p/q)·√n at `SNAP_TOL` relative to `v` (`format.ts`'s `surdOf`, the recogniser `surdText` spells),
+then the rational at the caller's `tol`. On data that is not precise it tries the rational at `tol` alone, so a
+noisy trace never snaps to a surd. `snapAndVerify` calls it with its scatter bar, precise when the scatter is within
+`SNAP_TOL`; `fitMonomial` calls it with `MONO_TOL`, precise when the samples' ratios agree to `SNAP_TOL`. The kind's
+coarse snap (`KIND_TOL`) stays rational-only. The printer is unchanged: a surd inside the equation prints through
+`fmtCoefficient`, as a decimal (ADR-AG-304 D2), so חורף 2023's circle about (−3√2/2, 0) reads
+`(x + 2.12)² + y² = 6²`.
+
+*Identifiers:* `snapExact` · `surdOf` · `surdValue` · `SurdBar` · `SNAP_TOL` · `precise`
 
 #### The trace honours the givens: the walk is judged, the pieces are drawn ([ADR-AG-245](06c-decisions-analytic.md#adr-ag-245), #1817)
 
