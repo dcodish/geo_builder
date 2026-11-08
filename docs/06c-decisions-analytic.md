@@ -3954,7 +3954,9 @@ charter is withdrawn) · **closes** the [ADR-AG-005](#adr-ag-005) open item *"wh
 ever revealed after a wrong claim"* — there are no claims · **⚠ §4 amended by [ADR-AG-351](#adr-ag-351)
 (2026-10-30, #1186):** the gate has a THIRD verdict — the set varies as a verified monomial in at most two of the
 student's letters, and the equation then prints in them (`(x − 16a)² + y² = (25a)²`); "stays refused" below no
-longer holds for that case
+longer holds for that case · **⚠ §7 amended by [ADR-AG-429](#adr-ag-429) (2026-11-08, #2734):** the snap reads the
+tree's exact-form vocabulary (a small rational, else a (p/q)·√n at the tight bar on precise data), not rationals only;
+the self-check is unchanged
 
 **Requirements:** [02c](02c-requirements-analytic.md) R87. **Design:**
 [04c](04c-design-analytic.md) — "The locus lane".
@@ -15925,3 +15927,57 @@ Each of those points moves along a curve.
 - `issue-1177-locus-chip.test.ts`: «two independent movers» now expects both chips, and the agreement lock gains the three new figures and two of the four saved figures that gained chips (the kite, the tangent at T).
 
 **Behaviour change for a student:** a point that moves on a curve offers «הצג מקום גאומטרי» even while other points move too: two movers on two circles or on one circle, or a locus beside another shape. A point whose positions fill a region (a free point, the midpoint of two independent movers) still has none.
+
+## ADR-AG-429 — A locus coefficient snaps to the tree's exact forms: a surd centre prints its equation (#2734)
+
+**Date:** 2026-11-08 · **Status:** accepted · bug (analytic, P2), fix round #2745 (stream B); branch `fix/2734-locus-surd-snap` from `main` @ `0b7edbe4`. **Amends [ADR-AG-072](#adr-ag-072) §7**: "snap to rationals" becomes "snap to the tree's exact-form vocabulary" (a small rational, else a (p/q)·√n). **LADDER stage:** none (the locus lane's self-check in `engine/locusFit.ts`; no solver change).
+
+**Requirements:** none (internal). [02c](02c-requirements-analytic.md) R87 already promises the equation of a determinate locus. · **Design:** [04c](04c-design-analytic.md) "The locus lane": "The fit is a claim, so it is checked" (the snap's vocabulary) and "The honesty gate is at the level of the SET" (the third verdict's ratio); "The tree's display formatter" (`surdOf`, the one recogniser).
+
+**Rulings.** Every student-visible line is `[ruled]`. R87 / [ADR-AG-072](#adr-ag-072) §4 (operator, 2026-09-16: *"I think we need to show the equation if we can determine it"*). [ADR-AG-304](#adr-ag-304) D2 / R94 (operator, 2026-10-20: *"2394 - option a."*): a number inside an equation prints as a decimal. #2741 (operator, 2026-11-08: *"exact if that is how the user entered it"*) prints a TYPED surd exactly; it is a separate feature and is not built here. The reported surd comes from the typed «4.5», so its row reads `(x + 2.12)² + y² = 6²`.
+
+**Re-measurement at pickup** (`0b7edbe4`, `derive` → `askLocus`, seeds 0–23). The issue and the plan hold. The reported figure answers «מעגל» alone at 24 of 24 seeds. The control x²/25 + y²/9 = 1 answers «מעגל · (x + 4)² + y² = 10²». Every sibling in the plan's audit answers its kind alone. Typed decimals (1.4142, 1.732, 3.14159265) answer the kind alone.
+
+**Class.** *A locus whose exact equation has a (p/q)·√n coefficient printed only its kind.* When ADR-AG-304 gave the tree a surd tier, the locus snap's vocabulary stayed rational. The trace finds the set exactly: it fits D = 4.242640692 against 3√2 = 4.242640687, and two configurations agree to 1e-9. But `snapRational` has no candidate for 3√2, so `snapAndVerify` returns null. `agreeingUnion` then has no conics to compare, and the row prints the kind. The mechanism is ADR-AG-072 §7's self-check pipeline (fit → snap → re-verify → gate), not M1–M4. Its vocabulary was what was missing.
+
+**Decision.**
+1. **One recogniser, two callers.** `surdOf` (`format.ts`) is the (p/q)·√n search extracted from `surdText`: a non-square n ≤ 50 ascending, q ≤ 12, p ≤ 999. It returns `{sign, num, den, n}` at the CALLER's bar (`SurdBar`), and `surdValue` is the number a recognised surd stands for. `surdText` spells it at the display tier's own bar, unchanged (2-D's `EXACT_TOL·max(x, 1)` on the rational part). The recogniser is numbers only, so `engine/locusFit.ts` reads it from the tree's formatter, as `render/` and `app/` already do. One vocabulary keeps one home.
+2. **The locus snap reads it after the rational, and only on precise data** (`locusFit.ts` `snapExact(v, tol, precise)`).
+   - On **precise** data: the rational at `SNAP_TOL`, else the surd at `SNAP_TOL` relative to `v` (the rational snap's own bar), else the rational at the caller's `tol`.
+   - On data that is **not precise**: the rational at `tol`, exactly as before.
+   - Callers: `snapAndVerify` (precise when the trace's scatter ≤ `SNAP_TOL`, so its bar was never widened) and `fitMonomial` (precise when the samples' ratios agree to `SNAP_TOL`).
+   - **Not** the kind snap (`KIND_TOL`): naming the family never needed exact coefficients (#2608). It stays rational-only.
+3. **The surd bar is relative to the value, not the display tier's.** The display bar floors at √n on `v` (`EXACT_TOL·max(|v|, √n)`), so it reads a typed `0.7071` as `√50/10`: 6.8e-6 from √2/2, inside 1e-6·√50. Measured under that bar: the bisector of «A(0,0)» «B(1.4142,0)» printed `x - 0.71 = 0` where it prints «ישר», which is a typed decimal dressed as a surd (#2742's question). The relative bar keeps it «ישר». The display tier keeps its bar: that bar is 2-D's, and it is #1460's question ([comment](https://github.com/dcodish/geo_builder/issues/1460#issuecomment-6718013184)).
+4. **A noisy trace never reaches the surd arm.** The candidates are dense (some forty radicands × twelve denominators), so the plan's rule is *"hold the surd arm to the tight bar, not a widened scatter bar: a noisy trace must not snap to a surd."* A trace whose scatter widened the bar gets the rational alone, as before. Measured: the eleven traced loci of #2734's audit and controls scatter by 1e-10 to 2e-7, so the gate refuses none of them.
+5. **Unchanged:** re-verification against the trace, `verifySymbolic`, the determinacy gate (`sameConic` compares the two snapped surds, computed identically), and the printer. `ask.ts` still passes `fmtCoefficient`, so a surd inside the equation prints as two decimals.
+
+**Deviation from the plan (mechanism only; the outcome is the plan's `[ruled]` R87 line).** The plan's order for `fitMonomial` was the loose rational (`MONO_TOL` 1e-4) first, then the surd. Measured on «A(3√2a/2,0)» · «נקודה M» · «MA = 3»: the ratios agree to 7e-12, `MONO_TOL`'s rational takes them as 70/33 (1.1e-4 away), and `verifySymbolic` then refuses the circle, so the row answered «מעגל» alone. «A(√2a,√3)» answered «מעגל» alone the same way: its constant √3 is taken as 97/56. The same bar takes 2√2 as 99/35, each 5e-5 away relatively. With rational candidates of denominator ≤ 64 at a 1e-4 bar, almost every ratio above ~2 is claimed. So on precise data the tight vocabulary (rational, then surd) goes first, and the loose rational stays the fallback. The plan's guarantee still holds, measured below: no rational locus changed.
+
+**Siblings.** 2-D has no locus and no curve-equation printer (`exactFormOf` formats standalone values). 3-D has no locus and no curve equation (`cleanNum` formats values). Complex has no locus. The class is absent from all three. In this tree the class has two snaps, `snapAndVerify` (the determinate set) and `fitMonomial` (the set in the student's letters). Both read the vocabulary now.
+
+**Measured after** (`derive` → `askLocus`, seeds 0–23 each):
+
+| figure | before | after |
+| --- | --- | --- |
+| reported (x²/9 + y²/4.5 = 1) | «מעגל» 0/24 | «מעגל · (x + 2.12)² + y² = 6²» 24/24 |
+| A(√2,0) · MA = 3 | «מעגל» | «מעגל · (x − 1.41)² + y² = 3²» 24/24 |
+| A(0,√3) · MA = 3 | «מעגל» | «מעגל · x² + (y − 1.73)² = 3²» 24/24 |
+| x²/6 + y²/4 = 1, same sentences | «מעגל» | «מעגל · (x + 1.41)² + y² = 24» 24/24 |
+| bisector (0,0), (√2,0) | «ישר» | «ישר · x - 0.71 = 0» 24/24 |
+| bisector (0,0), (1,√3) | «ישר» | «ישר · x + 1.73y - 2 = 0» 24/24 |
+| A(√2a,0) · MA = 3 | «מעגל» | «מעגל · (x − 1.41a)² + y² = 3²» 24/24 |
+| A(3√2a/2,0) · MA = 3 (found) | «מעגל» | «מעגל · (x − 2.12a)² + y² = 3²» 24/24 |
+| A(√2a,√3) · MA = 3 (found) | «מעגל» | «מעגל · (x − 1.41a)² + (y − 1.73)² = 3²» 24/24 |
+| controls: x²/25 ellipse, MA = √2, B(8,0) | equation | unchanged, 24/24 |
+| typed A(1.4142,0), A(1.732,0), A(3.14159265,0), A(2.1213,0), B(1.4142,0) | kind only | unchanged, kind only |
+
+**Blast radius.** Every saved analytic figure (the 143 fixtures and the folded sequences, 910 figures deduplicated): each locus chip asked through `askLocus` before and after. **157 chips, 0 answers changed** (142 print an equation or a union of equations, 15 a kind, an unnamed set or nothing, identically). No saved figure has a surd locus, and no rational locus moved.
+
+**Cost.** `askLocus` on the reported figure averages 70 ms before and 72 ms after (24 seeds). The surd search runs only once a tight rational has failed, on precise data. Across the saved figures' locus chips, askLocus totalled 92.5 s before and 90.4 s after (same machine, one run each).
+
+**Locks.**
+- Fixture `src-analytic/__tests__/fixtures/issue-2734-winter23-surd-centre.analytic.json`: the operator's six lines (exam חורף 2023 Q1).
+- `src-analytic/__tests__/locusFit.test.ts` (new, a unit file of the module). `surdText`'s ADR-AG-304 strings are unchanged. `snapExact`: 3√2, −√2/2 and 2√6 snap, and −63/2, −84, 8, 1/2 and 33/32 keep their rational. Counter-direction: a typed 1.4142, 1.732, 3.14159265, 0.7071, 2.1213 and −2.8284 do not snap; √2·(1 + 1e-5) and √2·(1 + 3e-6) do not snap; data that is not precise never reaches the surd. `snapAndVerify` / `shapeOfTrace` on synthetic traces: the circle about (−3√2/2, 0) of radius 6 gives D = 3√2 and F = −63/2, and x = √2/2 snaps. Typed-decimal circles stay kind-only. A noisy trace about (√2, 0) does not snap, even though its fitted centre is √2 to 1e-8. The `x = 40` refusal holds on a surd trace. `parametricShape`: √2·a, 3√2/2·a and the constant √3 are recognised, 16a is unchanged, and `verifySymbolic` refuses a wrong 1.41a.
+- `src-analytic/__tests__/issue-1224-slanted-locus.test.ts` gains `#2734`: the fixture through the chip at seeds 0–23, and the class (the plan's six siblings, the two found in this round, three rational controls and four typed-decimal counters) at seeds 0–2. The existing `x = 40` refusal sits in the same file, untouched.
+
+**Behaviour change for a student:** a locus whose equation has a square root in it now prints its equation, where it printed only its kind. The exam's circle reads «מעגל · (x + 2.12)² + y² = 6²». The numbers inside the equation stay decimals, as every equation in the tree prints them. A locus centred on a decimal the student typed (1.4142) still answers its kind alone.

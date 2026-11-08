@@ -1764,7 +1764,9 @@ shown in the `<details>` disclosure (ADR-AG-094); numbers go through `fmtAnalyti
 
 `src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? surdText(v) ?? fmtNum(v)`,
 above `shell/format.ts`. `surdText` is 2-D's `exactFormOf` rational·√n search, copied (q ≤ 12, p ≤ 999, n ≤ 50
-ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). A number inside an equation goes through
+ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). The search itself is `surdOf(v, bar)`, which returns
+`{sign, num, den, n}` at the caller's bar: `surdText` passes 2-D's display bar, and the locus snap passes its own
+relative one ([ADR-AG-429](06c-decisions-analytic.md#adr-ag-429)). A number inside an equation goes through
 `fmtCoefficient` (fraction, then `fmtNum`, never a surd): `curveText.ts`'s `fmt` and the locus equation; a curve's
 details (centre, radius, slope, focus) are standalone and use `fmtAnalytic` (`val`).
 
@@ -2104,7 +2106,8 @@ differ, one component at every configuration: the gate's own configurations (the
 rest of `sampleSeeds` — no new sweep) go with their `env` to `parametricShape` (`locusFit.ts`). Per configuration:
 fit → `kindConic` → the canonical parameters; per parameter the lowest-degree monomial `c·∏ letterᵉ` (total degree
 ≤ 2, at most `MAX_LETTERS = 2` varying letters, every varying `env` key a student letter) whose ratio snaps to one
-rational; then `verifySymbolic` substitutes each configuration's letters and checks its traced points to
+exact form (`snapExact`: a small rational, or a (p/q)·√n when the samples agree on the ratio to `SNAP_TOL`, #2734, so
+`√2·a` is a monomial); then `verifySymbolic` substitutes each configuration's letters and checks its traced points to
 `snapAndVerify`'s bar. `LocusShape.symbolic` carries it; `locusEquation` prints it (`symbolicLocusEquation`). Not
 CAS: measure → snap → verify on a ratio. The kind itself is read by `kindConic` when the coarse rational snap fails
 (#2608): the same `KIND_TOL`, without demanding rational coefficients. So חורף 25 now reads
@@ -2140,8 +2143,20 @@ unions (`agreeingUnion`), and `fitLine` / `normalized` do not out-claim the data
 
 #### The fit is a claim, so it is checked — against the trace, not against a student
 
-`sweep → least-squares fit over the four kinds → snap to rationals → RE-VERIFY the snapped equation against the
-traced points → print, or print nothing`.
+`sweep → least-squares fit over the four kinds → snap to the tree's exact forms → RE-VERIFY the snapped equation
+against the traced points → print, or print nothing`.
+
+**The snap's vocabulary is the tree's exact forms** ([ADR-AG-429](06c-decisions-analytic.md#adr-ag-429), #2734).
+`snapExact(v, tol, precise)` (`locusFit.ts`) snaps one coefficient. On precise data it tries the rational at
+`SNAP_TOL`, then a (p/q)·√n at `SNAP_TOL` relative to `v` (`format.ts`'s `surdOf`, the recogniser `surdText` spells),
+then the rational at the caller's `tol`. On data that is not precise it tries the rational at `tol` alone, so a
+noisy trace never snaps to a surd. `snapAndVerify` calls it with its scatter bar, precise when the scatter is within
+`SNAP_TOL`; `fitMonomial` calls it with `MONO_TOL`, precise when the samples' ratios agree to `SNAP_TOL`. The kind's
+coarse snap (`KIND_TOL`) stays rational-only. The printer is unchanged: a surd inside the equation prints through
+`fmtCoefficient`, as a decimal (ADR-AG-304 D2), so חורף 2023's circle about (−3√2/2, 0) reads
+`(x + 2.12)² + y² = 6²`.
+
+*Identifiers:* `snapExact` · `surdOf` · `surdValue` · `SurdBar` · `SNAP_TOL` · `precise`
 
 #### The trace honours the givens: the walk is judged, the pieces are drawn ([ADR-AG-245](06c-decisions-analytic.md#adr-ag-245), #1817)
 
