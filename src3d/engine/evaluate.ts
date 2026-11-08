@@ -49,7 +49,8 @@ import { carrierParams3, determinationReach3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import { claimResidual3, residualHolds3 } from './claims';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
@@ -2122,50 +2123,30 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   let paramOut: { value: number; roots: number[]; branches: number[] } | null = param;
   const pinParam = (): void => {
     if (!c.param || c.paramGivens.length === 0) return;
-    const symAt = (id: Id, t: number): Vec3 | undefined => {
-      const d = c.points.get(id);
-      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
+    // #1896 (ADR-3D-433): every given's residual is the verifier's own (`claimResidual3`, one per scalar kind), read
+    // with the coord-sym points at the candidate value and every other point where the figure put it — one scratch
+    // map, rewritten per candidate. The letter a `length-letter` tie names is the very value searched for (#2580).
+    const symPts = [...c.points].filter((e): e is [Id, Extract<PointDef, { kind: 'coord-sym' }>] => e[1].kind === 'coord-sym');
+    const scratch: Positions3 = new Map(pos);
+    const at = (t: number): Positions3 => {
+      for (const [id, d] of symPts) scratch.set(id, v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)));
+      return scratch;
     };
-    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
-      if (cl.type === 'length-eq') {
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.value : NaN;
-      }
-      if (cl.type === 'length-letter') {
-        // #2580 (ADR-3D-384): the tie |ab| = coef·k over the final positions, k being the very value searched for
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.coef * t : NaN;
-      }
-      if (cl.type === 'angle-seg-eq') {
-        const p1 = symAt(cl.a1, t);
-        const q1 = symAt(cl.b1, t);
-        const p2 = symAt(cl.a2, t);
-        const q2 = symAt(cl.b2, t);
-        if (!p1 || !q1 || !p2 || !q2) return NaN;
-        const u = sub3(q1, p1);
-        const w = sub3(q2, p2);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      if (cl.type === 'vertex-angle-eq') {
-        // #1573 (ADR-3D-290): the SIGNED angle between the two rays — the quantity its verifier measures
-        const v = symAt(cl.vertex, t);
-        const p = symAt(cl.p, t);
-        const q = symAt(cl.q, t);
-        if (!v || !p || !q) return NaN;
-        const u = sub3(p, v);
-        const w = sub3(q, v);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : dot3(u, w) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      return NaN;
-    };
-    const fns = c.paramGivens.map(residual);
-    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
-    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
-    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
+    const residualAt = (cl: Claim3, t: number) => claimResidual3(cl, c, at(t), (sym) => (sym === c.param ? t : undefined));
+    const holdsAll = (t: number): boolean => c.paramGivens.every((cl) => residualHolds3(residualAt(cl, t)));
+    // #902 (ADR-3D-219) in this lane too: a STATED value of the parameter is its only candidate, and it must satisfy every
+    // given here, or the set is contradictory (the honest no-roots, blamed on the newest of the statements). This lane
+    // alone ignored it, drawing a root while «k = 3» read green (found in round #2745, judged r2745-1896-stated-k).
+    const stated = symbolValueOf(c, c.param);
+    let roots: number[];
+    if (stated !== undefined) roots = holdsAll(stated) ? [stated] : [];
+    else {
+      const fns = c.paramGivens.map((cl) => (t: number): number => residualAt(cl, t)?.r ?? NaN);
+      // sign-change roots catch crossings; touch-zero catches double roots (a line angle of 90°, a tangency)
+      const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
+      // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
+      roots = snapAndDedupe(candidates).filter(holdsAll);
+    }
     const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {

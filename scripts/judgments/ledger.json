@@ -3119,6 +3119,45 @@
       "limits": "Not decided: the scope and cost of finding the roots (the operator's 2731-a); the first drawing before the comparison (p = 2 at seed 0); how «p» and «K» print while both roots stand (P8); «x_K = 18» (R125); the wording of any refusal when the listing still misses a root (P9 / #1590); a comparison typed before the givens (not measured).",
       "at": "2026-11-08T05:33:28.753Z",
       "status": "pending"
+    },
+    {
+      "id": "r2745-1896-stated-k",
+      "question": "What the student should see when a stated k contradicts a given that pins k (both orders, for «AB ⊥ AC» and for its twin «זווית BAC = 90»), on «A(0,0,0) · B(k-1,k,3) · C(k+1,0,k-3)» with «k = 3»",
+      "class": "stated-parameter-value-contradicts-pinning-given",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "This is a general rule built from several of his one-off rulings, all pointing the same way and none against it. When a stated value of the figure's parameter («k = 3») and a given that pins that parameter («AB ⊥ AC», «זווית BAC = 90») cannot both hold, the newer line is refused in either order. It is refused as a contradiction of the earlier line, and the refusal names both statements. In 3-D that means the parameter lane's existing sentence: «אין אף ערך ממשי של k שבו «<newest>» מתקיים יחד עם «<other>» — הנתונים האלה סותרים זה את זה». Option C is out because a stated k = 3 would vanish while both rows stay green, and his rule says the diagram either respects all input or refuses. Option B is out because, when the value comes first, it answers with the bare «הטענה לא מתקיימת בציור — בדקו את החישוב». That sentence names neither statement and does not say the line contradicts «k = 3». On these same coordinate-parameter points he already replaced «בדקו את החישוב» with the parameter message (#1896). His #1868 ruling only limits «בדקו את החישוב» to real contradictions; it never requires it, so it does not conflict.",
+      "precedents": [
+        {
+          "quote": "the idea of order is not relevant since the diagram should either respect all input or refuse to build",
+          "date": "2026-09-19",
+          "link": "https://github.com/dcodish/geo_builder/issues/1242#issuecomment-5743471435"
+        },
+        {
+          "quote": "the 3rd line should be rejected as it contradicts the previous line",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/2061#issuecomment-6151731590"
+        },
+        {
+          "quote": "this comment … is not relevant. the first error tells the story - the last input contradicts the prior one.",
+          "date": "2026-10-17",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-743"
+        },
+        {
+          "quote": "All three tools refuse immediately, naming both statements. A pending row that can never clear is not really pending.",
+          "date": "2026-10-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        },
+        {
+          "quote": "Use the twin's message",
+          "date": "2026-10-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/1896#issuecomment-6056676150"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "1. The rule is assembled from his rulings on #1242, #2061, ADR-743 (#2339), #1936 and #1896. None of them decides a stated parameter value against a pinning given; #1896 itself ruled only the case where no k works at all. 2. It covers only givens that #1896 routes to pin k: the ⊥ and its 90° twin, and, by #1896's own ruling, an impossible area or ratio on such points. 3. It does not decide a stated k that satisfies the given (k = 2 or k = −5 must simply be honoured), a contradicting sign («k > 0») or a contradicting second value of k. 4. It does not decide analytic's plane analogue or any other builder; 2-D has no coordinate parameter. 5. It reuses an existing 3-D sentence and adds no new text. If a new sentence turns out to be needed, it is the session's under ADR-W-174 and is shown in full for his review.",
+      "at": "2026-11-08T06:23:48.746Z",
+      "status": "pending"
     }
   ],
   "demoted": {

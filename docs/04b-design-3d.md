@@ -137,6 +137,17 @@ operands rebuilt at the candidate value (`operandAtParam`). A residual that vani
 is **not** a pin (the identity guard). The claim is always recorded, and a number drawn from it shows only
 when it holds (`DIRECTION_REL_TOL`).
 
+**A scalar given on a coord-sym point is the parameter's, asked by the one recorder** (ADR-3D-433, #1896;
+amending ADR-3D-032 Decision B). Every arm that records a claim goes through `recordClaim3` (`apply.ts`), which
+asks `pinsCoordParam3` FIRST: a claim whose reach (`statementPointIds3`: the points it names, a declared
+vector's endpoints included) holds a coord-sym point and whose kind has a residual in `CLAIM_RESIDUALS3` is
+recorded as the claim and as a parameter given (`paramGivens`, the same object), and is never driven
+through the pivot; otherwise the arm's pivot pin (`drive`: pin alone, pin and claim, or pin and arbiter),
+otherwise the claim alone. The post-pivot root-find (`pinParam`) solves each given's `claimResidual3` with
+the coord-sym points at the candidate value, filters the snapped candidates by the verifier's own predicate
+(`residualHolds3`), and, as `paramRoots` does since #902, takes a STATED value of the parameter as its only
+candidate. A `length-letter` tie keeps its owner-routed lowering (ADR-3D-384).
+
 **A pin is a driver; the claim beside it is the arbiter** (ADR-3D-282, #1546). A pin acts only where the
 pivot owns something that moves its object (a solid's gauge and dims, a pin symbol, a free rider), so
 every pin family that can land elsewhere records its claim: `coords-eq` for the existing-id `point3` pin,
@@ -1060,6 +1071,14 @@ parallelogram family and the kite, a plane rider otherwise), keeping the point's
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a
 composite command**; `claims.ts` checks each against four deterministic seeds (`claimSeeds`).
+
+**One residual per scalar claim kind** ([ADR-3D-433](06b-decisions-3d.md#adr-3d-433), #1896). `CLAIM_RESIDUALS3`
+(`claims.ts`) is total over `Claim3['type']`: each kind has a `residual` (one real equation, signed where the
+quantity is, with the tolerance its verdict reads: holds ⇔ `|r| ≤ tol`) or an `excluded` reason (a vector
+or several equations, an inequality, a classifier, an operand relation owned by ADR-3D-286's
+`paramPinningRels`). `holdsAt` judges every scalar kind through `claimResidual3`, and an excluded kind
+without its own case in `holdsAt` is a compile error (`ScalarClaimType3`), so the verifier and the
+parameter root-find cannot drift apart.
 
 **The diagonal claim's two layers ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203), [ADR-3D-246](06b-decisions-3d.md#adr-3d-246), #978).**
 One predicate, `diagonalClaimVerdict` (`baseShapes.ts`), judges «אלכסון AB» over the solids holding both

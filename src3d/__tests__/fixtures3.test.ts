@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1896 (ADR-3D-433) — the report: a ⟂ on points whose coordinates carry k pins k (k = 2 or k = −5, one drawn), where it
+  // was refused «בדקו את החישוב». The roots, the census of arms and the stated-k rule are asserted in algebraic3.test.ts;
+  // this is the build + drift + load net.
+  'coord-sym-perp-1896.geo3.json': ['A(0,0,0)', 'B(k-1,k,3)', 'C(k+1,0,k-3)', 'AB ⊥ AC'],
   // #1816 (ADR-3D-432) — the report and its split form: a length on a rider of a coordinate segment places the rider
   // (D = (1,0,0)), where it was refused «בדקו את החישוב». The geometry is asserted in engine3.test.ts (resolve3's
   // determination step); this is the build + drift + load net.
