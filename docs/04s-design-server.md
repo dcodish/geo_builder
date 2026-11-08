@@ -40,7 +40,7 @@ write a file, and aggregate other people's traffic.
 | `eventLog.ts` | The usage-event sink: validate → hash the visitor → append one JSON line |
 | `admin.ts` | The password-protected dashboard over `events.jsonl` |
 | `adminConfig.ts` | Operator-editable per-tool config, validated at save time |
-| `http.ts` | Client IP and rate-limiter helpers, shared by every handler |
+| `http.ts` | Client IP and rate-limiter helpers, the one body reader (`readBody`) and the one per-request failure boundary (`serveSafely`), shared by every handler and both hosts |
 | `llm/harness.ts` | The one LLM request harness: model, tool, prompt skeleton and response reader, composed from each product's prompt spec (#1359) |
 | `toolRouting.ts` | Which events file a `tool:` tag belongs in, derived from `products.json` (#1243) |
 | `shareStore.ts` | The share store: `POST …/api/share` stores a figure's fragment + PNG; `GET /g/<id>` serves the preview page (#1374) |
@@ -57,6 +57,19 @@ answers a **headless** browser (`HeadlessChrome` in the User-Agent or `sec-ch-ua
 session's probe) with no operator at it, and CLAUDE.md rule 2 lets only the operator authorise a live call. The
 scripts' own guard is the stub in `scripts/lib/browser-harness.mjs`; this is its backstop. `standalone.ts` is
 unchanged.
+
+**A request's failure ends that request, never the process** ([ADR-W-192](06w-decisions-workspace.md#adr-w-192), #2752).
+One process serves all four builders, so the failure of one request must stay inside it.
+- **One boundary.** Every route runs inside `serveSafely`: the production router (`dispatch` in `standalone.ts`) and
+  every dev mount. A handler is *returned* into it, never started as `void handleX(...)`. A throw or a rejected
+  promise is logged and answered 500, or the connection is closed if the answer had begun.
+- **One body reader.** Every body goes through `readBody`. It is capped, and it resolves `null` when the client goes
+  away mid-body; it never rejects.
+- **A last net.** A process-level `unhandledRejection` handler logs and keeps serving.
+- **Restarts never stop.** `deploy/geo-proxy.service` sets `StartLimitIntervalSec=0`, so systemd never stops
+  restarting the unit.
+
+`server/__tests__/request-boundary-2752.test.ts` locks all of it, including a ratchet on the two chokepoints.
 
 ## The key boundary
 

@@ -7129,6 +7129,67 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 
 **Behaviour change for a student:** none.
 
+## ADR-W-192 — A request's failure ends that request, never the shared server: one boundary per request, one body reader (#2752)
+
+**Status:** accepted · 2026-11-08 · bug fix (server)
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** [04s](04s-design-server.md) "A request's failure ends that request, never the process" · **Product:** server.
+
+**Context, measured at `0b7edbe4`.** One Node process serves the AI fallback, the usage log, sharing and the dashboards for all four builders.
+- A client that dropped mid-upload made `readBody` reject, and its callers awaited it outside any `try`.
+- The admin forms read their bodies with their own uncapped loop.
+- `standalone.ts` started every handler as `void handleX(...)`.
+- On loopback, the first aborted POST to `/api/log` ended the process (`Error: aborted`, `ECONNRESET`).
+
+Each crash also reset the daily AI cap, the concurrency cap and the per-IP limiters. systemd stops restarting a unit after five starts in ten seconds.
+
+**Class.** A request handler's failure (a throw or a rejected promise) escapes its request and ends the shared process. The dev server's four mounts had the same shape. No product tree runs a server.
+
+**Decision.**
+1. **`serveSafely` (`server/http.ts`) is the one failure boundary per request.** The production router (`dispatch`) and every dev mount run inside it, and a handler is returned into it. A failure is logged with its method and path, and ends its own request: 500 if nothing was sent, a closed connection otherwise.
+2. **`readBody` is the one body reader.** It resolves `null`, never rejects, when the client goes away or the body exceeds its cap. The admin login form (8 KB), the config form (256 KB) and the dev log mount use it.
+3. **A last net.** A process-level `unhandledRejection` handler logs and keeps serving.
+4. **Restarts never stop.** `deploy/geo-proxy.service` sets `StartLimitIntervalSec=0`.
+
+**Found in the same reader.** It decoded each chunk on its own, so a Hebrew letter whose two bytes arrived in different chunks became two replacement characters. It now decodes the bytes once.
+
+**Locks.** `server/__tests__/request-boundary-2752.test.ts`:
+- aborted bodies on every body-reading route of the real proxy, with the model SDK tripwired;
+- the boundary's three failure shapes;
+- the reader;
+- a ratchet: no `void handleX(`, no body loop outside `http.ts`, and every dev mount inside `serveSafely`.
+
+**Behaviour change for a student:** none while the server is up. A dropped upload no longer takes the server away from everyone else.
+
+## ADR-W-193 — The prod allowlist is the RUNBOOK's exact deploy lines, and nothing broader (#2753)
+
+**Status:** accepted · 2026-11-08 · security (workspace) · amends the RUNBOOK's "Standard deploy" allowlist sentence
+**Operator:** 2026-11-08, on that day's server review: *"Sounds like We Need to fix items 1 and 2 urgently"*.
+**Requirements:** none (internal) · **Design:** none (internal), [RUNBOOK](RUNBOOK.md) "Standard deploy" · **Product:** workspace.
+
+**Context.** `.claude/settings.json` allowed `ssh root@themathbible.com:*`, and the build uploads to any remote path. Any session could therefore run any command as root on the production host without a prompt.
+- **How it could be steered:** sessions read public issue comments, which anyone can write, and raw student text in log triage. An instruction planted in either could steer a session into a root command nobody sees.
+- **What's on the box:** the host also serves other sites, and holds the student logs and the AI key.
+
+**Decision.**
+1. **Exact lines only.** The allowlist holds the RUNBOOK's deploy and verify lines exactly:
+   - the four static uploads and the proxy upload;
+   - the three renames and the permission fix;
+   - the restart, the health check and `systemctl is-active`.
+
+   Any other command on the prod host asks the operator.
+2. **One command per rename.** The renames are now single `mv` commands with full paths, not `cd … &&` chains, so each matches its rule as written.
+3. **A guard.** `server/__tests__/prod-allowlist-2753.test.ts` fails on a rule naming the host that:
+   - is a prefix rule;
+   - has a wildcard after the host;
+   - does not appear verbatim in the RUNBOOK;
+
+   and on a Bash/PowerShell pair that differs.
+
+**Not decided here.** The SSH key is still root and unrestricted, so this limits what a session runs without asking, not what the key can do. A non-root deploy user with a forced command is the stronger fix. It changes how both PCs reach production, so it waits for the operator.
+
+**Behaviour change for a student:** none.
+
 ## ADR-W-194 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
 
 **Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
@@ -7170,3 +7231,4 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Locks.** `src/app/__tests__/proof-target-1666.test.ts` (2-D: both seams render the whole refusal; the nested label, both languages, through the real instance; the operator's sentence byte for byte; `App.tsx` draws `t('actions.viewRelations')`; the empty canvas). `src-analytic/__tests__/proof-target-1666.test.ts` and `src-complex/__tests__/proof-target-1666.test.ts` (the panel line with each builder's own labels, both languages; the App draws `<DataPanel title={t('dataTitle')}>` and `<AskLane addLabel={t('askAdd')}>`, through `shell/__tests__/fixtures/proof-target-check-2492.ts`). `src3d/__tests__/proof-target-1666.test.ts` unchanged (the sentence, now from the suite key). `shell/__tests__/suite-vocabulary.test.ts` (the `proofTarget` role leaves the table: the suite texts, the four retired keys, and no table outside 2-D naming «הצג צלעות וזוויות שוות»).
 
 **Behaviour change for a student:** a «הוכיחו…» line is refused as before, and the message now ends by saying how to check the claim. In 2-D: «ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות.» In analytic and complex: ask the claim's quantities in the «נתונים» panel and compare. In 3-D: unchanged until the operator rules.
+

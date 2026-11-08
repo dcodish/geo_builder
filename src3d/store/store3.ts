@@ -431,7 +431,7 @@ function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolv
         // #1615 (ADR-3D-293): the closed-form solve's own answer. `contradicts` — no value of the point's parameters
         // reaches the given: false as stated, «check the computation». `determined` — the point was placed, so the
         // claim was judged on the placed figure. Either way the sampled freedom is not why it fails.
-        const solved = resolved.coordDetermined.get(id);
+        const solved = resolved.determined.get(id);
         if (solved === 'contradicts' || solved === 'determined') return false;
         // the coord-sym point, the one kind the solve does not place (its letter is the figure parameter)
         if (def.kind === 'coord-sym') return statedDataAdmits(c, claim) && (resolved.param?.roots.length ?? 0) === 0;
@@ -630,6 +630,12 @@ function placementFixers3(
     // first enabled fact that names the letter in a ring is that declaration.
     const decl = facts.find((f) => f.enabled && f.cmds.some((k) => 'ids' in k && Array.isArray(k.ids) && (k.ids as unknown[]).includes(id)));
     if (decl) by.add(decl.id);
+    // #2490 (ADR-3D-434): a BOUND solid's apex stands on its ring — what placed the ring placed it too
+    for (const q of owner.bound ?? []) {
+      const sub = placementFixers3(c, facts, q, solidVertex, seen, flatSolid);
+      if (!sub) return null;
+      sub.forEach((x) => by.add(x));
+    }
     return by;
   }
   if (!DERIVED_POINT_KINDS3.has(def.kind)) return null;
@@ -672,6 +678,23 @@ function vectorsNamedBy3(k: Command3): string[] {
   if (k.type === 'cos-angle') return named([{ atom: k.u }, { atom: k.v }]);
   if (k.type === 'mutual-rel') return [k.a, k.b].flatMap((o) => (o.kind === 'vector' ? [o.name] : []));
   return [];
+}
+
+/** #2490 (ADR-3D-434): a pyramid-family solid kind (a triangular or a quad base, any rightness). */
+const isPyramidKind3 = (kind: string): boolean =>
+  kind === 'tetra' || kind === 'pyramid3' || kind === 'pyramid3e' || Object.prototype.hasOwnProperty.call(QUAD_PYRAMIDS, kind);
+
+/**
+ * #2490 (ADR-3D-434): does the row's own text SPELL these letters — one letter run naming exactly them, in any order
+ * («פירמידה SABCD» spells A, B, C, D, S)? An unlettered noun the parser lettered by default spells none. Primes fold as
+ * at the parse seam (`foldPrimes3`), and a lowercase run counts as typed (the parser reads it as letters).
+ */
+function spellsLetters3(utterance: string, ids: readonly string[]): boolean {
+  const want = [...ids].sort().join('|');
+  return (foldPrimes3(utterance).toUpperCase().match(/(?:[A-Z]\d*'*)+/g) ?? []).some((run) => {
+    const tokens = run.match(/[A-Z]\d*'*/g) ?? [];
+    return tokens.length === ids.length && [...tokens].sort().join('|') === want;
+  });
 }
 
 export function derive3(facts: Fact3[], seed: number): Derived3 {
@@ -745,12 +768,19 @@ function deriveCore3(
   /** #1680 (ADR-3D-391 Am. 1): the reading each line's two-reading segment equation took */
   const readings: Record<string, SegmentEquationReading3> = {};
   /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
-  const expandFact = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
+  const expandFactRaw = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
     const solid = presolids?.[f.id]; // #1566: a solid the mint pass created for this row is declared by it, first
     if (!f.cmds.some((k) => k.type === 'shape-ref3')) return solid ? { ok: true, cmds: [...solid.cmds, ...f.cmds] } : { ok: true, cmds: f.cmds };
     const r = expandShapeRefs3(at, f.cmds);
     if (!r.ok) return { ok: false, error: withShapeSentence3(r.error, f.utterance) };
     return solid ? { ok: true, cmds: [...solid.cmds, ...r.cmds] } : r;
+  };
+  /** #2490 (ADR-3D-434): a pyramid run the row's own text does not spell was lettered by the parser — marked, so it
+   *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged. */
+  const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
+    const r = expandFactRaw(at, f);
+    if (!r.ok || !r.cmds.some((k) => k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids))) return r;
+    return { ok: true, cmds: r.cmds.map((k) => (k.type === 'solid' && isPyramidKind3(k.kind) && !spellsLetters3(f.utterance, k.ids) ? { ...k, lettersUnstated: true as const } : k)) };
   };
   // #1467 (ADR-3D-382): the points the mint pass decided to create, placed before the fold so every row applies in
   // LIST ORDER over them (see the mint pass) — empty on the first fold
@@ -1641,20 +1671,28 @@ function deriveCore3(
   const declaredRings3: Id[][] = declaredRingsOf3(c); // #1986: the one enumeration, shared with the seed search
   const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
   const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
-    ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring));
+    ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring)) ||
+    // #2490 (ADR-3D-434): the line that declared a BOUND pyramid over this very ring — its base, and nothing else. A
+    // ring that merely shares letters with a solid's run («מרובע SABC» on pyramid SABCD) is declared by its own line.
+    (k.type === 'solid' && c.solids.some((s) => s.bound !== undefined && sameRing3(s.bound, ring) && sameRing3(s.ids, k.ids)));
   /**
    * The LINE THAT COMPLETED this ring: the latest enabled fact among its declaration and the statements that
    * placed its vertices. Returns it with the others it conflicts with, or null when some vertex is not placed in
    * the requested scope (`solidVertex`) — a ring with a free vertex is the configuration's business, never a refusal.
    */
-  const ringBlame3 = (ring: readonly Id[], solidVertex: boolean): { blamed: Fact3; by: Set<string> } | null => {
+  const ringBlame3 = (
+    ring: readonly Id[],
+    solidVertex: boolean,
+    /** #2490: which status a DECLARING line may hold to be blamed (an ok line, by default) */
+    admit: (st: FactStatus3) => boolean = (st) => st === 'ok',
+  ): { blamed: Fact3; by: Set<string> } | null => {
     const by = new Set<string>();
     for (const id of ring) {
       const f = placementFixers3(c, facts, id, solidVertex);
       if (!f) return null;
       f.forEach((x) => by.add(x));
     }
-    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declaresRing3(k, ring)));
+    const declaring = facts.find((f) => f.enabled && admit(status[f.id]) && f.cmds.some((k) => declaresRing3(k, ring)));
     if (declaring) by.add(declaring.id);
     const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
     return blamed ? { blamed, by } : null;
@@ -1687,8 +1725,13 @@ function deriveCore3(
   for (const ring of declaredRings3) {
     const pts = ring.map((id) => positions.get(id));
     if (pts.some((p) => !p) || ringSkew3(pts as Vec3[]) <= CLAIM_REL_TOL) continue;
-    const blame = ringBlame3(ring, true);
-    if (!blame || status[blame.blamed.id] !== 'ok') continue;
+    // #2490 (ADR-3D-434): a pyramid's BOUND base that is skew is the line's whole fault — the base-shape claim its kind
+    // lowered («פירמידה ABCA'S»: a rectangle) is refuted only because no flat ring stands on those corners, so the skew
+    // is what the refusal names, never the generic «בדקו את החישוב» (honesty: an error names the conflicting statement)
+    const boundBase = c.solids.some((s) => s.bound !== undefined && sameRing3(s.bound, ring));
+    const admit = (st: FactStatus3): boolean => st === 'ok' || (boundBase && typeof st === 'object' && st.code === 'claim-refuted');
+    const blame = ringBlame3(ring, true, admit);
+    if (!blame || !admit(status[blame.blamed.id])) continue;
     let placed = 0;
     let flatSomewhere = false;
     for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
@@ -1707,6 +1750,26 @@ function deriveCore3(
       others: namedStatements(blame.by, blame.blamed.id),
       sides: ring.length,
       vertices: [...ring],
+    };
+  }
+
+  // #2490 (ADR-3D-434): a pyramid BOUND over existing points whose base lies on ONE LINE has no plane to stand on, so
+  // its apex is left unplaced (`boundApexPosition3`). That is no pyramid: the declaring line is refused as the flattened
+  // solid it is, naming the lines that placed the base (#1860's sentence) — never drawn with a vertex missing. It speaks
+  // over a base-shape claim the kind lowered, which fails only because the ring is degenerate (as the skew check does).
+  for (const solid of c.solids) {
+    if (!solid.bound || solid.ids.every((id) => solid.bound!.includes(id) || positions.has(id))) continue;
+    const want = [...solid.ids].sort().join('|');
+    const decl = facts.find(
+      (f) => f.enabled && (status[f.id] === 'ok' || (typeof status[f.id] === 'object' && (status[f.id] as { code: string }).code === 'claim-refuted')) &&
+        f.cmds.some((k) => k.type === 'solid' && [...k.ids].sort().join('|') === want),
+    );
+    if (!decl) continue;
+    const by = new Set<string>();
+    for (const id of solid.bound) placementFixers3(c, facts, id, true)?.forEach((x) => by.add(x));
+    status[decl.id] = {
+      code: 'polygon-collapsed', stated: decl.utterance, others: namedStatements(by, decl.id),
+      sides: solid.bound.length, ring: solidAsWritten(solid.ids), solid: 'pyramid',
     };
   }
 

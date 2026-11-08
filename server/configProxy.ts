@@ -6,6 +6,7 @@
 import type { Plugin } from 'vite';
 import path from 'node:path';
 import { handleConfigRead } from './adminConfig';
+import { serveSafely } from './http';
 
 export function configProxyPlugin(): Plugin {
   let dir = '';
@@ -15,9 +16,14 @@ export function configProxyPlugin(): Plugin {
       dir = path.resolve(config.root, 'logs');
     },
     configureServer(server) {
-      server.middlewares.use('/api/config', (req, res) => {
-        void handleConfigRead(req, res, { dir });
-      });
+      // Inside the one request boundary (#2752, ADR-W-192).
+      server.middlewares.use(
+        '/api/config',
+        serveSafely(
+          (req, res) => handleConfigRead(req, res, { dir }),
+          (m) => server.config.logger.error(m),
+        ),
+      );
     },
   };
 }

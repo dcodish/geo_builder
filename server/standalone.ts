@@ -31,7 +31,7 @@
  * served on the /admin3 path tail (Apache maps /3d-builder/admin -> /admin3, since the prefix is stripped).
  */
 
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import { handleParse } from './parseHandler';
@@ -43,6 +43,7 @@ import { handleConfigRead } from './adminConfig';
 // purpose: the operator asked for `themathbible.com/<something short>`, and a preview crawler
 // never follows a builder's own prefix.
 import { handleShare, handleSharePage } from './shareStore';
+import { serveSafely } from './http';
 
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -87,7 +88,12 @@ if (!adminPassword || !adminCookieSecret) {
   );
 }
 
-const server = createServer((req, res) => {
+/**
+ * The routes. Every handler is RETURNED, never fired and forgotten, so a failure reaches the request
+ * boundary (`serveSafely`) and ends only its own request, never the process that serves all four builders
+ * (#2752, ADR-W-192).
+ */
+async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const path = (req.url ?? '').split('?')[0];
   if (path === '/healthz') {
     res.statusCode = 200;
@@ -95,33 +101,28 @@ const server = createServer((req, res) => {
     return;
   }
   if (path.endsWith('/api/parse')) {
-    void handleParse(req, res, { apiKey });
-    return;
+    return handleParse(req, res, { apiKey });
   }
   if (path.endsWith('/api/log')) {
     // handleLog routes the event to the 2-D or 3-D file by the request body's `tool` tag.
-    void handleLog(req, res, { ipSalt });
-    return;
+    return handleLog(req, res, { ipSalt });
   }
   // The SHARE page, checked before the api tails: it is the one route that is NOT under a builder
   // prefix, because the link a teacher sends has to be short (#1374).
   if (path.startsWith('/g/')) {
-    void handleSharePage(req, res);
-    return;
+    return handleSharePage(req, res);
   }
   if (path.endsWith('/api/share')) {
-    void handleShare(req, res);
-    return;
+    return handleShare(req, res);
   }
   if (path.endsWith('/api/config')) {
     // A3 (#662): the PUBLIC curation read — unauthenticated by design; 204 = "use your static
     // roster" (the degraded path). Config lives beside the events files.
-    void handleConfigRead(req, res, { dir: dirname(eventsLogPath()) });
-    return;
+    return handleConfigRead(req, res, { dir: dirname(eventsLogPath()) });
   }
   // #1362: the analytic tail, before `/admin` for the same substring reason as `/admin3` below.
   if (path.includes('/admin-analytic')) {
-    void handleAdmin(req, res, {
+    return handleAdmin(req, res, {
       username: adminUsername,
       password: adminPassword,
       cookieSecret: adminCookieSecret,
@@ -129,12 +130,11 @@ const server = createServer((req, res) => {
       logPath: eventsLogPathForId('analytic') ?? undefined,
       profile: PROFILE_ANALYTIC,
     });
-    return;
   }
   // The 3-D dashboard tail (`/admin3`) MUST be checked before the 2-D `/admin` — `'/admin3'.includes('/admin')`
   // is true, so 2-D would otherwise swallow it.
   if (path.includes('/admin3')) {
-    void handleAdmin(req, res, {
+    return handleAdmin(req, res, {
       username: adminUsername,
       password: adminPassword,
       cookieSecret: adminCookieSecret,
@@ -142,19 +142,24 @@ const server = createServer((req, res) => {
       logPath: events3LogPath(),
       profile: PROFILE_3D,
     });
-    return;
   }
   if (path.includes('/admin')) {
-    void handleAdmin(req, res, {
+    return handleAdmin(req, res, {
       username: adminUsername,
       password: adminPassword,
       cookieSecret: adminCookieSecret,
       base: adminBase,
     });
-    return;
   }
   res.statusCode = 404;
   res.end('not found');
+}
+
+const server = createServer(serveSafely(dispatch));
+
+// The last net (#2752, ADR-W-192): a rejection nothing awaited is logged and the process keeps serving.
+process.on('unhandledRejection', (reason) => {
+  console.error('[geo-proxy] unhandled rejection (kept running):', reason instanceof Error ? (reason.stack ?? reason.message) : reason);
 });
 
 server.listen(PORT, HOST, () => {

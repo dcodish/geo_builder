@@ -107,6 +107,271 @@ export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
 
+/**
+ * #1896 (ADR-3D-433) — ONE RESIDUAL PER SCALAR CLAIM KIND, the verifier's own function (ADR-3D-286 §3).
+ *
+ * A scalar claim states ONE real equation about the figure. Its residual `r` is signed where the quantity is signed
+ * (a length minus its value, a cosine minus its value), and the claim holds exactly when `|r| ≤ tol`: `holdsAt` judges
+ * every scalar kind through this table, and the coord-sym parameter's root-find (`pinParam`, ADR-3D-032) solves
+ * `r = 0` through it, so what drives the parameter and what verifies the drawing cannot drift apart (ADR-3D-033's
+ * tolerance rule). Before, `pinParam` kept three hand-written residuals (length, the two angles) beside a three-kind
+ * routing list in `apply.ts`, and every other kind on a coord-sym point was judged at the sampled parameter and refused
+ * «בדקו את החישוב» although roots existed («AB ⊥ AC» on «B(k-1,k,3) · C(k+1,0,k-3)»: k = 2, k = −5).
+ *
+ * The table is TOTAL over `Claim3['type']` (a new kind is a compile error until it is placed): a `residual`, or an
+ * `excluded` reason saying why the kind is not one scalar equation over the points. `letter` reads the number a letter
+ * names (`length-letter` only: the verifier reads each lane's value, the root-find the value it is searching).
+ */
+export type ClaimResidual3 = { r: number; tol: number };
+type ResidualOf3<K extends Claim3['type']> = (
+  claim: Extract<Claim3, { type: K }>,
+  c: Construction3,
+  pos: ReadonlyMap<string, Vec3>,
+  letter: (sym: string) => number | undefined,
+) => ClaimResidual3 | null;
+type ResidualEntry3<K extends Claim3['type']> = { residual: ResidualOf3<K> } | { excluded: string };
+
+const lengthOf = (pos: ReadonlyMap<string, Vec3>, a: string, b: string): number | null => {
+  const p = pos.get(a);
+  const q = pos.get(b);
+  return p && q ? norm3(sub3(q, p)) : null;
+};
+const valueTol = (value: number): number => REL_TOL * Math.max(Math.abs(value), 1);
+
+export const CLAIM_RESIDUALS3 = {
+  // #2580 (ADR-3D-384): |ab| = coef·(the number the letter names)
+  'length-letter': {
+    residual: (cl, _c, pos, letter) => {
+      const len = lengthOf(pos, cl.a, cl.b);
+      const v = letter(cl.sym);
+      return len === null || v === undefined || !Number.isFinite(v) ? null : { r: len - cl.coef * v, tol: REL_TOL * Math.max(Math.abs(len), 1) };
+    },
+  },
+  'length-eq': {
+    residual: (cl, _c, pos) => {
+      const len = lengthOf(pos, cl.a, cl.b);
+      return len === null ? null : { r: len - cl.value, tol: valueTol(cl.value) };
+    },
+  },
+  // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| against the stated value, the `length-eq` tolerance
+  'length-sum': {
+    residual: (cl, _c, pos) => {
+      let sum = 0;
+      for (const t of cl.terms) {
+        const len = lengthOf(pos, t.a, t.b);
+        if (len === null) return null;
+        sum += t.c * len;
+      }
+      return { r: sum - cl.value, tol: valueTol(cl.value) };
+    },
+  },
+  'area-eq': {
+    residual: (cl, _c, pos) => {
+      const ps = cl.ids.map((id) => pos.get(id));
+      if (ps.some((p) => !p)) return null;
+      const area = 0.5 * norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!)));
+      return { r: area - cl.value, tol: valueTol(cl.value) };
+    },
+  },
+  // #1560 (ADR-3D-284): the arbiter of «u·v = 24», at the `dot-eq` scale
+  'dot-val': {
+    residual: (cl, c, pos) => {
+      const u = atomVec(cl.a, c, pos as Map<string, Vec3>);
+      const v = atomVec(cl.b, c, pos as Map<string, Vec3>);
+      return !u || !v ? null : { r: dot3(u, v) - cl.value, tol: REL_TOL * Math.max(norm3(u) * norm3(v), Math.abs(cl.value), 1) };
+    },
+  },
+  // the angle between LINES: undirected, ≤ 90° (the textbook convention)
+  'angle-seg-eq': {
+    residual: (cl, _c, pos) => {
+      const deg = lineAngleDeg(pos, cl.a1, cl.b1, cl.a2, cl.b2);
+      return deg === null ? null : { r: deg - cl.deg, tol: ANGLE_TOL_DEG };
+    },
+  },
+  // #1573 (ADR-3D-290): the angle AT the vertex, between the two rays — 0–180°
+  'vertex-angle-eq': {
+    residual: (cl, _c, pos) => {
+      const deg = vertexAngleDeg(pos, cl.vertex, cl.p, cl.q);
+      return deg === null ? null : { r: deg - cl.deg, tol: ANGLE_TOL_DEG };
+    },
+  },
+  'length-ratio': {
+    residual: (cl, _c, pos) => {
+      const l1 = lengthOf(pos, cl.a1, cl.b1);
+      const l2 = lengthOf(pos, cl.a2, cl.b2);
+      if (l1 === null || l2 === null || cl.q === 0 || l2 < 1e-12) return null;
+      return { r: l1 / l2 - cl.p / cl.q, tol: REL_TOL * Math.max(cl.p / cl.q, 1) };
+    },
+  },
+  'length-rel': {
+    residual: (cl, _c, pos) => {
+      const l1 = lengthOf(pos, cl.a1, cl.b1);
+      const l2 = lengthOf(pos, cl.a2, cl.b2);
+      if (l1 === null || l2 === null) return null;
+      const target = cl.c * l2;
+      return { r: l1 - target, tol: REL_TOL * Math.max(target, 1) };
+    },
+  },
+  // a solid of revolution's measure from its STATED dims (guarded upstream: no-such-solid / the size refusal, #2076)
+  'volume-eq': { residual: (cl, c) => revolutionResidual(cl, c, 'volume') },
+  'lateral-area-eq': { residual: (cl, c) => revolutionResidual(cl, c, 'lateral') },
+  'surface-area-eq': { residual: (cl, c) => revolutionResidual(cl, c, 'surface') },
+  // #766 (ADR-3D-169): the subject is RESOLVED against the declared figure and its volume comes from that solid's own
+  // faces (the old `|triple product| / 6` over four ids read a square-base pyramid's base as 0)
+  'volume-poly': {
+    residual: (cl, c, pos) => {
+      const vol = subjectVolume(resolveSolidSubject(c, cl.noun, cl.ids), pos as Map<string, Vec3>);
+      return vol === null ? null : { r: vol - cl.value, tol: valueTol(cl.value) };
+    },
+  },
+  'volume-eq-poly': {
+    residual: (cl, _c, pos) => {
+      const vol = (ids: string[]): number | null => {
+        const ps = ids.map((id) => pos.get(id));
+        if (ps.length !== 4 || ps.some((p) => !p)) return null;
+        return Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
+      };
+      const v1 = vol(cl.ids1);
+      const v2 = vol(cl.ids2);
+      return v1 === null || v2 === null ? null : { r: v1 - v2, tol: REL_TOL * Math.max(v1, v2, 1) };
+    },
+  },
+  // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — the length-rel/length-eq twins, through the one evalExpr
+  'mag-rel': {
+    residual: (cl, c, pos) => {
+      const e1 = evalExpr(cl.e1, c, pos as Map<string, Vec3>);
+      const e2 = evalExpr(cl.e2, c, pos as Map<string, Vec3>);
+      if (!e1 || !e2) return null;
+      const target = cl.c * norm3(e2);
+      return { r: norm3(e1) - target, tol: REL_TOL * Math.max(target, 1) };
+    },
+  },
+  'mag-val': {
+    residual: (cl, c, pos) => {
+      const e = evalExpr(cl.e, c, pos as Map<string, Vec3>);
+      return !e ? null : { r: norm3(e) - cl.value, tol: valueTol(cl.value) };
+    },
+  },
+  // #305 (ADR-3D-090): the ScalarPin's twin — opposite angles supplementary (see solve3)
+  concyclic: {
+    residual: (cl, _c, pos) => {
+      const q = cl.ids.map((id) => pos.get(id));
+      if (q.length !== 4 || q.some((v) => !v)) return null;
+      const [A, B, C, D] = q as Vec3[];
+      const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
+        const u1 = sub3(p1, v);
+        const u2 = sub3(p2, v);
+        return dot3(u1, u2) / Math.max(norm3(u1) * norm3(u2), 1e-12);
+      };
+      return { r: cosAt(A, B, D) + cosAt(C, B, D), tol: REL_TOL * 10 };
+    },
+  },
+  // V8-f (G6): cos of the angle between two operands = value («AB ⊥ AC» is cos = 0)
+  'cos-angle-eq': {
+    residual: (cl, c, pos) => {
+      const u = atomVec(cl.u, c, pos as Map<string, Vec3>);
+      const v = atomVec(cl.v, c, pos as Map<string, Vec3>);
+      if (!u || !v) return null;
+      const den = norm3(u) * norm3(v);
+      return den < 1e-12 ? null : { r: dot3(u, v) / den - cl.cos, tol: REL_TOL * Math.max(Math.abs(cl.cos), 1) };
+    },
+  },
+  // V8-f (G9): u·v = c·d (a chained-equality link)
+  'dot-eq': {
+    residual: (cl, c, pos) => {
+      const [a, b, cc, d] = [cl.a, cl.b, cl.c, cl.d].map((r) => atomVec(r, c, pos as Map<string, Vec3>));
+      if (!a || !b || !cc || !d) return null;
+      return { r: dot3(a, b) - dot3(cc, d), tol: REL_TOL * Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12) };
+    },
+  },
+  // V8-f (G10): ∠(a,b) = ∠(c,d) — equal angles ⟺ equal cosines
+  'cos-eq': {
+    residual: (cl, c, pos) => {
+      const [a, b, cc, d] = [cl.a, cl.b, cl.c, cl.d].map((r) => atomVec(r, c, pos as Map<string, Vec3>));
+      if (!a || !b || !cc || !d) return null;
+      const den1 = norm3(a) * norm3(b);
+      const den2 = norm3(cc) * norm3(d);
+      return den1 < 1e-12 || den2 < 1e-12 ? null : { r: dot3(a, b) / den1 - dot3(cc, d) / den2, tol: REL_TOL };
+    },
+  },
+  // triage 3-D: sin β = |n·u| / (|n||u|) (formula sheet). n from two plane edges at pt[0].
+  'line-plane-angle': {
+    residual: (cl, _c, pos) => {
+      const a = pos.get(cl.a);
+      const b = pos.get(cl.b);
+      const pts = cl.plane.map((id) => pos.get(id));
+      if (!a || !b || pts.some((p) => !p)) return null;
+      const u = sub3(b, a);
+      const n = cross3(sub3(pts[1]!, pts[0]!), sub3(pts[pts.length - 1]!, pts[0]!));
+      const den = norm3(n) * norm3(u);
+      if (den < 1e-12) return null;
+      const beta = (Math.asin(Math.min(1, Math.abs(dot3(n, u)) / den)) * 180) / Math.PI;
+      return { r: beta - cl.deg, tol: 1e-3 };
+    },
+  },
+  // #833 (ADR-3D-193) — AB ∥ plane A'B'C'D': the segment's direction ⟂ the plane's normal (a segment LYING IN the plane
+  // satisfies it too: ∥ is about direction, containment has its own relation). A plane whose two spanning directions are
+  // dependent is not a plane, so the claim is unanswerable rather than true.
+  'par-plane': {
+    residual: (cl, _c, pos) => {
+      const [s1, s2] = cl.seg.map((id) => pos.get(id));
+      const [p1, p2, p3] = cl.plane.map((id) => pos.get(id));
+      if (!s1 || !s2 || !p1 || !p2 || !p3) return null;
+      const d = sub3(s2, s1);
+      const e1 = sub3(p2, p1);
+      const e2 = sub3(p3, p1);
+      const n = cross3(e1, e2);
+      if (norm3(n) <= REL_TOL * Math.max(norm3(e1) * norm3(e2), 1e-12)) return null;
+      return { r: dot3(d, n), tol: REL_TOL * Math.max(norm3(d) * norm3(n), 1) };
+    },
+  },
+  // ---- not one scalar equation over the points: each says why
+  'perp-plane': { excluded: 'two equations — the segment ⟂ BOTH spanning directions of the plane' },
+  'vec-eq': { excluded: 'a vector equation — three component equations, not one' },
+  'coords-eq': { excluded: 'a coordinate statement — three components; on a coord-sym point the coordinate lane reads it (`readCoordGiven` → symbol-value)' },
+  'vec-val': { excluded: "a vector's components — three equations, read by the pivot's pins and their arbiter" },
+  'plane-eq': { excluded: 'one equation per named point, not one' },
+  'collinear3': { excluded: 'a cross product per further point — a vector condition, not one equation' },
+  'polygon-open': { excluded: 'an inequality (the ring does not collapse), not an equation' },
+  'coord-plane-rel': { excluded: "a ring's relation to a coordinate plane — a classifier over several components" },
+  'plane-line-perp': { excluded: "the plane's normal ∥ the line — a vector condition" },
+  'bisector-dir': { excluded: 'a direction (a unit vector equal to the bisector), not one equation' },
+  'lines-rel': { excluded: 'a classifier (parallel / crossing / skew), not an equation' },
+  'free-rel': { excluded: "a free-vector relation, judged at the free-vector system's own solution (`freeX`)" },
+  'line-rel': { excluded: "a relation between operands: ADR-3D-286's `paramPinningRels` reads its parameter dependence" },
+  'mutual-rel': { excluded: "a relation between operands: ADR-3D-286's `paramPinningRels` reads its parameter dependence" },
+  'plane-rel': { excluded: "a relation between operands: ADR-3D-286's `paramPinningRels` reads its parameter dependence" },
+  'distance-rel': { excluded: "a relation between operands: ADR-3D-286's `paramPinningRels` reads its parameter dependence" },
+  'never-parallel': { excluded: 'a statement about EVERY value of the parameter, never one that pins it' },
+} satisfies { [K in Claim3['type']]: ResidualEntry3<K> };
+
+/** The claim kinds the table gives a residual (one scalar equation each). */
+export type ScalarClaimType3 = {
+  [K in keyof typeof CLAIM_RESIDUALS3]: (typeof CLAIM_RESIDUALS3)[K] extends { residual: unknown } ? K : never;
+}[keyof typeof CLAIM_RESIDUALS3];
+
+export const hasClaimResidual3 = (type: Claim3['type']): boolean => 'residual' in CLAIM_RESIDUALS3[type];
+
+/** #1896 (ADR-3D-433): a scalar claim's residual at these positions, or null (not a scalar kind, or a point missing or degenerate). */
+export function claimResidual3(
+  claim: Claim3,
+  c: Construction3,
+  pos: ReadonlyMap<string, Vec3>,
+  letter: (sym: string) => number | undefined = () => undefined,
+): ClaimResidual3 | null {
+  const entry = CLAIM_RESIDUALS3[claim.type] as ResidualEntry3<Claim3['type']>;
+  return 'residual' in entry ? (entry.residual as ResidualOf3<Claim3['type']>)(claim as never, c, pos, letter) : null;
+}
+
+/** `|r| ≤ tol`: the one verdict of a scalar claim, for the verifier and the root-find's candidate filter alike. */
+export const residualHolds3 = (res: ClaimResidual3 | null): boolean => res !== null && Number.isFinite(res.r) && Math.abs(res.r) <= res.tol;
+
+function revolutionResidual(cl: { solid: string; value: number }, c: Construction3, which: 'volume' | 'lateral' | 'surface'): ClaimResidual3 | null {
+  const rev = c.revolutions.find((r) => r.kind === cl.solid);
+  const actual = rev ? revolutionMeasure(rev, which) : null;
+  return actual === null ? null : { r: actual - cl.value, tol: valueTol(cl.value) };
+}
+
 function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean {
   // #375: a claim may reference a resolved LINE, not only positions. `evaluate3` is literally
   // `resolve3(...).positions`, so taking the whole Resolved3 costs nothing and stops the claim lane
@@ -120,17 +385,15 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
   // kind — the next pin family to gain an arbiter (#1567) inherits it by setting the flag. An ANSWER
   // («K = (…)») carries no flag and keeps its verify-your-answer register (ADR-3D-075).
   if ('given' in claim && claim.given && resolved.pivot !== null && resolved.pivot.solutions === 0) return true;
+  // #1896 (ADR-3D-433): every scalar kind is judged through its one residual, the function the parameter root-find solves
+  if (claim.type === 'length-letter') {
+    // #2580 (ADR-3D-384): for EVERY number owner of the letter, each read where its lane put it, so a lane that could not
+    // drive the tie is refuted here, never silently drawn
+    if (!pos.get(claim.a) || !pos.get(claim.b)) return false;
+    return letterNumbersAt3(c, claim.sym, resolved).every((v) => residualHolds3(claimResidual3(claim, c, pos, () => v)));
+  }
+  if (hasClaimResidual3(claim.type)) return residualHolds3(claimResidual3(claim, c, pos));
   switch (claim.type) {
-    case 'length-letter': {
-      // #2580 (ADR-3D-384): |ab| = coef·(the number the letter names) — for EVERY number owner of the letter, each
-      // read where its lane put it, so a lane that could not drive the tie is refuted here, never silently drawn
-      const a = pos.get(claim.a);
-      const b = pos.get(claim.b);
-      if (!a || !b) return false;
-      const len = norm3(sub3(b, a));
-      const values = letterNumbersAt3(c, claim.sym, resolved);
-      return values.every((v) => v !== undefined && Number.isFinite(v) && Math.abs(len - claim.coef * v) <= REL_TOL * Math.max(Math.abs(len), 1));
-    }
     case 'free-rel': // #2684 (ADR-3D-421): the relation at this drawing and this configuration's free-vector solution
       return freeRelationHolds3(c, claim.m, pos, resolved.freeX);
     case 'vec-eq': {
@@ -153,26 +416,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const ok2 = Math.abs(dot3(d, e2)) <= REL_TOL * Math.max(norm3(d) * norm3(e2), 1);
       return ok1 && ok2;
     }
-    /**
-     * #833 (ADR-3D-193) — AB ∥ plane A'B'C'D': the segment's direction is orthogonal to the plane's
-     * normal. Mirrors `perp-plane` above, including its degeneracy guard (a plane whose two spanning
-     * directions are dependent is not a plane, so the claim is unanswerable rather than true).
-     *
-     * A segment LYING IN the plane satisfies this too, and that is the intended reading: ∥ is a
-     * statement about DIRECTION, and the containment reading has its own relation («מוכל»). Refusing
-     * it here would put back a false negative of exactly the kind this issue is about.
-     */
-    case 'par-plane': {
-      const [s1, s2] = claim.seg.map((id) => pos.get(id)!);
-      const [p1, p2, p3] = claim.plane.map((id) => pos.get(id)!);
-      if (!s1 || !s2 || !p1 || !p2 || !p3) return false;
-      const d = sub3(s2, s1);
-      const e1 = sub3(p2, p1);
-      const e2 = sub3(p3, p1);
-      const n = cross3(e1, e2);
-      if (norm3(n) <= REL_TOL * Math.max(norm3(e1) * norm3(e2), 1e-12)) return false;
-      return Math.abs(dot3(d, n)) <= REL_TOL * Math.max(norm3(d) * norm3(n), 1);
-    }
     // #1849 (ADR-3D-310): a polygon declared over existing points — its ring must be open
     case 'polygon-open': {
       const ps = claim.ids.map((id) => pos.get(id));
@@ -190,29 +433,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       }
       return true;
     }
-    case 'length-sum': {
-      // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| against the stated value, the `length-eq` tolerance
-      let sum = 0;
-      for (const t of claim.terms) {
-        const a = pos.get(t.a);
-        const b = pos.get(t.b);
-        if (!a || !b) return false;
-        sum += t.c * norm3(sub3(b, a));
-      }
-      return Math.abs(sum - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
-    case 'length-eq': {
-      const a = pos.get(claim.a);
-      const b = pos.get(claim.b);
-      if (!a || !b) return false;
-      return Math.abs(norm3(sub3(b, a)) - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
-    case 'area-eq': {
-      const ps = claim.ids.map((id) => pos.get(id));
-      if (ps.some((p) => !p)) return false;
-      const area = 0.5 * norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!)));
-      return Math.abs(area - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
     case 'coords-eq': {
       const p = pos.get(claim.id);
       if (!p) return false;
@@ -227,13 +447,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       // coordinates, read through the one `atomVec` the claim lane shares (a named vector and a pair alike).
       const w = atomVec(claim.atom, c, pos);
       return w !== null && componentsHold(w, claim);
-    }
-    case 'dot-val': {
-      // #1560 (ADR-3D-284): the arbiter of «u·v = 24», at the `dot-eq` scale.
-      const u = atomVec(claim.a, c, pos);
-      const v = atomVec(claim.b, c, pos);
-      if (!u || !v) return false;
-      return Math.abs(dot3(u, v) - claim.value) <= REL_TOL * Math.max(norm3(u) * norm3(v), Math.abs(claim.value), 1);
     }
     case 'coord-plane-rel': {
       // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure.
@@ -311,71 +524,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       if (norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!))) < 1e-9) return false;
       return ps.every((p) => Math.abs(dot3(n, p!) + claim.d) <= REL_TOL * Math.max(norm3(n) * (1 + norm3(p!)), 1));
     }
-    case 'angle-seg-eq': {
-      // the angle between LINES: undirected, ≤ 90° (the textbook convention)
-      const deg = lineAngleDeg(pos, claim.a1, claim.b1, claim.a2, claim.b2);
-      return deg !== null && Math.abs(deg - claim.deg) <= ANGLE_TOL_DEG;
-    }
-    case 'vertex-angle-eq': {
-      // #1573 (ADR-3D-290): the angle AT the vertex, between the two rays — 0–180°
-      const deg = vertexAngleDeg(pos, claim.vertex, claim.p, claim.q);
-      return deg !== null && Math.abs(deg - claim.deg) <= ANGLE_TOL_DEG;
-    }
-    case 'length-ratio': {
-      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
-      if (!a1 || !b1 || !a2 || !b2 || claim.q === 0) return false;
-      const len2 = norm3(sub3(b2, a2));
-      if (len2 < 1e-12) return false;
-      return Math.abs(norm3(sub3(b1, a1)) / len2 - claim.p / claim.q) <= REL_TOL * Math.max(claim.p / claim.q, 1);
-    }
-    case 'volume-eq':
-    case 'lateral-area-eq':
-    case 'surface-area-eq': {
-      const rev = c.revolutions.find((r) => r.kind === claim.solid);
-      // guarded upstream (no-such-solid / the given-not-drivable size refusal, #2076)
-      const actual = rev ? revolutionMeasure(rev, claim.type === 'volume-eq' ? 'volume' : claim.type === 'lateral-area-eq' ? 'lateral' : 'surface') : null;
-      if (actual === null) return false;
-      return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
-    case 'volume-poly': {
-      // #766 (ADR-3D-169): the subject is RESOLVED against the declared figure and its volume comes from
-      // that solid's own faces. The old body was `|triple product| / 6` over exactly four ids — correct
-      // only for an actual tetrahedron, and selected by LETTER COUNT, which is why a square-base pyramid's
-      // base run evaluated to 0 and a true given came back refuted.
-      const vol = subjectVolume(resolveSolidSubject(c, claim.noun, claim.ids), pos);
-      if (vol === null) return false;
-      return Math.abs(vol - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
-    case 'length-rel': {
-      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
-      if (!a1 || !b1 || !a2 || !b2) return false;
-      const target = claim.c * norm3(sub3(b2, a2));
-      return Math.abs(norm3(sub3(b1, a1)) - target) <= REL_TOL * Math.max(target, 1);
-    }
-    // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — the length-rel/length-eq
-    // twins, evaluated through the one evalExpr every expression consumer shares.
-    case 'mag-rel': {
-      const e1 = evalExpr(claim.e1, c, pos);
-      const e2 = evalExpr(claim.e2, c, pos);
-      if (!e1 || !e2) return false;
-      const target = claim.c * norm3(e2);
-      return Math.abs(norm3(e1) - target) <= REL_TOL * Math.max(target, 1);
-    }
-    case 'mag-val': {
-      const e = evalExpr(claim.e, c, pos);
-      if (!e) return false;
-      return Math.abs(norm3(e) - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
-    }
-    case 'volume-eq-poly': {
-      const vol = (ids: string[]): number | null => {
-        const ps = ids.map((id) => pos.get(id));
-        if (ps.length !== 4 || ps.some((p) => !p)) return null;
-        return Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
-      };
-      const v1 = vol(claim.ids1);
-      const v2 = vol(claim.ids2);
-      return v1 !== null && v2 !== null && Math.abs(v1 - v2) <= REL_TOL * Math.max(v1, v2, 1);
-    }
     case 'lines-rel': {
       // S4 (#378): delegates to the ONE shared classifier — the same scalars the mutual-position
       // drive, the data panel and the requirement gate read, so a driven figure can never disagree
@@ -389,44 +537,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       // old `cross ≈ 0` test, and a saved figure may rely on it.
       if (claim.rel === 'parallel') return mutualHolds('parallel', s1, s2, MUTUAL_VERIFY_TOL) || mutualHolds('coincident', s1, s2, MUTUAL_VERIFY_TOL);
       return mutualHolds(claim.rel === 'intersect' ? 'intersecting' : 'skew', s1, s2, MUTUAL_VERIFY_TOL);
-    }
-    case 'concyclic': {
-      // #305 (ADR-3D-090): the ScalarPin's twin — opposite angles supplementary (see solve3).
-      const q = claim.ids.map((id) => pos.get(id));
-      if (q.length !== 4 || q.some((v) => !v)) return false;
-      const [A, B, C, D] = q as Vec3[];
-      const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
-        const u1 = sub3(p1, v);
-        const u2 = sub3(p2, v);
-        const den = Math.max(norm3(u1) * norm3(u2), 1e-12);
-        return dot3(u1, u2) / den;
-      };
-      return Math.abs(cosAt(A, B, D) + cosAt(C, B, D)) <= REL_TOL * 10;
-    }
-    case 'cos-angle-eq': {
-      // V8-f (G6) on a determined figure: cos of the angle between two operands = value
-      const u = atomVec(claim.u, c, pos);
-      const v = atomVec(claim.v, c, pos);
-      if (!u || !v) return false;
-      const den = norm3(u) * norm3(v);
-      if (den < 1e-12) return false;
-      return Math.abs(dot3(u, v) / den - claim.cos) <= REL_TOL * Math.max(Math.abs(claim.cos), 1);
-    }
-    case 'dot-eq': {
-      // V8-f (G9): u·v = c·d (a chained-equality link), checked on the determined figure
-      const [a, b, cc, d] = [claim.a, claim.b, claim.c, claim.d].map((r) => atomVec(r, c, pos));
-      if (!a || !b || !cc || !d) return false;
-      const scale = Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12);
-      return Math.abs(dot3(a, b) - dot3(cc, d)) <= REL_TOL * scale;
-    }
-    case 'cos-eq': {
-      // V8-f (G10): ∠(a,b) = ∠(c,d) — equal angles ⟺ equal cosines
-      const [a, b, cc, d] = [claim.a, claim.b, claim.c, claim.d].map((r) => atomVec(r, c, pos));
-      if (!a || !b || !cc || !d) return false;
-      const den1 = norm3(a) * norm3(b);
-      const den2 = norm3(cc) * norm3(d);
-      if (den1 < 1e-12 || den2 < 1e-12) return false;
-      return Math.abs(dot3(a, b) / den1 - dot3(cc, d) / den2) <= REL_TOL;
     }
     case 'bisector-dir': {
       /**
@@ -444,19 +554,6 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       if (!u || norm3(ray) < 1e-12) return false;
       return dist3(normalize3(ray), u) <= REL_TOL;
     }
-    case 'line-plane-angle': {
-      // triage 3-D: sin β = |n·u| / (|n||u|) (formula sheet). n from two plane edges at pt[0].
-      const a = pos.get(claim.a);
-      const b = pos.get(claim.b);
-      const pts = claim.plane.map((id) => pos.get(id));
-      if (!a || !b || pts.some((p) => !p)) return false;
-      const u = sub3(b, a);
-      const n = cross3(sub3(pts[1]!, pts[0]!), sub3(pts[pts.length - 1]!, pts[0]!));
-      const den = norm3(n) * norm3(u);
-      if (den < 1e-12) return false;
-      const beta = (Math.asin(Math.min(1, Math.abs(dot3(n, u)) / den)) * 180) / Math.PI;
-      return Math.abs(beta - claim.deg) <= 1e-3;
-    }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,
       // so the claim holds iff that residual has NO zero over the scanned range —
@@ -473,6 +570,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
         prev = r;
       }
       return true;
+    }
+    default: {
+      // the scalar kinds were judged above, through the table; an EXCLUDED kind with no case here is a compile error
+      const scalar: ScalarClaimType3 = claim.type;
+      void scalar;
+      return residualHolds3(claimResidual3(claim, c, pos));
     }
   }
 }

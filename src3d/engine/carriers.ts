@@ -1,5 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef } from './types';
-import { freeCoordKey, hasFreePoint3, ringCircle3 } from './types';
+import { freeCoordKey, pivotRuns3, ringCircle3 } from './types';
 
 /**
  * #1498 — THE SAMPLED-CARRIER TABLE: one enumeration of every free point-DOF the sampler owns.
@@ -27,8 +27,8 @@ import { freeCoordKey, hasFreePoint3, ringCircle3 } from './types';
  *               subtree re-seats its dependents AFTER the pivot (#557), which would silently discard
  *               a driven value.
  *  - `solvable` — #1615 (ADR-3D-293): the point is placed LINEARLY from this parameter and nothing re-seats it
- *               after the point pass, so a coordinate given can solve it in closed form
- *               (`solveCoordDeterminations`). Wider than `drivable` where the pivot's own limits are not the
+ *               after the point pass, so a coordinate or a length given can solve it in closed form
+ *               (`solveDeterminations`, ADR-3D-432). Wider than `drivable` where the pivot's own limits are not the
  *               solve's: an equation-plane rider is not a pivot unknown, but its in-plane offsets are exactly
  *               solvable. False for a FREE line's or plane's rider (re-seated by the free-carrier fixpoint) and
  *               for a stated side's height (its bound depends on the sampled height).
@@ -126,6 +126,8 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
   };
   switch (def.kind) {
     case 'solid-vertex':
+      // #2490 (ADR-3D-434): a BOUND solid's apex is placed in its ring's frame — it reads every base point
+      return [...(c.solids[def.solid]?.bound ?? [])];
     case 'coord':
     case 'partial':
     case 'coord-sym':
@@ -206,10 +208,22 @@ export function builtFrom3(c: Construction3, ids: readonly Id[], target: Id): bo
  * (`free3`) point, the pivot's own entry gate (`resolve3`). On an empty canvas the points a line creates are `free3`,
  * so «שטח המשולש ABC = 4.5» or «AB∥ACD» reaches their coordinates and drives them instead of being judged against
  * the sample. A figure with neither — coordinates and a rider on them, «D על AB · AD = 1» (#1816) — has no pivot to
- * run on, so a statement there reaches nothing the drive can move and stays the claim it was.
+ * run on, so a statement there reaches nothing the drive can move; #1816 (ADR-3D-432) gives that figure its own
+ * driver, the determination step ({@link determinationReach3}).
  */
 export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boolean {
-  if (c.solids.length === 0 && !hasFreePoint3(c)) return false;
+  if (!pivotRuns3(c)) return false;
+  return carrierReach3(c, ids).some((r) => r.params.some((p) => p.drivable));
+}
+
+/**
+ * #1816 (ADR-3D-432) — THE REACH WALK, written once: every point a statement names and, transitively, every point one
+ * of them is BUILT FROM ({@link pointParents3}), each with its rows of the sampled-carrier table. The pivot's reach
+ * ({@link reachesFreeCarrier3}) asks it for a `drivable` row; the determination step ({@link determinationReach3})
+ * for the `solvable` ones.
+ */
+export function carrierReach3(c: Construction3, ids: readonly Id[]): { id: Id; def: PointDef; params: CarrierParam3[] }[] {
+  const out: { id: Id; def: PointDef; params: CarrierParam3[] }[] = [];
   const seen = new Set<Id>();
   const stack = [...ids];
   while (stack.length > 0) {
@@ -218,10 +232,22 @@ export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boole
     seen.add(id);
     const def = c.points.get(id);
     if (!def) continue;
-    if (carrierParams3(c, id, def).some((p) => p.drivable)) return true;
+    out.push({ id, def, params: carrierParams3(c, id, def) });
     stack.push(...pointParents3(c, def));
   }
-  return false;
+  return out;
+}
+
+/**
+ * #1816 (ADR-3D-432) — THE SOLVABLE PARAMETERS A STATEMENT'S POINTS REACH, for the determination step: every `solvable`
+ * row of {@link carrierReach3}, with the point that owns it. Empty when the reach holds a coord-sym point: its letter is
+ * the FIGURE parameter, which the parameter lane owns (ADR-3D-032; ADR-3D-293 decision 7), so a given that reads it is
+ * never solved here as well.
+ */
+export function determinationReach3(c: Construction3, ids: readonly Id[]): { id: Id; param: CarrierParam3 }[] {
+  const reach = carrierReach3(c, ids);
+  if (reach.some((r) => r.def.kind === 'coord-sym')) return [];
+  return reach.flatMap((r) => r.params.filter((p) => p.solvable).map((param) => ({ id: r.id, param })));
 }
 
 /**
@@ -229,7 +255,7 @@ export function reachesFreeCarrier3(c: Construction3, ids: readonly Id[]): boole
  *
  * Every point whose position carries parameters in the sampled-carrier table above (a segment's `t`, a line's
  * or a plane's offset, a partial point's missing coordinates, …) is placed from a coordinate given by ONE
- * generic step in `resolve3` (`solveCoordDeterminations`), not here. #1561 (ADR-3D-292) had a per-kind case
+ * generic step in `resolve3` (`solveDeterminations`), not here. #1561 (ADR-3D-292) had a per-kind case
  * for segments and axes in this reader; they folded into that step.
  *
  * What stays here is the one point kind the table does not hold: a coord-sym point («B(1, t, 2)»), whose
@@ -269,7 +295,7 @@ export function readCoordGiven(c: Construction3, id: Id, stated: { x: number | n
 /**
  * #1590 (ADR-3D-291) — CAN THE POINT'S OWN STATED DATA STILL ADMIT THIS COORDINATE GIVEN? — for the coord-sym
  * point, the one kind the generic determination does not place. Every other point kind answers this exactly,
- * from the determination's published outcome (`Resolved3.coordDetermined`), not from a second reader.
+ * from the determination's published outcome (`Resolved3.determined`), not from a second reader.
  */
 export function statedDataAdmits(c: Construction3, claim: Claim3): boolean {
   if (claim.type !== 'coords-eq') return true;

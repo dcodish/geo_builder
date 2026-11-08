@@ -40,22 +40,23 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
+import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
-import { carrierParams3 } from './carriers';
+import { absolutePointCount, freeCoordKey, gaugeFramePoint3, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { carrierParams3, determinationReach3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import { claimResidual3, residualHolds3 } from './claims';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
-import { baseRingOf, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
+import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -258,6 +259,8 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   let all = bySeed.get(memoKey);
   if (!all) {
     all = c.solids.map((solid, i) => {
+      // #2490 (ADR-3D-434): a bound solid's dims are its apex's alone — no layout, no similarity of its own
+      if (solid.bound) return boundSolidDims3(solid.kind, `bound-${solid.kind}-${solid.ids.join('')}`, seed, !flatHostOf3(c, solid));
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
       const seat = concave[i];
       const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
@@ -444,6 +447,62 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3, oblique?:
   return [];
 }
 
+/**
+ * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — A BOUND SOLID IS PLACED IN ITS RING'S FRAME.
+ *
+ * A pyramid declared over a base that already exists («קובייה ABCDA'B'C'D'» · «פירמידה ABCDS») owns only its apex: the
+ * base points keep their own definitions. So it has no canonical layout and no gauge of its own — its frame is FITTED
+ * to the ring's resolved positions (the centroid g, the unit normal n by Newell's rule, the in-plane axis e1 along the
+ * ring's first side, e2 = n × e1, and the ring's RMS radius L as its unit), and its dims are the apex's three numbers:
+ * the foot's in-plane offset (u, v) and the height h, all in units of L, so the placement is similarity-covariant and
+ * rides the host's gauge. Each is a free sampled DOF (ADR-052): «הציגו תצורה אחרת» moves the apex, to either side of
+ * the base — the sign of h is a free choice, never a default. A RIGHT kind seats the foot at the ring's circumcentre
+ * (equal lateral edges, the ADR-3D-090 convention every right pyramid follows), so only h is free.
+ *
+ * Over a FLAT host — a stated polygon («ריבוע ABCD» · «פירמידה ABCDS שבסיסה ריבוע») — the two sides are mirror images
+ * of one figure, a gauge rather than a configuration: the apex stands on the side the polygon's floor frame calls up
+ * (`flatHostOf3`, the polygon's own ring normal), as a standalone pyramid's does (FR-SP-4, operator 2026-10-31), and the
+ * polygon never turns over when the pyramid is added. Over a solid's face the sides differ (outside the cube or inside
+ * it), so there the side is sampled.
+ *
+ * The apex is placed after its ring, so adding it can never move the host (stability).
+ */
+export function flatHostOf3(c: Pick<Construction3, 'solids'>, solid: SolidObj): SolidObj | undefined {
+  return c.solids.find((o) => o !== solid && FLAT_SOLID_KINDS.has(o.kind) && (solid.bound ?? []).every((id) => o.ids.includes(id)));
+}
+export function boundSolidDims3(kind: SolidKind, key: string, seed: number, sideFree = true): number[] {
+  const side = !sideFree || sample(seed, `${key}-side`, -1, 1) >= 0 ? 1 : -1;
+  const h = side * sample(seed, `${key}-h`, 0.8, 1.6);
+  if (boundSolidDimCount3(kind) === 1) return [h];
+  return [sample(seed, `${key}-u`, -0.35, 0.35), sample(seed, `${key}-v`, -0.35, 0.35), h];
+}
+/** The apex of bound solid `solid` from its dims, or null while its ring is unplaced or degenerate (honest: unplaced). */
+export function boundApexPosition3(solid: SolidObj, dims: readonly number[], pos: Positions3, host?: SolidObj): Vec3 | null {
+  const ring = (solid.bound ?? []).map((id) => pos.get(id));
+  if (ring.length < 3 || ring.some((p) => !p)) return null;
+  const pts = ring as Vec3[];
+  const nn = newellNormal(pts);
+  if (norm3(nn) < 1e-12) return null; // a collinear ring has no plane — no pyramid stands on it
+  // over a flat host, h > 0 is the side its floor frame calls up (the host ring's own normal)
+  const hostPts = host?.ids.map((id) => pos.get(id));
+  const up = hostPts && hostPts.every((p) => !!p) ? newellNormal(hostPts as Vec3[]) : null;
+  const n = normalize3(up && dot3(up, nn) < 0 ? scale3(nn, -1) : nn);
+  const g = centroid3(pts);
+  const L = Math.sqrt(pts.reduce((s, p) => s + dot3(sub3(p, g), sub3(p, g)), 0) / pts.length);
+  if (!(L > 1e-12)) return null;
+  if (boundSolidDimCount3(solid.kind) === 1) {
+    const foot = ringCircumcentre3(pts) ?? g;
+    return add3(foot, scale3(n, L * dims[0]));
+  }
+  const side = sub3(pts[1], pts[0]);
+  const along = sub3(side, scale3(n, dot3(side, n)));
+  if (norm3(along) < 1e-12) return null;
+  const e1 = normalize3(along);
+  const e2 = cross3(n, e1);
+  const [u, v, h] = dims;
+  return add3(g, scale3(add3(add3(scale3(e1, u), scale3(e2, v)), scale3(n, h)), L));
+}
+
 // ---------------------------------------------------------------------------
 // V2 — the algebraic lane's resolver (docs/20 §6.3, ADR-3D-004)
 // ---------------------------------------------------------------------------
@@ -499,8 +558,10 @@ export interface Resolved3 {
   ratioSymbols: Record<string, number>;
   /** #1615 (ADR-3D-293) — per point with a recorded coordinate given, what the closed-form solve found:
    *  `determined` (placed), `contradicts` (false as stated), `open` (not readable in closed form). Empty
-   *  where the pivot owns the figure. The not-determined verdict reads this, never a second reader. */
-  coordDetermined: ReadonlyMap<Id, CoordDetermined>;
+   *  where the pivot owns the figure. The not-determined verdict reads this, never a second reader.
+   *  #1816 (ADR-3D-432): a rider a stated LENGTH placed reads `determined` too; a length no admissible position
+   *  meets publishes nothing, so its claim keeps the verdict it always had. */
+  determined: ReadonlyMap<Id, Determined3>;
   /**
    * #1474 (ADR-3D-283) — the seed this configuration was resolved at: its GAUGE key. A consumer that
    * asks "is this value the same in the figure's OTHER configurations?" re-resolves at this seed with
@@ -1261,7 +1322,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     // "consumed" there — refining that is #1415's rank-probe territory, not this count's.
     // #1615 (ADR-3D-293): a point the closed-form solve PLACED had every solvable parameter set exactly by the
     // student's coordinates — consumed, the partial point's included (an exact solve, not a block enrolment).
-    const placed = resolved.coordDetermined.get(id) === 'determined';
+    const placed = resolved.determined.get(id) === 'determined';
     for (const cp of carrierParams3(c, id, def)) {
       if (placed && cp.solvable) continue;
       const blockEnrolled = def.kind === 'free3' || def.kind === 'partial';
@@ -1590,7 +1651,7 @@ export function orientationStated3(c: Construction3): boolean {
     c.planePins.length > 0 ||
     c.signGivens.length > 0 ||
     c.componentSigns.length > 0 ||
-    c.coordDeterminations.length > 0
+    c.determinations.some((d) => d.kind === 'coords')
   );
 }
 
@@ -1602,9 +1663,18 @@ export function orientationStated3(c: Construction3): boolean {
  * UNSTATED degree of freedom: where the solid sits relative to the absolute object is something the
  * student never said, so it must be sampled (ADR-052 / M4), not frozen at a value that happens to
  * put the canonical origin exactly on a line through the origin.
+ *
+ * #2592 (ADR-3D-435): a FREE plane («מישור π3», `PlaneDef.free`) is not an absolute object. It carries
+ * no absolute data: its three DOFs are sampled by `resolveFreePlane` relative to the figure, so sampling
+ * the figure's six as well samples one relative pose twice. Counting it threw an unplaced solid off the
+ * floor (and drew the axes) the moment a bare plane was declared, and the first membership or ∥/⊥ put
+ * it back: two jumps. It is the free line's rule (never counted) stated for planes. A free plane later
+ * given an equation stops being `free` and counts; one related to a coordinate plane, an axis or an
+ * equation plane counts through that other object, which this predicate reads already.
  */
 export function hasAbsoluteFrameObject(c: Construction3): boolean {
-  if (c.planes.size > 0 || c.pins.length > 0) return true;
+  if (c.pins.length > 0) return true;
+  for (const def of c.planes.values()) if (!def.free) return true;
   for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
   // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
   // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
@@ -2087,23 +2157,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     if (!movedP && !movedL) break;
     evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, undefined, ratioSymbols);
   }
-  // #1615 (ADR-3D-293): a coordinate given on a point that sits on something places it (`solveCoordDeterminations`).
-  // Only where the pivot owns nothing — no solid and no never-positioned point (the pivot's own entry gate):
-  // there the coordinate pin enrolls the rider and the pivot drives it, one driver per figure. It runs after the
-  // free-carrier fixpoint, so no later pass re-seats the point.
+  // #1615 (ADR-3D-293): a coordinate given on a point that sits on something places it, and #1816 (ADR-3D-432) a stated
+  // length on such a point does too (`solveDeterminations`). Only where the pivot owns nothing (`pivotRuns3`, the
+  // pivot's own entry gate): there the given's pin enrolls the rider and the pivot drives it, one driver per figure.
+  // It runs after the free-carrier fixpoint, so no later pass re-seats the point.
   //
   // Every probe AND the final placement are FRESH point passes from the same start — the absolute points only —
   // because a line's or a plane's rider is seated around the centroid of whatever is already placed (its own
   // earlier position included); a solve probed from one state and applied over another would land elsewhere.
-  let coordDetermined: ReadonlyMap<Id, CoordDetermined> = new Map();
-  if (c.coordDeterminations.length > 0 && !(c.solids.length > 0 || hasFreePoint3(c))) {
+  let determined: ReadonlyMap<Id, Determined3> = new Map();
+  if (c.determinations.length > 0 && !pivotRuns3(c)) {
     const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym').map(([id]) => [id, pos.get(id)!] as const);
-    const solved = solveCoordDeterminations(c, (ts) => {
+    const solved = solveDeterminations(c, (ts) => {
       const p2: Positions3 = new Map(absolute);
       evaluateSolidsAndPoints(c, seed, p2, new Map(planes), new Map(lines), undefined, undefined, undefined, undefined, undefined, ts);
       return p2;
     });
-    coordDetermined = solved.outcome;
+    determined = solved.outcome;
     if (solved.ts.size > 0) {
       pos.clear();
       for (const [id, p] of absolute) pos.set(id, p);
@@ -2120,50 +2190,30 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   let paramOut: { value: number; roots: number[]; branches: number[] } | null = param;
   const pinParam = (): void => {
     if (!c.param || c.paramGivens.length === 0) return;
-    const symAt = (id: Id, t: number): Vec3 | undefined => {
-      const d = c.points.get(id);
-      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
+    // #1896 (ADR-3D-433): every given's residual is the verifier's own (`claimResidual3`, one per scalar kind), read
+    // with the coord-sym points at the candidate value and every other point where the figure put it — one scratch
+    // map, rewritten per candidate. The letter a `length-letter` tie names is the very value searched for (#2580).
+    const symPts = [...c.points].filter((e): e is [Id, Extract<PointDef, { kind: 'coord-sym' }>] => e[1].kind === 'coord-sym');
+    const scratch: Positions3 = new Map(pos);
+    const at = (t: number): Positions3 => {
+      for (const [id, d] of symPts) scratch.set(id, v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)));
+      return scratch;
     };
-    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
-      if (cl.type === 'length-eq') {
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.value : NaN;
-      }
-      if (cl.type === 'length-letter') {
-        // #2580 (ADR-3D-384): the tie |ab| = coef·k over the final positions, k being the very value searched for
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.coef * t : NaN;
-      }
-      if (cl.type === 'angle-seg-eq') {
-        const p1 = symAt(cl.a1, t);
-        const q1 = symAt(cl.b1, t);
-        const p2 = symAt(cl.a2, t);
-        const q2 = symAt(cl.b2, t);
-        if (!p1 || !q1 || !p2 || !q2) return NaN;
-        const u = sub3(q1, p1);
-        const w = sub3(q2, p2);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      if (cl.type === 'vertex-angle-eq') {
-        // #1573 (ADR-3D-290): the SIGNED angle between the two rays — the quantity its verifier measures
-        const v = symAt(cl.vertex, t);
-        const p = symAt(cl.p, t);
-        const q = symAt(cl.q, t);
-        if (!v || !p || !q) return NaN;
-        const u = sub3(p, v);
-        const w = sub3(q, v);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : dot3(u, w) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      return NaN;
-    };
-    const fns = c.paramGivens.map(residual);
-    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
-    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
-    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
+    const residualAt = (cl: Claim3, t: number) => claimResidual3(cl, c, at(t), (sym) => (sym === c.param ? t : undefined));
+    const holdsAll = (t: number): boolean => c.paramGivens.every((cl) => residualHolds3(residualAt(cl, t)));
+    // #902 (ADR-3D-219) in this lane too: a STATED value of the parameter is its only candidate, and it must satisfy every
+    // given here, or the set is contradictory (the honest no-roots, blamed on the newest of the statements). This lane
+    // alone ignored it, drawing a root while «k = 3» read green (found in round #2745, judged r2745-1896-stated-k).
+    const stated = symbolValueOf(c, c.param);
+    let roots: number[];
+    if (stated !== undefined) roots = holdsAll(stated) ? [stated] : [];
+    else {
+      const fns = c.paramGivens.map((cl) => (t: number): number => residualAt(cl, t)?.r ?? NaN);
+      // sign-change roots catch crossings; touch-zero catches double roots (a line angle of 90°, a tangency)
+      const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
+      // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
+      roots = snapAndDedupe(candidates).filter(holdsAll);
+    }
     const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
@@ -2246,7 +2296,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     families.length > 0 && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
     // #1311 (ADR-3D-260): a figure with no solid still has DOF to drive when it holds a never-positioned
     // point — the vectors unit's «וקטור AB» is exactly that figure, and a given naming it must move it.
-    (c.solids.length > 0 || hasFreePoint3(c))
+    pivotRuns3(c)
   ) {
     // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
     // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
@@ -3228,7 +3278,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     placementSampled,
     placementSampledParts,
     ratioSymbols: Object.fromEntries(ratioSymbols),
-    coordDetermined,
+    determined,
     seed,
     // #1188 (ADR-3D-386): the post-pivot free-vector pass; step 2 (ADR-3D-390): the system, at the drawn figure
     ...(() => {
@@ -3236,6 +3286,17 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       return { freeVectors: fs3.values, freeSyms: fs3.syms, freeX: fs3.x, freeHolds: fs3.holds };
     })(),
   };
+}
+
+/**
+ * #2490 (ADR-3D-434): the solid whose base lies on the floor — the first solid, except that a flat polygon a BOUND solid
+ * stands on is that solid's base: «ריבוע ABCD» · «פירמידה ABCDS» lies on the floor with its apex above, as a standalone
+ * pyramid does (FR-SP-4), whichever mirror image the pivot chose. A polygon nothing stands on keeps its own frame.
+ */
+function floorSolid3(c: Construction3): SolidObj {
+  const s0 = c.solids[0];
+  if (!FLAT_SOLID_KINDS.has(s0.kind)) return s0;
+  return c.solids.find((s) => s.bound !== undefined && flatHostOf3(c, s) === s0) ?? s0;
 }
 
 /**
@@ -3265,7 +3326,7 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
   if (solved.freeDriven || orientationStated3(c) || c.revolutions.length > 0 || c.circles3.length > 0) return solved;
   const pos = solved.positions;
   const ordered = [...c.points.keys()].map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-  let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(c.solids[0], pos) : null;
+  let frame: { p0: Vec3; e1: Vec3; e2: Vec3; n: Vec3 } | null = c.solids.length > 0 ? solidFloorFrame3(floorSolid3(c), pos) : null;
   for (let i = 1; i < ordered.length && !frame; i += 1) {
     const d1 = sub3(ordered[i], ordered[0]);
     if (norm3(d1) < 1e-9) continue;
@@ -3295,7 +3356,7 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
 /**
  * #1615 (ADR-3D-293) — ONE MECHANISM: A COORDINATE GIVEN PLACES ANY POINT THAT SITS ON SOMETHING.
  *
- * `c.coordDeterminations` holds the STATED components of a coordinate given on a point whose position carries
+ * `c.determinations` (kind `coords`) holds the STATED components of a coordinate given on a point whose position carries
  * SOLVABLE parameters in the sampled-carrier table (`carrierParams3`): a segment's `t`, a line's or a plane's
  * offset, a partial point's missing coordinate, a trapezoid corner's ratio, the bisector distance. Every one of
  * those placements is LINEAR in its parameters, and every one already reads the same override map the pivot
@@ -3312,16 +3373,26 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
  * Only `determined` places the point. A later restatement of an already determined point is a CLAIM about it
  * and is not re-solved. The coordinates are stored, never a parameter value: a line's or a plane's offset is
  * measured from a seat that moves with the seed, so the solve runs per resolution.
+ *
+ * #1816 (ADR-3D-432) — A STATED LENGTH ON SUCH A POINT, THE SAME STEP. «A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1»
+ * was judged against D's random sample and refused «בדקו את החישוב», though D = (1,0,0): a coordinate given fixes
+ * the parameters linearly, a length |ab| = L does not. Determinations are solved in statement order, each with the
+ * earlier ones in force: a length on a point an earlier given placed is a claim about it, and a coordinate given
+ * on a point a length placed is a claim about it. See {@link solveLengthDetermination}.
  */
-export type CoordDetermined = 'determined' | 'contradicts' | 'open';
+export type Determined3 = 'determined' | 'contradicts' | 'open';
 
-function solveCoordDeterminations(
+function solveDeterminations(
   c: Construction3,
   pass: (ts: ReadonlyMap<Id, number>) => Positions3,
-): { ts: Map<Id, number>; outcome: Map<Id, CoordDetermined> } {
+): { ts: Map<Id, number>; outcome: Map<Id, Determined3> } {
   const ts = new Map<Id, number>();
-  const outcome = new Map<Id, CoordDetermined>();
-  for (const det of c.coordDeterminations) {
+  const outcome = new Map<Id, Determined3>();
+  for (const det of c.determinations) {
+    if (det.kind === 'length') {
+      solveLengthDetermination(c, det, ts, outcome, pass);
+      continue;
+    }
     if (outcome.has(det.id)) continue; // a restatement is a claim about the point, checked as one
     const def = c.points.get(det.id);
     if (!def) continue;
@@ -3372,6 +3443,78 @@ function solveCoordDeterminations(
     outcome.set(det.id, 'determined');
   }
   return { ts, outcome };
+}
+
+/**
+ * #1816 (ADR-3D-432) — ONE STATED LENGTH |ab| = L, SOLVED FOR THE ONE FREE PARAMETER IT READS.
+ *
+ * The reach of a and b ({@link determinationReach3}: the points they are built from, transitively) must hold exactly
+ * one solvable parameter the earlier determinations have not set. None: the length is about placed points, a claim.
+ * Two or more: not a 1-DOF solve («D על AB · E על AC · DE = 2»), left to the claim as before.
+ *
+ * Every solvable placement is linear in its parameter, and so is every point built from it by an affine rule, so the
+ * vector a − b is AFFINE in t and |a − b|² = L² is a QUADRATIC: probed through the real point pass at t = 0, 1, 2 (the
+ * third probe proves the affinity; a point built non-affinely — a crossing of two lines through the rider — is left to
+ * the claim), solved in closed form. A root must lie strictly inside the parameter's own range (`lo`/`hi`): a rider
+ * on a segment never coincides with an endpoint, the same rule the coordinate solve keeps.
+ *
+ * Two admissible roots are two configurations (D on AB at the given distance from a point off it): the one NEAREST the
+ * parameter's own sample is drawn, so the choice varies with the seed and «הציגו תצורה אחרת» reaches the other, as it
+ * does for every unstated choice (ADR-052) and as the pivot's minimal-displacement solve picks on a solid.
+ *
+ * Only a placement is published (`determined`, on the point that owns the parameter). A length no admissible position
+ * meets publishes nothing: the point keeps its sample, its claim keeps the verdict it always had (`claim-refuted`), and
+ * a later coordinate given on the point is still solved.
+ */
+function solveLengthDetermination(
+  c: Construction3,
+  det: Extract<Determination3, { kind: 'length' }>,
+  ts: Map<Id, number>,
+  outcome: Map<Id, Determined3>,
+  pass: (ts: ReadonlyMap<Id, number>) => Positions3,
+): void {
+  const open = determinationReach3(c, [det.a, det.b]).filter((r) => !ts.has(r.param.key));
+  if (open.length !== 1) return;
+  const [{ id: owner, param }] = open;
+  const probe = (t?: number): Positions3 => {
+    const m = new Map(ts);
+    if (t !== undefined) m.set(param.key, t);
+    return pass(m);
+  };
+  const at = [probe(0), probe(1), probe(2)];
+  const w = at.map((p) => {
+    const a = p.get(det.a);
+    const b = p.get(det.b);
+    return a && b ? sub3(a, b) : undefined;
+  });
+  if (w.some((x) => !x)) return;
+  const [w0, w1, w2] = w as Vec3[];
+  const d = sub3(w1, w0);
+  const scale = Math.max(1, norm3(w0), norm3(d), det.value);
+  if (norm3(sub3(sub3(w2, w1), d)) > 1e-9 * scale) return; // not affine in t: not this closed form
+  const qa = dot3(d, d);
+  if (qa <= 1e-18 * scale * scale) return; // the length does not move with the parameter: a claim
+  const qb = 2 * dot3(w0, d);
+  const qc = dot3(w0, w0) - det.value * det.value;
+  const disc = qb * qb - 4 * qa * qc;
+  const tol = 1e-12 * (qb * qb + Math.abs(4 * qa * qc)) + 1e-300;
+  if (disc < -tol) return;
+  // the numerically stable pair (no cancellation between −b and √disc); a touching root counts once
+  const sq = Math.sqrt(Math.max(0, disc));
+  const q = -0.5 * (qb + (qb >= 0 ? sq : -sq));
+  const roots = disc <= tol ? [-qb / (2 * qa)] : [q / qa, qc / q];
+  const EPS = 1e-9;
+  const inside = roots.filter((t) => Number.isFinite(t) && t > param.lo + EPS && t < param.hi - EPS).sort((x, y) => x - y);
+  if (inside.length === 0) return;
+  // the parameter's own sample, read off the owner's unforced seat along its affine track
+  const r0 = at[0].get(owner);
+  const r1 = at[1].get(owner);
+  const rs = probe().get(owner);
+  const dr = r0 && r1 ? sub3(r1, r0) : undefined;
+  const ts0 = r0 && rs && dr && dot3(dr, dr) > 0 ? dot3(sub3(rs, r0), dr) / dot3(dr, dr) : 0;
+  const t = inside.reduce((best, x) => (Math.abs(x - ts0) < Math.abs(best - ts0) ? x : best));
+  ts.set(param.key, t);
+  outcome.set(owner, 'determined');
 }
 
 /** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
@@ -3482,11 +3625,35 @@ function evaluateSolidsAndPoints(
   sampledSolidDims?: readonly number[][],
 ): void {
   let dimCursor = 0;
+  /**
+   * #2490 (ADR-3D-434): the BOUND solids whose ring is not all placed by the solid pass (a ring of free or derived
+   * points) — by index, with their dims. Each is placed in the point pass at its apex's turn: the apex was declared
+   * after every ring point, so they precede it there. A ring of solid vertices and coordinates is placed here.
+   */
+  const boundLater = new Map<number, readonly number[]>();
+  /** the ids this solid pass has placed (a stale position from an earlier pass is never a ring's frame) */
+  const solidPlaced = new Set<Id>();
+  const placeBound = (i: number, dims: readonly number[]): void => {
+    const solid = c.solids[i];
+    const at = boundApexPosition3(solid, dims, pos, flatHostOf3(c, solid));
+    if (!at) return; // unplaced, honestly — the derive reads a missing apex
+    for (const id of solid.ids) {
+      if (solid.bound!.includes(id)) continue;
+      pos.set(id, at);
+      solidPlaced.add(id);
+    }
+  };
   c.solids.forEach((solid, i) => {
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
     const own = sampledSolidDims?.[i] ?? solidDimsAll3(c, seed)[i];
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
+    if (solid.bound) {
+      const ringPlaced = solid.bound.every((id) => solidPlaced.has(id) || (c.points.get(id)?.kind === 'coord' && pos.has(id)));
+      if (ringPlaced) placeBound(i, dims);
+      else boundLater.set(i, dims);
+      return;
+    }
     const nShape = i === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
     let ps = solidPositions(solid.kind, dims.slice(0, nShape), origin, solid.oblique);
     if (i > 0) {
@@ -3498,7 +3665,10 @@ function evaluateSolidsAndPoints(
     }
     // #1918 (ADR-3D-313): a SEATED base takes the generator's ring one place round, so its parallel pair
     // (a trapezoid's) lands on the sides the student stated parallel. Only the base ring moves.
-    solid.ids.forEach((id, j) => pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]));
+    solid.ids.forEach((id, j) => {
+      pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]);
+      solidPlaced.add(id);
+    });
   });
 
   c.revolutions.forEach((rev, i) => {
@@ -3523,7 +3693,16 @@ function evaluateSolidsAndPoints(
   const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void =>
     seatOnPlaneRider(c, seed, pos, planes, id, def, riderTOverride);
   for (const [id, def] of c.points) {
-    if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
+    if (def.kind === 'solid-vertex') {
+      // #2490 (ADR-3D-434): a bound solid over a ring of free or derived points is placed at its apex's turn
+      const later = boundLater.get(def.solid);
+      if (later) {
+        boundLater.delete(def.solid);
+        placeBound(def.solid, later);
+      }
+      continue;
+    }
+    if (def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
       const a = pos.get(def.a);
       const b = pos.get(def.b);
@@ -3882,7 +4061,8 @@ function evaluateSolidsAndPoints(
     const P = solveVecDef(c, vd, pos, chosen);
     if (P) pos.set(id, P);
   }
-
+  // #2490 (ADR-3D-434): a bound solid whose ring finished only in the deferred pass
+  for (const [i, dims] of boundLater) placeBound(i, dims);
 }
 
 /** A free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame centred on the

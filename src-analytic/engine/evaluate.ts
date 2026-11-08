@@ -747,24 +747,28 @@ function commonTangentAt(c: Construction, env: Env, at: (id: Id) => Pt | null, o
 export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null): (id: Id) => NumCurve | null {
   return (id) => {
     const o = objectById(c, id);
-    if (!o) return null;
-    if (o.kind === 'circle-at') {
-      const centre = at?.(o.centre);
-      const r = evalExpr(o.r, env);
-      if (!centre || !Number.isFinite(r) || r <= 0) return null;
-      return { kind: 'circle', cx: centre.x, cy: centre.y, r };
-    }
-    // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
-    // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
-    if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
-    // A common tangent of two circles (#2390, ADR-AG-314): closed form from the two circles of this configuration.
-    if (o.kind === 'common-tangent') return at ? commonTangentAt(c, env, at, o) : null;
-    // A circle computed from points (#1464): a curve to every constraint and crossing that names one.
-    if (o.kind === 'circle-thru') return at ? circleThruCurve(o, at) : null;
-    if (o.kind !== 'curve') return null;
-    const res = resolveCurve(o.curve, env);
-    return res.ok ? res.curve : null;
+    return o ? numCurveOf(c, env, o, at) : null;
   };
+}
+
+/** One object as a curve in this configuration — `curveAtOf`'s body, for a caller that already holds the object. */
+function numCurveOf(c: Construction, env: Env, o: GeoObject, at?: (id: Id) => Pt | null): NumCurve | null {
+  if (o.kind === 'circle-at') {
+    const centre = at?.(o.centre);
+    const r = evalExpr(o.r, env);
+    if (!centre || !Number.isFinite(r) || r <= 0) return null;
+    return { kind: 'circle', cx: centre.x, cy: centre.y, r };
+  }
+  // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
+  // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
+  if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
+  // A common tangent of two circles (#2390, ADR-AG-314): closed form from the two circles of this configuration.
+  if (o.kind === 'common-tangent') return at ? commonTangentAt(c, env, at, o) : null;
+  // A circle computed from points (#1464): a curve to every constraint and crossing that names one.
+  if (o.kind === 'circle-thru') return at ? circleThruCurve(o, at) : null;
+  if (o.kind !== 'curve') return null;
+  const res = resolveCurve(o.curve, env);
+  return res.ok ? res.curve : null;
 }
 
 /**
@@ -1166,9 +1170,25 @@ export function curvesCoincide(p: NumCurve, q: NumCurve, at: Map<Id, Pt>, apart:
  *
  * One function for the judge and for the solve's separation restart (#1463), so the solve moves a
  * point exactly when the judge would have rejected it.
+ *
+ * **Never below the solver's resolution of the figure's extent with its curves** (#2732, ADR-AG-427): a hundredth of the
+ * points' spread shrinks with the points, so a crossing pair collapsed onto one root (the figure's only points) judged
+ * itself apart. The floor is measured on {@link spanOf}, which the curves keep from collapsing. "Where seeing stops"
+ * stays on the points: a hundredth of the curve-wide extent refused a stated arc of 2/3° («גזרה AOB · קשת AB = 2/3»,
+ * |AB| 0.040 on a circle of radius 3.46), which 2-D builds.
  */
-function apartOf(at: Map<Id, Pt>): number {
-  return spanOf(at) * VISIBLE_FRACTION;
+function apartOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
+  return apartWithin(at, spanOf(c, at, env));
+}
+
+/**
+ * `apartOf` with the figure's extent already measured (`failingSelectors` measures it once per configuration): a hundredth of
+ * the POINTS' spread, where seeing stops (#1077), never less than the solver's resolution of the figure's extent WITH ITS
+ * CURVES (#2732, ADR-AG-427). The floor is R60's "two positions the solver cannot tell apart are one position"
+ * (ADR-AG-136's `SOLVE_RESOLUTION`), and the curves keep it from vanishing when the judged points collapse together.
+ */
+function apartWithin(at: Map<Id, Pt>, extent: number): number {
+  return Math.max(pointSpread(at) * VISIBLE_FRACTION, extent * SOLVE_RESOLUTION);
 }
 
 /**
@@ -1202,8 +1222,56 @@ export function stackedPairs(f: Figure): Array<[Id, Id]> {
   return out;
 }
 
-/** The figure's extent — the larger coordinate spread of its points (1 with fewer than two). */
-function spanOf(at: Map<Id, Pt>): number {
+/**
+ * THE FIGURE'S EXTENT, the resolution ruler of every validity judgement of a configuration (#2732,
+ * [ADR-AG-427](../../docs/06c-decisions-analytic.md#adr-ag-427)): the larger coordinate spread of the solved points
+ * TOGETHER WITH every resolved curve. A circle or an ellipse adds its box (`curveExtent`), a canonical parabola its
+ * vertex and focus, a straight nothing (it has no extent). 1 when fewer than two positions are read.
+ *
+ * It was the points' spread alone, and a ruler taken from the judged points shrinks with them. On a bare ellipse whose
+ * only points are the two crossings A and B, a configuration with both on one root spread 1e-11, so "apart" let A and B
+ * 2e-10 apart pass `crossing-distinct`, and «A מעל B» held by 1e-10: the collapsed configuration was admitted to the
+ * knowledge pool and «A» answered «(-1, -3/2) או [(-1, 3/2)]». A circle's centre kept the old ruler honest only because
+ * the centre is a point. The curves are drawn, and they do not shrink when the points collapse. No origin term (unlike
+ * `viewBox`), so the ruler stays translation-invariant. Its readers: the floor of `apartOf` (the solver's resolution of
+ * it), the strict-side bands of `failingSelectors` (`sideOfBound`, the same resolution), and the deflation's push.
+ */
+export function spanOf(c: Construction, at: Map<Id, Pt>, env: Env): number {
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  let n = 0;
+  const add = (x: number, y: number) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+    n += 1;
+  };
+  for (const p of at.values()) add(p.x, p.y);
+  const atFn = (id: Id) => at.get(id) ?? null;
+  for (const o of c.objects) {
+    if (o.kind !== 'curve' && o.kind !== 'circle-at' && o.kind !== 'circle-thru') continue;
+    const k = numCurveOf(c, env, o, atFn);
+    if (!k || k.kind === 'line') continue;
+    if (k.kind === 'parabola') {
+      add(0, 0);
+      add(k.p / 2, 0);
+      continue;
+    }
+    const e = curveExtent(k);
+    if (e) {
+      add(e.minX, e.minY);
+      add(e.maxX, e.maxY);
+    }
+  }
+  return n < 2 ? 1 : Math.max(1e-9, x1 - x0, y1 - y0);
+}
+
+/** The points' spread alone (1 with fewer than two): what {@link figureScale} measures the solver's resolution by. */
+function pointSpread(at: Map<Id, Pt>): number {
   const xs = [...at.values()];
   return xs.length < 2 ? 1 : Math.max(
     1e-9,
@@ -1240,9 +1308,15 @@ export function openBoundFloor(at: Map<Id, Pt>, env: Env, syms: readonly string[
  * inside its domain): a descent that shrank the whole figure by more than the solver's resolution relative
  * to where it began has reached the bound, not a configuration. It states no magnitude (ADR-052) — the
  * sample's own extent is the reference — and a figure whose givens keep its size never comes near it.
+ *
+ * **The points, not the curves** (#2732, ADR-AG-427): unlike {@link spanOf}, the validity judges' resolution ruler, this
+ * is the open-bound floor and the whole-figure collapse check above. Points that all collapse onto one place on a FIXED curve are
+ * still a collapse it must see (two named points on one position is what #1113 forbids), and a curve whose size is
+ * free already enters as its parameters. Measured while ADR-AG-427 was built: reading the curves here as well changed no
+ * verdict and no drawing of the 4,874 corpus sequences at seed 0.
  */
 export function figureScale(at: Map<Id, Pt>, env: Env, syms: readonly string[]): number {
-  let scale = spanOf(at);
+  let scale = pointSpread(at);
   for (const sym of syms) {
     const v = Math.abs(env[sym]);
     if (Number.isFinite(v) && v > scale) scale = v;
@@ -1301,7 +1375,7 @@ export function crossingHasNoPoint(c: Construction, at: Map<Id, Pt>, env: Env, i
   const curveAt = curveAtOf(c, env, atFn);
   const p = straightCarrierOf(pair[0], atFn, curveAt);
   const q = straightCarrierOf(pair[1], atFn, curveAt);
-  return !!p && !!q && curvesCoincide(p, q, at, apartOf(at));
+  return !!p && !!q && curvesCoincide(p, q, at, apartOf(c, at, env));
 }
 
 /**
@@ -1345,7 +1419,7 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
  * "On both carriers" is the two incidences' own residuals within `SATISFIED_EPS` with the earlier point in the
  * crossing's place — the judge's own reading of an incidence. The proviso is ADR-AG-263's test: `orderedCrossings` on
  * the pair, at least two roots, not touching, and at least one root on the drawn piece of a bounded crossing that no
- * earlier point sits on (within `apartOf`).
+ * earlier point and no sibling sits on (within `apartOf`; the sibling since #2733, ADR-AG-428).
  * A tangency (#1924), a chord whose roots are all named (#1893, #1909), a pair of straights (one root, #1254) and an
  * ordinal crossing (`crossing-nth`, which owns its root) are therefore untouched.
  */
@@ -1379,7 +1453,7 @@ function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): I
   if (earlier.length === 0) return sibs;
   const o = orderedCrossings(pair, atFn, curveAt);
   if (!o || o.touching || o.roots.length < 2) return sibs;
-  const apart = apartOf(at);
+  const apart = apartOf(c, at, env);
   // A root outside the drawn piece of a bounded crossing («הקטע AP») is not a root of the sentence (ADR-AG-263's own filter).
   const bounds = pair.filter(
     (k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && k.crossing === true,
@@ -1390,7 +1464,16 @@ function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): I
       const pb = atFn(k.b);
       return !pa || !pb || withinSegment(pa, pb, r);
     });
-  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart));
+  /*
+   * #2733 (ADR-AG-428; ADR-W-177, operator 2026-11-02 "accept with message", and on #2733 2026-11-07): a root is FREE for
+   * this crossing only while neither an earlier point nor one of its SIBLINGS holds it, here. «P(-4,0) · הישר x=-4 חותך
+   * את המעגל בנקודות K ו-L»: P holds (-4,0), and once K holds (-4,6) the pair has no root left for L, so L's sentence
+   * forces it onto P — L's partners are its sibling K alone, and L lands on P with the notice. K, whose root (-4,6) is
+   * still free, keeps P as a partner. Counted per root, so it is exact for any number of roots; a single crossing on P
+   * (ADR-AG-350, no sibling) and a pair whose every root an earlier point holds are unchanged.
+   */
+  const holds = (q: Id, r: Pt) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart;
+  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => holds(q, r)) && !sibs.some((q) => holds(q, r)));
   return free ? [...sibs, ...earlier] : sibs;
 }
 
@@ -1626,7 +1709,9 @@ function lineTriple(d: Direction, at: (id: Id) => Pt | null, curveAt: (id: Id) =
 }
 
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
-  const apart = apartOf(at);
+  // The ruler, once per judged configuration (#2732, ADR-AG-427): the points and the curves.
+  const span = spanOf(c, at, env);
+  const apart = apartWithin(at, span);
 
   const holds = (s: Selector): boolean => {
     // A region choice that reaches here unresolved (#1708) holds when one of its options does — the constraint
@@ -1775,7 +1860,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (!t) return true; // a line not placed yet judges nothing, as below
       const across = s.axis === 'y' ? t.b : t.a;
       if (Math.abs(across) <= SOLVE_RESOLUTION * Math.hypot(t.a, t.b)) return false;
-      return sideOfBound(-t.c / across, 0, spanOf(at)) === (s.greater ? 1 : -1);
+      return sideOfBound(-t.c / across, 0, span) === (s.greater ? 1 : -1);
     }
     /**
      * WHICH AXIS IS THE ELLIPSE'S MAJOR ONE (#2616/#2619, ADR-AG-353/354) — the RESOLVED semi-axes, never the signed
@@ -1843,7 +1928,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (!line) return true; // an operand not placed (or no line) judges nothing, as above
       const bound = lineBoundAt(s, line, p);
       if (bound === null) return false;
-      return sideOfBound(s.axis === 'x' ? p.x : p.y, bound, spanOf(at)) === (s.greater ? 1 : -1);
+      return sideOfBound(s.axis === 'x' ? p.x : p.y, bound, span) === (s.greater ? 1 : -1);
     }
     const cmp = compareOf(s);
     if (cmp) {
@@ -1852,7 +1937,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
       // Strict, at the figure's resolution (#2230): a coordinate ON its bound is on neither side — and a CLOSED one
       // (≤ / ≥, #1138) holds there.
-      const side = sideOfBound(lhs, rhs, spanOf(at));
+      const side = sideOfBound(lhs, rhs, span);
       return side === (cmp.greater ? 1 : -1) || (cmp.closed === true && side === 0);
     }
     /** ON THE BISECTOR'S OWN RAY (#1284, ADR-AG-209) — the angle's side of the perpendicular at its vertex. */
@@ -1901,7 +1986,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
  * would reject it.
  */
 function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: ReadonlySet<Id>): Array<{ mover: Id; partner: Id }> {
-  const apart = apartOf(at);
+  const apart = apartOf(c, at, env);
   const pairs: Array<[Id, Id]> = [];
   for (const s of c.selectors) {
     if (s.kind === 'distinct') {
@@ -1914,10 +1999,21 @@ function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: Readon
   }
   const out: Array<{ mover: Id; partner: Id }> = [];
   const moving = new Set<Id>();
+  /*
+   * ONE MOVER PER PAIR (#2733, ADR-AG-428). Two crossings of one pair list EACH OTHER (`crossingPartners`), so the pair
+   * arrives twice, [L, K] and [K, L]; taking a mover from each moved both, and `deflatedStarts` nudges every mover the
+   * same way, so the two never parted (the distance the deflation divides by stayed 0). Measured on «x^2/25+y^2/9=1 ·
+   * P(4,9/5) · הישר x=4 חותך את האליפסה בנקודות K ו-L»: K and L stayed on one root at every seed. `chordStarts` already
+   * takes one member per pair for the same reason.
+   */
+  const seen = new Set<string>();
   for (const [a, b] of pairs) {
     const pa = at.get(a);
     const pb = at.get(b);
     if (!pa || !pb || Math.hypot(pa.x - pb.x, pa.y - pb.y) >= apart) continue;
+    const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const mover = free.has(b) && !moving.has(b) ? b : free.has(a) && !moving.has(a) ? a : null;
     if (mover === null) continue;
     moving.add(mover);
@@ -1946,6 +2042,7 @@ function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: Readon
  */
 const DEFLATION_NUDGE = 0.05;
 function deflatedStarts(
+  c: Construction,
   system: CarrierSystem,
   x: number[],
   pairs: ReadonlyArray<{ mover: Id; partner: Id }>,
@@ -1953,7 +2050,7 @@ function deflatedStarts(
 ): number[][] {
   if (pairs.length === 0) return [];
   const pos = system.positionsAt(x);
-  const s = apartOf(pos) * 1e2;
+  const s = spanOf(c, pos, system.envAt(x));
   const deflated = (v: number[]): number[] => {
     const r = system.residualsAt(v);
     const p = system.positionsAt(v);
@@ -2618,7 +2715,7 @@ export function legibleAt(c: Construction, at: (id: Id) => Pt | undefined, exten
 }
 /** `legibleAt` over a position map, its extent the map's own. */
 function legiblePositions(c: Construction, pos: Map<Id, Pt>): boolean {
-  return legibleAt(c, (id) => pos.get(id), spanOf(pos));
+  return legibleAt(c, (id) => pos.get(id), pointSpread(pos));
 }
 
 /**
@@ -2979,7 +3076,7 @@ function fitLineByLine(c: Construction, env: Env, seeded: Map<Id, Pt>, hashed: R
         const p = pos.get(k.id);
         if (pa && pb && p && !withinSegment(pa, pb, p)) return false;
       }
-      const near = 2 * apartOf(pos);
+      const near = 2 * apartOf(c, pos, env);
       for (const v of stacked ? [] : g.ids) {
         const p = pos.get(v);
         if (p && [...pos].some(([id, q]) => id !== v && Math.hypot(q.x - p.x, q.y - p.y) < near)) return false;
@@ -4181,7 +4278,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const pos = place(c, env, seeded);
       const atSeed = (id: Id) => pos.get(id) ?? null;
       const curveAt = curveAtOf(c, env, atSeed);
-      const apart = apartOf(pos);
+      const apart = apartOf(c, pos, env);
       for (const [id, pair] of pairs) {
         const o = orderedCrossings(pair, atSeed, curveAt);
         if (!o || o.touching || o.roots.length < 2) continue;
@@ -4303,7 +4400,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
     ...chordStarts(system, x),
-    ...deflatedStarts(system, x, collapsedPairs(c, system.positionsAt(x), system.envAt(x), ownFree), 120),
+    ...deflatedStarts(c, system, x, collapsedPairs(c, system.positionsAt(x), system.envAt(x), ownFree), 120),
   ];
   /**
    * THE OTHER ROOT OF A STRAIGHT AND A CIRCLE, IN CLOSED FORM (#1619 B1, ADR-AG-193).

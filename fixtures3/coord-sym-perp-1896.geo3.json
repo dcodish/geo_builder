@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-08T06:35:43.880Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B(k-1,k,3)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": null,
+          "y": null,
+          "z": 3,
+          "syms": [
+            "k",
+            "k",
+            null
+          ],
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -1
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 0
+            },
+            null
+          ],
+          "srcs": [
+            "k-1",
+            "k",
+            "3"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "C(k+1,0,k-3)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "C",
+          "x": null,
+          "y": 0,
+          "z": null,
+          "syms": [
+            "k",
+            null,
+            "k"
+          ],
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 1
+            },
+            null,
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -3
+            }
+          ],
+          "srcs": [
+            "k+1",
+            "0",
+            "k-3"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB ⊥ AC",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "A",
+            "to": "B"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "A",
+            "to": "C"
+          },
+          "cos": 0
+        }
+      ]
+    }
+  ]
+}
