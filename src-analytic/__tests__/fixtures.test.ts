@@ -24,7 +24,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { activeOf } from '../app/active';
+import { activeOf, activePins, rowOf } from '../app/active';
 import { loadAnalyticSession } from '../app/loadSession';
 import { parseLine } from '../parser/parseAnalytic';
 import { useAnalyticStore } from '../store/useAnalyticStore';
@@ -35,6 +35,8 @@ interface Envelope {
   seed?: number;
   name?: string;
   disabled?: number[];
+  /** #1973 (ADR-AG-430): per row, the ring a cevian line was accepted in. */
+  hosts?: Record<string, string[]>;
 }
 
 const DIR = path.join(__dirname, 'fixtures');
@@ -87,6 +89,18 @@ describe('analytic saved-session fixtures net (#2654, ADR-W-172)', () => {
         const d = derive(active, seed);
         expect(d.faults.map((f) => `${f.code}: ${active[f.index] ?? f.index}`)).toEqual([]);
       });
+
+      // #1973 (ADR-AG-430): a line saved with the host its cevian was accepted in still resolves in that shape
+      if (env.hosts) {
+        const hosts = env.hosts;
+        it('every recorded cevian host is the shape its line resolves in', () => {
+          const rows = rowOf(lines.length, env.disabled ?? []);
+          const d = derive(active, seed, {}, activePins(hosts as Record<number, string[]>, lines.length, env.disabled ?? []));
+          for (const [row, ring] of Object.entries(hosts)) {
+            expect(d.hosts.find((h) => rows[h.index] === Number(row))?.host.ring, `row ${row}: «${lines[Number(row)]}»`).toEqual(ring);
+          }
+        });
+      }
     });
   }
 });

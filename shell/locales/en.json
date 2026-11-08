@@ -51,6 +51,24 @@
       "createdCircle": "New circle centred at {{centre}} was created — if this is a typo, press ✕ to undo the line.",
       "createdCircleUnnamed": "A new circle was created — if this is a typo, press ✕ to undo the line.",
       "createdUndo": "Undo the line"
+    },
+    "host": {
+      "triangle": "in triangle {{ring}}",
+      "quadrilateral": "in quadrilateral {{ring}}",
+      "parallelogram": "in parallelogram {{ring}}",
+      "rectangle": "in rectangle {{ring}}",
+      "square": "in square {{ring}}",
+      "rhombus": "in rhombus {{ring}}",
+      "trapezoid": "in trapezoid {{ring}}",
+      "kite": "in kite {{ring}}",
+      "n5": "in pentagon {{ring}}",
+      "n6": "in hexagon {{ring}}",
+      "n7": "in heptagon {{ring}}",
+      "n8": "in octagon {{ring}}",
+      "n9": "in nonagon {{ring}}",
+      "n10": "in decagon {{ring}}",
+      "polygon": "in polygon {{ring}}",
+      "title": "The shape this segment was drawn in, fixed when the line was accepted"
     }
   }
 }

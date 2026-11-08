@@ -55,6 +55,7 @@ import { otherUtteranceForError } from './errorSubject';
 import { renderNote } from './renderNote';
 import { studentVocabulary } from './studentVocabulary';
 import { splitSentences, submitSentences, type SentenceOutcome } from '../../shell/sentences';
+import type { CevianHost } from '../../shell/cevianHost';
 
 export interface SubmitUi {
   setInputNote(msg: string): void;
@@ -120,7 +121,8 @@ export interface SubmitDeps {
  */
 export function commitVerdict(verdict: Verdict2D, utterance: string): CreatedNotice2D | null {
   const st = useGeoStore.getState();
-  if (verdict.kind === 'commit') return commitLine([...nameByUseCommands(verdict.binds), ...verdict.commands], verdict.commands, utterance);
+  // #1973 (ADR-797): the shape the line's cevian was resolved in rides on its facts, stamped at accept time
+  if (verdict.kind === 'commit') return commitLine([...nameByUseCommands(verdict.binds), ...verdict.commands], verdict.commands, utterance, verdict.host);
   if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
   return null;
 }
@@ -130,10 +132,10 @@ export function commitVerdict(verdict: Verdict2D, utterance: string): CreatedNot
  * deterministic verdict above and the LLM's decomposition) come through here, so the notice cannot be wired to one.
  * `statements` is the line's own commands, without its naming by use.
  */
-function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utterance: string): CreatedNotice2D | null {
+function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utterance: string, host?: CevianHost): CreatedNotice2D | null {
   const st = useGeoStore.getState();
   const before = replay(st.facts, st.seed).construction;
-  st.executeMany(batch, utterance);
+  st.executeMany(batch, utterance, host);
   const now = useGeoStore.getState();
   const last = now.facts[now.facts.length - 1];
   if (!last || now.facts.length === st.facts.length) return null;

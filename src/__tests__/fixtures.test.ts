@@ -164,6 +164,10 @@ describe('figure-file fixtures net', () => {
           // cycled «הציגו תצורה אחרת» choice reads as drift. The canonical forms are compared first for a readable diff.
           expect(canonicalStepCommands(prefix, stated), `"${step.utterance}" lowers differently than when saved`).toEqual(canonicalStepCommands(prefix, p.commands));
           expect(lowersAsSaved(prefix, p.commands, stated), `"${step.utterance}" lowers as saved`).toBe(true);
+          // #1973 (ADR-797): a step SAVED with the shape its cevian was resolved in still resolves in that shape. Only
+          // asked of a step that carries one — a file saved before the field records none, and loads as it did.
+          const saved = facts.slice(step.start, steps[i + 1]?.start ?? facts.length).find((f) => f.host)?.host;
+          if (saved) expect(p.host, `"${step.utterance}" is resolved in the shape it was saved with`).toEqual(saved);
         });
       });
     });

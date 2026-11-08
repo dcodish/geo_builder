@@ -20,6 +20,7 @@ import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { hostTag } from '../shell/cevianHost';
 import { InputArea } from '../shell/frame/InputArea';
 import { QuickChips } from '../shell/frame/QuickChips';
 import { ToolButton } from '../shell/frame/ToolButton';
@@ -34,9 +35,9 @@ import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
+import { commitRecord, decideEditHost, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
 import { submitTyped, type SentenceOutcome } from '../shell/sentences';
-import { activeOf, rowOf } from './app/active';
+import { activeOf, activePins, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
 import { nameRetryEvent } from '../shell/llm/retryLostNames';
@@ -170,6 +171,7 @@ export function App() {
     recordLine,
     recordLlmLines,
     spokenFor,
+    hosts,
     disabled,
     setDisabled,
     applyRename,
@@ -611,13 +613,15 @@ export function App() {
    */
   const active = useMemo(() => activeOf(lines, disabled), [lines, disabled]);
   const rows = useMemo(() => rowOf(lines.length, disabled), [lines.length, disabled]);
+  /** #1973 (ADR-AG-430): the hosts each cevian line was accepted in, on the active projection — `derive`'s pins. */
+  const pins = useMemo(() => activePins(hosts, lines.length, disabled), [hosts, lines.length, disabled]);
   const d = useMemo(() => {
-    const out = derive(active, seed, seedNames);
+    const out = derive(active, seed, seedNames, pins);
     // #1473 (ADR-AG-180, operator ruling B′): the page's knowledge gates judge only what is already
     // evaluated and answer «בודק…» for the rest; the pool completes AFTER the render (effect below).
     configurationPool(out.construction).defer();
     return out;
-  }, [active, seed, seedNames]);
+  }, [active, seed, seedNames, pins]);
   /**
    * #1177 (ADR-AG-352) — THE LOCUS CHIPS: one per point that has a locus, on the row that introduced it. The predicate
    * is the engine's `hasLocus` (app/locusChip.ts), never re-derived here; a click is the measure menu's `toggleAsk`.
@@ -903,9 +907,9 @@ export function App() {
    */
   const submitSentence = async (raw: string): Promise<SentenceOutcome> => {
     const live = useAnalyticStore.getState();
-    const same = live.lines === lines && live.disabled === disabled && live.seed === seed && live.seedNames === seedNames;
+    const same = live.lines === lines && live.disabled === disabled && live.seed === seed && live.seedNames === seedNames && live.hosts === hosts;
     const act = same ? active : activeOf(live.lines, live.disabled);
-    const cur = same ? d : derive(act, live.seed, live.seedNames);
+    const cur = same ? d : derive(act, live.seed, live.seedNames, activePins(live.hosts, live.lines.length, live.disabled));
     const verdict = decideSubmit(raw, act, live.seed, cur);
     /**
      * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
@@ -1537,6 +1541,8 @@ export function App() {
                  * bidi neutral) resolved to the paragraph direction and landed at the far end.
                  */
                 text: line,
+                // #1973 (ADR-AG-430): the shape the row's cevian was drawn in, BESIDE the student's words — 2-D's tag (ADR-797)
+                tag: hostTag(d.hosts.find((h) => rows[h.index] === i)?.host, t),
                 // #1864 (ADR-AG-267): the tool's choice for this row's unstated given, said under it (2-D's `role="note"`).
                 ...(unstatedNotes.some((n) => rows[n.line] === i)
                   ? {
@@ -1614,7 +1620,7 @@ export function App() {
                */
               onToggle={(id) => {
                 const i = Number(id);
-                const verdict = decideToggle(i, lines, disabled, seed, d);
+                const verdict = decideToggle(i, lines, disabled, seed, d, hosts);
                 logAnalytic({
                   kind: 'action',
                   action: 'toggle',
@@ -1628,10 +1634,12 @@ export function App() {
               editValueOf={(id) => lines[Number(id)] ?? ''}
               onEditCommit={(id, next) => {
                 const i = Number(id);
-                if (!decideEdit(i, next, lines, disabled, seed, seedNames)) return false;
+                // #1973 (ADR-AG-430): an edit is an accept — the row records the host its new sentence resolved to
+                const edit = decideEditHost(i, next, lines, disabled, seed, seedNames, hosts);
+                if (!edit.ok) return false;
                 // #1300 — an edit rewrites a line in place, so a replay without it diverges silently.
                 logAnalytic({ kind: 'action', action: 'edit', detail: `${i}:${next}` });
-                replaceLine(i, next);
+                replaceLine(i, next, edit.host?.ring);
                 return true;
               }}
               onDelete={(id) => {
@@ -1816,7 +1824,7 @@ export function App() {
                  * operator's own figure, while the DOF cue beside it said the figure still had
                  * freedom. When nothing differs, saying so beats redrawing in silence.
                  */
-                const next = anotherConfiguration(active, seed, undefined, seedNames);
+                const next = anotherConfiguration(active, seed, undefined, seedNames, pins);
                 // #1300: the seed IS the configuration, so a replay that loses this press redraws a
                 // different figure from the one the report is about.
                 logAnalytic({ kind: 'action', action: 'show-another', detail: next.found ? next.seed : 'none' });
@@ -2318,7 +2326,7 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle, annotations };
+          const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
           const letter = pick.letter;
           const onRename = (from: string, to: string): LetterRenameResult => {
             // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
@@ -2422,7 +2430,7 @@ export function App() {
         taken letter quotes its holder and offers the swap, like every LetterPopover.
       */}
       {centrePick && (() => {
-        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle, annotations };
+        const state = { lines, disabled, queries, spokenFor, hosts, seed, seedNames, segStyle, curveStyle, annotations };
         const ops = centrePopoverOps(
           centrePick.offerId,
           state,

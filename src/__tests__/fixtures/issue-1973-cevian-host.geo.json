@@ -1,0 +1,80 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-08T08:00:00.000Z",
+  "name": "issue-1973-cevian-host",
+  "seed": 18,
+  "facts": [
+    {
+      "id": "f0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "f1",
+      "utterance": "AE גובה",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "E",
+        "from": "A",
+        "a": "B",
+        "b": "C",
+        "named": true
+      },
+      "enabled": true,
+      "host": {
+        "ring": [
+          "A",
+          "B",
+          "C"
+        ],
+        "kind": "triangle"
+      }
+    },
+    {
+      "id": "f2",
+      "utterance": "AE גובה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "E"
+      },
+      "enabled": true,
+      "host": {
+        "ring": [
+          "A",
+          "B",
+          "C"
+        ],
+        "kind": "triangle"
+      }
+    },
+    {
+      "id": "f3",
+      "utterance": "מרובע ABCD",
+      "group": "g2",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

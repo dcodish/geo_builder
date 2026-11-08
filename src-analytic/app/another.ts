@@ -36,7 +36,8 @@ const TRIES = 24;
  * (#1201, #1220), is now stated once and CALLED
  * ([ADR-W-053](../../docs/06w-decisions-workspace.md#adr-w-053)).
  */
-const derivedAt = (lines: readonly string[], seed: Seed, seedNames: Readonly<Record<string, string>>) => derive(lines, seed, seedNames);
+const derivedAt = (lines: readonly string[], seed: Seed, seedNames: Readonly<Record<string, string>>, pins: Readonly<Record<number, readonly string[]>>) =>
+  derive(lines, seed, seedNames, pins);
 
 export interface AnotherConfiguration {
   /**
@@ -54,12 +55,14 @@ export function anotherConfiguration(
   tries = TRIES,
   // #1631: the session's seed names, so the search compares the figures the canvas would actually draw
   seedNames: Readonly<Record<string, string>> = {},
+  // #1973 (ADR-AG-430): the hosts the session's cevian lines were accepted in, on these lines — the figure the canvas draws
+  pins: Readonly<Record<number, readonly string[]>> = {},
 ): AnotherConfiguration {
   const from = seedNumber(seed);
   if (lines.length === 0) return { seed: from + 1, found: true };
   // TOLERANCE-AWARE (#1539, ADR-AG-197): a picture that differs only by the solver's noise — «-0.0000» against
   // «0.0000» above all — is the SAME picture, so the walk moves on to a configuration that really differs.
-  const current = derivedAt(lines, seed, seedNames).figure;
+  const current = derivedAt(lines, seed, seedNames, pins).figure;
   /**
    * THE SAME SAMPLE IS THE SAME CONFIGURATION (#2633, ADR-AG-358 — the operator on #1166: *"we need to give the user
    * different options and not similar options"*). A candidate that draws the sample already on the screen in the other box
@@ -67,7 +70,7 @@ export function anotherConfiguration(
    */
   const shownSample = drawnSampleOf(current);
   for (let step = 1; step <= tries; step += 1) {
-    const next = derivedAt(lines, from + step, seedNames);
+    const next = derivedAt(lines, from + step, seedNames, pins);
     if (shownSample !== undefined && drawnSampleOf(next.figure) === shownSample) continue;
     /*
      * …AND THE SAME PICTURE IS NOT ANOTHER ONE (ADR-W-175 sr-30, ADR-AG-379): a candidate that differs from the drawing on

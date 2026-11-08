@@ -14,6 +14,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { useAnalyticStore } from '../store/useAnalyticStore';
+import { commitRecord, decideEditHost, decideSubmit, decideToggle } from '../app/submit';
+import { activeOf, activePins } from '../app/active';
+import { analyticI18n } from '../i18n';
+import { hostTag } from '../../shell/cevianHost';
+import { CEVIAN_HOST_TAG } from '../../shell/__tests__/fixtures/geo-input-parity';
 
 const store = () => useAnalyticStore.getState();
 const temporal = () => useAnalyticStore.temporal.getState();
@@ -119,5 +124,79 @@ describe('#1098 — what the history does NOT record', () => {
     store().setError({ key: 'not-handled', detail: 'בלה' });
     store().undo();
     expect(store().error).toBeNull();
+  });
+});
+
+/**
+ * #1973 (ADR-AG-430; 2-D's ADR-797) — THE HOST A CEVIAN LINE WAS ACCEPTED IN IS PART OF THE STEP. The submit decision
+ * records it with the line (`commitRecord`), `derive` honours it (`pins`), and it follows its line through undo, a delete,
+ * an edit and a mute exactly as the line does. The operator's seven lines, through the real decision and the store.
+ */
+describe('#1973 — the recorded host rides with its line', () => {
+  const OPERATOR = ['A(0,0)', 'B(6,0)', 'C(5,4)', 'D(1,3)', 'משולש ABC', 'AE גובה', 'מרובע ABCD'];
+  const pins = () => activePins(store().hosts, store().lines.length, store().disabled);
+  const current = () => derive(activeOf(store().lines, store().disabled), store().seed, store().seedNames, pins());
+  const submit = (line: string) => {
+    const v = decideSubmit(line, activeOf(store().lines, store().disabled), store().seed, current());
+    if (v.kind === 'record') commitRecord(v, store().recordLine, (k) => k);
+    return v.kind;
+  };
+  const E = () => current().figure.points.find((p) => p.id === 'E');
+
+  it('accepting «AE גובה» records triangle ABC with it; the row shows it, in 2-D’s words', () => {
+    for (const l of OPERATOR) expect(submit(l), l).toBe('record');
+    expect(store().hosts).toEqual({ 5: ['A', 'B', 'C'] });
+    expect(store().lines[5]).toBe('AE גובה'); // the student's own words
+    const host = current().hosts.find((h) => h.index === OPERATOR.indexOf(CEVIAN_HOST_TAG.row))?.host;
+    for (const lng of ['he', 'en'] as const) expect(hostTag(host, (k, o) => analyticI18n.t(k, { ...o, lng }) as string)?.text).toBe(CEVIAN_HOST_TAG[lng]);
+    const e = E()!;
+    expect([e.x, e.y].map((n) => n.toFixed(2))).toEqual(['5.65', '1.41']); // the operator's screenshot
+  });
+
+  it('undo takes it back with its line, redo restores both', () => {
+    for (const l of OPERATOR) submit(l);
+    store().undo();
+    store().undo();
+    expect(store().hosts).toEqual({});
+    store().redo();
+    expect(store().hosts).toEqual({ 5: ['A', 'B', 'C'] });
+  });
+
+  it('a delete above it moves it with its line; deleting the line drops it', () => {
+    for (const l of OPERATOR) submit(l);
+    store().removeLine(3);
+    expect(store().hosts).toEqual({ 4: ['A', 'B', 'C'] });
+    store().removeLine(4);
+    expect(store().hosts).toEqual({});
+  });
+
+  it('an EDIT that brings a second shape above it keeps the height the triangle’s — unpinned, the line would ask', () => {
+    for (const l of OPERATOR) submit(l);
+    const edit = decideEditHost(3, 'מרובע ABCD', store().lines, store().disabled, store().seed, store().seedNames, store().hosts);
+    expect(edit).toEqual({ ok: true });
+    store().replaceLine(3, 'מרובע ABCD', edit.host?.ring);
+    expect(current().faults.filter((f) => f.index === 5)).toEqual([]);
+    expect(current().hosts.find((h) => h.index === 5)?.host.ring).toEqual(['A', 'B', 'C']);
+    expect(derive(store().lines, store().seed).faults.find((f) => f.index === 5)?.code).toBe('ambiguous-cevian');
+  });
+
+  it('an edit of the cevian row records the host its NEW sentence resolves to', () => {
+    for (const l of OPERATOR.slice(0, 5)) submit(l);
+    submit('AE גובה לצלע BC');
+    expect(store().hosts).toEqual({});
+    const edit = decideEditHost(5, 'AE גובה', store().lines, store().disabled, store().seed, store().seedNames, store().hosts);
+    expect(edit).toEqual({ ok: true, host: { ring: ['A', 'B', 'C'], kind: 'triangle' } });
+    store().replaceLine(5, 'AE גובה', edit.host?.ring);
+    expect(store().hosts).toEqual({ 5: ['A', 'B', 'C'] });
+  });
+
+  it('UN-MUTING a second shape above it keeps the height the triangle’s — unpinned, the un-mute was refused', () => {
+    for (const l of OPERATOR.slice(0, 5)) submit(l);
+    submit('מרובע ABCD');
+    store().setDisabled([5]);
+    expect(submit('AE גובה')).toBe('record');
+    expect(store().hosts).toEqual({ 6: ['A', 'B', 'C'] });
+    expect(decideToggle(5, store().lines, store().disabled, store().seed, current(), store().hosts)).toEqual({ kind: 'apply', disabled: [] });
+    expect(decideToggle(5, store().lines, store().disabled, store().seed, current()).kind).toBe('refused'); // no hosts: today's ask
   });
 });

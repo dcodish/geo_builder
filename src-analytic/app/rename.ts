@@ -63,7 +63,7 @@ import type { Fact } from '../engine/types';
 import type { AskedQuestion, InputError } from '../store/useAnalyticStore';
 import type { Construction, Id } from '../engine/types';
 import { positionalOf } from '../engine/types';
-import { activeOf, rowOf } from './active';
+import { activeOf, activePins, rowOf } from './active';
 import type { LetterRenameResult } from '../../shell/frame/letterOffer';
 import { foldIndexedName } from '../../shell/indexedName';
 import type { SegDisplayMap } from '../../shell/frame/segmentDisplay';
@@ -280,6 +280,8 @@ export interface RenameState {
   curveStyle?: SegDisplayMap;
   /** #1863 — the annotation map (keyed by object id); absent = none. */
   annotations?: AnnotationMap;
+  /** #1973 — the recorded cevian hosts (by row); absent = none. */
+  hosts?: Readonly<Record<number, readonly string[]>>;
 }
 
 /**
@@ -303,6 +305,8 @@ export interface RelabelCommit {
   curveStyle: SegDisplayMap;
   /** #1863 (ADR-AG-375) — the annotation map, re-keyed like `curveStyle`: a parabola's chip state survives a letter change. */
   annotations?: AnnotationMap;
+  /** #1973 (ADR-AG-430) — the recorded cevian hosts, their ring letters relabelled: a pinned «AE גובה» stays pinned as «XE גובה». */
+  hosts?: Record<number, string[]>;
 }
 
 /**
@@ -345,9 +349,9 @@ export type SwapVerdict =
   | ({ kind: 'apply'; a: string; b: string } & RelabelCommit)
   | { kind: 'refused'; error: InputError };
 
-/** The derivation a decision compares against: the ACTIVE fold, with the session's seed names. */
+/** The derivation a decision compares against: the ACTIVE fold, with the session's seed names (and #1973 its hosts). */
 const currentOf = (state: RenameState): Derivation =>
-  derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {});
+  derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {}, activePins(state.hosts ?? {}, state.lines.length, state.disabled));
 
 /** The first of the student's lines whose facts name `id`, with its row. */
 function typedHolder(lines: readonly string[], id: string): LetterHolder | null {
@@ -483,7 +487,7 @@ function materialize(state: RenameState, current: Derivation, id: string): strin
     const p = parseLine(cand);
     if (!p.ok || !factsMention(p.facts, id)) continue;
     const lines = state.lines.map((l, i) => (i === row ? cand : l));
-    const after = derive(activeOf(lines, state.disabled), state.seed, state.seedNames ?? {});
+    const after = derive(activeOf(lines, state.disabled), state.seed, state.seedNames ?? {}, activePins(state.hosts ?? {}, lines.length, state.disabled));
     if (constructionShape(after, {}) === want && faultShape(after) === wantFaults) return lines;
   }
   return null;
@@ -524,7 +528,9 @@ function relabelSession(
   // The figure must be the SAME construction, mapped — no tool-chosen name may shift because a letter
   // was freed or taken.
   const seedNames = transposeSeedNames(state.seedNames ?? {}, pair[0], pair[1]);
-  const after = derive(activeOf(out, state.disabled), state.seed, seedNames);
+  // #1973: a host is a ring of point letters — relabelled letter by letter, as a line is, and the figure is compared pinned
+  const hosts = state.hosts ? Object.fromEntries(Object.entries(state.hosts).map(([k, ring]) => [k, ring.map((v) => map[v] ?? v)])) : undefined;
+  const after = derive(activeOf(out, state.disabled), state.seed, seedNames, activePins(hosts ?? {}, out.length, state.disabled));
   if (constructionShape(current, map) !== constructionShape(after, {}) || faultShape(current) !== faultShape(after)) {
     return { ok: false, why: 'unsafe', line: '' };
   }
@@ -539,6 +545,7 @@ function relabelSession(
     curveStyle: relabelCurveStyle(state.curveStyle ?? {}, current, after),
     // #1863: the annotation channel is keyed by object id too — the same re-keying (ADR-AG-375)
     ...(state.annotations ? { annotations: relabelCurveStyle(state.annotations, current, after) } : {}),
+    ...(hosts ? { hosts } : {}),
   };
 }
 
@@ -645,7 +652,7 @@ export interface SwapActions {
   setError: (e: InputError | null) => void;
 }
 
-const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle, curveStyle: v.curveStyle, ...(v.annotations ? { annotations: v.annotations } : {}) });
+const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle, curveStyle: v.curveStyle, ...(v.annotations ? { annotations: v.annotations } : {}), ...(v.hosts ? { hosts: v.hosts } : {}) });
 
 /**
  * DISPATCH A RENAME — decide, then write ONE commit (one undo step) or show the refusal.

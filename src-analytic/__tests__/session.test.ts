@@ -20,6 +20,9 @@ import {
   useAnalyticStore,
 } from '../store/useAnalyticStore';
 import { figureNameFromFileName, readEnvelope, savedFileName } from '../../shell/save';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { loadAnalyticSession } from '../app/loadSession';
 
 const LINES = [
   'נתונה הנקודה A(2,6)',
@@ -114,5 +117,49 @@ describe('#1087 — the suite naming convention (docs/22 §9)', () => {
 
   it('and the name comes back off the filename when the file carried none', () => {
     expect(figureNameFromFileName('בגרות קיץ-analytic.json', 'analytic')).toBe('בגרות קיץ');
+  });
+});
+
+/**
+ * #1973 (ADR-AG-430) — THE RECORDED HOSTS TRAVEL WITH THE LINES: the save file, the restored session and the share link
+ * (all three are `serialize` → `loadAnalyticSession`). A file from before the field loads unchanged, and a host that
+ * cannot be one is dropped, never trusted.
+ */
+describe('#1973 — a save carries the host each cevian line was accepted in', () => {
+  const FIXTURE = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'issue-1973-cevian-host.analytic.json'), 'utf8')) as Record<string, unknown>;
+
+  it('the operator’s saved session loads with «AE גובה» pinned to triangle ABC, green', () => {
+    fresh();
+    expect(loadAnalyticSession(FIXTURE, 'x').failed).toBe(0);
+    expect(useAnalyticStore.getState().hosts).toEqual({ 5: ['A', 'B', 'C'] });
+  });
+
+  it('serialize writes it, and loading what it wrote (a file, a restored session, a link) restores it', () => {
+    fresh();
+    loadAnalyticSession(FIXTURE, 'x');
+    const saved = JSON.parse(JSON.stringify(useAnalyticStore.getState().serialize())) as Record<string, unknown>;
+    expect(saved.hosts).toEqual({ 5: ['A', 'B', 'C'] });
+    fresh();
+    expect(loadAnalyticSession(saved, 'x').failed).toBe(0);
+    expect(useAnalyticStore.getState().hosts).toEqual({ 5: ['A', 'B', 'C'] });
+  });
+
+  it('a session with no recorded host writes no field — every older reader sees the file it always saw', () => {
+    fresh();
+    for (const l of LINES) useAnalyticStore.getState().recordLine(l);
+    expect('hosts' in useAnalyticStore.getState().serialize()).toBe(false);
+  });
+
+  it('a file saved before the field loads with no host and no fault', () => {
+    fresh();
+    const { hosts: _gone, ...old } = FIXTURE;
+    expect(loadAnalyticSession(old, 'x').failed).toBe(0);
+    expect(useAnalyticStore.getState().hosts).toEqual({});
+  });
+
+  it('a host that names no line, or no ring, is dropped', () => {
+    fresh();
+    loadAnalyticSession({ ...FIXTURE, hosts: { 5: ['A', 'B'], 6: ['A', 'B', 'C', 'C'], 99: ['A', 'B', 'C'], x: ['A', 'B', 'C'], 4: 'ABC' } }, 'x');
+    expect(useAnalyticStore.getState().hosts).toEqual({});
   });
 });

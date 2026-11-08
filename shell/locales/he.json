@@ -51,6 +51,24 @@
       "createdCircle": "נוצר מעגל חדש שמרכזו {{centre}} — אם זו טעות הקלדה, לחצו ✕ לביטול השורה",
       "createdCircleUnnamed": "נוצר מעגל חדש — אם זו טעות הקלדה, לחצו ✕ לביטול השורה",
       "createdUndo": "ביטול השורה"
+    },
+    "host": {
+      "triangle": "במשולש {{ring}}",
+      "quadrilateral": "במרובע {{ring}}",
+      "parallelogram": "במקבילית {{ring}}",
+      "rectangle": "במלבן {{ring}}",
+      "square": "בריבוע {{ring}}",
+      "rhombus": "במעוין {{ring}}",
+      "trapezoid": "בטרפז {{ring}}",
+      "kite": "בדלתון {{ring}}",
+      "n5": "במחומש {{ring}}",
+      "n6": "במשושה {{ring}}",
+      "n7": "במשובע {{ring}}",
+      "n8": "במתומן {{ring}}",
+      "n9": "במתושע {{ring}}",
+      "n10": "במעושר {{ring}}",
+      "polygon": "במצולע {{ring}}",
+      "title": "הצורה שבה הקטע נבנה, כפי שנקבעה כשהשורה התקבלה"
     }
   }
 }

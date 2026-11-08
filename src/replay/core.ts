@@ -37,6 +37,7 @@ import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed,
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
+import type { CevianHost } from '../../shell/cevianHost';
 import { Structure, pairKey, ringOnOneCircle } from '@/engine/structure';
 import { cyclicKiteCommands } from '@/engine/inscribe';
 
@@ -54,6 +55,14 @@ export interface Fact {
   group?: string;
   cmd: AnyCommand;
   enabled: boolean;
+  /**
+   * #1973 ([ADR-797](../../docs/06-decisions.md#adr-797)) — the SHAPE a cevian was resolved in when its sentence named
+   * none («AE גובה» → triangle ABC), stamped on the line's facts at ACCEPT time (`commitVerdict`, the ✎ edit, the load
+   * refresh). Display only: replay never reads it — the side is already in `cmd` — so it changes no figure, no memo key
+   * and no load comparison. The row keeps the student's words and shows this beside them (the operator's ruling of
+   * 2026-10-10, option C).
+   */
+  host?: CevianHost;
 }
 
 /**

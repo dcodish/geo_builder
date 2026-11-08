@@ -229,6 +229,9 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
           ...(group !== undefined ? { group } : {}),
           cmd,
           enabled,
+          // #1973 (ADR-797): a re-lowered step is re-read against its PREFIX — the figure it was accepted in — so the
+          // host its fresh reading reports is the accept-time host of the commands it now stores
+          ...(p.host ? { host: p.host } : {}),
         });
       });
     } else {

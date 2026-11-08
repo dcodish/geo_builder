@@ -27,6 +27,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldTangentSide } from './tangentSide';
 import { foldGlyphs } from '../../shell/glyphFold';
+import { hostNounOf, type CevianHost } from '../../shell/cevianHost';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
@@ -45,7 +46,9 @@ import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_
 export type ParseResult =
   // `indefiniteShape` (#2127, ADR-654): the vertices of the existing polygon an INDEFINITE unnamed shape noun
   // («משולש …») was bound to — the caller decides whether the sentence restates that shape or draws a new one
-  | { ok: true; commands: AnyCommand[]; angleReadings?: string[]; indefiniteShape?: string[] }
+  // `host` (#1973, ADR-797): the shape a cevian whose sentence named neither its side nor its triangle was resolved in —
+  // parse METADATA beside the commands, never inside one, so command identity and the load comparison are unchanged
+  | { ok: true; commands: AnyCommand[]; angleReadings?: string[]; indefiniteShape?: string[]; host?: CevianHost }
   | { ok: false; reason: 'not-handled' }
   // #1654–#1657 (ADR-562): a FOREIGN GIVEN — a slope, a quadrant, axes/coordinates (the analytic Builder's), a
   // plane, a sphere or another solid (the Space Builder's). Decided BEFORE every rule (`foreignGiven`), because
@@ -1043,6 +1046,15 @@ function rightAngleVertexRefusal(s: string, ctx: ParseContext): ParseResult | nu
 /** #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)): the outermost `parse` call collects the existing polygons an
  *  INDEFINITE shape noun was bound to; only one the winning commands name is reported (`indefiniteShape`). */
 let indefiniteBindSink: Id[][] | null = null;
+
+/**
+ * #1973 ([ADR-797](../../docs/06-decisions.md#adr-797)) — THE SHAPE EACH CEVIAN WAS RESOLVED IN during ONE top-level
+ * `parse`, when its sentence named neither its side nor its triangle («AE גובה», «תיכון מ-A»). The altitude and median
+ * rules choose that side from the figure (the placed foot, the ring's own parallel base, the one shape's opposite sides —
+ * ADR-665, ADR-568); {@link noteCevianHost} records the RING it belongs to. Owned by the outermost `parse` like the
+ * angle readings, and only an entry the winning commands name is reported (`host`).
+ */
+let cevianHostSink: { apex: Id; side: [Id, Id]; ring: Id[]; kind?: string }[] | null = null;
 /** {@link existingPolygon} for an unnamed shape noun in `s`: the binding is recorded when the noun is indefinite. */
 const referencedPolygon = (ctx: ParseContext, n: number, s: string): Id[] | null => {
   const ids = existingPolygon(ctx, n);
@@ -11516,6 +11528,7 @@ const median: Rule = (s, ctx) => {
     // #1999 (ADR-666): the figure says which end is the vertex — «AM תיכון לצלע CD» is «MA תיכון לצלע CD»
     const [apex, foot] = cevianEnds(seg[0], seg[1], cevianVertexOf(s, ctx, side));
     let opp = side;
+    let figureSide = false; // #1973: the side came from the figure, not the sentence
     if (!opp) {
       // No side stated: derive the opposite side from a triangle named in the
       // utterance ("AD median in ABC"), else from the figure when it's a single
@@ -11535,12 +11548,14 @@ const median: Rule = (s, ctx) => {
         if ('shapes' in res) return { clarify: 'ambiguous-cevian', role: 'median', apex, shapes: res.shapes, side: res.side };
         if (res.edges.length !== 1) return null;
         opp = res.edges[0];
+        figureSide = true;
       }
     }
     // #1233 — the gate that used to read only `apex ∈ opp` here is now the shared definition, so the
     // altitude and the foot rule cannot drift from it again.
     const medFault = cevianFault(apex, foot, opp, 'median');
     if (medFault) return medFault; // #1266
+    if (figureSide) noteCevianHost(apex, opp, ctx); // #1973 (ADR-797): the shape the figure chose the side in
     return [
       { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
       { type: 'segment', a: apex, b: foot },
@@ -11589,6 +11604,7 @@ const median: Rule = (s, ctx) => {
     const edges = res.edges;
     if (edges.length !== 1) return null;
     const mid = existingMidpointOf(ctx, edges[0][0], edges[0][1]) ?? freeLabel(ctx, [apex, ...edges[0]], ['M', 'N', 'P', 'Q']); // reuse (Am. 2)
+    noteCevianHost(apex, edges[0], ctx); // #1973 (ADR-797): the shape the figure chose the side in
     return [
       { type: 'midpoint', id: mid, a: edges[0][0], b: edges[0][1] },
       { type: 'segment', a: apex, b: mid },
@@ -11739,6 +11755,51 @@ const cevianShapeEdges = (
   if (targets.size > 1) return { shapes: [...shapes.values()].map((x) => x.ring), side: [...shapes.values()][0].first };
   return { edges: all };
 };
+
+/**
+ * #1973 ([ADR-797](../../docs/06-decisions.md#adr-797)) — RECORD THE SHAPE a cevian's figure-chosen side belongs to.
+ *
+ * Called by the altitude and median rules at their one emit, only when the SIDE came from the figure — never for a
+ * sentence that states its side («AE גובה לצלע BC») or its triangle («AE גובה במשולש ABC»): those already say it.
+ * The host is the one ring of the figure that holds the apex and has `side` as an opposite edge (semantic: the
+ * declared rings, never coordinates). A side two rings share names no single shape, so nothing is recorded and the
+ * row shows no tag rather than a guess. `kind` is the noun the ring was declared with, read here because a compound
+ * line («טרפז ABCD ו-AE גובה») declares its ring in this parse's context only.
+ */
+const noteCevianHost = (apex: Id, side: readonly [Id, Id], ctx: ParseContext): void => {
+  if (!cevianHostSink) return;
+  const rings = new Map<string, Id[]>();
+  for (const poly of ctx.polygons ?? []) {
+    const ring = poly.map(up);
+    if (!ring.includes(apex)) continue;
+    if (!oppositePolygonEdges(apex, [ring], null).some((e) => sameSide(e[0], e[1], side[0], side[1]))) continue;
+    rings.set([...ring].sort().join(','), ring);
+  }
+  if (rings.size !== 1) return;
+  const [ring] = [...rings.values()];
+  const key = [...ring].sort().join(',');
+  const kind = (ctx.declaredPolygons ?? []).find((p) => [...p.vertices.map(up)].sort().join(',') === key)?.kind;
+  cevianHostSink.push({ apex, side: [side[0], side[1]], ring, ...(kind ? { kind } : {}) });
+};
+
+/**
+ * #1973 — the host a successful parse reports: the recorded rings whose cevian the WINNING commands draw (a `foot`
+ * from the apex onto the side, or the side's `midpoint`), deduplicated. Exactly one ⇒ that ring and its noun; none or
+ * several (a rule that tried a reading and lost, a plural line spanning two shapes) ⇒ no host.
+ */
+function cevianHostOf(cmds: readonly AnyCommand[], sink: NonNullable<typeof cevianHostSink>): CevianHost | null {
+  const drawn = sink.filter((h) =>
+    cmds.some(
+      (c) =>
+        (c.type === 'foot' && c.from === h.apex && sameSide(c.a, c.b, h.side[0], h.side[1])) ||
+        (c.type === 'midpoint' && sameSide(c.a, c.b, h.side[0], h.side[1])),
+    ),
+  );
+  const rings = new Map(drawn.map((h) => [[...h.ring].sort().join(','), h] as const));
+  if (rings.size !== 1) return null;
+  const [h] = [...rings.values()];
+  return { ring: [...h.ring], kind: hostNounOf(h.ring.length, h.kind) };
+}
 
 /** #2064 (ADR-643): every vertex of a polygon the student DECLARED — a semantic field, never coordinates. */
 const declaredVertices = (ctx: ParseContext): Set<Id> => new Set((ctx.declaredPolygons ?? []).flatMap((p) => p.vertices.map(up)));
@@ -11931,6 +11992,8 @@ const altitude: Rule = (s, ctx) => {
   const sideM = onLine ? { side: [up(onLine[1]), up(onLine[2])] as [Id, Id], match: onLine[0] } : statedSide(s); // #1267: the ONE reader — this rule’s copy is where it came from
   let p: string, q: string;
   let tri: Id[] | null = null;
+  /** #1973 (ADR-797): the side came from the FIGURE — the sentence named neither the side nor a triangle. */
+  let figureSide = false;
   // #1233 — this used to read `sideM && up(sideM[1]) !== apex`: a HALF gate that checked only the
   // stated side's FIRST letter, and whose answer to a degenerate statement was to discard it and derive
   // a different side from the figure. «AD גובה לצלע AB» therefore drew the altitude to **BC** — the
@@ -11963,6 +12026,7 @@ const altitude: Rule = (s, ctx) => {
     // and must not overrule it (the ring base keeps its old precedence over the named triangle).
     const namesTriangle = (labelRun((s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s).replace(/triangle|\bthe\b/gi, ' '), 3) ?? []).filter((x) => x !== apex).length === 2;
     const base = (namesTriangle ? null : footNarrowedSide(apex, ctx, namedFoot)) ?? ringParallelBase(apex, ctx);
+    figureSide = !namesTriangle;
     if (base) {
       [p, q] = base; // tri stays null — the trapezoid already exists; don't re-emit a shape
     } else {
@@ -12038,6 +12102,7 @@ const altitude: Rule = (s, ctx) => {
     if (options.length > 0) return [{ type: 'altitude-choice', options, variant: 0 }];
     return { clarify: 'cevian-redefines-vertex', apex, foot: namedFoot, side: [p, q] };
   }
+  if (figureSide) noteCevianHost(apex, [p, q], ctx); // #1973 (ADR-797): the shape the figure chose the side in
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q, ...(f === namedFoot ? { named: true as const } : {}) }); // #1946 (ADR-731): a foot the student named
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
@@ -14690,6 +14755,7 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   if (angleReadingSink) return parseEntry(raw, ctx);
   angleReadingSink = [];
   indefiniteBindSink = []; // #2127 (ADR-654): the same outermost-call ownership
+  cevianHostSink = []; // #1973 (ADR-797): the same ownership
   try {
     let r = parseEntry(raw, ctx);
     if (!r.ok) return r;
@@ -14700,12 +14766,15 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const named = new Set(r.commands.flatMap(commandLetters));
     const indefiniteShape = indefiniteBindSink.find((ids) => ids.every((v) => named.has(v)));
     if (indefiniteShape) r = { ...r, indefiniteShape };
+    const host = cevianHostOf(r.commands, cevianHostSink);
+    if (host) r = { ...r, host };
     if (angleReadingSink.length === 0) return r;
     const angleReadings = angleReadingsOf(r.commands, angleReadingSink);
     return angleReadings.length ? { ...r, angleReadings } : r;
   } finally {
     angleReadingSink = null;
     indefiniteBindSink = null;
+    cevianHostSink = null;
   }
 }
 
