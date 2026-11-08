@@ -137,6 +137,17 @@ operands rebuilt at the candidate value (`operandAtParam`). A residual that vani
 is **not** a pin (the identity guard). The claim is always recorded, and a number drawn from it shows only
 when it holds (`DIRECTION_REL_TOL`).
 
+**A scalar given on a coord-sym point is the parameter's, asked by the one recorder** (ADR-3D-433, #1896;
+amending ADR-3D-032 Decision B). Every arm that records a claim goes through `recordClaim3` (`apply.ts`), which
+asks `pinsCoordParam3` FIRST: a claim whose reach (`statementPointIds3`: the points it names, a declared
+vector's endpoints included) holds a coord-sym point and whose kind has a residual in `CLAIM_RESIDUALS3` is
+recorded as the claim and as a parameter given (`paramGivens`, the same object), and is never driven
+through the pivot; otherwise the arm's pivot pin (`drive`: pin alone, pin and claim, or pin and arbiter),
+otherwise the claim alone. The post-pivot root-find (`pinParam`) solves each given's `claimResidual3` with
+the coord-sym points at the candidate value, filters the snapped candidates by the verifier's own predicate
+(`residualHolds3`), and, as `paramRoots` does since #902, takes a STATED value of the parameter as its only
+candidate. A `length-letter` tie keeps its owner-routed lowering (ADR-3D-384).
+
 **A pin is a driver; the claim beside it is the arbiter** (ADR-3D-282, #1546). A pin acts only where the
 pivot owns something that moves its object (a solid's gauge and dims, a pin symbol, a free rider), so
 every pin family that can land elsewhere records its claim: `coords-eq` for the existing-id `point3` pin,
@@ -158,11 +169,22 @@ root-find (`paramGivens`), the wedges and the knees each read their kind's quant
 
 **One mechanism places a point from a coordinate given, whatever it sits on** (ADR-3D-293, #1615;
 generalising ADR-3D-292). Beside the `point3` pin and its arbiter, a point with `solvable` entries in
-`carrierParams3` records the stated components in `c.coordDeterminations`. Where the pivot owns nothing (no
-solid, no `free3` point), `resolve3` runs `solveCoordDeterminations` after the free-carrier fixpoint: it
-probes the point at parameter 0 and each unit parameter (placements are linear), solves by the normal
-equations, and publishes `Resolved3.coordDetermined` — `determined` (placed through `riderTOverride`),
-`contradicts`, or `open`. A coord-sym point keeps `readCoordGiven` → `symbol-value`.
+`carrierParams3` records the stated components in `c.determinations` (kind `coords`). Where the pivot owns
+nothing (`pivotRuns3`: no solid, no `free3` point), `resolve3` runs `solveDeterminations` after the
+free-carrier fixpoint: it probes the point at parameter 0 and each unit parameter (placements are linear),
+solves by the normal equations, and publishes `Resolved3.determined` — `determined` (placed through
+`riderTOverride`), `contradicts`, or `open`. A coord-sym point keeps `readCoordGiven` → `symbol-value`.
+
+**A stated length on such a point is a determination too** (ADR-3D-432, #1816). The claim arm records a
+`length` determination beside whatever lane takes the claim, whenever the length's reach
+(`determinationReach3`: the `solvable` rows of `carrierReach3`, the one reach walk the pivot's
+`reachesFreeCarrier3` also reads) holds a parameter and no coord-sym point (the parameter lane owns those). The
+same step solves it, in statement order, when exactly one reached parameter is still unsolved: a − b is affine
+in that parameter, so |a − b|² = L² is a quadratic, probed at t = 0, 1, 2 through the real point pass (the third
+probe proves affinity) and solved in closed form. A root strictly inside the parameter's range places the owner
+(`determined`); of two, the one nearest the parameter's own sample, so the choice varies with the seed. No
+admissible root publishes nothing, and the claim, still the arbiter, keeps its verdict. Where the pivot runs,
+its pin drives and the determination is idle.
 
 **A declared action must hold for every spelling of its row** (ADR-3D-217). `'angle|segment|segment'`
 declares `drive-dims`, so `apply.ts` drives it through its own pin kind rather than only when
@@ -880,7 +902,7 @@ dim crawls and the stalled iterations cost 2.9 s against 11 ms.
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
 `claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit
 (ADR-3D-291, #1590): a point whose free parameter stayed sampled (`carrierParams3` keys the pivot did not
-drive, or a coord-sym letter with no root) unless `Resolved3.coordDetermined` answered `contradicts` or
+drive, or a coord-sym letter with no root) unless `Resolved3.determined` answered `contradicts` or
 `determined` (ADR-3D-293) or `statedDataAdmits` finds a contradiction; and the apex of a cone or cylinder
 of unstated height.
 
@@ -1049,6 +1071,14 @@ parallelogram family and the kite, a plane rider otherwise), keeping the point's
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a
 composite command**; `claims.ts` checks each against four deterministic seeds (`claimSeeds`).
+
+**One residual per scalar claim kind** ([ADR-3D-433](06b-decisions-3d.md#adr-3d-433), #1896). `CLAIM_RESIDUALS3`
+(`claims.ts`) is total over `Claim3['type']`: each kind has a `residual` (one real equation, signed where the
+quantity is, with the tolerance its verdict reads: holds ⇔ `|r| ≤ tol`) or an `excluded` reason (a vector
+or several equations, an inequality, a classifier, an operand relation owned by ADR-3D-286's
+`paramPinningRels`). `holdsAt` judges every scalar kind through `claimResidual3`, and an excluded kind
+without its own case in `holdsAt` is a compile error (`ScalarClaimType3`), so the verifier and the
+parameter root-find cannot drift apart.
 
 **The diagonal claim's two layers ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203), [ADR-3D-246](06b-decisions-3d.md#adr-3d-246), #978).**
 One predicate, `diagonalClaimVerdict` (`baseShapes.ts`), judges «אלכסון AB» over the solids holding both

@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../apply';
-import { evaluate3 } from '../evaluate';
+import { verifyClaim } from '../claims';
+import { evaluate3, freeDofCount3, resolve3 } from '../evaluate';
 import { emptyConstruction3, type Command3, type Construction3 } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
 
@@ -156,6 +157,116 @@ describe('evaluate — on-segment points', () => {
     expect(t(0)).toBeGreaterThan(0.05);
     expect(t(0)).toBeLessThan(0.95);
     expect(t(1)).not.toBeCloseTo(t(0), 4);
+  });
+});
+
+/**
+ * #1816 (ADR-3D-432) — A STATED LENGTH ON A POINT THAT SITS ON SOMETHING, ON A FIGURE THE PIVOT DOES NOT RUN ON.
+ *
+ * «A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1» was judged against D's random sample and refused «בדקו את החישוב». The
+ * claim arm records a `length` determination (apply), and `resolve3`'s determination step solves the rider's one free
+ * parameter from it (a quadratic in t, probed through the real point pass). These call the reducer and the resolver;
+ * the operator's sequences are the fixtures `rider-length-coords-1816*.geo3.json`.
+ */
+describe('#1816 — a stated length places a rider of a coordinate figure (resolve3, ADR-3D-432)', () => {
+  const pt = (id: string, x: number | null, y: number | null, z: number | null): Command3 => ({ type: 'point3', id, x, y, z });
+  const length = (a: string, b: string, value: number): Command3[] => [
+    { type: 'segment3', a, b },
+    { type: 'claim', claim: { type: 'length-eq', a, b, value } },
+  ];
+  const AB = [pt('A', 0, 0, 0), pt('B', 4, 0, 0), { type: 'point-on-segment3', id: 'D', a: 'A', b: 'B' } as Command3];
+  const SEEDS = Array.from({ length: 24 }, (_, s) => s);
+  const lengthClaim = (c: Construction3) => c.claims[c.claims.length - 1];
+
+  it('the report: AD = 1 places D at (1,0,0) at every seed, the claim holds, and the rider counts as determined', () => {
+    const c = build(...AB, ...length('A', 'D', 1));
+    expect(c.determinations).toEqual([{ kind: 'length', a: 'A', b: 'D', value: 1 }]);
+    for (const s of SEEDS) {
+      const r = resolve3(c, s);
+      expect(r.positions.get('D')).toEqual(v3(1, 0, 0));
+      expect(r.determined.get('D')).toBe('determined');
+    }
+    expect(verifyClaim(lengthClaim(c), c, 0)).toBe(true);
+    expect(freeDofCount3(c, resolve3(c, 0))).toBe(0);
+  });
+
+  it('the mirrored spelling «DA = 1» places D the same', () => {
+    const c = build(pt('A', 0, 0, 0), pt('B', 4, 0, 0), { type: 'point-on-segment3', id: 'D', a: 'A', b: 'B' }, ...length('D', 'A', 1));
+    for (const s of SEEDS) expect(resolve3(c, s).positions.get('D')).toEqual(v3(1, 0, 0));
+  });
+
+  it('a slanted segment off the origin: |AD| is exact and D stays on AB', () => {
+    const c = build(pt('A', 1, 2, 3), pt('B', 5, 4, 7), { type: 'point-on-segment3', id: 'D', a: 'A', b: 'B' }, ...length('A', 'D', 2));
+    for (const s of SEEDS) {
+      const p = resolve3(c, s).positions;
+      expect(dist3(p.get('A')!, p.get('D')!)).toBeCloseTo(2, 12);
+      expect(dist3(p.get('A')!, p.get('D')!) + dist3(p.get('D')!, p.get('B')!)).toBeCloseTo(dist3(p.get('A')!, p.get('B')!), 12);
+    }
+  });
+
+  it('two positions meet the length: one is drawn, and the seeds reach both (an unstated choice, ADR-052)', () => {
+    const c = build(...AB, pt('C', 2, 1, 0), ...length('C', 'D', 1.25));
+    const xs = new Set(SEEDS.map((s) => +resolve3(c, s).positions.get('D')!.x.toFixed(9)));
+    expect([...xs].sort()).toEqual([1.25, 2.75]);
+    for (const s of SEEDS) expect(dist3(resolve3(c, s).positions.get('C')!, resolve3(c, s).positions.get('D')!)).toBeCloseTo(1.25, 12);
+  });
+
+  it('a point BUILT FROM the rider reaches its parameter: M the midpoint of DB, AM = 2.5 puts D at (1,0,0)', () => {
+    const c = build(...AB, { type: 'point-on-segment3', id: 'M', a: 'D', b: 'B', t: 0.5 }, ...length('A', 'M', 2.5));
+    for (const s of SEEDS) {
+      expect(resolve3(c, s).positions.get('D')).toEqual(v3(1, 0, 0));
+      expect(resolve3(c, s).positions.get('M')).toEqual(v3(2.5, 0, 0));
+    }
+  });
+
+  it('every carrier of the table, one step: a line rider (two sides) and a point on the positive x-axis', () => {
+    const line = build(
+      { type: 'line3', name: 'ℓ1', anchor: [{ k: 0, p: 0 }, { k: 0, p: 0 }, { k: 0, p: 0 }], dir: [{ k: 1, p: 0 }, { k: 0, p: 0 }, { k: 0, p: 0 }] } as Command3,
+      { type: 'on-line', id: 'P', line: 'ℓ1' } as Command3,
+      pt('A', 0, 3, 0),
+      ...length('A', 'P', 5),
+    );
+    const xs = new Set(SEEDS.map((s) => +resolve3(line, s).positions.get('P')!.x.toFixed(9) + 0));
+    expect([...xs].sort((a, b) => a - b)).toEqual([-4, 4]);
+    const axis = build(pt('A', 0, 0, 0), pt('D', null, 0, 0), { type: 'sign-given', id: 'D', axis: 'x', positive: true } as Command3, ...length('A', 'D', 3));
+    for (const s of SEEDS) expect(resolve3(axis, s).positions.get('D')).toEqual(v3(3, 0, 0));
+  });
+
+  it('no position of the segment meets it (AD = 5 on AB = 4), or only an endpoint does (AD = 4): nothing is placed, the claim fails', () => {
+    for (const value of [5, 4]) {
+      const c = build(...AB, ...length('A', 'D', value));
+      const r = resolve3(c, 0);
+      expect(r.determined.has('D')).toBe(false);
+      expect(dist3(r.positions.get('A')!, r.positions.get('D')!)).toBeLessThan(4); // still the sampled interior seat
+      expect(verifyClaim(lengthClaim(c), c, 0)).toBe(false);
+    }
+  });
+
+  it('not a 1-DOF solve: two riders (DE = 2) and a plane rider (two offsets) are left to the claim, as before', () => {
+    const two = build(...AB, pt('C', 0, 4, 0), { type: 'point-on-segment3', id: 'E', a: 'A', b: 'C' }, ...length('D', 'E', 2));
+    expect(resolve3(two, 0).determined.size).toBe(0);
+    const plane = build(
+      { type: 'plane3', name: 'π', plane: { cx: { k: 0, p: 0 }, cy: { k: 0, p: 0 }, cz: { k: 1, p: 0 }, d: { k: 0, p: 0 }, src: 'z = 0' } } as Command3,
+      { type: 'on-planes', id: 'P', plane: 'π' } as Command3,
+      pt('A', 0, 0, 0),
+      ...length('A', 'P', 3),
+    );
+    expect(resolve3(plane, 0).determined.size).toBe(0);
+  });
+
+  it('a later length on a placed rider is a claim about it: BD = 3 holds, BD = 2 does not', () => {
+    for (const [value, holds] of [[3, true], [2, false]] as const) {
+      const c = build(...AB, ...length('A', 'D', 1), ...length('B', 'D', value));
+      expect(resolve3(c, 0).positions.get('D')).toEqual(v3(1, 0, 0));
+      expect(verifyClaim(lengthClaim(c), c, 0)).toBe(holds);
+    }
+  });
+
+  it('the parameter lane keeps a coord-sym reach (ADR-3D-032), and a solid figure keeps its pivot: no determination is recorded or solved', () => {
+    const sym = build(pt('A', 0, 0, 0), { type: 'point3', id: 'B', x: null, y: 0, z: 0, syms: ['k', null, null] } as Command3, { type: 'point-on-segment3', id: 'D', a: 'A', b: 'B' }, ...length('A', 'D', 1));
+    expect(sym.determinations).toEqual([]);
+    const cube = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'point-on-segment3', id: 'E', a: 'A', b: 'B' }, ...length('A', 'E', 0.5));
+    expect(resolve3(cube, 0).determined.size).toBe(0); // the pivot's pin drives it (#1782); the step does not run
   });
 });
 

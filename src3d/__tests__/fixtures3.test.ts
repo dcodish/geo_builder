@@ -29,6 +29,15 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #1896 (ADR-3D-433) — the report: a ⟂ on points whose coordinates carry k pins k (k = 2 or k = −5, one drawn), where it
+  // was refused «בדקו את החישוב». The roots, the census of arms and the stated-k rule are asserted in algebraic3.test.ts;
+  // this is the build + drift + load net.
+  'coord-sym-perp-1896.geo3.json': ['A(0,0,0)', 'B(k-1,k,3)', 'C(k+1,0,k-3)', 'AB ⊥ AC'],
+  // #1816 (ADR-3D-432) — the report and its split form: a length on a rider of a coordinate segment places the rider
+  // (D = (1,0,0)), where it was refused «בדקו את החישוב». The geometry is asserted in engine3.test.ts (resolve3's
+  // determination step); this is the build + drift + load net.
+  'rider-length-coords-1816.geo3.json': ['A(0,0,0)', 'B(4,0,0)', 'D על AB כך ש-AD = 1'],
+  'rider-length-coords-split-1816.geo3.json': ['A(0,0,0)', 'B(4,0,0)', 'D על AB', 'AD = 1'],
   // #253 (ADR-3D-419) — the exact prod line, then the textbook's order: the bare circle first, what pins it later. The
   // geometry is asserted in free-circle-253.test.ts; this is the build + drift + load net.
   'free-circle-bare-253.geo3.json': ['נתון מעגל שמרכזו O.'],

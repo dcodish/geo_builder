@@ -90,8 +90,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   placement: a length on each builds, a relation between them («AB ∥ DE») is driven, and «הציגו תצורה אחרת»
   varies them (#1855). **A stated length, angle or relation on a free point of a rigid solid moves that point:**
   «קובייה ABCD · AB = 2 · E על AB · AE = 1» puts E at AB's midpoint, in either order, as it does on a box and as
-  2-D does on a square; a given no position of the point can meet is still refused (#1782).
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour).
+  2-D does on a square; a given no position of the point can meet is still refused (#1782). **The same holds on a
+  figure of coordinates:** a stated length on a point that sits on something places it — «A(0,0,0) · B(4,0,0) · D על AB
+  כך ש-AD = 1» (or «D על AB · AD = 1») puts D at (1,0,0), as 2-D and analytic do; when two positions meet the length,
+  one is drawn and «הציגו תצורה אחרת» reaches the other; a length no position of the point can meet («AD = 5» on AB = 4)
+  is still refused (#1816).
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form).
@@ -489,7 +493,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A value
   the figure cannot satisfy is refused naming the statement, an unknown letter as unknown; a stated sign
   («k חיובי») is honoured the same way.
-  - Sources: ADR-052, ADR-3D-219, ADR-3D-236; #814, #902, #922, #930.
+  - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order); #814, #902, #922, #930, #1896.
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is
@@ -631,8 +635,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A relation between objects given by equations or coordinates, where one carries the figure's parameter in
   what the relation reads, determines the parameter instead, including a coordinate point stated on the plane
   or line («A(1, 2, 3)» · «π: mx + z − 1 = 0» · «A על המישור π» gives m = −2, shown as «m = −2»); one that
-  holds for every value leaves it free.
-  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396; #508, #512, #552, #1311, #1439, #1472, #1528.
+  holds for every value leaves it free. So does every scalar given (a length, an angle, a perpendicularity, an
+  area, a ratio) on points whose coordinates carry the parameter, whatever sentence states it: «A(0,0,0) ·
+  B(k-1,k,3) · C(k+1,0,k-3) · AB ⊥ AC» gives k = 2 or k = −5, one drawn and the other a press of «הציגו תצורה
+  אחרת» away, shown as «k = -5 או k = 2»; when no k works it is refused naming the statement (FR-EQ-3).
+  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286, ADR-3D-396, ADR-3D-433; #508, #512, #552, #1311, #1439, #1472, #1528, #1896.
 - **FR-VC-10 (Must)** — **A segment equation is asked about only when both readings can be true.** As vectors, «AC = 2BD» over «מרובע ABCD» makes the diagonals parallel, which crosses the ring, and a crossed ring is not a quadrilateral. So it builds as lengths with no question, shows «|AC| = 2|BD|» and draws both segments. «AB = DC», a parallelogram as vectors, keeps asking ([ADR-3D-431](06b-decisions-3d.md#adr-3d-431)).
 - **FR-CL-8 (Must)** — **A claim row that moved the figure is a given, one that was checked is a claim** (every claim since [ADR-3D-431](06b-decisions-3d.md#adr-3d-431): «AB = 3» on a free cube leads with ●). **A plane equation that moved the figure is a given, one that was checked is a claim.** A plane
   equation that did not already hold on the figure before its row (a free cube, a cube of a stated side, points the row

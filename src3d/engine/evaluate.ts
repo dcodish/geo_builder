@@ -44,12 +44,13 @@ import { applyGauge, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot,
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
-import { carrierParams3 } from './carriers';
+import { absolutePointCount, freeCoordKey, gaugeFramePoint3, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { carrierParams3, determinationReach3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Construction3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
+import { claimResidual3, residualHolds3 } from './claims';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
@@ -499,8 +500,10 @@ export interface Resolved3 {
   ratioSymbols: Record<string, number>;
   /** #1615 (ADR-3D-293) — per point with a recorded coordinate given, what the closed-form solve found:
    *  `determined` (placed), `contradicts` (false as stated), `open` (not readable in closed form). Empty
-   *  where the pivot owns the figure. The not-determined verdict reads this, never a second reader. */
-  coordDetermined: ReadonlyMap<Id, CoordDetermined>;
+   *  where the pivot owns the figure. The not-determined verdict reads this, never a second reader.
+   *  #1816 (ADR-3D-432): a rider a stated LENGTH placed reads `determined` too; a length no admissible position
+   *  meets publishes nothing, so its claim keeps the verdict it always had. */
+  determined: ReadonlyMap<Id, Determined3>;
   /**
    * #1474 (ADR-3D-283) — the seed this configuration was resolved at: its GAUGE key. A consumer that
    * asks "is this value the same in the figure's OTHER configurations?" re-resolves at this seed with
@@ -1261,7 +1264,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
     // "consumed" there — refining that is #1415's rank-probe territory, not this count's.
     // #1615 (ADR-3D-293): a point the closed-form solve PLACED had every solvable parameter set exactly by the
     // student's coordinates — consumed, the partial point's included (an exact solve, not a block enrolment).
-    const placed = resolved.coordDetermined.get(id) === 'determined';
+    const placed = resolved.determined.get(id) === 'determined';
     for (const cp of carrierParams3(c, id, def)) {
       if (placed && cp.solvable) continue;
       const blockEnrolled = def.kind === 'free3' || def.kind === 'partial';
@@ -1590,7 +1593,7 @@ export function orientationStated3(c: Construction3): boolean {
     c.planePins.length > 0 ||
     c.signGivens.length > 0 ||
     c.componentSigns.length > 0 ||
-    c.coordDeterminations.length > 0
+    c.determinations.some((d) => d.kind === 'coords')
   );
 }
 
@@ -2087,23 +2090,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     if (!movedP && !movedL) break;
     evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs, freeLineDofs, undefined, ratioSymbols);
   }
-  // #1615 (ADR-3D-293): a coordinate given on a point that sits on something places it (`solveCoordDeterminations`).
-  // Only where the pivot owns nothing — no solid and no never-positioned point (the pivot's own entry gate):
-  // there the coordinate pin enrolls the rider and the pivot drives it, one driver per figure. It runs after the
-  // free-carrier fixpoint, so no later pass re-seats the point.
+  // #1615 (ADR-3D-293): a coordinate given on a point that sits on something places it, and #1816 (ADR-3D-432) a stated
+  // length on such a point does too (`solveDeterminations`). Only where the pivot owns nothing (`pivotRuns3`, the
+  // pivot's own entry gate): there the given's pin enrolls the rider and the pivot drives it, one driver per figure.
+  // It runs after the free-carrier fixpoint, so no later pass re-seats the point.
   //
   // Every probe AND the final placement are FRESH point passes from the same start — the absolute points only —
   // because a line's or a plane's rider is seated around the centroid of whatever is already placed (its own
   // earlier position included); a solve probed from one state and applied over another would land elsewhere.
-  let coordDetermined: ReadonlyMap<Id, CoordDetermined> = new Map();
-  if (c.coordDeterminations.length > 0 && !(c.solids.length > 0 || hasFreePoint3(c))) {
+  let determined: ReadonlyMap<Id, Determined3> = new Map();
+  if (c.determinations.length > 0 && !pivotRuns3(c)) {
     const absolute = [...c.points].filter(([, def]) => def.kind === 'coord' || def.kind === 'coord-sym').map(([id]) => [id, pos.get(id)!] as const);
-    const solved = solveCoordDeterminations(c, (ts) => {
+    const solved = solveDeterminations(c, (ts) => {
       const p2: Positions3 = new Map(absolute);
       evaluateSolidsAndPoints(c, seed, p2, new Map(planes), new Map(lines), undefined, undefined, undefined, undefined, undefined, ts);
       return p2;
     });
-    coordDetermined = solved.outcome;
+    determined = solved.outcome;
     if (solved.ts.size > 0) {
       pos.clear();
       for (const [id, p] of absolute) pos.set(id, p);
@@ -2120,50 +2123,30 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
   let paramOut: { value: number; roots: number[]; branches: number[] } | null = param;
   const pinParam = (): void => {
     if (!c.param || c.paramGivens.length === 0) return;
-    const symAt = (id: Id, t: number): Vec3 | undefined => {
-      const d = c.points.get(id);
-      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
+    // #1896 (ADR-3D-433): every given's residual is the verifier's own (`claimResidual3`, one per scalar kind), read
+    // with the coord-sym points at the candidate value and every other point where the figure put it — one scratch
+    // map, rewritten per candidate. The letter a `length-letter` tie names is the very value searched for (#2580).
+    const symPts = [...c.points].filter((e): e is [Id, Extract<PointDef, { kind: 'coord-sym' }>] => e[1].kind === 'coord-sym');
+    const scratch: Positions3 = new Map(pos);
+    const at = (t: number): Positions3 => {
+      for (const [id, d] of symPts) scratch.set(id, v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)));
+      return scratch;
     };
-    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
-      if (cl.type === 'length-eq') {
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.value : NaN;
-      }
-      if (cl.type === 'length-letter') {
-        // #2580 (ADR-3D-384): the tie |ab| = coef·k over the final positions, k being the very value searched for
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.coef * t : NaN;
-      }
-      if (cl.type === 'angle-seg-eq') {
-        const p1 = symAt(cl.a1, t);
-        const q1 = symAt(cl.b1, t);
-        const p2 = symAt(cl.a2, t);
-        const q2 = symAt(cl.b2, t);
-        if (!p1 || !q1 || !p2 || !q2) return NaN;
-        const u = sub3(q1, p1);
-        const w = sub3(q2, p2);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      if (cl.type === 'vertex-angle-eq') {
-        // #1573 (ADR-3D-290): the SIGNED angle between the two rays — the quantity its verifier measures
-        const v = symAt(cl.vertex, t);
-        const p = symAt(cl.p, t);
-        const q = symAt(cl.q, t);
-        if (!v || !p || !q) return NaN;
-        const u = sub3(p, v);
-        const w = sub3(q, v);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : dot3(u, w) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      return NaN;
-    };
-    const fns = c.paramGivens.map(residual);
-    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
-    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
-    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
+    const residualAt = (cl: Claim3, t: number) => claimResidual3(cl, c, at(t), (sym) => (sym === c.param ? t : undefined));
+    const holdsAll = (t: number): boolean => c.paramGivens.every((cl) => residualHolds3(residualAt(cl, t)));
+    // #902 (ADR-3D-219) in this lane too: a STATED value of the parameter is its only candidate, and it must satisfy every
+    // given here, or the set is contradictory (the honest no-roots, blamed on the newest of the statements). This lane
+    // alone ignored it, drawing a root while «k = 3» read green (found in round #2745, judged r2745-1896-stated-k).
+    const stated = symbolValueOf(c, c.param);
+    let roots: number[];
+    if (stated !== undefined) roots = holdsAll(stated) ? [stated] : [];
+    else {
+      const fns = c.paramGivens.map((cl) => (t: number): number => residualAt(cl, t)?.r ?? NaN);
+      // sign-change roots catch crossings; touch-zero catches double roots (a line angle of 90°, a tangency)
+      const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
+      // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
+      roots = snapAndDedupe(candidates).filter(holdsAll);
+    }
     const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
@@ -2246,7 +2229,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     families.length > 0 && // #815: a pin-symbol membership with NO pin beside it enters the pivot too
     // #1311 (ADR-3D-260): a figure with no solid still has DOF to drive when it holds a never-positioned
     // point — the vectors unit's «וקטור AB» is exactly that figure, and a given naming it must move it.
-    (c.solids.length > 0 || hasFreePoint3(c))
+    pivotRuns3(c)
   ) {
     // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
     // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
@@ -3228,7 +3211,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     placementSampled,
     placementSampledParts,
     ratioSymbols: Object.fromEntries(ratioSymbols),
-    coordDetermined,
+    determined,
     seed,
     // #1188 (ADR-3D-386): the post-pivot free-vector pass; step 2 (ADR-3D-390): the system, at the drawn figure
     ...(() => {
@@ -3295,7 +3278,7 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
 /**
  * #1615 (ADR-3D-293) — ONE MECHANISM: A COORDINATE GIVEN PLACES ANY POINT THAT SITS ON SOMETHING.
  *
- * `c.coordDeterminations` holds the STATED components of a coordinate given on a point whose position carries
+ * `c.determinations` (kind `coords`) holds the STATED components of a coordinate given on a point whose position carries
  * SOLVABLE parameters in the sampled-carrier table (`carrierParams3`): a segment's `t`, a line's or a plane's
  * offset, a partial point's missing coordinate, a trapezoid corner's ratio, the bisector distance. Every one of
  * those placements is LINEAR in its parameters, and every one already reads the same override map the pivot
@@ -3312,16 +3295,26 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
  * Only `determined` places the point. A later restatement of an already determined point is a CLAIM about it
  * and is not re-solved. The coordinates are stored, never a parameter value: a line's or a plane's offset is
  * measured from a seat that moves with the seed, so the solve runs per resolution.
+ *
+ * #1816 (ADR-3D-432) — A STATED LENGTH ON SUCH A POINT, THE SAME STEP. «A(0,0,0) · B(4,0,0) · D על AB כך ש-AD = 1»
+ * was judged against D's random sample and refused «בדקו את החישוב», though D = (1,0,0): a coordinate given fixes
+ * the parameters linearly, a length |ab| = L does not. Determinations are solved in statement order, each with the
+ * earlier ones in force: a length on a point an earlier given placed is a claim about it, and a coordinate given
+ * on a point a length placed is a claim about it. See {@link solveLengthDetermination}.
  */
-export type CoordDetermined = 'determined' | 'contradicts' | 'open';
+export type Determined3 = 'determined' | 'contradicts' | 'open';
 
-function solveCoordDeterminations(
+function solveDeterminations(
   c: Construction3,
   pass: (ts: ReadonlyMap<Id, number>) => Positions3,
-): { ts: Map<Id, number>; outcome: Map<Id, CoordDetermined> } {
+): { ts: Map<Id, number>; outcome: Map<Id, Determined3> } {
   const ts = new Map<Id, number>();
-  const outcome = new Map<Id, CoordDetermined>();
-  for (const det of c.coordDeterminations) {
+  const outcome = new Map<Id, Determined3>();
+  for (const det of c.determinations) {
+    if (det.kind === 'length') {
+      solveLengthDetermination(c, det, ts, outcome, pass);
+      continue;
+    }
     if (outcome.has(det.id)) continue; // a restatement is a claim about the point, checked as one
     const def = c.points.get(det.id);
     if (!def) continue;
@@ -3372,6 +3365,78 @@ function solveCoordDeterminations(
     outcome.set(det.id, 'determined');
   }
   return { ts, outcome };
+}
+
+/**
+ * #1816 (ADR-3D-432) — ONE STATED LENGTH |ab| = L, SOLVED FOR THE ONE FREE PARAMETER IT READS.
+ *
+ * The reach of a and b ({@link determinationReach3}: the points they are built from, transitively) must hold exactly
+ * one solvable parameter the earlier determinations have not set. None: the length is about placed points, a claim.
+ * Two or more: not a 1-DOF solve («D על AB · E על AC · DE = 2»), left to the claim as before.
+ *
+ * Every solvable placement is linear in its parameter, and so is every point built from it by an affine rule, so the
+ * vector a − b is AFFINE in t and |a − b|² = L² is a QUADRATIC: probed through the real point pass at t = 0, 1, 2 (the
+ * third probe proves the affinity; a point built non-affinely — a crossing of two lines through the rider — is left to
+ * the claim), solved in closed form. A root must lie strictly inside the parameter's own range (`lo`/`hi`): a rider
+ * on a segment never coincides with an endpoint, the same rule the coordinate solve keeps.
+ *
+ * Two admissible roots are two configurations (D on AB at the given distance from a point off it): the one NEAREST the
+ * parameter's own sample is drawn, so the choice varies with the seed and «הציגו תצורה אחרת» reaches the other, as it
+ * does for every unstated choice (ADR-052) and as the pivot's minimal-displacement solve picks on a solid.
+ *
+ * Only a placement is published (`determined`, on the point that owns the parameter). A length no admissible position
+ * meets publishes nothing: the point keeps its sample, its claim keeps the verdict it always had (`claim-refuted`), and
+ * a later coordinate given on the point is still solved.
+ */
+function solveLengthDetermination(
+  c: Construction3,
+  det: Extract<Determination3, { kind: 'length' }>,
+  ts: Map<Id, number>,
+  outcome: Map<Id, Determined3>,
+  pass: (ts: ReadonlyMap<Id, number>) => Positions3,
+): void {
+  const open = determinationReach3(c, [det.a, det.b]).filter((r) => !ts.has(r.param.key));
+  if (open.length !== 1) return;
+  const [{ id: owner, param }] = open;
+  const probe = (t?: number): Positions3 => {
+    const m = new Map(ts);
+    if (t !== undefined) m.set(param.key, t);
+    return pass(m);
+  };
+  const at = [probe(0), probe(1), probe(2)];
+  const w = at.map((p) => {
+    const a = p.get(det.a);
+    const b = p.get(det.b);
+    return a && b ? sub3(a, b) : undefined;
+  });
+  if (w.some((x) => !x)) return;
+  const [w0, w1, w2] = w as Vec3[];
+  const d = sub3(w1, w0);
+  const scale = Math.max(1, norm3(w0), norm3(d), det.value);
+  if (norm3(sub3(sub3(w2, w1), d)) > 1e-9 * scale) return; // not affine in t: not this closed form
+  const qa = dot3(d, d);
+  if (qa <= 1e-18 * scale * scale) return; // the length does not move with the parameter: a claim
+  const qb = 2 * dot3(w0, d);
+  const qc = dot3(w0, w0) - det.value * det.value;
+  const disc = qb * qb - 4 * qa * qc;
+  const tol = 1e-12 * (qb * qb + Math.abs(4 * qa * qc)) + 1e-300;
+  if (disc < -tol) return;
+  // the numerically stable pair (no cancellation between −b and √disc); a touching root counts once
+  const sq = Math.sqrt(Math.max(0, disc));
+  const q = -0.5 * (qb + (qb >= 0 ? sq : -sq));
+  const roots = disc <= tol ? [-qb / (2 * qa)] : [q / qa, qc / q];
+  const EPS = 1e-9;
+  const inside = roots.filter((t) => Number.isFinite(t) && t > param.lo + EPS && t < param.hi - EPS).sort((x, y) => x - y);
+  if (inside.length === 0) return;
+  // the parameter's own sample, read off the owner's unforced seat along its affine track
+  const r0 = at[0].get(owner);
+  const r1 = at[1].get(owner);
+  const rs = probe().get(owner);
+  const dr = r0 && r1 ? sub3(r1, r0) : undefined;
+  const ts0 = r0 && rs && dr && dot3(dr, dr) > 0 ? dot3(sub3(rs, r0), dr) / dot3(dr, dr) : 0;
+  const t = inside.reduce((best, x) => (Math.abs(x - ts0) < Math.abs(best - ts0) ? x : best));
+  ts.set(param.key, t);
+  outcome.set(owner, 'determined');
 }
 
 /** Gaussian elimination with partial pivoting for the ≤ 3×3 normal equations; null when singular. */
