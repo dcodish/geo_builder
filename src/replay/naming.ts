@@ -10,6 +10,7 @@
 import type { AnyCommand, Id, RoleSideBinding } from '@/engine';
 import { commandPointIds } from './core';
 import type { Fact } from './core';
+import type { CevianHost } from '../../shell/cevianHost';
 
 /**
  * Rewrite every WHOLE point label `from`→`to` inside a string — a bare point id ("O"), OR a label EMBEDDED
@@ -55,6 +56,14 @@ export function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
  */
 export const relabelUtterance = (utt: string | undefined, from: Id, to: Id): string | undefined =>
   utt ? utt.replace(new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\d)', 'g'), to) : utt;
+
+/**
+ * #1973 ([ADR-797](../../docs/06-decisions.md#adr-797)): a cevian's recorded HOST follows a relabel exactly as its
+ * utterance does — the tag beside «AE גובה» names the ring as the figure now spells it («במשולש PBC» after A → P).
+ * Whole letters only; a fact with no host is returned as is.
+ */
+export const relabelHost = (f: Fact, from: Id, to: Id): Pick<Fact, 'host'> =>
+  f.host ? { host: { ...f.host, ring: f.host.ring.map((v) => (v === from ? to : v)) } as CevianHost } : {};
 
 /** Outcome of a relabel request, so the UI can explain a no-op. */
 /**
@@ -122,6 +131,7 @@ export function renameFacts(facts0: Fact[], from: Id, to: Id): { ok: true; facts
       // The step row shows the utterance; relabel the letter there too (whole labels only,
       // so a `C1`/`O1` isn't corrupted — Hebrew words and lowercase keywords are untouched).
       utterance: relabelUtterance(f.utterance, F, T),
+      ...relabelHost(f, F, T), // #1973: the tag follows the letters
     })),
   };
 }
@@ -140,7 +150,7 @@ export function mergeFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: 
   const firstAt = (id: Id) => facts.findIndex((f) => f.enabled && commandPointIds(f.cmd).includes(id));
   const iF = firstAt(F), iT = firstAt(T);
   if (iF < 0 || iT < 0 || iF >= iT) return { ok: false };
-  return { ok: true, facts: facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, F, T), utterance: relabelUtterance(f.utterance, F, T) })) };
+  return { ok: true, facts: facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, F, T), utterance: relabelUtterance(f.utterance, F, T), ...relabelHost(f, F, T) })) };
 }
 
 /**

@@ -340,6 +340,12 @@ export type Fact =
        */
       either?: true;
       /**
+       * THE HOST THE LINE WAS ACCEPTED IN (#1973, ADR-AG-430) — the ring's letters, set by `derive` from the session's
+       * recorded `hosts`, never by the parser. While the figure holds that ring the side is resolved in it alone; a ring
+       * the figure no longer holds pins nothing.
+       */
+      pin?: Id[];
+      /**
        * THE LENGTH THE SENTENCE STATES FOR THE DRAWN CEVIAN (#1737, ADR-AG-265) — «הגובה לצלע BC הוא 4»: the length
        * half, parsed by the length lane over {@link CEVIAN_MEASURE_SENTINELS} (apex, foot), because only M1 knows
        * which vertex the apex is. Applied after the cevian with the resolved apex and foot written in.

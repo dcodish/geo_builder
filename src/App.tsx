@@ -21,6 +21,7 @@ import { askLaneRows } from '@/engine/valuesPanel';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { heldHost, hostTag } from '../shell/cevianHost';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { Workbench } from '../shell/frame/Workbench';
 import { FigureName } from '../shell/frame/FigureName';
@@ -819,6 +820,8 @@ export default function App() {
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc, degeneracies } = display;
+  /** #1973 (ADR-797): the rings the figure holds now — a row's host tag shows only while its shape is one of them. */
+  const polygonRings = useMemo(() => construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), [construction]);
   /** #2305 (ADR-755): how every sentence names a circle of the displayed figure (`circleRefs` → `circleText`). */
   const displayCircleRefs = useMemo(() => circleRefs(construction), [construction]);
   /**
@@ -1655,6 +1658,10 @@ export default function App() {
                     // button carried `dir={textDir(label)}` itself, a decision the other builders
                     // had to remember to copy (analytic did not).
                     text: label,
+                    // #1973 (ADR-797): the shape the row's cevian was accepted in, BESIDE the student's words
+                    // («AE גובה» · «במשולש ABC»), never inside them — the operator's ruling of 2026-10-10, option C
+                    // — while the figure holds that shape (`heldHost`: a muted or edited-away ring names nothing)
+                    tag: hostTag(heldHost(g.facts.find((f) => f.host)?.host, polygonRings), t),
                     lead: (
                       <span style={{ fontSize: 12, width: 16, textAlign: 'center', flexShrink: 0 }}>
                         {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : state === 'waiting' ? <span data-testid="waiting-mark" style={{ color: '#2563eb' }}>⧗</span> : <span style={{ color: '#94a3b8' }}>○</span>}

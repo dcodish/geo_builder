@@ -80,6 +80,7 @@ import { findProofTarget, PROOF_TARGET_KEY } from '../../shell/proofTarget';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { findNumberPair, teachPair, type NumberPair } from '../../shell/juxtaposedNumbers';
 import { unreadScript } from '../../shell/inputScript';
+import type { CevianHost } from '../../shell/cevianHost';
 import { honestyGateReport } from './honestyGates';
 import { tangentsExhaustedKey } from '@/i18n/humanizeError';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
@@ -206,6 +207,8 @@ export type Verdict2D =
       readonly commands: readonly AnyCommand[];
       readonly logs: readonly DecideLog[];
       readonly note: DecideNote | null;
+      /** #1973 (ADR-797): the shape a cevian whose sentence named none was resolved in — stamped on the line's facts */
+      readonly host?: CevianHost;
     }
   /** nothing to add (already drawn, a restatement, or a name the auto-bind already gave): the text clears */
   | {
@@ -981,7 +984,7 @@ export async function decideFromParse(
           const lm = lowercaseMeasureLetters(r.commands);
           if (lm.length) note = { key: 'input.measureCaseNote', params: { letter: lm.join(', ') } };
         }
-        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note: withGreekAngleTip(note, r.commands, facts) };
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note: withGreekAngleTip(note, r.commands, facts), ...(r.host ? { host: r.host } : {}) };
       }
       // A cleanly-parsed CONSTRAINT that errored only because it can't be satisfied AT THIS POSITION (an
       // under-determined coupled solve before its pinning givens arrive — e.g. "CE⟂AB" before "CD=36,
@@ -993,7 +996,7 @@ export async function decideFromParse(
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
       if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
-          kind: 'commit', deferred: true, binds, commands: r.commands, note: withGreekAngleTip(readAsNote(r.angleReadings), r.commands, facts),
+          kind: 'commit', deferred: true, binds, commands: r.commands, note: withGreekAngleTip(readAsNote(r.angleReadings), r.commands, facts), ...(r.host ? { host: r.host } : {}),
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
         };
       }
@@ -1061,7 +1064,7 @@ export async function decideFromParse(
       // a foot G took E — a merge or a fresh rename), so its statement now holds by construction. It is a plain success, never «כבר קיים», and the statement is kept
       // as the line's own fact: it still holds X on that circle if the earlier line about X is deleted.
       if ((outcome.reason === 'implied' || outcome.reason === 'empty') && identityBound) {
-        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null };
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null, ...(r.host ? { host: r.host } : {}) };
       }
       if (outcome.reason === 'implied') {
         return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };

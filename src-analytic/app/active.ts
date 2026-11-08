@@ -23,3 +23,20 @@ export const rowOf = (count: number, disabled: readonly number[]): number[] => {
   for (let i = 0; i < count; i++) if (!disabled.includes(i)) rows.push(i);
   return rows;
 };
+
+/**
+ * #1973 ([ADR-AG-430](../../docs/06c-decisions-analytic.md#adr-ag-430)) — THE RECORDED HOSTS, re-keyed from row to
+ * ACTIVE index: what `derive`'s `pins` takes for the active projection. A muted row's host is not in the figure, as
+ * its line is not. `rowOf`'s translation, the other way round.
+ */
+export const activePins = (
+  hosts: Readonly<Record<number, readonly string[]>>,
+  count: number,
+  disabled: readonly number[],
+): Record<number, readonly string[]> => {
+  const out: Record<number, readonly string[]> = {};
+  rowOf(count, disabled).forEach((row, k) => {
+    if (hosts[row]) out[k] = hosts[row];
+  });
+  return out;
+};

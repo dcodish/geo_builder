@@ -25,6 +25,7 @@ import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { displayModeToIndexed } from '../../shell/displayMode';
 import { figureTooLarge } from '../../shell/save';
+import { cleanHost } from '../../shell/cevianHost';
 import type { AnyCommand, Id } from '@/engine';
 import { typedLabels } from '@/parser';
 import type { Fact, GeoState } from './geoStore';
@@ -168,6 +169,8 @@ function sanitizeFactOut(f: Fact): Fact {
     ...(f.group !== undefined ? { group: f.group } : {}),
     cmd: f.cmd,
     enabled: f.enabled,
+    // #1973 (ADR-797): the shape a cevian was accepted in — saved, so a reload and a link show the same tag
+    ...(f.host ? { host: f.host } : {}),
   };
 }
 
@@ -200,7 +203,15 @@ function sanitizeFactIn(v: unknown): Fact | null {
     cmd: cmd as unknown as AnyCommand,
     // A hand-edited file may omit `enabled` — default to on (a saved fact was entered to be used).
     enabled: typeof v.enabled === 'boolean' ? v.enabled : true,
+    // #1973 (ADR-797): kept only when it can be a host; a file saved before it has none and loads as it did
+    ...withHost(v.host),
   };
+}
+
+/** #1973: a saved host, cleaned — absent or malformed reads as none (the row then shows no tag). */
+function withHost(raw: unknown): Pick<Fact, 'host'> {
+  const host = cleanHost(raw);
+  return host ? { host } : {};
 }
 
 /**

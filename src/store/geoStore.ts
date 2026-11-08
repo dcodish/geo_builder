@@ -29,10 +29,11 @@ import type { FigureFile } from './figureFile';
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
 export * from '@/replay/naming';
-import { nameCentreFacts, reletterHiddenFacts, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
+import { nameCentreFacts, reletterHiddenFacts, relabelHost, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
 import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import type { RingNote } from '../../shell/narrowing';
+import type { CevianHost } from '../../shell/cevianHost';
 import { geoWork, geoValues, isCancelled } from './geoWork';
 import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
@@ -195,7 +196,7 @@ export interface GeoState {
   /** Commit ONE user action's whole command group in ONE set — one undo entry removes the whole step
    *  (E4/STO-4; the per-command `execute` loop recorded N entries, so one undo peeled one command off a
    *  step whose row still showed ✓). Applies the same idempotency/move-in-place policy per command. */
-  executeMany: (cmds: AnyCommand[], utterance?: string) => void;
+  executeMany: (cmds: AnyCommand[], utterance?: string, host?: CevianHost) => void;
   /** Undo/redo wrappers (E5/STO-5): zundo restores `facts` + `seed` (the figure the student SAW — the
    *  seed is in the temporal state, so an auto-advanced/resampled view rolls back with its facts). */
   undo: () => void;
@@ -212,7 +213,8 @@ export interface GeoState {
   removeGroup: (key: string) => void;
   /** Replace a whole step group with freshly-parsed commands, in place (edit a multi-command step). */
   /** `after` (#1697): the facts AFTER the group, as the edit's own naming by use rewrote them — omitted, they stay */
-  replaceGroup: (key: string, cmds: AnyCommand[], utterance?: string, after?: Fact[]) => void;
+  /** `host` (#1973, ADR-797): the shape the edited line's cevian was resolved in — stamped on the replacement, like a commit */
+  replaceGroup: (key: string, cmds: AnyCommand[], utterance?: string, after?: Fact[], host?: CevianHost) => void;
   /** Select a fact for inspection (or clear, if it was already selected). */
   select: (id: string | null) => void;
   /** The figure's NAME (issue #42) — shown on the page, used as the save filename, derived from the
@@ -332,9 +334,10 @@ const cleanUtterance = (u: string | undefined): string | undefined =>
  * them can model a list the commit would not save. `committed` is the list's length before this batch.
  * Returns the same array when nothing changed.
  */
-function foldFact(facts: Fact[], cmd: AnyCommand, committed: number, utterance?: string, group?: string): Fact[] {
+function foldFact(facts: Fact[], cmd: AnyCommand, committed: number, utterance?: string, group?: string, host?: CevianHost): Fact[] {
   utterance = cleanUtterance(utterance);
-  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true }), utterance, committed);
+  // #1973 (ADR-797): every fact the line appends carries the host its cevian was accepted in
+  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true, ...(host ? { host } : {}) }), utterance, committed);
 }
 
 /**
@@ -349,10 +352,11 @@ function commitCommands(
   cmds: AnyCommand[],
   utterance?: string,
   group?: string,
+  host?: CevianHost,
 ): void {
   const facts = get().facts;
   let next = facts;
-  for (const cmd of cmds) next = foldFact(next, cmd, facts.length, utterance, group);
+  for (const cmd of cmds) next = foldFact(next, cmd, facts.length, utterance, group, host);
   if (next === facts) return; // every command was an idempotent duplicate — nothing to record
   // Settle a NEWLY-appended cyclable variant's default configuration (ADR-339) before the seed search,
   // in the same transaction — one undo restores the pre-step state whole.
@@ -404,9 +408,9 @@ export const useGeoStore = create<GeoState>()(
         commitCommands(get, set, [cmd], utterance, group);
       },
 
-      executeMany: (cmds, utterance) => {
+      executeMany: (cmds, utterance, host) => {
         // One utterance → one group id → ONE set → one undo entry for the whole step (E4/STO-4).
-        commitCommands(get, set, cmds, utterance, cmds.length > 1 ? nanoid() : undefined);
+        commitCommands(get, set, cmds, utterance, cmds.length > 1 ? nanoid() : undefined, host);
       },
 
       undo: () => {
@@ -485,7 +489,7 @@ export const useGeoStore = create<GeoState>()(
         });
       },
 
-      replaceGroup: (key, cmds, utterance, after) => {
+      replaceGroup: (key, cmds, utterance, after, host) => {
         utterance = cleanUtterance(utterance);
         const facts = get().facts;
         const start = facts.findIndex((f) => groupKey(f) === key);
@@ -493,7 +497,7 @@ export const useGeoStore = create<GeoState>()(
         let end = start; // the group's commands are a contiguous run (appended together, edited in place)
         while (end < facts.length && groupKey(facts[end]) === key) end++;
         const group = cmds.length > 1 ? nanoid() : undefined; // multi-command edits stay one step
-        const replacement: Fact[] = cmds.map((cmd) => ({ id: nanoid(), cmd, utterance, group, enabled: true }));
+        const replacement: Fact[] = cmds.map((cmd) => ({ id: nanoid(), cmd, utterance, group, enabled: true, ...(host ? { host } : {}) }));
         let next = [...facts.slice(0, start), ...replacement, ...(after ?? facts.slice(end))];
         // Edit-path parity: an edited step re-lowers with the parser's default variant — settle it like a
         // newly-typed one (ADR-339).
@@ -809,7 +813,8 @@ export const useGeoStore = create<GeoState>()(
         const swapCmd = (cmd: AnyCommand) => renameInCommand(renameInCommand(renameInCommand(cmd, A, TMP), B, A), TMP, B);
         const swapUtt = (u: string | undefined) => relabelUtterance(relabelUtterance(relabelUtterance(u, A, TMP), B, A), TMP, B);
         set({
-          facts: facts.map((f) => ({ ...f, cmd: swapCmd(f.cmd), utterance: swapUtt(f.utterance) })),
+          // #1973: a cevian's host tag swaps with the letters, through the same sentinel dance
+          facts: facts.map((f) => ({ ...f, cmd: swapCmd(f.cmd), utterance: swapUtt(f.utterance), ...relabelHost({ ...f, ...relabelHost({ ...f, ...relabelHost(f, A, TMP) }, B, A) }, TMP, B) })),
           hidden: get().hidden.map((h) => (h === A ? B : h === B ? A : h)),
           segStyle: renameSegStyle(renameSegStyle(renameSegStyle(get().segStyle, A, TMP), B, A), TMP, B),
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${A}` ? `circle-${B}` : c === `circle-${B}` ? `circle-${A}` : c)),
@@ -839,6 +844,7 @@ export const useGeoStore = create<GeoState>()(
             // token-aware, like rename/swap — the old substring split/join corrupted multi-char labels
             // (`F1`→`E1` when folding F→E), and ✎-edit re-parses this text (STO-6)
             utterance: relabelUtterance(f.utterance, F, T),
+            ...relabelHost(f, F, T), // #1973: the tag follows the letters
           }))
           .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
         set({

@@ -14,7 +14,7 @@
  * have got — one commit, so one «בטל» undoes it.
  */
 import { decideSubmit, type SubmitVerdict } from './submit';
-import { activeOf } from './active';
+import { activeOf, activePins } from './active';
 import { decideSwap, letterHolder, nameInUse, normalizePointName, type LetterHolder, type RelabelCommit, type RenameState } from './rename';
 import { centreSentenceOf, freeLetter } from '../engine/crossings';
 import { derive, type Derivation } from '../engine/derive';
@@ -25,7 +25,9 @@ export type CentreNameVerdict =
   | { kind: 'record'; verdict: Extract<SubmitVerdict, { kind: 'record' }> }
   | { kind: 'refused'; error: InputError; holder?: LetterHolder };
 
-const currentOf = (state: RenameState): Derivation => derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {});
+// #1973 (ADR-AG-430): with the session's recorded hosts, so the figure decided on is the one on the screen
+const currentOf = (state: RenameState): Derivation =>
+  derive(activeOf(state.lines, state.disabled), state.seed, state.seedNames ?? {}, activePins(state.hosts ?? {}, state.lines.length, state.disabled));
 
 /** The sentence the gate accepted, or why not — the one path both the name and the swap go through. */
 function recordable(offerId: string, letter: string, state: RenameState, current: Derivation): CentreNameVerdict {

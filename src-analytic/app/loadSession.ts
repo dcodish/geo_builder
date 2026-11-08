@@ -15,7 +15,7 @@ import { derive } from '../engine/derive';
 import { logAnalytic } from '../debug/sessionLogAnalytic';
 import { cleanSeed, useAnalyticStore } from '../store/useAnalyticStore';
 import { parseLine } from '../parser/parseAnalytic';
-import { activeOf, rowOf } from './active';
+import { activeOf, activePins, rowOf } from './active';
 
 /**
  * Restore a validated envelope's body, then AUDIT it (#1087): the lines are re-parsed on the way
@@ -47,6 +47,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     annotations: envelope.annotations,
     // #2688 — the canvas switches (grid / axis numbers / coordinates); absent = all shown
     display: envelope.display,
+    // #1973 (ADR-AG-430) — the hosts the cevian lines were accepted in; the store keeps only rings that name a line
+    hosts: envelope.hosts,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:
@@ -54,9 +56,9 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
    * but it is still the student's sentence, so one that no longer PARSES is named too — it would be
    * refused the moment they un-mute it, and the drift net is exactly for that.
    */
-  const { disabled } = useAnalyticStore.getState(); // the restored set, already range-checked
+  const { disabled, hosts } = useAnalyticStore.getState(); // the restored set, already range-checked
   const rows = rowOf(savedLines.length, disabled);
-  const replayed = derive(activeOf(savedLines, disabled), 0);
+  const replayed = derive(activeOf(savedLines, disabled), 0, {}, activePins(hosts, savedLines.length, disabled));
   const failed = [
     ...replayed.faults.map((f) => ({ line: savedLines[rows[f.index]] ?? '', reason: f.code })),
     ...disabled.flatMap((i) => {

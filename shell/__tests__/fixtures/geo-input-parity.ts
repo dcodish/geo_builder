@@ -513,6 +513,19 @@ export function catalogCoverageFaults(
 
 // ─── the rows ───────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * #1973 ([ADR-797](../../../docs/06-decisions.md#adr-797), [ADR-AG-430](../../../docs/06c-decisions-analytic.md#adr-ag-430))
+ * — THE HOST TAG IS ONE TEXT IN BOTH BUILDERS (ADR-W-118 B1: 2-D's wording). A verdict row cannot carry a row's tag,
+ * so the equality is carried the same transitive way: each builder's lock builds `steps`, renders the tag beside `row`
+ * through its OWN i18n, and asserts these literals (the LTR run isolated, as both builders' post-processors isolate it).
+ */
+export const CEVIAN_HOST_TAG = {
+  steps: ['משולש ABC', 'AE גובה', 'מרובע ABCD'],
+  row: 'AE גובה',
+  he: 'במשולש \u2066ABC\u2069',
+  en: 'in triangle ABC',
+} as const;
+
 export const PARITY_ROWS: readonly ParityRow[] = [
   // ── every construction sentence of the three catalogs, each in the context that types in every builder
   //    it is expected in (measured on c6a412aa; 'cat-<catalog>-NNN') ──
@@ -898,6 +911,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cevian-height-parallelogram', family: 'cevians-centres', steps: ['מקבילית ABCD', 'AE גובה'], expect: 'builds' },
   // #1966/#2090 (ADR-665): a placed foot outranks the assumed base; a trapezoid's bases are its own pair (the #1965 verdict never changed — builds — so it has no row; where the foot lands is its scenario)
   { id: 'cevian-height-placed-foot-1966', family: 'cevians-centres', steps: ['טרפז ABCD', 'E על BC', 'AE גובה'], expect: 'builds', note: 'E stays on BC, never on C' },
+  // #1973 (ADR-797, ADR-AG-430): an accepted cevian keeps its host when a second shape arrives; its row's tag is CEVIAN_HOST_TAG
+  { id: 'cevian-host-second-shape-1973', family: 'cevians-centres', steps: ['משולש ABC', 'AE גובה', 'מרובע ABCD'], expect: 'builds', note: 'the row reads «AE גובה», with «במשולש ABC» beside it in 2-D and analytic' },
   { id: 'trapezoid-midsegment-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EF קטע אמצעים'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'trapezoid-bases-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EL מקביל לבסיסים'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },

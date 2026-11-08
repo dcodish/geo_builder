@@ -41,6 +41,13 @@ export interface FactRow {
   lead?: ReactNode;
   /** After the statement, OUTSIDE its direction scope (e.g. 3-D's per-plane display chips). */
   trail?: ReactNode;
+  /**
+   * #1973 (ADR-797, ADR-AG-430) — a quiet LABEL beside the statement: the shape a cevian was drawn in
+   * («במשולש ABC»), so «AE גובה» keeps the student's words and still says which height it is. Text only, in
+   * its own direction, before the row's `trail`; the product decides which rows carry one and words it. One
+   * look in every builder because the chrome draws it, not each product.
+   */
+  tag?: { text: string; title?: string };
   /** Under the statement, OUTSIDE its direction scope (advisories, readouts). Each note carries
    *  its own direction — a Hebrew sentence under an LTR statement is still a Hebrew sentence. */
   notes?: ReactNode;
@@ -194,6 +201,11 @@ export function FactList({
                 {row.error && <div style={errorStyle}>{row.error}</div>}
               </div>
             )}
+            {row.tag && editing?.id !== row.id && (
+              <span data-testid="fact-tag" dir={textDir(row.tag.text)} title={row.tag.title} style={tagStyle}>
+                {row.tag.text}
+              </span>
+            )}
             {row.trail !== undefined && editing?.id !== row.id && <span style={trailStyle}>{row.trail}</span>}
             <span style={rowActions}>
               {/* #937: the chip sits with the row's OTHER actions, before ✎/✕ — it is an affordance
@@ -254,6 +266,18 @@ const chipBtn: CSSProperties = {
   lineHeight: '16px',
   padding: '1px 6px',
   cursor: 'pointer',
+};
+
+/** #1973: the host tag — the chip's quiet pill, but a label, not a control (no pointer, no button). */
+const tagStyle: CSSProperties = {
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  border: `1px solid ${color.border}`,
+  borderRadius: 6,
+  color: color.faint,
+  fontSize: 11,
+  lineHeight: '16px',
+  padding: '1px 6px',
 };
 
 const wrap: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };

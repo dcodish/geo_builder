@@ -28,6 +28,7 @@ import { EN_SHAPE, axisOf, displacedAssumption, isGenericNoun, membersOf, namesO
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { probeEnvs } from './probes';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
+import { hostNounOf, type CevianHost } from '../../shell/cevianHost';
 import { measureRestatement } from './statedMeasures';
 import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols, directionSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
@@ -828,7 +829,11 @@ export type ApplyOutcome =
    * `createdCircle` (#2552 D9, ADR-AG-344): the fact stated a NEW circle on this centre letter («X מרכז מעגל» with every
    * circle's centre lettered). The fold carries it per fact; the submit path turns it into the created-circle notice.
    */
-  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true; createdCircle?: Id }
+  /*
+   * `host` (#1973, ADR-AG-430): the ring a cevian whose sentence named neither its side nor its triangle was resolved in
+   * («AE גובה» → triangle ABC). The fold carries it per fact; `derive` rolls it up per line for the row's tag.
+   */
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true; createdCircle?: Id; host?: CevianHost }
   | { ok: false; error: ApplyError };
 
 /**
@@ -2035,6 +2040,28 @@ const oppositeRingEdges = (ring: readonly Id[], apex: Id): [Id, Id][] => {
   }
   return out;
 };
+
+/**
+ * #1973 ([ADR-AG-430](../../docs/06c-decisions-analytic.md#adr-ag-430); 2-D's `noteCevianHost`, ADR-797, ported) —
+ * THE SHAPE A CEVIAN WAS DRAWN IN, once M1 has chosen its side `u v` from the figure: the one ring of the figure that
+ * holds the apex and has `u v` as an opposite side — any ring for a height, a triangle for every other cevian (the
+ * rings the arm itself resolves in). A side two rings share names no single shape: null, and the row shows no tag
+ * rather than a guess. Its noun is the ring's declared one (`shapeRow`'s kind), worded by `shell/cevianHost`. A line
+ * PINNED to a ring (`only`, its sorted letters) resolved in that ring alone, so that ring is its host.
+ */
+function cevianHostOf(c: Construction, apex: Id, u: Id, v: Id, anyRing: boolean, only: string | null): CevianHost | null {
+  const hits = new Map<string, PolygonObject>();
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 3 || !o.vertices.includes(apex)) continue;
+    if (o.vertices.length !== 3 && !anyRing) continue;
+    if (only !== null && [...o.vertices].sort().join(',') !== only) continue;
+    if (!oppositeRingEdges(o.vertices, apex).some((e) => sameEdge(e, [u, v]))) continue;
+    hits.set([...o.vertices].sort().join(','), o);
+  }
+  if (hits.size !== 1) return null;
+  const [ring] = [...hits.values()];
+  return { ring: [...ring.vertices], kind: hostNounOf(ring.vertices.length, ring.noun ? shapeRow(ring.noun)?.kind : undefined) };
+}
 
 /**
  * THE PARALLEL BASE A TRAPEZOID'S HEIGHT DROPS ONTO (#1945; 2-D's [ADR-169](../../docs/06-decisions.md#adr-169)).
@@ -5805,9 +5832,18 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       /** Every candidate side, deduped, in declaration order — the union 2-D's `cevianShapeEdges` draws one from. */
       const union: [Id, Id][] = [];
       let parallelBase: [Id, Id] | null = null;
+      /*
+       * #1973 (ADR-AG-430) — THE HOST RECORDED WHEN THE LINE WAS ACCEPTED. A line the session recorded with a host (`pin`,
+       * set by `derive` from the store's `hosts`) resolves in THAT ring while the figure still holds it, so a shape that
+       * reaches the line's position later (an earlier row edited or un-muted) cannot change which height the row means.
+       * A ring no longer in the figure pins nothing: the line resolves as it always did.
+       */
+      const pinKey = f.pin && f.apex && !f.side ? [...f.pin].sort().join(',') : null;
+      const pinned = pinKey !== null && c.objects.some((o) => o.kind === 'polygon' && o.vertices.includes(f.apex!) && [...o.vertices].sort().join(',') === pinKey);
       for (const o of f.apex && f.side ? [] : c.objects) {
         if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
         if (o.vertices.length !== 3 && !ringHost) continue;
+        if (pinned && [...o.vertices].sort().join(',') !== pinKey) continue;
         const ring = o.vertices;
         if (f.side) {
           const [u, v] = f.side;
@@ -5862,19 +5898,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
       /** The length the sentence stated for this cevian (#1737, ADR-AG-265), on the segment it draws. */
       const measured = (foot: Id): Fact[] => (f.measure ? measureFacts(f.measure, apex, foot) : []);
+      /** #1973 (ADR-AG-430): the ring the figure chose the side in, said beside the row — only when the sentence named neither. */
+      const hosted = (out: ApplyOutcome): ApplyOutcome => {
+        const host = f.apex && !f.side ? cevianHostOf(c, apex, u, v, ringHost, pinned ? pinKey : null) : null;
+        return out.ok && host ? { ...out, host } : out;
+      };
       if (f.toolFoot && !objectById(c, f.foot)) {
         // The same point derived the same way already has a name (#1153): the cevian runs to IT.
         const rule = toolFootRule(f.role, apex, u, v);
         const same = c.objects.find((o) => o.kind === 'derived' && !o.follows && sameDerivation(o.rule, rule));
         // #2166 (ADR-790): the typed letter is never dropped: the tool's letter yields to it (#2674), a student's is the model's.
         if (same && f.typedFoot) {
-          if (same.kind === 'derived' && same.tool) return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
+          if (same.kind === 'derived' && same.tool) return hosted(applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]));
           return { ok: false, error: { code: 'not-handled', detail: f.src } };
         }
-        if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]);
+        if (same) return hosted(applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]));
         // The foot's letter is the tool's (#2674): `auto`, so a student's fresh letter for the same point takes it over.
         const tool = toolFootFacts(f.role, apex, f.foot, u, v, f.src).map((h): Fact => (h.t === 'derived' ? { ...h, auto: true } : h));
-        return applyAll(c, [...tool, ...measured(f.foot)]);
+        return hosted(applyAll(c, [...tool, ...measured(f.foot)]));
       }
       /*
        * A STUDENT'S FRESH FOOT FOR THE TOOL'S POINT (#2674, ADR-AG-387): «AD תיכון במשולש ABC» after «תיכון מ-A במשולש ABC»
@@ -5885,10 +5926,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!f.toolFoot && !objectById(c, f.foot)) {
         const rule = toolFootRule(f.role, apex, u, v);
         if (c.objects.some((o) => o.kind === 'derived' && o.tool && !o.follows && sameDerivation(o.rule, rule))) {
-          return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
+          return hosted(applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]));
         }
       }
-      return applyAll(c, [...cevianFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
+      return hosted(applyAll(c, [...cevianFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]));
     }
 
     /**
@@ -7010,6 +7051,8 @@ export interface FoldResult {
   created: Array<Id[] | null>;
   /** #2552 D9 (ADR-AG-344): per fact, the centre letter of the NEW circle it stated (`createdCircle`), null elsewhere. */
   createdCircles: Array<Id | null>;
+  /** #1973 (ADR-AG-430): per fact, the ring a cevian whose sentence named none was resolved in (`host`), null elsewhere. */
+  hosts: Array<CevianHost | null>;
   /**
    * #1687 (ADR-AG-348): per object id, the index of the FACT that first put it in the construction — recorded where
    * `constraintFact` is, by comparing the construction before and after each commit. `fold` turns it into the
@@ -7074,6 +7117,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
           r.notices[i] = null;
           r.created[i] = null;
           r.createdCircles[i] = null;
+          r.hosts[i] = null;
         }
       });
       return withObjectLines(r, group);
@@ -7121,6 +7165,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   const effects: Array<LineEffect | null> = facts.map(() => null);
   const notices: Array<ApplyNotice | null> = facts.map(() => null);
   const createdCircles: Array<Id | null> = facts.map(() => null);
+  const hosts: Array<CevianHost | null> = facts.map(() => null);
   /**
    * Which FACT put each constraint in the construction (#1079).
    *
@@ -7142,7 +7187,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   const selectorFact: number[] = [];
   const touchByOnLine: boolean[] = facts.map(() => false);
   const objectFact = new Map<Id, number>();
-  const commit = (i: number, committed: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id) => {
+  const commit = (i: number, committed: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true, circle?: Id, host?: CevianHost) => {
     const next = drawLinesSpokenOf(c, committed);
     touchByOnLine[i] = byOnLine === true;
     // #1687 (ADR-AG-348): the first fact that brought each object in — the object's provenance.
@@ -7179,6 +7224,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     effects[i] = effect;
     notices[i] = notice ?? null;
     createdCircles[i] = circle ?? null;
+    hosts[i] = host ?? null;
   };
   /*
    * #2169 (ADR-W-131): the lines whose shape noun the ring's nouns already imply (`restates`) — the rest of that line's
@@ -7219,7 +7265,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     }
     const out = applyTyped(aged(f, i));
     if (out.ok) {
-      commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
+      commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle, out.host);
       if (out.restates) restated.add(lineOfFact(i));
     } else errors[i] = out.error;
   });
@@ -7235,7 +7281,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         if (failedOn.get(i) === c) return;
         const out = applyTyped(aged(f, i));
         if (out.ok) {
-          commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle);
+          commit(i, out.next, out.effect, out.notice, out.touchByOnLine, out.createdCircle, out.host);
           progressed = true;
         } else {
           errors[i] = out.error;
@@ -7326,14 +7372,14 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         next = minted0;
         continue;
       }
-      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine, out.createdCircle);
+      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine, out.createdCircle, out.host);
       created[landed[0].j] = missing;
       minted = true;
     }
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, touchByOnLine, objectFact };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, created, createdCircles, hosts, touchByOnLine, objectFact };
 }
 
 /**

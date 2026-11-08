@@ -171,8 +171,9 @@ so a migration of 3-D onto the shared core has to decide about it rather than lo
 statement's string, and `content`, its rendering. The chrome wraps `content` in
 `<div dir={textDir(text)} data-fact-text>`, using the `textDir` the product passes (required). The
 edit-in-place box takes its `dir` from the same function, per keystroke. The row's other parts sit
-outside that scope and follow the UI's direction: `lead` (the status mark), `trail` (3-D's plane
-chips), `notes` (advisories and readouts, each with its own `dir`) and `error`. A product still
+outside that scope and follow the UI's direction: `lead` (the status mark), `tag` (a quiet label beside the
+statement in its own `dir`, the cevian host of #1973), `trail` (3-D's plane chips), `notes` (advisories and readouts,
+each with its own `dir`) and `error`. A product still
 decides WHICH string is the statement (3-D: `factRowText3`) and HOW it is typeset. Shell only decides
 that the direction comes from that string. The rows and checks live in
 `shell/__tests__/fixtures/fact-row-dir-rows.tsx`, and each tree runs them against its own `textDir`.
@@ -489,6 +490,21 @@ A line that created a CIRCLE by its centre ([ADR-W-164](06w-decisions-workspace.
 `suite.notice.createdCircle` («נוצר מעגל חדש שמרכזו {{centre}} — …») instead: `CreatedNotice.circle` carries the centre,
 `createdNoticeTextOf(notice)` picks the key, and the ✕ is the same. The rows' sixth (circle) row runs for a builder that
 hands `CreatedNoticeSentences.circle`: analytic (`record.createdCircle`) and 3-D (`Derived3.createdCircles`). A circle with no centre letter carries `circle: ''` and shows `suite.notice.createdCircleUnnamed` ([ADR-3D-420](06b-decisions-3d.md#adr-3d-420)).
+
+### The cevian host tag ([ADR-797](06-decisions.md#adr-797), [ADR-AG-430](06c-decisions-analytic.md#adr-ag-430), #1973)
+
+`shell/cevianHost.ts` words the shape a cevian was resolved in, for every builder that records one. A `CevianHost` is
+`{ ring, kind }`, where `kind` is a `HostNoun`: the ring's base noun from `hostNounOf(arity, declared kind)`. Every
+triangle is `triangle`, a quadrilateral keeps its specific noun (the adjective variants fold to it), and a larger
+ring is `n5`…`n10` or `polygon`. `hostTag(host, t)` returns the fact list's `tag` from the suite strings
+`suite.host.<kind>` («במשולש {{ring}}», "in triangle {{ring}}") and its tooltip `suite.host.title`. `cleanHost`
+is the one reader of a saved host. `heldHost(host, rings)` keeps a stored host only while the figure holds its ring
+(2-D's rows ask it, because a 2-D fact keeps its host after its ring is muted or edited away; analytic's derivation
+reports no host for such a line). Each builder decides WHICH ring (2-D in the parser, analytic at M1) and calls
+this, so the tag is one text in both (ADR-W-118 B1). The shared literal `CEVIAN_HOST_TAG` in the parity fixtures is
+what both builders' locks render.
+
+*Identifiers:* `CevianHost` · `HostNoun` · `hostNounOf` · `hostTag` · `hostTagText` · `heldHost` · `cleanHost` · `suite.host.*` · `CEVIAN_HOST_TAG`
 
 ### The guide's sample, and its escape hatch ([ADR-W-074](06w-decisions-workspace.md#adr-w-074))
 

@@ -65,6 +65,11 @@ export interface SavedAnalyticSession {
   /** #2688 (ADR-AG-388) — the canvas switches the student turned OFF (`{ grid: false }`). Omitted when all are shown,
    *  so every save from before it loads unchanged, as all shown. */
   display?: Partial<CanvasDisplay>;
+  /**
+   * #1973 (ADR-AG-430) — per line INDEX, the ring a cevian line was accepted in («AE גובה» → `["A","B","C"]`): the line
+   * resolves in it while the figure holds it. Omitted when none, so every save from before it loads unchanged.
+   */
+  hosts?: Record<number, string[]>;
 }
 
 /**
@@ -312,6 +317,8 @@ export interface LetterCommit {
   curveStyle?: SegDisplayMap;
   /** #1863 — the annotation map under the new object ids; absent = unchanged. */
   annotations?: AnnotationMap;
+  /** #1973 — the recorded hosts under the new letters; absent = unchanged. */
+  hosts?: Record<number, string[]>;
 }
 
 interface AnalyticState {
@@ -319,6 +326,13 @@ interface AnalyticState {
   lines: string[];
   /** #1297 — see {@link SavedAnalyticSession.spokenFor}. Keys follow the lines' indices. */
   spokenFor: Record<number, string>;
+  /**
+   * #1973 ([ADR-AG-430](../../docs/06c-decisions-analytic.md#adr-ag-430)) — THE HOST EACH CEVIAN LINE WAS ACCEPTED IN,
+   * per line INDEX: the ring its cevian resolved in when it was recorded, captured from the decision that recorded it.
+   * `derive` honours it (`pins`), so «AE גובה» keeps meaning the triangle's height when a second shape reaches its
+   * position later. Keys follow the lines, as `spokenFor`'s do; an edited line takes the host its edit resolved to.
+   */
+  hosts: Record<number, string[]>;
   /**
    * THE MUTED LINES (#1548, docs/28 D6) — indexes into `lines`, the complex shape.
    *
@@ -365,9 +379,11 @@ interface AnalyticState {
    * before it.
    */
   /** `at` (#2039, ADR-AG-358): the configuration the decision drew the new figure in — recorded in the same set. */
-  recordLine: (line: string, notice?: string | null, at?: Seed) => void;
+  /** `host` (#1973, ADR-AG-430): the ring the line's cevian was resolved in — recorded with the line, in the same set. */
+  recordLine: (line: string, notice?: string | null, at?: Seed, host?: readonly string[]) => void;
   removeLine: (index: number) => void;
-  replaceLine: (index: number, next: string) => void;
+  /** `host` (#1973): the ring the edited line's cevian resolves in; absent = none (the old host goes with the old line). */
+  replaceLine: (index: number, next: string, host?: readonly string[]) => void;
   /** #1548 — record the muted set the submit path decided on. */
   setDisabled: (disabled: number[]) => void;
   /**
@@ -462,7 +478,7 @@ interface AnalyticState {
    */
   serialize: () => SavedAnalyticSession;
   /** Replace the session with a loaded one. */
-  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown; annotations?: unknown; display?: unknown }) => void;
+  restore: (session: { lines: string[]; seed?: Seed; name?: string; spokenFor?: Record<number, string>; disabled?: number[]; seedNames?: Record<string, string>; segStyle?: unknown; curveStyle?: unknown; annotations?: unknown; display?: unknown; hosts?: unknown }) => void;
   /** Record the fallback's machine lines under the student's OWN sentence (#1297). */
   /** `notice` travels in the commit, as `recordLine`'s does (#1350). */
   recordLlmLines: (spoken: string, lines: string[], notice?: string | null, at?: Seed) => void;
@@ -487,7 +503,7 @@ export const rowShownText = (line: string, spoken: string | undefined): string =
   spoken !== undefined && spokenSentence(spoken) === spoken ? spoken : line;
 
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
-const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle, annotations }: LetterCommit) => ({
+const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle, annotations, hosts }: LetterCommit) => ({
   lines: lines.map(ingestTypedText),
   queries: [...queries],
   spokenFor: { ...spokenFor },
@@ -495,6 +511,7 @@ const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveSty
   ...(segStyle ? { segStyle: { ...segStyle } } : {}),
   ...(curveStyle ? { curveStyle: { ...curveStyle } } : {}),
   ...(annotations ? { annotations: { ...annotations } } : {}),
+  ...(hosts ? { hosts: { ...hosts } } : {}),
   error: null,
   notice: null,
 });
@@ -553,11 +570,40 @@ function cleanSpokenFor(raw: unknown, lineCount: number): Record<number, string>
   return out;
 }
 
+/**
+ * #1973 (ADR-AG-430) — the recorded hosts from a saved file, kept only where they can be true: a key that names a LINE
+ * of this file and a ring of three or more distinct point names. Anything else is dropped — that line then resolves as
+ * it always did — never trusted.
+ */
+function cleanHosts(raw: unknown, lineCount: number): Record<number, string[]> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<number, string[]> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const i = Number(k);
+    if (!/^\d+$/.test(k) || i >= lineCount || !Array.isArray(v) || v.length < 3) continue;
+    if (!v.every((p): p is string => typeof p === 'string' && isPointName(p)) || new Set(v).size !== v.length) continue;
+    out[i] = [...v];
+  }
+  return out;
+}
+
+/** #1973: the host map after line `index` is removed — its own key dropped, every later key one row up. */
+const shiftHosts = (hosts: Record<number, string[]>, index: number): Record<number, string[]> => {
+  const out: Record<number, string[]> = {};
+  for (const [k, v] of Object.entries(hosts)) {
+    const i = Number(k);
+    if (i < index) out[i] = v;
+    else if (i > index) out[i - 1] = v; // keys follow their lines when an earlier row goes
+  }
+  return out;
+};
+
 export const useAnalyticStore = create<AnalyticState>()(
   temporal(
     (set, get) => ({
   lines: [],
   spokenFor: {},
+  hosts: {},
   disabled: [],
   seedNames: {},
   segStyle: {},
@@ -574,8 +620,15 @@ export const useAnalyticStore = create<AnalyticState>()(
 
   // #1348 (ADR-W-095): the store-side ingest (ADR-W-029) — every line this store records passes it
   // #2039 (ADR-AG-358): the drawn configuration rides IN the commit, so the undo entry is one and holds what was shown
-  recordLine: (line, notice = null, at) =>
-    set((s) => ({ lines: [...s.lines, ingestTypedText(line)], error: null, notice, ...(at === undefined ? {} : { seed: canonicalSeed(at) }) })),
+  // #1973 (ADR-AG-430): the host the decision resolved the line's cevian in rides IN the commit too
+  recordLine: (line, notice = null, at, host) =>
+    set((s) => ({
+      lines: [...s.lines, ingestTypedText(line)],
+      ...(host ? { hosts: { ...s.hosts, [s.lines.length]: [...host] } } : {}),
+      error: null,
+      notice,
+      ...(at === undefined ? {} : { seed: canonicalSeed(at) }),
+    })),
   recordLlmLines: (spoken, ls, notice = null, at) =>
     set((s) => {
       const spokenFor = { ...s.spokenFor };
@@ -594,13 +647,15 @@ export const useAnalyticStore = create<AnalyticState>()(
       }
       // #1548: the muted indexes name POSITIONS, so they shift with their lines too (complex's rule)
       const disabled = s.disabled.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d));
-      return { lines: s.lines.filter((_, i) => i !== index), spokenFor, disabled, error: null, notice: null };
+      return { lines: s.lines.filter((_, i) => i !== index), spokenFor, hosts: shiftHosts(s.hosts, index), disabled, error: null, notice: null };
     }),
-  replaceLine: (index, next) =>
+  replaceLine: (index, next, host) =>
     set((s) => {
       // An EDITED row shows what the student typed into the editor — the annotation is stale.
       const { [index]: _gone, ...spokenFor } = s.spokenFor;
-      return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, error: null, notice: null };
+      // #1973: and its host is the one the EDIT resolved to, accepted now — the old line's goes with it
+      const { [index]: _was, ...hosts } = s.hosts;
+      return { lines: s.lines.map((l, i) => (i === index ? ingestTypedText(next) : l)), spokenFor, hosts: host ? { ...hosts, [index]: [...host] } : hosts, error: null, notice: null };
     }),
   setDisabled: (disabled) => set({ disabled: [...disabled].sort((a, b) => a - b), error: null, notice: null }),
   applyRename: (next) => set(letterCommit(next)),
@@ -614,7 +669,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   clearAll: () =>
     // The QUERIES go with the lines (#1110): a reading of a figure that no longer exists is a lie,
     // and «נקה הכל» is the clearest case of the figure no longer existing.
-    set({ lines: [], spokenFor: {}, disabled: [], seedNames: {}, segStyle: {}, curveStyle: {}, annotations: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
+    set({ lines: [], spokenFor: {}, hosts: {}, disabled: [], seedNames: {}, segStyle: {}, curveStyle: {}, annotations: {}, error: null, notice: null, seed: 0, name: '', loadAudit: null, queries: [] }),
 
   /**
    * The three gestures, as store actions (ADR-AG-067's decisions, now over the stored record).
@@ -645,7 +700,7 @@ export const useAnalyticStore = create<AnalyticState>()(
   setLoadAudit: (loadAudit) => set({ loadAudit }),
 
   serialize: () => {
-    const { lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, annotations, display } = get();
+    const { lines, seed, name, spokenFor, hosts, disabled, seedNames, segStyle, curveStyle, annotations, display } = get();
     const hidden = displayForSave(display);
     return {
       app: ANALYTIC_APP,
@@ -660,10 +715,11 @@ export const useAnalyticStore = create<AnalyticState>()(
       ...(Object.keys(curveStyle).length ? { curveStyle: JSON.parse(JSON.stringify(curveStyle)) as SegDisplayMap } : {}),
       ...(hidden ? { display: hidden } : {}),
       ...(Object.keys(annotations).length ? { annotations: cleanAnnotations(annotations) } : {}),
+      ...(Object.keys(hosts).length ? { hosts: Object.fromEntries(Object.entries(hosts).map(([k, v]) => [k, [...v]])) } : {}),
     };
   },
 
-  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, annotations, display }) =>
+  restore: ({ lines, seed, name, spokenFor, disabled, seedNames, segStyle, curveStyle, annotations, display, hosts }) =>
     set({
       // #2688 — the canvas switches; absent (every older file) or malformed is all shown
       display: cleanCanvasDisplay(display),
@@ -675,6 +731,8 @@ export const useAnalyticStore = create<AnalyticState>()(
       annotations: cleanAnnotations(annotations),
       lines: lines.map(ingestTypedText),
       spokenFor: cleanSpokenFor(spokenFor, lines.length),
+      // #1973 — the recorded hosts, kept only where they name a line and a ring
+      hosts: cleanHosts(hosts, lines.length),
       seedNames: cleanSeedNames(seedNames),
       // #1548: only indexes that name a line survive a restore — a hand-edited file cannot mute a ghost
       disabled: [...new Set(disabled ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d < lines.length).sort((a, b) => a - b),
@@ -709,11 +767,11 @@ export const useAnalyticStore = create<AnalyticState>()(
       // #2688: so do the canvas switches (grid / axis numbers / coordinates) — one «בטל» puts a switch back.
       // #1863: the annotation map rides along — a chip press is a step the student took (ADR-AG-375: "undoable").
       partialize: (s) =>
-        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle, annotations: s.annotations, display: s.display }) as AnalyticState,
+        ({ lines: s.lines, seed: s.seed, queries: s.queries, disabled: s.disabled, spokenFor: s.spokenFor, hosts: s.hosts, seedNames: s.seedNames, segStyle: s.segStyle, curveStyle: s.curveStyle, annotations: s.annotations, display: s.display }) as AnalyticState,
       // Without this, setting an error would push a history entry and undo would appear to do nothing.
       equality: (a, b) =>
         a.lines === b.lines && sameSeed(a.seed, b.seed) && a.queries === b.queries && a.disabled === b.disabled &&
-        a.spokenFor === b.spokenFor && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle && a.annotations === b.annotations && a.display === b.display,
+        a.spokenFor === b.spokenFor && a.hosts === b.hosts && a.seedNames === b.seedNames && a.segStyle === b.segStyle && a.curveStyle === b.curveStyle && a.annotations === b.annotations && a.display === b.display,
       limit: 100,
     },
   ),

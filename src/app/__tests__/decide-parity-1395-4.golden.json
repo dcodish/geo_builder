@@ -400,6 +400,7 @@
  "fixture:issue-1966-placed-foot-trapezoid.geo.json": "48234087e91def52",
  "fixture:issue-1972-cyclic-triangle-reveals-its-circle.geo.json": "7a6c0ea75eb8170f",
  "fixture:issue-1972-pentagon-reveals-its-circle.geo.json": "69522a0cdd543a67",
+ "fixture:issue-1973-cevian-host.geo.json": "7dbc503f754d7c2e",
  "fixture:issue-1999-bisector-english.geo.json": "8310541463f21908",
  "fixture:issue-1999-bisector-vertex-last.geo.json": "690c74e8ac173ba8",
  "fixture:issue-1999-height-vertex-last.geo.json": "f081d9a5362d3ab1",
