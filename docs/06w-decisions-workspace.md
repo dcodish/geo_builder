@@ -5151,7 +5151,7 @@ That makes two copies of one surface, with a third on the way. ADR-W-016 rule 1 
 
 ## ADR-W-107 — A claim to prove is refused in every builder, by one shared rule (#1666)
 
-**⚠ Amended by [ADR-W-192](#adr-w-192) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
+**⚠ Amended by [ADR-W-194](#adr-w-194) (2026-11-08):** the builders no longer word their own refusal: it is one suite sentence, `suite.refusal.proofTarget`, followed by where the claim can be checked (2-D its relations button; analytic and complex their data panel; 3-D pending the operator, #2492).
 
 **Status:** accepted · 2026-10-02 · bug (P1, honesty) · operator ruling on #1649, 2026-10-02: *"all refused with exaplanation"*. **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Product sides: [ADR-561](06-decisions.md#adr-561) (2-D), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295) (3-D); analytic's first copy was ADR-AG-187 (#1618).
 
@@ -7129,7 +7129,7 @@ That folded **345 files for 315 issues: 2-D 203, 3-D 75, analytic 48, complex 19
 
 **Behaviour change for a student:** none.
 
-## ADR-W-192 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
+## ADR-W-194 — The proof-target refusal is one suite sentence, and it says where the claim can be checked: 2-D its relations button, analytic and complex their data panel (#2492)
 
 **Status:** accepted · 2026-11-08 · feature (P2, all four builders) · fix round #2745, stream G · branch `feat/2492-proof-target-check` · **Operator:** 2026-10-24, playing round #2466 T12: *"For all cases of הוכיחו we should add to the message that they can check if its true using the data panel. ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות וזוויות שוות."*; his ruling the same day (ballot e19, answer B with a note that wins over the card): *"Other tools have the data panel and there is a ask button there that might be able to answer such questions so for non-2d tools, we tell them to check the claim in the data panel"* · plan of 2026-10-24 (#2492), armed `auto-ok` on that ruling · **Amends** [ADR-W-107](#adr-w-107) (each builder no longer words its own refusal) · **Extends** [ADR-W-148](#adr-w-148) (two suite keys) · per-product notes on [ADR-561](06-decisions.md#adr-561), [ADR-3D-295](06b-decisions-3d.md#adr-3d-295), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)
 **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 and its parity row *A proof target «הוכיחו כי»*; [02](02-requirements.md) FR-RV-1 (the refusal names the control); [02c](02c-requirements-analytic.md) *Out of the language*; [02d](02d-requirements-complex.md) FR-KN-2 · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* and § *Proof targets*; [04d](04d-design-complex.md) (the complex wording site)

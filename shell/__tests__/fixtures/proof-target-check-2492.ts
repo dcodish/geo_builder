@@ -1,5 +1,5 @@
 /**
- * #2492 ([ADR-W-192](../../../docs/06w-decisions-workspace.md#adr-w-192)) — the proof-target refusal says where the claim
+ * #2492 ([ADR-W-194](../../../docs/06w-decisions-workspace.md#adr-w-194)) — the proof-target refusal says where the claim
  * can be checked, and names only what the builder draws. The shared half of the per-builder locks.
  *
  * Operator, 2026-10-24: *"For all cases of הוכיחו we should add to the message that they can check if its true … ניתן

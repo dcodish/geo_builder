@@ -95,7 +95,7 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // a measured wording difference outside this issue, reported as found work, so it is not asserted here.
   vertexAngleReadAs: { '2d': ['input.vertexAngleReadAs'], '3d': ['notice.vertexAngleReadAs'], complex: null, analytic: null },
 
-  // `proofTarget` (#1870, ADR-CX-083, ADR-W-107) left this table in #2492 (ADR-W-192): it is ONE key now,
+  // `proofTarget` (#1870, ADR-CX-083, ADR-W-107) left this table in #2492 (ADR-W-194): it is ONE key now,
   // `suite.refusal.proofTarget`, so it cannot differ. Its ruled text and the retired keys are held below.
 };
 
@@ -238,7 +238,7 @@ describe('#1990 — one already-there note', () => {
 });
 
 /**
- * #2492 (ADR-W-192; operator 2026-10-24 and his ruling the same day, ballot e19) — the proof-target refusal: one suite
+ * #2492 (ADR-W-194; operator 2026-10-24 and his ruling the same day, ballot e19) — the proof-target refusal: one suite
  * sentence in every builder (#1870's role, ADR-W-107's wording), then where the claim can be checked. 2-D names its
  * relations button (the operator's sentence); a builder that sends the student to its data panel reads ONE suite line
  * whose two names are its own labels. The per-builder rendering is each tree's `proof-target-1666.test.ts`.

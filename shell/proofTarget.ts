@@ -143,7 +143,7 @@ export function findProofTarget(text: string): ProofTarget | null {
 export const isProofTarget = (text: string): boolean => findProofTarget(text) !== null;
 
 /**
- * #2492 ([ADR-W-192](../docs/06w-decisions-workspace.md#adr-w-192)) — THE REFUSAL'S SUITE KEYS, and the line that says
+ * #2492 ([ADR-W-194](../docs/06w-decisions-workspace.md#adr-w-194)) — THE REFUSAL'S SUITE KEYS, and the line that says
  * where the claim CAN be checked.
  *
  * Operator, 2026-10-24: *"For all cases of הוכיחו we should add to the message that they can check if its true …"*, and

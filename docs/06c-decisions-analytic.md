@@ -8579,7 +8579,7 @@ A subject whose tail the reader cannot account for, or with a capital letter bef
 
 ## ADR-AG-187 — The exam's sentence frame is read once, at `parseLine`; a proof target is refused; a right trapezoid does not fix its leg (#1618)
 
-**⚠ Amended by [ADR-W-192](06w-decisions-workspace.md#adr-w-192) (2026-11-08, #2492):** the proof-target refusal is the suite sentence `suite.refusal.proofTarget`, then `suite.refusal.proofTargetCheckPanel` naming this builder's «נתונים» panel and «שאלו» button by their own keys (`errorText` → `proofTargetPanelText`). `errProofTarget` is deleted.
+**⚠ Amended by [ADR-W-194](06w-decisions-workspace.md#adr-w-194) (2026-11-08, #2492):** the proof-target refusal is the suite sentence `suite.refusal.proofTarget`, then `suite.refusal.proofTargetCheckPanel` naming this builder's «נתונים» panel and «שאלו» button by their own keys (`errorText` → `proofTargetPanelText`). `errProofTarget` is deleted.
 
 **Status:** accepted · 2026-10-01 · operator rulings 2026-10-01 on #1616 (full 2-D parity first; proof targets refused, "this is not a proof engine"; chords lifted) · slice A of #1616
 

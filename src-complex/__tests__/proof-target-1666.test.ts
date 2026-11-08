@@ -10,7 +10,7 @@
  * Now each is refused as `proof-target`, quoting the proof sentence, and nothing of it is recorded. How a BARE
  * statement («w ממשי») is read is not this file's to lock: ruled to change (#2338, 2026-10-17).
  *
- * #2492 ([ADR-W-192](../../docs/06w-decisions-workspace.md#adr-w-192)): the refusal ends by saying where the claim can be
+ * #2492 ([ADR-W-194](../../docs/06w-decisions-workspace.md#adr-w-194)): the refusal ends by saying where the claim can be
  * checked: the data panel, whose ask box answers the claim's quantities (operator ruling 2026-10-24, ballot e19). The
  * panel and its button are named by the keys the App draws them with.
  */

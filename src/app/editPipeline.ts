@@ -91,7 +91,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     const before = replay(work.filter((f) => !afterIds.has(f.id)));
     return buildParseCtx(before.construction, before.positions);
   };
-  // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit. #2492 (ADR-W-192):
+  // #1666 (ADR-561): an edit is a statement too — a proof target is refused here exactly as at submit. #2492 (ADR-W-194):
   // the same note, rendered the same way (`renderNote`, its `also` line included), so the two seams cannot word it apart.
   const proof = findProofTarget(editText);
   if (proof) {

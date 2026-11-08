@@ -184,7 +184,7 @@ const SIDE_WORD_KEY = { above: 'sideWordAbove', below: 'sideWordBelow', right: '
 
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
-  // #1618 / #1666: a claim to prove is named and left out. #2492 (ADR-W-192): the suite's sentence, then where the claim
+  // #1618 / #1666: a claim to prove is named and left out. #2492 (ADR-W-194): the suite's sentence, then where the claim
   // can be checked: this panel's ask box, named by the labels the panel and its button carry (`dataTitle`, `askAdd`).
   if (error.key === 'proof-target') return proofTargetPanelText(t, error.detail, { panel: t('dataTitle'), ask: t('askAdd') });
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;

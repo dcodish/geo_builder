@@ -8,7 +8,7 @@
  * the mixed line «נתון AB = AC. הוכיחו כי …» were refused as `bad-operand` — never recorded, but the message
  * blamed the operand instead of saying it is a claim to prove. Now each is `proof-target`, quoting the claim.
  *
- * #2492 ([ADR-W-192](../../docs/06w-decisions-workspace.md#adr-w-192)): the refusal ends by saying where the claim can be
+ * #2492 ([ADR-W-194](../../docs/06w-decisions-workspace.md#adr-w-194)): the refusal ends by saying where the claim can be
  * checked: the data panel, whose ask box answers the claim's quantities (operator ruling 2026-10-24, ballot e19). The
  * panel and its button are named by the keys the App draws them with.
  */

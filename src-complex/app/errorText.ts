@@ -83,7 +83,7 @@ const errParams = (e: InputError, t: Translate): Record<string, string> =>
 
 /**
  * The sentence a refusal reaches the student as. A claim to prove (#1870, ADR-CX-083) reads the suite's sentence, then where
- * the claim can be checked (#2492, ADR-W-192): this panel's ask box, named by the labels the panel and its button carry.
+ * the claim can be checked (#2492, ADR-W-194): this panel's ask box, named by the labels the panel and its button carry.
  */
 export const errorText = (e: InputError, t: Translate): string =>
   e.key === 'proof-target' ? proofTargetPanelText(t, e.detail, { panel: t('dataTitle'), ask: t('askAdd') }) : t(keyOf(e), errParams(e, t));

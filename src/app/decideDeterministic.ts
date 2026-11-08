@@ -333,7 +333,7 @@ export function decidePreParse(utterance: string, view: DecideView, centresShown
 }
 
 /**
- * #2492 ([ADR-W-192](../../docs/06w-decisions-workspace.md#adr-w-192)) — THE PROOF-TARGET NOTE, one spelling for the
+ * #2492 ([ADR-W-194](../../docs/06w-decisions-workspace.md#adr-w-194)) — THE PROOF-TARGET NOTE, one spelling for the
  * submit and the edit seam: the suite's sentence quoting the claim, then where 2-D checks a claim. Operator, 2026-10-24:
  * *"For all cases of הוכיחו we should add to the message … ניתן לבדוק את נכונות הטענה על ידי לחיצה על כפתור הצג צלעות
  * וזוויות שוות."* The button's name is NESTED in `input.scope.proofTargetCheck` from `actions.viewRelations`, the key

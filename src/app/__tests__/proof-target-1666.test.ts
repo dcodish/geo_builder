@@ -8,7 +8,7 @@
  * figure was forced to satisfy the claim the student was asked to prove. «(1) …» and «1. …» escalated to the
  * paid model. Now each is refused BEFORE the parser, naming the proof sentence.
  *
- * #2492 ([ADR-W-192](../../../docs/06w-decisions-workspace.md#adr-w-192)): the refusal is the suite's sentence, then
+ * #2492 ([ADR-W-194](../../../docs/06w-decisions-workspace.md#adr-w-194)): the refusal is the suite's sentence, then
  * the operator's line naming the button that checks a claim (2026-10-24, verbatim), its label NESTED from the key that
  * labels the button. One note (`proofTargetNote`) for both seams, rendered by `renderNote`.
  */

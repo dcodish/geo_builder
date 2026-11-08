@@ -377,7 +377,7 @@ in `editLine` (a muted row too), before the ask routing and before the grammar, 
 (`shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107)) — the error `proof-target`, worded by
 `errorText` through `proofTargetPanelText`: the suite sentence `suite.refusal.proofTarget` quoting the proof sentence, then
 `suite.refusal.proofTargetCheckPanel`, which sends the student to the «נתונים» panel's ask box with the panel's and the
-button's own labels (`dataTitle`, `askAdd`; [ADR-W-192](06w-decisions-workspace.md#adr-w-192), #2492). Nothing of the line is recorded, the mixed line
+button's own labels (`dataTitle`, `askAdd`; [ADR-W-194](06w-decisions-workspace.md#adr-w-194), #2492). Nothing of the line is recorded, the mixed line
 «נתון … . הוכיחו כי …» included. The load path replays through `submitLine`, so a saved proof line lands in the
 load audit. A bare statement has no proof verb and reaches the claim pipeline unchanged.
 
