@@ -1420,9 +1420,13 @@ the start only when a root was dropped and exactly one admissible root is left �
 «הציגו תצורה אחרת» cycles.
 **The judge reads the same rule at the JUDGED positions** ([ADR-AG-350](06c-decisions-analytic.md#adr-ag-350), #2615): `crossingPartners`
 (`evaluate.ts`) is the signature siblings plus every point declared before the crossing that lies on both of its carriers
-(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds.
-`crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation) reads the same
-set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other root.
+(the incidences' residuals within `SATISFIED_EPS`), when the pair has a root on its drawn piece that no such point holds
+**and no sibling holds** ([ADR-AG-428](06c-decisions-analytic.md#adr-ag-428), #2733): once «בנקודות K ו-L»'s K holds the root P
+does not, L's partners are K alone and L is forced onto P (ADR-W-177's accepted coincidence), counted per root at the
+judged positions. `crossing-distinct` keeps the crossing `apartOf` every partner and `collapsedPairs` (the #1463 deflation)
+reads the same set, so a curve that reaches the earlier point only through the joint solve sends the crossing to the other
+root. `collapsedPairs` takes ONE mover per unordered pair: two crossings list each other, and moving both nudged them
+alike in `deflatedStarts`, so they never parted (ADR-AG-428).
 An ordinal lowers to `crossing-nth {id, nth, pair}`, otherwise `crossing-distinct`. Two conics are ordered by the
 reading direction ([ADR-AG-236](06c-decisions-analytic.md#adr-ag-236): `orderedCrossings`, `conicsMeet`), and the
 duplicate fault names its operands (`incidenceWords`, `errCrossingAlreadyNamedOperands`). **Both crossings in one
@@ -1657,7 +1661,10 @@ before P. Two ways, mirroring the chord member: **nothing can move** (`noFreedom
 `touchPointOf` (`crossing-order.ts`; the chord ℓ would cut is within `meetsTwice`'s `SOLVE_RESOLUTION` floor) puts the touch
 within that floor of Q; or **by construction** — Q on K for good, Q on ℓ, and a stated `relation perpendicular` between ℓ
 and K's radius at Q (`{radius, K, Q}` or K's centre and Q, via `centreIdOf`), or ℓ is K's tangent object at Q, or runs
-through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member.
+through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member. **P is never
+its own straight's second crossing** ([ADR-AG-428](06c-decisions-analytic.md#adr-ag-428), #2733): when `tangentByConstruction(ℓ, K, P)`
+holds — the statement made ℓ tangent to K AT P («הישר y=5 משיק למעגל בנקודה K») — P is skipped, and a Q already at the touch
+is a forced coincidence the figure reports, not a refusal.
 
 **Both members reach every curve a line meets at most twice** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909,
 #1932). The gate is `maxCrossings('line', curveKindOf(K)) === 2` (`apply.ts`, the Bézout bound #1114 counts by) — a circle, a

@@ -1419,7 +1419,7 @@ function crossingSiblings(c: Construction, id: Id, at: Map<Id, Pt>): Id[] {
  * "On both carriers" is the two incidences' own residuals within `SATISFIED_EPS` with the earlier point in the
  * crossing's place — the judge's own reading of an incidence. The proviso is ADR-AG-263's test: `orderedCrossings` on
  * the pair, at least two roots, not touching, and at least one root on the drawn piece of a bounded crossing that no
- * earlier point sits on (within `apartOf`).
+ * earlier point and no sibling sits on (within `apartOf`; the sibling since #2733, ADR-AG-428).
  * A tangency (#1924), a chord whose roots are all named (#1893, #1909), a pair of straights (one root, #1254) and an
  * ordinal crossing (`crossing-nth`, which owns its root) are therefore untouched.
  */
@@ -1464,7 +1464,16 @@ function crossingPartners(c: Construction, id: Id, at: Map<Id, Pt>, env: Env): I
       const pb = atFn(k.b);
       return !pa || !pb || withinSegment(pa, pb, r);
     });
-  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart));
+  /*
+   * #2733 (ADR-AG-428; ADR-W-177, operator 2026-11-02 "accept with message", and on #2733 2026-11-07): a root is FREE for
+   * this crossing only while neither an earlier point nor one of its SIBLINGS holds it, here. «P(-4,0) · הישר x=-4 חותך
+   * את המעגל בנקודות K ו-L»: P holds (-4,0), and once K holds (-4,6) the pair has no root left for L, so L's sentence
+   * forces it onto P — L's partners are its sibling K alone, and L lands on P with the notice. K, whose root (-4,6) is
+   * still free, keeps P as a partner. Counted per root, so it is exact for any number of roots; a single crossing on P
+   * (ADR-AG-350, no sibling) and a pair whose every root an earlier point holds are unchanged.
+   */
+  const holds = (q: Id, r: Pt) => Math.hypot(at.get(q)!.x - r.x, at.get(q)!.y - r.y) < apart;
+  const free = o.roots.some((r) => onPiece(r) && !earlier.some((q) => holds(q, r)) && !sibs.some((q) => holds(q, r)));
   return free ? [...sibs, ...earlier] : sibs;
 }
 
@@ -1990,10 +1999,21 @@ function collapsedPairs(c: Construction, at: Map<Id, Pt>, env: Env, free: Readon
   }
   const out: Array<{ mover: Id; partner: Id }> = [];
   const moving = new Set<Id>();
+  /*
+   * ONE MOVER PER PAIR (#2733, ADR-AG-428). Two crossings of one pair list EACH OTHER (`crossingPartners`), so the pair
+   * arrives twice, [L, K] and [K, L]; taking a mover from each moved both, and `deflatedStarts` nudges every mover the
+   * same way, so the two never parted (the distance the deflation divides by stayed 0). Measured on «x^2/25+y^2/9=1 ·
+   * P(4,9/5) · הישר x=4 חותך את האליפסה בנקודות K ו-L»: K and L stayed on one root at every seed. `chordStarts` already
+   * takes one member per pair for the same reason.
+   */
+  const seen = new Set<string>();
   for (const [a, b] of pairs) {
     const pa = at.get(a);
     const pb = at.get(b);
     if (!pa || !pb || Math.hypot(pa.x - pb.x, pa.y - pb.y) >= apart) continue;
+    const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const mover = free.has(b) && !moving.has(b) ? b : free.has(a) && !moving.has(a) ? a : null;
     if (mover === null) continue;
     moving.add(mover);
