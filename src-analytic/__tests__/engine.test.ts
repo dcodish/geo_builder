@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { classify, fitConic } from '../engine/conic';
 import { isOn, polylines, residual, resolveCurve, ellipseFoci, parabolaFocus } from '../engine/curves';
-import { evaluate, isKnowledge, sampleParam, viewBox } from '../engine/evaluate';
+import { admittedToPool, drawableAt, evaluate, isKnowledge, POOL_SIZE, sampleParam, selectorsHold, spanOf, viewBox } from '../engine/evaluate';
 import { constValue, evalExpr, parseExpr, symbolsOf } from '../engine/expr';
 import { applyFact, fold } from '../engine/apply';
 import { derive } from '../engine/derive';
@@ -726,5 +726,116 @@ describe('#1063 — a given that adds nothing is said, not recorded', () => {
   it('#1076 does not regress — a promotion is recorded, never called entailed', () => {
     expect(verdict(['נקודה B על הישר y=x'], 'נתון הישר l1: y=x')).toBe('recorded');
     expect(verdict(['נקודה B על הישר y=x'], 'y=x')).toBe('recorded');
+  });
+});
+
+/**
+ * #2732 ([ADR-AG-427](../../docs/06c-decisions-analytic.md#adr-ag-427)) — THE RULER A CONFIGURATION IS JUDGED BY
+ * INCLUDES ITS CURVES.
+ *
+ * `spanOf` was the solved points' spread alone. On a bare ellipse whose only points are the two crossings, a
+ * configuration with both on one root spread 1e-11, so "apart" shrank with the pair and the collapse passed
+ * `crossing-distinct` and «A מעל B» (by 1e-10). The pool admitted it, and «A» answered «(-1, -3/2) או [(-1, 3/2)]».
+ */
+describe('#2732 — the validity ruler is the figure\'s extent, its curves included', () => {
+  const ELLIPSE = ['נתונה אליפסה שמשוואתה x^2/4+y^2/3=1', 'הישר x=-1 חותך את האליפסה בנקודות A ו-B', 'A מעל B'];
+  const c = derive(ELLIPSE, 0).construction;
+  const pts = (a: [number, number], b: [number, number]) =>
+    new Map([['A', { x: a[0], y: a[1] }], ['B', { x: b[0], y: b[1] }]]);
+
+  it('two coincident points on x²/4+y²/3=1 get a ruler of 4, not 1e-9', () => {
+    expect(spanOf(c, pts([-1, -1.5], [-1, -1.5]), {})).toBeCloseTo(4, 9);
+    expect(spanOf(c, pts([-1, -1.5], [-1, -1.5 + 2.3e-10]), {})).toBeCloseTo(4, 9);
+  });
+
+  it('the collapsed pair fails the judge; the two crossings, in the stated order, pass it', () => {
+    expect(selectorsHold(c, pts([-1, -1.5 + 2.3e-10], [-1, -1.5]), {})).toBe(false);
+    expect(selectorsHold(c, pts([-1, 1.5], [-1, -1.5]), {})).toBe(true);
+    expect(selectorsHold(c, pts([-1, -1.5], [-1, 1.5]), {})).toBe(false); // «A מעל B» still judged
+  });
+
+  it('a parabola adds its vertex and focus, a circle its box, a straight nothing', () => {
+    const parabola = derive(['y^2=4x', 'הישר x=1 חותך את הפרבולה בנקודות A ו-B'], 0).construction;
+    // A and B on one point; the vertex (0, 0) and the focus (1, 0) widen it to x 0…1, y 0…2.
+    expect(spanOf(parabola, pts([1, 2], [1, 2]), {})).toBeCloseTo(2, 9);
+    const circle = derive(['(x-1)^2+(y-2)^2=9', 'הישר x=1 חותך את המעגל בנקודות A ו-B'], 0).construction;
+    expect(spanOf(circle, pts([1, 5], [1, 5]), {})).toBeCloseTo(6, 9);
+    const lines = derive(['A(0,0)', 'B(1,0)', 'הישר y=2x'], 0).construction;
+    expect(spanOf(lines, pts([0, 0], [1, 0]), {})).toBeCloseTo(1, 9);
+  });
+
+  it('on the reported figure every admitted pool configuration holds A and B on the two crossings, 3 apart', () => {
+    let admitted = 0;
+    for (let seed = 0; seed < POOL_SIZE; seed += 1) {
+      const f = drawableAt(c, seed);
+      if (!admittedToPool(f)) continue;
+      admitted += 1;
+      const a = f.points.find((p) => p.id === 'A')!;
+      const b = f.points.find((p) => p.id === 'B')!;
+      expect(Math.hypot(a.x - b.x, a.y - b.y), `seed ${seed}`).toBeCloseTo(3, 6);
+    }
+    expect(admitted).toBeGreaterThan(0);
+  });
+
+  it("the floor is the solver's resolution of that ruler, so a stated small arc beside its circle is no collapse", () => {
+    // «קשת AB = 2/3» (2/3°): |AB| ≈ 0.040 on a circle of radius ≈ 3.46. A hundredth of the curve-wide extent (0.069) refused
+    // it; a hundredth of the points' spread, floored at SOLVE_RESOLUTION × the extent (0.022), keeps 2-D's verdict.
+    expect(derive(['גזרה AOB', 'קשת AB = 2/3'], 0).faults).toEqual([]);
+  });
+});
+
+/**
+ * #2733 ([ADR-AG-428](../../docs/06c-decisions-analytic.md#adr-ag-428)) — A CROSSING'S EARLIER POINT IS A PARTNER ONLY
+ * WHILE THE PAIR HAS A ROOT NO EARLIER POINT AND NO SIBLING HOLDS.
+ *
+ * «מעגל M(0,3) r 5 · P(-4,0) · הישר x=-4 חותך את המעגל בנקודות K ו-L»: the roots are (-4,0), held by P, and (-4,6). K
+ * and L each kept P as a partner, which asked for three separate points on two roots, so the judge accepted nothing.
+ */
+describe('#2733 — the crossing judge: a pair with one root already named', () => {
+  const CIRCLE = 'נתון מעגל שמרכזו M(0,3) ורדיוסו 5';
+  const pts = (rest: Record<string, [number, number]>) =>
+    new Map(Object.entries({ M: [0, 3] as [number, number], P: [-4, 0] as [number, number], ...rest }).map(([id, [x, y]]) => [id, { x, y }]));
+  const pair = derive([CIRCLE, 'P(-4,0)', 'הישר x=-4 חותך את המעגל בנקודות K ו-L'], 0).construction;
+
+  it('either letter on P, the other on the free root, holds', () => {
+    expect(selectorsHold(pair, pts({ K: [-4, 6], L: [-4, 0] }), {})).toBe(true);
+    expect(selectorsHold(pair, pts({ K: [-4, 0], L: [-4, 6] }), {})).toBe(true);
+  });
+
+  it('one root twice does not', () => {
+    expect(selectorsHold(pair, pts({ K: [-4, 6], L: [-4, 6] }), {})).toBe(false);
+    expect(selectorsHold(pair, pts({ K: [-4, 0], L: [-4, 0] }), {})).toBe(false);
+  });
+
+  it('a single crossing on P does not (ADR-AG-350 kept): it takes the other root', () => {
+    const single = derive([CIRCLE, 'P(-4,0)', 'הישר x=-4 חותך את המעגל בנקודה K'], 0).construction;
+    expect(selectorsHold(single, pts({ K: [-4, 0] }), {})).toBe(false);
+    expect(selectorsHold(single, pts({ K: [-4, 6] }), {})).toBe(true);
+  });
+
+  it('both roots already named: K on P and L on Q hold', () => {
+    const both = derive([CIRCLE, 'P(-4,0)', 'Q(-4,6)', 'הישר x=-4 חותך את המעגל בנקודות K ו-L'], 0).construction;
+    expect(selectorsHold(both, pts({ Q: [-4, 6], K: [-4, 0], L: [-4, 6] }), {})).toBe(true);
+  });
+
+  it('the deflation moves ONE member of a collapsed pair, so the ellipse pair reaches P at every seed', () => {
+    const c = derive(['x^2/25+y^2/9=1', 'P(4,9/5)', 'הישר x=4 חותך את האליפסה בנקודות K ו-L'], 0).construction;
+    for (let seed = 0; seed < 6; seed += 1) {
+      const f = evaluate(c, seed);
+      const at = (id: string) => f.points.find((p) => p.id === id)!;
+      expect(Math.hypot(at('K').x - at('L').x, at('K').y - at('L').y), `seed ${seed}`).toBeCloseTo(3.6, 6);
+      expect(admittedToPool(f), `seed ${seed}`).toBe(true);
+    }
+  });
+});
+
+describe('#2733 — the #1924 arm: a touch point is never its own line\'s second crossing', () => {
+  it('«הישר y=5 משיק למעגל בנקודה K» with T(0,5) already there: no fault', () => {
+    expect(derive(['x^2+y^2=25', 'T(0,5)', 'הישר y=5 משיק למעגל בנקודה K'], 0).faults).toEqual([]);
+  });
+
+  it('a point stated on the circle and on that line keeps the fault', () => {
+    const d = derive(['x^2+y^2=25', 'T(0,5)', 'נתון הישר l: y=5', 'K על המעגל', 'K על הישר l'], 0);
+    expect(d.faults.map((f) => f.code)).toEqual(['tangent-no-second-crossing']);
   });
 });

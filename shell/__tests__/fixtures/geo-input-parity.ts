@@ -1960,6 +1960,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'length-relation-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = |BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
   { id: 'length-ratio-bars-1848', family: 'lengths', steps: ['מרובע ABCD', '|AC| = 2|BD|'], expect: 'builds', note: 'AC and BD drawn in every builder' },
   { id: 'length-ratio-colon-1848', family: 'lengths', steps: ['מרובע ABCD', 'AC:BD = 2:1'], expect: 'builds', note: 'AC and BD drawn in every builder' },
+  // ── #2733 (ADR-AG-428; ADR-W-177, operator 2026-11-02 "accept with message"): a line through a point already on the circle names
+  // its two crossings; one of them is forced onto that point and recorded there with «… נפלו על אותה נקודה.».
+  { id: 'crossing-pair-on-named-point-2733', family: 'circles', steps: ['מעגל O', 'A על מעגל O', 'הישר AO חותך את מעגל O בנקודות C ו-D'], expect: 'builds', exception: 'X8', note: 'one of C and D lands on A with the notice; 2-D puts C on A at every configuration, analytic leaves which letter to the configuration (its existing rule for an unlabelled curve). Analytic refused it unsatisfiable before ADR-AG-428' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
