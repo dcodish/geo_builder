@@ -8,6 +8,7 @@
  * curve kind cannot reach a refusal without a noun, which is how «הנקודה parabola-I» happened.
  */
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
+import { proofTargetPanelText } from '../../shell/proofTarget';
 import type { RefKind } from '../engine/names';
 import type { InputError } from '../store/useAnalyticStore';
 import type { HostRef } from '../engine/apply';
@@ -183,6 +184,9 @@ const SIDE_WORD_KEY = { above: 'sideWordAbove', below: 'sideWordBelow', right: '
 
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
+  // #1618 / #1666: a claim to prove is named and left out. #2492 (ADR-W-194): the suite's sentence, then where the claim
+  // can be checked: this panel's ask box, named by the labels the panel and its button carry (`dataTitle`, `askAdd`).
+  if (error.key === 'proof-target') return proofTargetPanelText(t, error.detail, { panel: t('dataTitle'), ask: t('askAdd') });
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
   const host = error.key === 'ambiguous-shape' ? error.host : undefined;
   // #1775 (ADR-AG-423): a perpendicular's candidate is its description, `from:onto`, worded here. The engine holds no locale.
@@ -202,7 +206,6 @@ export function errorText(error: InputError, t: Translate): string {
     'not-handled': 'suite.refusal.notUnderstood',
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
-    'proof-target': 'errProofTarget',
     // #1837 (ADR-W-142) — 2-D's ruled degrees sentence, verbatim
     'radian-angle': 'errRadianAngle',
     // #2032 (ADR-AG-408) — an arc's length is refused, naming the sentence that is read, until #2710

@@ -5,7 +5,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
-import { restoreSession3, sessionPayload3, session3Adapter } from '../store/sessionPersist3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { crashSession3, restoreSession3, sessionPayload3, session3Adapter } from '../store/sessionPersist3';
+import { logCrash3 } from '../debug/sessionLog3';
+import { crashMountFaults, crashRecoveryFaults } from '../../shell/__tests__/fixtures/crash-recovery-rows';
 import { sessionOfferFaults } from '../../shell/__tests__/fixtures/session-offer-rows';
 import { installFakeStorage, uninstallFakeStorage } from '../../shell/__tests__/fixtures/fakeStorage';
 
@@ -73,5 +77,31 @@ describe('#1238 — an empty canvas never overwrites the stored session', () => 
   it('a fresh boot state produces no payload at all', () => {
     expect(useGeo3.getState().facts).toEqual([]);
     expect(sessionPayload3()).toBeNull();
+  });
+});
+
+/**
+ * #1507 (ADR-W-195) — a crash costs a notice, never the construction. The shared crash rows over this
+ * tree's REAL wiring: the store and its undo history, `crashSession3`, the session-offer adapter (the
+ * reload path), `logCrash3`, and the builder's own submit. Plus the mount: `main.tsx` puts the boundary
+ * around the app, with this session and log, and the dev trigger gated on DEV.
+ */
+describe('#1507 — a crash rolls back to the last figure that drew, and a reload offers it', () => {
+  it('no faults against the shared crash-recovery checks', async () => {
+    const faults = await crashRecoveryFaults({
+      session: crashSession3,
+      store: useGeo3,
+      adapter: session3Adapter,
+      onCrash: logCrash3,
+      populate: () => build(['תיבה ABCDA1B1C1D1']),
+      step: () => build(['נקודה E נמצאת במישור ABC']),
+      construction: () => useGeo3.getState().facts.map((f) => f.utterance),
+    });
+    expect(faults).toEqual([]);
+  });
+
+  it('main.tsx mounts the boundary around the app, with this session and log, and a DEV-only trigger', () => {
+    const main = readFileSync(join(__dirname, '..', 'main.tsx'), 'utf8');
+    expect(crashMountFaults(main, { session: 'crashSession3', log: 'logCrash3', app: 'App3' })).toEqual([]);
   });
 });

@@ -10,9 +10,14 @@
 import type { SessionAdapter } from '../../shell/session/adapter';
 import type { SessionSpec } from '../../shell/session/persist';
 import { clearSession, readSession, writeSession } from '../../shell/session/persist';
+import type { CrashSession } from '../../shell/session/crash';
+import { crashSessionOf, sliceChanged } from '../../shell/session/crash';
 import { readEnvelope } from '../../shell/save';
 import { loadAnalyticSession } from './loadSession';
 import { ANALYTIC_ENVELOPE, useAnalyticStore } from '../store/useAnalyticStore';
+
+/** The store's state, as the slice lists below name its fields. */
+type AnalyticState = ReturnType<typeof useAnalyticStore.getState>;
 
 /** Namespaced per builder — four tools share one origin in dev. */
 export const SESSION_AN: SessionSpec = { key: 'analytic-builder:session' };
@@ -31,11 +36,27 @@ export function persistSessionAn(now: Date = new Date()): void {
   writeSession(SESSION_AN, payload, now);
 }
 
+/**
+ * The fields whose change writes the session. #1548: a mute changes what the session restores as, so
+ * it persists like a line does.
+ */
+export const SESSION_SLICE_AN = [
+  'lines',
+  'disabled',
+  'queries',
+  'seed',
+  'name',
+  'seedNames',
+  'segStyle',
+  'curveStyle',
+  'annotations',
+  'display',
+] as const satisfies readonly (keyof AnalyticState)[];
+
 /** Start mirroring the session to storage. Returns the unsubscribe, for the caller's effect. */
 export function startSessionPersistAn(): () => void {
   return useAnalyticStore.subscribe((s, p) => {
-    // #1548: a mute changes what the session restores as, so it persists like a line does
-    if (s.lines !== p.lines || s.disabled !== p.disabled || s.queries !== p.queries || s.seed !== p.seed || s.name !== p.name || s.seedNames !== p.seedNames || s.segStyle !== p.segStyle || s.curveStyle !== p.curveStyle || s.annotations !== p.annotations || s.display !== p.display) persistSessionAn();
+    if (sliceChanged(SESSION_SLICE_AN, s, p)) persistSessionAn();
   });
 }
 
@@ -65,6 +86,19 @@ export function restoreSessionAn(payload: string): boolean {
   loadAnalyticSession(env.data, '');
   return true;
 }
+
+/**
+ * #1507 (ADR-W-195) — the crash boundary's hold on this store: «שחזור» comes back with the last
+ * figure that drew, and the autosave writes it, so a reload offers that one rather than the state
+ * that failed. The rollback restores the persisted slice plus `spokenFor`, the one field the undo
+ * history tracks that the autosave does not watch (it only ever changes together with the lines),
+ * and clears what this builder's undo clears.
+ */
+export const crashSessionAn: CrashSession<AnalyticState> = crashSessionOf(useAnalyticStore, {
+  slice: [...SESSION_SLICE_AN, 'spokenFor'],
+  clear: { error: null, notice: null },
+  persist: () => persistSessionAn(),
+});
 
 /** The §5c cross-product subject — the real wiring, exposed as a value so a lock can drive it. */
 export const sessionAnAdapter: SessionAdapter = {

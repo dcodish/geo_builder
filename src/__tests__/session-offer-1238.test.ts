@@ -9,7 +9,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildParseCtx, parse } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { geoSessionAdapter, restoreSession, sessionPayload } from '@/store/sessionPersist';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { geoCrashSession, geoSessionAdapter, restoreSession, sessionPayload } from '@/store/sessionPersist';
+import { logCrash } from '@/debug/sessionLog';
+import { crashMountFaults, crashRecoveryFaults } from '../../shell/__tests__/fixtures/crash-recovery-rows';
 import { loadFigureText } from '@/store/figureLoad';
 import { sessionOfferFaults } from '../../shell/__tests__/fixtures/session-offer-rows';
 import { installFakeStorage, uninstallFakeStorage } from '../../shell/__tests__/fixtures/fakeStorage';
@@ -105,5 +109,31 @@ describe('#1238 — an empty canvas never overwrites the stored session', () => 
   it('a fresh boot state produces no payload at all', () => {
     expect(useGeoStore.getState().facts).toEqual([]);
     expect(sessionPayload()).toBeNull();
+  });
+});
+
+/**
+ * #1507 (ADR-W-195) — a crash costs a notice, never the construction. The shared crash rows over this
+ * tree's REAL wiring: the store and its undo history, `geoCrashSession`, the session-offer adapter (the
+ * reload path), `logCrash`, and the builder's own parse + commit. Plus the mount: `main.tsx` puts the
+ * boundary around the app, with this session and log, and the dev trigger gated on DEV.
+ */
+describe('#1507 — a crash rolls back to the last figure that drew, and a reload offers it', () => {
+  it('no faults against the shared crash-recovery checks', async () => {
+    const faults = await crashRecoveryFaults({
+      session: geoCrashSession,
+      store: useGeoStore,
+      adapter: geoSessionAdapter,
+      onCrash: logCrash,
+      populate: () => build(['ריבוע ABCD']),
+      step: () => build(['נקודה G על AD']),
+      construction: () => useGeoStore.getState().facts.map((f) => f.utterance),
+    });
+    expect(faults).toEqual([]);
+  });
+
+  it('main.tsx mounts the boundary around the app, with this session and log, and a DEV-only trigger', () => {
+    const main = readFileSync(join(__dirname, '..', 'main.tsx'), 'utf8');
+    expect(crashMountFaults(main, { session: 'geoCrashSession', log: 'logCrash', app: 'App' })).toEqual([]);
   });
 });
