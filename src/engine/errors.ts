@@ -50,7 +50,8 @@ export type EngineError =
   | { code: 'shape-excluded'; actual: string; stated: string }
   | { code: 'name-taken'; measure: 'angle' | 'segment'; name: Composite; symbol: Num }
   | { code: 'equal-nested'; circle: ObjectId; relation: 'contained' | 'int-tangent' | 'concentric' }
-  | { code: 'pair-position-conflict'; a: ObjectId; b: ObjectId; position: 'contained'; other: 'contained' | 'disjoint' | 'ext-tangent' | 'crossing' }
+  // #2677 (ADR-779) the containment's exclusions; #2700 (ADR-803) «זרים» against a tangency or a crossing
+  | { code: 'pair-position-conflict'; a: ObjectId; b: ObjectId; position: 'contained' | 'disjoint'; other: 'contained' | 'disjoint' | 'ext-tangent' | 'tangent' | 'crossing' }
   | { code: 'tangents-exhausted'; pair: Composite; kind: 'external' | 'internal' | 'any'; position: 'int-tangent' | 'ext-tangent' | 'contained' }
   | { code: 'restated-size'; circle: ObjectId; value: Num }
   | { code: 'over-constrained'; what: Fragment }
@@ -333,7 +334,7 @@ const PARSERS: readonly [RegExp, (m: RegExpMatchArray) => ParsedEngineError][] =
   [/^shape-excluded: the figure is already known to be a (\S+), so it is not a (\S+)$/, (m) => ({ code: 'shape-excluded', actual: G(m, 1), stated: G(m, 2) })],
   [new RegExp(String.raw`^name-taken: (angle|segment) (\S+) is already named (.+?)${TAIL}$`), (m) => ({ code: 'name-taken', measure: m[1] as 'angle' | 'segment', name: G(m, 2), symbol: G(m, 3), ...tailOf(m) })],
   [new RegExp(String.raw`^over-constrained: equal circles (\S+) nested (contained|int-tangent|concentric) cannot hold${TAIL}$`), (m) => ({ code: 'equal-nested', circle: G(m, 1), relation: m[2] as 'contained' | 'int-tangent' | 'concentric', ...tailOf(m) })],
-  [new RegExp(String.raw`^over-constrained: circles (\S+) and (\S+) stated (contained) and (contained|disjoint|ext-tangent|crossing) cannot hold${TAIL}$`), (m) => ({ code: 'pair-position-conflict', a: G(m, 1), b: G(m, 2), position: 'contained', other: m[4] as 'contained' | 'disjoint' | 'ext-tangent' | 'crossing', ...tailOf(m) })],
+  [new RegExp(String.raw`^over-constrained: circles (\S+) and (\S+) stated (contained|disjoint) and (contained|disjoint|ext-tangent|tangent|crossing) cannot hold${TAIL}$`), (m) => ({ code: 'pair-position-conflict', a: G(m, 1), b: G(m, 2), position: m[3] as 'contained' | 'disjoint', other: m[4] as 'contained' | 'disjoint' | 'ext-tangent' | 'tangent' | 'crossing', ...tailOf(m) })],
   [/^tangents-exhausted: common tangent (\S+) of kind (external|internal|any) on (int-tangent|ext-tangent|contained) circles$/, (m) => ({ code: 'tangents-exhausted', pair: G(m, 1), kind: m[2] as 'external' | 'internal' | 'any', position: m[3] as 'int-tangent' | 'ext-tangent' | 'contained' })],
   [new RegExp(String.raw`^over-constrained: radius of (\S+) = (.+) cannot hold${TAIL}$`), (m) => ({ code: 'restated-size', circle: G(m, 1), value: G(m, 2), ...tailOf(m) })],
   [new RegExp(String.raw`^over-constrained: (.+) cannot hold${TAIL}$`), (m) => ({ code: 'over-constrained', what: G(m, 1), ...tailOf(m) })],

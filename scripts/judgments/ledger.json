@@ -3389,6 +3389,16 @@
       ],
       "at": "2026-11-08T08:50:38.002Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2700-disjoint-pair-reasons",
+      "kind": "text",
+      "issue": "#2700",
+      "what": "The reason clause of the refusal when «זרים» and a crossing or a tangency of the same circle pair are both stated (errors.pairPositionReason.disjoint-*, he+en), inside the ruled «לא ניתן: «X» סותר את «Y» …» frame",
+      "choice": "disjoint-tangent: לשני מעגלים זרים אין אף נקודה משותפת, ולכן הם אינם משיקים זה לזה · disjoint-crossing: לשני מעגלים זרים אין אף נקודה משותפת, ולכן אין להם נקודות חיתוך (en mirrors)",
+      "chosen": true,
+      "at": "2026-11-09T05:54:32.452Z",
+      "status": "pending"
     }
   ],
   "demoted": {

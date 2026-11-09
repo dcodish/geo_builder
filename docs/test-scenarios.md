@@ -2318,3 +2318,6 @@ over all four (ADR-041).
 ### `secant-through-existing-point-puts-it-on-circle-1840` — an existing named crossing is put on the circle (#1840, ADR-802)
 
 **Guards against:** the line drawn through an existing C with C off the circle, every row green.
+### `disjoint-pair-common-point-2700` — «המעגלים O ו-P זרים» · «נחתכים בנקודות X ו-Y» / «משיקים»: refused naming «זרים», in either order (#2700, ADR-803)
+
+**Guards against:** a crossing or a tangency of a pair stated disjoint, committed with the «זרים» row red for good. **Asserts** a plain «זרים» builds clean; after it, the crossing and each tangency spelling (no kind, from outside, from inside, at T) is refused before it becomes a fact with «לא ניתן: «…» סותר את «המעגלים O ו-P זרים» …» and the exclusion's reason; the reverse orders refuse «זרים» naming the crossing or the tangency; «שני מעגלים זרים» then the crossing the same.

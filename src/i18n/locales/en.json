@@ -438,7 +438,9 @@
       "contained-contained": "a circle contained in another is smaller than it, so the other circle is not contained in it",
       "contained-disjoint": "a circle contained in another lies inside it, so it is not outside it",
       "contained-ext-tangent": "a circle contained in another lies inside it, so it cannot touch it from outside",
-      "contained-crossing": "a circle contained in another lies entirely inside it, so the two circles do not cross"
+      "contained-crossing": "a circle contained in another lies entirely inside it, so the two circles do not cross",
+      "disjoint-tangent": "two disjoint circles have no point in common, so they do not touch",
+      "disjoint-crossing": "two disjoint circles have no point in common, so they do not cross"
     },
     "collinearCircleReason": "{{a}}, {{b}} and {{c}} are on one line, and no circle passes through three points on one line",
     "diagonalNoSideReason": "the diagonal {{d}} is perpendicular to no side of {{shape}}",

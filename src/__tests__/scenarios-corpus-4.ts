@@ -6519,6 +6519,40 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs((D.x - E.x) * (C.y - E.y) - (D.y - E.y) * (C.x - E.x)) / (dist(D, E) * dist(E, C)), 'E, C, D collinear').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'disjoint-pair-common-point-2700',
+    title: '#2700: after «המעגלים O ו-P זרים», «נחתכים בנקודות X ו-Y» and «משיקים» (any kind) are refused naming «זרים», in either order (ADR-803)',
+    guards:
+      "#2700 (P2, wrong answer, judged q-2677-disjoint): measured at 4a06aae9 through decideDeterministic2D, «המעגלים O ו-P זרים» then «המעגלים O ו-P נחתכים בנקודות X ו-Y» (or «משיקים», «משיקים מבחוץ/מבפנים», «משיקים בנקודה T») committed, and the «זרים» row turned red (circles-disjoint) and could never clear; the reverse orders and the noun «שני מעגלים זרים» the same. Root cause: ADR-779's pairPositionConflictOf returned early unless a containment was stated, so «זרים» was never compared with a common point. Fix (ADR-803): the reader takes «זרים» as the other position that excludes a tangency of any kind and a crossing point.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P זרים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'a plain «זרים» builds clean').toEqual([]);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const bare = (s: string) => s.replace(/[⁦-⁩]/g, '');
+      const D = 'המעגלים O ו-P זרים';
+      const X = 'המעגלים O ו-P נחתכים בנקודות X ו-Y';
+      const refusedNaming = (priorLines: string[], line: string, other: string, why: string) => {
+        const prior = factsOf(priorLines);
+        const v = gateVerdict(prior, line);
+        expect(v.kind === 'refused' && v.reason, line + ': refused before it becomes a fact').toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        const text = bare(figureExplainer(he, replay(prior, 0).construction, prior)(detail, line, otherUtteranceForError(prior, detail)));
+        const reason = he('errors.pairPositionReason.' + why);
+        expect(text, line).toBe(bare(he('errors.overConstrained_said_vs', { said: line, other, what: reason }) + ' ' + he('errors.retryHint')));
+      };
+      const C = ['מעגל O', 'מעגל P'];
+      // the report, and every tangency spelling after «זרים»
+      refusedNaming([...C, D], X, D, 'disjoint-crossing');
+      for (const t of ['המעגלים O ו-P משיקים', 'המעגלים O ו-P משיקים מבחוץ', 'המעגלים O ו-P משיקים מבפנים', 'המעגלים O ו-P משיקים בנקודה T'])
+        refusedNaming([...C, D], t, D, 'disjoint-tangent');
+      // the reverse orders: «זרים» is the refused line, naming the common point
+      refusedNaming([...C, X], D, X, 'disjoint-crossing');
+      refusedNaming([...C, 'המעגלים O ו-P משיקים'], D, 'המעגלים O ו-P משיקים', 'disjoint-tangent');
+      // the two-circle noun
+      refusedNaming(['שני מעגלים זרים'], 'המעגלים נחתכים בנקודות X ו-Y', 'שני מעגלים זרים', 'disjoint-crossing');
+    },
+  },
 ];
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {

@@ -149,8 +149,12 @@ export function commonTangentCapacityError(prev: Construction, cmd: Command): st
  * (`tangent`), or a drawn crossing point (`crossing`).
  */
 export type PairPosition = 'contained' | 'disjoint' | 'ext-tangent' | 'tangent' | 'crossing';
-/** An excluding pair, the containment first (`contained` twice: each circle stated inside the other). */
-export type PairPositionConflict = ['contained', Exclude<PairPosition, 'tangent'>];
+/**
+ * An excluding pair, the containment or the disjointness first (`contained` twice: each circle stated inside the other).
+ * Against a containment the excluded tangency is the external one (its kind stated); against «זרים» it is any tangency
+ * (`tangent`), since a touch point is a common point (#2700, ADR-803).
+ */
+export type PairPositionConflict = ['contained', Exclude<PairPosition, 'tangent'>] | ['disjoint', 'tangent' | 'crossing'];
 /** The engine message of {@link pairPositionConflict}; the humanizer reads it back through `parseEngineError`. */
 export const pairPositionConflictMessage = (a: Id, b: Id, [position, other]: PairPositionConflict): string =>
   engineErrorDebugText({ code: 'pair-position-conflict', a, b, position, other });
@@ -164,11 +168,14 @@ export const pairPositionConflictMessage = (a: Id, b: Id, [position, other]: Pai
  *    מבפנים» builds), so a crossing point is excluded only while no tangency is stated (a touch point of a tangency is a
  *    common point the tangency itself states), and a tangency whose kind nobody stated is not excluded either (the fold
  *    resolves it internal under a containment, ADR-704);
- *  - a circle inside another is the smaller one, so the other is not inside it (`contained` twice).
+ *  - a circle inside another is the smaller one, so the other is not inside it (`contained` twice);
+ *  - two circles each outside the other (`disjoint`, «זרים») have no common point: they neither touch, with any kind
+ *    of tangency stated or none, nor cross (#2700, [ADR-803](../../docs/06-decisions.md#adr-803), ruled q-2677-disjoint).
+ *    A crossing is excluded only while no tangency is stated, as for a containment: a tangency stated beside it is
+ *    already the exclusion, and the crossing against the tangency keeps ADR-645's guard.
  * Kinds of tangency against each other (ADR-704: a later stated kind wins) and a tangency against a second crossing
- * point (the one-common-point guard, ADR-645) are not this reader's: they keep their own refusals. Nor is «זרים» against
- * a tangency or a crossing: its outcome is the operator's question (round #2697), so it is still drawn with the
- * disjointness flagged.
+ * point (the one-common-point guard, ADR-645) are not this reader's: they keep their own refusals. Nor is a common
+ * point stated through two on-circle riders (a numeric constraint, not a statement about the pair).
  */
 export function pairPositionConflictOf(c: Pick<Construction, 'objects' | 'requirements'>, a: Id, b: Id): PairPositionConflict | null {
   const pair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
@@ -191,12 +198,17 @@ export function pairPositionConflictOf(c: Pick<Construction, 'objects' | 'requir
       if (r.kindStated !== false && r.external !== false) extStated = true;
     }
   }
-  if (!contained) return null;
+  if (!contained && !disjoint) return null;
   const crossing = c.objects.some((o) => o.kind === 'circle-circle' && pair(o.circle1, o.circle2));
-  if (reversed) return ['contained', 'contained'];
-  if (contained && disjoint) return ['contained', 'disjoint'];
-  if (contained && extStated) return ['contained', 'ext-tangent'];
-  if (contained && crossing && !tangent) return ['contained', 'crossing'];
+  if (contained) {
+    if (reversed) return ['contained', 'contained'];
+    if (disjoint) return ['contained', 'disjoint'];
+    if (extStated) return ['contained', 'ext-tangent'];
+    if (crossing && !tangent) return ['contained', 'crossing'];
+    return null;
+  }
+  if (tangent) return ['disjoint', 'tangent'];
+  if (crossing) return ['disjoint', 'crossing'];
   return null;
 }
 
@@ -205,7 +217,8 @@ export function pairPositionConflictOf(c: Pick<Construction, 'objects' | 'requir
  * EARLIER ONE EXCLUDES, in either order. Stage 0a, beside {@link equalNestedPair}: `next` is the construction with the
  * incoming commands applied; a pair whose stated positions exclude each other in `next` and did not in `prev` is
  * refused, so the line that COMPLETES the contradiction is the one refused — «משיקים מבחוץ» or «נחתכים» after «מוכל»,
- * or «מוכל» after either of them, «זרים» against «מוכל», and a containment stated both ways. Before ADR-779 each was applied as a construct
+ * or «מוכל» after either of them, «זרים» against «מוכל», a containment stated both ways, and «נחתכים» or «משיקים» (any
+ * kind) against «זרים» (#2700, ADR-803). Before ADR-779 each was applied as a construct
  * over free centres and radii, the containment was only a requirement the drive never reconciled,
  * and the figure was drawn with every row green and the verifier flagging the earlier statement. The fold's drop-one
  * search names the other statement; the humanizer gives the reason.
