@@ -73,8 +73,11 @@ and the same test fails on an allowed `root@` line.
 
 The one
 terminal case is the work PC: `Connection refused` on port 22 while 443 serves is the work network
-(2026-09-02). Finish everything up to the upload, hand off through git, and deploy from home. Write no
-`prod/*` tag and no DEPLOY-LOG entry until the upload has happened.
+(2026-09-02). Only the office LAN blocks it. On another network SSH works (operator, 2026-11-09: *"when i
+connect from work i need to switch networks and then it works - but the lan blocks it"*), so the operator
+can switch the PC to one. The deploy lines also need that PC's deploy key (*The deploy user*, "A new PC");
+the work PC has none yet. Otherwise finish everything up to the upload, hand off through git, and deploy
+from home. Write no `prod/*` tag and no DEPLOY-LOG entry until the upload has happened.
 
 **Which steps to run is a MEASUREMENT, never a question about which files changed**
 ([ADR-W-058](06w-decisions-workspace.md#adr-w-058), [#1130](https://github.com/dcodish/geo_builder/issues/1130)):
