@@ -43,6 +43,9 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   **a change to shared chrome either changes every builder or is not a shared change.**
   - Sources: ADR-W-016; the enforced edges are [`BOUNDARIES.json`](../BOUNDARIES.json).
 
+- **FR-SU-35 (Must)** — **A figure that can be drawn is drawn.** In every builder, when the givens can all hold in some figure, one is drawn; a statement is refused only when no figure satisfies it, and the refusal names the statements that conflict. An existing shape is fitted with its own free degrees of freedom as far as its givens allow. When more than one figure fits, one is shown and «הציגו תצורה אחרת» reaches the others. The operator's ruling (2026-11-09): *"we always draw a figure if there is a possible way to draw it. we would not refuse something that can be built. if there is more than 1 way to build it - we draw a possible config and allow user to change configs"*.
+  - Sources: [ADR-W-199](06w-decisions-workspace.md#adr-w-199); ADR-W-121 §1; ADR-052; 02 FR-ALT-2.
+
 ## The suite — one learned interface
 
 ### The frame

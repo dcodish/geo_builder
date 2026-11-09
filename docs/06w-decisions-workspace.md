@@ -7363,3 +7363,26 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Found, not built.** A 2-D example chip clicked while the first line is processing is dropped silently by the busy gate (measured: «משולש ABC», then the «מקבילית ABCD» chip 150 ms later — one row). What it should do is a question for the operator, raised on #2782.
 
 **Behaviour change for a student:** a line typed while the previous one is still being processed is no longer erased when that one finishes; it stays in the box, ready for Enter. In every builder.
+
+## ADR-W-199 — A figure that can be drawn is drawn: never refused; more than one drawing means one shown and the others a press away (#2490)
+
+**Status:** accepted · 2026-11-09 · operator ruling, all four builders · LADDER stage: **none** (a product rule over every rung's refusal)
+**Operator:** 2026-11-09, in chat, answering round #2786's question on «פירמידה ישרה SABCD שבסיסה מרובע» over an existing quadrilateral, and then stating the rule in general:
+> "q1 - i think what hapens today is right. the only way to build what user asked is to fit the base accordingly with the dof. refusing would be wrong since such a shape exists"
+>
+> "so i want to give a clear ruling - we always draw a figure if there is a possible way to draw it. we would not refuse something that can be built. if there is more than 1 way to build it - we draw a possible config and allow user to change configs"
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-35 · **Design:** none (internal): the mechanisms that carry it are each builder's own search and «הציגו תצורה אחרת»
+
+**Decision.**
+1. **A figure that can be drawn is drawn.** When some assignment of the figure's free quantities (a free point, a free length, a free shape's own degrees of freedom, a configuration branch) satisfies every given, the tool draws one. It never refuses a statement a figure can satisfy.
+2. **A refusal is a proof that no figure exists**, never a failed default, a failed sample, or a search that gave up. A refusal names the statements that cannot hold together.
+3. **More than one figure: one is shown, and «הציגו תצורה אחרת» reaches the others** (with 02 FR-ALT-2 and ADR-052: every unstated choice is a free degree of freedom).
+4. **An existing shape is fitted with its own free degrees of freedom** to meet a later statement, as far as its own givens allow. What its givens fix is never moved (the stability rule).
+
+**It restates and generalises** [ADR-W-121](#adr-w-121)'s §1 ("the refusal is gated on a failed search": *"it tells a student who is right that they are wrong"*), which held for convex rings; it now holds for every statement.
+
+**What it decides now.**
+- **#2490, the right pyramid over an existing ring.** «פירמידה ישרה ABCDS» and «פירמידה ישרה SABCD שבסיסה מרובע» over an existing quadrilateral fit the ring to a quadrilateral a circle passes through, with the ring's free degrees of freedom; refused only when the ring's own givens make that impossible. This supersedes the morning's "2490 - reject" for a ring that can still move. A stated rhombus becomes a square (Q-2490c answered). The built fix (`fix/2490-right-pyramid-existing-ring`, ADR-3D-437 draft) refuses these lines and is reworked before it lands.
+
+**Not changed.** A statement that contradicts what is already fixed is still refused, naming both statements. A figure's first drawing, and what is held, follow the existing rules.
