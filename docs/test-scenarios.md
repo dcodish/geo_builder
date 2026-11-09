@@ -2328,3 +2328,7 @@ over all four (ADR-041).
 ### `primed-names-triangle-2624` — «A' אמצע BC», «AA' = 8», «B′ על AC», «נקודה C'», «C'B' = 3»: each primed name is its own point (#2624, ADR-806)
 
 **Guards against:** «A' אמצע BC» refused as A, «נקודה A'» sent to the AI, a prime glyph (′) read as another name. **Asserts** A′ is the midpoint of BC beside A, AA′ = 8, B′ on AC, C′B′ = 3.
+
+### `issue-2151-tangent-from-inside` — «מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» is refused naming both statements (#2151, ADR-814)
+
+**Guards against:** a tangent from a point stated inside the circle being built until its scaffold circle fails (an internal id, the floor sentence) or committing with the circle shrunk. **Asserts** the refusal names «tangent from P to circle O» and «P inside circle O», no `tanaux`, P still inside; the «PA ו-PB» form in both orders; the outside control builds.

@@ -50,6 +50,7 @@ const st = () => useGeoStore.getState();
 const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
 const FLOOR = { he: 'משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.', en: 'Something went wrong building this line. Try wording it differently, or split it into two steps.' };
 const HINT_HE = 'אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.';
+const TANGENT_INSIDE = 'לא ייתכן: «משיק מ-P למעגל O» סותר את «P בתוך המעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים. ' + HINT_HE;
 
 /**
  * The literal pieces of every locale template that spell a label as the template's own worked example («למשל AB = »):
@@ -120,7 +121,9 @@ beforeEach(() => {
 
 describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
   const CASES: { issue: string; lines: string[]; after: string }[] = [
-    { issue: '#2151', lines: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], after: FLOOR.he },
+    // #2151 (ADR-814): the reading bug fixed — a tangent from a point stated inside is refused naming both statements
+    { issue: '#2151', lines: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], after: TANGENT_INSIDE },
+    { issue: '#2151', lines: ['מעגל O', 'P בתוך המעגל', 'PA ו-PB משיקים למעגל'], after: TANGENT_INSIDE },
     // #2345 (ADR-758) under #2486 (ADR-759): «רבע מעגל AOB» is centred at O (the middle letter), so AB is a real arc of
     // the quarter — «קשת AB = 40» contradicts its 90° and is refused as over-constrained (#2483), «קשת AB = 90» is
     // already true. Never the floor, never ∠AAB. Read from the locale table (one source).

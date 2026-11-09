@@ -126,6 +126,8 @@ const DESC_WORDS: [RegExp, string, string[]?][] = [
 const STATEMENT_WORDS: [RegExp, string, string[]?][] = [
   // #2305 (ADR-755): a circle statement captures the circle's token as a CIRCLE SLOT — «על המעגל הפנימי», not «על המעגל O-2».
   [/\bis the centre of circle (\S+)/g, 'errors.stmt.centreOfCircle', ['circle']],
+  // #2151 (ADR-814): the tangent statement names its apex before the circle — «משיק מ-P למעגל O»
+  [/\btangent from (\S+) to circle (\S+)/g, 'errors.stmt.tangentFrom', ['p', 'circle']],
   [/\bis the midpoint of\b/g, 'errors.stmt.midpointOf'],
   [/\bis a vertex of\b/g, 'errors.stmt.vertexOf'],
   [/\bon different sides of\b/g, 'errors.stmt.differentSidesOf'],
@@ -148,7 +150,8 @@ export function translateConstraintWords(s: string, t: Translate, circles: Circl
   const slotted = (names: string[] | undefined, g: string[]) => {
     if (!names) return undefined;
     const ps = Object.fromEntries(names.map((n, i) => [n, g[i + 1]]));
-    return wordCircleSlots(ps, names, (slot) => circles(ps[slot]), t);
+    // only a CIRCLE slot is worded through circleText; a point slot (#2151's apex) stays the letter
+    return wordCircleSlots(ps, names.filter((n) => n === 'circle' || /^c\d$/.test(n)), (slot) => circles(ps[slot]), t);
   };
   for (const [re, key, names] of DESC_WORDS) out = out.replace(re, (...g: string[]) => t(key, slotted(names, g)));
   // A statement phrase is a FRAGMENT of the sentence the caller renders: no bidi pass of its own (circleText's rule),

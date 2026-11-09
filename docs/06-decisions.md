@@ -20723,3 +20723,32 @@ A display-only change (hiding a point, a measure toggle) is not a new figure: it
 - `src/app/__tests__/resolve-view.test.ts` (the reviewer's probe as a harness, the regression lock): a gated worker and the App's `applyView` binding; undo, clear, a new line, a mute, an ✎ edit and a redo mid-search each leave the store as the student left it (the same `facts` reference, the same seed, no note); the control (nothing in between) still applies the answer, merged into the commit's undo entry; hiding a point mid-search still applies it; a «הציגו תצורה אחרת» search is superseded by an undo. Not a corpus scenario or a fixture: the scenario harness is synchronous and cannot interleave a student action with a pending search.
 
 **Behaviour change for a student:** a line they undid, cleared or edited away stays gone when a configuration search finishes late, and the input box is free again at once instead of waiting for that search.
+
+## ADR-814 — A tangent drawn from a point stated inside the circle is a side contradiction, refused naming both statements (#2151)
+
+**Status:** accepted, 2026-11-09 · **Issue:** [#2151](https://github.com/dcodish/geo_builder/issues/2151) (bug, `P2`, `2d`) · round [#2783](https://github.com/dcodish/geo_builder/issues/2783)
+**Requirements:** [02](02-requirements.md) — FR-EN-23: the tangent-from-an-inside-point member joins the side contradictions · **Design:** none (internal) · **LADDER stage:** 0g′ (the existing `sideImpossibility` row; also inside `constraintIsPending` and replay's deferral validity, which call the same prover)
+**Amends** [ADR-549](#adr-549) (a new circle-side member) · **cites** the operator's acceptance of 2026-10-15 ([#2136](https://github.com/dcodish/geo_builder/issues/2136#issuecomment-6187109141), row 11), the honesty invariant (CLAUDE.md), #2201 phase 3b (the leak lock, ADR-W-130 Am. 1)
+
+**Re-measured at 4a06aae9** (`runSubmit`, model mocked):
+
+| sequence | before | after |
+| --- | --- | --- |
+| «מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» (and «…משיק למעגל», «משיק מ-P למעגל», «PT משיק למעגל O») | raw `cannot construct T: circles circle-O and tanaux-OP do not meet`; on screen the leak lock's floor «משהו השתבש…» | refused: «משיק מ-P למעגל O» סותר את «P בתוך המעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט |
+| «מעגל O» · «P בתוך המעגל» · «PA ו-PB משיקים למעגל» | committed, the circle shrunk to 0.2 with a red side row | refused, the same sentence |
+| «מעגל O» · «PA ו-PB משיקים למעגל» · «P בתוך המעגל» | committed | refused: «P בתוך המעגל O» סותר את «משיק מ-P למעגל O» |
+| «מעגל O» · «מהנקודה P העבירו משיקים למעגל» · «הנקודה P בתוך המעגל» | refused, naming «P מחוץ למעגל O» — a record the macro writes, which the student never typed | refused, naming the tangent |
+| «הנקודה P מחוץ למעגל» · the tangents; «P בתוך מעגל Q» · tangents to O | builds | builds (unchanged) |
+| «מעגל O» · «מהנקודה O העבירו משיקים למעגל» (from the centre: no stated side) | floor sentence | unchanged — not this class |
+
+**Root cause.** The tangent-from-a-point construction ran until its auxiliary circle failed to meet the circle (or, in the constraint form, until the solver shrank the circle). Nothing asked first whether the point can have a tangent: `sideImpossibility` proved the side contradictions of ADR-549 and had no reader for a tangent.
+
+**Decision.** `Structure.tangentFrom(p, circle)` reads, from what the construction IS, that a tangent is drawn from p: a point T that is a crossing of the circle with a circle whose centre is the midpoint of the centre and p and whose radius runs through the centre (the Thales form, read from the objects, never from the `tanaux-` id), or a point T on the circle with a stated `perpendicular` OT ⟂ pT (the constraint form, set or driven). Either puts p at √(r² + |pT|²) ≥ r from the centre, so a stated **inside** cannot hold. `sideImpossibility`'s circle-side arm refuses it; when the tangent macro has also recorded its own apex outside (#556), the both-sides pair names the student's tangent instead of that record. The statement is `tangent from P to circle O`, worded by `humanizeError`'s statement table (`errors.stmt.tangentFrom`, «משיק מ-P {{circleTo}}» — the session's text, ADR-W-174, inside the existing refusal template); a statement slot that is a point is no longer passed to `circleText`.
+
+**Class.** *A statement that needs a point outside a circle, about a point stated inside it.* Every spelling that lowers to the Thales construction or to the ⟂-at-the-touch-point form is one case, both entry orders. The prover stays one-way sound: a free apex, another circle's inside, a tangent from a point outside all build.
+
+**Analytic** (ADR-W-157, measured at the same commit through `decideSubmit`): it already refuses «PT משיק למעגל O» and «PA ו-PB משיקים למעגל» against a point stated inside (`unsatisfiable`, naming the line, no internal id), in both orders. It does not read the «מהנקודה P העבירו משיקים» / «משיק מ-P» spellings at all (not-handled; teach) — a reading gap, not this defect: known-gap cells, unscheduled (ADR-W-170). 3-D: the circle-geometry exception (X8).
+
+**Locks.** `src/engine/__tests__/side-feasibility.test.ts` (the prover over every spelling and both orders, and the controls; its `split` now takes every command of the last line's group); `src/i18n/__tests__/humanize-error.test.ts` (the statement reads fully in Hebrew, no `tanaux`/`circle-`/T); `src/app/__tests__/student-text-leak-lock.test.ts` (the issue's sequence and the «PA ו-PB» one render the named refusal through the real submit path, clean); the scenario `issue-2151-tangent-from-inside` in the last corpus chunk; parity rows `*-2151`.
+
+**Behaviour change for a student:** drawing tangents from a point said to be inside the circle is refused with a sentence naming both of the student's statements, instead of «משהו השתבש» or a broken figure with a shrunk circle.

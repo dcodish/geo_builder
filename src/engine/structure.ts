@@ -102,6 +102,39 @@ export class Structure {
     }
     return null;
   }
+  /**
+   * #2151 ([ADR-814](../../docs/06-decisions.md#adr-814)) — the construction draws a TANGENT FROM `p` to circle `circ`:
+   * a point T structurally on the circle with ∠OTP = 90° stated, either way the tangent rules lower it —
+   *  - the Thales form: T is a crossing of `circ` with a circle whose diameter is O–p (its centre the midpoint of the
+   *    centre and `p`, its radius through the centre) — read from the objects, never from the scaffold's id;
+   *  - the constraint form: T on `circ` with OT ⟂ pT stated (`perpendicular`, set or driven).
+   * Either one puts `p` at distance √(r² + |pT|²) ≥ r from the centre, so `p` can never be strictly inside.
+   */
+  tangentFrom(p: Id, circ: Id): string | null {
+    const C = this.circle(circ);
+    if (!C) return null;
+    const said = `tangent from ${p} to circle ${circleName(circ)}`;
+    const mine = this.cls(p);
+    const ctr = this.cls(C.center);
+    const pair = (a: Id, b: Id) => (ctr.has(a) && mine.has(b)) || (ctr.has(b) && mine.has(a));
+    const thales = (id: Id): boolean => {
+      const X = this.circle(id);
+      if (!X || X.radius.via !== 'through' || !ctr.has(X.radius.point)) return false;
+      return this.defs(X.center).some((o) => o.kind === 'midpoint' && pair(o.a, o.b));
+    };
+    for (const list of this.lists)
+      for (const o of list)
+        if (o.kind === 'circle-circle' && ((o.circle1 === circ && thales(o.circle2)) || (o.circle2 === circ && thales(o.circle1)))) return said;
+    for (const con of [...this.c.constraints, ...drivenConstraintsOf(this.c)]) {
+      if (con.type !== 'perpendicular') continue;
+      for (const [x, y, u, v] of [[con.a, con.b, con.c, con.d], [con.b, con.a, con.c, con.d], [con.a, con.b, con.d, con.c], [con.b, con.a, con.d, con.c]] as const) {
+        // the two lines share the touch point T (y = v); one runs to the centre, the other to p
+        if (y !== v || this.onCircle(y, circ) === null) continue;
+        if ((ctr.has(x) && mine.has(u)) || (ctr.has(u) && mine.has(x))) return said;
+      }
+    }
+    return null;
+  }
   isCentre(p: Id, circ: Id): string | null {
     const C = this.circle(circ);
     return C && this.cls(p).has(C.center) ? `${p} is the centre of circle ${circleName(circ)}` : null;

@@ -273,6 +273,7 @@ describe('#1470 — a side contradiction reads fully in Hebrew', () => {
     'E inside polygon ABCD',
     'C, D on different sides of AB',
     'C, D on the same side of AB',
+    'tangent from P to circle O', // #2151 (ADR-814)
   ];
   for (const st of STATEMENTS) {
     it(`«${st}»`, () => {
@@ -281,6 +282,11 @@ describe('#1470 — a side contradiction reads fully in Hebrew', () => {
       expect(shown, `«${shown}» leaks English`).not.toMatch(/[a-z]{2,}/);
     });
   }
+  it('#2151 — a tangent from a point inside reads as the student’s own two statements, no internal id', () => {
+    const shown = humanizeError('impossible: «tangent from P to circle O» contradicts «P inside circle O»', t).replace(/[⁦-⁩]/g, '');
+    expect(shown).toBe('לא ייתכן: «משיק מ-P למעגל O» סותר את «P בתוך המעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.');
+    expect(shown).not.toMatch(/tanaux|circle-|\bT\b/);
+  });
   it('the operator’s sequence renders as one sentence naming both statements', () => {
     expect(humanizeError('impossible: «E on circle O» contradicts «E outside circle O»', t).replace(/[⁦-⁩]/g, '')).toBe(
       'לא ייתכן: «E על המעגל O» סותר את «E מחוץ למעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.',
