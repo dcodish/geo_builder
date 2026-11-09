@@ -241,6 +241,34 @@ function polygon4ConcaveDims(key: string, seed: number, allowed: readonly number
 /** #2764 (ADR-3D-454): solid `i`'s index in the WHOLE figure — itself, except inside a part (`partsOf3`). */
 export const wholeSolidIndex3 = (c: Construction3, i: number): number => c.partOf?.solidIndex[i] ?? i;
 
+/**
+ * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — the kinds whose quad base may take the concave seat:
+ * the flat quadrilateral (ADR-3D-418), and a solid's base a dart can draw — a general quadrilateral (`pyramidQuad`,
+ * `prism4g`) or a kite (`pyramidKite`). A right pyramid's base is cyclic (convex whenever simple) and is not here.
+ */
+const CONCAVE_SEAT_KINDS3: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon4', 'pyramidQuad', 'prism4g', 'pyramidKite']);
+
+/**
+ * #2702 (ADR-3D-438) — a solid's dims with its quad base on the concave seat. The general bases (`polygon4`,
+ * `pyramidQuad`, `prism4g`) lead with C, D in the A, B gauge — exactly what `polygon4ConcaveDims` returns — so the
+ * seat replaces those four and the apex's or the lateral dims follow unchanged. A kite keeps its symmetry (|AB| = |AD|,
+ * |CB| = |CD|, structural) and takes a DART window of its own two dims: reflex at C, C rides the axis inside triangle
+ * ABD (`axis` = f·cos(half), f ∈ [0.25, 0.75]); reflex at A, the half-angle opens past 90° (`half` ∈ [95°, 130°]).
+ * Which corner is reflex is drawn from the seed among the allowed ones (FR-ALT-2), as ADR-3D-418 draws it.
+ */
+function concaveSolidDims3(solid: SolidObj, key: string, seed: number, seat: readonly number[]): number[] {
+  if (solid.kind === 'polygon4') return polygon4ConcaveDims(key, seed, seat);
+  const dims = solidDims(solid.kind, key, seed, solid.oblique);
+  if (solid.kind !== 'pyramidKite') return [...polygon4ConcaveDims(key, seed, seat), ...dims.slice(4)];
+  const reflex = seat[Math.min(seat.length - 1, Math.floor(sample(seed, `${key}-reflex`, 0, seat.length)))];
+  const [half, axis] = dims;
+  const dart =
+    reflex === 0
+      ? [(sample(seed, `${key}-dart-half`, 95, 130) * Math.PI) / 180, axis]
+      : [half, sample(seed, `${key}-dart-axis`, 0.25, 0.75) * Math.cos(half)];
+  return [...dart, ...dims.slice(2)];
+}
+
 /** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
 export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
   return [...solidDimsAll3(c, seed)[i]];
@@ -258,7 +286,8 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   let bySeed = solidDimsMemo3.get(c.solids);
   if (!bySeed) solidDimsMemo3.set(c.solids, (bySeed = new Map()));
   // #1986 (ADR-3D-418): which flat quadrilaterals take the concave seat is part of the configuration's identity
-  const concave = c.solids.map((solid) => (solid.kind === 'polygon4' ? concaveSeatVertices3(c, solid.ids) : null));
+  // #2702 (ADR-3D-438): ...and so do a solid's own quad base — a general or kite pyramid base, a general prism base
+  const concave = c.solids.map((solid) => (CONCAVE_SEAT_KINDS3.has(solid.kind) && !solid.bound ? concaveSeatVertices3(c, baseRingOf(solid)!) : null));
   const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
   let all = bySeed.get(memoKey);
   if (!all) {
@@ -267,7 +296,7 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
       if (solid.bound) return boundSolidDims3(solid.kind, `bound-${solid.kind}-${solid.ids.join('')}`, seed, !flatHostOf3(c, solid));
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
       const seat = concave[i];
-      const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
+      const shape = seat ? concaveSolidDims3(solid, key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
       // #2764 (ADR-3D-454): a part's solid keeps its index in the whole, so it is sampled as it is there
       return wholeSolidIndex3(c, i) === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
     });

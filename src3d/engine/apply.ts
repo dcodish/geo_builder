@@ -2087,6 +2087,35 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
 }
 
 /**
+ * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — AN UNSTATED BASE'S RECTANGLE YIELDS TO A SECOND RING
+ * OVER ITS LETTERS (M4: a default yields to a statement; ADR-052).
+ *
+ * «פירמידה SABCD» draws its base as ADR-3D-011's free-aspect rectangle: the default for a base nobody described. «מרובע
+ * ABDC» then declares another cyclic order over the same four letters, which a rectangle (convex whenever simple) can
+ * never draw simple, so the default would refuse a sentence a general quadrilateral base satisfies. The student stated
+ * nothing that makes ABCD a rectangle, so the default yields: the pyramid's base becomes the general quadrilateral it
+ * always could have been (`pyramidQuad`, the twin «… שבסיסה מרובע»), and its concave seat draws both rings simple
+ * (`concaveSeatVertices3`). A STATED base («… שבסיסה מלבן») carries no mark and keeps its shape — and its refusal.
+ * Mutates `next` (the clone the caller returns), on a fresh `solids` array so the per-solid dim memo stays true.
+ */
+function yieldUnstatedBase3(next: Construction3, ring: readonly Id[]): void {
+  if (ring.length !== 4) return;
+  const letters = [...ring].sort().join();
+  const own = ringKeyIds3(ring);
+  let changed = false;
+  const solids = next.solids.map((s) => {
+    if (!s.baseUnstated || s.bound) return s;
+    const base = baseRingOf(s);
+    if (!base || base.length !== 4 || [...base].sort().join() !== letters || ringKeyIds3(base) === own) return s;
+    changed = true;
+    const { baseUnstated: _unstated, ...rest } = s;
+    void _unstated;
+    return { ...rest, kind: GENERAL_QUAD_PYRAMID };
+  });
+  if (changed) next.solids = solids;
+}
+
+/**
  * How deep the reducer is inside its own lowerings.
  *
  * The ambiguity question below is about **the sentence the student submitted**, and several commands
@@ -2396,6 +2425,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         recordClaim3(nextRef, c, { type: 'polygon-open', ids: [...cmd.ids], given: true });
         // #1935 (ADR-3D-356): ...and the ring is FLAT — a free vertex rides the plane of the placed ones
         flattenRingFreeVertices3(nextRef, cmd.ids);
+        yieldUnstatedBase3(nextRef, cmd.ids);
         return { ok: true, next: nextRef };
       }
       // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
@@ -2530,6 +2560,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
         ...(cmd.oblique ? { oblique: true as const } : {}),
         ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}), // #1918
+        ...(cmd.baseUnstated && QUAD_PYRAMIDS[cmd.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[cmd.kind]?.right ? { baseUnstated: true as const } : {}), // #2702
         ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}), // #1918
       };
       const solidIndex = next.solids.length;
