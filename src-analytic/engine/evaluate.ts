@@ -12,7 +12,7 @@
  */
 import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
-import { enumerateBlockRoots, pinReach, statedScale, walkPins, type Pin } from './pinRoots';
+import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -3734,144 +3734,6 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
 }
 
 /**
- * THE ROOTS OF A DETERMINED BLOCK SEED THE SOLVE (#2731, [ADR-AG-433](../../docs/06c-decisions-analytic.md#adr-ag-433)) — ADR-AG-303's
- * scan covers a given that reads one open symbol and no carrier; a block whose givens read a free point («KF = 20» reads
- * K, so p is no pin) was left to descent from a sample the seed barely moves, and the pool held one root of several.
- *
- * WHEN: configuration 0 of this assignment converged (nothing unsatisfied) with no freedom left (`carrierDof` 0), and an
- * unknown is left that no pin fixed. The selectors and rings do not decide WHETHER it runs, only which roots count: a
- * comparison only another root satisfies («x_K < 10») leaves configuration 0 unadmitted, and the listing is what finds
- * the configuration that holds it (search first, refuse last — the 2026-11-08 ruling on #2731).
- *
- * WHAT: `enumerateBlockRoots` over the figure's own `carrierSystem` at that root, every pinned symbol held at its root
- * (the pin's other roots are ADR-AG-303's axis). A candidate counts when the solve's judge admits it — nothing unsatisfied
- * on the real residuals, the declared domains at the open-bound floor, the free-direction signs, the selectors and the
- * hard ring faults (`admissibleAt`). Directions compare mod π; duplicates merge at `SOLVE_RESOLUTION` of the span. At most
- * `OPTION_CAP + 1` roots. Memoised per (construction, assignment), anchored on configuration 0, so the list depends only
- * on the input and every seed reuses it.
- *
- * WHICH: configuration 0 draws its own root, unchanged. A configuration s ≥ 1 whose pins took configuration 0's roots
- * starts stage one AT root ⌊jitter(s + BLOCK_STREAM)·n⌋ of the admitted list — vertices and parameters both — so the
- * pool misses one of two roots with probability 2⁻²³. A root is part of the assignment (`rootKey`, ADR-AG-303 §5), so
- * the first drawing's spread walk never crosses to another root. A start, never a verdict: the solve and the judge keep
- * the last word.
- */
-const BLOCK_STREAM = 300043;
-/** Listings run so far and the solves they cost — the #1473 perf lock reads them (counted, never timed). */
-export const blockRootStats = { listings: 0, solves: 0 };
-interface BlockList {
-  /** The anchor's pinned symbols and their values: a configuration whose pins differ is not steered. */
-  pinned: ReadonlyMap<string, number>;
-  ids: Id[];
-  syms: string[];
-  /** The admitted roots, each with its index in the listing (0 is configuration 0's own root). */
-  roots: Array<{ x: number[]; index: number }>;
-}
-const blockMemo = new WeakMap<Construction, Map<string, BlockList | null>>();
-function blockRootsOf(raw: Construction, choiceSeed: number): BlockList | null {
-  const akey = assignmentAt(raw, choiceSeed).key;
-  let perRaw = blockMemo.get(raw);
-  if (!perRaw) {
-    perRaw = new Map();
-    blockMemo.set(raw, perRaw);
-  }
-  if (perRaw.has(akey)) return perRaw.get(akey)!;
-  perRaw.set(akey, null); // a re-entry while the anchor is evaluated reads "none"
-  const out = listBlockRoots(raw, choiceSeed, akey);
-  perRaw.set(akey, out);
-  return out;
-}
-
-function listBlockRoots(raw: Construction, choiceSeed: number, akey: string): BlockList | null {
-  // Configuration 0 of THIS assignment: the memoised first drawing when it took it, else its own evaluation.
-  const first = evaluate(raw, 0, 1, false);
-  let anchorSeed = first.choiceSeed ?? 0;
-  let f = first;
-  if (assignmentAt(raw, anchorSeed).key !== akey) {
-    anchorSeed = choiceSeed;
-    evaluateStats.uncached += 1;
-    f = evaluateUncached(raw, 0, choiceSeed, 1, false);
-  }
-  if (f.unsatisfied.length > 0 || f.carrierDof !== 0 || f.vacant.length > 0) return null;
-  const c = resolvedAt(raw, 0, anchorSeed);
-  const sys = carrierSystem(c, f.env);
-  if (sys.ids.length + sys.syms.length === 0 || c.constraints.length === 0) return null;
-  const at = new Map(f.points.map((p) => [p.id, { x: p.x, y: p.y }] as const));
-  if (!sys.ids.every((id) => at.has(id))) return null;
-  // The pins configuration 0 took: held at their roots, and what a later configuration must agree on to be steered.
-  const pins = seedPinRoots(raw, c, f.env, 0, anchorSeed).pins;
-  const pinned = new Map(pins.map((p) => [p.sym, p.roots[p.index]] as const));
-  if (sys.ids.length === 0 && sys.syms.every((sym) => pinned.has(sym))) return null;
-  const anchor = sys.toVec(at, f.env);
-  const base = 2 * sys.ids.length;
-  const pinIdx = new Set(sys.syms.map((sym, j) => (pinned.has(sym) ? base + j : -1)).filter((i) => i >= 0));
-  const held = (x: readonly number[]) => x.map((v, i) => (pinIdx.has(i) ? anchor[i] : v));
-  const span = Math.max(spanOf(c, sys.positionsAt(anchor), f.env), 1e-9);
-  const isDir = (i: number) => i >= base && isDirectionSymbol(sys.syms[i - base]);
-  const delta = (a: readonly number[], b: readonly number[], i: number) => {
-    if (pinIdx.has(i)) return 0;
-    if (!isDir(i)) return (a[i] - b[i]) / span;
-    // a direction is a line: θ and θ + π are one root
-    const d = ((((a[i] - b[i]) % Math.PI) + 1.5 * Math.PI) % Math.PI) - Math.PI / 2;
-    return d / Math.PI;
-  };
-  const domains = new Map(paramRegister(c).map((p) => [p.sym, p.domain] as const));
-  const sampledScale = figureScale(sys.positionsAt(anchor), f.env, sys.syms);
-  const admit = (x: number[]) => {
-    const e = sys.envAt(x);
-    const pos = sys.positionsAt(x);
-    if (sys.ids.some((id) => !pos.has(id))) return false;
-    if (sys.residualsAt(x).some((r) => !(Math.abs(r) <= SATISFIED_EPS))) return false;
-    const floor = openBoundFloor(pos, e, sys.syms, sampledScale);
-    if (!sys.syms.every((sym) => inDomain(domains.get(sym) ?? {}, e[sym], floor))) return false;
-    for (const sel of c.selectors) {
-      if (sel.kind !== 'sign') continue;
-      const sym = freeAngleOf(c, sel);
-      if (sym === null || !Number.isFinite(e[sym])) continue;
-      if ((Math.tan(e[sym]) > 0) !== sel.positive) return false;
-    }
-    return admissibleAt(c, placeOrderFree(c, e, pos, 0) ?? pos, e);
-  };
-  blockRootStats.listings += 1;
-  const listed = enumerateBlockRoots({
-    anchor,
-    residuals: (x) => sys.residualsAt(held(x)),
-    solve: (x0, fn) => {
-      const r = solveLM(held(x0), (x) => fn(held(x)), 120);
-      return { values: held(r.values), ok: r.ok };
-    },
-    admit: (x) => admit(held(x)),
-    delta,
-    same: SOLVE_RESOLUTION,
-    cap: OPTION_CAP + 1,
-  });
-  blockRootStats.solves += listed.solves;
-  const roots = listed.roots.map((x, index) => ({ x, index })).filter((_, i) => listed.admitted[i]);
-  // No admitted root, or only configuration 0's own: nothing to choose, so nothing is steered.
-  if (roots.length === 0 || (roots.length === 1 && roots[0].index === 0)) return null;
-  return { pinned, ids: sys.ids, syms: sys.syms, roots };
-}
-
-/**
- * Configuration `seed`'s start at a listed root (`blockRootsOf`): the vertices and parameters written in, and the root's
- * index for `rootKey`. Configuration 0, an unlisted block, or pins that took another root: `null`, nothing moves.
- */
-function steerToBlockRoot(raw: Construction, seed: number, choiceSeed: number, env: Env, seeded: Map<Id, Pt>): { env: Env; index: number } | null {
-  if (seed === 0) return null;
-  const list = blockRootsOf(raw, choiceSeed);
-  if (!list) return null;
-  for (const [sym, v] of list.pinned) if (!(Math.abs((env[sym] ?? Number.NaN) - v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v)))) return null;
-  if (!list.ids.every((id) => seeded.has(id))) return null;
-  const root = list.roots[Math.min(list.roots.length - 1, Math.floor(jitter(seed + BLOCK_STREAM, 1) * list.roots.length))];
-  list.ids.forEach((id, i) => seeded.set(id, { x: root.x[2 * i], y: root.x[2 * i + 1] }));
-  const out: Record<string, number> = { ...env };
-  list.syms.forEach((sym, j) => {
-    out[sym] = root.x[2 * list.ids.length + j];
-  });
-  return { env: out, index: root.index };
-}
-
-/**
  * The names (`labelRows`) whose symbol carries no STATED range — a name whatever the figure measures, so the structural
  * stages (which vertices a row moves, the fit's budget) can treat its row as met before any value is read (#2632). A
  * symbol the student bounded («α < 30» · «∢ABC = α») is a name only where the figure's measure lies inside the range:
@@ -4465,9 +4327,6 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   // A symbol a row names from the figure starts at the figure's own measure (#2632, ADR-AG-365): the row already holds.
   const named = labelsFromFigure(c, env, seeded);
   env = named.env;
-  // #2731 (ADR-AG-433): a determined block's configuration s ≥ 1 starts AT one of its listed roots — the seed chooses.
-  const block = steerToBlockRoot(raw, seed, choiceSeed, env, seeded);
-  if (block) env = block.env;
 
   const unsatisfied: Constraint[] = [];
   /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
@@ -5366,9 +5225,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     ...(metPairs.length > 0 ? { metPairs } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
-    ...(pinned.pins.length > 0 || (block && block.index > 0)
-      ? { rootKey: pinned.pins.map((q) => q.index).join(',') + (block && block.index > 0 ? `;b${block.index}` : '') }
-      : {}),
+    ...(pinned.pins.length > 0 ? { rootKey: pinned.pins.map((q) => q.index).join(',') } : {}),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),

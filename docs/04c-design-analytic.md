@@ -1542,14 +1542,7 @@ of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions
 `walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over
 the sampler's domain clipped to ±`pinReach` (`GRID` points uniform in asinh; sign change or touching minimum, kept at
 `ROOT_EPS`), and `evaluateUncached`'s `seedPinRoots` seeds the chosen root before stage one — seed 0 the root nearest
-its sample, other seeds `ROOT_STREAM`; a DETERMINED BLOCK's roots are the same kind of axis
-([ADR-AG-433](06c-decisions-analytic.md#adr-ag-433)): when configuration 0 of an assignment converged with `carrierDof` 0 and an
-unknown no pin fixed, `blockRootsOf` lists the roots of its `carrierSystem` by deflated descent (`pinRoots.ts`
-`enumerateBlockRoots`: `BLOCK_STARTS` fixed nudges of the anchor × up to `BLOCK_ROUNDS`, every root found so far deflated,
-each candidate polished on the real residuals and judged — domains, free-direction signs, `admissibleAt`; directions
-mod π; at most `OPTION_CAP + 1`), memoised per (construction, assignment), and `steerToBlockRoot` starts configuration
-s ≥ 1 at admitted root ⌊jitter(s + `BLOCK_STREAM`)·n⌋, vertices and parameters both; configuration 0 is never steered,
-and a root past the anchor writes `;b<i>` into `rootKey`. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
+its sample, other seeds `ROOT_STREAM`; `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.

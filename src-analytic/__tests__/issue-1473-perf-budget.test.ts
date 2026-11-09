@@ -19,7 +19,6 @@ import {
   configurationPool,
   distinctConfigSeeds,
   drawableAt,
-  blockRootStats,
   evaluateStats,
   figureSignature,
   isKnowledge,
@@ -35,7 +34,6 @@ import { panelKnowledge, segmentKnowledge } from '../app/panelRows';
 import { positionalOf } from '../engine/types';
 import { pointText } from '../app/pointText';
 import { ask } from '../app/ask';
-import { BLOCK_ROUNDS, BLOCK_STARTS } from '../engine/pinRoots';
 
 const PART_B = [
   'נתון הישר 1: 2x-y+8=0', 'נתון הישר 2: x+3y-10=0', 'N נקודת החיתוך של הישר 1 עם הישר 2', 'k הוא פרמטר',
@@ -206,24 +204,5 @@ describe('#1473 — the conic memo', () => {
     } finally {
       __setConicMemo(true);
     }
-  });
-});
-
-/**
- * #2731 (ADR-AG-433) — THE BLOCK LISTING IS CAPPED AND PAID ONCE. A determined figure's roots are listed by deflated
- * descent once per (construction, assignment): at most BLOCK_STARTS × BLOCK_ROUNDS × 2 solves, and every configuration
- * after the first reuses the list. Counted, never timed.
- */
-describe('#2731 — the determined-block listing is capped and memoised', () => {
-  it('the exam parabola: one listing, within the cap, and a second pool walk lists nothing', () => {
-    const lines = ['נתונה פרבולה שמשוואתה y^2=4px', 'p > 0', 'K על הפרבולה', 'y_K = 12', 'F מוקד הפרבולה', 'KF = 20'];
-    const before = { ...blockRootStats };
-    const d = derive(lines, 0);
-    configurationPool(d.construction).fill();
-    expect(blockRootStats.listings - before.listings).toBe(1);
-    expect(blockRootStats.solves - before.solves).toBeLessThanOrEqual(2 * BLOCK_STARTS * BLOCK_ROUNDS);
-    const warm = { ...blockRootStats };
-    for (let s = 0; s < POOL_SIZE; s += 1) drawableAt(d.construction, s);
-    expect(blockRootStats).toEqual(warm);
   });
 });
