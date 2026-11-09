@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2804 (ADR-3D-460) — the report: a length relation naming a new T over a ring, refused «no position of T». As vectors T
+  // cancels, so it reads as lengths and T is created free. The class is asserted in issue-1156-ratio-taught.test.ts; this is
+  // the build + drift + load net.
+  'new-point-equal-lengths-2804.geo3.json': ['מרובע ABCD', 'מעגל חוסם את ABCD', 'TA = TB'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],

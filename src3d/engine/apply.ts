@@ -1604,7 +1604,10 @@ function ratioStatement(
  * the case"*. So the sentence is judged by what it does to the figure:
  *
  * - **marked** (an arrow, «וקטור») → `vector` (#1183): the student said which reading.
- * - **a point not yet drawn** → `vector`: the sentence DEFINES it (ADR-3D-010, «A'K = 4/5 DN», «AK = AD»).
+ * - **a point not yet drawn that the vector reading solves for** → `vector`: the sentence DEFINES it (ADR-3D-010,
+ *   «A'K = 4/5 DN», «AK = AD»). A new point whose coefficient CANCELS («TA = TB»: as vectors A − T = B − T, so T drops
+ *   out and the sentence says only A = B) is not defined by it (#2804, ADR-3D-460), so the line falls through to the
+ *   rules below like any statement about known points — `vectorReadingDefines3`.
  * - **a negative coefficient** → `vector`: no length is a negative multiple of another, so only one reading can hold.
  * - **one segment on both sides** with `k ≠ 1` («AB = 2AB») → `vector`, as it always was.
  * - **anything else** → `two-readings`. Which of them can hold, and whether they give one figure, is a question
@@ -1620,14 +1623,36 @@ function segmentEquationShape(cmd: Command3): { pair1: [Id, Id]; pair2: [Id, Id]
   return { pair1: [cmd.from, cmd.to], pair2: [term.atom.from, term.atom.to], k: term.coeff.k };
 }
 
-/** Is `cmd` a segment equation at all (one pair against a numeric multiple of one pair)? Null when it is not. */
-export function segmentEquationKind3(c: Construction3, cmd: Command3): SegmentEquationKind3 | null {
+/**
+ * #2804 (ADR-3D-460, amending ADR-3D-391): does the VECTOR reading of a segment equation determine every point it
+ * names that is not yet drawn? As vectors, `pair1 = k·pair2` is `(to₁ − from₁) − k(to₂ − from₂) = 0`, so a point's
+ * net coefficient is +1 as a head, −1 as a tail, on the left, minus k times the same on the right. A nonzero net
+ * coefficient solves for the point (`AT = TB` → the midpoint, `TA = 2TB`, `TA = AB`); a zero one cancels
+ * («TA = TB», «AT = BT»: the sentence reads A = B and places nothing), so the line is no definition of it.
+ * True when the line names no new point. Null when `cmd` is not a segment equation.
+ *
+ * `fresh`: letters already on `c` that the line ITSELF created (the ADR-3D-382 mint pass places them before the row is
+ * applied). They are new to the sentence, so a line is read the same before and after the pass creates its letters.
+ */
+export function vectorReadingDefines3(c: Construction3, cmd: Command3, fresh?: ReadonlySet<Id>): boolean | null {
+  const shape = segmentEquationShape(cmd);
+  if (!shape) return null;
+  const { pair1, pair2, k } = shape;
+  const net = (id: Id) =>
+    (pair1[1] === id ? 1 : 0) - (pair1[0] === id ? 1 : 0) - k * ((pair2[1] === id ? 1 : 0) - (pair2[0] === id ? 1 : 0));
+  return [...pair1, ...pair2].every((id) => (c.points.has(id) && !fresh?.has(id)) || Math.abs(net(id)) > 1e-12);
+}
+
+/** Is `cmd` a segment equation at all (one pair against a numeric multiple of one pair)? Null when it is not.
+ *  `fresh` as in {@link vectorReadingDefines3}: the line's own created letters count as not yet drawn. */
+export function segmentEquationKind3(c: Construction3, cmd: Command3, fresh?: ReadonlySet<Id>): SegmentEquationKind3 | null {
   const shape = segmentEquationShape(cmd);
   if (!shape) return null;
   if (cmd.type === 'vec-rel' && cmd.marked) return 'vector';
   const { pair1, pair2, k } = shape;
   const all = [...pair1, ...pair2];
-  if (all.some((id) => !c.points.has(id))) return 'vector'; // a definition, not a statement
+  // a definition, not a statement — when the vector reading places the new point; a cancelled one falls through (#2804)
+  if (all.some((id) => !c.points.has(id) || fresh?.has(id)) && vectorReadingDefines3(c, cmd, fresh)) return 'vector';
   if (k < 0) return 'vector'; // no length reading: a length is never a negative multiple of another
   const unit = Math.abs(k - 1) < 1e-12;
   if (pair1.every((p) => pair2.includes(p)) && !unit) return 'vector'; // one segment, not two
@@ -1651,7 +1676,9 @@ function readSegmentEquation(c: Construction3, cmd: Command3): { ask: EngineErro
   const kind = segmentEquationKind3(c, cmd);
   if (kind === null) return { cmd, arrows: [] };
   const { pair1, pair2, k } = segmentEquationShape(cmd)!;
-  const reading = kind === 'vector' ? 'vector' : (cmd as VecRelCommand).reading;
+  // a reading the store's fold already decided is the reading (#2804: decided against the figure BEFORE the line, so a
+  // letter the mint pass created for the line cannot turn it into a definition here); else a vector kind is a vector
+  const reading = (cmd as VecRelCommand).reading ?? (kind === 'vector' ? 'vector' : undefined);
   if (reading === 'vector') return { cmd, arrows: [pair1, pair2] };
   if (reading === 'length')
     return { length: [{ type: 'segment3', a: pair1[0], b: pair1[1] }, { type: 'length-rel', a1: pair1[0], b1: pair1[1], rhs: { pair: pair2 }, c: k }] };
