@@ -2010,8 +2010,11 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 notice. The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
 because `absorbed` hid two events. **Before either no-op answer** (`already-known`, `already-follows`) the decision
 asks `addsStatedValue(current, trial)` (`app/submit.ts`): a trial whose stated-measure layer labels something the
-current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc; not the knee, which «⟂» shares), never
+current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc), never
 counted — records, so its value is drawn (2-D's ADR-542 visibility half; [ADR-AG-401](06c-decisions-analytic.md#adr-ag-401)).
+A knee counts only when it is `spoken` and the current figure draws no knee at that angle: the fold keeps every right
+angle stated as an angle value in `Construction.statedRightAngles` (display only, written whatever the effect, so an
+absorbed one survives), and `statedMeasures` tags its knee `spoken`; a ⟂ knee is never a key ([ADR-AG-437](06c-decisions-analytic.md#adr-ag-437)).
 
 *Identifiers:* `no`
 

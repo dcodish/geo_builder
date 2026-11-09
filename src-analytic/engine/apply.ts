@@ -2997,7 +2997,7 @@ export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
   const tangent = resolveFigureTangent(c, f0);
   if ('error' in tangent) return { ok: false, error: tangent.error };
   const f = resolveLineRefs(c, readBound(c, tangent.fact));
-  const out = applyStatement(c, f);
+  const out = withStatedRightAngle(applyStatement(c, f), f);
   if (!out.ok || out.effect === 'known') return out;
   // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
   // taken, as 2-D answers (`aliasTaken`). Checked here, where every statement that introduces an object lands, so no
@@ -3026,6 +3026,37 @@ export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
   if (f.t === 'param' && sizeLetters(c).has(f.sym) && sameRegisterDomain(c, out.next, f.sym)) return { ok: true, effect: 'known', next: c };
   const notice = readingTwin(c, f);
   return notice ? { ...out, notice } : out;
+}
+
+/**
+ * A RIGHT ANGLE STATED AS AN ANGLE VALUE IS KEPT AS STATED (#2704, [ADR-AG-437](../../docs/06c-decisions-analytic.md#adr-ag-437)).
+ *
+ * «∢ABC = 90» lowers to the constraint «AB ⟂ BC» lowers to (`rightAngleAt`), so by the time the stated layer reads the
+ * constraints nothing says a VALUE was stated — and where the figure already holds that very constraint («מלבן ABCD» ·
+ * «∢BAD = 90») the statement is absorbed and there is no constraint to read at all. Here, where every statement lands,
+ * a constraint the parser marked `angleSentence`, or an angle given the number 90 («זווית ABC היא 90 מעלות», «angle B is
+ * 90 degrees» through its vertex resolution), appends its vertex and rays to `statedRightAngles` whatever its effect: a
+ * `known` outcome stays `known`. One entry per angle (the rays unordered).
+ */
+function withStatedRightAngle(out: ApplyOutcome, f: Fact): ApplyOutcome {
+  if (!out.ok || f.t !== 'constraint') return out;
+  const r = statedRightAngleOf(f);
+  if (!r) return out;
+  const key = (x: { v: Id; a: Id; b: Id }) => `${x.v}:${[x.a, x.b].sort().join('|')}`;
+  const held = out.next.statedRightAngles ?? [];
+  if (held.some((x) => key(x) === key(r))) return out;
+  return { ...out, next: { ...out.next, statedRightAngles: [...held, r] } };
+}
+
+/** The right angle a constraint fact states as an ANGLE VALUE, or null (`withStatedRightAngle`). */
+function statedRightAngleOf(f: Extract<Fact, { t: 'constraint' }>): { v: Id; a: Id; b: Id } | null {
+  const k = f.k;
+  if (k.t === 'angle') {
+    return !k.measure && isAngleRef(k.at) && k.value.kind === 'num' && k.value.value === 90 ? { v: k.at.v, a: k.at.a, b: k.at.b } : null;
+  }
+  if (!f.angleSentence || k.t !== 'relation' || k.rel !== 'perpendicular' || k.u.k !== 'points' || k.v.k !== 'points') return null;
+  // `rightAngleAt`'s shape: both rays start at the vertex.
+  return k.u.a === k.v.a ? { v: k.u.a, a: k.u.b, b: k.v.b } : null;
 }
 
 /** The register gives `sym` the same domain before and after (the role-implied one, #2419). */
@@ -5743,7 +5774,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'right-angle': {
       const at = resolveAngleName(c, { v: f.id }, f.src);
       if (!at.ok) return at;
-      return withReadAs(applyFact(c, { t: 'constraint', k: rightAngleAt(f.id, at.ref.a, at.ref.b), src: f.src }), at);
+      const k = rightAngleAt(f.id, at.ref.a, at.ref.b);
+      return withReadAs(applyFact(c, { t: 'constraint', k, ...(f.angleSentence ? { angleSentence: true as const } : {}), src: f.src }), at);
     }
 
     /**
@@ -6681,7 +6713,7 @@ function symbolNodes(x: unknown, out: Set<string> = new Set()): Set<string> {
 }
 
 /** The construction's fields that are not expressions over the figure's symbols — never substituted into. */
-const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound', 'objectLine', 'rowLine']);
+const NOT_SUBSTITUTED = new Set<keyof Construction>(['params', 'seedNames', 'bound', 'objectLine', 'rowLine', 'statedRightAngles']);
 
 /**
  * THE ONE PLACE A STATED VALUE REPLACES A FREE SYMBOL (#2521, ADR-AG-332).

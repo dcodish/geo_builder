@@ -55,8 +55,11 @@ export interface StatedMeasures {
    * A stated right angle at `v` — the knee. `alt` is a second named point on the `b` ray's LINE (an altitude's foot
    * lies on the side, between or beyond its ends): the renderer runs the knee toward whichever of `b`, `alt` is
    * farther from `v`, so a foot that lands on an endpoint still has a ray to draw along (#1241).
+   *
+   * `spoken` (#2704, ADR-AG-437): the student stated this right angle as an ANGLE VALUE («∢ABC = 90»), not only as a
+   * relation («AB ⟂ BC») — the knee is then a stated value the submit path's `addsStatedValue` counts.
    */
-  rights: Array<{ v: Id; a: Id; b: Id; alt?: Id }>;
+  rights: Array<{ v: Id; a: Id; b: Id; alt?: Id; spoken?: true }>;
   /**
    * «שטח המשולש ABC הוא 13», «שטח ABC = 12», «נסמן את שטח ABC ב-S» — written at the ring's centroid. `bare` marks a
    * value that is ONE letter the student wrote («S»), which is written alone, as 2-D writes it; every other value
@@ -311,9 +314,16 @@ export function statedMeasures(
    * One knee per right angle. A foot's knee stands for the right angle between its ray and EITHER end of the line it
    * sits on, so «AD גובה לצלע BC» and «זווית ADB ישרה» (in either order) are one knee, not two.
    */
-  const right = (r: { v: Id; a: Id; b: Id; alt?: Id }): void => {
+  const right = (r: { v: Id; a: Id; b: Id; alt?: Id; spoken?: true }): void => {
     const keys = [angKey(r.v, r.a, r.b), ...(r.alt ? [angKey(r.v, r.a, r.alt)] : [])];
-    if (keys.some((key) => seenRight.has(key))) return;
+    if (keys.some((key) => seenRight.has(key))) {
+      // #2704: the one knee already drawn for this angle now also says the angle was stated as a value.
+      if (r.spoken) {
+        const at = out.rights.findIndex((x) => [angKey(x.v, x.a, x.b), ...(x.alt ? [angKey(x.v, x.a, x.alt)] : [])].some((key) => keys.includes(key)));
+        if (at >= 0) out.rights[at] = { ...out.rights[at], spoken: true };
+      }
+      return;
+    }
     keys.forEach((key) => seenRight.add(key));
     out.rights.push(r);
   };
@@ -347,6 +357,13 @@ export function statedMeasures(
     if (onto.k !== 'points') continue;
     right({ v: o.id, a: o.rule.from, b: onto.a, alt: onto.b });
   }
+
+  /**
+   * THE RIGHT ANGLES STATED AS AN ANGLE VALUE (#2704, ADR-AG-437) — read after the constraints, so a knee they already
+   * drew is the same knee (the dedupe above) and only gains `spoken`; one the figure's own constraint absorbed
+   * («מלבן ABCD» · «∢BAD = 90») is drawn from here.
+   */
+  for (const r of c.statedRightAngles ?? []) right({ ...r, spoken: true });
 
   out.lengths = [...lenAt.values()];
   out.angles = [...angAt.values()];

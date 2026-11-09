@@ -251,8 +251,13 @@ export type Fact =
    * `definition` (#1714, ADR-AG-225) — the constraint is the DEFINITION of a named shape («מלבן ABCD»'s right angle)
    * or of a stated correspondence («△ABC ≅ △DEF»'s equal sides), not a measure the sentence states. The parser,
    * which built it from the noun, says so once; the stated-measure layer leaves it off the figure, as 2-D does.
+   *
+   * `angleSentence` (#2704, [ADR-AG-437](../../docs/06c-decisions-analytic.md#adr-ag-437)) — the constraint is a right angle
+   * the student stated as an ANGLE VALUE («∢ABC = 90», «זווית ABC ישרה»), not the relation «AB ⟂ BC» it lowers to. The
+   * parser's angle rule says so once; the fold keeps the statement (`Construction.statedRightAngles`) even when the figure
+   * already holds the constraint, so its knee is drawn as every stated value is (ADR-W-118 B2).
    */
-  | (FactBase & { t: 'constraint'; k: Constraint; definition?: true })
+  | (FactBase & { t: 'constraint'; k: Constraint; definition?: true; angleSentence?: true })
   /**
    * D7 KIND 2 — a BRANCH SELECTOR, not a constraint ([ADR-AG-005](../../docs/06c-decisions-analytic.md#adr-ag-005)).
    *
@@ -286,7 +291,7 @@ export type Fact =
    *
    * «זווית ABC ישרה» needs none of this and lowers to a constraint in the parser, as it should.
    */
-  | (FactBase & { t: 'right-angle'; id: Id })
+  | (FactBase & { t: 'right-angle'; id: Id; angleSentence?: true })
   /**
    * «זווית C = 60» · «∠B = ∠C» — an angle given a VALUE, or set in ratio to another, where at least one
    * side names its angle by the VERTEX ALONE (#1407, ADR-AG-158).
@@ -1283,6 +1288,14 @@ export interface Construction {
    * exactly where it started inside the whole.
    */
   whole?: Construction;
+  /**
+   * THE RIGHT ANGLES THE STUDENT STATED AS AN ANGLE VALUE (#2704, [ADR-AG-437](../../docs/06c-decisions-analytic.md#adr-ag-437))
+   * — «∢ABC = 90», «זווית B ישרה», «זווית ABC היא 90 מעלות»: the vertex `v` and the two rays' ends. Written by the fold
+   * (`apply.ts` `withStatedRightAngle`) whatever the statement's effect, so a right angle the figure already holds («מלבן
+   * ABCD» · «∢BAD = 90», absorbed by the rectangle's own constraint) still says it was stated. DISPLAY ONLY: the stated
+   * layer draws its knee; the solve, the DOF count and the sampling never read it. Pure over the lines; never saved.
+   */
+  statedRightAngles?: ReadonlyArray<{ v: Id; a: Id; b: Id }>;
 }
 
 /**
