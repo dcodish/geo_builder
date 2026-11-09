@@ -654,6 +654,15 @@ export function symmetricEigen(a0: readonly (readonly number[])[]): { values: nu
   return { values: order.map((i) => a[i][i]), vectors: order.map((i) => v.map((row) => row[i])) };
 }
 
+/**
+ * #2714 (ADR-3D-447): the fixed fan a DETERMINED flat ring's free vertex is moved to, in the canonical frame
+ * (v0 = (0, 0), v1 = (1, 0)), to reach the shape's other discrete roots: near the first edge on each side, above
+ * its middle, and beyond each end. Fixed, never seeded — it enumerates roots, it does not sample.
+ */
+const FLAT_RING_FAN: readonly (readonly [number, number])[] = [[0.25, 0.2], [0.75, 0.2], [0.5, 0.45], [-0.4, 0.5], [1.4, 0.5]];
+/** #2714 (docs/17 §9): exercised counters — how often the fan ran on a determined flat ring, and the roots it added. */
+export const ssaFanStats = { runs: 0, found: 0 };
+
 export function solvePivot(
   c: Construction3,
   evalCanonical: (dims: number[], symbolOverride?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
@@ -1972,6 +1981,12 @@ export function solvePivot(
   };
   const hasFlatKind = c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind));
   /**
+   * #2714 (ADR-3D-447): the figure is ONE flat triangle and the dims are exactly its apex's (x, y). A quadrilateral or
+   * pentagon has reachable second roots too, but measured, 2-D shows some and not others and the fan multiplies their
+   * replay 2.8× / 8× — not built here (the ADR records the measurement; the question is the operator's).
+   */
+  const flatRingDims = c.solids.length === 1 && c.solids[0].kind === 'polygon3' && dims0.length === 2;
+  /**
    * #2503 ([ADR-3D-378](../../docs/06b-decisions-3d.md#adr-3d-378), the 3-D twin of 2-D's ADR-764) — THE TRIGGER READS
    * THE DRIVING RELATIONS' OPERAND PAIRS. ADR-3D-372 asked the tightened re-solve only of a THIN declared ring or solid,
    * and two vertices of a quadrilateral meeting leave the ring open («מרובע ABCD · |AB| = |BC| · AC ⟂ BC» drew C on A,
@@ -2449,6 +2464,8 @@ export function solvePivot(
   }
   /** #1735: per mirror, the deferred re-seat of its off-host candidates — run only when the pool is empty. */
   const reseatStages: (() => void)[] = [];
+  /** #2714 (ADR-3D-447): the shapes the first mirror's fan found — the second mirror tries only these. */
+  let fanShapes: number[][] | null = null;
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -2867,13 +2884,82 @@ export function solvePivot(
     const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;
     if (!collectAll && best && bestAccept < ACCEPT) {
       // #518: an undriven scale parks at the seed target, exactly; #1854: and a free dim at the seed's dims
-      const bx = settleFreeDims(parkScale(best.x) ?? best.x);
-      const g = { ...unpack(bx), mirror };
-      const dims = bx.slice(7, 7 + nDims);
-      const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-      const pinSymbols = pinSymbolsAt(bx);
-      const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, bx[riderBase + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...bx], mirror), err: bestAccept, x: [...bx] });
+      const parked = parkScale(best.x) ?? best.x;
+      const bx = settleFreeDims(parked);
+      const pushSolution = (sx: number[], err: number): void => {
+        const g = { ...unpack(sx), mirror };
+        const dims = sx.slice(7, 7 + nDims);
+        const symbols = coupled ? sx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+        const pinSymbols = pinSymbolsAt(sx);
+        const riderTs = nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, sx[riderBase + i]])) : undefined;
+        results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), err, x: [...sx] });
+      };
+      pushSolution(bx, bestAccept);
+      /**
+       * #2714 (ADR-3D-447) — A DETERMINED FLAT RING'S OTHER DISCRETE ROOTS, reached FROM THE FOUND SOLUTION.
+       *
+       * Every cold start carries the dims at the seed's one sample (a triangle's apex in x2 ∈ [0.2, 0.8],
+       * y2 ∈ [0.6, 1.1]), and the first exact solution ends the search. When the givens DETERMINE the shape
+       * and admit several discrete shapes, only the root the sample's basin falls into is ever found:
+       * «משולש ABC · AB = 5 · BC = 4 · ∠BAC = 40°» (SSA) drew AC = 6.21 at 48/48 seeds while AC = 1.45 — its
+       * apex at about (0.22, 0.19), outside the sample box — was never reached, so «הציגו תצורה אחרת» could not
+       * show a configuration that exists (ADR-052, 02b FR-ALT-2). 2-D reaches both. The 3-D twin of the #797
+       * pool undercount (ADR-3D-168 Am. 1), for shape dims instead of pin symbols, closed the #797 way: WARM,
+       * from the found solution — the existing starts are never moved (#518) and the sample box is never
+       * widened (that would redraw every free polygon).
+       *
+       * Only a DETERMINED shape pays: the #1854 settle could not move its dims and they are off the sample.
+       * A free shape's settle slides it toward the sample, so it never reaches the fan, and a second "root"
+       * of a continuum is never added. Each fan entry moves ONE free vertex of the ring to a fixed position
+       * (others kept), solves the primary residuals, and keeps an exact, non-degenerate result whose shape
+       * differs from every kept one (a vertex's mirror in the first edge is the same shape: the mirror pass
+       * owns it). Each joins the pool after the found root, so a seed's first drawing is the root found today
+       * and the next configuration index reaches the other one (`pool[seed % n]`).
+       */
+      if (flatRingDims && nSym === 0 && !planeDrive) {
+        const settleMoved = bx.slice(7, 7 + nDims).some((v, i) => Math.abs(v - parked[7 + i]) > 1e-7);
+        if (!settleMoved && dimOffset(bx) > 1e-6) {
+          ssaFanStats.runs++;
+          // the canonical ring's y side: a ring with every y negated is the same shape turned over its first edge
+          const side = bx[8] < 0 ? -1 : 1;
+          const shapeKey = (x: number[]): number[] => {
+            const d = x.slice(7, 7 + nDims);
+            return d[1] < 0 ? d.map((v, i) => (i % 2 ? -v : v)) : d;
+          };
+          const kept: number[][] = [shapeKey(bx)];
+          const sameShape = (p: number[], q: number[]): boolean => p.every((v, i) => Math.abs(v - q[i]) < 1e-4);
+          /** One start: the found solution with its dims replaced, solved on the givens' rows; a new exact shape joins. */
+          const tryDims = (dims: number[]): number[] | null => {
+            const x0 = [...bx];
+            for (let i = 0; i < nDims; i++) x0[7 + i] = i % 2 ? side * dims[i] : dims[i];
+            const r = leastSquares(fPrimary, x0);
+            if (degenerate(r.x) || primaryErr(r.x) >= ACCEPT || !membersHold(mirror, r.x)) return null;
+            const key = shapeKey(r.x);
+            if (kept.some((q) => sameShape(q, key))) return null;
+            kept.push(key);
+            ssaFanStats.found++;
+            pushSolution(r.x, primaryErr(r.x));
+            return key;
+          };
+          if (fanShapes) {
+            // the other mirror's turned-over ring is a ring of this mirror: its roots are the shapes already found
+            for (const key of fanShapes) tryDims(key);
+          } else {
+            const found: number[][] = [];
+            const base = shapeKey(bx);
+            for (let k = 0; k + 1 < nDims; k += 2) {
+              for (const [fx, fy] of FLAT_RING_FAN) {
+                const dims = [...base];
+                dims[k] = fx;
+                dims[k + 1] = fy;
+                const key = tryDims(dims);
+                if (key) found.push(key);
+              }
+            }
+            fanShapes = found;
+          }
+        }
+      }
     }
   }
   // #797 (ADR-3D-168 Am. 1): interleave the pool round-robin across DISTINCT symbol vectors —

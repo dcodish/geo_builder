@@ -934,6 +934,18 @@ path** (`collectAll`), where a slide would move a discrete branch the sign/root 
 rows were measured and rejected: the 1e-4 gradient sits under LM's improvement floor (#518's lesson), so the
 dim crawls and the stalled iterations cost 2.9 s against 11 ms.
 
+**A determined flat triangle's other root is reached from the found one** (#2714, [ADR-3D-447](06b-decisions-3d.md#adr-3d-447)).
+Every cold start carries the apex at the seed's sample, and the first exact solution ends the non-pooled search,
+so SSA («AB = 5 · BC = 4 · ∠BAC = 40°») found only the root the sample box's basin holds. After acceptance,
+when the figure is one `polygon3` and the #1854 settle could not move its apex although it sits off the sample
+(the shape is determined), the apex is moved to each of a fixed fan (`FLAT_RING_FAN`, five positions around
+the first edge) and the primary residuals are solved from there, gauge kept. Each exact, non-degenerate result
+whose apex differs (up to the turn over the first edge) joins the pool AFTER the found root, so `pool[seed % n]`
+shows today's drawing first and the next configuration the other triangle. The second mirror tries only the
+shapes the first one found (a flat ring's mirror is its turn-over, so the root sets coincide). A free shape is
+slid by the settle and never reaches the fan. Quadrilaterals and pentagons are not fanned (measured: 2-D
+differs per figure, and the fan cost 2.8× / 8×). `ssaFanStats` counts runs and roots found.
+
 **The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
 `claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit
