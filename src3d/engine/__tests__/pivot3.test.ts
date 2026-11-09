@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../apply';
 import { verifyClaim } from '../claims';
 import { resolve3 } from '../evaluate';
+import { ssaFanStats } from '../solve3';
 import { emptyConstruction3, type Command3, type Construction3 } from '../types';
 import { dist3 } from '../vec3';
 
@@ -127,5 +128,73 @@ describe('2023-Q2 ג — partial injection + the sign branch', () => {
     const k = ln.dir.x / -3;
     expect(ln.dir.y).toBeCloseTo(4 * k, 5);
     expect(ln.dir.z).toBeCloseTo(5 * k, 5);
+  });
+});
+
+/**
+ * #2714 (ADR-3D-447) — a DETERMINED flat triangle's other discrete root is reached from the found one.
+ * SSA («AB = 5 · BC = 4 · ∠BAC = 40°») has two triangles, AC = 6.21 and AC = 1.45; before, every cold start's
+ * apex sat in the sample box and AC = 6.21 was drawn at 48/48 seeds. The fan runs only on a shape the givens
+ * determine: one-root givens keep one value and a free shape keeps its spread.
+ */
+describe('#2714 — a determined flat triangle with two roots pools both', () => {
+  const tri: Command3 = { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] };
+  const len = (a: string, b: string, value: number): Command3 => ({ type: 'claim', claim: { type: 'length-eq', a, b, value } }) as Command3;
+  const ang = (vertex: string, p: string, q: string, deg: number): Command3 =>
+    ({ type: 'claim', claim: { type: 'vertex-angle-eq', vertex, p, q, deg } }) as Command3;
+  const values = (cmds: Command3[], a: string, b: string, seeds = 48): Map<string, number> => {
+    const c = build(cmds);
+    const hist = new Map<string, number>();
+    for (let s = 0; s < seeds; s++) {
+      const p = resolve3(c, s).positions;
+      const v = dist3(p.get(a)!, p.get(b)!).toFixed(2);
+      hist.set(v, (hist.get(v) ?? 0) + 1);
+    }
+    return hist;
+  };
+  const twoRoots = (hist: Map<string, number>, r1: string, r2: string) => {
+    expect([...hist.keys()].sort()).toEqual([r1, r2].sort());
+    expect(hist.get(r1)!).toBeGreaterThanOrEqual(20);
+    expect(hist.get(r2)!).toBeGreaterThanOrEqual(20);
+  };
+
+  it('the report, in all three entry orders: AC 6.21 and 1.45, each at ≥ 20 of 48 seeds', () => {
+    const before = ssaFanStats.found;
+    twoRoots(values([tri, len('A', 'B', 5), len('B', 'C', 4), ang('A', 'B', 'C', 40)], 'A', 'C'), '6.21', '1.45');
+    twoRoots(values([tri, ang('A', 'B', 'C', 40), len('A', 'B', 5), len('B', 'C', 4)], 'A', 'C'), '6.21', '1.45');
+    twoRoots(values([tri, len('B', 'C', 4), ang('A', 'B', 'C', 40), len('A', 'B', 5)], 'A', 'C'), '6.21', '1.45');
+    expect(ssaFanStats.found, 'the fan ran and found the second root (docs/17 §9)').toBeGreaterThan(before);
+  });
+
+  it('consecutive configurations alternate the two triangles, the first drawing the one found before', () => {
+    const c = build([tri, len('A', 'B', 5), len('B', 'C', 4), ang('A', 'B', 'C', 40)]);
+    const seq = [0, 1, 2, 3, 4, 5].map((s) => {
+      const p = resolve3(c, s).positions;
+      return dist3(p.get('A')!, p.get('C')!).toFixed(2);
+    });
+    expect(seq).toEqual(['6.21', '1.45', '6.21', '1.45', '6.21', '1.45']);
+  });
+
+  it('the class: other SSA spellings and the angle at another vertex reach both triangles', () => {
+    twoRoots(values([tri, len('A', 'B', 5), len('B', 'C', 3.5), ang('A', 'B', 'C', 40)], 'A', 'C'), '5.22', '2.44');
+    twoRoots(values([tri, len('A', 'B', 7), len('B', 'C', 5), ang('A', 'B', 'C', 30)], 'A', 'C'), '9.63', '2.49');
+    twoRoots(values([tri, len('A', 'B', 5), len('A', 'C', 4), ang('B', 'A', 'C', 40)], 'B', 'C'), '6.21', '1.45');
+    twoRoots(values([tri, len('A', 'B', 4), len('B', 'C', 5), ang('C', 'A', 'B', 40)], 'A', 'C'), '6.21', '1.45');
+  });
+
+  it('givens with one triangle keep one value', () => {
+    const one = (cmds: Command3[], a: string, b: string, v: string) => expect([...values(cmds, a, b, 24)]).toEqual([[v, 24]]);
+    one([tri, len('A', 'B', 5), len('A', 'C', 4), ang('A', 'B', 'C', 40)], 'B', 'C', '3.22'); // SAS
+    one([tri, len('A', 'B', 5), len('A', 'C', 4), len('B', 'C', 4)], 'B', 'C', '4.00'); // SSS
+    one([tri, len('A', 'B', 4), len('B', 'C', 5), ang('A', 'B', 'C', 40)], 'A', 'C', '7.35'); // the longer side: one triangle
+    one([tri, len('A', 'B', 5), len('B', 'C', 4), ang('C', 'A', 'B', 40)], 'A', 'C', '7.35'); // the other root's angles exceed 180°
+    one([tri, len('A', 'B', 5), len('B', 'C', 2.5), ang('A', 'B', 'C', 30)], 'A', 'C', '4.33'); // tangent: the double root
+  });
+
+  it('a free triangle keeps its spread and never runs the fan', () => {
+    const before = ssaFanStats.runs;
+    const hist = values([tri, len('A', 'B', 5), len('B', 'C', 4)], 'A', 'C');
+    expect(hist.size).toBeGreaterThanOrEqual(40);
+    expect(ssaFanStats.runs).toBe(before);
   });
 });

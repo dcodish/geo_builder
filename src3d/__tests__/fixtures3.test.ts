@@ -567,6 +567,9 @@ const SEEDED: SeededCorpus = {
   // «k = ?» on the vec-defined point). The rows are asserted in data-view.test.ts; these are the build + drift net.
   'dot-given-decimal-2703.geo3.json': ['הווקטורים u ו-v', 'u·v = 2.5'],
   'letter-value-decimal-2703.geo3.json': ["קובייה ABCDA'B'C'D'", 'AE = k·AC', 'k = 2.5'],
+  // #2714 (ADR-3D-447): the issue's SSA lines — two triangles meet them, and «הציגו תצורה אחרת» reaches the second
+  // (before: AC 6.21 at 48/48 seeds). Both roots, the alternation and the one-root controls are asserted in pivot3.test.ts.
+  'ssa-two-triangles-2714.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 4', '∠BAC = 40°'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T07:08:19.091Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB = 5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 5
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "BC = 4",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "B",
+            "b": "C",
+            "value": 4
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "∠BAC = 40°",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vertex-angle-eq",
+            "vertex": "A",
+            "p": "B",
+            "q": "C",
+            "deg": 40
+          }
+        }
+      ]
+    }
+  ]
+}

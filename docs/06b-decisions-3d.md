@@ -15250,3 +15250,27 @@ This is an order-independence fix (M2 law i, read at the fold). It adds no choke
 
 **Behaviour change for a student:** «המישור ABCD מקביל למישור EFGH» on a blank canvas draws two parallel planes, each with its four letters, at every configuration, instead of a line and a dot (it already did at about half of them).
 
+## ADR-3D-447 — A determined flat triangle's second root is reached from the found one: SSA shows both triangles (#2714)
+
+**Status:** accepted · 2026-11-09 · bug (P2, 3d) · fix round #2783, stream P · branch `fix/2714-ssa-second-root` from `main` @ `4a06aae9` · plan armed `auto-ok` 2026-11-05 · extends [ADR-3D-168](#adr-3d-168) Am. 1 (the #797 walk, for shape dims instead of pin symbols) and [ADR-3D-332](#adr-3d-332) (its settle is the determinedness signal) · cites [ADR-052](06-decisions.md#adr-052)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-2 · **Design:** [04b](04b-design-3d.md) § "A determined flat triangle's other root is reached from the found one" · **Ladder:** none new: the 3-D pivot (`solvePivot`'s non-pooled acceptance); no chokepoint list grows
+
+**Measured at pickup** (`4a06aae9`, the store's `submit` → `derive3`, seeds 0–47, |AC|). «משולש ABC» · «AB = 5» · «BC = 4» · «∠BAC = 40°»: 6.21 at 48/48, in all three entry orders; «BC = 3.5» 5.22 ×48; «AB = 7 · BC = 5 · ∠BAC = 30°» 9.63 ×48; «AB = 5 · AC = 4 · ∠ABC = 40°» (BC) 6.21 ×48; «AB = 4 · BC = 5 · ∠ACB = 40°» 6.21 ×43, 1.45 ×5. 2-D at the same commit (`decideDeterministic2D` → `commitVerdict` → `replay`): every one of them reaches both triangles (the report 6.21 ×35, 1.45 ×13). The plan's account held.
+
+**Class (docs/17 §1).** *A determined flat figure with several discrete roots keeps only the root its sampled start falls into, so a valid configuration is unreachable.* A `polygon3`'s apex is sampled in x2 ∈ [0.2, 0.8], y2 ∈ [0.6, 1.1]; every cold start carries that sample and the first exact solution ends the non-pooled search, so the obtuse triangle (apex ≈ (0.22, 0.19)) was never reached and `pool[seed % n]` had only the found root and its mirror to choose from. Mechanism M3/M4: an unstated choice stays a choice (ADR-052, FR-ALT-2).
+
+**Decision.** Reach the other root WARM, from the found solution, as #797 did — never by moving the cold starts (#518) or widening the sample box (that would redraw every free triangle).
+1. After the non-pooled acceptance, when the figure is one `polygon3` (dims = its apex) and the #1854 settle could not move the apex although it is off the sample, the shape is determined. The apex is set to each of a fixed fan (`FLAT_RING_FAN`: (0.25, 0.2), (0.75, 0.2), (0.5, 0.45), (−0.4, 0.5), (1.4, 0.5), on the found apex's side of the first edge), and the primary residuals are solved from there with the found gauge.
+2. A result that is exact, not degenerate, holds every member pin, and whose apex differs from every kept one (up to the turn over the first edge) joins the pool AFTER the found root. So a seed's first drawing is today's, and the next configuration index shows the other triangle: the store's `resample` gives 6.21, 1.45, 6.21, 1.45, …
+3. The second mirror tries only the shapes the first one's fan found: a flat ring's mirror is its turn-over, so the two root sets coincide.
+4. A free shape is slid by the settle (ADR-3D-332) and never reaches the fan, so a point of a continuum is never pooled as a second root.
+
+**Quadrilaterals and pentagons are not fanned.** Measured with the fan on every flat ring: «מרובע ABCD · AB = 5 · BC = 4 · ∠ABC = 80° · CD = 3 · DA = 4» reached BD 1.48 beside 5.28 (2-D reaches it too, 4/24), but «… CD = 4 · ∠ACD = 30°» reached a second root 2-D never shows (5.53 ×24 in 2-D), and «מחומש ABCDE …» the same (7.26 ×24 in 2-D). The replay cost rose 2.8× (quadrilateral) and 8× (pentagon), which docs/17 §7 puts to the operator. So the fan is the triangle's; what a determined quadrilateral or pentagon should show is a question for him (round #2783's Questions).
+
+**Worst-case multiplier (docs/17 M3).** Five LM solves on the first mirror and one per found shape on the second, per pivot call, only on a determined lone triangle. Measured (48 seeds, the full prefix): the report's figure 378 → 685 ms; SAS 371 → 641, SSS 275 → 485 (the fan runs and finds nothing); a free triangle 951 → 957 (never runs). Figures without a lone `polygon3` are unchanged.
+
+**Blast radius.** A value read off the drawing that differs between the two triangles is no longer one value (FR-EQ-4): «AC = 6.21» typed after the three givens is refused `givens-contradict` (the rounded value contradicts them) as it was before. Givens with one triangle (SAS, SSS, the longer side, the tangent case, the angle whose second root exceeds 180°) keep one value at every seed.
+
+**Locks.** Unit: `src3d/engine/__tests__/pivot3.test.ts` (#2714: both roots ≥ 20/48 in three entry orders, the seed alternation, four other SSA spellings, five one-root controls, a free triangle's spread with the fan never run; `ssaFanStats` asserts the fan ran). Fixture: `fixtures3/ssa-two-triangles-2714.geo3.json` (the issue's four lines, build + drift). The unit rows fail at `4a06aae9`; the controls pass on both sides.
+
+**Behaviour change for a student:** a triangle given by two sides and an angle not between them, where two triangles fit, is still drawn the way it was, and «הציגו תצורה אחרת» now shows the other triangle; before, it never could.
