@@ -15229,3 +15229,24 @@ This is an order-independence fix (M2 law i, read at the fold). It adds no choke
 **Locks.** Unit: `src3d/parser/__tests__/parse3.test.ts` (the `src` on both commands, integers carrying none) and `src3d/__tests__/data-view.test.ts` (every row above, the controls, the derived row). Fixtures: `fixtures3/dot-given-decimal-2703.geo3.json`, `fixtures3/letter-value-decimal-2703.geo3.json` (the issue's rows 1 and 4).
 
 **Behaviour change for a student:** a dot product or a letter's value typed as a decimal reads in the panel as typed («u · v = 2.5», «k = 0.4»), and a letter whose value was typed no longer reads «k = ?». Fractions, integers and computed rows are unchanged.
+## ADR-3D-445 — Two planes are parallel at the figure's own verdict bar, never at machine precision (#2707)
+
+**Status:** accepted · 2026-11-09 · bug (P2, 3d) · fix round #2783, stream O · branch `fix/2707-parallel-planes-blank` from `main` @ `4a06aae9` · plan armed `auto-ok` 2026-11-05
+**Requirements:** none (internal; 02b's plane display requirements stand, and the drawing is what they already promise) · **Design:** [04b](04b-design-3d.md) § *Rendering* (two planes are parallel at the verdict's bar) · **Ladder:** none: a read of the resolved figure, no solve stage changes
+
+**Report.** «המישור ABCD מקביל למישור EFGH» on a blank canvas was accepted, but drew a thin line labelled ABCD and one dot labelled EFGH; no point was visible separately. Same on «המישור ABC מקביל למישור DEF».
+
+**Measured (4a06aae9, after ADR-3D-435).** `derive3` is well formed at every seed (A…D on one plane, E…H on a parallel one). In `buildScene3` at `HOME_CAMERA` the eight points' on-screen extent is 0 px at 13 of 24 seeds for the four-letter sentence and 11 of 24 for the three-letter one. At those seeds the sine of the angle between the two planes is 3e-7 to 7e-6; at the good seeds it is under about 3e-7. ADR-3D-435 (free planes and the frame) did not change it.
+
+**Root cause.** `planePlaneLine` judged "parallel" by an absolute bar on unnormalised normals, `|n₁ × n₂| < 1e-10`. The solver holds a stated ∥ to about 1e-6, well inside the bar the claim itself is verified at (`MUTUAL_VERIFY_TOL = 1e-4`, the sine). So the two planes were parallel by the figure's own verdict and yet "crossed", along a line about 1e6 from the figure. The scene centres every crossing pair's patches on their fold line ("intersecting planes must visibly cross") and the fit zoomed out to hold the patches, so every real point landed on one pixel.
+
+**Class.** Two planes the figure holds parallel to the solve's accuracy, treated as crossing because parallelism was read at machine precision on raw normals. `planePlaneLine` is the one predicate; its readers are the scene's patch frames (`intersectPlanes`), a `plane-plane` line (both resolve passes). A far false crossing appeared in each of them.
+
+**Decision.** One predicate, relative, at the verdict's bar: no crossing line when `|n₁ × n₂| ≤ MUTUAL_VERIFY_TOL · |n₁| |n₂|`. "These planes are parallel" now reads the same in the claim and in the geometry. The Cramer solve behind the fold line's anchor judged singularity by an absolute `|det| < 1e-12` too, which refused a well-posed pair whose normals are merely short; it is now relative to the rows' lengths. No clamp on the patches and no fit heuristic: those would hide the cause and leave the far line in the `plane-plane` lane. Two planes at a genuinely tiny angle (under about 0.006°) read as parallel, which is what the claim already said about them.
+
+**Audit.** Line × plane (`line-plane` points, the pyramid apex, the free-object fills) already uses a relative bar (`|n·d| > 1e-10 · |n||d|`); it is not this absolute shape, and moving its bar would change which crossings are refused (`line-misses-plane`), a student-visible change nobody ruled, so it is left. Line × line reads its own `detm` for an anchor only. The other `1e-10`/`1e-12` floors in `evaluate.ts` are degeneracy guards (a zero normal, a collinear ring), not parallelism. Sibling products: 2-D, analytic and complex have no planes; no ADR-W-118 parity row is owed.
+
+**Locks.** Unit: `src3d/engine/__tests__/lines3.test.ts` (`intersectPlanes`: the measured sines give no line; the verdict is the same at normal lengths 1e-3, 1 and 1e3; a 1° crossing keeps its fold line on both planes; a `plane-plane` line of two parallel planes resolves to none). Scenario: `src3d/__tests__/scenarios3.test.ts` `parallel-planes-frame-2707` (eight separate points, a spread over 150 px and two patches at ten presses; the three-letter twin), failing at 4a06aae9. Fixture: `fixtures3/parallel-planes-free-2707.geo3.json`.
+
+**Behaviour change for a student:** «המישור ABCD מקביל למישור EFGH» on a blank canvas draws two parallel planes, each with its four letters, at every configuration, instead of a line and a dot (it already did at about half of them).
+

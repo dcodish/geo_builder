@@ -7,7 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../apply';
 import { verifyClaim } from '../claims';
-import { paramRoots, resolve3 } from '../evaluate';
+import { intersectPlanes, paramRoots, resolve3, type ResolvedPlane } from '../evaluate';
+import { MUTUAL_VERIFY_TOL } from '../operands';
+import { cross3, dot3, norm3, normalize3, scale3, v3, type Vec3 } from '../vec3';
 import { emptyConstruction3, type Command3, type Construction3, type LinExpr } from '../types';
 
 const e = (k: number, p = 0): LinExpr => ({ k, p });
@@ -84,5 +86,50 @@ describe('2024-Q2 (engine level)', () => {
       { type: 'line-plane-point', id: 'A', line: 'ℓ', plane: 'π1' },
     ]);
     expect(resolve3(c, 0).positions.has('A')).toBe(false);
+  });
+});
+
+/**
+ * #2707 (ADR-3D-445) — "two planes are parallel" is read at the figure's own verdict bar, relative to the normals'
+ * size. The solver holds a stated ∥ to ~1e-6; read at an absolute 1e-10 on raw normals, such a pair "crossed" along
+ * a line ~1e6 from the figure, the scene centred both patches on it and every point fell on one pixel.
+ */
+describe('#2707 — intersectPlanes: parallel at the verdict bar, scale-free', () => {
+  /** A plane through `p` with normal `n` (unnormalised, as the resolver leaves it). */
+  const plane = (n: Vec3, p: Vec3): ResolvedPlane => ({ n, d: -dot3(n, p) });
+  /** The normal (0,0,1)·k tilted by `sin` about the x-axis. */
+  const tilted = (sin: number, k = 1): Vec3 => scale3(v3(0, -sin, Math.sqrt(1 - sin * sin)), k);
+
+  it('two planes the solver holds parallel (sin ≈ 1e-6, the measured seeds) have no crossing line', () => {
+    for (const sin of [3e-7, 1.1e-6, 6.9e-6]) {
+      expect(intersectPlanes(plane(v3(0, 3e-16, 1.24), v3(0, 0, 0)), plane(tilted(sin, -4.65), v3(0, 0, -0.93))), `sin ${sin}`).toBeNull();
+    }
+  });
+
+  it('the verdict does not depend on how long the normals are (the old absolute bar did)', () => {
+    const sin = MUTUAL_VERIFY_TOL / 2;
+    for (const k of [1e-3, 1, 1e3]) {
+      expect(intersectPlanes(plane(v3(0, 0, k), v3(0, 0, 0)), plane(tilted(sin, k), v3(0, 0, 1))), `k ${k}`).toBeNull();
+    }
+    const big = intersectPlanes(plane(v3(0, 0, 1e-3), v3(0, 0, 0)), plane(tilted(2 * MUTUAL_VERIFY_TOL, 1e-3), v3(0, 0, 1)));
+    expect(big).not.toBeNull();
+  });
+
+  it('a real crossing (1°) keeps its fold line, and the line lies on both planes', () => {
+    const a = plane(v3(0, 0, 2), v3(1, 2, 0));
+    const b = plane(tilted(Math.sin(Math.PI / 180), 5), v3(0, 0, 1));
+    const line = intersectPlanes(a, b)!;
+    expect(line).not.toBeNull();
+    expect(norm3(cross3(normalize3(line.dir), v3(1, 0, 0)))).toBeLessThan(1e-9);
+    for (const pl of [a, b]) expect(Math.abs(dot3(pl.n, line.anchor) + pl.d) / norm3(pl.n)).toBeLessThan(1e-9);
+  });
+
+  it('a stated crossing line of two parallel planes resolves to NO line (never a far-away one)', () => {
+    const c = build([
+      { type: 'plane3', name: 'π1', plane: { cx: e(0), cy: e(0), cz: e(1), d: e(0), src: 'z = 0' } },
+      { type: 'plane3', name: 'π2', plane: { cx: e(0), cy: e(1e-6), cz: e(1), d: e(-1), src: '1e-6·y + z - 1 = 0' } },
+      { type: 'plane-plane-line', name: 'ℓ', p1: 'π1', p2: 'π2' },
+    ]);
+    expect(resolve3(c, 0).lines.has('ℓ')).toBe(false);
   });
 });
