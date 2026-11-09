@@ -39,6 +39,7 @@ import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from '
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidBase3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
+import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
@@ -760,6 +761,9 @@ function deriveCore3(
   /** #2610 (ADR-3D-409): the created points that RIDE the plane their row names by 4+ letters — point id → plane name.
    *  Placed with the free points before the fold (the row that names the plane declares it, in list order). */
   preriders?: Readonly<Record<string, string>>,
+  /** #2705 (ADR-3D-439): rows a fold of this list found answering «המעגל» against a past that never existed in list
+   *  order — each refused with its question, applied by no fold (see the list-order judgment after the fixpoint). */
+  refusedInOrder?: Readonly<Record<string, FactStatus3>>,
 ): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
@@ -818,6 +822,34 @@ function deriveCore3(
   const coordPinOwnerIds = new Set<string>();
   /** #1310 (ADR-3D-397): the rows whose application added a point to the figure (what "holds a point" reads). */
   const pointAdders = new Set<string>();
+  /** #2705 (ADR-3D-439): circle id → the row whose application added it to the figure (count-delta, like claims). */
+  const circleOwner = new Map<string, string>();
+  /** #2705: the circle each row's bare «המעגל» named when it applied — what the membership check reads after the fold. */
+  const boundCircle: Record<string, string> = {};
+  /** #2705: a row this fold must not apply (a refusal an earlier fold of the same list judged in list order). */
+  const settled = (f: Fact3): boolean => typeof status[f.id] === 'string' || refusedInOrder?.[f.id] !== undefined;
+  /** #2705: the circles the rows AT OR ABOVE `f` in list order put on `at` — what its bare «המעגל» may name. A circle no
+   *  row owns yet is `f`'s own (an earlier command of the row, or the circle the mint pass created for it). */
+  const circlesAbove = (f: Fact3, at: Construction3): Construction3['circles3'] => {
+    const row = factsIn.findIndex((g) => g.id === f.id);
+    return at.circles3.filter((k) => {
+      const by = circleOwner.get(k.id);
+      return by === undefined || factsIn.findIndex((g) => g.id === by) <= row;
+    });
+  };
+  /**
+   * #2705 (ADR-3D-439): a bare «המעגל» names the circle of the rows ABOVE it once any of them made one, however the
+   * fold landed them: a circle a row BELOW made (landed first because this row was deferred) never outvotes it, so a
+   * later circle cannot break an earlier D. With none above, the figure's one circle is named (ADR-3D-420's forward
+   * reference: «D על המעגל» · «משולש ABC חסום במעגל»).
+   */
+  const inListOrder = (f: Fact3, at: Construction3, cmd: Command3): { ok: true; cmd: Command3 } | { ok: false; error: FactStatus3 } => {
+    if ((cmd.type !== 'point-on-circle3' && cmd.type !== 'circle-given') || cmd.circle !== '') return { ok: true, cmd };
+    const above = circlesAbove(f, at);
+    if (above.length === 0) return { ok: true, cmd };
+    const r = definiteCircle3(above, cmd.type === 'point-on-circle3' ? cmd.point : undefined);
+    return r.ok ? { ok: true, cmd: { ...cmd, circle: r.circle.id } } : r;
+  };
   /** #492: the facts that contributed something CONSTRAINING THE PARAMETER — a pinning given
    *  (`pinningGivens`: plane angles, line⟂plane, S2 line relations) or a `paramGivens` claim. Kept in
    *  fact order, so the LAST is the newest statement: a refusal names what the student just said
@@ -919,6 +951,7 @@ function deriveCore3(
      * fact builds on a probe and the figure advances only when the whole fact holds.
      */
     let probe = c;
+    const bound: Record<string, string> = {}; // #2705: committed with the row, never by a failing one (atomic)
     const exp = expandFact(c, f); // #2235: an unnamed shape noun names the ring the figure holds NOW
     if (!exp.ok) return exp.error;
     for (const [j, stated] of exp.cmds.entries()) {
@@ -930,10 +963,16 @@ function deriveCore3(
         readings[f.id] = reading;
         cmd = { ...stated, reading };
       }
-      const r = applyCommand3(probe, seated(cmd));
+      const named = inListOrder(f, probe, cmd);
+      if (!named.ok) return named.error;
+      if (named.cmd !== cmd && (named.cmd.type === 'point-on-circle3' || named.cmd.type === 'circle-given')) bound[f.id] = named.cmd.circle;
+      else if ((cmd.type === 'point-on-circle3' || cmd.type === 'circle-given') && cmd.circle === '' && probe.circles3.length === 1) bound[f.id] = probe.circles3[0].id;
+      const r = applyCommand3(probe, seated(named.cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
+    for (const k of probe.circles3) if (!before.circles3.some((x) => x.id === k.id)) circleOwner.set(k.id, f.id);
+    Object.assign(boundCircle, bound);
     c = probe;
     if (c.points.size > pointsBefore) pointAdders.add(f.id); // #1310: the row put a point on the figure
     if (exp.cmds !== f.cmds) resolvedCmds[f.id] = [...exp.cmds];
@@ -986,6 +1025,11 @@ function deriveCore3(
       status[f.id] = 'disabled';
       continue;
     }
+    const inOrder = refusedInOrder?.[f.id];
+    if (inOrder !== undefined) {
+      status[f.id] = inOrder; // #2705: judged in list order by an earlier fold of this list; never applied
+      continue;
+    }
     status[f.id] = restatedAgainst(f, applyFact(f));
     if (status[f.id] === 'ok') {
       for (const [sym, ms] of letterMeanings3(c)) for (const m of ms) if (!meaningOrigin.has(`${sym}|${m.kind}`)) meaningOrigin.set(`${sym}|${m.kind}`, f.utterance);
@@ -1026,7 +1070,9 @@ function deriveCore3(
     if (!exp.ok) return exp.error;
     for (const cmd of exp.cmds) {
       if (droppedSoft(cmd)) continue;
-      const r = applyCommand3(probe, seated(cmd));
+      const named = inListOrder(f, probe, cmd); // #2705: the dry run names the circle the real application will
+      if (!named.ok) return named.error;
+      const r = applyCommand3(probe, seated(named.cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
@@ -1035,7 +1081,7 @@ function deriveCore3(
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
-      if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
+      if (settled(f)) continue; // ok, or disabled — never touched (#2705: nor a row refused in list order)
       if (retryError(f) !== null) continue; // still unsatisfiable against the completed figure — stays red
       status[f.id] = restatedAgainst(f, applyFact(f));
       progressed = true;
@@ -1052,9 +1098,35 @@ function deriveCore3(
    * «already defined» to the retry.
    */
   for (const f of facts) {
-    if (typeof status[f.id] === 'string') continue; // ok, or disabled
+    if (settled(f)) continue; // ok, or disabled (#2705: a list-order refusal is already its latest word)
     const latest = retryError(f);
     if (latest !== null) status[f.id] = restatedAgainst(f, latest);
+  }
+  /**
+   * #2705 ([ADR-3D-439](../../docs/06b-decisions-3d.md#adr-3d-439)) — A BARE «המעגל» IS JUDGED IN LIST ORDER. A row
+   * that names "the one circle" is judged by `applyCommand3` against the figure as the fold LANDED it, and the fixpoint
+   * above lands a deferred earlier row after it: «מעגל שמרכזו O משיק לישר AB בנקודה T» (A, B not yet declared) ·
+   * «מעגל חסום במשולש ABC» · «D על המעגל» put D on the incircle, while the list above D holds two circles. Judged
+   * again here over the circles the rows AT OR ABOVE it made (`circleOwner`, list order): two or more is the question
+   * which (q-2611-twocircles; 2-D asks the same, `ambiguous-circle-ref`). A circle a row BELOW made never counts, so a
+   * later circle cannot break an earlier D (ADR-3D-420's forward reference is the fold's own and stands). The row
+   * applied, so the list is folded again with it refused and applied by no pass (atomic: it keeps nothing); bounded,
+   * each refold refuses at least one more row.
+   */
+  {
+    const found: Record<string, FactStatus3> = {};
+    for (const f of facts) {
+      if (status[f.id] !== 'ok') continue;
+      const bare = f.cmds.filter((k) => (k.type === 'point-on-circle3' || k.type === 'circle-given') && k.circle === '');
+      if (bare.length === 0) continue;
+      const above = circlesAbove(f, c);
+      if (above.length < 2) continue;
+      const first = bare[0];
+      const r = definiteCircle3(above, first.type === 'point-on-circle3' ? first.point : undefined);
+      if (!r.ok) found[f.id] = restatedAgainst(f, r.error);
+    }
+    if (Object.keys(found).length > 0)
+      return deriveCore3(factsIn, seed, narrow, premint, prelines, postMint, preplanes, presolids, mustStayOk, foldOut, preriders, { ...refusedInOrder, ...found });
   }
   /**
    * #1467 ([ADR-3D-382](../../docs/06b-decisions-3d.md#adr-3d-382), ADR-W-162; operator ruling 2026-09-27, "Create
@@ -1106,7 +1178,9 @@ function deriveCore3(
     if (!exp.ok) return exp.error;
     for (const cmd of exp.cmds) {
       if (droppedSoft(cmd)) continue;
-      const r = applyCommand3(probe, seated(cmd));
+      const named = inListOrder(f, probe, cmd); // #2705: the dry run names the circle the real application will
+      if (!named.ok) return named.error;
+      const r = applyCommand3(probe, seated(named.cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
@@ -1138,7 +1212,7 @@ function deriveCore3(
   for (let guard = 0; guard < facts.length && !premint; guard++) {
     let minted = false;
     for (const f of facts) {
-      if (typeof status[f.id] === 'string' || !mintEligible3(f.cmds)) continue;
+      if (settled(f) || !mintEligible3(f.cmds)) continue;
       let st: FactStatus3 | null = dryRunOn(c, f); // the latest attempt: an earlier mint may have supplied a letter
       if (missingOf(st, c, f) === null) continue;
       let probe = c;
@@ -1242,7 +1316,7 @@ function deriveCore3(
     for (let pass = 0; pass < facts.length; pass++) {
       let progressed = false;
       for (const f of facts) {
-        if (typeof status[f.id] === 'string' || retryError(f) !== null) continue;
+        if (settled(f) || retryError(f) !== null) continue;
         status[f.id] = restatedAgainst(f, applyFact(f));
         progressed = true;
       }
@@ -1264,7 +1338,7 @@ function deriveCore3(
     const reasons: Record<string, FactStatus3> = { ...failedAfterMint };
     for (let round = 0; round <= Object.keys(mintedBy).length; round++) {
       const out = { broken: [] as string[] };
-      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, keepSolids, okBeforePass, out, ridersOf);
+      const again = deriveCore3(factsIn, seed, narrow, keep, keepLines, reasons, keepPlanes, keepSolids, okBeforePass, out, ridersOf, refusedInOrder);
       /**
        * #1566 (ADR-3D-399): a row that is green in the fold of the rows UP TO IT failed only because a LATER row
        * contradicts it — two statements in conflict, which the declared-first figure reports as a conflict on both. It
@@ -1276,7 +1350,7 @@ function deriveCore3(
         if (at < 0 || at === factsIn.length - 1) return true;
         const upTo = new Set(factsIn.slice(0, at + 1).map((f) => f.id));
         const pick = <V,>(r: Record<string, V>): Record<string, V> => Object.fromEntries(Object.entries(r).filter(([k]) => upTo.has(k)));
-        const alone = deriveCore3(factsIn.slice(0, at + 1), seed, false, pick(keep), pick(keepLines), pick(reasons), pick(keepPlanes), pick(keepSolids), undefined, undefined, ridersOf);
+        const alone = deriveCore3(factsIn.slice(0, at + 1), seed, false, pick(keep), pick(keepLines), pick(reasons), pick(keepPlanes), pick(keepSolids), undefined, undefined, ridersOf, refusedInOrder);
         return alone.status[id] !== 'ok';
       };
       let failed = Object.keys(keep).filter((id) => again.status[id] !== 'ok' && ownFailure(id));
@@ -1295,7 +1369,7 @@ function deriveCore3(
         const before = <V,>(rec: Record<string, V>) => Object.fromEntries(Object.entries(rec).filter(([k]) => order(k) < order(id)));
         if (Object.keys(keep).every((k) => order(k) < order(id))) return false;
         const probe = { broken: [] as string[] };
-        deriveCore3(factsIn, seed, false, before(keep), before(keepLines), reasons, before(keepPlanes), before(keepSolids), [id], probe, ridersOf);
+        deriveCore3(factsIn, seed, false, before(keep), before(keepLines), reasons, before(keepPlanes), before(keepSolids), [id], probe, ridersOf, refusedInOrder);
         return probe.broken.length === 0;
       };
       if (failed.length === 0 && out.broken.some(readsLater)) {
@@ -1307,7 +1381,7 @@ function deriveCore3(
       keepLines = Object.fromEntries(Object.entries(keepLines).filter(([id]) => !failed.includes(id)));
       keepPlanes = Object.fromEntries(Object.entries(keepPlanes).filter(([id]) => !failed.includes(id)));
       keepSolids = Object.fromEntries(Object.entries(keepSolids).filter(([id]) => !failed.includes(id)));
-      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, {}, reasons, {}, {});
+      if (Object.keys(keep).length === 0) return deriveCore3(factsIn, seed, narrow, {}, {}, reasons, {}, {}, undefined, undefined, undefined, refusedInOrder);
     }
   }
   // a row whose created points were dropped reports why it failed WITH them, never «unknown point» (atomicity)
@@ -2067,7 +2141,7 @@ function deriveCore3(
       } else if (cmd.type === 'point-on-circle3') {
         // V8-i: on the circle ⟺ |P−centre| = radius AND P lies in the circle's plane
         const p = positions.get(cmd.point);
-        const k = cmd.circle === '' ? resolved.circles3[0] : resolved.circles3.find((x) => x.id === cmd.circle);
+        const k = resolved.circles3.find((x) => x.id === (cmd.circle === '' ? boundCircle[f.id] : cmd.circle)); // #2705: the circle it named
         const holds =
           p !== undefined &&
           k !== undefined &&

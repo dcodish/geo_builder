@@ -9,6 +9,7 @@ import { isAbsolute, isPlanar, lineDirCarriesParam, meaningKey, paramPinningRels
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { freePlaneDef } from './freePlane';
 import { heldRadius3, radiusLengthCircle3 } from './freeCircle';
+import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
@@ -4489,13 +4490,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.circle !== '' && !c.circles3.some((k) => k.id === cmd.circle)) {
         return { ok: false, error: cmd.name !== undefined ? { code: 'unknown-circle', name: cmd.name } : { code: 'unknown-circle' } };
       }
-      if (cmd.circle === '' && c.circles3.length !== 1) {
-        if (c.circles3.length === 0) return { ok: false, error: { code: 'unknown-circle' } };
-        // a circle «המעגל X» can name: one built on a centre the student lettered (`circle-<centre>`, ADR-029)
-        const centre = c.circles3.map((k) => ('center' in k.def && k.id === `circle-${k.def.center}` ? k.def.center : null)).find((x) => x !== null);
-        return { ok: false, error: centre ? { code: 'unknown-circle', several: true, centre, point: cmd.point } : { code: 'unknown-circle', several: true } };
-      }
-      const circle = cmd.circle === '' ? c.circles3[0] : c.circles3.find((k) => k.id === cmd.circle)!;
+      // #2705 (ADR-3D-439): the bare «המעגל» is the one reader's — none, one, or the question which
+      const definite = cmd.circle === '' ? definiteCircle3(c.circles3, cmd.point) : null;
+      if (definite && !definite.ok) return definite;
+      const circle = definite ? definite.circle : c.circles3.find((k) => k.id === cmd.circle)!;
       // #2611 (ADR-3D-410) — the on-line rider's circle twin (ADR-3D-031). A NEW id stated onto the circle is CREATED
       // riding it (1 sampled DOF); before, the statement was only checked, so the fold's mint pass made the letter a free
       // point and the check refused a true statement `not-on-line`.
@@ -4534,9 +4532,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'circle-given': {
       if (cmd.circle !== '' && !c.circles3.some((k) => k.id === cmd.circle))
         return { ok: false, error: cmd.name !== undefined ? { code: 'unknown-circle', name: cmd.name } : { code: 'unknown-circle' } };
-      if (cmd.circle === '' && c.circles3.length !== 1)
-        return { ok: false, error: c.circles3.length === 0 ? { code: 'unknown-circle' } : { code: 'unknown-circle', several: true } };
-      const k = cmd.circle === '' ? c.circles3[0] : c.circles3.find((x) => x.id === cmd.circle)!;
+      const definite = cmd.circle === '' ? definiteCircle3(c.circles3) : null; // #2705 (ADR-3D-439)
+      if (definite && !definite.ok) return definite;
+      const k = definite ? definite.circle : c.circles3.find((x) => x.id === cmd.circle)!;
       if (cmd.plane !== undefined && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       return stateCircleGiven3(c, k, { plane: cmd.plane, radius: cmd.radius }, cmd.name);
     }
