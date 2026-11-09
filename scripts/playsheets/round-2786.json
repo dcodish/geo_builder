@@ -1,0 +1,341 @@
+{
+ "name": "round-2786",
+ "title": "Fix round #2786 — 2026-11-09 (batch on main)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Analytic: a wrong AI parabola for a stated focus is retried, then refused (#2680)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "פרבולה שמוקדה (2,0)"
+   ],
+   "verifiedBy": "unit lock with a mocked model (issue-2231-llm-retry.test.ts, honesty-computed-values-2680.test.ts): a model answer is not reproducible by playing (rule 2)",
+   "lookFor": "If the AI answers «y^2 = 4x», the tool asks once more naming «שמוקדה (2,0)»; a second answer «y^2 = 8x» builds; a repeated «y^2 = 4x» is refused naming «2».",
+   "before": "«y^2 = 4x» was accepted and drew focus (1,0)."
+  },
+  {
+   "id": "T2",
+   "title": "Analytic: a wrong circle for a stated diameter is refused (#2680)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל שקוטרו 6 ומרכזו (0,0)"
+   ],
+   "verifiedBy": "unit lock with a mocked model",
+   "lookFor": "«x^2+y^2=36» answered twice is refused naming «6»; «x^2+y^2=9» is still accepted.",
+   "before": "Accepted (radius 6)."
+  },
+  {
+   "id": "T3",
+   "title": "Analytic: wrong foci are refused (#2680)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "אליפסה שמוקדיה (4,0) ו-(-4,0) וצירה הגדול 10"
+   ],
+   "verifiedBy": "unit lock with a mocked model",
+   "lookFor": "«x^2/25+y^2/16=1» answered twice is refused naming «4, 4»; «/9» is still accepted.",
+   "before": "Accepted."
+  },
+  {
+   "id": "T4",
+   "title": "3-D: restating a point you already placed says it is already there (#2341, your T29 line)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(√2,0,0)",
+    "B=(√2,0,0)"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "No third row; «זה כבר קיים באיור — אין מה להוסיף.».",
+   "before": "Unchanged since ADR-3D-423."
+  },
+  {
+   "id": "T5",
+   "title": "3-D: a cube's parallel edges are already known (#2341)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ∥ CD"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row; the note «זה כבר קיים באיור — אין מה להוסיף.».",
+   "before": "A ✓ row."
+  },
+  {
+   "id": "T6",
+   "title": "3-D: a correct computed midpoint is already known (#2341)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(2,0,0)",
+    "M אמצע AB",
+    "M=(1,0,0)"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Three rows; the note.",
+   "before": "A ✓ row."
+  },
+  {
+   "id": "T7",
+   "title": "3-D: a held right angle draws no knee (#2341)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ⟂ AD"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row, the note, and no new right-angle mark.",
+   "before": "A row plus a knee."
+  },
+  {
+   "id": "T8",
+   "title": "3-D: a length the points decide is already known (#2341)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(3,0,0)",
+    "AB = 3"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Two rows, the note, no segment AB and no «3» label.",
+   "before": "A row."
+  },
+  {
+   "id": "T9",
+   "title": "3-D REFUSAL: a false statement is still refused (#2341)",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ∥ AD"
+   ],
+   "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
+   "before": "Unchanged.",
+   "expectRefusal": "הטענה לא מתקיימת בציור",
+   "class": "verified"
+  },
+  {
+   "id": "T10",
+   "title": "3-D: a free size still commits (#2341)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB = 3"
+   ],
+   "expectRows": [
+    "AB = 3"
+   ],
+   "expectAbsent": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Two rows; the cube resized to 3.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T11",
+   "title": "3-D: a trapezoid's own parallel pair still commits (#2341)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "טרפז ABCD",
+    "AB ∥ DC"
+   ],
+   "expectAbsent": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Two rows.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T12",
+   "title": "3-D: the 2023 exam's answer lines are already known (#2341)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "נסמן: AB = u, AD = v, AA' = w",
+    "CA' מאונך למישור BC'D",
+    "E מפגש התיכונים של משולש BC'D",
+    "E, C, A' על ישר אחד"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "The ⟂ line and the collinearity line each answer «כבר קיים»; three rows.",
+   "before": "Five rows with ✓."
+  },
+  {
+   "id": "T13",
+   "title": "3-D: an isosceles trapezoid's equal diagonals are already known — no diagonals drawn (#2341; 2-D still records it)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "טרפז שווה שוקיים ABCD",
+    "|AC| = |BD|"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row, the note, and no diagonals AC or BD drawn. (In 2-D the same line still adds a row and draws the diagonals.)",
+   "before": "A row, with AC and BD drawn."
+  },
+  {
+   "id": "T14",
+   "title": "3-D: a box's parallel planes are already known — no planes drawn (#2341)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "המישור ABC מקביל למישור A'B'C'"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row, the note; no planes drawn and no «parallel» row in the data panel.",
+   "before": "A row, two planes drawn, a parallel row in the data panel."
+  },
+  {
+   "id": "T15",
+   "title": "3-D: a later line on a rectangle that became a square answers at once (#2749)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מלבן ABCD",
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "expectFigure": [
+    "S"
+   ],
+   "lookFor": "Each line answers within a few seconds; the square and segment draw as before.",
+   "before": "The last line froze the page for about 4 minutes (244 s measured)."
+  },
+  {
+   "id": "T16",
+   "title": "3-D: a cube sized to 4 keeps its size when a free plane is added (#2746)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "מישור π3"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "«אורך AB = 4» stays green; the cube keeps edge 4; nothing moves when the plane appears.",
+   "before": "The length turned red and the cube shrank back to edge 1."
+  },
+  {
+   "id": "T17",
+   "title": "3-D: the same with a free line (#2746)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "ישר l"
+   ],
+   "lookFor": "The length stays green; the cube stays at edge 4.",
+   "before": "Red and shrunk."
+  },
+  {
+   "id": "T18",
+   "title": "3-D: plane first, then the size (#2746)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מישור π3",
+    "אורך AB = 4"
+   ],
+   "lookFor": "The size is accepted and the cube grows to edge 4.",
+   "before": "Refused (size-on-solid)."
+  },
+  {
+   "id": "T19",
+   "title": "3-D: a distance to the free plane holds at the stated size (#2746)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "מישור π3",
+    "המרחק בין A למישור π3 הוא 2"
+   ],
+   "lookFor": "Every line green; the cube at edge 4; π3 at distance 2 from A.",
+   "before": "The length was red and the cube at edge 1."
+  },
+  {
+   "id": "T20",
+   "title": "3-D REFUSAL: an equation plane still refuses the size (#2746)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "x+y+z=1"
+   ],
+   "lookFor": "The «אורך AB = 4» row is marked not satisfied (an amber dot, not the green one), as before: an equation plane fixes the frame, so the stated size cannot hold.",
+   "before": "Unchanged."
+  }
+ ]
+}

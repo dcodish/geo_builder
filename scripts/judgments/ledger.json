@@ -3665,6 +3665,52 @@
       "chosen": true,
       "at": "2026-11-09T08:44:06.434Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2746b",
+      "issue": 2746,
+      "round": 2786,
+      "question": "A partial point («P נמצא על החלק החיובי של ציר ה-x») beside a sized cube: (a) not absolute — size accepted, placement frozen; (b) absolute everywhere — placement sampled; (c) keep today's refusal.",
+      "class": "3d-partial-point-absolute-frame",
+      "verdict": "escalate",
+      "reason": "No operator words decide whether an axis-and-sign point fixes the frame; #754 (no reason to refuse a cube's size) and ADR-3D-095 (A hard-coded at the origin) pull different ways.",
+      "nearest": [
+        {
+          "quote": "I dont see any reason to refuse this case. a cube can have |AB|=4… the shape might not change at all since the proportion of 1 or 4 are the same.",
+          "date": "2026-08-26",
+          "link": "https://github.com/dcodish/geo_builder/issues/754#issuecomment-5429136846"
+        },
+        {
+          "quote": "it seems that A is hard coded at 0,0,0",
+          "date": "2026-07-28",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-095"
+        }
+      ],
+      "at": "2026-11-09T11:44:29.148Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2341d",
+      "issue": 2341,
+      "round": 2786,
+      "question": "Four 3-D guide examples (a cone's volume and areas, a never-parallel probe) now answer «כבר קיים» when clicked: (a) rewrite their setup lines; (b) drop them; (c) keep them.",
+      "class": "guide-example-already-held",
+      "verdict": "escalate",
+      "reason": "#2048 (2026-10-13) decided examples that fail for a missing prerequisite, not ones whose own setup makes them already true; dropping is a scope question.",
+      "nearest": [
+        {
+          "quote": "Ruling: A — every example builds on a blank canvas, and whatever is missing is created, circles included.",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/2048#issuecomment-6149836571"
+        },
+        {
+          "quote": "In all cases it should say כבר קיים",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2341#issuecomment-6683983248"
+        }
+      ],
+      "at": "2026-11-09T11:44:29.148Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
