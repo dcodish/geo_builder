@@ -14,12 +14,13 @@
  *
  * Every assertion goes through `decideSubmit3`, the real submit decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 import { decideSubmit3, type Fact3, type StoreError3 } from '../store/store3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };

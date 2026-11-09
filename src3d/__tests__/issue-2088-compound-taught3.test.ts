@@ -11,6 +11,7 @@
  * expected lists are 2-D's (`decideDeterministic2D`, measured at 688dfb96), byte for byte. Not reached, on purpose:
  * «שבו», «ו-∠…» and the English compound (2-D quotes fragments there, #2096), and a trailing piece that does not read.
  */
+import type { Seed3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
@@ -21,7 +22,7 @@ type T = (k: string, o?: Record<string, unknown>) => string;
 const render = (lng: string, err: Parameters<typeof errorText3>[1]) =>
   (errorText3(i18n3d.getFixedT(lng) as T, err) ?? '').replace(/[⁦-⁩‎‏]/g, '');
 
-const EMPTY = { facts: [] as Fact3[], seed: 0 };
+const EMPTY: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
 let n = 0;
 const id = () => `f${(n += 1)}`;
 

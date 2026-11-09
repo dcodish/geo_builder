@@ -1711,6 +1711,13 @@ export interface Construction3 {
    *  (the planeLinePerps stage); absolute op → a parameter root-find when an operand carries the
    *  figure parameter in what the relation reads (`paramPinningRels`, #1472), else verify-only (the recorded claim is always the final arbiter). */
   lineRels: { rel: 'perp' | 'parallel' | 'angle' | 'contained'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
+  /**
+   * #2764 ([ADR-3D-454](../../docs/06b-decisions-3d.md#adr-3d-454)) — set only on one PART of a figure (`partsOf3`,
+   * components3.ts): the WHOLE figure's index of each of this part's solids. A part is laid out, sampled and given its
+   * own similarity at its index in the whole (solid 0 alone keeps the gauge, #1855), so it lands where it would inside
+   * the whole. Holds no name.
+   */
+  partOf?: { readonly solidIndex: readonly number[] };
 }
 
 /**
@@ -1938,6 +1945,26 @@ export function hasAbsoluteFrameObject(c: Construction3): boolean {
     if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) return true;
   }
   return absolutePointCount(c) > 0;
+}
+
+/**
+ * #2630 (ADR-3D-400): has the student said anything about WHICH WAY the figure faces? That is a wider
+ * question than {@link hasAbsoluteFrameObject} (is the placement itself a DOF, #367): a component given
+ * on a pair or a vector («AB = (1,2,3)»), a plane equation, a component's sign or a coordinate
+ * determination fixes the figure's turn against the axes without placing a point. The gauge
+ * normalisation may turn only a figure for which this is false; turning any other one rewrites a
+ * stated component (measured before this: «AB = (1,2,3)» with two lengths drew AB as (3.74, 0, 0)).
+ */
+export function orientationStated3(c: Construction3): boolean {
+  return (
+    hasAbsoluteFrameObject(c) ||
+    c.pairPins.length > 0 ||
+    c.vectorPins.length > 0 ||
+    c.planePins.length > 0 ||
+    c.signGivens.length > 0 ||
+    c.componentSigns.length > 0 ||
+    c.determinations.some((d) => d.kind === 'coords')
+  );
 }
 
 export function pinSymsOf(c: Construction3): string[] {

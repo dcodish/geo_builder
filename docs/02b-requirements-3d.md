@@ -916,6 +916,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   apex. Unchanged: «טטראדר ABCD» inside one face, a base only partly drawn, a pyramid over letters that all exist, and
   an unlettered pyramid («פירמידה ישרה שבסיסה ריבוע» over an existing ABCD): only letters the student typed bind.
   - Sources: ADR-3D-434, ADR-3D-436, ADR-3D-080, ADR-3D-172; #2490, #2478.
+- **FR-SP-30 (Must)** — **Shapes that share nothing are drawn and judged as if each stood alone** (#2764; 3-D's copy of
+  analytic's R254; operator 2026-11-08 *"yes - i confirm"*, 2026-11-09 *"3 - yes"* and Q-2764a *"option b"*). A shape
+  beside unrelated shapes is accepted, refused and drawn exactly as it would be alone, and each one is drawn visibly as
+  itself where its own givens allow (the #615 preference, per shape). A new line never moves a shape it does not touch,
+  and answers about as fast as the same line on that shape alone: the ninth of nine separate quadrilaterals answers in
+  about a second. A line that links two shapes drawn separately («ריבוע ABCD» · «ריבוע EFGH» · «AB ∥ EF») may move both
+  of them to meet it. Where each separate shape lands is free, like any unstated position (ADR-052), so a figure of
+  separate shapes may be drawn slightly differently than before this rule, figures saved before it included; it still
+  opens, never refused. «הציגו תצורה אחרת» redraws every shape. A figure tied to coordinates, a coordinate letter, a free
+  vector, a stated size or a solid of revolution is still drawn as one.
+  - Sources: ADR-3D-454, ADR-3D-455; #2764.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

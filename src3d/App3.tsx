@@ -5,6 +5,7 @@
  * src/ — docs/20 §12 rule 1).
  */
 
+import type { Seed3 } from './engine/components3';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
@@ -337,7 +338,7 @@ export default function App3() {
    * Shared by the file picker and the restored session offer (#1238): a restore is a load, so it is
    * audited like one.
    */
-  const noteLoadOutcome = (facts: Fact3[], seed: number) => {
+  const noteLoadOutcome = (facts: Fact3[], seed: Seed3) => {
     logDebug3({ kind: 'action', action: 'load', detail: `${facts.length} facts` }); // #182: a load replaces the figure — the replay must know
     const audit = auditLoad3(facts, seed);
     setLoadNote(

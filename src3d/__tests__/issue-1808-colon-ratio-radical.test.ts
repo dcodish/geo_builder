@@ -4,12 +4,13 @@
  * `lengthRatioClaim` read `UNUM`, so «AB:AC=3:√13» and «AB/AC=3/√13» were not understood; the honesty gate's ratio pass
  * read digits, so «3:2√3» would have been the pair «3:2».
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { decideSubmit3, type Fact3 } from '../store/store3';
 
 const verdict = (line: string) => {
-  let s: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let s: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   const v0 = decideSubmit3(s, 'משולש ABC');
   if (v0.kind === 'record') s = { facts: v0.facts, seed: v0.seed };
   return decideSubmit3(s, line);

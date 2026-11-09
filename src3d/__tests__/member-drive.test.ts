@@ -12,6 +12,7 @@
  * solution, transactional — rolled back if it breaks any sibling given).
  */
 
+import type { Seed3 } from '../engine/components3';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { dot3, norm3, dist3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
@@ -33,7 +34,7 @@ const derived = (seed = state().seed) => derive3(state().facts, seed);
  * order-independence test), so the standing "the operator's exact sequence is the regression" rule is
  * satisfied — it just isn't paid for five times.
  */
-type Built = { facts: Fact3[]; seed: number };
+type Built = { facts: Fact3[]; seed: Seed3 };
 const capture = (): Built => ({ facts: structuredClone(state().facts), seed: state().seed });
 const restore = (b: Built) => useGeo3.setState({ facts: structuredClone(b.facts), seed: b.seed, lastError: null });
 

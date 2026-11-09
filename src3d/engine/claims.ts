@@ -8,6 +8,7 @@
  */
 
 import { knowledgeSamples3, lineAtParam, planeAtParam, type Resolved3 } from './evaluate';
+import { seedNumber3, type Seed3 } from './components3';
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
@@ -105,7 +106,11 @@ export function letterNumbersAt3(c: Construction3, sym: string, r: Resolved3): (
 }
 
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
-export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
+// #2764 (ADR-3D-454): a configuration of several parts is sampled around its base number — a verdict is the facts'
+export const claimSeeds = (at: Seed3): number[] => {
+  const seed = seedNumber3(at);
+  return [seed, seed + 1013, seed + 2027, seed + 4057];
+};
 
 /**
  * #1896 (ADR-3D-433) — ONE RESIDUAL PER SCALAR CLAIM KIND, the verifier's own function (ADR-3D-286 §3).
@@ -591,7 +596,7 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
  * moved that memo down to `resolve3` itself, so the claim verifier, the data panel and the ask lane share
  * ONE solve per configuration — `knowledgeSamples3` is called directly here.
  */
-export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
+export function verifyClaim(claim: Claim3, c: Construction3, seed: Seed3): boolean {
   // one base seed at a time, so a refuted claim still stops at the first failing seed (docs/17 §7)
   return claimSeeds(seed).every((s) => knowledgeSamples3(c, [s]).every((r) => holdsAt(claim, c, r)));
 }

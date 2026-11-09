@@ -17,6 +17,7 @@
  * presumes the figure builds at all; this one asks whether it does. Patterns are copied between the
  * products, never imported (docs/20 §12).
  */
+import type { Seed3 } from '../engine/components3';
 import type { Fact3 } from './store3';
 import { derive3 } from './store3';
 
@@ -52,7 +53,7 @@ function failureCode(status: unknown): string | null {
  * for — nothing drew at all — so the caller can distinguish "some steps are broken" from "this file
  * does not open in this version".
  */
-export function auditLoad3(facts: Fact3[], seed: number): LoadAudit3Result {
+export function auditLoad3(facts: Fact3[], seed: Seed3): LoadAudit3Result {
   const enabled = facts.filter((f) => f.enabled);
   if (enabled.length === 0) return { failed: [], total: 0, unbuildable: false };
 

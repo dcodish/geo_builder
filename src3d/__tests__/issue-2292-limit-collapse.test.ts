@@ -13,14 +13,15 @@
  * collapse it is (`polygon-collapsed`, `forced`), with the same words «AB ⊥ AC» already got. A genuinely thin
  * triangle is exact where it stands and keeps building. Everything runs through the real `decideSubmit3`.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
-function run(lines: readonly string[], seed: number) {
+function run(lines: readonly string[], seed: Seed3) {
   let st: St = { facts: [], seed };
   for (let i = 0; i < lines.length; i++) {
     const v = decideSubmit3(st, lines[i]);
@@ -37,7 +38,7 @@ const SEEDS_24 = Array.from({ length: 24 }, (_, i) => i);
 const dist = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 /** Refused on the LAST line as a forced collapse of ABC, naming `others`; keep-prior (the line is not a fact). */
-function refusedCollapse(lines: readonly string[], seed: number, others: readonly string[]): void {
+function refusedCollapse(lines: readonly string[], seed: Seed3, others: readonly string[]): void {
   const r = run(lines, seed);
   const last = lines.length - 1;
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[last]}» (got ${r.kind} at ${r.refusedAt})`).toBe(last);
@@ -82,7 +83,7 @@ describe('#2292 — a right isosceles triangle with the right angle at the apex 
 
 describe('#2292 — controls: a thin but real triangle keeps building', () => {
   /** Every line records and every fact is ok; returns the shortest side over the longest. */
-  function builds(lines: readonly string[], seed: number): number {
+  function builds(lines: readonly string[], seed: Seed3): number {
     const r = run(lines, seed);
     expect(r.refusedAt, `seed ${seed}: «${lines[r.refusedAt]}» → ${JSON.stringify(r.error ?? r.kind)}`).toBe(-1);
     const d = derive3(r.st.facts, r.st.seed);

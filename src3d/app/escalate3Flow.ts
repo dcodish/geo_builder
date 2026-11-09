@@ -9,6 +9,7 @@
  * Pure over the injected transport: it commits nothing. The App hands the steps to `submitSteps`, whose `decideSteps3` runs
  * the full battery, so a label still lost is the `dropped-given` refusal that names it.
  */
+import type { Seed3 } from '../engine/components3';
 import { ingestTypedText } from '../../shell/bidi';
 import { askKeepingNames, type NameRetry } from '../../shell/llm/retryLostNames';
 import { derive3, type Fact3 } from '../store/store3';
@@ -23,7 +24,7 @@ export interface Escalation3 {
   retry?: NameRetry;
 }
 
-type Figure3 = { facts: Fact3[]; seed: number };
+type Figure3 = { facts: Fact3[]; seed: Seed3 };
 type Ask3 = (utterance: string, context: string, keep?: readonly string[]) => Promise<string[] | null>;
 
 /** The labels the answer's re-parsed commands lose: the same call as the battery's (`lostGivens3`). */

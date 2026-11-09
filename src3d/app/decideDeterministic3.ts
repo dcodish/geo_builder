@@ -20,6 +20,7 @@
  * added here reaches both the day it is written. Pure over `(facts, seed, raw)`: it sets nothing.
  */
 
+import type { Seed3 } from '../engine/components3';
 import { parse3 } from '../parser/parse3';
 import { classifyGuidance3, upperCasedLabelCandidate3, type ScopeMatch3 } from '../parser/scope3';
 import { decideSubmit3, type StoreError3, type Fact3, type Verdict3 } from '../store/store3';
@@ -32,7 +33,7 @@ export type DeterministicVerdict3 =
   | { readonly kind: 'guided'; readonly register: 'scope'; readonly match: ScopeMatch3; readonly tag: string };
 
 export function decideDeterministic3(
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   raw: string,
   newId?: () => string,
 ): DeterministicVerdict3 {

@@ -11,6 +11,7 @@
  * rows, `pointComps` → the ask lane, a plane's d-term, the parametric anchor). The FIGURE is not changed:
  * nothing is newly sampled, and the drawn positions are asserted below to sit where they always did.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { dataView } from '../engine/dataView';
 import { planeOffsetAnchored3 } from '../engine/dataView';
@@ -18,7 +19,7 @@ import { translationAnchoredAxes3, translationKnown3 } from '../engine/evaluate'
 import { answerQuery } from '../engine/queries';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const BOX = "תיבה ABCDA'B'C'D'";
 const CUBE = "קובייה ABCDA'B'C'D'";
 const PYRAMID = 'פירמידה ABCDS';

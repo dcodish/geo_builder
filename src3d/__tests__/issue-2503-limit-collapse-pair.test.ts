@@ -8,6 +8,7 @@
  * angle whose arm the re-solve empties, makes the candidate inadmissible, and with no ring or solid to name the store
  * refuses the line as the statements' contradiction (`givens-contradict`). Everything runs through `decideSubmit3`.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import i18n3d from '../i18n';
@@ -15,9 +16,9 @@ import { errorText3 } from '../i18n/errorText3';
 import { pinOperandPairs3 } from '../engine/solve3';
 import type { Construction3, ScalarPin } from '../engine/types';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
-function run(lines: readonly string[], seed: number) {
+function run(lines: readonly string[], seed: Seed3) {
   let st: St = { facts: [], seed };
   for (let i = 0; i < lines.length; i++) {
     const v = decideSubmit3(st, lines[i]);
@@ -34,7 +35,7 @@ const SEEDS_24 = Array.from({ length: 24 }, (_, i) => i);
 const SEEDS_8 = SEEDS_24.slice(0, 8);
 
 /** Refused on the LAST line as the statements' contradiction naming `others`, never a flat polygon; keep-prior. */
-function refusedContradiction(lines: readonly string[], seed: number, others: readonly string[]): void {
+function refusedContradiction(lines: readonly string[], seed: Seed3, others: readonly string[]): void {
   const r = run(lines, seed);
   const last = lines.length - 1;
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[last]}» (got ${r.kind} at ${r.refusedAt})`).toBe(last);
@@ -47,7 +48,7 @@ function refusedContradiction(lines: readonly string[], seed: number, others: re
 }
 
 /** Every line records, and every row is ok. */
-function builds(lines: readonly string[], seed: number): void {
+function builds(lines: readonly string[], seed: Seed3): void {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: ${r.kind} at ${r.refusedAt} ${JSON.stringify(r.error)}`).toBe(-1);
   const d = derive3(r.st.facts, r.st.seed);

@@ -18,6 +18,7 @@
  * it keeps protecting even if the preference is ever weakened.
  */
 
+import type { Seed3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { solidFaceCollapsed } from '../engine/evaluate';
@@ -31,7 +32,7 @@ function reset() {
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
-const render = (seed: number) => {
+const render = (seed: Seed3) => {
   const d = derive3(state().facts, seed);
   return buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1, {}, true);
 };

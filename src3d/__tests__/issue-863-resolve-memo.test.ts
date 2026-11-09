@@ -8,6 +8,7 @@
  * `leastSquares` solves per panel, 1.44 M residual evaluations). Locked by COUNT, cold and warm — never
  * by clock.
  */
+import { seedNumber3 } from '../engine/components3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -51,14 +52,14 @@ describe('#863 Part A — resolve3 is solved once per (construction, configurati
     const d = derive3([...r.facts], r.seed);
     const c = d.construction;
     expect(resolve3(c, r.seed)).toBe(d.resolved);
-    expect(knowledgeSamples3(c, [r.seed])[0]).toBe(d.resolved);
+    expect(knowledgeSamples3(c, [seedNumber3(r.seed)])[0]).toBe(d.resolved);
   });
 
   it('the memo is keyed on the configuration: another seed or an explicit parameter value is its own solve', () => {
     const r = load('plane-distance-param-1472.geo3.json');
     const c = { ...derive3([...r.facts], r.seed).construction }; // a fresh key: nothing resolved yet
     const base = resolve3(c, r.seed);
-    expect(resolve3(c, r.seed + 1)).not.toBe(base);
+    expect(resolve3(c, seedNumber3(r.seed) + 1)).not.toBe(base);
     const branches = base.param?.branches ?? [];
     expect(branches.length).toBeGreaterThan(1);
     const other = branches.find((v) => v !== base.param!.value)!;

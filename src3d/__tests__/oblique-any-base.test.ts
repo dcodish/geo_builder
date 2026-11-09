@@ -16,6 +16,7 @@
  *  4. `מקבילון` still behaves exactly as before — the proof the general path subsumes the special one;
  *  5. the DOF cue is monotone: stating rightness never increases the count.
  */
+import type { Seed3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { freeDofCount3 } from '../engine/evaluate';
@@ -36,7 +37,7 @@ const len = (v: Vec3) => Math.hypot(v.x, v.y, v.z);
 const dot = (v: Vec3, w: Vec3) => v.x * w.x + v.y * w.y + v.z * w.z;
 
 /** Every vertical edge of a prism, as vectors base→top (they are all equal iff it is a prism at all). */
-function laterals(seed: number, base: string[]): Vec3[] {
+function laterals(seed: Seed3, base: string[]): Vec3[] {
   const pos = derive3(state().facts, seed).positions;
   return base.map((id) => sub(pos.get(`${id}'`)!, pos.get(id)!));
 }

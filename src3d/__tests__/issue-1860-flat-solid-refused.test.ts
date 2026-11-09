@@ -10,6 +10,7 @@
  * exactly the solver landed. Now one judgement, the declared-polygon one (ADR-3D-310), reaches every solid kind.
  * Everything runs through the App's real pre-LLM decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import { derive3, type Fact3 } from '../store/store3';
@@ -22,8 +23,8 @@ const he = (k: string, o?: Record<string, unknown>) => i18n3d.getFixedT('he')(k,
 const en = (k: string, o?: Record<string, unknown>) => i18n3d.getFixedT('en')(k, o) as string;
 const plain = (s: string | null): string => (s ?? '').replace(/[⁦-⁩]/g, '');
 
-function run(lines: readonly string[], seed: number) {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed };
+function run(lines: readonly string[], seed: Seed3) {
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed };
   let n = 0;
   for (let i = 0; i < lines.length; i++) {
     const v = decideDeterministic3(st, lines[i], () => `f${++n}`);
@@ -34,7 +35,7 @@ function run(lines: readonly string[], seed: number) {
 }
 
 /** Refused on the LAST line as the named solid, forced, naming `others`; the line is not a fact. */
-function refused(lines: readonly string[], seed: number, solid: string, ring: string, others: readonly string[]): void {
+function refused(lines: readonly string[], seed: Seed3, solid: string, ring: string, others: readonly string[]): void {
   const r = run(lines, seed);
   const last = lines.length - 1;
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[last]}» (got ${r.kind} at ${r.refusedAt})`).toBe(last);
@@ -45,7 +46,7 @@ function refused(lines: readonly string[], seed: number, solid: string, ring: st
 }
 
 /** Builds: every line records, every fact ok, and no flat-solid notice exists. */
-function builds(lines: readonly string[], seed: number): void {
+function builds(lines: readonly string[], seed: Seed3): void {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: «${lines[r.refusedAt]}» → ${JSON.stringify(r.error ?? r.kind)}`).toBe(-1);
   const d = derive3(r.st.facts, r.st.seed);

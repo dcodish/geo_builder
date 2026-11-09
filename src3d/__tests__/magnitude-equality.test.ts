@@ -9,6 +9,7 @@
  * length-rel), so no form has two semantics.
  */
 
+import { seedNumber3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { scalePinned } from '../engine/solve3';
@@ -31,7 +32,7 @@ const add = (p: V, q: V): V => ({ x: p.x + q.x, y: p.y + q.y, z: p.z + q.z });
 const scale = (p: V, k: number): V => ({ x: k * p.x, y: k * p.y, z: k * p.z });
 const dot = (p: V, q: V) => p.x * q.x + p.y * q.y + p.z * q.z;
 const nrm = (p: V) => Math.hypot(p.x, p.y, p.z);
-const seeds = () => [state().seed, state().seed + 1, state().seed + 2];
+const seeds = () => [0, 1, 2].map((k) => seedNumber3(state().seed) + k);
 const vecOf = (pos: Map<string, V>, from: string, to: string) => sub(pos.get(to)!, pos.get(from)!);
 
 describe('parsing (#393/#335) — chains, expressions, coefficients', () => {

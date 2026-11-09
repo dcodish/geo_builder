@@ -14,6 +14,7 @@
  * The lock is a phrasing SWEEP (size noun × own line / in the declaration × copula × value form × language × solid),
  * with a guard on its size, so it cannot pass by checking nothing.
  */
+import type { Seed3 } from '../../engine/components3';
 import { describe, expect, it } from 'vitest';
 import i18n3d from '../../i18n';
 import he from '../../i18n/locales/he.json';
@@ -22,7 +23,7 @@ import { errorText3 } from '../../i18n/errorText3';
 import { decideSubmit3, derive3, type Fact3 } from '../../store/store3';
 
 type Solid = 'cone' | 'cylinder' | 'sphere';
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 let n = 0;
 const newId = () => `f${++n}`;
 const tHe = i18n3d.getFixedT('he') as (k: string, o?: Record<string, unknown>) => string;

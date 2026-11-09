@@ -891,6 +891,30 @@ further such solid appends seven dims, `[ln s, w, t]`
 ordinary dims: a length on each figure, or a relation between them («AB ∥ DE»), is driven, and with nothing
 stated they resample. A one-solid figure appends nothing and is bit-identical.
 
+**Independent parts are resolved and searched apart (#2764, [ADR-3D-454](06b-decisions-3d.md#adr-3d-454), [ADR-3D-455](06b-decisions-3d.md#adr-3d-455)).**
+`partsOf3` (`engine/components3.ts`, analytic's `components.ts` copied, ADR-AG-425) splits a figure by a union–find over
+names: every statement of every `Construction3` field is deep-walked, and each string in it that is a point, plane,
+line, vector, circle or letter name, or a run of point names («SBC»), links the statement to it; a solid links its
+vertices. The split is by the field's type (array, map, set); any other field must be listed in `NAMELESS_FIELDS3`
+(the totality lock). A part with no solid rides with the first part. A figure holding something that frames every
+solid (`wholeFigure3`: the coordinate letter, a free vector, `orientationStated3`, a scale given, a revolution) is one
+part, and one part is the construction itself, so a connected figure takes the old path bit for bit. Each part is a
+sub-construction that keeps its solids' indices in the whole (`partOf.solidIndex`, read by `wholeSolidIndex3`), so its
+layout origin and its #1855 similarity are the ones it has inside the whole. `resolve3` resolves each part at its own
+seed in the solved frame (`resolveParts3`), joins them (`joinParts3`: maps unioned, the pivot's records side by side,
+`solutions` the least, `scalarConsumed` summed — the parts share no unknown, so the ranks add) and turns the joined figure
+onto the floor once (`drawnFrame3`, whose frame is the first solid's, in the first part).
+
+The configuration is `Seed3 = number | { seed, parts }`: `parts[key]` is the seed of the part whose first solid's sampler
+key is `key`; a part with no entry sits at `seed`, and the canonical spelling drops entries equal to it. Two parts that
+join take the earliest key's entry; a part that splits off keeps the entry it holds. `firstSatisfyingSeed3` walks each
+part from its own entry against its own requirements and preferences, so a part already drawn as itself is answered at
+the first seed asked and nothing earlier moves; «הציגו תצורה אחרת» stays a plain-number press from the base. The claim,
+panel and query samples stay plain numbers around the base (`claimSeeds`, `panelSeeds3`, `querySeeds3` read
+`seedNumber3`), each resolved part by part. On disk `seed` stays the base number and the entries ride in the optional
+sibling `seedParts` (`figureFile3`, the link and the session share it); a loaded figure of several parts runs each
+part's search from where it was saved (`loadedSeed3`).
+
 **A pyramid over an existing base is a BOUND solid (#2490, [ADR-3D-434](06b-decisions-3d.md#adr-3d-434)).** It is the
 one solid that shares points, and only over letters the row's text spells (the fold marks a run the parser lettered by
 default `lettersUnstated`, which never binds): `SolidObj.bound` lists its base ids, which keep their own `PointDef` (a cube's vertices,

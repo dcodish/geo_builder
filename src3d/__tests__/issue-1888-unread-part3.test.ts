@@ -11,6 +11,7 @@
  * angle at the named vertex. A taught remedy is a hypothesis, so this file DRIVES the taught lines and
  * asserts they build with the right angle where the student named it.
  */
+import type { Seed3 } from '../engine/components3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -23,7 +24,7 @@ import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { dot3, norm3, sub3 } from '../engine/vec3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const EMPTY: St = { facts: [], seed: 0 };
 
 let n = 0;

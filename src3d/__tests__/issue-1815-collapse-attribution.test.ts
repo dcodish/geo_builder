@@ -17,6 +17,7 @@
  * Everything goes through the real submit decision `decideSubmit3`; the per-fix unit test reads the
  * pivot's own record through `resolve3`.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { resolve3 } from '../engine/evaluate';
@@ -26,11 +27,11 @@ import { parse3 } from '../parser/parse3';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 type P3 = { x: number; y: number; z: number };
 
 /** Submit the lines from an empty canvas at `seed`; stops at the first line that does not record. */
-function run(lines: readonly string[], seed: number) {
+function run(lines: readonly string[], seed: Seed3) {
   let st: St = { facts: [], seed };
   let lastMs = 0;
   for (let i = 0; i < lines.length; i++) {
@@ -65,7 +66,7 @@ const plain = (s: string | null): string => (s ?? '').replace(/[\u2066-\u2069]/g
 const SEEDS_24 = Array.from({ length: 24 }, (_, i) => i);
 
 /** Refused at the last line, by the collapse refusal, naming `stated` and `other`; the triangle stays open. */
-function refusesCollapse(lines: readonly string[], seed: number, stated: string, other: string): string {
+function refusesCollapse(lines: readonly string[], seed: Seed3, stated: string, other: string): string {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: refused at the last line (got ${r.kind} at ${r.refusedAt})`).toBe(lines.length - 1);
   expect(r.error?.code, `seed ${seed}`).toBe('polygon-collapsed');
@@ -82,7 +83,7 @@ function refusesCollapse(lines: readonly string[], seed: number, stated: string,
  * #1849 (ADR-3D-310): refused at line `at` with the FORCED wording — `stated` and every one of `others`
  * named — and the standing figure keeps its ring open.
  */
-function refusesForced(lines: readonly string[], seed: number, at: number, stated: string, others: readonly string[], ring: readonly string[]): void {
+function refusesForced(lines: readonly string[], seed: Seed3, at: number, stated: string, others: readonly string[], ring: readonly string[]): void {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[at]}» (got ${r.kind} at ${r.refusedAt})`).toBe(at);
   expect(r.error, `seed ${seed}`).toMatchObject({ code: 'polygon-collapsed', stated, forced: true, ring: ring.join('') });
@@ -92,7 +93,7 @@ function refusesForced(lines: readonly string[], seed: number, at: number, state
 }
 
 /** Builds at `seed`: every line records, every fact is ok. Returns the ring's area ratio. */
-function builds(lines: readonly string[], seed: number, ring: readonly string[]): number {
+function builds(lines: readonly string[], seed: Seed3, ring: readonly string[]): number {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: «${lines[r.refusedAt]}» → ${JSON.stringify(r.error ?? r.kind)}`).toBe(-1);
   const d = derive3(r.st.facts, r.st.seed);

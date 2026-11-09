@@ -55,6 +55,7 @@ import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } fr
 import { coincidences3, namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, letterMeanings3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3, type SegmentEquationReading3, type SolidCommand } from '../engine/types';
+import { partsOf3, sameSeed3, seedKey3, seedNumber3, type Seed3 } from '../engine/components3';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { droppedPropertyWords3 } from '../parser/propertyWords3';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
@@ -118,7 +119,7 @@ export interface Derived3 {
  * tool's point must be minted by an EARLIER line. Returns the renamed list and its derive, or null (nothing to name,
  * or the named list does not build: the line then stands as it was).
  */
-function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed: number): { facts: Fact3[]; derived: Derived3 } | null {
+function toolLetterTakenOver3(candidate: readonly Fact3[], factId: string, seed: Seed3): { facts: Fact3[]; derived: Derived3 } | null {
   const at = candidate.findIndex((f) => f.id === factId);
   const line = candidate[at];
   if (!line || !line.enabled) return null;
@@ -292,7 +293,7 @@ export type StoreError3 =
 /** The first seed at/after `from` whose figure meets every stated requirement, or null when none does
  *  within budget (ADR-3D-053). Requirement-free figures return `from` immediately — the search costs
  *  nothing for the figures that state no inequality. */
-function seedForRequirements(facts: Fact3[], from: number): number | null {
+function seedForRequirements(facts: Fact3[], from: Seed3): Seed3 | null {
   const d = derive3(facts, from);
   const construction = d.construction;
   // #817 (ADR-3D-176): the short-circuit used to be «no stated requirements ⇒ any seed will do», which
@@ -304,6 +305,17 @@ function seedForRequirements(facts: Fact3[], from: number): number | null {
   // #1986 (ADR-3D-418): ...and a declared ring drawn crossed asks the sweep too (its preference tier), judged the same way.
   if (construction.requirements.length === 0 && !solidFaceCollapsed(construction, d.positions) && !declaredRingCrossed3(construction, d.positions)) return from;
   return firstSatisfyingSeed3(construction, from);
+}
+
+/**
+ * #2764 ([ADR-3D-454](../../docs/06b-decisions-3d.md#adr-3d-454)) — THE CONFIGURATION A LOADED FIGURE OPENS AT. A figure of
+ * one part opens at its saved number, exactly as before. A figure of several parts saved before its parts had entries
+ * (or with a part the saved entry no longer suits) runs that part's own search from where it was saved: each part is
+ * kept where it is drawn as it should be, and is never refused for it.
+ */
+function loadedSeed3(facts: Fact3[], seed: Seed3): Seed3 {
+  if (facts.length === 0 || partsOf3(derive3(facts, seed).construction).length < 2) return seed;
+  return seedForRequirements(facts, seed) ?? seed;
 }
 
 /**
@@ -473,7 +485,7 @@ function sampledCarrierVerdict(claim: Claim3, c: Construction3, resolved: Resolv
  * pyramid): the message then falls back to asking for letters without naming candidates, which is still
  * honest — naming a candidate that does not exist would be worse than naming none.
  */
-function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
+function mainDiagonalCandidates(st: { facts: Fact3[]; seed: Seed3 }): string {
   const c = derive3(st.facts, st.seed).construction;
   if (c.solids.length !== 1) return '';
   return spaceDiagonals(c.solids[0].faces).map(([a, b]) => `${a}${b}`).join(', ');
@@ -491,7 +503,7 @@ function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
  * the caller then shows the bare ask rather than an empty list, exactly as the main-diagonal path does.
  * #1942: the enumeration is the engine's `angleCandidates3`, the candidate list of the one vertex-angle resolver.
  */
-function angleCandidatesAt(st: { facts: Fact3[]; seed: number }, vertex: string): string[] {
+function angleCandidatesAt(st: { facts: Fact3[]; seed: Seed3 }, vertex: string): string[] {
   return angleCandidates3(derive3(st.facts, st.seed).construction, vertex);
 }
 
@@ -528,7 +540,7 @@ const paramPinKey = (c: Construction3): string =>
  * read-only already (it is shared across the render tree within one commit). Bounded per figure:
  * a seed sweep touches many seeds, and 32 entries cover the ADR-3D-053 search window.
  */
-const deriveMemo3 = new WeakMap<readonly Fact3[], Map<number, Derived3>>();
+const deriveMemo3 = new WeakMap<readonly Fact3[], Map<string, Derived3>>();
 
 /**
  * The 0-DOF DERIVED point kinds (#769, ADR-3D-183) — a point placed by a closed form from other objects. A free
@@ -759,15 +771,16 @@ function touchesDefault3(facts: readonly Fact3[], cmds: readonly Command3[]): bo
   });
 }
 
-export function derive3(facts: Fact3[], seed: number): Derived3 {
+export function derive3(facts: Fact3[], seed: Seed3): Derived3 {
   const per = deriveMemo3.get(facts);
-  const hit = per?.get(seed);
+  const key = seedKey3(seed); // #2764 (ADR-3D-454): a configuration of several parts is keyed by its canonical spelling
+  const hit = per?.get(key);
   if (hit) return hit;
   const out = derive3Uncached(facts, seed);
-  const m = per ?? new Map<number, Derived3>();
+  const m = per ?? new Map<string, Derived3>();
   if (!per) deriveMemo3.set(facts, m);
-  m.set(seed, out);
-  if (m.size > 32) m.delete(m.keys().next().value as number);
+  m.set(key, out);
+  if (m.size > 32) m.delete(m.keys().next().value as string);
   return out;
 }
 
@@ -784,7 +797,7 @@ type MintedSolid3 = {
 /** #1310 (ADR-3D-397): `refoldBroke` counts mint-pass refolds that broke a row the fold had made ok — the class
  *  guard (`issue-1310-many-free-vectors.test.ts`) asserts it stays 0 over every fixture. */
 export const deriveStats3 = { uncached: 0, refoldBroke: 0 };
-function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
+function derive3Uncached(facts: Fact3[], seed: Seed3): Derived3 {
   deriveStats3.uncached++;
   return deriveCore3(facts, seed, true);
 }
@@ -803,7 +816,7 @@ function withShapeSentence3<E extends { code: string }>(e: E, utterance: string)
  */
 function deriveCore3(
   factsIn: Fact3[],
-  seed: number,
+  seed: Seed3,
   narrow: boolean,
   premint?: Readonly<Record<string, readonly string[]>>,
   /** #2489 (ADR-3D-383): the LINES the pass decided to create, by row — placed with the points before the refold. */
@@ -2330,13 +2343,13 @@ function deriveCore3(
   // admissible pool this sample already carries (`pivot.pointRoots`, built for #827).
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
-  const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
+  const narrowed = narrow ? narrowingNotes3(facts, seedNumber3(seed), c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
   return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
 }
 
 export interface Geo3State {
   facts: Fact3[];
-  seed: number;
+  seed: Seed3;
   lastError: StoreError3;
   /**
    * #613 (ADR-W-031) — the statement SUCCEEDED and added nothing, because the figure already says it.
@@ -2411,7 +2424,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap, dihedralShown?: DihedralShownMap) => void;
+  loadFigure: (facts: Fact3[], seed: Seed3, queries?: string[], planeDisplay?: PlaneDisplayMode3Map, displayMode?: DisplayModeMap, dihedralShown?: DihedralShownMap) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema' | 'too-large') => void;
 }
@@ -2614,7 +2627,7 @@ function numbersRestatementTwin3(facts: readonly Fact3[], commands: readonly Com
  * are one class here. A change that breaks nothing pays two folds and reports nothing — the happy path
  * is unchanged.
  */
-function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed: Fact3): StoreError3 {
+function dependentsBroken(before: Fact3[], after: Fact3[], seed: Seed3, changed: Fact3): StoreError3 {
   const was = derive3(before, seed).status;
   const now = derive3(after, seed).status;
   const broken = after.filter((f) => f.id !== changed.id && was[f.id] === 'ok' && now[f.id] !== 'ok' && now[f.id] !== 'disabled');
@@ -2628,7 +2641,7 @@ function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed
  * what a sentence means or how its refusal is worded.
  */
 function readStatement3(
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   utterance: string,
 ): { ok: true; commands: Command3[]; unread: string[]; readAs?: string[] } | { ok: false; error: NonNullable<StoreError3> } {
   // #1666 (ADR-3D-295): a PROOF TARGET is refused BEFORE the grammar, at the one reader both statement
@@ -2716,7 +2729,7 @@ function readStatement3(
  * trailing clauses («(3) AB = 4»). Anything else — a head that records, a head refused for another reason, a
  * trailing clause that does not read — returns null and the line keeps `not-understood`.
  */
-function compoundLostPart3(st: { facts: Fact3[]; seed: number }, utterance: string): LostPart3 | null {
+function compoundLostPart3(st: { facts: Fact3[]; seed: Seed3 }, utterance: string): LostPart3 | null {
   const split = trailingGivens3(utterance);
   if (!split) return null;
   const head = decideSubmit3(st, split.head, () => 'compound-head');
@@ -2772,7 +2785,7 @@ function lostGivens3(
 function honestyRefusal3(
   utterance: string,
   commands: readonly Command3[],
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   readExtent: boolean,
   unreadWords: readonly string[] = [],
   lane: 'grammar' | 'model' = 'grammar',
@@ -2821,10 +2834,10 @@ export type Verdict3 =
   /** #613 (ADR-W-031): already stated — nothing is appended; a MUTED twin is re-enabled instead */
   | { readonly kind: 'already-stated'; readonly twin: Fact3; readonly facts: Fact3[] }
   /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note */
-  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: number; readonly readAs?: readonly string[] };
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: Seed3; readonly readAs?: readonly string[] };
 
 export function decideSubmit3(
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   raw: string,
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
@@ -2851,7 +2864,7 @@ export function decideSubmit3(
  * always has; the deterministic lane asks it with both.
  */
 export function decideCommands3(
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   utterance: string,
   commands: readonly Command3[],
   opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model' },
@@ -2937,7 +2950,7 @@ export function decideCommands3(
  * The twin the notice stands for is the latest enabled line naming every point of the equation (the line that
  * already says it), else the latest enabled line; it is always enabled, so nothing is re-enabled.
  */
-function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: number, fact: Fact3, derived: Derived3): Fact3 | null {
+function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: Seed3, fact: Fact3, derived: Derived3): Fact3 | null {
   const reading = derived.readings[fact.id];
   if (reading !== 'vector' && reading !== 'length') return null;
   const cmd = fact.cmds.find((k) => k.type === 'vec-rel');
@@ -2996,7 +3009,7 @@ function knownTwin3(facts: readonly Fact3[], ids: readonly string[]): Fact3 | nu
  * prior samples (memoised by `resolve3`) and the candidate's (already resolved by its own claim verification), paid
  * only after (a) passes. The model lane asks without it (`opts.twins`), as it asks without every twin rule.
  */
-function impliedByPrior3(facts: readonly Fact3[], seed: number, fact: Fact3, derived: Derived3): Fact3 | null {
+function impliedByPrior3(facts: readonly Fact3[], seed: Seed3, fact: Fact3, derived: Derived3): Fact3 | null {
   if (facts.length === 0 || derived.status[fact.id] !== 'ok') return null;
   // a line that only draws, or that DECLARES a shape (a polygon over existing points names a face: its restatement is
   // `ringRestatementTwin3`'s), is never "already known"
@@ -3130,7 +3143,7 @@ export function factLead3(f: Pick<Fact3, 'id' | 'cmds'>, status: FactStatus3 | u
  * log-triage replay follows a logged LLM step through this function instead of a copy of it.
  */
 export function decideSteps3(
-  st: { facts: Fact3[]; seed: number },
+  st: { facts: Fact3[]; seed: Seed3 },
   rawUtterance: string,
   steps: readonly string[],
   newId: () => string = () => nanoid(8),
@@ -3359,8 +3372,10 @@ export const useGeo3 = create<Geo3State>()(
       // unchanged for every figure that states none.
       resample: () => {
         const { facts, seed } = get();
-        const next = seedForRequirements(facts, seed + 1);
-        set({ seed: next ?? seed + 1 });
+        // #2764 (ADR-3D-454): a plain-number press — every part walks to its own first good seed from the next base
+        const base = seedNumber3(seed) + 1;
+        const next = seedForRequirements(facts, base);
+        set({ seed: next ?? base });
       },
 
       dismissError: () => set({ lastError: null }),
@@ -3368,7 +3383,7 @@ export const useGeo3 = create<Geo3State>()(
       loadFigure: (facts, seed, queries = [], planeDisplay = {}, displayMode = {}, dihedralShown = {}) =>
         // #937: a file saved before the chip shipped carries no map, so it loads showing values —
         // today's behaviour, no migration, and the load audit stays green.
-        set({ facts, seed, queries, planeDisplay, displayMode: pruneDisplayMode(displayMode, facts.map((f) => f.id)), dihedralShown: pruneDihedralShown(dihedralShown, facts.map((f) => f.id)), lastError: null }),
+        set({ facts, seed: loadedSeed3(facts, seed), queries, planeDisplay, displayMode: pruneDisplayMode(displayMode, facts.map((f) => f.id)), dihedralShown: pruneDihedralShown(dihedralShown, facts.map((f) => f.id)), lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
@@ -3377,7 +3392,7 @@ export const useGeo3 = create<Geo3State>()(
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
       partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay, displayMode: s.displayMode, dihedralShown: s.dihedralShown }) as Geo3State,
       equality: (past, current) =>
-        past.facts === current.facts && past.seed === current.seed && past.queries === current.queries &&
+        past.facts === current.facts && sameSeed3(past.seed, current.seed) && past.queries === current.queries &&
         past.planeDisplay === current.planeDisplay && past.displayMode === current.displayMode &&
         past.dihedralShown === current.dihedralShown,
     },

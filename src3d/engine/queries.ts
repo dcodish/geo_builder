@@ -13,6 +13,7 @@
  */
 
 import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
+import { seedNumber3, type Seed3 } from './components3';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
 import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
@@ -633,7 +634,7 @@ function pinFreeMeasures(c: Construction3): { c: Construction3; params: string }
  * The note is set in both outcomes — with an answer it explains why no equation follows, without one
  * it is the whole reply.
  */
-function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind: 'plane' }>, seed: number): Answer3 {
+function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind: 'plane' }>, seed: Seed3): Answer3 {
   const ids = q.ids ?? (q.name ? c.pointPlanes.get(q.name) : undefined);
   const label = q.name ?? (ids ? ids.join('') : '');
   const parts: string[] = [];
@@ -662,19 +663,23 @@ function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind
  * The ask lane's base seeds — they cover the GAUGE. #1474 (ADR-3D-283): the parameter's branches are added
  * at each by `knowledgeSamples3`; never reach them through these offsets (`seed % n` covered n = 2 by accident).
  */
-export const querySeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 3041];
+// #2764 (ADR-3D-454): sampled around the configuration's base number
+export const querySeeds3 = (at: Seed3): number[] => {
+  const seed = seedNumber3(at);
+  return [seed, seed + 1013, seed + 2027, seed + 3041];
+};
 
 /** #2368 (ADR-3D-375): every ask-lane gate reads back, so it samples the leftover placement freedom too. */
 const RB = { readback: true } as const;
 
-export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
+export function answerQuery(c: Construction3, text: string, seed: Seed3): QueryResult {
   const q = parseQuery(c, text);
   if (!q) return { text, answer: null, note: 'notUnderstood', echo: 'plain' };
   return { ...answerParsed(c, text, q, seed), echo: queryEcho3(q) };
 }
 
 /** Answer one PARSED question (the echo is attached by {@link answerQuery}). */
-function answerParsed(c: Construction3, text: string, q: Query, seed: number): Answer3 {
+function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): Answer3 {
   const seeds = querySeeds3(seed);
   const stableNums = (vals: (number | null)[]): number | null => {
     if (vals.some((v) => v === null || !Number.isFinite(v))) return null;

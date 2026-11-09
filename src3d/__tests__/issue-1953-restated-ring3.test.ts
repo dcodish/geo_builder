@@ -10,12 +10,13 @@
  * rotation and reversal) is that fact's twin: a generic word refers to it, and the same shape in a reading it is
  * symmetric under is it.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import type { Fact3 } from '../store/store3';
 
 function play(lines: string[]) {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   let last: ReturnType<typeof decideDeterministic3> = { kind: 'not-understood' };
   let before = 0;
   for (const line of lines) {

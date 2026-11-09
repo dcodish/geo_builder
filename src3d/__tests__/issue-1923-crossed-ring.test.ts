@@ -11,6 +11,7 @@
  * scope), the claim-refuted siblings, a ring that only TOUCHES itself.
  */
 
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { errorText3 } from '../i18n/errorText3';
@@ -21,7 +22,7 @@ const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
 const he = (k: string, o?: Record<string, unknown>) => plain(i18n3d.getFixedT('he')(k, o) as string);
 const en = (k: string, o?: Record<string, unknown>) => plain(i18n3d.getFixedT('en')(k, o) as string);
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 /** Submit each line; returns every verdict kind and the last refusal's error. */
 function play(lines: readonly string[]) {
   let n = 0;

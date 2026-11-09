@@ -12,13 +12,14 @@
  *
  * Every verdict goes through `decideSubmit3`, the real submit decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { applyCommand3 } from '../engine/apply';
 import { claimSeeds } from '../engine/claims';
 import { emptyConstruction3, type Claim3, type Command3, type Construction3 } from '../engine/types';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };
@@ -30,7 +31,7 @@ function build(lines: readonly string[]): St {
   return st;
 }
 
-const lenAt = (facts: Fact3[], a: string, b: string, seed: number): number => {
+const lenAt = (facts: Fact3[], a: string, b: string, seed: Seed3): number => {
   const pos = derive3(facts, seed).positions;
   const p = pos.get(a);
   const q = pos.get(b);

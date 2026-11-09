@@ -11,6 +11,7 @@
  * Two layers, one predicate (`quadImplies`): the ENGINE records the statement redundant and leaves the figure
  * untouched (every lane, including the model's), and the STORE's restatement rule adds no row.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { errorText3 } from '../i18n/errorText3';
@@ -20,7 +21,7 @@ import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsDisjoint, ty
 const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
 const he = (k: string, o?: Record<string, unknown>) => plain(i18n3d.getFixedT('he')(k, o) as string);
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 function play(lines: readonly string[]) {
   let n = 0;
   let st: St = { facts: [], seed: 0 };
