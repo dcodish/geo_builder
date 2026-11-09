@@ -892,8 +892,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   state no base shape («פירמידה ABCDS») keeps the shape of the base it stands on, and no proportion is assumed (operator
   2026-11-08: *"Keep its shape"*, ADR-052): «מרובע ABCD» · «פירמידה ABCDS» stays a general quadrilateral that «הציגו תצורה
   אחרת» keeps varying, a rhombus or a trapezoid keeps its kind, an oblique prism's side face stays oblique (FR-SP-3), and
-  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base, and
-  «פירמידה ישרה ABCDS» over an existing quadrilateral is unchanged. Height, volume, an
+  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base. A
+  RIGHT pyramid whose words state no base shape («פירמידה ישרה ABCDS») over an existing ring also keeps the ring's shape
+  (operator 2026-11-09: *"reject"*): a right pyramid needs a base a circle passes through, so «ישרה» is checked against
+  the ring and never imposed on it. A ring whose own statements make it cyclic (a square, a rectangle, an isosceles
+  trapezoid, a circle stated through it, a box, cube or right prism face) builds, unchanged, with no note; any other
+  («מרובע ABCD», a rhombus, parallelogram, kite or trapezoid, an oblique prism's side face) is refused, naming the line
+  and the ring. A base stated in the same line («… שבסיסה דלתון») still becomes the cyclic member of its family. Height, volume, an
   edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
   ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for
