@@ -493,6 +493,45 @@ export const CYCLIC_MEMBER_NAME: Record<QuadBase, string> = {
   quad: 'cyclicQuad',
 };
 
+/**
+ * The constraint «ישרה» adds so the stated base becomes CYCLIC — the operator's 2026-07-27 ruling
+ * (#305). A right pyramid's apex sits over the base's circumcentre, which exists iff the base is
+ * cyclic; rather than refuse, the base is constrained into the cyclic member of its OWN family and
+ * a build notice names what it became. Nothing is invented: the base noun and «ישרה» jointly
+ * ENTAIL it (the ADR-165 / ADR-123 allowed-with-a-notice precedent). Lowered as ordinary relations —
+ * the ADR-110 macro pattern — so the solver does the work and no new engine construct is needed.
+ * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
+ *
+ * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437)): lives in the engine, beside `CYCLIC_MEMBER`, so the
+ * parser (a base the line states) and the fold's reading of an unstated base over an existing ring
+ * (`unstatedPyramidReading3`) lower the one fix.
+ */
+export function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
+  return shapeInternal3(cyclicFixRelations(base, ring)); // #1844: equal DIAGONALS are the shape's, not a drawn pair
+}
+
+export function cyclicFixRelations(base: QuadBase, ring: Id[]): ShapeRelation3[] {
+  const fix = CYCLIC_MEMBER[base].fix;
+  switch (fix.kind) {
+    case 'none':
+      return [];
+    case 'right-angle': {
+      const v = ring[fix.vertex];
+      const prev = ring[(fix.vertex + 3) % 4];
+      const nxt = ring[(fix.vertex + 1) % 4];
+      return [{ type: 'cos-angle', u: { kind: 'pair', from: v, to: prev }, v: { kind: 'pair', from: v, to: nxt }, cos: 0 }];
+    }
+    // an isosceles trapezoid: its DIAGONALS are equal, |AC| = |BD|. #1792: not the legs — with AB ∥ DC,
+    // |AD| = |BC| also holds on every PARALLELOGRAM, and a free flat ring solved onto that branch at 3 of 8
+    // seeds (a circle through a parallelogram's vertices then missed one). Equal diagonals on a trapezoid
+    // admit only the isosceles trapezoid and the rectangle — both cyclic, both isosceles trapezoids.
+    case 'equal-diagonals':
+      return [{ type: 'length-rel', a1: ring[0], b1: ring[2], rhs: { pair: [ring[1], ring[3]] }, c: 1 }];
+    case 'concyclic':
+      return [{ type: 'concyclic', ids: [...ring] }];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The quad-pyramid family: BASE × TOP, as one table
 // ---------------------------------------------------------------------------

@@ -433,7 +433,8 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
     // The note names the base ring and never prints the apex (operator 2026-10-13, #1996; judged q16, ADR-W-180).
     const ring = baseRingOf(s);
-    if (ring && spec?.right && spec.base === 'quad') out.push({ kind: 'base-constrained', ids: ring, from: 'quad', to: 'cyclicQuad' });
+    // #2490 (ADR-3D-437, Q-2490d): a bound ring a circle already passed through was constrained to nothing — no note
+    if (ring && spec?.right && spec.base === 'quad' && !s.boundCyclic) out.push({ kind: 'base-constrained', ids: ring, from: 'quad', to: 'cyclicQuad' });
   }
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
   // The four cases that used to live here inline (a redundant shape, a relation between two

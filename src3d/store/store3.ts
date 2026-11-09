@@ -36,7 +36,7 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidBase3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidReading3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { definiteCircle3 } from '../engine/definiteCircle';
@@ -868,7 +868,8 @@ function deriveCore3(
   /** #2490 (ADR-3D-434): a pyramid run the row's own text does not spell was lettered by the parser — marked, so it
    *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged.
    *  #2490 (ADR-3D-436): and a pyramid whose base SHAPE goes unnamed, over a ring the figure `at` already holds, is read
-   *  as the quadrilateral its letters name (`unstatedPyramidBase3`): the ring keeps its shape. The row's own text says
+   *  as the quadrilateral its letters name (`unstatedPyramidReading3`): the ring keeps its shape; a RIGHT one as its
+   *  stated twin, with the cyclic fix that twin lowers (ADR-3D-437). The row's own text says
    *  whether a shape was named (`namesQuadBase3`); a solid the mint pass declared for the row is its bare declaration
    *  («פירמידה ABCDS», listed first), which names none. Every reader after the fold reads this, as `resolvedCmds`. */
   const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
@@ -877,12 +878,12 @@ function deriveCore3(
     const minted = presolids?.[f.id]?.cmds.length ?? 0;
     let named: boolean | undefined;
     let changed = false;
-    const cmds = r.cmds.map((k, i) => {
-      if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return k;
-      let out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
-      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) out = unstatedPyramidBase3(at, out);
-      if (out !== k) changed = true;
-      return out;
+    const cmds = r.cmds.flatMap((k, i): Command3[] => {
+      if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return [k];
+      const out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
+      const read = i < minted || !(named ??= namesQuadBase3(f.utterance)) ? unstatedPyramidReading3(at, out) : [out];
+      if (read.length !== 1 || read[0] !== k) changed = true;
+      return read;
     });
     return changed ? { ok: true, cmds } : r;
   };
@@ -1320,13 +1321,17 @@ function deriveCore3(
           let refused: FactStatus3 | null = null;
           for (const cmd of declCmds) {
             // #2490 (ADR-3D-436): a minted solid is its bare declaration, whose base shape is unstated — tried as the
-            // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`)
-            const r = applyCommand3(made, seated(m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidBase3(made, cmd) : cmd));
-            if (!r.ok) {
-              refused = r.error;
-              break;
+            // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`);
+            // a right one with its twin's cyclic fix (ADR-3D-437), every command the fold will apply
+            for (const k of m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidReading3(made, cmd) : [cmd]) {
+              const r = applyCommand3(made, seated(k));
+              if (!r.ok) {
+                refused = r.error;
+                break;
+              }
+              made = r.next;
             }
-            made = r.next;
+            if (refused) break;
           }
           if (refused) {
             st = refused;

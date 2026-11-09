@@ -920,8 +920,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   state no base shape («פירמידה ABCDS») keeps the shape of the base it stands on, and no proportion is assumed (operator
   2026-11-08: *"Keep its shape"*, ADR-052): «מרובע ABCD» · «פירמידה ABCDS» stays a general quadrilateral that «הציגו תצורה
   אחרת» keeps varying, a rhombus or a trapezoid keeps its kind, an oblique prism's side face stays oblique (FR-SP-3), and
-  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base, and
-  «פירמידה ישרה ABCDS» over an existing quadrilateral is unchanged. Height, volume, an
+  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base. A
+  **right** pyramid whose words state no base shape («פירמידה ישרה ABCDS», "right pyramid ABCDS") over a ring that
+  already exists reads exactly as «פירמידה ישרה ABCDS שבסיסה מרובע»: the ring is fitted to a quadrilateral a circle
+  passes through with its own free DOF (FR-SU-35, [ADR-W-199](06w-decisions-workspace.md#adr-w-199); operator
+  2026-11-09), so a general quadrilateral becomes a general cyclic one that «הציגו תצורה אחרת» keeps varying (never the
+  rectangle), a rhombus a square, a parallelogram a rectangle, a kite a right kite and a trapezoid an isosceles one, with
+  the build note naming the change. A ring a circle already passes through (a square, a rectangle, an isosceles
+  trapezoid, a box or cube face, a ring with a stated circle or with supplementary stated opposite angles) is drawn as it
+  was, with no build note (Q-2490d). A ring whose own givens forbid a circle («מקבילית ABCD» · «∠DAB = 60») is refused,
+  naming those givens ([ADR-3D-437](06b-decisions-3d.md#adr-3d-437)). Height, volume, an
   edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
   ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for

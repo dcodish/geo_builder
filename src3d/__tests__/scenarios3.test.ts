@@ -905,3 +905,47 @@ describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic
     }
   });
 });
+
+// right-pyramid-existing-quad-2490 (#2490, ADR-3D-437) — the operator's lines and the ruling of 2026-11-09 (ADR-W-199:
+// "we would not refuse something that can be built"): «פירמידה ישרה ABCDS» over a quadrilateral that already exists fits
+// it to a quadrilateral a circle passes through, with its own free DOF. The figure built green before the fix too, as a
+// rectangle, so the lock is bespoke: ABCD is cyclic, not a rectangle at some configuration, and varies across presses
+// (ADR-052); and a ring whose own givens forbid a circle is refused, naming them.
+describe('right-pyramid-existing-quad-2490 — «מרובע ABCD» · «פירמידה ישרה ABCDS» fits ABCD to a cyclic quadrilateral', () => {
+  beforeEach(reset);
+  const ring = ['A', 'B', 'C', 'D'];
+  const angles = () => {
+    const pos = derived().positions;
+    return ring.map((v, i) => {
+      const at = pos.get(v)!;
+      const a = pos.get(ring[(i + 3) % 4])!;
+      const b = pos.get(ring[(i + 1) % 4])!;
+      const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
+      return (Math.acos(dot / (dist3(at, a) * dist3(at, b))) * 180) / Math.PI;
+    });
+  };
+
+  it('builds; ABCD is cyclic at every press, not always a rectangle, and its shape varies', () => {
+    submit('מרובע ABCD');
+    submit('פירמידה ישרה ABCDS');
+    expectAllOk();
+    expect(derived().construction.solids[1]).toMatchObject({ kind: 'pyramidQuadR', bound: ring });
+    const seen: number[][] = [];
+    for (let press = 0; press < 6; press++) {
+      const [a, b, c, d] = angles();
+      expect(a + c, `press ${press}`).toBeCloseTo(180, 4);
+      expect(b + d, `press ${press}`).toBeCloseTo(180, 4);
+      seen.push([a, b, c, d]);
+      useGeo3.getState().resample();
+      expectAllOk();
+    }
+    expect(seen.some((q) => q.some((x) => Math.abs(x - 90) > 1))).toBe(true);
+    expect(new Set(seen.map((q) => q[0].toFixed(3))).size).toBeGreaterThan(1);
+  });
+
+  it('REFUSAL: «מקבילית ABCD» · «∠DAB = 60» · «פירמידה ישרה ABCDS» names both earlier lines', () => {
+    ['מקבילית ABCD', '∠DAB = 60', 'פירמידה ישרה ABCDS'].forEach(submit);
+    expect(state().lastError).toEqual({ code: 'givens-contradict', stated: 'פירמידה ישרה ABCDS', others: ['מקבילית ABCD', '∠DAB = 60'] });
+    expect(state().facts).toHaveLength(2);
+  });
+});

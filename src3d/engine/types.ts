@@ -1406,6 +1406,12 @@ export interface SolidObj {
    * in its ring's frame (`boundApexPosition3`) and its dims are the apex's alone (`boundSolidDims3`).
    */
   bound?: Id[];
+  /**
+   * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437); Q-2490d) — on a bound RIGHT quad pyramid whose kind
+   * states no base shape: a circle already passed through the ring before this solid (verified from the ring's own
+   * statements), so «ישרה» narrowed nothing and the build note `base-constrained` is not shown.
+   */
+  boundCyclic?: true;
 }
 
 export type PointDef =
