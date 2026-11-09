@@ -170,65 +170,6 @@
         "הישר y=5 משיק למעגל בנקודה K"
       ],
       "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T42",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "מעגל שמרכזו O משיק לישר AB בנקודה T",
-        "D על המעגל",
-        "מעגל חסום במשולש ABC"
-      ],
-      "lookFor": "D stays green on circle O."
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T43",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "הווקטורים u ו-v",
-        "u·v = 2.5"
-      ],
-      "lookFor": "The data panel shows «u · v = 2.5»."
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T40",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "מעגל שמרכזו O משיק לישר AB בנקודה T",
-        "מעגל חסום במשולש ABC",
-        "D על המעגל O"
-      ],
-      "lookFor": "D on circle O, green."
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T41",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "המשולש ABC חסום במעגל",
-        "D על המעגל",
-        "מעגל חסום במשולש ABC"
-      ],
-      "lookFor": "D stays green on the circumcircle."
     }
   ],
   "results": [
@@ -572,6 +513,77 @@
       "pass": true,
       "date": "2026-11-04",
       "note": "all other tests pass"
+    },
+    {
+      "sheet": "round-2783",
+      "id": "T40",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "מעגל שמרכזו O משיק לישר AB בנקודה T",
+        "מעגל חסום במשולש ABC",
+        "D על המעגל O"
+      ],
+      "lookFor": "D on circle O, green.",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all pass"
+    },
+    {
+      "sheet": "round-2783",
+      "id": "T41",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "המשולש ABC חסום במעגל",
+        "D על המעגל",
+        "מעגל חסום במשולש ABC"
+      ],
+      "lookFor": "D stays green on the circumcircle.",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all pass"
+    },
+    {
+      "sheet": "round-2783",
+      "id": "T42",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "מעגל שמרכזו O משיק לישר AB בנקודה T",
+        "D על המעגל",
+        "מעגל חסום במשולש ABC"
+      ],
+      "lookFor": "D stays green on circle O.",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all pass"
+    },
+    {
+      "sheet": "round-2783",
+      "id": "T43",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "הווקטורים u ו-v",
+        "u·v = 2.5"
+      ],
+      "lookFor": "The data panel shows «u · v = 2.5».",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all pass"
     }
   ],
   "demoted": {}
