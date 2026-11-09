@@ -554,6 +554,10 @@ const SEEDED: SeededCorpus = {
   // stability are asserted in engine3.test.ts; these are the build + drift net.
   'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
   'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
+  // #2703 (ADR-3D-443) — a dot product and a letter's value typed as decimals keep their spelling (before: «5/2», and
+  // «k = ?» on the vec-defined point). The rows are asserted in data-view.test.ts; these are the build + drift net.
+  'dot-given-decimal-2703.geo3.json': ['הווקטורים u ו-v', 'u·v = 2.5'],
+  'letter-value-decimal-2703.geo3.json': ["קובייה ABCDA'B'C'D'", 'AE = k·AC', 'k = 2.5'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

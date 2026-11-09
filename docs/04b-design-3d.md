@@ -1333,7 +1333,7 @@ the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expr
 
 ### The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
 
-A stated value carries its spelling: `src` on the `length-eq` claim, `vec-mag`, `mag-val`, `mag-rel`, `lenSrc` on `perp-to-base`, `srcs` on a tuple, `src` on `VecTerm`/`SymTerm` ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426)). `statedMagText` and `statedCoordText` print it through `shell/literal`. Display only: nothing solves from it. `spellingOf` reads the older `decimal` mark from a save.
+A stated value carries its spelling: `src` on the `length-eq` claim, `vec-mag`, `mag-val`, `mag-rel`, `dot-given` (and the `dot` metric), `symbol-value`, `lenSrc` on `perp-to-base`, `srcs` on a tuple, `src` on `VecTerm`/`SymTerm` ([ADR-3D-426](06b-decisions-3d.md#adr-3d-426), [ADR-3D-443](06b-decisions-3d.md#adr-3d-443)). A letter's stated value is recorded for every owner kind in `Construction3.symbolGivens`, written by the `symbol-value` arm; the panel's params loop prints it before any lane prices the letter (after the gauge gate), and the angle mark's relations row reads it through `givenText`. `statedMagText` and `statedCoordText` print it through `shell/literal`. Display only: nothing solves from it. `spellingOf` reads the older `decimal` mark from a save.
 
 | kind | scene record | shape |
 | --- | --- | --- |

@@ -15118,3 +15118,31 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 **Locks.** Unit: `src3d/engine/__tests__/engine3.test.ts` (`unstatedPyramidBase3`: the reading over a quadrilateral, a cube and an oblique prism's face; applied, the ring keeps its DOFs and its drawing; the trapezoid; the standalone, right, partly-drawn, unlettered and triangular runs left as read) and `src3d/parser/__tests__/parse3.test.ts` (`namesQuadBase3` on the plain, English, volume and right spellings and every named base; the plain and stated-rectangle sentences parse to one command). Class, through the store: `src3d/__tests__/pyramid-base.test.ts` (nine hosts and spellings, each built, drawn as before the line, host + 3 DOF, never a rectangle at six seeds; ten presses on the quadrilateral and the oblique prism; the cube with no note, the volume path too; the standalone pyramid in both entry orders, the stated bases and the right pyramid unchanged; the pyramid typed again «already stated» with and without a shape reference). Scenario: `src3d/__tests__/scenarios3.test.ts` `pyramid-keeps-quad-2490`, the operator's two lines, ABCD no rectangle across ten presses and 7 DOF. The three class tests and the scenario fail at `5db9d910`; the guards pass on both sides.
 
 **Behaviour change for a student:** a pyramid typed without a base shape («פירמידה ABCDS») on a quadrilateral that is already drawn keeps that quadrilateral as it is: a general quadrilateral stays general and «הציגו תצורה אחרת» keeps varying it, a rhombus stays a rhombus, a trapezoid is no longer refused, and an oblique prism's side face stays oblique. On a cube's face the pyramid no longer shows «בגלל הנתונים, ABCD הוגבל ממלבן לריבוע…». A pyramid typed on its own still has a rectangle base, a stated base shape still shapes the quadrilateral, and «פירמידה ישרה» is unchanged.
+
+## ADR-3D-443 — A dot product and a letter's value typed as a decimal print as typed (#2703)
+
+**Status:** accepted · 2026-11-09 · bug (3d, P2) · fix round #2783 · branch `fix/2703-decimal-prints-as-typed` from `main` @ `4a06aae9` · extends [ADR-3D-426](#adr-3d-426) (the stated number's `src`) to the two givens its sibling audit left open
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-8 · **Design:** [04b](04b-design-3d.md) § "The stated-magnitude lane" · **LADDER stage:** none (display)
+
+**Ruling.** #1497, 2026-09-28: *"keep the format of entry"*, *"should apply to all tools"*; a given is printed as the student typed it, a derived value goes through the tiers (judged q-2361-decimals on this issue's plan).
+
+**Measured at pickup** (`4a06aae9`, the store's `submit` → `derive3` → `dataView`, no model). «הווקטורים u ו-v» · «u·v = 2.5» → `u · v = 5/2`; «u·v = 0.75» → `3/4`; «קובייה» · «E על AC כך ש-AE = k·AC» · «k = 0.4» → `k = 2/5`; «קובייה» · «AE = k·AC» · «k = 2.5» → `k = ?` (also for «k = 2»); «AB = 2.5» · «קטע AD» → the derived `|AD| = 5/2`. The plan's account held. Since it was written, #1497 landed `src` in place of #2361's `decimal` mark (ADR-3D-426), so the mark this item extends is `src`.
+
+**Found while measuring, same cause and chokepoint.** The plan's arm read the solver lanes' `value` pin, but a letter whose owner is a length («|AB| = k»), an angle («∠SAB = α»), a named component («C(p,1,0)») or a rider has no such pin: its value is lowered into that owner's given and the panel priced it off the figure. All four printed `5/2`, `125/2`, and the angle mark's relations row read `α = 125/2°`.
+
+**Root cause.** `dot-given` and `symbol-value` stored a bare number, so both rows printed through the tiers built for computed numbers: `freeMetricRow`'s `dot` arm (`cleanNum`) and the params loop (`cleanNum(nums[0], 1e-4)`), which also priced a letter only from the solver's output, never from the value the student stated.
+
+**Decision.**
+1. **The parser carries the spelling** on `dot-given` and `symbol-value` with `statedSrc`, as on every other stated magnitude: a decimal or a fraction carries `src`, an integer nothing.
+2. **The dot metric carries it** (`FreeVecMetric3` kind `dot`, through `spellingOf`); the anchored twin keeps it only when the coefficients divide nothing, as `mag-val` does.
+3. **A letter's stated value is recorded once, for every owner**: `Construction3.symbolGivens` (letter → `{ value, src }`), written by the `symbol-value` arm after every owner has accepted the value, the latest statement replacing the last. Display only; no lane reads it, and the `value` pin is unchanged. Pushing a `value` pin for every owner would have changed what the pivot, the free-vector system and the store signatures read.
+4. **The panel prints it**: the params loop gets one arm before any pricing, after ADR-3D-389's gauge gate: a letter with a stated value prints `givenText(value, src, cleanNum)`, so the row is never `?` beside a number the student typed. The angle mark's relations row prints its measure through the same `givenText`, which falls back to the tiers when the measure is not the stated value («2α»). The dot row prints `givenText(m.value, m.src, cleanNum)`.
+5. **A derived row stays computed** (`|AD| = 5/2`), per the ruling.
+
+**Measured after.** `u · v = 2.5`, `0.75`, `-2.5`; `k = 0.4`; `k = 2.5` and `k = 2` on the vec-defined point; `k = 2.5` on a length letter; `α = 62.5` and `α = 62.5°`; `p = 2.5`; `t = 0.25`; `t = 1.5`. Controls: `k = 1/2`, `u · v = 3`, `k = 2.125` → `2.13` (sr-22), `|AD| = 5/2`.
+
+**Sibling audit.** A coordinate («A(2.5,0,0)») already prints as typed (ADR-3D-426). «z = 2.5» printing as an equation is #1497's table, outside this item. 2-D has no dot product or letter row in this form; analytic and complex were covered by ADR-W-179.
+
+**Locks.** Unit: `src3d/parser/__tests__/parse3.test.ts` (the `src` on both commands, integers carrying none) and `src3d/__tests__/data-view.test.ts` (every row above, the controls, the derived row). Fixtures: `fixtures3/dot-given-decimal-2703.geo3.json`, `fixtures3/letter-value-decimal-2703.geo3.json` (the issue's rows 1 and 4).
+
+**Behaviour change for a student:** a dot product or a letter's value typed as a decimal reads in the panel as typed («u · v = 2.5», «k = 0.4»), and a letter whose value was typed no longer reads «k = ?». Fractions, integers and computed rows are unchanged.

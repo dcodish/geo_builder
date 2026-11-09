@@ -1178,7 +1178,7 @@ const rhombusPrism: Rule = (s) => {
 const dotGiven: Rule = (s) => {
   const m = s.match(/^([a-w])\s*[·×*]\s*([a-w])\s*=\s*(-?\d+(?:\.\d+)?)$/);
   if (!m) return null;
-  return [{ type: 'dot-given', v1: m[1], v2: m[2], value: +m[3] }];
+  return [{ type: 'dot-given', v1: m[1], v2: m[2], value: +m[3], ...statedSrc(m[3]) }]; // #2703: as typed
 };
 
 /** `BD = (-4,5,12)` — a PAIR-vector injection (V7 T2).
@@ -2171,7 +2171,7 @@ const symbolValue: Rule = (s) => {
   const m = s.match(/^([a-wα-ωΑ-Ω])\s*(?:=|היא|הוא|is)\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(-?\d+(?:\.\d+)?))?\s*°?\s*$/);
   if (!m || 'xyz'.includes(m[1])) return null;
   const v = m[3] ? +m[2] / +m[3] : +m[2];
-  return [{ type: 'symbol-value', symbol: m[1], value: v }];
+  return [{ type: 'symbol-value', symbol: m[1], value: v, ...statedSrc(m[3] ? `${m[2]}/${m[3]}` : m[2]) }]; // #2703: as typed
 };
 
 /** `נפח הפירמידה SENB שווה לנפח הפירמידה CENB` — two tetra volumes are equal (a claim). */

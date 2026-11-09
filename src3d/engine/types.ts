@@ -768,7 +768,7 @@ export interface FreeVecEq3 {
 export type FreeVecMetric3 =
   | { kind: 'mag'; e: VecExpr; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
   | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
-  | { kind: 'dot'; e1: VecExpr; e2: VecExpr; value: number }
+  | { kind: 'dot'; e1: VecExpr; e2: VecExpr; value: number; src?: string } // `src`: #2703
   | { kind: 'cos'; e1: VecExpr; e2: VecExpr; cos: number }
   | { kind: 'par'; e1: VecExpr; e2: VecExpr }
   | { kind: 'ratio'; from: Id; to: Id; terms: SymTerm[]; symbol?: string }
@@ -1224,7 +1224,7 @@ export type Command3 =
   | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number; src?: string }
   | { type: 'mag-val'; e: VecExpr; value: number; src?: string; decimal?: true } // `src`: as on the `length-eq` claim (#1497)
   // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
-  | { type: 'symbol-value'; symbol: string; value: number }
+  | { type: 'symbol-value'; symbol: string; value: number; src?: string } // `src`: as on the `length-eq` claim (#1497, #2703)
   | SolidCommand
   | AngleMark3Command
   | LengthMark3Command
@@ -1314,7 +1314,7 @@ export type Command3 =
   // parallel pair is the stated one — sides 1/3 of the ring as named instead of 0/2 (2-D's ADR-506).
   | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id]; adj?: ShapeAdj3; seat?: 1 }
   | ShapeRef3Command
-  | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
+  | { type: 'dot-given'; v1: string; v2: string; value: number; src?: string } // u·v = 24 (V7 T2); `src`: #2703
   // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
   // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
   // (`AA' = (k-1, k-7, k+1)` — the symbol joins the pivot as an open unknown).
@@ -1648,6 +1648,14 @@ export interface Construction3 {
     // arm carrying the unknown; seg(c,d) is the fixed reference.
     | { rel: 'seg-perp' | 'seg-par'; a: Id; b: Id; c: Id; d: Id; sym: string }
   )[];
+  /**
+   * #2703 ([ADR-3D-443](../../docs/06b-decisions-3d.md#adr-3d-443)) — the value the student GAVE each letter («k = 2.5»,
+   * «α = 62.5»), with its spelling (#1497's `src`), whichever owner the letter has. Display only: no lane reads it.
+   * The solver-owned lanes keep their own record (the `value` pin above); a length, angle, component or rider letter
+   * has none, its value being lowered into that owner's given, so the panel priced it off the figure through the
+   * tiers built for computed numbers and printed «2.5» as «5/2». The latest statement of a letter replaces the last.
+   */
+  symbolGivens: Map<string, { value: number; src?: string }>;
   /** Every claim RECORDED by apply (incl. ones composite commands create) — derive3
    *  attributes them to facts by count-delta and verifies them all; a claim can
    *  never escape verification by being created indirectly. */
@@ -1824,6 +1832,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   circleMembers3: [],
   vecDefs: [],
   symbolPins: [],
+  symbolGivens: new Map(),
   claims: [],
   scaleGivens: [],
   scalarPins: [],
