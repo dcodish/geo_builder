@@ -284,7 +284,7 @@ function factAccounts(line: string): { names: string[]; numbers: number[]; perp:
  * stated centre only when its curve has that centre.
  *
  * The parameters of each canonical form. A value COMPUTED from them (a diameter, a focus, a point the curve passes
- * through) is read by its stated role, in {@link heldByCurves} (ADR-AG-405):
+ * through) is read by its stated role, in {@link roleVerdicts} (ADR-AG-405):
  * - a line `y = mx + n`: m and n; a vertical `x = k`: k;
  * - a circle `(x−a)² + (y−b)² = r²`: a, b, r;
  * - a canonical ellipse `x²/a² + y²/b² = 1`: its centre (0, 0), a, b;
@@ -329,16 +329,52 @@ const POINT_LEAD = String.raw`(?:\s+(?:של\s+)?ה?(?:פרבולה|אליפסה)
 /** Never a half: «חצי קוטר 3» is a radius and «חצי הציר הגדול 5» a semi-axis, parameters {@link curveParameters} pays. */
 const NOT_HALF = String.raw`(?<!חצי\s+ה?)(?<!semi-?)`;
 
-/** A value's ROLE, read off the words right before it, and the test that the answer's curve really holds it there. */
-const SCALAR_ROLES: readonly { before: RegExp; holds: (s: AnswerShapes, v: number, axis: string) => boolean }[] = [
-  { before: new RegExp(String.raw`${NOT_HALF}(?:קוטר[א-ת]*|diameter)${LINK}$`, 'i'), holds: (s, v) => radiiOf(s).some((r) => close(2 * r, v)) },
+type Line = NumCurve & { kind: 'line' };
+/** The answer's non-vertical lines, by slope. */
+const slopesOf = (s: AnswerShapes): number[] => s.curves.filter((c): c is Line => c.kind === 'line' && Math.abs(c.b) > 1e-12).map((c) => -c.a / c.b);
+
+/**
+ * A value's ROLE, read off the words right before it: the test that the answer's curve really holds it there (`holds`),
+ * and whether the answer drew a curve of the kind that role is about at all (`testable`). The second is what lets a
+ * role DECIDE (#2680, ADR-AG-449): a focus is contradicted only by an answer that drew a parabola or an ellipse.
+ *
+ * `signed`: the role reads a minus right before the value as its sign («שיפועו -2»). Every other scalar is unsigned,
+ * like the scanner: the hyphen of «ב-2» is a maqaf, never a sign.
+ */
+interface ScalarRole {
+  before: RegExp;
+  holds: (s: AnswerShapes, v: number, axis: string) => boolean;
+  testable: (s: AnswerShapes) => boolean;
+  signed?: true;
+}
+const SCALAR_ROLES: readonly ScalarRole[] = [
+  {
+    before: new RegExp(String.raw`${NOT_HALF}(?:קוטר[א-ת]*|diameter)${LINK}$`, 'i'),
+    holds: (s, v) => radiiOf(s).some((r) => close(2 * r, v)),
+    testable: (s) => radiiOf(s).length > 0,
+  },
+  {
+    // ADR-AG-449: a radius, «רדיוסו 6» or «חצי קוטר 6», is a role too: «x^2 + y^2 = 6» has a 6 and radius √6.
+    before: new RegExp(String.raw`(?:רדיוס[א-ת]*|radius|חצי\s+ה?קוטר[א-ת]*|semi-?diameter)${LINK}$`, 'i'),
+    holds: (s, v) => radiiOf(s).some((r) => close(r, v)),
+    testable: (s) => radiiOf(s).length > 0,
+  },
+  {
+    // ADR-AG-449: a slope, signed: «y = 3x + 2» has a 2 and slope 3.
+    before: new RegExp(String.raw`(?:שיפוע[א-ת]*|slope)${LINK}(?:-\s*)?$`, 'i'),
+    holds: (s, v) => slopesOf(s).some((m) => close(m, v)),
+    testable: (s) => slopesOf(s).length > 0,
+    signed: true,
+  },
   {
     before: new RegExp(String.raw`${NOT_HALF}(?:ציר[א-ת]*\s+ה?(?:גדול|ראשי|ארוך)|major\s+axis)${LINK}$`, 'i'),
     holds: (s, v) => ellipses(s).some((c) => close(2 * Math.max(c.a, c.b), v)),
+    testable: (s) => ellipses(s).length > 0,
   },
   {
     before: new RegExp(String.raw`${NOT_HALF}(?:ציר[א-ת]*\s+ה?(?:קטן|משני|קצר)|minor\s+axis)${LINK}$`, 'i'),
     holds: (s, v) => ellipses(s).some((c) => close(2 * Math.min(c.a, c.b), v)),
+    testable: (s) => ellipses(s).length > 0,
   },
   {
     before: new RegExp(String.raw`(?:מרחק\s+(?:בין\s+)?ה?מוקד[א-ת]*|distance\s+between\s+(?:the\s+)?foci|focal\s+distance)${LINK}$`, 'i'),
@@ -347,24 +383,43 @@ const SCALAR_ROLES: readonly { before: RegExp; holds: (s: AnswerShapes, v: numbe
         const [a, b] = ellipseFoci(c);
         return close(Math.hypot(a.x - b.x, a.y - b.y), v);
       }),
+    testable: (s) => ellipses(s).length > 0,
   },
   {
     before: new RegExp(String.raw`(?:מדריך|מדריכ[א-ת]*|directrix)[^0-9]*?x\s*=\s*-?\s*$`, 'i'),
     holds: (s, v) => parabolas(s).some((c) => close(Math.abs(c.p) / 2, v)),
+    testable: (s) => parabolas(s).length > 0,
   },
   {
-    // Unsigned, like every scalar here: the hyphen of «ב-2» is a maqaf, never a sign.
     before: new RegExp(String.raw`${CROSS}\s*(?:ב-?|בנקודה\s*|at\s+)$`, 'i'),
     holds: (s, v, axis) => s.curves.some((c) => [v, -v].some((at) => (axis === 'x' ? isOn(c, at, 0) : isOn(c, 0, at)))),
+    testable: (s) => s.curves.length > 0,
   },
 ];
 
-const PAIR_ROLES: readonly { before: RegExp; holds: (s: AnswerShapes, x: number, y: number) => boolean }[] = [
+/**
+ * A coordinate pair's role. `features`: the points the role names on the answer's curve (a focus role: its foci), so
+ * a contradicted pair names only the coordinates the curve does not have («(2,0)» against the focus (1,0): the 2).
+ */
+interface PairRole {
+  before: RegExp;
+  holds: (s: AnswerShapes, x: number, y: number) => boolean;
+  testable: (s: AnswerShapes) => boolean;
+  features?: (s: AnswerShapes) => { x: number; y: number }[];
+}
+const focusesOf = (s: AnswerShapes): { x: number; y: number }[] => [...parabolas(s).map(parabolaFocus), ...ellipses(s).flatMap(ellipseFoci)];
+const PAIR_ROLES: readonly PairRole[] = [
   {
     before: new RegExp(String.raw`(?:דרך|עובר[א-ת]*|מכיל[א-ת]*|through|passes|passing|contains?|containing|${CROSS})${POINT_LEAD}`, 'i'),
     holds: (s, x, y) => s.curves.some((c) => isOn(c, x, y)),
+    testable: (s) => s.curves.length > 0,
   },
-  { before: new RegExp(String.raw`(?:מוקד[א-ת]*|foc(?:us|i))${POINT_LEAD}`, 'i'), holds: hasFocus },
+  {
+    before: new RegExp(String.raw`(?:מוקד[א-ת]*|foc(?:us|i))${POINT_LEAD}`, 'i'),
+    holds: hasFocus,
+    testable: (s) => focusesOf(s).length > 0,
+    features: focusesOf,
+  },
 ];
 
 /** A coordinate pair's parenthesis: two parts, each of which may hold one group («(√(2), 1)»). */
@@ -373,47 +428,112 @@ const PAIR = /\(((?:[^(),;]|\([^()]*\))*)[,;]((?:[^(),;]|\([^()]*\))*)\)/g;
 const LIST_GAP = new RegExp(String.raw`^\s*,?\s*(?:ו\s*-?|and\b)?\s*(?:${POINT_ATOM})?\s*$`);
 
 /**
- * #2680 ([ADR-AG-405](../../docs/06c-decisions-analytic.md#adr-ag-405), operator ruling 2026-11-04: *"Accept when the
- * answer's curve really has the value"*) — THE STATED VALUES THE ANSWER'S CURVE HOLDS IN ANOTHER FORM. The number gate
- * looks a value up, and a value the answer COMPUTED is not there to find: a diameter of 6 in «x^2 + y^2 = 9», the point
- * (2,3) in «y = 4x - 5», the focus (1,0) in «y^2 = 4x». This reads each occurrence's stated ROLE and tests the curve the
- * engine draws, with the engine's own {@link isOn}, {@link parabolaFocus} and {@link ellipseFoci}.
+ * #2680 — THE ROLE VERDICT ([ADR-AG-405](../../docs/06c-decisions-analytic.md#adr-ag-405), operator ruling 2026-11-04:
+ * *"Accept when the answer's curve really has the value"*; [ADR-AG-449](../../docs/06c-decisions-analytic.md#adr-ag-449),
+ * operator ruling 2026-11-06: *"We would want the correct to be accepted and wrong not"*). The number gate looks a value
+ * up, and a value the answer COMPUTED is not there to find: a diameter of 6 in «x^2 + y^2 = 9», the point (2,3) in
+ * «y = 4x - 5», the focus (1,0) in «y^2 = 4x». This reads each occurrence's stated ROLE and tests the curve the engine
+ * draws, with the engine's own {@link isOn}, {@link parabolaFocus} and {@link ellipseFoci}. Each occurrence gets one of
+ * three verdicts:
+ *
+ * - **held**: the role holds on the answer's curve. It needs no account and spends none, so the multiset is left for
+ *   what remains: in «(2,3), slope 4» answered «y=4x-5», the 4 pays the slope, not the root of the stated 2.
+ * - **contradicted**: the answer drew a curve of the kind the role is about, the role fails on every one of them, and the
+ *   answer never restates the value as a plain given (outside an equation, «ברדיוס 6», «A=(2,3)»: the grammar then
+ *   carries it). It is DROPPED, and never reaches the number gate, where an exponent, a square, a root or another of
+ *   the curve's parameters would pay it by coincidence (`y^2 = 4x`'s p = 2 paying a stated focus (2,0)). Its statement,
+ *   as the student typed it, is what the one retry names (ADR-W-189 am.).
+ * - **no role**: no role noun, or no curve of that kind to test it on. The number gate, as before.
  *
  * The test needs the role. «x^2 + y^2 = 25» does pass through (3,4), and that does not pay a stated CENTRE (3,4); its
- * diameter is 10, and that does not pay a stated RADIUS 10. A value with no role here goes to the number gate as before.
- *
- * Returns the positions of the occurrences proven held. They need no account and spend none, so the multiset is left
- * for what remains: in «(2,3), slope 4» answered «y=4x-5», the 4 pays the slope, not the root of the stated 2.
+ * diameter is 10, and that does not pay a stated RADIUS 10.
  */
-function heldByCurves(utterance: string, stated: readonly StatedNumber[], shapes: AnswerShapes): Set<number> {
-  const held = new Set<number>();
-  if (shapes.curves.length === 0 && shapes.radii.length === 0) return held;
-  const t = numberText(utterance);
-  const inPair = new Set<number>();
-  let role: (typeof PAIR_ROLES)[number] | undefined;
-  let prevEnd = -1;
+interface RoleVerdicts {
+  held: Set<number>;
+  contradicted: Set<number>;
+  /** The contradicted statements, as typed («שמוקדה (2,0)»), in order and once each. */
+  statements: string[];
+}
+
+/** What the answer states OUTSIDE an equation: a plain value, a plain pair. A role it restates there is the grammar's to hold. */
+interface PlainGivens {
+  values: number[];
+  pairs: [number, number][];
+}
+
+/** Each coordinate pair of `t` whose two parts are `numbers`' occurrences: where it opens and ends, and its signed values. */
+function pairsOf(t: string, numbers: readonly StatedNumber[]): { open: number; end: number; parts: StatedNumber[]; xy: [number, number] }[] {
+  const out: { open: number; end: number; parts: StatedNumber[]; xy: [number, number] }[] = [];
   for (const m of t.matchAll(PAIR)) {
     const open = m.index ?? 0;
     const end = open + m[0].length;
-    const parts = stated.filter((o) => o.at > open && o.at < end);
+    const parts = numbers.filter((o) => o.at > open && o.at < end);
     if (parts.length !== 2) continue;
     const signed = (o: StatedNumber): number => (/-\s*$/.test(t.slice(open, o.at)) ? -o.value : o.value);
+    out.push({ open, end, parts, xy: [signed(parts[0]), signed(parts[1])] });
+  }
+  return out;
+}
+
+function plainGivensOf(lines: readonly string[]): PlainGivens {
+  const out: PlainGivens = { values: [], pairs: [] };
+  for (const line of lines) {
+    const occ = numbersOf(line).filter((o) => !o.eq);
+    out.values.push(...occ.map((o) => o.value));
+    for (const p of pairsOf(numberText(line), occ)) out.pairs.push(p.xy);
+  }
+  return out;
+}
+
+function roleVerdicts(utterance: string, stated: readonly StatedNumber[], shapes: AnswerShapes, plain: PlainGivens): RoleVerdicts {
+  const out: RoleVerdicts = { held: new Set(), contradicted: new Set(), statements: [] };
+  if (shapes.curves.length === 0 && shapes.radii.length === 0) return out;
+  const t = numberText(utterance);
+  /** The student's words from the role noun's word to the value's end, by where they start: a listed pair widens its list's. */
+  const spans = new Map<number, number>();
+  const statement = (from: number, to: number): void => {
+    const start = t.slice(0, from).search(/\S*$/);
+    spans.set(start, Math.max(to, spans.get(start) ?? to));
+  };
+  const inPair = new Set<number>();
+  let role: PairRole | undefined;
+  let roleAt = -1;
+  let prevEnd = -1;
+  for (const { open, end, parts, xy } of pairsOf(t, stated)) {
     const before = t.slice(0, open);
     const listed = prevEnd >= 0 && LIST_GAP.test(t.slice(prevEnd, open)) ? role : undefined;
-    role = PAIR_ROLES.find((r) => r.before.test(before)) ?? listed;
+    const own = PAIR_ROLES.map((r) => ({ r, m: r.before.exec(before) })).find((x) => x.m);
+    role = own?.r ?? listed;
+    if (own?.m) roleAt = own.m.index;
     prevEnd = end;
     for (const o of parts) inPair.add(o.at);
-    if (role?.holds(shapes, signed(parts[0]), signed(parts[1]))) for (const o of parts) held.add(o.at);
+    if (!role) continue;
+    if (role.holds(shapes, xy[0], xy[1])) for (const o of parts) out.held.add(o.at);
+    else if (role.testable(shapes) && !plain.pairs.some(([x, y]) => close(x, xy[0]) && close(y, xy[1]))) {
+      // A role that names points on the curve names only the coordinates none of them has; else the whole pair.
+      const features = role.features?.(shapes) ?? [];
+      const wrong = parts.filter((_o, i) => !features.some((f) => close(i === 0 ? f.x : f.y, xy[i])));
+      for (const o of wrong.length ? wrong : parts) out.contradicted.add(o.at);
+      statement(roleAt, end);
+    }
   }
   for (const o of stated) {
     if (inPair.has(o.at)) continue;
     const before = t.slice(0, o.at);
     for (const r of SCALAR_ROLES) {
       const m = r.before.exec(before);
-      if (m && r.holds(shapes, o.value, (m[1] ?? m[2] ?? '').toLowerCase())) held.add(o.at);
+      if (!m) continue;
+      const v = r.signed && /-\s*$/.test(before) ? -o.value : o.value;
+      if (r.holds(shapes, v, (m[1] ?? m[2] ?? '').toLowerCase())) out.held.add(o.at);
+      else if (r.testable(shapes) && !plain.values.some((p) => close(p, o.value))) {
+        out.contradicted.add(o.at);
+        statement(m.index, o.at + o.raw.length);
+      }
+      break; // one role per value
     }
   }
-  return held;
+  for (const [start, end] of [...spans].sort((a, b) => a[0] - b[0])) out.statements.push(t.slice(start, end).replace(/\s+/g, ' ').trim());
+  return out;
 }
 
 /**
@@ -439,6 +559,11 @@ export interface Faithfulness {
   dropped: string[];
   /** The NAME half of {@link dropped}: what the one retry asks the model to keep (#2231, ADR-W-189). A lost number never retries. */
   droppedNames: string[];
+  /**
+   * #2680 (ADR-AG-449): the student's statements whose role the answer's curve contradicts, as typed («שמוקדה (2,0)»).
+   * Their values are in {@link dropped}. The second trigger of the one retry, which names them (ADR-W-189 am.).
+   */
+  contradicted: string[];
   /** Names the answer wrote that the student did not, and the figure does not hold. */
   invented: string[];
   /**
@@ -458,8 +583,8 @@ export interface Faithfulness {
  *    went with it).
  * 2. **Dropped number**: every stated number must be paid, as a multiset, by a model line's numbers or facts:
  *    the value itself, its square (a radius stated, r² in the equation), its square root, or, for 90, a line
- *    that states a right angle. A value whose stated role the answer's curve really holds needs no account
- *    (ADR-AG-405, {@link heldByCurves}).
+ *    that states a right angle. A value whose stated role the answer's curve really holds needs no account, and
+ *    one whose role it contradicts is dropped whatever pays it (ADR-AG-405, ADR-AG-449, {@link roleVerdicts}).
  * 3. **Invented name**: every point, line or numeral name the model WROTE must be stated or in the figure. Read
  *    off the text, so a name the grammar mints while lowering (P₁, a canonical centre) is never counted.
  * 4. **Invented existing name** (#2225, ADR-AG-281, operator ruling 2026-10-16): a name the model wrote that the
@@ -503,8 +628,9 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
     if (facts[i].perp || PERPENDICULAR.test(line)) accounts.push({ value: 90, tag });
   });
   const statedNumbers = numbersOf(utterance);
-  const held = heldByCurves(utterance, statedNumbers, { curves: facts.flatMap((f) => f.curves), radii: facts.flatMap((f) => f.radii) });
-  const droppedNumbers = spendAccounts(statedNumbers.filter((o) => !held.has(o.at)), accounts, (o) => {
+  const roles = roleVerdicts(utterance, statedNumbers, { curves: facts.flatMap((f) => f.curves), radii: facts.flatMap((f) => f.radii) }, plainGivensOf(modelLines));
+  // ADR-AG-449: a held value needs no account; a contradicted one is dropped and never reaches the accounts.
+  const unpaid = spendAccounts(statedNumbers.filter((o) => !roles.held.has(o.at) && !roles.contradicted.has(o.at)), accounts, (o) => {
     const across = o.eq ? PLAIN : EQ;
     return [
       { value: o.value, tag: EQ },
@@ -514,10 +640,13 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
     ];
   });
 
+  const droppedNumbers = [...unpaid, ...statedNumbers.filter((o) => roles.contradicted.has(o.at))].sort((a, b) => a.at - b.at);
+
   const droppedNames = names.dropped.map((k) => shownOf.get(k) ?? k);
   return {
     dropped: [...droppedNames, ...droppedNumbers.map((o) => o.raw)],
     droppedNames,
+    contradicted: roles.statements,
     invented: names.invented.map((k) => shownOf.get(k) ?? k),
     inventedExisting: inventedExisting.map((k) => shownOf.get(k) ?? k),
   };

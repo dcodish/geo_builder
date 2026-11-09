@@ -11,7 +11,7 @@ const answer = (...steps: string[]): A => ({ steps });
 const lost = (a: A) => (a.steps.some((s) => s.includes('K')) ? [] : ['K']);
 const usable = (a: A) => !a.busy && a.steps.length > 0;
 const transport = (...replies: (A | null | undefined)[]) => {
-  const ask = vi.fn(async (_keep?: readonly string[]): Promise<A | null | undefined> => replies.shift());
+  const ask = vi.fn(async (_keep?: readonly string[], _contradicted?: readonly string[]): Promise<A | null | undefined> => replies.shift());
   return ask;
 };
 
@@ -71,5 +71,50 @@ describe('#2231 — askKeepingNames', () => {
   it('the log line is an action, so the lean sink carries it', () => {
     expect(nameRetryEvent({ keep: ['K', 'l3'], recovered: false })).toEqual({ kind: 'action', action: 'llm-retry', detail: 'K,l3:lost' });
     expect(nameRetryEvent({ keep: ['K'], recovered: true }).detail).toBe('K:recovered');
+    expect(nameRetryEvent({ keep: [], contradicted: ['שמוקדה (2,0)', 'שקוטרו 6'], recovered: false }).detail).toBe(':lost | שמוקדה (2,0); שקוטרו 6');
+  });
+});
+
+/**
+ * #2680 (ADR-AG-450, amending ADR-W-189): the second trigger. Operator, 2026-11-06: *"Or even go back to llm to get the
+ * correct one."* The stub's role gate: the student stated «focus (2,0)», and an answer «y^2 = 4x» contradicts it.
+ */
+describe('#2680 — a contradicted statement is the second trigger', () => {
+  const wrong = (a: A) => (a.steps.includes('y^2 = 4x') ? ['focus (2,0)'] : []);
+  const named = (a: A) => (a.steps.some((s) => s.includes('K')) || a.steps.includes('y^2 = 8x') || a.steps.includes('y^2 = 4x') ? [] : ['K']);
+
+  it('a contradicted statement: a second call naming it, keep empty, and the right answer goes on', async () => {
+    const ask = transport(answer('y^2 = 4x'), answer('y^2 = 8x'));
+    const out = await askKeepingNames(ask, named, usable, wrong);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(ask.mock.calls[1]).toEqual([[], ['focus (2,0)']]);
+    expect(out).toEqual({ answer: answer('y^2 = 8x'), retry: { keep: [], contradicted: ['focus (2,0)'], recovered: true } });
+  });
+
+  it('the retry contradicts it again: the second answer goes on, never a third call', async () => {
+    const ask = transport(answer('y^2 = 4x'), answer('y^2 = 4x'), answer('y^2 = 8x'));
+    const out = await askKeepingNames(ask, named, usable, wrong);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(out).toEqual({ answer: answer('y^2 = 4x'), retry: { keep: [], contradicted: ['focus (2,0)'], recovered: false } });
+  });
+
+  it('nothing contradicted: one call', async () => {
+    const ask = transport(answer('y^2 = 8x'));
+    expect(await askKeepingNames(ask, named, usable, wrong)).toEqual({ answer: answer('y^2 = 8x') });
+    expect(ask).toHaveBeenCalledTimes(1);
+  });
+
+  it('a names-only retry is unchanged when the builder injects a role gate: one argument, no contradicted field', async () => {
+    const ask = transport(answer('H'), answer('K here'));
+    const out = await askKeepingNames(ask, lost, usable, () => []);
+    expect(ask.mock.calls[1]).toEqual([['K']]);
+    expect(out.retry).toEqual({ keep: ['K'], recovered: true });
+  });
+
+  it('at most four statements travel, and none longer than the proxy accepts', async () => {
+    const long = 'x'.repeat(41);
+    const ask = transport(answer('y'), answer('z'));
+    await askKeepingNames(ask, () => [], usable, () => ['a', long, 'b', 'c', 'd', 'e']);
+    expect(ask.mock.calls[1][1]).toEqual(['a', 'b', 'c', 'd']);
   });
 });

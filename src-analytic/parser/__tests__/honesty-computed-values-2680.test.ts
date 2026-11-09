@@ -53,10 +53,11 @@ describe('#2680 — a value the curve does not have stays refused, naming it', (
   it.each<[string, string, string, string[]]>([
     ['the plan’s wrong diameter', 'מעגל שקוטרו 6 ומרכזו (0,0)', 'x^2 + y^2 = 16', ['6']],
     ['the plan’s wrong slope', 'ישר שעובר דרך (2,3) ושיפועו 4', 'y=3x-3', ['4']],
-    ['the point is not on the line', 'ישר שעובר דרך (2,3) ושיפועו 4', 'y=4x-1', ['3', '4']],
+    // ADR-AG-449: the contradicted role names its own values: the point is off the line, the slope 4 holds
+    ['the point is not on the line', 'ישר שעובר דרך (2,3) ושיפועו 4', 'y=4x-1', ['2', '3']],
     ['the wrong focus', 'פרבולה שמוקדה (3,0)', 'y^2 = 4x', ['3']],
     ['the wrong intercept', 'ישר ששיפועו 3 וחותך את ציר x ב-2', 'y=3x-5', ['2']],
-    ['the sign a pair states: (2,1) is on this circle, (-2,1) is not', 'מעגל שמרכזו (1,1) ועובר דרך (-2,1)', '(x-1)^2 + (y-1)^2 = 1', ['2']],
+    ['the sign a pair states: (2,1) is on this circle, (-2,1) is not', 'מעגל שמרכזו (1,1) ועובר דרך (-2,1)', '(x-1)^2 + (y-1)^2 = 1', ['2', '1']],
   ])('%s: «%s» answered «%s»', (_name, utterance, answer, expected) => {
     expect(dropped(utterance, [answer])).toEqual(expected);
   });
@@ -68,9 +69,56 @@ describe('#2680 — a value the curve does not have stays refused, naming it', (
     ['«חצי קוטר» is a radius, not a diameter', 'מעגל שחצי קוטר 6 ומרכזו (0,0)', 'x^2 + y^2 = 9', ['6']],
     ['a semi-major axis, not an axis', 'אליפסה שחצי צירה הגדול 10', 'x^2/25 + y^2/9 = 1', ['10']],
     ['a list stops at a pair with no role', 'מעגל שעובר דרך (5,0) ומרכזו (3,4)', 'x^2 + y^2 = 25', ['3', '4']],
-    ['a stated focus that is only a point of the curve', 'פרבולה שמוקדה (8,4)', 'y^2 = 2x', ['8']],
+    // ADR-AG-449: the focus (1/2, 0) has neither coordinate
+    ['a stated focus that is only a point of the curve', 'פרבולה שמוקדה (8,4)', 'y^2 = 2x', ['8', '4']],
   ])('%s: «%s» answered «%s»', (_name, utterance, answer, expected) => {
     expect(dropped(utterance, [answer])).toEqual(expected);
+  });
+});
+
+/**
+ * #2680 ([ADR-AG-449](../../../docs/06c-decisions-analytic.md#adr-ag-449), operator ruling 2026-11-06: *"We would want the
+ * correct to be accepted and wrong not"*) — THE ROLE DECIDES. Each answer below holds the stated number somewhere (an
+ * exponent, a square, a root, another parameter), and its curve contradicts the role the student gave it. Before, the
+ * number paid by coincidence and the answer was accepted.
+ */
+describe('#2680 — a value whose stated role the curve contradicts is refused, whatever pays the number', () => {
+  const gate = (utterance: string, answer: string[]) => faithfulnessAnalytic(utterance, answer, new Set());
+
+  it.each<[string, string, string, string[], string[]]>([
+    // the plan's three measured rows
+    ['a focus paid by the parabola’s p', 'פרבולה שמוקדה (2,0)', 'y^2 = 4x', ['2'], ['שמוקדה (2,0)']],
+    ['a diameter paid by the root of r²', 'מעגל שקוטרו 6 ומרכזו (0,0)', 'x^2 + y^2 = 36', ['6'], ['שקוטרו 6']],
+    ['foci paid by the semi-minor axis', 'אליפסה שמוקדיה (4,0) ו-(-4,0) וצירה הגדול 10', 'x^2/25 + y^2/16 = 1', ['4', '4'], ['שמוקדיה (4,0) ו-(-4,0)']],
+    // the same class in the roles the plan lists
+    ['a radius paid by the equation’s constant', 'מעגל שרדיוסו 6 ומרכזו (0,0)', 'x^2 + y^2 = 6', ['6'], ['שרדיוסו 6']],
+    ['a slope paid by the intercept', 'ישר ששיפועו 2 ועובר דרך (0,3)', 'y = 3x + 2', ['2', '0', '3'], ['ששיפועו 2', 'דרך (0,3)']],
+    ['a slope’s sign', 'ישר ששיפועו -2 ועובר דרך (0,3)', 'y = 2x + 3', ['2'], ['ששיפועו -2']],
+    ['a major axis paid by a square', 'אליפסה שצירה הגדול 4', 'x^2/16 + y^2/9 = 1', ['4'], ['שצירה הגדול 4']],
+    ['a directrix', 'פרבולה שהמדריך שלה x=-2', 'y^2 = 2x', ['2'], ['שהמדריך שלה x=-2']],
+    ['English', 'parabola with focus (2,0)', 'y^2 = 4x', ['2'], ['focus (2,0)']],
+  ])('%s: «%s» answered «%s»', (_name, utterance, answer, dropped, contradicted) => {
+    expect(gate(utterance, [answer])).toMatchObject({ dropped, contradicted });
+  });
+
+  it.each<[string, string, string]>([
+    // the correct twins of the plan's rows
+    ['the right focus', 'פרבולה שמוקדה (2,0)', 'y^2 = 8x'],
+    ['the right diameter', 'מעגל שקוטרו 6 ומרכזו (0,0)', 'x^2 + y^2 = 9'],
+    ['the right foci', 'אליפסה שמוקדיה (4,0) ו-(-4,0) וצירה הגדול 10', 'x^2/25 + y^2/9 = 1'],
+    ['the right radius', 'מעגל שרדיוסו 6 ומרכזו (0,0)', 'x^2 + y^2 = 36'],
+    ['the right signed slope', 'ישר ששיפועו -2 ועובר דרך (0,3)', 'y = -2x + 3'],
+  ])('%s is still accepted: «%s» answered «%s»', (_name, utterance, answer) => {
+    expect(gate(utterance, [answer])).toMatchObject({ dropped: [], contradicted: [] });
+  });
+
+  it.each<[string, string, string[]]>([
+    // a role with no curve of its kind to test it on keeps the number gate
+    ['no equation: the answer restates the radius', 'מעגל O שרדיוסו 3', ['מעגל O ברדיוס 3']],
+    ['the answer restates the pair as a given, outside any equation', 'ישר דרך (2,3) המקביל לישר y=2x', ['ישר דרך (2,3) המקביל לישר y=2x']],
+    ['a focus, and no parabola or ellipse drawn', 'פרבולה שמוקדה (2,0)', ['F(2,0)']],
+  ])('%s: «%s» answered %j', (_name, utterance, answer) => {
+    expect(gate(utterance, answer)).toMatchObject({ dropped: [], contradicted: [] });
   });
 });
 

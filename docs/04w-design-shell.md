@@ -330,7 +330,12 @@ builder's full battery then judges that answer. The body field `keep` is validat
 `server/llm/harness.ts` (at most 8 name tokens, otherwise ignored), and `buildRequest` adds one line after the student
 request; without it the request is byte-identical. The gates injected: 2-D `droppedNewLabels`, 3-D `droppedNewLabels3`,
 analytic `faithfulnessAnalytic(...).droppedNames`. A retry logs one `llm-retry` action (`nameRetryEvent`), detail
-`K:recovered` or `K:lost`, which the lean sinks and the admin session view already carry.
+`K:recovered` or `K:lost`, which the lean sinks and the admin session view already carry. **A second trigger**
+([ADR-AG-450](06c-decisions-analytic.md#adr-ag-450), #2680): an optional fourth gate `contradictedOf` returns the student's
+statements the answer contradicts (analytic: `faithfulnessAnalytic(...).contradicted`); a non-empty list also triggers the
+one retry, as `ask(keep, contradicted)`. The body field `contradicted` is validated by `readContradicted` (at most 4
+statements of at most 40 characters, no quotes or newlines, otherwise ignored) and adds one line to the request; the
+shell trims to the same bounds. The log detail appends ` | <statements>`. A builder that injects nothing is unchanged.
 
 **The corrections are logged.** Each product puts `restored` (`WAS→WANT`) on the submit event. Without
 it, a submit that was silently corrected looks exactly like one that needed no correction.

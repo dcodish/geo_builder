@@ -19,7 +19,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 // Type-only: erased at build, so the dynamic import('@anthropic-ai/sdk') below still governs runtime.
 import type { MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources';
-import { buildRequest, extractSteps, readKeep, type PromptSpec } from './llm/harness';
+import { buildRequest, extractSteps, readContradicted, readKeep, type PromptSpec } from './llm/harness';
 import { PROMPT_SPEC_2D } from '../src/parser/llmShared';
 // The 3-D sibling app shares this proxy: a `tool: '3d'` field in the body selects its
 // prompt (docs/20 §6.6 — one process, one endpoint, no new infrastructure). The server
@@ -101,10 +101,13 @@ export async function handleParse(
   let tool = '';
   let locale: 'he' | 'en' | undefined;
   let keep: string[] | undefined;
+  let contradicted: string[] | undefined;
   try {
-    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown; tool?: unknown; locale?: unknown; keep?: unknown };
+    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown; tool?: unknown; locale?: unknown; keep?: unknown; contradicted?: unknown };
     // #2231 (ADR-W-189): the names a retry asks the model to keep. A retry is an ordinary request: it pays the same limits.
     keep = readKeep(j.keep);
+    // #2680 (ADR-AG-450): the student's statements the previous answer contradicted. Validated the same way: bounded, or ignored.
+    contradicted = readContradicted(j.contradicted);
     // #1297: the session's language, so the prompt speaks ONE language. Optional — an old client omits it.
     locale = j.locale === 'he' || j.locale === 'en' ? j.locale : undefined;
     utterance = String(j.utterance ?? '').slice(0, 400);
@@ -153,7 +156,7 @@ export async function handleParse(
     // Unreachable — the tool was validated before any spend (see PROMPT_SPECS above). Kept as a
     // typed floor so this stays a total function if the guard above is ever moved.
     if (!spec) return send(400, { error: 'unknown-tool' });
-    const request = buildRequest(spec, utterance, context, locale, keep);
+    const request = buildRequest(spec, utterance, context, locale, keep, contradicted);
     // The prompt builders own the request as PLAIN DATA and deliberately import no SDK types — they ship in
     // browser bundles, and `llmShared.ts` says so explicitly. Their `as const` therefore makes every array
     // readonly, which the SDK's mutable `string[]` fields reject. Widening is a boundary concern, so it

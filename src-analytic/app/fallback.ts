@@ -110,19 +110,27 @@ export function fallbackContext(lines: readonly string[]): string {
  * #2231 (ADR-W-189): an answer that loses a name the student typed is asked for once more, naming what to keep
  * (`keep`, the third argument of `ask`, on the retry only). A lost number never retries. Whichever answer comes back
  * meets every gate below, so a name still lost is the `unfaithful` refusal that names it.
+ *
+ * #2680 (ADR-AG-450): an answer whose curve CONTRADICTS a statement's role (a focus, a diameter, a slope) is asked for
+ * once more too, naming the statement (`contradicted`, the fourth argument of `ask`, on the retry only). Operator,
+ * 2026-11-06: *"Or even go back to llm to get the correct one."* A retry that still contradicts it meets the same gate,
+ * so it is the `unfaithful` refusal naming the value.
  */
 export async function runFallback(
   utterance: string,
   lines: readonly string[],
   seed: Seed,
-  ask: (utterance: string, context: string, keep?: readonly string[]) => Promise<LlmStepsOutcome | null>,
+  ask: (utterance: string, context: string, keep?: readonly string[], contradicted?: readonly string[]) => Promise<LlmStepsOutcome | null>,
 ): Promise<FallbackOutcome> {
   const context = fallbackContext(lines);
   const existing = existingNamesAnalytic(derive(lines, seed).construction);
+  const gate = (a: LlmStepsOutcome) => faithfulnessAnalytic(utterance, restoreStatedSequencesAnalytic(utterance, [...a.steps]).lines, existing);
   const { answer, retry } = await askKeepingNames(
-    (keep) => (keep ? ask(utterance, context, keep) : ask(utterance, context)),
-    (a) => faithfulnessAnalytic(utterance, restoreStatedSequencesAnalytic(utterance, [...a.steps]).lines, existing).droppedNames,
+    (keep, contradicted) =>
+      contradicted ? ask(utterance, context, keep, contradicted) : keep ? ask(utterance, context, keep) : ask(utterance, context),
+    (a) => gate(a).droppedNames,
     (a) => !a.busy && a.steps.length > 0,
+    (a) => gate(a).contradicted,
   );
   const out = judgeAnswer(utterance, lines, seed, answer, existing);
   return retry ? { ...out, retry } : out;

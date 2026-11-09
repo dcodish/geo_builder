@@ -151,16 +151,48 @@ export function readKeep(raw: unknown): string[] | undefined {
   return raw.every((n) => typeof n === 'string' && KEEP_NAME.test(n)) ? (raw as string[]) : undefined;
 }
 
+/** At most this many contradicted statements travel in one retry (#2680); the shared helper trims to the same bound. */
+export const CONTRADICTED_MAX = 4;
+/**
+ * A contradicted statement: the student's own words around one value («שמוקדה (2,0)», "diameter 6"). Letters of either
+ * script, digits and the punctuation a coordinate or an equation needs. Never a quote, a guillemet, a bracket of the
+ * prompt's own or a newline, and at most 40 characters: never a sentence that could carry an instruction (#2680).
+ */
+const CONTRADICTED_STATEMENT = /^[A-Za-zא-ת0-9 ()\-−,.=^/√+:]{1,40}$/u;
+
+/**
+ * #2680 ([ADR-AG-450](../../docs/06c-decisions-analytic.md#adr-ag-450)) — the `contradicted` field of a retry, validated
+ * like `keep`: at most {@link CONTRADICTED_MAX} statements in the student's own words, otherwise the whole field is
+ * ignored and the request is an ordinary one. An absent or malformed field is `undefined`.
+ */
+export function readContradicted(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > CONTRADICTED_MAX) return undefined;
+  return raw.every((n) => typeof n === 'string' && CONTRADICTED_STATEMENT.test(n)) ? (raw as string[]) : undefined;
+}
+
 /**
  * The full Messages-API request body (model, tool, forced tool_choice, message). Pure + testable.
  *
  * `keep` (#2231, ADR-W-189): the names the model's previous answer lost. It adds one line after the student's request;
  * without it the body is byte-identical to what it always was (`issue-1359-prompt-identity.test.ts`).
+ *
+ * `contradicted` (#2680, ADR-AG-450): the student's statements the previous answer's figure contradicted. One more line.
  */
-export function buildRequest(spec: PromptSpec, utterance: string, context: string, locale?: 'he' | 'en', keep?: readonly string[]) {
-  const retry = keep?.length
+export function buildRequest(
+  spec: PromptSpec,
+  utterance: string,
+  context: string,
+  locale?: 'he' | 'en',
+  keep?: readonly string[],
+  contradicted?: readonly string[],
+) {
+  const lost = keep?.length
     ? `\n\nYour previous answer lost these names the student typed: ${keep.join(', ')}. Every one of them must appear in your steps, spelled exactly as typed.`
     : '';
+  const wrong = contradicted?.length
+    ? `\n\nYour previous answer contradicted what the student stated: ${contradicted.map((s) => `«${s}»`).join('; ')}. The figure your steps draw must satisfy each of these statements exactly.`
+    : '';
+  const retry = lost + wrong;
   return {
     model: LLM_MODEL,
     max_tokens: LLM_MAX_TOKENS,
