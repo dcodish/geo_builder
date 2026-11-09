@@ -12,6 +12,7 @@
  * base-specific `parallelepiped` template, so these parses now read `prism4` + `oblique` — the same solid,
  * one mechanism — and the bases that used to be refused (triangle, general quad) build oblique too.
  */
+import type { Seed3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { freeDofCount3 } from '../engine/evaluate';
@@ -135,7 +136,7 @@ describe('#321 — the constraints DRIVE the base shape at every seed, and «ה�
   const len = (v: { x: number; y: number; z: number }) => Math.hypot(v.x, v.y, v.z);
   const dot = (v: { x: number; y: number; z: number }, w: { x: number; y: number; z: number }) =>
     v.x * w.x + v.y * w.y + v.z * w.z;
-  const baseVecs = (seed: number) => {
+  const baseVecs = (seed: Seed3) => {
     const pos = derive3(state().facts, seed).positions;
     return { ab: sub(at(pos, 'B'), at(pos, 'A')), ad: sub(at(pos, 'D'), at(pos, 'A')), aa: sub(at(pos, "A'"), at(pos, 'A')) };
   };

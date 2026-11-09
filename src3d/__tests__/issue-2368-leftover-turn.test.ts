@@ -14,6 +14,7 @@
  * No gate is rewritten. The drawing was untouched here; #2378 (ADR-3D-379) then turned it along the same
  * probe, by the operator's ruling, and the drawing lock below was re-based to that.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { dataView } from '../engine/dataView';
 import { knowledgeSamples3, resolve3 } from '../engine/evaluate';
@@ -21,7 +22,7 @@ import { answerQuery } from '../engine/queries';
 import { symmetricEigen } from '../engine/solve3';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const CUBE = "קובייה ABCDA'B'C'D'";
 const REPORT = [CUBE, 'A(0,0,0)', 'AB=(2,0,0)', 'מישור ABCD'];
 
@@ -34,9 +35,9 @@ function build(lines: readonly string[]): St {
   }
   return st;
 }
-const cAt = (st: St, seed: number) => derive3(st.facts, seed).construction;
-const panel = (st: St, seed: number) => dataView(cAt(st, seed), seed);
-const ask = (st: St, q: string, seed: number) => answerQuery(cAt(st, seed), q, seed);
+const cAt = (st: St, seed: Seed3) => derive3(st.facts, seed).construction;
+const panel = (st: St, seed: Seed3) => dataView(cAt(st, seed), seed);
+const ask = (st: St, q: string, seed: Seed3) => answerQuery(cAt(st, seed), q, seed);
 /** seeds 0 and 5 were the false ones; 1, 2 and 7 were already correct by luck */
 const SEEDS = [0, 5, 1, 2, 7];
 

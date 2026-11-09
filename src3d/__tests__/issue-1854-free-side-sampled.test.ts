@@ -15,10 +15,11 @@
  * decides whether the givens hold. These locks assert the SAMPLING, not that the figure builds: a fixed
  * default would pass "it builds" and fail every assertion below.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, useGeo3, type Fact3 } from '../store/store3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 type P3 = { x: number; y: number; z: number };
 
 const LINES = ['משולש ABC', 'AC = 8', 'BC = 3'] as const;
@@ -29,7 +30,7 @@ const EDGES = [5, 11] as const;
 const d3 = (a: P3, b: P3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 /** Every line through the real submit door; returns the state it committed (seed included). */
-function run(lines: readonly string[], seed: number): { st: St; refusedAt: number; kind: string } {
+function run(lines: readonly string[], seed: Seed3): { st: St; refusedAt: number; kind: string } {
   let st: St = { facts: [], seed };
   for (let i = 0; i < lines.length; i++) {
     const v = decideSubmit3(st, lines[i]);
@@ -40,7 +41,7 @@ function run(lines: readonly string[], seed: number): { st: St; refusedAt: numbe
 }
 
 /** The triangle's three sides at `(facts, seed)`, with ∠C — every fact must verify `ok`. */
-function sides(facts: Fact3[], seed: number): { AB: number; AC: number; BC: number; angC: number } {
+function sides(facts: Fact3[], seed: Seed3): { AB: number; AC: number; BC: number; angC: number } {
   const d = derive3(facts, seed);
   for (const f of facts) expect(d.status[f.id], `seed ${seed}: «${f.utterance}»`).toBe('ok');
   const [A, B, C] = ['A', 'B', 'C'].map((id) => {

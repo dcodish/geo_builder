@@ -10,6 +10,7 @@
  *
  * No model is called (rule 2): the answers are canned and go through the real model-lane decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +25,7 @@ import { droppedPropertyWords3, propertyOccurrences3, PROPERTY_VOCABULARY3 } fro
 import type { Command3 } from '../engine/types';
 import { NEAR_MISS_ROWS } from '../../shell/__tests__/fixtures/honesty-rows';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const EMPTY: St = { facts: [], seed: 0 };
 
 /** The setup lines record deterministically; the last is unread by the grammar and answered with `answer`. */

@@ -23,6 +23,7 @@
  * artifact, and the report files it as unverified, never as a gap.
  */
 
+import type { Seed3 } from '../engine/components3';
 import { decideSteps3, type Fact3 } from '../store/store3';
 import { renameFacts3, swapSession3 } from '../store/rename3';
 import { decideDeterministic3, refusalCategory3 } from './decideDeterministic3';
@@ -71,7 +72,7 @@ const errorDetail = (e: unknown): string => (typeof e === 'string' ? e : ((e as 
  */
 export function replay3dSession(events: readonly LoggedEvent3[], budgetMs = 60_000): ReplayOutcome3[] {
   const out: ReplayOutcome3[] = [];
-  type St = { facts: Fact3[]; seed: number };
+  type St = { facts: Fact3[]; seed: Seed3 };
   let st: St = { facts: [], seed: 0 };
   let degraded = false;
   const history: St[] = [];

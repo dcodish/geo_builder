@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T22:26:31.265Z",
+  "seed": 0,
+  "seedParts": {
+    "solid-polygon4-EFGH": 1,
+    "solid-polygon4-QRST": 1
+  },
+  "facts": [
+    {
+      "utterance": "מרובע",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "solid",
+              "kind": "polygon4",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "טרפז",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "trapezoid",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "טרפז שווה שוקיים",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "trapezoid",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ],
+              "adj": "isosceles"
+            },
+            {
+              "type": "length-rel",
+              "a1": "#1",
+              "b1": "#3",
+              "rhs": {
+                "pair": [
+                  "#2",
+                  "#4"
+                ]
+              },
+              "c": 1,
+              "origin": "shape"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "טרפז ישר זווית",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "trapezoid",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ],
+              "adj": "right"
+            },
+            {
+              "type": "cos-angle",
+              "u": {
+                "kind": "pair",
+                "from": "#1",
+                "to": "#4"
+              },
+              "v": {
+                "kind": "pair",
+                "from": "#1",
+                "to": "#2"
+              },
+              "cos": 0,
+              "soft": true,
+              "ring": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ],
+              "origin": "shape"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מקבילית",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "parallelogram",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מלבן",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "rectangle",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מעוין",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "rhombus",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "ריבוע",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "square",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "דלתון",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 4,
+          "body": [
+            {
+              "type": "quad-shape",
+              "base": "kite",
+              "ids": [
+                "#1",
+                "#2",
+                "#3",
+                "#4"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

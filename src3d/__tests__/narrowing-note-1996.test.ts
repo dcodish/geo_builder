@@ -8,6 +8,7 @@
  * 3-D-only rows: #1915's (a right pyramid's base and a given typed before the circle), and the lifecycle — muting
  * the cause removes the note, a reload says what typing said.
  */
+import { seedNumber3, type Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import { derive3, type Fact3 } from '../store/store3';
@@ -22,7 +23,7 @@ import type { NarrowTranslate } from '../../shell/narrowing';
 const plain = (s: string) => s.replace(/[⁦-⁩]/g, '');
 const tHe = i18n3d.getFixedT('he') as unknown as NarrowTranslate;
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function play(lines: readonly string[]): { st: St; recorded: boolean } {
   let n = 0;
@@ -105,7 +106,7 @@ describe('#1996 — the note is derived: muting the cause removes it, a reload s
   it('«הציגו תצורה אחרת» keeps the note (it is a property of the givens, not of one drawing)', () => {
     const { st } = play(['מקבילית ABCD', 'ABCD חסום במעגל']);
     const circum = 'כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.';
-    for (const seed of [st.seed, st.seed + 1, st.seed + 2]) expect(notesOf({ ...st, seed })).toEqual([circum]);
+    for (const seed of [0, 1, 2].map((k) => seedNumber3(st.seed) + k)) expect(notesOf({ ...st, seed })).toEqual([circum]);
   }, 120_000);
 });
 

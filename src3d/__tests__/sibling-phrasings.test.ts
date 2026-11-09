@@ -8,6 +8,7 @@
  * `shell/__tests__/fixtures/sibling-phrasings/known-3d.json`, which only shrinks. `not-understood` is the
  * verdict the app escalates to the model — never called here (standing rule 2).
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, type Fact3, type Verdict3 } from '../store/store3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
@@ -33,7 +34,7 @@ function outcomeOf(v: Verdict3): Outcome {
 }
 
 const run3D: DecideRunner = (context, lines) => {
-  let s: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let s: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   for (const line of context) {
     const v = decideSubmit3(s, line);
     if (v.kind === 'record') s = { facts: v.facts, seed: v.seed };

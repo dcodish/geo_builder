@@ -13,6 +13,7 @@
  * is the perf canary, the twin of the 2-D `sampleStats.sweeps`. Positions were measured byte-identical
  * before/after on every `fixtures3/` figure at two seeds (57/57) — this is a pure-performance change.
  */
+import { seedNumber3 } from '../engine/components3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -55,15 +56,17 @@ describe('#863 — the pivot residual loop samples nothing', () => {
     const over: string[] = [];
     for (const f of files) {
       const r = load(f);
-      for (const seed of [r.seed, r.seed + 1]) {
+      for (const seed of [seedNumber3(r.seed), seedNumber3(r.seed) + 1]) {
         sampleStats.solidCalls = 0;
         narrowingStats3.solidCalls = 0;
-        derive3(r.facts, seed);
+        const solids = Math.max(1, derive3(r.facts, seed).construction.solids.length);
+        // #2764 (ADR-3D-454): the count is O(distinct keys), and each solid brings its own keys — nine separate shapes
+        // sample 368 per derive (92 per seed, as the same figure solved as one system does), so the ceiling is per solid
         // #1996 (ADR-3D-343): the forced-narrowing pass draws its OWN knowledge pool (claimSeeds × branches, the plan's
         // bar) and its subset folds — a separate, bounded consumer held to its own ceiling; the derive's pivot loop
         // (this lock's class) is held to CEILING without it
         const own = sampleStats.solidCalls - narrowingStats3.solidCalls;
-        if (own > CEILING) over.push(`${f}@${seed}=${own}`);
+        if (own > CEILING * solids) over.push(`${f}@${seed}=${own}`);
         if (narrowingStats3.solidCalls > NARROWING_CEILING) over.push(`${f}@${seed} narrowing=${narrowingStats3.solidCalls}`);
       }
     }

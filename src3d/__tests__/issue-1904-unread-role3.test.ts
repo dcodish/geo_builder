@@ -7,6 +7,7 @@
  * existing one-input-per-line message"*, *"Refuse it too"*; W22: *"Teach the lines"* — one line per role, a lock
  * driving the taught lines in 3-D. A taught pair is offered only when it is PROVED to record on the figure.
  */
+import type { Seed3 } from '../engine/components3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +20,7 @@ import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { dot3, norm3, sub3 } from '../engine/vec3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 let n = 0;
 const id = () => `r${n++}`;
 function run(lines: string[]): St {

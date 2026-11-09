@@ -11,6 +11,7 @@
  * (`decideSubmit3`) and the real notices (`derive3`, worded by `narrowingText3` / `errorText3` in the real i18n). Any
  * «adds nothing» notice (`already-known`) is reported as a note, so a row expecting none fails on it.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { errorText3 } from '../i18n/errorText3';
@@ -24,7 +25,7 @@ import { pairFaults, type PairGate } from '../../shell/__tests__/fixtures/quad-n
 const plain = (s: string) => s.replace(/[⁦-⁩‎‏]/g, '');
 const t = i18n3d.getFixedT('he') as unknown as NarrowTranslate;
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function play(steps: readonly string[]): { st: St; last: 'restates' | 'refines' | 'refused'; refusal?: string; earlierAccepted: boolean } {
   let st: St = { facts: [], seed: 0 };

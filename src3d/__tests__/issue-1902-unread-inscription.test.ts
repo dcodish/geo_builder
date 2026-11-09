@@ -13,13 +13,14 @@
  * (`dropped-given`); spelling correction is not ruled.
  */
 
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import { decideSteps3, type Fact3 } from '../store/store3';
 import { errorText3 } from '../i18n/errorText3';
 import he from '../i18n/locales/he.json';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const EMPTY: St = { facts: [], seed: 0 };
 
 function play(lines: string[]) {

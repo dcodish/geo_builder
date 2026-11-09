@@ -11,12 +11,13 @@
  *
  * Every submit goes through `decideSubmit3`, the real submit decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { claimSeeds } from '../engine/claims';
 import { freeDofCount3 } from '../engine/evaluate';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };

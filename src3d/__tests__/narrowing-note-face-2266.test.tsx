@@ -2,6 +2,7 @@
  * #2266 (ADR-W-180) — 3-D's forced-narrowing note gains the ⓘ and the suite's blue information strip, as 2-D has them.
  * Operator, 2026-10-16: *"2266 - A"*. The real App3, server-rendered over the real submit decision's figure.
  */
+import type { Seed3 } from '../engine/components3';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider } from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,7 +23,7 @@ vi.mock('../store/store3', async (importOriginal) => {
 /** The real App3 over the figure the real submit decision records for `lines`. */
 function page(lines: readonly string[]): string {
   let n = 0;
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   for (const line of lines) {
     const v = decideDeterministic3(st, line, () => `f${++n}`);
     if (v.kind !== 'record') throw new Error(`did not record: ${line}`);

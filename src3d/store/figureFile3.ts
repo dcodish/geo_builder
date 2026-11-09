@@ -11,6 +11,7 @@
  */
 
 import { nanoid } from 'nanoid';
+import { cleanSeed3, seedNumber3, seedPartsOf3, type Seed3 } from '../engine/components3';
 import { ingestTypedText } from '../../shell/bidi';
 import { figureTooLarge } from '../../shell/save';
 import { displayModeFromIndexed, displayModeToIndexed, type DisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -29,7 +30,14 @@ export interface FigureFile3 {
   savedAt?: string;
   /** The figure's name at save time (issue #42) - PROVENANCE only: on load the FILENAME wins. */
   name?: string;
+  /** The configuration's base number (#2764: every part without an entry in `seedParts` sits here). */
   seed: number;
+  /**
+   * #2764 ([ADR-3D-454](../../docs/06b-decisions-3d.md#adr-3d-454)) — where each independent part of the figure landed,
+   * by part key, written only when some part is not at `seed`. A sibling field, never an object in `seed`: a build
+   * that predates it ignores it and draws every part at `seed` instead of refusing the file.
+   */
+  seedParts?: Record<string, number>;
   facts: { utterance: string; cmds: Command3[]; enabled?: boolean }[];
   /** Data-panel queries (ADR-3D-057, #274) — questions about the figure, not facts; optional. */
   queries?: string[];
@@ -146,7 +154,7 @@ const COMMAND_TYPES = new Set<Command3['type']>(
 
 export function serializeFigure3(
   facts: Fact3[],
-  seed: number,
+  seed: Seed3,
   name?: string,
   queries: string[] = [],
   planeDisplay: PlaneDisplayMode3Map = {},
@@ -163,7 +171,7 @@ export function serializeFigure3(
  *  {@link serializeFigure3ForLink}. */
 function figureFile3Of(
   facts: Fact3[],
-  seed: number,
+  seed: Seed3,
   name: string | undefined,
   queries: string[],
   planeDisplay: PlaneDisplayMode3Map,
@@ -176,7 +184,11 @@ function figureFile3Of(
     app: '3d-builder',
     ...(savedAt ? { savedAt: savedAt.toISOString() } : {}),
     ...(name ? { name } : {}),
-    seed,
+    seed: seedNumber3(seed),
+    ...(() => {
+      const parts = seedPartsOf3(seed);
+      return parts ? { seedParts: { ...parts } } : {};
+    })(),
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
     ...(queries.length ? { queries } : {}),
     ...(Object.keys(planeDisplay).length ? { planeDisplay } : {}),
@@ -204,7 +216,7 @@ function figureFile3Of(
  */
 export function serializeFigure3ForLink(
   facts: Fact3[],
-  seed: number,
+  seed: Seed3,
   name?: string,
   queries: string[] = [],
   planeDisplay: PlaneDisplayMode3Map = {},
@@ -218,7 +230,7 @@ export type LoadResult3 =
   | {
       ok: true;
       facts: Fact3[];
-      seed: number;
+      seed: Seed3;
       queries: string[];
       planeDisplay: PlaneDisplayMode3Map;
       displayMode: DisplayModeMap;
@@ -268,7 +280,9 @@ export function deserializeFigure3(text: string): LoadResult3 {
   if (!Array.isArray(file.facts) || file.facts.length === 0) return { ok: false, reason: 'bad-file' };
   // #1379: more statements than any figure needs — refused BEFORE anything replays (shell/save).
   if (figureTooLarge(file.facts.length)) return { ok: false, reason: 'too-large' };
-  if (typeof file.seed !== 'number' || !Number.isFinite(file.seed)) return { ok: false, reason: 'bad-file' };
+  // #2764 (ADR-3D-454): the base must be a number; a malformed `seedParts` entry is dropped (that part sits at the base)
+  const seed = cleanSeed3(file.seed, file.seedParts);
+  if (seed === null) return { ok: false, reason: 'bad-file' };
 
   const facts: Fact3[] = [];
   for (const f of file.facts) {
@@ -296,7 +310,7 @@ export function deserializeFigure3(text: string): LoadResult3 {
   return {
     ok: true,
     facts,
-    seed: file.seed,
+    seed,
     queries,
     planeDisplay,
     displayMode: displayModeFromIndexed(file.displayMode, facts.map((f) => f.id)),

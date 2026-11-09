@@ -16,6 +16,7 @@ import { joinChoiceSeeds, splitChoiceSeed, assignmentAt } from '../engine/discre
 import { partIndexOf, partsOf } from '../engine/components';
 import { evaluateStats, type Seed } from '../engine/evaluate';
 import { cleanSeed } from '../store/useAnalyticStore';
+import { independentPartsSuite } from '../../shell/__tests__/fixtures/independent-parts-2764';
 
 const NINE = ['מרובע', 'טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית', 'מקבילית', 'מלבן', 'מעוין', 'ריבוע', 'דלתון'];
 
@@ -140,3 +141,28 @@ describe('#2737 — one choice seed, split across the parts and joined back', ()
   });
 });
 
+
+/**
+ * #2764 — the cross-builder lock (`shell/__tests__/fixtures/independent-parts-2764.ts`): the same nine lines, the same
+ * assertions as 3-D's, through analytic's own submit gate. The budget is this file's own (42 evaluations a line).
+ */
+let heldLines: string[] = [];
+let heldSeed: Seed = 0;
+independentPartsSuite('analytic', {
+  reset: () => {
+    heldLines = [];
+    heldSeed = 0;
+  },
+  type: (line) => {
+    const before = evaluateStats.uncached;
+    const v = decideSubmit(line, heldLines, heldSeed);
+    const work = evaluateStats.uncached - before;
+    if (v.kind === 'record') {
+      heldLines = [...heldLines, line];
+      heldSeed = v.configuration ?? heldSeed;
+    }
+    const points = new Map(derive(heldLines, heldSeed).figure.points.map((p) => [p.id, [p.x, p.y]] as const));
+    return { recorded: v.kind === 'record', work, points };
+  },
+  budget: Array(9).fill(42),
+});

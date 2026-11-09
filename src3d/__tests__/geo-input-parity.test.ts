@@ -11,6 +11,7 @@
  * The runner is `decideSubmit3`, the function `store3.submit` dispatches; a `record` carries its facts and
  * seed forward. `not-understood` is the verdict the app escalates to the model — never called here.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, type Fact3, type Verdict3 } from '../store/store3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
@@ -39,7 +40,7 @@ function verdictOf3D(v: Verdict3): StepVerdict {
 }
 
 const run3D: StepRunner = (steps) => {
-  let s: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let s: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   return steps.map((line) => {
     const v = decideSubmit3(s, line);
     if (v.kind === 'record') s = { facts: v.facts, seed: v.seed };

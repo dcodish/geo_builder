@@ -15,6 +15,7 @@
  * ADR-3D-358, refused it too.)
  * Everything runs through the real submit decision `decideSubmit3`.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { resolve3 } from '../engine/evaluate';
@@ -25,10 +26,10 @@ import { parse3 } from '../parser/parse3';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 type P3 = { x: number; y: number; z: number };
 
-function run(lines: readonly string[], seed: number) {
+function run(lines: readonly string[], seed: Seed3) {
   let st: St = { facts: [], seed };
   let lastMs = 0;
   for (let i = 0; i < lines.length; i++) {
@@ -61,7 +62,7 @@ const plain = (s: string | null): string => (s ?? '').replace(/[⁦-⁩]/g, '');
 const SEEDS_24 = Array.from({ length: 24 }, (_, i) => i);
 
 /** Refused on the LAST line with the forced-collapse wording, naming `stated` and `others`; the line was not added. */
-function refused(lines: readonly string[], seed: number, ring: string, others: readonly string[]): number {
+function refused(lines: readonly string[], seed: Seed3, ring: string, others: readonly string[]): number {
   const r = run(lines, seed);
   const last = lines.length - 1;
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[last]}» (got ${r.kind} at ${r.refusedAt})`).toBe(last);
@@ -73,7 +74,7 @@ function refused(lines: readonly string[], seed: number, ring: string, others: r
 }
 
 /** Builds at `seed`: every line records, every fact is ok. Returns the ring's area ratio. */
-function builds(lines: readonly string[], seed: number, ring: readonly string[]): number {
+function builds(lines: readonly string[], seed: Seed3, ring: readonly string[]): number {
   const r = run(lines, seed);
   expect(r.refusedAt, `seed ${seed}: «${lines[r.refusedAt]}» → ${JSON.stringify(r.error ?? r.kind)}`).toBe(-1);
   const d = derive3(r.st.facts, r.st.seed);

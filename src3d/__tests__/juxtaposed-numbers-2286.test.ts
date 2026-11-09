@@ -6,6 +6,7 @@
  * `not-understood`, handed to the model. Now `readStatement3` — the reader submit and the ✎ edit share — refuses them
  * with the suite's sentence (`shell/juxtaposedNumbers`), `guided`, never a model call.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
@@ -27,7 +28,7 @@ const segment = figure('קטע AB');
 const box = figure('תיבה ABCDEFGH');
 const empty = { facts: [] as Fact3[], seed: 0 };
 
-const ROWS: readonly [st: { facts: Fact3[]; seed: number }, line: string, text: string][] = [
+const ROWS: readonly [st: { facts: Fact3[]; seed: Seed3 }, line: string, text: string][] = [
   [segment, 'AB = 2 3', '2 3'],
   [box, 'AB = 2 3', '2 3'],
   [empty, 'A(2 3, 1, 0)', '2 3'],

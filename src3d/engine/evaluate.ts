@@ -44,7 +44,7 @@ import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scaleP
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, orientationStated3, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
@@ -56,6 +56,7 @@ import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, r
   bisectorDir3,
   lineCrossing3,
   ringSelfCrossing3} from './vec3';
+import { canonicalSeed3, partsOf3, seedNumber3, seedOfPart3, type Part3, type Seed3 } from './components3';
 import { baseRingOf, boundSolidDimCount3, concaveSeatVertices3, declaredRings3, quadDrawnDegenerate, quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -237,6 +238,9 @@ function polygon4ConcaveDims(key: string, seed: number, allowed: readonly number
   return [g[2].x, flip * g[2].y, g[3].x, flip * g[3].y];
 }
 
+/** #2764 (ADR-3D-454): solid `i`'s index in the WHOLE figure — itself, except inside a part (`partsOf3`). */
+export const wholeSolidIndex3 = (c: Construction3, i: number): number => c.partOf?.solidIndex[i] ?? i;
+
 /** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
 export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
   return [...solidDimsAll3(c, seed)[i]];
@@ -264,7 +268,8 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
       const seat = concave[i];
       const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
-      return i === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
+      // #2764 (ADR-3D-454): a part's solid keeps its index in the whole, so it is sampled as it is there
+      return wholeSolidIndex3(c, i) === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
     });
     bySeed.set(memoKey, all);
   }
@@ -566,8 +571,9 @@ export interface Resolved3 {
    * #1474 (ADR-3D-283) — the seed this configuration was resolved at: its GAUGE key. A consumer that
    * asks "is this value the same in the figure's OTHER configurations?" re-resolves at this seed with
    * an explicit `paramValue`, so the comparison moves the parameter's branch and nothing else.
+   * #2764 (ADR-3D-454): a figure of several parts carries the whole configuration, each part's entry included.
    */
-  seed: number;
+  seed: Seed3;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -1643,25 +1649,8 @@ function solidFloorFrame3(s: SolidObj, pos: Positions3): { p0: Vec3; e1: Vec3; e
   return { p0: pts[0], e1, e2: cross3(n, e1), n };
 }
 
-/**
- * #2630 (ADR-3D-400): has the student said anything about WHICH WAY the figure faces? That is a wider
- * question than {@link hasAbsoluteFrameObject} (is the placement itself a DOF, #367): a component given
- * on a pair or a vector («AB = (1,2,3)»), a plane equation, a component's sign or a coordinate
- * determination fixes the figure's turn against the axes without placing a point. The gauge
- * normalisation may turn only a figure for which this is false; turning any other one rewrites a
- * stated component (measured before this: «AB = (1,2,3)» with two lengths drew AB as (3.74, 0, 0)).
- */
-export function orientationStated3(c: Construction3): boolean {
-  return (
-    hasAbsoluteFrameObject(c) ||
-    c.pairPins.length > 0 ||
-    c.vectorPins.length > 0 ||
-    c.planePins.length > 0 ||
-    c.signGivens.length > 0 ||
-    c.componentSigns.length > 0 ||
-    c.determinations.some((d) => d.kind === 'coords')
-  );
-}
+/** #2630 / #2764 — moved to `types.ts` so the parts split (`components3.ts`) asks the SAME predicate; re-exported. */
+export { orientationStated3 };
 
 /** #367 / ADR-3D-435 — moved to `types.ts` (ADR-3D-453) so the scale given asks the SAME predicate; re-exported. */
 export { hasAbsoluteFrameObject };
@@ -2021,8 +2010,18 @@ const RESOLVE_MEMO_PER_FIGURE = 64;
 /** #2368 (ADR-3D-375): a plain resolve's pivot pools, in call order — replayed by its read-back image only. */
 const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
 
-/** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
-export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}): Resolved3 {
+/**
+ * Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes.
+ *
+ * #2764 ([ADR-3D-454](../../docs/06b-decisions-3d.md#adr-3d-454)): a figure of independent parts (`partsOf3`) is resolved
+ * PART BY PART — each part at its own entry of the configuration, on its own unknowns — and the parts' solved figures are
+ * joined, then turned onto the floor once (`drawnFrame3`, read from the first solid, which is in the first part). A figure
+ * of one part takes the path below, at its part's seed.
+ */
+export function resolve3(c: Construction3, seedIn: Seed3, opts: Resolve3Opts = {}): Resolved3 {
+  const parts = partsOf3(c);
+  if (parts.length > 1) return resolveParts3(c, parts, seedIn, opts);
+  const seed = seedOfPart3(seedIn, parts[0].key);
   // #1986 (ADR-3D-418): a coordinate letter whose default draw crosses a declared ring is drawn at a widened reach
   if (opts.paramValue === undefined && c.param) {
     const reached = ringReachValue3(c, seed);
@@ -2048,6 +2047,126 @@ export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}
   else solved = remember(solvedKey, resolveJoint3(c, seed, opts));
   if (opts.solvedFrame) return solved;
   return memo.get(base) ?? remember(base, drawnFrame3(c, solved));
+}
+
+/**
+ * #2764 (ADR-3D-454) — THE PARTS, each resolved alone in the solved frame and joined. Memoised on the whole figure under
+ * the seeds its parts are at (two spellings of one configuration share an entry); each part's own resolve is memoised on
+ * the part. A figure split into parts has no coordinate letter (`wholeFigure3`), so `paramValue` never reaches here.
+ */
+function resolveParts3(c: Construction3, parts: readonly Part3[], seed: Seed3, opts: Resolve3Opts): Resolved3 {
+  const at = parts.map((p) => seedOfPart3(seed, p.key));
+  const base = `parts:${at.join(',')}` + (opts.placementImage ? '|img' : '');
+  let memo = resolveMemo3.get(c);
+  if (!memo) resolveMemo3.set(c, (memo = new Map()));
+  const per = memo;
+  const remember = (key: string, out: Resolved3): Resolved3 => {
+    per.set(key, out);
+    if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
+    return out;
+  };
+  const solvedKey = `${base}|raw`;
+  let solved = per.get(solvedKey);
+  if (solved) resolveStats3.hits++;
+  else {
+    const partOpts: Resolve3Opts = { ...opts, solvedFrame: true };
+    const outs = parts.map((p, i) => resolve3(p.construction, at[i], partOpts));
+    const drawnAt = canonicalSeed3(seedNumber3(seed), Object.fromEntries(parts.map((p, i) => [p.key, at[i]])));
+    solved = remember(solvedKey, joinParts3(c, outs, drawnAt));
+  }
+  if (opts.solvedFrame) return solved;
+  return per.get(base) ?? remember(base, drawnFrame3(c, solved));
+}
+
+type Pivot3 = NonNullable<Resolved3['pivot']>;
+
+/**
+ * #2764 (ADR-3D-454) — ONE FIGURE FROM ITS PARTS' FIGURES. Every map is the union (positions in the whole's point order);
+ * the pivot's outcome is the parts' together: no solution if any part has none, each part's records side by side, and
+ * what the scalar pins consume summed (the parts share no unknown, so the ranks add).
+ */
+function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Resolved3 {
+  const positions: Positions3 = new Map();
+  for (const id of c.points.keys()) {
+    const p = rs.find((r) => r.positions.has(id))?.positions.get(id);
+    if (p) positions.set(id, p);
+  }
+  for (const r of rs) for (const [id, p] of r.positions) if (!positions.has(id)) positions.set(id, p);
+  const union = <K, V>(maps: readonly ReadonlyMap<K, V>[]): Map<K, V> => {
+    const out = new Map<K, V>();
+    for (const m of maps) for (const [k, v] of m) out.set(k, v);
+    return out;
+  };
+  const circleOrder = new Map(c.circles3.map((k, i) => [k.id, i]));
+  const pivots = rs.map((r) => r.pivot).filter((p): p is Pivot3 => p !== null);
+  const merged = <T>(pick: (p: Pivot3) => Record<string, T> | undefined): Record<string, T> | undefined => {
+    const found = pivots.map(pick).filter((x): x is Record<string, T> => x !== undefined);
+    return found.length === 0 ? undefined : Object.assign({}, ...found);
+  };
+  let pivot: Resolved3['pivot'] = null;
+  if (pivots.length > 0) {
+    const pinSymbols = merged((p) => p.pinSymbols);
+    const symRoots = merged((p) => p.symRoots);
+    const pointRoots = merged((p) => p.pointRoots);
+    const riderTs = merged((p) => p.riderTs);
+    const collapse = pivots.find((p) => p.collapse)?.collapse;
+    const scalarConsumed = pivots.some((p) => p.scalarConsumed)
+      ? () =>
+          pivots.reduce(
+            (acc, p) => {
+              const sc = p.scalarConsumed?.();
+              return { dims: acc.dims + (sc?.dims ?? 0), block: acc.block + (sc?.block ?? 0) };
+            },
+            { dims: 0, block: 0 },
+          )
+      : undefined;
+    const placementFreedom = pivots.some((p) => p.placementFreedom)
+      ? () =>
+          pivots.reduce<PlacementFreedom3>(
+            (acc, p) => {
+              const f = p.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3;
+              return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree };
+            },
+            { ...NO_PLACEMENT_FREEDOM3 },
+          )
+      : undefined;
+    pivot = {
+      solutions: Math.min(...pivots.map((p) => p.solutions)),
+      chosen: pivots[0].chosen,
+      err: Math.max(...pivots.map((p) => p.err)),
+      ...(pinSymbols ? { pinSymbols } : {}),
+      ...(symRoots ? { symRoots } : {}),
+      ...(pointRoots ? { pointRoots } : {}),
+      ...(riderTs ? { riderTs } : {}),
+      ...(collapse ? { collapse } : {}),
+      ...(scalarConsumed ? { scalarConsumed } : {}),
+      ...(placementFreedom ? { placementFreedom } : {}),
+    };
+  }
+  const first = rs[0];
+  return {
+    positions,
+    planes: union(rs.map((r) => r.planes)),
+    lines: union(rs.map((r) => r.lines)),
+    param: first.param,
+    pivot,
+    ratioSymbols: Object.assign({}, ...rs.map((r) => r.ratioSymbols)),
+    determined: union(rs.map((r) => r.determined)),
+    seed,
+    revolutions: rs.flatMap((r) => r.revolutions),
+    circles3: rs.flatMap((r) => r.circles3).sort((a, b) => (circleOrder.get(a.id) ?? 0) - (circleOrder.get(b.id) ?? 0)),
+    freePlaneDofs: union(rs.map((r) => r.freePlaneDofs)),
+    freeLineDofs: union(rs.map((r) => r.freeLineDofs)),
+    placementSampled: rs.some((r) => r.placementSampled),
+    placementSampledParts: {
+      translation: rs.some((r) => r.placementSampledParts.translation),
+      rotation: rs.some((r) => r.placementSampledParts.rotation),
+    },
+    freeVectors: first.freeVectors,
+    freeX: first.freeX,
+    freeHolds: rs.every((r) => r.freeHolds),
+    freeSyms: first.freeSyms,
+  };
 }
 
 /**
@@ -3375,7 +3494,7 @@ function drawnFrame3(c: Construction3, solved: Resolved3): Resolved3 {
   const planes = new Map([...solved.planes].map(([name, pl]) => [name, { ...pl, n: rot(pl.n), d: pl.d + dot3(pl.n, p0) }]));
   const lines = new Map([...solved.lines].map(([name, ln]) => [name, { ...ln, anchor: rot(sub3(ln.anchor, p0)), dir: rot(ln.dir) }]));
   // #1188 (ADR-3D-386): the free-vector pass runs at the drawn figure, as it always has
-  const fs3 = solveFreeVectors3(c, solved.seed, positions);
+  const fs3 = solveFreeVectors3(c, seedNumber3(solved.seed), positions);
   // #2684 (ADR-3D-421): a relation held in the solved frame that a stated component cannot follow keeps that frame
   if (solved.freeHolds && !fs3.holds) return solved;
   return { ...solved, positions, planes, lines, freeVectors: fs3.values, freeSyms: fs3.syms, freeX: fs3.x, freeHolds: fs3.holds };
@@ -3624,7 +3743,7 @@ export function openParamProbes3(c: Construction3, seed: number): number[] {
 }
 
 /** Evaluate every point's world position. Parents always precede children (apply enforces it). */
-export function evaluate3(c: Construction3, seed: number): Positions3 {
+export function evaluate3(c: Construction3, seed: Seed3): Positions3 {
   return resolve3(c, seed).positions;
 }
 
@@ -3675,7 +3794,9 @@ function evaluateSolidsAndPoints(
     }
   };
   if (!only) c.solids.forEach((solid, i) => {
-    const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
+    // #2764 (ADR-3D-454): a part's solid is laid out at its index in the whole
+    const wi = wholeSolidIndex3(c, i);
+    const origin = v3(wi * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
     const own = sampledSolidDims?.[i] ?? solidDimsAll3(c, seed)[i];
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
@@ -3685,9 +3806,9 @@ function evaluateSolidsAndPoints(
       else boundLater.set(i, dims);
       return;
     }
-    const nShape = i === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
+    const nShape = wi === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
     let ps = solidPositions(solid.kind, dims.slice(0, nShape), origin, solid.oblique);
-    if (i > 0) {
+    if (wi > 0) {
       // #1855 (ADR-3D-355): this solid's own similarity, about its canonical centroid
       const [ls, wx, wy, wz, tx, ty, tz] = dims.slice(nShape);
       const ctr = centroid3(ps);
@@ -4599,7 +4720,7 @@ export function checkInSpan(
  * gates WHICH sampled configuration may be shown. The measure keeps its DOF, and "show another
  * configuration" varies it inside the bound (see {@link firstSatisfyingSeed3}).
  */
-export function meetsRequirements3(c: Construction3, seed: number): boolean {
+export function meetsRequirements3(c: Construction3, seed: Seed3): boolean {
   const hard = c.requirements.filter((req) => req.kind !== 'quad-general');
   if (hard.length === 0) return true;
   const r = resolve3(c, seed);
@@ -4715,7 +4836,7 @@ export function possibleShapePreferences3(c: Construction3, from: number, prefs:
   return prefs.filter((req) => !samples.every((r) => preferenceFails3(req, r.positions, FORCED_SPECIAL_TOL)));
 }
 
-export function meetsShapePreferences3(c: Construction3, seed: number, prefs: readonly QuadPreference3[] = quadPreferences3(c)): boolean {
+export function meetsShapePreferences3(c: Construction3, seed: Seed3, prefs: readonly QuadPreference3[] = quadPreferences3(c)): boolean {
   // #817: ...and the preference no utterance states — a solid's faces should have real area. It joins
   // the PREFERENCE tier deliberately: a figure whose givens genuinely force a flat face must still
   // draw (the #615 fallback), it just must not be chosen while a real configuration is available.
@@ -4743,7 +4864,22 @@ export function meetsShapePreferences3(c: Construction3, seed: number, prefs: re
  * samples, not the budget, and lands on the seed the full sweep fell back to. Asked only on the failure path: a
  * figure whose first valid seed is preferred pays nothing new.
  */
-export function firstSatisfyingSeed3(c: Construction3, from = 0, budget = 200): number | null {
+export function firstSatisfyingSeed3(c: Construction3, from: Seed3 = 0, budget = 200): Seed3 | null {
+  const parts = partsOf3(c);
+  if (parts.length === 1) return firstSatisfyingSeedOf3(c, seedOfPart3(from, parts[0].key), budget);
+  // #2764 (ADR-3D-454): each part is judged and walked on its own, from its own entry. A part already drawn as it should
+  // be is answered by the first seed it is asked at, so nothing earlier moves when a line touches another part.
+  const entries: Record<string, number> = {};
+  for (const p of parts) {
+    const found = firstSatisfyingSeedOf3(p.construction, seedOfPart3(from, p.key), budget);
+    if (found === null) return null;
+    entries[p.key] = found;
+  }
+  return canonicalSeed3(seedNumber3(from), entries);
+}
+
+/** {@link firstSatisfyingSeed3} for one part: the walk over its plain seeds. */
+function firstSatisfyingSeedOf3(c: Construction3, from: number, budget: number): number | null {
   let fallback: number | null = null;
   let prefs = quadPreferences3(c);
   let guarded = false;

@@ -578,6 +578,10 @@ const SEEDED: SeededCorpus = {
   // later line paid the 200-seed sweep; «|SA| = 5» measured 244 s at f6c14ca2). The seed, the resolve counts and the
   // relation rows are asserted in engine3.test.ts; this is the build + drift net.
   'rectangle-then-square-2749.geo3.json': ['מלבן ABCD', 'ריבוע ABCD', 'קטע AS', '|SA| = 5'],
+  // #2764 (ADR-3D-454/455): the operator's nine separate shapes (before: the ninth line took 25.9 s and moved every earlier
+  // point). Saved with `seedParts`, so the corpus also loads the new file field. The per-line work, the stability and the
+  // round trips are asserted in issue-2764-independent-parts.test.ts; this is the build + drift + load net.
+  'nine-separate-shapes-2764.geo3.json': ['מרובע', 'טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית', 'מקבילית', 'מלבן', 'מעוין', 'ריבוע', 'דלתון'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

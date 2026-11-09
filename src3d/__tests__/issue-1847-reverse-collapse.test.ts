@@ -9,6 +9,7 @@
  * failure-path search, and when only a flat polygon could hold it the claim is refused as that collapse.
  * Everything runs through the App's real pre-LLM decision, `decideDeterministic3`.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
 import { derive3, type Fact3 } from '../store/store3';
@@ -21,8 +22,8 @@ const en = (k: string, o?: Record<string, unknown>) => i18n3d.getFixedT('en')(k,
 /** The locale wraps interpolated Latin runs in bidi isolates (U+2066–U+2069); compared without them. */
 const plain = (s: string | null): string => (s ?? '').replace(/[⁦-⁩]/g, '');
 
-function run(lines: readonly string[], seed: number) {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed };
+function run(lines: readonly string[], seed: Seed3) {
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed };
   let n = 0;
   for (let i = 0; i < lines.length; i++) {
     const v = decideDeterministic3(st, lines[i], () => `f${++n}`);
@@ -47,7 +48,7 @@ function ringArea(pos: ReadonlyMap<string, { x: number; y: number; z: number }>,
 }
 
 /** Refused on the LAST line as the (not forced) collapse, naming every one of `others`; the triangle stays open. */
-function refusesCollapse(lines: readonly string[], seed: number, others: readonly string[]): string {
+function refusesCollapse(lines: readonly string[], seed: Seed3, others: readonly string[]): string {
   const r = run(lines, seed);
   const last = lines.length - 1;
   expect(r.refusedAt, `seed ${seed}: refused at «${lines[last]}» (got ${r.kind} at ${r.refusedAt})`).toBe(last);

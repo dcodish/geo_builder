@@ -16,6 +16,7 @@
  *  (D) a trapezoid and a shape no quadrilateral can be at the same time are refused, either order.
  */
 
+import { seedNumber3, type Seed3 } from '../engine/components3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -40,7 +41,7 @@ const en = (k: string, o?: Record<string, unknown>) => plain(i18n3d.getFixedT('e
 const SIN1 = Math.sin(Math.PI / 180);
 const sinBetween = (u: Vec3, w: Vec3) => norm3(cross3(u, w)) / (norm3(u) * norm3(w));
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 type Outcome = { kind: string; error?: unknown };
 
 /** Submit each line through the 3-D deterministic lane; stop at the first line that does not record. */
@@ -60,11 +61,12 @@ function play(lines: readonly string[]): { st: St; outcomes: Outcome[] } {
 /** The App's «הציגו תצורה אחרת» walk: `count` configurations from the committed seed. */
 function walk(st: St, count: number): Derived3[] {
   const out: Derived3[] = [];
-  let seed: number | null = st.seed;
+  let seed: Seed3 | null = st.seed;
   for (let k = 0; k < count && seed !== null; k++) {
     out.push(derive3(st.facts, seed));
-    const d = derive3(st.facts, seed + 1);
-    seed = d.construction.requirements.length === 0 && !solidFaceCollapsed(d.construction, d.positions) ? seed + 1 : firstSatisfyingSeed3(d.construction, seed + 1);
+    const next: number = seedNumber3(seed) + 1;
+    const d = derive3(st.facts, next);
+    seed = d.construction.requirements.length === 0 && !solidFaceCollapsed(d.construction, d.positions) ? next : firstSatisfyingSeed3(d.construction, next);
   }
   return out;
 }

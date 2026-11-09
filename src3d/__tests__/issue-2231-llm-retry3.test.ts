@@ -2,13 +2,14 @@
  * #2231 ([ADR-W-189](../../docs/06w-decisions-workspace.md#adr-w-189)) — 3-D's one retry, through `escalate3Flow` with a mocked
  * model (standing rule 2), then the store's own decision on what came back: a label still lost is `dropped-given`.
  */
+import type { Seed3 } from '../engine/components3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { escalate3Flow } from '../app/escalate3Flow';
 import { escalate3 } from '../parser/llm3';
 import { decideSteps3, decideSubmit3, type Fact3 } from '../store/store3';
 
 const figure = () => {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed: 0 };
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed: 0 };
   for (const line of ['A(0,0,0)', 'B(4,0,0)', 'M(1,3,0)']) {
     const v = decideSubmit3(st, line);
     if (v.kind !== 'record') throw new Error(`«${line}»: ${v.kind}`);

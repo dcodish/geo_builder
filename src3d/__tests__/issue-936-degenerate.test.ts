@@ -11,6 +11,7 @@
  * What stays from #936, and is the part that matters: the boundary. A thin but real solid (41/50 and the near-miss
  * family) builds with no notice and no refusal, and no figure in the `fixtures3/` corpus is refused.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +22,7 @@ import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
 
 function run(lines: readonly string[], seed = 0) {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed };
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed };
   for (let i = 0; i < lines.length; i++) {
     const v = decideSubmit3(st, lines[i]);
     if (v.kind !== 'record') return { st, refusedAt: i, error: v.kind === 'refused' ? v.error : null };

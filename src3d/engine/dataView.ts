@@ -16,6 +16,7 @@
  */
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
+import { seedNumber3, type Seed3 } from './components3';
 import { givenText } from '../../shell/literal';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { knowledgeSamples3, letterIsGaugeLength3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
@@ -775,9 +776,13 @@ export function statedMagText(value: number, src?: string): string {
  * The ask lane keeps its own four (`querySeeds3`): merging them added one full resolve per panel (+130 % on the
  * fixture corpus), and with the leftover freedom sampled the fourth seed no longer decides that class.
  */
-export const panelSeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027];
+// #2764 (ADR-3D-454): sampled around the configuration's base number
+export const panelSeeds3 = (at: Seed3): number[] => {
+  const seed = seedNumber3(at);
+  return [seed, seed + 1013, seed + 2027];
+};
 
-export function dataView(c: Construction3, seed: number): DataPanel {
+export function dataView(c: Construction3, seed: Seed3): DataPanel {
   const seeds = panelSeeds3(seed);
   // #1474 (ADR-3D-283): the seeds cover the gauge, `knowledgeSamples3` every parameter branch at each —
   // so every agreement gate below reads ALL of `resolved`, never a fixed [0]/[1]/[2].

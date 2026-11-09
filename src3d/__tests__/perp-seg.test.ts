@@ -6,6 +6,7 @@
  * optional for a 3–4-point target run.
  */
 
+import { seedNumber3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { derive3, useGeo3 } from '../store/store3';
@@ -95,7 +96,7 @@ describe('issue #14 — the exact prod sequence (session 4wmcbqbl): SM ⊥ DB DR
     submit('SA גובה');
     submit('M אמצע אלכסון BD');
     submit('SM ⊥ DB');
-    for (const seed of [state().seed, state().seed + 1, state().seed + 2]) {
+    for (const seed of [0, 1, 2].map((k) => seedNumber3(state().seed) + k)) {
       const d = derive3(state().facts, seed);
       const pos = d.positions;
       const S = pos.get('S')!, M = pos.get('M')!, D = pos.get('D')!, B = pos.get('B')!;

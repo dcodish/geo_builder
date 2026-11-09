@@ -16,6 +16,7 @@
 
 import { openParamProbes3, paramConfigValues3, resolve3, type Resolved3 } from './evaluate';
 import type { Construction3, Id } from './types';
+import { seedNumber3 } from './components3';
 import { coincidentPairs } from '../../shell/converge';
 import { add3, dist3, dot3, norm3, scale3, sub3, type Vec3 } from './vec3';
 
@@ -141,8 +142,10 @@ function configurations3(c: Construction3, resolved: Resolved3): Resolved3[] | n
   if (!c.param || !resolved.param) return [resolved];
   const drawn = resolved.param.value;
   if (!Number.isFinite(drawn)) return null;
-  const pool = paramConfigValues3(c, resolved.seed, resolved);
-  const others = (pool.length > 0 ? pool : openParamProbes3(c, resolved.seed)).filter((v) => v !== drawn);
+  // #2764: a figure with a coordinate letter is never split into parts (`wholeFigure3`), so its seed is one number
+  const seed = seedNumber3(resolved.seed);
+  const pool = paramConfigValues3(c, seed, resolved);
+  const others = (pool.length > 0 ? pool : openParamProbes3(c, seed)).filter((v) => v !== drawn);
   return [resolved, ...others.map((v) => resolve3(c, resolved.seed, { paramValue: v }))];
 }
 

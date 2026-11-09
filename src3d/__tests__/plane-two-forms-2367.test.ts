@@ -9,6 +9,7 @@
  * Q2 the simplest point; Q3 no letter on the row («π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)» "is perfect");
  * Q4 nicer numbers where possible.
  */
+import type { Seed3 } from '../engine/components3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +18,7 @@ import { answerQuery } from '../engine/queries';
 import { deserializeFigure3 } from '../store/figureFile3';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 const BOX = "תיבה ABCDA'B'C'D'";
 const T45 = [BOX, 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"];
 

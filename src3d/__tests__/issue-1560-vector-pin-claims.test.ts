@@ -11,6 +11,7 @@
  *
  * Every verdict goes through `decideSubmit3`, the real submit decision.
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -23,7 +24,7 @@ import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 import { emptyConstruction3, type Claim3, type Command3, type Construction3 } from '../engine/types';
 import { foldedSequences } from './foldedSequences';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };
@@ -36,7 +37,7 @@ function build(lines: readonly string[]): St {
 }
 
 /** The figure's actual vector from→to at a seed. */
-const vecAt = (facts: Fact3[], from: string, to: string, seed: number): number[] => {
+const vecAt = (facts: Fact3[], from: string, to: string, seed: Seed3): number[] => {
   const pos = derive3(facts, seed).positions;
   const a = pos.get(from);
   const b = pos.get(to);

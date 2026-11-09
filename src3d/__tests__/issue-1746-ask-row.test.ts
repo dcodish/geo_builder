@@ -12,12 +12,13 @@
  * compile without a case that asserts its JOINED row text. Every statement goes through `decideSubmit3`
  * (the real submit decision), every question through `answerQuery` (the real ask lane).
  */
+import type { Seed3 } from '../engine/components3';
 import { describe, expect, it } from 'vitest';
 import { decideSubmit3, derive3, type Fact3 } from '../store/store3';
 import { answerQuery, type QueryKind3 } from '../engine/queries';
 import { dataView } from '../engine/dataView';
 
-type St = { facts: Fact3[]; seed: number };
+type St = { facts: Fact3[]; seed: Seed3 };
 
 function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };

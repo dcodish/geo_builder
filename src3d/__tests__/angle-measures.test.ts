@@ -8,6 +8,7 @@
  * did not make equal. A stated given silently dropped.
  */
 
+import { seedNumber3 } from '../engine/components3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { derive3, useGeo3 } from '../store/store3';
@@ -154,7 +155,7 @@ describe('ADR-3D-053 — numeric BOUNDS on an angle (#273)', () => {
   it('the angle keeps its DOF — a bound restricts, it does not determine', () => {
     const { st, construction } = build([PYRAMID, '60 < ∠SAB < 70']);
     const seen = new Set<string>();
-    for (let s = st.seed; s < st.seed + 40; s++) {
+    for (let s = seedNumber3(st.seed); s < seedNumber3(st.seed) + 40; s++) {
       const { positions } = resolve3(construction, s);
       const a = deg(positions, 'A', 'S', 'B');
       if (a > 60 && a < 70) seen.add(a.toFixed(2));
