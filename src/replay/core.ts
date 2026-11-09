@@ -18,6 +18,7 @@ import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
+import { reachImpossibility } from '@/engine/reachFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
@@ -2740,6 +2741,9 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // residual moves (the figure still flexes), which is not whether it can reach zero; the law of
   // cosines proves it cannot.
   if (obtuseSideImpossibility(probe.objects, probe.constraints)) return false;
+  // #2797 (ADR-817): the reach member — a rider of a fixed ray or circle stated at a distance it can never reach. The
+  // residual moves (the rider's free parameter moves it), which is not whether it can reach zero.
+  if (reachImpossibility([...probe.constraints, ...drivenConstraintsOf(probe)]) && !reachImpossibility([...cur.constraints, ...drivenConstraintsOf(cur)])) return false;
   // #1470 (ADR-549): the side twin — a stated side and a statement that structurally puts the point
   // elsewhere. No later given can move a point off the circle it rides.
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;

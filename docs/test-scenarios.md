@@ -2332,3 +2332,7 @@ over all four (ADR-041).
 ### `issue-2151-tangent-from-inside` — «מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» is refused naming both statements (#2151, ADR-814)
 
 **Guards against:** a tangent from a point stated inside the circle being built until its scaffold circle fails (an internal id, the floor sentence) or committing with the circle shrunk. **Asserts** the refusal names «tangent from P to circle O» and «P inside circle O», no `tanaux`, P still inside; the «PA ו-PB» form in both orders; the outside control builds.
+
+### `pentagon-impossible-closing-side-refuses` — «מחומש ABCDE» · … · ∠CDE = 100° · «EA = 1» is refused naming the statement, never parked as waiting (#2797, ADR-817)
+
+**Guards against:** a closing side no configuration reaches (E rides the ray from D and comes no closer to A than 2.11) committed as a red «waiting for givens» row once the solver samples the pentagon's free side. **Asserts** the seven lines build green; «EA = 1» is refused by the gate as an over-constraint naming |EA| = 1; «EA = 4.5» commits.
