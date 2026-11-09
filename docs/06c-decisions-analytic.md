@@ -14052,6 +14052,8 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 
 ## ADR-AG-346 — A line stated again gets one verdict in every spelling: a new name for a drawn line is refused with the naming sentence offered (#2584)
 
+> **⚠ Ruled to change — superseded in part by [ADR-W-200](06w-decisions-workspace.md#adr-w-200)** (operator 2026-11-09, #2790, answering Q-2790a: **"b"** — a line already drawn, restated under a new name («l2 אנך אמצעי ל-EK»), is accepted as its own row with the «already exists» notice, and that row gives the line its name): the T32 refusal with the naming sentence offered is to go. This entry holds until #2790 lands.
+
 **Date:** 2026-10-28 · **Status:** accepted · bug #2584, fix round #2585 stream E, on PR #2574's branch `feat/1138-construction-locus`. **Withdraws decision 4 of [ADR-AG-341](#adr-ag-341)** (the rename-in-place). LADDER stage: none — the M1 boundary (both line-twin arms, `name-line-object`), the parser and the submit path.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R182 (a line named by its description; the restated line refused). · **Design:** [04c](04c-design-analytic.md), "The exam's own questions, and its named lines".
