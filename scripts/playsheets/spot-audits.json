@@ -170,35 +170,6 @@
         "הישר y=5 משיק למעגל בנקודה K"
       ],
       "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
-    },
-    {
-      "sheet": "round-2786",
-      "id": "T9",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "קובייה ABCDA'B'C'D'",
-        "AB ∥ AD"
-      ],
-      "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row."
-    },
-    {
-      "sheet": "round-2786",
-      "id": "T8",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "A(0,0,0)",
-        "B(3,0,0)",
-        "AB = 3"
-      ],
-      "lookFor": "Two rows, the note, no segment AB and no «3» label."
     }
   ],
   "results": [
@@ -613,6 +584,41 @@
       "pass": true,
       "date": "2026-11-09",
       "note": "all pass"
+    },
+    {
+      "sheet": "round-2786",
+      "id": "T8",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "A(0,0,0)",
+        "B(3,0,0)",
+        "AB = 3"
+      ],
+      "lookFor": "Two rows, the note, no segment AB and no «3» label.",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all tests pass (operator 2026-11-09)"
+    },
+    {
+      "sheet": "round-2786",
+      "id": "T9",
+      "kind": "3d:assertion",
+      "queued": "2026-11-09",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "AB ∥ AD"
+      ],
+      "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
+      "pass": true,
+      "date": "2026-11-09",
+      "note": "all tests pass (operator 2026-11-09)"
     }
   ],
   "demoted": {}
