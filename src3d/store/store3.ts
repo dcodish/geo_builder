@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -698,6 +698,67 @@ function spellsLetters3(utterance: string, ids: readonly string[]): boolean {
   });
 }
 
+/**
+ * #116 / #424 / #1918 (M4 defaults-yield) — THE ENTRY ONE COMMAND MAKES IN A DEFAULTS-YIELD REGISTRY of `derive3`: an
+ * explicit right angle (its three labels, vertex first), an explicit equal pair spanning three labels (a triangle's side
+ * pair), or a stated segment ∥ (`[a, b, c, d]` for ab ∥ cd). A shape's own lowered relation (`soft`, `origin`) makes none.
+ * One reader, so the fold that retires a default and the #2341 rule that asks whether a line touches one
+ * ({@link touchesDefault3}) cannot drift apart.
+ */
+function yieldEntry3(cmd: Command3): { kind: 'right' | 'equal'; labels: string[] } | { kind: 'parallel'; pairs: [string, string, string, string] } | null {
+  if (cmd.type === 'cos-angle' && !cmd.soft && Math.abs(cmd.cos) < 1e-9 && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' && cmd.u.from === cmd.v.from)
+    return { kind: 'right', labels: [cmd.u.from, cmd.u.to, cmd.v.to] };
+  if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
+    return { kind: 'right', labels: [cmd.claim.a1, cmd.claim.b1, cmd.claim.b2] };
+  if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9)
+    return { kind: 'right', labels: [cmd.claim.vertex, cmd.claim.p, cmd.claim.q] };
+  if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
+    const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
+    return labels.size === 3 ? { kind: 'equal', labels: [...labels] } : null;
+  }
+  if (cmd.type === 'mutual-rel' && cmd.rel === 'parallel' && !cmd.origin && cmd.a.kind === 'segment' && cmd.b.kind === 'segment')
+    return { kind: 'parallel', pairs: [cmd.a.a, cmd.a.b, cmd.b.a, cmd.b.b] };
+  return null;
+}
+
+/**
+ * #2341 (ADR-3D-449) — DOES THIS LINE SPEAK TO A DEFAULT? A right angle, an equal pair or a ∥ that names what an earlier
+ * row's DEFAULT reading assumed (a right triangle's soft right angle, an isosceles triangle's soft equal pair, a
+ * trapezoid's parallel pair) turns that default into a given: the fold reads later lines differently once it is stated
+ * («טרפז ABCD» · «AB ∥ DC» · «AD ∥ BC» is a parallelogram; without the middle line the last one re-seats the trapezoid).
+ * So it is information even where every sample already agrees, as in 2-D (ADR-605: a given true only by the tool's
+ * default records). Read with {@link yieldEntry3}, the fold's own registry reader.
+ */
+function touchesDefault3(facts: readonly Fact3[], cmds: readonly Command3[]): boolean {
+  const key = (labels: readonly string[]) => [...labels].sort().join('');
+  const same = (p: readonly string[], q: readonly string[]) => (p[0] === q[0] && p[1] === q[1]) || (p[0] === q[1] && p[1] === q[0]);
+  // a ⟂ between two pairs that share one point states the right angle at it, whichever way the pairs are written
+  // («AB ⟂ BC» is the corner at B, as «BA ⟂ BC» is)
+  const corner = (k: Command3): ReturnType<typeof yieldEntry3> => {
+    if (k.type !== 'cos-angle' || k.soft || k.origin || Math.abs(k.cos) >= 1e-9 || k.u.kind !== 'pair' || k.v.kind !== 'pair') return null;
+    const [p, q] = [[k.u.from, k.u.to], [k.v.from, k.v.to]];
+    const at = p.filter((x) => q.includes(x));
+    return at.length === 1 ? { kind: 'right', labels: [at[0], ...p.filter((x) => x !== at[0]), ...q.filter((x) => x !== at[0])] } : null;
+  };
+  const entries = cmds.map((k) => yieldEntry3(k) ?? corner(k)).filter((y) => y !== null);
+  if (entries.length === 0) return false;
+  const prior = facts.filter((f) => f.enabled).flatMap((f) => f.cmds);
+  return entries.some((y) => {
+    if (y.kind !== 'parallel')
+      return y.kind === 'right'
+        ? prior.some((k) => k.type === 'cos-angle' && k.soft && k.u.kind === 'pair' && k.v.kind === 'pair' &&
+            (k.ring ? k.ring.includes(y.labels[0]) : key([k.u.from, k.u.to, k.v.to]) === key(y.labels)))
+        : prior.some((k) => k.type === 'length-rel' && k.soft && 'pair' in k.rhs && key([...new Set([k.a1, k.b1, ...k.rhs.pair])]) === key(y.labels));
+    const rings = prior.flatMap((k) =>
+      k.type === 'quad-shape' && k.base === 'trapezoid' ? [k.ids] : k.type === 'solid' && QUAD_PYRAMIDS[k.kind]?.base === 'trapezoid' ? [k.ids.slice(0, 4)] : []);
+    const [a, b, c, d] = y.pairs;
+    return rings.some((r) => {
+      const side = (i: number) => [r[i], r[(i + 1) % 4]];
+      return [0, 1].some((i) => (same([a, b], side(i)) && same([c, d], side(i + 2))) || (same([c, d], side(i)) && same([a, b], side(i + 2))));
+    });
+  });
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
   const hit = per?.get(seed);
@@ -871,17 +932,9 @@ function deriveCore3(
   for (const f of facts) {
     if (!f.enabled) continue;
     for (const cmd of f.cmds) {
-      if (cmd.type === 'cos-angle' && !cmd.soft && Math.abs(cmd.cos) < 1e-9 && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' && cmd.u.from === cmd.v.from)
-        addRight([cmd.u.from, cmd.u.to, cmd.v.to]);
-      if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
-        addRight([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]);
-      if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9)
-        addRight([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]);
-      // an explicit |xy| = |zw| whose two pairs span exactly THREE labels names a triangle's side pair
-      if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
-        const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
-        if (labels.size === 3) explicitEqualSides.add(key3([...labels]));
-      }
+      const y = yieldEntry3(cmd);
+      if (y?.kind === 'right') addRight(y.labels);
+      if (y?.kind === 'equal') explicitEqualSides.add(key3(y.labels));
     }
   }
   /**
@@ -894,9 +947,10 @@ function deriveCore3(
   const statedParallels: [string, string, string, string][] = [];
   for (const f of facts) {
     if (!f.enabled) continue;
-    for (const cmd of f.cmds)
-      if (cmd.type === 'mutual-rel' && cmd.rel === 'parallel' && !cmd.origin && cmd.a.kind === 'segment' && cmd.b.kind === 'segment')
-        statedParallels.push([cmd.a.a, cmd.a.b, cmd.b.a, cmd.b.b]);
+    for (const cmd of f.cmds) {
+      const y = yieldEntry3(cmd);
+      if (y?.kind === 'parallel') statedParallels.push(y.pairs);
+    }
   }
   const reseated = (ring: readonly string[]): boolean => trapezoidRingInForce3(ring, statedParallels)[0] !== ring[0];
   const seated = (cmd: Command3): Command3 => {
@@ -2859,7 +2913,7 @@ export function decideCommands3(
   const named = toolLetterTakenOver3(candidate, fact.id, seed);
   if (named) [candidate, derived, status] = [named.facts, named.derived, named.derived.status[fact.id]];
   if (opts.twins) {
-    const twin = knownSegmentEquationTwin3(facts, seed, fact, derived);
+    const twin = knownSegmentEquationTwin3(facts, seed, fact, derived) ?? impliedByPrior3(facts, seed, fact, derived);
     if (twin) return { kind: 'already-stated', twin, facts };
   }
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
@@ -2895,20 +2949,117 @@ function knownSegmentEquationTwin3(facts: readonly Fact3[], seed: number, fact: 
       ? { type: 'length-rel', a1: cmd.from, b1: cmd.to, a2, b2, c: k }
       : { type: 'vec-eq', lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], rhs: [{ coeff: k, atom: { kind: 'pair', from: a2, to: b2 } }] };
   if (!verifyClaim(claim, derive3(facts as Fact3[], seed).construction, seed)) return null;
-  const ids = [cmd.from, cmd.to, a2, b2];
+  return knownTwin3(facts, [cmd.from, cmd.to, a2, b2]);
+}
+
+/** Every string a value holds, wherever it sits in its shape (the ids a command names, among its other words). */
+const stringsIn3 = (v: unknown, into = new Set<string>()): Set<string> => {
+  if (typeof v === 'string') into.add(v);
+  else if (Array.isArray(v)) v.forEach((x) => stringsIn3(x, into));
+  else if (typeof v === 'object' && v !== null) Object.values(v).forEach((x) => stringsIn3(x, into));
+  return into;
+};
+
+/** The row an «already known» answer stands for: the latest enabled line naming every point of the statement (the line
+ *  that already says it), else the latest enabled line. Always enabled, so nothing is re-enabled. */
+function knownTwin3(facts: readonly Fact3[], ids: readonly string[]): Fact3 | null {
+  const enabled = facts.filter((f) => f.enabled);
   const names = (f: Fact3): boolean => {
-    const seen = new Set<string>();
-    const walk = (v: unknown): void => {
-      if (typeof v === 'string') seen.add(v);
-      else if (Array.isArray(v)) v.forEach(walk);
-      else if (typeof v === 'object' && v !== null) Object.values(v).forEach(walk);
-    };
-    walk(f.cmds);
+    const seen = stringsIn3(f.cmds);
     return ids.every((id) => seen.has(id));
   };
-  const enabled = facts.filter((f) => f.enabled);
   return [...enabled].reverse().find(names) ?? enabled[enabled.length - 1] ?? null;
 }
+
+/**
+ * #2341 ([ADR-3D-449](../../docs/06b-decisions-3d.md#adr-3d-449), operator ruling 2026-11-06: *"In all cases it should say
+ * כבר קיים"*; [judged] Q-2341, 2026-11-09) — A STATEMENT THE FIGURE ALREADY HOLDS IS ALREADY KNOWN. The 3-D twin of
+ * 2-D's `implied`: the line, applied after the figure, changes nothing the earlier givens did not already decide.
+ * Judged on the candidate fold the decision already paid, against the figure before the row, in three parts:
+ *  - (a) NOTHING NEW. Every part of the construction other than what a STATEMENT adds (its claims, pins, mutual
+ *    requirements, memberships: {@link STATEMENT_PARTS3}) keeps its size: no new point, line, plane, solid, circle,
+ *    vector, letter, mark, sign, angle bound or scale given. The ink a statement draws over its own operands (a segment,
+ *    a point-run plane's patch, ADR-3D-148) is not a new object: the judged «A(0,0,0)» · «B(3,0,0)» · «AB = 3» is
+ *    already known. The line must state something (a line that only draws is a drawing request), must not declare a
+ *    shape (a polygon over existing points names a face; its restatement is `ringRestatementTwin3`'s), and must not
+ *    speak to a DEFAULT reading ({@link touchesDefault3}: «טרפז ABCD» · «AB ∥ DC» turns the noun's default pair into a
+ *    given, as 2-D records it).
+ *  - (b) EVERY ADMISSIBLE CONFIGURATION UNCHANGED. In every sample the claim verifier reads (every claim seed × every
+ *    branch, `knowledgeSamples3`), every point, plane and line sits where it sat without the row, and every other row
+ *    keeps its status. A pin that already holds moves nothing; one that pins a free magnitude moves the sampled figure
+ *    («AB = 3» on a free triangle), so it commits, as the ruling's scope says. The row's own claims verified on the
+ *    candidate (its status is `ok`), whose samples are the prior ones, so they hold on the figure before the row.
+ *  - (c) its stated MUTUAL position (a skew pair, the open half of a crossing) holds at every claim seed: a requirement
+ *    moves nothing, so the samples cannot see it. A sign or an angle bound is not judged at all (a): it SELECTS among
+ *    configurations, and no sample set shows that every admissible one obeys it.
+ * Something that holds only at the drawn seed differs in another sample and commits. Cost (measured in ADR-3D-449): the
+ * prior samples (memoised by `resolve3`) and the candidate's (already resolved by its own claim verification), paid
+ * only after (a) passes. The model lane asks without it (`opts.twins`), as it asks without every twin rule.
+ */
+function impliedByPrior3(facts: readonly Fact3[], seed: number, fact: Fact3, derived: Derived3): Fact3 | null {
+  if (facts.length === 0 || derived.status[fact.id] !== 'ok') return null;
+  // a line that only draws, or that DECLARES a shape (a polygon over existing points names a face: its restatement is
+  // `ringRestatementTwin3`'s), is never "already known"
+  if (statementsOf3(fact.cmds).length === 0 || fact.cmds.some((k) => k.type === 'solid')) return null;
+  if (touchesDefault3(facts, fact.cmds)) return null; // it turns a default reading into a given
+  const prior = derive3(facts as Fact3[], seed);
+  const was = prior.construction;
+  const now = derived.construction;
+  const size = (v: unknown): number | null => (v instanceof Map || v instanceof Set ? v.size : Array.isArray(v) ? v.length : null);
+  let stated = false;
+  for (const key of Object.keys(now) as (keyof Construction3)[]) {
+    const a = size(was[key]);
+    const b = size(now[key]);
+    if (a === null || b === null) {
+      if (was[key] !== now[key]) return null; // the figure's parameter, or any part with no size: a new object
+      continue;
+    }
+    if (a === b) continue;
+    if (!STATEMENT_PARTS3.has(key)) return null;
+    // an angle bound selects among configurations: the samples can never show that every admissible one obeys it
+    const bounds = (c: Construction3) => c.requirements.filter((r) => r.kind !== 'mutual').length;
+    if (key === 'requirements' && bounds(now) !== bounds(was)) return null;
+    if (!STATEMENT_INK3.has(key)) stated = true;
+  }
+  if (!stated) return null;
+  if (facts.some((f) => prior.status[f.id] !== derived.status[f.id])) return null;
+  const close = (p: Vec3 | undefined, q: Vec3 | undefined): boolean => {
+    if (!p || !q) return p === q;
+    const u = [p.x, p.y, p.z];
+    const v = [q.x, q.y, q.z];
+    if (u.some(Number.isNaN) || v.some(Number.isNaN)) return u.every((x, i) => Object.is(x, v[i]));
+    return Math.hypot(u[0] - v[0], u[1] - v[1], u[2] - v[2]) <= IMPLIED_TOL3 * Math.max(1, Math.hypot(...u));
+  };
+  const sameSample = (r: Resolved3, q: Resolved3): boolean =>
+    r.positions.size === q.positions.size &&
+    [...r.positions].every(([id, p]) => close(p, q.positions.get(id))) &&
+    // a point-run plane the line materialises (ADR-3D-148) is new in the candidate and sits on points already compared
+    [...r.planes].every(([id, pl]) => {
+      const ql = q.planes.get(id);
+      return !!ql && close({ ...pl.n }, { ...ql.n }) && Math.abs(pl.d - ql.d) <= IMPLIED_TOL3 * Math.max(1, Math.abs(pl.d));
+    }) &&
+    [...r.lines].every(([id, ln]) => {
+      const ql = q.lines.get(id);
+      return !!ql && close(ln.anchor, ql.anchor) && close(ln.dir, ql.dir);
+    });
+  for (const s of claimSeeds(seed)) {
+    const before = knowledgeSamples3(was, [s]);
+    const after = knowledgeSamples3(now, [s]);
+    if (before.length !== after.length || !before.every((r, i) => sameSample(r, after[i]))) return null;
+    if (now.requirements.length > was.requirements.length && !meetsRequirements3(now, s)) return null;
+  }
+  return knownTwin3(facts, [...stringsIn3(fact.cmds)].filter((id) => was.points.has(id)));
+}
+/** How far apart two samples may sit and still be the same figure: the fold's own solve noise, relative. */
+const IMPLIED_TOL3 = 1e-7;
+/** The parts of a construction a STATEMENT about existing objects adds to (`impliedByPrior3` (a)); every other part is an object.
+ *  A sign («a חיובי», «k > 0») is left out on purpose: like an angle bound it selects among configurations, so it commits. */
+const STATEMENT_PARTS3: ReadonlySet<keyof Construction3> = new Set<keyof Construction3>([
+  'claims', 'requirements', 'scalarPins', 'pairPins', 'planePins', 'pins', 'vectorPins', 'paramGivens', 'determinations',
+  'lineRels', 'coordPlanePins', 'planeLinePerps', 'linePerps', 'memberships', 'onLines', 'segments', 'pointPlanes',
+]);
+/** ...and of those, the ink a statement draws over its own operands: drawing it says nothing on its own. */
+const STATEMENT_INK3: ReadonlySet<keyof Construction3> = new Set<keyof Construction3>(['segments', 'pointPlanes']);
 
 /** One step of the fact list, by object identity, so a prefix shared between two commits is one node (the claim-lead memo). */
 interface LeadNode3 {

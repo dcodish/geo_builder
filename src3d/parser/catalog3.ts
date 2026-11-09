@@ -229,7 +229,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'A נקודת החיתוך של ℓ עם π1', en: 'A is the intersection of ℓ and π1' },
   { category: 'planesLines', he: 'הישר ℓ1 חותך את מישור ACD בנקודה E', en: 'line ℓ1 cuts plane ACD at E' },
   { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
-  { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes', needs: { he: ['מישור π1', 'A על המישור π1'], en: ['plane π1', 'A on plane π1'] } },
+  { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes', needs: { he: ['המישור π1: z - 3 = 0', 'המישור π2: ay + z - 8 = 0', 'הזווית בין המישורים π1 ו-π2 היא 45', 'A(2,-2,6)'], en: ['plane π1: z - 3 = 0', 'plane π2: ay + z - 8 = 0', 'the angle between planes π1 and π2 is 45', 'A(2,-2,6)'] } }, // #2341 (ADR-3D-449): the 2022 exam's figure, where the sentence picks the branch a = −1 (on «A על המישור π1» it was already known)
   { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },
   // S2 (#378, ADR-3D-103): the NAMED-LINE column — point-on-ℓ short forms + ∥/⟂/angle with a
   // named-line operand (segment / vector / second line / named plane / point-run plane)

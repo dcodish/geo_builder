@@ -27,6 +27,13 @@ function build(lines: readonly string[]): St {
   let st: St = { facts: [], seed: 0 };
   for (const l of lines) {
     const v = decideSubmit3(st, l);
+    // #2341 (ADR-3D-449): a held given typed today is «כבר קיים»; kept as the row a save holds, so the canvas reads it
+    if (v.kind === 'already-stated') {
+      const p = parse3(l);
+      if (!p.ok) throw new Error(l);
+      st = { ...st, facts: [...st.facts, { id: `saved-${st.facts.length}`, utterance: l, cmds: p.commands, enabled: true }] };
+      continue;
+    }
     if (v.kind !== 'record') throw new Error(`setup line «${l}» did not record: ${JSON.stringify(v)}`);
     st = { facts: v.facts, seed: v.seed };
   }
@@ -60,28 +67,29 @@ describe('#1573 — on a FIXED figure a vertex angle is the angle at the vertex'
     `∠DAB = ${deg}`, // the mirrored arms state the same corner
     `angle BAD is ${deg}`,
   ];
-  for (const line of vertexSpellings(135)) it(`the TRUE «${line}» records`, () => expect(verdict(build(OBTUSE), line)).toBe('record'));
+  // #2341 (ADR-3D-449): on a FIXED figure a TRUE angle is already known — «כבר קיים», never refused
+  for (const line of vertexSpellings(135)) it(`the TRUE «${line}» is already known`, () => expect(verdict(build(OBTUSE), line)).toBe('already-stated'));
   for (const line of vertexSpellings(45)) it(`the FALSE supplement «${line}» is refused`, () => expect(verdict(build(OBTUSE), line)).toBe('claim-refuted'));
 
-  it('a right vertex angle is unchanged: true 90 records, false 90 refuses', () => {
-    expect(verdict(build(['A(0,0,0)', 'B(1,0,0)', 'D(0,2,0)']), 'הזווית BAD היא 90')).toBe('record');
+  it('a right vertex angle is unchanged: true 90 is already known, false 90 refuses', () => {
+    expect(verdict(build(['A(0,0,0)', 'B(1,0,0)', 'D(0,2,0)']), 'הזווית BAD היא 90')).toBe('already-stated');
     expect(verdict(build(OBTUSE), 'הזווית BAD היא 90')).toBe('claim-refuted');
   });
 
   it('a vertex named by its letter alone («זווית A = 135», two edges at A) is the vertex angle too', () => {
     const st = build([...OBTUSE, 'AB', 'AD']);
-    expect(verdict(st, 'זווית A = 135')).toBe('record');
+    expect(verdict(st, 'זווית A = 135')).toBe('already-stated');
     expect(verdict(st, 'זווית A = 45')).toBe('claim-refuted');
   });
 });
 
 describe('#1573 — the LINE angle keeps its ≤ 90° meaning on the same figure', () => {
-  it('«הזווית בין AB לבין AD היא 45» records (the lines meet at 45° although the corner is 135°)', () => {
-    expect(verdict(build(OBTUSE), 'הזווית בין AB לבין AD היא 45')).toBe('record');
-    expect(verdict(build(OBTUSE), 'the angle between AB and AD is 45')).toBe('record');
+  it('«הזווית בין AB לבין AD היא 45» holds (the lines meet at 45° although the corner is 135°): already known', () => {
+    expect(verdict(build(OBTUSE), 'הזווית בין AB לבין AD היא 45')).toBe('already-stated');
+    expect(verdict(build(OBTUSE), 'the angle between AB and AD is 45')).toBe('already-stated');
   });
-  it('the exam wording «גודל הזווית שבין הישר AB ובין הישר AD הוא 45» records', () => {
-    expect(verdict(build(OBTUSE), 'גודל הזווית שבין הישר AB ובין הישר AD הוא 45')).toBe('record');
+  it('the exam wording «גודל הזווית שבין הישר AB ובין הישר AD הוא 45» holds: already known', () => {
+    expect(verdict(build(OBTUSE), 'גודל הזווית שבין הישר AB ובין הישר AD הוא 45')).toBe('already-stated');
   });
 });
 

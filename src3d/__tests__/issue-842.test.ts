@@ -15,6 +15,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { planeChipsByFact, planesNamedBy } from '../store/planeChips';
 import { buildNotices3 } from '../engine/notices';
 import { parse3 } from '../parser/parse3';
@@ -23,12 +24,12 @@ function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-const submit = (u: string) => useGeo3.getState().submit(u);
 const st = () => useGeo3.getState();
 const build = (us: string[]) => {
   reset();
+  // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
   for (const u of us) {
-    submit(u);
+    submitOrSave3(u);
     expect(st().lastError, `«${u}» should build`).toBeNull();
   }
   return derive3(st().facts, st().seed);
@@ -149,7 +150,7 @@ describe('#842 step 4 — a redundant containment says so', () => {
     // it must read identically at every seed. If it ever does not, it has started guessing.
     for (const seed of [0, 1, 3, 17, 42]) {
       reset();
-      OPERATOR.forEach(submit);
+      OPERATOR.forEach((u) => submitOrSave3(u));
       const d = derive3(st().facts, seed);
       expect(buildNotices3(d.construction).some((n) => n.kind === 'already-known' && n.rel === 'contained'), `seed ${seed}`).toBe(true);
     }

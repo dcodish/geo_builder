@@ -161,9 +161,10 @@ describe('#2076 — the supported spellings keep building, to exactly their stat
     expect(d.construction.revolutions[0].height).toBe(rev.height);
   });
 
-  it('a volume claim on a SIZED cone still verifies', () => {
+  // #2341 (ADR-3D-449): the sized cone already decides its volume, so the true claim is «כבר קיים» — never refused
+  it('a volume claim on a SIZED cone still verifies (already known, no row)', () => {
     const { st, last } = build(['חרוט שרדיוסו 5 וגובהו 12', 'נפח החרוט = 100π']);
-    expect(last.kind).toBe('record');
+    expect(last.kind).toBe('already-stated');
     const d = derive3(st.facts, st.seed);
     for (const f of st.facts) expect(d.status[f.id]).toBe('ok');
   });

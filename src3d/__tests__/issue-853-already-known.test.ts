@@ -14,6 +14,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { ALREADY_KNOWN_RELS, type BuildNotice3 } from '../engine/notices';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
@@ -25,7 +26,8 @@ function reset() {
 }
 const build = (us: string[]) => {
   reset();
-  for (const u of us) st().submit(u);
+  // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
+  for (const u of us) submitOrSave3(u);
 };
 const known = (): Extract<BuildNotice3, { kind: 'already-known' }>[] =>
   derive3(st().facts, st().seed).notices.filter(

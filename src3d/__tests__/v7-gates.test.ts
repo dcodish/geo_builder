@@ -11,10 +11,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
+  KNOWN = [];
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-const submit = (u: string) => useGeo3.getState().submit(u);
+/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+let KNOWN: string[] = [];
+const submit = (u: string) => {
+  const rows = useGeo3.getState().facts.length;
+  useGeo3.getState().submit(u);
+  const st = useGeo3.getState();
+  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+};
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
 function expectAllOk() {
@@ -40,7 +48,8 @@ describe('GATE — 2021 חורף א Q2 (vec-defined C, right angle, plane equati
 
   it('Hebrew: the full chain builds and every answer verifies', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(9);
+    expect(state().facts).toHaveLength(5);
+    expect(KNOWN).toEqual(["C = (0, 5, -1)","∠BAC = 90","המישור ABC: x + z + 1 = 0","E = (-3, 5, 2)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
   });
 
@@ -73,7 +82,8 @@ describe('GATE — 2021 קיץ ב Q2 (the cevian intersection → coordinate ans
       'E = (0, 4, 0)',
       'F = (1.5, 3, 0)',
     ].forEach(submit);
-    expect(state().facts).toHaveLength(9);
+    expect(state().facts).toHaveLength(7);
+    expect(KNOWN).toEqual(["E = (0, 4, 0)","F = (1.5, 3, 0)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
   });
 });
@@ -96,7 +106,8 @@ describe('GATE — 2018 קיץ Q2 (box on axes, a vector-relation point, SKEW li
 
   it('Hebrew: the chain builds and the skew claim verifies', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(10);
+    expect(state().facts).toHaveLength(9);
+    expect(KNOWN).toEqual(["NK ו-PL מצטלבים"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
   });
 

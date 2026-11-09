@@ -8,6 +8,13 @@
   },
   {
     "builder": "3d",
+    "base": "אורך AS שווה לאורך AB",
+    "variant": "אורך GS שווה לאורך GH",
+    "operator": "rename-letters",
+    "differs": "builds → builds (already-stated)"
+  },
+  {
+    "builder": "3d",
     "base": "אלכסון תיבה AC'",
     "variant": "נתון אלכסון תיבה AC'",
     "operator": "given-lead",

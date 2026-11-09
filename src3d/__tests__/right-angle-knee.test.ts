@@ -12,6 +12,10 @@
  *   (2) the knee is genuinely 3-D — its legs track the arms as the camera orbits;
  *   (3) honesty — a SKEW ⊥ gets no knee (it has no intersection to mark), nor does a ⟂ at an
  *       UNNAMED crossing (#2091, ADR-3D-360), and the same corner asserted twice is marked once.
+ *
+ * #2341 (ADR-3D-449, operator 2026-11-06: *"In all cases it should say כבר קיים"*): a ⊥ the figure already holds
+ * («AB ⊥ AD» on a box) is already known, adds no row and so draws no knee. Every form here is therefore stated on a
+ * free tetrahedron, where the ⊥ is a given that shapes the figure and the knee is what it draws.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -19,7 +23,8 @@ import { dist3, dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { HOME_CAMERA } from '../render/camera';
 import { rightAngles3 } from '../render/rightAngles';
 import { buildScene3 } from '../render/scene3';
-import { derive3, useGeo3 } from '../store/store3';
+import { parse3 } from '../parser/parse3';
+import { derive3, useGeo3, type Fact3 } from '../store/store3';
 
 const reset = () => {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -57,12 +62,12 @@ describe('#307 — a stated ⊥ is marked on the figure', () => {
   beforeEach(reset);
 
   const FORMS: { name: string; steps: string[] }[] = [
-    { name: 'two segments, word form (He)', steps: ["תיבה ABCDA'B'C'D'", 'AB מאונך ל-AD'] },
-    { name: 'two segments, symbol form', steps: ["תיבה ABCDA'B'C'D'", 'AB ⊥ AD'] },
-    { name: 'two segments (En)', steps: ["box ABCDA'B'C'D'", 'AB is perpendicular to AD'] },
-    { name: 'named vectors u ⊥ v', steps: ["תיבה ABCDA'B'C'D'", "נסמן: AB = u, AD = v, AA' = w", 'u ⊥ v'] },
-    { name: 'vertex angle = 90', steps: ["תיבה ABCDA'B'C'D'", 'זווית BAD = 90'] },
-    { name: 'segment ⊥ plane', steps: ['קובייה ABCD', "AA' מאונך למישור ABCD"] },
+    { name: 'two segments, word form (He)', steps: ["טטראדר ABCD", 'AB מאונך ל-AD'] },
+    { name: 'two segments, symbol form', steps: ["טטראדר ABCD", 'AB ⊥ AD'] },
+    { name: 'two segments (En)', steps: ["tetrahedron ABCD", 'AB is perpendicular to AD'] },
+    { name: 'named vectors u ⊥ v', steps: ["טטראדר ABCD", 'נסמן: AB = u, AD = v, AC = w', 'u ⊥ v'] },
+    { name: 'vertex angle = 90', steps: ["טטראדר ABCD", 'זווית BAD = 90'] },
+    { name: 'segment ⊥ plane', steps: ['טטראדר ABCD', 'DA מאונך למישור ABC'] },
   ];
 
   for (const { name, steps } of FORMS) {
@@ -74,22 +79,22 @@ describe('#307 — a stated ⊥ is marked on the figure', () => {
   }
 
   it('the knee sits at the shared vertex, with legs along the two arms', () => {
-    const ms = wedges(["תיבה ABCDA'B'C'D'", 'AB מאונך ל-AD']);
+    const ms = wedges(["טטראדר ABCD", 'AB מאונך ל-AD']);
     expect(ms).toHaveLength(1);
     const d = derived();
     const A = d.resolved.positions.get('A')!;
     const B = d.resolved.positions.get('B')!;
     const D = d.resolved.positions.get('D')!;
-    expect(dist3(ms[0].vertex, A)).toBeLessThan(1e-9);
+    expect(dist3(ms[0].vertex, A)).toBeLessThan(1e-6); // a driven ⊥ holds to the solve's accuracy
     // each leg is a unit vector along one of the two arms
-    const along = (u: Vec3, p: Vec3) => Math.abs(dot3(u, sub3(p, A)) / (norm3(u) * dist3(A, p)) - 1) < 1e-9;
+    const along = (u: Vec3, p: Vec3) => Math.abs(dot3(u, sub3(p, A)) / (norm3(u) * dist3(A, p)) - 1) < 1e-6;
     expect(along(ms[0].u1, B) || along(ms[0].u1, D)).toBe(true);
     expect(along(ms[0].u2, B) || along(ms[0].u2, D)).toBe(true);
-    expect(Math.abs(dot3(ms[0].u1, ms[0].u2))).toBeLessThan(1e-9); // and they really are ⊥
+    expect(Math.abs(dot3(ms[0].u1, ms[0].u2))).toBeLessThan(1e-6); // and they really are ⊥
   });
 
   it('a stated 90° draws the KNEE, not an arc labelled "90°"', () => {
-    const s = scene(["תיבה ABCDA'B'C'D'", 'זווית BAD = 90']);
+    const s = scene(["טטראדר ABCD", 'זווית BAD = 90']);
     expect(s.marks.length).toBeGreaterThanOrEqual(1);
     expect(s.angles.map((a) => a.text)).not.toContain('90°');
   });
@@ -137,7 +142,7 @@ describe('#307 — the knee is three-dimensional, not a screen-space square', ()
   beforeEach(reset);
 
   it('the projected legs stay parallel to the projected arms as the camera orbits', () => {
-    const steps = ["תיבה ABCDA'B'C'D'", 'AB מאונך ל-AD'];
+    const steps = ["טטראדר ABCD", 'AB מאונך ל-AD'];
     for (const cam of [HOME_CAMERA, { yaw: 0.2, pitch: 0.15 }, { yaw: 2.1, pitch: 0.9 }, { yaw: -1.3, pitch: -0.4 }]) {
       const s = scene(steps, cam);
       expect(s.marks).toHaveLength(1);
@@ -160,9 +165,9 @@ describe('#307 — the knee is three-dimensional, not a screen-space square', ()
   });
 
   it('a foreshortened right angle is NOT drawn as a square on screen (it is a real projection)', () => {
-    // at the home camera the box's base corner projects obliquely — the two legs must NOT be
+    // at the home camera the tetrahedron's corner projects obliquely — the two legs must NOT be
     // axis-aligned/equal-length on screen, which is what a fake 2-D knee would give
-    const s = scene(["תיבה ABCDA'B'C'D'", 'AB מאונך ל-AD']);
+    const s = scene(["טטראדר ABCD", 'AB מאונך ל-AD']);
     const [p, q, r] = s.marks[0].pts;
     const l1 = Math.hypot(q.x - r.x, q.y - r.y);
     const l2 = Math.hypot(q.x - p.x, q.y - p.y);
@@ -200,7 +205,7 @@ describe('#307 — honesty: no knee where the arms do not meet', () => {
   });
 
   it('the SAME corner asserted twice (stated + stated again) is marked once', () => {
-    expect(wedges(["תיבה ABCDA'B'C'D'", 'AB מאונך ל-AD', 'AD מאונך ל-AB'])).toHaveLength(1);
+    expect(wedges(["טטראדר ABCD", 'AB מאונך ל-AD', 'AD מאונך ל-AB'])).toHaveLength(1);
   });
 
   it('a figure with no perpendicularity statement draws no knees', () => {
@@ -216,11 +221,25 @@ describe('S2 — a stated ⊥ between a segment and a named line', () => {
   beforeEach(reset);
 
   it('a segment genuinely CROSSING ℓ at 90° is marked at the crossing', () => {
-    // A(0,-1,0)–B(0,1,0) crosses ℓ1 (the x-axis) at the origin, perpendicularly — a determined
-    // figure (coordinate points), so the relation lands as a verified claim
-    const ms = wedges(['A(0,-1,0)', 'B(0,1,0)', 'AB', 'l1:x=(0,0,0)+t(1,0,0)', 'AB מאונך לישר l1']);
+    // A(0,-1,0)–B(0,1,0) crosses ℓ1 (the x-axis) at the origin, perpendicularly — a determined figure, so since
+    // #2341 (ADR-3D-449) the typed ⊥ is already known and adds no row. The knee is the renderer's: a row saved
+    // before the rule replays as saved (a load never reads the submit decision), so the row is folded directly.
+    const steps = ['A(0,-1,0)', 'B(0,1,0)', 'AB', 'l1:x=(0,0,0)+t(1,0,0)', 'AB מאונך לישר l1'];
+    const facts: Fact3[] = steps.map((u, i) => {
+      const p = parse3(u);
+      if (!p.ok) throw new Error(u);
+      return { id: `f${i}`, utterance: u, cmds: p.commands, enabled: true };
+    });
+    const d = derive3(facts, 0);
+    for (const f of facts) expect(d.status[f.id], f.utterance).toBe('ok');
+    const ms = rightAngles3(d.construction, d.resolved, 1.5);
     expect(ms).toHaveLength(1);
     expect(dist3(ms[0].vertex, { x: 0, y: 0, z: 0 })).toBeLessThan(1e-9);
+    // and typed, the same ⊥ is already known
+    build(steps.slice(0, -1));
+    useGeo3.getState().submit(steps[steps.length - 1]);
+    expect(useGeo3.getState().facts).toHaveLength(4);
+    expect(useGeo3.getState().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   it('a driven ⊥ whose segment never meets ℓ draws NO knee (the R³ honesty rule)', () => {

@@ -149,10 +149,12 @@ describe('above / below a plane (מעל / מתחת)', () => {
   it("an EXISTING point is a verified given: A' above the base holds, below refuses", () => {
     submit('קובייה ABCD');
     submit("A' מעל המישור ABCD");
-    expect(state().facts).toHaveLength(2);
+    // #2341 (ADR-3D-449): it holds on the cube, so it is already known and adds no row
+    expect(state().facts).toHaveLength(1);
+    expect(state().lastNotice).toEqual({ code: 'already-stated' });
     expectAllOk();
     submit("A' מתחת למישור ABCD");
-    expect(state().facts).toHaveLength(2); // keep-prior
+    expect(state().facts).toHaveLength(1); // keep-prior
     expect(state().lastError).toEqual({ code: 'wrong-side-of-plane', id: "A'" });
   });
 
@@ -171,8 +173,9 @@ describe('membership on a point-run plane is a verified given for existing point
     submit('קובייה ABCD');
     submit("B על המישור BC'D");
     expectAllOk();
+    expect(state().lastNotice).toEqual({ code: 'already-stated' }); // #2341 (ADR-3D-449): held, so no row
     submit("A על המישור BC'D");
-    expect(state().facts).toHaveLength(2);
+    expect(state().facts).toHaveLength(1);
     expect(state().lastError).toEqual({ code: 'not-on-plane', id: 'A' });
   });
 });

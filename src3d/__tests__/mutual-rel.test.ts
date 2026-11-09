@@ -9,7 +9,8 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { derive3, useGeo3 } from '../store/store3';
+import { parse3 } from '../parser/parse3';
+import { derive3, useGeo3, type Fact3 } from '../store/store3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { dataView } from '../engine/dataView';
@@ -18,6 +19,20 @@ import type { Vec3 } from '../engine/vec3';
 
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
+/**
+ * #2341 (ADR-3D-449): a general tetrahedron's opposite edges are skew in every configuration, so TYPED, «AB ו-CD מצטלבים»
+ * after «פירמידה ABCD» is already known and adds no row. What the statement LOWERS to is read off the rows folded
+ * directly, as a saved file replays them (a load never reads the submit decision).
+ */
+const folded = (lines: readonly string[]) =>
+  derive3(
+    lines.map((u, i): Fact3 => {
+      const p = parse3(u);
+      if (!p.ok) throw new Error(u);
+      return { id: `f${i}`, utterance: u, cmds: p.commands, enabled: true };
+    }),
+    0,
+  );
 const vsub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
 const vcross = (a: Vec3, b: Vec3): Vec3 => ({
   x: a.y * b.z - a.z * b.y,
@@ -89,8 +104,7 @@ describe('skew — the OPEN condition, carried by the requirement lane', () => {
   });
 
   it('skew never least-squares: it adds a REQUIREMENT, never a drive residual', () => {
-    for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
-    const c = derive3(state().facts, 0).construction;
+    const c = folded(['פירמידה ABCD', 'AB ו-CD מצטלבים']).construction;
     expect(c.requirements.some((r) => r.kind === 'mutual' && r.rel === 'skew')).toBe(true);
     expect(c.scalarPins.some((p) => p.kind === 'mutual')).toBe(false);
   });
@@ -126,9 +140,15 @@ describe('surfacing — the DATA PANEL says it, the canvas stays clean (operator
   });
 
   it('the panel reports the STATED relation as a structured row (words are the App\'s to pick)', () => {
-    for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
-    const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
+    const panel = dataView(folded(['פירמידה ABCD', 'AB ו-CD מצטלבים']).construction, 0);
     expect(panel.mutual).toContainEqual({ a: 'AB', b: 'CD', rel: 'skew' });
+  });
+
+  it('typed on a general tetrahedron the relation is already known (#2341): no row', () => {
+    state().clear();
+    for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
+    expect(state().facts).toHaveLength(1);
+    expect(state().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   it('…and reports a relation the figure merely HOLDS, never stated', () => {
@@ -187,10 +207,7 @@ describe('honesty', () => {
   });
 
   it('a stated mutual position survives a save → load round-trip', () => {
-    for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
-    const facts = state().facts.length;
-    expect(facts).toBeGreaterThan(0);
-    const c = derive3(state().facts, 0).construction;
+    const c = folded(['פירמידה ABCD', 'AB ו-CD מצטלבים']).construction;
     expect(c.claims.some((cl) => cl.type === 'mutual-rel')).toBe(true);
   });
 });

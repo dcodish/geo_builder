@@ -72,17 +72,18 @@ describe('#578 — the text command', () => {
   });
 
   it('a point-run plane NAME follows the rename — the plane stays addressable', () => {
-    build([CUBE, 'מישור ABCD', 'E אמצע AC', 'BE מוכל במישור ABCD']);
+    // #2341 (ADR-3D-449): a containment the cube already holds adds no row, so the plane-run claim here is one that
+    // places E (BE ∥ ABCD seats E at C's height on CC')
+    build([CUBE, 'מישור ABCD', "E על CC'", 'BE מקביל למישור ABCD']);
     expect(st().lastError).toBeNull();
     st().submit('שנה שם A ל-M');
     expect(st().lastError).toBeNull();
     expect(st().facts[1].cmds[0]).toMatchObject({ type: 'plane-through', name: 'MBCD', ids: ['M', 'B', 'C', 'D'] });
     // the NESTED operand of the containment claim followed too (the structural walk, not a field list)
-    expect(st().facts[3].cmds[0]).toMatchObject({
-      type: 'plane-rel',
-      a: { kind: 'segment', a: 'B', b: 'E' },
-      b: { kind: 'plane-run', ids: ['M', 'B', 'C', 'D'] },
-    });
+    expect(st().facts).toHaveLength(4);
+    const nested = JSON.stringify(st().facts[3].cmds);
+    expect(nested).toContain('["M","B","C","D"]');
+    expect(nested).not.toContain('"A"');
     expect(derive3(st().facts, st().seed).positions.size, 'and it still builds').toBeGreaterThan(0);
   });
 

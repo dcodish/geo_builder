@@ -94,15 +94,16 @@ describe('#833 — honesty is preserved in both directions', () => {
     }
   });
 
-  it('the statement leaves a visible trace — the stated segment is drawn (#821 / V1)', () => {
-    // AC is the BOTTOM DIAGONAL — parallel to the top face and not already a drawn edge, so this
-    // tests the drawing convention rather than a segment the cube supplied anyway.
+  // #2341 (ADR-3D-449, operator 2026-11-06: "In all cases it should say כבר קיים"): on a cube the ∥ is ALREADY HELD, so
+  // it is answered «כבר קיים» with no row, and draws nothing. Was: a ✓ row that drew the bottom diagonal AC.
+  it('a ∥ the cube already holds is already known: no row, nothing drawn', () => {
     reset();
     [CUBE, "AC מקביל למישור A'B'C'D'"].forEach(submit);
     expect(st().lastError).toBeNull();
+    expect(st().facts).toHaveLength(1);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
     const d = derive3(st().facts, st().seed);
-    const drawn = d.construction.segments.some(([a, b]) => (a === 'A' && b === 'C') || (a === 'C' && b === 'A'));
-    expect(drawn).toBe(true);
+    expect(d.construction.segments.some(([a, b]) => (a === 'A' && b === 'C') || (a === 'C' && b === 'A'))).toBe(false);
   });
 
   it('parses through the real grammar (no hand-built commands)', () => {

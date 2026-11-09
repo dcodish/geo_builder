@@ -25,6 +25,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { planeChipsByFact } from '../store/planeChips';
 
 function reset() {
@@ -34,7 +35,8 @@ function reset() {
 const st = () => useGeo3.getState();
 const build = (us: string[]) => {
   reset();
-  for (const u of us) st().submit(u);
+  // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
+  for (const u of us) submitOrSave3(u);
 };
 /** Chip ownership as the UI computes it — status included. */
 const chips = () => {
