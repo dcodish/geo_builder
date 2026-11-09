@@ -3736,6 +3736,36 @@
       "limits": "Only a ring that already passes through a circle. Not the note when the base does change (ADR-3D-080, ADR-W-129), nor cube · «פירמידה ABCDA'» (#2495).",
       "at": "2026-11-09T20:14:21.274Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2789a",
+      "issue": 2789,
+      "question": "In 3-D, «P נמצא על ציר ה-x» (whole axis, no side) after a cube: does it anchor the frame like a half-axis point (placement sampled, axes drawn)? (a) yes; (b) no, the cube stays at its default placement.",
+      "class": "axis-point-anchors-frame",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A point stated on a coordinate axis, with or without a side, anchors the solid to the coordinate frame: its placement is sampled and the axes are drawn. A frozen default placement would put P on line AB in every configuration, a position the student never stated.",
+      "precedents": [
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "The tool must therefore make no assumption about any size, angle, position, or proportion unless the student stated it",
+          "date": "2026-06-17",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-052"
+        },
+        {
+          "quote": "it seems that A is hard coded at 0,0,0",
+          "date": "2026-07-28",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-095"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Not which side of the axis P falls on (ADR-3D-094 samples it), nor a point on a coordinate plane (#2794), nor the non-origin refusals (#2792).",
+      "at": "2026-11-09T20:16:45.817Z",
+      "status": "pending"
     }
   ],
   "demoted": {
