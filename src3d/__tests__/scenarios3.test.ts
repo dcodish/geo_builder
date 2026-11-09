@@ -18,9 +18,6 @@ import { derive3, useGeo3 } from '../store/store3';
 import { dataView, panelIsEmpty } from '../engine/dataView';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
-  });
-});
-
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 
