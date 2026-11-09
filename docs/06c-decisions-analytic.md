@@ -16144,3 +16144,27 @@ Each of those points moves along a curve.
 **Locks.** `issue-2621c-prime-names.test.ts` § "#2624": `POINT_NAME` is `NAME_ATOM`, and under `i` «A'B'» is two primed names and «A's» a possessive. The parity rows `prime-*-2624` run analytic as an expected builder.
 
 **Behaviour change for a student:** none.
+
+## ADR-AG-435 — A cevian named as an operand meets through the foot M1 resolves, so it ends at the figure's own midpoint (#2648)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (analytic, P2, wrong answer) · round #2783, stream G · branch `fix/2648-median-binds-midpoint` · **amends:** [ADR-AG-224](#adr-ag-224) (the line-object operand) · **LADDER stage:** none (the parser's operand lowering and M1's `cevian-of` arm)
+**Operator:** [ADR-W-177](06w-decisions-workspace.md#adr-w-177) (2026-11-02 on #1595, *"accept with message"*): a crossing the geometry puts on a named point is accepted with the notice «M ו-E נפלו על אותה נקודה.».
+**Requirements:** none (internal: it restores the promise that a stated median ends at the side's midpoint) · **Design:** [04c](04c-design-analytic.md) § "The tool's letters: one table, one resolver"
+
+**Measured before** (`main` @ `4a06aae9`, `decideSubmit` line by line, then `derive`). «משולש ABC» · «M אמצע BC» · «התיכון מ-A והישר BC נפגשים בנקודה E» recorded with `faults: []`, drew `seg-AM`, and put E 0.6 to 8.2 away from M (seeds 0, 9, 22), with a fifth point N in the figure. The same happened with «… והאנך האמצעי לצלע BC …», «E נקודת החיתוך של התיכון מ-A עם הישר BC», «התיכון מ-A חותך את BC בנקודה E», «E על התיכון מ-A», and the English "the median from A and the line BC meet at E". The altitude did the same after «האנך מ-A ל-BC»: E landed 2.8 to 8.9 away from the foot H, beside a stray G. Without M, the median lettered its own foot M and E fell on it with the notice, as ADR-W-177 rules.
+
+**Cause.** Two places decided which point the operand's foot is. `lineObjectOperand` (ADR-AG-224) put the meet on `on-line-2pt E (A, foot)` at parse time, with the foot's tool placeholder. `resolveToolLetters` gave that placeholder a fresh letter, N, because its reuse rule reads only a `derived` fact and the side is not known before M1. Then M1's `cevian-of` arm found the side's midpoint already lettered M (ONE POSITION, ONE NAME, #1153) and drew the cevian to M. Nothing made N, so the last-resort minting (ADR-AG-210) created it as a free point, and E became the crossing of BC with a line to nowhere.
+
+**Class.** *A line-object operand whose foot only M1 can identify, with its incidence written before M1 decides.* That covers each cevian role (median and altitude), every frame that takes the operand (the meet, the crossing noun, «חותך», «E על …»), both languages, and any existing foot (a student's «M אמצע BC», «D אמצע BC», the perpendicular's H). The other line-objects are outside the class: a bisector's point is on its ray, a perpendicular bisector's line is `line-at`, and a drawn piece runs to a foot its own facts derive.
+
+**Decision.** One decision point. The incidence rides the cevian fact: `cevian-of { through: [E] }`. M1 writes `on-line-2pt E (apex, foot)` against the foot it resolves, on every path of the arm: the existing derived point, the tool's new foot, a typed foot, or the student's conjunction. So the incidence and the drawn segment end at the same point. The parse-time letter of a foot the figure already has is never created. The existing filter in `derive` already drops a `minted` row whose point the fold did not create (ADR-AG-211), so the row announces nothing. A point that is the cevian's own apex still refuses, as it did before.
+
+**Measured after.** The six median spellings at seeds 0 to 23: E coincides with M to within 1e-6, the figure's points are A, B, C, M and E, the earlier points stay in place (|Δ| < 1e-9), and the page says «M ו-E נפלו על אותה נקודה.». The altitude twin draws exactly what «הגובה מ-A» · the meet draws: E on H and no G. The control without M is unchanged.
+
+**Sibling audit.** 2-D, measured at `4a06aae9` through `decideDeterministic2D`, refuses this sentence with `cevian-degenerate:median-foot-at-end` (with or without M). That is a separate 2-D defect, reported to the round and not changed here, so 2-D is not the reference for this verdict (ADR-W-177 is). 2-D's standalone «התיכון מ-A» after «M אמצע BC» draws AM to M, which is the identity this ADR restores. A student-named conjunction foot («AM תיכון לצלע BC», «AH גובה לצלע BC») followed by the operand still mints a second foot on the same spot (N, G) with notices. M1's identity check reads only derived points there, so that is a different cause, and it is reported as found work.
+
+**Locks.**
+- `src-analytic/__tests__/issue-1715-meet-frame.test.ts`, `#2648` block: the six median spellings after «M אמצע BC» at 24 seeds (E on M, no N, nothing earlier moves, the notice), «E על התיכון מ-A», the altitude twin, the control, and the unit check that the parsed operand carries `through` with no incidence to the foot placeholder.
+- Fixture `src-analytic/__tests__/fixtures/median-operand-existing-foot-2648.analytic.json` (the fixtures net).
+
+**Behaviour change for a student:** after «M אמצע BC», «התיכון מ-A והישר BC נפגשים בנקודה E» draws the median to M, E is M, and the page says «M ו-E נפלו על אותה נקודה.». Before this, E landed elsewhere, on a line to a stray point N.

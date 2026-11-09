@@ -18,6 +18,7 @@ import { convergeText } from '../../shell/converge';
 import { centroid, circumcentre, incentre, orthocentre } from '../engine/derived';
 import { decideSubmit } from '../app/submit';
 import { analyticI18n } from '../i18n';
+import { parseLine } from '../parser/parseAnalytic';
 
 const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7];
 type P = { x: number; y: number };
@@ -278,5 +279,94 @@ describe('#1715 — the class reaches every frame that takes an operand', () => 
     const d = built([TRI, 'חוצה זוית B חותך את הגובה מ-A בנקודה E'], 0);
     expect(ON['bisector of B'].at(d, pt(d, 'E'))).toBeLessThan(1e-5);
     expect(ON['altitude from A'].at(d, pt(d, 'E'))).toBeLessThan(1e-5);
+  });
+});
+
+/**
+ * #2648 (ADR-AG-435) — A CEVIAN OPERAND RUNS TO THE FOOT M1 RESOLVES. «M אמצע BC» · «התיכון מ-A והישר BC נפגשים בנקודה E»
+ * drew the median AM, but the meet was put on the line from A to a fresh letter N the parse wrote for the foot — a free
+ * point no fact defined — so E landed 0.6–8 away from M and the figure gained a stray N. The incidence now rides the
+ * cevian fact (`through`) and M1 writes it against the foot it chooses: the side's midpoint the figure letters, so E is
+ * M, accepted with the notice (ADR-W-177, operator 2026-11-02, "accept with message").
+ */
+describe('#2648 — a cevian operand meets through the foot the figure already has', () => {
+  const ALL_SEEDS = Array.from({ length: 24 }, (_, i) => i);
+  const recordAll = (steps: readonly string[]): string[] => {
+    const lines: string[] = [];
+    for (const step of steps) {
+      const v = decideSubmit(step, lines, 0);
+      expect(v.kind, step).toBe('record');
+      if (v.kind === 'record') lines.push(v.line);
+    }
+    return lines;
+  };
+  /** Each frame that takes the operand, and both orders of the meet. */
+  const MEDIAN_FRAMES = [
+    'התיכון מ-A והישר BC נפגשים בנקודה E', // the operator-reported row
+    'התיכון מ-A והאנך האמצעי לצלע BC נפגשים בנקודה E',
+    'הישר BC והתיכון מ-A נפגשים בנקודה E',
+    'E נקודת החיתוך של התיכון מ-A עם הישר BC',
+    'התיכון מ-A חותך את BC בנקודה E',
+    'the median from A and the line BC meet at E',
+  ];
+  it.each(MEDIAN_FRAMES)('«M אמצע BC» · «%s»: E is M, no N, nothing earlier moves, the notice (24 seeds)', (line) => {
+    const context = [TRI, 'M אמצע BC'];
+    const recorded = recordAll([...context, line]);
+    for (const seed of ALL_SEEDS) {
+      const before = derive(context, seed);
+      const after = derive(recorded, seed);
+      expect(after.faults, `@${seed}`).toEqual([]);
+      expect(dist(pt(after, 'E'), pt(after, 'M')) / scaleOf(after), `E on M @${seed}`).toBeLessThan(1e-6);
+      expect(after.figure.points.map((p) => p.id).sort(), `@${seed}`).toEqual(['A', 'B', 'C', 'E', 'M']);
+      for (const id of ['A', 'B', 'C', 'M']) expect(dist(pt(after, id), pt(before, id)), `${id} @${seed}`).toBeLessThan(1e-9);
+      expect(convergeText(coincidencesOf(after), (k, o) => tHe(k, o)), `@${seed}`).toBe('M ו-E נפלו על אותה נקודה.');
+    }
+  });
+  it('«E על התיכון מ-A» · «E על BC» after «M אמצע BC»: E is on the median AM, so on M', () => {
+    const recorded = recordAll([TRI, 'M אמצע BC', 'E על התיכון מ-A', 'E על BC']);
+    for (const seed of SEEDS) {
+      const d = derive(recorded, seed);
+      expect(d.faults).toEqual([]);
+      expect(d.figure.points.some((p) => p.id === 'N'), `@${seed}`).toBe(false);
+      expect(dist(pt(d, 'E'), pt(d, 'M')) / scaleOf(d), `@${seed}`).toBeLessThan(1e-6);
+    }
+  });
+  /*
+   * The altitude twin: the foot «האנך מ-A ל-BC» lettered H is the altitude's foot, so the meet is on H, with no stray G — the
+   * same figure the meet draws after «הגובה מ-A» (which always reused H). Its comparison is against that figure, not the
+   * one before the line: at seed 0 both altitude meets re-sample the triangle, on main as well (found work, not this cause).
+   */
+  it('the altitude twin: «האנך מ-A ל-BC» · «הגובה מ-A והישר BC נפגשים בנקודה E» meets on the foot H, no stray G', () => {
+    const meet = 'הגובה מ-A והישר BC נפגשים בנקודה E';
+    const recorded = recordAll([TRI, 'האנך מ-A ל-BC', meet]);
+    const reference = recordAll([TRI, 'הגובה מ-A', meet]);
+    for (const seed of SEEDS) {
+      const after = derive(recorded, seed);
+      const same = derive(reference, seed);
+      expect(after.faults).toEqual([]);
+      expect(after.figure.points.map((p) => p.id).sort(), `@${seed}`).toEqual(['A', 'B', 'C', 'E', 'H']);
+      expect(dist(pt(after, 'E'), pt(after, 'H')) / scaleOf(after), `@${seed}`).toBeLessThan(1e-6);
+      for (const id of ['A', 'B', 'C', 'H', 'E']) expect(dist(pt(after, id), pt(same, id)), `${id} @${seed}`).toBeLessThan(1e-9);
+      expect(coincidencesOf(after), `@${seed}`).toContainEqual(['H', 'E']);
+    }
+  });
+  it('control: with no M the median letters its own foot M, and E falls on it with the notice (ADR-W-177), unchanged', () => {
+    const recorded = recordAll([TRI, 'התיכון מ-A והישר BC נפגשים בנקודה E']);
+    for (const seed of SEEDS) {
+      const d = derive(recorded, seed);
+      expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'E', 'M']);
+      expect(convergeText(coincidencesOf(d), (k, o) => tHe(k, o)), `@${seed}`).toBe('E ו-M נפלו על אותה נקודה.');
+    }
+  });
+  it('unit (`lineObjectOperand`): the incidence rides the cevian fact, never a line to the parse-time foot letter', () => {
+    const r = parseLine('התיכון מ-A והישר BC נפגשים בנקודה E');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const cevian = r.facts.find((f) => f.t === 'cevian-of');
+    expect(cevian && cevian.t === 'cevian-of' ? cevian.through : null).toEqual(['E']);
+    const toFoot = r.facts.filter((f) => f.t === 'constraint' && f.k.t === 'on-line-2pt' && cevian?.t === 'cevian-of' && (f.k.a === cevian.foot || f.k.b === cevian.foot));
+    expect(toFoot).toEqual([]);
+    // a point the cevian starts from names no meet (the operand's own refusal, unchanged)
+    expect(verdict([TRI, 'התיכון מ-A והישר BC נפגשים בנקודה A'])).toMatch(/^refused:/);
   });
 });

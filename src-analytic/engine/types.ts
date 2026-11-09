@@ -351,6 +351,13 @@ export type Fact =
        * which vertex the apex is. Applied after the cevian with the resolved apex and foot written in.
        */
       measure?: Fact[];
+      /**
+       * THE POINTS A SENTENCE PUTS ON THE CEVIAN'S LINE (#2648, ADR-AG-435) — the cevian as an OPERAND: «התיכון מ-A והישר BC
+       * נפגשים בנקודה E», «E על הגובה מ-A». Each lies on the line through the apex and the foot M1 RESOLVES, so the incidence
+       * runs through the point the cevian draws to — the figure's own M when the side's midpoint is already lettered —
+       * never through the parse-time letter a foot the figure already has does not take.
+       */
+      through?: Id[];
     })
   /**
    * A HEIGHT STATED AS A MAGNITUDE, WITH NO SEGMENT NAMED (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה הטרפז 4»,
