@@ -851,11 +851,23 @@ one leaves the figure where it was. A free plane given an equation stops being f
 **One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453)).** The scale given (#754) asks the
 same question, "would a uniform rescale detach an absolute object?", so `scaleGivenSafe` calls `hasAbsoluteFrameObject`
 and keeps no list of its own; only a rescale's own exclusions stay there (no solid, a revolution or a `circles3`,
-`scalePinned`, and a `partial` point pending a ruling). The predicate lives in `types.ts` beside `absolutePointCount`,
+`scaleFixingPins3`). The predicate lives in `types.ts` beside `absolutePointCount`,
 re-exported from `evaluate.ts`. A free or figure-derived plane or line is resolved from the figure, so the rescale
 carries it: a plane's offset and a line's anchor scale by k. A free plane pinned by a stated distance to a figure point
 (#508/#528) does not commute with the factor, so it re-resolves from the rescaled positions (`reresolveFreeObjects3`,
 the #557 rule) and its riders, feet and crossings are re-seated.
+
+**One enumeration, with each member's rescale invariance (#2789, [ADR-3D-457](06b-decisions-3d.md#adr-3d-457)).**
+`hasAbsoluteFrameObject` is `absoluteFrameObjects3(c).length > 0`: one entry per absolute object, `{ kind, scaleInvariant }`.
+A partly stated point (`partial`, an axis or half-axis point) is a member, so it samples the placement, draws the axes and
+stops `drawnFrame3` turning it off its axis (`orientationStated3` reads the same predicate). `scaleInvariant` is "a cone
+through the origin": the #754 rescale multiplies every position, plane offset and line anchor by k > 0 about the origin, so
+a pin or partial point whose stated components are all 0, the origin, a coordinate plane or axis relation, a numeric plane
+with d = 0 and a numeric line anchored at 0 each map onto themselves. `scaleGivenSafe` refuses the size only beside a
+member that is not invariant, and asks `scaleFixingPins3` (a pin whose stated components are all 0 fixes no scale) rather
+than `scalePinned`, the pivot's ownership flag. `positionedAbsolutePoint3` (coord, coord-sym, partial) is what the
+funnel's clearance keeps vertices away from. `absolutePointCount` stays "a stated position" and does not count an axis
+point.
 
 **The funnel moves the figure lane (#2798, [ADR-3D-456](06b-decisions-3d.md#adr-3d-456)).** `gaugePlacedIds3` is the
 figure lane; the funnel's extent and clearance read only it. After each candidate motion every `mixed` point is

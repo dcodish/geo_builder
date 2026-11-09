@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
+  // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],
   // #2798 (ADR-3D-456) — the report: «M אמצע AP» beside a stated point was carried off with the cube (1–4.2 units off the
   // midpoint, every line green). Where M sits is asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-midpoint-fixed-point-2798.geo3.json': ["קובייה ABCDA'B'C'D'", 'P(1,2,3)', 'M אמצע AP'],

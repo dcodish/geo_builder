@@ -116,7 +116,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   Sampling or solving a figure's placement never moves a point away from its own definition. A point built from both
   the figure and a fixed object (a stated coordinate, an equation plane, a typed line, an axis point) is re-derived
   wherever the figure lands; a point built only from fixed objects never moves (#2798).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456).
+  A point stated on a coordinate axis or half-axis («P נמצא על החלק החיובי של ציר ה-x», «P נמצא על ציר ה-x») anchors the
+  figure like any absolute object: its placement is sampled and the axes are drawn. A size stated beside an object a
+  rescale about the origin keeps (an axis point, the origin, a coordinate plane or axis, a plane or a typed line through
+  the origin) holds in both orders (#2789).
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456), [ADR-3D-457](06b-decisions-3d.md#adr-3d-457).
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:

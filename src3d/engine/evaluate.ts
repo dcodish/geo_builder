@@ -44,7 +44,7 @@ import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scaleP
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
@@ -3054,7 +3054,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
             if (nn > 1e-9) worst = Math.min(worst, Math.abs(dot3(pl.n, p) + pl.d) / nn);
           }
           for (const [id2, def2] of c.points) {
-            if (def2.kind !== 'coord' && def2.kind !== 'coord-sym') continue;
+            // #2789 (ADR-3D-457): every point positioned in the absolute frame, an axis point included
+            if (!positionedAbsolutePoint3(def2)) continue;
             const q = pos.get(id2);
             if (!q) continue;
             worst = Math.min(worst, dist3(p, q));
@@ -3275,6 +3276,9 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     const stated = scaleGivenValue(g);
     if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
       const k = Math.pow(stated / m0, 1 / power);
+      // #2789 (ADR-3D-457): every absolute object admitted here is a cone through the origin (`scaleGivenSafe`): an axis
+      // point's zero components stay 0 and its free one keeps its sign (k > 0), an origin plane's d and an origin line's
+      // anchor stay 0. So the factor keeps each one exactly, and the figure is the same figure at the stated size.
       for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
       for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
       // #2746 (ADR-3D-453): a relative line (free, plane-plane, common-perp, projection) is admitted now that the

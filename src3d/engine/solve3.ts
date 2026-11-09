@@ -414,7 +414,22 @@ export function pinOperandPlanes3(c: Construction3, pin: ScalarPin): Id[][] {
 
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
-  return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind] || (p.kind === 'free-joint' && p.gauge));
+  return scalarPinFixesScale3(c);
+}
+
+/** The scalar-pin half of the scale question, shared by {@link scalePinned} and {@link scaleFixingPins3}. */
+const scalarPinFixesScale3 = (c: Construction3): boolean => c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind] || (p.kind === 'free-joint' && p.gauge));
+
+/**
+ * #2789 (ADR-3D-457) — DOES A STATED PIN FIX THE FIGURE'S SCALE? The scale given's own question (`scaleGivenSafe`), which
+ * {@link scalePinned} (the pivot's ownership flag, "any pin at all") answered too broadly: a point pin whose every stated
+ * component is 0 («הקודקוד D נמצא על החלק החיובי של ציר ה-x»: y = z = 0) holds under every rescale about the origin and
+ * fixes no size. Every other pin family fixes it as before.
+ */
+export function scaleFixingPins3(c: Construction3): boolean {
+  if (c.pins.some((p) => ![p.x, p.y, p.z].every((v) => v === null || v === 0))) return true;
+  if (c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
+  return scalarPinFixesScale3(c);
 }
 
 /**

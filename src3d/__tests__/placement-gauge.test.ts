@@ -13,6 +13,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { freeDofCount3, hasAbsoluteFrameObject, placementSampled3 } from '../engine/evaluate';
+import { absoluteFrameObjects3, absolutePointCount } from '../engine/types';
 import { dataView } from '../engine/dataView';
 import { answerQuery } from '../engine/queries';
 import { buildScene3 } from '../render/scene3';
@@ -357,7 +358,9 @@ describe('#2746 — the scale given asks the same absolute-frame predicate', () 
   });
 
   // the controls: an absolute object still detaches the size, as #551 contracts — refused as today
-  for (const abs of ['x+y+z=1', 'l1:x=t(1,1,1)', 'P(1,2,3)']) {
+  // #2789 (ADR-3D-457): «l1:x=t(1,1,1)» passes through the origin, so the rescale keeps it — now accepted (below); the
+  // controls off the origin still refuse, the follow-up #2792's
+  for (const abs of ['x+y+z=1', 'P(1,2,3)']) {
     it(`«${abs}» still refuses the size (size-on-solid)`, () => {
       for (const l of [CUBE3, 'אורך AB = 4', abs]) submit(l);
       const d = derived(0);
@@ -368,11 +371,140 @@ describe('#2746 — the scale given asks the same absolute-frame predicate', () 
     });
   }
 
-  it('a partial point («P on the positive x-axis») keeps today’s refusal — the open question in ADR-3D-453', () => {
+  it('a partial point («P on the positive x-axis») frames the figure and keeps the size (#2789, ADR-3D-457, operator "4 - b")', () => {
     for (const l of [CUBE3, 'אורך AB = 4', 'P נמצא על החלק החיובי של ציר ה-x']) submit(l);
     const d = derived(0);
-    expect(hasAbsoluteFrameObject(d.construction)).toBe(false);
-    expect(scaleGivenSafe(d.construction)).toBe(false);
+    expect(hasAbsoluteFrameObject(d.construction)).toBe(true);
+    expect(scaleGivenSafe(d.construction)).toBe(true);
+  });
+});
+
+/**
+ * #2789 (ADR-3D-457) — a point stated on a coordinate axis is an absolute object (ADR-3D-094: "Lane-A absolute like
+ * coord"), and a size beside any object the rescale keeps (a cone through the origin) is accepted in both orders.
+ * Operator 2026-11-09 on #2746: "4 - b"; ADR-W-199: "we would not refuse something that can be built".
+ */
+describe('#2789 — an axis point frames the figure, and a size beside an origin cone holds', () => {
+  beforeEach(() => state().clear());
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const SIZE = 'אורך AB = 4';
+  const PX = 'P נמצא על החלק החיובי של ציר ה-x';
+  const SEEDS8 = [0, 1, 2, 3, 4, 5, 6, 7];
+  const near = (p: Vec3, q: Vec3): number => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
+  const build = (lines: readonly string[]): void => {
+    for (const l of lines) {
+      submit(l);
+      expect(state().lastError, l).toBeNull();
+    }
+  };
+  const okAt = (seed: number) => {
+    const d = derive3(state().facts, seed);
+    for (const f of state().facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
+    return d;
+  };
+  const onAxis = (p: Vec3, axis: 'x' | 'y' | 'z', sign: 1 | -1 | 0) => {
+    const others = (['x', 'y', 'z'] as const).filter((a) => a !== axis);
+    for (const a of others) expect(p[a]).toBe(0);
+    if (sign !== 0) expect(Math.sign(p[axis])).toBe(sign);
+  };
+
+  it('the report: the size holds, P stays on +x, the placement is sampled, every vertex clears P, the axes are drawn', () => {
+    build([CUBE, PX, SIZE]);
+    const As = new Set<string>();
+    for (const seed of SEEDS8) {
+      const d = okAt(seed);
+      const pos = d.resolved.positions;
+      expect(near(pos.get('A')!, pos.get('B')!)).toBeCloseTo(4, 9);
+      onAxis(pos.get('P')!, 'x', 1);
+      As.add(pos.get('A')!.x.toFixed(6));
+      for (const v of ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"]) expect(near(pos.get(v)!, pos.get('P')!), `${v} @${seed}`).toBeGreaterThan(0.1);
+    }
+    expect(As.size, 'A varies across seeds').toBeGreaterThan(1);
+    const d0 = derive3(state().facts, 0);
+    expect(placementSampled3(d0.construction)).toBe(true);
+    expect(buildScene3(d0.construction, d0.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).axes.length, 'axes drawn').toBeGreaterThan(0);
+  });
+
+  it('size first: «אורך AB = 4» stays ok and the cube keeps edge 4 when P is added', () => {
+    build([CUBE, SIZE]);
+    expect(near(at(0, 'A'), at(0, 'B'))).toBeCloseTo(4, 9);
+    build([PX]);
+    for (const seed of SEEDS8) {
+      const d = okAt(seed);
+      expect(near(d.resolved.positions.get('A')!, d.resolved.positions.get('B')!)).toBeCloseTo(4, 9);
+      onAxis(d.resolved.positions.get('P')!, 'x', 1);
+    }
+  });
+
+  it.each([
+    ['P נמצא על החלק השלילי של ציר ה-y', 'y', -1],
+    ['P נמצא על החלק החיובי של ציר ה-z', 'z', 1],
+    ['P נמצא על ציר ה-x', 'x', 0],
+  ] as const)('«%s», both orders', (line, axis, sign) => {
+    for (const order of [[CUBE, line, SIZE], [CUBE, SIZE, line]]) {
+      state().clear();
+      build(order);
+      for (const seed of [0, 3]) {
+        const d = okAt(seed);
+        expect(near(d.resolved.positions.get('A')!, d.resolved.positions.get('B')!)).toBeCloseTo(4, 9);
+        onAxis(d.resolved.positions.get('P')!, axis, sign);
+      }
+    }
+  });
+
+  it('the drift: a box with «P נמצא על ציר ה-x» and «אורך AB = 4» keeps P on the x-axis at every seed', () => {
+    build(["תיבה ABCDA'B'C'D'", 'P נמצא על ציר ה-x', SIZE]);
+    for (const seed of SEEDS8) onAxis(okAt(seed).resolved.positions.get('P')!, 'x', 0);
+  });
+
+  it('a pyramid’s volume beside a half-axis point: ok in both orders, the same drawing', () => {
+    const vol = 'נפח הפירמידה ABCDS = 12';
+    build(['פירמידה ABCDS', PX, vol]);
+    const first = [0, 3].map((s) => okAt(s).resolved.positions);
+    state().clear();
+    build(['פירמידה ABCDS', vol, PX]);
+    [0, 3].forEach((s, i) => {
+      const pos = okAt(s).resolved.positions;
+      for (const [id, p] of pos) expect(near(p, first[i].get(id)!), `${id} @${s}`).toBeLessThan(1e-9);
+    });
+  });
+
+  it('a vertex on the +x half-axis with the size: |AB| = 4 and D on the half-axis', () => {
+    build([CUBE, 'הקודקוד D נמצא על החלק החיובי של ציר ה-x', SIZE]);
+    for (const seed of SEEDS8) {
+      const pos = okAt(seed).resolved.positions;
+      expect(near(pos.get('A')!, pos.get('B')!)).toBeCloseTo(4, 9);
+      const D = pos.get('D')!;
+      expect(Math.abs(D.y) + Math.abs(D.z)).toBeLessThan(1e-6);
+      expect(D.x).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(['הקודקוד D נמצא על ציר ה-x', 'D בראשית הצירים', 'המישור ABC מונח על המישור [xy]', 'x+y+z=0', 'l1:x=t(1,1,1)'])(
+    'the origin cone «%s» keeps the size, both orders',
+    (line) => {
+      for (const order of [[CUBE, line, SIZE], [CUBE, SIZE, line]]) {
+        state().clear();
+        build(order);
+        for (const seed of [0, 3]) {
+          const pos = okAt(seed).resolved.positions;
+          expect(near(pos.get('A')!, pos.get('B')!)).toBeCloseTo(4, 9);
+        }
+      }
+    },
+  );
+
+  it.each(['P(2,0,0)', 'x+y+z=1', 'l1:x=(1,0,0)+t(1,1,1)'])('a control off the origin «%s» still refuses the size (#2792)', (line) => {
+    build([CUBE, line]);
+    submit(SIZE);
+    expect(state().lastError).toMatchObject({ code: 'size-on-solid' });
+  });
+
+  it('an axis point is not a stated position: absolutePointCount and the translation axes are untouched', () => {
+    build([CUBE, PX]);
+    const c = derive3(state().facts, 0).construction;
+    expect(absolutePointCount(c)).toBe(0);
+    expect(absoluteFrameObjects3(c)).toEqual([{ kind: 'point', scaleInvariant: true }]);
   });
 });
 
