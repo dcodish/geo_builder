@@ -113,7 +113,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   still let turn about a pinned point or axis, or resize, is turned to a new angle and resized by «הציגו
   תצורה אחרת»; the first drawing may be tilted (operator 2026-10-23, #2378: *"Each press turns the cube about
   AB to a new angle. The first drawing may no longer sit square on the floor."*; 2026-10-24, #2504 d03b).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435).
+  Sampling or solving a figure's placement never moves a point away from its own definition. A point built from both
+  the figure and a fixed object (a stated coordinate, an equation plane, a typed line, an axis point) is re-derived
+  wherever the figure lands; a point built only from fixed objects never moves (#2798).
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456).
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:

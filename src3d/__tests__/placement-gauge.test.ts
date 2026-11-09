@@ -375,3 +375,97 @@ describe('#2746 — the scale given asks the same absolute-frame predicate', () 
     expect(scaleGivenSafe(d.construction)).toBe(false);
   });
 });
+
+/**
+ * #2798 (ADR-3D-456) — a point built from BOTH the figure and a fixed object is drawn at its own definition wherever the
+ * funnel lands the figure. «M אמצע AP» beside «P(1,2,3)» was carried off with the cube (1–4.6 units off the midpoint)
+ * while every line read green; a foot from a vertex to an equation plane stayed where the canonical cube had put it.
+ */
+describe('#2798 — the funnel re-seats a mixed point from its own definition', () => {
+  beforeEach(() => state().clear());
+  type P3 = { x: number; y: number; z: number };
+  const lerp = (a: P3, b: P3, t: number): P3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
+  const gap = (a: P3, b: P3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const mean = (...ps: P3[]): P3 => ({ x: ps.reduce((s, q) => s + q.x, 0) / ps.length, y: ps.reduce((s, q) => s + q.y, 0) / ps.length, z: ps.reduce((s, q) => s + q.z, 0) / ps.length });
+  const footOnPlane = (p: P3, n: P3, d: number): P3 => {
+    const t = (n.x * p.x + n.y * p.y + n.z * p.z + d) / (n.x * n.x + n.y * n.y + n.z * n.z);
+    return { x: p.x - n.x * t, y: p.y - n.y * t, z: p.z - n.z * t };
+  };
+  const footOnLine = (p: P3, a: P3, u: P3): P3 => lerp(a, { x: a.x + u.x, y: a.y + u.y, z: a.z + u.z }, ((p.x - a.x) * u.x + (p.y - a.y) * u.y + (p.z - a.z) * u.z) / (u.x * u.x + u.y * u.y + u.z * u.z));
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const PI1 = 'המישור π1: x + y + z - 1 = 0';
+  const L1 = 'הישר ℓ1: x = (1,2,3) + t(1,1,1)';
+  const ONES = { x: 1, y: 1, z: 1 };
+  const P = { x: 1, y: 2, z: 3 };
+  /** every line accepted, every fact ok at seeds 0–7, and the drawn point at its definition from the drawn inputs */
+  const holds = (lines: readonly string[], off: (p: (id: string) => P3) => number, seeds = 8): void => {
+    for (const l of lines) {
+      submit(l);
+      expect(state().lastError, l).toBeNull();
+    }
+    for (let seed = 0; seed < seeds; seed++) {
+      const d = derive3(state().facts, seed);
+      for (const f of state().facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
+      expect(off((id) => d.positions.get(id)!), `seed ${seed}`).toBeLessThan(1e-9);
+    }
+  };
+  const mid = (m: string, a: string, b: string) => (p: (id: string) => P3) => gap(p(m), lerp(p(a), p(b), 0.5));
+
+  it('the report: «M אמצע AP» beside «P(1,2,3)» is the midpoint at every seed, P stays put, the cube still roams', () => {
+    holds([CUBE, 'P(1,2,3)', 'M אמצע AP'], mid('M', 'A', 'P'));
+    for (let seed = 0; seed < 8; seed++) expect(gap(at(seed, 'P'), P)).toBe(0);
+    expect(new Set([0, 1, 2, 3].map((s) => at(s, 'A').x.toFixed(6))).size, 'the placement is still sampled').toBeGreaterThan(1);
+  });
+  it.each([
+    ['a box', ["תיבה ABCDA'B'C'D'", 'P(1,2,3)', 'M אמצע AP'], 'A'],
+    ['a pyramid', ['פירמידה ABCDS', 'P(1,2,3)', 'M אמצע SP'], 'S'],
+    ['a tetrahedron', ['פירמידה משולשת ABCD', 'P(1,2,3)', 'M אמצע AP'], 'A'],
+  ])('%s: the same', (_n, lines, v) => holds(lines, mid('M', v, 'P')));
+  it('a midpoint of two stated points never moves with the cube (all its inputs are fixed)', () => {
+    holds([CUBE, 'P(1,2,3)', 'Q(4,0,1)', 'M אמצע PQ'], (p) => gap(p('M'), { x: 2.5, y: 1, z: 2 }));
+    for (let seed = 0; seed < 8; seed++) expect(at(seed, 'M')).toEqual({ x: 2.5, y: 1, z: 2 });
+  });
+  it('a ratio point and a centroid with a stated point', () => {
+    holds([CUBE, 'P(1,2,3)', 'E על AP כך ש-AE:EP = 2:1'], (p) => gap(p('E'), lerp(p('A'), p('P'), 2 / 3)));
+    state().clear();
+    holds([CUBE, 'P(1,2,3)', 'E מפגש התיכונים של משולש ABP'], (p) => gap(p('E'), mean(p('A'), p('B'), p('P'))));
+  });
+  it('a foot from a vertex to an equation plane and to a typed line is the foot of the DRAWN vertex', () => {
+    holds([CUBE, PI1, 'מ-A מורידים אנך למישור π1 החותך אותו בנקודה F'], (p) => gap(p('F'), footOnPlane(p('A'), ONES, -1)));
+    state().clear();
+    holds([CUBE, L1, 'מ-B מעבירים אנך לישר ℓ1 החותך אותו בנקודה F'], (p) => gap(p('F'), footOnLine(p('B'), P, ONES)));
+  });
+  it('an equation plane’s crossing with an edge lies on the plane and on the edge — the funnel keeps the crossing on its ink', () => {
+    holds([CUBE, PI1, "המישור π1 חותך את AC' בנקודה E"], (p) => {
+      const E = p('E');
+      const A = p('A');
+      const C = p("C'");
+      const t = ((E.x - A.x) * (C.x - A.x) + (E.y - A.y) * (C.y - A.y) + (E.z - A.z) * (C.z - A.z)) / gap(A, C) ** 2;
+      return Math.abs(E.x + E.y + E.z - 1) + gap(E, lerp(A, C, t)) + (t < 0 || t > 1 ? 1 : 0);
+    });
+  });
+  it('control: the crossing of a typed line with plane ABC (resolved late) is unchanged', () => {
+    holds([CUBE, L1, 'הישר ℓ1 חותך את מישור ABC בנקודה E'], (p) => gap(p('E'), footOnLine(p('E'), P, ONES)));
+  });
+  it('a point built from a mixed point follows the re-seated one', () => {
+    holds([CUBE, 'P(1,2,3)', 'M אמצע AP', 'N אמצע MB'], (p) => mid('M', 'A', 'P')(p) + mid('N', 'M', 'B')(p));
+  });
+  it('the refusals that disappear: «AM = MP» is true, «E על המישור ABP» is buildable (ADR-W-199)', () => {
+    holds([CUBE, 'P(1,2,3)', 'M אמצע AP', 'AM = MP'], mid('M', 'A', 'P'));
+    state().clear();
+    holds([CUBE, 'P(1,2,3)', 'מישור ABP', 'E על המישור ABP'], (p) => {
+      const [A, B, Q, E] = [p('A'), p('B'), p('P'), p('E')];
+      const u = { x: B.x - A.x, y: B.y - A.y, z: B.z - A.z };
+      const v = { x: Q.x - A.x, y: Q.y - A.y, z: Q.z - A.z };
+      const n = { x: u.y * v.z - u.z * v.y, y: u.z * v.x - u.x * v.z, z: u.x * v.y - u.y * v.x };
+      return Math.abs(n.x * (E.x - A.x) + n.y * (E.y - A.y) + n.z * (E.z - A.z)) / Math.hypot(n.x, n.y, n.z);
+    });
+  });
+  it('a stated length on a rider of a mixed segment holds where the rider is drawn («E על AP» · «AE = 1»)', () => {
+    holds([CUBE, 'P(1,2,3)', 'E על AP', 'AE = 1'], (p) => {
+      const [A, E, Q] = [p('A'), p('E'), p('P')];
+      const t = ((E.x - A.x) * (Q.x - A.x) + (E.y - A.y) * (Q.y - A.y) + (E.z - A.z) * (Q.z - A.z)) / gap(A, Q) ** 2;
+      return gap(E, lerp(A, Q, t)) + Math.abs(gap(A, E) - 1);
+    }, 3); // the drive is a full pivot solve per seed (~1.7 s)
+  });
+});

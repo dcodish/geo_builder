@@ -18,8 +18,8 @@
 
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { carrierParams3 } from './carriers';
-import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
+import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
+import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
 import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -663,9 +663,17 @@ const FLAT_RING_FAN: readonly (readonly [number, number])[] = [[0.25, 0.2], [0.7
 /** #2714 (docs/17 §9): exercised counters — how often the fan ran on a determined flat ring, and the roots it added. */
 export const ssaFanStats = { runs: 0, found: 0 };
 
+/**
+ * The pivot's canonical evaluator. `reseat` (#2798, ADR-3D-456) re-derives the figure's MIXED points (`figureLanes3`) in
+ * a candidate's final frame; solve3 cannot import the point pass (evaluate imports solve3), so the caller hands it in.
+ */
+export type CanonicalEval3 = ((dims: number[], symbolOverride?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3) & {
+  reseat?: (pos: Positions3, riderTs?: ReadonlyMap<Id, number>) => void;
+};
+
 export function solvePivot(
   c: Construction3,
-  evalCanonical: (dims: number[], symbolOverride?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
+  evalCanonical: CanonicalEval3,
   dims0: number[],
   seed: number,
   coupled?: { syms: string[]; pins: Construction3['symbolPins'] },
@@ -965,23 +973,40 @@ export function solvePivot(
       return (memo = { dim, generators, counted, rotation, scaleFree });
     };
   };
+  /**
+   * #1498, #2798 (ADR-3D-456) — A CANDIDATE'S FINAL FRAME, the one the drawn figure will be in: the figure lane carried
+   * by the candidate's gauge, the fixed lane verbatim, and each mixed point re-derived from its own definition there
+   * (`reseat`). With no mixed point this is the per-point lookup it always was.
+   */
+  const hasMixed = mixedPointIds3(c).length > 0 && !!evalCanonical.reseat;
+  const frameOf = (pos: Positions3, g: Parameters<typeof applyGauge>[1], riderTs: ReadonlyMap<Id, number> | undefined): ((id: Id) => Vec3 | undefined) => {
+    if (!hasMixed) {
+      return (id) => {
+        const p = pos.get(id);
+        if (!p) return undefined;
+        return gaugeFramePoint3(c, id) ? applyGauge(p, g) : p;
+      };
+    }
+    const fin: Positions3 = new Map();
+    for (const [id, p] of pos) fin.set(id, gaugeFramePoint3(c, id) ? applyGauge(p, g) : p);
+    evalCanonical.reseat!(fin, riderTs);
+    return (id) => fin.get(id);
+  };
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7, 7 + nDims);
     const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(dims, override, riderMap(x));
+    const riderTs = riderMap(x);
+    const pos = evalCanonical(dims, override, riderTs);
     /**
      * #1498 — THE frame accessor for every residual: a point is read in the frame the DRAWN figure
-     * will put it in (`gaugeFramePoint3`, the final placement's own rule). Every residual family
+     * will put it in (`frameOf`, the final placement's own rule). Every residual family
      * below used `applyGauge` unconditionally, so any pin relating a gauge-frame point to a Lane-A
      * absolute one (a typed coordinate, an equation-plane rider) compared two different frames — the
      * residual could never reach zero, and the pivot refused the student's true given.
      */
-    const laneAt = (id: Id): Vec3 | null => {
-      const p = pos.get(id);
-      if (!p) return null;
-      return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
-    };
+    const frame = frameOf(pos, g, riderTs);
+    const laneAt = (id: Id): Vec3 | null => frame(id) ?? null;
     const out: number[] = [];
     for (const pin of pointPins) {
       const q = laneAt(pin.id);
@@ -2276,13 +2301,10 @@ export function solvePivot(
   const atFor = (mirror: boolean, x: number[]): ((id: Id) => Vec3 | undefined) => {
     const g = { ...unpack(x), mirror };
     const override = coupled ? new Map(coupled.syms.map((s, i) => [s, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(x.slice(7, 7 + nDims), override, riderMap(x));
-    return (id) => {
-      const p = pos.get(id);
-      if (!p) return undefined;
-      // #1498: the one lane rule — see `gaugeFramePoint3`
-      return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
-    };
+    const riders = riderMap(x);
+    const pos = evalCanonical(x.slice(7, 7 + nDims), override, riders);
+    // #1498, #2798: the one lane rule — see `frameOf`
+    return frameOf(pos, g, riders);
   };
   /**
    * #1769 (ADR-3D-395) — DO THE MEMBER PINS HOLD BY THE VERIFIER'S OWN BAR at a candidate's final positions?

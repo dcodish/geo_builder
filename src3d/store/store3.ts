@@ -48,7 +48,7 @@ import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engi
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { nounOfKind } from '../engine/solidSubject';
 import { foldPrimes3 } from '../lexicon/marks3';
-import { checkInSpan, componentValue, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, componentValue, crossingOnInk3, declaredRingCrossed3, evaluate3, firstSatisfyingSeed3, knowledgeSamples3, meetsRequirements3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { cross3, dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
@@ -2175,10 +2175,7 @@ function deriveCore3(
           status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // ∥ to the plane — no crossing at all
           break;
         }
-        const dir = sub3(B, A);
-        const len2 = dot3(dir, dir);
-        const t = len2 > 1e-18 ? dot3(sub3(P, A), dir) / len2 : -1;
-        if (!(t > -1e-9 && t < 1 + 1e-9)) {
+        if (!crossingOnInk3(P, A, B)) {
           status[f.id] = { code: 'crossing-off-segment', id: cmd.id };
           break;
         }

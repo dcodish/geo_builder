@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2798 (ADR-3D-456) — the report: «M אמצע AP» beside a stated point was carried off with the cube (1–4.2 units off the
+  // midpoint, every line green). Where M sits is asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-midpoint-fixed-point-2798.geo3.json': ["קובייה ABCDA'B'C'D'", 'P(1,2,3)', 'M אמצע AP'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
