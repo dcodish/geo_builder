@@ -1771,7 +1771,15 @@ The relations layer's definite values, the values panel and the forced crossing 
   scale), and `stable` (every sampled seed, via `seedOfSample` and the `circlesOfSample` discipline, sees that
   number). It rides `detectAll` into the store's `determinacy` slot (facts-keyed, like `crossings`), and
   `figureStatus` (`app/figureStatus.ts`) maps it to the status line (FR-ALT-6). The values panel reads the same
-  `complete` flag.
+  `complete` flag. Two samples are one shape when they differ by less than `DOUBLE_ROOT_SPLIT` (√`SOLVE_PRECISION`,
+  the engine's tolerance table in `engine/geometry.ts`), the distance by which solver precision can split a tangency
+  ([ADR-798](06-decisions.md#adr-798), #2758).
+- **A tangency is one double root** ([ADR-798](06-decisions.md#adr-798), [ADR-799](06-decisions.md#adr-799), #2758). The rider's
+  root finders (`solveParam`'s grid scan, `directionRoots`' quadratic) take an extremum of the residual that reaches zero
+  to within `SOLVE_PRECISION` of the residual's own scale as ONE root at the extremum: a sign-change pair inside its
+  bracket collapses into it, and a touch that falls just short still counts. The DOF rank (`engine/dofRank.ts`) flags a
+  solved point's embedded row that is flat but curved in its own column (`secondOrderPin`), and counts such a row as
+  still pinning the column where the first-order rank finds it dependent.
 - **A «נתון» row prints the spelling** ([ADR-W-179](06w-decisions-workspace.md#adr-w-179), #1497): `computeValues` (`withGivenSpelling`) sets `ValueRow.given` from the `measure-*` command's `expr.text`, the text the canvas label prints; `MathValues` typesets it with `MathText`. A row in the student's unit, or with two values, keeps its own form.
 - **The values panel's one value gate** ([ADR-634](06-decisions.md#adr-634), #1867): every row and every question in
   `computeValuesPanel` asks `optionsOf` — one value when the pool agrees; the quantity's TWO values (classified by

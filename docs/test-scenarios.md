@@ -2299,3 +2299,6 @@ over all four (ADR-041).
 ### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
 
 **Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.
+### `tangent-rider-one-configuration-2758` — «מלבן ABCD · AB = 4 · BC = 2 · E על CD · ∠AEB = 90°»: E forced to CD's midpoint is ONE configuration (#2758, ADR-798/799)
+
+**Guards against:** a tangency (double root) counted as two configurations, with «הציגו תצורה אחרת» then showing the same drawing. **Asserts** E at the midpoint in the drawn figure and every pool sample, `configurations: 1` determined and stable, «נקבע במלואו», one shape over three presses, the ⟂ spelling the same; neighbours BC = 1.9 two configurations, BC = 2.001 refused.

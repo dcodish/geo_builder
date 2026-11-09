@@ -27,7 +27,7 @@ import {
   isOrderConstraint,
   isScaffoldId,
 } from './types';
-import { add, angleDeg, circumcenter, dist, scale, solveParam, sub, unit } from './geometry';
+import { add, angleDeg, circumcenter, dist, scale, solveParam, SOLVE_PRECISION, sub, unit } from './geometry';
 import { operandArea, operandBoundary, operandText } from './roundMeasure';
 
 /** A length bound's aim/accept margins in LENGTH units: the order fractions taken against the stated
@@ -806,7 +806,15 @@ export function directionRoots(con: Constraint, self: Id, a: Vec, b: Vec, pos: M
     roots = [-q0 / q1];
   } else {
     const disc = q1 * q1 - 4 * q2 * q0;
-    if (disc <= eps * scaleQ) return []; // no sign change: no root (a tangential touch is not one the scan found either)
+    // #2758 (ADR-798): a TANGENCY — the polynomial's extremum reaches zero to within the precision the figure is
+    // solved to — is ONE double root at the vertex, whether that precision made it overshoot (two roots
+    // √SOLVE_PRECISION apart: «AE ⟂ BE» with E on CD and the circle on AB just touching CD) or fall short (no
+    // root at all). Measured against the condition's own scale along the carrier, as `solveParam`'s scan does.
+    const vertex = -q1 / (2 * q2);
+    const p = (t: number) => (q2 * t + q1) * t + q0;
+    const scaleP = Math.max(Math.abs(p(lo)), Math.abs(p(hi)), vertex > lo && vertex < hi ? Math.abs(p(vertex)) : 0);
+    if (vertex > lo && vertex < hi && Math.abs(disc / (4 * q2)) <= SOLVE_PRECISION * scaleP) return [vertex];
+    if (disc <= eps * scaleQ) return []; // no sign change: no root
     const s = Math.sqrt(disc);
     roots = [(-q1 - s) / (2 * q2), (-q1 + s) / (2 * q2)];
   }

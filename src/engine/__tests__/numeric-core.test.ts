@@ -13,8 +13,9 @@
  * a failure here means the numeric core CHANGED, which is the signal.
  *
  * Known characterized quirks (findings, locked below — see the annotated tests):
- *  - `solveParam` (sign-change bisection) cannot see a touch-zero minimum —
- *    that is `drivenRoots`' reason to exist.
+ *  - `solveParam` (sign-change bisection) USED to be blind to a touch-zero
+ *    minimum; since #2758 (ADR-798) a tangency is one double root, found whether
+ *    solver precision made it overshoot into a sign-change pair or fall short.
  *  - `drivenRoots` scans interior grid indices only (i = 1..steps-1), so a
  *    root AT the range boundary is never found.
  *  - `drivenRoots`' dedup epsilon (1e-3) is FINER than its default grid
@@ -29,7 +30,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { nelderMead, argMin, drivenRoots, multiStartSolve, collapseBarrier } from '../evaluate';
-import { solveParam } from '../geometry';
+import { DOUBLE_ROOT_SPLIT, SOLVE_PRECISION, solveParam } from '../geometry';
+import { directionRoots } from '../solve';
 import type { Construction, Constraint, Id, Vec } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -64,10 +66,37 @@ describe('solveParam — sign-change bisection root finder', () => {
     expect(solveParam((t) => t * t + 1)).toEqual([]);
   });
 
-  it('QUIRK (by design): a touch-zero minimum is INVISIBLE to sign-change bracketing', () => {
-    // (t-0.3)^2 touches zero at 0.3 but never changes sign, and 0.3 is not on
-    // the 256-step grid — solveParam returns []. drivenRoots exists for this.
-    expect(solveParam((t) => (t - 0.3) * (t - 0.3))).toEqual([]);
+  // #2758 (ADR-798): a root of even multiplicity — a tangency — is ONE root, at the extremum.
+  it('a touch-zero minimum (no sign change, off the grid) is ONE double root at the touch', () => {
+    const roots = solveParam((t) => (t - 0.3) * (t - 0.3));
+    expect(roots).toHaveLength(1);
+    expect(roots[0]).toBeCloseTo(0.3, 6);
+  });
+
+  it('a tangency that OVERSHOOTS by solver precision (a sign-change pair √tol apart) is one root, not two', () => {
+    // the extremum dips 1e-8 below zero: within SOLVE_PRECISION of the residual's own scale (~0.49 here)
+    const roots = solveParam((t) => (t - 0.3) * (t - 0.3) - 1e-8);
+    expect(roots).toHaveLength(1);
+    expect(roots[0]).toBeCloseTo(0.3, 6);
+  });
+
+  it('a tangency that FALLS SHORT by solver precision is still the one double root', () => {
+    const roots = solveParam((t) => -((t - 0.6) * (t - 0.6)) - 1e-8);
+    expect(roots).toHaveLength(1);
+    expect(roots[0]).toBeCloseTo(0.6, 6);
+  });
+
+  it('a GENUINE close pair (the extremum crosses zero by more than the precision) stays two roots', () => {
+    const roots = solveParam((t) => (t - 0.3) * (t - 0.3) - 1e-4);
+    expect(roots).toHaveLength(2);
+    expect(roots[0]).toBeCloseTo(0.29, 10);
+    expect(roots[1]).toBeCloseTo(0.31, 10);
+    // and an extremum that stays clear of zero is no root at all
+    expect(solveParam((t) => (t - 0.3) * (t - 0.3) + 1e-4)).toEqual([]);
+  });
+
+  it('the tolerance table: the double-root split is √ of the solve precision', () => {
+    expect(DOUBLE_ROOT_SPLIT).toBeCloseTo(Math.sqrt(SOLVE_PRECISION), 15);
   });
 
   it('an everywhere-NaN residual yields no roots', () => {
@@ -78,6 +107,28 @@ describe('solveParam — sign-change bisection root finder', () => {
     const roots = solveParam((t) => t + 0.5, -1, 1, 128);
     expect(roots).toHaveLength(1);
     expect(roots[0]).toBeCloseTo(-0.5, 12);
+  });
+});
+
+// #2758 (ADR-798): directionRoots (solve.ts) — the exact ⟂/∥ roots of a rider. A tangent condition is ONE
+// double root at the quadratic's vertex, not a √tol-split pair and not "no root".
+describe('directionRoots — a tangent direction condition is one double root', () => {
+  // E rides C→D; AE ⟂ BE is the circle on AB. A=(0,0), B=(4,0), CD at height h: tangent when h = 2.
+  const at = (h: number) => {
+    const pos = new Map<Id, Vec>([['A', { x: 0, y: 0 }], ['B', { x: 4, y: 0 }]]);
+    const con = { type: 'perpendicular', a: 'A', b: 'E', c: 'B', d: 'E' } as Constraint;
+    return directionRoots(con, 'E', { x: 4, y: h }, { x: 0, y: h }, pos, 0, 1);
+  };
+  it('exactly tangent, and tangent to within solver precision on either side: one root at the midpoint', () => {
+    for (const h of [2, 2 * (1 - 5e-8), 2 * (1 + 5e-8)]) {
+      const roots = at(h)!;
+      expect(roots, `h = ${h}`).toHaveLength(1);
+      expect(roots[0]).toBeCloseTo(0.5, 9);
+    }
+  });
+  it('a genuine secant keeps its two roots, a genuine miss has none', () => {
+    expect(at(1.9)).toHaveLength(2);
+    expect(at(2.01)).toEqual([]);
   });
 });
 

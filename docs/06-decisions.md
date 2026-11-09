@@ -20531,3 +20531,44 @@ No new student text. Every sentence is an existing ruled string.
 **Not changed.** The figure, every verdict, and every lowered command. A file saved before this field shows no tag.
 
 **Behaviour change for a student:** a height or median typed without its side or triangle («AE גובה», «תיכון מ-A») keeps the student's words on its row and shows the shape it was drawn in beside them («במשולש ABC»), and that shape stays after a second shape, undo/redo, save/load and a share link.
+
+## ADR-798 — A tangency is one root: the rider's root finders polish a double root, and the configuration count compares at the split solver precision can make (#2758)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (P2, 2-D, wrong-answer) · round #2783, stream C · branch `fix/2758-tangency-one-configuration` · **sibling:** [ADR-799](#adr-799) (the DOF rank at the same double root) · LADDER stage: **4** (the 1-D rider roots inside `evaluate`) and the knowledge pool's configuration count
+**Operator:** 2026-11-08, *"ok"* on the audit #2755, item A3.
+**Requirements:** [02](02-requirements.md) FR-ALT-6 (unchanged promise, restored: a point a tangency forces is one shape; one sentence added) · **Design:** [04](04-design.md) § the status cue reads the same pool, and "A tangency is one double root"
+
+**Measured before** (`main` @ `4a06aae9`, `factsOf` → `replay` → `sharedSamples` → `figureDeterminacy`). «מלבן ABCD · AB = 4 · BC = 2 · E על CD · ∠AEB = 90°»: `configurations: 2`, `stable: true`, `determined: true`. E sat at 0.4998–0.5002 along CD over all 27 samples. In every sample the rectangle carried |BC| − |AB|/2 between −8.6e-9 and −1.3e-7 of the side, and the angle's maximum along CD overshot 90° by 5e-7° to 7e-6°, so the root scan bracketed two sign changes about 7e-4 apart. The «AE ⟂ BE» spelling (`directionRoots`, the exact quadratic) did the same, as did a different order of the facts and «AB = 10 · BC = 5». That last one read 3 configurations, unstable. The neighbours were right: BC = 2.001 is refused, BC = 1.9 has two configurations (0.344 / 0.656).
+
+**Class.** *A root of even multiplicity (a tangency) is counted as two roots.* An O(ε) error in the upstream figure moves a double root's residual by O(ε). That splits it into two roots O(√ε) apart, or leaves no root at all. The configuration count compared samples at 1e-4, a literal below √ε.
+
+**Decision.**
+1. **One tolerance table** (`engine/geometry.ts`). `SOLVE_PRECISION = 1e-6` is the relative residual the solvers leave on a figure they report solved. LM's `Σr² ≤ 1e-12` is the same bar squared, and the measurement above sits 4× inside it. `DOUBLE_ROOT_SPLIT = √SOLVE_PRECISION` is the distance by which that precision can split a tangency.
+2. **`solveParam` finds double roots** (`doubleRoots`). Each interior local minimum of |f| whose two grid neighbours lie on the same side of zero is polished to f's extremum by a ternary search on s·f. If |f| there is within `SOLVE_PRECISION` of the residual's own scale along the carrier (its largest |f| on the grid), the extremum replaces every sign-change root in its bracket. This covers an overshoot pair, a touch that falls just short, and a touch exactly on a grid point. A genuine close pair, whose extremum crosses zero by more than the precision, is kept. A cheap parabola test skips an extremum that plainly stays clear of zero. The plan said "Newton on f′". The ternary search on f is the same polish and is the scan's existing idiom (`drivenRoots`).
+3. **`directionRoots` does the same for its quadratic.** A vertex inside the range whose value is within `SOLVE_PRECISION` of the polynomial's scale on the range is the one root. Before, a touch inside `disc ≤ eps` returned no root.
+4. **The configuration count compares at `DOUBLE_ROOT_SPLIT`** (`CONFIG_REL_TOL` in `figureDeterminacy`), never a literal. Two samples closer than a tangency's split cannot be told apart from one tangency split by precision. That is 0.1% of the figure's span, below a pixel.
+
+**Sibling audit.** Every 1-D root finder over a rider: `solveParam` (the scan behind `solvedOnSegmentCandidates`) and `directionRoots` are fixed here. `drivenRoots` (the solve-directive path) minimises |f| and already merges minima within 1e-3. It is unchanged. 3-D: «הציגו תצורה אחרת» resamples seeds (`seedForRequirements`) and states no configuration count, so the class is absent. Analytic, measured with the rectangle pinned by coordinates (A(0,0) … D(0,2)): E lands within 1e-4 of the midpoint, and `anotherConfiguration` answers `found: false` because `looksTheSame` merges the split. The class is absent there, and ADR-AG-441 was not needed. *Found while measuring, a different class:* analytic accepts BC = 2.001 (pinned C(4, 2.001)), drawing E at (2, 2.0008), off CD, where 2-D refuses. This is a tolerance acceptance of an infeasible tangency, recorded on #2758 for its own triage.
+
+**Cost.** The polish runs only at a local minimum of |f| that the parabola test cannot rule out (80 residual evaluations each). The rank's curvature check runs only on a flagged row (two evaluations). Measured cold, `sharedSamples` at `4a06aae9` against this change on a loaded machine: round #1767's T12 tangent-circles figure 18.2 s → 18.5 s, and «מלבן ABCD · AB = 4 · BC = 1.9 · E על CD · ∠AEB = 90°» 22.9 s → 24.2 s. Both are within the noise of the shared machine.
+
+**Locks.** `src/engine/__tests__/numeric-core.test.ts`: a touch, an overshoot and a shortfall are each one root, and a genuine close pair stays two. This replaces the old QUIRK lock "a touch is invisible". The same file has `directionRoots` exactly tangent and ±5e-8 off (one root), a secant (two) and a miss (none). `src/replay/__tests__/issue-434-admissible-set.test.ts`: a 5e-4-relative difference is one configuration and a 5e-3 one is two. Scenario `tangent-rider-one-configuration-2758`: the reported sequence, every pool sample at the midpoint, one configuration, «נקבע במלואו», one shape over three presses, the ⟂ spelling, and the two neighbours.
+
+**Behaviour change for a student:** a figure whose point is forced by a tangency says «נקבע במלואו», and «הציגו תצורה אחרת» no longer offers the same drawing again.
+
+## ADR-799 — A solved point at a double root still pins its parameter in the DOF rank (#2758)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (P2, 2-D) · round #2783, stream C · branch `fix/2758-tangency-one-configuration` · **sibling:** [ADR-798](#adr-798) · LADDER stage: **the DOF accountant** (`freeDofCount` → `constraintRank`)
+**Requirements:** none (internal: FR-ALT-6's count holds for the ADR-798 figure) · **Design:** [04](04-design.md) "A tangency is one double root"
+
+**Measured.** Once ADR-798 placed the tangent E exactly at its extremum, `freeDofCount` for «מלבן ABCD · AB = 4 · BC = 2 · E על CD · ∠AEB = 90°» read **1** (it had read 0 only because E sat off the extremum). The pool then took the 16-seed undetermined route and the status lost «נקבע במלואו». Cause: ADR-536's rank unbakes E into a plain on-segment column with its embedded row. At a double root that row is flat in E's own column (∂g/∂t = 0). Its gradient over the other columns is a combination of «AB = 4» and «BC = 2», because the tangency is BC = AB/2, which the givens already force. The first-order rank drops the row as dependent, and E's column reads free.
+
+**Class.** *A first-order rank reads a root that is isolated at second order as a freedom.* It is the same double root as ADR-798, read by the DOF count instead of the root finder.
+
+**Decision** (`engine/dofRank.ts`). `constraintJacobian` flags a solved point's embedded row whose component on its own column is below `RANK_TOL` of its norm, and whose second difference in that column (step `H2 = 1e-4`) is not below that bar (`secondOrderPin`). `constraintRank` counts a flagged row that Gram–Schmidt finds dependent as still consuming its column. Moving t breaks such a root at second order, and nothing is left to compensate. A flagged row that is independent is the ordinary case and counts as before: the tangency is a fold of a smooth solution set, as with four free corners. A row that is flat and also not curved is identically satisfied along the carrier, a genuine freedom, and stays free. The shared column-shift builder `shiftedCfg` replaces the loop's inline copy, with no behaviour change.
+
+**Sibling audit.** `impliedByFigure` reads the same Jacobian but asks about one stated row, never a solved column, so it is unchanged. The coupled-pair unbaking (the on-segment carriers that `resolveDriven` promotes) gets the same flag, because it shares the embedded-row list.
+
+**Locks.** `src/engine/__tests__/dof-vacuous.test.ts`: the tangent rider in both spellings is 0 DOF, and the secant neighbour (BC = 1.9) is 0 DOF. The scenario of ADR-798 asserts `determined: true`.
+
+**Behaviour change for a student:** none beyond ADR-798's (it keeps «נקבע במלואו» on that figure).

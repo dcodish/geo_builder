@@ -6443,6 +6443,35 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs((E.x - Q.x) * (C.x - A.x) + (E.y - Q.y) * (C.y - A.y)) / (dist(E, Q) * dist(A, C)), 'QE ⟂ AC').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'tangent-rider-one-configuration-2758',
+    title: '«מלבן ABCD · AB = 4 · BC = 2 · E על CD · ∠AEB = 90°»: E is forced to CD’s midpoint (the circle on AB touches CD) — ONE configuration, not two (#2758, ADR-798/799)',
+    guards:
+      'Audit #2755 item A3, operator 2026-11-08 «ok». Measured on 4a06aae9 through parse -> replay: `figureDeterminacy` read `configurations: 2` (stable) and three presses of «הציגו תצורה אחרת» showed the same drawing, E at 0.4998–0.5002 along CD over 27 samples. Root cause: at a double root the rider’s root scan sees the tangency split into a sign-change pair √SOLVE_PRECISION apart (the rectangle is solved to ~1e-7), and the configuration count compared at 1e-4, below that split. Fix: a tangency is one double root at the extremum (`solveParam`, `directionRoots`), the count compares at DOUBLE_ROOT_SPLIT, and the rank keeps a tangent solved point pinned (ADR-799). Neighbours: BC = 2.001 is refused, BC = 1.9 has two configurations. Units: numeric-core.test.ts, dof-vacuous.test.ts, issue-434-admissible-set.test.ts.',
+    steps: ['מלבן ABCD', 'AB = 4', 'BC = 2', 'E על CD', '∠AEB = 90°'],
+    check(fig) {
+      allStepsOk(fig);
+      const along = (f: ReturnType<typeof replay>) => dist(at(f, 'D'), at(f, 'E')) / dist(at(f, 'D'), at(f, 'C'));
+      expect(along(fig), 'E at the midpoint of CD').toBeCloseTo(0.5, 5);
+      const steps = ['מלבן ABCD', 'AB = 4', 'BC = 2', 'E על CD', '∠AEB = 90°'];
+      const facts = factsOf(steps);
+      // the seed sweep: every sample of the pool puts E at the midpoint
+      const pool = sharedSamples(facts);
+      for (const pos of pool.samples) {
+        const [C, D, E] = [pos.get('C')!, pos.get('D')!, pos.get('E')!];
+        expect(dist(D, E) / dist(D, C), 'E at the midpoint in every sample').toBeCloseTo(0.5, 5);
+      }
+      expect(figureDeterminacy(pool)).toEqual({ determined: true, configurations: 1, stable: true, complete: true });
+      expect(configsShown(facts), 'the status says «נקבע במלואו»').toBe(1);
+      expect(shapesReached(facts, 3), '«הציגו תצורה אחרת» offers no second drawing').toBe(1);
+      // the perpendicular spelling is the same figure
+      expect(configsShown(factsOf(['מלבן ABCD', 'AB = 4', 'BC = 2', 'E על CD', 'AE ⟂ BE']))).toBe(1);
+      // the neighbours: a secant has two configurations; a rectangle too tall for the circle is refused
+      expect(configsShown(factsOf(['מלבן ABCD', 'AB = 4', 'BC = 1.9', 'E על CD', '∠AEB = 90°']))).toBe(2);
+      const over = replay(factsOf(['מלבן ABCD', 'AB = 4', 'BC = 2.001', 'E על CD', '∠AEB = 90°']));
+      expect(Object.values(over.status).some((s) => String(s).startsWith('cannot place E on segment CD')), 'BC = 2.001 is refused').toBe(true);
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
