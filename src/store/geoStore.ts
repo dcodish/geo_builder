@@ -34,7 +34,7 @@ import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, sear
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import type { RingNote } from '../../shell/narrowing';
 import type { CevianHost } from '../../shell/cevianHost';
-import { geoWork, geoValues, isCancelled } from './geoWork';
+import { geoWork, geoValues, isCancelled, isStaleBasis, supersedeStaleSearches, type ViewBasis } from './geoWork';
 import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
 import { GLUED_NAME_G } from '../../shell/indexedName';
@@ -259,8 +259,11 @@ export interface GeoState {
    *  Returns `true` if the figure now meets every requirement, `false` if none was found (kept as-is). */
   autoResolve: () => boolean;
   /** #41 (ADR-290): apply a view decided OFF-thread (a worker resample / auto-resolve outcome) as ONE
-   *  undo-tracked transition — the async twin of `resample`/`autoResolve`'s own `set`. */
-  applyView: (patch: { facts?: Fact[]; seed: number }) => void;
+   *  undo-tracked transition — the async twin of `resample`/`autoResolve`'s own `set`.
+   *  #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)): a compare-and-set on `(facts, seed)`. The
+   *  view applies only while the store still holds the `basis` it was searched on; a result that
+   *  arrives after an undo, redo, clear, edit or new line is dropped. Returns whether it applied. */
+  applyView: (patch: { facts?: Fact[]; seed: number; basis: ViewBasis }) => boolean;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
   /** Show/hide every circle's centre + label (ADR-059). */
@@ -686,10 +689,15 @@ export const useGeoStore = create<GeoState>()(
 
       applyView: (patch) => {
         // #41 (ADR-290): the worker's answer arrives here as one undo-tracked transition.
+        // #2757 (ADR-812): the ONE sink of every asynchronous search result, so the staleness check
+        // lives here, not at each caller — a view searched for a figure the student has left (undo,
+        // redo, clear, an edit, a new line) would write that figure back with no undo entry.
+        if (isStaleBasis(patch.basis, get())) return false;
         set({
           ...(patch.facts ? { facts: patch.facts } : {}),
           seed: patch.seed,
         });
+        return true;
       },
 
       autoResolve: () => {
@@ -900,3 +908,13 @@ export const useGeoStore = create<GeoState>()(
     },
   ),
 );
+
+// #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)): every change of the store's source of truth
+// supersedes the configuration searches computed for the figure it replaced. `applyView` already
+// refuses their results; this frees the worker at once, so the student is not left `busy` (input
+// locked, the canvas held on the last good view) behind a search for a figure no longer on screen.
+// One subscription covers every path — undo, redo, clear, edit, mute, load, a new line — by
+// construction, where per-button cancels would have to be remembered at each new action.
+useGeoStore.subscribe((s, prev) => {
+  if (s.facts !== prev.facts || s.seed !== prev.seed) supersedeStaleSearches(s);
+});

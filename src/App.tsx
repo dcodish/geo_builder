@@ -754,7 +754,7 @@ export default function App() {
           const temporal = useGeoStore.temporal.getState();
           temporal.pause();
           try {
-            useGeoStore.getState().applyView({ facts: found.facts, seed: found.seed });
+            useGeoStore.getState().applyView({ facts: found.facts, seed: found.seed, basis: found.basis });
           } finally {
             temporal.resume();
           }

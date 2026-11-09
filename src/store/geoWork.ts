@@ -145,21 +145,83 @@ function call(
   });
 }
 
+/**
+ * #2757 ([ADR-812](../../docs/06-decisions.md#adr-812)) — the store state a configuration search was
+ * computed AGAINST: the main thread's own `facts` reference (never the worker's structured clone) and
+ * the seed. The store's source of truth is `(facts, seed)` (ADR-484), so this pair is the whole
+ * identity of "the figure the search answered for". Every search result carries it, and
+ * `applyView` applies a result only while the store still holds that exact pair.
+ */
+export interface ViewBasis {
+  facts: Fact[];
+  seed: number;
+}
+
+/** True when the store no longer holds the figure `basis` was searched for — any undo, redo, clear,
+ *  edit, toggle, load or new line in between replaces the `facts` reference or the seed. */
+export function isStaleBasis(basis: ViewBasis, now: { facts: Fact[]; seed: number }): boolean {
+  return now.facts !== basis.facts || now.seed !== basis.seed;
+}
+
+/** The searches in flight, by the figure each answers for. A search whose figure the student has
+ *  left is superseded (`supersedeStaleSearches`): its promise rejects `{ cancelled }` and the
+ *  interactive worker is killed, so the student is never left waiting behind a search for a figure
+ *  that is no longer on screen. */
+type SearchToken = { basis: ViewBasis; superseded: boolean };
+const searchesInFlight = new Set<SearchToken>();
+
+async function searchOn<T>(basis: ViewBasis, run: () => Promise<T>): Promise<T> {
+  const token: SearchToken = { basis, superseded: false };
+  searchesInFlight.add(token);
+  try {
+    const out = await run();
+    // the no-Worker fallback has nothing to terminate, so the supersede is honoured HERE — the same
+    // `{ cancelled }` outcome in both modes (this module's "only the threading differs" contract)
+    if (token.superseded) throw Object.assign(new Error('cancelled'), { cancelled: true });
+    return out;
+  } finally {
+    searchesInFlight.delete(token);
+  }
+}
+
+/**
+ * #2757 (ADR-812): the store calls this on every change of its `(facts, seed)`. A search computed for
+ * another figure is superseded: it can never be applied (`applyView` checks the basis) and nothing
+ * waits on it, so its lane is freed at once. Returns true when it superseded anything.
+ */
+export function supersedeStaleSearches(now: { facts: Fact[]; seed: number }): boolean {
+  let any = false;
+  for (const token of searchesInFlight) {
+    if (token.superseded || !isStaleBasis(token.basis, now)) continue;
+    token.superseded = true;
+    any = true;
+  }
+  if (any) cancelLane('interactive');
+  return any;
+}
+
 export const geoWork = {
   /** The "show another configuration" search, off-thread. Resolves the validated COMPOSITE view —
-   *  facts (possibly carrying a branch/variant step) + seed — or null (ADR-340, #175). */
-  async resample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): Promise<{ facts: Fact[]; seed: number } | null> {
-    const done = (await call('resample', facts, seed, onProgress)) as ResampleDone;
-    return done.found;
+   *  facts (possibly carrying a branch/variant step) + seed — or null (ADR-340, #175). The view
+   *  carries the `basis` it was searched on (#2757). */
+  async resample(
+    facts: Fact[],
+    seed: number,
+    onProgress?: (k: number, n: number) => void,
+  ): Promise<{ facts: Fact[]; seed: number; basis: ViewBasis } | null> {
+    const basis = { facts, seed };
+    const done = (await searchOn(basis, () => call('resample', facts, seed, onProgress))) as ResampleDone;
+    return done.found ? { ...done.found, basis } : null;
   },
   /** The post-commit config search. `'ok'` = already valid; `null` = nothing found in budget. */
   async autoResolve(
     facts: Fact[],
     seed: number,
-  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null } | null> {
-    const done = (await call('autoResolve', facts, seed)) as AutoResolveDone;
+  ): Promise<'ok' | { facts: Fact[]; seed: number; fold: FoldNode | null; basis: ViewBasis } | null> {
+    const basis = { facts, seed };
+    const done = (await searchOn(basis, () => call('autoResolve', facts, seed))) as AutoResolveDone;
     if ('ok' in done) return 'ok';
-    return done.found;
+    return done.found ? { ...done.found, basis } : null;
   },
   /** Warm the fold for a fact-list's content off-thread; returns the node for `primeFoldFor`. */
   async prefold(facts: Fact[], seed: number): Promise<FoldNode | null> {

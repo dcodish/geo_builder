@@ -345,7 +345,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     // applied (searchResample found seed 2, then cycleAlt(D) unchecked). The gated cycleAlt must keep
     // the view requirement-satisfying (here: no other valid branch exists at seed 2 → a no-op); the
     // ungated one flips into the violation and FAILS this assert.
-    st.applyView({ seed: 2 });
+    useGeoStore.setState({ seed: 2 });
     expect(meetsRequirements(useGeoStore.getState().facts, 2), 'seed 2 is a valid view').toBe(true);
     st.cycleAlt('D');
     {
@@ -353,7 +353,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(meetsRequirements(facts, seed), 'cycleAlt never turns a valid view violating (kept or no-opped)').toBe(true);
     }
     // …and EVERY view "show another" applies keeps satisfying the givens — no reachable output violates.
-    st.applyView({ facts: facts0, seed: 0 });
+    useGeoStore.setState({ facts: facts0, seed: 0 });
     for (let press = 1; press <= 3; press++) {
       st.resample();
       const { facts, seed } = useGeoStore.getState();

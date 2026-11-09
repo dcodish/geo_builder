@@ -22,7 +22,7 @@ import {
   useGeoStore,
   type Fact,
 } from '../geoStore';
-import { geoWork } from '../geoWork';
+import { geoWork, isStaleBasis, supersedeStaleSearches } from '../geoWork';
 import type { AnyCommand } from '@/engine';
 
 let n = 0;
@@ -108,7 +108,7 @@ describe('geoWork — the no-Worker fallback (vitest env)', () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');
     const sync = searchAnotherView(facts, 0);
     const viaWork = await geoWork.resample(facts, 0);
-    expect(viaWork).toEqual(sync);
+    expect(viaWork).toEqual(sync && { ...sync, basis: { facts, seed: 0 } }); // + the #2757 basis it ran on
     expect(viaWork, 'this figure has another configuration').not.toBeNull();
     // The contract: whatever is returned is a WHOLE view the caller applies verbatim — and it is valid.
     expect(meetsRequirements(viaWork!.facts, viaWork!.seed)).toBe(true);
@@ -121,5 +121,50 @@ describe('geoWork — the no-Worker fallback (vitest env)', () => {
     const facts = factsOf('משולש KLM');
     const fold = await geoWork.prefold(facts, 0);
     expect(fold).not.toBeNull();
+  });
+});
+
+/** #2757 (ADR-812): a search result carries the `(facts, seed)` it ran on, and only that figure takes it. */
+describe('the search basis — applyView is a compare-and-set, a stale search is superseded', () => {
+  const st = () => useGeoStore.getState();
+  beforeEach(() => {
+    useGeoStore.setState({ facts: factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל'), seed: 0 });
+  });
+
+  it('isStaleBasis: the facts REFERENCE and the seed are the identity (equal content is not enough)', () => {
+    const facts = st().facts;
+    expect(isStaleBasis({ facts, seed: 0 }, { facts, seed: 0 })).toBe(false);
+    expect(isStaleBasis({ facts, seed: 0 }, { facts, seed: 1 })).toBe(true);
+    expect(isStaleBasis({ facts, seed: 0 }, { facts: [...facts], seed: 0 })).toBe(true);
+  });
+
+  it('applyView applies on its own basis and refuses any other, leaving the store untouched', () => {
+    const facts = st().facts;
+    expect(st().applyView({ facts, seed: 5, basis: { facts, seed: 0 } })).toBe(true);
+    expect(st().seed).toBe(5);
+    // a second answer for the figure at seed 0 arrives late: the store is now at seed 5
+    expect(st().applyView({ facts: [], seed: 9, basis: { facts, seed: 0 } })).toBe(false);
+    expect(st().facts).toBe(facts);
+    expect(st().seed).toBe(5);
+  });
+
+  it('every search result carries the basis it was searched on — the caller\'s own reference', async () => {
+    const facts = st().facts;
+    const found = await geoWork.resample(facts, 0);
+    expect(found?.basis.facts).toBe(facts);
+    expect(found?.basis.seed).toBe(0);
+  });
+
+  it('a change of (facts, seed) supersedes a search in flight: it rejects {cancelled}, in the no-Worker fallback too', async () => {
+    const pending = geoWork.resample(st().facts, 0);
+    useGeoStore.setState({ seed: 7 }); // the store moved on (the subscription fires)
+    await expect(pending).rejects.toMatchObject({ cancelled: true });
+  });
+
+  it('a search on the CURRENT figure is not superseded, and a display-only change supersedes nothing', async () => {
+    const pending = geoWork.resample(st().facts, st().seed);
+    st().toggleHidden('A');
+    expect(supersedeStaleSearches(st())).toBe(false);
+    await expect(pending).resolves.not.toBeNull();
   });
 });

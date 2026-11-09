@@ -46,7 +46,7 @@ describe('#1338 — a fact mutation clears every figure-level note', () => {
     const { ui, raise, clean } = sinks();
     const stop = subscribeFigureNotes(useGeoStore.subscribe, ui);
     try {
-      useGeoStore.getState().applyView({ facts: factsOf(['משולש ABC', 'BC = 4'] as never), seed: 0 });
+      useGeoStore.setState({ facts: factsOf(['משולש ABC', 'BC = 4'] as never), seed: 0 });
       raise();
       expect(clean()).toBe(false);
 
@@ -71,7 +71,7 @@ describe('#1338 — a fact mutation clears every figure-level note', () => {
     const { ui, raise, clean } = sinks();
     const stop = subscribeFigureNotes(useGeoStore.subscribe, ui);
     try {
-      useGeoStore.getState().applyView({ facts: factsOf(['משולש ABC', 'BC = 4'] as never), seed: 0 });
+      useGeoStore.setState({ facts: factsOf(['משולש ABC', 'BC = 4'] as never), seed: 0 });
       raise();
       act();
       expect(clean()).toBe(true);
@@ -89,9 +89,9 @@ describe('#1338 — a fact mutation clears every figure-level note', () => {
     const stop = subscribeFigureNotes(useGeoStore.subscribe, ui);
     try {
       const facts = factsOf(['משולש ABC', 'BC = 4'] as never);
-      useGeoStore.getState().applyView({ facts, seed: 0 });
+      useGeoStore.setState({ facts, seed: 0 });
       raise();
-      useGeoStore.getState().applyView({ facts, seed: 3 });
+      useGeoStore.setState({ facts, seed: 3 });
       expect(clean()).toBe(false);
     } finally {
       stop();
@@ -109,7 +109,7 @@ describe('#1338 — a fact mutation clears every figure-level note', () => {
     const { ui, raise, clean } = sinks();
     const stop = subscribeFigureNotes(useGeoStore.subscribe, ui);
     stop();
-    useGeoStore.getState().applyView({ facts: factsOf(['משולש ABC'] as never), seed: 0 });
+    useGeoStore.setState({ facts: factsOf(['משולש ABC'] as never), seed: 0 });
     raise();
     useGeoStore.getState().remove(useGeoStore.getState().facts.at(-1)!.id);
     expect(clean()).toBe(false);

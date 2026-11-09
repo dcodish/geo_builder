@@ -15,12 +15,15 @@
  */
 import type { Fact } from '@/store/geoStore';
 import type { FoldNode } from '@/replay/core';
+import { isStaleBasis, type ViewBasis } from '@/store/geoWork';
 
 export interface ViewResolveFound {
   facts: Fact[];
   seed: number;
   /** The worker's fold, transplanted by the caller (`primeFoldFor`) so main replays at tail speed. */
   fold: FoldNode | null;
+  /** #2757 (ADR-812): the `(facts, seed)` the search ran on — `applyView` refuses it once stale. */
+  basis: ViewBasis;
 }
 
 export interface ResolveViewDeps {
@@ -48,6 +51,10 @@ export async function runViewResolve(deps: ResolveViewDeps): Promise<void> {
   deps.setPending(true);
   try {
     const r = await deps.autoResolve(st.facts, st.seed);
+    // #2757 (ADR-812): the search answered for the figure as it was when it STARTED. If the student
+    // undid, redid, cleared or edited meanwhile, its answer, found or exhausted, is about a figure no
+    // longer on screen: apply nothing and say nothing (the store's `applyView` refuses it as well).
+    if (isStaleBasis(st, deps.getState())) return;
     if (r && r !== 'ok') deps.applyView(r);
     else if (r === null) deps.onExhausted();
   } catch (err) {
