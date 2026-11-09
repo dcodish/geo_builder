@@ -49,8 +49,8 @@ import { carrierParams3, determinationReach3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
-import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, SolidKind, SolidObj } from './types';
-import { claimResidual3, residualHolds3 } from './claims';
+import type { Claim3, Construction3, Determination3, Id, LinExpr, Operand3, PointDef, Positions3, Requirement3, SolidKind, SolidObj } from './types';
+import { claimResidual3, claimSeeds, residualHolds3 } from './claims';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, runNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3,
   bisectorDir3,
@@ -4578,8 +4578,37 @@ export function declaredRingCrossed3(c: Construction3, positions: Positions3): b
   return false;
 }
 
-export function meetsShapePreferences3(c: Construction3, seed: number): boolean {
-  const prefs = c.requirements.filter((req) => req.kind === 'quad-general');
+/** A #615 drawing preference: draw the declared quad ring visibly as itself (ADR-3D-158). */
+export type QuadPreference3 = Extract<Requirement3, { kind: 'quad-general' }>;
+const quadPreferences3 = (c: Construction3): QuadPreference3[] =>
+  c.requirements.filter((req): req is QuadPreference3 => req.kind === 'quad-general');
+/** Is this ring drawn as a special case of its preference's base here? Unresolvable: no (never a veto). */
+const preferenceFails3 = (req: QuadPreference3, positions: Positions3, tol?: number): boolean => {
+  const ring = req.ids.map((id) => positions.get(id));
+  return ring.every((p) => p) && quadDrawnDegenerate(req.base, ring as Vec3[], tol, req.right === true);
+};
+
+/** A special case the givens FORCE holds to solver precision; one a seed merely drew near holds only within the drawing's
+ *  0.06 (#2749: «טרפז ABCD» · «AD ∥ BC» is drawn within it at all four samples, yet seed 20 draws it general). */
+const FORCED_SPECIAL_TOL = 1e-6;
+/**
+ * #2749 ([ADR-3D-451](../../docs/06b-decisions-3d.md#adr-3d-451)) — THE PREFERENCES THE GIVENS LEAVE POSSIBLE. A
+ * preference whose ring is drawn as a special case, to solver precision ({@link FORCED_SPECIAL_TOL}), in EVERY sample of the
+ * figure — every `claimSeeds` seed × every parameter branch, the bar `verifyClaim` holds a claim to — is one the givens
+ * have made impossible: «מלבן ABCD» ·
+ * «AB = BC» is a square, and "never look like a square" fails at every seed. Demanded anyway, the sweep paid its whole
+ * 200-seed budget on every later line and drew its fallback (179 s for one line, #2749). Dropped here, the sweep is
+ * the one it would have fallen back to, at four samples' cost (docs/17 §7). A figure whose samples all failed to solve
+ * keeps every preference (nothing measured, so nothing dropped).
+ */
+export function possibleShapePreferences3(c: Construction3, from: number, prefs: readonly QuadPreference3[] = quadPreferences3(c)): QuadPreference3[] {
+  if (prefs.length === 0) return [];
+  const samples = knowledgeSamples3(c, claimSeeds(from)).filter((r) => !(r.pivot && r.pivot.solutions === 0));
+  if (samples.length === 0) return [...prefs];
+  return prefs.filter((req) => !samples.every((r) => preferenceFails3(req, r.positions, FORCED_SPECIAL_TOL)));
+}
+
+export function meetsShapePreferences3(c: Construction3, seed: number, prefs: readonly QuadPreference3[] = quadPreferences3(c)): boolean {
   // #817: ...and the preference no utterance states — a solid's faces should have real area. It joins
   // the PREFERENCE tier deliberately: a figure whose givens genuinely force a flat face must still
   // draw (the #615 fallback), it just must not be chosen while a real configuration is available.
@@ -4590,12 +4619,7 @@ export function meetsShapePreferences3(c: Construction3, seed: number): boolean 
   const r = resolve3(c, seed);
   if (solidFaceCollapsed(c, r.positions)) return false;
   if (declaredRingCrossed3(c, r.positions)) return false;
-  return prefs.every((req) => {
-    if (req.kind !== 'quad-general') return true;
-    const ring = req.ids.map((id) => r.positions.get(id));
-    if (ring.some((p) => !p)) return true; // unresolvable: nothing to judge, never a veto
-    return !quadDrawnDegenerate(req.base, ring as Vec3[], undefined, req.right === true);
-  });
+  return prefs.every((req) => !preferenceFails3(req, r.positions));
 }
 
 /**
@@ -4606,14 +4630,29 @@ export function meetsShapePreferences3(c: Construction3, seed: number): boolean 
  * every stated shape visibly as itself wins outright; otherwise the first merely-valid seed is
  * remembered and returned when the sweep ends. So a figure whose givens FORCE a special case still
  * draws, at exactly the seed it would have drawn at before.
+ *
+ * #2749 (ADR-3D-451): at the first valid seed a preference vetoes, the preferences the givens made impossible are
+ * dropped ({@link possibleShapePreferences3}) and that seed is judged again — so a forced special case costs four
+ * samples, not the budget, and lands on the seed the full sweep fell back to. Asked only on the failure path: a
+ * figure whose first valid seed is preferred pays nothing new.
  */
 export function firstSatisfyingSeed3(c: Construction3, from = 0, budget = 200): number | null {
   let fallback: number | null = null;
+  let prefs = quadPreferences3(c);
+  let guarded = false;
   for (let i = 0; i < budget; i++) {
     const seed = from + i;
     if (!meetsRequirements3(c, seed)) continue;
-    if (meetsShapePreferences3(c, seed)) return seed;
+    if (meetsShapePreferences3(c, seed, prefs)) return seed;
     if (fallback === null) fallback = seed;
+    if (!guarded) {
+      guarded = true;
+      const kept = possibleShapePreferences3(c, from, prefs);
+      if (kept.length < prefs.length) {
+        prefs = kept;
+        if (meetsShapePreferences3(c, seed, prefs)) return seed;
+      }
+    }
   }
   return fallback;
 }

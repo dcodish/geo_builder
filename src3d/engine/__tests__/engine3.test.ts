@@ -7,7 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, freeDims, unstatedPyramidBase3 } from '../apply';
 import { verifyClaim } from '../claims';
-import { evaluate3, freeDofCount3, resolve3 } from '../evaluate';
+import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, type QuadPreference3 } from '../evaluate';
+import { quadDrawnDegenerate } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
@@ -438,6 +439,121 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
     expect(unstatedPyramidBase3(quad(), unlettered)).toBe(unlettered); // FR-SP-24: never binds by default letters
     const tetra: SolidCommand = { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] };
     expect(unstatedPyramidBase3(tri, tetra)).toBe(tetra); // a triangular base has no default shape to yield
+  });
+});
+
+/**
+ * #2749 (ADR-3D-451/452) — a drawing preference the givens made impossible is not demanded. «מלבן ABCD» · «ריבוע ABCD»
+ * (a later noun), «מלבן ABCD» · «AC ⟂ BD» (a relation) and the circle/pyramid seats: the sweep used to pay its whole
+ * 200-seed budget on every later line, then draw its fallback. Locked by COUNT (resolves), never by clock, and the
+ * seed drawn is asserted equal to the full sweep's, run with the stale preference put back (stability).
+ */
+describe('#2749 — an impossible drawing preference is not demanded', () => {
+  const ABCD = ['A', 'B', 'C', 'D'] as [string, string, string, string];
+  const quad = (base: 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'quad'): Command3 => ({ type: 'quad-shape', base, ids: ABCD });
+  const prefsOf = (c: Construction3) => c.requirements.filter((q): q is QuadPreference3 => q.kind === 'quad-general');
+  /** Today's sweep before the fix: every preference demanded, the first valid seed the fallback. */
+  const fullSweep = (c: Construction3, prefs: QuadPreference3[], from = 0): number | null => {
+    let fallback: number | null = null;
+    for (let seed = from; seed < from + 200; seed++) {
+      if (!meetsRequirements3(c, seed)) continue;
+      if (meetsShapePreferences3(c, seed, prefs)) return seed;
+      fallback ??= seed;
+    }
+    return fallback;
+  };
+  const counted = <T,>(run: () => T): [T, number] => {
+    const u0 = resolveStats3.uncached;
+    const out = run();
+    return [out, resolveStats3.uncached - u0];
+  };
+  const perpDiagonals: Command3 = { type: 'cos-angle', u: { kind: 'pair', from: 'A', to: 'C' }, v: { kind: 'pair', from: 'B', to: 'D' }, cos: 0 };
+  const equalSides: Command3 = { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['B', 'C'] }, c: 1 } as Command3;
+
+  it("a later noun narrows the ring's preference: a square has none, a rectangle's replaces a parallelogram's", () => {
+    expect(prefsOf(build(quad('rectangle'), quad('square')))).toEqual([]);
+    expect(prefsOf(build(quad('rhombus'), quad('square')))).toEqual([]);
+    expect(prefsOf(build(quad('rectangle'), quad('rhombus')))).toEqual([]); // the meet of the two is a square
+    expect(prefsOf(build(quad('parallelogram'), quad('rectangle'))).map((q) => q.base)).toEqual(['rectangle']);
+    // a third noun that restates the wider kind never brings the retired preference back
+    expect(prefsOf(build(quad('rectangle'), quad('square'), quad('rectangle')))).toEqual([]);
+  });
+
+  it("a relation that forces the special case: the preference is dropped at the sweep, and the seed is the full sweep's", () => {
+    for (const rel of [perpDiagonals, equalSides]) {
+      const c = build(quad('rectangle'), rel);
+      expect(prefsOf(c).map((q) => q.base)).toEqual(['rectangle']); // no seat narrows it: the sweep is the guard
+      const [seed, cost] = counted(() => firstSatisfyingSeed3(c, 0));
+      expect(cost).toBeLessThanOrEqual(8); // four samples and the seeds judged, not the 200-seed budget
+      const again = build(quad('rectangle'), rel); // a fresh construction pays the same count
+      expect(counted(() => firstSatisfyingSeed3(again, 0))).toEqual([seed, cost]);
+      expect(possibleShapePreferences3(c, 0)).toEqual([]);
+      const [old, oldCost] = counted(() => fullSweep(build(quad('rectangle'), rel), prefsOf(c)));
+      expect(seed).toBe(old);
+      expect(oldCost).toBeGreaterThan(190); // what the line used to pay
+    }
+  });
+
+  it("every narrowed row draws at the seed the stale preference fell back to (stability)", () => {
+    const rows: [Command3[], QuadPreference3['base']][] = [
+      [[quad('rectangle'), quad('square')], 'rectangle'],
+      [[quad('rhombus'), quad('square')], 'rhombus'],
+      [[quad('parallelogram'), quad('rectangle')], 'parallelogram'],
+      [[quad('rectangle'), perpDiagonals], 'rectangle'],
+      [[quad('rectangle'), equalSides], 'rectangle'],
+    ];
+    for (const [cmds, stale] of rows) {
+      for (const from of [0, 1, 5]) {
+        const c = build(...cmds);
+        const stalePref: QuadPreference3 = { kind: 'quad-general', base: stale, ids: ABCD };
+        expect(firstSatisfyingSeed3(c, from)).toBe(fullSweep(build(...cmds), [stalePref], from));
+      }
+    }
+  });
+
+  it("a ring drawn NEAR a special case at all four samples is not forced: only solver precision drops a preference", () => {
+    // «טרפז ABCD» · «AD ∥ BC» (#1918's re-seat): from seed 18 the four claim samples are each within the drawing's 0.06
+    // of a special case, yet seed 20 draws a general trapezoid. The full sweep finds it, so the guard must not drop it.
+    // the same drawing without the store's re-seat: the trapezoid declared over the ring that carries AD ∥ BC
+    const cmds: Command3[] = [{ type: 'quad-shape', base: 'trapezoid', ids: ['D', 'A', 'B', 'C'] }];
+    const c = build(...cmds);
+    const trapezoid: QuadPreference3[] = [{ kind: 'quad-general', base: 'trapezoid', ids: ABCD }];
+    const near = (from: number) => [0, 1013, 2027, 4057].every((o) => quadDrawnDegenerate('trapezoid', ABCD.map((id) => resolve3(c, from + o, { solvedFrame: true }).positions.get(id)!)));
+    const reached = Array.from({ length: 60 }, (_, k) => k).filter(near);
+    expect(reached.length).toBeGreaterThan(0); // the case is really exercised
+    for (const from of reached) {
+      expect(possibleShapePreferences3(c, from, trapezoid)).toEqual(trapezoid);
+      expect(fullSweep(c, trapezoid, from)).not.toBe(fullSweep(c, [], from)); // a general drawing IS reachable
+    }
+  });
+
+  it("a preference the givens leave possible is kept: a right kite in a circle is still never drawn as a square", () => {
+    const c = build(
+      quad('kite'),
+      { type: 'cos-angle', u: { kind: 'pair', from: 'B', to: 'A' }, v: { kind: 'pair', from: 'B', to: 'C' }, cos: 0, origin: 'shape' } as Command3,
+      { type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ABCD } } as Command3,
+    );
+    expect(prefsOf(c)).toEqual([{ kind: 'quad-general', base: 'kite', ids: ABCD, right: true }]);
+    expect(possibleShapePreferences3(c, 0)).toEqual(prefsOf(c));
+    for (const from of [0, 3]) {
+      const seed = firstSatisfyingSeed3(c, from)!;
+      const p = evaluate3(c, seed);
+      expect(quadDrawnDegenerate('kite', ABCD.map((id) => p.get(id)!), undefined, true)).toBe(false);
+    }
+  });
+
+  it("a preferred first seed pays nothing new, and a possible preference at most the four samples, once", () => {
+    // the rectangle is drawn visibly a rectangle at its first seed: not one resolve more than before
+    const rect = build(quad('rectangle'));
+    const [seed, cost] = counted(() => firstSatisfyingSeed3(rect, 0));
+    expect([seed, cost]).toEqual(counted(() => fullSweep(build(quad('rectangle')), prefsOf(rect))));
+    // the parallelogram's seed 0 is drawn as a special case: the guard asks its four samples once, keeps the
+    // preference (a general parallelogram is reachable), and the sweep goes on to the seed it always found
+    const par = build(quad('parallelogram'));
+    const [pSeed, pCost] = counted(() => firstSatisfyingSeed3(par, 0));
+    const [oldSeed, oldCost] = counted(() => fullSweep(build(quad('parallelogram')), prefsOf(par)));
+    expect(pSeed).toBe(oldSeed);
+    expect(pCost).toBeLessThanOrEqual(oldCost + 4);
   });
 });
 

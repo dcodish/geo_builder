@@ -13,7 +13,7 @@ import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -384,9 +384,34 @@ function noteInscribedQuad(next: Construction3, ring: Id[]): void {
   next.requirements = next.requirements.flatMap((req) => {
     if (req.kind !== 'quad-general' || !sameRing(req.ids, ring)) return [req];
     const { member, fix } = CYCLIC_MEMBER[req.base];
-    if (QUAD_BASE_DIMS[member] === 0) return []; // a square has no freedom left to be drawn wrongly
-    return [{ ...req, base: member, ...(fix.kind === 'right-angle' || req.right ? { right: true as const } : {}) }];
+    // a cyclic kite's off-axis corners are right: a right corner there is stated, not a special case to avoid
+    const stated = fix.kind === 'right-angle' && !req.right ? { ...req, right: true as const } : req;
+    return narrowedPreference3(stated, baseKind3(member)); // #2749: the one narrowing rule
   });
+}
+
+type QuadPreference3 = Extract<Construction3['requirements'][number], { kind: 'quad-general' }>;
+
+/**
+ * #2749 ([ADR-3D-452](../../docs/06b-decisions-3d.md#adr-3d-452)) — THE ONE NARROWING RULE for a ring's #615 drawing
+ * preference: once the ring is stated to be `stated` too, "draw it visibly as itself" is judged against what is stated
+ * over it IN TOTAL (their meet). The narrower kind's preference replaces the old one, and a square has none (no
+ * freedom left to be drawn wrongly). Left stale, it failed at every seed and the seed sweep paid its whole budget on
+ * every later line. A meet no base names (an isosceles trapezoid) keeps the preference as it is. The seats: a later
+ * noun over the ring (`recordShape`, #2171), a bound pyramid's stated base (ADR-3D-434), a circle through it (#1792).
+ */
+function narrowedPreference3(req: QuadPreference3, stated: NarrowKind): QuadPreference3[] {
+  const meet = declaredKindOf([declaredKind3(req), stated], false);
+  if (!meet || meet === declaredKind3(req)) return [req];
+  const narrower = QUAD_BASES.find((b) => baseKind3(b) === meet);
+  if (!narrower) return [req];
+  return QUAD_BASE_DIMS[narrower] === 0 ? [] : [{ ...req, base: narrower }];
+}
+
+/** {@link narrowedPreference3} over the preference of the ring `ring` (as a cycle, #1927): the requirements after it. */
+function narrowRingPreference3(reqs: Construction3['requirements'], ring: readonly Id[], stated: NarrowKind): Construction3['requirements'] {
+  const key = ringKeyIds3(ring);
+  return reqs.flatMap((req) => (req.kind === 'quad-general' && ringKeyIds3(req.ids) === key ? narrowedPreference3(req, stated) : [req]));
 }
 
 /**
@@ -424,6 +449,10 @@ function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id], ad
     const prior = next.quadShapes[at];
     const kind = declaredKindOf([prior.kind ?? declaredKind3(prior), declaredKind3({ base, adj })], false);
     if (kind && kind !== declaredKind3(prior)) next.quadShapes[at] = { ...prior, kind };
+    // #2749 (ADR-3D-452): ...and the ring's drawing preference narrows with it — «מלבן ABCD» · «ריבוע ABCD» is a square,
+    // which has none. The ring already had its preference recorded (or none, a square's), so none is added here.
+    if (kind) next.requirements = narrowRingPreference3(next.requirements, ids, kind);
+    return next;
   }
   // #615: only a shape with room to be drawn wrongly needs the gate — a square has no freedom left,
   // and a general `quad` has no more-specific sibling it is obliged to avoid looking like.
@@ -1993,16 +2022,8 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
   // circle through a ring): «מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» is a square, so the rectangle's "never look like
   // a square" fails at every seed and the seed sweep paid its whole budget on every later line (8 s for «|SA| = 5»).
   // The narrower kind's preference replaces it; a square has none. The seed drawn is the one the sweep fell back to.
-  const requirements = !stated
-    ? r.next.requirements
-    : r.next.requirements.flatMap((req) => {
-        if (req.kind !== 'quad-general' || !sameRing(req.ids, base)) return [req];
-        const meet = declaredKindOf([declaredKind3(req), stated], false);
-        if (!meet || meet === declaredKind3(req)) return [req];
-        const narrower = (Object.keys(QUAD_BASE_DIMS) as QuadBase[]).find((b) => baseKind3(b) === meet);
-        if (!narrower) return [req];
-        return QUAD_BASE_DIMS[narrower] === 0 ? [] : [{ ...req, base: narrower }];
-      });
+  // #2749 (ADR-3D-452): the one narrowing rule, shared with a later noun and a circle through the ring.
+  const requirements = stated ? narrowRingPreference3(r.next.requirements, base, stated) : r.next.requirements;
   // 3. the solid — on fresh arrays: a memo keyed by the lowering's own `solids` / `points` (`solidDimsAll3`) stays true
   const at = (i: number): Id => ids[i];
   const solid: SolidObj = {

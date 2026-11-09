@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T09:59:01.178Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מלבן ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rectangle",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "ריבוע ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "square",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "קטע AS",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "S",
+          "bare": true
+        }
+      ]
+    },
+    {
+      "utterance": "|SA| = 5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "S",
+          "b": "A"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "S",
+            "b": "A",
+            "value": 5
+          }
+        }
+      ]
+    }
+  ]
+}
