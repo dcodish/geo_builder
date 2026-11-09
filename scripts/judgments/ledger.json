@@ -3766,6 +3766,28 @@
       "limits": "Not which side of the axis P falls on (ADR-3D-094 samples it), nor a point on a coordinate plane (#2794), nor the non-origin refusals (#2792).",
       "at": "2026-11-09T20:16:45.817Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2790a",
+      "issue": 2790,
+      "question": "Does ADR-W-200 reach a line already drawn restated under a NEW name (analytic «l2 אנך אמצעי ל-EK» after the same bisector drawn unnamed)? (a) keep T32: refuse and offer the rename; (b) accept as its own row with the notice, giving the line the name.",
+      "class": "restated-line-under-new-name",
+      "verdict": "escalate",
+      "reason": "T32 (2026-10-27, ADR-AG-346, a shipped 02c promise) and ADR-W-200 (2026-11-09, all cases) conflict; ADR-W-200 does not name this case and its reason speaks to relations, not naming.",
+      "nearest": [
+        {
+          "quote": "it should refuse to draw second line and say that already exists and offer to rename the line",
+          "date": "2026-10-27",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06c-decisions-analytic.md#adr-ag-346"
+        },
+        {
+          "quote": "if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-200"
+        }
+      ],
+      "at": "2026-11-09T20:19:54.257Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
