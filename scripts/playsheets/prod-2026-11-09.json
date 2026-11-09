@@ -1,0 +1,201 @@
+{
+ "name": "prod-2026-11-09",
+ "title": "Prod smoke — deploy prod/2026-11-09 (round #2783)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "2-D REFUSAL: a line from a point on both circles cannot cut circle O at two named points (#1840)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו- B",
+    "C על מעגל P",
+    "מנקודה A ישר חותך את המעגל O בנקודות C ו-D"
+   ],
+   "expectRefusal": "חותך אותו רק בעוד נקודה אחת",
+   "lookFor": "The last line stays in the box with «A נמצאת על המעגל O, ולכן ישר שיוצא מ-A חותך אותו רק בעוד נקודה אחת — לא גם ב-C וגם ב-D. אין מה לשרטט מהשורה הזאת.» (the closing «אין מה לשרטט מהשורה הזאת.» is new text, for your review); only two circles on screen.",
+   "before": "Prod before this deploy: A third circle O, everything green.",
+   "section": "prod"
+  },
+  {
+   "id": "P2",
+   "title": "2-D REFUSAL: «זרים» then «נחתכים» is refused naming «זרים» (#2700)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P זרים",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "expectRefusal": "סותר את «המעגלים O ו-P זרים»",
+   "lookFor": "The last line is refused: «לא ניתן: «המעגלים O ו-P נחתכים בנקודות X ו-Y» סותר את «המעגלים O ו-P זרים» — אי אפשר לקיים את שניהם יחד. הסיבה: לשני מעגלים זרים אין אף נקודה משותפת, ולכן אין להם נקודות חיתוך.» (the «הסיבה…» sentence is new text).",
+   "before": "Prod before this deploy: Drawn, with the «זרים» row red.",
+   "section": "prod"
+  },
+  {
+   "id": "P3",
+   "title": "2-D: a primed point on a circle is drawn as A′ (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O",
+    "A' על המעגל"
+   ],
+   "expectFigure": [
+    "A′"
+   ],
+   "lookFor": "A point labelled A′ on circle O, and no point A.",
+   "before": "Prod before this deploy: A point named A was drawn green.",
+   "section": "prod"
+  },
+  {
+   "id": "P4",
+   "title": "2-D REFUSAL: tangents from a point inside the circle name both statements (#2151)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל שמרכזו O",
+    "הנקודה P בתוך המעגל",
+    "מהנקודה P העבירו משיקים למעגל"
+   ],
+   "expectRefusal": "«משיק מ-P למעגל O» סותר את «P בתוך המעגל O»",
+   "expectAbsent": [
+    "tanaux",
+    "circle-O",
+    "משהו השתבש"
+   ],
+   "lookFor": "Refused with «לא ייתכן: «משיק מ-P למעגל O» סותר את «P בתוך המעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.» P stays inside; no tangents drawn.",
+   "before": "Prod before this deploy: «משהו השתבש בבניית השורה הזאת…».",
+   "section": "prod"
+  },
+  {
+   "id": "P5",
+   "title": "Analytic: a median drawn as part of a meet ends at the midpoint already named (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "התיכון מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "M ו-E נפלו על אותה נקודה"
+   ],
+   "expectAbsent": [
+    "N"
+   ],
+   "lookFor": "The median AM; E sits on M; no point N; the triangle does not move; the page says «M ו-E נפלו על אותה נקודה.».",
+   "before": "Prod before this deploy: E sat 0.6–8 away from M, on a line from A to a stray point N.",
+   "section": "prod"
+  },
+  {
+   "id": "P6",
+   "title": "Analytic: the square's right angle is kept and marked (#2704)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "ריבוע ABCD",
+    "∢ABC = 90"
+   ],
+   "expectRows": [
+    "∢ABC = 90"
+   ],
+   "expectAbsent": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "«∢ABC = 90» is a row in the givens list, and the right-angle mark is drawn at B.",
+   "before": "Prod before this deploy: «זה כבר קיים באיור», no row, no mark.",
+   "section": "prod"
+  },
+  {
+   "id": "P7",
+   "title": "3-D REFUSAL: two circles above «D על המעגל» — the tool asks which (#2705)",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "מעגל חסום במשולש ABC",
+    "D על המעגל"
+   ],
+   "expectRefusal": "בשרטוט יש יותר ממעגל אחד",
+   "lookFor": "The third line is refused with «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה… «הנקודה D על המעגל O»»; no D is drawn.",
+   "before": "Prod before this deploy: D was silently put on the incircle.",
+   "section": "prod"
+  },
+  {
+   "id": "P8",
+   "title": "3-D: a dot product typed as a decimal shows as typed (#2703)",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "הווקטורים u ו-v",
+    "u·v = 2.5"
+   ],
+   "expect": [
+    "2.5"
+   ],
+   "expectAbsent": [
+    "5/2"
+   ],
+   "lookFor": "The data panel shows «u · v = 2.5».",
+   "before": "Prod before this deploy: «u · v = 5/2».",
+   "section": "prod"
+  },
+  {
+   "id": "P9",
+   "title": "3-D: an angle letter's value (#2703, found in round)",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "פירמידה ABCDS שבסיסה ריבוע",
+    "∠SAB = α",
+    "α = 62.5"
+   ],
+   "expect": [
+    "62.5"
+   ],
+   "expectAbsent": [
+    "125/2"
+   ],
+   "lookFor": "«α = 62.5» and «α = 62.5°» in the panel.",
+   "before": "Prod before this deploy: «α = 125/2» and «α = 125/2°».",
+   "section": "prod"
+  },
+  {
+   "id": "P10",
+   "title": "Complex loads and builds (untouched this round)",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+   "before": "Unchanged.",
+   "section": "prod",
+   "expect": [
+    "z₁ = 3+4i"
+   ]
+  }
+ ]
+}
