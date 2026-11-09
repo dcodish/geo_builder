@@ -101,7 +101,7 @@ describe('#2240 — circleVariantsHold, the bare pair’s configuration floor', 
     expect([0, 1, 2, 3, -1].map((v) => circlePairVariantCase(anyRec(v)))).toEqual(['meet', 'disjoint', 'contained', 'meet', 'contained']);
     expect([0, 1, 2].map((v) => circlePairVariantCase(anyRec(v, ['meet', 'disjoint'])))).toEqual(['meet', 'disjoint', 'meet']);
     expect(circlePairVariantCase({ type: 'set-circle-position', relation: 'disjoint', a: 'circle-O', b: 'circle-P' } as Command)).toBeNull();
-    expect(circlePairVariantCase({ type: 'point', id: 'A', x: 0, y: 0 } as Command)).toBeNull();
+    expect(circlePairVariantCase({ type: 'free-point', id: 'A', x: 0, y: 0 } as Command)).toBeNull();
   });
   it('a view strictly in another case’s region is rejected; its own case passes (either circle inside)', () => {
     const cut = view(4, 3, 2);
