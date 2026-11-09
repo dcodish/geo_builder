@@ -102,6 +102,21 @@ describe('#2201 phase 3a — the bank round-trips', () => {
     }
   });
 
+  it('#2700 (ADR-803): every pair-position exclusion round-trips and is worded, both locales — «זרים» against a tangency or a crossing beside the containment ones', () => {
+    const pairs = [['contained', 'contained'], ['contained', 'disjoint'], ['contained', 'ext-tangent'], ['contained', 'crossing'], ['disjoint', 'tangent'], ['disjoint', 'crossing']] as const;
+    for (const [position, other] of pairs) {
+      const e = { code: 'pair-position-conflict', a: 'circle-O', b: 'circle-P', position, other } as EngineError;
+      expect(parseEngineError(engineErrorDebugText(e))).toEqual(e);
+      expect(parseEngineError(`${engineErrorDebugText(e)} [vs #3]`)).toEqual({ ...e, vs: 3 });
+      for (const t of [he, en]) {
+        const out = humanizeErrorOutcome(`${engineErrorDebugText(e)} [vs #3]`, t, 'המעגלים O ו-P משיקים', 'המעגלים O ו-P זרים');
+        expect(out.floor, `${position}-${other}`).toBe(false);
+        expect(out.text).not.toContain('errors.');
+        expect(out.text).toContain(t(`errors.pairPositionReason.${position}-${other}`));
+      }
+    }
+  });
+
   it('a fold tail is read only on the variants that read one; elsewhere the text is no variant (the floor, as before)', () => {
     expect(parseEngineError(`${engineErrorDebugText(SAMPLES['over-constrained'])} [vs #3]`)).toEqual({ ...SAMPLES['over-constrained'], vs: 3 });
     expect(parseEngineError(`${engineErrorDebugText(SAMPLES['same-spot'])} [vs #3]`).code).toBe('raw');

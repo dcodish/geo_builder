@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyStep } from '../step';
-import { equalNestedPair } from '../radiusFeasibility';
+import { equalNestedPair, pairPositionConflictOf } from '../radiusFeasibility';
 import { evaluate } from '../evaluate';
 import type { Command, Construction } from '../types';
 
@@ -121,5 +121,41 @@ describe('#2206 — equalNestedPair, contained and concentric, and the equality 
     expect(applyStep(build([circle('circle-O', 'O', 3), free('circle-P', 'P')]), contain).ok).toBe(true);
     const apart = build([circle('circle-O', 'O', 3), circle('circle-P', 'P', 3, { apart: true })]);
     expect(equalNestedPair(apart, apart, [{ type: 'set-circle-position', relation: 'disjoint', a: 'circle-O', b: 'circle-P' } as Command])).toBeNull();
+  });
+});
+
+/**
+ * #2700 ([ADR-803](../../../docs/06-decisions.md#adr-803)) — `pairPositionConflictOf` reads «זרים» against a stated tangency
+ * (any kind) and a crossing point; the reader reads statements, never coordinates.
+ */
+describe('#2700 — pairPositionConflictOf, «זרים» against a common point', () => {
+  const pos = (relation: 'contained' | 'disjoint', a = 'circle-O', b = 'circle-P') => ({ kind: 'circle-position' as const, relation, a, b });
+  const tanReq = (external: boolean, kindStated?: false) => ({ kind: 'circle-position' as const, relation: 'tangent' as const, a: 'circle-P', b: 'circle-O', at: 'T', external, ...(kindStated === false ? { kindStated } : {}) });
+  const cc = { kind: 'circle-circle', id: 'X', circle1: 'circle-P', circle2: 'circle-O', branch: 0 } as never;
+  const of = (objects: never[], requirements: object[], a = 'circle-O', b = 'circle-P') => pairPositionConflictOf({ objects, requirements } as never, a, b);
+  it('«זרים» with a tangency of every kind — external, internal, unstated — is the disjoint–tangent exclusion, in either argument order', () => {
+    for (const t of [tanReq(true), tanReq(false), tanReq(true, false)]) {
+      expect(of([], [pos('disjoint'), t])).toEqual(['disjoint', 'tangent']);
+      expect(of([], [t, pos('disjoint', 'circle-P', 'circle-O')], 'circle-P', 'circle-O')).toEqual(['disjoint', 'tangent']);
+    }
+  });
+  it('«זרים» with a crossing point is the disjoint–crossing exclusion; beside a tangency the tangency is named (ADR-645 owns crossing vs tangency)', () => {
+    expect(of([cc], [pos('disjoint')])).toEqual(['disjoint', 'crossing']);
+    expect(of([cc], [pos('disjoint'), tanReq(true)])).toEqual(['disjoint', 'tangent']);
+  });
+  it('a plain «זרים», «זרים» of another pair, and the containment exclusions are unchanged', () => {
+    expect(of([], [pos('disjoint')])).toBeNull();
+    expect(of([cc], [pos('disjoint', 'circle-Q', 'circle-P')])).toBeNull();
+    expect(of([], [pos('contained'), pos('disjoint')])).toEqual(['contained', 'disjoint']);
+    expect(of([], [pos('contained'), tanReq(false)])).toBeNull(); // ADR-704
+  });
+  it('the step refuses the line that completes the exclusion, in either order, with the disjoint wire', () => {
+    const two = [free('circle-O', 'O'), free('circle-P', 'P')];
+    const disjoint = { type: 'set-circle-position', relation: 'disjoint', a: 'circle-O', b: 'circle-P' } as Command;
+    const after = applyStep(build([...two, disjoint]), tan(true));
+    expect(!after.ok && after.error).toBe('over-constrained: circles circle-O and circle-P stated disjoint and tangent cannot hold');
+    const before = applyStep(build([...two, tan(false)]), disjoint);
+    expect(!before.ok && before.error).toBe('over-constrained: circles circle-O and circle-P stated disjoint and tangent cannot hold');
+    expect(applyStep(build(two), disjoint).ok).toBe(true);
   });
 });

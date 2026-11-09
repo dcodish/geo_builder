@@ -2299,3 +2299,6 @@ over all four (ADR-041).
 ### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
 
 **Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.
+### `disjoint-pair-common-point-2700` — «המעגלים O ו-P זרים» · «נחתכים בנקודות X ו-Y» / «משיקים»: refused naming «זרים», in either order (#2700, ADR-803)
+
+**Guards against:** a crossing or a tangency of a pair stated disjoint, committed with the «זרים» row red for good. **Asserts** a plain «זרים» builds clean; after it, the crossing and each tangency spelling (no kind, from outside, from inside, at T) is refused before it becomes a fact with «לא ניתן: «…» סותר את «המעגלים O ו-P זרים» …» and the exclusion's reason; the reverse orders refuse «זרים» naming the crossing or the tangency; «שני מעגלים זרים» then the crossing the same.
