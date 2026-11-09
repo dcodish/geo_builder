@@ -4,10 +4,16 @@
  * Operator, playing round #2304 T29 (2026-10-17): *"the test passes but the 3rd line should not be accepted and we say
  * that it is already known"*. «B(√2,0,0)» · «B=(√2,0,0)» lower to different commands, so the #613 twin rule missed them
  * and the line became a ✓ row.
+ *
+ * ADR-3D-449 — the general rule (operator 2026-11-06: *"In all cases it should say כבר קיים"*; [judged] Q-2341,
+ * 2026-11-09): any statement the figure before it already holds in every admissible configuration is answered by
+ * `impliedByPrior3` in `decideCommands3`, the same `already-stated` verdict, with no row.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
-import { derive3, useGeo3, type Fact3 } from '../store/store3';
+import { HOME_CAMERA } from '../render/camera';
+import { buildScene3 } from '../render/scene3';
+import { decideSteps3, derive3, useGeo3, type Fact3 } from '../store/store3';
 
 const st = () => useGeo3.getState();
 
@@ -107,30 +113,112 @@ describe('#2341 — a length restated, [judged] q21 2026-11-05 (2-D\'s noop)', (
     expect(st().lastNotice).toBeNull();
   });
 
-  it('a first value on a segment still records: this compares stated numbers only', () => {
+  it('a first value on a segment the figure already fixes is already known ([judged] Q-2341, 2026-11-09)', () => {
     build(['A(0,0,0)', 'B(√2,0,0)']);
-    expect(verdict('AB = √2')).toBe('record');
-    expect(verdict('BA = √2')).toBe('record');
+    expect(verdict('AB = √2')).toBe('already-stated');
+    expect(verdict('BA = √2')).toBe('already-stated');
   });
 });
 
-describe('#2341 — the boundary: these keep their row', () => {
-  it("a coordinate line on a point the student never gave coordinates is their ANSWER (ADR-3D-075)", () => {
-    build(['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB']);
-    expect(verdict('M=(1,0,0)')).toBe('record');
+describe('#2341 — ADR-3D-449: a statement the figure already holds is already known', () => {
+  const known = (lines: readonly string[], line: string) => {
+    build(lines);
+    const rows = st().facts.length;
+    st().submit(line);
+    expect(st().lastError, line).toBeNull();
+    expect(st().facts, line).toHaveLength(rows);
+    expect(st().lastNotice, line).toEqual({ code: 'already-stated' });
+  };
+
+  it.each([
+    [["קובייה ABCDA'B'C'D'"], 'AB ∥ CD'], // ruled 2026-11-06
+    [["cube ABCDA'B'C'D'"], 'AB ∥ CD'],
+    [["קובייה ABCDA'B'C'D'"], 'CD ∥ AB'], // the other letter order
+    [['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB'], 'M=(1,0,0)'], // ruled: a correct computed answer
+    [['A(0,0,0)', 'B(2,0,0)', 'M is the midpoint of AB'], 'M = (1, 0, 0)'],
+    [["קובייה ABCDA'B'C'D'"], 'AB ⟂ AD'], // ruled
+    [["cube ABCDA'B'C'D'"], 'AB is perpendicular to AD'],
+    [['A(0,0,0)', 'B(3,0,0)'], 'AB = 3'], // [judged] Q-2341
+    [["קובייה ABCDA'B'C'D'"], 'זווית DAB = 90'], // [judged] Q-2341
+    [['ריבוע ABCD'], 'AB ∥ CD'],
+    [["קובייה ABCDA'B'C'D'"], "AA' מאונך למישור ABCD"],
+    [["תיבה ABCDA'B'C'D'"], "המישור ABC מקביל למישור A'B'C'"],
+    [['המישור π1: z = 0', 'המישור π2: x = 0'], 'π1 ניצב ל-π2'],
+    [['A(0,0,0)', 'B(a,0,0)', 'a = 2'], 'B=(2,0,0)'], // the letter is decided, so the point is
+  ])('%j + «%s»: no row, the note', (lines, line) => known(lines, line));
+
+  it('«AB ⟂ AD» on a cube draws no new right-angle mark (ruled 2026-11-06)', () => {
+    build(["קובייה ABCDA'B'C'D'"]);
+    const before = derive3(st().facts, st().seed);
+    const marks = buildScene3(before.construction, before.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).marks.length;
+    st().submit('AB ⟂ AD');
+    const after = derive3(st().facts, st().seed);
+    expect(buildScene3(after.construction, after.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).marks).toHaveLength(marks);
   });
 
-  it('a wrong answer on such a point is still refused', () => {
+  it('the figure does not change', () => {
+    build(["קובייה ABCDA'B'C'D'"]);
+    const before = derive3(st().facts, st().seed).positions;
+    st().submit('AB ∥ CD');
+    expect(derive3(st().facts, st().seed).positions).toEqual(before);
+  });
+
+  it('the notice is cleared by the next ordinary statement', () => {
+    build(["קובייה ABCDA'B'C'D'"]);
+    st().submit('AB ∥ CD');
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    st().submit("M אמצע AB");
+    expect(st().lastNotice).toBeNull();
+    expect(st().facts).toHaveLength(2);
+  });
+
+  it('the model lane asks without the rule, as it always has (the twin rule is the grammar lane\'s)', () => {
+    build(["קובייה ABCDA'B'C'D'"]);
+    expect(decideSteps3(st(), 'AB ∥ CD', ['AB ∥ CD']).kind).toBe('record');
+  });
+});
+
+describe('#2341 — ADR-3D-449: the boundary — what still commits', () => {
+  it('a false statement is still refused (FR-CL-1)', () => {
+    build(["קובייה ABCDA'B'C'D'"]);
+    st().submit('AB ∥ AD');
+    expect(st().lastError?.code).toBe('claim-refuted');
+    expect(st().facts).toHaveLength(1);
+  });
+
+  it('a wrong answer on a computed point is still refused', () => {
     build(['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB']);
     st().submit('M=(3,0,0)');
     expect(st().lastError?.code).toBe('claim-refuted');
   });
 
-  it('a partly symbolic point states no numbers to compare', () => {
-    build(['A(0,0,0)', 'B(a,0,0)', 'a = 2']);
-    expect(verdict('B=(2,0,0)')).toBe('record');
+  it.each([
+    [["קובייה ABCDA'B'C'D'"], 'AB = 1'], // a free magnitude: the cube's size is pinned, even at its drawn value (ADR-052)
+    [["קובייה ABCDA'B'C'D'"], 'AB = 3'],
+    [['משולש ABC'], 'AB = 3'], // a free triangle's side
+    [["תיבה ABCDA'B'C'D'"], 'AB = BC'], // true only at some configurations of the box
+    [['טטראדר ABCD'], 'AB ⟂ CD'], // a pin on a free figure
+    [['A(0,0,0)'], 'B=(√2,0,0)'], // a new point
+    [["קובייה ABCDA'B'C'D'"], 'E אמצע AB'], // a construction
+    [['A(0,0,0)', 'B(1,0,0)'], 'AB'], // a line that only draws
+    [['פירמידה SABC'], 'משולש ABC'], // a shape declared over existing points (#613's lock)
+    [["קובייה ABCDA'B'C'D'"], 'מרובע ABC\'D\''],
+    // a statement that turns a DEFAULT reading into a given (M4; 2-D's ADR-605 row): true at every sample, still new
+    [['טרפז ABCD'], 'AB ∥ DC'], // the noun's parallel pair, which a later «AD ∥ BC» would otherwise re-seat
+    [['משולש ישר זווית ABC'], 'AB ⟂ BC'], // the soft right-angle vertex
+    [['משולש שווה שוקיים ABC'], '|AB| = |AC|'], // the soft equal pair
+  ])('%j + «%s» records a row', (lines, line) => {
+    build(lines);
+    expect(verdict(line)).toBe('record');
   });
 
+  it('a sign selects among configurations, so it commits even where every sample obeys it', () => {
+    build(['A(0,0,0)', 'B(a,0,0)']);
+    expect(verdict('a חיובי')).not.toBe('already-stated');
+  });
+});
+
+describe('#2341 — a load replays as saved', () => {
   it('a saved row replays as saved: a load never reads the submit decision', () => {
     build(['A(0,0,0)', 'B(√2,0,0)']);
     const old: Fact3 = { id: 'old', utterance: 'B=(√2,0,0)', cmds: [{ type: 'claim', claim: { type: 'coords-eq', id: 'B', x: Math.SQRT2, y: 0, z: 0 } }], enabled: true };

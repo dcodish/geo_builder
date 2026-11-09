@@ -9,10 +9,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
+  KNOWN = [];
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-const submit = (u: string) => useGeo3.getState().submit(u);
+/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+let KNOWN: string[] = [];
+const submit = (u: string) => {
+  const rows = useGeo3.getState().facts.length;
+  useGeo3.getState().submit(u);
+  const st = useGeo3.getState();
+  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+};
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
 function expectAllOk() {
@@ -42,7 +50,8 @@ describe('GATE — 2023 קיץ מועד ב Q2 (tetra + scalar givens + injection
 
   it('Hebrew: the full chain builds; B, C, D and the volume verify', () => {
     HE.forEach(submit);
-    expect(state().facts).toHaveLength(13);
+    expect(state().facts).toHaveLength(8);
+    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)","נפח הפירמידה ABCD = 64"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
     const pos = derived().positions;
     expect(pos.get('D')!.z).toBeCloseTo(12, 3);
@@ -55,7 +64,8 @@ describe('GATE — 2023 קיץ מועד ב Q2 (tetra + scalar givens + injection
   it('a wrong volume is refused', () => {
     HE.slice(0, 12).forEach(submit);
     submit('נפח הפירמידה ABCD = 60');
-    expect(state().facts).toHaveLength(12);
+    expect(state().facts).toHaveLength(8);
+    expect(KNOWN).toEqual(["u·v = 24","B = (4, 3, 0)","C = (0, 8, 0)","D = (0, 8, 12)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 

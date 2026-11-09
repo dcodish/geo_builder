@@ -22,11 +22,19 @@ import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 
 function reset() {
+  KNOWN = [];
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
 
-const submit = (u: string) => useGeo3.getState().submit(u);
+/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+let KNOWN: string[] = [];
+const submit = (u: string) => {
+  const rows = useGeo3.getState().facts.length;
+  useGeo3.getState().submit(u);
+  const st = useGeo3.getState();
+  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+};
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
 
@@ -62,7 +70,8 @@ describe('GATE — 2020 קיץ Q2 א–ב (prism, geometric-vector lane)', () =>
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the full sequence builds, P lands at t = 2/5, both answers verify`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(7);
+      expect(state().facts).toHaveLength(5);
+      expect(KNOWN).toEqual(["AM = 1/2u + 1/2v + 5/3w","KP = 1/5u + 1/5v"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const pos = derived().positions;
       const t = dist3(pos.get('P')!, pos.get('A')!) / dist3(pos.get('M')!, pos.get('A')!);
@@ -83,7 +92,8 @@ describe('GATE — 2020 קיץ Q2 א–ב (prism, geometric-vector lane)', () =>
   it('a wrong α,β answer is refused', () => {
     HE.slice(0, 6).forEach(submit);
     submit('KP = 1/2u + 1/2v');
-    expect(state().facts).toHaveLength(6);
+    expect(state().facts).toHaveLength(5);
+    expect(KNOWN).toEqual(["AM = 1/2u + 1/2v + 5/3w"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });
@@ -111,14 +121,16 @@ describe("GATE — 2023 קיץ א Q2 א–ב (cube, perpendicular-to-plane + cen
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the full sequence builds and every claim verifies`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(6);
+      expect(state().facts).toHaveLength(3);
+      expect(KNOWN).toHaveLength(3); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       // E is the centroid of B, C', D — at the unit cube: (2/3, 2/3, 1/3)
       const pos = derived().positions;
       expect(pos.get('E')).toEqual({ x: 2 / 3, y: 2 / 3, z: 1 / 3 });
-      // the auxiliary segments were auto-drawn: CA' and the plane triangle BD, BC', DC'
+      // the auxiliary segments were auto-drawn: the plane triangle BD, BC', DC' (the centroid's). #2341 (ADR-3D-449): the
+      // ⊥ the cube already holds is «כבר קיים» and adds no row, so CA' is no longer drawn by it
       const segs = derived().construction.segments.map(([a, b]) => (a < b ? `${a}|${b}` : `${b}|${a}`));
-      expect(segs).toContain("A'|C");
+      expect(segs).not.toContain("A'|C");
       expect(segs).toContain('B|D');
       expect(segs).toContain("B|C'");
       expect(segs).toContain("C'|D");
@@ -135,7 +147,8 @@ describe("GATE — 2023 קיץ א Q2 א–ב (cube, perpendicular-to-plane + cen
   it('a false collinearity claim is refused', () => {
     HE.slice(0, 4).forEach(submit);
     submit("E, B, A' על ישר אחד");
-    expect(state().facts).toHaveLength(4);
+    expect(state().facts).toHaveLength(3);
+    expect(KNOWN).toEqual(["CA' מאונך למישור BC'D"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });
@@ -169,7 +182,8 @@ describe('GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the full constructive chain builds, a = −1 selected, both answers verify`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(9);
+      expect(state().facts).toHaveLength(7);
+      expect(KNOWN).toHaveLength(2); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const d = derived();
       expect(d.resolved.param).toMatchObject({ name: 'a', value: -1, roots: [-1, 1] });
@@ -257,7 +271,8 @@ describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, th
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the full sequence builds, m = −5 pinned, the answer verifies, B lands on ℓ`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(7);
+      expect(state().facts).toHaveLength(5);
+      expect(KNOWN).toHaveLength(2); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const d = derived();
       expect(d.resolved.param).toMatchObject({ name: 'm', value: -5, roots: [-5] });
@@ -269,7 +284,8 @@ describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, th
   it('a wrong coordinates answer is refused (keep-prior)', () => {
     HE.slice(0, 5).forEach(submit);
     submit('A = (2, 0, -9)');
-    expect(state().facts).toHaveLength(5);
+    expect(state().facts).toHaveLength(4);
+    expect(KNOWN).toEqual(["ℓ אינו מקביל ל-π לכל m"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 
@@ -278,7 +294,8 @@ describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, th
   it('a point NOT on ℓ is refused: no m satisfies it together with the ⟂', () => {
     HE.slice(0, 4).forEach(submit);
     submit('C(1,1,1) על הישר ℓ');
-    expect(state().facts).toHaveLength(4);
+    expect(state().facts).toHaveLength(3);
+    expect(KNOWN).toEqual(["ℓ אינו מקביל ל-π לכל m"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'no-roots', sym: 'm', stated: 'C(1,1,1) על הישר ℓ', others: ['הישר ℓ ניצב למישור π'] });
   });
 
@@ -326,7 +343,8 @@ describe('GATE — 2020 קיץ Q2 ג (the coordinate-injection pivot on the pris
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the injection pins the figure, K and the KBC plane equation verify`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(8);
+      expect(state().facts).toHaveLength(7);
+      expect(KNOWN).toHaveLength(1); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const d = derived();
       expect(d.resolved.pivot?.solutions).toBeGreaterThan(0);
@@ -396,7 +414,8 @@ describe("GATE — 2023 קיץ א Q2 ג–ד (partial injection, the sign branch
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the partial injection resolves n,p, the sign given selects C′, ℓ resolves through B and C′`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(9);
+      expect(state().facts).toHaveLength(7);
+      expect(KNOWN).toEqual(["A = (3, -4, 0)","C' = (4, 3, 5)"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const d = derived();
       const A = d.positions.get('A')!;
@@ -455,7 +474,8 @@ describe('GATE — 2019 קיץ Q2 (V5: line through points cutting a point-plane
   for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
     it(`${name}: the full sequence builds and every answer verifies`, () => {
       seq.forEach(submit);
-      expect(state().facts).toHaveLength(9);
+      expect(state().facts).toHaveLength(6);
+      expect(KNOWN).toHaveLength(3); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
       expectAllOk();
       const K = derived().positions.get('K')!;
       expect(K.x).toBeCloseTo(2, 4);
@@ -467,7 +487,8 @@ describe('GATE — 2019 קיץ Q2 (V5: line through points cutting a point-plane
   it('a wrong ratio is refused', () => {
     HE.slice(0, 7).forEach(submit);
     submit("A'K : A'C = 1 : 2");
-    expect(state().facts).toHaveLength(7);
+    expect(state().facts).toHaveLength(6);
+    expect(KNOWN).toEqual(["הזווית בין A'C לבין BC' היא 90"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });
@@ -485,7 +506,8 @@ describe('GATE — V6 solids-trig (cone / cylinder / sphere with stated sizes; f
     submit('חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12');
     submit('נפח החרוט = 100π');
     submit('שטח המעטפת של החרוט = 65π');
-    expect(state().facts).toHaveLength(3);
+    expect(state().facts).toHaveLength(1);
+    expect(KNOWN).toEqual(["נפח החרוט = 100π","שטח המעטפת של החרוט = 65π"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
     submit('נפח החרוט = 99π');
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
@@ -495,7 +517,8 @@ describe('GATE — V6 solids-trig (cone / cylinder / sphere with stated sizes; f
     submit('sphere with center O radius 3');
     submit('the volume of the sphere = 36π');
     submit('the surface area of the sphere = 36π');
-    expect(state().facts).toHaveLength(3);
+    expect(state().facts).toHaveLength(1);
+    expect(KNOWN).toEqual(["the volume of the sphere = 36π","the surface area of the sphere = 36π"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
     expectAllOk();
   });
 
@@ -802,5 +825,32 @@ describe('parallel-planes-frame-2707 — two parallel planes on a blank canvas d
     submit('המישור ABC מקביל למישור DEF');
     expectAllOk();
     expectSpread(6, 'first configuration');
+  });
+});
+
+// #2341 (ADR-3D-449) — the operator's ruled cases, as typed (round #2304 T29, 2026-10-17; ruling 2026-11-06: "In all
+// cases it should say כבר קיים"; [judged] Q-2341, 2026-11-09). Each last line adds no row and answers «כבר קיים».
+describe('SCENARIO — #2341: a statement the figure already holds is already known', () => {
+  beforeEach(reset);
+
+  it.each([
+    [['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)']],
+    [["קובייה ABCDA'B'C'D'", 'AB ∥ CD']],
+    [['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB', 'M=(1,0,0)']],
+    [["קובייה ABCDA'B'C'D'", 'AB ⟂ AD']],
+    [['A(0,0,0)', 'B(3,0,0)', 'AB = 3']],
+    [["קובייה ABCDA'B'C'D'", 'זווית DAB = 90']],
+  ])('%j', (lines) => {
+    lines.forEach(submit);
+    expect(state().lastError).toBeNull();
+    expect(state().facts.map((f) => f.utterance)).toEqual(lines.slice(0, -1));
+    expect(KNOWN).toEqual(lines.slice(-1));
+    expectAllOk();
+  });
+
+  it('a false one is still refused: «AB ∥ AD» on the cube', () => {
+    ["קובייה ABCDA'B'C'D'", 'AB ∥ AD'].forEach(submit);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+    expect(state().facts).toHaveLength(1);
   });
 });

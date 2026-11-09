@@ -48,7 +48,8 @@ describe('#374 — a knee is drawn at a legible SIZE regardless of the figure’
   });
 
   it('a compact figure with points draws a knee of the SAME screen size (not proportional to the world)', () => {
-    submit("תיבה ABCDA'B'C'D'");
+    // #2341 (ADR-3D-449): on a box this ⊥ is already known and draws nothing; on a free tetrahedron it is a given
+    submit('טטראדר ABCD');
     submit('AB מאונך ל-AD');
     const compact = legs(0);
     expect(compact.length).toBeGreaterThan(0);

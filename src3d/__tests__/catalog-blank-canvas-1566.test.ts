@@ -36,6 +36,14 @@ const STILL_FAILS: Record<string, string> = {
   'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)': '#2563',
 };
 
+/**
+ * #2341 (ADR-3D-449, operator 2026-11-06: *"In all cases it should say כבר קיים"*): a guide example that can only CHECK —
+ * a claim no figure can be driven to (a cone's volume or area, a never-parallel probe) — is a correct answer on the
+ * figure its `needs` build, so the click answers «זה כבר קיים באיור — אין מה להוסיף.» and adds no row. Asserted as that,
+ * never as a failure: the example still reads and verifies. Keyed by the Hebrew spelling.
+ */
+const KNOWN_ON_CLICK = new Set(['ℓ אינו מקביל ל-π1 לכל m', 'נפח החרוט = 100π', 'שטח המעטפת של החרוט = 65π', 'שטח הפנים של החרוט = 90π']);
+
 const st = () => useGeo3.getState();
 const reset = () => useGeo3.setState({ facts: [], seed: 0, lastError: null, lastNotice: null, lastCreated: null } as never);
 const ENTRIES = COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite');
@@ -44,10 +52,15 @@ const ENTRIES = COMMAND_CATALOG_3D.filter((e) => e.lane !== 'rewrite');
 function clickOnBlank(entry: (typeof ENTRIES)[number], lang: 'he' | 'en'): string | null {
   reset();
   const lines = guideTryLines3(entry, lang, 0);
+  const known = KNOWN_ON_CLICK.has(entry.he);
   for (const [i, line] of lines.entries()) {
     st().submit(line);
     const err = st().lastError;
     if (err) return `«${line}» refused ${err.code}`;
+    if (known && i === lines.length - 1) {
+      if (st().facts.length !== i || st().lastNotice?.code !== 'already-stated') return `«${line}» was not answered already known`;
+      continue;
+    }
     if (st().facts.length !== i + 1) return `«${line}» recorded ${st().facts.length - i} rows`;
   }
   const status = derive3(st().facts, st().seed).status;

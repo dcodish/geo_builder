@@ -84,8 +84,10 @@ describe('#1844 the reported lines draw only the ring (and the solid), at seeds 
 });
 
 describe('#1844 the control — a STUDENT\'s own relation still draws what it names', () => {
-  it('«טרפז שווה שוקיים ABCD» · «|AC| = |BD|» draws AC and BD (#1848)', () => {
-    const facts = build(['טרפז שווה שוקיים ABCD', '|AC| = |BD|']);
+  // #2341 (ADR-3D-449): on «טרפז שווה שוקיים ABCD» the relation is already held, so it is «כבר קיים» with no row; the
+  // control is the same sentence where it is a given
+  it('«מרובע ABCD» · «|AC| = |BD|» draws AC and BD (#1848)', () => {
+    const facts = build(['מרובע ABCD', '|AC| = |BD|']);
     expect(facts).not.toBeNull();
     const d = derive3(facts!, 0);
     for (const f of facts!) expect(d.status[f.id]).toBe('ok');

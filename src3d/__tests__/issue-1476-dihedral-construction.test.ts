@@ -10,6 +10,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, undo3, useGeo3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { dihedralConstruction, solidBaseRings } from '../render/dihedral';
@@ -28,7 +29,7 @@ function build(...lines: string[]) {
   st().clear();
   useGeo3.temporal.getState().clear();
   for (const l of lines) {
-    st().submit(l);
+    submitOrSave3(l); // #2341 (ADR-3D-449): a held line typed today is «כבר קיים»; kept as the row a save holds
     expect(st().lastError, l).toBeNull();
   }
 }

@@ -98,10 +98,12 @@ describe('#1847 — what does not change', () => {
     }
   }, 120_000);
 
-  it('a membership claim that holds still records (the centroid on the median)', () => {
+  // #2341 (ADR-3D-449): a membership the figure holds is already known: «כבר קיים», no row, never a refusal
+  it('a membership claim that holds is never refused (the centroid on the median): it is already known', () => {
     for (const seed of SEEDS_24.slice(0, 8)) {
       const r = run(['משולש ABC', 'E מפגש התיכונים במשולש ABC', 'M אמצע BC', 'E על AM'], seed);
-      expect(r.refusedAt, `seed ${seed}: ${JSON.stringify(r.error)}`).toBe(-1);
+      expect(r.refusedAt, `seed ${seed}: ${JSON.stringify(r.error)}`).toBe(3);
+      expect(r.kind, `seed ${seed}`).toBe('already-stated');
       const d = derive3(r.st.facts, r.st.seed);
       for (const f of r.st.facts) expect(d.status[f.id], `seed ${seed}: «${f.utterance}»`).toBe('ok');
     }

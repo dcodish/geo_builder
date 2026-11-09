@@ -14,6 +14,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3, type Fact3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { parse3 } from '../parser/parse3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
@@ -23,8 +24,9 @@ import { paramPinningRels } from '../engine/operands';
 import { emptyConstruction3, type Command3, type Construction3 } from '../engine/types';
 
 const st = () => useGeo3.getState();
+/** #2341 (ADR-3D-449): a held line typed today is «כבר קיים»; here it is kept as the row a save holds (`savedRows3`). */
 const submitAll = (lines: string[]) => {
-  for (const l of lines) st().submit(l);
+  for (const l of lines) submitOrSave3(l);
 };
 const derived = () => derive3(st().facts, st().seed);
 
@@ -57,9 +59,16 @@ describe('#1439 — a stated angle between equation planes is checked', () => {
     expect(st().facts).toHaveLength(2);
   });
 
-  it('(a) the TRUE angle (54.7356°) verifies', () => {
-    submitAll([...REVIEWER, `הזווית בין המישורים π1 ו-π2 היא ${TRUE_DEG}`]);
+  it('(a) the TRUE angle (54.7356°) is already known — never refused, no row (#2341)', () => {
+    submitAll(REVIEWER);
+    st().submit(`הזווית בין המישורים π1 ו-π2 היא ${TRUE_DEG}`);
     expect(st().lastError).toBeNull();
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+  });
+
+  it('(a) …and a row saved before #2341 still verifies on load', () => {
+    submitAll([...REVIEWER, `הזווית בין המישורים π1 ו-π2 היא ${TRUE_DEG}`]);
     expect(st().facts).toHaveLength(3);
     expect(Object.values(derived().status).every((s) => s === 'ok')).toBe(true);
   });
@@ -71,7 +80,8 @@ describe('#1439 — a stated angle between equation planes is checked', () => {
     expect(st().lastError).toEqual({ code: 'claim-refuted' });
     st().submit(`the angle between planes π1 and π2 is ${TRUE_DEG}`);
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(3);
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   // (c) the «המישור π1 לבין המישור π2» spelling — was not-understood — and the mirrored slot order
@@ -85,7 +95,8 @@ describe('#1439 — a stated angle between equation planes is checked', () => {
     expect(st().lastError).toEqual({ code: 'claim-refuted' });
     st().submit(`${head} ${TRUE_DEG}`);
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(3);
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   it('(c) every spelling lowers to the ONE plane-rel', () => {

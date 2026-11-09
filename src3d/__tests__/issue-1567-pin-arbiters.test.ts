@@ -106,12 +106,13 @@ describe('#1567 — a given beside a sphere or cone of unstated size is refused 
   });
 });
 
+// #2341 (ADR-3D-449, operator 2026-11-06: "In all cases it should say כבר קיים"): true of a placed figure, each is
+// already known — never refused, and no row. Was: each recorded an ok row.
 describe('#1567 — the same statements, true of the figure, stay green', () => {
   for (const [title, seq] of GREEN) {
-    it(`${title}: «${seq[seq.length - 1]}» records ok`, () => {
+    it(`${title}: «${seq[seq.length - 1]}» is already known, never refused`, () => {
       const v = decideSubmit3(build(seq.slice(0, -1)), seq[seq.length - 1]);
-      expect(v.kind).toBe('record');
-      if (v.kind === 'record') expect(derive3(v.facts, v.seed).status[v.fact.id]).toBe('ok');
+      expect(v.kind).toBe('already-stated');
     });
   }
 });

@@ -456,13 +456,15 @@ describe('the battery — supported cells exercised end-to-end', () => {
     ['coincident', ['המישור π1: x + y + z = 1', 'המישור π2: 2x + 2y + 2z = 2'], 'π1 מתלכד עם π2', 'π1 מתלכד עם π2', ['המישור π1: x + y + z = 1', 'המישור π2: x + y + z = 4']],
     ['distance', ['המישור π1: z = 0', 'המישור π2: z = 5'], 'המרחק בין המישור π1 לבין המישור π2 הוא 5', 'המרחק בין המישור π1 לבין המישור π2 הוא 3'],
   ] as [string, string[], string, string, string[]?][])(
-    '%s|plane-named|plane-named — absolute × absolute: the true statement verifies, the false one is refused',
+    '%s|plane-named|plane-named — absolute × absolute: the true statement is already known, the false one is refused',
     (rel, setup, trueLine, falseLine, falseSetup) => {
       for (const u of setup) submit(u);
       expect(state().lastError, `${rel}: setup`).toBeNull();
       submit(trueLine);
-      expect(state().lastError, `${rel}: «${trueLine}» is true and verifies`).toBeNull();
-      expect(state().facts).toHaveLength(setup.length + 1);
+      // #2341 (ADR-3D-449): two equation planes decide the relation, so a true one is «כבר קיים» with no row
+      expect(state().lastError, `${rel}: «${trueLine}» is true and is never refused`).toBeNull();
+      expect(state().facts).toHaveLength(setup.length);
+      expect(state().lastNotice).toEqual({ code: 'already-stated' });
       state().clear();
       for (const u of falseSetup ?? setup) submit(u);
       submit(falseLine);

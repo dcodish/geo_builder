@@ -194,7 +194,8 @@ describe('#1918 (B) the warning — every route that DRAWS a declared trapezoid 
     [['פירמידה ישרה SABCD שבסיסה טרפז ישר זווית']],
   ])('%j — records, warned at every configuration, no cyclic notice beside it', (lines) => {
     const { st, outcomes } = play(lines);
-    expect(outcomes.every((o) => o.kind === 'record'), JSON.stringify(outcomes)).toBe(true);
+    // #2341 (ADR-3D-449): «AB ∥ DC» after «טרפז ABCD» is the pair the noun already makes parallel: «כבר קיים», no row
+    expect(outcomes.every((o) => o.kind === 'record' || (o.kind === 'already-stated' && lines.join() === 'טרפז ABCD,AB ∥ DC,AD ∥ BC')), JSON.stringify(outcomes)).toBe(true);
     for (const d of walk(st, 8)) {
       expect(allOk(d)).toBe(true);
       expect(d.shapeWarnings.map((w) => w.ids.join(''))).toEqual(['ABCD']);

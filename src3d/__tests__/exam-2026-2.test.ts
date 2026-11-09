@@ -13,10 +13,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
+  KNOWN = [];
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
   useGeo3.temporal.getState().clear();
 }
-const submit = (u: string) => useGeo3.getState().submit(u);
+/** #2341 (ADR-3D-449): the lines answered «כבר קיים» — an answer the figure already holds adds no row and is not refused. */
+let KNOWN: string[] = [];
+const submit = (u: string) => {
+  const rows = useGeo3.getState().facts.length;
+  useGeo3.getState().submit(u);
+  const st = useGeo3.getState();
+  if (st.lastError === null && st.facts.length === rows && st.lastNotice?.code === 'already-stated') KNOWN.push(u);
+};
 const state = () => useGeo3.getState();
 const derived = () => derive3(state().facts, state().seed);
 function expectAllOk() {
@@ -74,7 +82,8 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
     submit('נפח הפירמידה SENB = 108');
     submit('נפח הפירמידה SENB שווה לנפח הפירמידה CENB');
     expectAllOk();
-    expect(state().facts).toHaveLength(15);
+    expect(state().facts).toHaveLength(10);
+    expect(KNOWN).toEqual(["N = (6, 6, 6)","E = (9, 0, 3)","המישור ENB: 3x+2y-z-24=0","נפח הפירמידה SENB = 108","נפח הפירמידה SENB שווה לנפח הפירמידה CENB"]); // #2341 (ADR-3D-449): each answer the figure already holds is «כבר קיים», no row
   });
 
   it('the coefficient commutes and radicals bind tight: |EN| = |w|·√6/4 (the operator-typed order)', () => {

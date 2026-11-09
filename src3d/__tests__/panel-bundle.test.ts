@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { dataView } from '../engine/dataView';
 import { deserializeFigure3, serializeFigure3 } from '../store/figureFile3';
+import { parse3 } from '../parser/parse3';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
@@ -21,11 +22,14 @@ const panel = () => dataView(derived().construction, state().seed);
 describe('#384 — the data panel reports plane pairs (stated or holding)', () => {
   beforeEach(reset);
 
-  it("«המישור ABC מקביל למישור A'B'C'» on a box (play test 3) → a parallel row", () => {
+  // #2341 (ADR-3D-449, operator 2026-11-06: "In all cases it should say כבר קיים"): the box already holds it, so it adds
+  // no row and names no plane. Was: a row that drew both planes and a parallel row in the panel.
+  it("«המישור ABC מקביל למישור A'B'C'» on a box (play test 3) → already known, no row", () => {
     submit("תיבה ABCDA'B'C'D'");
     submit("המישור ABC מקביל למישור A'B'C'");
     expect(state().lastError).toBeNull();
-    expect(panel().mutual).toContainEqual({ a: 'ABC', b: "A'B'C'", rel: 'parallel' });
+    expect(state().facts).toHaveLength(1);
+    expect(state().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   it('«המישור ABC מאונך למישור ABD» on a tetra (driven, play test 1) → a perpendicular row', () => {
@@ -66,12 +70,25 @@ describe('#384 — the data panel reports stated distances', () => {
 describe('#396 — a relation between two ABSOLUTE objects gets the redundancy notice', () => {
   beforeEach(reset);
 
-  it('«π1 ניצב ל-π2» over two equation planes (play test 5) → notice naming both', () => {
+  // #2341 (ADR-3D-449, operator 2026-11-06: "In all cases it should say כבר קיים"): typed, such a relation is already
+  // known and adds no row; the notice is what a row SAVED before the rule still shows when its file loads.
+  it('«π1 ניצב ל-π2» over two equation planes (play test 5) → already known, no row', () => {
     submit('המישור π1: z = 0');
     submit('המישור π2: x = 0');
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices).toContainEqual({ kind: 'already-known', rel: 'objects', subject: 'π1', object: 'π2' });
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastNotice).toEqual({ code: 'already-stated' });
+  });
+
+  it('…and the same row, saved before #2341, loads with the notice naming both', () => {
+    submit('המישור π1: z = 0');
+    submit('המישור π2: x = 0');
+    const saved = parse3('π1 ניצב ל-π2');
+    if (!saved.ok) throw new Error('parse');
+    const d = derive3([...state().facts, { id: 'saved', utterance: 'π1 ניצב ל-π2', cmds: saved.commands, enabled: true }], 0);
+    expect(d.status.saved).toBe('ok');
+    expect(d.notices).toContainEqual({ kind: 'already-known', rel: 'objects', subject: 'π1', object: 'π2' });
   });
 
   it('a relation over FIGURE objects (the verify register) never notices', () => {
@@ -116,13 +133,15 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     expect(derived().notices.filter((n) => n.kind === 'already-known' && n.rel === 'objects')).toEqual([]);
   });
 
-  it('a free plane REPLACED by its equation makes a later relation genuinely redundant — notice returns', () => {
+  it('a free plane REPLACED by its equation makes a later relation genuinely redundant — already known', () => {
     submit('π1');
     submit('המישור π1: z = 0');
     submit('המישור π2: x = 0');
+    const rows = state().facts.length;
     submit('π1 ניצב ל-π2');
     expect(state().lastError).toBeNull();
-    expect(derived().notices).toContainEqual({ kind: 'already-known', rel: 'objects', subject: 'π1', object: 'π2' });
+    expect(state().facts).toHaveLength(rows);
+    expect(state().lastNotice).toEqual({ code: 'already-stated' });
   });
 });
 

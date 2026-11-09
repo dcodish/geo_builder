@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3, type Fact3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import { parse3 } from '../parser/parse3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
@@ -24,7 +25,7 @@ const VIEW = { width: 800, height: 600 };
 function build(...lines: string[]) {
   st().clear();
   for (const l of lines) {
-    st().submit(l);
+    submitOrSave3(l); // #2341 (ADR-3D-449): a held line typed today is «כבר קיים»; kept as the row a save holds
     expect(st().lastError, l).toBeNull();
   }
   return derive3(st().facts, st().seed);
@@ -178,5 +179,16 @@ describe('#1475 — dihedralGeometry (the shared helper)', () => {
   it('is null for parallel planes', () => {
     const d = build(NAMED_1, 'המישור π2: z = 3');
     expect(dihedralGeometry(g('π1', d), g('π2', d), { center: v3(0, 0, 0) })).toBeNull();
+  });
+});
+
+describe('#2341 — typed today, a right angle the planes already make is already known (ADR-3D-449)', () => {
+  it('«π1 ניצב ל-π2» over two perpendicular equation planes: «כבר קיים», no row, so no knee', () => {
+    build(NAMED_1, NAMED_2);
+    st().submit('π1 ניצב ל-π2');
+    expect(st().lastError).toBeNull();
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(scene(derive3(st().facts, st().seed)).marks).toHaveLength(0);
   });
 });

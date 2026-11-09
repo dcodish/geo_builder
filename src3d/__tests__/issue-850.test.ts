@@ -19,6 +19,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { submitOrSave3 } from './savedRows3';
 import type { BuildNotice3 } from '../engine/notices';
 
 function reset() {
@@ -28,7 +29,8 @@ function reset() {
 const st = () => useGeo3.getState();
 const build = (us: string[]) => {
   reset();
-  for (const u of us) st().submit(u);
+  // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
+  for (const u of us) submitOrSave3(u);
 };
 /** The #850 CASES of the converged `already-known` channel (#853) — the ∥/⟂ ones. */
 const entailed = (seed = 0) =>
@@ -39,6 +41,17 @@ const entailed = (seed = 0) =>
 
 const CUBE = "קובייה ABCDA'B'C'D'";
 const ANCHOR = ['A(0,0,0)', 'B(4,0,0)', 'D(0,4,0)'];
+
+describe('#2341 — typed today, an entailed relation is already known (ADR-3D-449)', () => {
+  beforeEach(reset);
+  it.each(["AB מקביל למישור A'B'C'D'", "AA' מאונך למישור ABCD"])('«%s» on a cube: «כבר קיים», no row', (line) => {
+    st().submit("קובייה ABCDA'B'C'D'");
+    st().submit(line);
+    expect(st().lastError).toBeNull();
+    expect(st().facts).toHaveLength(1);
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+  });
+});
 
 describe('#850 — an entailed relation says so', () => {
   beforeEach(reset);
