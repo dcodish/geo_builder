@@ -969,7 +969,7 @@ The base SHAPE a bound pyramid carries is only a stated one ([ADR-3D-436](06b-de
 reads «פירמידה ABCDS» and «… שבסיסה מלבן» as one command (ADR-3D-011's rectangle is the default that draws a base the
 pyramid makes), so the fold decides from the row's own text (`namesQuadBase3`, the rule's own reader): a non-right pyramid
 whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate the solid apply also asks) is read in
-`expandFact` as the general-quadrilateral kind (`unstatedPyramidBase3`), the twin «… שבסיסה מרובע». A minted bare
+`expandFact` as the general-quadrilateral kind (`unstatedPyramidReading3`), the twin «… שבסיסה מרובע». A minted bare
 declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
