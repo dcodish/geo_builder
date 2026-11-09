@@ -1,0 +1,187 @@
+{
+ "name": "prod-2026-11-09-2",
+ "title": "Prod smoke — deploy prod/2026-11-09-2 (round #2786)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "3-D: an isosceles trapezoid's equal diagonals are already known — no diagonals drawn (#2341; 2-D still records it) [round T13]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "טרפז שווה שוקיים ABCD",
+    "|AC| = |BD|"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row, the note, and no diagonals AC or BD drawn. (In 2-D the same line still adds a row and draws the diagonals.)",
+   "before": "A row, with AC and BD drawn."
+  },
+  {
+   "id": "P2",
+   "title": "3-D: a box's parallel planes are already known — no planes drawn (#2341) [round T14]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "המישור ABC מקביל למישור A'B'C'"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "One row, the note; no planes drawn and no «parallel» row in the data panel.",
+   "before": "A row, two planes drawn, a parallel row in the data panel."
+  },
+  {
+   "id": "P3",
+   "title": "3-D: a length the points decide is already known (#2341) [round T8]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "A(0,0,0)",
+    "B(3,0,0)",
+    "AB = 3"
+   ],
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Two rows, the note, no segment AB and no «3» label.",
+   "before": "A row."
+  },
+  {
+   "id": "P4",
+   "title": "3-D REFUSAL: a false statement is still refused (#2341) [round T9]",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ∥ AD"
+   ],
+   "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
+   "before": "Unchanged.",
+   "expectRefusal": "הטענה לא מתקיימת בציור",
+   "class": "verified"
+  },
+  {
+   "id": "P5",
+   "title": "3-D: a free size still commits (#2341) [round T10]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB = 3"
+   ],
+   "expectRows": [
+    "AB = 3"
+   ],
+   "expectAbsent": [
+    "כבר קיים באיור"
+   ],
+   "lookFor": "Two rows; the cube resized to 3.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "P6",
+   "title": "3-D: a later line on a rectangle that became a square answers at once (#2749) [round T15]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מלבן ABCD",
+    "ריבוע ABCD",
+    "קטע AS",
+    "|SA| = 5"
+   ],
+   "expectFigure": [
+    "S"
+   ],
+   "lookFor": "Each line answers within a few seconds; the square and segment draw as before.",
+   "before": "The last line froze the page for about 4 minutes (244 s measured)."
+  },
+  {
+   "id": "P7",
+   "title": "3-D: a cube sized to 4 keeps its size when a free plane is added (#2746) [round T16]",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "מישור π3"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "«אורך AB = 4» stays green; the cube keeps edge 4; nothing moves when the plane appears.",
+   "before": "The length turned red and the cube shrank back to edge 1."
+  },
+  {
+   "id": "P8",
+   "title": "2-D: a primed point on a circle is drawn as A′ (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מעגל O",
+    "A' על המעגל"
+   ],
+   "expectFigure": [
+    "A′"
+   ],
+   "lookFor": "A point labelled A′ on circle O, and no point A.",
+   "before": "Prod before this deploy: A point named A was drawn green.",
+   "section": "prod"
+  },
+  {
+   "id": "P9",
+   "title": "Analytic: a median drawn as part of a meet ends at the midpoint already named (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "התיכון מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "M ו-E נפלו על אותה נקודה"
+   ],
+   "expectAbsent": [
+    "N"
+   ],
+   "lookFor": "The median AM; E sits on M; no point N; the triangle does not move; the page says «M ו-E נפלו על אותה נקודה.».",
+   "before": "Prod before this deploy: E sat 0.6–8 away from M, on a line from A to a stray point N.",
+   "section": "prod"
+  },
+  {
+   "id": "P10",
+   "title": "Complex loads and builds (untouched this round)",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+   "before": "Unchanged.",
+   "section": "prod",
+   "expect": [
+    "z₁ = 3+4i"
+   ]
+  }
+ ]
+}
