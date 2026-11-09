@@ -1382,6 +1382,8 @@ ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decis
 
 ## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
 
+> **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. This entry holds until #2790 lands.
+
 **Operator ruling (2026-08-16):** *"if a fact is already known - it should not be added. this is true to
 all tools."*
 
@@ -7386,3 +7388,23 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 - **#2490, the right pyramid over an existing ring.** «פירמידה ישרה ABCDS» and «פירמידה ישרה SABCD שבסיסה מרובע» over an existing quadrilateral fit the ring to a quadrilateral a circle passes through, with the ring's free degrees of freedom; refused only when the ring's own givens make that impossible. This supersedes the morning's "2490 - reject" for a ring that can still move. A stated rhombus becomes a square (Q-2490c answered). The built fix (`fix/2490-right-pyramid-existing-ring`, ADR-3D-437 draft) refuses these lines and is reworked before it lands.
 
 **Not changed.** A statement that contradicts what is already fixed is still refused, naming both statements. A figure's first drawing, and what is held, follow the existing rules.
+
+## ADR-W-200 — A line restating what the figure already holds is accepted as its own row, with a notice that it already exists, in every builder (#2790)
+
+**Status:** accepted · 2026-11-09 · operator ruling, all four builders · not yet built (#2790) · **supersedes** [ADR-W-031](#adr-w-031) (2026-08-16) and [ADR-3D-449](06b-decisions-3d.md#adr-3d-449) · LADDER stage: **none** (the submit decision)
+**Operator:** 2026-11-09, in chat, answering round #2786's question on one behaviour for a restated fact (#2704, #2341):
+> "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools. logic is that basically this should not happen but if it does, we accept it for cases where the user might want to delete/disable a previous input and still wants a specific relation to exist. so this needs to be done in all cases. this ruling is for all tools."
+
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-36 (02b FR-SP-19a, FR-CL-1, FR-CL-8 change when #2790 is built) · **Design:** none yet; #2790's plan names it
+
+**Decision.**
+1. **Accepted.** A line whose fact the figure already holds (a restated relation, a value the points already decide, a restated point, an exact repeat of an earlier line) becomes its own row: a given in its own right.
+2. **With a notice** that it already exists in the figure.
+3. **Independent of what implied it.** Deleting or disabling the earlier row leaves the restated relation holding. This is the ruling's reason: the student may want to remove a previous input and keep a specific relation.
+4. **In every builder, in every case**, exact repeats included.
+
+**What it replaces.** ADR-W-031 ("if a fact is already known - it should not be added", no row, «already stated») and ADR-3D-449 (3-D's «זה כבר קיים באיור — אין מה להוסיף.», no row, deployed in `prod/2026-11-09-2`). Both stay in force until #2790 lands.
+
+**Not changed.** A statement the figure contradicts is still refused, naming it ([ADR-W-199](#adr-w-199)).
+
+**Consequence.** The four 3-D guide examples that answer «כבר קיים» since ADR-3D-449 (Q-2341d) build again, with the notice; the operator's "7 - a" (rewrite them) falls away.

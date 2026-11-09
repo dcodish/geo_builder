@@ -15224,6 +15224,8 @@ This is an order-independence fix (M2 law i, read at the fold). It adds no choke
 
 ## ADR-3D-449 — A statement the figure already holds is already known: «כבר קיים», no row (#2341)
 
+> **⚠ Ruled to change — superseded by [ADR-W-200](06w-decisions-workspace.md#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. This entry holds until #2790 lands.
+
 **Status:** accepted · 2026-11-09 · bug (P2, 3d) · fix round #2786, stream B · branch `fix/2341-already-known-3d` from `main` @ `f6c14ca2` · plan: the #2341 "Fix plan — the general rule" comment (2026-11-09), armed `auto-ok` after the judge's Q-2341 · **supersedes** the ✓-row rule for a checked claim (sr-19's ✓ half as [ADR-3D-429](#adr-3d-429) Q2 and [ADR-3D-431](#adr-3d-431) kept it) and the "Open: q20" paragraph of [ADR-3D-423](#adr-3d-423) · **amends** [ADR-3D-075](#adr-3d-075) and [ADR-3D-108](#adr-3d-108)'s charter line (a checked answer is now answered «כבר קיים», not a ✓ row)
 **Requirements:** [02b](02b-requirements-3d.md) FR-SP-19a, FR-CL-1, FR-CL-8 · **Design:** [04b](04b-design-3d.md) § "A statement the figure already holds" · **Ladder:** none: the submit decision's twin step, after the candidate derive; no solve stage changes
 

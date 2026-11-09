@@ -46,6 +46,9 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 - **FR-SU-35 (Must)** — **A figure that can be drawn is drawn.** In every builder, when the givens can all hold in some figure, one is drawn; a statement is refused only when no figure satisfies it, and the refusal names the statements that conflict. An existing shape is fitted with its own free degrees of freedom as far as its givens allow. When more than one figure fits, one is shown and «הציגו תצורה אחרת» reaches the others. The operator's ruling (2026-11-09): *"we always draw a figure if there is a possible way to draw it. we would not refuse something that can be built. if there is more than 1 way to build it - we draw a possible config and allow user to change configs"*.
   - Sources: [ADR-W-199](06w-decisions-workspace.md#adr-w-199); ADR-W-121 §1; ADR-052; 02 FR-ALT-2.
 
+- **FR-SU-36 (Must)** — **A line restating what the figure already holds is accepted, with a notice.** In every builder, a line whose fact the figure already holds (exact repeats included) becomes its own row, and a notice says it already exists in the figure. The row holds its relation on its own: deleting or disabling the row that implied it leaves the relation in force. A contradicted statement is still refused. The operator's ruling (2026-11-09): "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools. logic is that basically this should not happen but if it does, we accept it for cases where the user might want to delete/disable a previous input and still wants a specific relation to exist. so this needs to be done in all cases. this ruling is for all tools." Not yet built: #2790.
+  - Sources: [ADR-W-200](06w-decisions-workspace.md#adr-w-200), superseding ADR-W-031 and ADR-3D-449.
+
 ## The suite — one learned interface
 
 ### The frame
