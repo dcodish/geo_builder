@@ -3788,6 +3788,28 @@
       ],
       "at": "2026-11-09T20:19:54.257Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2764a",
+      "issue": 2764,
+      "question": "Separate shapes linked by a later line («AB ∥ EF» across two squares): (a) the newer shape moves, the older stays; (b) both may move.",
+      "class": "linked-separate-shapes-which-moves",
+      "verdict": "escalate",
+      "reason": "Only precedent is the circle-pair ruling (#2237, 2026-10-16), where the newer circle was also the subject; NFR-ST-1 does not choose; extending it to every shape is a general rule from one ruling.",
+      "nearest": [
+        {
+          "quote": "Accept at P2: Q moves, O and P stay where they are, and no unstated relation is drawn between them.",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2237#issuecomment-6217511016"
+        },
+        {
+          "quote": "When a new fact is added, objects already on screen must not visibly jump or rearrange beyond what the new constraint strictly requires.",
+          "date": "2026-10-21",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/03-nonfunctional-requirements.md#stability"
+        }
+      ],
+      "at": "2026-11-09T20:22:21.487Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
