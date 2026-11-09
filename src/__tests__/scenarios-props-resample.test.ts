@@ -259,15 +259,19 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     // cuts circle O at Y and Z". The OLD behaviour: (1) re-placed the existing Y onto circle O (pinning a
     // point to BOTH circles, so it collapsed to the intersection), and (2) used a fixed branch index whose
     // root order flips under resampling, so D/E intermittently collapsed onto A/B ("would be at the same
-    // point"). Now: an existing crossing is a direction point (never re-placed on the circle), and the new
-    // crossing is the root that does NOT coincide with a placed point — so it holds on EVERY view.
+    // point"). Now the new crossing is the root that does NOT coincide with a placed point — so it holds on
+    // EVERY view. (Since #1840, ADR-802, an existing named crossing IS put on the circle the line cuts: in
+    // step 5 that is B, which already lies on both circles, so C still rides P alone.)
     const st = useGeoStore.getState();
     st.clear();
     // Steps 2–5 are the LLM canonical lines the log recorded (re-parsed with context, as llmParse does).
+    // Step 3 was «מנקודה A ישר חותך את המעגל O בנקודות C ו-D»: A lies on circle O, so since #1840 (ADR-802,
+    // operator 2026-10-08 "Refuse and explain") that line is refused. The same line AC is written as the
+    // student writes it, and the property under test — D and E hold on every view — is unchanged.
     const steps = [
       'שני מעגלים נחתכים בנקודות A ו- B',
       'C על מעגל P',
-      'מנקודה A ישר חותך את המעגל O בנקודות C ו-D',
+      'AC חותך את המעגל O בנקודה D',
       'segment CD', // LLM canonical for the operator's "CD"
       'מנקודה C ישר חותך את המעגל O בנקודות B ו-E',
     ];
@@ -277,8 +281,12 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       if (!r.ok) return;
       for (const cmd of r.commands) st.execute(cmd, u);
     }
-    const radius = (fig: Derived, center: Id) =>
-      (fig.construction.objects.find((o) => o.kind === 'circle' && [(center as string), `@ctr-${center}`].includes((o as { center: Id }).center)) as { radius: { value: number } }).radius.value; // anon centre (ADR-342)
+    // The SOLVED circle (`fig.circles`), never the declared radius: «AC חותך את המעגל O בנקודה D» is a bare pair, so D
+    // must lie within segment AC (ADR-127 `order`), and the solve flexes the circles' free centres and radii to seat it.
+    const onCircle = (fig: Derived, circle: Id, p: Id) => {
+      const c = fig.circles.get(circle)!;
+      return dist(c.center, at(fig, p)) - c.r;
+    };
 
     // Canonical view + 8 resampled "other views" all stay structurally correct.
     for (let press = 0; press <= 8; press++) {
@@ -286,11 +294,11 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
       expect(evaluate(fig.construction).ok, `view ${press}`).toBe(true);
       // C stays on the RIGHT circle P only — never pinned onto circle O.
-      expect(dist(at(fig, 'P'), at(fig, 'C')), `view ${press}: C on P`).toBeCloseTo(radius(fig, 'P'), 2);
-      expect(dist(at(fig, 'O'), at(fig, 'C')), `view ${press}: C off O`).not.toBeCloseTo(radius(fig, 'O'), 1);
+      expect(onCircle(fig, 'circle-P', 'C'), `view ${press}: C on P`).toBeCloseTo(0, 2);
+      expect(Math.abs(onCircle(fig, 'circle-O', 'C')), `view ${press}: C off O`).toBeGreaterThan(0.05);
       // D and E are genuine second crossings of the secants with the LEFT circle O — on it, and distinct from A/B.
       for (const p of ['D', 'E'] as const) {
-        expect(dist(at(fig, 'O'), at(fig, p)), `view ${press}: ${p} on O`).toBeCloseTo(radius(fig, 'O'), 2);
+        expect(onCircle(fig, 'circle-O', p), `view ${press}: ${p} on O`).toBeCloseTo(0, 2);
         expect(dist(at(fig, p), at(fig, 'A')), `view ${press}: ${p}≠A`).toBeGreaterThan(0.1);
         expect(dist(at(fig, p), at(fig, 'B')), `view ${press}: ${p}≠B`).toBeGreaterThan(0.1);
       }
