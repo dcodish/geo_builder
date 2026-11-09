@@ -15,12 +15,13 @@ import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeCompo
 import { lower } from './lower';
 import { circlesTouch, oneCommonPointError } from './evaluate';
 import { circlesStatedTangent } from './structure';
-import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, newCrossingTangency, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
+import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, gateDefects, newCrossingTangency, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals, unstatedFreeVertex } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
+import { reachImpossibility } from './reachFeasibility';
 import {
   angleSumImpossibility,
   angleSumImpossibilityError,
@@ -38,7 +39,7 @@ import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
 import { circlesTangentError, commonTangentCapacityError, equalNestedPair, pairPositionConflict } from './radiusFeasibility';
-import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
+import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
 import { reseatExtensions } from './extensionSide';
@@ -418,29 +419,6 @@ export function forcedFlatError(prev: Construction, next: Construction): string 
   const added = addedConstraints(prev, next);
   return collapsedPolygonError(proof.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
 }
-/**
- * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the defects the accept gate refuses. A straight corner whose
- * three vertices are all UNSTATED free points (no constraint, no directive — their positions are pure defaults,
- * ADR-052) is a configuration choice, not a given the step forced: «קטע AC» · «קטע BD» · «מרובע ABCD» lays B out on
- * line AC by default, and the post-commit search draws it elsewhere (#1927's doctrine, ADR-608: a ring with a free
- * vertex is a configuration choice, never a refusal). A corner a statement made straight — an angle, an incidence,
- * a derived point — is refused.
- */
-function gateDefects(c: Construction, positions: Map<Id, Vec>): PolygonDefect[] {
-  const all = polygonDefects(c, positions, COLLAPSED_POLYGON_RATIO);
-  if (!all.some((d) => d.kind === 'corner')) return all;
-  const unstated = unstatedFreeVertex(c);
-  return all.filter((d) => d.kind !== 'corner' || !d.corner!.every(unstated));
-}
-/** A free point no constraint and no directive touches: its position is a pure default (ADR-052), never a given.
- *  Shared by the corner gate (ADR-643) and the restart (ADR-660), which also leaves a pinned (typed) point alone. */
-function unstatedFreeVertex(c: Construction): (id: Id) => boolean {
-  const stated = new Set([...c.constraints, ...drivenConstraintsOf(c)].flatMap(constraintRefs));
-  return (id: Id) => {
-    const o = c.objects.find((x) => x.id === id);
-    return o?.kind === 'free-point' && !(o as { solve?: unknown }).solve && !stated.has(id);
-  };
-}
 /** #1934 (ADR-660): how many sampled starts the free-vertex restart tries (the ADR-399 probe sampler, `applySeed`). */
 const FREE_RESTART_SEEDS = 8;
 /**
@@ -485,16 +463,6 @@ function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
   // (B1 — the scale-free ruler reads its noise as a healthy shape) and a straight corner on a 4+-gon (B2).
   return gateDefects(c, positions).length > 0;
 }
-/**
- * ADR-413's floor, RAISED to the notice band's ceiling by #1849 ([ADR-602](../../docs/06-decisions.md#adr-602),
- * operator ruling 2026-10-07, [ADR-W-115](../../docs/06w-decisions-workspace.md#adr-w-115)). It was 1e-4, and a
- * construction the givens FORCE flat — «משולש ABC» with sides 5, 3 and 8 — settled just above it (1e-4–2.3e-4 over
- * seeds 0–7) and drew, with ADR-513's notice. The ruling reverses ADR-W-048 for declared polygons: a flat figure is
- * not a triangle, so the line that completes the collapse is REFUSED. One ruler, one number: the band the notice
- * calibrated (ADR-513 — 2.2× above the forced family's worst seed, 2.8× below the nearest legitimate thin triangle,
- * 46× below the thinnest ordinary corpus polygon) is now the refusal floor.
- */
-const COLLAPSED_POLYGON_RATIO = DEGENERATE_EXTENT_RATIO;
 
 /**
  * #1328 (ADR-537): a declared polygon that is THIN and whose constraints hold only by the tolerance's
@@ -1484,6 +1452,19 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const obtuseErr = obtuseSideImpossibility(probed.objects, probed.constraints);
   if (obtuseErr) {
     return { ok: false, error: obtuseSideImpossibilityError(obtuseErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
+  // #2797 (ADR-817): the reach member — a stated distance from a point that RIDES a fixed ray or circle of the rigid
+  // frame (one free parameter) to a frame point, outside every reach that locus allows («… ∠CDE = 100° · EA = 1»: E
+  // rides the ray from D and comes no closer to A than 2.11). The flex probe sees the rider move and would park it as
+  // waiting for givens; no later given brings it closer. A reach already proven of the prior figure is never blamed
+  // on this line (ADR-602's doctrine). Refused as the new statement's over-constraint, so the fold's drop-one search
+  // names the statement it contradicts.
+  if (reachImpossibility([...probed.constraints, ...drivenConstraintsOf(probed)]) && !reachImpossibility([...prev.constraints, ...drivenConstraintsOf(prev)])) {
+    const newCons = probed.constraints.slice(prev.constraints.length);
+    const added = newCons.length ? newCons : addedConstraints(prev, probed);
+    const error = engineErrorDebugText(added.length ? { code: 'over-constrained', what: describeConstraint(describeNewStatement(added)) } : { code: 'over-constrained-unnamed' });
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #1470 + #1487 (ADR-549), stage 0g′: a stated SIDE and a statement that structurally puts the point

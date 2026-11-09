@@ -8,6 +8,7 @@
 import { engineErrorDebugText } from './errors';
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, TANGENT_COS, isGeoPoint, isOrderConstraint, objectParents } from './types';
+import { DEGENERATE_EXTENT_RATIO, polygonDefects, type PolygonDefect } from './degeneracy';
 import { isShapeCarrier } from './carriers';
 import { angleIntoSpans, drawnArcSpans, drawnSign, type ArcSpan } from './arcs';
 import {
@@ -25,8 +26,9 @@ import {
   sub,
   unit,
 } from './geometry';
-import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
+import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostRowCount, jointCostRows, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
+import { solveLM } from './solveLM';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
 import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
@@ -523,6 +525,34 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     return { s: s + extra, pos: r.positions };
   };
   const resid = (x: number[]): number => residFull(x).s;
+  // #2797 (ADR-816): the same cost as SIGNED rows, for multiStartSolve's LM rescue rung — the constraint terms
+  // through jointCostRows (one convention), the steer's extra (side shortfall at the verifier's own aim, the
+  // freeze) as one √ row. A fixed count; NaN rows where the figure does not evaluate.
+  // The convex-first pass's rung also carries the ORIENTATION rows (`convexityRows`, the seed's turning sense).
+  const orient = polygonOrientations(c, place(seed));
+  const rowsFor = (convex: boolean) => {
+    const rowCount = cons.reduce((n, con) => n + jointCostRowCount(con), 0) + 1 + (convex ? convexityRowCount(c) : 0);
+    return (x: number[]): number[] => {
+      const r = evaluateCore(place(x), { skipConstraints: true });
+      const bad = new Array<number>(rowCount).fill(NaN);
+      if (!r.ok) return bad;
+      let extra = steer ? sideCost(sides, r.positions, r.circles, 0) : 0;
+      if (steer) for (const i of frozen) extra += (FREEZE_W * ((x[2 * i] - freezeAt[2 * i]) ** 2 + (x[2 * i + 1] - freezeAt[2 * i + 1]) ** 2)) / (span * span);
+      const out: number[] = [];
+      for (const con of cons) {
+        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return bad;
+        out.push(...jointCostRows(con, (id) => r.positions.get(id)!, aim));
+      }
+      out.push(Math.sqrt(extra));
+      if (convex) out.push(...convexityRows(c, r.positions, orient));
+      return out;
+    };
+  };
+  const admit = (x: number[]): boolean => {
+    const r = evaluateCore(place(x), { skipConstraints: true });
+    return r.ok && gateDefects(c, r.positions).length === 0;
+  };
+  const rescue = { convex: { rows: rowsFor(true), scale: seed.map(() => span), admit }, relaxed: { rows: rowsFor(false), scale: seed.map(() => span), admit } };
   const barrier = collapseBarrier(c, cons, ids);
   const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
   const regCost = (x: number[]): number => {
@@ -559,7 +589,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     solutionAccepted(c, place, x, cons, span, requireConvex) && (!steer || allSidesHold(c, place(x)));
   const finish = (requireConvex: boolean, useBarrier = false): { x: number[]; ok: boolean } => {
     const best = multiStartSolve(seed, offsets, span * 0.2, useBarrier ? regCostB : regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-      accepted(x, requireConvex),
+      accepted(x, requireConvex), requireConvex ? rescue.convex : rescue.relaxed,
     );
     return { x: best, ok: accepted(best, requireConvex) };
   };
@@ -625,6 +655,7 @@ export function multiStartSolve(
   polishSteps: number[],
   polishIters: number,
   accept: (x: number[]) => boolean,
+  rescue?: LmRescue,
 ): number[] {
   let best = seed;
   let bestReg = regCost(seed);
@@ -664,7 +695,63 @@ export function multiStartSolve(
     consider(best);
   }
   if (accept(best)) return best;
-  return accepted ?? seed; // keep an accepted solution if the polish ended on a rejected one
+  if (accepted) return accepted; // keep an accepted solution if the polish ended on a rejected one
+  // THE LM RESCUE RUNG (#2797, ADR-816) — retry-only, the ADR-238/547/594 shape: reached only when Nelder–Mead
+  // accepted NOTHING, so a solve it already accepts returns byte-identical. Past ~8 unknowns the derivative-free
+  // descent does not converge even beside a root (ADR-281); Levenberg–Marquardt on the same terms' signed rows
+  // does. From the seed, then at most the first LM_RESCUE_RESTARTS restarts in order, pulled weakly toward the
+  // seed; the FIRST result `accept` passes wins — `accept` carries the caller's convex requirement, so the
+  // convex-first pass keeps its meaning. The whole rung shares ONE evaluation cap (docs/17 §7: the refusal path,
+  // where every start fails, must not multiply — the drop-one attribution search re-runs a failing ladder ~13×).
+  if (rescue) {
+    const perStart = 2 * LM_RESCUE_ITERS * 2 * (seed.length + 1); // two phases of ≤ ITERS iterations, each ≈ 2n + 2 evaluates
+    let left = perStart * (1 + LM_RESCUE_RESTARTS); // the per-solve cap
+    let evals = 0;
+    const rows = (x: number[]): number[] => {
+      evals++;
+      return rescue.rows(x);
+    };
+    for (const start of [seed, ...restarts.slice(0, LM_RESCUE_RESTARTS)]) {
+      if (left <= 0 || (start !== seed && budgetExceeded())) break; // #259's discipline: never open a start past a budget
+      drivenSolveStats.lmRescue++;
+      const before = evals;
+      const x = solveLM(rows, start, { scale: rescue.scale, regularize: { weight: 1e-3, toward: seed }, maxIter: LM_RESCUE_ITERS, maxEvals: Math.min(perStart, left) }).x;
+      left -= evals - before;
+      drivenSolveStats.lmEvals += evals - before;
+      if (accept(x)) {
+        // A root the STEP would refuse as not a figure (`admit`: the step's own `gateDefects`) is no rescue — the
+        // hexagon's FA = 4 has a second root with F, A, B on one line. The rung goes on to its next start, and when
+        // none admits, returns the seed exactly as before the rung (the ladder's later stages, measured, then find the
+        // regular hexagon). Returning the defective root instead made the step refuse the hexagon as flat.
+        if (rescue.admit && !rescue.admit(x)) continue;
+        drivenSolveStats.lmRescued++;
+        return x;
+      }
+    }
+  }
+  return seed;
+}
+
+/** #2797 ([ADR-816](docs/06-decisions.md#adr-816)): the rescue rung's starts past the seed. Measured (the ADR's table):
+ *  past 4 no measured row changes (a free-vertex solve's restarts are translations of one shape; the mixed solver's
+ *  are per-unknown pushes), and every failing solve pays for each start. */
+export const LM_RESCUE_RESTARTS = 4;
+/** #2797 (ADR-816): the rung's iteration budget per LM phase (search, then polish), so one start costs at most
+ *  2·ITERS·(2n + 2) evaluates and the whole rung (1 + LM_RESCUE_RESTARTS) times that — the per-solve cap. Measured:
+ *  20 leaves P3′ and the hexagon short of convergence (committed as waiting), 30 converges every row, 60 lets the
+ *  regularised search spend the start's whole cap (it never reached the polish) and P3's prior came out concave. */
+export const LM_RESCUE_ITERS = 30;
+
+/**
+ * #2797 ([ADR-816](docs/06-decisions.md#adr-816)): what a driven solver hands `multiStartSolve` for the LM
+ * rescue rung — the cost's signed rows ({@link jointCostRows}, a FIXED count; NaN rows where the figure does
+ * not evaluate) and the per-unknown scale the solve normalises by.
+ */
+export interface LmRescue {
+  rows: (x: number[]) => number[];
+  scale: number[];
+  /** Is this accepted candidate a FIGURE the step will keep (no `gateDefects`)? Absent: every accepted one is. */
+  admit?: (x: number[]) => boolean;
 }
 
 /**
@@ -701,6 +788,55 @@ function declaredPolygonsConvex(c: Construction, positions: Map<Id, Vec>): boole
     }
   }
   return true;
+}
+
+/**
+ * #2797 ([ADR-816](docs/06-decisions.md#adr-816)) — THE CONVEX-FIRST PASS, IN LM's TERMS. Nelder–Mead's convex pass
+ * rejects a concave candidate and moves on to the next basin; Levenberg–Marquardt goes to the root NEAREST its start,
+ * and every restart of a free-vertex solve is a translation of the whole figure (the same shape), so a seed whose
+ * nearest root is concave (the seven-line pentagon: E slides onto the outer ray from D) gave the convex pass nothing,
+ * and the relaxed pass drew it concave where Nelder–Mead had drawn it convex. So the rung's convex pass carries one
+ * ONE-SIDED row per corner of every declared ≥4-gon: how far the corner turns AGAINST the seed's polygon (the sine of
+ * the reverse turn, 0 when it turns the seed's way or not at all). Zero on every convex figure of that orientation,
+ * so a convex root is still a root; and zero on a straight corner, so it builds no compromise minimum there (a margin
+ * was measured to: the hexagon's straight-corner root then floored at 7.6e-6 and the line was parked as waiting). The
+ * rung's `admit` still holds a straight corner back (`gateDefects`). The relaxed pass carries none. A fixed row count.
+ */
+function convexityRowCount(c: Construction): number {
+  let n = 0;
+  for (const o of c.objects) if (o.kind === 'polygon' && o.vertices.length >= 4) n += o.vertices.length;
+  return n;
+}
+/** The turning sense (±1, by signed area) of every declared ≥4-gon in `c`'s evaluated figure; +1 where unknown. */
+function polygonOrientations(c: Construction, at: Construction): Map<Id, number> {
+  const out = new Map<Id, number>();
+  const r = evaluateCore(at, { skipConstraints: true });
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 4) continue;
+    const pts = r.ok ? o.vertices.map((id) => r.positions.get(id)) : [];
+    let area = 0;
+    if (pts.length && pts.every(Boolean)) for (let i = 0; i < pts.length; i++) { const a = pts[i]!, b = pts[(i + 1) % pts.length]!; area += a.x * b.y - a.y * b.x; }
+    out.set(o.id, area < 0 ? -1 : 1);
+  }
+  return out;
+}
+function convexityRows(c: Construction, positions: Map<Id, Vec>, orient: Map<Id, number>): number[] {
+  const out: number[] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 4) continue;
+    const n = o.vertices.length;
+    const pts = o.vertices.map((id) => positions.get(id));
+    const sense = orient.get(o.id) ?? 1;
+    for (let i = 0; i < n; i++) {
+      const A = pts[i], B = pts[(i + 1) % n], C = pts[(i + 2) % n];
+      if (!A || !B || !C) { out.push(0); continue; } // a vertex that did not resolve — not this row's concern
+      const ux = B.x - A.x, uy = B.y - A.y, vx = C.x - B.x, vy = C.y - B.y;
+      const den = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+      const sin = den > 0 ? (ux * vy - uy * vx) / den : 0;
+      out.push(Math.max(0, -sense * sin));
+    }
+  }
+  return out;
 }
 
 /**
@@ -752,6 +888,43 @@ function solutionAccepted(c: Construction, place: (x: number[]) => Construction,
   return true;
 }
 
+/**
+ * ADR-413's floor, RAISED to the notice band's ceiling by #1849 ([ADR-602](../../docs/06-decisions.md#adr-602),
+ * operator ruling 2026-10-07, [ADR-W-115](../../docs/06w-decisions-workspace.md#adr-w-115)). It was 1e-4, and a
+ * construction the givens FORCE flat — «משולש ABC» with sides 5, 3 and 8 — settled just above it (1e-4–2.3e-4 over
+ * seeds 0–7) and drew, with ADR-513's notice. The ruling reverses ADR-W-048 for declared polygons: a flat figure is
+ * not a triangle, so the line that completes the collapse is REFUSED. One ruler, one number: the band the notice
+ * calibrated (ADR-513 — 2.2× above the forced family's worst seed, 2.8× below the nearest legitimate thin triangle,
+ * 46× below the thinnest ordinary corpus polygon) is now the refusal floor.
+ */
+const COLLAPSED_POLYGON_RATIO = DEGENERATE_EXTENT_RATIO;
+/**
+ * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the defects the accept gate refuses. A straight corner whose
+ * three vertices are all UNSTATED free points (no constraint, no directive — their positions are pure defaults,
+ * ADR-052) is a configuration choice, not a given the step forced: «קטע AC» · «קטע BD» · «מרובע ABCD» lays B out on
+ * line AC by default, and the post-commit search draws it elsewhere (#1927's doctrine, ADR-608: a ring with a free
+ * vertex is a configuration choice, never a refusal). A corner a statement made straight — an angle, an incidence,
+ * a derived point — is refused.
+ * #2797 ([ADR-816](../../docs/06-decisions.md#adr-816)): moved here from `step.ts` so the driven solvers' LM rescue rung
+ * asks the SAME question the step asks (`LmRescue.admit`), with the step's floor — a root the step would refuse as not
+ * a figure is no rescue. Nelder–Mead's accept is unchanged: putting the test
+ * there hid the defect from the step, and ADR-643's refusals («…would be flat at B, C, D») lost their wording.
+ */
+export function gateDefects(c: Construction, positions: Map<Id, Vec>): PolygonDefect[] {
+  const all = polygonDefects(c, positions, COLLAPSED_POLYGON_RATIO);
+  if (!all.some((d) => d.kind === 'corner')) return all;
+  const unstated = unstatedFreeVertex(c);
+  return all.filter((d) => d.kind !== 'corner' || !d.corner!.every(unstated));
+}
+/** A free point no constraint and no directive touches: its position is a pure default (ADR-052), never a given.
+ *  Shared by the corner gate (ADR-643) and the restart (ADR-660), which also leaves a pinned (typed) point alone. */
+export function unstatedFreeVertex(c: Construction): (id: Id) => boolean {
+  const stated = new Set([...c.constraints, ...drivenConstraintsOf(c)].flatMap(constraintRefs));
+  return (id: Id) => {
+    const o = c.objects.find((x) => x.id === id);
+    return o?.kind === 'free-point' && !(o as { solve?: unknown }).solve && !stated.has(id);
+  };
+}
 /** Set free vertices to explicit positions and clear their `solve` directives (now resolved). */
 function setFreePos(c: Construction, pos: Map<Id, Vec>): Construction {
   return {
@@ -893,7 +1066,7 @@ export function warmStartCarriers(to: Construction, from: Construction): Constru
  * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
  */
 /** #1602 (ADR-557): how often the joint optimizer ran — the operation-count lock's probe (never time). */
-export const drivenSolveStats = { joint: 0, shapeRescue: 0 };
+export const drivenSolveStats = { joint: 0, shapeRescue: 0, lmRescue: 0, lmRescued: 0, lmEvals: 0 }; // lm*: #2797 (ADR-816) — LM starts run / accepted
 
 function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
   drivenSolveStats.joint++;
@@ -960,6 +1133,29 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       return { s, pos: r.positions };
     };
     const cost = (u: number[]): number => costFull(u).s;
+    // #2797 (ADR-816): costFull as SIGNED rows for the LM rescue rung (see resolveFreeDriven) — already in u-space.
+    const orient = polygonOrientations(c, place(seedU));
+    const rowCount = cons.reduce((n, con) => n + jointCostRowCount(con), 0) + 1 + (requireConvex ? convexityRowCount(c) : 0);
+    const rows = (u: number[]): number[] => {
+      const r = evaluateCore(place(u), { skipConstraints: true });
+      const bad = new Array<number>(rowCount).fill(NaN);
+      if (!r.ok) return bad;
+      let extra = sides.length ? sideCost(sides, r.positions, r.circles, 0) : 0;
+      for (const h of held) extra += FREEZE_W * (u[h.k] - h.t) ** 2;
+      const out: number[] = [];
+      for (const con of cons) {
+        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return bad;
+        out.push(...jointCostRows(con, (id) => r.positions.get(id)!, aim));
+      }
+      out.push(Math.sqrt(extra));
+      if (requireConvex) out.push(...convexityRows(c, r.positions, orient));
+      return out;
+    };
+    const admit = (u: number[]): boolean => {
+      const r = evaluateCore(place(u), { skipConstraints: true });
+      return r.ok && gateDefects(c, r.positions).length === 0;
+    };
+    const rescue = { rows, scale: seedU.map(() => 1), admit };
     const barrier = collapseBarrier(c, cons, specs.map((s) => s.id));
     const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
     const regCost = (u: number[]): number => {
@@ -1075,7 +1271,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     ];
     const run = (rc: (u: number[]) => number): { u: number[]; ok: boolean } => {
       const best = multiStartSolve(seedU, restarts, 0.3, rc, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
-        acc(x),
+        acc(x), rescue,
       );
       return { u: best, ok: acc(best) };
     };
@@ -1117,7 +1313,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       }
       if (shapeRanges.length > 0) {
         drivenSolveStats.shapeRescue++;
-        const u = multiStartSolve(bindingSweep([...ranges, ...shapeRanges]), [], 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, acc);
+        const u = multiStartSolve(bindingSweep([...ranges, ...shapeRanges]), [], 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, acc, rescue);
         if (acc(u)) best = { u, ok: true };
       }
     }

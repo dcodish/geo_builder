@@ -6665,6 +6665,21 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'pentagon-impossible-closing-side-refuses',
+    title: '«מחומש ABCDE» · AB = 5 · BC = 4 · ∠ABC = 100° · CD = 4 · ∠BCD = 110° · ∠CDE = 100° · «EA = 1» is refused naming the statement, never parked as waiting (#2797, ADR-817)',
+    guards:
+      "#2797: once the driven solver's LM rescue rung (ADR-816) samples the 7-line pentagon at every seed, E slides along its ray from D and the flex probe (constraintIsPending, ADR-104) saw |EA| move — «EA = 1» would have committed as a red «waiting for givens» row, though E can come no closer to A than 2.11 in any configuration. ADR-817's reach prover (stage 0i′) refuses it first. Asserts: the first seven lines build green; «EA = 1» is refused by the deterministic gate as an over-constraint naming |EA| = 1, and nothing is pending; the reachable closing side «EA = 4.5» (the operator's line) commits. Unit lock: src/engine/__tests__/reach-feasibility.test.ts.",
+    steps: ['מחומש ABCDE', 'AB = 5', 'BC = 4', 'זווית ABC = 100', 'CD = 4', 'זווית BCD = 110', 'זווית CDE = 100'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מחומש ABCDE', 'AB = 5', 'BC = 4', 'זווית ABC = 100', 'CD = 4', 'זווית BCD = 110', 'זווית CDE = 100']);
+      const v = gateVerdict(facts, 'EA = 1');
+      expect(v.kind === 'refused' && v.reason, '«EA = 1» is refused as a conflict, never committed as waiting').toBe('error');
+      if (v.kind === 'refused') expect(v.detail ?? '', 'the refusal names the statement').toMatch(/|EA| = 1 cannot hold/);
+      expect(gateVerdict(facts, 'EA = 4.5').kind, 'the reachable closing side commits').toBe('commit');
+    },
+  },
 ];
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {

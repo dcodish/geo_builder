@@ -656,6 +656,34 @@ export function jointCostTerm(con: Constraint, get: (id: Id) => Vec, aim = true)
 }
 
 /**
+ * #2797 ([ADR-816](docs/06-decisions.md#adr-816)): the SIGNED rows of {@link jointCostTerm}, for the
+ * Levenberg–Marquardt rescue rung of `multiStartSolve` — the same terms, one convention (ADR-033's relative
+ * residual), never a second copy of the cost. An equation is its residual ÷ its scale, signed; a `coincide`
+ * and a `concyclic` contribute their {@link residualRows} (the scalar distance is not differentiable where it
+ * holds); an order or a bound is ONE-SIDED — `√jointCostTerm`, 0 inside its region (its aim included).
+ * The row COUNT depends only on the constraint ({@link jointCostRowCount}), so a caller can fill a failed
+ * evaluation with that many NaN rows (LM rejects a non-finite trial).
+ */
+export function jointCostRows(con: Constraint, get: (id: Id) => Vec, aim = true): number[] {
+  if (isOrderConstraint(con)) return [Math.sqrt(jointCostTerm(con, get, aim))]; // an order or a bound: one-sided
+  const sc = Math.max(constraintScale(con, get), 1e-9);
+  if (con.type === 'coincide' || con.type === 'concyclic') {
+    const rows = residualRows(con, get).map((r) => r / sc);
+    const n = jointCostRowCount(con);
+    return rows.length === n ? rows : new Array<number>(n).fill(NaN);
+  }
+  return [residual(con, get) / sc];
+}
+
+/** How many rows {@link jointCostRows} returns for `con` — a function of the constraint alone. */
+export function jointCostRowCount(con: Constraint): number {
+  if (isOrderConstraint(con)) return 1;
+  if (con.type === 'coincide') return 2;
+  if (con.type === 'concyclic') return Math.max(0, con.points.length - 3);
+  return 1;
+}
+
+/**
  * "40 ≤ ∠ABC < 60" / "∠ABC > 40" / "|AB| ≤ 5" — a bound rendered the way the student wrote it.
  *
  * #1265: every bound used to render with `>` and `<`, so a figure carrying «BC ≥ 10» was refused with
