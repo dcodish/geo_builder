@@ -1537,6 +1537,11 @@ is never re-read.
 - **The resolve** is `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) → `geoWork.autoResolve`
   (the worker): `meetsRequirements` decides whether anything is wrong, and `findValidConfig(facts, seed)` sweeps
   from the current seed (M2). The found view merges into the commit's history entry, so one undo removes both.
+- **The search basis** ([ADR-812](06-decisions.md#adr-812), #2757). Every worker search result carries the `(facts, seed)`
+  it ran on (`ViewBasis`, `store/geoWork.ts`), and `applyView` is a compare-and-set on it: a view that lands after
+  an undo, redo, clear, edit or new line is dropped. A store subscription supersedes such a search on the change
+  itself (`supersedeStaleSearches`: it rejects `{ cancelled }` and the interactive worker is killed), and
+  `runViewResolve` re-reads the store after its await, so a stale exhausted search raises no note.
 - The violating configuration may paint for one frame before the answer lands (operator-accepted); the keep-prior
   slot (#573) holds the last good view meanwhile.
 

@@ -46,7 +46,7 @@ const resolveAfterCommit = () => {
   if (meetsRequirements(s.facts, s.seed)) return;
   const found = findValidConfig(s.facts, s.seed);
   if (!found) return;
-  st().applyView({ facts: found.facts, seed: found.seed });
+  st().applyView({ facts: found.facts, seed: found.seed, basis: { facts: s.facts, seed: s.seed } });
 };
 const deps = { resolveAfterCommit };
 

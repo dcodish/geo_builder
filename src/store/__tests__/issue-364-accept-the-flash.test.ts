@@ -46,7 +46,7 @@ async function resolveAfterCommit(): Promise<void> {
       const temporal = useGeoStore.temporal.getState();
       temporal.pause();
       try {
-        state().applyView({ facts: found.facts, seed: found.seed });
+        state().applyView({ facts: found.facts, seed: found.seed, basis: found.basis });
       } finally {
         temporal.resume();
       }

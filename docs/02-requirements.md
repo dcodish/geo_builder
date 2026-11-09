@@ -295,7 +295,7 @@ Not the theorem layer: it answers "which named shapes does this figure contain, 
 ## History & session
 
 - **FR-HS-1 (Must)** — Show the ordered list of steps the user has entered.
-- **FR-HS-2 (Must)** — Support undo/redo of steps.
+- **FR-HS-2 (Must)** — Support undo/redo of steps. An undone, redone, cleared or edited step stays as the student left it: a configuration search still running when they act answers for a figure no longer on screen, so it is dropped, never applied afterwards, and the input is free again at once ([ADR-812](06-decisions.md#adr-812), #2757; operator 2026-11-08).
 - **FR-HS-3 (Must)** — Provide "clear / start over".
 - **FR-HS-4 — WITHDRAWN (2026-09-06, operator ruling; [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919).** *Was:* "Persist the current construction across page reloads (local only)." Never realised in 2-D or 3-D, honoured only by the complex builder, and settled the other way: **a builder opens empty on every load** ([02w](02w-requirements-workspace.md) FR-SL-5). Un-withdrawn in its **offer** form: the session is persisted but only OFFERED on open (FR-SL-6). Sources: ADR-W-078, #1238.
 - **FR-HS-5 (Should)** — Export the current figure as a clean, print-ready image (SVG and/or PNG) for use in exams, worksheets, and books. Built as PNG save and copy-to-clipboard, over-sampled 2× on white.
