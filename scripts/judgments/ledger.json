@@ -3399,6 +3399,55 @@
       "chosen": true,
       "at": "2026-11-09T05:54:32.452Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2341",
+      "issue": 2341,
+      "round": 2783,
+      "question": "Does the 2026-11-06 «כבר קיים in all cases» ruling also cover a restated VALUE the figure already holds that would add a visible label (e.g. «A(0,0,0)» · «B(3,0,0)» · «AB = 3», or «זווית DAB = 90» on a cube)? (A) literal — «כבר קיים», no row, no label; (B) a held value that would add a label still records as a row, as 2-D does.",
+      "class": "held-statement-already-known",
+      "verdict": "ruled",
+      "choice": "A",
+      "ruling": "In 3-D, a stated value that the earlier givens already decide in every admissible configuration answers «זה כבר קיים באיור — אין מה להוסיף.», adds no row, and draws no new label or mark (sr-19 A; applied by the operator on 2026-11-06 to «AB ⟂ AD» on a cube; ADR-W-118 Am. 3 classes the knee as a value).",
+      "precedents": [
+        {
+          "quote": "In all cases it should say כבר קיים",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2341#issuecomment-6683983248"
+        },
+        {
+          "quote": "sr-19, A: a statement the givens already decide is «כבר קיים»; one they do not decide is a given that shapes the figure.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "a stated ⟂ whose right angle sits at a NAMED point is a VALUE, so the knee is drawn at rest, in both 2-D and 3-D",
+          "date": "2026-10-10",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Only values decided in EVERY admissible configuration; free or pinning values still commit. Does not change 2-D's measured row for «ריבוע ABCD» · «AB = 5» · «BC = 5». Plane equations that first draw their plane (ADR-3D-429) not covered.",
+      "at": "2026-11-09T07:16:45.969Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2735",
+      "issue": 2735,
+      "round": 2783,
+      "question": "The data panel answers in the parameter («(2k,0)»). How far does this reach? (A) point coordinates in the data panel only; (B) A plus the ask box; (C) B plus curve equations and lengths in the letter.",
+      "class": "answer-in-parameter-reach",
+      "verdict": "escalate",
+      "reason": "How far a new feature reaches is reserved to the operator; 02c R173 (ADR-AG-001 D1) promises a value that moves with a parameter is never written as an expression in it, and his 2026-11-07 ruling reverses that only for the data panel's coordinate.",
+      "nearest": [
+        {
+          "quote": "yes - we should support (2k,0) in the data panel",
+          "date": "2026-11-07",
+          "link": "https://github.com/dcodish/geo_builder/issues/2735"
+        }
+      ],
+      "at": "2026-11-09T07:16:45.969Z",
+      "status": "escalated"
     }
   ],
   "demoted": {

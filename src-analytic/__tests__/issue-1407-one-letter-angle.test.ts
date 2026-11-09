@@ -166,9 +166,10 @@ describe('#1407 ruling — the distinct edges at the vertex decide, not the numb
 
   it('edges from separately drawn SEGMENTS count as 2-D counts them: two segments at A give ∠BAC', () => {
     const SEG = ['A(0,0)', 'B(4,0)', 'C(0,3)', 'הקטע AB', 'הקטע AC'];
-    // The coordinates already make ∠BAC right, so 90 follows from them and 60 cannot hold — both read ∠BAC.
+    // The coordinates already make ∠BAC right, so 60 cannot hold — both read ∠BAC. A stated right angle the figure
+    // already holds keeps its row and draws its knee (#2704, ADR-AG-437, as 2-D; before it answered «already follows»).
     const v = decideSubmit('זווית A = 90', SEG, 0);
-    expect(v.kind, JSON.stringify(v)).toBe('already-follows');
+    expect(v.kind, JSON.stringify(v)).toBe('record');
     expect(reachesFallback(v)).toBe(false);
     const w = decideSubmit('זווית A = 60', SEG, 0);
     expect(w.kind === 'refused' && w.error.key, JSON.stringify(w)).toBe('unsatisfiable');
