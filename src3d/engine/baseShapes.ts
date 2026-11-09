@@ -631,8 +631,12 @@ export function concaveSeatVertices3(c: Pick<Construction3, 'quadShapes' | 'soli
   if (ids.length !== 4 || !ringReordered3(c, ids)) return null;
   const letters = [...ids].sort().join();
   let allowed = [0, 1, 2, 3];
-  for (const q of c.quadShapes) {
+  // #2702 (ADR-3D-438): every quad DECLARED over the letters, a pyramid's base among them (`declaredQuads3`) — so a kite
+  // base is a dart only about its axis, as a flat kite is. A RIGHT pyramid's base is cyclic, and a cyclic quadrilateral
+  // is convex whenever simple: it has no concave drawing.
+  for (const q of declaredQuads3(c)) {
     if ([...q.ids].sort().join() !== letters) continue;
+    if (q.solid !== undefined && QUAD_PYRAMIDS[c.solids[q.solid].kind]?.right) return null;
     if (convexWhenSimple(q.base) || (q.base === 'kite' && q.adj)) return null;
     if (q.base === 'kite') allowed = allowed.filter((i) => ids[i] === q.ids[0] || ids[i] === q.ids[2]);
   }

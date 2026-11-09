@@ -547,6 +547,12 @@ const SEEDED: SeededCorpus = {
   // issue-1986-ring-search.test.ts; these are the build + drift net.
   'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
   'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
+  // #2702 (ADR-3D-438) — the report and its unstated-base and prism siblings: a second ring over a solid's base letters is
+  // drawn on a dart base, where it was refused ring-crossed. The seat is asserted in engine3.test.ts, the class rows in
+  // scenarios3.test.ts; these are the build + drift + load net.
+  'pyramid-kite-dart-2702.geo3.json': ['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC'],
+  'pyramid-unstated-dart-2702.geo3.json': ['פירמידה SABCD', 'מרובע ABDC'],
+  'prism-quad-dart-2702.geo3.json': ["מנסרה ABCDA'B'C'D'", 'מרובע ABDC'],
   // #1542 (ADR-3D-429): the operator's exact sequence; the geometry, the chip and the lead are asserted in issue-1542.test.ts
   'plane-equation-sentence-1542.geo3.json': ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'],
   // #2490 (ADR-3D-434): the operator's exact sequence (round #2466 T38) and #2478's — a pyramid over a base that already

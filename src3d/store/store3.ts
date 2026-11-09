@@ -790,7 +790,11 @@ function deriveCore3(
     const cmds = r.cmds.map((k, i) => {
       if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return k;
       let out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
-      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) out = unstatedPyramidBase3(at, out);
+      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) {
+        out = unstatedPyramidBase3(at, out);
+        // #2702 (ADR-3D-438): a base the pyramid makes, with no shape named — its rectangle is a default that yields
+        if (out.kind === k.kind && QUAD_PYRAMIDS[out.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[out.kind]?.right) out = { ...out, baseUnstated: true as const };
+      }
       if (out !== k) changed = true;
       return out;
     });
