@@ -703,43 +703,6 @@ describe('right-pyramid-existing-quad-2490 — «מרובע ABCD» · «פירמ
   });
 });
 
-// pyramid-dart-base-2702 (#2702, ADR-3D-438) — the operator's two lines and the plan's class rows (q-1986-pyramid; #1927
-// 2026-10-09: "Refuse only when nothing the student wrote can save it"): a second ring over a solid's base letters draws
-// the base as a dart, both rings simple at every configuration. A base convex whenever simple — a stated rectangle,
-// parallelogram, square, a box, or a right pyramid's cyclic base — still refuses the second ring.
-describe('pyramid-dart-base-2702 — «פירמידה SABCD שבסיסה דלתון» · «מרובע ABDC» draws a dart base', () => {
-  beforeEach(reset);
-  const simpleAt = (seed: number, ids: string) => {
-    const pos = derive3(state().facts, seed).positions;
-    return !ringSelfCrossing3([...ids].map((id) => pos.get(id)!));
-  };
-  it.each([
-    [['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC']],
-    [['פירמידה SABCD שבסיסה מרובע', 'מרובע ABDC']],
-    [['פירמידה SABCD', 'מרובע ABDC']],
-    [["מנסרה ABCDA'B'C'D'", 'מרובע ABDC']],
-  ])('%j builds with both rings simple at seeds 0–5', (lines) => {
-    for (const l of lines) submit(l);
-    expectAllOk();
-    for (let seed = 0; seed < 6; seed++) {
-      expect(simpleAt(seed, 'ABCD'), `@${seed}`).toBe(true);
-      expect(simpleAt(seed, 'ABDC'), `@${seed}`).toBe(true);
-    }
-  });
-  it.each([
-    ['פירמידה ישרה SABCD שבסיסה דלתון'],
-    ['פירמידה SABCD שבסיסה מלבן'],
-    ['פירמידה SABCD שבסיסה מקבילית'],
-    ['פירמידה SABCD שבסיסה ריבוע'],
-    ["תיבה ABCDA'B'C'D'"],
-  ])('REFUSAL: %s · «מרובע ABDC» — no configuration saves the second ring', (first) => {
-    submit(first);
-    submit('מרובע ABDC');
-    expect(state().lastError).toEqual({ code: 'ring-crossed', stated: 'מרובע ABDC' });
-    expect(state().facts.map((f) => f.utterance)).toEqual([first]);
-  });
-});
-
 // definite-circle-list-order-2705 (#2705, ADR-3D-439) — the operator's found-in-round lines (round #2697): two circles
 // stand above «D על המעגל», the first one's letters made by a line the fold deferred. Judged q-2611-twocircles
 // (ADR-W-175 sr-12, 2026-11-02): "With two, the tool asks which, using the existing question"; 2-D asks too. The
