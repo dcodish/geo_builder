@@ -120,9 +120,16 @@ describe('#2621 B — a line given by its direction alone', () => {
     }
   });
 
-  it('the book\'s p2-15, one given per row, answers what the two-point form answers', () => {
+  // #2731 (ADR-AG-451; operator 2026-11-10, "if there are 2 possible answers, we give them and anything else we leave open"):
+  // three ellipses meet p2-15's givens (foci on the x-axis — the book's — and two with foci on the y-axis), so the equation
+  // is open; the first drawing is still the book's ellipse. The three are locked in issue-2731-determined-roots.test.ts.
+  it('the book\'s p2-15, one given per row, records, draws the book\'s ellipse first, and leaves the equation open (three ellipses)', () => {
     expect(kinds(p215.lines)).toEqual(p215.lines.map(() => 'record'));
-    expect(ask(derive(p215.lines, 0), 'משוואת האליפסה', fmtAnalytic).value).toContain('x²/64 + y²/48 = 1');
+    const d = derive(p215.lines, 0);
+    expect(ask(d, 'משוואת האליפסה', fmtAnalytic)).toEqual({ question: 'משוואת האליפסה', value: null });
+    const e = d.figure.curves.find((q) => q.curve.kind === 'ellipse')!.curve as unknown as { a: number; b: number };
+    expect(e.a).toBeCloseTo(8, 6);
+    expect(e.b).toBeCloseTo(Math.sqrt(48), 6);
   });
 
   // Ruled since (judged q-2621-parallel; ADR-AG-367 Am. 1): the single row draws a true parallel (issue-2621-side-parallel.test.ts);
