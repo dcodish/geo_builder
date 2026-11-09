@@ -467,7 +467,7 @@ describe('#2490 — a right pyramid over an existing ring fits the ring to its c
 
   // [host lines, seeds the ring is compared at]: a host whose ring is SOLVED (a stated circle, stated angles) is moved
   // by ANY added solid at one seed, a disjoint cube too (~0.007 at seed 0; ~0.017 at seed 4) — a separate stability bug,
-  // reported on #2490, not this class — so that seed is left out for those two hosts only
+  // #2791, not this class — so that seed is left out for those two hosts only
   const ALREADY: [string[], number[]][] = [
     [['ריבוע ABCD'], SEEDS],
     [['מלבן ABCD'], SEEDS],
