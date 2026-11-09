@@ -2332,3 +2332,7 @@ over all four (ADR-041).
 ### `issue-2151-tangent-from-inside` — «מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» is refused naming both statements (#2151, ADR-814)
 
 **Guards against:** a tangent from a point stated inside the circle being built until its scaffold circle fails (an internal id, the floor sentence) or committing with the circle shrunk. **Asserts** the refusal names «tangent from P to circle O» and «P inside circle O», no `tanaux`, P still inside; the «PA ו-PB» form in both orders; the outside control builds.
+
+### `bare-circle-pair-configurations-2240` — «שני מעגלים»: every view «הציגו תצורה אחרת» offers is the configuration it stands for (#2240, ADR-815)
+
+**Guards against:** a "separate" or "one inside the other" view of the bare pair drawn crossing, so the button showed one case twice in a cycle. **Asserts** 12 presses of the real view search, each view in its variant's case (crossing / apart / nested) and all three shown; with both radii stated, «OP = 10» settles apart, «OP = 0.5» nested and «OP = 5» on the touch (the boundary is never rejected), each meeting every requirement; a common point through two riders is never drawn apart.

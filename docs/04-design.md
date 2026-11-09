@@ -1463,6 +1463,15 @@ asks `findValidConfig` of the trial facts before refusing; a configuration found
 search draws it («דלתון ABCD · מרובע ABDC» → the dart). A square, rectangle, rhombus, parallelogram or trapezoid is
 convex whenever simple, so the search finds nothing for them in a few milliseconds and the refusal stands.
 
+**The unstated two-circle configuration is a floor too** ([ADR-815](06-decisions.md#adr-815), #2240). Bare «שני מעגלים»
+lowers to a `set-circle-position any` variant (crossing / apart / nested, ADR-359 Am. 2) that apply only SEATS;
+every sampled seed re-samples the centres and free radii. `circleVariantsHold` (a `meetsRequirements` member beside
+`polygonsConvex`) keeps each offered view in the case `circlePairVariantCase` (`variants.ts`, the one reader the
+seat shares) names, classified in closed form (nested d < |r₁ − r₂|, either circle inside; apart d > r₁ + r₂;
+crossing otherwise). A view is rejected only strictly inside ANOTHER case's region; a pair within
+`CIRCLES_TOUCH_REL` of a tangency passes, so a forced touch stays drawable. It yields to a statement: a
+`circle-position` record of the same pair or a `circle-circle` point on it decides, and the floor skips that pair.
+
 A yielded default also needs a yielded SEAT ([ADR-622](06-decisions.md#adr-622), #1987). The quadrilateral macro
 seats its four free vertices convex and the seed jitter almost never leaves convex position (2 of 200 raw seeds), so
 for a FREE quadrilateral the search above had nothing new to try and the refusal stood — the kite row was carried by
