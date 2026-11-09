@@ -54,7 +54,7 @@ export type { ChoiceFact, StatedShapeEquality, UnstatedChoice, UnstatedChoiceKin
 export { expandInscribe, innerDrawn, inscribePlacements, inscribeVariantCount } from './inscribe';
 export type { InscribeShape, InscribeCmd } from './inscribe';
 export { roleSidesOf, openRightTriangles, bindRoleSide, resolveRoleSide, type RoleSide } from './roleSides';
-export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';
+export { variantCountOf, cyclableVariant, withVariant, variantVertices, circlePairVariantCase } from './variants';
 export { expandAltitudeChoice, pinnedAltitudeOption, rightAngleAtFoot, statedRightAngles } from './altitudeChoice';
 export type { AltitudeOption, StatedRightAngle } from './altitudeChoice';
 export { computeValuesPanel, queryLabel, rowOptions, valueText } from './valuesPanel';

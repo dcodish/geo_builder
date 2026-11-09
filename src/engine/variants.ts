@@ -14,7 +14,7 @@
  * the verifier) sees the drawn angle without knowing a choice exists.
  */
 
-import type { AnyCommand, Id } from './types';
+import type { AnyCommand, CirclePositionCase, Id } from './types';
 import { VARIANT_COUNT } from './shapeVariants';
 import { inscribeVariantCount } from './inscribe';
 
@@ -38,6 +38,19 @@ export function variantCountOf(cmd: AnyCommand): number {
   const roots = angleRoots(cmd);
   if (roots) return roots.length;
   return 1;
+}
+
+/**
+ * #2240 ([ADR-815](../../docs/06-decisions.md#adr-815)) — WHICH CONFIGURATION AN UNSTATED TWO-CIRCLE VARIANT STANDS FOR:
+ * the case of the pair's `set-circle-position any` record its variant index names, over the cases the sentence admits
+ * (#2200, ADR-712: all three when absent, an equal pair crossing and apart only). The ONE reader of what the index
+ * means: the apply seat places the pair in it, {@link variantCountOf} counts the cases, and the view floor
+ * (`circleVariantsHold`, replay) keeps every offered view inside it. Null for any other command.
+ */
+export function circlePairVariantCase(cmd: AnyCommand): CirclePositionCase | null {
+  if (cmd.type !== 'set-circle-position' || cmd.relation !== 'any') return null;
+  const cases: CirclePositionCase[] = cmd.admits?.length ? cmd.admits : ['meet', 'disjoint', 'contained'];
+  return cases[(((cmd.variant ?? 0) % cases.length) + cases.length) % cases.length];
 }
 
 /** Is this a variant command with more than one configuration (so "show another" can step it)? */
