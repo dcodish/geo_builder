@@ -20531,3 +20531,39 @@ No new student text. Every sentence is an existing ruled string.
 **Not changed.** The figure, every verdict, and every lowered command. A file saved before this field shows no tag.
 
 **Behaviour change for a student:** a height or median typed without its side or triangle («AE גובה», «תיכון מ-A») keeps the student's words on its row and shows the shape it was drawn in beside them («במשולש ABC»), and that shape stays after a second shape, undo/redo, save/load and a share link.
+
+## ADR-806 — A primed point name is a name: «A'» is the point A′, distinct from A (#2624)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (P2, wrong-answer, 2-D) · fix round #2783, stream F · branch `fix/2624-primed-names` · **siblings:** [ADR-807](#adr-807) (the net), [ADR-AG-446](06c-decisions-analytic.md#adr-ag-446) (analytic composes the same atom), [ADR-W-197](06w-decisions-workspace.md#adr-w-197) (the shared atom) · LADDER stage: **none** (the parser boundary and the label atom; no rung moves)
+**Operator:** #2435 (2026-10-23) *"what analytic reads, 2-D reads too"*; #2621 (2026-10-30) *"now we need to build all capabilities"*. Analytic reads primes ([ADR-AG-395](06c-decisions-analytic.md#adr-ag-395)), and 3-D always did ([ADR-3D-300](06b-decisions-3d.md#adr-3d-300)).
+**Requirements:** [02](02-requirements.md) FR-IN-4j (new: a primed name is a name) · **Design:** [04](04-design.md) § "A primed name is one label"; [04w](04w-design-shell.md) § `shell/indexedName.ts`
+
+**Measured before** (`main` @ `4a06aae9`, `decideDeterministic2D` → `commitVerdict`, the model mocked). «מעגל O» · «A' על המעגל» committed `point-on-circle A`: a point named A, the prime dropped, drawn green. «משולש ABC» · «A' אמצע BC» was refused as `midpoint A` («A coincides with its constructed target»). «נקודה A'», «משולש A'B'C'» and «A' על BC» escalated `not-handled`. The control «D אמצע BC» committed.
+
+**Class.** *Every 2-D rule that takes a point name, given a primed name.* The atom `LABEL = [A-Za-z]\d*` / `ULABEL = [A-Z]\d*` had no prime, and the same atom was spelled inline 490 times in `parse.ts` and about 60 times in the rest of `src/`. A rule whose label was not bounded on the right read «A'» as A and a stray mark. A rule that ended its label with `\b` backed off from «A'» to «A», because no word boundary sits between a prime and a space.
+
+**Decision.**
+1. **The boundary folds the prime glyphs.** `normalizeUtterance` calls `shell/primes`' `foldPrimes` first, the one fold 3-D and analytic call: ′ ’ ‘ ` ´ ׳ ʹ ʼ become ASCII `'`.
+2. **The atom carries the prime.** `LABEL` / `ULABEL` (`src/parser/lexicon.ts`) compose `PRIMED` from `shell/indexedName` ([ADR-W-197](06w-decisions-workspace.md#adr-w-197)). It takes a prime when one is there and is never optional in the backtracking sense, so a rule whose next token does not fit fails instead of reading «A». A prime before a lone «s» is an English possessive («ABC's»), never a prime. The lexicon adds the compiled forms `LABEL_G`, `LABEL_WHOLE`, `LABEL_RUN_G` and `labelsOf`.
+3. **Every inline copy moved onto the atom.** The sweep was mechanical, inside template and regex literals only. The atoms carry no capture group, so no rule's captures renumber. In `parse.ts`, `[A-Z]\d*` went from 157 to 0 and `[A-Za-z]\d*` from 333 to 5 (prose in comments). The parser, app, replay, store and engine helpers moved too; engine, replay and store compose `shell/indexedName`'s `GLUED_NAME_G` / `GLUED_NAME_WHOLE` (the ASCII-index form of the shared atom; `ULABEL` is it too), since they do not import the parser. A `\b` right after a label became `(?!\w)`. That is identical after a letter or a digit, and it is the only spelling that holds after a prime. The same change was made in `runOf` (the shape-run reader) and in the label-value strips (`removeClaimed`, the circle-name strips). `lexical-ratchet.test.ts` lowers its ceilings to the new counts and adds a count for `src/` outside the parser.
+4. **The label is drawn A′.** `Figure.tsx`'s `subscriptLabel` draws the id's prime as ′ (`displayPrimes`), after a lowered index («B1'» → B₁′). That is the glyph 3-D and analytic draw. The id stays `A'`.
+
+**Not changed.** Any input without a prime: for it the atom matches exactly what the old spelling matched. The other label spellings are not this atom: `[A-Z][0-9]?` in `roleReadings`, and the circle name `[A-Z][A-Za-z0-9'′]*`, which already took a prime. A rule that still cannot read «A'» is caught by [ADR-807](#adr-807).
+
+**Locks.** `src/parser/__tests__/prime-names-2624.test.ts` runs the reported lines and «נקודה A'», «משולש A'B'C'», «A' על BC», «A'B = 3» and «AA' = 8» through `decideDeterministic2D`. It also checks that A and A′ are two points, five prime glyphs, that «A's» is not a name, and the ✎ edit seam. `shell/__tests__/indexed-name-1814.test.ts` and `read-extent-1888.test.ts` lock the atom. The ratchet counts the copies left. The scenario is `primed-point-on-circle-2624` (`scenarios-corpus-4.ts`). The parity rows are `prime-on-circle-2624`, `prime-midpoint-2624`, `prime-triangle-2624` and `prime-length-2624`, and `prime-point-2621` loses its 2-D gap.
+
+**Behaviour change for a student:** «A' על המעגל», «A' אמצע BC», «נקודה A'», «משולש A'B'C'» and «A'B = 3» build the point A′, drawn A′, a point of its own beside A. Before, the first drew a point A, the second was refused as A, and the rest went to the AI.
+
+## ADR-807 — The prime net: a reading that keeps «A» for a typed «A'» is never committed (#2624)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (P2, wrong-answer, 2-D) · fix round #2783, stream F · branch `fix/2624-primed-names` · **sibling:** [ADR-806](#adr-806) · LADDER stage: **none** (the honesty gate)
+**Operator:** the honesty invariant (CLAUDE.md): *"a given parses to a constraint, escalates, or errors, but never vanishes"*.
+**Requirements:** [02](02-requirements.md) FR-IN-4j (a primed name is never read as the unprimed letter) · **Design:** [04](04-design.md) § "A primed name is one label"
+
+**Class.** ADR-806 makes every rule read the prime. This entry makes the gate independent of that. The label accountant (`src/parser/labelAccounting.ts`, [ADR-597](#adr-597)) tokenized the student's labels and the commands' values with `[A-Z]\d*`, so «A'» counted as A, and `point-on-circle A` accounted it. A rule that read A for A' passed every honesty gate.
+
+**Decision.** `carriedLabels` and `unaccountedLabels` tokenize with the lexicon's label atom (`LABEL_G` / `labelsOf`), prime included, and so do the scene-noun and circle-name readers in the same module. A typed A' is accounted only by a command value that carries A' (`A'`, `seg-A'B`). A reading that carries A instead leaves A' unaccounted, and the line takes the existing dropped-label path (the clause split, then the model), never a commit. `shell/readExtent`'s default label run carries the prime too ([ADR-W-197](06w-decisions-workspace.md#adr-w-197)), so the part probe substitutes «A'» whole.
+
+**Locks.** `prime-names-2624.test.ts` § "the prime net": `point-on-circle A` for «A' על המעגל» and `midpoint A` for «A' אמצע BC» leave A' unaccounted, with A on the figure too. A reading that carries A' accounts it.
+
+**Behaviour change for a student:** none beyond ADR-806's. A sentence that some rule still cannot read with its prime goes to the AI instead of drawing the unprimed letter.

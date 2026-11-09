@@ -311,7 +311,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2216': 'open', // #2552 (ADR-AG-336): 2-D does not read the pair with one radius for both, «שני מעגלים שרדיוס כל אחד מהם 5» (its item 2)
   '#1358': 'open', // #1775 (ADR-792 / ADR-AG-416): analytic teaches the construction imperatives, 2-D still builds them; #1358 converges them on the teach
   '#2626': 'open', // #2621 E (ADR-AG-396): 2-D does not read the rhombus height or the three side lengths
-  '#2624': 'open', // #2621 C (ADR-AG-395): 2-D drops a point name's prime
   '#2629': 'open', // #2618 (ADR-AG-355): 2-D does not read «קודקודי ה<noun> ABCD נמצאים על המעגל» (analytic reads it as the inscribed sentence)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
@@ -1923,7 +1922,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'plural-lines-meet-he-2533', family: 'intersections', steps: ['מרובע ABCD', 'הישרים AB ו-CD נחתכים בנקודה M'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '«הישרים» read as lines in 2-D before ADR-774 too (its prefix «הישר»); analytic: the side-line crossing refusal of plural-lines-crossing-2533' },
   { id: 'plural-rays-crossing-2533', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של הקרניים AB ו-CD'], expect: 'builds', knownGap: [{ product: 'analytic' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D read «הקרניים» as the segments before ADR-774; analytic has no ray operand and refuses it (bad-operand on coordinate points, measured)' },
   // ── #2621 (ADR-AG-395 / ADR-AG-396 / ADR-AG-367 Am. 1): the ellipse book's last rows, analytic first (operator Q2 → A) ──
-  { id: 'prime-point-2621', family: 'points-incidence', steps: ["נקודה A'"], expect: 'builds', knownGap: [{ product: '2d', issue: '#2624' }, { product: '3d' }], note: "2-D and 3-D parse-fail «נקודה A'» (measured at ebacadd1)" },
+  { id: 'prime-point-2621', family: 'points-incidence', steps: ["נקודה A'"], expect: 'builds', knownGap: [{ product: '3d' }], note: "3-D parse-fails «נקודה A'» (measured at ebacadd1); 2-D reads it since #2624 (ADR-806)" },
+  // #2624 (ADR-806 / ADR-AG-446): a primed name is a name in 2-D too, the atom shared with analytic (ADR-W-197).
+  { id: 'prime-on-circle-2624', family: 'circles', steps: ['מעגל O', "A' על המעגל"], expect: 'builds', exception: 'X8', note: "the reported line: 2-D drew a point A (the prime dropped)" },
+  { id: 'prime-midpoint-2624', family: 'midpoint-ratio', steps: ['משולש ABC', "A' אמצע BC"], expect: 'builds', note: '2-D read it as A and refused the collapse' },
+  { id: 'prime-triangle-2624', family: 'points-incidence', steps: ["משולש A'B'C'"], expect: 'builds' },
+  { id: 'prime-length-2624', family: 'points-incidence', steps: ['משולש ABC', "A' אמצע BC", "A'B = 3"], expect: 'builds' },
   { id: 'prime-coordinate-point-2621', family: 'topic', steps: ["A'(3,4)"], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'rhombus-height-2621', family: 'lengths', steps: ['מעוין ABCD', 'AB = 5', 'גובה המעוין הוא 4.8'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2626' }, { product: '3d' }], note: '2-D parse-fails «גובה המעוין» (measured); 3-D cell measured at ebacadd1' },
   { id: 'rhombus-long-diagonal-2621', family: 'lengths', steps: ['מעוין ABCD', 'האלכסון הגדול של המעוין הוא AC'], expect: 'builds', knownGap: [{ product: '3d' }], note: '2-D builds it as the segment AC alone and drops «הגדול» (measured); analytic also states AC > BD (ADR-AG-396)' },

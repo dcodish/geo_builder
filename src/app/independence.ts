@@ -43,6 +43,7 @@ import { RESPECTIVELY } from '@/parser/lexicon';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
+import { ULABEL, LABEL_G, LABEL_RUN_G } from '../parser/lexicon';
 
 /**
  * Liberal clause separators. NO noun lookahead anywhere — that is the enumeration this issue exists
@@ -67,7 +68,7 @@ const SEPARATORS = new RegExp(
  *  A run closed by «בהתאמה» / "respectively" is the closing half of a pairing (#2185, ADR-735): «… בנקודות A ו-C
  *  בהתאמה» is one statement, never «… בנקודות A» plus a clause «C בהתאמה». */
 const BARE_LABELS = new RegExp(
-  String.raw`^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)[A-Z]\d*)*(?:\s*,?\s*${RESPECTIVELY})?$`,
+  String.raw`^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?${ULABEL}(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)${ULABEL})*(?:\s*,?\s*${RESPECTIVELY})?$`,
 );
 
 /**
@@ -90,7 +91,7 @@ export const clausesOf = (utterance: string): string[] => {
   const clean = (p: string) => p.replace(/^\s*[ו]?-?\s*/, '').trim();
   const continues = (prev: string, piece: string): boolean => {
     if (/^[A-Z]/.test(piece)) return false;
-    const subject = prev.match(/^(?:[A-Z]\d*)+(?![A-Za-z\d])/)?.[0];
+    const subject = prev.match(new RegExp(String.raw`^(?:${ULABEL})+(?![A-Za-z\d])`))?.[0];
     if (!subject) return false;
     const r = parse(`${subject} ${piece}`, {});
     return r.ok && r.commands.length > 0;
@@ -100,7 +101,7 @@ export const clausesOf = (utterance: string): string[] => {
   // with a standalone label, the right one opens with one, and the right piece says nothing alone (it does not read).
   // «A על מעגל O ו-B על מעגל P» keeps its cut: «B על מעגל P» reads.
   const operandList = (sep: string, prev: string, piece: string): boolean => {
-    if (!/^\s+ו-?$/.test(sep) || !/(?:^|\s)[A-Z]\d*$/.test(prev) || !/^[A-Z]\d*(?![A-Za-z\d])/.test(piece)) return false;
+    if (!/^\s+ו-?$/.test(sep) || !new RegExp(String.raw`(?:^|\s)${ULABEL}$`).test(prev) || !new RegExp(String.raw`^${ULABEL}(?![A-Za-z\d])`).test(piece)) return false;
     const r = parse(piece, {});
     return !(r.ok && r.commands.length > 0);
   };
@@ -121,7 +122,7 @@ export const clausesOf = (utterance: string): string[] => {
 };
 
 /** The uppercase point labels a clause names. */
-const labelsOf = (s: string): string[] => s.match(/[A-Z]\d*/g) ?? [];
+const labelsOf = (s: string): string[] => s.match(LABEL_G) ?? [];
 
 /**
  * Does `clause` refer BACK to something an earlier clause introduced? Derived from the text itself,
@@ -155,7 +156,7 @@ function refersBack(clause: string, earlier: string): boolean {
  * left.
  */
 const hasContentWord = (clause: string): boolean =>
-  /[א-ת]{2,}|[A-Za-z]{2,}/.test(clause.replace(/(?:[A-Z]\d*)+/g, ' '));
+  /[א-ת]{2,}|[A-Za-z]{2,}/.test(clause.replace(LABEL_RUN_G, ' '));
 
 /** Parses alone AND builds alone — the tool's own definition of "this is a whole construct". */
 function standsAlone(clause: string): boolean {

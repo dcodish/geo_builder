@@ -15,7 +15,7 @@
  * typed. The line STORED is always the one the student typed.
  */
 import { SHAPE_NOUN_WORDS, readShapePhrase, type ShapeNoun } from './shapePhrase';
-import { COPULA_HE } from './lexicon'; // #1999 (ADR-666): the one copula atom
+import { COPULA_HE, ULABEL, LABEL_G } from './lexicon'; // #1999 (ADR-666): the one copula atom
 
 /** The figure, as the exam refers to it — «הסרטוט», «בציור שלפניכם», «האיור». */
 const FIGURE = String.raw`(?:ה)?(?:ציור|סרטוט|שרטוט|איור)(?:\s+ש?לפני(?:ך|כם|כן))?`;
@@ -27,11 +27,11 @@ const FIGURE = String.raw`(?:ה)?(?:ציור|סרטוט|שרטוט|איור)(?:\
  */
 const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [new RegExp(String.raw`^ב${FIGURE}\s+(?:מתוא(?:ר|רת|רים|רות)\s+)?(?=\S)`), ''],
-  [/^([A-Z]\d*)\s+[–—-]\s+(?=[א-ת])/, '$1 '],
+  [new RegExp(String.raw`^(${ULABEL})\s+[–—-]\s+(?=[א-ת])`), '$1 '],
 ];
 
 /** One letter-run subject: three or four vertex labels. */
-const LETTERS = String.raw`((?:[A-Z]\d*){3,4})`;
+const LETTERS = String.raw`((?:${ULABEL}){3,4})`;
 const NOUN_HE = String.raw`(?:משולש|ריבוע|מלבן|מעוין|דלתון|טרפז|מקבילית|מרובע)`;
 const NOUN_EN = String.raw`(?:triangle|square|rectangle|rhombus|kite|trapezoid|trapezium|parallelogram|quadrilateral)`;
 
@@ -79,7 +79,7 @@ function shapePredicate(line: string): string | null {
   const phrase = own && !own.noun && subjectWord ? readShapePhrase(phraseText) : own;
   if (!phrase || !phrase.noun || phrase.unconsumed.length) return null;
   if (phrase.strip(phraseText).trim() !== '') return null; // the predicate is the phrase and nothing more
-  const count = letters.match(/[A-Z]\d*/g)?.length ?? 0;
+  const count = letters.match(LABEL_G)?.length ?? 0;
   if (count !== phrase.arity) return null;
   if (subject && subject !== phrase.noun && !(subject === 'quad' && phrase.arity === 4)) return null;
   return `${phraseText.trim()} ${letters}${paren}`;

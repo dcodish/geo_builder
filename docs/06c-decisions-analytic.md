@@ -16079,3 +16079,15 @@ Each of those points moves along a curve.
 
 **Behaviour change for a student:** «AE גובה» keeps the student's words on its row and shows «במשולש ABC» beside it. An earlier row edited or un-muted into a second shape no longer turns it into a question: it stays the triangle's height, as in 2-D.
 
+
+## ADR-AG-446 — The point-name atom is the shared one: analytic composes `shell/indexedName`'s NAME_ATOM (#2624)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug port (analytic), fix round #2783 stream F, branch `fix/2624-primed-names` · **siblings:** [ADR-806](06-decisions.md#adr-806) (2-D reads primes), [ADR-W-197](06w-decisions-workspace.md#adr-w-197) (the shared atom) · LADDER stage: none (the name atom).
+**Operator:** #2435 (2026-10-23) *"what analytic reads, 2-D reads too"*. The #2624 plan: *"whichever lands first creates NAME_ATOM, the other composes it"*.
+**Requirements:** none (R234's promise is unchanged) · **Design:** [04c](04c-design-analytic.md) § "The point-name atom"
+
+**Decision.** `engine/pointName.ts`'s `POINT_NAME`, `isPointName` and `splitPointNames` are now `shell/indexedName`'s `NAME_ATOM`, `isPointName` and `splitPointNames`, so analytic and 2-D read one name. The prime's guard changes from `(?![a-z])` to the shared one, under which a prime before a lone «s» is a possessive. The old guard, compiled into a rule with the `i` flag, refused a capital after the prime too, and would have cut «A'B'» at its first prime. In the shared atom the name is atomic (`PRIMED`): «A'» never backs off to «A». The analytic name-atom ratchet's baseline for `pointName.ts` drops to 0.
+
+**Locks.** `issue-2621c-prime-names.test.ts` § "#2624": `POINT_NAME` is `NAME_ATOM`, and under `i` «A'B'» is two primed names and «A's» a possessive. The parity rows `prime-*-2624` run analytic as an expected builder.
+
+**Behaviour change for a student:** none.

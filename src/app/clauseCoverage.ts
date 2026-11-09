@@ -40,6 +40,7 @@ import type { ParseContext, ScopeMatch } from '@/parser';
 import type { AnyCommand } from '@/engine';
 import { clausesOf } from './independence';
 import { dryRunOutcome, trialFacts, type Fact } from '@/store/geoStore';
+import { LABEL_G } from '../parser/lexicon';
 
 interface ClauseReading {
   clause: string;
@@ -51,7 +52,7 @@ interface ClauseReading {
 function labelsOf(c: AnyCommand): Set<string> {
   const out = new Set<string>();
   const walk = (v: unknown): void => {
-    if (typeof v === 'string') for (const l of v.match(/[A-Z]\d*/g) ?? []) out.add(l);
+    if (typeof v === 'string') for (const l of v.match(LABEL_G) ?? []) out.add(l);
     else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
   };

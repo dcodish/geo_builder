@@ -28,6 +28,7 @@ import {
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
 import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
+import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -1527,7 +1528,7 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
     for (const id of stuck) {
       const o = c.objects.find((x) => x.id === id);
       if (!o) continue;
-      for (const p of objectParents(o)) if (/^[A-Z]\d*$/.test(p) && !present.has(p) && !missing.includes(p)) missing.push(p);
+      for (const p of objectParents(o)) if (GLUED_NAME_WHOLE.test(p) && !present.has(p) && !missing.includes(p)) missing.push(p);
     }
     if (missing.length) return { ok: false, error: engineErrorDebugText({ code: 'undefined-points', ids: missing }), stuckIds: stuck };
     return { ok: false, error: engineErrorDebugText({ code: 'unresolved-deps', ids: stuck }), stuckIds: stuck };

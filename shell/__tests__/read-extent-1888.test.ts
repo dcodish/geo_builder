@@ -90,3 +90,18 @@ describe('cutAtReading — the parts in the student’s words, cut where the rea
     });
   });
 });
+
+// #2624 (ADR-W-197): the default label run carries the prime — a primed name is one occurrence, substituted whole.
+describe('labelRuns — a primed name is one label', () => {
+  it("«A'B' = 3» is one run of A' and B'; «A' על BC» two runs", () => {
+    expect(labelRuns("A'B' = 3").map((o) => o.parts)).toEqual([["A'", "B'"]]);
+    expect(labelRuns("A' על BC").map((o) => [o.text, o.parts])).toEqual([["A'", ["A'"]], ['BC', ['B', 'C']]]);
+  });
+  it("substituting a primed name replaces the prime with it (the reading sees «Q», never «Q'»)", () => {
+    const seen: string[] = [];
+    const reader: Reader<string> = { read: (t) => (seen.push(t), t), same: (a, b) => a === b };
+    readLabelRuns("A' על BC", "A' על BC", { ...reader });
+    expect(seen).toContain('B על BC'); // A' → the line's own spare letter B, the prime with it
+    expect(seen).not.toContain("B' על BC");
+  });
+});

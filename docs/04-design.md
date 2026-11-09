@@ -157,6 +157,14 @@ A single boundary: `utterance → command[]`.
 - **One vocabulary home (#361, ADR-501).** `src/parser/lexicon.ts` holds the keyword and token atoms the grammar
   consumes; a rule's alternation (`INTERSECT_KW`, `BISECTOR_KW`) is compiled from it, and
   `lexicon-consumers.test.ts` fails on an atom nothing composes from. 3-D keeps its own leaf (`src3d/lexicon/nouns3.ts`).
+- **A primed name is one label (#2624, ADR-806, ADR-807).** `LABEL` / `ULABEL` compose `shell/indexedName`'s `PRIMED`
+  after their index, so «A'» is one label and never backs off to «A»; `normalizeUtterance` folds every prime glyph to `'`
+  first (`shell/primes`). The compiled forms `LABEL_G` (tokens), `LABEL_WHOLE` (one label), `LABEL_RUN_G` (a glued run)
+  and `labelsOf` replace the inline `[A-Z]\d*` copies everywhere in `src/` (engine, replay and store use the shell's
+  `GLUED_NAME_G` / `GLUED_NAME_WHOLE`, since they do not import the parser); `lexical-ratchet.test.ts` holds the counts
+  at the prose left in comments. A `\b` after a label is spelled `(?!\w)`, which holds after a prime too. The label
+  accountant tokenizes with the same atom, so a reading that carries A for a typed A' leaves A' unaccounted and is never
+  committed (the net, independent of which rule read the line). The canvas draws the prime as ′ (`subscriptLabel`).
 - **The number atom refuses a Hebrew particle's maqaf as a sign (#975, ADR-505).**
   `NUM` is `(?<![א-ת])-?\d+(?:\.\d+)?`: a hyphen glued to a preceding Hebrew letter («ל-90», «מ-5») is the
   particle, so the digits match unsigned; a hyphen after a space, `=`, `(`, `,` or at line start is a sign.

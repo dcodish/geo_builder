@@ -30,6 +30,7 @@ import { THROUGH_OPEN, THROUGH_VERB } from '@/parser/lexicon';
 import type { AnyCommand } from '@/engine';
 import { cutAtReading, labelRuns, readLabelRuns, readWords, type Occurrence, type PartsCut } from '../../shell/readExtent';
 import { clauseReaders, loweringKey, readerIn } from './unreadParts';
+import { LABEL_WHOLE } from '../parser/lexicon';
 
 /** A whole phrase: an opener, then everything to the clause end. */
 const PHRASE_SRC = String.raw`${THROUGH_OPEN}[^,;.]*`;
@@ -49,7 +50,7 @@ export interface ThroughReport {
 /** Does the lowering reference a point label (`T`, `O1`) that the line never typed as a label? */
 function resolvesUntypedPoint(utterance: string, commands: readonly AnyCommand[]): boolean {
   const typed = new Set(labelRuns(utterance).flatMap((o) => o.parts));
-  const isPoint = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]\d*$/.test(v);
+  const isPoint = (v: unknown): v is string => typeof v === 'string' && LABEL_WHOLE.test(v);
   return (commands as unknown as Record<string, unknown>[]).some((c) =>
     Object.values(c).some((v) => (Array.isArray(v) ? v : [v]).some((x) => isPoint(x) && !typed.has(x))),
   );

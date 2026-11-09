@@ -75,3 +75,51 @@ export function foldIndexedName(s: string, to: 'glued' | 'glyph'): string {
     .replace(UNDERSCORE_TO_GLYPH, (_m, base: string, braced: string | undefined, bare: string | undefined) => `${base}${subscriptOf(braced ?? bare ?? '')}`)
     .replace(GLUED_TO_GLYPH, (_m, base: string, digits: string) => `${base}${subscriptOf(digits)}`);
 }
+
+/**
+ * #2624 ([ADR-W-197](../docs/06w-decisions-workspace.md#adr-w-197)) — THE PRIME ON A POINT NAME, ONCE: «A'», «B1'». The book
+ * names a second point after the first this way («A ו-A' הן נקודות החיתוך…»), so a name atom that has no prime reads «A'»
+ * as A and a stray mark — the silent drop 2-D shipped (#2624) and analytic closed inline first (#2621 C,
+ * [ADR-AG-395](../docs/06c-decisions-analytic.md#adr-ag-395)). Every builder's boundary folds the prime glyphs (′ ’ ׳ …)
+ * to ASCII `'` first (`shell/primes`), so the atom is spelled with `'` alone.
+ *
+ * The guard: a prime followed by a lone «s» is an English possessive («ABC's area»), never a prime. It is spelled with the
+ * letter itself, not a lowercase class, because most grammar rules are compiled case-INSENSITIVE (2-D's `rx` defaults to
+ * `i`): a `(?![a-z])` guard under `i` refuses every capital too and would cut «A'B'C'» at its first prime. The cost, an
+ * «A'S» at a word end read under `i`, fails closed (the label accountant sees «A'» unaccounted), never as A.
+ */
+export const PRIME = String.raw`(?:'(?!s(?![\w'])))`;
+
+/**
+ * The prime WHEN THERE IS ONE — a name's tail, never optional in the backtracking sense: a name followed by a prime takes
+ * it, so a rule whose next token does not fit («(A)\b» before «' על») fails instead of backing off to the bare «A»
+ * and leaving the mark behind (the misread #2624 measured). Compose this after a letter and its index.
+ */
+export const PRIMED = String.raw`(?:${PRIME}|(?!${PRIME}))`;
+
+/**
+ * One POINT NAME: a capital Latin letter, an optional index (a digit run, ASCII or subscript glyphs), an optional
+ * {@link PRIME} ({@link PRIMED}) — «A», «F1», «D₂», «A'», «B1'». Regex source, no capture, no anchor.
+ */
+export const NAME_ATOM = String.raw`[A-Z][0-9₀-₉]*${PRIMED}`;
+
+/**
+ * The same name with 2-D's GLUED index — ASCII digits only («A1'»), the spelling `foldIndexedName(s, 'glued')` leaves and
+ * every 2-D id carries. 2-D's `LABEL` / `ULABEL` and its engine, replay and store tokenizers compose this one, so a
+ * subscript glyph («A₁») reads exactly as it did before the prime joined; analytic, whose ids carry the glyph, composes
+ * {@link NAME_ATOM}.
+ */
+export const GLUED_NAME_ATOM = String.raw`[A-Z]\d*${PRIMED}`;
+/** {@link GLUED_NAME_ATOM}, global — `match` / `matchAll` / `replace` / `split` only. */
+export const GLUED_NAME_G = new RegExp(GLUED_NAME_ATOM, 'g');
+/** {@link GLUED_NAME_ATOM}, the whole string; not global, safe to `test`. */
+export const GLUED_NAME_WHOLE = new RegExp(`^${GLUED_NAME_ATOM}$`);
+
+/** {@link NAME_ATOM}, global — for `match` / `matchAll` / `replace` / `split` only (never `test`/`exec` a shared global). */
+export const NAME_ATOM_G = new RegExp(NAME_ATOM, 'g');
+/** {@link NAME_ATOM}, the whole string; not global, safe to `test`. */
+export const NAME_ATOM_WHOLE = new RegExp(`^${NAME_ATOM}$`);
+/** "Is this whole string one point name?" («A'» yes, «A'B» no). */
+export const isPointName = (s: string): boolean => NAME_ATOM_WHOLE.test(s);
+/** A glued run of point names split into its names: «AA'B» → A, A', B; «seg-A'B» → A', B (a lowercase prefix adds none). */
+export const splitPointNames = (run: string): string[] => run.match(NAME_ATOM_G) ?? [];

@@ -11,7 +11,7 @@
  * sweep that retires inline copies lowers the recorded ceiling (update the constant DOWNWARD only).
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { ANGLE_KW, EN_START, enWord } from '../lexicon';
 
@@ -20,6 +20,16 @@ const parse2 = readFileSync(path.join(root, 'src/parser/parse.ts'), 'utf8');
 const parse3 = readFileSync(path.join(root, 'src3d/parser/parse3.ts'), 'utf8');
 
 const count = (src: string, literal: string): number => src.split(literal).length - 1;
+const lexicon2 = readFileSync(path.join(root, 'src/parser/lexicon.ts'), 'utf8');
+/** Every 2-D source file but parse.ts (counted on its own) and the lexicon (which holds the atom), as text. */
+function src2Files(dir = path.join(root, 'src')): string[] {
+  return readdirSync(dir).flatMap((n) => {
+    const p = path.join(dir, n);
+    if (statSync(p).isDirectory()) return n === '__tests__' ? [] : src2Files(p);
+    if (!/\.tsx?$/.test(n) || /\.test\.tsx?$/.test(n) || /[\\/]parser[\\/](?:parse|lexicon)\.ts$/.test(p)) return [];
+    return [readFileSync(p, 'utf8')];
+  });
+}
 
 // The recorded ceilings (2026-07-24 baselines). LOWER when you sweep; NEVER raise — compose new
 // regexes from src/parser/lexicon.ts atoms instead of inlining a fresh fragment.
@@ -27,7 +37,11 @@ const CEILINGS = {
   // #1790 (ADR-595): the inscription rules read their shape through src/parser/shapePhrase.ts and the incircle's
   // circumscribes pattern composes the LABEL atom — lowered to the measured count (342 → 334, earlier drift included).
   // #1814 (ADR-600): the number gate's subscript blank composes NAME_LETTER (shell/indexedName) — 334 → 333.
-  parse2Label: 333, // '[A-Za-z]\d*' in parse.ts
+  // #2624 (ADR-806): the label atom gained its PRIME, so every inline copy was a reader that could not see «A'» — all
+  // swept onto LABEL / ULABEL / LABEL_G / LABEL_WHOLE. What is left of either spelling is prose in comments.
+  parse2Label: 5, // '[A-Za-z]\d*' in parse.ts (333 before #2624)
+  parse2ULabel: 0, // '[A-Z]\d*' in parse.ts (157 before #2624)
+  src2Label: 7, // either spelling in every other src/ source file, the lexicon excepted (all comments; ~60 before #2624)
   // #2065 (ADR-700): the two-term ratio patterns share one `UDEC` spelling — 31 → 30.
   parse2Num: 30, //    '\d+(?:\.\d+)?' in parse.ts
   parse3Label: 163, // '[A-Z]\d*' in parse3.ts
@@ -50,6 +64,13 @@ describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1
   it('parse.ts label-token inlines ≤ ceiling', () => {
     expect(count(parse2, String.raw`[A-Za-z]\d*`)).toBeLessThanOrEqual(CEILINGS.parse2Label);
   });
+  it('#2624: parse.ts uppercase label-token inlines ≤ ceiling (the atom carries the prime; a copy does not)', () => {
+    expect(count(parse2, String.raw`[A-Z]\d*`)).toBeLessThanOrEqual(CEILINGS.parse2ULabel);
+  });
+  it('#2624: no other 2-D source file re-spells the label atom (≤ ceiling)', () => {
+    const n = src2Files().reduce((k, f) => k + count(f, String.raw`[A-Za-z]\d*`) + count(f, String.raw`[A-Z]\d*`), 0);
+    expect(n).toBeLessThanOrEqual(CEILINGS.src2Label);
+  });
   it('parse.ts number-fragment inlines ≤ ceiling', () => {
     expect(count(parse2, String.raw`\d+(?:\.\d+)?`)).toBeLessThanOrEqual(CEILINGS.parse2Num);
   });
@@ -71,7 +92,9 @@ describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1
     expect(ANGLE_KW).toContain(EN_START);
   });
   it('non-vacuity: the counters actually see the fragments', () => {
-    expect(count(parse2, String.raw`[A-Za-z]\d*`)).toBeGreaterThan(100);
+    expect(count(lexicon2, String.raw`[A-Za-z]\d*`)).toBeGreaterThan(0); // the atom itself (#2624: parse.ts has none left)
+    expect(count(readFileSync(path.join(root, 'shell/indexedName.ts'), 'utf8'), String.raw`[A-Z]\d*`)).toBeGreaterThan(0); // ULABEL is the shell's GLUED_NAME_ATOM
+    expect(src2Files().length).toBeGreaterThan(50);
     expect(count(parse3, String.raw`[A-Z]\d*`)).toBeGreaterThan(50);
   });
 });

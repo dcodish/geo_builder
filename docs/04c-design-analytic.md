@@ -735,7 +735,8 @@ Amended (ADR-AG-367 Am. 1): `direction-line` carries `to: [A, B]` for «ישר �
 #### The point-name atom ([ADR-AG-395](06c-decisions-analytic.md#adr-ag-395), #2621 C)
 
 `engine/pointName.ts` holds the one point-name atom (`POINT_NAME`: a capital, an optional index (a digit run, [ADR-AG-398](06c-decisions-analytic.md#adr-ag-398)), an optional prime not
-before a lowercase letter) and its readers (`isPointName`, `splitPointNames`, `withPointName`, `displayPointName`). Every
+before a lone «s», the possessive). Since #2624 ([ADR-AG-446](06c-decisions-analytic.md#adr-ag-446)) `POINT_NAME`, `isPointName` and `splitPointNames` are
+`shell/indexedName`'s `NAME_ATOM` and its readers, the atom 2-D composes too; the prime is atomic (`PRIMED`: «A'» never backs off to «A»). The module keeps its readers (`isPointName`, `splitPointNames`, `withPointName`, `displayPointName`). Every
 grammar rule, the length tokenizer, the ask lane, the rename dialog and the id parsers compose it; a ratchet counts the inline
 copies left. `orthography` folds every prime glyph to `'` first (`shell/primes`, shared with 3-D). The canvas and the panel
 draw the prime as ′. `distributedCrossingClauses` (the frame) reads «P ו-Q הן נקודות החיתוך של X עם Y1 ועם Y2» as two

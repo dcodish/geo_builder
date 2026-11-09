@@ -9,7 +9,8 @@ import { decideSubmit } from '../app/submit';
 import { ask, askSettled } from '../app/ask';
 import { decideRename, normalizePointName, type RenameState } from '../app/rename';
 import { derive } from '../engine/derive';
-import { displayPointName, isPointName, splitPointNames } from '../engine/pointName';
+import { POINT_NAME, displayPointName, isPointName, splitPointNames } from '../engine/pointName';
+import { NAME_ATOM } from '../../shell/indexedName';
 import { buildScene } from '../render/scene';
 import { fmtAnalytic } from '../format';
 import p109 from './fixtures/prime-names-p10-9b-2621.analytic.json';
@@ -127,5 +128,16 @@ describe('#2621 C — the book line, p10-9 ב (fixture)', () => {
     expect(ptsOf(one)).toEqual(ptsOf(two));
     // «בהתאמה» said aloud reads the same.
     expect(kinds([one[0], `${one[1]} בהתאמה`])).toEqual(['record', 'record']);
+  });
+});
+
+// #2624 (ADR-AG-446): the atom is the SHARED one — 2-D reads the same point name — and its possessive guard survives a rule
+// compiled case-insensitive (the inline `(?![a-z])` refused every capital after a prime under `i`).
+describe('#2624 — analytic composes the shared point-name atom', () => {
+  it('POINT_NAME is shell NAME_ATOM', () => expect(POINT_NAME).toBe(NAME_ATOM));
+  it("under `i`, «A'B'» is still two primed names; «A's» is still a possessive", () => {
+    expect("A'B'".match(new RegExp(POINT_NAME, 'gi'))).toEqual(["A'", "B'"]);
+    expect(splitPointNames("A's")).toEqual(['A']);
+    expect(isPointName("A's")).toBe(false);
   });
 });

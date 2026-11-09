@@ -2299,3 +2299,10 @@ over all four (ADR-041).
 ### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
 
 **Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.
+
+### `primed-point-on-circle-2624` — «מעגל O» · «A' על המעגל» builds the point A′ on the circle, never a point A (#2624, ADR-806)
+
+**Guards against:** a primed name read as its bare letter (the prime dropped, a point A drawn green). **Asserts** every step green, no point A, A′ rides circle O.
+### `primed-names-triangle-2624` — «A' אמצע BC», «AA' = 8», «B′ על AC», «נקודה C'», «C'B' = 3»: each primed name is its own point (#2624, ADR-806)
+
+**Guards against:** «A' אמצע BC» refused as A, «נקודה A'» sent to the AI, a prime glyph (′) read as another name. **Asserts** A′ is the midpoint of BC beside A, AA′ = 8, B′ on AC, C′B′ = 3.

@@ -30,7 +30,7 @@
  * (objects referenced → their defining points). Re-widening the EXEMPTION is not.
  */
 import type { AnyCommand } from '@/engine';
-import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from './lexicon';
+import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE, ULABEL, labelsOf, LABEL, LABEL_G } from './lexicon';
 import { ROLE_NOUNS, type RoleNoun } from './roleNouns';
 
 /** Latin unit tokens — never a run of point labels. */
@@ -59,8 +59,9 @@ export interface LabelAccountCtx {
 /** The polygon nouns a sentence names a shape with («במשולש ABC») — rule 4's scene nouns. */
 const POLY_NOUNS = 'משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon';
 const CIRCLE_NOUNS = 'מעגל|circle';
-const POLY_NOUN_RUN = new RegExp(`(?:${POLY_NOUNS})\\s+((?:[A-Z]\\d*\\s*){3,})`, 'gi');
-const CIRCLE_NAME = new RegExp(`(?:${CIRCLE_NOUNS})\\s+([A-Z]\\d*)(?![A-Za-z\\d])`, 'gi');
+const POLY_NOUN_RUN = new RegExp(`(?:${POLY_NOUNS})\\s+((?:${ULABEL}\\s*){3,})`, 'gi');
+const CIRCLE_NAME = new RegExp(`(?:${CIRCLE_NOUNS})\\s+(${ULABEL})(?![A-Za-z\\d])`, 'gi');
+const LABEL_RUN_G = new RegExp(`(?:${ULABEL})+`, 'g');
 const SCENE_NOUN_BEFORE = new RegExp(`(?:${POLY_NOUNS}|${CIRCLE_NOUNS})\\s*$`, 'i');
 
 /**
@@ -70,7 +71,7 @@ const SCENE_NOUN_BEFORE = new RegExp(`(?:${POLY_NOUNS}|${CIRCLE_NOUNS})\\s*$`, '
  */
 export const endsWithSceneNoun = (textBefore: string): boolean => SCENE_NOUN_BEFORE.test(textBefore);
 /** A sentence-opening locative that names its circle — «במעגל O …», "in (the) circle O …" (rule 5). */
-const LOCATIVE_CIRCLE_NAME = /^\s*(?:ב(?:ה)?מעגל|[Ii]n\s+(?:the\s+|a\s+)?circle)\s+([A-Z]\d*)(?![A-Za-z\d])/;
+const LOCATIVE_CIRCLE_NAME = new RegExp(String.raw`^\s*(?:ב(?:ה)?מעגל|[Ii]n\s+(?:the\s+|a\s+)?circle)\s+(${ULABEL})(?![A-Za-z\d])`);
 
 /** Every string VALUE of the commands (field names and `type` excluded — the "TYPE contains E" trap). */
 function commandStrings(commands: AnyCommand[]): string[] {
@@ -91,8 +92,9 @@ function commandStrings(commands: AnyCommand[]): string[] {
  */
 export function carriedLabels(commands: AnyCommand[]): Set<string> {
   const strVals = commandStrings(commands);
-  const labels = new Set(strVals.flatMap((v) => v.match(/[A-Z]\d*/g) ?? []));
-  for (const v of strVals) if (/^[A-Za-z]\d*$/.test(v)) labels.add(v.toUpperCase());
+  // #2624 (ADR-806): tokenized with the label atom, PRIME included — `seg-A'B` carries A' and B, never A.
+  const labels = new Set(strVals.flatMap((v) => labelsOf(v)));
+  for (const v of strVals) if (new RegExp(String.raw`^${LABEL}$`).test(v)) labels.add(v.toUpperCase());
   return labels;
 }
 
@@ -140,7 +142,7 @@ export function referencedContextLabels(s: string, commands: AnyCommand[], actx:
   const polys = (actx.polygons ?? []).map((v) => new Set(v.map((x) => x.toUpperCase())));
   const existingPts = new Set((actx.existingPoints ?? []).map((p) => p.toUpperCase()));
   for (const m of s.matchAll(POLY_NOUN_RUN)) {
-    const run = (m[1].match(/[A-Z]\d*/g) ?? []).map((x) => x.toUpperCase());
+    const run = labelsOf(m[1].toUpperCase());
     const ring = polys.find((p) => p.size === run.length && run.every((x) => p.has(x)));
     const spanned = run.length === 3 && new Set(run).size === 3 && run.every((x) => existingPts.has(x));
     if ((ring || spanned) && run.some((x) => carried.has(x))) for (const x of run) out.add(x);
@@ -233,7 +235,9 @@ export function unaccountedLabels(
     }
     labels.push(label);
   };
-  for (const run of s.match(/(?:[A-Z]\d*)+/g) ?? []) for (const label of run.match(/[A-Z]\d*/g) ?? []) account(label);
+  // #2624 (ADR-806) — THE PRIME NET: a stated label is tokenized with its prime («A'» is one label), so a reading that
+  // carries A for a typed A' leaves A' unaccounted and the line is never committed as A, whichever rule read it.
+  for (const run of s.match(LABEL_RUN_G) ?? []) for (const label of labelsOf(run)) account(label);
   // #779: in HEBREW text a standalone Latin run is notation regardless of case — the parser's own
   // captures accept lowercase. Latin-only text keeps the uppercase-only read. Unit/trig tokens excluded.
   const labelWords = new Set<string>();
@@ -241,7 +245,7 @@ export function unaccountedLabels(
     for (const run of s.match(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g) ?? []) {
       if (NOTATION_WORDS.has(run.toLowerCase())) continue;
       labelWords.add(run.toLowerCase());
-      for (const label of run.toUpperCase().match(/[A-Z]\d*/g) ?? []) account(label);
+      for (const label of run.toUpperCase().match(LABEL_G) ?? []) account(label);
     }
   }
   return { labels, labelWords };

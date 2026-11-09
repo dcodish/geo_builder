@@ -25,6 +25,7 @@
  * same side again, whatever path the cycling took — so the two legs of «גובה לשוק» twice stay two legs.
  */
 import type { AnyCommand, Construction, GeoObject, Id, RoleSideBinding, SideRole } from './types';
+import { GLUED_NAME_G } from '../../shell/indexedName';
 
 /** One role a triangle's declarations induce on one of its sides. */
 export interface RoleSide {
@@ -139,7 +140,7 @@ function nounSeat(construction: Construction, vs: Id[]): Id | null {
 }
 
 /** Map every whole point label inside a string (a bare id or one embedded in a structured id). */
-const relabel = (v: string, map: Map<Id, Id>): string => v.replace(/[A-Z]\d*/g, (tok) => map.get(tok) ?? tok);
+const relabel = (v: string, map: Map<Id, Id>): string => v.replace(GLUED_NAME_G, (tok) => map.get(tok) ?? tok);
 
 /**
  * Re-resolve a role-bound command against the construction in force (#1810). Returns the command
