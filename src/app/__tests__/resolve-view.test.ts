@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { runViewResolve, type ResolveViewDeps, type ViewResolveFound } from '../resolveView';
 import { deserializeFigure } from '@/store/figureFile';
-import { findValidConfig, meetsRequirements, replay } from '@/replay/core';
+import { findValidConfig, groupKey, meetsRequirements, replay } from '@/replay/core';
 import { useGeoStore, type Fact } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { buildParseCtx, parse } from '@/parser';
@@ -169,7 +169,7 @@ describe('#2757 — a configuration search that finishes late applies nothing', 
       const { construction, positions } = replay(st().facts.slice(0, -1), st().seed);
       const r = parse('BC = 6', buildParseCtx(construction, positions));
       if (!r.ok) throw new Error('parse');
-      st().replaceGroup(last.group, r.commands, 'BC = 6');
+      st().replaceGroup(groupKey(last), r.commands, 'BC = 6');
     }, ['משולש ABC', 'BC = 6']],
   ] as const)('%s mid-search: the store stays as the student left it', async (_act, act, expected) => {
     const search = lateSearch();
