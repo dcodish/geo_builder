@@ -3867,6 +3867,28 @@
       "limits": "Not a sign alone (Q-2793a), not the free-DOF cue count (#2505 e23), not a vertex on a coordinate plane, not #2799.",
       "at": "2026-11-09T20:46:17.138Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2800a",
+      "issue": 2800,
+      "question": "3-D «מנסרה ABCA'B'C'» then «A'B = A'C»: (a) the later-named part (top face / lateral edge) moves first, base stays; (b) the whole solid refits, base may reshape.",
+      "class": "which-part-of-one-solid-moves",
+      "verdict": "escalate",
+      "reason": "NFR-ST-1 does not say whether parts of one solid are separate objects; ADR-W-199 decides refusal, not which DOF moves first; the circle-pair precedent concerns separate shapes.",
+      "nearest": [
+        {
+          "quote": "When a new fact is added, objects already on screen must not visibly jump or rearrange beyond what the new constraint strictly requires.",
+          "date": "2026-10-21",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/03-nonfunctional-requirements.md#stability"
+        },
+        {
+          "quote": "Accept at P2: Q moves, O and P stay where they are",
+          "date": "2026-10-16",
+          "link": "https://github.com/dcodish/geo_builder/issues/2237#issuecomment-6217511016"
+        }
+      ],
+      "at": "2026-11-09T20:59:56.454Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
