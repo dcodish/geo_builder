@@ -1900,6 +1900,46 @@ export function absolutePointCount(c: Construction3): number {
   return n;
 }
 
+/**
+ * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
+ * given by its equation, a point given by its coordinates? While the answer is NO, the canonical
+ * placement (first vertex at the origin, second along +x) is pure gauge and freezing it costs
+ * nothing. The moment the answer is YES, that placement stops being a gauge and becomes a real,
+ * UNSTATED degree of freedom: where the solid sits relative to the absolute object is something the
+ * student never said, so it must be sampled (ADR-052 / M4), not frozen at a value that happens to
+ * put the canonical origin exactly on a line through the origin.
+ *
+ * #2592 (ADR-3D-435): a FREE plane («מישור π3», `PlaneDef.free`) is not an absolute object. It carries
+ * no absolute data: its three DOFs are sampled by `resolveFreePlane` relative to the figure, so sampling
+ * the figure's six as well samples one relative pose twice. Counting it threw an unplaced solid off the
+ * floor (and drew the axes) the moment a bare plane was declared, and the first membership or ∥/⊥ put
+ * it back: two jumps. It is the free line's rule (never counted) stated for planes. A free plane later
+ * given an equation stops being `free` and counts; one related to a coordinate plane, an axis or an
+ * equation plane counts through that other object, which this predicate reads already.
+ *
+ * #2746 (ADR-3D-453): this is the ONE "absolute frame?" predicate. The scale given (`scaleGivenSafe`) used to keep
+ * its own list (`c.planes.size > 0 || c.lines.size > 0`, coordinate planes, coordinate points) that drifted from
+ * this one when ADR-3D-435 gated free planes here, so a bare «מישור π3» beside «אורך AB = 4» still detached the
+ * stated size. It now asks this predicate; an object added here is seen by both seams. (Lives in `types.ts`
+ * beside {@link absolutePointCount} so `scaleGiven.ts` reads it without an import cycle through `evaluate.ts`.)
+ */
+export function hasAbsoluteFrameObject(c: Construction3): boolean {
+  if (c.pins.length > 0) return true;
+  for (const def of c.planes.values()) if (!def.free) return true;
+  for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
+  // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
+  // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
+  // FACES. The list enumerated the absolute objects that can be DECLARED and missed the frame itself,
+  // so a figure related to [xy] kept the canonical placement and the relation was judged against a
+  // position nothing had chosen — then reported as the student's error.
+  if (c.coordPlanePins.length > 0) return true;
+  for (const cl of c.claims) {
+    const ops = cl.type === 'plane-rel' || cl.type === 'distance-rel' || cl.type === 'mutual-rel' ? [cl.a, cl.b] : cl.type === 'line-rel' ? [cl.op] : [];
+    if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) return true;
+  }
+  return absolutePointCount(c) > 0;
+}
+
 export function pinSymsOf(c: Construction3): string[] {
   const out: string[] = [];
   // #794 (ADR-3D-168): every pin family with symbolic components contributes — point pins,

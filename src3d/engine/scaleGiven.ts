@@ -26,7 +26,7 @@ import { scalePinned } from './solve3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { cross3, norm3, sub3, type Vec3 } from './vec3';
 import { reachesFreeCarrier3 } from './carriers';
-import { claimPointIds, type Claim3, type Construction3, type Id } from './types';
+import { claimPointIds, hasAbsoluteFrameObject, type Claim3, type Construction3, type Id } from './types';
 
 /** The magnitude claim kinds that pin the scale, with the POWER the factor enters at. */
 export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
@@ -67,8 +67,8 @@ export function isScaleGivenClaim(claim: Claim3): boolean {
 /**
  * May the figure's scale be taken from a stated magnitude — i.e. is a uniform rescale of every
  * position both MEANINGFUL (the scale is a frozen gauge nothing else owns) and SAFE (no absolute
- * object would be detached by it)? Deliberately conservative: an equation plane, a parametric
- * line, a coordinate point, a revolution solid with its own stated dims, or any pin that fixes
+ * object would be detached by it)? Deliberately conservative: any absolute-frame object
+ * ({@link hasAbsoluteFrameObject}), a revolution solid with its own stated dims, or any pin that fixes
  * the scale keeps today's behaviour — that corner is the placement design's (#551), and refusing
  * it honestly beats half-solving it.
  *
@@ -79,12 +79,17 @@ export function isScaleGivenClaim(claim: Claim3): boolean {
 export function scaleGivenSafe(c: Construction3): boolean {
   if (c.solids.length === 0) return false;
   if (c.revolutions.length > 0 || c.circles3.length > 0) return false;
-  if (c.planes.size > 0 || c.lines.size > 0) return false;
-  if (c.coordPlanePins.length > 0) return false;
+  // #2746 (ADR-3D-453): "would a uniform rescale detach an absolute object?" is the placement funnel's own question,
+  // so it is asked of the ONE predicate (an equation plane, a parametric line, a coordinate point, a coordinate-plane
+  // or axis relation). This used to be a second, hand-kept list counting EVERY plane and line, and it drifted when
+  // ADR-3D-435 stopped counting a free plane there: a bare «מישור π3» or «ישר l» detached «אורך AB = 4». A free or
+  // figure-derived plane/line is resolved from the figure, so the rescale below carries it along (evaluate.ts).
+  if (hasAbsoluteFrameObject(c)) return false;
+  // A `partial` point («P על החלק החיובי של ציר ה-x», ADR-3D-094) is the one category the two lists still read
+  // differently: Lane-A absolute here, not counted by `absolutePointCount` there. Kept refused (today's behaviour)
+  // pending the operator's ruling on whether it frames the figure — see ADR-3D-453 and #2746.
+  for (const def of c.points.values()) if (def.kind === 'partial') return false;
   if (scalePinned(c)) return false; // pins of any kind, or a scale-fixing scalar pin — the pivot owns scale
-  for (const def of c.points.values()) {
-    if (def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'partial') return false;
-  }
   return true;
 }
 

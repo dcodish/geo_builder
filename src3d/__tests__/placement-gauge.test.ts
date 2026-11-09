@@ -18,6 +18,7 @@ import { answerQuery } from '../engine/queries';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import type { Vec3 } from '../engine/vec3';
+import { scaleGivenActive, scaleGivenSafe } from '../engine/scaleGiven';
 
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
@@ -268,5 +269,109 @@ describe('#2592 — a free plane is not an absolute frame: the figure never jump
       submit('המישור π1: z - 3 = 0');
       expect(hasAbsoluteFrameObject(derived(0).construction), 'an equation plane').toBe(true);
     });
+  });
+});
+
+/**
+ * #2746 (ADR-3D-453): ONE "absolute frame?" predicate. `scaleGivenSafe` kept its own list (every plane, every line),
+ * which drifted from `hasAbsoluteFrameObject` when ADR-3D-435 stopped counting a free plane: «אורך AB = 4» beside
+ * a bare «מישור π3» or «ישר l» turned red and the cube shrank back to edge 1; the other order was refused.
+ */
+describe('#2746 — the scale given asks the same absolute-frame predicate', () => {
+  beforeEach(() => state().clear());
+  const CUBE3 = "קובייה ABCDA'B'C'D'";
+  const derived = (seed: number) => derive3(state().facts, seed);
+  const SEEDS = [0, 3];
+  const allOk = (seed: number): void => {
+    const d = derive3(state().facts, seed);
+    for (const f of state().facts) expect(d.status[f.id], `${f.utterance} @ seed ${seed}`).toBe('ok');
+  };
+  const snap = (seed: number): Map<string, Vec3> => new Map(derive3(state().facts, seed).resolved.positions);
+  const near = (p: Vec3, q: Vec3): number => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
+
+  for (const free of ['מישור π3', 'ישר l']) {
+    it(`«אורך AB = 4» then «${free}»: the length stays ok and no point moves`, () => {
+      submit(CUBE3);
+      submit('אורך AB = 4');
+      const before = SEEDS.map(snap);
+      submit(free);
+      expect(state().lastError).toBeNull();
+      SEEDS.forEach((seed, i) => {
+        allOk(seed);
+        const after = snap(seed);
+        expect(near(after.get('B')!, { x: 4, y: 0, z: 0 }), 'B = (4,0,0)').toBeLessThan(1e-9);
+        for (const [id, p] of before[i]) expect(near(after.get(id)!, p), `${id} @ seed ${seed}`).toBeLessThan(1e-9);
+      });
+      expect(scaleGivenActive(derived(0).construction)).toBe(true);
+    });
+
+    it(`«${free}» then «אורך AB = 4»: the size is accepted, edge 4`, () => {
+      submit(CUBE3);
+      submit(free);
+      submit('אורך AB = 4');
+      expect(state().lastError).toBeNull();
+      for (const seed of SEEDS) {
+        allOk(seed);
+        expect(near(snap(seed).get('B')!, { x: 4, y: 0, z: 0 })).toBeLessThan(1e-9);
+      }
+    });
+  }
+
+  it('a stated distance from A to the free plane holds at the stated size (re-resolved after the rescale)', () => {
+    for (const l of [CUBE3, 'אורך AB = 4', 'מישור π3', 'המרחק בין A למישור π3 הוא 2']) submit(l);
+    expect(state().lastError).toBeNull();
+    for (const seed of SEEDS) {
+      allOk(seed);
+      const r = derive3(state().facts, seed).resolved;
+      const pl = r.planes.get('π3')!;
+      const A = r.positions.get('A')!;
+      const nn = Math.hypot(pl.n.x, pl.n.y, pl.n.z);
+      expect(Math.abs((pl.n.x * A.x + pl.n.y * A.y + pl.n.z * A.z + pl.d) / nn), 'dist(A, π3)').toBeCloseTo(2, 9);
+      expect(near(r.positions.get('B')!, { x: 4, y: 0, z: 0 })).toBeLessThan(1e-9);
+    }
+  });
+
+  it('a free plane through A, B, C and a free line through A and C′ are carried by the rescale', () => {
+    for (const l of [CUBE3, 'אורך AB = 4', 'מישור π3', 'A על המישור π3', 'B על המישור π3', 'C על המישור π3', 'ישר l', 'A על הישר l', "C' על הישר l"]) submit(l);
+    expect(state().lastError).toBeNull();
+    for (const seed of SEEDS) {
+      allOk(seed);
+      const r = derive3(state().facts, seed).resolved;
+      const pl = r.planes.get('π3')!;
+      const nn = Math.hypot(pl.n.x, pl.n.y, pl.n.z);
+      for (const id of ['A', 'B', 'C']) {
+        const p = r.positions.get(id)!;
+        expect(Math.abs(pl.n.x * p.x + pl.n.y * p.y + pl.n.z * p.z + pl.d) / nn, `${id} on π3`).toBeLessThan(1e-9);
+      }
+      const ln = r.lines.get('ℓ')!;
+      expect(distToLine(r.positions.get("C'")!, ln.anchor, ln.dir), "C' on ℓ").toBeLessThan(1e-9);
+      expect(distToLine(r.positions.get('A')!, ln.anchor, ln.dir), 'A on ℓ').toBeLessThan(1e-9);
+      expect(near(r.positions.get("C'")!, { x: 4, y: 4, z: 4 })).toBeLessThan(1e-9);
+    }
+  });
+
+  it('a volume given on a pyramid beside a free line is the scale given too', () => {
+    for (const l of ['פירמידה ABCDS שבסיסה ריבוע', 'נפח הפירמידה ABCDS = 12', 'ישר k']) submit(l);
+    expect(state().lastError).toBeNull();
+    for (const seed of SEEDS) allOk(seed);
+  });
+
+  // the controls: an absolute object still detaches the size, as #551 contracts — refused as today
+  for (const abs of ['x+y+z=1', 'l1:x=t(1,1,1)', 'P(1,2,3)']) {
+    it(`«${abs}» still refuses the size (size-on-solid)`, () => {
+      for (const l of [CUBE3, 'אורך AB = 4', abs]) submit(l);
+      const d = derived(0);
+      expect(hasAbsoluteFrameObject(d.construction)).toBe(true);
+      expect(scaleGivenSafe(d.construction)).toBe(false);
+      const sized = state().facts.find((f) => f.utterance === 'אורך AB = 4')!;
+      expect(d.status[sized.id]).toEqual(expect.objectContaining({ code: 'size-on-solid' }));
+    });
+  }
+
+  it('a partial point («P on the positive x-axis») keeps today’s refusal — the open question in ADR-3D-453', () => {
+    for (const l of [CUBE3, 'אורך AB = 4', 'P נמצא על החלק החיובי של ציר ה-x']) submit(l);
+    const d = derived(0);
+    expect(hasAbsoluteFrameObject(d.construction)).toBe(false);
+    expect(scaleGivenSafe(d.construction)).toBe(false);
   });
 });
