@@ -662,7 +662,9 @@ the construction's points, so nothing downstream draws, labels, crosses or lists
 point (`sameDerivation`) renames it at M1's one-position-one-name check (`replaceId`), and `resolveToolLetters` re-points
 the helper's later placeholders to that letter.
 
-*Identifiers:* `P₁` · `@fresh:<role>|<key>` · `mid:B,C` · `HELPER_ROLES` · `helperId` · `~mid:E,K` · `foot(A|BC)` · `median:A` · `toolPoint` · `derived midpoint(u, v)` · `derived foot(apex → uv)` · `cevian-of { toolFoot }` · `cevian-of { side }`
+**A cevian operand's point rides the cevian** ([ADR-AG-435](06c-decisions-analytic.md#adr-ag-435), #2648). `lineObjectOperand` does not write the operand's incidence against the foot's placeholder: it sets `cevian-of { through: [E] }`, and M1's `cevian-of` arm writes `on-line-2pt E (apex, foot)` against the foot it resolves (the existing same-derivation point, the tool's new foot, or the student's). The placeholder of a foot the figure already letters is never created, and `derive`'s `present` filter drops its `minted` row.
+
+*Identifiers:* `P₁` · `@fresh:<role>|<key>` · `mid:B,C` · `HELPER_ROLES` · `helperId` · `~mid:E,K` · `foot(A|BC)` · `median:A` · `toolPoint` · `derived midpoint(u, v)` · `derived foot(apex → uv)` · `cevian-of { toolFoot }` · `cevian-of { side }` · `cevian-of { through }`
 
 ### New letters and circles a reference names ([ADR-AG-210](06c-decisions-analytic.md#adr-ag-210), #1670, #1686)
 

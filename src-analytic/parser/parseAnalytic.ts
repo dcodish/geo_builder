@@ -1444,8 +1444,17 @@ function lineObjectOperand(operand: string, id: Id): ObjectOperand | 'bad' | nul
     if (at.v === id || (isAngleRef(at) && (at.a === id || at.b === id))) return 'bad';
     return { t: 'object', facts: [{ ...facts[0], p: id }] };
   }
+  /*
+   * A cevian puts the point on ITS OWN line (#2648, ADR-AG-435): the foot is M1's to resolve — the side's midpoint the
+   * figure already letters is the one the cevian draws to — so the incidence rides the cevian fact (`through`) and is
+   * written against the foot M1 chooses. Written here against the parse-time letter, it pointed at a point no fact made.
+   */
   const cevian = facts.find((f) => f.t === 'cevian-of');
-  if (cevian) return cevian.t === 'cevian-of' && cevian.apex !== undefined ? on(cevian.apex, cevian.foot) : null;
+  if (cevian) {
+    if (cevian.t !== 'cevian-of' || cevian.apex === undefined) return null;
+    if (cevian.apex === id || cevian.foot === id) return 'bad';
+    return { t: 'object', facts: facts.map((f) => (f === cevian ? { ...cevian, through: [...(cevian.through ?? []), id] } : f)) };
+  }
   const lineAt = facts.find((f) => f.t === 'line-at');
   if (lineAt && lineAt.t === 'line-at') return { t: 'object', facts: [...facts, { t: 'constraint', k: { t: 'on-curve', id, curve: lineAt.id }, src: '' }] };
   // The drawn piece runs from the given point to the DERIVED one (the foot) — its line is the object's line.

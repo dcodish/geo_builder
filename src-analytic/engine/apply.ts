@@ -5897,7 +5897,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const [{ apex, u, v }] = [...targets.values()];
       if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
       /** The length the sentence stated for this cevian (#1737, ADR-AG-265), on the segment it draws. */
-      const measured = (foot: Id): Fact[] => (f.measure ? measureFacts(f.measure, apex, foot) : []);
+      // #2648 (ADR-AG-435): the points the sentence put on the cevian's LINE (an operand) lie on it through the foot resolved
+      // HERE, so the incidence and the drawn segment end at one point — the same decision, never the parse-time letter.
+      const measured = (foot: Id): Fact[] => [
+        ...(f.measure ? measureFacts(f.measure, apex, foot) : []),
+        ...(f.through ?? []).map((id): Fact => ({ t: 'constraint', k: { t: 'on-line-2pt', id, a: apex, b: foot }, src: f.src })),
+      ];
       /** #1973 (ADR-AG-430): the ring the figure chose the side in, said beside the row — only when the sentence named neither. */
       const hosted = (out: ApplyOutcome): ApplyOutcome => {
         const host = f.apex && !f.side ? cevianHostOf(c, apex, u, v, ringHost, pinned ? pinKey : null) : null;
