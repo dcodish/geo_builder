@@ -13,6 +13,7 @@ import { derive3, useGeo3 } from '../store/store3';
 import { freeDofCount3 } from '../engine/evaluate';
 import { createdNoticeFaults } from '../../shell/__tests__/fixtures/created-notice-rows';
 import { createdNoticeTextOf, type CreatedPointsAdapter } from '../../shell/session/createdPoints';
+import { definiteCircle3 } from '../engine/definiteCircle';
 
 const st = () => useGeo3.getState();
 const reset = () => useGeo3.setState({ facts: [], seed: 0, lastError: null, lastNotice: null, lastCreated: null } as never);
@@ -83,9 +84,21 @@ describe('#2611 — «המעגל» on a figure with no circle creates one, with 
     }
   });
 
-  it('with two circles «המעגל» is not created for: #2705 owns that answer', () => {
+  it('with two circles «המעגל» is not created for: it asks which (#2705, ADR-3D-439)', () => {
     run('משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC', 'D על המעגל');
     expect(st().lastError).toEqual({ code: 'unknown-circle', several: true });
+  });
+});
+
+describe('#2705 (ADR-3D-439) — `definiteCircle3`, the one reader of a bare «המעגל»', () => {
+  const free = (id: string, center?: string) => ({ id, def: { kind: 'free' as const, ...(center ? { center } : {}) } });
+  it('one circle is named; none names nothing; several ask which, with the remedy of a lettered centre when there is one', () => {
+    expect(definiteCircle3([free('circle-O', 'O')], 'D')).toEqual({ ok: true, circle: free('circle-O', 'O') });
+    expect(definiteCircle3([], 'D')).toEqual({ ok: false, error: { code: 'unknown-circle' } });
+    expect(definiteCircle3([free('circle-1'), free('circle-O', 'O')], 'D')).toEqual({ ok: false, error: { code: 'unknown-circle', several: true, centre: 'O', point: 'D' } });
+    expect(definiteCircle3([free('circle-1'), free('circle-2')], 'D')).toEqual({ ok: false, error: { code: 'unknown-circle', several: true } });
+    // a statement that places no point (a radius, a plane) asks without the point sentence
+    expect(definiteCircle3([free('circle-1'), free('circle-O', 'O')])).toEqual({ ok: false, error: { code: 'unknown-circle', several: true } });
   });
 });
 

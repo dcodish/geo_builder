@@ -16,6 +16,8 @@ import { freeDofCount3 } from '../engine/evaluate';
 import { dist3, ringSelfCrossing3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
 import { dataView, panelIsEmpty } from '../engine/dataView';
+import i18n3d from '../i18n';
+import { errorText3 } from '../i18n/errorText3';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -733,5 +735,88 @@ describe('pyramid-dart-base-2702 — «פירמידה SABCD שבסיסה דלת�
     submit('מרובע ABDC');
     expect(state().lastError).toEqual({ code: 'ring-crossed', stated: 'מרובע ABDC' });
     expect(state().facts.map((f) => f.utterance)).toEqual([first]);
+  });
+});
+
+// definite-circle-list-order-2705 (#2705, ADR-3D-439) — the operator's found-in-round lines (round #2697): two circles
+// stand above «D על המעגל», the first one's letters made by a line the fold deferred. Judged q-2611-twocircles
+// (ADR-W-175 sr-12, 2026-11-02): "With two, the tool asks which, using the existing question"; 2-D asks too. The
+// essence is a refusal and a stability guard, so the lock is bespoke (a fixture cannot hold a refusal).
+describe('definite-circle-list-order-2705 — two circles above «D על המעגל» ask which; a later circle never breaks D', () => {
+  beforeEach(reset);
+  const TANGENT = 'מעגל שמרכזו O משיק לישר AB בנקודה T';
+  const INCIRCLE = 'מעגל חסום במשולש ABC';
+  const ASK = { code: 'unknown-circle', several: true, centre: 'O', point: 'D' };
+  const QUESTION = 'בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה. ציינו את המעגל לפי מרכזו — למשל «הנקודה D על המעגל O».';
+  const he = (err: unknown) => (errorText3((k, o) => i18n3d.t(k, { ...o, lng: 'he' }) as string, err as never) ?? '').replace(/[⁦-⁩]/g, '');
+  const offCircle = (id: string, circle: string, seed: number) => {
+    const d = derive3(state().facts, seed);
+    const k = d.resolved.circles3.find((x) => x.id === circle)!;
+    const p = d.positions.get(id)!;
+    const q = { x: p.x - k.center.x, y: p.y - k.center.y, z: p.z - k.center.z };
+    return Math.abs(Math.hypot(q.x, q.y, q.z) - k.radius) + Math.abs(q.x * k.normal.x + q.y * k.normal.y + q.z * k.normal.z);
+  };
+  for (const [name, lines] of [
+    ['the reported lines (incircle)', [TANGENT, INCIRCLE, 'D על המעגל']],
+    ['the circumcircle variant', [TANGENT, 'המשולש ABC חסום במעגל', 'D על המעגל']],
+    ['in English', [TANGENT, INCIRCLE, 'D on the circle']],
+    ['over stated points (already asked)', ['קטע AB', TANGENT, INCIRCLE, 'D על המעגל']],
+    ['the two circle lines swapped (already asked)', [INCIRCLE, TANGENT, 'D על המעגל']],
+  ] as const) {
+    it(`${name}: refused with the existing question, nothing recorded, no D`, () => {
+      for (const l of lines.slice(0, -1)) submit(l);
+      expectAllOk();
+      const before = state().facts.length;
+      submit(lines[lines.length - 1]);
+      expect(state().lastError).toEqual(ASK);
+      expect(he(state().lastError)).toBe(QUESTION);
+      expect(state().facts).toHaveLength(before);
+      expect(derived().construction.points.has('D')).toBe(false);
+    });
+  }
+  it('a saved list holding the row reads it red with the question at seeds 0–3, the rest green, no D', () => {
+    submit(TANGENT);
+    submit(INCIRCLE);
+    const facts = [...state().facts, { ...state().facts[0], id: 'd-row', utterance: 'D על המעגל', cmds: [{ type: 'point-on-circle3', point: 'D', circle: '' }] } as never];
+    for (const s of [0, 1, 2, 3]) {
+      const out = derive3(facts, s);
+      expect(out.status['d-row']).toEqual(ASK);
+      expect(out.construction.points.has('D')).toBe(false);
+      for (const f of state().facts) expect(out.status[f.id]).toBe('ok');
+    }
+  });
+  it('a radius or a plane stated about «המעגל» on the same figure asks too', () => {
+    for (const line of ['רדיוס המעגל הוא 3', 'המעגל במישור π1']) {
+      reset();
+      submit(TANGENT);
+      submit(INCIRCLE);
+      submit(line);
+      expect(state().lastError).toEqual({ code: 'unknown-circle', several: true });
+    }
+  });
+  it('the sentence the question teaches builds: «D על המעגל O»', () => {
+    submit(TANGENT);
+    submit(INCIRCLE);
+    submit('D על המעגל O');
+    expectAllOk();
+    expect(derived().construction.points.get('D')).toEqual({ kind: 'on-circle3', circle: 'circle-O' });
+    for (const s of [0, 1, 2, 3]) expect(offCircle('D', 'circle-O', s)).toBeLessThan(1e-7);
+  });
+  it('stability: «משולש ABC חסום במעגל» · «D על המעגל» · a later incircle — D stays green on the circumcircle', () => {
+    submit('המשולש ABC חסום במעגל');
+    submit('D על המעגל');
+    submit(INCIRCLE);
+    expectAllOk();
+    expect(derived().construction.points.get('D')).toEqual({ kind: 'on-circle3', circle: 'circle-ABC' });
+    for (const s of [0, 1, 2, 3]) expect(offCircle('D', 'circle-ABC', s)).toBeLessThan(1e-7);
+  });
+  it('found in round: the deferred tangent circle above D, an incircle added below — D stays green on circle O (it went red)', () => {
+    submit(TANGENT);
+    submit('D על המעגל');
+    expect(derived().construction.points.get('D')).toEqual({ kind: 'on-circle3', circle: 'circle-O' });
+    submit(INCIRCLE);
+    expectAllOk();
+    expect(derived().construction.points.get('D')).toEqual({ kind: 'on-circle3', circle: 'circle-O' });
+    for (const s of [0, 1, 2, 3]) expect(offCircle('D', 'circle-O', s)).toBeLessThan(1e-7);
   });
 });
