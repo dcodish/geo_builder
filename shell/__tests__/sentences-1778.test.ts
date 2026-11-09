@@ -3,7 +3,7 @@
  * The per-builder wiring is locked by `fixtures/paste-paragraph-rows.ts`; this is the mechanism itself.
  */
 import { describe, expect, it } from 'vitest';
-import { joinSentences, splitSentences, submitSentences, submitTyped, type SentenceOutcome } from '../sentences';
+import { boxAfterSubmit, joinSentences, splitSentences, submitSentences, submitTyped, type SentenceOutcome } from '../sentences';
 
 const LRM = '‎';
 const texts = (s: string) => splitSentences(s)?.map((x) => x.text) ?? null;
@@ -119,8 +119,8 @@ describe('#1778 — submitTyped: one sentence is the one-element case', () => {
         seen.push(t);
         return outcome;
       },
-      (t) => {
-        b = t;
+      (update) => {
+        b = update(raw);
       },
     );
     return { seen, box: b };
@@ -134,5 +134,43 @@ describe('#1778 — submitTyped: one sentence is the one-element case', () => {
 
   it('a paragraph: each sentence, and the box set once to what the chain left', async () => {
     expect(await box('a1. a2.', 'consumed')).toEqual({ seen: ['a1', 'a2'], box: '' });
+  });
+});
+
+describe('#2782 (ADR-W-198) — a finished submit writes the box only while it still holds what was submitted', () => {
+  it('boxAfterSubmit: the submitted text becomes the answer; any other text stays as typed', () => {
+    expect(boxAfterSubmit('משולש ABC', '')('משולש ABC')).toBe('');
+    expect(boxAfterSubmit('משולש ABC', '')('AB = 5')).toBe('AB = 5');
+    expect(boxAfterSubmit('מעבירים X', 'X')('מעבירים X')).toBe('X');
+    expect(boxAfterSubmit('מעבירים X', 'X')('')).toBe('');
+  });
+
+  it('submitTyped: a line typed while an awaited submit is pending survives that submit', async () => {
+    for (const [raw, outcome] of [
+      ['משולש ABC', 'consumed'],
+      ['מעבירים X', { prefill: 'X' }],
+      ['a1. a2.', 'consumed'],
+    ] as const) {
+      let box: string = raw;
+      let release!: () => void;
+      let calls = 0;
+      const pending = submitTyped(
+        raw,
+        () =>
+          calls++ > 0
+            ? outcome
+            : new Promise<SentenceOutcome>((resolve) => {
+                release = () => resolve(outcome);
+              }),
+        (update) => {
+          box = update(box);
+        },
+      );
+      await Promise.resolve();
+      box = 'AB = 5'; // the student types the next line during the wait
+      release();
+      await pending;
+      expect(box, `«${raw}»`).toBe('AB = 5');
+    }
   });
 });

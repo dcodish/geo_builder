@@ -535,3 +535,54 @@ describe('#1973 — an accepted cevian records the shape it was resolved in', ()
     expect(hostsOf('AE גובה לצלע BC')).toEqual(['null']);
   });
 });
+
+describe('#2782 (ADR-810) — a line typed while the previous one is processing is never erased', () => {
+  /** A submit whose first paint waits until `release()`, the box written through `editText` as the App writes it. */
+  const pendingSubmit = (utterance: string) => {
+    const { deps } = makeDeps();
+    const box = { text: utterance };
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let painted = false;
+    const run = runSubmit(utterance, {
+      ...deps,
+      ui: { ...deps.ui, clearText: undefined, editText: (update) => (box.text = update(box.text)) },
+      nextPaint: async () => {
+        if (!painted) {
+          painted = true;
+          await gate;
+        }
+      },
+    });
+    return { box, release, run };
+  };
+
+  it('the first line commits, and the line typed during its wait stays in the box', async () => {
+    const { box, release, run } = pendingSubmit('משולש ABC');
+    await Promise.resolve();
+    box.text = 'AB = 5';
+    release();
+    await run;
+    expect(useGeoStore.getState().facts.map((f) => f.utterance)).toContain('משולש ABC');
+    expect(box.text).toBe('AB = 5');
+  });
+
+  it('a pasted paragraph: the box typed over during the chain is kept', async () => {
+    const { box, release, run } = pendingSubmit('משולש ABC. M אמצע AB.');
+    await Promise.resolve();
+    box.text = 'AB = 5';
+    release();
+    await run;
+    expect(useGeoStore.getState().facts.map((f) => f.utterance)).toEqual(expect.arrayContaining(['משולש ABC', 'M אמצע AB']));
+    expect(box.text).toBe('AB = 5');
+  });
+
+  it('untouched, the box is cleared as before', async () => {
+    const { box, release, run } = pendingSubmit('משולש ABC');
+    release();
+    await run;
+    expect(box.text).toBe('');
+  });
+});

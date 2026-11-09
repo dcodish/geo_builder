@@ -781,8 +781,8 @@ export default function App() {
         setInputNote,
         setRenameNote,
         setLlmDropped,
-        clearText: () => setText(''),
-        setText,
+        // #2782 (ADR-810): the box is written as an update of what it holds NOW — the pipeline replaces only the text it submitted
+        editText: setText,
         setBusy,
         setCreatedNotice,
       },
