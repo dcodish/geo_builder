@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
+  // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
+  'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
   // #1896 (ADR-3D-433) — the report: a ⟂ on points whose coordinates carry k pins k (k = 2 or k = −5, one drawn), where it
   // was refused «בדקו את החישוב». The roots, the census of arms and the stated-k rule are asserted in algebraic3.test.ts;
   // this is the build + drift + load net.

@@ -1257,18 +1257,26 @@ export function intersectPlanes(a: ResolvedPlane, b: ResolvedPlane): ResolvedLin
   return planePlaneLine(a, b);
 }
 
+/**
+ * #2707 (ADR-3D-445): "these planes are parallel" is read at the SAME relative bar the figure's own
+ * verdict uses (`MUTUAL_VERIFY_TOL`, the sine of the angle between the normals). The solver holds a
+ * stated ∥ to ~1e-6; an absolute 1e-10 on raw normals called such a pair "crossing", and its fold line
+ * sat ~1e6 from the figure — the scene centred both patches on it and the fit collapsed every point to
+ * one pixel. One predicate for every caller: the patches, the `plane-plane` line, the second line pass.
+ */
 function planePlaneLine(a: ResolvedPlane, b: ResolvedPlane): ResolvedLine | null {
   const dir = cross3(a.n, b.n);
-  if (norm3(dir) < 1e-10) return null; // parallel planes
+  if (!(norm3(dir) > MUTUAL_VERIFY_TOL * norm3(a.n) * norm3(b.n))) return null; // parallel planes
   // anchor solves n1·p+d1=0, n2·p+d2=0, dir·p=0 (the minimal-norm point)
   const anchor = solve3x3(a.n, b.n, dir, v3(-a.d, -b.d, 0));
   return anchor ? { anchor, dir: normalize3(dir) } : null;
 }
 
-/** Solve [r1;r2;r3]·p = rhs by Cramer (rows r1..r3). */
+/** Solve [r1;r2;r3]·p = rhs by Cramer (rows r1..r3). Singular is judged relative to the rows' size
+ *  (#2707): an absolute floor refused a well-posed system whose rows are merely short. */
 function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
   const det = dot3(r1, cross3(r2, r3));
-  if (Math.abs(det) < 1e-12) return null;
+  if (!(Math.abs(det) > 1e-12 * norm3(r1) * norm3(r2) * norm3(r3))) return null;
   const dx = dot3(v3(rhs.x, r1.y, r1.z), cross3(v3(rhs.y, r2.y, r2.z), v3(rhs.z, r3.y, r3.z)));
   const dy = dot3(v3(r1.x, rhs.x, r1.z), cross3(v3(r2.x, rhs.y, r2.z), v3(r3.x, rhs.z, r3.z)));
   const dz = dot3(v3(r1.x, r1.y, rhs.x), cross3(v3(r2.x, r2.y, rhs.y), v3(r3.x, r3.y, rhs.z)));

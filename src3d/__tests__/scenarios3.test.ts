@@ -16,6 +16,8 @@ import { freeDofCount3 } from '../engine/evaluate';
 import { dist3, ringSelfCrossing3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
 import { dataView, panelIsEmpty } from '../engine/dataView';
+import { buildScene3 } from '../render/scene3';
+import { HOME_CAMERA } from '../render/camera';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -681,5 +683,39 @@ describe('pyramid-keeps-quad-2490 — «מרובע ABCD» · «פירמידה AB
       useGeo3.getState().resample();
       expectAllOk();
     }
+  });
+});
+
+// parallel-planes-frame-2707 (#2707, ADR-3D-445) — the report: «המישור ABCD מקביל למישור EFGH» on a blank canvas drew a
+// line and a dot at half the configurations. The figure built green before the fix too (the planes were parallel to the
+// solve's accuracy, read as crossing far away), so the lock is bespoke: at every configuration «הציגו תצורה אחרת» reaches,
+// the home view shows eight separate points spread over the canvas and two plane patches. The three-letter twin at the
+// first configuration, which collapsed too.
+describe('parallel-planes-frame-2707 — two parallel planes on a blank canvas draw as two planes', () => {
+  beforeEach(reset);
+  const VIEW = { width: 800, height: 600 };
+  const expectSpread = (n: number, what: string) => {
+    const d = derived();
+    const scene = buildScene3(d.construction, d.resolved, HOME_CAMERA, VIEW);
+    expect(scene.points.length, what).toBe(n);
+    expect(new Set(scene.points.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)).size, what).toBe(n);
+    const xs = scene.points.map((p) => p.x);
+    const ys = scene.points.map((p) => p.y);
+    expect(Math.max(...xs) - Math.min(...xs) + Math.max(...ys) - Math.min(...ys), what).toBeGreaterThan(150);
+    expect(scene.planes.length, what).toBe(2);
+  };
+  it('ABCD ∥ EFGH: eight separate points and two patches across ten presses', () => {
+    submit('המישור ABCD מקביל למישור EFGH');
+    expectAllOk();
+    for (let press = 0; press < 10; press++) {
+      expectSpread(8, `press ${press}`);
+      useGeo3.getState().resample();
+      expectAllOk();
+    }
+  });
+  it('ABC ∥ DEF: six separate points and two patches', () => {
+    submit('המישור ABC מקביל למישור DEF');
+    expectAllOk();
+    expectSpread(6, 'first configuration');
   });
 });

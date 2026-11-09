@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T07:01:45.308Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "המישור ABCD מקביל למישור EFGH",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "parallel",
+          "a": {
+            "kind": "plane-run",
+            "ids": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          },
+          "b": {
+            "kind": "plane-run",
+            "ids": [
+              "E",
+              "F",
+              "G",
+              "H"
+            ]
+          }
+        },
+        {
+          "type": "plane-through",
+          "name": "ABCD",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "plane-through",
+          "name": "EFGH",
+          "ids": [
+            "E",
+            "F",
+            "G",
+            "H"
+          ]
+        }
+      ]
+    }
+  ]
+}
