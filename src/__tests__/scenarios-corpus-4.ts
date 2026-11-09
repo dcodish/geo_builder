@@ -6442,6 +6442,31 @@ export const SCENARIOS_4: Scenario[] = [
       const [A, C, Q, E] = [at(fig, 'A'), at(fig, 'C'), at(fig, 'Q'), at(fig, 'E')];
       expect(Math.abs((E.x - Q.x) * (C.x - A.x) + (E.y - Q.y) * (C.y - A.y)) / (dist(E, Q) * dist(A, C)), 'QE ⟂ AC').toBeLessThan(1e-6);
     },
+  },  {
+    id: 'issue-2151-tangent-from-inside',
+    title: '«מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» is refused naming both statements (#2151, ADR-814)',
+    guards:
+      "#2151: the tangent construction ran until its Thales circle failed to meet the circle — raw `cannot construct T: circles circle-O and tanaux-OP do not meet`, the floor sentence on screen — and the «PA ו-PB» spelling committed with the circle shrunk to 0.2. ADR-814: `Structure.tangentFrom` reads a tangent drawn from P (the Thales crossing, or T on the circle with OT ⟂ PT) and the side prover refuses it against a stated inside, naming both statements, both orders. Unit lock: src/engine/__tests__/side-feasibility.test.ts.",
+    steps: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'],
+    expectViolations: true,
+    check: (fig) => {
+      const said = Object.values(fig.status).map(String);
+      expect(said, 'the refusal names both statements').toContain('impossible: «tangent from P to circle O» contradicts «P inside circle O»');
+      expect(said.join(' '), 'no internal id').not.toMatch(/tanaux/);
+      expect(fig.pending, 'a proven contradiction is never pending').toBe(false);
+      const c = fig.circles.get('circle-O')!;
+      expect(dist(at(fig, 'P'), c.center), 'keep-prior: P still inside').toBeLessThan(c.r);
+      // the constraint form and the reverse order: the same refusal
+      for (const [steps, msg] of [
+        [['מעגל O', 'P בתוך המעגל', 'PA ו-PB משיקים למעגל'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+        [['מעגל O', 'PA ו-PB משיקים למעגל', 'P בתוך המעגל'], 'impossible: «P inside circle O» contradicts «tangent from P to circle O»'],
+      ] as [string[], string][]) {
+        const f = replay(factsOf(steps));
+        expect(Object.values(f.status).map(String), steps.join(' · ')).toContain(msg);
+      }
+      // the control: a point outside builds both tangents
+      allStepsOk(replay(factsOf(['מעגל O', 'הנקודה P מחוץ למעגל', 'מהנקודה P העבירו משיקים למעגל'])));
+    },
   },
 ];
 

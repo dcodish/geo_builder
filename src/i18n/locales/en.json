@@ -370,6 +370,7 @@
       "radiusOf": "radius of {{circle}}"
     },
     "stmt": {
+      "tangentFrom": "a tangent from {{p}} to {{circle}}",
       "centreOfCircle": "is the centre of {{circle}}",
       "midpointOf": "is the midpoint of",
       "vertexOf": "is a vertex of",

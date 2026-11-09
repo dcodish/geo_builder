@@ -19,7 +19,9 @@
  * Members, each against a recorded {@link SideRequirement}:
  *  - circle side: the point is ON the circle (a rider, a crossing, the radius's through-point, a
  *    circumcircle vertex, a membership lowered to a constraint) — contradicts inside and outside; the
- *    point is the circle's CENTRE — contradicts outside; inside and outside both stated;
+ *    point is the circle's CENTRE — contradicts outside; a TANGENT is drawn from the point to the circle
+ *    (#2151, ADR-814: the Thales crossing or a stated ⟂ to the radius) — contradicts inside; inside and
+ *    outside both stated;
  *  - polygon side: the point is a VERTEX of the region, on one of its EDGES (a rider within the edge, its
  *    midpoint, a segment meet within it, an in-order statement between its ends) — contradicts strict
  *    inside and strict outside; inside and outside both stated;
@@ -93,8 +95,19 @@ export function sideImpossibility(probed: Construction, cmd?: Command): SideImpo
         const ctr = s.isCentre(r.id, r.circle);
         if (ctr) return hit(ctr, r);
       }
+      // #2151 (ADR-814): a tangent drawn FROM the point needs it outside — a stated inside cannot hold
+      if (r.side === 'inside') {
+        const tan = s.tangentFrom(r.id, r.circle);
+        if (tan) return hit(tan, r);
+      }
       const other = reqs.find((q) => q.kind === 'circle-side' && q.id === r.id && q.circle === r.circle && q.side !== r.side);
-      if (other) return hit(sideText(isNew(r) ? other : r), isNew(r) ? r : other);
+      if (other) {
+        // the tangent macro records its apex outside on its own (#556): name the student's tangent, not that record
+        const inside = r.side === 'inside' ? r : (other as typeof r);
+        const tan = s.tangentFrom(inside.id, inside.circle);
+        if (tan) return hit(tan, inside);
+        return hit(sideText(isNew(r) ? other : r), isNew(r) ? r : other);
+      }
     } else if (r.kind === 'polygon-side') {
       const on = s.onBoundary(r.id, r.poly);
       if (on) return hit(on, r);

@@ -2299,3 +2299,7 @@ over all four (ADR-041).
 ### `bare-perpendicular-asks-1775` — Two drawn perpendiculars: «E על האנך» asks which, and «E על האנך מ-Q ל-AC» answers (#1775, ADR-796)
 
 **Guards against:** a guess between two drawn perpendiculars, and a question whose answer does not read. **Asserts** the refusal's two options, then QE ⟂ AC.
+
+### `issue-2151-tangent-from-inside` — «מעגל שמרכזו O» · «הנקודה P בתוך המעגל» · «מהנקודה P העבירו משיקים למעגל» is refused naming both statements (#2151, ADR-814)
+
+**Guards against:** a tangent from a point stated inside the circle being built until its scaffold circle fails (an internal id, the floor sentence) or committing with the circle shrunk. **Asserts** the refusal names «tangent from P to circle O» and «P inside circle O», no `tanaux`, P still inside; the «PA ו-PB» form in both orders; the outside control builds.

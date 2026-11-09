@@ -370,6 +370,7 @@
       "radiusOf": "רדיוס {{circle}}"
     },
     "stmt": {
+      "tangentFrom": "משיק מ-{{p}} {{circleTo}}",
       "centreOfCircle": "הוא מרכז {{circleThe}}",
       "midpointOf": "היא אמצע",
       "vertexOf": "היא קדקוד של",

@@ -18,11 +18,12 @@ import type { Command, Construction } from '../types';
 import { factsOf } from '../../__tests__/scenario-pipeline';
 import { replay } from '@/replay/core';
 
-/** The figure of every line but the last, and the last line's engine commands. */
+/** The figure of every line but the last, and the last line's engine commands — every command of its group (#2151: a tangent macro is several). */
 function split(steps: string[]): { prior: Construction; last: Command[] } {
   const facts = factsOf(steps as never);
-  const prior = replay(facts.slice(0, -1)).construction;
-  const last = lower([facts[facts.length - 1].cmd]) as Command[];
+  const group = facts[facts.length - 1].group;
+  const prior = replay(facts.filter((f) => f.group !== group)).construction;
+  const last = lower(facts.filter((f) => f.group === group).map((f) => f.cmd)) as Command[];
   return { prior, last };
 }
 
@@ -65,6 +66,14 @@ describe('sideImpossibility — every structural member, both entry orders', () 
     [['קטע AB', 'C על AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C on segment AB»'],
     [['ישר AB', 'C על הישר AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C on line AB»'],
     [['קטע AB', 'C ו-D באותו צד של AB', 'C ו-D בצדדים שונים של AB'], 'impossible: «C, D on different sides of AB» contradicts «C, D on the same side of AB»'],
+    // #2151 (ADR-814): a tangent drawn FROM a point stated inside — every spelling, both lowerings (Thales / ⟂), both orders
+    [['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+    [['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיק למעגל'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+    [['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'משיק מ-P למעגל'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+    [['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'PT משיק למעגל O'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+    [['מעגל O', 'P בתוך המעגל', 'PA ו-PB משיקים למעגל'], 'impossible: «tangent from P to circle O» contradicts «P inside circle O»'],
+    [['מעגל O', 'PA ו-PB משיקים למעגל', 'P בתוך המעגל'], 'impossible: «P inside circle O» contradicts «tangent from P to circle O»'],
+    [['מעגל O', 'מהנקודה P העבירו משיקים למעגל', 'הנקודה P בתוך המעגל'], 'impossible: «P inside circle O» contradicts «tangent from P to circle O»'],
   ];
   it.each(CASES)('%j', (steps, message) => {
     expect(prove(steps)).toBe(message);
@@ -129,6 +138,9 @@ describe('sideImpossibility — satisfiable combinations are NEVER refused (the 
     ['מעגל O', 'AD חותך את מעגל O בנקודה B'],
     ['מעגל O', 'מנקודה A יוצאים שני משיקים למעגל O'],
     ['מעגל O', 'PA משיק למעגל בנקודה A'],
+    ['מעגל O', 'הנקודה P מחוץ למעגל', 'מהנקודה P העבירו משיקים למעגל'], // #2151: the outside control still builds
+    ['מעגל O', 'P מחוץ למעגל', 'PA ו-PB משיקים למעגל'],
+    ['מעגל O', 'מעגל Q', 'P בתוך מעגל Q', 'מהנקודה P העבירו משיקים למעגל O'], // inside ANOTHER circle is no contradiction
   ];
   it.each(CONTROLS)('%j', (...steps) => {
     expect(prove(steps)).toBeNull();
