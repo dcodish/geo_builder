@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2806 (ADR-3D-458) — the report: a square beside one vertex on an axis, drawn shrunk to a dot (every line green) and
+  // 3.8 s to submit. The size, the square and the work count are asserted in issue-936-degenerate.test.ts; this is the
+  // build + drift + load net.
+  'square-vertex-axis-2806.geo3.json': ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-x'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
