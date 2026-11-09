@@ -3889,6 +3889,26 @@
       ],
       "at": "2026-11-09T20:59:56.454Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2802a",
+      "issue": 2802,
+      "question": "complex, a lone line through the origin («Re(z) = 0»): (a) «הציגו תצורה אחרת» alternates z between the two sides of the origin as for «z מדומה טהור»; (b) z stays on one side, only the distance changes.",
+      "class": "no-fixed-assumptions-free-dof",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Which side of the origin z sits on is unstated, so it is a free DOF re-sampled with the distance; z alternates sides as it does for «z מדומה טהור».",
+      "precedents": [
+        {
+          "quote": "A default is fine as a starting value so the figure can be drawn, but it must be a free degree of freedom, not a fixed value",
+          "date": "2026-06-17",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06-decisions.md#adr-052"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Not the distance range, not a note on a side change, not other loci beyond the same rule.",
+      "at": "2026-11-09T21:01:56.861Z",
+      "status": "pending"
     }
   ],
   "demoted": {
