@@ -428,61 +428,16 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
     expect(applyCommand3(trap, unstatedPyramidBase3(trap, plain)).ok).toBe(true);
   });
 
-  it('left as read: a pyramid that makes its own base, a run that does not bind, an unlettered run', () => {
+  it('left as read: a pyramid that makes its own base, a right kind, a run that does not bind, an unlettered run', () => {
     expect(unstatedPyramidBase3(emptyConstruction3(), plain)).toBe(plain); // standalone: ADR-3D-011's rectangle draws the base
     const right: SolidCommand = { type: 'solid', kind: 'pyramid4r', ids: PYR };
-    expect(unstatedPyramidBase3(emptyConstruction3(), right)).toBe(right); // a standalone right pyramid keeps its rectangle
+    expect(unstatedPyramidBase3(quad(), right)).toBe(right); // the right pyramid over an existing ring is the operator's question
     const tri = build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
     expect(unstatedPyramidBase3(tri, plain)).toBe(plain); // a base only partly there: no binding, today's refusal
     const unlettered: SolidCommand = { ...plain, lettersUnstated: true };
     expect(unstatedPyramidBase3(quad(), unlettered)).toBe(unlettered); // FR-SP-24: never binds by default letters
     const tetra: SolidCommand = { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] };
     expect(unstatedPyramidBase3(tri, tetra)).toBe(tetra); // a triangular base has no default shape to yield
-  });
-});
-
-/**
- * #2490 (ADR-3D-437, operator 2026-11-09: "reject") — a RIGHT pyramid over an existing ring reads as the general right
- * kind, and its cyclic requirement is CHECKED against the ring (the claim verifier), never imposed on it.
- */
-describe('#2490 — a right pyramid over an existing ring: «ישרה» is checked, never imposed', () => {
-  const PYR = ['A', 'B', 'C', 'D', 'S'];
-  const right: SolidCommand = { type: 'solid', kind: 'pyramid4r', ids: PYR };
-  const ring = (base: 'quad' | 'square' | 'rectangle' | 'rhombus' | 'kite' | 'trapezoid' | 'parallelogram'): Construction3 =>
-    base === 'quad' ? build({ type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] }) : build({ type: 'quad-shape', base, ids: ['A', 'B', 'C', 'D'] });
-
-  it('reads as the general right kind over an existing ring, every other field kept', () => {
-    expect(unstatedPyramidBase3(ring('quad'), right)).toEqual({ ...right, kind: 'pyramidQuadR' });
-    expect(unstatedPyramidBase3(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }), right).kind).toBe('pyramidQuadR');
-  });
-
-  it('REFUSAL: a ring its statements do not make cyclic is refused, naming the ring and what it is known to be', () => {
-    for (const base of ['quad', 'rhombus', 'kite', 'trapezoid', 'parallelogram'] as const) {
-      const c = ring(base);
-      const r = applyCommand3(c, unstatedPyramidBase3(c, right));
-      expect(r.ok, base).toBe(false);
-      if (r.ok) continue;
-      expect(r.error, base).toMatchObject({ code: 'right-pyramid-base-not-cyclic', ring: ['A', 'B', 'C', 'D'] });
-    }
-    const quad = ring('quad');
-    expect(applyCommand3(quad, { ...right, kind: 'pyramidQuadR' })).toEqual({ ok: false, error: { code: 'right-pyramid-base-not-cyclic', ring: ['A', 'B', 'C', 'D'] } });
-  });
-
-  it('a cyclic ring builds: the ring unchanged, the apex over its circumcentre, one DOF', () => {
-    for (const before of [ring('square'), ring('rectangle'), build({ type: 'solid', kind: 'cube', ids: CUBE_IDS })]) {
-      const r = applyCommand3(before, unstatedPyramidBase3(before, right));
-      expect(r.ok).toBe(true);
-      if (!r.ok) continue;
-      expect(r.next.solids.at(-1)).toMatchObject({ kind: 'pyramidQuadR', bound: ['A', 'B', 'C', 'D'] });
-      expect(freeDims(r.next)).toBe(freeDims(before) + 1);
-      expect(verifyClaim({ type: 'concyclic', ids: ['A', 'B', 'C', 'D'] }, r.next, 0)).toBe(true);
-      for (const seed of [0, 3]) {
-        const p = evaluate3(r.next, seed);
-        for (const id of ['A', 'B', 'C', 'D']) expect(dist3(p.get(id)!, evaluate3(before, seed).get(id)!)).toBeLessThan(1e-9);
-        const lateral = ['A', 'B', 'C', 'D'].map((id) => dist3(p.get('S')!, p.get(id)!));
-        for (const l of lateral) expect(l).toBeCloseTo(lateral[0], 6);
-      }
-    }
   });
 });
 

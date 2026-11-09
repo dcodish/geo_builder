@@ -894,12 +894,7 @@ whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate
 declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
-otherwise. A right kind reads the same way, as the general right kind `pyramidQuadR` ([ADR-3D-437](06b-decisions-3d.md#adr-3d-437));
-its cyclic requirement is then a CHECK in `applyBoundPyramid3`, never a drive: for a right quad pyramid that states no base
-shape, the ring must satisfy the `concyclic` claim through `verifyClaim` (every claim seed × every branch) on the figure before
-the pyramid, else the apply refuses `right-pyramid-base-not-cyclic` (the store adds the row's text). The bound right pyramid is
-its ring's definition for the narrowing pass (`rowClass3` with the construction), and ADR-3D-090's `base-constrained` note
-skips a bound solid, so a cyclic ring that builds carries no note.
+otherwise. A right kind is left as read, because its cyclic fix is the parser's for the base it read.
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 

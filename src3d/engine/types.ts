@@ -2108,10 +2108,6 @@ export type EngineError3 =
   // operator's 2026-10-10 ruling: a square IS a rectangle, so the line is a restatement, not a naming error.
   // #2171 (ADR-3D-345): both are lattice KINDS, adjective included — «טרפז שווה שוקיים» is named as typed.
   | { code: 'shape-disjoint'; stated: NarrowKind; actual: NarrowKind }
-  // #2490 (ADR-3D-437, operator 2026-11-09 "reject"): «פירמידה ישרה ABCDS» over a ring that already exists and that its
-  // own statements do not make cyclic — no right pyramid stands on it, and the ring keeps its shape. `ring` is the base
-  // as the pyramid names it, `shape` what the ring is known to be (none for a plain one); the store adds the line.
-  | { code: 'right-pyramid-base-not-cyclic'; ring: Id[]; shape?: NarrowKind; sentence?: string }
   // #1792 / #1918 (ADR-3D-313): a shape no circle can pass around without turning it into `forced` (a right
   // trapezoid in a circle is a rectangle). Raised by the parser for the one-line form and by apply for a ring
   // DECLARED with the phrase on one line and inscribed on another, in either order. `shape`/`forced` are

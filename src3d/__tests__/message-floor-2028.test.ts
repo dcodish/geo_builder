@@ -29,7 +29,6 @@ const ERRORS3: Record<Code3, Payload[]> = {
   ],
   'angle-coef-conflict': [{ was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 2 } }],
   'shape-disjoint': [{ stated: 'trapezoid', actual: 'parallelogram' }],
-  'right-pyramid-base-not-cyclic': [{ ring: ['A', 'B', 'C', 'D'], sentence: 'פירמידה ישרה ABCDS' }, { ring: ['A', 'B', 'C', 'D'], shape: 'rhombus', sentence: 'פירמידה ישרה ABCDS' }],
   'inscribed-contradicts-noun': [
     { shape: 'rightTrapezoid', forced: 'rectangle', sentence: 'AB = 3', other: 'משולש ABC' },
     { shape: 'rightTrapezoid', forced: 'rectangle', sentence: 'AB = 3' },

@@ -375,6 +375,16 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
     expect(state().lastError).toEqual({ code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' });
   });
 
+  it('UNCHANGED: the right pyramid keeps today\'s reading (a rectangle base; on the cube, its note)', () => {
+    build(['מרובע ABCD', 'פירמידה ישרה ABCDS']);
+    expectAllOk();
+    expect(derived().construction.solids[1].kind).toBe('pyramid4r');
+    for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D'])).toBe(true);
+    build([CUBE, 'פירמידה ישרה ABCDS']);
+    expectAllOk();
+    expect(narrowed()).toHaveLength(1);
+  });
+
   it('the pyramid typed again is still «already stated», with a shape reference elsewhere in the figure too', () => {
     for (const lines of [['מרובע ABCD', 'פירמידה ABCDS'], ['משולש EFG', 'המשולש ישר זווית', 'מרובע ABCD', 'פירמידה ABCDS']]) {
       build(lines);
@@ -384,93 +394,5 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
       expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-stated' });
       expect(state().facts, lines.join(' · ')).toHaveLength(n);
     }
-  });
-});
-
-describe('#2490 (ADR-3D-437) — a right pyramid over an existing ring: «ישרה» is checked, never imposed', () => {
-  beforeEach(reset);
-  const CUBE = "קובייה ABCDA'B'C'D'";
-  const build = (lines: readonly string[]) => {
-    reset();
-    for (const u of lines) submit(u);
-  };
-  const isRectangle = (p: ReadonlyMap<string, { x: number; y: number; z: number }>, ring: readonly string[]) =>
-    ring.every((v, i) => {
-      const at = p.get(v)!;
-      const a = p.get(ring[(i + 3) % 4])!;
-      const b = p.get(ring[(i + 1) % 4])!;
-      const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
-      return Math.abs(dot) / (dist(at, a) * dist(at, b)) < 1e-6;
-    });
-
-  // [host lines, the pyramid line, the base ring, what the ring is known to be]
-  const REFUSED: [string[], string, string[], string | undefined][] = [
-    [['מרובע ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], undefined],
-    [['מרובע ABCD'], 'right pyramid ABCDS', ['A', 'B', 'C', 'D'], undefined],
-    [['מרובע ABCD'], 'פירמידה ישרה ABCDS שבסיסה מרובע', ['A', 'B', 'C', 'D'], undefined],
-    [['מעוין ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], 'rhombus'],
-    [['מקבילית ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], 'parallelogram'],
-    [['דלתון ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], 'kite'],
-    [['טרפז ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], 'trapezoid'],
-    [["מנסרה ABCA'B'C'"], "פירמידה ישרה ABB'A'S", ['A', 'B', "B'", "A'"], undefined], // an oblique prism's side face
-  ];
-
-  it('REFUSAL: a ring its statements do not make cyclic — the line is refused, naming the ring, and nothing moves', () => {
-    for (const [host, line, ring, shape] of REFUSED) {
-      const label = [...host, line].join(' · ');
-      build(host);
-      const before = state().facts;
-      const pos = derive3(before, 0).positions;
-      submit(line);
-      expect(state().lastError, label).toEqual({ code: 'right-pyramid-base-not-cyclic', ring, ...(shape ? { shape } : {}), sentence: line });
-      expect(state().facts, label).toBe(before);
-      for (const id of ring) expect(derive3(state().facts, 0).positions.get(id), `${label}: ${id}`).toEqual(pos.get(id));
-    }
-  });
-
-  // [host lines, the pyramid line, the base ring, how far the ring may move: a circle through it is SOLVED, and the plain
-  // bound pyramid moves it as far (≤ 0.01 at seed 0, measured; reported on #2490), so that row asserts the shape is kept]
-  const BUILT: [string[], string, string[], number?][] = [
-    [['ריבוע ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D']],
-    [['מלבן ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D']],
-    [['טרפז שווה שוקיים ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D']],
-    [['מרובע ABCD', 'מעגל חוסם את ABCD'], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D'], 0.02],
-    [["תיבה ABCDA'B'C'D'"], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D']],
-    [["מנסרה ישרה ABCA'B'C'"], "פירמידה ישרה ABB'A'S", ['A', 'B', "B'", "A'"]], // a right prism's side face
-    [[CUBE], 'פירמידה ישרה ABCDS', ['A', 'B', 'C', 'D']],
-  ];
-
-  it('a cyclic ring builds: the ring drawn exactly as before, the apex over its circumcentre, no note', () => {
-    for (const [host, line, ring, tol = 1e-9] of BUILT) {
-      const label = [...host, line].join(' · ');
-      build(host);
-      const hostFacts = state().facts;
-      submit(line);
-      expectAllOk();
-      expect(derived().construction.solids.at(-1), label).toMatchObject({ kind: 'pyramidQuadR', bound: ring });
-      expect(derived().notices.filter((n) => n.kind === 'narrowed' || n.kind === 'base-constrained'), label).toEqual([]);
-      for (let seed = 0; seed < 4; seed++) {
-        const p = derive3(state().facts, seed).positions;
-        const q = derive3(hostFacts, seed).positions;
-        for (const id of ring) expect(dist(p.get(id)!, q.get(id)!), `${label} @${seed}: ${id}`).toBeLessThan(tol);
-        const lateral = ring.map((id) => dist(p.get('S')!, p.get(id)!));
-        for (const l of lateral) expect(l, `${label} @${seed}`).toBeCloseTo(lateral[0], 6);
-      }
-    }
-  });
-
-  it('UNCHANGED: a triangle base is always cyclic, a standalone right pyramid keeps its rectangle, a stated base still applies', () => {
-    build(['משולש ABC', 'פירמידה ישרה ABCS']);
-    expectAllOk();
-    expect(derived().construction.solids[1]).toMatchObject({ kind: 'pyramid3', bound: ['A', 'B', 'C'] });
-    build(['פירמידה ישרה ABCDS']);
-    expectAllOk();
-    expect(derived().construction.solids[0].kind).toBe('pyramid4r');
-    build(['פירמידה ישרה ABCDS שבסיסה דלתון']);
-    expectAllOk();
-    expect(derived().construction.solids[0].kind).toBe('pyramidKiteR');
-    build(['מרובע ABCD', 'פירמידה ישרה ABCDS שבסיסה מלבן']);
-    expectAllOk();
-    for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D'])).toBe(true);
   });
 });

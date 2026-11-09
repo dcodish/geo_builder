@@ -2249,7 +2249,7 @@ function deriveCore3(
   facts.forEach((f, i) => {
     const st = status[f.id];
     if (typeof st !== 'object') return;
-    if (st.code === 'free-vector-coupling' || st.code === 'right-pyramid-base-not-cyclic') status[f.id] = { ...st, sentence: f.utterance };
+    if (st.code === 'free-vector-coupling') status[f.id] = { ...st, sentence: f.utterance };
     else if (st.code === 'free-vector-conflict') {
       // #1188 step 2 (ADR-3D-390): the earlier lines that said something about that vector — a tuple, a definition, an equation
       const named = [st.id, ...f.cmds.flatMap(vectorsNamedBy3)];

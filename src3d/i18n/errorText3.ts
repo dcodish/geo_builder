@@ -151,11 +151,6 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — what the ring
     // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written
     // under; #1988 (ADR-3D-326) retired the other caller, not the sentence.
-    // #2490 (ADR-3D-437): a right pyramid over an existing ring no circle passes through — the line, the ring, its kind
-    case 'right-pyramid-base-not-cyclic':
-      return t(err.shape ? 'err.rightPyramidBaseNotCyclicKind' : 'err.rightPyramidBaseNotCyclic', {
-        sentence: err.sentence ?? '', ring: err.ring.join(''), ...(err.shape ? { shape: t(`notice.narrowed.shape.${err.shape}`) } : {}),
-      });
     case 'shape-disjoint':
       // #2171 (ADR-3D-345): both are lattice kinds, so a declared «טרפז שווה שוקיים» is named with its adjective
       return t('err.shapeLessSpecific', { stated: t(`notice.narrowed.shape.${err.stated}`), actual: t(`notice.narrowed.shape.${err.actual}`) });

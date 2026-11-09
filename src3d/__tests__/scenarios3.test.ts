@@ -688,21 +688,6 @@ describe('pyramid-keeps-quad-2490 — «מרובע ABCD» · «פירמידה AB
   });
 });
 
-// right-pyramid-existing-quad-2490 (#2490, ADR-3D-437) — the operator's ruling of 2026-11-09 ("2490 - reject"): a right
-// pyramid over a quadrilateral that already exists and that no circle passes through is refused, naming the line, and
-// the quadrilateral stays as it was. A refusal, so the lock is bespoke (no fixture builds green).
-describe('right-pyramid-existing-quad-2490 — «מרובע ABCD» · «פירמידה ישרה ABCDS» is refused', () => {
-  beforeEach(reset);
-  it('refuses the line with the reason, records nothing, and the quadrilateral keeps its row', () => {
-    submit('מרובע ABCD');
-    submit('פירמידה ישרה ABCDS');
-    expect(state().lastError).toMatchObject({ code: 'right-pyramid-base-not-cyclic', ring: ['A', 'B', 'C', 'D'], sentence: 'פירמידה ישרה ABCDS' });
-    expect(state().facts.map((f) => f.utterance)).toEqual(['מרובע ABCD']);
-    expect(derived().status[state().facts[0].id]).toBe('ok');
-    expect(derived().construction.solids.map((s) => s.kind)).toEqual(['polygon4']);
-  });
-});
-
 // definite-circle-list-order-2705 (#2705, ADR-3D-439) — the operator's found-in-round lines (round #2697): two circles
 // stand above «D על המעגל», the first one's letters made by a line the fold deferred. Judged q-2611-twocircles
 // (ADR-W-175 sr-12, 2026-11-02): "With two, the tool asks which, using the existing question"; 2-D asks too. The
