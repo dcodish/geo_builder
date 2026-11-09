@@ -26,7 +26,8 @@ import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities, isShapeCarrier } from '@/engine';
-import { carrierParams, setCarrierVals } from '@/engine/evaluate';
+import { carrierParams, setCarrierVals, CIRCLES_TOUCH_REL } from '@/engine/evaluate';
+import { circlePairVariantCase } from '@/engine/variants';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { crossingPastSecond } from '@/engine/extensionSide';
@@ -3188,8 +3189,50 @@ export function meetsRequirements(facts: Fact[], seed = 0): boolean {
     intersectionsWithinSegments(fig) &&
     segmentsCrossWithin(facts, fig.positions) &&
     pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
-    polygonsConvex(facts, fig.positions)
+    polygonsConvex(facts, fig.positions) &&
+    circleVariantsHold(facts, fig) // #2240 (ADR-804)
   );
+}
+
+/**
+ * #2240 ([ADR-804](docs/06-decisions.md#adr-804)) — DOES EVERY UNSTATED TWO-CIRCLE CONFIGURATION SHOW THE CASE ITS
+ * VARIANT STANDS FOR? Bare «שני מעגלים» states no mutual position; its `set-circle-position any` variant (crossing /
+ * apart / one inside the other, ADR-359 Am. 2) is seated at apply, and every sampled seed re-samples both centres
+ * and the free radii, so before this floor a "separate" or "inside" view could be drawn crossing and «הציגו תצורה
+ * אחרת» showed the same case twice in one cycle. A view floor, the `polygonsConvex` kind (ADR-479 / ADR-616): never
+ * a given and never a violation, a property every offered view has.
+ *
+ * Closed form over `fig.circles`: the pair is nested when d < |r₁ − r₂| (either circle inside, the student did not
+ * say which), apart when d > r₁ + r₂, crossing otherwise; the view is rejected only when it lies strictly in ANOTHER
+ * case's region. A pair within ADR-645's touch ruler (`CIRCLES_TOUCH_REL`) of a tangency passes: a later statement
+ * can force a touch, and a floor never makes a figure undrawable.
+ *
+ * It YIELDS to a statement (M4, #441's rule: the default only where the student stated nothing): a stated
+ * position of the same pair (a `circle-position` record, contained / disjoint / tangent) or a named crossing of it
+ * (a `circle-circle` point) decides instead, and the floor is skipped for that pair. It reads the records that
+ * exist; it enumerates no command types.
+ */
+export function circleVariantsHold(facts: readonly Fact[], fig: Pick<Derived, 'circles' | 'construction'>): boolean {
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    const want = circlePairVariantCase(f.cmd);
+    if (!want || f.cmd.type !== 'set-circle-position') continue;
+    const { a, b } = f.cmd;
+    const ca = fig.circles.get(a);
+    const cb = fig.circles.get(b);
+    if (!ca || !cb) continue;
+    const pair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
+    if ((fig.construction.requirements ?? []).some((r) => r.kind === 'circle-position' && pair(r.a, r.b))) continue;
+    if (fig.construction.objects.some((o) => o.kind === 'circle-circle' && pair(o.circle1, o.circle2))) continue;
+    const d = Math.hypot(ca.center.x - cb.center.x, ca.center.y - cb.center.y);
+    const sum = ca.r + cb.r;
+    const diff = Math.abs(ca.r - cb.r);
+    const tol = CIRCLES_TOUCH_REL * Math.max(d, sum);
+    if (Math.abs(d - sum) <= tol || Math.abs(d - diff) <= tol) continue; // the boundary passes
+    const is = d < diff ? 'contained' : d > sum ? 'disjoint' : 'meet';
+    if (is !== want) return false;
+  }
+  return true;
 }
 
 /**

@@ -6477,6 +6477,64 @@ export const SCENARIOS_4: Scenario[] = [
       refusedNaming(['שני מעגלים זרים'], 'המעגלים נחתכים בנקודות X ו-Y', 'שני מעגלים זרים', 'disjoint-crossing');
     },
   },
+  {
+    id: 'bare-circle-pair-configurations-2240',
+    title: '#2240: «שני מעגלים» — every view «הציגו תצורה אחרת» offers is the configuration it stands for (crossing, apart, one inside the other); a pair later lines force is never rejected (ADR-804)',
+    guards:
+      "#2240 (P3, wrong answer): measured at 4a06aae9 through useGeoStore.resample(), bare «שני מעגלים» offered «apart» crossing (press 1, seed 1) and «one inside the other» crossing (press 8, seed 8): the variant was seated at apply only, and every sampled seed re-sampled both centres and the free radii with nothing checking the case. Fix (ADR-804): circleVariantsHold, a meetsRequirements view floor, keeps the case (circlePairVariantCase), passes the tangency boundary, and yields to a stated position or a named crossing.",
+    steps: ['שני מעגלים'],
+    check(fig) {
+      allStepsOk(fig);
+      const relOf = (f: ReturnType<typeof replay>) => {
+        const [a, b] = [f.circles.get('circle-O')!, f.circles.get('circle-P')!];
+        const d = dist(a.center, b.center);
+        const tol = 2e-4 * Math.max(d, a.r + b.r);
+        if (Math.abs(d - a.r - b.r) <= tol || Math.abs(d - Math.abs(a.r - b.r)) <= tol) return 'touch';
+        return d < Math.abs(a.r - b.r) ? 'contained' : d > a.r + b.r ? 'disjoint' : 'meet';
+      };
+      const caseOf = (facts: Fact[]) => {
+        const f = facts.find((x) => x.cmd.type === 'set-circle-position' && x.cmd.relation === 'any');
+        const cases = ['meet', 'disjoint', 'contained'];
+        const v = (f?.cmd as { variant?: number } | undefined)?.variant ?? 0;
+        return cases[((v % 3) + 3) % 3];
+      };
+      // the student's button, 12 presses: every view is its variant's case, and all three are shown
+      let cur = { facts: factsOf(['שני מעגלים']), seed: 0 };
+      const seen = new Set<string>();
+      for (let k = 0; k <= 12; k++) {
+        if (k > 0) {
+          const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+          expect(next, 'press ' + k + ' finds a view').not.toBeNull();
+          cur = next!;
+        }
+        const rel = relOf(replay(cur.facts, cur.seed));
+        expect(rel, 'press ' + k + ' (seed ' + cur.seed + ')').toBe(caseOf(cur.facts));
+        seen.add(rel);
+      }
+      expect([...seen].sort()).toEqual(['contained', 'disjoint', 'meet']);
+      // later lines that force the pair: the search settles on the case that holds, never amber; a forced touch passes
+      const settle = (lines: string[]) => {
+        const facts = factsOf(lines);
+        const found = findValidConfig(facts, 0, Number.POSITIVE_INFINITY);
+        expect(found, lines.join(' · ') + ': a view is found').not.toBeNull();
+        expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
+        return relOf(replay(found!.facts, found!.seed));
+      };
+      const R = ['שני מעגלים', 'מעגל O שרדיוסו 3', 'מעגל P שרדיוסו 2'];
+      expect(settle([...R, 'OP = 10'])).toBe('disjoint');
+      expect(settle([...R, 'OP = 0.5'])).toBe('contained');
+      expect(settle([...R, 'OP = 5'])).toBe('touch');
+      // a common point through two riders: never apart, at any press
+      cur = { facts: factsOf(['שני מעגלים', 'A על מעגל O', 'A על מעגל P ועל מעגל O']), seed: 0 };
+      for (let k = 0; k < 8; k++) {
+        const next = searchAnotherView(cur.facts, cur.seed, undefined, Number.POSITIVE_INFINITY);
+        if (!next) break;
+        cur = next;
+        expect(relOf(replay(cur.facts, cur.seed)), 'riders press ' + (k + 1)).not.toBe('disjoint');
+        expect(meetsRequirements(cur.facts, cur.seed)).toBe(true);
+      }
+    },
+  },
 ];
 
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */

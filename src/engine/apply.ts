@@ -9,7 +9,8 @@
  */
 
 import { engineErrorDebugText } from './errors';
-import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
+import { circlePairVariantCase } from './variants';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { circlesStatedTangent, ringOnOneCircle } from './structure';
@@ -2878,8 +2879,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // a valid drawing. Deterministic per variant (stable replays).
         // #2200 (ADR-712): the variant indexes the cases the sentence ADMITS (all three when absent) — an equal
         // pair cycles crossing ↔ apart and is never seated as a "contained" pair it cannot be.
-        const cases: CirclePositionCase[] = cmd.admits?.length ? cmd.admits : ['meet', 'disjoint', 'contained'];
-        const pick = cases[(((cmd.variant ?? 0) % cases.length) + cases.length) % cases.length];
+        // #2240 (ADR-804): the case the variant stands for is read by the ONE reader the view floor reads too.
+        const pick = circlePairVariantCase(cmd);
         const v = pick === 'meet' ? 0 : pick === 'disjoint' ? 1 : 2;
         // #2237 (ADR-742): the NEWER circle moves (one chooser for every circle-pair seat).
         const mv = seatMover(objects, ca, cb)?.mover ?? null;

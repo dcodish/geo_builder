@@ -25,7 +25,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '@/__tests__/scenarios-harness';
-import { meetsRequirements, replay } from '@/store/geoStore';
+import { meetsRequirements, replay, type Fact } from '@/store/geoStore';
+import { circleVariantsHold } from '@/replay/core';
+import { circlePairVariantCase } from '@/engine/variants';
+import type { Command } from '@/engine/types';
 
 const SQUARE_CE = ['ריבוע ABCD', 'נקודה E על AB', 'CE=5.2'];
 
@@ -77,5 +80,66 @@ describe('#345 — displayability requires the figure to satisfy its own command
       { id: 'x.0', utterance: 'bogus', group: 'gX', cmd: { type: 'segment', a: 'Q', b: 'Z' }, enabled: false } as (typeof facts)[number],
     ];
     expect(meetsRequirements(withDisabled, 0)).toBe(meetsRequirements(facts, 0));
+  });
+});
+
+/**
+ * #2240 ([ADR-804](../../../docs/06-decisions.md#adr-804)) — the unstated two-circle configuration is a view floor:
+ * `circleVariantsHold` (a `meetsRequirements` member) keeps every view of «שני מעגלים» in the case its variant stands
+ * for (`circlePairVariantCase`), passes the tangency boundary, and yields to a stated position or a named crossing.
+ */
+describe('#2240 — circleVariantsHold, the bare pair’s configuration floor', () => {
+  const anyRec = (variant: number, admits?: ('meet' | 'disjoint' | 'contained')[]) =>
+    ({ type: 'set-circle-position', relation: 'any', a: 'circle-O', b: 'circle-P', variant, ...(admits ? { admits } : {}) }) as Command;
+  const factOf = (cmd: Command) => ({ id: 'f1', cmd, enabled: true, source: '' }) as unknown as Fact;
+  const view = (d: number, rO: number, rP: number, requirements: object[] = [], objects: object[] = []) =>
+    ({
+      circles: new Map([['circle-O', { center: { x: 0, y: 0 }, r: rO }], ['circle-P', { center: { x: d, y: 0 }, r: rP }]]),
+      construction: { objects, constraints: [], requirements },
+    }) as never;
+  it('circlePairVariantCase: the index names a case over what the sentence admits; null for every other command', () => {
+    expect([0, 1, 2, 3, -1].map((v) => circlePairVariantCase(anyRec(v)))).toEqual(['meet', 'disjoint', 'contained', 'meet', 'contained']);
+    expect([0, 1, 2].map((v) => circlePairVariantCase(anyRec(v, ['meet', 'disjoint'])))).toEqual(['meet', 'disjoint', 'meet']);
+    expect(circlePairVariantCase({ type: 'set-circle-position', relation: 'disjoint', a: 'circle-O', b: 'circle-P' } as Command)).toBeNull();
+    expect(circlePairVariantCase({ type: 'point', id: 'A', x: 0, y: 0 } as Command)).toBeNull();
+  });
+  it('a view strictly in another case’s region is rejected; its own case passes (either circle inside)', () => {
+    const cut = view(4, 3, 2);
+    const apart = view(8, 3, 2);
+    const nested = view(0.5, 3, 2);
+    const nestedOther = view(0.5, 2, 3);
+    const grid = [cut, apart, nested, nestedOther].map((fig) => [0, 1, 2].map((v) => circleVariantsHold([factOf(anyRec(v))], fig)));
+    expect(grid).toEqual([
+      [true, false, false],
+      [false, true, false],
+      [false, false, true],
+      [false, false, true],
+    ]);
+  });
+  it('the tangency boundary passes every case (ADR-645’s ruler): a later statement may force a touch', () => {
+    for (const fig of [view(5, 3, 2), view(5 * (1 + 1e-4), 3, 2), view(1, 3, 2)]) for (const v of [0, 1, 2]) expect(circleVariantsHold([factOf(anyRec(v))], fig)).toBe(true);
+    expect(circleVariantsHold([factOf(anyRec(1))], view(5 * 0.99, 3, 2))).toBe(false); // beyond the ruler: crossing
+  });
+  it('yields to a stated position of the pair or a named crossing; a disabled record and a missing circle are not judged', () => {
+    const cut = (req: object[] = [], objs: object[] = []) => view(4, 3, 2, req, objs);
+    expect(circleVariantsHold([factOf(anyRec(1))], cut([{ kind: 'circle-position', relation: 'tangent', a: 'circle-P', b: 'circle-O', at: 'T', external: true }]))).toBe(true);
+    expect(circleVariantsHold([factOf(anyRec(2))], cut([], [{ kind: 'circle-circle', id: 'X', circle1: 'circle-P', circle2: 'circle-O', branch: 0 }]))).toBe(true);
+    expect(circleVariantsHold([factOf(anyRec(1))], cut([{ kind: 'circle-position', relation: 'disjoint', a: 'circle-Q', b: 'circle-O' }]))).toBe(false); // another pair
+    expect(circleVariantsHold([{ ...factOf(anyRec(1)), enabled: false }], cut())).toBe(true);
+    expect(circleVariantsHold([factOf({ ...anyRec(1), b: 'circle-Z' } as Command)], cut())).toBe(true);
+  });
+  it('meetsRequirements carries the floor: bare «שני מעגלים» at every variant × seed 0–7 meets it exactly where its case holds', () => {
+    const base = factsOf(['שני מעגלים']);
+    const i = base.findIndex((f) => circlePairVariantCase(f.cmd) !== null);
+    expect(i).toBeGreaterThanOrEqual(0);
+    let rejected = 0;
+    for (const v of [0, 1, 2])
+      for (let seed = 0; seed < 8; seed++) {
+        const facts = base.map((f, j) => (j === i ? { ...f, cmd: { ...(f.cmd as Command), variant: v } as Command } : f));
+        const fig = replay(facts, seed);
+        if (!circleVariantsHold(facts, fig)) rejected++;
+        expect(meetsRequirements(facts, seed), `v${v} s${seed}`).toBe(circleVariantsHold(facts, fig));
+      }
+    expect(rejected, "the sampler does leave the seated case at some seeds (measured: 6 of 24 at 4a06aae9), so the floor is not vacuous").toBeGreaterThan(0);
   });
 });
