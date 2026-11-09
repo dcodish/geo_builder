@@ -29,6 +29,12 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
+  // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],
+  // #2798 (ADR-3D-456) — the report: «M אמצע AP» beside a stated point was carried off with the cube (1–4.2 units off the
+  // midpoint, every line green). Where M sits is asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-midpoint-fixed-point-2798.geo3.json': ["קובייה ABCDA'B'C'D'", 'P(1,2,3)', 'M אמצע AP'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],

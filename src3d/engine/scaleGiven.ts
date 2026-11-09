@@ -22,11 +22,11 @@
  * scale given is in force (the "guard bound to the event, not the code path" discipline).
  */
 
-import { scalePinned } from './solve3';
+import { scaleFixingPins3 } from './solve3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { cross3, norm3, sub3, type Vec3 } from './vec3';
 import { reachesFreeCarrier3 } from './carriers';
-import { claimPointIds, hasAbsoluteFrameObject, type Claim3, type Construction3, type Id } from './types';
+import { absoluteFrameObjects3, claimPointIds, type Claim3, type Construction3, type Id } from './types';
 
 /** The magnitude claim kinds that pin the scale, with the POWER the factor enters at. */
 export function scaleGivenPower(claim: Claim3): 1 | 2 | 3 | null {
@@ -84,12 +84,12 @@ export function scaleGivenSafe(c: Construction3): boolean {
   // or axis relation). This used to be a second, hand-kept list counting EVERY plane and line, and it drifted when
   // ADR-3D-435 stopped counting a free plane there: a bare «מישור π3» or «ישר l» detached «אורך AB = 4». A free or
   // figure-derived plane/line is resolved from the figure, so the rescale below carries it along (evaluate.ts).
-  if (hasAbsoluteFrameObject(c)) return false;
-  // A `partial` point («P על החלק החיובי של ציר ה-x», ADR-3D-094) is the one category the two lists still read
-  // differently: Lane-A absolute here, not counted by `absolutePointCount` there. Kept refused (today's behaviour)
-  // pending the operator's ruling on whether it frames the figure — see ADR-3D-453 and #2746.
-  for (const def of c.points.values()) if (def.kind === 'partial') return false;
-  if (scalePinned(c)) return false; // pins of any kind, or a scale-fixing scalar pin — the pivot owns scale
+  // #2789 (ADR-3D-457): the rescale multiplies every position, plane offset and line anchor by k about the ORIGIN, so an
+  // absolute object that is a cone through the origin (an axis or half-axis point, the origin itself, a pin whose stated
+  // components are all 0, a coordinate plane or axis, x+y+z=0, a line anchored at the origin) maps exactly onto itself.
+  // Only an object the rescale would detach refuses the size (ADR-W-199: refuse only when no figure exists).
+  if (absoluteFrameObjects3(c).some((o) => !o.scaleInvariant)) return false;
+  if (scaleFixingPins3(c)) return false; // a pin that fixes the scale, or a scale-fixing scalar pin — the pivot owns scale
   return true;
 }
 

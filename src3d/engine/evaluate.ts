@@ -40,12 +40,12 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
+import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, freeCoordKey, hasAbsoluteFrameObject, gaugeFramePoint3, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
-import { carrierParams3, determinationReach3 } from './carriers';
+import { absolutePointCount, claimPointIds, freeCoordKey, hasAbsoluteFrameObject, openPinSymsOf, positionedAbsolutePoint3, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { carrierParams3, determinationReach3, figureLanes3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
 import { figureLineRels, figurePlaneLinePerps, isFreeLine3, resolveFreeLine } from './freeLine';
@@ -1707,15 +1707,29 @@ export function translationGaugeFree3(c: Construction3): boolean {
     // the drive had just put it on (an enumeration standing in for the question, docs/17 §2.1).
     symMemberDrives(c).length === 0 &&
     !freePlaneOffsetPinned3(c) &&
-    !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains')
+    !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains') &&
+    !scalarPinReadsOffFigure3(c)
   );
+}
+
+/**
+ * #2798 (ADR-3D-456) — DOES A STATED MAGNITUDE READ A POINT THE FIGURE'S MOTION DOES NOT CARRY? A length, angle, area or
+ * volume between figure points is the same wherever the figure stands, so the funnel may sample the placement around it.
+ * One that reads a fixed or mixed point («AE = 1» with E on AP beside «P(1,2,3)») is not: the pivot solved it in the
+ * placement it chose, and moving the figure afterwards breaks it. Such a placement is not provably free, so it is not
+ * sampled (the funnel's own doctrine: a component is sampled only when provably free).
+ */
+export function scalarPinReadsOffFigure3(c: Construction3): boolean {
+  if (c.scalarPins.length === 0) return false;
+  const lanes = figureLanes3(c);
+  return c.scalarPins.some((p) => claimPointIds(c, p).some((id) => c.points.has(id) && lanes.get(id) !== 'figure'));
 }
 
 /** The points the placement funnel MOVES — the figure's gauge-placed content (its own scan, shared). */
 export function gaugePlacedIds3(c: Construction3): Id[] {
   const ids: Id[] = [];
-  for (const [id, def] of c.points) {
-    if (gaugeFramePoint3(c, def)) ids.push(id);
+  for (const id of c.points.keys()) {
+    if (gaugeFramePoint3(c, id)) ids.push(id);
   }
   return ids;
 }
@@ -2304,8 +2318,11 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
      *  that accepted them. */
     const ridersOf = (sol: PivotResult): ReadonlyMap<Id, number> | undefined =>
       sol.riderTs ? new Map(Object.entries(sol.riderTs)) : undefined;
-    const EC = (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) =>
-      evalCanonical(dims, true, override, riderTs);
+    // #2798 (ADR-3D-456): the solver reads a candidate's mixed points re-derived in the candidate's own frame (`reseat`)
+    const EC: CanonicalEval3 = Object.assign(
+      (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => evalCanonical(dims, true, override, riderTs),
+      { reseat: (p: Positions3, riderTs?: ReadonlyMap<Id, number>) => reseatMixed3(c, seed, p, planes, lines, riderTs, true) },
+    );
 
     /**
      * #2368 (ADR-3D-375) — the pivot's solves are a pure function of (construction, seed, branch) and the
@@ -2321,6 +2338,16 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       const pool = replay && n < replay.length ? replay[n] : run();
       record.push(pool);
       return pool;
+    };
+    /**
+     * #2798 (ADR-3D-456) — ONE SOLUTION'S DRAWN POSITIONS: the canonical evaluation at its dims, the figure lane carried
+     * by its similarity, the fixed lane verbatim, and every mixed point re-derived from its own definition there.
+     */
+    const finalFrameOf = (sol: PivotResult): Positions3 => {
+      const out: Positions3 = new Map();
+      for (const [id, q] of evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol))) out.set(id, gaugeFramePoint3(c, id) ? sol.transform(q) : q);
+      reseatMixed3(c, seed, out, planes, lines, ridersOf(sol));
+      return out;
     };
     const applySolutions = (solutions: PivotPool): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
@@ -2380,30 +2407,23 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         const pointRoots: Record<string, Vec3[]> = {};
         if (pool.length > 1) {
           for (const sol of pool) {
-            for (const [id, q] of evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol))) {
-              const def = c.points.get(id);
-              // the same gauge rule the chosen solution below uses — an equation-plane point is
-              // Lane-A absolute and must NOT be transformed, or every branch would look distinct
-              const gauge = gaugeFramePoint3(c, def);
+            // the same lane rule the chosen solution below uses (`finalFrameOf`) — an equation-plane point is
+            // Lane-A absolute and must NOT be transformed, or every branch would look distinct; a mixed point is
+            // re-derived in the solution's own frame (#2798)
+            for (const [id, q] of finalFrameOf(sol)) {
               // Stored ONE ENTRY PER POOL SOLUTION, in pool order, deliberately NOT deduplicated:
               // `pointRoots[a][i]` and `pointRoots[b][i]` must describe the same configuration, or a
               // consumer asking about the VECTOR a→b would pair positions from different branches.
               // The pool is small, so the redundancy costs nothing and the pairing is worth keeping.
-              (pointRoots[id] ??= []).push(gauge ? sol.transform(q) : q);
+              (pointRoots[id] ??= []).push(q);
             }
           }
         }
         warm.x = [...chosen.x];
         warm.mirror = chosen.mirror;
-        const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen), ridersOf(chosen));
-        for (const [id, q] of finalCanonical) {
-          const def = c.points.get(id);
-          // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
-          // points are gauge-frame); an equation plane is Lane-A absolute — no transform
-          const gauge = gaugeFramePoint3(c, def);
-          if (gauge) pos.set(id, chosen.transform(q));
-          else pos.set(id, q);
-        }
+        // the figure lane rides the chosen similarity, the fixed lane stays verbatim, and a mixed point is re-derived
+        // from its own definition in the final frame (#2798, ADR-3D-456)
+        for (const [id, q] of finalFrameOf(chosen)) pos.set(id, q);
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
@@ -2513,9 +2533,10 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
       // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
       // parameter / an equation-plane rider) is FROZEN at its final position
+      // #2798 (ADR-3D-456): a MIXED member is evaluated inside the solve too (the residual re-derives it in the
+      // candidate's frame), never frozen at a position read off the previous frame
       const frozenOf = (id: Id): { ok: boolean; frozen?: Vec3 } => {
-        const def = c.points.get(id);
-        const gauge = gaugeFramePoint3(c, def);
+        const gauge = figureLanes3(c).get(id) !== 'fixed';
         const fin = pos.get(id);
         if (gauge) return { ok: true };
         return fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z)
@@ -2928,6 +2949,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     symDrives.length === 0 && // #801: a membership on an absolute pin-symbol carrier orients the figure too
     !freePlaneFigurePinned &&
     !freePlaneOffsetPinned && // #508: rotation about the gauge origin moves the distance-pinned point
+    !scalarPinReadsOffFigure3(c) && // #2798: a magnitude read off a fixed or mixed point holds only where the pivot put it
 
     // S3 (#378): `zero` belongs here too. It says the ring LIES IN a coordinate plane («הבסיס ABCD
     // שוכן במישור ה-xy»), which fixes the ring's orientation as surely as it fixes its offset — it
@@ -3032,7 +3054,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
             if (nn > 1e-9) worst = Math.min(worst, Math.abs(dot3(pl.n, p) + pl.d) / nn);
           }
           for (const [id2, def2] of c.points) {
-            if (def2.kind !== 'coord' && def2.kind !== 'coord-sym') continue;
+            // #2789 (ADR-3D-457): every point positioned in the absolute frame, an axis point included
+            if (!positionedAbsolutePoint3(def2)) continue;
             const q = pos.get(id2);
             if (!q) continue;
             worst = Math.min(worst, dist3(p, q));
@@ -3044,11 +3067,17 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       };
 
       const canonical = new Map(gaugeIds.map((id) => [id, pos.get(id)!] as const));
+      // #2798 (ADR-3D-456): the funnel moves the figure lane only, then re-derives each mixed point (a midpoint of a
+      // vertex and a stated point, a foot on an equation plane) from its own definition wherever the figure landed.
+      // The extent and the clearance read the figure lane alone: a mixed point lies on its fixed object by
+      // construction, so judging its clearance would fail every candidate.
+      const mixedIds = mixedPointIds3(c);
       const place = (g: Parameters<typeof applyGauge>[1]): void => {
         for (const id of gaugeIds) {
           const p = canonical.get(id);
           if (p) pos.set(id, applyGauge(p, g));
         }
+        if (mixedIds.length > 0) reseatMixed3(c, seed, pos, planes, lines, pivot?.riderTs ? new Map(Object.entries(pivot.riderTs)) : undefined);
       };
       /**
        * #385 — how faithfully the stated line relations READ at the default view. 0 = perfect (a ⟂
@@ -3091,7 +3120,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // enough — clearance is a correctness-adjacent floor (never draw a false coincidence), legibility
       // is what the leftover freedom is then spent on.
       const LEGIBLE = 8; // degrees: a 90° that draws within 8° of square reads as square
-      let best: { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number } | null = null;
+      let best: { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number; holds: boolean } | null = null;
       for (let attempt = 0; attempt < 12; attempt++) {
         const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
@@ -3109,14 +3138,24 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         place(g);
         const clear = clearance();
         const legib = legibility();
+        // #2798 (ADR-3D-456): a placement where a mixed point no longer exists (a stated crossing carried off its
+        // edge) draws nothing the student stated — it ranks below every placement that keeps them all
+        const holds = mixedIds.length === 0 || mixedPointsHold3(c, pos, mixedIds);
         // Ranking: clear the absolute objects first (a false coincidence is a drawing that LIES), then
         // read correctly. Without a spin axis `legib` is 0 for every candidate, so this reduces exactly
         // to the previous clearance-only rule — the existing figures cannot move.
         const better =
           !best ||
-          (best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
-        if (better) best = { g, clear, legib };
-        if (clear >= MARGIN && (!spinAxis || legib <= LEGIBLE)) break;
+          (best.holds !== holds ? holds : best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
+        if (better) best = { g, clear, legib, holds };
+        if (holds && clear >= MARGIN && (!spinAxis || legib <= LEGIBLE)) break;
+      }
+      // no sampled placement keeps every mixed point: the solved placement is kept when it does (it was the frame the
+      // statements were accepted in), so the figure is never moved into one that refuses them
+      const stay = { t: v3(0, 0, 0), w: v3(0, 0, 0), s: 1, mirror: false };
+      if (best && !best.holds) {
+        place(stay);
+        if (mixedPointsHold3(c, pos, mixedIds)) best = { g: stay, clear: 0, legib: 0, holds: true };
       }
       if (best) place(best.g);
     }
@@ -3237,6 +3276,9 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     const stated = scaleGivenValue(g);
     if (m0 !== null && m0 > 1e-9 && power !== null && stated !== null) {
       const k = Math.pow(stated / m0, 1 / power);
+      // #2789 (ADR-3D-457): every absolute object admitted here is a cone through the origin (`scaleGivenSafe`): an axis
+      // point's zero components stay 0 and its free one keeps its sign (k > 0), an origin plane's d and an origin line's
+      // anchor stay 0. So the factor keeps each one exactly, and the figure is the same figure at the stated size.
       for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
       for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
       // #2746 (ADR-3D-453): a relative line (free, plane-plane, common-perp, projection) is admitted now that the
@@ -3609,6 +3651,9 @@ function evaluateSolidsAndPoints(
    *  keys). A pure per-seed quantity is derived once; the residual closes over figure constants. Omitted
    *  (the one-shot callers) ⇒ sampled here, exactly as before. */
   sampledSolidDims?: readonly number[][],
+  /** #2798 (ADR-3D-456): re-seat ONLY these points, from the current positions, planes and lines — no solid placement,
+   *  no free-carrier resolution, every other point left where it is. `reseatMixed3`'s one pass (the same per-kind code). */
+  only?: ReadonlySet<Id>,
 ): void {
   let dimCursor = 0;
   /**
@@ -3629,7 +3674,7 @@ function evaluateSolidsAndPoints(
       solidPlaced.add(id);
     }
   };
-  c.solids.forEach((solid, i) => {
+  if (!only) c.solids.forEach((solid, i) => {
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
     const own = sampledSolidDims?.[i] ?? solidDimsAll3(c, seed)[i];
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
@@ -3657,7 +3702,7 @@ function evaluateSolidsAndPoints(
     });
   });
 
-  c.revolutions.forEach((rev, i) => {
+  if (!only) c.revolutions.forEach((rev, i) => {
     const { h, origin } = revolutionDims(c, i, seed);
     if (rev.center) pos.set(rev.center, origin);
     if (rev.apex) pos.set(rev.apex, v3(origin.x, origin.y, origin.z + h));
@@ -3667,11 +3712,11 @@ function evaluateSolidsAndPoints(
   // from one, like a foot or a cut) must read the plane's real resolution, never the placeholder.
   // A pinning member that is itself placed later in this loop is the reason resolve3 re-runs this
   // whole pass once when a free plane moves.
-  resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
+  if (!only) resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
   // #552: free LINES resolve right after — after the planes (a free line related to a free plane
   // reads the plane's real resolution; when both are free the plane LEADS and the line follows,
   // deterministically) and before the point pass (an on-line rider must read the real line).
-  resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
+  if (!only) resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
 
   // ADR-3D-056 (#286): vec-defined points whose seg-perp/seg-par pin references a point placed LATER in
   // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
@@ -3679,6 +3724,7 @@ function evaluateSolidsAndPoints(
   const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void =>
     seatOnPlaneRider(c, seed, pos, planes, id, def, riderTOverride);
   for (const [id, def] of c.points) {
+    if (only && !only.has(id)) continue;
     if (def.kind === 'solid-vertex') {
       // #2490 (ADR-3D-434): a bound solid over a ring of free or derived points is placed at its apex's turn
       const later = boundLater.get(def.solid);
@@ -4251,6 +4297,89 @@ function seatOnLineRider(
   // #1498: a DRIVEN rider slides from its sampled seat along the line (0 = the seat; see the
   // carrier table) — a line is infinite both ways, so the offset is unbounded.
   pos.set(id, add3(centre, scale3(u, t + (riderTOverride?.get(id) ?? 0))));
+}
+
+/**
+ * #2798 (ADR-3D-456) — RE-DERIVE EVERY MIXED POINT from its own definition, at the current positions.
+ *
+ * A point built from both the figure and a fixed object (`figureLanes3` = `'mixed'`) is right only in the frame it was
+ * evaluated in; after any rigid motion of the figure it is re-seated here, in declaration order (a mixed point's
+ * dependents are mixed by the join, so they follow). The carriers it may ride — a plane through points, a rel-plane, a
+ * line through two points — are read from the CURRENT positions (a scratch copy, so the caller's maps are untouched),
+ * because the figure they are built from has just moved. A pivot-driven rider keeps its solved parameter through
+ * `riderTs`. With no mixed point it returns at once, so every figure without one is byte-identical and pays nothing.
+ */
+export function reseatMixed3(
+  c: Construction3,
+  seed: number,
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  lines: Map<string, ResolvedLine>,
+  riderTs?: ReadonlyMap<Id, number>,
+  /** the solver's residual path: a symbol-pinned point takes the pass's CHEAP value, as in `evalCanonical` */
+  cheap = false,
+): void {
+  const mixed = mixedPointIds3(c);
+  if (mixed.length === 0) return;
+  if (c.pointPlanes.size === 0 && c.relPlanes.size === 0 && c.pointLines.size === 0) {
+    // no carrier is built from points, so none moves between two mixed points: one pass, in declaration order
+    for (const id of mixed) pos.delete(id);
+    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, cheap, undefined, undefined, undefined, riderTs, undefined, undefined, new Set(mixed));
+    return;
+  }
+  for (const id of mixed) {
+    const pl = new Map(planes);
+    for (const name of c.pointPlanes.keys()) {
+      const p = planeFromPointRun(c, name, pos);
+      if (p) pl.set(name, p);
+      else pl.delete(name);
+    }
+    for (const name of c.relPlanes.keys()) {
+      const p = relPlaneFromPositions(c, name, pos);
+      if (p) pl.set(name, p);
+      else pl.delete(name);
+    }
+    const ln = new Map(lines);
+    for (const [name, def] of c.pointLines) {
+      const a = pos.get(def.a);
+      const b = pos.get(def.b);
+      if (a && b && dist3(a, b) > 1e-12) ln.set(name, { anchor: a, dir: sub3(b, a) });
+    }
+    // an unplaceable point (a segment ∥ the plane, lines that miss) is honestly MISSING, never left at its stale position
+    pos.delete(id);
+    evaluateSolidsAndPoints(c, seed, pos, pl, ln, undefined, cheap, undefined, undefined, undefined, riderTs, undefined, undefined, new Set([id]));
+  }
+}
+
+/**
+ * #780 — IS A PLANE'S CROSSING ON THE INK of the segment it was stated on? The one bound, read by the store's status
+ * pass (`crossing-off-segment`) and by the placement funnel (#2798), so the funnel never chooses a placement the status
+ * pass would then refuse.
+ */
+export function crossingOnInk3(P: Vec3, A: Vec3, B: Vec3): boolean {
+  const dir = sub3(B, A);
+  const len2 = dot3(dir, dir);
+  const t = len2 > 1e-18 ? dot3(sub3(P, A), dir) / len2 : -1;
+  return t > -1e-9 && t < 1 + 1e-9;
+}
+
+/**
+ * #2798 (ADR-3D-456) — DOES EVERY MIXED POINT STILL EXIST where the figure now stands? A mixed point is re-derived after
+ * each rigid motion, and a motion can take away what defined it: a sampled placement can carry the edge «המישור π1 חותך
+ * את AC'» names clear of π1. Such a placement draws nothing the student stated, so the funnel does not choose it.
+ */
+function mixedPointsHold3(c: Construction3, pos: Positions3, mixed: readonly Id[]): boolean {
+  for (const id of mixed) {
+    const p = pos.get(id);
+    if (!p) return false;
+    const def = c.points.get(id);
+    if (def?.kind === 'plane-cut') {
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      if (!A || !B || !crossingOnInk3(p, A, B)) return false;
+    }
+  }
+  return true;
 }
 
 /**

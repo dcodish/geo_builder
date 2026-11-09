@@ -851,11 +851,29 @@ one leaves the figure where it was. A free plane given an equation stops being f
 **One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453)).** The scale given (#754) asks the
 same question, "would a uniform rescale detach an absolute object?", so `scaleGivenSafe` calls `hasAbsoluteFrameObject`
 and keeps no list of its own; only a rescale's own exclusions stay there (no solid, a revolution or a `circles3`,
-`scalePinned`, and a `partial` point pending a ruling). The predicate lives in `types.ts` beside `absolutePointCount`,
+`scaleFixingPins3`). The predicate lives in `types.ts` beside `absolutePointCount`,
 re-exported from `evaluate.ts`. A free or figure-derived plane or line is resolved from the figure, so the rescale
 carries it: a plane's offset and a line's anchor scale by k. A free plane pinned by a stated distance to a figure point
 (#508/#528) does not commute with the factor, so it re-resolves from the rescaled positions (`reresolveFreeObjects3`,
 the #557 rule) and its riders, feet and crossings are re-seated.
+
+**One enumeration, with each member's rescale invariance (#2789, [ADR-3D-457](06b-decisions-3d.md#adr-3d-457)).**
+`hasAbsoluteFrameObject` is `absoluteFrameObjects3(c).length > 0`: one entry per absolute object, `{ kind, scaleInvariant }`.
+A partly stated point (`partial`, an axis or half-axis point) is a member, so it samples the placement, draws the axes and
+stops `drawnFrame3` turning it off its axis (`orientationStated3` reads the same predicate). `scaleInvariant` is "a cone
+through the origin": the #754 rescale multiplies every position, plane offset and line anchor by k > 0 about the origin, so
+a pin or partial point whose stated components are all 0, the origin, a coordinate plane or axis relation, a numeric plane
+with d = 0 and a numeric line anchored at 0 each map onto themselves. `scaleGivenSafe` refuses the size only beside a
+member that is not invariant, and asks `scaleFixingPins3` (a pin whose stated components are all 0 fixes no scale) rather
+than `scalePinned`, the pivot's ownership flag. `positionedAbsolutePoint3` (coord, coord-sym, partial) is what the
+funnel's clearance keeps vertices away from. `absolutePointCount` stays "a stated position" and does not count an axis
+point.
+
+**The funnel moves the figure lane (#2798, [ADR-3D-456](06b-decisions-3d.md#adr-3d-456)).** `gaugePlacedIds3` is the
+figure lane; the funnel's extent and clearance read only it. After each candidate motion every `mixed` point is
+re-derived (`reseatMixed3`), and a candidate where one no longer exists (a stated crossing carried off its edge: the #780
+`crossingOnInk3` bound the status pass reads) ranks below every candidate that keeps them all; when none does, the
+solved placement is kept.
 
 **The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
 offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
@@ -979,9 +997,19 @@ of unstated height.
 
 ### The sampled-carrier table and the one frame rule (#1498, [ADR-3D-267](06b-decisions-3d.md#adr-3d-267))
 
-**The frame rule.** `gaugeFramePoint3` (types.ts, beside `GAUGE_KINDS`) is the one answer to whether the
-pivot's similarity applies to a point; the final placement and every residual (`laneAt` in `residualsFor`)
-read it, so a residual sees the drawn figure's frame.
+**The frame rule: three lanes (#2798, [ADR-3D-456](06b-decisions-3d.md#adr-3d-456)).** Whether the figure's rigid motions
+(the pivot's similarity, the landing funnel, the stage-6 turn walk) carry a point is decided by what the point is BUILT
+FROM, never by its kind: `figureLanes3` (`engine/carriers.ts`) joins the lanes of everything its definition reads
+(`pointInputs3`: the parent points, plus a fixed carrier, an equation plane or a typed parametric line). A point that
+reads nothing takes its lane from its kind (`GAUGE_KINDS`, now only that root table): a solid vertex or a free point is
+`figure`; a coordinate, an axis point or a revolution point is `fixed`. figure + figure = figure, fixed + fixed = fixed,
+anything else is `mixed`. `gaugeFramePoint3(c, id)` asks "is the lane figure?"; the final placement (`applySolutions`,
+through `finalFrameOf`), the member pins (`frozenOf`), and every residual and candidate accessor (solve3's `frameOf`)
+read it, so a residual sees the drawn figure's frame. A `mixed` point is re-derived from its own definition after every
+motion (`reseatMixed3`: the point pass with `only`, in declaration order, its point-built carriers re-read from the
+current positions); a `fixed` derived point (a midpoint of two stated points) never moves. A figure with no mixed point
+pays nothing. A stated magnitude that reads a fixed or mixed point (`scalarPinReadsOffFigure3`) holds only where the
+pivot put the figure, so it closes the funnel's translation and rotation, as a pin does.
 
 **The carrier table.** `carrierParams3` (`engine/carriers.ts`) enumerates every sampled point-DOF — keys,
 bounds, anchor seeding, drivability — and both `freeDofCount3` and the pivot's rider lane fold it, so a

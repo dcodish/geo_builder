@@ -98,3 +98,28 @@ describe('#276 — NEW point on a coordinate axis (partial point)', () => {
     expect(state().lastError).toMatchObject({ code: 'symbolic-new-point' });
   });
 });
+
+/**
+ * #2798 (ADR-3D-456) — «M אמצע AP» beside an axis point is the midpoint at every seed. It is today only because the cube's
+ * placement is not sampled here; #2789 samples it, and a mixed point (a vertex and an axis point) must then be re-derived
+ * wherever the cube lands. These rows tie the two items together.
+ */
+describe('#2798 — a midpoint of a vertex and an axis point', () => {
+  it.each([
+    ['the positive half-axis, a cube', ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x']],
+    ['the whole axis, a cube', ["קובייה ABCDA'B'C'D'", 'P נמצא על ציר ה-x']],
+    ['the whole axis, a box', ["תיבה ABCDA'B'C'D'", 'P נמצא על ציר ה-x']],
+  ])('%s', (_n, lines) => {
+    for (const l of [...lines, 'M אמצע AP']) {
+      submit(l);
+      expect(state().lastError, l).toBeNull();
+    }
+    for (let seed = 0; seed < 8; seed++) {
+      const d = derive3(state().facts, seed);
+      for (const f of state().facts) expect(d.status[f.id], `${f.utterance} @${seed}`).toBe('ok');
+      const [A, P, M] = ['A', 'P', 'M'].map((id) => d.positions.get(id)!);
+      expect(Math.hypot(M.x - (A.x + P.x) / 2, M.y - (A.y + P.y) / 2, M.z - (A.z + P.z) / 2), `seed ${seed}`).toBeLessThan(1e-9);
+      expect(Math.abs(P.y) + Math.abs(P.z), `seed ${seed}: P on the x-axis`).toBeLessThan(1e-9);
+    }
+  });
+});

@@ -21,6 +21,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { verifyClaim } from '../engine/claims';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { deserializeFigure3 } from '../store/figureFile3';
+import { figureLanes3, gaugeFramePoint3 } from '../engine/carriers';
+import { GAUGE_KINDS, ringCircle3 } from '../engine/types';
 
 const st = () => useGeo3.getState();
 beforeEach(() => {
@@ -144,5 +149,96 @@ describe('#1498 — refusals that were CORRECT stay refused', () => {
   it.each([['E אמצע BC'], ['E על BC']])('«%s» then «ABEC מקבילית» stays refused', (eLine) => {
     const r = submitAll([...T, eLine, 'ABEC מקבילית']);
     expect(r.err?.code, `«${eLine}» + מקבילית must refuse`).toBeTruthy();
+  });
+});
+
+/**
+ * #2798 (ADR-3D-456) — THE FRAME RULE ASKS WHAT A POINT IS BUILT FROM. `gaugeFramePoint3` answered from a list of kinds,
+ * so a point read from both the figure and a fixed object was in the wrong frame after the pivot's similarity: carried
+ * with the figure (a midpoint, a centroid) or left behind (a foot on an equation plane). Each point now has a LANE, the
+ * join of what its definition reads (`figureLanes3`), and a mixed point is re-derived in every candidate's frame.
+ */
+describe('#2798 — the figure lanes', () => {
+  const lanesOf = (lines: readonly string[]) => {
+    submitAll(lines);
+    return figureLanes3(derive3(st().facts, 0).construction);
+  };
+  it('one representative per lane', () => {
+    const lanes = lanesOf(["קובייה ABCDA'B'C'D'", 'P(1,2,3)', 'Q נמצא על ציר ה-x', 'M אמצע AP', 'N אמצע PQ', 'K אמצע MB', 'L אמצע AB']);
+    expect(lanes.get('A')).toBe('figure');
+    expect(lanes.get('L'), 'a midpoint of two vertices').toBe('figure');
+    expect(lanes.get('P'), 'a stated coordinate').toBe('fixed');
+    expect(lanes.get('Q'), 'an axis point').toBe('fixed');
+    expect(lanes.get('N'), 'a midpoint of two fixed points').toBe('fixed');
+    expect(lanes.get('M'), 'a midpoint of a vertex and a fixed point').toBe('mixed');
+    expect(lanes.get('K'), 'a midpoint of a mixed point and a vertex').toBe('mixed');
+    expect(gaugeFramePoint3(derive3(st().facts, 0).construction, 'M')).toBe(false);
+  });
+  it('a foot from a vertex to an equation plane is mixed (the plane is a fixed input)', () => {
+    const lanes = lanesOf(["קובייה ABCDA'B'C'D'", 'המישור π1: x + y + z - 1 = 0', 'מ-A מורידים אנך למישור π1 החותך אותו בנקודה F']);
+    expect(lanes.get('F')).toBe('mixed');
+  });
+  it('identity: over every fixtures3 figure a non-mixed point keeps the old kind rule, except a derived point of fixed points only', () => {
+    const dir = join(__dirname, '..', '..', 'fixtures3');
+    const changed: string[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.geo3.json'))) {
+      const r = deserializeFigure3(readFileSync(join(dir, file), 'utf8')) as { facts?: Parameters<typeof derive3>[0]; seed?: number };
+      if (!r.facts) continue;
+      const c = derive3(r.facts, r.seed ?? 0).construction;
+      const lanes = figureLanes3(c);
+      for (const [id, def] of c.points) {
+        const old = GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)) || (def.kind === 'on-circle3' && ringCircle3(c, def.circle));
+        if (lanes.get(id) !== 'mixed' && (lanes.get(id) === 'figure') !== old) changed.push(`${file}:${id}:${lanes.get(id)}`);
+      }
+    }
+    expect(changed.sort()).toEqual([
+      'free-vector-joint-letter-owned-2684.geo3.json:E:fixed',
+      'free-vector-ratio-2603.geo3.json:E:fixed',
+      'rider-length-coords-1816.geo3.json:D:fixed',
+      'rider-length-coords-split-1816.geo3.json:D:fixed',
+    ]);
+  }, 120_000); // derives every fixtures3 figure once
+});
+
+describe('#2798 — the pivot draws a mixed point at its definition and a pin on it in the right frame', () => {
+  type P3 = { x: number; y: number; z: number };
+  const gap = (a: P3, b: P3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const half = (a: P3, b: P3): P3 => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 });
+  const BOX = "תיבה ABCDA'B'C'D'";
+  const PI1 = 'המישור π1: x + y + z - 1 = 0';
+  const holds = (lines: readonly string[], off: (p: (id: string) => P3) => number): void => {
+    const r = submitAll(lines);
+    expect(r.err, lines.join(' · ')).toBeNull();
+    for (let seed = 0; seed < 8; seed++) {
+      expect(allOk(seed), `seed ${seed}`).toBe(true);
+      expect(off((id) => at(seed, id)), `seed ${seed}`).toBeLessThan(1e-9);
+    }
+  };
+  it('a pinned vertex and a midpoint that reads a stated point', () => {
+    holds([BOX, 'A(1,2,3)', 'Q(4,0,1)', 'M אמצע AQ'], (p) => gap(p('M'), half(p('A'), p('Q'))) + gap(p('A'), { x: 1, y: 2, z: 3 }));
+  });
+  it.each([
+    ['a pinned vertex, the midpoint of another', ["קובייה ABCDA'B'C'D'", 'A(1,2,3)', 'Q(4,0,1)', 'M אמצע BQ']],
+    ['a stated vector', [BOX, 'AB = (2,0,0)', 'Q(4,0,1)', 'M אמצע BQ']],
+  ])('%s', (_n, lines) => holds(lines, (p) => gap(p('M'), half(p('B'), p('Q')))));
+  it('a foot from a vertex to an equation plane under a pin', () => {
+    holds([BOX, 'A(1,2,3)', PI1, 'מ-B מורידים אנך למישור π1 החותך אותו בנקודה F'], (p) => {
+      const B = p('B');
+      const t = (B.x + B.y + B.z - 1) / 3;
+      return gap(p('F'), { x: B.x - t, y: B.y - t, z: B.z - t });
+    });
+  });
+  it('a centroid with a stated point under a pin', () => {
+    holds([BOX, 'A(1,2,3)', 'Q(4,0,1)', 'E מפגש התיכונים של משולש BCQ'], (p) => {
+      const [B, C, Q] = [p('B'), p('C'), p('Q')];
+      return gap(p('E'), { x: (B.x + C.x + Q.x) / 3, y: (B.y + C.y + Q.y) / 3, z: (B.z + C.z + Q.z) / 3 });
+    });
+  });
+  it('a pin on a mixed point places the cube so it is both pinned and the midpoint: A = (3,2,1)', () => {
+    holds(["קובייה ABCDA'B'C'D'", 'P(1,2,3)', 'M אמצע AP', 'M(2,2,2)'], (p) =>
+      gap(p('M'), half(p('A'), p('P'))) + gap(p('M'), { x: 2, y: 2, z: 2 }) + gap(p('A'), { x: 3, y: 2, z: 1 }));
+  });
+  it('a pinned vertex and a pin on a mixed midpoint', () => {
+    holds([BOX, 'A(1,2,3)', 'Q(4,0,1)', 'M אמצע BQ', 'M(4,2,2)'], (p) => gap(p('M'), half(p('B'), p('Q'))) + gap(p('M'), { x: 4, y: 2, z: 2 }));
   });
 });

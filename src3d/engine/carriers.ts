@@ -1,5 +1,5 @@
 import type { Claim3, Construction3, Id, PointDef } from './types';
-import { freeCoordKey, pivotRuns3, ringCircle3 } from './types';
+import { freeCoordKey, GAUGE_KINDS, pivotRuns3, ringCircle3 } from './types';
 
 /**
  * #1498 — THE SAMPLED-CARRIER TABLE: one enumeration of every free point-DOF the sampler owns.
@@ -107,6 +107,18 @@ export function carrierParams3(c: Construction3, id: Id, def: PointDef): Carrier
  * enumeration of the drivable cases is not a rule; the walk over what a definition READS is).
  */
 export function pointParents3(c: Construction3, def: PointDef): Id[] {
+  return pointInputs3(c, def).points;
+}
+
+/**
+ * #2798 (ADR-3D-456) — WHAT A POINT'S DEFINITION READS, one level: its parent points ({@link pointParents3}) and
+ * whether it reads a FIXED carrier — an equation plane (not free) or a typed parametric line, objects stated in the
+ * absolute frame that no rigid motion of the figure moves. The same walk, so a carrier kind added later is seen by
+ * both answers or by neither. A free plane or free line is neither: it is re-seated against final positions by the
+ * #557 pass, and reads as nothing here.
+ */
+export function pointInputs3(c: Construction3, def: PointDef): { points: Id[]; fixedCarrier: boolean } {
+  let fixedCarrier = false;
   const carrierPts = (o: unknown): Id[] => {
     const out: Id[] = [];
     const walk = (v: unknown, depth: number): void => {
@@ -114,8 +126,13 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
       if (typeof v === 'string') {
         if (c.points.has(v)) out.push(v);
         else if (depth < 6 && c.pointPlanes.has(v)) walk(c.pointPlanes.get(v), depth + 1);
-        else if (depth < 6 && c.planes.has(v)) walk(c.planes.get(v), depth + 1);
-        else if (depth < 6 && c.lines.has(v)) walk(c.lines.get(v), depth + 1);
+        else if (depth < 6 && c.planes.has(v)) {
+          if (!c.planes.get(v)!.free) fixedCarrier = true;
+          walk(c.planes.get(v), depth + 1);
+        } else if (depth < 6 && c.lines.has(v)) {
+          if (c.lines.get(v)!.kind === 'parametric') fixedCarrier = true;
+          walk(c.lines.get(v), depth + 1);
+        }
         return;
       }
       if (Array.isArray(v)) return v.forEach((x) => walk(x, depth));
@@ -124,6 +141,7 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
     walk(o, 0);
     return out;
   };
+  const points = ((): Id[] => {
   switch (def.kind) {
     case 'solid-vertex':
       // #2490 (ADR-3D-434): a BOUND solid's apex is placed in its ring's frame — it reads every base point
@@ -173,7 +191,87 @@ export function pointParents3(c: Construction3, def: PointDef): Id[] {
       return never;
     }
   }
+  })();
+  return { points, fixedCarrier };
 }
+
+/** #2798 (ADR-3D-456) — the three lanes a point can be in relative to the figure's rigid motions. */
+export type FigureLane3 = 'figure' | 'fixed' | 'mixed';
+
+/** The ROOT table: the lane of a point that reads nothing (no parent point, no fixed carrier), by its kind. */
+const rootLane3 = (c: Construction3, def: PointDef): FigureLane3 =>
+  GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)) || (def.kind === 'on-circle3' && ringCircle3(c, def.circle))
+    ? 'figure'
+    : 'fixed';
+
+const figureLaneMemo3 = new WeakMap<Construction3, { size: number; lanes: ReadonlyMap<Id, FigureLane3> }>();
+
+/**
+ * #2798 (ADR-3D-456) — WHETHER A POINT MOVES WITH THE FIGURE, decided by what it is BUILT FROM, never by its kind.
+ *
+ * The engine moves the figure rigidly in three places (the pivot's similarity, the placement funnel's sampled motion,
+ * the stage-6 turn walk through `applySolutions`), and each moved the points a list of KINDS said yes to. A point read
+ * from both the figure and a fixed object was then wrong after the motion either way: «M אמצע AP» beside «P(1,2,3)»
+ * was carried off with the cube while P stayed put (its kind was listed), and a foot from a vertex to an equation
+ * plane stayed where the canonical cube had put it (its kind was not). So the lane is a JOIN over the definition's
+ * inputs ({@link pointInputs3}):
+ *  - a point that reads nothing takes its lane from its kind ({@link rootLane3}: a solid vertex or a never-positioned
+ *    point is the figure; a stated coordinate, an axis point, a revolution point is fixed);
+ *  - a fixed carrier (an equation plane, a typed line) is a fixed input;
+ *  - figure + figure = figure, fixed + fixed = fixed, anything else = `'mixed'`.
+ * A `'figure'` point rides the motion; a `'fixed'` point never moves (a midpoint of two stated points stays
+ * where they say); a `'mixed'` point is RE-DERIVED from its own definition after every motion (`reseatMixed3`).
+ * Memoised per construction object (the residual reads it per point per evaluation).
+ */
+export function figureLanes3(c: Construction3): ReadonlyMap<Id, FigureLane3> {
+  const hit = figureLaneMemo3.get(c);
+  if (hit && hit.size === c.points.size) return hit.lanes;
+  const lanes = new Map<Id, FigureLane3>();
+  const visiting = new Set<Id>();
+  const laneOf = (id: Id): FigureLane3 | null => {
+    const known = lanes.get(id);
+    if (known) return known;
+    const def = c.points.get(id);
+    if (!def || visiting.has(id)) return null;
+    visiting.add(id);
+    const { points, fixedCarrier } = pointInputs3(c, def);
+    let lane: FigureLane3 | null = fixedCarrier ? 'fixed' : null;
+    for (const p of points) {
+      if (p === id) continue;
+      const l = laneOf(p);
+      if (l === null) continue;
+      lane = lane === null || lane === l ? l : 'mixed';
+    }
+    visiting.delete(id);
+    const out = lane ?? rootLane3(c, def);
+    lanes.set(id, out);
+    return out;
+  };
+  for (const id of c.points.keys()) laneOf(id);
+  figureLaneMemo3.set(c, { size: c.points.size, lanes });
+  return lanes;
+}
+
+/**
+ * #1498, #2798 (ADR-3D-456) — DOES THE FIGURE'S RIGID MOTION CARRY THIS POINT? Asked in ONE place: the final
+ * placement (`applySolutions`), the funnel's moved set (`gaugePlacedIds3`), the member pins (`frozenOf`) and the
+ * solver's residual and candidate accessors all read it, so a residual sees exactly the frame the drawn figure will be
+ * in. True iff the point's lane is `'figure'` ({@link figureLanes3}); a `'mixed'` point is not carried but re-seated.
+ */
+export function gaugeFramePoint3(c: Construction3, id: Id): boolean {
+  return figureLanes3(c).get(id) === 'figure';
+}
+
+/** #2798 (ADR-3D-456): the figure's `'mixed'` points, in declaration order — the ones `reseatMixed3` re-derives. */
+export function mixedPointIds3(c: Construction3): readonly Id[] {
+  const lanes = figureLanes3(c);
+  const hit = mixedMemo3.get(lanes);
+  if (hit) return hit;
+  const out = [...c.points.keys()].filter((id) => lanes.get(id) === 'mixed');
+  mixedMemo3.set(lanes, out);
+  return out;
+}
+const mixedMemo3 = new WeakMap<ReadonlyMap<Id, FigureLane3>, readonly Id[]>();
 
 /**
  * #2611 (ADR-3D-410) — IS `target` AMONG THE POINTS `ids` ARE BUILT FROM (transitively, {@link pointParents3})? A point

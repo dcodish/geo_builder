@@ -1736,25 +1736,17 @@ export type Determination3 =
   | { kind: 'coords'; id: Id; x: number | null; y: number | null; z: number | null }
   | { kind: 'length'; a: Id; b: Id; value: number };
 
-/** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
+/**
+ * The ROOT table of the figure lanes (#2798, ADR-3D-456): the kinds whose point, when it reads no other point and no fixed
+ * carrier, is the FIGURE's (carried by the pivot's similarity, the placement funnel and the turn walk). It is no longer
+ * the lane rule itself: a derived point's lane is the join of what its definition reads (`figureLanes3`, carriers.ts),
+ * so a kind listed here answers only for a point built from nothing. A kind is added here only with an ADR
+ * (docs/17 §3, the `GAUGE_KINDS` row).
+ */
 export const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'seg-cross', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'bisector-ray', 'foot-seg', 'reflect-line', 'parallelogram-point', 'scaled-offset', 'right-pyramid-apex', 'right-apex', 'free3']);
 
-/**
- * #1498 — DOES THE PIVOT'S GAUGE APPLY TO THIS POINT? Asked in ONE place.
- *
- * The final placement pass (`applySolutions`) has always answered it with this exact rule; the
- * in-solve residual accessor (`at` in solve3) answered it with "yes, always", so any pin relating a
- * gauge-frame point to an ABSOLUTE one (a typed coordinate, an equation-plane rider) compared two
- * different frames — the residual could never reach zero, the pivot reported 0 solutions, and
- * `store3` blamed the student's newest true statement (`givens-contradict`). Two other sites carried
- * hand-rolled approximations of the rule (`coord || on-plane-off-run`) that silently treated every
- * remaining Lane-A kind (`partial`, `foot-plane`, `foot-line`, `line-plane`, `rev-point`, `on-line`)
- * as gauge-frame. One predicate, one lane rule; a residual now sees exactly the frame the drawn
- * figure will be in.
- */
-export function gaugeFramePoint3(c: Construction3, def: PointDef | undefined): boolean {
-  return !!def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)) || (def.kind === 'on-circle3' && ringCircle3(c, def.circle)));
-}
+// #1498: `gaugeFramePoint3` — the ONE lane rule — moved to carriers.ts (#2798, ADR-3D-456), where it reads the
+// dependency closure (`figureLanes3`) instead of the point's kind.
 
 /**
  * #2611 (ADR-3D-410): is the circle a POLYGON's (through or inside a ring)? Its rider is then a figure point, riding the
@@ -1924,20 +1916,69 @@ export function absolutePointCount(c: Construction3): number {
  * beside {@link absolutePointCount} so `scaleGiven.ts` reads it without an import cycle through `evaluate.ts`.)
  */
 export function hasAbsoluteFrameObject(c: Construction3): boolean {
-  if (c.pins.length > 0) return true;
-  for (const def of c.planes.values()) if (!def.free) return true;
-  for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
-  // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
-  // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
-  // FACES. The list enumerated the absolute objects that can be DECLARED and missed the frame itself,
-  // so a figure related to [xy] kept the canonical placement and the relation was judged against a
-  // position nothing had chosen — then reported as the student's error.
-  if (c.coordPlanePins.length > 0) return true;
+  return absoluteFrameObjects3(c).length > 0;
+}
+
+/**
+ * #2789 (ADR-3D-457) — a POINT STATED AT AN ABSOLUTE POSITION, whole or in part: a coordinate point, a coordinate point
+ * in the figure's parameter, or a point on a coordinate axis or half-axis (`partial`, ADR-3D-094: "Lane-A absolute like
+ * coord"). The one answer for "is this point positioned in the absolute frame?", read by {@link absoluteFrameObjects3} and
+ * by the placement funnel's clearance. (Not {@link absolutePointCount}: that asks for a stated POSITION, and an axis point's
+ * free magnitude is neither a position nor scale knowledge.)
+ */
+export const positionedAbsolutePoint3 = (def: PointDef): boolean => def.kind === 'coord' || def.kind === 'coord-sym' || def.kind === 'partial';
+
+/** #2789 (ADR-3D-457): one absolute-frame object and whether a uniform rescale about the origin maps it onto itself. */
+export interface AbsoluteFrameObject3 {
+  kind: 'pin' | 'plane' | 'line' | 'coord-plane' | 'point';
+  /** a cone through the origin: k·X lies on it for every k > 0, so the #754 rescale never detaches it */
+  scaleInvariant: boolean;
+}
+
+const isZeroLin = (e: LinExpr): boolean => e.k === 0 && e.p === 0;
+const isNumericLin = (e: LinExpr): boolean => e.p === 0;
+
+/**
+ * #2789 (ADR-3D-457) — THE ABSOLUTE OBJECTS OF THE FIGURE, one entry each, with whether the scale given's uniform rescale
+ * about the origin keeps it. ONE enumeration answers both "is the frame absolute?" ({@link hasAbsoluteFrameObject}) and
+ * "does a rescale keep it?" (`scaleGivenSafe`), so the two questions cannot drift (the ADR-3D-453 discipline, extended).
+ *
+ *  - a point pin: invariant iff every stated component is 0 («D on the +x half-axis» pins y = z = 0);
+ *  - a coordinate point: invariant iff it is the origin; a coordinate point in the parameter: never;
+ *  - a partly stated point (`partial`): invariant iff every stated component is 0 — an axis or half-axis point;
+ *  - an equation plane (not free): invariant iff numeric, not in a pin symbol, and through the origin (d = 0);
+ *  - a typed parametric line: invariant iff numeric, not in a pin symbol, anchored at the origin;
+ *  - a relation to a coordinate plane or an axis: always (every coordinate plane and axis passes through the origin).
+ *
+ * #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just as surely as an
+ * equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid FACES.
+ */
+export function absoluteFrameObjects3(c: Construction3): AbsoluteFrameObject3[] {
+  const out: AbsoluteFrameObject3[] = [];
+  for (const pin of c.pins) out.push({ kind: 'pin', scaleInvariant: [pin.x, pin.y, pin.z].every((v) => v === null || v === 0) });
+  for (const def of c.planes.values()) {
+    if (def.free) continue;
+    const numeric = def.sym === undefined && [def.cx, def.cy, def.cz, def.d].every(isNumericLin);
+    out.push({ kind: 'plane', scaleInvariant: numeric && isZeroLin(def.d) });
+  }
+  for (const def of c.lines.values()) {
+    if (def.kind !== 'parametric') continue;
+    const numeric = def.sym === undefined && [...def.anchor, ...def.dir].every(isNumericLin);
+    out.push({ kind: 'line', scaleInvariant: numeric && def.anchor.every(isZeroLin) });
+  }
+  for (let i = 0; i < c.coordPlanePins.length; i++) out.push({ kind: 'coord-plane', scaleInvariant: true });
   for (const cl of c.claims) {
     const ops = cl.type === 'plane-rel' || cl.type === 'distance-rel' || cl.type === 'mutual-rel' ? [cl.a, cl.b] : cl.type === 'line-rel' ? [cl.op] : [];
-    if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) return true;
+    if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) out.push({ kind: 'coord-plane', scaleInvariant: true });
   }
-  return absolutePointCount(c) > 0;
+  for (const def of c.points.values()) {
+    if (def.kind === 'coord') out.push({ kind: 'point', scaleInvariant: def.x === 0 && def.y === 0 && def.z === 0 });
+    else if (def.kind === 'coord-sym') out.push({ kind: 'point', scaleInvariant: false });
+    // a partial point is invariant iff every stated component is 0 (an axis point, whose free component scales and keeps
+    // its sign); «שיעור ה-x של B הוא 3» states x = 3, a plane off the origin the rescale would detach
+    else if (def.kind === 'partial') out.push({ kind: 'point', scaleInvariant: [def.x, def.y, def.z].every((v) => v === null || v === 0) });
+  }
+  return out;
 }
 
 export function pinSymsOf(c: Construction3): string[] {
