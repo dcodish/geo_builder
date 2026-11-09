@@ -18,9 +18,10 @@
  */
 import type { Id, ValueQuery } from '@/engine';
 import { normalizeUtterance } from './parse';
+import { ULABEL } from './lexicon';
 
-/** A point label: an uppercase letter, optional digit subscript, optional prime. */
-const PT = String.raw`[A-Z]\d*'?`;
+/** A point label: an uppercase letter, optional digit subscript, optional prime — the lexicon's atom (#2624). */
+const PT = ULABEL;
 
 const rx = {
   /** «∠GBC» / «זווית GBC» / «angle GBC» — the middle label is the vertex. */

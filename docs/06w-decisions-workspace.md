@@ -7307,3 +7307,30 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Not decided here.** Removing the PCs' keys from root's `authorized_keys`, plan step 5, waits for the operator. The keys serve more than deploys, and the server's other login paths are his call. The security detail stays off this public log.
 
 **Behaviour change for a student:** none.
+
+## ADR-W-197 — The prime joins the shared point-name atom (#2624)
+
+**Status:** accepted · 2026-11-09 · bug (workspace, from 2-D #2624) · fix round #2783 stream F · branch `fix/2624-primed-names` · **siblings:** [ADR-806](06-decisions.md#adr-806) (2-D), [ADR-AG-446](06c-decisions-analytic.md#adr-ag-446) (analytic)
+**Operator:** #2435 (2026-10-23) *"what analytic reads, 2-D reads too"*.
+**Requirements:** none (internal) · **Design:** [04w](04w-design-shell.md) § `shell/indexedName.ts` and § "Read extent" (`labelRuns`)
+
+**Context.** Analytic grew a primed point name inline in its own tree (#2621 C). 2-D's atom had no prime (#2624). Two atoms for one name is the docs/17 §3 "inline lexical fragment" chokepoint again, one level up.
+
+**Decision.**
+1. `shell/indexedName.ts` holds the atom and its parts:
+   - `PRIME`: `'`, except before a lone «s», which is the English possessive.
+   - `PRIMED`: the prime when there is one. A name followed by a prime takes it, so a rule never backs off to the bare letter.
+   - `NAME_ATOM`: a capital, an optional digit-run index (ASCII or subscript digits), then `PRIMED`.
+   - Its compiled forms `NAME_ATOM_G` and `NAME_ATOM_WHOLE`, and `isPointName` / `splitPointNames`.
+   - `GLUED_NAME_ATOM` (with `GLUED_NAME_G` / `GLUED_NAME_WHOLE`): the same name with an ASCII-digit index, the spelling every 2-D id carries after `foldIndexedName(s, 'glued')`, so a subscript glyph reads in 2-D exactly as it did before.
+
+   The guard is spelled with the letter, not a lowercase class, because most grammar rules are compiled case-insensitive, and there `(?![a-z])` refuses every capital too.
+2. 2-D's `ULABEL` is `GLUED_NAME_ATOM` and `LABEL` composes `PRIMED` after its ASCII index. Analytic's `POINT_NAME` is `NAME_ATOM`. 2-D's engine, replay and store tokenize ids with `GLUED_NAME_G` / `GLUED_NAME_WHOLE`. `readExtent`'s default label is `GLUED_NAME_ATOM`.
+3. `shell/readExtent`'s default label run and label carry `PRIMED`, so a primed name is one occurrence and is substituted whole. 3-D passes its own run (repeated primes, `''`) and is unchanged.
+4. The glyph fold is unchanged: `shell/primes`' `foldPrimes`, which 2-D's boundary now calls too.
+
+**Consumers** (BOUNDARIES.json `src`, `src-analytic`, `src3d` → `shell`):
+- `indexedName`: 2-D's lexicon, label accountant and engine/replay/store helpers; analytic's `engine/pointName.ts`, and through it every analytic reader.
+- `readExtent`'s defaults: 2-D's `unreadRoles` / `unreadThrough` (`labelRuns`) and analytic's `lostPart`. 2-D's `unreadParts` and 3-D pass their own runs.
+
+**Behaviour change for a student:** none of its own (2-D's is ADR-806's).

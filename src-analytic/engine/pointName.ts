@@ -16,16 +16,21 @@
  * Regex SOURCE with no capture group and no anchor, so composing it never renumbers a rule.
  */
 import { displayPrimes } from '../../shell/primes';
+import { NAME_ATOM, isPointName as isNameAtom, splitPointNames as splitNameAtoms } from '../../shell/indexedName';
 
-/** One point name: a capital, an optional index (a digit run, ADR-AG-398), an optional prime. */
-export const POINT_NAME = String.raw`[A-Z][0-9₀-₉]*(?:'(?![a-z]))?`;
+/**
+ * One point name: a capital, an optional index (a digit run, ADR-AG-398), an optional prime — the SHARED atom since #2624
+ * ([ADR-AG-446](../../docs/06c-decisions-analytic.md#adr-ag-446), [ADR-W-197](../../docs/06w-decisions-workspace.md#adr-w-197)):
+ * 2-D reads the same name, so the atom moved to `shell/indexedName` and this module composes it. Its possessive guard is
+ * case-blind safe (a rule compiled with `i` keeps «A'B'»), where the inline copy's `(?![a-z])` was not.
+ */
+export const POINT_NAME = NAME_ATOM;
 
-const WHOLE = new RegExp(`^${POINT_NAME}$`);
 /** "Is this whole string one point name?" */
-export const isPointName = (s: string): boolean => WHOLE.test(s);
+export const isPointName = (s: string): boolean => isNameAtom(s);
 
 /** A run of point names split into its names: «AA'B» → A, A', B. */
-export const splitPointNames = (run: string): string[] => run.match(new RegExp(POINT_NAME, 'g')) ?? [];
+export const splitPointNames = (run: string): string[] => splitNameAtoms(run);
 
 /**
  * A REGEX LITERAL with `ℕ` standing for the atom — so a grammar pattern that carries Hebrew stays a regex literal (the

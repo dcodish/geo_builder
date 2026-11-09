@@ -27,10 +27,11 @@
  * (a pure reading or an analysis probe) says nothing about what exists, so nothing is created there.
  */
 import { applyCommand, constraintRefs, lower, objectParents, type AnyCommand, type Command, type Construction, type GeoObject, type Id } from '@/engine';
+import { LABEL_WHOLE } from './lexicon';
 
 /** A point label as the student types it in 2-D: an uppercase letter and glued digits. Circles (`circle-O`), lines
  *  (`bis-…`), anonymous centres (`@ctr-O`) and symbols never match. */
-const POINT_LABEL = /^[A-Z]\d*$/;
+const POINT_LABEL = LABEL_WHOLE;
 
 /** The point operands of a store-level measure, read by its own fields (its lowering is list-dependent). */
 function measureOperands(cmd: AnyCommand): Id[] {

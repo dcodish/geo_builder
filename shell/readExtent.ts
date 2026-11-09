@@ -54,6 +54,8 @@
  * carry primes).
  */
 
+import { GLUED_NAME_ATOM } from './indexedName';
+
 /** One occurrence of a token the student typed, located in the line. */
 export interface Occurrence {
   /** the text as typed */
@@ -81,9 +83,9 @@ export interface Reader<L> {
 }
 
 export interface LabelProbe<L> extends Reader<L> {
-  /** a whole label run (global). Default: uppercase Latin labels with optional digits, glued («ABC», «A1B»). */
+  /** a whole label run (global). Default: uppercase Latin labels with optional digits and a prime, glued («ABC», «A1B», «A'B'»). */
   run?: RegExp;
-  /** one label inside a run (global). Default: `[A-Z]\d*`. */
+  /** one label inside a run (global). Default: `[A-Z]\d*` with an optional prime. */
   label?: RegExp;
   /**
    * the figure's labels — never used as a substitute, only kept out of the fresh ones. A figure letter is no
@@ -96,8 +98,13 @@ export interface LabelProbe<L> extends Reader<L> {
   exempt?(occ: Occurrence): boolean;
 }
 
-const DEFAULT_RUN = /(?<![A-Za-z])(?:[A-Z]\d*)+(?![A-Za-z])/g;
-const DEFAULT_LABEL = /[A-Z]\d*/g;
+/**
+ * #2624 ([ADR-W-197](../docs/06w-decisions-workspace.md#adr-w-197)): a label carries its PRIME («A'», «A'B'C'») — the shared
+ * {@link PRIME} atom — so a primed name is one occurrence, substituted whole, never «A» with a stray mark beside it.
+ */
+const DEFAULT_LABEL_SRC = GLUED_NAME_ATOM;
+const DEFAULT_RUN = new RegExp(String.raw`(?<![A-Za-z])(?:${DEFAULT_LABEL_SRC})+(?![A-Za-z])`, 'g');
+const DEFAULT_LABEL = new RegExp(DEFAULT_LABEL_SRC, 'g');
 /** Fresh letters, the last resort; S is left out (it is the area marker in every builder). */
 const FRESH = 'QZXWVUTRPNMKJHGY'.split('');
 

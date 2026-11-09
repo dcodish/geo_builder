@@ -21,6 +21,7 @@ import type { Fact } from '@/replay/core';
 import type { RowNouns, RowNoun } from '@/replay/narrowing';
 import { narrowImplies, NARROW_KINDS, type NarrowKind } from '../../shell/narrowing';
 import { readShapePhrase, type ShapeKind } from '@/parser/shapePhrase';
+import { GLUED_NAME_ATOM } from '../../shell/indexedName';
 
 const KIND: Readonly<Record<ShapeKind, NarrowKind>> = {
   triangle: 'triangle',
@@ -77,7 +78,7 @@ export function nounsForRing(utterance: string, ring: readonly Id[], own = true)
     const p = readShapePhrase(s);
     return p && p.arity === ring.length && (p.noun || p.consumed) ? KIND[p.kind] : null;
   };
-  const RUN = /\b[A-Z]\d*(?:[A-Z]\d*){2,}\b/;
+  const RUN = new RegExp(String.raw`\b${GLUED_NAME_ATOM}(?:${GLUED_NAME_ATOM}){2,}\b`);
   const hits = [...utterance.matchAll(new RegExp(String.raw`(?<![A-Z\d])(?:${spellings(ring).join('|')})(?![A-Z\d])`, 'g'))];
   if (!hits.length) {
     const k = own ? fits(utterance) : null;

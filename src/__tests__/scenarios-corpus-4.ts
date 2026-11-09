@@ -6553,6 +6553,35 @@ export const SCENARIOS_4: Scenario[] = [
       refusedNaming(['שני מעגלים זרים'], 'המעגלים נחתכים בנקודות X ו-Y', 'שני מעגלים זרים', 'disjoint-crossing');
     },
   },
+  {
+    id: 'primed-point-on-circle-2624',
+    title: "«מעגל O» · «A' על המעגל» builds the point A′ on the circle, never a point A (#2624, ADR-806)",
+    guards: "Reported #2624 (found 2026-10-30 planning #2621): 2-D's label atom had no prime, so «A' על המעגל» committed point-on-circle A — the prime silently dropped. The atom now carries it (shared with analytic, ADR-W-197), and the label accountant tokenizes it, so a reading that keeps A for a typed A' is never committed.",
+    steps: ['מעגל O', "A' על המעגל"],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('A'), 'no point A was made').toBe(false);
+      const [O, P] = [at(fig, 'O'), at(fig, "A'")];
+      expect(fig.construction.objects.some((o) => o.id === 'circle-O'), 'circle O is drawn').toBe(true);
+      expect(fig.construction.objects.find((o) => o.id === "A'"), "A' rides the circle").toMatchObject({ kind: 'on-circle' });
+      expect(dist(O, P), "A' is off the centre").toBeGreaterThan(1e-6);
+    },
+  },
+  {
+    id: 'primed-names-triangle-2624',
+    title: "«A' אמצע BC», «AA' = 8», «B′ על AC», «נקודה C'», «C'B' = 3»: each primed name is its own point (#2624, ADR-806)",
+    guards: "Reported #2624: «A' אמצע BC» was read as A and refused («A coincides with its constructed target»), and «נקודה A'» went to the AI. The prime is part of the name in every rule (and every prime glyph is one prime), so A' is the midpoint beside A, and the lengths name the primed points.",
+    steps: ['משולש ABC', "A' אמצע BC", "AA' = 8", 'B′ על AC', "נקודה C'", "C'B' = 3"],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, A1, B1, C1] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'C'), at(fig, "A'"), at(fig, "B'"), at(fig, "C'")];
+      expect(dist(A1, { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 }), "A' is the midpoint of BC").toBeLessThan(1e-6);
+      expect(dist(A, A1), "AA' = 8").toBeCloseTo(8, 4);
+      expect(Math.abs((B1.x - A.x) * (C.y - A.y) - (B1.y - A.y) * (C.x - A.x)) / (dist(A, C) ** 2), "B' on AC").toBeLessThan(1e-6);
+      expect(dist(C1, B1), "C'B' = 3").toBeCloseTo(3, 4);
+      expect(fig.positions.has('A1'), 'no stray name').toBe(false);
+    },
+  },
 ];
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {

@@ -28,7 +28,7 @@
  */
 
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
-import { AT_VERTEX, COPULA_HE, RIGHT_ANGLED } from './lexicon';
+import { AT_VERTEX, COPULA_HE, RIGHT_ANGLED, LABEL, ULABEL, LABEL_G } from './lexicon';
 
 export type ScopeCategory =
   | 'analytic'
@@ -100,7 +100,7 @@ const planeObject: Matcher = {
       const before = s.slice(0, m.index!);
       const after = s.slice(m.index! + m[0].length);
       if (/\b(?:cartesian|coordinate|xy|x-y)\s+$/i.test(before)) continue; // the coordinate plane — analytic
-      const setting = /\b(?:in|on)\s+(?:the|a)\s+$/i.test(before) && !/s$/i.test(m[0]) && !/^\s*[A-Z]\d*[A-Z]/.test(after);
+      const setting = /\b(?:in|on)\s+(?:the|a)\s+$/i.test(before) && !/s$/i.test(m[0]) && !new RegExp(String.raw`^\s*${ULABEL}[A-Z]`).test(after);
       if (!setting) return { index: m.index!, 0: m[0] };
     }
     return null;
@@ -114,7 +114,7 @@ const planeObject: Matcher = {
  */
 const COORD = String.raw`[-−+]?\s*\d+(?:\.\d+)?`;
 const COORD_PAIR = String.raw`\(\s*${COORD}\s*[,;]\s*${COORD}\s*\)`;
-const COORD_LABEL = String.raw`(?<![A-Za-z\d])[A-Za-z]\d*`;
+const COORD_LABEL = String.raw`(?<![A-Za-z\d])${LABEL}`;
 /** the joiners a student puts between the label and the pair: «=», «:», "at", "is at", «ב-», «בנקודה» */
 const COORD_JOIN = String.raw`(?:=|:|\bis\s+at\b|\bat\b|ב-?|בנקודה)`;
 
@@ -167,8 +167,8 @@ const RULES: ScopeRule[] = [
       // the message names it. Kept to the BARE statement (a pair + the base noun and nothing else) so a real
       // construction that merely mentions a base is never brushed off; `בסיסים` (a trapezoid's two parallel
       // bases, a genuine geometric reference — #185) is excluded by the negative lookahead.
-      /^\s*(?:ה?בסיס(?!ים|י)\s+(?:הוא\s+)?[A-Z]\d*[A-Z]\d*|[A-Z]\d*[A-Z]\d*\s+(?:הוא\s+)?ה?בסיס(?!ים|י))\s*\.?\s*$/,
-      /^\s*(?:the\s+base\s+is\s+[A-Z]\d*[A-Z]\d*|[A-Z]\d*[A-Z]\d*\s+is\s+the\s+base)\s*\.?\s*$/i,
+      new RegExp(String.raw`^\s*(?:ה?בסיס(?!ים|י)\s+(?:הוא\s+)?${ULABEL}${ULABEL}|${ULABEL}${ULABEL}\s+(?:הוא\s+)?ה?בסיס(?!ים|י))\s*\.?\s*$`),
+      new RegExp(String.raw`^\s*(?:the\s+base\s+is\s+${ULABEL}${ULABEL}|${ULABEL}${ULABEL}\s+is\s+the\s+base)\s*\.?\s*$`, 'i'),
     ],
   },
   {
@@ -261,7 +261,7 @@ const RULES: ScopeRule[] = [
     // term's own label pair («arc AC + arc BE») from reading as a bare segment pair.
     category: 'compound-relation',
     patterns: [
-      /(?<!(?:arcs?|הקשת|קשת|⌢|⏜|∠|∢|angle|הזוו?ית|זוו?ית)\s*)(?<![A-Za-z\d])[A-Z]\d*[A-Z]\d*(?![A-Za-z\d])\s*[+−]\s*(?:arcs?|קשת|⌢|⏜|∠|∢|angle|זוו?ית)/u,
+      new RegExp(String.raw`(?<!(?:arcs?|הקשת|קשת|⌢|⏜|∠|∢|angle|הזוו?ית|זוו?ית)\s*)(?<![A-Za-z\d])${ULABEL}${ULABEL}(?![A-Za-z\d])\s*[+−]\s*(?:arcs?|קשת|⌢|⏜|∠|∢|angle|זוו?ית)`, 'u'),
     ],
   },
   {
@@ -271,7 +271,7 @@ const RULES: ScopeRule[] = [
     // BUILDS too since #185 (the `pointOnTheLine` rule — a line with a named rider), so its old guidance
     // pattern is gone. LAST (the most generic pattern).
     category: 'bare-point',
-    patterns: [/^\s*[A-Za-z]\d*\s*\.?\s*$/],
+    patterns: [new RegExp(String.raw`^\s*${LABEL}\s*\.?\s*$`)],
   },
 ];
 
@@ -504,7 +504,7 @@ export interface RightAngledAtVertex {
   rest: string;
 }
 const RA_TRI_NOUN = String.raw`(?:ה|the\s+)?(?:משולש|triangle|△)`;
-const RA_RUN = String.raw`(?:[A-Z]\d*\s*){3}`;
+const RA_RUN = String.raw`(?:${ULABEL}\s*){3}`;
 /** «…ישר זווית שהזווית הישרה שלו ב-B»: a relative that restates the right angle before the locative is the same phrase. */
 const RA_RESTATED = String.raw`ש(?:בו\s+|בה\s+)?ה?זוו?ית\s+ה?ישרה(?:\s+(?:שלו|שלה|היא|הוא|נמצאת|נמצא))*\s*`;
 const RIGHT_ANGLED_AT = new RegExp(
@@ -512,10 +512,10 @@ const RIGHT_ANGLED_AT = new RegExp(
   'i',
 );
 const RA_POLYGON_NOUN = new RegExp(`(${SHAPE_NOUNS_HE.join('|')})|\\b(${SHAPE_NOUNS_EN.join('|')}|trapezium)s?\\b|[△▲]`, 'gi');
-const RA_TRIANGLE_RUN = new RegExp(String.raw`(?:משולש|\btriangle|[△▲])[^A-Za-z]*?(?:${RIGHT_ANGLED}\s*)?((?:[A-Z]\d*\s*){3})(?![A-Za-z\d])`);
-const RA_BARE_SUBJECT = new RegExp(String.raw`(?<![A-Za-z\d])((?:[A-Z]\d*\s*){3})\s*(?:(?:${COPULA_HE}|is)\s+)?$`);
+const RA_TRIANGLE_RUN = new RegExp(String.raw`(?:משולש|\btriangle|[△▲])[^A-Za-z]*?(?:${RIGHT_ANGLED}\s*)?((?:${ULABEL}\s*){3})(?![A-Za-z\d])`);
+const RA_BARE_SUBJECT = new RegExp(String.raw`(?<![A-Za-z\d])((?:${ULABEL}\s*){3})\s*(?:(?:${COPULA_HE}|is)\s+)?$`);
 const RA_LEADING_JOIN = new RegExp(String.raw`^[\s,;]*(?:(?:${CLAUSE_CONNECTIVES}|${CLAUSE_RELATIVES})(?![A-Za-zא-ת])|ו-?)?\s*`, 'i');
-const labelsIn = (run: string): string[] => (run.match(/[A-Z]\d*/g) ?? []).map((x) => x.toUpperCase());
+const labelsIn = (run: string): string[] => (run.match(LABEL_G) ?? []).map((x) => x.toUpperCase());
 
 export function rightAngledAtVertex(utterance: string): RightAngledAtVertex | null {
   const s = utterance;
@@ -526,7 +526,7 @@ export function rightAngledAtVertex(utterance: string): RightAngledAtVertex | nu
   const nouns = [...head.matchAll(RA_POLYGON_NOUN)];
   const noun = nouns.at(-1)?.[0];
   if (noun && !/משולש|triangle|[△▲]/i.test(noun)) return null;
-  const vertex = (m[2].match(/[A-Za-z]\d*(?=[^A-Za-z\d]*$)/)?.[0] ?? '').toUpperCase();
+  const vertex = (m[2].match(new RegExp(String.raw`${LABEL}(?=[^A-Za-z\d]*$)`))?.[0] ?? '').toUpperCase();
   if (!vertex) return null;
   // the statement's start: its triangle noun (with its article / clitics), else a bare subject run, else the adjective
   const tri = RA_TRIANGLE_RUN.exec(head);

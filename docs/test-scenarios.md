@@ -2321,3 +2321,10 @@ over all four (ADR-041).
 ### `disjoint-pair-common-point-2700` — «המעגלים O ו-P זרים» · «נחתכים בנקודות X ו-Y» / «משיקים»: refused naming «זרים», in either order (#2700, ADR-803)
 
 **Guards against:** a crossing or a tangency of a pair stated disjoint, committed with the «זרים» row red for good. **Asserts** a plain «זרים» builds clean; after it, the crossing and each tangency spelling (no kind, from outside, from inside, at T) is refused before it becomes a fact with «לא ניתן: «…» סותר את «המעגלים O ו-P זרים» …» and the exclusion's reason; the reverse orders refuse «זרים» naming the crossing or the tangency; «שני מעגלים זרים» then the crossing the same.
+
+### `primed-point-on-circle-2624` — «מעגל O» · «A' על המעגל» builds the point A′ on the circle, never a point A (#2624, ADR-806)
+
+**Guards against:** a primed name read as its bare letter (the prime dropped, a point A drawn green). **Asserts** every step green, no point A, A′ rides circle O.
+### `primed-names-triangle-2624` — «A' אמצע BC», «AA' = 8», «B′ על AC», «נקודה C'», «C'B' = 3»: each primed name is its own point (#2624, ADR-806)
+
+**Guards against:** «A' אמצע BC» refused as A, «נקודה A'» sent to the AI, a prime glyph (′) read as another name. **Asserts** A′ is the midpoint of BC beside A, AA′ = 8, B′ on AC, C′B′ = 3.

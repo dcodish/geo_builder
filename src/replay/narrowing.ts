@@ -36,6 +36,7 @@ import {
   mergeOf,
   type RingNote,
 } from '../../shell/narrowing';
+import { GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /** The minimal fact shape this module reads (the replay `Fact`, without importing core — no cycle). */
 interface NFact {
@@ -79,8 +80,8 @@ function pointsOf(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'type' || k === 'expr') continue;
-    if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) out.push(v);
-    else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string' && /^[A-Z]\d*$/.test(x)) out.push(x);
+    if (typeof v === 'string' && GLUED_NAME_WHOLE.test(v)) out.push(v);
+    else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string' && GLUED_NAME_WHOLE.test(x)) out.push(x);
   }
   return out;
 }

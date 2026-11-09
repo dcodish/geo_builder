@@ -41,6 +41,7 @@ import {
 import { FILLER, KEYWORD_STEMS } from './spanAccounting';
 import { SHAPE_NOUN_WORDS } from './shapePhrase';
 import { describedCircle, ringOf, ringRoleSpans, type RingSpan } from './ringRoles';
+import { ULABEL, LABEL_WHOLE } from './lexicon';
 
 type QuadNounKind = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'trapezoid' | 'kite';
 /** What a property word names. */
@@ -128,7 +129,7 @@ const ANGLE_BISECT_TYPES = new Set(['bisector', 'set-angle-ratio', 'arc-midpoint
 const BISECT_GATE = VERB_GATES.find((g) => g.verb === 'חוצה/bisect');
 const ALTITUDE_TYPES = new Set(['foot', 'set-perpendicular', 'perpendicular', 'perpendicular-line', 'altitude-choice', 'right-triangle']);
 const MEDIAN_TYPES = new Set(['midpoint', 'set-equal', 'set-ratio', 'ratio']);
-const LETTERED = /^[A-Z]\d*$/;
+const LETTERED = LABEL_WHOLE;
 
 /** The quadrilateral kinds a lowering declares a ring as (its command type, `declaredAs`, a trapezoid's `kind`, …). */
 function declaredQuadKinds(commands: AnyCommand[]): string[] {
@@ -256,7 +257,7 @@ export function droppedPropertyWords(
   const out: string[] = [];
   for (const o of occs) {
     // a DEFINITE role noun naming a segment already drawn («הגובה AB = 5») refers to it, as a definite polygon noun does
-    const roleReference = /^ה/.test(o.text) && ((m) => !!m && [m[1], m[2]].every((l) => drawn.has(l)))(utterance.slice(o.end).match(/^\s*([A-Z]\d*)([A-Z]\d*)(?![A-Za-z\d])/));
+    const roleReference = /^ה/.test(o.text) && ((m) => !!m && [m[1], m[2]].every((l) => drawn.has(l)))(utterance.slice(o.end).match(new RegExp(String.raw`^\s*(${ULABEL})(${ULABEL})(?![A-Za-z\d])`)));
     const ok = o.candidates.some(({ phrase, canonical }) =>
       phrase.props.some((p) => {
         if (opts.skip?.includes(p.kind)) return true;

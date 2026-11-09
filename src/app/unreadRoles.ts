@@ -25,6 +25,7 @@ import { BISECT_KW, CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from '@/parser/lexicon';
 import type { AnyCommand } from '@/engine';
 import { labelRuns, readWords, type Occurrence, type Reader } from '../../shell/readExtent';
 import { loweringKey } from './unreadParts';
+import { LABEL_WHOLE } from '../parser/lexicon';
 
 /** A cevian role; `verb` is a bare bisect verb («שחוצה את …», "bisects"), whose object the word alone does not name. */
 type Role = 'altitude' | 'median' | 'bisector' | 'verb';
@@ -114,7 +115,7 @@ export function lostRoleNote(utterance: string, commands: readonly AnyCommand[],
 
 /** The side the cevian meets, from the reading (a foot's or midpoint's endpoints, a bisector's rays), else the figure's triangle. */
 function sideOf(commands: readonly AnyCommand[], apex: string, foot: string, ctx: ParseContext): string | null {
-  const one = (v: unknown) => typeof v === 'string' && /^[A-Z]\d*$/.test(v);
+  const one = (v: unknown) => typeof v === 'string' && LABEL_WHOLE.test(v);
   for (const c of commands as unknown as Record<string, unknown>[]) {
     for (const [x, y] of [['a', 'b'], ['p', 'q']] as const) {
       const [P, Q] = [c[x], c[y]];

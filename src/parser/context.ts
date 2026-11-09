@@ -15,6 +15,7 @@ import type { Construction, Id, Vec } from '@/engine';
 import { statedCirclePosition, type StatedCirclePosition } from '@/engine';
 import { isGeoPoint, nounOfKind, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
+import { ULABEL, LABEL_WHOLE } from './lexicon';
 
 /** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
  *  centre ('@ctr-O') is referenced by its letter ('O' — the circle's name, «מעגל O», `circle-O`), while a
@@ -189,9 +190,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
       const vertices = new Set(construction.objects.flatMap((o) => (o.kind === 'polygon' ? o.vertices : [])));
       // a point a drawn circle is built from (a diameter end, a through point) is placed by that circle
       const byId = new Map(construction.objects.map((o) => [o.id, o] as const));
-      const labelsIn = (o: unknown): string[] => (o ? JSON.stringify(o).match(/"[A-Z]\d*"/g)?.map((q) => q.slice(1, -1)) ?? [] : []);
+      const labelsIn = (o: unknown): string[] => (o ? JSON.stringify(o).match(new RegExp(String.raw`"${ULABEL}"`, 'g'))?.map((q) => q.slice(1, -1)) ?? [] : []);
       for (const o of construction.objects) if (o.kind === 'circle') for (const l of [...labelsIn(o), ...labelsIn(byId.get(o.center))]) vertices.add(l);
-      return construction.objects.flatMap((o) => (o.kind === 'free-point' && /^[A-Z]\d*$/.test(o.id) && !vertices.has(o.id) ? [o.id] : []));
+      return construction.objects.flatMap((o) => (o.kind === 'free-point' && LABEL_WHOLE.test(o.id) && !vertices.has(o.id) ? [o.id] : []));
     })(),
     // #538: whether the two unnamed circles are structurally identical under the pair swap — lets the
     // #186 binding name-by-use deterministically when asking "which circle?" has no informative answer.

@@ -21,6 +21,7 @@ import { SegmentMenu } from '../../shell/frame/SegmentMenu';
 import { segInk } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, rightAngleKnee } from '../../shell/marks';
 import { swapOffered, type LetterRenameResult } from '../../shell/frame/letterOffer';
+import { displayPrimes } from '../../shell/primes';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
@@ -195,15 +196,20 @@ const ACCENT = '#f59e0b';
  * "O1" draws as "O₁" (base + a smaller, lowered `<tspan>`). Presentation only — the
  * id stays "O1" everywhere else. A plain label (no trailing digits) renders as-is.
  */
-function subscriptLabel(label: string, fontSize: number): ReactNode {
-  const m = /^(.*?)(\d+)$/.exec(label);
-  if (!m || !m[1]) return label; // no trailing digits (or all digits) → render verbatim
+export function subscriptLabel(label: string, fontSize: number): ReactNode {
+  // #2624 (ADR-806): a PRIMED id («A'», «B1'») draws its prime as ′, after the subscript — the glyph 3-D and analytic
+  // draw (`shell/primes` displayPrimes). The prime rides back up to the baseline when the digits were lowered.
+  const m = /^(.*?)(\d+)?('*)$/.exec(label);
+  if (!m || !m[1] || (!m[2] && !m[3])) return label; // no trailing digits or primes (or all digits) → render verbatim
+  const primes = displayPrimes(m[3]);
+  if (!m[2]) return `${m[1]}${primes}`;
   return (
     <>
       {m[1]}
       <tspan fontSize={fontSize * 0.7} dy={fontSize * 0.16}>
         {m[2]}
       </tspan>
+      {primes && <tspan dy={-fontSize * 0.16}>{primes}</tspan>}
     </>
   );
 }

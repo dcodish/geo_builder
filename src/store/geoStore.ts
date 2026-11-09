@@ -37,6 +37,7 @@ import type { CevianHost } from '../../shell/cevianHost';
 import { geoWork, geoValues, isCancelled } from './geoWork';
 import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
+import { GLUED_NAME_G } from '../../shell/indexedName';
 
 /**
  * Run the shared detection sweep for `facts` off the main thread and return its verdicts, or null when
@@ -64,7 +65,7 @@ const setSegFlag = toggleSegFlag;
  *  left them stale). */
 function renameSegKey(key: Id, from: Id, to: Id): Id {
   if (!key.startsWith('seg-')) return key;
-  const eps = key.slice(4).match(/[A-Z]\d*/g);
+  const eps = key.slice(4).match(GLUED_NAME_G);
   if (!eps || eps.length !== 2) return key;
   const [a, b] = eps.map((e) => (e === from ? to : e));
   return `seg-${[a, b].sort().join('')}`;

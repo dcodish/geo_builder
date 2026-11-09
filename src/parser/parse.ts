@@ -20,13 +20,14 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF, CIRCLE_NOUN_PHRASE_HE, CIRCLE_NOUN_PHRASE_EN } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, LABEL_G, LABEL_WHOLE, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF, CIRCLE_NOUN_PHRASE_HE, CIRCLE_NOUN_PHRASE_EN } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldTangentSide } from './tangentSide';
 import { foldGlyphs } from '../../shell/glyphFold';
+import { foldPrimes } from '../../shell/primes';
 import { hostNounOf, type CevianHost } from '../../shell/cevianHost';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
@@ -430,8 +431,8 @@ const NO_CONTEXT: ParseContext = {};
  *  principle). The bare "דרך X" form is read only where a tangent keyword already gates the rule. */
 const throughPointLabel = (s: string): string | null => {
   const m =
-    s.match(/(?:דרך\s+ה?נקודה|through\s+(?:the\s+)?point)\s+([A-Za-z]\d*)/i) ??
-    s.match(/(?:דרך|\bthrough\b)\s+([A-Za-z]\d*)(?![A-Za-z])/i);
+    s.match(new RegExp(String.raw`(?:דרך\s+ה?נקודה|through\s+(?:the\s+)?point)\s+(${LABEL})`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:דרך|\bthrough\b)\s+(${LABEL})(?![A-Za-z])`, 'i'));
   return m ? up(m[1]) : null;
 };
 
@@ -487,8 +488,8 @@ const circleCenter = (s: string): string | null => {
   // (the 2025-exam wording; issue #100 ride-along). Without it the stated centre was silently DROPPED and
   // an auto-named sibling minted (P) — luck-dependent honesty (§6).
   const m =
-    s.match(/(?:cent\w*\s+(?:at\s+)?(?:point\s+)?|around\s+|שמרכז[וה]\s+(?:ב?נקודה\s+)?|שמרכז[וה]|מרכז[וה]\s+(?:ב?נקודה\s+)?|מרכז[וה]|סביב\s+)([A-Za-z]\d*)\b/i) ??
-    s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i) ??
+    s.match(new RegExp(String.raw`(?:cent\w*\s+(?:at\s+)?(?:point\s+)?|around\s+|שמרכז[וה]\s+(?:ב?נקודה\s+)?|שמרכז[וה]|מרכז[וה]\s+(?:ב?נקודה\s+)?|מרכז[וה]|סביב\s+)(${LABEL})(?!\w)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:circle|מעגל)\s+(${LABEL})(?!\w)`, 'i')) ??
     orderlessCenter(s);
   return m ? m[1] : null;
 };
@@ -497,13 +498,13 @@ const orderlessCenter = (s: string): RegExpMatchArray | null => {
   if (!/cent(?:er|re)|מרכז/i.test(s) || !/circle|מעגל/i.test(s)) return null; // both a centre word AND a circle word
   return (
     // Hebrew, letter BEFORE: "O [הוא/היא/הינו] מרכז ה?מעגל" (optionally "נקודה O …")
-    s.match(/(?:^|\s)(?:ה?נקוד[הת]\s+)?([A-Za-z]\d*)\s+(?:הוא\s+|היא\s+|הינו\s+)?מרכז\s+ה?מעגל/i) ??
+    s.match(new RegExp(String.raw`(?:^|\s)(?:ה?נקוד[הת]\s+)?(${LABEL})\s+(?:הוא\s+|היא\s+|הינו\s+)?מרכז\s+ה?מעגל`, 'i')) ??
     // Hebrew, letter AFTER with a copula/noun the "מעגל X" branch skips: "מרכז ה?מעגל [הוא/היא] [נקודה] O"
-    s.match(/מרכז\s+ה?מעגל\s+(?:הוא\s+|היא\s+)?(?:ה?נקוד[הת]\s+)?([A-Za-z]\d*)\b/i) ??
+    s.match(new RegExp(String.raw`מרכז\s+ה?מעגל\s+(?:הוא\s+|היא\s+)?(?:ה?נקוד[הת]\s+)?(${LABEL})(?!\w)`, 'i')) ??
     // English, letter BEFORE: "O is the centre …" (circle word guaranteed present by the gate above)
-    s.match(/(?:^|\s)([A-Za-z]\d*)\s+(?:is\s+)?(?:the\s+)?cent(?:er|re)\b/i) ??
+    s.match(new RegExp(String.raw`(?:^|\s)(${LABEL})\s+(?:is\s+)?(?:the\s+)?cent(?:er|re)\b`, 'i')) ??
     // English, letter AFTER: "the centre of the circle is O"
-    s.match(/cent(?:er|re)\b[\s\S]*?\bcircle\b[\s\S]*?\bis\s+([A-Za-z]\d*)\b/i)
+    s.match(new RegExp(String.raw`cent(?:er|re)\b[\s\S]*?\bcircle\b[\s\S]*?\bis\s+(${LABEL})(?!\w)`, 'i'))
   );
 };
 /**
@@ -566,10 +567,10 @@ export function doubleCentreNaming(raw: string, answerable: ReadonlySet<string>)
 const incenterLabel = (s: string): string | null => {
   const m =
     // leading subject: "M מרכז…" / "M is the [in]centre…"
-    s.match(/^\s*([A-Za-z]\d*)\s+(?:is\s+|הוא\s+|הינו\s+)?(?:the\s+)?(?:in)?cent(?:er|re)\b/i) ??
-    s.match(/^\s*([A-Za-z]\d*)\s+מרכז/i) ??
+    s.match(new RegExp(String.raw`^\s*(${LABEL})\s+(?:is\s+|הוא\s+|הינו\s+)?(?:the\s+)?(?:in)?cent(?:er|re)\b`, 'i')) ??
+    s.match(new RegExp(String.raw`^\s*(${LABEL})\s+מרכז`, 'i')) ??
     // trailing: "incentre M" / "incenter is M"
-    s.match(/incent(?:er|re)\s+(?:is\s+)?([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`incent(?:er|re)\s+(?:is\s+)?(${LABEL})(?!\w)`, 'i'));
   return m ? m[1] : null;
 };
 /**
@@ -676,7 +677,7 @@ const existingCircleRef = (s: string, ctx: ParseContext): string | null => {
  *  (ADR-233/119). Unique survivor → that circle; none or several → null (genuinely ambiguous). */
 /** The point labels a sentence names, its circle reference dropped — the membership voters of the tie-break (#546) and
  *  of the #1694 candidate gate. */
-const sentencePointLabels = (s: string): string[] => [...new Set((dropCircleRef(s).match(/[A-Za-z]\d*/g) ?? []).filter((t) => isUpperLabel(t)).map(up))];
+const sentencePointLabels = (s: string): string[] => [...new Set((dropCircleRef(s).match(new RegExp(String.raw`${LABEL}`, 'g')) ?? []).filter((t) => isUpperLabel(t)).map(up))];
 const anonymousCircleTieBreak = (s: string, ctx: ParseContext, circles: string[]): string | null => {
   const pts = sentencePointLabels(s);
   let cand: string[] | null = null;
@@ -734,7 +735,7 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupp
     // #1650: the auto letter dodges the sentence's OWN labels too, not only the drawn ones — the anonymiser
     // (`withAnonymousAutoCentres`) remaps every exact use of the letter, so a letter the sentence also names
     // as a point (a fresh «O» typed in the same line) would be swallowed into the hidden centre.
-    const said = (s.match(/[A-Z]\d*/g) ?? []);
+    const said = (s.match(LABEL_G) ?? []);
     const c = freeLabel(ctx, [...said], ['O', 'P', 'Q', 'K']);
     return {
       center: c,
@@ -747,12 +748,12 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupp
 /** The crossing point named AFTER the circle word ("… circle [O] at R" / "… [ה]מעגל [O] בנקודה R"),
  *  with the circle's NAME optional so "the circle" / "המעגל" anchors too (operator: one circle → no name). */
 const crossingAfterCircle = (s: string): string | null => {
-  const ci = s.search(/(?:circle|מעגל)(?:\s+[A-Za-z]\d*)?/i);
+  const ci = s.search(new RegExp(String.raw`(?:circle|מעגל)(?:\s+${LABEL})?`, 'i'));
   if (ci < 0) return null;
   // The crossing marker may be a full "בנקודה F", a hyphenated "ב-F", OR a bare "ב F" (spaced bet — a
   // real prod form, issue #47): "ב-?" tolerates the missing hyphen. Safe: the marker is anchored to a
   // Latin label, so a Hebrew ב-prefix (always followed by Hebrew) can never false-match.
-  const m = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  const m = s.slice(ci).match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'i'));
   return m ? up(m[1]) : null;
 };
 
@@ -762,20 +763,20 @@ const crossingAfterCircle = (s: string): string | null => {
  *  point, mirroring `crossingAfterCircle` for the verb form ("… circle at E"). */
 const leadingNamedPoint = (s: string): string | null => {
   const m =
-    s.match(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+([A-Za-z]\d*)\b/i) ??
-    s.match(/^\s*([A-Za-z]\d*)\s*(?:\bis\b|היא|הוא|=)/i) ??
+    s.match(new RegExp(String.raw`(?:^|\s)(?:ה?נקוד[הת]|point)\s+(${LABEL})(?!\w)`, 'i')) ??
+    s.match(new RegExp(String.raw`^\s*(${LABEL})\s*(?:\bis\b|היא|הוא|=)`, 'i')) ??
     // #71 (log-triage): the appositive NOUN form, no copula — "E נקודת החיתוך של המעגל עם AD".
     // #776 (prod ah1kqxz5): the TERSE spelling drops «נקודת» too — «D מפגש המעגל עם AB» — so the
     // descriptor noun is optional; the bare short heads «מפגש»/«חיתוך» carry the same meaning.
-    s.match(/^\s*([A-Za-z]\d*)\s+(?:נקודת\s+)?ה?(?:חיתוך|מפגש)/) ??
-    s.match(/^\s*([A-Za-z]\d*)\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point\b/i);
+    s.match(new RegExp(String.raw`^\s*(${LABEL})\s+(?:נקודת\s+)?ה?(?:חיתוך|מפגש)`)) ??
+    s.match(new RegExp(String.raw`^\s*(${LABEL})\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point\b`, 'i'));
   return m ? up(m[1]) : null;
 };
 
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string =>
   dropRingRefs(s) // #2545 (ADR-768): a circle named by its relation to a ring, the ring's labels and all (ADR-291's strip)
-    .replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
+    .replace(new RegExp(String.raw`(?:circle|מעגל)\s+${LABEL}(?!\w)`, 'gi'), ' ');
 
 /**
  * English filler words, lowercase only — typed fillers are lowercase, while
@@ -811,7 +812,7 @@ const REQUEST_WORDS =
  * letters (e.g. "square") aren't mistaken for labels; lowercase filler words
  * are stripped here so "connect A to B" can't read "to" as the labels T,O.
  */
-const PT = String.raw`[A-Za-z]\d*`; // a point token: a letter + an optional digit subscript (O, O1, A12)
+const PT = String.raw`${LABEL}`; // a point token: a letter + an optional digit subscript (O, O1, A12)
 /** #348: the longest collinear list a single statement is read as — a generous bound, since
  *  `labelRun` returns EXACTLY n and the rule probes downward for the longest run that matches. */
 const MAX_COLLINEAR_RUN = 12;
@@ -821,16 +822,17 @@ function labelRun(s: string, n: number): Id[] | null {
   // case-insensitive read, so a lowercase English word can never shadow the student's labels
   // ("draw a square ABCD" used to build square D,R,A,W — "draw" is four PT tokens and scans first).
   // A lowercase run is still accepted when no uppercase one exists («ריבוע abcd»).
-  return runOf(t, n, String.raw`[A-Z]\d*`) ?? runOf(t, n, PT);
+  return runOf(t, n, String.raw`${ULABEL}`) ?? runOf(t, n, PT);
 }
 function runOf(t: string, n: number, tok: string): Id[] | null {
   // A single word of exactly n tokens ("ABCD", "O1O2") — split it back into tokens.
-  const contiguous = t.match(new RegExp(String.raw`\b(?:${tok}){${n}}\b`));
+  // #2624: the run's end is `(?!\w)`, not `\b` — a run ending in a prime («A'B'C'») has no word boundary before a space.
+  const contiguous = t.match(new RegExp(String.raw`\b(?:${tok}){${n}}(?!\w)`));
   if (contiguous) {
     const toks = contiguous[0].match(new RegExp(tok, 'g'));
     if (toks && toks.length === n) return toks.map(up);
   }
-  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b(${tok})\b`).join(String.raw`\s+`)));
+  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b(${tok})(?!\w)`).join(String.raw`\s+`)));
   if (spaced) return spaced.slice(1, n + 1).map(up);
   return null;
 }
@@ -945,7 +947,7 @@ function withAnonymousAutoCentres(commands: AnyCommand[], ctx: ParseContext = NO
 }
 /** The bare labels a command carries (top-level string and array values). */
 const commandLetters = (c: AnyCommand): string[] =>
-  Object.entries(c).flatMap(([k, v]) => (k === 'expr' ? [] : (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))));
+  Object.entries(c).flatMap(([k, v]) => (k === 'expr' ? [] : (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && LABEL_WHOLE.test(x))));
 
 /** The first `n` vertex labels — A, B, C, D, … in order, skipping any already in `used` — for a polygon
  *  the student drew WITHOUT naming its vertices ("מרובע חסום במעגל" / "square"). The convention is to name
@@ -1128,8 +1130,8 @@ const HE_PREFIX_REMNANT = /^[ובלכשמה]{1,3}$/; // «הטרפז» → «ה�
  *  (uppercase runs aren't denylist words) and the fail-closed gate does (#497). */
 const removeClaimed = (s: string, ids: Id[]): string =>
   ids.reduce(
-    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-    ids.length ? s.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' ') : s,
+    (a, id) => a.replace(new RegExp(String.raw`\b${id}(?!\w)`, 'gi'), ' '),
+    ids.length ? s.replace(new RegExp(String.raw`\b${ids.join('')}(?!\w)`, 'i'), ' ') : s,
   );
 /**
  * #1678 ([ADR-601](../../docs/06-decisions.md#adr-601)) — the ADR-024 leftover guard AT THE RUN: the labels a
@@ -1517,8 +1519,8 @@ function midsegmentFree(s: string, ctx: ParseContext): AnyCommand[] | null {
  */
 function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
   const nm =
-    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
-    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`^\s*\b(${LABEL})\s*(${LABEL})(?!\w)\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!nm || !isUpperLabel(nm[1]) || !isUpperLabel(nm[2])) return midsegmentFree(s, ctx);
   const pair = [up(nm[1]), up(nm[2])];
   if (pair[0] === pair[1]) return null;
@@ -1624,7 +1626,7 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
   //     convention the bases are AB ∥ DC, so the legs are the other two sides BC and DA; derive them from
   //     the vertex order (no context needed) and build the trapezoid if it isn't drawn yet. This makes the
   //     self-contained form work (and lets the help catalog carry it).
-  const nameM = s.match(/(?:trapezoid|טרפז)\s*([A-Za-z]\d*)\s+([A-Za-z]\d*)\s+([A-Za-z]\d*)\s+([A-Za-z]\d*)/i)
+  const nameM = s.match(new RegExp(String.raw`(?:trapezoid|טרפז)\s*(${LABEL})\s+(${LABEL})\s+(${LABEL})\s+(${LABEL})`, 'i'))
     ?? s.match(/(?:trapezoid|טרפז)\s*\b([A-Za-z])([A-Za-z])([A-Za-z])([A-Za-z])\b/i);
   if (nameM && [1, 2, 3, 4].every((i) => isUpperLabel(nameM[i]))) {
     const [w, x, y, z] = [up(nameM[1]), up(nameM[2]), up(nameM[3]), up(nameM[4])];
@@ -1663,8 +1665,8 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
   // Named endpoints — "EF קטע אמצעים …" (name-first) or "קטע האמצעים EF …" (keyword-first). Honour the
   // student's labels (the altitude "CD→CF" bug class): UPPERCASE, distinct, and not the trapezoid's vertices.
   const nmM =
-    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
-    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`^\s*\b(${LABEL})\s*(${LABEL})(?!\w)\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   const named =
     nmM && isUpperLabel(nmM[1]) && isUpperLabel(nmM[2]) && up(nmM[1]) !== up(nmM[2]) && !verts.includes(up(nmM[1])) && !verts.includes(up(nmM[2]))
       ? [up(nmM[1]), up(nmM[2])]
@@ -1696,7 +1698,7 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
  */
 const midsegment: Rule = (s, ctx) => {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(s)) return null;
-  const triM = s.match(/(?:triangle|משולש)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)/i);
+  const triM = s.match(new RegExp(String.raw`(?:triangle|משולש)\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})`, 'i'));
   // A TRAPEZOID's median (leg-midpoints) — resolved from the figure's unique parallel base-pair ([ADR-222]).
   // Only when no triangle is explicitly named (a named triangle ⇒ the triangle midsegment below); returns
   // null for a triangle (no parallel pair) or a parallelogram (two), so it never steals those cases.
@@ -1704,7 +1706,7 @@ const midsegment: Rule = (s, ctx) => {
     const trap = trapezoidMidsegment(s, ctx);
     if (trap) return trap;
   }
-  const baseM = s.match(/(?:parallel\s+to|to|מקביל\s*ל-?|לצלע|ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const baseM = s.match(new RegExp(String.raw`(?:parallel\s+to|to|מקביל\s*ל-?|לצלע|ל-?)\s*(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!baseM) return midsegmentBaseless(s, ctx);
   const base = [up(baseM[1]), up(baseM[2])];
   if (base[0] === base[1]) return null;
@@ -1729,8 +1731,8 @@ const midsegment: Rule = (s, ctx) => {
   // NOT be the triangle's own vertices, and the keyword-first labels must sit immediately after the
   // keyword (whitespace only) so the unnamed "…to BC in triangle ABC" is never read as a name.
   const nmM =
-    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
-    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`^\s*\b(${LABEL})\s*(${LABEL})(?!\w)\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   // The named pair must be UPPERCASE labels (not a lowercase connector like "to BC" → T,O) and NOT the
   // triangle's own vertices (that's the triangle/base, not the endpoints).
   const namedM = nmM && isUpperLabel(nmM[1]) && isUpperLabel(nmM[2]) ? nmM : null;
@@ -1826,7 +1828,7 @@ const crossingSubjectOf = (s: string, pointFirst: boolean): CrossingSubject =>
 function namedTriangleAngles(s: string, poly: readonly Id[], result: Id, shapeRun: string | undefined): [Id, Id, Id][] | null | 'invalid' {
   if (poly.length !== 3) return null;
   const text = shapeRun ? s.replace(shapeRun, ' ') : s;
-  const runs = [...text.matchAll(/(?<![A-Za-z])(?:[A-Z]\d*)+(?![A-Za-z])/g)].map((m) => m[0].match(/[A-Z]\d*/g) ?? []);
+  const runs = [...text.matchAll(new RegExp(String.raw`(?<![A-Za-z])(?:${ULABEL})+(?![A-Za-z])`, 'g'))].map((m) => m[0].match(LABEL_G) ?? []);
   const named = runs.filter((r) => !(r.length === 1 && r[0] === result));
   const out: [Id, Id, Id][] = [];
   for (const r of named) {
@@ -1868,21 +1870,21 @@ const specialPointMeet: Rule = (s, ctx) => {
       if (!r.ok) return 'stop';
       out.push(...r.commands);
     }
-    const at = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})\b`, 'i'));
+    const at = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})(?!\w)`, 'i'));
     const X = at ? up(at[1]) : leadingNamedPoint(s) ?? freeLabel(ctx, [a, b, c, d], ['G', 'H', 'I', 'K']);
     return [...out, { type: 'line-line-intersection', id: X, a, b, c, d }];
   }
   // Result label: "… בנקודה X" / "… at X" (after the meet), or "הנקודה X היא …"/"X מפגש …"/"X is the
   // intersection …" (before). Precise so a shape vertex is never mistaken for the result point.
-  const after = s.match(/(?:בנקודה|\bat\b(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
-  const before = s.match(/^\s*([A-Za-z]\d*)\s+(?:היא\s+|הוא\s+|is\s+)?(?:ה?נקודת\s+)?(?:מפגש|the\s+(?:intersection|meeting|concurrency)\b)/i);
+  const after = s.match(new RegExp(String.raw`(?:בנקודה|\bat\b(?:\s+point)?)\s+(${LABEL})(?!\w)`, 'i'));
+  const before = s.match(new RegExp(String.raw`^\s*(${LABEL})\s+(?:היא\s+|הוא\s+|is\s+)?(?:ה?נקודת\s+)?(?:מפגש|the\s+(?:intersection|meeting|concurrency)\b)`, 'i'));
   const named = after ? up(after[1]) : leadingNamedPoint(s) ?? (before ? up(before[1]) : null);
   // Resolve the shape: a named qualifier's label run of the right size, else the figure's single polygon.
   // #770: the qualifier's labels are UPPERCASE runs — the old `[A-Za-z]` read the English word after
   // the noun as labels ("the square MEET at M" → a phantom poly M,E,E,T), which is the #779 case-fold
   // class inside a qualifier regex. A lowercase qualifier now takes the #779 candidate nudge instead.
   const shapeM = s.match(
-    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Z]\d*\s*){3,4})(?![A-Za-z])/,
+    new RegExp(String.raw`(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:${ULABEL}\s*){3,4})(?![A-Za-z])`),
   );
   /**
    * #890 — a STATED shape materialises. «G is the intersection of the diagonals of quadrilateral
@@ -1895,7 +1897,7 @@ const specialPointMeet: Rule = (s, ctx) => {
   const declared: AnyCommand[] = [];
   let poly: Id[] | null = null;
   if (shapeM) {
-    const ids = (shapeM[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
+    const ids = (shapeM[1].match(new RegExp(String.raw`${LABEL}`, 'g')) ?? []).map(up);
     if (ids.length === fam.n) {
       poly = ids;
       const have = (ctx.points ?? []).map(up);
@@ -1917,8 +1919,8 @@ const specialPointMeet: Rule = (s, ctx) => {
   // statement. Diag family only (the demonstrated class; the n=3 heads name their triangle via the
   // shape qualifier above).
   if (!poly && fam.key === 'diag') {
-    const runM = s.match(/(?:אלכסוני|diagonals\s+of)\s+((?:[A-Z]\d*\s*){4})(?![A-Za-z])/i);
-    const ids = runM ? (runM[1].match(/[A-Z]\d*/g) ?? []).map(up) : [];
+    const runM = s.match(new RegExp(String.raw`(?:אלכסוני|diagonals\s+of)\s+((?:${ULABEL}\s*){4})(?![A-Za-z])`, 'i'));
+    const ids = runM ? (runM[1].match(LABEL_G) ?? []).map(up) : [];
     if (ids.length === 4) poly = ids;
   }
   // #770 — the DEFINITE SHAPE NOUN is a reference, not decoration: «אלכסוני הריבוע» binds the ring the
@@ -2053,7 +2055,7 @@ const specialPointMeet: Rule = (s, ctx) => {
 const diagonals: Rule = (s, ctx) => {
   if (!/אלכסונים|אלכסוני|\bdiagonals\b/i.test(s)) return null;
   // (A) named diagonals: two label-pairs joined by ו/and/comma
-  const named = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?|,|and)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const named = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*(?:ו-?|,|and)\s*\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (named && named.slice(1, 5).every(isUpperLabel)) {
     // #966: explicitly NAMED diagonals make the same role claim the singular does, so they carry the
     // same flag. Form (B) below DERIVES the pairs from the ring and is correct by construction — there
@@ -2110,7 +2112,7 @@ const segment: Rule = (s) => {
  * as a catch-all, so anything with structure is claimed ahead of it.
  */
 const bareSegment: Rule = (s) => {
-  const m = s.trim().match(/^(?:line\s+|ישר\s+|הישר\s+|ה?קו\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)$/);
+  const m = s.trim().match(new RegExp(String.raw`^(?:line\s+|ישר\s+|הישר\s+|ה?קו\s+)?(${LABEL})\s*(${LABEL})$`));
   if (!m) return null;
   const a = up(m[1]), b = up(m[2]);
   if (a === b) return null; // "AA" is not a segment
@@ -2148,9 +2150,9 @@ const tangentsMeet: Rule = (s, ctx) => {
   const pairsByKey = ctx.commonTangents ?? {};
   const keys = Object.keys(pairsByKey);
   // The named meet point: «בנקודה K» or the one label the utterance names.
-  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה)\s*(${LABEL})(?!\w)`, 'i'));
   // Letter RUNS split into labels («AB ו-CD» → A,B,C,D — the shared toks pattern).
-  const labels = [...new Set((dropCircleRef(s).match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((t) => t.match(/[A-Z]\d*/g) ?? []).map(up))];
+  const labels = [...new Set((dropCircleRef(s).match(new RegExp(String.raw`\b(?:${ULABEL}){1,2}(?!\w)`, 'g')) ?? []).flatMap((t) => t.match(LABEL_G) ?? []).map(up))];
   const K = atM ? up(atM[1]) : null;
   // Labeled form: two stated pairs, both recognised tangents of ONE circle pair.
   const runs = labels.filter((l) => l !== K);
@@ -2215,7 +2217,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // #776: «מפגש» (and En "meeting") join the label-first slot — «M מפגש AB ו-CD» is the same
   // statement as «M חיתוך AB ו-CD», and the terse spelling is what prod typed (session ah1kqxz5).
   const pointFirst = t.match(
-    /\b([A-Za-z]\d*)\b.*?(?:intersection|meeting|∩|חיתוך|נחתך|מפגש).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`\b(${LABEL})(?!\w).*?(?:intersection|meeting|∩|חיתוך|נחתך|מפגש).*?\b(${LABEL})\s*(${LABEL})(?!\w).*?\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
   );
   // PER-OPERAND reference semantics (issue #22, the ADR-077 principle generalized): each pair operand is,
   // independently, a bare SEGMENT reference (crossing must land WITHIN it), a "המשך"/extension (directional
@@ -2303,7 +2305,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
     return cross(m[1], m[2], m[3], m[4], m[5], sem1, distribute(sem1, semOf(s2)), 'point'); // the noun head: point first
   }
   const linesFirst = t.match(
-    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w).*?\b(${LABEL})\s*(${LABEL})(?!\w).*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b(${LABEL})(?!\w)`, 'i'),
   );
   if (linesFirst) {
     const m = linesFirst;
@@ -2314,7 +2316,7 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // cut-form: seg1, the CUT verb, seg2, then the point — "BD חותך את OC בנקודה A" / "BD cuts OC at A".
   // (The verb between the segments is what the lines-first form, which needs it AFTER both, misses.)
   const cutForm = t.match(
-    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w).*?(?:חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?).*?\b(${LABEL})\s*(${LABEL})(?!\w).*?\b(${LABEL})(?!\w)`, 'i'),
   );
   if (cutForm) {
     const m = cutForm;
@@ -2336,12 +2338,12 @@ const lineLineIntersection: Rule = (s, ctx) => {
   // (`tangentsMeet` owns the named form).
   if (!EXT_RE.test(s) && !LINE_RE.test(s)) {
     const unnamedCut = t.match(
-      /^\s*(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:חות[כך]|נחתכ[א-ת]*|נפגש[א-ת]*|פוגש[א-ת]*|cuts?|crosses?|intersects?|meets?)\s*(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*[.!]?\s*$/i,
+      new RegExp(String.raw`^\s*(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*(${LABEL})\s*(${LABEL})(?!\w)\s*(?:חות[כך]|נחתכ[א-ת]*|נפגש[א-ת]*|פוגש[א-ת]*|cuts?|crosses?|intersects?|meets?)\s*(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*(${LABEL})\s*(${LABEL})(?!\w)\s*[.!]?\s*$`, 'i'),
     );
     const unnamedMeet =
       unnamedCut ??
       t.match(
-        /^\s*(?:ה?קטעים\s+|ה?אלכסונים\s+|segments\s+|diagonals\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?\s*|and\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:נפגש[א-ת]*|נחתכ[א-ת]*|מצטלב[א-ת]*|intersect\w*|meets?|cross(?:es)?)\s*(?:זה\s+(?:את|עם)\s+זה)?\s*[.!]?\s*$/i,
+        new RegExp(String.raw`^\s*(?:ה?קטעים\s+|ה?אלכסונים\s+|segments\s+|diagonals\s+)?(${LABEL})\s*(${LABEL})(?!\w)\s*(?:ו-?\s*|and\s+)(${LABEL})\s*(${LABEL})(?!\w)\s*(?:נפגש[א-ת]*|נחתכ[א-ת]*|מצטלב[א-ת]*|intersect\w*|meets?|cross(?:es)?)\s*(?:זה\s+(?:את|עם)\s+זה)?\s*[.!]?\s*$`, 'i'),
       );
     if (unnamedMeet) {
       const [a, b, c, d] = [up(unnamedMeet[1]), up(unnamedMeet[2]), up(unnamedMeet[3]), up(unnamedMeet[4])];
@@ -2390,14 +2392,14 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   // F = the on-circle point the diameter goes FROM ("from F" / "מנקודה F" / "היוצא מ-F")
-  const fromM = s.match(/(?:from(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?)\s*([A-Za-z]\d*)/i);
+  const fromM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?)\s*(${LABEL})`, 'i'));
   if (!fromM) return null;
   const F = up(fromM[1]);
   // Everything AFTER the cut verb names the target side XY and the result point E.
   const kw = s.match(INTERSECT_KW);
   const after = kw ? s.slice((kw.index ?? 0) + kw[0].length) : '';
   const seg = labelRun(after.replace(/את|\bthe\b|\bside\b|הצלע|הקטע|\bline\b|הישר|הקו|בנקודה|\bat\b/gi, ' '), 2);
-  const atM = after.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  const atM = after.match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'i'));
   if (!seg || !atM) return null;
   const [X, Y] = seg;
   const E = up(atM[1]);
@@ -2465,7 +2467,7 @@ const bareVertexAngle: Rule = (s, ctx) => {
   // UPPERCASE only: in this grammar a lowercase letter is a SYMBOL (a unit variable `a = 6`, a bound
   // radius symbol `r`), never a point label. Coercing case here claimed `a = 6` and — because a vertex
   // with a different edge count clarifies — made it unparseable, killing the symbolic-unit rule downstream.
-  const m = s.match(/^\s*([A-Z]\d*)\s*=\s*(\d+(?:\.\d+)?)\s*°?\s*\.?\s*$/);
+  const m = s.match(new RegExp(String.raw`^\s*(${ULABEL})\s*=\s*(\d+(?:\.\d+)?)\s*°?\s*\.?\s*$`));
   if (!m) return null;
   const v = m[1];
   if (!(ctx.points ?? []).includes(v)) return null; // not a point → not an angle statement
@@ -2492,10 +2494,10 @@ const bisectorIntersection: Rule = (s, ctx) => {
   // angle; anything else → the ambiguous-angle clarification ("name all three letters").
   const vform =
     s.match(
-      /^חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+ו-?חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+נפגש(?:ים|ות)\s+בנקודה\s+([A-Za-z]\d*)\s*\.?\s*$/,
+      new RegExp(String.raw`^חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+ו-?חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+נפגש(?:ים|ות)\s+בנקודה\s+(${LABEL})\s*\.?\s*$`),
     ) ??
     s.match(
-      /^the\s+bisectors?\s+of\s+angles?\s+([A-Za-z])\s+and\s+(?:of\s+)?(?:angle\s+)?([A-Za-z])\s+meet\s+at\s+(?:point\s+)?([A-Za-z]\d*)\s*\.?\s*$/i,
+      new RegExp(String.raw`^the\s+bisectors?\s+of\s+angles?\s+([A-Za-z])\s+and\s+(?:of\s+)?(?:angle\s+)?([A-Za-z])\s+meet\s+at\s+(?:point\s+)?(${LABEL})\s*\.?\s*$`, 'i'),
     );
   if (vform) {
     const triples: string[] = [];
@@ -2531,10 +2533,10 @@ const bisectorIntersection: Rule = (s, ctx) => {
 const foot: Rule = (s) => {
   if (!/\bfoot\b|רגל/i.test(s)) return null;
   const en = s.match(
-    new RegExp(String.raw`([A-Za-z]\d*)\b.*?\bfoot\b.*?from\s+([A-Za-z]\d*)\b.*?to\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'),
+    new RegExp(String.raw`(${LABEL})(?!\w).*?\bfoot\b.*?from\s+(${LABEL})(?!\w).*?to\s+(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
   );
   const he = s.match(
-    new RegExp(String.raw`([A-Za-z]\d*)\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z]\d*)\b.*?(?:אל\s*|ל-?\s*)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
+    new RegExp(String.raw`(${LABEL})(?!\w).*?רגל.*?(?:מהנקודה\s*|מ-?\s*)(${LABEL})(?!\w).*?(?:אל\s*|ל-?\s*)(${LABEL})\s*(${LABEL})(?!\w)`),
   );
   const m = en ?? he;
   if (!m) return null;
@@ -2553,7 +2555,7 @@ const foot: Rule = (s) => {
 const midpoint: Rule = (s, ctx) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
   // Leading \b so "point M is the midpoint …" reads M, not the "t" of "poin**t**".
-  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})(?!\w).*?(?:midpoint|אמצע)\s*(.*)`, 'i'));
   let id = m ? up(m[1]) : null;
   let tail = m ? m[2] : null;
   if (!m) {
@@ -2574,9 +2576,9 @@ const midpoint: Rule = (s, ctx) => {
   if (!id) {
     // Nothing but the one segment may remain in the unnamed tail — extra labels or words mean a
     // compound (escalate). Label runs are GLUED ("AB"), so count tokens and strip whole runs.
-    const toks = rest.match(/[A-Z]\d*/g) ?? [];
+    const toks = rest.match(LABEL_G) ?? [];
     if (toks.length !== 2) return null;
-    const leftover = rest.replace(/\b(?:[A-Z]\d*)+\b/g, ' ').replace(REQUEST_WORDS, ' ').trim();
+    const leftover = rest.replace(new RegExp(String.raw`\b(?:${ULABEL})+(?!\w)`, 'g'), ' ').replace(REQUEST_WORDS, ' ').trim();
     if (leftover) return null;
     id = freeLabel(ctx, [...(ctx.circles ?? [])], ['M', 'N', 'K', 'L']);
   }
@@ -2615,7 +2617,7 @@ const extendVerb: Rule = (s, ctx) => {
   // the target marker tolerates every ל / נקודה combination the register uses: «עד לנקודה D», «עד נקודה D»,
   // «עד ל-D», «עד D», "to point D", "to D"
   const m = s.match(
-    /([\s\S]*?)(?:עד\s*(?:ל[-\s]*)?(?:ה?נקודה\s*(?:ל[-\s]*)?)?|\bto\s+(?:the\s+)?(?:point\s+)?)([A-Za-z]\d*)(?![A-Za-z])/i,
+    new RegExp(String.raw`([\s\S]*?)(?:עד\s*(?:ל[-\s]*)?(?:ה?נקודה\s*(?:ל[-\s]*)?)?|\bto\s+(?:the\s+)?(?:point\s+)?)(${LABEL})(?![A-Za-z])`, 'i'),
   );
   if (!m) return null;
   const seg = labelRun(m[1].replace(FILLER, ' '), 2);
@@ -2638,13 +2640,13 @@ const pointOnExtension: Rule = (s, ctx) => {
   // Copula form first: "המשך CD היא נקודה A" / "the extension of CD is point A" — the segment's two labels
   // sit right after the extension word, the named point after the copula (היא/הוא/is).
   const cop = s.match(
-    /(?:extension\s+of|המש(?:ך|כי(?:ם|הם|הן)?))\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[\s\S]*?(?:\bis\b|היא|הוא)\s*(?:the\s+point\s+|נקודה\s+|point\s+)?([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`(?:extension\s+of|המש(?:ך|כי(?:ם|הם|הן)?))\s+(${LABEL})\s*(${LABEL})(?!\w)[\s\S]*?(?:\bis\b|היא|הוא)\s*(?:the\s+point\s+|נקודה\s+|point\s+)?(${LABEL})(?!\w)`, 'i'),
   );
   if (cop) {
     seg = [up(cop[1]), up(cop[2])];
     id = up(cop[3]);
   } else {
-    const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המש(?:ך|כי(?:ם|הם|הן)?))\s*(.*)/i);
+    const m = s.match(new RegExp(String.raw`(?:point\s+|נקודה\s+)?(${LABEL})(?!\w).*?(?:extension|המש(?:ך|כי(?:ם|הם|הן)?))\s*(.*)`, 'i'));
     if (!m) return null;
     // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
     seg = labelRun(m[2].replace(FILLER, ' '), 2);
@@ -2713,7 +2715,7 @@ const centralAngle: Rule = (s, ctx) => {
   // "…נשענת על CB"). With a signal present the endpoints are the trailing letter PAIR (a central-angle
   // utterance names exactly those two labels). The centre is then resolved from the circle they ride.
   const arcSignal = /קשת|\barc\b|⌢|⏜|נשע|subtend|rest\w*\s+on/i.test(body);
-  const arcM = arcSignal ? body.match(/([A-Z]\d*)\s*([A-Z]\d*)\s*$/) : null;
+  const arcM = arcSignal ? body.match(new RegExp(String.raw`(${ULABEL})\s*(${ULABEL})\s*$`)) : null;
   if (arcM) {
     a = up(arcM[1]);
     b = up(arcM[2]);
@@ -2865,7 +2867,7 @@ function angleReadingsOf(cmds: AnyCommand[], sink: AngleArms[]): string[] {
  * building square D,R,A,W). Contiguity likewise keeps a THREE-letter run out: `\b([A-Z])([A-Z])\b` cannot
  * match inside «ABC», so the triple spelling can never be re-read as a segment pair.
  */
-const ANGLE_SIDE_PAIR_RE = /\b([A-Z]\d*)([A-Z]\d*)\b/g;
+const ANGLE_SIDE_PAIR_RE = new RegExp(String.raw`\b(${ULABEL})(${ULABEL})(?!\w)`, 'g');
 /** #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)) — the angle-family rules' noun, compiled WITHOUT `/i` (the
  *  lexicon atom spells its case, so «angleABC = 40» still reads while «angled» does not): the test and the strip. */
 const ANGLE_KW_RE = new RegExp(ANGLE_KW);
@@ -2903,7 +2905,7 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
   // ASK for all three letters rather than guessing or escalating to the LLM.
   // Gated to a CLEAN single-label text so compounds fall through.
   const one = labelRun(text, 1); // labelRun already uppercases a lone lowercase label (`d` -> `D`)
-  const upperCount = (text.match(/[A-Z]\d*/g) ?? []).length;
+  const upperCount = (text.match(LABEL_G) ?? []).length;
   // A LOWERCASE vertex (#45 / ADR-299): «נתון זווית d=90». `labelRun` resolves it, but an
   // uppercase-only count reads zero labels and bails. Count a LONE lowercase Latin letter too — but
   // only when there is NO uppercase label, so a filler word's letters are never counted.
@@ -3325,12 +3327,12 @@ const angleAliasRule: Rule = (s, ctx) => {
   // VERTEX-letter + digit name (CAD כ 1 ⇒ A1), displayed as the digit alone (#262/#263, ADR-386 Am.).
   const m =
     s.match(
-      new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])`),
+      new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})(?!\w)[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])`),
     ) ??
     // The «=» binder (#267): «נסמן ∠CAD=A1» / «denote ∠CAD = A1» — the notation-first spelling the toolbar
     // «∠» invites. The name MUST be a letter+digit LABEL (A1/B2), never a bare number — «∠CAD=40» is a
     // VALUE (owned by the `angle` rule) and «∠CAD=∠DEF» an EQUALITY; both are excluded by requiring `[A-Z]\d+`.
-    s.match(new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b\s*=\s*(?:∠|∢|זוו?ית)?\s*([A-Z]\d+)(?![A-Za-z\d])`));
+    s.match(new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*(?:∠|∢|זוו?ית)?\s*([A-Z]\d+)(?![A-Za-z\d])`));
   if (!m) {
     // ALL-OR-NOTHING (the ADR-024 leftover guard; issue #262 P1): a NAMING-shaped utterance — the
     // sign/denote verb + an angle + ANY digit and no stated «=» — that this rule cannot bind must
@@ -3447,7 +3449,7 @@ function arcSize(s: string, ctx: ParseContext): ReturnType<Rule> {
   if (!m || /אורך|length|[+−]/i.test(m[1]) || !/arc|קשת|⌢|⏜/i.test(m[1])) return null; // «אורך הקשת …» is roundMeasure's; sums are measureSum's
   const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
   const pair = labelRun(stripped, 2);
-  if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+  if (!pair || (stripped.match(LABEL_G) ?? []).length !== 2) return null;
   const value = m[2].trim();
   if (roundValue(value)?.pi) return roundSize(ctx, 'arc', pair, value);
   if (!ARC_SYMBOL_MARK.test(value)) return null;
@@ -3481,11 +3483,11 @@ const arcValue: Rule = (s, ctx) => {
   if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
   // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
   // A plain fraction is degrees too (ADR-789): with no unit, nothing in the line says length.
-  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
+  const m = s.match(new RegExp(String.raw`^(.*?)=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+${LABEL}\s*)?$`, 'is'));
   if (!m) return arcSize(s, ctx); // not a degree number: a π value is the arc's LENGTH, a symbol is asked about (ADR-664)
   const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
   const pair = labelRun(stripped, 2);
-  if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
+  if (!pair || (stripped.match(LABEL_G) ?? []).length !== 2) return null; // not a single-arc value shape
   const center = resolveCenter(s, ctx);
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
   const value = parseFloat(m[2]) / (m[3] ? parseFloat(m[3]) : 1);
@@ -3515,7 +3517,7 @@ const SEG_NOUN = String.raw`(?:(?:the\s+)?(?:${CARRIER_NOUN})\s+)?`;
  * their own keyword and grab the bare "AB" run, silently dropping the named rider point.
  */
 const POINT_ON_CARRIER = new RegExp(
-  String.raw`[A-Za-z]\d*\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+(?:the\s+)?(?:${CARRIER_NOUN})\s`,
+  String.raw`${LABEL}\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+(?:the\s+)?(?:${CARRIER_NOUN})\s`,
   'i',
 );
 
@@ -3527,7 +3529,7 @@ const POINT_ON_CARRIER = new RegExp(
 const pointOnSegment: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
+      String.raw`(?:point\s+|נקודה\s+)?(${LABEL})\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+${SEG_NOUN}(${LABEL})\s*(${LABEL})(?!\w)(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
       'i',
     ),
   );
@@ -3543,7 +3545,7 @@ const pointOnSegment: Rule = (s) => {
   // angle `הזווית בין`, swap `החלף בין`, area-ratio) — but those lead with a Hebrew word, so anchoring the
   // SUBJECT to a Latin label at the START already excludes them; a keyword bow-out guards the rest.
   const bw = s.match(
-    new RegExp(String.raw`^\s*(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:is\s+)?(?:בין|between)\s+([A-Za-z]\d*)\s+(?:and|ל-?|ו-?)\s*([A-Za-z]\d*)\b`, 'i'),
+    new RegExp(String.raw`^\s*(?:point\s+|נקודה\s+)?(${LABEL})\s+(?:is\s+)?(?:בין|between)\s+(${LABEL})\s+(?:and|ל-?|ו-?)\s*(${LABEL})(?!\w)`, 'i'),
   );
   if (bw && !/יחס|ratio|זוו?ית|\bangle\b|החלף|\bswap\b|שטח|\barea\b/i.test(s))
     return [{ type: 'point-on-segment', id: up(bw[1]), a: up(bw[2]), b: up(bw[3]) }];
@@ -3566,7 +3568,7 @@ const pointsOnSegment: Rule = (s) => {
       // The verb «נמצאות/נמצאים» ("are located on") sits between the "points" noun and «על» — the singular
       // `pointOnSegment` and the circle-list rule (ADR-240) both accept it, so the TWO-points form must too,
       // else «M ו N נמצאות על הצלע BC» escalated to the LLM (#245). En «lie/lies/are located on».
-      String.raw`\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+|is\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:נמצא[א-ת]*\s+|lie[sn]?\s+|located\s+)?(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`,
+      String.raw`\b(${LABEL})\s*(?:,|and|ו-?)\s*(${LABEL})(?!\w)\s*(?:are\s+|is\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:נמצא[א-ת]*\s+|lie[sn]?\s+|located\s+)?(?:on|על)\s+${SEG_NOUN}(${LABEL})\s*(${LABEL})(?!\w)`,
       'i',
     ),
   );
@@ -3596,8 +3598,8 @@ const pointsOnSegments: Rule = (s) => {
   if (/circle|מעגל/i.test(s)) return null; // points on a CIRCLE → the circle rules
   const m = s.match(/^(.*?)(?:\bon\b|על)\s+(.*)$/i);
   if (!m) return null;
-  const pts = (m[1].match(/[A-Z]\d*/g) ?? []).map(up); // point labels before "on"
-  const segLabels = (m[2].match(/[A-Z]\d*/g) ?? []).map(up); // segment endpoint labels after it
+  const pts = (m[1].match(LABEL_G) ?? []).map(up); // point labels before "on"
+  const segLabels = (m[2].match(LABEL_G) ?? []).map(up); // segment endpoint labels after it
   if (pts.length < 2 || segLabels.length !== 2 * pts.length) return null; // N points ↔ N two-letter segments
   if (new Set(pts).size !== pts.length) return null; // the points are distinct
   const out: AnyCommand[] = [];
@@ -3614,13 +3616,13 @@ const pointsOnSegments: Rule = (s) => {
 const pointByDistances: Rule = (s) => {
   const en = s.match(
     new RegExp(
-      String.raw`(?:point\s+)?([A-Za-z]\d*)\s+(?:is\s+)?${num}\s+from\s+([A-Za-z]\d*)\s+and\s+${num}\s+from\s+([A-Za-z]\d*)`,
+      String.raw`(?:point\s+)?(${LABEL})\s+(?:is\s+)?${num}\s+from\s+(${LABEL})\s+and\s+${num}\s+from\s+(${LABEL})`,
       'i',
     ),
   );
   const he = s.match(
     new RegExp(
-      String.raw`(?:נקודה\s+)?([A-Za-z]\d*)\s+במרחק\s+${num}\s+מ-?\s*([A-Za-z]\d*)\s+ו-?\s*${num}\s+מ-?\s*([A-Za-z]\d*)`,
+      String.raw`(?:נקודה\s+)?(${LABEL})\s+במרחק\s+${num}\s+מ-?\s*(${LABEL})\s+ו-?\s*${num}\s+מ-?\s*(${LABEL})`,
     ),
   );
   const m = en ?? he;
@@ -3671,7 +3673,7 @@ function affineTailOf(g: Record<string, string | undefined>, p: string): { konst
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
     new RegExp(
-      String.raw`(?<![A-Za-z\d])(?:${NUMEXPR('m')}\s*[*·]?\s*)?(?<la>[A-Za-z]\d*)\s*(?<lb>[A-Za-z]\d*)\b\s*=\s*(?:${NUMEXPR('n')}\s*[*·]?\s*)?(?<lc>[A-Za-z]\d*)\s*(?<ld>[A-Za-z]\d*)\b\s*(?:\/\s*${NUMEXPR('q')})?`,
+      String.raw`(?<![A-Za-z\d])(?:${NUMEXPR('m')}\s*[*·]?\s*)?(?<la>${LABEL})\s*(?<lb>${LABEL})(?!\w)\s*=\s*(?:${NUMEXPR('n')}\s*[*·]?\s*)?(?<lc>${LABEL})\s*(?<ld>${LABEL})(?!\w)\s*(?:\/\s*${NUMEXPR('q')})?`,
     ),
   );
   const g = en?.groups ?? {};
@@ -3687,7 +3689,7 @@ const ratioConstraint: Rule = (s) => {
   // skip an optional noun after מ; the LHS noun prefix ("אורך AC" / "הצלע BC") is absorbed by the `[^=]*?`.
   const he = s.match(
     new RegExp(
-      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b(?<hmid>[^=]*?)פי\s*${NUMEXPR('k')}\s*מ-?\s*(?:(?:ה?קטע|ה?צלע|אורך|ה?ישר)\s+)?(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
+      String.raw`(?<ha>${LABEL})\s*(?<hb>${LABEL})(?!\w)(?<hmid>[^=]*?)פי\s*${NUMEXPR('k')}\s*מ-?\s*(?:(?:ה?קטע|ה?צלע|אורך|ה?ישר)\s+)?(?<hc>${LABEL})\s*(?<hd>${LABEL})(?!\w)`,
     ),
   );
   if (he) {
@@ -3730,7 +3732,7 @@ const incompleteComparative: Rule = (s) => {
       // (`lexical-ratchet.test.ts`, docs/24 S2.1) caught this rule inlining two more label fragments
       // and refused it — those ceilings only ever go DOWN, and a brand-new rule is exactly what they
       // exist to catch.
-      String.raw`(?<![A-Za-z\d])(?<a>${LABEL})\s*(?<b>${LABEL})\b[^=]{0,24}?פי\s*${NUMEXPR('k')}\s*$`,
+      String.raw`(?<![A-Za-z\d])(?<a>${LABEL})\s*(?<b>${LABEL})(?!\w)[^=]{0,24}?פי\s*${NUMEXPR('k')}\s*$`,
     ),
   );
   if (!m) return null;
@@ -3748,7 +3750,7 @@ const incompleteComparative: Rule = (s) => {
 const segmentRatio: Rule = (s) => {
   // RHS value uses the shared NUMEXPR atom (ADR-298) so "√(2)", "√(2/3)" (the √() toolbar form) and quotient
   // radicals parse, not only the RATVAL "√2/2" shapes (issue #114).
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${NUMEXPR('v')}`));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*\/\s*\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*${NUMEXPR('v')}`));
   if (!m) return null;
   const v = numexprVal(m.groups!, 'v');
   if (!v) return null;
@@ -4034,13 +4036,13 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       coef = v.value;
       chunk = chunk.slice(cm[0].length);
     }
-    const labels = chunk.match(/[A-Z]\d*/g) ?? [];
+    const labels = chunk.match(LABEL_G) ?? [];
     // 3) an ARC term → its central angle (needs the resolved circle centre). The label count runs on
     // the STRIPPED text so a trailing circle reference («arc BC in circle O») isn't read as a 3rd label.
     if (ARC_KW.test(chunk)) {
       const stripped = dropCircleRef(chunk).replace(new RegExp(ARC_KW.source, 'gi'), ' ').replace(/\bin\b|\bof\b|של|ב-?/gi, ' ');
       const pair = labelRun(stripped, 2);
-      if (!pair || !center || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+      if (!pair || !center || (stripped.match(LABEL_G) ?? []).length !== 2) return null;
       side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], centrePt(ctx, up(center)), pair[1]], arc: true });
       sign = 1;
       continue;
@@ -4064,7 +4066,7 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       continue;
     }
     // 5) a bare segment PAIR («AB»), optionally over a numeric divisor («AB/2»)
-    const pm = chunk.match(/^([A-Z]\d*)\s*([A-Z]\d*)\s*(?:\/\s*(\d+(?:\.\d+)?))?$/);
+    const pm = chunk.match(new RegExp(String.raw`^(${ULABEL})\s*(${ULABEL})\s*(?:\/\s*(\d+(?:\.\d+)?))?$`));
     if (pm && labels.length === 2) {
       const div = pm[3] !== undefined ? parseFloat(pm[3]) : 1;
       if (div === 0) return null;
@@ -4162,8 +4164,8 @@ function parseProductSide(raw: string): { k: number; factors: [Id, Id][] } | nul
       out.k *= v.value;
       chunk = chunk.slice(cm[0].length);
     }
-    const pm = chunk.match(/^([A-Z]\d*)\s*([A-Z]\d*)\s*(²|\^2)?$/);
-    if (!pm || (chunk.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+    const pm = chunk.match(new RegExp(String.raw`^(${ULABEL})\s*(${ULABEL})\s*(²|\^2)?$`));
+    if (!pm || (chunk.match(LABEL_G) ?? []).length !== 2) return null;
     out.factors.push([pm[1], pm[2]]);
     if (pm[3] !== undefined) out.factors.push([pm[1], pm[2]]); // ² = the factor twice
   }
@@ -4234,7 +4236,7 @@ const lengthProduct: Rule = (s) => {
  */
 const segmentRatioColon: Rule = (s) => {
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*:\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATPQ}\s*\.?\s*$`),
+    new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*:\s*\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*${RATPQ}\s*\.?\s*$`),
   );
   if (!m) return null;
   const k = ratioTerms(m.groups!);
@@ -4270,7 +4272,7 @@ const dividesInRatio: Rule = (s) => {
   // (a) divider-first: "G divides DC in ratio p:q" / "G מחלקת את DC ביחס p:q".
   const div = s.match(
     new RegExp(
-      String.raw`([A-Za-z]\d*)\s+(?:divides?|מחלק[הת]?)\s+(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[\s\S]*?(?:ratio|ביחס|יחס)\D*?${RATPQ}`,
+      String.raw`(${LABEL})\s+(?:divides?|מחלק[הת]?)\s+(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+)?(${LABEL})\s*(${LABEL})(?!\w)[\s\S]*?(?:ratio|ביחס|יחס)\D*?${RATPQ}`,
       'i',
     ),
   );
@@ -4302,14 +4304,14 @@ const dividesInRatio: Rule = (s) => {
  * When this matches, only `segmentRatio` (which runs first) may handle it; an RHS it can't read then
  * escalates honestly rather than half-parsing.
  */
-const SEG_RATIO_LHS = new RegExp(String.raw`\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*\/\s*\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*=`);
+const SEG_RATIO_LHS = new RegExp(String.raw`\b${LABEL}\s*${LABEL}(?!\w)\s*\/\s*\b${LABEL}\s*${LABEL}(?!\w)\s*=`);
 
 /**
  * A DIVIDED RHS — "= CD/2" — is a ratio (|AB| = |CD|/2), not an equality. Guards `equalSegments`
  * from matching the "AB = CD" prefix and dropping the "/2" (the ADR-024/026 silent-half-parse class);
  * `ratioConstraint` owns this form. Same discipline as `SEG_RATIO_LHS` on `distanceConstraint`.
  */
-const SEG_DIV_RHS = new RegExp(String.raw`=\s*[A-Za-z]\d*\s*[A-Za-z]\d*\s*\/\s*${COEF}`);
+const SEG_DIV_RHS = new RegExp(String.raw`=\s*${LABEL}\s*${LABEL}\s*\/\s*${COEF}`);
 
 /**
  * An optional CARRIER NOUN before a label pair — "מיתר AB" / "the chord AB" / "קוטר CD". The relation
@@ -4328,7 +4330,7 @@ const CARRIER_PRE = String.raw`(?:(?:the\s+)?(?:chord|diameter|radius)\s+|ה?(?:
  */
 const equalSegments: Rule = (s) => {
   if (SEG_DIV_RHS.test(s)) return null; // "= CD/2" is a ratio, not an equality — let ratioConstraint own it
-  const m = s.match(new RegExp(String.raw`${CARRIER_PRE}\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${CARRIER_PRE}\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'));
+  const m = s.match(new RegExp(String.raw`${CARRIER_PRE}\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*${CARRIER_PRE}\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
   return [
@@ -4347,7 +4349,7 @@ const equalSegments: Rule = (s) => {
  */
 const distanceConstraint: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null;
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\s*$`));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*${num}\s*$`));
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
   return [
@@ -4393,7 +4395,7 @@ const normVar = (v: string): string => v;
  */
 const measurePi: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null; // a ratio's RHS, not a length — let segmentRatio own it
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*(${COEF})?\s*[*·]?\s*π`));
   if (!m) return null;
   const c = m[3] ? parseFloat(m[3]) : 1;
   return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` }, consumed: PI_CONSUMED }];
@@ -4418,7 +4420,7 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
     const labelStart = kwEnd + (raw.length - after.length); // where the vertex run begins in `s`
     // Read ONLY the leading vertex run (the labels right after the shape word) — never scan ahead, or a later
     // filler word ("area", "of") would be read as labels (the word "area" → A,R,E,A bug).
-    const lead = after.match(/^((?:[A-Za-z]\d*\s*){3,4})/);
+    const lead = after.match(new RegExp(String.raw`^((?:${LABEL}\s*){3,4})`));
     const ids = lead ? (labelRun(lead[1], 4) ?? labelRun(lead[1], 3)) : null;
     if (ids) {
       refs.push({ ids, at: m.index });
@@ -4433,7 +4435,7 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
   // compact S-notation: S immediately followed by 3–4 uppercase vertex labels (SABC / SABCD).
   // `(?<![A-Za-z])` (not `\b`) so a COEFFICIENT glued to the marker is allowed — "4SNCE" (the ratio
   // `SACD = 4SNCE`) must still find SNCE, where `\b` failed because digit↔S is not a word boundary.
-  const reS = /(?<![A-Za-z])S((?:[A-Z]\d*){3,4})\b/g;
+  const reS = new RegExp(String.raw`(?<![A-Za-z])S((?:${ULABEL}){3,4})(?!\w)`, 'g');
   while ((m = reS.exec(s)) !== null) {
     const ids = labelRun(m[1], 4) ?? labelRun(m[1], 3);
     if (ids && !seen.has(m.index)) refs.push({ ids, at: m.index });
@@ -4587,7 +4589,7 @@ function perimeterReferences(s: string): { ids: Id[]; at: number }[] {
     const kwEnd = m.index + m[0].length;
     const raw = s.slice(kwEnd);
     const after = raw.replace(new RegExp(String.raw`^(?:\s+(?:of|the|של|ה))*\s*${AREA_SHAPE}?\s*`, 'i'), '');
-    const lead = after.match(/^((?:[A-Za-z]\d*\s*){3,4})/);
+    const lead = after.match(new RegExp(String.raw`^((?:${LABEL}\s*){3,4})`));
     const ids = lead ? (labelRun(lead[1], 4) ?? labelRun(lead[1], 3)) : null;
     if (ids) refs.push({ ids, at: m.index });
   }
@@ -4782,7 +4784,7 @@ const measureLength: Rule = (s) => {
   // "AB = 3x²" must NOT half-parse to "3x" (measurePower runs first and owns it); a leftover suffix
   // falls through to escalation instead of a wrong partial parse (the ADR-024/026 class). (R6a.)
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*${AFFINE_TAIL('lt')}\s*$`),
+    new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*${AFFINE_TAIL('lt')}\s*$`),
   );
   if (!m) return null;
   const num = m[3] ? parseFloat(m[3]) : 1;
@@ -4827,7 +4829,7 @@ const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\}
  */
 const measureFraction: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null;
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${NUMEXPR('v')}\s*$`));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*${NUMEXPR('v')}\s*$`));
   if (!m || !isNewValueForm(m.groups!, 'v')) return null; // bare `35` / `12√2` → their owners; a quotient or a √(…) group is ours
   const val = numexprVal(m.groups!, 'v');
   if (!val) return null;
@@ -4836,7 +4838,7 @@ const measureFraction: Rule = (s) => {
 
 const measureSqrt: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null; // don't grab the "AE=√2" fragment inside "EB/AE=√2/2"
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}\s*[*·]?\s*(${LVAR})?(?![a-zA-Z])\s*$`, 'i'));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}\s*[*·]?\s*(${LVAR})?(?![a-zA-Z])\s*$`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
@@ -4867,7 +4869,7 @@ const measureSqrt: Rule = (s) => {
  */
 const measurePower: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null;
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
+  const m = s.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
@@ -4980,7 +4982,7 @@ const measureOrder: Rule = (s) => {
  */
 const lengthOrder: Rule = (s) => {
   let a: string, b: string, c: string, d: string, leftLarger: boolean;
-  const SEG = String.raw`\|?([A-Za-z]\d*)\s*([A-Za-z]\d*)\|?`;
+  const SEG = String.raw`\|?(${LABEL})\s*(${LABEL})\|?`;
   // Each side may carry a carrier noun ("מיתר AB > מיתר CD") — membership is restored by the post-pass.
   const sym = s.match(new RegExp(String.raw`^\s*${CARRIER_PRE}${SEG}\s*(<=|>=|<|>|≤|≥)\s*${CARRIER_PRE}${SEG}\s*$`, 'i'));
   if (sym) {
@@ -5022,7 +5024,7 @@ const parallelConstraint: Rule = (s, ctx) => {
   if (!PARALLEL_PRETEST.test(s)) return null;
   // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
   const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
-  const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
+  const m = t.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w).*?\b(${LABEL})\s*(${LABEL})(?!\w)`));
   if (!m) {
     // «EL מקביל לבסיסים» / "EL parallel to the bases" (#185 row 3): the definite BASES resolve via the
     // figure's vertex-disjoint parallel edge-pair (the ADR-169 `parallels` hint). One base suffices as
@@ -5030,7 +5032,7 @@ const parallelConstraint: Rule = (s, ctx) => {
     // exactly ∥-to-both (no redundant second constraint). Two pairs (a parallelogram) → ambiguous →
     // defer; zero → not a trapezoid figure → defer.
     if (/בסיסים|בסיסי\b|the\s+bases/i.test(s)) {
-      const one = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
+      const one = t.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)`));
       const pair = trapezoidBasePair(ctx); // #2090 (ADR-665): the trapezoid ring's own pair, not every stated ∥
       if (one && pair) {
         const [a, b] = [up(one[1]), up(one[2])];
@@ -5058,8 +5060,8 @@ const parallelConstraint: Rule = (s, ctx) => {
 const perpendicularConstraint: Rule = (s) => {
   if (!/perpendicular|⊥|⟂|מאונ[כך]|אנ[כך]/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2); אנך = the noun form ("EF אנך ל AB")
   const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונ[כך](?:\s*ל-?)?|אנ[כך](?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
-  if ((t.match(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
-  const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
+  if ((t.match(new RegExp(String.raw`\b${LABEL}\s*${LABEL}(?!\w)`, 'g')) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
+  const m = t.match(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w).*?\b(${LABEL})\s*(${LABEL})(?!\w)`));
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
   return [
@@ -5090,7 +5092,7 @@ const perpendicularConstraint: Rule = (s) => {
  */
 const lineThroughCenters: Rule = (s, ctx) => {
   if (!/(?:עובר[ת]?|passes|goes)/i.test(s)) return null;
-  const m = s.match(/^\s*(?:(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+)?([A-Z]\d*)\s*([A-Z]\d*)\b/);
+  const m = s.match(new RegExp(String.raw`^\s*(?:(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+)?(${ULABEL})\s*(${ULABEL})(?!\w)`));
   if (!m) return null;
   const A = up(m[1]), B = up(m[2]);
   if (A === B) return null;
@@ -5127,9 +5129,9 @@ const dashCollinear: Rule = (s) => {
   // The noun is order-free here too (#417): «ישר A-O1-O2-B» and «A-O1-O2-B ישר» are one statement. Strip
   // it wherever it stands, then require the remainder to be exactly the dashed run.
   const bare = LINE_NOUN_RE.test(s) ? s.replace(LINE_NOUN_G, ' ') : s;
-  const m = bare.match(/^\s*([A-Z]\d*(?:\s*-\s*[A-Z]\d*){2,})\s*$/);
+  const m = bare.match(new RegExp(String.raw`^\s*(${ULABEL}(?:\s*-\s*${ULABEL}){2,})\s*$`));
   if (!m) return null;
-  const pts = m[1].match(/[A-Z]\d*/g)?.map(up) ?? [];
+  const pts = m[1].match(LABEL_G)?.map(up) ?? [];
   if (pts.length < 3 || new Set(pts).size !== pts.length) return null; // 3+ DISTINCT labels
   return [
     { type: 'segment', a: pts[0], b: pts[pts.length - 1] },
@@ -5146,14 +5148,14 @@ const dashCollinear: Rule = (s) => {
  * segments — or any drawn `line` object — make "the line" ambiguous → defer (LLM keeps the case).
  */
 const pointOnTheLine: Rule = (s, ctx) => {
-  const LABELS = String.raw`((?:[A-Za-z]\d*)(?:\s*,?\s*(?:ו-?\s*|and\s+)?[A-Za-z]\d*)*)`;
+  const LABELS = String.raw`((?:${LABEL})(?:\s*,?\s*(?:ו-?\s*|and\s+)?${LABEL})*)`;
   const m =
     s.match(new RegExp(String.raw`^\s*(?:ה?נקוד(?:ה|ות)\s+)?${LABELS}\s+(?:נמצא(?:ת|ות|ים)?\s+)?על\s+ה(?:קו|ישר)\s*$`)) ??
     s.match(new RegExp(String.raw`^\s*points?\s+${LABELS}\s+(?:lies?\s+|is\s+|are\s+)?on\s+the\s+line\s*$`, 'i')) ??
     s.match(new RegExp(String.raw`^\s*ה?(?:קו|ישר)\s+(?:ועליו|שעליו|עם)\s+ה?נקוד(?:ה|ות)\s+${LABELS}\s*$`)) ??
     s.match(new RegExp(String.raw`^\s*(?:a\s+)?line\s+(?:with|and\s+on\s+it)\s+points?\s+${LABELS}(?:\s+on\s+it)?\s*$`, 'i'));
   if (!m) return null;
-  const labels = (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
+  const labels = (m[1].match(new RegExp(String.raw`${LABEL}`, 'g')) ?? []).map(up);
   if (!labels.length) return null;
   if ((ctx.lines ?? []).length) return null; // a drawn line OBJECT exists — "the line" is ambiguous with it
   // THE line = the figure's single drawn segment/edge; none → create; several → ambiguous.
@@ -5254,14 +5256,14 @@ const collinearConstraint: Rule = (s) => {
   // is a line REFERENCE, not a collinearity.
   if (LINE_NOUN_RE.test(s)) {
     const bare = s.replace(LINE_NOUN_G, ' ');
-    if (/^\s*(?:[A-Z]\d*\s*){3,}$/.test(bare)) {
-      const pts = bare.match(/[A-Z]\d*/g)?.map(up) ?? [];
+    if (new RegExp(String.raw`^\s*(?:${ULABEL}\s*){3,}$`).test(bare)) {
+      const pts = bare.match(LABEL_G)?.map(up) ?? [];
       if (pts.length >= 3) return [{ type: 'set-line', points: pts }];
     }
   }
   // "line QR passes through P" / "(ה)ישר QR עובר [דרך/בנקודה] P" — drive a point OF the line (Q/R) onto P.
   const through = s.match(
-    /(?:line|ה?ישר|ה?קו)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\s+(?:עובר[ת]?|passes(?:\s+through)?|goes\s+through|through)\s*(?:דרך|בנקודה|נקודה|ב-?|the\s+point|point|at|in)?\s*([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`(?:line|ה?ישר|ה?קו)\s+(${LABEL})\s*(${LABEL})\s+(?:עובר[ת]?|passes(?:\s+through)?|goes\s+through|through)\s*(?:דרך|בנקודה|נקודה|ב-?|the\s+point|point|at|in)?\s*(${LABEL})(?!\w)`, 'i'),
   );
   if (through) {
     const [Q, R, P] = [up(through[1]), up(through[2]), up(through[3])];
@@ -5273,7 +5275,7 @@ const collinearConstraint: Rule = (s) => {
   }
   // "P on line QR" / "P על (ה)ישר QR" — slide P onto the line through Q and R (P listed first → driven).
   const onLine = s.match(
-    /([A-Za-z]\d*)\s+(?:is\s+|lies\s+)?(?:on|על|נמצאת?\s+על)\s+(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+(?:through\s+|דרך\s+)?([A-Za-z]\d*)\s*(?:and\s+|ו-?\s*)?([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`(${LABEL})\s+(?:is\s+|lies\s+)?(?:on|על|נמצאת?\s+על)\s+(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+(?:through\s+|דרך\s+)?(${LABEL})\s*(?:and\s+|ו-?\s*)?(${LABEL})(?!\w)`, 'i'),
   );
   if (onLine) {
     const [P, Q, R] = [up(onLine[1]), up(onLine[2]), up(onLine[3])];
@@ -5324,7 +5326,7 @@ const collinearConstraint: Rule = (s) => {
  * the `$` anchor leaves it unparsed, and the scope register refuses it (#1245, ADR-553 — analytic's syntax).
  */
 const bareFreePoint: Rule = (s, ctx) => {
-  const m = s.match(/^\s*(?:הוסף\s+|add\s+)?(?:ה?נקודה|point)\s+([A-Za-z]\d*)\s*$/i);
+  const m = s.match(new RegExp(String.raw`^\s*(?:הוסף\s+|add\s+)?(?:ה?נקודה|point)\s+(${LABEL})\s*$`, 'i'));
   if (!m) return null;
   // A name bound as an ANGLE ALIAS (#235) is not a point — an `ifAbsent` free point would silently
   // no-op against the alias record (a point the student never got). The collision is theirs to resolve.
@@ -5420,7 +5422,7 @@ const circleSizeRadius = (s: string): { r: number; stated: number; pi: boolean }
     // the LLM). The keyword is behind us, so "circle-word? + ONE label + number" is safe.
     sizeOf(after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*${SIZE_VAL}`, 'i'))) ??
     sizeOf(after.match(new RegExp(String.raw`^\s*${SIZE_VAL}`, 'i'))) ??
-    sizeOf(after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+${SIZE_VAL}`, 'i')));
+    sizeOf(after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*${ULABEL}\s+${SIZE_VAL}`, 'i')));
   const sized = (v: SizeVal | null, toRadius: (magnitude: number) => number): { r: number; stated: number; pi: boolean } | null => {
     if (!v) return null;
     const magnitude = v.coef * (v.pi ? Math.PI : 1);
@@ -5464,7 +5466,7 @@ const nameCenter: Rule = (s, ctx) => {
   const leftover = s
     .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
     .replace(/circles?|ה?מעגל\w*/gi, ' ') // strip the definite article too, else "המעגל" leaves a dangling "ה"
-    .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`\b${X}(?!\w)`, 'gi'), ' ')
     .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
     .replace(FILLER, ' ')
     .trim();
@@ -5527,7 +5529,7 @@ const concentricCircles: Rule = (s, ctx) => {
   if (nested) return nested;
   // The centre letter: right after "משותף"/"קונצנטריים", or via the shared centre reader ("centered at O",
   // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
-  const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
+  const m = s.match(new RegExp(String.raw`(?:משותף|קונצנטריים)\s+(${LABEL})(?![A-Za-z])`));
   const named = m ? m[1] : circleCenter(s);
   const center = named ?? freeLabel(ctx, [...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const outer = circleId(center);
@@ -5552,12 +5554,12 @@ const concentricCircles: Rule = (s, ctx) => {
  */
 const THROUGH_CLAUSE = new RegExp(
   String.raw`(?:(?:that\s+)?(?:[Pp]ass(?:es|ing)?\s+)?(?:[וש]-?)?(?:ה?עוברת?\s*)?(?:[Tt]hrough|THROUGH|דרך)\s+(?:the\s+)?(?:points?\s+|ה?נקוד(?:ה|ות)\s+)?|(?:[וש]-?)?ה?עוברת?\s+ב-?\s*ה?נקוד(?:ה|ות)\s+|[Pp]ass(?:es|ing)?\s+(?:at|by)\s+(?:the\s+)?points?\s+)` +
-    String.raw`([A-Za-z]\d*(?![A-Za-z\d])(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Z]\d*(?![A-Za-z\d]))*)`,
+    String.raw`(${LABEL}(?![A-Za-z\d])(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)${ULABEL}(?![A-Za-z\d]))*)`,
 );
 const throughClause = (s: string): { labels: Id[]; text: string } | null => {
   const m = s.match(THROUGH_CLAUSE);
   if (!m) return null;
-  return { labels: (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up), text: m[0] };
+  return { labels: (m[1].match(new RegExp(String.raw`${LABEL}`, 'g')) ?? []).map(up), text: m[0] };
 };
 
 /** A DEFINITE circle noun — «המעגל» (with the ו/ש conjunction prefixes) / "the circle" — the ADR-029
@@ -5694,7 +5696,7 @@ const circle: Rule = (s, ctx) => {
   // The centre the student named ("circle O" / "centered at O"), or null. «מעגל עם מרכז O» / "circle
   // with centre O" (#184 — a verbatim prod form circleCenter doesn't read) is added LOCALLY: widening
   // circleCenter itself would touch every consumer (e.g. nameCenter's «מרכז המעגל הוא P»).
-  const withCentreM = s.match(/(?:עם\s+מרכז|with\s+cent(?:er|re))\s+([A-Za-z]\d*)\b/i);
+  const withCentreM = s.match(new RegExp(String.raw`(?:עם\s+מרכז|with\s+cent(?:er|re))\s+(${LABEL})(?!\w)`, 'i'));
   const named = circleCenter(s) ?? (withCentreM ? withCentreM[1] : null);
   // #1438 (ADR-548): a through-statement about a circle the figure ALREADY has is a REFERENCE — lowered to
   // membership on it, exactly like «X [ו-Y] על המעגל». Asked BEFORE the definition path, which would mint
@@ -5727,7 +5729,7 @@ const circle: Rule = (s, ctx) => {
       // read as residue by the lowercase-token guard below ("circle centered at M through B").
       .replace(/cent(?:er|re)(?:e?d)?(?:\s+at)?|around|מרכז\w*|סביב/gi, ' ')
       .replace(thr!.text, ' ')
-      .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
+      .replace(named ? new RegExp(String.raw`\b${named}(?!\w)`, 'gi') : /,^/, ' ')
       .replace(FILLER, ' ');
     if (SHAPE_LEFTOVER.test(rest) || INTERSECT_KW.test(rest) || /הישר|(?<![א-ת])ישר(?![א-ת])|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(rest)) return null;
     // #779 — a residual LOWERCASE letter token is a label this path would silently CASE-FOLD and drop
@@ -5740,7 +5742,7 @@ const circle: Rule = (s, ctx) => {
     // EXISTING label). A definition lowers exactly ONE through point (`circle-through`); a 3-point list is
     // the circumcircle (its own rule, before this one); anything else is not this path's — fail closed.
     if (thr!.labels.length > 1) return null;
-    if (/(?<![A-Za-z\d])[A-Z]\d*(?![A-Za-z\d])/.test(rest)) return null;
+    if (new RegExp(String.raw`(?<![A-Za-z\d])${ULABEL}(?![A-Za-z\d])`).test(rest)) return null;
     // A stated SIZE beside the through point is two givens this path would split — the plain `circle`
     // return below keeps the size and drops the through point. Fail closed rather than drop either.
     if (r.numeric || r.symbolic) return null;
@@ -5783,7 +5785,7 @@ const circle: Rule = (s, ctx) => {
     // request words, and filler; if anything meaningful is left, it's not a standalone circle.
     const leftover = s
       .replace(/circles?|מעגל\w*/gi, ' ')
-      .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
+      .replace(named ? new RegExp(String.raw`\b${named}(?!\w)`, 'gi') : /,^/, ' ')
       .replace(REQUEST_WORDS, ' ')
       .replace(FILLER, ' ')
       .trim();
@@ -5833,7 +5835,7 @@ const sizeStatementLeftover = (s: string): boolean =>
   SHAPE_LEFTOVER.test(
     s
       .replace(/radius|radii|רדיוס\S*|circles?|מעגל\w*|circumference|perimeter|area|שהיקפו|היקפו|היקף|ששטחו|שטחו|שטח|נתון|הוא|=/gi, ' ')
-      .replace(/[A-Z]\d*/g, ' ')
+      .replace(LABEL_G, ' ')
       .replace(/\d+(?:\.\d+)?|π/g, ' ')
       .replace(FILLER, ' '),
   );
@@ -5948,7 +5950,7 @@ const setRadius: Rule = (s, ctx) => {
   // The value, with circle labels (e.g. P1) stripped first. #2008 (ADR-635): the COPULA's value, read through the
   // shared NUMEXPR atom — «רדיוס המעגל O הוא 1/2» used to take the first bare number of the sentence (1) and drop
   // the «/2» with every gate quiet; a quotient is one value. No copula → the first value, as before.
-  const bare = s.replace(/[A-Z]\d*/g, ' ');
+  const bare = s.replace(LABEL_G, ' ');
   const valM =
     bare.match(new RegExp(String.raw`(?:=|:|הוא|היא|שווה(?:\s+ל-?)?|\bis\b|\bequals?\b)\s*${NUMEXPR('rv')}`, 'i')) ??
     bare.match(new RegExp(UNGLUED + NUMEXPR('rv')));
@@ -5957,7 +5959,7 @@ const setRadius: Rule = (s, ctx) => {
   const center =
     circleCenter(s) ??
     (() => {
-      const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
+      const labels = (s.match(LABEL_G) ?? []).map(up);
       return (ctx.circles ?? []).find((c) => labels.includes(up(c))) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
     })();
   if (!center) return null;
@@ -6031,7 +6033,7 @@ const radiusSymbolStatement: Rule = (s, ctx) => {
   const leftover = head
     .replace(/(?:הוא|היא|=|\bis\b)\s*$/, ' ') // the optional copula, when the slot took one (#772)
     .replace(/radius|ה?רדיוס\S*|circles?|ה?מעגל\w*|של/gi, ' ')
-    .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`\b${center}(?!\w)`, 'gi'), ' ')
     .replace(FILLER, ' ')
     .trim();
   if (leftover) return null;
@@ -6097,7 +6099,7 @@ const circleSizeExisting: Rule = (s, ctx) => {
   if (!center) {
     // UPPERCASE labels only — a point/circle label is always uppercase, so this can't grab a stray letter
     // from a lowercase keyword ("perimeter of …" → the "o" of "of" must NOT resolve circle O).
-    const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
+    const labels = (s.match(LABEL_G) ?? []).map(up);
     center = (ctx.circles ?? []).map(up).find((c) => labels.includes(c)) ?? null;
   }
   if (!center) {
@@ -6581,7 +6583,7 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
   // The subject's labels are what is LEFT after the polygon phrase and the inscription vocabulary go —
   // both existing strip lists, neither re-spelled here.
   let rest = dropCircleRef(s).replace(POLY_STRIP, ' ').replace(INSCRIBED_STRIP, ' ');
-  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}(?!\w)`, 'gi'), ' ');
   // The radius is read, so neither its symbol nor its value is leftover — the 3-/4-gon path's own treatment
   // (ADR-034, #54, #497). Without it «מחומש ABCDE חסום במעגל שרדיוסו 5» refused a line its 4-gon twin reads.
   if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' ');
@@ -6745,7 +6747,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     /polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
-  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}(?!\w)`, 'gi'), ' ');
   if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' '); // the radius symbol is not a vertex (ADR-034; #54 — any bound letter)
   rest = stripConsumedNumber(rest, r.numeric); // a CONSUMED radius value is not leftover either (#497)
   // The vertices the student named, or — when the shape word is explicit but UNLABELED ("מרובע חסום
@@ -6984,7 +6986,7 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   // #2257 (ADR-767): the container's label RUN is claimed as a run first («במרובע ABCD»), as `removeClaimed` claims it —
   // the per-letter strip below cannot match inside «ABCD», and the inner noun then read the container's name as its own
   inner = inner.replace(new RegExp(String.raw`\b${contIds.join('')}\b`), ' ');
-  for (const id of contIds) inner = inner.replace(new RegExp(String.raw`\b${id}\b`, 'g'), ' ');
+  for (const id of contIds) inner = inner.replace(new RegExp(String.raw`\b${id}(?!\w)`, 'g'), ' ');
   const innerPhrase = readShapePhrase(inner);
   // a polygon inscription we can't make determinate — or an inner shape carrying an adjective it cannot
   // lower — escalates, never a plain-shape misparse
@@ -7074,7 +7076,7 @@ const regularPolygon: Rule = (s, ctx) => {
   const named = circleCenter(s);
   let rest = dropCircleRef(s).replace(POLY_STRIP, ' ');
   if (r.symbolic) rest = rest.replace(/\b[Rr]\b/g, ' ');
-  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}(?!\w)`, 'gi'), ' ');
   // Generic "regular polygon ABCDE": no name/number, so read n from the label run (largest wins).
   if (n === null) for (let k = 12; k >= 3; k--) if (labelRun(rest, k)) { n = k; break; }
   if (n === null || n < 3) return null;
@@ -7149,11 +7151,11 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
   if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
   if (!/כל\s+צלע|(?:every|each)\s+side/i.test(s)) return null; // the "on EVERY side" quantifier
   const shapeM = s.match(
-    /(משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע|triangle|quadrilateral|quad|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)\s+((?:[A-Za-z]\d*\s*){3,})/i,
+    new RegExp(String.raw`(משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע|triangle|quadrilateral|quad|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)\s+((?:${LABEL}\s*){3,})`, 'i'),
   );
   let poly: Id[] | null = null;
   if (shapeM) {
-    const ids = (shapeM[2].match(/[A-Z]\d*/g) ?? []).map(up); // UPPERCASE labels only — never lowercase prose ("square THERE is …")
+    const ids = (shapeM[2].match(LABEL_G) ?? []).map(up); // UPPERCASE labels only — never lowercase prose ("square THERE is …")
     if (ids.length >= 3) poly = ids;
   }
   if (!poly) {
@@ -7206,16 +7208,16 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
 // toward (inside) the shape. Matches the whole clause so it can be stripped before the leftover/diameter
 // read; the shape noun + up to 4 labels are consumed with it.
 const BULGE_CLAUSE =
-  /(?:מחוץ\s*ל|בתוך\s*ה?|מבחוץ|מבפנים|(?<![א-ת])בחוץ(?![א-ת])|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:[A-Z]\d*\s*){0,4}/gi;
+  new RegExp(String.raw`(?:מחוץ\s*ל|בתוך\s*ה?|מבחוץ|מבפנים|(?<![א-ת])בחוץ(?![א-ת])|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:${ULABEL}\s*){0,4}`, 'gi');
 
 /** #1771 (ADR-589): «… העובר דרך C» / «… דרך C» / "… through C" — the third point a semicircle passes through
  *  (the explicit spelling of the three-points-on reading). Captures the point's label. */
 const SEMI_THROUGH =
-  /(?:(?<![א-ת])[הש]?עוב(?:ר|רת)\s+(?:דרך\s+|ב-?)|(?<![א-ת])דרך\s+|\b(?:passing\s+|(?:which|that)\s+passes\s+|goes\s+)?through\s+|\bvia\s+)(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z]\d*)(?![A-Za-z0-9])/;
+  new RegExp(String.raw`(?:(?<![א-ת])[הש]?עוב(?:ר|רת)\s+(?:דרך\s+|ב-?)|(?<![א-ת])דרך\s+|\b(?:passing\s+|(?:which|that)\s+passes\s+|goes\s+)?through\s+|\bvia\s+)(?:ה?נקודה\s+|(?:the\s+)?point\s+)?(${ULABEL})(?![A-Za-z0-9])`);
 
 /** #1771 (ADR-589): a membership on THE semicircle — «C [ו-D] [נמצאת] על חצי המעגל» / "C is on the semicircle". */
 const SEMI_MEMBERSHIP =
-  /^\s*(?:ה?נקוד(?:ה|ות)\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Z]\d*)*\s+(?:נמצא(?:ת|ות|ים)?\s+|(?:is|are|lies|lie)\s+)?(?:על\s+חצי[\s-]?ה(?:מעגל|עיגול)|on\s+the\s+(?:semicircle|half[\s-]?circle))\s*\.?\s*$/;
+  new RegExp(String.raw`^\s*(?:ה?נקוד(?:ה|ות)\s+|points?\s+)?${ULABEL}(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)${ULABEL})*\s+(?:נמצא(?:ת|ות|ים)?\s+|(?:is|are|lies|lie)\s+)?(?:על\s+חצי[\s-]?ה(?:מעגל|עיגול)|on\s+the\s+(?:semicircle|half[\s-]?circle))\s*\.?\s*$`);
 
 /** Resolve a semicircle's bulge orientation (#outward): "outside/inside the <shape>" → the reference vertex
  *  (a vertex of the shape NOT on the diameter side) + `bulgeToward` for inside. The shape is a named run,
@@ -7230,9 +7232,9 @@ function semicircleBulge(s: string, ctx: ParseContext, a: Id, b: Id): { bulgeRef
   const A = up(a), B = up(b);
   let poly: Id[] | null = null;
   const shapeM = s.match(
-    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Z]\d*\s*){3,4})/i,
+    new RegExp(String.raw`(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:${ULABEL}\s*){3,4})`, 'i'),
   );
-  if (shapeM) { const run = (shapeM[1].match(/[A-Z]\d*/g) ?? []).map(up); if (run.length >= 3) poly = run; }
+  if (shapeM) { const run = (shapeM[1].match(LABEL_G) ?? []).map(up); if (run.length >= 3) poly = run; }
   if (!poly) {
     const edge = (ctx.polygons ?? []).find((v) => { const u = v.map(up); return u.includes(A) && u.includes(B); });
     if (edge) poly = edge.map(up);
@@ -7260,7 +7262,7 @@ const semicircle: Rule = (s, ctx) => {
     /semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול|(?<![א-ת])חצי(?![א-ת])|\bhalf\b|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
-  const restNoC0 = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const restNoC0 = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}(?!\w)`, 'gi'), ' ') : stripped;
   /**
    * A THIRD POINT ON THE SEMICIRCLE (#1771, ADR-589) — «חצי מעגל שקוטרו AB העובר דרך C» / "semicircle with
    * diameter AB through C". The explicit spelling of the three-points-on reading below, and the sentence
@@ -7457,7 +7459,7 @@ const quarterCircle: Rule = (s, ctx) => {
     /quarter[\s-]?circle|רבע[\s-]?ה?מעגל|רבע[\s-]?ה?עיגול|(?<![א-ת])רבע(?![א-ת])|\bquarter\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
-  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}(?!\w)`, 'gi'), ' ') : stripped;
   const named = labelRun(restNoC, 3); // "AOB" (or "OAB") ⇒ centre O + ends A,B
   const namedRoles = named ? arcRunRoles(named) : null;
   const endsRun = !named && namedC ? labelRun(restNoC, 2) : null; // centre named separately + "…AB" ends
@@ -7528,7 +7530,7 @@ const sector: Rule = (s, ctx) => {
     /(?<![א-ת])ה?גי?זרה|\bsectors?\b|בזוו?ית|שווה(?:\s*ל-?)?|with\s+angle|at\s+angle|equals?|\bangle\b|מעלות|degrees?|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*|\d+(?:\.\d+)?|[°=]/gi,
     ' ',
   );
-  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}(?!\w)`, 'gi'), ' ') : stripped;
   const run = labelRun(restNoC, 3);
   const endsRun = !run && namedC ? labelRun(restNoC, 2) : null;
   if (shapeLeftover(removeClaimed(restNoC, [...(run ?? []), ...(endsRun ?? [])]))) return 'stop';
@@ -7646,8 +7648,8 @@ const incircle: Rule = (s, ctx) => {
   // Only the phrase's OWN words are consumed (the noun + the adjective it lowers); an adjective it cannot lower
   // on this noun stays, and the leftover guard below escalates the line (#1790).
   let rest = phrase.strip(dropCircleRef(s)).replace(new RegExp(INCIRCLE_FILLER, 'gi'), ' ');
-  if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
-  if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}\b`, 'gi'), ' ');
+  if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}(?!\w)`, 'gi'), ' ');
+  if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}(?!\w)`, 'gi'), ' ');
   // A SYMBOLIC radius («radius r») names the incircle's own radius — the binding post-pass attaches the letter
   // (#54). A NUMERIC one is left in `rest`: the inradius is derived, so a stated value is a compound to escalate.
   const rad = parseRadius(s);
@@ -7893,7 +7895,7 @@ const incircleConstruction = (v: Id[], I: Id, autoCenter: boolean, foot: (e: num
 const cornerTangentCircle: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   // two segments joined by "and"/"ו", both tangent to a circle: capture the 4 side labels
-  const m = s.match(/([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s+(?:are\s+)?(?:tangent|משיק)/i);
+  const m = s.match(new RegExp(String.raw`(${LABEL})\s*(${LABEL})\s*(?:and|ו-?|,)\s*(${LABEL})\s*(${LABEL})\s+(?:are\s+)?(?:tangent|משיק)`, 'i'));
   if (!m) return null;
   const seg1 = [up(m[1]), up(m[2])];
   const seg2 = [up(m[3]), up(m[4])];
@@ -7925,7 +7927,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // until a later «O מרכז המעגל» names it; one circle binds; several are ambiguous (the analytic sibling
   // is ADR-AG-196/198). Beside several circles with no tie-break this rule now declines, so
   // `ambiguousCircleAsk` asks — it used to mint a third circle.
-  const tpM = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
+  const tpM = s.match(new RegExp(String.raw`(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+(${LABEL})\s*(?:and|ו-?|,)\s*(${LABEL})`, 'i')); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
   const namedTips = tpM ? [up(tpM[1]), up(tpM[2])] : null;
   const known = new Set((ctx.points ?? []).map(up));
   const existingCenter = existingCircleRef(s, ctx);
@@ -8011,8 +8013,8 @@ const cornerTangentCircle: Rule = (s, ctx) => {
  * cannot be redefined as feet — states each touch on the circle as the two-sides rule does: the point on the
  * circle, the radius ⟂ the side, the point on the side.
  */
-const TL_PAIR = String.raw`[A-Z]\d*[A-Z]\d*`;
-const TL_LBL = String.raw`[A-Z]\d*`;
+const TL_PAIR = String.raw`${ULABEL}${ULABEL}`;
+const TL_LBL = String.raw`${ULABEL}`;
 const TL_SEP = String.raw`(?:\s*,\s*(?:and\s+|ו[-־]?\s*)?|\s+and\s+|\s+ו[-־]?\s*)`;
 const tlList = (item: string, min: number): string => String.raw`(${item}(?:${TL_SEP}${item}){${min - 1},})`;
 const TOUCH_LIST_HE = new RegExp(
@@ -8156,7 +8158,7 @@ const chord: Rule = (s, ctx) => {
   // lowercase connectives "and"/"are" are never tokens; glued "AB" and spaced "A B" both read) and
   // pair them sequentially, each pair one chord. An odd token count is not a pair list — fall back
   // to the single labelRun read (whose honesty gates flag any leftover), byte-identical to before.
-  const toks = (body.match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((u) => u.match(/[A-Z]\d*/g) ?? []);
+  const toks = (body.match(new RegExp(String.raw`\b(?:${ULABEL}){1,2}(?!\w)`, 'g')) ?? []).flatMap((u) => u.match(LABEL_G) ?? []);
   let chordPairs: Id[][];
   // The distribution is for BARE declarations only — an intersect compound that fell through to this
   // rule must not pair-read its cut operands as chords (the leftover stays with the honesty gates).
@@ -8222,7 +8224,7 @@ const circleOnDiameter: Rule = (s, ctx) => {
     /diameter|קוטר\S*|circles?|מעגל|\bwith\b|\bof\b|\bthe\b|\ba\b|\bis\b|\bas\b|של|שבו|שקוטר\S*|שמרכז\S*|מרכז\S*|ורדיוס\S*|רדיוס\S*|cent(?:er|re)\w*|\bradius\b|\band\b|בו|הוא|היא/gi,
     ' ',
   );
-  if (named) body = body.replace(new RegExp(String.raw`\b${named}\b`, 'g'), ' '); // drop the centre label
+  if (named) body = body.replace(new RegExp(String.raw`\b${named}(?!\w)`, 'g'), ' '); // drop the centre label
   const ids = labelRun(body, 2);
   if (!ids) return null;
   // Fire to DEFINE a circle from AB in three situations (the INVERSE of `diameter`, which adds a diameter to
@@ -8359,7 +8361,7 @@ const diameter: Rule = (s, ctx) => {
   // A plural declaration names SEVERAL diameters at once — "AB ו CD קוטרים" / "AB and CD are
   // diameters" (issue #151's diameter mirror): sequential UPPERCASE pair extraction, the same
   // conjunction distribution as `chord`; an odd token count falls back to the single labelRun read.
-  const toks = (body.match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((u) => u.match(/[A-Z]\d*/g) ?? []);
+  const toks = (body.match(new RegExp(String.raw`\b(?:${ULABEL}){1,2}(?!\w)`, 'g')) ?? []).flatMap((u) => u.match(LABEL_G) ?? []);
   let diaPairs: Id[][];
   // Bare declarations only — an intersect compound's operands are never pair-read (as in `chord`).
   if (!INTERSECT_KW.test(s) && toks.length >= 2 && toks.length % 2 === 0) {
@@ -8426,7 +8428,7 @@ const diameterFromPoint: Rule = (s, ctx) => {
   // A leading imperative («הוסף קוטר…», "add/draw a diameter…") needs no handling of its own — the rule
   // is unanchored and the strip below keeps the En filler words out of the label count.
   const fromM = s.match(
-    /(?:from(?:\s+(?:the\s+)?point)?|through(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?|מ-|(?:ה?עובר\s+)?(?:ב|במ)-?נקודה|דרך(?:\s+ה?נקודה)?)\s*([A-Za-z]\d*)/i,
+    new RegExp(String.raw`(?:from(?:\s+(?:the\s+)?point)?|through(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?|מ-|(?:ה?עובר\s+)?(?:ב|במ)-?נקודה|דרך(?:\s+ה?נקודה)?)\s*(${LABEL})`, 'i'),
   );
   if (!fromM) return null; // no from/through-marker → the two-label `diameter` rule
   const center = resolveCenter(s, ctx);
@@ -8438,7 +8440,7 @@ const diameterFromPoint: Rule = (s, ctx) => {
     /diameter|קוטר|היוצא|העובר|עובר|מ-?נקודה|מהנקודה|(?:ב|במ)-?נקודה|דרך|\bfrom\b|\bthrough\b|\bpoint\b|\bthe\b|\badd\b|\bdraw\b|\ban?\b/gi,
     ' ',
   );
-  const labels = [...rest.matchAll(/\b[A-Za-z]\d*\b/g)].map((mm) => up(mm[0]));
+  const labels = [...rest.matchAll(new RegExp(String.raw`\b${LABEL}(?!\w)`, 'g'))].map((mm) => up(mm[0]));
   if (labels.some((l) => l !== F)) return null;
   const far = freeLabel(ctx, [F, up(center), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);
   const exists = (ctx.points ?? []).some((q) => up(q) === F);
@@ -8464,7 +8466,7 @@ const arcMidpoint: Rule = (s, ctx) => {
   // without it, the labels demanded a position immediately after the keyword and the whole utterance
   // fell through to the generic `midpoint` rule → D on the CHORD, a silent wrong figure.
   const m = dropCircleRef(s).match(
-    /([A-Za-z]\d*)\b.*?(midpoint|אמצע|\bon\b|על)\s*.*?(?:(minor|major)\s+)?(?:arc|הקשת|קשת)\s*(?:(ה?(?:קטנה|גדולה))\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`(${LABEL})(?!\w).*?(midpoint|אמצע|\bon\b|על)\s*.*?(?:(minor|major)\s+)?(?:arc|הקשת|קשת)\s*(?:(ה?(?:קטנה|גדולה))\s+)?(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
   );
   if (!m) return null;
   const id = up(m[1]), from = up(m[5]), to = up(m[6]);
@@ -8517,7 +8519,7 @@ const pairOnCircle: Rule = (s, ctx) => {
   if (POINT_ON_CARRIER.test(s)) return null; // "D על המיתר AB" is a point on a chord, not a pair on the circle
   // Exactly a glued 2-letter pair as the subject of "on [the] circle": "BC על [ה]מעגל [O]" / "BC on circle
   // [O]". Anchored full-match — a LIST ("B ו C") is pointOnCircle's, a longer run / compound is not this rule.
-  const m = s.match(new RegExp(String.raw`^\s*(?:ה?קטע\s+|segment\s+)?([A-Z]\d*)([A-Z]\d*)\s+(?:על|on)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+${LABEL})?\s*\.?\s*$`, 'i'));
+  const m = s.match(new RegExp(String.raw`^\s*(?:ה?קטע\s+|segment\s+)?(${ULABEL})(${ULABEL})\s+(?:על|on)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+${LABEL})?\s*\.?\s*$`, 'i'));
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
   if (a === b) return null;
@@ -8553,7 +8555,7 @@ const pointOnCircle: Rule = (s, ctx) => {
   // The subject run: everything before the on-word that precedes the circle word. Requires at least one
   // \b-delimited label (so "point A on circle O" reads A, not the "t" of "poin**t**", and a glued pair
   // "AB על המעגל" stays with the chord/segment readings instead of being split into A,B).
-  const m = s.match(/^(.*?\b[A-Za-z]\d*\b.*?)(?:\bon\b|על)(?=.*?(?:circle|מעגל))/i);
+  const m = s.match(new RegExp(String.raw`^(.*?\b${LABEL}(?!\w).*?)(?:\bon\b|על)(?=.*?(?:circle|מעגל))`, 'i'));
   if (!m) return null;
   // The circle: its named centre ("circle O"), or — for a DEFINITE/unnamed reference ("on the
   // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context. A NAMED
@@ -8575,10 +8577,10 @@ const pointOnCircle: Rule = (s, ctx) => {
   // centre is no member of its own circle. A point the student DID put on its centre («O על מעגל O», «מעגל O, נקודה O
   // על המעגל») keeps its subject: the letter there stands outside any noun phrase.
   const run = subjectRun(m[1]);
-  const ids = (run.match(/[A-Z]\d*/g) ?? []).map(up);
+  const ids = (run.match(LABEL_G) ?? []).map(up);
   // A distinct uppercase run is the subject list; anything else falls back to the legacy
   // first-single-label read (e.g. a lowercase label) so looser phrasings keep parsing as before.
-  const first = run.match(/\b([A-Za-z]\d*)\b/);
+  const first = run.match(new RegExp(String.raw`\b(${LABEL})(?!\w)`));
   if (!ids.length && !first) return null; // the run held only the circle's own name: no subject was stated
   const subjects = ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(first![1])];
   return [...prepend, ...subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }))];
@@ -8594,7 +8596,7 @@ const pointVsCircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   const m = s.match(
     // the noun may also FOLLOW the label — "M נקודה מחוץ למעגל" (#71, log-triage)
-    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נקודה\s+|נקודות\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+)?(מחוץ\s*ל|בתוך\s+|outside\s+|inside\s+)(?:of\s+|the\s+)?(?:ה?מעגל|circle)\s*([A-Za-z]\d*)?\s*\.?\s*$/i,
+    new RegExp(String.raw`^\s*(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?((?:${LABEL})(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)${LABEL})*)\s+(?:נקודה\s+|נקודות\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+)?(מחוץ\s*ל|בתוך\s+|outside\s+|inside\s+)(?:of\s+|the\s+)?(?:ה?מעגל|circle)\s*(${LABEL})?\s*\.?\s*$`, 'i'),
   );
   if (!m) return null;
   const side = /מחוץ|outside/i.test(m[2]) ? ('outside' as const) : ('inside' as const);
@@ -8610,7 +8612,7 @@ const pointVsCircle: Rule = (s, ctx) => {
   }
   if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
   // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
-  const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  const subjects = (m[1].match(LABEL_G) ?? []).map(up);
   if (subjects.length === 0 || new Set(subjects).size !== subjects.length) return null;
   return [...prepend, ...subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }))];
 };
@@ -8626,14 +8628,14 @@ const pointVsCircle: Rule = (s, ctx) => {
  *  pointVsCircle shape. */
 const pointsVsLine: Rule = (s) => {
   const m = s.match(
-    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|נקודת\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נקודות\s+|נקודה\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+|lie\s+)?(?:on\s+)?(בצדדים\s+(?:שונים|נגדיים)|מצדדים\s+שונים|משני\s+(?:ה?צדדים|צי?די)|באותו\s+ה?צד|מאותו\s+ה?צד|(?:different|opposite)\s+sides?|(?:the\s+)?same\s+side)\s+(?:של\s+)?(?:of\s+)?(?:ה?ישר\s+|ה?קטע\s+|the\s+line\s+|the\s+segment\s+|line\s+|segment\s+)?((?:[A-Z]\d*\s*){2})\s*\.?\s*$/i,
+    new RegExp(String.raw`^\s*(?:ה?נקודות\s+|ה?נקודה\s+|נקודת\s+|points?\s+)?((?:${LABEL})(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)${LABEL})*)\s+(?:נקודות\s+|נקודה\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+|lie\s+)?(?:on\s+)?(בצדדים\s+(?:שונים|נגדיים)|מצדדים\s+שונים|משני\s+(?:ה?צדדים|צי?די)|באותו\s+ה?צד|מאותו\s+ה?צד|(?:different|opposite)\s+sides?|(?:the\s+)?same\s+side)\s+(?:של\s+)?(?:of\s+)?(?:ה?ישר\s+|ה?קטע\s+|the\s+line\s+|the\s+segment\s+|line\s+|segment\s+)?((?:${ULABEL}\s*){2})\s*\.?\s*$`, 'i'),
   );
   if (!m) return null;
   const rel = /שונים|נגדיים|different|opposite|משני/i.test(m[2]) ? ('different' as const) : ('same' as const);
-  const pair = (m[3].match(/[A-Z]\d*/g) ?? []).map(up);
+  const pair = (m[3].match(LABEL_G) ?? []).map(up);
   if (pair.length !== 2 || pair[0] === pair[1]) return null;
   // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
-  const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  const subjects = (m[1].match(LABEL_G) ?? []).map(up);
   if (new Set(subjects).size !== subjects.length) return null;
   if (subjects.some((x) => pair.includes(x))) return null; // a carrier endpoint has no side of its own line
   if (rel === 'different' ? subjects.length !== 2 : subjects.length < 2) return null;
@@ -8654,12 +8656,12 @@ const twoTangentsMeet: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /נפגש|מפגש/.test(s))) return null;
   // the two tangency points: a label after each "tangent at/from"/"משיק [מ/ב]נקוד[ה]" (typo מנקדה allowed)
-  const pts = [...s.matchAll(/(?:tangent|משיק)[^A-Za-z]{0,14}?(?:\bat\b|\bfrom\b|בנקודה|מנקודה|מנקדה)\s*([A-Za-z]\d*)/gi)].map((m) => up(m[1]));
+  const pts = [...s.matchAll(new RegExp(String.raw`(?:tangent|משיק)[^A-Za-z]{0,14}?(?:\bat\b|\bfrom\b|בנקודה|מנקודה|מנקדה)\s*(${LABEL})`, 'gi'))].map((m) => up(m[1]));
   if (pts.length < 2) return null; // need TWO tangents (one tangent ∩ a segment is tangentLineIntersection)
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   // the meeting point: "meet at D" / "נפגשים בנקודה D" / "חותך … D"
-  const meetM = s.match(/(?:נפגש\w*|מפגש|פוגש\w*|\bmeets?\b|\bintersects?\b|חות[כך])[^A-Za-z]{0,14}?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)/i);
+  const meetM = s.match(new RegExp(String.raw`(?:נפגש\w*|מפגש|פוגש\w*|\bmeets?\b|\bintersects?\b|חות[כך])[^A-Za-z]{0,14}?(?:בנקודה|\bat\b|ב-)\s*(${LABEL})`, 'i'));
   if (!meetM) return null;
   const [A, C] = [pts[0], pts[1]];
   const D = up(meetM[1]);
@@ -8697,7 +8699,7 @@ const tangentsAtPointsMeet: Rule = (s, ctx) => {
   const E = up(meetM[1]);
   // The definite plural names NO tangent of its own: any other label means a named form another rule owns.
   // Letter RUNS split into labels («BE ו-CE» → B,E,C,E — the tangentsMeet pattern); lowercase words are ignored.
-  const labels = [...new Set((dropCircleRef(s).match(rx(String.raw`\b(?:${ULABEL}){1,2}\b`, 'g')) ?? []).flatMap((t) => t.match(rx(ULABEL, 'g')) ?? []))];
+  const labels = [...new Set((dropCircleRef(s).match(rx(String.raw`\b(?:${ULABEL}){1,2}(?!\w)`, 'g')) ?? []).flatMap((t) => t.match(rx(ULABEL, 'g')) ?? []))];
   if (labels.some((l) => l !== E)) return null;
   const drawn = ctx.tangentLines ?? [];
   if (drawn.length < 2) return null;
@@ -8723,7 +8725,7 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   // tangency point: the label after the tangent's "at"/"בנקודה" (the circle name may sit between).
-  const atM = s.match(/(?:tangent|משיק).*?(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:tangent|משיק).*?(?:\bat\b|בנקודה|ב-)\s*(${LABEL})(?!\w)`, 'i'));
   if (!atM) return null;
   const at = up(atM[1]);
   // Strip the circle ref, the tangent + its "at D", and the connecting words (incl.
@@ -8731,16 +8733,16 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   // pair, the result point the remaining lone letter.
   const rest = dropCircleRef(s)
     .replace(/tangent|משיק/gi, ' ')
-    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}\b`, 'i'), ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}(?!\w)`, 'i'), ' ')
     .replace(/extension|המש(?:ך|כי(?:ם|הם|הן)?)|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bcuts?\b|crosses|\bthrough\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
     .replace(FILLER, ' ');
   // Labels are UPPERCASE (the repo convention, `isUpperLabel`) — a leftover lowercase word or the
   // article "a" must not be read as a point pair ("through point C **a** tangent…" → pair C,A).
-  const pairM = rest.match(/\b([A-Z]\d*)\s*([A-Z]\d*)\b/);
+  const pairM = rest.match(new RegExp(String.raw`\b(${ULABEL})\s*(${ULABEL})(?!\w)`));
   if (!pairM) return null;
   const a = up(pairM[1]);
   const b = up(pairM[2]);
-  const resM = rest.replace(/\b[A-Z]\d*\s*[A-Z]\d*\b/, ' ').match(/\b([A-Z]\d*)\b/); // remove the pair, take the lone letter
+  const resM = rest.replace(new RegExp(String.raw`\b${ULABEL}\s*${ULABEL}(?!\w)`), ' ').match(new RegExp(String.raw`\b(${ULABEL})(?!\w)`)); // remove the pair, take the lone letter
   if (!resM) return null;
   // Bind touch vs crossing SEMANTICALLY (circle membership; positional only as the both-new tiebreak) —
   // the post-keyword read alone swaps the roles in the "דרך הנקודה C העבירו משיק … בנקודה E" phrasing (#36).
@@ -8807,7 +8809,7 @@ const bisectorSegmentIntersection: Rule = (s) => {
  */
 const secantFromExternal: Rule = (s, ctx) => {
   if (!/חות[כך]|\bcuts?\b|\bsecant\b|\bmeets?\b|crosses|נחת/i.test(s)) return null; // a secant cut
-  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // the (external) point — spelled out "מנקודה B" OR the abbreviated "מ-B" (#96); `(?![A-Za-z])` keeps it a single label (not "מ-AB")
+  const eM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)(${LABEL})(?![A-Za-z])`, 'i')); // the (external) point — spelled out "מנקודה B" OR the abbreviated "מ-B" (#96); `(?![A-Za-z])` keeps it a single label (not "מ-AB")
   if (!eM) return null;
   // Resolve-or-INTRODUCE (#159, the tangent rules' secant sibling): the opener "from E outside the
   // circle a line cuts it at A,B" introduces its own circle (free radius); named-but-absent creates.
@@ -8816,7 +8818,7 @@ const secantFromExternal: Rule = (s, ctx) => {
   const resolved = resolveOrIntroduceCircle(s, ctx, { reference: true });
   if (!resolved) return null;
   const center = resolved.center;
-  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two intersections "A and B" / "A ו-B"
+  const abM = s.match(new RegExp(String.raw`\b(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})(?!\w)`, 'i')); // the two intersections "A and B" / "A ו-B"
   if (!abM) return null;
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
   if (new Set([E, A, B]).size !== 3) return null; // need three distinct labels
@@ -8859,14 +8861,14 @@ const secantFromExternal: Rule = (s, ctx) => {
 const parallelCircleIntersection: Rule = (s, ctx) => {
   if (!PARALLEL_PRETEST.test(s) || !/circle|מעגל/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
-  const throughM = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
-  const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const throughM = s.match(new RegExp(String.raw`(?:through|דרך)\s+(${LABEL})(?!\w)`, 'i'));
+  const toM = s.match(new RegExp(String.raw`(?:parallel\s+to|מקביל\s*ל-?)\s*(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!center || !throughM || !toM) return null;
   const resM = dropCircleRef(s)
-    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`through\s+${LABEL}(?!\w)|דרך\s+${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(/\bpoint\b|נקודה/gi, ' ')
     .replace(FILLER, ' ')
-    .match(/\b([A-Za-z]\d*)\b/);
+    .match(new RegExp(String.raw`\b(${LABEL})(?!\w)`));
   if (!resM) return null;
   const through = up(throughM[1]);
   const a = up(toM[1]);
@@ -9026,10 +9028,10 @@ const nestedPairRadius = (s: string): { clarify: 'nested-pair-radius'; parts: [s
  */
 const namedCircleRefs = (s: string): string[] => {
   const at: { i: number; name: string }[] = [];
-  for (const m of s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)) at.push({ i: m.index!, name: up(m[1]) });
+  for (const m of s.matchAll(new RegExp(String.raw`(?:circle|מעגל)\s+(${LABEL})(?!\w)`, 'gi'))) at.push({ i: m.index!, name: up(m[1]) });
   // PLURAL-list form: "circles O1 and O2" / «מעגלים O1 ו-O2» — the names follow the plural noun,
   // which the per-circle «מעגל X» regex misses (ADR-228 Am.).
-  for (const pl of s.matchAll(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/gi)) {
+  for (const pl of s.matchAll(new RegExp(String.raw`(?:circles|מעגלים|מעגלי)\s+(${LABEL})\s*(?:ו-?|\band\b|,)\s*(${LABEL})`, 'gi'))) {
     at.push({ i: pl.index!, name: up(pl[1]) }, { i: pl.index! + 1, name: up(pl[2]) });
   }
   at.sort((a, b) => a.i - b.i);
@@ -9124,7 +9126,7 @@ const containedNewInExisting = (
   const eq = equalNested(s, 'contained'); // #2200: «מעגל מוכל (במעגל O) ברדיוסים שווים» — refused from the words
   if (eq) return eq;
   const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
-  const objM = s.match(/(?:בתוך|\binside\b|\bin\b)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+([A-Za-z]\d*))?/i);
+  const objM = s.match(new RegExp(String.raw`(?:בתוך|\binside\b|\bin\b)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+(${LABEL}))?`, 'i'));
   let outer: string;
   let outerNew = false;
   let outerNamed = false;
@@ -9251,8 +9253,8 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   // branch below read C,D as the circles' MUTUAL crossings and silently dropped E,F (then a paid LLM
   // escalation). Existing circles (the definite plural) get riders; a fresh pair is created first.
   if (/הישר|ישר|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(s)) {
-    const namedCentres = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
-    const labels = [...new Set((dropCircleRef(s).match(/\b[A-Z]\d*\b/g) ?? []).map(up))].filter((l) => !namedCentres.includes(l));
+    const namedCentres = [...s.matchAll(new RegExp(String.raw`(?:circle|מעגל)\s+(${LABEL})(?!\w)`, 'gi'))].map((m) => up(m[1]));
+    const labels = [...new Set((dropCircleRef(s).match(new RegExp(String.raw`\b${ULABEL}(?!\w)`, 'g')) ?? []).map(up))].filter((l) => !namedCentres.includes(l));
     if (labels.length === 4) {
       const pairIds = definiteTwoCircles(s, ctx);
       const cc1 = namedCentres[0] ?? 'O';
@@ -9283,7 +9285,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   const existing = definiteTwoCircles(s, ctx);
   if (existing) {
     const [id1, id2] = existing;
-    const labels = [...new Set((dropCircleRef(s).match(/\b[A-Z]\d*\b/g) ?? []).map(up))];
+    const labels = [...new Set((dropCircleRef(s).match(new RegExp(String.raw`\b${ULABEL}(?!\w)`, 'g')) ?? []).map(up))];
     if (labels.length === 0) return null; // no crossing named — leave to another rule / escalate
     const out: AnyCommand[] = [{ type: 'circle-circle-intersection', id: labels[0], circle1: id1, circle2: id2, branch: 0 }];
     if (labels[1]) out.push({ type: 'circle-circle-intersection', id: labels[1], circle1: id1, circle2: id2, branch: 1, avoid: labels[0] });
@@ -9303,8 +9305,8 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   // The two intersection points: the pair after "at"/"בנקודות", or a bare "X and Y" that ISN'T the
   // named centres — else AUTO-name them A,B (the student drew "two intersecting circles" without naming the
   // crossings; ADR-132). Avoid the centres and any existing points.
-  const atM = s.match(/(?:\bat\b|בנקוד\S*|points?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)/i);
-  const bareM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקוד\S*|points?)\s*(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})`, 'i'));
+  const bareM = s.match(new RegExp(String.raw`\b(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})(?!\w)`, 'i'));
   const pair: [Id, Id] | null = atM
     ? [up(atM[1]), up(atM[2])]
     : bareM && !named.includes(up(bareM[1])) && !named.includes(up(bareM[2]))
@@ -9345,9 +9347,9 @@ const circleCircleIntersection: Rule = (s) => {
   // circle∩circle of the through-point, silently dropping the tangent AND the crossing (play-test
   // session yla2d4xo — the gates caught it, but a not-handled escalates honestly instead).
   if (/tangent|משיק/i.test(s)) return null;
-  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => m[1]);
+  const centers = [...s.matchAll(new RegExp(String.raw`(?:circle|מעגל)\s+(${LABEL})(?!\w)`, 'gi'))].map((m) => m[1]);
   if (centers.length < 2) return null;
-  const resM = dropCircleRef(s).match(/\b([A-Za-z]\d*)\b/);
+  const resM = dropCircleRef(s).match(new RegExp(String.raw`\b(${LABEL})(?!\w)`));
   if (!resM) return null;
   // #2186 (ADR-679): «מעגל O חותך את מעגל P בנקודה A ברדיוסים שווים» — the equality lands on the named pair
   return withEqualRadii(s, [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }], circleId(centers[0]), circleId(centers[1]));
@@ -9392,7 +9394,7 @@ const extendOntoCircle: Rule = (s, ctx) => {
   if (!R) return null;
   // the line's two points (document order: a then b; D lands beyond b — the 2nd letter)
   const body = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ') // strip the crossing marker (incl. the spaced "ב F", issue #47)
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${LABEL}(?!\w)`, 'gi'), ' ') // strip the crossing marker (incl. the spaced "ב F", issue #47)
     .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
@@ -9412,7 +9414,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   if (/tangent|משיק/i.test(s)) return null;
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → secantFromExternal
   // TWO crossing labels: "at C and D" / "בנקודות C ו-D"
-  const twoM = s.match(/(?:\bat\b|בנקודות?|ב-)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  const twoM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודות?|ב-)\s*(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})(?!\w)`, 'i'));
   if (!twoM) return null;
   if (circleIsOnlyLocative(s)) return null; // #1678: a locative «במעגל …» is the scene, never the met object
   const center = resolveCenter(s, ctx); // a named circle, or the figure's single circle
@@ -9420,7 +9422,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   const [C, D] = [up(twoM[1]), up(twoM[2])];
   // the line's two points: strip the circle ref + the two-crossing clause + connectives → the 2-label run
   const body = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודות?|ב-)\s*${LABEL}\s*(?:\band\b|ו-?|,)\s*${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(/\bline\b|הישר|הקו|ישר|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(C) || pr.includes(D)) return null; // the line's points must differ from the crossings
@@ -9460,11 +9462,11 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
   if (mentionsCircle(s)) return null; // a circle target → extendOntoCircle / lineMeetsCircle
   if (!/tangent|משיק|\bline\b|הישר|הקו/i.test(s)) return null; // the object D lives on (not a 2nd segment → line∩line)
   if (!INTERSECT_KW.test(s)) return null; // a "meets/cuts" phrasing
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'i'));
   if (!atM) return null;
   const D = up(atM[1]);
   if (!(ctx.points ?? []).includes(D)) return null; // only CONSTRAIN an existing point (a new crossing is the intersection construct)
-  const segM = s.match(/(?:המש(?:ך|כי(?:ם|הם|הן)?)|extension(?:\s+of)?|extended)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const segM = s.match(new RegExp(String.raw`(?:המש(?:ך|כי(?:ם|הם|הן)?)|extension(?:\s+of)?|extended)\s+(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!segM) return null;
   const [X, Y] = [up(segM[1]), up(segM[2])];
   if (X === D || Y === D) return null;
@@ -9528,13 +9530,13 @@ const secantFarPoint: Rule = (s, ctx) => {
   if (!center) return null; // must REFER to a circle
   const circ = circleId(center);
   // TWO crossings named ("at C and D" / "בנקודות C ו-D") → lineCutsCircleTwice / secantFromExternal, never this rule.
-  if (/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*/i.test(s)) return null;
+  if (new RegExp(String.raw`(?:\bat\b|בנקודות?|ב-)\s*${LABEL}\s*(?:\band\b|ו-?|,)\s*${LABEL}`, 'i').test(s)) return null;
 
   // FROM-POINT form: "מנקודה A [יוצא] חותך למעגל בנקודה D" / "from point A a secant cuts the circle at D" —
   // A the external apex (named by "from point A"), D the FAR crossing (named after the circle; the ONLY
   // crossing given, so there's no leading pair to supply it). secantFromExternal (earlier) owns the
   // two-crossings / "outside"+two-crossings forms; a single far crossing falls through to here.
-  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i);
+  const fromM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)(${LABEL})(?![A-Za-z])`, 'i'));
   // The cut must be OF THE CIRCLE directly ("חותך למעגל" / "cuts the circle"), not of a segment named after a
   // circle mention ("חותך את הצלע AC" — that's diameterCutsSegment / lineLineIntersection, guarded above too).
   const cutsCircle = /(?:חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|\bsecant\b|crosses|meets?)\s+(?:ל|את\s+ה|to\s+the\s+|the\s+)?(?:מעגל|circle)/i.test(s);
@@ -9550,13 +9552,13 @@ const secantFarPoint: Rule = (s, ctx) => {
   // PAIR form: "AD חותך למעגל [בנקודה B]" — apex+far from a leading label pair, בנקודה = the NEAR crossing.
   // Optional NEAR-crossing label ("בנקודה B" / "at B") and THROUGH-point ("דרך P" / "through P").
   const thr = /(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)/i.test(s) ? throughPointLabel(s) : null;
-  const atM = s.match(/(?:בנקודה|בנק'|\bat\b)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:בנקודה|בנק'|\bat\b)\s*(${LABEL})(?!\w)`, 'i'));
   const near = atM && up(atM[1]) !== thr ? up(atM[1]) : null; // the "at/בנקודה" label is the near crossing
 
   // The leading label pair A (apex) + D (far) — strip the circle ref, the at/through clauses, and keywords.
   const body = dropCircleRef(s)
-    .replace(/(?:בנקודה|בנק'|\bat\b)\s*[A-Za-z]\d*\b/gi, ' ')
-    .replace(/(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)\s+(?:ה?נקודה\s+)?[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`(?:בנקודה|בנק'|\bat\b)\s*${LABEL}(?!\w)`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)\s+(?:ה?נקודה\s+)?${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(/חות[כך]|נחתכ?\w*|פוגש\w*|\bsecant\b|cuts?|meets?|crosses|\bline\b|הישר|הקו|ועובר|עובר/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr) return null;
@@ -9590,8 +9592,8 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   // the line's two points: strip the circle ref + the new-point clause (both a trailing "at E"
   // and a leading "[נקודה] E היא") + connective words → the 2-label run
   const body = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
-    .replace(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-)\s*${LABEL}(?!\w)`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`(?:^|\s)(?:ה?נקוד[הת]|point)\s+${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(new RegExp(String.raw`^\s*${R}\s*(?:\bis\b|היא|הוא|=)`, 'i'), ' ')
     // #71: the appositive noun form — strip the leading "E נקודת החיתוך" / "E is the intersection point"
     .replace(new RegExp(String.raw`^\s*${R}\s+נקודת\s+ה?(?:חיתוך|מפגש)(?:\s+של)?`, 'i'), ' ')
@@ -9663,7 +9665,7 @@ const tangentMeetsOtherCircle: Rule = (s, ctx) => {
   // Two adjacent "circle <C> at <P>" pairs: the tangent's circle + tangency point, then the
   // target circle + the new crossing. The adjacency (no "and"/verb between circle and "at")
   // is what separates this from `circlesTangent`'s "circle O and circle P … at M".
-  const pairs = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b\s*(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/gi)];
+  const pairs = [...s.matchAll(new RegExp(String.raw`(?:circle|מעגל)\s+(${LABEL})(?!\w)\s*(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'gi'))];
   let c1: string, p1: string, c2: string, p2: string;
   if (pairs.length >= 2) {
     [c1, p1, c2, p2] = [up(pairs[0][1]), up(pairs[0][2]), up(pairs[1][1]), up(pairs[1][2])];
@@ -9674,7 +9676,7 @@ const tangentMeetsOtherCircle: Rule = (s, ctx) => {
     // member of the tangent's own circle — the one named with the tangent preposition («משיק למעגל O» /
     // "tangent to circle O"), which the single pair must not be.
     const thr = throughPointLabel(s);
-    const tanCircM = s.match(/(?:משיק\s+למעגל|tangent\s+to\s+(?:the\s+)?circle)\s+([A-Za-z]\d*)\b/i);
+    const tanCircM = s.match(new RegExp(String.raw`(?:משיק\s+למעגל|tangent\s+to\s+(?:the\s+)?circle)\s+(${LABEL})(?!\w)`, 'i'));
     if (!thr || !tanCircM) return null;
     [c1, p1, c2, p2] = [up(tanCircM[1]), thr, up(pairs[0][1]), up(pairs[0][2])];
     if (!membersOfCenter(ctx, c1).has(p1)) return null; // an off-circle through-point is an external apex — other rules own it
@@ -9707,7 +9709,7 @@ const theTangentMeetsCircle: Rule = (s, ctx) => {
   // retry phrasing) — which SELECTS the tangent line tan-A (and disambiguates when several exist).
   // No `\b` after the Hebrew verb — Hebrew letters are not `\w`, so \b never matches there (the recorded ℓ trap).
   const subj = s.match(
-    /^\s*(?:המשיק|the\s+tangent)\s+(?:(?:בנקודה|at)\s*([A-Za-z]\d*)\s+)?(?:חות(?:ך|כת)|פוגש\w*|נפגש\w*|cuts?|meets?|crosses|intersects?)(?![A-Za-z])/i,
+    new RegExp(String.raw`^\s*(?:המשיק|the\s+tangent)\s+(?:(?:בנקודה|at)\s*(${LABEL})\s+)?(?:חות(?:ך|כת)|פוגש\w*|נפגש\w*|cuts?|meets?|crosses|intersects?)(?![A-Za-z])`, 'i'),
   );
   if (!subj) return null;
   const tans = (ctx.lines ?? []).filter((l) => l.startsWith('tan-'));
@@ -9785,8 +9787,8 @@ const circlesTangent: Rule = (s, ctx) => {
     .replace(/circles?|מעגל\w*/gi, ' ')
     .replace(/\b(?:internal|external)\w*\b|\binside\b|\boutside\b|פנימ\w*|חיצונ\w*|מבפנים|מבחוץ/gi, ' ')
     .replace(/זה\s+ל?זה|אחד\s+לשני|\beach\s+other\b|\bone\s+another\b/gi, ' ')
-    .replace(/(?:\bat\b|בנקוד\S*)\s*[A-Za-z]\d*/gi, ' ')
-    .replace(/[A-Z]\d*/g, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקוד\S*)\s*${LABEL}`, 'gi'), ' ')
+    .replace(LABEL_G, ' ')
     .replace(REQUEST_WORDS, ' ')
     .replace(FILLER, ' ');
   // The DENYLIST (`SHAPE_LEFTOVER`), not the #497 fail-closed closure. Fail-closed is the stronger
@@ -9837,7 +9839,7 @@ const circlesTangent: Rule = (s, ctx) => {
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)
-  const atM = s.match(/(?:\bat\b|בנקוד\S*)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקוד\S*)\s*(${LABEL})(?!\w)`, 'i'));
   const id1 = circleId(c1), id2 = circleId(c2);
   // #2209 (ADR-703): a pair already stated tangent keeps its record's operand order and, with no «בנקודה», its touch.
   const onRecord = onStatedTangency(ctx, id1, id2);
@@ -10102,7 +10104,7 @@ const commonTangent: Rule = (s, ctx) => {
   // circles through one point IS a common tangent through that point). The plural-circles word is
   // required so a single-circle «מנקודה A יוצא משיק למעגל» keeps its tangentFromExternal owner
   // (which runs earlier and defers on a two-circle figure).
-  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i);
+  const fromM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)(${LABEL})(?![A-Za-z])`, 'i'));
   const apexForm = !!fromM && (/מעגלים|\bcircles\b/i.test(s) || /\bboth\b|לשני|שני\s+ה?מעגל/i.test(s));
   if (!(/common|משותף|משותפ/i.test(s) || (kind !== undefined && singularTangent && !circlesForm) || apexForm)) return null;
   // The two circles: named per-circle ("למעגלים O1 ו O2" / "circles O and P"), else THE two circles
@@ -10131,7 +10133,7 @@ const commonTangent: Rule = (s, ctx) => {
   // express — defer whole (never a bare tangent that drops the cut; the ADR-024 discipline). The
   // participle description «מעגלים נחתכים» (the circles being intersecting) stays legal.
   if (/חות(?:ך|כת|כים)|\bcuts?\b|\bcrosses\b/i.test(s)) return null;
-  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה)\s*(${LABEL})(?!\w)`, 'i'));
   const at = atM ? up(atM[1]) : null;
   // The apex (#214): the from-marked point, never a centre. Excluded from touch naming below — the
   // exact defect of the operator's session was A swept into the touch labels and placed ON circle O.
@@ -10141,11 +10143,11 @@ const commonTangent: Rule = (s, ctx) => {
   // apex (its from-clause is stripped so the label can't be re-read as a touch).
   // ALL touch labels, not one 2-run — «AB ו-CD משיקים משותפים» names two tangents as two separate runs.
   const namingText = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה)\s*[A-Za-z]\d*\b/gi, ' ')
-    .replace(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)[A-Za-z]\d*(?![A-Za-z])/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה)\s*${LABEL}(?!\w)`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)${LABEL}(?![A-Za-z])`, 'gi'), ' ')
     .replace(/tangent|משיק\S*|\bcommon\b|משותף|משותפת|\bline\b|הישר|הקו|למעגלים|מעגלים|לשני|המעגלים/gi, ' ');
   // `lineLetters` keeps a typed touch letter («TB משיק משותף … בנקודה T»); `naming` is the line's OTHER letters.
-  const lineLetters = [...new Set((namingText.match(/\b[A-Z]\d*(?:[A-Z]\d*)?\b/g) ?? []).flatMap((run) => run.match(/[A-Z]\d*/g) ?? []).map(up))].filter(
+  const lineLetters = [...new Set((namingText.match(new RegExp(String.raw`\b${ULABEL}(?:${ULABEL})?\b`, 'g')) ?? []).flatMap((run) => run.match(LABEL_G) ?? []).map(up))].filter(
     (p) => p !== centres[0] && p !== centres[1] && p !== apex,
   );
   const naming = lineLetters.filter((p) => p !== at);
@@ -10430,7 +10432,7 @@ const tangentChord: Rule = (s, ctx) => {
   if (!host || !target || up(host) === up(target)) return null; // two DIFFERENT named circles
   const ends = labelRun(dropCircleRef(before).replace(/chords?|מיתר|diameters?|קוטר/gi, ' '), 2); // the chord's endpoints
   if (!ends || ends[0] === ends[1]) return null;
-  const zM = after.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i); // the touch point ("…at A" / "…בנקודה A")
+  const zM = after.match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'i')); // the touch point ("…at A" / "…בנקודה A")
   const Z = zM ? up(zM[1]) : null;
   if (Z && !ends.includes(Z)) return null; // a named touch must be one of the chord's own endpoints
   const hostCirc = circleId(host);
@@ -10496,8 +10498,8 @@ function lineMarkers(lineId: Id, labels: Id[]): AnyCommand[] {
  */
 function lineNameLabels(s: string, exclude: Id[]): Id[] {
   const m =
-    s.match(/(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b/i) ??
-    s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular|⊥|מאונ[כך]|אנ[כך]|parallel|∥|מקביל)/i);
+    s.match(new RegExp(String.raw`(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b(${LABEL})(?:\s*(${LABEL}))?\b`, 'i')) ??
+    s.match(new RegExp(String.raw`^\s*\b(${LABEL})(?:\s*(${LABEL}))?\b\s*(?=perpendicular|⊥|מאונ[כך]|אנ[כך]|parallel|∥|מקביל)`, 'i'));
   if (!m) return [];
   const ex = new Set(exclude.map((e) => e.toUpperCase()));
   const out: Id[] = [];
@@ -10521,7 +10523,7 @@ function lineNameLabels(s: string, exclude: Id[]): Id[] {
 const tangentsFromExternal: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   if (!/\btwo\b|tangents|שני|שתי|משיקים/i.test(s)) return null; // TWO tangents from a point, not a single tangent-at-a-point
-  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // "מנקודה E" OR abbreviated "מ-E" (#96)
+  const eM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)(${LABEL})(?![A-Za-z])`, 'i')); // "מנקודה E" OR abbreviated "מ-E" (#96)
   if (!eM) return null;
   // Resolve-or-INTRODUCE (#159): the circle this sentence itself introduces («…שני משיקים למעגל» as an
   // opener) is created here with a FREE radius — it used to fall to the LLM, whose rescue pinned 5.
@@ -10534,7 +10536,7 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   // student needn't name them. "מנקודה A יוצאים שני משיקים למעגל O" / "two tangents from A to circle O"
   // just wants the two tangent lines drawn ([ADR-126]); previously a missing touch-point pair bailed the
   // rule to the LLM (which built nothing).
-  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // a named pair "A and B", if any
+  const abM = s.match(new RegExp(String.raw`\b(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})(?!\w)`, 'i')); // a named pair "A and B", if any
   let A: Id, B: Id;
   if (abM && new Set([E, up(abM[1]), up(abM[2])]).size === 3 && ![up(abM[1]), up(abM[2])].includes(up(center))) {
     A = up(abM[1]);
@@ -10601,8 +10603,8 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const center = resolved.center;
   const have = new Set(ctx.points ?? []);
   const members = membersOfCenter(ctx, center); // labels already ON this circle
-  const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
-  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)/i); // "at D" / "בנקודה D" → the touch point (NOT the apex)
+  const labels = (s.match(LABEL_G) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה)\s*(${LABEL})`, 'i')); // "at D" / "בנקודה D" → the touch point (NOT the apex)
   const atPoint = atM ? up(atM[1]) : null;
   // "tangent AT an EXISTING point" — e.g. "KB tangent at K", K already placed — is NOT a tangent FROM an
   // external apex: its touch point is GIVEN, which this Thales construction can't honour (it computes its
@@ -10612,7 +10614,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   // The apex is the EXISTING external point — explicit "from E" / "מנקודה E" wins; else the single
   // existing point that isn't introduced as the touch ("at …"). If none exists, defer (it's a
   // tangent AT a point on the circle, or needs the LLM).
-  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|\bמ-)\s*([A-Za-z]\d*)/i);
+  const fromM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|\bמ-)\s*(${LABEL})`, 'i'));
   const fromName = fromM ? up(fromM[1]) : null;
   let apex: Id | null = null;
   let placeApex = false;
@@ -10659,12 +10661,12 @@ const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  const atM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*(${LABEL})(?!\w)`, 'i'));
   const have = new Set(ctx.points ?? []);
   // The 1–2 point labels NAMING the line ("הישר CD משיק…" / "AB משיק…"), excluding the
   // tangency point (the "at X" clause) and the centre.
   const named = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
   // NOTE: a degenerate pair ("BB") is deliberately NOT filtered here — it flows to the existing-segment
   // branch whose set-perpendicular the ADR-202 apply gate rejects with a clear message (the ONE chokepoint
@@ -10791,7 +10793,7 @@ const tangentLine: Rule = (s, ctx) => {
   // become ±offset sliders along the tangent (ADR-036 — a free DOF, ADR-052); a pre-existing label is left
   // as-is (never redefined, so no dependency cycle). Before ADR-233 the off-circle endpoint of "BA משיק
   // למעגל" was silently dropped when the other endpoint was the touch (design-rules §6 honesty).
-  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|\bמ-)\s*([A-Za-z]\d*)/i);
+  const fromM = s.match(new RegExp(String.raw`(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|\bמ-)\s*(${LABEL})`, 'i'));
   const onLine: Id[] = [];
   for (const p of [...(pts ?? []), ...(fromM ? [up(fromM[1])] : [])]) {
     if (p !== T && p !== up(center) && !onLine.includes(p)) onLine.push(p); // not the touch, not the centre
@@ -10823,14 +10825,14 @@ const bisectorLine: Rule = (s) => {
 // The point a drawn line passes through: "through P" / "at P" / "דרך P" / "בנקודה P" (at point P).
 // "at"/"בנקודה" lets "DE ⟂ AB at C" / "DE אנך ל-AB בנקודה C" name the foot as the through-point.
 // #1775 (ADR-792): the operand's own noun («דרך הנקודה P») is read here, by every frame that takes a through-point.
-const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+${POINT_OPERAND_NOUN}([A-Za-z]\d*)\b`;
+const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+${POINT_OPERAND_NOUN}(${LABEL})(?!\w)`;
 
 // The "from a point" origin students write for a drawn PARALLEL line — "from point A" / "from A" /
 // "מנקודה A" / "מ-A" (issue #127). Used ONLY by the parallel-line rule: the perpendicular "from a point"
 // is already read (better) by the foot rule, and adding a "from" anchor to the SHARED perpendicular path
 // would make it grab foot phrasings ("the foot of the perpendicular from C to AD" carries both אנך AND a
 // "from C" source). Mirrors the מ-/מנקודה idiom the tangent/secant/diameter rules use (e.g. :3455).
-const FROM_PT = String.raw`(?:from\s+(?:(?:a|the)\s+)?point|\bfrom\b|מהנקודה|מ-?נקודה|מ-)\s*([A-Za-z]\d*)\b`;
+const FROM_PT = String.raw`(?:from\s+(?:(?:a|the)\s+)?point|\bfrom\b|מהנקודה|מ-?נקודה|מ-)\s*(${LABEL})(?!\w)`;
 
 /**
  * "… cuts/meets <the line/the extension of> CD at E" — the cut-clause a drawn ⊥/∥ line compound ends
@@ -10842,7 +10844,7 @@ const FROM_PT = String.raw`(?:from\s+(?:(?:a|the)\s+)?point|\bfrom\b|מהנקו�
  */
 const CUT_VERB = String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)`;
 const CUT_FILLER = String.raw`(?:את\s+|the\s+|line\s+|ray\s+|segment\s+|extension\s+(?:of\s+)?|extended\s+|chord\s+|radius\s+|side\s+|diagonal\s+|ה?קו\s+|ה?ישר\s+|ה?משך\s+|ה?קטע\s+|ה?מיתר\s+|ה?רדיוס\s+|ה?צלע\s+|ה?אלכסון\s+)*`;
-const LINE_CUT = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i');
+const LINE_CUT = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}(${LABEL})\s*(${LABEL})(?!\w).*?(?:בנקודה|\bat\b|ב-)\s*(${LABEL})`, 'i');
 /** Reference semantics of a LINE_CUT target (the issue-#22 class, per operand): a bare pair (or "הקטע"/
  *  "segment") means the SEGMENT — the crossing lands WITHIN it (order [c1,e,c2], ADR-077); "המשך"/
  *  extension is DIRECTIONAL — beyond the 2nd letter (order [c1,c2,e], ADR-054); "הישר"/line/ray is the
@@ -10856,7 +10858,7 @@ const cutTargetOrder = (cutText: string, c1: Id, c2: Id, e: Id): Id[] | undefine
  *  bind, the utterance is a cut compound we can't fully read → escalate, never half-parse. A cut verb
  *  with a PRONOUN target ("וחותך אותו בנקודה E" — cuts IT, i.e. the reference segment) is NOT this:
  *  that's the reposition/foot form the plain construct handles (its through-point IS the cut). */
-const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}[A-Za-z]\d*\s*[A-Za-z]\d*\b`, 'i');
+const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}${LABEL}\s*${LABEL}(?!\w)`, 'i');
 
 /**
  * #2232 ([ADR-795](../../docs/06-decisions.md#adr-795)) — «MK אנך ל-AB בנקודה K» · "MK is a perpendicular to AB at K", with M
@@ -10931,7 +10933,7 @@ const perpendicularLine: Rule = (s, ctx) => {
   if (!thr) return null; // no through-point ⇒ it's the ⟂ constraint or a foot, not a drawn line
   const seg = s
     .replace(new RegExp(THROUGH_PT, 'gi'), ' ') // drop the through-clause so its point isn't read as the segment
-    .match(new RegExp(String.raw`(?:perpendicular\s*to|⊥|מאונ[כך]\s*ל-?|אנ[כך]\s*ל-?)\s*${LINE_OPERAND_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'));
+    .match(new RegExp(String.raw`(?:perpendicular\s*to|⊥|מאונ[כך]\s*ל-?|אנ[כך]\s*ל-?)\s*${LINE_OPERAND_NOUN}(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const have = new Set(ctx.points ?? []);
@@ -10983,7 +10985,7 @@ const parallelLine: Rule = (s, ctx) => {
   if (!thr) return null; // no through-point ⇒ it's the ∥ constraint, not a drawn line
   const seg = s
     .replace(thr[0], ' ') // drop the anchor clause so its point isn't read as the parallel-to segment
-    .match(new RegExp(String.raw`(?:parallel\s*to|∥|מקביל\s*ל[-=]?)\s*${LINE_OPERAND_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i')); // ל[-=] tolerates the ל=AB typo (#127)
+    .match(new RegExp(String.raw`(?:parallel\s*to|∥|מקביל\s*ל[-=]?)\s*${LINE_OPERAND_NOUN}(${LABEL})\s*(${LABEL})(?!\w)`, 'i')); // ל[-=] tolerates the ל=AB typo (#127)
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const lineIdCut = `par-${P}-${a}${b}`;
@@ -11042,7 +11044,7 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   // חוסם» puts the circle INSIDE the shape, which is no circle through its vertices
   if (cue && /circumscrib|חוסם/i.test(cue[0]) && inscriptionVoice(s)?.container === 'shape') return null;
   const cut = s.match(/חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?/i);
-  const at = s.match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  const at = s.match(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-)\s*(${LABEL})(?!\w)`, 'i'));
   if (!cue || !cut || !at || cut.index! < cue.index!) return null;
   const D = up(at[1]);
   // the shape's vertices: the labels between the cue and the cut verb ("…circumscribing [triangle] ABC
@@ -11107,7 +11109,7 @@ const circumcircle: Rule = (s, ctx) => {
     // #1438 (ADR-548): a LIST-spelled run — «A, B ו-C», "A, B and C" — is the same three points as the
     // spaced «A B C». Unread, the separators hid the run and the `circle` rule committed a circle through
     // A alone with B and C dropped. Only separators BETWEEN uppercase labels are normalised.
-    .replace(/(?<=(?<![A-Za-z])[A-Z]\d*)(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)(?=[A-Z]\d*(?![A-Za-z]))/g, ' ');
+    .replace(new RegExp(String.raw`(?<=(?<![A-Za-z])${ULABEL})(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)(?=${ULABEL}(?![A-Za-z]))`, 'g'), ' ');
   // #83 ([ADR-291](docs/06-decisions.md#adr-291), M1): a circumscription stated about points that ALREADY
   // ride a circle RESOLVES it — reveal the existing (auto-hidden) circle, never mint a coincident
   // duplicate + duplicate constraint (the ADR-099/ADR-115 family, circumscribes-edition). This also
@@ -11144,11 +11146,11 @@ const circumcircle: Rule = (s, ctx) => {
  *  The LOCATIVE form ("<keyword> בנקודה A" / "… at point A", #242) is NOT folded in here: «בנקודה X» /
  *  «at point X» are the universal CROSSING markers elsewhere, so a free-floating match would mis-read a
  *  crossing point as an apex — the locative is detected keyword-anchored per rule (`LOCATIVE_APEX`). */
-const APEX_FROM = String.raw`(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)(${LABEL})\b`;
+const APEX_FROM = String.raw`(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)(${LABEL})(?!\w)`;
 /** The keyword-anchored LOCATIVE apex "<special-line keyword> בנקודה/בקודקוד X" / "… at [the] point/vertex
  *  X" (#242). Anchored to the keyword so it can never grab a crossing "…בנקודה K". `%KW%` is replaced with
  *  the rule's own keyword alternation; the apex is captured in group 1. */
-const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קודקוד)\s+|at\s+(?:the\s+)?(?:point|vertex)\s+)(${LABEL})\b`;
+const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קודקוד)\s+|at\s+(?:the\s+)?(?:point|vertex)\s+)(${LABEL})(?!\w)`;
 
 /**
  * #775 — a special line to a side named by its ROLE: «תיכון ליתר» (the median to the hypotenuse),
@@ -11235,7 +11237,7 @@ const roleSideLine: Rule = (s, ctx) => {
   // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
   // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
   // (#2166: the foot tail is not a pair — "… at K" would read as the side AT.)
-  const afterNoun = s.replace(FOOT_LETTER_TAIL, '').slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
+  const afterNoun = s.replace(FOOT_LETTER_TAIL, '').slice((m.index ?? 0) + m[0].length).match(new RegExp(String.raw`^\s*(${LABEL})\s*(${LABEL})(?![A-Za-z\d])`));
   const selected = afterNoun
     ? cands.find((r) => sameSide(r.edge[0], r.edge[1], up(afterNoun[1]), up(afterNoun[2]))) ?? null
     : null;
@@ -11406,7 +11408,7 @@ const roleSideLine: Rule = (s, ctx) => {
  */
 const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
   const m = s.match(
-    /(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
   );
   return m ? { side: [up(m[1]), up(m[2])], match: m[0] } : null;
 };
@@ -11426,7 +11428,7 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
  */
 const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
   const m =
-    s.match(/(?:\b(?:in|of)\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ?? // #1999: "of triangle"
+    s.match(new RegExp(String.raw`(?:\b(?:in|of)\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)(${LABEL})\s*(${LABEL})\s*(${LABEL})(?!\w)`, 'i')) ?? // #1999: "of triangle"
     // #1720: the English forms the median and altitude rules always read — "median from A in ABC", "triangle
     // ABC with a height from A". UPPERCASE labels only (no /i), so "a triangle and …" is never A, N, D.
     s.match(new RegExp(String.raw`(?:\b[Ii]n\s+(?:the\s+)?|\b[Tt]riangle\s+)(${ULABEL})\s*(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`));
@@ -11455,7 +11457,7 @@ const cevianTriangleOf = (rule: Rule): Rule => (s, ctx) => {
   const ringKey = key(tri.ring);
   if ((ctx.polygons ?? []).some((p) => key(p) === ringKey)) return res;
   if (res.some((c) => Array.isArray((c as { ids?: unknown }).ids) && key((c as { ids: string[] }).ids) === ringKey)) return res;
-  const named = new Set(res.flatMap((c) => JSON.stringify(c).match(/[A-Z]\d*/g) ?? []));
+  const named = new Set(res.flatMap((c) => JSON.stringify(c).match(LABEL_G) ?? []));
   if (!tri.ring.every((v) => named.has(v))) return res; // the cevian is not about this triangle
   return [{ type: 'triangle', ids: [tri.ring[0], tri.ring[1], tri.ring[2]] }, ...res];
 };
@@ -11834,7 +11836,7 @@ const isVertexPair = (a: Id, b: Id, ctx: ParseContext): boolean => {
 /** The named-altitude head, name-first: «AB גובה», «AB הוא גובה», "AB is the altitude" (the `altitude` rule's reader). */
 const NAMED_ALT_FIRST = rx(String.raw`^\s*${CEVIAN_SUBJECT}(?:height|altitude|גובה)`, 'i'); // #1999 (ADR-666): the shared subject
 /** The named-altitude head, keyword-first: «הגובה AB», "the altitude AB". */
-const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s*(${LABEL})\b`, 'i');
+const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i');
 
 /**
  * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — THE RIGHT ANGLES A HEIGHT NAMED BY TWO EXISTING VERTICES CAN
@@ -11906,7 +11908,7 @@ export function cevianPairReadings(raw: string, ctx: ParseContext): { segments: 
   const plural = s.match(PLURAL_SPECIAL_RX);
   if (plural) {
     if (!/גבהים|heights|altitudes/i.test(plural[2]) || plural[3] || plural[4]) return null;
-    const labels = plural[1].match(/[A-Z]\d*/g) ?? [];
+    const labels = plural[1].match(LABEL_G) ?? [];
     if (labels.length < 4 || labels.length % 2 !== 0) return null;
     const segments: CevianPairSegment[] = [];
     for (let i = 0; i < labels.length; i += 2) {
@@ -11987,7 +11989,7 @@ const altitude: Rule = (s, ctx) => {
     // determinate apex).
     if (!isHeight) return null;
     const sideOnly = s.match(
-      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+      new RegExp(String.raw`(?:\bto\s+(?:the\s+)?(?:side\s+)?|\bon\s+side\s+|אל\s*(?:ה?צלע\s+)?|על\s+ה?צלע\s+|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
     );
     if (!sideOnly) return null;
     const sd: [Id, Id] = [up(sideOnly[1]), up(sideOnly[2])];
@@ -12010,7 +12012,7 @@ const altitude: Rule = (s, ctx) => {
   // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "על צלע BC" / "לקטע BC" (descriptor noun tolerated).
   // #1775 (ADR-792): a perpendicular FROM a point takes a LINE as well as a side, «מ-P מורידים אנך לישר AB». The noun is
   // the frame's operand and states nothing; a cevian noun («גובה», «תיכון») keeps the side reader's own nouns.
-  const onLine = isPerpFrom && !isHeight ? s.match(new RegExp(String.raw`(?:\bto\s+(?:the\s+)?line\s+|ל-?\s*ה?ישר\s+)(${LABEL})\s*(${LABEL})\b`, 'i')) : null;
+  const onLine = isPerpFrom && !isHeight ? s.match(new RegExp(String.raw`(?:\bto\s+(?:the\s+)?line\s+|ל-?\s*ה?ישר\s+)(${LABEL})\s*(${LABEL})(?!\w)`, 'i')) : null;
   const sideM = onLine ? { side: [up(onLine[1]), up(onLine[2])] as [Id, Id], match: onLine[0] } : statedSide(s); // #1267: the ONE reader — this rule’s copy is where it came from
   let p: string, q: string;
   let tri: Id[] | null = null;
@@ -12144,11 +12146,11 @@ const altitude: Rule = (s, ctx) => {
  * «בהתאמה», pairs nothing: the rule bows out rather than guess a pairing (analytic's `parseCevianFamily`
  * plural arm, ADR-AG-209, copied — never imported).
  */
-const PAIR = String.raw`(?:[A-Z]\d*){2}`;
+const PAIR = String.raw`(?:${ULABEL}){2}`;
 const PAIR_SEP = String.raw`(?:\s*,\s*|\s+ו-?\s*|\s+[aA]nd\s+|\s+)`;
 const PLURAL_SPECIAL_RX = new RegExp(
   String.raw`^(${PAIR}(?:${PAIR_SEP}${PAIR})+)\s+(?:(?:הם|הן)\s+|[aA]re\s+(?:the\s+)?)?ה?(גבהים|[hH]eights|[aA]ltitudes|תיכונים|[mM]edians)` +
-    String.raw`(?:\s+(?:במשולש|[iI]n\s+(?:the\s+)?triangle)(\s+(?:[A-Z]\d*){3})?` +
+    String.raw`(?:\s+(?:במשולש|[iI]n\s+(?:the\s+)?triangle)(\s+(?:${ULABEL}){3})?` +
     // #1685: «לצלעות BC ו-OC בהתאמה» · "to sides BC and AC respectively"
     String.raw`|\s+(?:(?:ל|אל\s+ה?)-?\s*(?:ה?צלעות\s+)?|[tT]o\s+(?:the\s+)?(?:sides\s+)?)(${PAIR}(?:${PAIR_SEP}${PAIR})+)\s*,?\s+(?:בהתאמה|[rR]espectively))?\s*\.?\s*$`,
 );
@@ -12157,12 +12159,12 @@ const pluralSpecialLines: Rule = (s, ctx) => {
   // as the pairs "an"+"d"); En keywords carry explicit case alternatives instead.
   const m = s.match(PLURAL_SPECIAL_RX);
   if (!m) return null;
-  const labels = m[1].match(/[A-Z]\d*/g) ?? [];
+  const labels = m[1].match(LABEL_G) ?? [];
   if (labels.length < 4 || labels.length % 2 !== 0) return null;
   const kind = /גבהים|heights|altitudes/i.test(m[2]) ? 'גובה' : 'תיכון';
   const tail = m[3] ? ` במשולש${m[3]}` : '';
   // #1685: one stated side per segment, in order — or no pairing at all.
-  const sides = m[4] ? (m[4].match(/[A-Z]\d*/g) ?? []) : null;
+  const sides = m[4] ? (m[4].match(LABEL_G) ?? []) : null;
   if (sides && sides.length !== labels.length) return null;
   const out: AnyCommand[] = [];
   for (let i = 0; i < labels.length; i += 2) {
@@ -12196,7 +12198,7 @@ const perpBisector: Rule = (s, ctx) => {
   // pair after the connector; emitting only the first would half-parse (drop CD).
   if (/bisectors|אנכים/i.test(s)) {
     const tail = s.match(/(?:\bof\b|\bto\b|ל-?|של)\s*(.+)$/i)?.[1] ?? '';
-    const pairs = [...tail.matchAll(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/g)].map((m) => [up(m[1]), up(m[2])] as [Id, Id]);
+    const pairs = [...tail.matchAll(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)`, 'g'))].map((m) => [up(m[1]), up(m[2])] as [Id, Id]);
     if (pairs.length < 2) return null; // a plural naming <2 segments is unclear — escalate, don't guess
     const taken: Id[] = [...pairs.flat(), ...(ctx.points ?? [])];
     return pairs.flatMap(([pa, pb]) => {
@@ -12209,7 +12211,7 @@ const perpBisector: Rule = (s, ctx) => {
     });
   }
   // The bisected segment follows the connector ("of AB" / "ל-AB" / "to AB").
-  const segM = s.match(/(?:\bof\b|\bto\b|ל-?)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const segM = s.match(new RegExp(String.raw`(?:\bof\b|\bto\b|ל-?)\s*\b(${LABEL})\s*(${LABEL})(?!\w)`, 'i'));
   let a: Id, b: Id;
   if (segM) {
     [a, b] = [up(segM[1]), up(segM[2])];
@@ -12220,7 +12222,7 @@ const perpBisector: Rule = (s, ctx) => {
     [a, b] = ids;
   }
   // An optional leading NAME for the bisector line ("CD אנך אמצעי …"), excluding the bisected segment.
-  const nameM = s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular\s+bisector|ה?אנך\s*ה?אמצעי)/i);
+  const nameM = s.match(new RegExp(String.raw`^\s*\b(${LABEL})(?:\s*(${LABEL}))?\b\s*(?=perpendicular\s+bisector|ה?אנך\s*ה?אמצעי)`, 'i'));
   const names: Id[] = [];
   for (const tok of [nameM?.[1], nameM?.[2]]) {
     if (!tok) continue;
@@ -12283,10 +12285,10 @@ const polygonSideHost = (a: Id, b: Id, ctx: ParseContext, third: Id | null): str
  */
 const bisectorRoleNounOnSide = (s: string, ctx: ParseContext): Extract<Clarify, { clarify: 'cevian-degenerate' }> | null => {
   const m =
-    s.match(/^\s*([A-Z]\d*)\s*([A-Z]\d*)\s+(?:הוא|היא)\s+ה?חוצה[\s-]+ה?זוו?ית(?![א-ת])/) ??
-    s.match(/(?<![א-ת])ה?חוצה[\s-]+ה?זוו?ית\s+([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/) ??
-    s.match(/^\s*([A-Z]\d*)\s*([A-Z]\d*)\s+is\s+(?:an?|the)\s+(?:angle\s+)?bisector\b/i) ??
-    s.match(/\b(?:the\s+)?(?:angle\s+)?bisector\s+([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/i);
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})\s*(${ULABEL})\s+(?:הוא|היא)\s+ה?חוצה[\s-]+ה?זוו?ית(?![א-ת])`)) ??
+    s.match(new RegExp(String.raw`(?<![א-ת])ה?חוצה[\s-]+ה?זוו?ית\s+(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`)) ??
+    s.match(new RegExp(String.raw`^\s*(${ULABEL})\s*(${ULABEL})\s+is\s+(?:an?|the)\s+(?:angle\s+)?bisector\b`, 'i')) ??
+    s.match(new RegExp(String.raw`\b(?:the\s+)?(?:angle\s+)?bisector\s+(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`, 'i'));
   if (!m || !isUpperLabel(m[1]) || !isUpperLabel(m[2]) || m[1] === m[2]) return null;
   const host = polygonSideHost(m[1], m[2], ctx, null);
   return host ? { clarify: 'cevian-degenerate', role: 'bisector', why: 'bisector-is-side', apex: m[1], foot: m[2], side: [m[1], m[2]], host } : null;
@@ -12353,7 +12355,7 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
    */
   if (!tri) {
     const vertexText = triangle ? tail.replace(triangle.match, ' ') : tail;
-    const kw = vertexText.match(/(?:זוו?ית|(?<![A-Za-z])[Aa]ngle|[∠∡])\s*(?:(?:at|of)\s+)?(?:the\s+)?(?:vertex\s+)?(?:ש?ב?ה?קודקוד\s+)?([A-Z]\d*)(?![A-Za-z\d])/);
+    const kw = vertexText.match(new RegExp(String.raw`(?:זוו?ית|(?<![A-Za-z])[Aa]ngle|[∠∡])\s*(?:(?:at|of)\s+)?(?:the\s+)?(?:vertex\s+)?(?:ש?ב?ה?קודקוד\s+)?(${ULABEL})(?![A-Za-z\d])`));
     // The triangle form's lone-letter fallback (#1285) stays the triangle form's: without a triangle and an
     // angle word, a stray letter («CD חוצה את AB בנקודה K») is the segment-bisection rule's, not an angle.
     const lone = triangle ? labelRun(after, 1) : null;
@@ -12469,12 +12471,12 @@ const bisectsSegment: Rule = (s, ctx) => {
   if (INTERSECT_KW.test(s) || /מפגש/.test(s)) return null; // the intersection rules own cut/meet phrasing
   if (/המש(?:ך|כי)|extension|extended|הישר|הקו|קרן|\bline\b|\bray\b/i.test(s)) return null; // non-bare subject → defer
   const m = s.match(
-    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצה)\s+(?:את\s+)?(?:הקטע\s+|הצלע\s+|האלכסון\s+|the\s+)?(?:segment\s+|side\s+|diagonal\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})(?!\w)\s*(?:bisects?|חוצה)\s+(?:את\s+)?(?:הקטע\s+|הצלע\s+|האלכסון\s+|the\s+)?(?:segment\s+|side\s+|diagonal\s+)?(${LABEL})\s*(${LABEL})(?!\w)`, 'i'),
   );
   if (!m) return null;
   const [s1, s2, o1, o2] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])]; // s1s2 bisects o1o2
   if (new Set([s1, s2, o1, o2]).size !== 4) return null; // a shared endpoint is not a bisection of a disjoint segment
-  const named = s.slice((m.index ?? 0) + m[0].length).match(/(?:בנקודה|\bat(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
+  const named = s.slice((m.index ?? 0) + m[0].length).match(new RegExp(String.raw`(?:בנקודה|\bat(?:\s+point)?)\s+(${LABEL})(?!\w)`, 'i'));
   // Reuse an existing midpoint of the object segment (either orientation) rather than minting a coincident twin.
   const existingMid = Object.entries(ctx.midpointOf ?? {}).find(
     ([, [x, y]]) => (x === o1 && y === o2) || (x === o2 && y === o1),
@@ -12508,7 +12510,7 @@ const twoTriangles = (s: string): [[Id, Id, Id], [Id, Id, Id]] | null => {
   const t = s
     .replace(/triangles?|משולשים?|המשולש\w*|congruent|similar|חופפים?|חופף|דומ\w*|are|is|the|of|to|and|של/gi, ' ')
     .replace(/[≅~∼∽△▲]|ל-?|ו-?/g, ' ');
-  const triples = [...t.matchAll(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/g)];
+  const triples = [...t.matchAll(new RegExp(String.raw`\b(${LABEL})\s*(${LABEL})\s*(${LABEL})(?!\w)`, 'g'))];
   if (triples.length < 2) return null;
   const grab = (i: number) => [up(triples[i][1]), up(triples[i][2]), up(triples[i][3])] as [Id, Id, Id];
   return [grab(0), grab(1)];
@@ -12605,7 +12607,7 @@ const statedSimilarityRatio = (s: string): number | null | 'unreadable' => {
 // The old lookahead admitted only whitespace or a Latin label, so the hyphenated form fell past this
 // rule to the membership rule, which read only its own clause and DROPPED the stated magnitude (the
 // ratio member «כך ש-AD = 2·DB» lost the membership instead — same hole, opposite half surviving).
-const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש-?(?=\s|[A-Za-z]\d*)/i;
+const SUCH_THAT = new RegExp(String.raw`\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש-?(?=\s|${LABEL})`, 'i');
 /**
  * #461 — «<shape> ABCD עם <construct>» / "<shape> ABCD with <construct>": declare the shape AND the
  * construct in one line (the capability half of ADR-430).
@@ -12707,7 +12709,7 @@ const shapeWithConstruct: Rule = (s, ctx) => {
  * #108 compound the operator ruled is TAUGHT as two steps, and stays so.
  */
 const GIVEN_AND = /\s+(?:ו-?\s*(?:נתון|ידוע)\s*(?:כי|ש-?)|and\s+(?:it\s+is\s+)?(?:given|known)\s+that)\s*/i;
-const POINT_PLACEMENT = /^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?[A-Z]\d*\s+(?:נמצא[הת]?\s+|is\s+|lies\s+)?(?:על|\bon\b)\s/i;
+const POINT_PLACEMENT = new RegExp(String.raw`^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?${ULABEL}\s+(?:נמצא[הת]?\s+|is\s+|lies\s+)?(?:על|\bon\b)\s`, 'i');
 const compoundSuchThat: Rule = (s, ctx) => {
   const given = s.split(GIVEN_AND);
   const parts = given.length === 2 && POINT_PLACEMENT.test(given[0].trim()) ? given : s.split(SUCH_THAT);
@@ -12732,14 +12734,14 @@ const compoundSuchThat: Rule = (s, ctx) => {
  * parse the SYNTHESIZED distance statement «<X><point> = <n>» the same way. Falls through whole
  * whenever either half doesn't parse or the subject isn't a point-on-carrier statement.
  */
-const AT_DISTANCE = rx(String.raw`^(?<left>.+?)\s+(?:במרחק|at\s+(?:a\s+)?distance(?:\s+of)?)\s+(?<num>${NUM})\s+(?:מ-?\s*|from\s+)(?<from>[A-Z]\d*)\s*$`, 'i');
+const AT_DISTANCE = rx(String.raw`^(?<left>.+?)\s+(?:במרחק|at\s+(?:a\s+)?distance(?:\s+of)?)\s+(?<num>${NUM})\s+(?:מ-?\s*|from\s+)(?<from>${ULABEL})\s*$`, 'i');
 const compoundAtDistance: Rule = (s, ctx) => {
   const m = s.match(AT_DISTANCE);
   if (!m) return null;
   const { left, num, from } = m.groups as { left: string; num: string; from: string };
   // the LEFT must be a point-on-carrier statement about a single subject point — anything else
   // (a tangent length, a chord distance) belongs to richer rules or the LLM
-  const subj = left.trim().match(/^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?([A-Z]\d*)\s+(?:על|\bon\b)/i);
+  const subj = left.trim().match(new RegExp(String.raw`^(?:ה?נקודה\s+|the\s+point\s+|point\s+)?(${ULABEL})\s+(?:על|\bon\b)`, 'i'));
   if (!subj || subj[1].toUpperCase() === from.toUpperCase()) return null;
   const lr = parse(left.trim(), ctx);
   if (!lr.ok) return null;
@@ -12850,14 +12852,14 @@ const unnamedSecant: Rule = (s, ctx) => {
   if (!resolved) return null;
   const center = resolved.center;
   // The stated crossing names, if any («בנקודות C ו-D» / "at C and D"); else the two-points COUNT form.
-  const namedM = s.match(/(?:\bat\b|בנקודות?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  const namedM = s.match(new RegExp(String.raw`(?:\bat\b|בנקודות?)\s*(${LABEL})\s*(?:\band\b|ו-?|,)\s*(${LABEL})(?!\w)`, 'i'));
   const countForm = /בשתי\s+נקודות|ב-?2\s+נקודות|at\s+two\s+points|\btwo\s+points\b/i.test(s);
   if (!namedM && !countForm) return null;
   // Beyond the line noun + cut verb + circle ref + the crossing clause, nothing may remain (no line
   // labels — those belong to lineCutsCircleTwice/lineMeetsCircle, which run first).
   const leftover = dropCircleRef(s)
     .replace(REQUEST_WORDS, ' ')
-    .replace(/(?:\bat\b|בנקודות?)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודות?)\s*${LABEL}\s*(?:\band\b|ו-?|,)\s*${LABEL}(?!\w)`, 'gi'), ' ')
     .replace(/בשתי\s+נקודות|ב-?2\s+נקודות|at\s+two\s+points|\btwo\s+points\b/gi, ' ')
     .replace(/\bline\b|הישר|הקו|(?<![א-ת])ישר(?![א-ת])|(?<![א-ת])קו(?![א-ת])|ה?חות(?:ך|כת|כים)|נחת\w*|פוגש\w*|cut(?:s|ting)?|meet(?:s|ing)?|cross(?:es|ing)?|intersect(?:s|ing)?|circles?|ה?מעגל\w*/gi, ' ')
     .replace(new RegExp(String.raw`\b${up(center)}\b`, 'gi'), ' ')
@@ -13229,8 +13231,8 @@ const normalizeAreaSubscript = (s: string): string =>
   s
     // `(?<![A-Za-z])` (not `\b`) so a coefficient glued to the marker is handled — "4S_{NCE}" (in the
     // ratio `S_{ACD}=4S_{NCE}`) must normalise too, where `\b` failed because digit↔S is no boundary.
-    .replace(/(?<![A-Za-z])S_\{((?:[A-Z]\d*){3,4})\}/g, 'S$1') // S_{ABC} → SABC
-    .replace(/(?<![A-Za-z])S_((?:[A-Z]\d*){3,4})\b/g, 'S$1'); // S_ABC → SABC
+    .replace(new RegExp(String.raw`(?<![A-Za-z])S_\{((?:${ULABEL}){3,4})\}`, 'g'), 'S$1') // S_{ABC} → SABC
+    .replace(new RegExp(String.raw`(?<![A-Za-z])S_((?:${ULABEL}){3,4})(?!\w)`, 'g'), 'S$1'); // S_ABC → SABC
 
 /**
  * Point-label subscript notation → the glued form (ADR-228). Students write a subscripted label the LaTeX
@@ -13474,10 +13476,10 @@ function withConcentricResolution(
     const labels = Object.entries(cmd).flatMap(([k, v]) =>
       k === 'type' || CIRCLE_REF_KEYS.includes(k)
         ? []
-        : typeof v === 'string' && /^[A-Z]\d*$/.test(v)
+        : typeof v === 'string' && LABEL_WHOLE.test(v)
           ? [v]
           : Array.isArray(v)
-            ? v.filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))
+            ? v.filter((x): x is string => typeof x === 'string' && LABEL_WHOLE.test(x))
             : [],
     );
     const o = membersOf(pair.outer);
@@ -13786,7 +13788,7 @@ function withOnCircleMembership(commands: AnyCommand[], s: string, ctx: ParseCon
   const after: AnyCommand[] = [];
   // The label must be a STANDALONE token immediately before "on the circle" (`(?<![A-Za-z])` so the last
   // letter of a word — "are ON the circle" → not "e" — is never captured, PAR-2/ADR-240 regression).
-  for (const m of s.matchAll(/(?<![A-Za-z])([A-Za-z]\d*)\s*(?:על\s+ה?מעגל|on\s+(?:the\s+)?circle)(?:\s+([A-Za-z]\d*)(?![A-Za-z\d]))?/gi)) {
+  for (const m of s.matchAll(new RegExp(String.raw`(?<![A-Za-z])(${LABEL})\s*(?:על\s+ה?מעגל|on\s+(?:the\s+)?circle)(?:\s+(${LABEL})(?![A-Za-z\d]))?`, 'gi'))) {
     const named = m[2] && known.has(up(m[2])) ? up(m[2]) : null;
     const center = named ?? resolved;
     if (!center) continue; // no single/named circle to anchor on
@@ -14602,7 +14604,9 @@ export function normalizeUtterance(raw: string): string {
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
-  const spelling = stripFormatControls(raw)
+  // #2624 (ADR-806): every prime glyph (′ ’ ׳ ʹ …) is ASCII `'` from here on — the ONE prime fold every builder's
+  // boundary calls (`shell/primes`, 3-D's ADR-3D-300, analytic's ADR-AG-395), so the label atom reads «A′» as «A'».
+  const spelling = foldPrimes(stripFormatControls(raw))
     .replace(/־/g, '-')
     // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
     // (the 3-D seam was the gap), but an NBSP from the same paste paths still broke literal-space
@@ -14654,7 +14658,7 @@ export function normalizeUtterance(raw: string): string {
     // one spelling. TWO uppercase labels only: «|z|», «|w|» (not 2-D's vocabulary) and a three-letter «|ABC|» keep
     // their current path. Guarded against a doubled bar on either side, so a keyboard «AB || CD || EF» is never read
     // as «|CD|».
-    .replace(/(?<!\|)\|\s*([A-Z]\d*)\s*([A-Z]\d*)\s*\|(?!\|)/g, '$1$2');
+    .replace(new RegExp(String.raw`(?<!\|)\|\s*(${ULABEL})\s*(${ULABEL})\s*\|(?!\|)`, 'g'), '$1$2');
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
@@ -15050,7 +15054,7 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
  * (a region reference, never a construction); an ambiguous subject (0 or 2+ introduced points) defers.
  */
 const REGION_TAIL = new RegExp(
-  String.raw`[,\s]+(?:ש?נמצאת\s+|ש?נמצא\s+|is\s+|lies\s+|and\s+)*(בתוך|מחוץ\s*ל-?|inside(?:\s+of)?|outside(?:\s+of)?)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram)\s+((?:[A-Z]\d*\s*){3,4})\s*\.?\s*$`,
+  String.raw`[,\s]+(?:ש?נמצאת\s+|ש?נמצא\s+|is\s+|lies\s+|and\s+)*(בתוך|מחוץ\s*ל-?|inside(?:\s+of)?|outside(?:\s+of)?)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram)\s+((?:${ULABEL}\s*){3,4})\s*\.?\s*$`,
 );
 /**
  * A REGION-clause utterance whose SUBJECT the winning parse dropped (issue #99) — the region lane of
@@ -15067,15 +15071,15 @@ export function droppedRegionSubject(utterance: string, commands: AnyCommand[]):
   const m = s.match(REGION_TAIL);
   if (!m) return false;
   if (commands.some((c) => c.type === 'point-polygon-side')) return false;
-  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []);
-  return (s.slice(0, m.index).match(/[A-Z]\d*/g) ?? []).some((l) => !used.has(l));
+  const used = new Set(JSON.stringify(commands).match(LABEL_G) ?? []);
+  return (s.slice(0, m.index).match(LABEL_G) ?? []).some((l) => !used.has(l));
 }
 
 function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
   const m = s.match(REGION_TAIL);
   if (!m) return null;
   const side: 'inside' | 'outside' = /בתוך|inside/i.test(m[1]) ? 'inside' : 'outside';
-  const poly = (m[2].match(/[A-Z]\d*/g) ?? []).map(up);
+  const poly = (m[2].match(LABEL_G) ?? []).map(up);
   if (poly.length < 3) return null;
   const have = new Set((ctx.points ?? []).map(up));
   // The region is normally a REFERENCE to drawn vertices. An all-NEW TRIANGLE is the one implicit
@@ -15097,7 +15101,7 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
   const one = head
     .replace(/ה?נקודה|ה?נקודות|points?/gi, ' ')
     .trim()
-    .match(/^([A-Z]\d*)$/);
+    .match(new RegExp(String.raw`^(${ULABEL})$`));
   if (one) {
     const id = up(one[1]);
     // A VERTEX of the region stated inside/outside it («A בתוך המשולש ABC») is a real statement, and an
@@ -15113,7 +15117,7 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
       ...new Set(
         r.commands
           .map((c) => (c as { id?: unknown }).id)
-          .filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x) && !have.has(up(x))),
+          .filter((x): x is string => typeof x === 'string' && LABEL_WHOLE.test(x) && !have.has(up(x))),
       ),
     ];
     if (introduced.length === 1 && !poly.includes(up(introduced[0]))) {
@@ -15186,10 +15190,10 @@ export function polygonNounsAllReferences(s: string, ctx: ParseContext): boolean
   const pts = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
   const isReference = (m: RegExpMatchArray): boolean => {
     const run =
-      s.slice(m.index! + m[0].length).match(/^(?:ים|ות)?\s+(?:\S+\s+){0,2}?ה?((?:[A-Z]\d*\s*){3,})/)?.[1] ??
-      s.slice(0, m.index!).match(/((?:[A-Z]\d*\s*){3,})\s*$/)?.[1];
+      s.slice(m.index! + m[0].length).match(new RegExp(String.raw`^(?:ים|ות)?\s+(?:\S+\s+){0,2}?ה?((?:${ULABEL}\s*){3,})`))?.[1] ??
+      s.slice(0, m.index!).match(new RegExp(String.raw`((?:${ULABEL}\s*){3,})\s*$`))?.[1];
     if (!run) return (ctx.polygons?.length ?? 0) > 0;
-    return (run.match(/[A-Z]\d*/g) ?? []).every((l) => pts.has(l));
+    return (run.match(LABEL_G) ?? []).every((l) => pts.has(l));
   };
   return nouns.every(isReference);
 }
@@ -15252,19 +15256,19 @@ export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseCo
   const arities = materialisedArities(commands);
   const known = new Set([
     ...(ctx.points ?? []).map((p) => p.toUpperCase()),
-    ...(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []),
+    ...(JSON.stringify(commands).match(LABEL_G) ?? []),
   ]);
   for (const m of s.matchAll(POLY_NOUN)) {
     if (arities.has(polyNounArity(m[0]))) continue; // a polygon of this noun's arity was materialised
     const after = s.slice(m.index! + m[0].length);
     const before = s.slice(0, m.index!);
     const run =
-      after.match(/^(?:ים|ות)?\s+ה?((?:[A-Z]\d*\s*){3,})/)?.[1] ?? before.match(/((?:[A-Z]\d*\s*){3,})\s*$/)?.[1];
+      after.match(new RegExp(String.raw`^(?:ים|ות)?\s+ה?((?:${ULABEL}\s*){3,})`))?.[1] ?? before.match(new RegExp(String.raw`((?:${ULABEL}\s*){3,})\s*$`))?.[1];
     if (!run) {
       if ((ctx.polygons?.length ?? 0) > 0) continue; // a bare noun with a polygon on the figure = definite reference
       return true; // a bare shape DECLARATION nothing materialized
     }
-    const letters = run.match(/[A-Z]\d*/g) ?? [];
+    const letters = run.match(LABEL_G) ?? [];
     if (!letters.every((l) => known.has(l))) return true; // names a vertex nothing accounts for
   }
   return false;
@@ -15284,7 +15288,7 @@ export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseCo
  * the predicate's own circle, or the gate goes blind exactly when a rule branch drops the whole clause.
  */
 const CIRCLE_PRED_TAIL =
-  /(?:^|\s+)((?:[שה])?(?:חסום|חסומה|חסומים|חסומות|חוסם|חוסמת|חוסמים|חוסמות)\s+במעגל(?:\s+אחר)?(?:\s+[A-Z]\d*)?(?:,?\s*(?:ש|ו)?רדיוסו\s+\S+)?|(?:is\s+|are\s+)?inscribed\s+in\s+(?:a\s+|the\s+|another\s+)?circle(?:\s+[A-Z]\d*)?(?:,?\s+(?:whose\s+radius\s+is|with\s+radius|of\s+radius)\s+\S+)?)\s*$/i;
+  new RegExp(String.raw`(?:^|\s+)((?:[שה])?(?:חסום|חסומה|חסומים|חסומות|חוסם|חוסמת|חוסמים|חוסמות)\s+במעגל(?:\s+אחר)?(?:\s+${ULABEL})?(?:,?\s*(?:ש|ו)?רדיוסו\s+\S+)?|(?:is\s+|are\s+)?inscribed\s+in\s+(?:a\s+|the\s+|another\s+)?circle(?:\s+${ULABEL})?(?:,?\s+(?:whose\s+radius\s+is|with\s+radius|of\s+radius)\s+\S+)?)\s*$`, 'i');
 function droppedCirclePredicate(s: string, commands: AnyCommand[]): boolean {
   if (!CIRCLE_PRED_TAIL.test(s)) return false;
   // Accounted when ANY command touches a circle (creates one, places a point on one, asserts
@@ -15591,7 +15595,7 @@ const APPOSITION_SEP = new RegExp(
   'gi',
 );
 /** A piece that is only labels (with an optional point-word) — a LIST fragment, never a statement. */
-const BARE_LABEL_PIECE = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:\s+[A-Z]\d*)*$/;
+const BARE_LABEL_PIECE = new RegExp(String.raw`^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?${ULABEL}(?:\s+${ULABEL})*$`);
 function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
   // A PARENTHESIZED relation is the textbook appositive — «ABC משולש שווה שוקיים (AB=AC)» (#185 row 6):
   // rewrite the parens to a clause separator so the ADR-264 split reads it. Only a group carrying a
@@ -15671,7 +15675,7 @@ function parseClause(p: string, c0: ParseContext): AnyCommand[] | null {
  *  `neighbors`; a `center` field joins `circles`. Copy-on-write — the caller's context is never mutated. */
 export function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
   const points = new Set(ctx.points ?? []);
-  for (const l of JSON.stringify(cmds).match(/[A-Z]\d*/g) ?? []) points.add(l);
+  for (const l of JSON.stringify(cmds).match(LABEL_G) ?? []) points.add(l);
   const polygons = [...(ctx.polygons ?? [])];
   const circles = new Set(ctx.circles ?? []);
   const centrePoint: Record<string, string> = { ...(ctx.centrePoint ?? {}) };
@@ -15747,13 +15751,13 @@ export function typedLabels(raw: string): Id[] {
   const out = new Set<string>();
   for (const word of normalizeUtterance(raw).match(/[A-Za-z0-9]+/g) ?? []) {
     const w = word.replace(/^\d+/, '');
-    if (/^(?:[A-Z]\d*)+$/.test(w)) for (const l of w.match(/[A-Z]\d*/g) ?? []) out.add(l);
+    if (new RegExp(String.raw`^(?:${ULABEL})+$`).test(w)) for (const l of w.match(LABEL_G) ?? []) out.add(l);
   }
   return [...out];
 }
 export function statedLabelTokens(s: string): Id[] {
-  const out = [...(s.match(/[A-Z]\d*/g) ?? [])];
-  if (hasHebrewScript(s)) for (const run of lowercaseLabelRuns(s)) out.push(...(run.toUpperCase().match(/[A-Z]\d*/g) ?? []));
+  const out = [...(s.match(LABEL_G) ?? [])];
+  if (hasHebrewScript(s)) for (const run of lowercaseLabelRuns(s)) out.push(...(run.toUpperCase().match(LABEL_G) ?? []));
   return [...new Set(out)];
 }
 /** Canonical labels the commands actually carry, case-blind over label-shaped VALUES: an id like
@@ -15761,7 +15765,7 @@ export function statedLabelTokens(s: string): Id[] {
  *  radius symbol `name: "r"` (#54) contributes R here — without it, the case-blind input extraction
  *  above would read the BINDING utterance «מעגל שרדיוסו r» as having dropped the label R. */
 function commandLabelTokens(commands: AnyCommand[]): Set<string> {
-  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []);
+  const used = new Set(JSON.stringify(commands).match(LABEL_G) ?? []);
   const walk = (v: unknown): void => {
     if (typeof v === 'string') {
       if (rx(String.raw`^${LABEL}$`, '').test(v)) used.add(v.toUpperCase());
@@ -15799,7 +15803,7 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
   // "S" and escalated to the LLM for nothing (ADR-236). A bare label S ("S_{ABC} = S") is stored in the
   // measure command, so it lands in `used` and never tripped this. The residual risk (an S-led 4-letter
   // POINT run like "STUV" masking a genuinely dropped S) only ever suppresses a warning, never corrupts.
-  const s = normalizeUtterance(utterance).replace(/(?<![A-Za-z])S(?=(?:[A-Z]\d*){3,4}(?![A-Za-z\d]))/g, ' ');
+  const s = normalizeUtterance(utterance).replace(new RegExp(String.raw`(?<![A-Za-z])S(?=(?:${ULABEL}){3,4}(?![A-Za-z\d]))`, 'g'), ' ');
   const inputLabels = statedLabelTokens(s);
   return inputLabels.filter((L) => !have.has(L) && !used.has(L));
 }
@@ -15850,7 +15854,7 @@ export function introducedNewLabels(
   // lines are canonical, and lowercase glyphs there are never labels.
   const norm = normalizeUtterance(utterance);
   const stated = new Set(statedLabelTokens(norm));
-  const written = canonicalLines.flatMap((line) => normalizeUtterance(line).match(/[A-Z]\d*/g) ?? []);
+  const written = canonicalLines.flatMap((line) => normalizeUtterance(line).match(LABEL_G) ?? []);
   return nameAccounting({
     stated: [...stated, ...nounReferencedLabels(norm, stated, refs)],
     written,
@@ -15867,7 +15871,7 @@ export function introducedNewLabels(
  */
 export function definedLabels(commands: readonly AnyCommand[]): Set<string> {
   const out = new Set<string>();
-  const label = (v: unknown) => typeof v === 'string' && /^[A-Z]\d*$/.test(v) && out.add(v);
+  const label = (v: unknown) => typeof v === 'string' && LABEL_WHOLE.test(v) && out.add(v);
   for (const c of commands as readonly Record<string, unknown>[]) {
     if (Array.isArray(c.ids)) c.ids.forEach(label);
     for (const k of ['id', 'id1', 'id2', 'center']) label(c[k]);
@@ -15890,7 +15894,7 @@ const teachableLetters = (commands: readonly AnyCommand[], existingPoints: reado
  *  the criterion admits, given the commands the candidate parsed to. */
 export function liftTeachable(utterance: string, commands: readonly AnyCommand[], existingPoints: readonly string[] = []): boolean {
   const teachable = teachableLetters(commands, existingPoints);
-  return liftedRuns(utterance).every((run) => (run.toUpperCase().match(/[A-Z]\d*/g) ?? []).every(teachable));
+  return liftedRuns(utterance).every((run) => (run.toUpperCase().match(LABEL_G) ?? []).every(teachable));
 }
 
 /**
@@ -15908,7 +15912,7 @@ export function latinProseLabels(utterance: string, commands: readonly AnyComman
   const runs = s.match(/(?<![A-Za-z\d])[A-Za-z][A-Za-z\d]*/g) ?? [];
   const typed = new Set<string>();
   for (const run of runs) {
-    for (const m of run.matchAll(/[A-Z]\d*/g)) {
+    for (const m of run.matchAll(LABEL_G)) {
       const capitalisedWord = m.index === 0 && /^[A-Z][a-z]/.test(run) && run.length > 1;
       if (!capitalisedWord) typed.add(m[0]);
     }
@@ -15917,7 +15921,7 @@ export function latinProseLabels(utterance: string, commands: readonly AnyComman
   const referenced = new Set<string>();
   const walk = (v: unknown): void => {
     // a POINT label is a whole value; a compound object id («circle-O», «seg-AB», «bis-ABC») names an object the line built
-    if (typeof v === 'string') { if (/^[A-Z]\d*$/.test(v)) referenced.add(v); }
+    if (typeof v === 'string') { if (LABEL_WHOLE.test(v)) referenced.add(v); }
     else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
   };
@@ -15968,7 +15972,7 @@ export function lowercaseLabelFold(utterance: string, commands: AnyCommand[], ex
   // measure «שרדיוסו r» (the "TYPE contains E" trap, field-name edition).
   const referenced = new Set<string>();
   const walk = (v: unknown): void => {
-    if (typeof v === 'string') for (const tok of v.match(/[A-Z]\d*/g) ?? []) referenced.add(tok);
+    if (typeof v === 'string') for (const tok of v.match(LABEL_G) ?? []) referenced.add(tok);
     else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
   };
@@ -15978,7 +15982,7 @@ export function lowercaseLabelFold(utterance: string, commands: AnyCommand[], ex
   const RUN = /(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g;
   const foldToks = (run: string): Id[] | null => {
     if (symbols.has(run)) return null; // #2024: a symbol the commands carry is not a folded label
-    const toks = run.toUpperCase().match(/[A-Z]\d*/g) ?? [];
+    const toks = run.toUpperCase().match(LABEL_G) ?? [];
     return toks.length > 0 && toks.every((tok) => referenced.has(tok) && teachable(tok)) ? toks : null;
   };
   // Pass 1 — DETECT on unambiguous runs only: in Latin text an English function word never proves a
@@ -16396,16 +16400,16 @@ function verbEvidence(g: (typeof VERB_GATES)[number], commands: AnyCommand[]): A
  *  between a pair and the verb yields nothing, so a clause like «המשך CA נפגש עם המשיק» extracts no
  *  operand and keeps the family-presence fallback (never a false block). */
 function statedVerbOperands(s: string, verbAt: number, verbLen: number): Id[] {
-  const PAIR = String.raw`(?<![A-Za-z\d])[A-Z]\d*[A-Z]\d*(?![A-Za-z\d])`;
+  const PAIR = String.raw`(?<![A-Za-z\d])${ULABEL}${ULABEL}(?![A-Za-z\d])`;
   const out: Id[] = [];
   const before = s.slice(0, verbAt);
   const subj = before.match(
     new RegExp(String.raw`(${PAIR}(?:\s*(?:,|ו-?|\band\b)\s*${PAIR})*)\s*(?:\b(?:is|are)\b\s+|הוא\s+|היא\s+|הם\s+)?$`),
   );
-  if (subj) out.push(...(subj[1].match(/[A-Z]\d*/g) ?? []));
+  if (subj) out.push(...(subj[1].match(LABEL_G) ?? []));
   const after = s.slice(verbAt + verbLen);
   const obj = after.match(new RegExp(String.raw`^[א-ת]*\s*(?:את\s+|ל-?\s*|\bto\b\s+(?:the\s+)?)?(${PAIR})`));
-  if (obj) out.push(...(obj[1].match(/[A-Z]\d*/g) ?? []));
+  if (obj) out.push(...(obj[1].match(LABEL_G) ?? []));
   return [...new Set(out)];
 }
 
@@ -16455,7 +16459,7 @@ export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): st
     const stated = statedVerbOperands(s, m.index, m[0].length);
     if (stated.length === 0) continue;
     const bound = new Set<string>();
-    for (const c of evidence) for (const L of JSON.stringify(c).match(/[A-Z]\d*/g) ?? []) bound.add(L);
+    for (const c of evidence) for (const L of JSON.stringify(c).match(LABEL_G) ?? []) bound.add(L);
     if (!stated.every((L) => bound.has(L))) out.push(g.verb);
   }
   return out;
@@ -16488,10 +16492,10 @@ export function droppedComparison(utterance: string, commands: AnyCommand[]): bo
 
 export function droppedGivenRelations(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
-  const rel = /(?<![A-Za-z\d])([A-Z]\d*)([A-Z]\d*)\s*(=|⊥|⟂|∥)\s*([A-Z]\d*)([A-Z]\d*)(?![A-Za-z\d])/g;
+  const rel = new RegExp(String.raw`(?<![A-Za-z\d])(${ULABEL})(${ULABEL})\s*(=|⊥|⟂|∥)\s*(${ULABEL})(${ULABEL})(?![A-Za-z\d])`, 'g');
   const perCommand = commands.map((c) => ({
     isConstraint: typeof (c as { type?: unknown }).type === 'string' && (c as { type: string }).type.startsWith('set-'),
-    labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []),
+    labels: new Set(JSON.stringify(c).match(LABEL_G) ?? []),
   }));
   /**
    * (b) as written: the point-definition command that INTRODUCES one of the relation's labels must itself
@@ -16502,7 +16506,7 @@ export function droppedGivenRelations(utterance: string, commands: AnyCommand[])
    */
   const definers = commands.flatMap((c) => {
     const id = (c as { id?: unknown }).id;
-    return typeof id === 'string' && /^[A-Z]\d*$/.test(id) ? [{ id, labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []) }] : [];
+    return typeof id === 'string' && LABEL_WHOLE.test(id) ? [{ id, labels: new Set(JSON.stringify(c).match(LABEL_G) ?? []) }] : [];
   });
   const dropped: string[] = [];
   for (const m of s.matchAll(rel)) {
@@ -16546,14 +16550,14 @@ export function droppedCompoundRelation(utterance: string, commands: AnyCommand[
   // Classify one additive chunk (coef already irrelevant — only the measure ATOM matters here).
   const atomLabels = (chunkRaw: string): Id[] | null => {
     const chunk = chunkRaw.replace(/[*·]/g, ' ').trim();
-    const labels = chunk.match(/[A-Z]\d*/g) ?? [];
+    const labels = chunk.match(LABEL_G) ?? [];
     if (arcKw.test(chunk)) {
-      const sl = dropCircleRef(chunk).match(/[A-Z]\d*/g) ?? []; // «arc BC in circle O» — O isn't an arc endpoint
+      const sl = dropCircleRef(chunk).match(LABEL_G) ?? []; // «arc BC in circle O» — O isn't an arc endpoint
       return sl.length === 2 ? sl : null;
     }
     if (angleKw.test(chunk)) return labels.length === 3 || labels.length === 1 ? labels : null;
     // a bare pair, possibly with a numeric coefficient/divisor/square glued around it
-    if (labels.length === 2 && /(?<![A-Za-z\d])[A-Z]\d*\s*[A-Z]\d*(?![A-Za-z\d])/.test(chunk)) return labels;
+    if (labels.length === 2 && new RegExp(String.raw`(?<![A-Za-z\d])${ULABEL}\s*${ULABEL}(?![A-Za-z\d])`).test(chunk)) return labels;
     return null;
   };
   // ── detect the compound structure ──────────────────────────────────────────
@@ -16586,15 +16590,15 @@ export function droppedCompoundRelation(utterance: string, commands: AnyCommand[
   // pair on the OTHER side of the '=' too (a numeric other side is the supported set-ratio lane)
   if (!compound) {
     stated = [];
-    const pair = String.raw`[A-Z]\d*\s*[A-Z]\d*`;
+    const pair = String.raw`${ULABEL}\s*${ULABEL}`;
     const pairProd = new RegExp(String.raw`(?<![A-Za-z\d])${pair}\s*(?:²|\^2|[*·/]\s*(?:\d+(?:\.\d+)?\s*[*·]?\s*)?${pair}(?![A-Za-z\d]))`);
-    const hasPair = (p: string) => /(?<![A-Za-z\d])[A-Z]\d*\s*[A-Z]\d*(?![A-Za-z\d])/.test(p);
+    const hasPair = (p: string) => new RegExp(String.raw`(?<![A-Za-z\d])${ULABEL}\s*${ULABEL}(?![A-Za-z\d])`).test(p);
     const lProd = pairProd.test(parts[0]);
     const rProd = pairProd.test(parts[1]);
     if ((lProd || rProd) && hasPair(parts[0]) && hasPair(parts[1])) {
       compound = true;
       for (const part of parts) {
-        for (const m of part.matchAll(/(?<![A-Za-z\d])([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/g)) {
+        for (const m of part.matchAll(new RegExp(String.raw`(?<![A-Za-z\d])(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`, 'g'))) {
           stated.push(m[1], m[2]);
           termCount++;
           if (/²|\^2/.test(part.slice(m.index! + m[0].length, m.index! + m[0].length + 3))) termCount++; // a square is TWO factor slots
@@ -16608,7 +16612,7 @@ export function droppedCompoundRelation(utterance: string, commands: AnyCommand[
   const accounted = commands.some((c) => {
     const t = (c as { type?: unknown }).type;
     if (t !== 'set-measure-sum' && t !== 'set-length-product' && t !== 'set-perimeter') return false;
-    const labels = new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []);
+    const labels = new Set(JSON.stringify(c).match(LABEL_G) ?? []);
     if (!statedSet.every((l) => labels.has(l))) return false;
     const cc = c as { coefs?: unknown[]; lhs?: unknown[]; rhs?: unknown[]; ids?: unknown[] };
     const slots =
@@ -16666,7 +16670,7 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
     .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
     .replace(/circles?|ה?מעגל\w*/gi, ' ')
     .replace(/ה?(גדול|קטן|ימני|שמאלי)(?=\s|$)|\b(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little|right|left)\b/gi, ' ') // (?=\s|$), never \b — Hebrew letters are not \w (the recorded trap)
-    .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
+    .replace(new RegExp(String.raw`\b${X}(?!\w)`, 'gi'), ' ')
     .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
     .replace(FILLER, ' ')
     .trim();
@@ -16723,8 +16727,8 @@ export function parseRename(raw: string): { from: Id; to: Id } | null {
   // need the normalization themselves (review 2026-07-03, P7).
   const s = normalizeUtterance(raw);
   const m =
-    s.match(/(?:rename|relabel|replace)\s+([A-Za-z]\d*)\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z]\d*)\b/i) ??
-    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z]\d*)\s*(?:ל-?|ב-?|עם|→|=)?\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`(?:rename|relabel|replace)\s+(${LABEL})(?!\w)(?:\s+(?:to|as|into|with|by|->|→|=))?\s+(${LABEL})(?!\w)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?(${LABEL})\s*(?:ל-?|ב-?|עם|→|=)?\s*(${LABEL})(?!\w)`, 'i'));
   if (!m) return null;
   const from = up(m[1]);
   const to = up(m[2]);
@@ -16742,10 +16746,10 @@ export function parseSwap(raw: string): { a: Id; b: Id } | null {
   const s = normalizeUtterance(raw); // orthography boundary (PAR-7) — see parseRename
 
   const m =
-    s.match(/\bswap\s+([A-Za-z]\d*)\s*(?:and|with|for|↔|<->|→)\s*([A-Za-z]\d*)\b/i) ??
+    s.match(new RegExp(String.raw`\bswap\s+(${LABEL})\s*(?:and|with|for|↔|<->|→)\s*(${LABEL})(?!\w)`, 'i')) ??
     // «החליפו» (plural) is the wording of the swap button itself (ADR-520 Am. 1) and of 3-D's typed swap
     // (#1631) — a student who reads the button and types it must get the same swap here.
-    s.match(/(?:החלף|החליפי|החליפו)\s+בין\s+([A-Za-z]\d*)\s*(?:לבין|ל-?|ו-?|↔|→)\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`(?:החלף|החליפי|החליפו)\s+בין\s+(${LABEL})\s*(?:לבין|ל-?|ו-?|↔|→)\s*(${LABEL})(?!\w)`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
@@ -16763,8 +16767,8 @@ export function parseMerge(raw: string): { from: Id; to: Id } | null {
   const s = normalizeUtterance(raw); // orthography boundary (PAR-7) — see parseRename
 
   const m =
-    s.match(/(?:merge|fold|combine|unify)\s+([A-Za-z]\d*)\b(?:\s+(?:into|with|and|to|->|→))?\s+([A-Za-z]\d*)\b/i) ??
-    s.match(/(?:מזג|אחד)\s*(?:את\s*)?([A-Za-z]\d*)\s*(?:ל-?|עם|ו-?|→)?\s*([A-Za-z]\d*)\b/i);
+    s.match(new RegExp(String.raw`(?:merge|fold|combine|unify)\s+(${LABEL})(?!\w)(?:\s+(?:into|with|and|to|->|→))?\s+(${LABEL})(?!\w)`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:מזג|אחד)\s*(?:את\s*)?(${LABEL})\s*(?:ל-?|עם|ו-?|→)?\s*(${LABEL})(?!\w)`, 'i'));
   if (!m) return null;
   const from = up(m[1]);
   const to = up(m[2]);

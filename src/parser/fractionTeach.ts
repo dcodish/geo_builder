@@ -22,7 +22,7 @@
  * A fraction with no comparand («BE = רבע») proposes nothing: there is nothing the canonical form could say.
  */
 import type { ParseContext } from './parse';
-import { HE_FRACTION_DENOM, HE_FRACTION_NUM, EN_FRACTION_DENOM, EN_FRACTION_NUM } from './lexicon';
+import { HE_FRACTION_DENOM, HE_FRACTION_NUM, EN_FRACTION_DENOM, EN_FRACTION_NUM, LABEL_G } from './lexicon';
 
 type Id = string;
 
@@ -148,7 +148,7 @@ const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
 
 /** The one side of a candidate shape the segment XY lies on, spelled as the figure spells it — or null. */
 function sideOf(subject: string, side: { kind: string | null; ring: string | null }, ctx: ParseContext): string | null {
-  const [x, y] = subject.match(/[A-Z]\d*/g) as [Id, Id];
+  const [x, y] = subject.match(LABEL_G) as [Id, Id];
   if (x === y) return null;
   let shapes = (ctx.declaredPolygons ?? []).map((p) => ({ ring: p.vertices, kind: p.kind ?? null }));
   if (side.kind === 'triangle') shapes = shapes.filter((p) => p.ring.length === 3);
@@ -200,7 +200,7 @@ export function fractionTeachCandidate(utterance: string, ctx: ParseContext): Fr
   const sentences: string[] = [];
   for (const subj of subjects) {
     const base = 'seg' in cmp ? cmp.seg : sideOf(subj, cmp.side, ctx);
-    if (!base || pairKey(...(subj.match(/[A-Z]\d*/g) as [Id, Id])) === pairKey(...(base.match(/[A-Z]\d*/g) as [Id, Id]))) return null;
+    if (!base || pairKey(...(subj.match(LABEL_G) as [Id, Id])) === pairKey(...(base.match(LABEL_G) as [Id, Id]))) return null;
     sentences.push(`${subj} = ${p}/${q} ${base}`);
   }
   const line = sentences.join(', ');

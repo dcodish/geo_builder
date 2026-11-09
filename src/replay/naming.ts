@@ -11,6 +11,7 @@ import type { AnyCommand, Id, RoleSideBinding } from '@/engine';
 import { commandPointIds } from './core';
 import type { Fact } from './core';
 import type { CevianHost } from '../../shell/cevianHost';
+import { GLUED_NAME_ATOM, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/indexedName';
 
 /**
  * Rewrite every WHOLE point label `from`→`to` inside a string — a bare point id ("O"), OR a label EMBEDDED
@@ -24,8 +25,8 @@ import type { CevianHost } from '../../shell/cevianHost';
  * sentinel (U+0000, not a label shape) falls back to a literal replace.
  */
 function relabelId(v: string, from: Id, to: Id): string {
-  if (!/^[A-Z]\d*$/.test(from)) return v.split(from).join(to); // the swap TMP sentinel — literal, unique, safe
-  return v.replace(/[A-Z]\d*/g, (tok) => (tok === from ? to : tok));
+  if (!GLUED_NAME_WHOLE.test(from)) return v.split(from).join(to); // the swap TMP sentinel — literal, unique, safe
+  return v.replace(GLUED_NAME_G, (tok) => (tok === from ? to : tok));
 }
 
 /** Rewrite one point letter to another across a single command — bare point fields AND the letters embedded
@@ -207,7 +208,7 @@ function typedInFacts(facts: Fact[]): Set<string> {
     if (!f.enabled || !f.utterance) continue;
     for (const word of f.utterance.match(/[A-Za-z0-9]+/g) ?? []) {
       const w = word.replace(/^\d+/, '');
-      if (/^(?:[A-Z]\d*)+$/.test(w)) for (const l of w.match(/[A-Z]\d*/g) ?? []) typed.add(l);
+      if (new RegExp(String.raw`^(?:${GLUED_NAME_ATOM})+$`).test(w)) for (const l of w.match(GLUED_NAME_G) ?? []) typed.add(l);
     }
   }
   return typed;

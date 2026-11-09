@@ -23,7 +23,7 @@ const SPELLINGS = [
   '[A-Z][0-9]*',
 ];
 const BASELINE: Readonly<Record<string, number>> = {
-  'engine/pointName.ts': 1, // the atom itself
+  // engine/pointName.ts: 0 since #2624 (ADR-AG-446) — the atom moved to `shell/indexedName` (NAME_ATOM), which 2-D shares
   'engine/apply.ts': 1, // `isPointLabel`: an id parser that also takes a repeated prime
   'parser/frameAnalytic.ts': 4, // the «X_A» axis subscript (2) and the common-tangent head's circle letters (2)
   'parser/parseAnalytic.ts': 3, // comments quoting the atom

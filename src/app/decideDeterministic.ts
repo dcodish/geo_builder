@@ -87,6 +87,7 @@ import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
 import { drawnPointIds } from '@/engine/inkCrossings';
+import { LABEL_G, LABEL_WHOLE } from '../parser/lexicon';
 
 /**
  * #1584 ([ADR-583](../../docs/06-decisions.md#adr-583)) — a ROLE RE-READING is a re-attempt of a line that
@@ -1253,9 +1254,9 @@ async function arcEndStep(
   pctx: ReturnType<typeof buildParseCtx>,
   prove: (line: string) => Promise<Verdict2D>,
 ): Promise<string | null> {
-  const named = new Set((utterance.match(/[A-Z]\d*/g) ?? []).map((l) => l.toUpperCase()));
+  const named = new Set((utterance.match(LABEL_G) ?? []).map((l) => l.toUpperCase()));
   const members = [...new Set((pctx.circleMembers ?? []).filter((e) => e.id === r.circle).flatMap((e) => e.points))]
-    .filter((p) => /^[A-Z]\d*$/.test(p) && !named.has(p))
+    .filter((p) => LABEL_WHOLE.test(p) && !named.has(p))
     .sort();
   const token = new RegExp(String.raw`(?<![a-z])${r.end}(?![a-z\d])`, 'g');
   for (const m of members) {
@@ -1287,7 +1288,7 @@ export function missingOperandLetters(prev: Construction, commands: readonly Any
   const referenced = new Set<string>();
   const visit = (v: unknown): void => {
     if (typeof v === 'string') {
-      if (/^[A-Z]\d*$/.test(v)) referenced.add(v);
+      if (LABEL_WHOLE.test(v)) referenced.add(v);
     } else if (Array.isArray(v)) v.forEach(visit);
   };
   for (const cmd of commands) for (const [k, v] of Object.entries(cmd)) if (k !== 'type') visit(v);

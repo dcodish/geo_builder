@@ -13,7 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import { indexedNameText } from '../../shell/indexedName';
+import { indexedNameText, GLUED_NAME_G, GLUED_NAME_WHOLE } from '../../shell/indexedName';
 import { givenText } from '../../shell/literal';
 import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GeoObject, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
@@ -5113,7 +5113,7 @@ export function introducedDefinedPointIds(cmd: Command): Id[] {
 export function commandPointIds(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   const take = (v: unknown) => {
-    if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) out.push(v);
+    if (typeof v === 'string' && GLUED_NAME_WHOLE.test(v)) out.push(v);
   };
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') continue;
@@ -5134,7 +5134,7 @@ export function commandPointIds(cmd: AnyCommand): Id[] {
 export function autoNamedLabels(raw: Fact[]): Set<Id> {
   const facts = resolveBinds(raw); // #1697: the labels as the figure has them, every naming by use applied
   const typed = new Set<string>();
-  for (const f of facts) if (f.enabled && f.utterance) for (const m of f.utterance.match(/[A-Z]\d*/g) ?? []) typed.add(m);
+  for (const f of facts) if (f.enabled && f.utterance) for (const m of f.utterance.match(GLUED_NAME_G) ?? []) typed.add(m);
   const out = new Set<Id>();
   for (const f of facts) if (f.enabled) for (const id of commandPointIds(f.cmd)) if (!typed.has(id)) out.add(id);
   return out;
@@ -5207,7 +5207,7 @@ export function impliedIdentityBinding(
 export function commandObjectIds(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   const take = (v: unknown) => {
-    if (typeof v === 'string' && (/^[A-Z]\d*$/.test(v) || /^(circle|line|seg|bis|tan|poly)-/.test(v))) out.push(v);
+    if (typeof v === 'string' && (GLUED_NAME_WHOLE.test(v) || /^(circle|line|seg|bis|tan|poly)-/.test(v))) out.push(v);
   };
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr' || k === 'type') continue;

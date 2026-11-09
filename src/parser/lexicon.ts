@@ -22,12 +22,26 @@
  * All atoms are SOURCE FRAGMENTS (strings for `new RegExp`) with no capture groups and no anchors.
  */
 
+import { GLUED_NAME_ATOM, PRIMED } from '../../shell/indexedName';
+
 // ── Labels ────────────────────────────────────────────────────────────────────────────────────────
-/** A point-label token: one Latin letter + optional glued digits (`A`, `B2`, `O1`). Case-insensitive
- *  contexts must validate case at the use site (see parse.ts `isUpperLabel`). */
-export const LABEL = String.raw`[A-Za-z]\d*`;
-/** An explicitly-uppercase label (the student-vertex convention). */
-export const ULABEL = String.raw`[A-Z]\d*`;
+/** A point-label token: one Latin letter + optional glued digits + an optional PRIME (`A`, `B2`, `O1`, `A'`).
+ *  Case-insensitive contexts must validate case at the use site (see parse.ts `isUpperLabel`).
+ *  #2624 ([ADR-806](../../docs/06-decisions.md#adr-806)): the prime is the shared atom's (`PRIMED`,
+ *  `shell/indexedName`) — without it every rule read «A'» as A and a stray mark, and «A' על המעגל» drew a point A. */
+export const LABEL = String.raw`[A-Za-z]\d*${PRIMED}`;
+/** An explicitly-uppercase label (the student-vertex convention), prime included («A'B'C'» is three labels) — the
+ *  shared glued-index name atom (`GLUED_NAME_ATOM`), the one 2-D's engine, replay and store tokenize ids with. */
+export const ULABEL = GLUED_NAME_ATOM;
+/** {@link ULABEL} compiled, case-SENSITIVE and global — every label token of a text or an id: «A'B» → A', B. For `match`,
+ *  `matchAll`, `replace` and `split` only (stateless for them); never `test`/`exec` a shared global. */
+export const LABEL_G = new RegExp(ULABEL, 'g');
+/** {@link ULABEL}, the WHOLE string — "is this one uppercase label?" («A'» yes, «A'B» no). Not global: safe to `test`. */
+export const LABEL_WHOLE = new RegExp(`^${ULABEL}$`);
+/** A glued run of uppercase labels, global (`(?:ULABEL)+`) — same rules as {@link LABEL_G}. */
+export const LABEL_RUN_G = new RegExp(`(?:${ULABEL})+`, 'g');
+/** The labels of a run or an id: «A'B» → A', B; «seg-A'B» → A', B. */
+export const labelsOf = (s: string): string[] => s.match(LABEL_G) ?? [];
 
 // ── Numbers ───────────────────────────────────────────────────────────────────────────────────────
 /** The one number fragment: optional sign, decimal point allowed. NO capture — wrap at use site.
