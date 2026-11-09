@@ -14,7 +14,9 @@ was my own command construction — an env prefix (`MSYS_NO_PATHCONV=1`), extra 
 and `;`-compound remote commands, none of which can match an allow rule.
 
 Since 2026-11-08 (#2753, ADR-W-193) the prod rules are **exact**: each is one literal line of
-`docs/RUNBOOK.md`, so only the RUNBOOK's spelling matches. Any other command on the prod host asks the
+`docs/RUNBOOK.md`, so only the RUNBOOK's spelling matches. They log in as `deploy@`, never `root@`
+(#2780, ADR-W-196): a `Permission denied (publickey)` there means this PC has no deploy key yet
+(RUNBOOK, "A new PC"), never a reason to retry as root. Any other command on the prod host asks the
 operator by design. That is a prompt to expect, not a denial to diagnose. Then, after one `scp` denial, I
 invented "the classifier allows reads but blocks writes" and reported it as a finding; the identical
 `scp` succeeded minutes later with no config change.

@@ -62,7 +62,7 @@
  *     `reports/triage-surfaced.json` is git-TRACKED and holds only hashed row keys + dates (no utterance
  *     text, so the privacy posture stands), answering just "was this already surfaced, and when".
  *
- * Options: --server root@themathbible.com  --remote-dir /var/www/geo-proxy
+ * Options: --server deploy@themathbible.com  --remote-dir /var/www/geo-proxy
  *          --days N (0=all)  --release <substr>  --top 80  --no-fetch  --no-verify
  *          --session-budget-ms N (default 60000; overrun → honest `unverified`, never a silent drop)
  *          --reverify (ignore the session cache)  --no-state (don't read or write the state file)
@@ -92,7 +92,7 @@ const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] 
 const has = (k) => argv.includes(k);
 const app = opt('--app', 'all');
 const days = Number(opt('--days', '0')) || 0;
-const server = opt('--server', 'root@themathbible.com');
+const server = opt('--server', 'deploy@themathbible.com'); // the deploy user reads the logs and writes verdicts-*.json (#2780)
 const remoteDir = opt('--remote-dir', '/var/www/geo-proxy');
 const top = Number(opt('--top', '80'));
 const release = opt('--release', '');

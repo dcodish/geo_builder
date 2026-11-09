@@ -81,6 +81,8 @@ ssh root@themathbible.com 'mkdir -p /var/www/vhosts/themathbible.com/httpdocs/ge
 scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
 scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 ssh root@themathbible.com 'systemctl restart geo-proxy'
+# This first push runs as root. Then create the deploy user (deploy/setup-deploy-user.sh); every routine
+# deploy after that logs in as `deploy`, never root (docs/RUNBOOK.md, "The deploy user"; #2780).
 ```
 
 ## Verify (Phase C smoke test)

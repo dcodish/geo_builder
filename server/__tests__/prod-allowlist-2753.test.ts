@@ -45,6 +45,13 @@ describe('#2753 — every allow rule that names the prod host is one exact RUNBO
     expect(prodRules.filter((r) => !runbook.includes(r.command)).map((r) => r.command)).toEqual([]);
   });
 
+  // #2780 (ADR-W-196): the lines run as the deploy user, which can write only what a deploy writes and may
+  // restart the proxy. A root line in the allowlist would hand back the whole box, so it asks instead.
+  it('no rule logs in as root: every allowed prod command is the deploy user', () => {
+    expect(prodRules.filter((r) => !r.command.includes(`deploy@${HOST}`)).map((r) => r.command)).toEqual([]);
+    expect(prodRules.filter((r) => r.command.includes(`root@${HOST}`)).map((r) => r.command)).toEqual([]);
+  });
+
   it('Bash and PowerShell allow the same commands', () => {
     const of = (tool: string) => prodRules.filter((r) => r.tool === tool).map((r) => r.command).sort();
     expect(of('PowerShell')).toEqual(of('Bash'));

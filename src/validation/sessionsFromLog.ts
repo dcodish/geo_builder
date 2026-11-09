@@ -4,7 +4,7 @@
  * Each line is a `UsageEvent` (see `server/eventLog.ts`): a `session` marker per page load and a
  * `submit` per utterance, grouped by `sid`. We reconstruct, per session, the ORDERED list of
  * utterances the student typed — the input to `replaySession`. Pure parsing of a JSONL string; the
- * file is fetched out-of-band (e.g. `scp root@themathbible.com:/var/www/geo-proxy/events.jsonl .`).
+ * file is fetched out-of-band (e.g. `scp deploy@themathbible.com:/var/www/geo-proxy/events.jsonl .`).
  */
 
 export interface LoggedSession {

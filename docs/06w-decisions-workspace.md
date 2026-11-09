@@ -7186,7 +7186,7 @@ Each crash also reset the daily AI cap, the concurrency cap and the per-IP limit
 
    and on a Bash/PowerShell pair that differs.
 
-**Not decided here.** The SSH key is still root and unrestricted, so this limits what a session runs without asking, not what the key can do. A non-root deploy user with a forced command is the stronger fix. It changes how both PCs reach production, so it waits for the operator.
+**Not decided here.** The SSH key is still root and unrestricted, so this limits what a session runs without asking, not what the key can do. A non-root deploy user with a forced command is the stronger fix. It changes how both PCs reach production, so it waits for the operator. → **Decided in [ADR-W-196](#adr-w-196)** (2026-11-08): deploys log in as a deploy-only user.
 
 **Behaviour change for a student:** none.
 
@@ -7268,3 +7268,42 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Behaviour change for a student:** in every builder, an error while drawing shows a notice with the error's text and «שחזור» instead of a blank page; «שחזור» comes back with the construction as it last drew, undoing the change the error followed (and saying so); a reload after a crash offers that construction.
 
 
+
+## ADR-W-196 — Deploys log in as a deploy-only user; root is for setup and asks (#2780)
+
+**Status:** accepted · 2026-11-08 · security (workspace) · completes [ADR-W-193](#adr-w-193)'s "Not decided here" · branch `feat/2780-deploy-user`
+**Operator:** 2026-11-08, on the server review: replace the root deploy key, *"re the deploy - i can only do that when I'm next to my home pc so later tonight"*. That evening, at the home PC: *"I'm home now and u wanted to run some commands form home"*. He ran the root setup himself.
+**Requirements:** none (internal) · **Design:** none (internal), [RUNBOOK](RUNBOOK.md) "The deploy user" · **Product:** workspace.
+
+**Context.** After ADR-W-193, sessions could run only the RUNBOOK's exact lines without asking. The key behind those lines was still root, with no restriction. Anything that obtained it held the whole box: the other sites, the student logs and the AI key.
+
+**Decision.**
+1. **A `deploy` user does every routine deploy.**
+   - **What it owns:** the four builder directories, `/var/www/geo-proxy/proxy.mjs` and the triage `verdicts-*.json`.
+   - **One sudo rule:** `systemctl restart geo-proxy`. `is-active` and the health check need no root.
+   - **Login:** no password; its keys carry `restrict` (no forwarding, agent or terminal).
+   - **Its key file is root's,** so it cannot add a key of its own.
+2. **Traverse-only into the vhost.** The vhost directory and `httpdocs` are Plesk's, with modes `710` and `750`.
+   - An ACL gives `deploy` execute only, so it reaches the four directories by name and cannot list or read the other sites. This needed the `acl` package.
+   - Joining `psaserv` instead would have given it every site's files.
+3. **One key per PC, for deploys only** (`~/.ssh/geo_deploy_ed25519`). A `Match host themathbible.com user deploy` block in `~/.ssh/config` selects it, so:
+   - `root@` keeps the default identity, which also serves other uses;
+   - a lost key is revoked alone.
+4. **The setup is one idempotent root script** (`deploy/setup-deploy-user.sh <public key>`). The first run creates the user. Each further run adds one PC's key, and re-applies the ownership and the rule.
+5. **The allowlist moves to `deploy@`.**
+   - The 24 rules, the RUNBOOK lines, the preflight's reads and log triage's fetch and verdict upload all move.
+   - The guard (`server/__tests__/prod-allowlist-2753.test.ts`) now also fails on an allowed rule that does not log in as `deploy`.
+6. **Root stays for setup, and asks the operator:**
+   - the homepage and site-root files;
+   - the unit file;
+   - the Apache directives;
+   - this script.
+
+**Proven 2026-11-08** from the home PC, as `deploy`:
+- the identical proxy bundle uploaded (sha256 `48d05575…` before and after), the proxy restarted, `healthz` `ok`, `active`;
+- all four pages 200; `api/parse` 405 on the three builders that route it;
+- write access to the four directories; no listing of `httpdocs`; no write to its own keys; exactly the one sudo rule.
+
+**Not decided here.** Removing the PCs' keys from root's `authorized_keys`, plan step 5, waits for the operator. The keys serve more than deploys, and the server's other login paths are his call. The security detail stays off this public log.
+
+**Behaviour change for a student:** none.
