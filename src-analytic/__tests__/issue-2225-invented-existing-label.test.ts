@@ -68,7 +68,7 @@ describe('#2225 — the class: an existing point or line the sentence never wrot
     ['a lowercase spelling of an existing name (#779)', 'דרך p עובר ישר l', ['דרך P עובר ישר l'], CTX],
     ['a restatement the student made in full', 'הצלע BC מונחת על y=x+1', ['הצלע BC מונחת על y=x+1'], CTX],
   ])('%s is not', (_name, utterance, answer, ctx) => {
-    expect(gates(utterance, answer, ctx)).toEqual({ dropped: [], droppedNames: [], invented: [], inventedExisting: [] });
+    expect(gates(utterance, answer, ctx)).toEqual({ dropped: [], droppedNames: [], contradicted: [], invented: [], inventedExisting: [] });
   });
 
   it('a NEW invented name keeps its own message (it names nothing), even beside an existing one', () => {

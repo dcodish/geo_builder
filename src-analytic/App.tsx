@@ -1028,8 +1028,13 @@ export function App() {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, act, atSeed, (utterance, context, keep) =>
-        llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he', ...(keep ? { keep } : {}) }),
+      const out = await runFallback(raw, act, atSeed, (utterance, context, keep, contradicted) =>
+        llmParseAnalytic(utterance, context, {
+          signal: ctl.signal,
+          locale: i18n.language === 'en' ? 'en' : 'he',
+          ...(keep?.length ? { keep } : {}),
+          ...(contradicted?.length ? { contradicted } : {}),
+        }),
       );
       if (out.retry) logAnalytic(nameRetryEvent(out.retry)); // #2231 (ADR-W-189)
       /**

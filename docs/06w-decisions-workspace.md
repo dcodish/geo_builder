@@ -6977,6 +6977,8 @@ The complex rows are the student's own lines and were always right. Complex «z 
 **Behaviour change for a student:** a fraction or a root reads as typed wherever a given is printed, in every builder; a decimal is never rewritten as a fraction; a decimal past two places reads the house decimals.
 ## ADR-W-189 — An AI answer that loses a name the student typed is asked for once more; still lost, the refusal naming it stands (#2231)
 
+> **Amended** 2026-11-09 by [ADR-AG-450](06c-decisions-analytic.md#adr-ag-450) (#2680, operator 2026-11-06: *"Or even go back to llm to get the correct one"*): a second trigger. A builder may inject a role gate (`contradictedOf`), and an answer that contradicts a stated role is asked for once more too, naming the statement (body field `contradicted`, validated by `readContradicted`). The names-only retry and "a lost plain number never retries" are unchanged.
+
 **Status:** accepted · 2026-11-05 · operator ruling · bug (P2, `reported`, 2d + 3d + analytic + server) · round #2722 · branch `fix/2231-keep-student-letter` · **supersedes ruling (c) of 2026-10-16** on #2231 (accept with a notice), which was never built
 
 **Operator:** 2026-10-16: *"1b"* (retry once, naming the letter); 2026-10-18, the decisions page: **A**, *"Retry once. If K is still missing, keep today's refusal naming K."*
