@@ -1,0 +1,892 @@
+{
+ "name": "round-2783",
+ "title": "Fix round #2783 — 2026-11-09 (batch on main)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "2-D: a point on a circle typed in the same line as the circle shows no false red row (#2713)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O, נקודה A על המעגל"
+   ],
+   "expectFigure": [
+    "O",
+    "A"
+   ],
+   "lookFor": "Circle O with A on it; the givens list has no row saying O should lie on circle O.",
+   "before": "A false red row «O should lie on circle O…»."
+  },
+  {
+   "id": "T2",
+   "title": "2-D: a radius letter in the same line adds no extra point (#2713, found in round)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס R, נקודה A על המעגל"
+   ],
+   "expectFigure": [
+    "O",
+    "A"
+   ],
+   "lookFor": "Circle O, radius named R, only A on the circle — no point R.",
+   "before": "A point R on the circle, plus the false O row."
+  },
+  {
+   "id": "T3",
+   "title": "2-D: two points on the circle in one line build (#2713)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O, נקודה A על המעגל ונקודה B על המעגל"
+   ],
+   "expectFigure": [
+    "A",
+    "B"
+   ],
+   "lookFor": "A and B on circle O, no red row.",
+   "before": "Refused with the internal «|OO| = |OB|»."
+  },
+  {
+   "id": "T4",
+   "title": "2-D guard: the centre put on its own circle is still reported (#2713)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "O על מעגל O"
+   ],
+   "lookFor": "The line is refused honestly: «לא נמצאה תצורה שמקיימת את כל הדרישות יחד…» (a point cannot be both the centre and on its own circle).",
+   "before": "Unchanged.",
+   "expectRefusal": "לא נמצאה תצורה"
+  },
+  {
+   "id": "T5",
+   "title": "Analytic: the same line gives the same figure (#2713)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O, נקודה A על המעגל"
+   ],
+   "expectFigure": [
+    "A"
+   ],
+   "lookFor": "A on the circle only.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T6",
+   "title": "2-D REFUSAL: a line from a point on both circles cannot cut circle O at two named points (#1840)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו- B",
+    "C על מעגל P",
+    "מנקודה A ישר חותך את המעגל O בנקודות C ו-D"
+   ],
+   "expectRefusal": "חותך אותו רק בעוד נקודה אחת",
+   "lookFor": "The last line stays in the box with «A נמצאת על המעגל O, ולכן ישר שיוצא מ-A חותך אותו רק בעוד נקודה אחת — לא גם ב-C וגם ב-D. אין מה לשרטט מהשורה הזאת.» (the closing «אין מה לשרטט מהשורה הזאת.» is new text, for your review); only two circles on screen.",
+   "before": "A third circle O, everything green."
+  },
+  {
+   "id": "T7",
+   "title": "2-D REFUSAL: the two-line version is refused the same way (#1840)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו- B",
+    "מנקודה A ישר חותך את המעגל O בנקודות C ו-D"
+   ],
+   "expectRefusal": "חותך אותו רק בעוד נקודה אחת",
+   "lookFor": "The same refusal; two circles.",
+   "before": "A third circle."
+  },
+  {
+   "id": "T8",
+   "title": "2-D: a line from another point uses the other drawn circle (#1840)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים נחתכים בנקודות A ו- B",
+    "C על מעגל P",
+    "נקודה E",
+    "מנקודה E ישר חותך את המעגל O בנקודות F ו-G"
+   ],
+   "expectFigure": [
+    "F",
+    "G"
+   ],
+   "lookFor": "Still two circles; the unnamed one is now O, with F and G on it.",
+   "before": "A third circle O."
+  },
+  {
+   "id": "T9",
+   "title": "2-D: a crossing that is already drawn lands on the circle (#1840)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "נקודה E",
+    "נקודה C",
+    "מנקודה E ישר חותך את המעגל O בנקודות C ו-D"
+   ],
+   "lookFor": "C and D on circle O, E–C–D on one line, no red row.",
+   "before": "C left off the circle, while the figure showed green."
+  },
+  {
+   "id": "T10",
+   "title": "2-D: with one unnamed circle, the line names it (#1840)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל",
+    "נקודה E",
+    "מנקודה E ישר חותך את המעגל O בנקודות C ו-D"
+   ],
+   "lookFor": "One circle, named O.",
+   "before": "A second circle."
+  },
+  {
+   "id": "T11",
+   "title": "2-D REFUSAL: «זרים» then «נחתכים» is refused naming «זרים» (#2700)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P זרים",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "expectRefusal": "סותר את «המעגלים O ו-P זרים»",
+   "lookFor": "The last line is refused: «לא ניתן: «המעגלים O ו-P נחתכים בנקודות X ו-Y» סותר את «המעגלים O ו-P זרים» — אי אפשר לקיים את שניהם יחד. הסיבה: לשני מעגלים זרים אין אף נקודה משותפת, ולכן אין להם נקודות חיתוך.» (the «הסיבה…» sentence is new text).",
+   "before": "Drawn, with the «זרים» row red."
+  },
+  {
+   "id": "T12",
+   "title": "2-D REFUSAL: the reverse order — tangent first, then «זרים» (#2700)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים",
+    "המעגלים O ו-P זרים"
+   ],
+   "expectRefusal": "סותר את «המעגלים O ו-P משיקים»",
+   "lookFor": "«זרים» is refused naming «המעגלים O ו-P משיקים», with the reason «…ולכן הם אינם משיקים זה לזה».",
+   "before": "Drawn, with a red row."
+  },
+  {
+   "id": "T13",
+   "title": "2-D REFUSAL: the two-circle noun «שני מעגלים זרים» then a crossing (#2700)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים זרים",
+    "המעגלים נחתכים בנקודות X ו-Y"
+   ],
+   "expectRefusal": "שני מעגלים זרים",
+   "lookFor": "Refused, naming «שני מעגלים זרים».",
+   "before": "Drawn, with a red row."
+  },
+  {
+   "id": "T14",
+   "title": "2-D control: «זרים» alone builds green (#2700)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P זרים"
+   ],
+   "expectFigure": [
+    "O",
+    "P"
+   ],
+   "lookFor": "Builds green.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T15",
+   "title": "2-D: a point forced by a tangency is one configuration (#2758)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "AB = 4",
+    "BC = 2",
+    "E על CD",
+    "∠AEB = 90°"
+   ],
+   "expect": [
+    "נקבע במלואו"
+   ],
+   "lookFor": "The status says «נקבע במלואו»; E sits at CD's midpoint; «הציגו תצורה אחרת» offers no second drawing.",
+   "before": "«יש 2 תצורות אפשריות», and the button showed the same drawing.",
+   "verifiedBy": "timed probe (round #2783): waits for «חושב»/«בודק» to clear — T15 «נקבע במלואו» after 17.9 s, the button only re-places the same shape; T16 after 1.6 s; T17 the button changes the drawing after 21.6 s"
+  },
+  {
+   "id": "T16",
+   "title": "2-D: the same with the ⟂ spelling (#2758)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "AB = 4",
+    "BC = 2",
+    "E על CD",
+    "AE ⟂ BE"
+   ],
+   "expect": [
+    "נקבע במלואו"
+   ],
+   "lookFor": "One configuration, «נקבע במלואו».",
+   "before": "Two configurations.",
+   "verifiedBy": "timed probe (round #2783): waits for «חושב»/«בודק» to clear — T15 «נקבע במלואו» after 17.9 s, the button only re-places the same shape; T16 after 1.6 s; T17 the button changes the drawing after 21.6 s"
+  },
+  {
+   "id": "T17",
+   "title": "2-D guard: the secant neighbour still has two drawings (#2758)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "AB = 4",
+    "BC = 1.9",
+    "E על CD",
+    "∠AEB = 90°"
+   ],
+   "cycles": 1,
+   "expectConfigsDiffer": true,
+   "lookFor": "«יש 2 תצורות אפשריות»; the button moves E between about 0.34 and 0.66 of CD.",
+   "before": "Unchanged.",
+   "verifiedBy": "timed probe (round #2783): waits for «חושב»/«בודק» to clear — T15 «נקבע במלואו» after 17.9 s, the button only re-places the same shape; T16 after 1.6 s; T17 the button changes the drawing after 21.6 s"
+  },
+  {
+   "id": "T18",
+   "title": "2-D REFUSAL: a rectangle too tall for the tangency (#2758)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "AB = 4",
+    "BC = 2.001",
+    "E על CD",
+    "∠AEB = 90°"
+   ],
+   "expectRefusal": "לא הצלחתי למקם",
+   "lookFor": "The angle line is refused (E cannot be placed on CD).",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T19",
+   "title": "2-D: a primed point on a circle is drawn as A′ (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A' על המעגל"
+   ],
+   "expectFigure": [
+    "A′"
+   ],
+   "lookFor": "A point labelled A′ on circle O, and no point A.",
+   "before": "A point named A was drawn green."
+  },
+  {
+   "id": "T20",
+   "title": "2-D: the midpoint A′ sits beside A (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "A' אמצע BC"
+   ],
+   "expectFigure": [
+    "A",
+    "A′"
+   ],
+   "lookFor": "A′ at the midpoint of BC, with A unchanged.",
+   "before": "Refused as «A coincides with its constructed target»."
+  },
+  {
+   "id": "T21",
+   "title": "2-D: a triangle with primed vertices (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש A'B'C'"
+   ],
+   "expectFigure": [
+    "A′",
+    "B′",
+    "C′"
+   ],
+   "lookFor": "A triangle labelled A′B′C′.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T22",
+   "title": "2-D: a length between primed names (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "A' אמצע BC",
+    "AA' = 8"
+   ],
+   "expectFigure": [
+    "8"
+   ],
+   "lookFor": "The segment AA′ drawn with 8 on it.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T23",
+   "title": "2-D: a typographic prime is the same name (#2624)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "B′ על AC"
+   ],
+   "expectFigure": [
+    "B′"
+   ],
+   "lookFor": "A point B′ on AC.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T24",
+   "title": "2-D REFUSAL: tangents from a point inside the circle name both statements (#2151)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל שמרכזו O",
+    "הנקודה P בתוך המעגל",
+    "מהנקודה P העבירו משיקים למעגל"
+   ],
+   "expectRefusal": "«משיק מ-P למעגל O» סותר את «P בתוך המעגל O»",
+   "expectAbsent": [
+    "tanaux",
+    "circle-O",
+    "משהו השתבש"
+   ],
+   "lookFor": "Refused with «לא ייתכן: «משיק מ-P למעגל O» סותר את «P בתוך המעגל O» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.» P stays inside; no tangents drawn.",
+   "before": "«משהו השתבש בבניית השורה הזאת…»."
+  },
+  {
+   "id": "T25",
+   "title": "2-D REFUSAL: the «PA ו-PB» spelling gets the same refusal (#2151)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "P בתוך המעגל",
+    "PA ו-PB משיקים למעגל"
+   ],
+   "expectRefusal": "סותר את «P בתוך המעגל O»",
+   "lookFor": "The same sentence as T24; no red figure; the circle is not shrunk.",
+   "before": "Committed with a red row, the circle shrunk to 0.2."
+  },
+  {
+   "id": "T26",
+   "title": "2-D REFUSAL: the reverse order names the tangent, not an unstated side (#2151)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מהנקודה P העבירו משיקים למעגל",
+    "הנקודה P בתוך המעגל"
+   ],
+   "expectRefusal": "סותר את «משיק מ-P למעגל O»",
+   "lookFor": "«לא ייתכן: «P בתוך המעגל O» סותר את «משיק מ-P למעגל O» …».",
+   "before": "Refused, but naming «P מחוץ למעגל O», which the student never typed."
+  },
+  {
+   "id": "T27",
+   "title": "2-D control: a point outside still gets both tangents (#2151)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "הנקודה P מחוץ למעגל",
+    "מהנקודה P העבירו משיקים למעגל"
+   ],
+   "expectFigure": [
+    "P"
+   ],
+   "lookFor": "Both tangents drawn, every row green.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T28",
+   "title": "2-D: a line typed while the first is still processing stays in the box (#2782)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 5"
+   ],
+   "lookFor": "Turn on DevTools network throttling («Slow 3G») so the first line takes a visible moment. Press Enter on «משולש ABC», then type «AB = 5» at once: «חושב…» shows and Enter does nothing; when it finishes, the triangle's row appears and «AB = 5» is still in the box. Enter then adds it.",
+   "before": "The box emptied and «AB = 5» was lost.",
+   "verifiedBy": "browser probe (round #2783, 6× CPU throttle): «חושב…» shown, «AB = 5» still in the box after the first line finished"
+  },
+  {
+   "id": "T29",
+   "title": "2-D: a chip clicked on an empty figure no longer erases text you already typed (#2782 — a consequence you did not name)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [],
+   "lookFor": "On a clear canvas, type «AB = 5» in the box without pressing Enter, then click an example chip (e.g. «מקבילית ABCD»): the chip's figure is drawn and «AB = 5» is still in the box.",
+   "before": "The chip's submit emptied the box, erasing «AB = 5».",
+   "verifiedBy": "browser probe (round #2783): «AB = 5» typed, chip «מקבילית ABCD» clicked — ABCD drawn, «AB = 5» still in the box"
+  },
+  {
+   "id": "T30",
+   "title": "3-D: the same, while a line waits on the AI (#2782)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "תבנה לי קובייה יפה בבקשה"
+   ],
+   "llm": {
+    "תבנה לי קובייה יפה בבקשה": [
+     "קובייה ABCDA'B'C'D'"
+    ]
+   },
+   "lookFor": "Pre-played with a stubbed model: a second line typed during the wait stays in the box.",
+   "before": "Erased.",
+   "verifiedBy": "delayed-model probe (round #2783): the stubbed answer held 1.5 s, «AB = 5» typed during the wait — the cube is built and «AB = 5» is still in the box (0 requests reached the network)"
+  },
+  {
+   "id": "T31",
+   "title": "Analytic: a median drawn as part of a meet ends at the midpoint already named (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "התיכון מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "M ו-E נפלו על אותה נקודה"
+   ],
+   "expectAbsent": [
+    "N"
+   ],
+   "lookFor": "The median AM; E sits on M; no point N; the triangle does not move; the page says «M ו-E נפלו על אותה נקודה.».",
+   "before": "E sat 0.6–8 away from M, on a line from A to a stray point N."
+  },
+  {
+   "id": "T32",
+   "title": "Analytic: the same through the noun form (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "M אמצע BC",
+    "E נקודת החיתוך של התיכון מ-A עם הישר BC"
+   ],
+   "expect": [
+    "M ו-E נפלו על אותה נקודה"
+   ],
+   "lookFor": "E on M, no N, the notice.",
+   "before": "E off M, with an extra point N."
+  },
+  {
+   "id": "T33",
+   "title": "Analytic: the altitude meets on the foot already drawn (#2648, found in round)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "האנך מ-A ל-BC",
+    "הגובה מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "H ו-E נפלו על אותה נקודה"
+   ],
+   "lookFor": "E on H, no point G, the notice «H ו-E נפלו על אותה נקודה.».",
+   "before": "E was 2.8–8.9 away from H, with a stray point G."
+  },
+  {
+   "id": "T34",
+   "title": "Analytic control: without M, the median gets its own foot (#2648)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "התיכון מ-A והישר BC נפגשים בנקודה E"
+   ],
+   "expect": [
+    "E ו-M נפלו על אותה נקודה"
+   ],
+   "lookFor": "The median's own foot M; «E ו-M נפלו על אותה נקודה.».",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T35",
+   "title": "Analytic: the square's right angle is kept and marked (#2704)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "ריבוע ABCD",
+    "∢ABC = 90"
+   ],
+   "expectRows": [
+    "∢ABC = 90"
+   ],
+   "expectAbsent": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "«∢ABC = 90» is a row in the givens list, and the right-angle mark is drawn at B.",
+   "before": "«זה כבר קיים באיור», no row, no mark."
+  },
+  {
+   "id": "T36",
+   "title": "Analytic: a rectangle's corner the shape itself holds (#2704)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מלבן ABCD",
+    "∢BAD = 90"
+   ],
+   "expectRows": [
+    "∢BAD = 90"
+   ],
+   "lookFor": "A row, and the knee at A.",
+   "before": "«זה כבר קיים באיור», no row, no mark."
+  },
+  {
+   "id": "T37",
+   "title": "Analytic: fixed coordinates (#2704)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(4,3)",
+    "∢ABC = 90"
+   ],
+   "expectRows": [
+    "∢ABC = 90"
+   ],
+   "lookFor": "A row, and the knee at B.",
+   "before": "The note, no row."
+  },
+  {
+   "id": "T38",
+   "title": "Analytic REFUSAL guard: «AB ⟂ BC» on a square still says it is already there (#2704)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "ריבוע ABCD",
+    "AB ⟂ BC"
+   ],
+   "expect": [
+    "זה כבר קיים באיור"
+   ],
+   "lookFor": "«זה כבר קיים באיור», no new row, no knee.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T39",
+   "title": "3-D REFUSAL: two circles above «D על המעגל» — the tool asks which (#2705)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "מעגל חסום במשולש ABC",
+    "D על המעגל"
+   ],
+   "expectRefusal": "בשרטוט יש יותר ממעגל אחד",
+   "lookFor": "The third line is refused with «בשרטוט יש יותר ממעגל אחד, ו«המעגל» לא אומר לאיזה מהם הכוונה… «הנקודה D על המעגל O»»; no D is drawn.",
+   "before": "D was silently put on the incircle."
+  },
+  {
+   "id": "T40",
+   "title": "3-D: the suggested sentence builds (#2705)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "מעגל חסום במשולש ABC",
+    "D על המעגל O"
+   ],
+   "expectFigure": [
+    "D"
+   ],
+   "lookFor": "D on circle O, green.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T41",
+   "title": "3-D: a circle added later never moves an earlier D (#2705)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "המשולש ABC חסום במעגל",
+    "D על המעגל",
+    "מעגל חסום במשולש ABC"
+   ],
+   "expectFigure": [
+    "D"
+   ],
+   "lookFor": "D stays green on the circumcircle.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T42",
+   "title": "3-D: D stays green when a second circle is added below it (#2705, found in round)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "D על המעגל",
+    "מעגל חסום במשולש ABC"
+   ],
+   "expectAbsent": [
+    "בשרטוט יש יותר ממעגל אחד"
+   ],
+   "lookFor": "D stays green on circle O.",
+   "before": "D's line turned red with the two-circle question after the third line."
+  },
+  {
+   "id": "T43",
+   "title": "3-D: a dot product typed as a decimal shows as typed (#2703)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "הווקטורים u ו-v",
+    "u·v = 2.5"
+   ],
+   "expect": [
+    "2.5"
+   ],
+   "expectAbsent": [
+    "5/2"
+   ],
+   "lookFor": "The data panel shows «u · v = 2.5».",
+   "before": "«u · v = 5/2»."
+  },
+  {
+   "id": "T44",
+   "title": "3-D: a letter's decimal value shows as typed (#2703)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "E על AC כך ש-AE = k·AC",
+    "k = 0.4"
+   ],
+   "expect": [
+    "k = 0.4"
+   ],
+   "expectAbsent": [
+    "2/5"
+   ],
+   "lookFor": "«k = 0.4».",
+   "before": "«k = 2/5»."
+  },
+  {
+   "id": "T45",
+   "title": "3-D: a typed letter value no longer reads «?» (#2703)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AE = k·AC",
+    "k = 2.5"
+   ],
+   "expect": [
+    "k = 2.5"
+   ],
+   "lookFor": "«k = 2.5».",
+   "before": "«k = ?»."
+  },
+  {
+   "id": "T46",
+   "title": "3-D: an angle letter's value (#2703, found in round)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה ABCDS שבסיסה ריבוע",
+    "∠SAB = α",
+    "α = 62.5"
+   ],
+   "expect": [
+    "62.5"
+   ],
+   "expectAbsent": [
+    "125/2"
+   ],
+   "lookFor": "«α = 62.5» and «α = 62.5°» in the panel.",
+   "before": "«α = 125/2» and «α = 125/2°»."
+  },
+  {
+   "id": "T47",
+   "title": "3-D: a length letter's value (#2703, found in round)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "|AB| = k",
+    "k = 2.5"
+   ],
+   "expect": [
+    "k = 2.5"
+   ],
+   "lookFor": "«k = 2.5».",
+   "before": "«k = 5/2»."
+  },
+  {
+   "id": "T48",
+   "title": "3-D guard: a computed row stays computed (#2703)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB = 2.5",
+    "קטע AD"
+   ],
+   "expect": [
+    "5/2"
+   ],
+   "lookFor": "«|AB| = 2.5» and «|AD| = 5/2».",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T49",
+   "title": "3-D: two parallel planes on a blank canvas show as two planes (#2707)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "המישור ABCD מקביל למישור EFGH"
+   ],
+   "cycles": 3,
+   "expectFigure": [
+    "A",
+    "E",
+    "H"
+   ],
+   "lookFor": "Two separate parallel plane patches, all eight letters visible and spread apart, at every press of «הציגו תצורה אחרת».",
+   "before": "About half the configurations drew one thin line labelled ABCD and a single dot labelled EFGH."
+  },
+  {
+   "id": "T50",
+   "title": "3-D: the configuration button reaches the second triangle (#2714)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "BC = 4",
+    "∠BAC = 40°"
+   ],
+   "cycles": 2,
+   "expectConfigsDiffer": true,
+   "lookFor": "The first drawing is the wide triangle (AC ≈ 6.21); the next press shows the narrow obtuse one (AC ≈ 1.45); the presses then alternate. All four rows stay green.",
+   "before": "The same wide triangle on every press."
+  }
+ ]
+}

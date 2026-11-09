@@ -3448,6 +3448,223 @@
       ],
       "at": "2026-11-09T07:16:45.969Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2648b",
+      "issue": 2648,
+      "round": 2783,
+      "question": "A student-named foot («AM תיכון לצלע BC») then the operand meet creates a second foot on the same spot: (a) bind to the student's foot; (b) leave.",
+      "class": "definite-noun-binds-drawn-object",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A definite role noun binds the one drawn object of its kind, the student's own cevian with its foot; no second foot; E gets the one forced-coincidence notice (ADR-W-177).",
+      "precedents": [
+        {
+          "quote": "sr-12, A: a definite noun binds the drawn object of its kind.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "1955 - accept with message",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/issues/1595#issuecomment-6589391507"
+        }
+      ],
+      "confidence": "high",
+      "limits": "One cevian of that role from A only.",
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2782b",
+      "issue": 2782,
+      "round": 2783,
+      "question": "An example chip clicked while busy is silently dropped: (a) run after; (b) disable visibly; (c) unchanged.",
+      "class": "input-while-busy",
+      "verdict": "escalate",
+      "reason": "The 2026-11-09 ruling names only Enter; chips are a different control.",
+      "nearest": [
+        {
+          "quote": "2782 - enter should be disabled",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2782#issuecomment-6732813262"
+        }
+      ],
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2700b",
+      "issue": 2700,
+      "round": 2783,
+      "question": "Analytic's refusal of «שני מעגלים זרים» + a crossing: (a) name «זרים» as 2-D; (b) leave generic.",
+      "class": "refusal-names-conflicting-statement",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Analytic refuses in 2-D's wording, naming the «זרים» statement.",
+      "precedents": [
+        {
+          "quote": "B13 — One refusal voice. Each refusal kind has one wording, with 2-D as the reference.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        },
+        {
+          "quote": "we should know if there is a contradiction in data and tell students there is a contradiction",
+          "date": "2026-10-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/1868#issuecomment-6053627888"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Wording only.",
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2151b",
+      "issue": 2151,
+      "round": 2783,
+      "question": "Analytic's refusal of an inside point + a tangent from it: (a) name both statements as 2-D; (b) leave.",
+      "class": "refusal-names-conflicting-statement",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Analytic names both statements in 2-D's wording where it proves the contradiction.",
+      "precedents": [
+        {
+          "quote": "B13 — One refusal voice. Each refusal kind has one wording, with 2-D as the reference.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Where unproved, the «sent for review» sentence applies.",
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2705b",
+      "issue": 2705,
+      "round": 2783,
+      "question": "«D על המעגל» before any circle, two circles follow: (a) D keeps its first circle (2-D); (b) ask.",
+      "class": "definite-noun-binds-drawn-object",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "«המעגל» resolves against the figure at the time the line was typed; a later circle never re-binds or moves D; 3-D follows 2-D.",
+      "precedents": [
+        {
+          "quote": "sr-12, A: … With none, the object is created.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        },
+        {
+          "quote": "B1 — 2-D is the reference for display too, for plane geometry.",
+          "date": "2026-10-07",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-118"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Measure 2-D on both orders at pickup.",
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2490c",
+      "issue": 2490,
+      "round": 2783,
+      "question": "«מעוין ABCD» · «פירמידה ישרה ABCDS שבסיסה מעוין»: (a) checked only — refused; (b) leave (squares the rhombus).",
+      "class": "right-pyramid-over-existing-ring",
+      "verdict": "escalate",
+      "reason": "ADR-3D-080 (stated family → cyclic member) and the 2026-11-08/09 rulings (existing base keeps its shape; reject) conflict for a line that does both.",
+      "nearest": [
+        {
+          "quote": "2490 - reject",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2490#issuecomment-6732813874"
+        }
+      ],
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-1840b",
+      "issue": 1840,
+      "round": 2783,
+      "question": "Does ADR-W-177 override ADR-802's refusal of a secant from a point on the circle? (a) refusal stands; (b) accept with notice.",
+      "class": "new-letter-forced-onto-named-point",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "The 2026-10-08 refusal stands; ADR-W-177 ordered no change to 2-D here.",
+      "precedents": [
+        {
+          "quote": "Refuse and explain (#1595's accept route offered and not chosen)",
+          "date": "2026-10-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/1840#issuecomment-6053606078"
+        }
+      ],
+      "confidence": "high",
+      "limits": "This sentence only.",
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2714b",
+      "issue": 2714,
+      "round": 2783,
+      "question": "Should a quadrilateral/pentagon fixed in several ways show its other drawings (2.8×/8× cost)? (a) yes; (b) no; (c) only where 2-D does.",
+      "class": "alternative-configuration-reach",
+      "verdict": "escalate",
+      "reason": "sr-30 and B1 point opposite ways, and the cost needs his sign-off (docs/17 §7).",
+      "nearest": [
+        {
+          "quote": "sr-30, A: «הציגו תצורה אחרת» never repeats the drawing on screen while another valid one exists.",
+          "date": "2026-11-02",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-175"
+        }
+      ],
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2704p",
+      "issue": 2704,
+      "round": 2783,
+      "question": "One plane-geometry behaviour for a restated held value: (a) record + knee everywhere (2-D); (b) «כבר קיים» everywhere; (c) builders differ.",
+      "class": "held-value-restatement",
+      "verdict": "escalate",
+      "reason": "#2491 (2026-10-24, analytic: keep and show) and #2341 (2026-11-06, 3-D: «כבר קיים» in all cases) conflict across builders.",
+      "nearest": [
+        {
+          "quote": "In all cases it should say כבר קיים",
+          "date": "2026-11-06",
+          "link": "https://github.com/dcodish/geo_builder/issues/2341#issuecomment-6683983248"
+        },
+        {
+          "quote": "In this case, the AB=4 does add value. not for the data which we know but the tool can draw 4 on the segment",
+          "date": "2026-10-24",
+          "link": "https://github.com/dcodish/geo_builder/issues/2491#issuecomment-6380337106"
+        }
+      ],
+      "at": "2026-11-09T08:44:06.344Z",
+      "status": "escalated"
+    },
+    {
+      "id": "text-1840-secant-from-on-circle-tail",
+      "kind": "text",
+      "issue": "#1840",
+      "what": "The closing sentence appended to the ruled refusal of a secant from a point on the circle (input.secantFromOnCircle, he+en), required by ADR-W-154's next-step rule; the ruled part is unchanged",
+      "choice": "«A נמצאת על המעגל O, ולכן ישר שיוצא מ-A חותך אותו רק בעוד נקודה אחת — לא גם ב-C וגם ב-D.» + «אין מה לשרטט מהשורה הזאת.» (en: \"There is nothing to draw from this line.\")",
+      "chosen": true,
+      "at": "2026-11-09T08:44:06.434Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2151-tangent-from-statement",
+      "kind": "text",
+      "issue": "#2151",
+      "what": "How a tangent drawn from a point is named inside the two-statement contradiction refusal (errors.stmt.tangentFrom, he+en)",
+      "choice": "«משיק מ-P {{circleTo}}» → «משיק מ-P למעגל O» (en: \"a tangent from P to {{circle}}\"), inside «לא ייתכן: «X» סותר את «Y» — שני הנתונים אינם יכולים להתקיים יחד באף שרטוט. בדקו את הנתונים.»",
+      "chosen": true,
+      "at": "2026-11-09T08:44:06.434Z",
+      "status": "pending"
     }
   ],
   "demoted": {
