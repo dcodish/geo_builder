@@ -198,6 +198,18 @@ function readSegmentEquation3(prefix: readonly Fact3[], at: number): SegmentEqua
     if (reading === 'vector') {
       const crossed = (of: Derived3): number => Object.values(of.status).filter((s) => s !== 'ok' && s !== 'disabled' && s.code === 'ring-crossed').length;
       if (crossed(d) > 0 && crossed(d) > crossed(deriveCore3(prefix.slice(0, -1), READING_SEED, true))) return null;
+      // #2804 (ADR-3D-460): a vector reading that puts two of the line's OWN letters on one dot cannot hold either (Am. 2's
+      // «AB = 1AC» "makes B and C one point"). Over known points that is already a refuted claim; over a new one the
+      // vector reading DEFINES it onto the other («AT = BT» on an empty canvas: A − T = B − T places A on B), so it is
+      // read here, off the figure's own coincidence verdict, against the figure before the line.
+      const cmd = forced.cmds[at];
+      const own = new Set(cmd.type === 'vec-rel' ? [cmd.from, cmd.to, ...cmd.terms.flatMap((t) => (t.atom.kind === 'pair' ? [t.atom.from, t.atom.to] : []))] : []);
+      const ownPairs = (of: Derived3): string[] => of.coincidences.filter(([a, b]) => own.has(a) && own.has(b)).map(([a, b]) => [a, b].sort().join('|'));
+      const merged = ownPairs(d);
+      if (merged.length > 0) {
+        const before = new Set(ownPairs(deriveCore3(prefix.slice(0, -1), READING_SEED, true)));
+        if (merged.some((k) => !before.has(k))) return null;
+      }
     }
     return d;
   };
@@ -985,6 +997,39 @@ function deriveCore3(
     return false;
   };
   /**
+   * #1680 (ADR-3D-391 Am. 1): an unmarked two-reading segment equation takes the reading trying both gives. ONE place
+   * for every application of a row — the in-order fold AND every dry run below (#2804, ADR-3D-460): the dry runs used
+   * to apply the bare sentence, so a red row re-judged there answered with the question its own application never
+   * asked («TA = TB» over a new T: read as lengths, red only for want of T, then re-labelled the ask — which also kept
+   * the mint pass from seeing the missing T).
+   */
+  /** The letters the mint pass is creating for the row it is working on (before `mintedBy` records them). */
+  let minting: { f: Fact3; ids: readonly string[] } | null = null;
+  const readStated = (f: Fact3, probe: Construction3, cmds: readonly Command3[], j: number): Command3 => {
+    const stated = cmds[j];
+    // the line is read against the figure BEFORE it: the letters the mint pass created for it are new to it (#2804)
+    const fresh = new Set([...(premint?.[f.id] ?? []), ...(minting?.f === f ? minting.ids : [])]);
+    if (stated.type !== 'vec-rel' || segmentEquationKind3(probe, stated, fresh) !== 'two-readings') return stated;
+    const reading = stated.reading ?? readSegmentEquation3([...facts.slice(0, facts.indexOf(f)), { ...f, cmds: [...cmds] }], j);
+    return { ...stated, reading };
+  };
+  /** A DRY RUN of one fact on `base` (pure: `applyCommand3` commits nothing): null = it would apply cleanly, else its
+   *  error. Applied exactly as `applyFact` applies it — the same expansion, soft drops, circle naming and reading. */
+  const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
+    let probe = base;
+    const exp = expandFact(base, f);
+    if (!exp.ok) return exp.error;
+    for (const [j, stated] of exp.cmds.entries()) {
+      if (droppedSoft(stated)) continue;
+      const named = inListOrder(f, probe, readStated(f, probe, exp.cmds, j)); // #2705: the circle the real application names
+      if (!named.ok) return named.error;
+      const r = applyCommand3(probe, seated(named.cmd));
+      if (!r.ok) return r.error;
+      probe = r.next;
+    }
+    return null;
+  };
+  /**
    * Apply ONE fact's commands and attribute what it added by count-delta — claims, pivot pins, coordinate
    * pins, parameter pins. ONE function for the in-order fold and the #926 retry pass below, so a retried
    * fact owns its additions exactly as an in-order one does (the 2-D `recordOwnership` discipline).
@@ -1010,13 +1055,8 @@ function deriveCore3(
     if (!exp.ok) return exp.error;
     for (const [j, stated] of exp.cmds.entries()) {
       if (droppedSoft(stated)) continue; // an explicit ∠=90 on this triangle superseded the soft default
-      // #1680 (ADR-3D-391 Am. 1): an unmarked two-reading segment equation takes the reading trying both gives
-      let cmd = stated;
-      if (stated.type === 'vec-rel' && segmentEquationKind3(probe, stated) === 'two-readings') {
-        const reading = stated.reading ?? readSegmentEquation3([...facts.slice(0, facts.indexOf(f)), { ...f, cmds: [...exp.cmds] }], j);
-        readings[f.id] = reading;
-        cmd = { ...stated, reading };
-      }
+      const cmd = readStated(f, probe, exp.cmds, j); // #1680: the reading trying both gives (one place, #2804)
+      if (cmd !== stated && cmd.type === 'vec-rel' && cmd.reading) readings[f.id] = cmd.reading;
       const named = inListOrder(f, probe, cmd);
       if (!named.ok) return named.error;
       if (named.cmd !== cmd && (named.cmd.type === 'point-on-circle3' || named.cmd.type === 'circle-given')) bound[f.id] = named.cmd.circle;
@@ -1118,20 +1158,7 @@ function deriveCore3(
   // iff its dry run succeeds — and a row whose reference nothing declares still fails the dry run and
   // stays red.
   /** The dry run's verdict against the CURRENT figure: null = the fact would apply cleanly. */
-  const retryError = (f: Fact3): FactStatus3 | null => {
-    let probe = c;
-    const exp = expandFact(c, f);
-    if (!exp.ok) return exp.error;
-    for (const cmd of exp.cmds) {
-      if (droppedSoft(cmd)) continue;
-      const named = inListOrder(f, probe, cmd); // #2705: the dry run names the circle the real application will
-      if (!named.ok) return named.error;
-      const r = applyCommand3(probe, seated(named.cmd));
-      if (!r.ok) return r.error;
-      probe = r.next;
-    }
-    return null;
-  };
+  const retryError = (f: Fact3): FactStatus3 | null => dryRunOn(c, f);
   for (let pass = 0; pass < facts.length; pass++) {
     let progressed = false;
     for (const f of facts) {
@@ -1226,20 +1253,6 @@ function deriveCore3(
         }
     return false;
   };
-  const dryRunOn = (base: Construction3, f: Fact3): FactStatus3 | null => {
-    let probe = base;
-    const exp = expandFact(base, f);
-    if (!exp.ok) return exp.error;
-    for (const cmd of exp.cmds) {
-      if (droppedSoft(cmd)) continue;
-      const named = inListOrder(f, probe, cmd); // #2705: the dry run names the circle the real application will
-      if (!named.ok) return named.error;
-      const r = applyCommand3(probe, seated(named.cmd));
-      if (!r.ok) return r.error;
-      probe = r.next;
-    }
-    return null;
-  };
   /** What the latest attempt says is missing and the pass may create: a point, or (#2489) a line named in a line slot. */
   type Missing3 = { kind: 'point' | 'line' | 'plane'; id: string } | { kind: 'solid'; id: string; cmds: Command3[]; circle?: string };
   const missingOf = (st: FactStatus3 | null, base: Construction3, f: Fact3): Missing3 | null => {
@@ -1271,6 +1284,7 @@ function deriveCore3(
       if (missingOf(st, c, f) === null) continue;
       let probe = c;
       const ids: string[] = [];
+      minting = { f, ids }; // #2804: the row's own created letters stay new to its reading
       const lineIds: string[] = [];
       const planeIds: string[] = [];
       let solidMade: MintedSolid3 | null = null;
@@ -1377,6 +1391,7 @@ function deriveCore3(
       if (!progressed) break;
     }
   }
+  minting = null;
   /**
    * The pass decided WHICH points to create; the figure is folded again with them in place from the start, so every
    * row applies in list order. Applying the minted row LAST changed what the solve did with the rows after it: «AB =

@@ -771,6 +771,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-an-039', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB ⊥ BC'], expect: 'builds' },
   { id: 'cat-an-040', family: 'lengths', steps: ['משולש ABC', 'AB = 10'], expect: 'builds' },
   { id: 'cat-an-041', family: 'lengths', steps: ['משולש ABC', 'AB = AC'], expect: 'builds', note: 'X12 until ADR-3D-391 Am.1: as vectors B would be C, so 3-D reads lengths' },
+  // #2804 (ADR-3D-460): a length relation over a new point the vector reading cannot place — 3-D read it as a vector definition (T cancels) and refused
+  { id: 'new-point-equal-lengths-2804', family: 'lengths', steps: ['משולש ABC', 'TA = TB'], expect: 'builds', note: '3-D refused «no position of T» before ADR-3D-460: as vectors T cancels, so it reads lengths and creates T' },
+  { id: 'new-point-equal-lengths-mirror-2804', family: 'lengths', steps: ['משולש ABC', 'AT = BT'], expect: 'builds', note: 'the mirror spelling (ADR-3D-460)' },
   { id: 'cat-an-042', family: 'lengths', steps: ['משולש ABC', 'AB + BC = 10'], expect: 'builds', note: '3-D reads a length sum since #1680 (ADR-3D-392)' },
   { id: 'cat-an-043', family: 'midpoint-ratio', steps: ['משולש ABC', 'AC:CB = 3:2'], expect: 'builds' },
   { id: 'cat-an-044', family: 'midpoint-ratio', steps: ['נקודה C', 'נקודה A', 'נקודה B', 'C מחלקת את AB ביחס 3:2'], expect: 'builds', exception: 'X9' },

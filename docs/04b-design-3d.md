@@ -799,8 +799,9 @@ vector equation on the host line (`a ↦ 0`, `b ↦ 1`, rider `↦ t`) for both 
 
 **One reading for an unmarked segment equation** (ADR-3D-391 and its Am. 1, #1680). The parser no longer refuses
 a bare «AB = AC»: it lowers, like «AB = 1AC», to an unmarked single-pair `vec-rel` («3BD = AD» lowers to «AD = 3·BD»).
-`segmentEquationKind3` (`apply.ts`) classifies it against the figure: marked, a point not yet drawn (a definition), a
-negative coefficient, or one segment on both sides with `k ≠ 1` → `vector`; anything else → `two-readings`. Which
+`segmentEquationKind3` (`apply.ts`) classifies it against the figure: marked, a point not yet drawn **that the vector
+reading solves for** (a definition: `vectorReadingDefines3`, a nonzero net coefficient — +1 as a head, −1 as a tail, minus
+k times the same on the right; ADR-3D-460), a negative coefficient, or one segment on both sides with `k ≠ 1` → `vector`; anything else → `two-readings`. Which
 reading a two-reading line takes is decided by the **store's fold**, not the engine, because "can this reading hold"
 is a question about the solved figure: `applyFact` hands the line to `readSegmentEquation3` (`store3.ts`), which folds
 the list up to and including the line twice through `deriveCore3` itself — once with `reading: 'vector'`, once with
@@ -808,7 +809,14 @@ the list up to and including the line twice through `deriveCore3` itself — onc
 reading; both green and the same positions → `'length'`; both green and different → `'ask'`; the vector
 trial red → `'length'` without running the length trial (Am. 2), so a length that cannot hold either is refused by the
 length path's own verdict. Memoized by the prefix, so the verdict
-never changes with the seed or with a later line; recorded per line in `Derived3.readings`. The outermost
+never changes with the seed or with a later line; recorded per line in `Derived3.readings`. A new point whose net
+coefficient is 0 («TA = TB») goes to `two-readings`, and the line is read against the figure BEFORE it: the letters
+the ADR-3D-382 mint pass created for the line count as new (`fresh`), so creating T cannot turn the line into a
+definition. The vector trial is also red when it puts two of the line's own letters on one dot that the figure before
+the line kept apart (`coincidences`, Am. 2's «B would be C» read off the figure when a new letter is defined onto
+another). `readStated` in `deriveCore3` is the one place a row's reading is chosen: the in-order fold, the retry
+dry run and the mint pass's dry runs all apply the row as read, and `applyCommand3` honours a stamped `reading`
+before its own kind (ADR-3D-460). The outermost
 `applyCommand3` then applies it: `'vector'` as the vector command plus an ink arrow (`arrows`) for each pair of the
 sentence; `'length'` as exactly «|XY| = k|ZW|»'s commands (`segment3` + `length-rel`); `'ask'` or no reading as
 `ambiguous-vector-length`, which carries the pairs except at `k = 1`. `decideCommands3` answers `already-stated` for

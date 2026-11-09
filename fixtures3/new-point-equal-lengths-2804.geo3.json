@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T22:09:03.455Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מרובע ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מעגל חוסם את ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "concyclic",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "origin": "shape"
+        },
+        {
+          "type": "circle3",
+          "id": "circle-ABCD",
+          "def": {
+            "kind": "circum",
+            "ring": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "TA = TB",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "T",
+          "to": "A",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "T",
+                "to": "B"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

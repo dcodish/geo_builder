@@ -29,6 +29,8 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { mintFree, segmentEquationKind3, vectorReadingDefines3 } from '../engine/apply';
+import { parse3 } from '../parser/parse3';
 
 const st = () => useGeo3.getState();
 const submit = (u: string) => st().submit(u);
@@ -158,5 +160,102 @@ describe('#1156 — what must NOT move (round #1169’s escalation tripwire)', (
     const { err } = build(['תיבה', 'AB=4']);
     expect(err).toBeNull();
     expect(lenOf('A', 'B')).toBeCloseTo(4, 6);
+  });
+});
+
+/**
+ * #2804 (ADR-3D-460, amending ADR-3D-391): «משולש ABC» · «TA = TB» with T not yet drawn was refused «no position of T».
+ * The new-point gate read every segment equation naming a new letter as a vector DEFINITION of it; as vectors
+ * A − T = B − T, T cancels and the "definition" says only A = B. A new point is a definition only when the vector
+ * reading solves for it (a nonzero net coefficient); a cancelled one goes to the two-reading trial, whose vector reading
+ * cannot hold, so the line is read as lengths and T is created free on the bisector plane of AB.
+ */
+describe('#2804 — a new point the vector reading cannot place is read as lengths', () => {
+  const triangle = () => {
+    st().clear();
+    submit('משולש ABC');
+    return derive3(st().facts, st().seed).construction;
+  };
+  const cmdOf = (line: string) => {
+    const r = parse3(line);
+    if (!r.ok) throw new Error(line);
+    return r.commands[0];
+  };
+
+  it.each([
+    ['TA = TB', 'two-readings', false],
+    ['AT = BT', 'two-readings', false],
+    ['TA = 1TB', 'two-readings', false],
+    ['TA = TC', 'two-readings', false],
+    ['AT = TB', 'vector', true],
+    ['TA = 2TB', 'vector', true],
+    ['TA = AB', 'vector', true],
+    ['AT = -TB', 'vector', false],
+  ])('«%s» over a triangle: %s', (line, kind, defines) => {
+    const c = triangle();
+    expect(segmentEquationKind3(c, cmdOf(line))).toBe(kind);
+    expect(vectorReadingDefines3(c, cmdOf(line))).toBe(defines);
+  });
+
+  it('a letter the line itself created stays new to its reading (the mint pass cannot turn it into a definition)', () => {
+    const minted = mintFree(triangle(), ['T']);
+    // T on the figure, but created FOR this line: still new to it, still cancelled
+    expect(segmentEquationKind3(minted, cmdOf('AT = BT'), new Set(['T']))).toBe('two-readings');
+    expect(vectorReadingDefines3(minted, cmdOf('AT = BT'), new Set(['T']))).toBe(false);
+    // …while a created letter the vector reading DOES solve for keeps the line a definition
+    expect(segmentEquationKind3(minted, cmdOf('AT = TB'), new Set(['T']))).toBe('vector');
+  });
+
+  /** The issue's own line, at every seed: T free and equidistant, the notice, the length reading, the triangle unmoved. */
+  it.each([0, 1, 2, 3])('«משולש ABC» · «TA = TB» builds at seed %i', (seed) => {
+    st().clear();
+    submit('משולש ABC');
+    const base = derive3(st().facts, seed).positions;
+    submit('TA = TB');
+    expect(st().lastError).toBeNull();
+    const facts = st().facts;
+    const d = derive3(facts, seed);
+    const line = facts[facts.length - 1];
+    expect(d.status[line.id]).toBe('ok');
+    expect(d.construction.points.get('T')?.kind).toBe('free3');
+    expect(d.readings[line.id]).toBe('length');
+    expect(d.created[line.id]).toEqual(['T']);
+    const P = d.positions;
+    const len = (a: string, b: string) => Math.hypot(P.get(a)!.x - P.get(b)!.x, P.get(a)!.y - P.get(b)!.y, P.get(a)!.z - P.get(b)!.z);
+    expect(Math.abs(len('T', 'A') - len('T', 'B'))).toBeLessThan(1e-6);
+    for (const id of ['A', 'B', 'C']) {
+      const p = base.get(id)!;
+      const q = P.get(id)!;
+      expect(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z), id).toBeLessThan(1e-9);
+    }
+  });
+
+  /** The plan's table: every host and mirror spelling builds; a new point never lands on another letter. */
+  it.each([
+    [['משולש ABC', 'AT = BT']],
+    [['משולש ABC', 'TA = TC']],
+    [['מרובע ABCD', 'TA = TB']],
+    [["קובייה ABCDA'B'C'D'", 'TA = TB']],
+    [['פירמידה ABCS', 'TA = TB']],
+    [['TA = TB']],
+    [['AT = BT']],
+  ])('%j builds with T equidistant and no two letters on one dot', (lines) => {
+    st().clear();
+    lines.forEach(submit);
+    expect(st().lastError).toBeNull();
+    const line = lines[lines.length - 1];
+    const [p, q] = line.replace(/\s/g, '').split('=').map((s) => s.replace('T', ''));
+    const d = derive3(st().facts, st().seed);
+    expect(d.coincidences).toEqual([]);
+    expect(Math.abs(lenOf('T', p) - lenOf('T', q))).toBeLessThan(1e-6);
+  });
+
+  /** What must NOT move: a vector reading that DOES place the new point is still a definition (ADR-3D-010). */
+  it('«AT = TB» still defines T as the midpoint', () => {
+    st().clear();
+    build(['משולש ABC', 'AT = TB']);
+    expect(st().lastError).toBeNull();
+    expect(lenOf('A', 'T')).toBeCloseTo(lenOf('T', 'B'), 9);
+    expect(lenOf('A', 'B')).toBeCloseTo(2 * lenOf('A', 'T'), 9);
   });
 });
