@@ -1086,7 +1086,7 @@ collapse goes to a **frozen-dims retry** with the shape fixed at the seed's samp
 Every relation `PIN_FIXES_SCALE` marks similarity-invariant has a residual of degree 0 in the gauge scale
 (normalised by its operands, `relDiff3` for the magnitude ratios `length-rel` / `mag-rel`, `|l| + |r|` for
 `vec-eq`), so the pivot can never satisfy it by shrinking the figure while one stated point makes the scale an
-unknown. The rows live in `scalarPinRows3`, and the rule is locked over the table: every `false` kind's row is
+unknown (on the frozen-gauge `invariantOnly` solve the rows keep their raw form, so a figure without a pin solves as before). The rows live in `scalarPinRows3`, and the rule is locked over the table: every `false` kind's row is
 unchanged when the figure doubles (`issue-936-degenerate.test.ts`).
 
 **The base sentinel names a solid's base; a flat polygon has none** (#1907, ADR-3D-315). `seg-plane-rel`

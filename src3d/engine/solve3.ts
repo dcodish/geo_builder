@@ -63,12 +63,13 @@ export const leastSquaresStats = { solves: 0, evals: 0 };
 /** #2806 (ADR-3D-458): the floor under a relative difference's denominator — the 1e-12 every normalised row uses. */
 const REL_DIFF_FLOOR = 1e-12;
 /**
- * #2806 (ADR-3D-458) — a SIGNED relative difference `(p − q) / (p + q)` of two non-negative magnitudes: zero exactly
+ * #2806 (ADR-3D-458) — a SIGNED relative difference `(p − q) / ((p + q) / 2)` of two non-negative magnitudes: zero exactly
  * where `p = q`, crossing zero through it (the ADR-3D-006 lesson), and of degree 0 under a common rescaling. The one
- * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them.
+ * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them. Over the MEAN magnitude,
+ * so at a unit-size figure its slope equals the raw difference's and the descent's conditioning is unchanged.
  */
 export function relDiff3(p: number, q: number): number {
-  return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
+  return (p - q) / Math.max((p + q) / 2, REL_DIFF_FLOOR);
 }
 
 export function leastSquares(residuals0: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
@@ -709,8 +710,13 @@ export function scalarPinRows3(
     lines?: Map<string, { anchor: Vec3; dir: Vec3 }>;
     symAt: (sym: string) => number | null | undefined;
     riderAt: (key: string) => number | undefined;
+    /** #2806: the dims-only `invariantOnly` solve, gauge frozen at identity — no scale unknown to shrink, so the
+     *  ratio rows keep their raw form there and every figure without a pin solves bit-identically to before. */
+    gaugeFrozen?: boolean;
   },
 ): void {
+  // #2806 (ADR-3D-458): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
+  const ratioRow = (p: number, q: number): number => (env.gaugeFrozen ? p - q : relDiff3(p, q));
   // V8-f: a VecAtom operand → its (gauge-transformed) direction
   const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
     if (atom.kind === 'named') {
@@ -809,7 +815,7 @@ export function scalarPinRows3(
       const b2 = at(pin.b2);
       // #2806 (ADR-3D-458): normalised by the operands (`relDiff3`) — degree 0 in the gauge scale, so the
       // pivot can never meet a ratio of lengths by shrinking the figure to a point
-      out.push(a1 && b1 && a2 && b2 ? relDiff3(norm3(sub3(b1, a1)), pin.c * norm3(sub3(b2, a2))) : 10);
+      out.push(a1 && b1 && a2 && b2 ? ratioRow(norm3(sub3(b1, a1)), pin.c * norm3(sub3(b2, a2))) : 10);
     } else if (pin.kind === 'vec-eq') {
       // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
       // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
@@ -822,7 +828,7 @@ export function scalarPinRows3(
       }
       // #2806 (ADR-3D-458): each component over |l| + |r| — still signed, now scale-free like every
       // similarity-invariant row, so a shrinking figure cannot zero it
-      const den = Math.max(norm3(l) + norm3(r), REL_DIFF_FLOOR);
+      const den = env.gaugeFrozen ? 1 : Math.max((norm3(l) + norm3(r)) / 2, REL_DIFF_FLOOR);
       out.push((l.x - r.x) / den, (l.y - r.y) / den, (l.z - r.z) / den);
     } else if (pin.kind === 'volume3') {
       // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
@@ -843,7 +849,7 @@ export function scalarPinRows3(
       const e1 = exprAt(pin.e1);
       const e2 = exprAt(pin.e2);
       // #2806 (ADR-3D-458): normalised like `length-rel` — one helper, so the two forms cannot drift
-      out.push(e1 && e2 ? relDiff3(norm3(e1), pin.c * norm3(e2)) : 10);
+      out.push(e1 && e2 ? ratioRow(norm3(e1), pin.c * norm3(e2)) : 10);
     } else if (pin.kind === 'mag-val') {
       // #393/#335: |e| − value — the absolute-size twin of `length`.
       const e = exprAt(pin.e);
@@ -1562,6 +1568,7 @@ export function solvePivot(
     const scalarStart = out.length; // #990: the scalar pins' rows begin here
     scalarPinRows3(c, at, out, {
       lines,
+      gaugeFrozen: invariantOnly,
       symAt: (sym) => symAt(x, sym),
       riderAt: (key) => {
         const i = riders.findIndex((r) => r.id === key);
