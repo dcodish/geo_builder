@@ -1130,9 +1130,9 @@ over all four (ADR-041).
 **Steps**: `שני מעגלים נחתכים בנקודות A ו- B`
 **Guards against:** no rule for "two circles intersect at A and B" → it escalated and the LLM produced a SINGLE point G (not A AND B), and the two circles did not visibly meet. A deterministic rule now creates both circles overlapping and BOTH intersection points (the two branches).
 
-### `two-circles-then-secant-from-A` — two circles → point C on the right circle → a secant from existing A cuts the left circle at D
-**Steps**: `שני מעגלים נחתכים בנקודות A ו- B` · `C על מעגל P` · `מנקודה A ישר חותך את המעגל O בנקודות C ו-D`
-**Guards against:** the LLM fallback re-parsed its canonical steps with NO figure context, so "from A a line cuts circle O at C and D" fell to the "first secant" branch (which needs an "outside" cue) and was DROPPED — "the next command failed". llmParse now threads the figure context (and accumulates ids across steps) into each re-parse, so the secant-from-an-existing-point branch fires. (Steps 2–3 are the LLM canonical lines the log recorded; parsed here with context exactly as llmParse does.)
+### `two-circles-then-secant-from-A` — two circles → C on the right circle → AC cuts the left circle at D (the student’s own lines, #1840)
+
+**Guards against:** re-authored for #1840 (ADR-801): the sequence was the LLM’s canonical mistranslation, which drew a third circle O. Now the student’s own lines from the log: two circles, never three, D on line AC.
 
 ### `oc-half-radius-sizes-the-chord` — "OC = 0.5R" sizes the chord (R auto-binds to the radius; "C אמצע מיתר AB" is the midpoint)
 **Steps**: `circle centered at O radius 5` · `מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B` · `נקודה C היא אמצע מיתר AB` · `OC=0.5R`
@@ -2302,3 +2302,19 @@ over all four (ADR-041).
 ### `tangent-rider-one-configuration-2758` — «מלבן ABCD · AB = 4 · BC = 2 · E על CD · ∠AEB = 90°»: E forced to CD's midpoint is ONE configuration (#2758, ADR-798/799)
 
 **Guards against:** a tangency (double root) counted as two configurations, with «הציגו תצורה אחרת» then showing the same drawing. **Asserts** E at the midpoint in the drawn figure and every pool sample, `configurations: 1` determined and stable, «נקבע במלואו», one shape over three presses, the ⟂ spelling the same; neighbours BC = 1.9 two configurations, BC = 2.001 refused.
+
+### `secant-from-crossing-after-two-circles-1840` — the issue’s own lines are refused with the ruled sentence (#1840, ADR-802)
+
+**Guards against:** after two circles «מנקודה A ישר חותך את המעגל O בנקודות C ו-D» drew a third circle O and left C off it, green. O now names the other drawn circle, A lies on it, and the line is refused (operator ruling 2026-10-08).
+
+### `secant-from-crossing-two-lines-1840` — the two-line variant is refused the same way (#1840)
+
+**Guards against:** the third circle in «שני מעגלים נחתכים» · «מנקודה A ישר חותך את המעגל O בנקודות C ו-D».
+
+### `secant-from-point-names-other-circle-1840` — a secant from E names the other drawn circle O (#1840, ADR-801)
+
+**Guards against:** a fresh circle letter in the secant-from rule minting a third circle beside two drawn ones.
+
+### `secant-through-existing-point-puts-it-on-circle-1840` — an existing named crossing is put on the circle (#1840, ADR-802)
+
+**Guards against:** the line drawn through an existing C with C off the circle, every row green.

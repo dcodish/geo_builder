@@ -44,6 +44,8 @@ export function renderNote(n: DecideNote, ctx: { t: T; explain: (raw: string) =>
   for (const [k, v] of Object.entries(n.params ?? {})) {
     if (v && typeof v === 'object' && 't' in v) params[k] = ctx.t((v as { t: string }).t);
     else if (v && typeof v === 'object' && 'circle' in v) params[k] = circleText(item((v as { circle: CircleParam }).circle).ref, (v as { circle: CircleParam }).circle.letter, ctx.t).circle;
+    // #1840 (ADR-802): the definite noun phrase («המעגל O» / "circle O"), for a template that reads «על המעגל O»
+    else if (v && typeof v === 'object' && 'circleThe' in v) params[k] = circleText(item((v as { circleThe: CircleParam }).circleThe).ref, (v as { circleThe: CircleParam }).circleThe.letter, ctx.t).circleThe;
     else if (v && typeof v === 'object' && 'circleList' in v) params[k] = circleList((v as { circleList: CircleParam[] }).circleList.map(item), ctx.t);
     else if (typeof v === 'string') {
       // the student's own sentence is never judged

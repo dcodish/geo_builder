@@ -22,6 +22,8 @@ import type { AnyCommand } from '@/engine';
 import { decideDeterministic2D, type Verdict2D } from '@/app/decideDeterministic';
 import { commitVerdict } from '@/app/submitPipeline';
 import { useGeoStore } from '@/store/geoStore';
+import i18n from '@/i18n';
+import { renderNote } from '@/app/renderNote';
 
 const factsFrom = (steps: string[] | Fact[]): Fact[] => {
   if (steps.length && typeof steps[0] !== 'string') return steps as Fact[];
@@ -214,6 +216,48 @@ describe('#1694 — a fresh letter in a chord/diameter sentence names the drawn 
   it('«שני מעגלים משיקים מבחוץ» · «AB קוטר במעגל O» with A, B new is still a new circle (nothing rides the pair)', async () => {
     green(await run(['שני מעגלים משיקים מבחוץ', 'AB קוטר במעגל O']));
     expect(centres()).toHaveLength(3);
+  });
+
+  // #1840 (ADR-801/802): the secant-from-a-point rule's circle is a REFERENCE, as in «AC חותך את המעגל O בנקודה D»
+  it('#1840: after two circles, one named P, «מנקודה E ישר חותך את המעגל O …» names the other drawn circle', async () => {
+    green(await run(['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'נקודה E', 'מנקודה E ישר חותך את המעגל O בנקודות F ו-G']));
+    expect(centres().sort()).toEqual(['O', 'P']);
+  });
+  it('#1840: one unnamed circle — the fresh letter names it, as «EF חותך את המעגל O בנקודה D» does', async () => {
+    green(await run(['מעגל', 'נקודה E', 'מנקודה E ישר חותך את המעגל O בנקודות C ו-D']));
+    expect(centres()).toEqual(['O']);
+  });
+  it('#1840: the English spelling binds the same way', async () => {
+    green(await run(['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'נקודה E', 'from E a line cuts circle O at F and G']));
+    expect(centres().sort()).toEqual(['O', 'P']);
+  });
+  for (const lines of [
+    ['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D'],
+    ['שני מעגלים נחתכים בנקודות A ו- B', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D'],
+    ['מעגל O', 'A על מעגל O', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D'],
+  ]) {
+    it(`#1840: a line from a point ON circle O cannot cut it at two more points — refused: ${lines.join(' · ')}`, async () => {
+      const vs = await run(lines);
+      const last = vs[vs.length - 1] as { kind: string; note?: { key?: string; params?: Record<string, unknown> } };
+      expect(last.kind).toBe('refuse');
+      expect(last.note?.key).toBe('input.secantFromOnCircle');
+      expect(last.note?.params).toMatchObject({ from: 'A', a: 'C', b: 'D', circle: { circleThe: { letter: 'O' } } });
+      expect(centres(), 'no third circle, and the refusal named nothing').toHaveLength(lines[0] === 'מעגל O' ? 1 : 2);
+    });
+  }
+  it('#1840: the refusal reads the operator’s sentence, letters from the statement (both locales)', async () => {
+    const vs = await run(['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D']);
+    const note = (vs[2] as { note: Parameters<typeof renderNote>[0] }).note;
+    const text = (lng: string) => renderNote(note, { t: i18n.getFixedT(lng) as never, explain: (r) => r }).replace(/[⁦-⁩‎‏]/g, '');
+    expect(text('he')).toBe('A נמצאת על המעגל O, ולכן ישר שיוצא מ-A חותך אותו רק בעוד נקודה אחת — לא גם ב-C וגם ב-D. אין מה לשרטט מהשורה הזאת.');
+    expect(text('en')).toBe('A lies on circle O, so a line from A meets it at only one more point — not at both C and D. There is nothing to draw from this line.');
+  });
+  it('#1840: a crossing the line names that already exists is put on the circle, not left off it', async () => {
+    const vs = await run(['מעגל O', 'נקודה E', 'נקודה C', 'מנקודה E ישר חותך את המעגל O בנקודות C ו-D']);
+    green(vs);
+    const last = vs[vs.length - 1] as { kind: string; commands?: AnyCommand[] };
+    expect(last.commands).toContainEqual({ type: 'point-on-circle', id: 'C', circle: 'circle-O' });
+    expect(fig().violations).toEqual([]);
   });
 
   it('decision level: a by-member candidate with NO membership signal binds nothing (no sole-circle fallback)', () => {

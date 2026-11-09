@@ -646,6 +646,19 @@ export async function decideFromParse(
       step ? { key: 'input.arcEndIsCentre', params: { detail, end: r.end, step } } : { key: 'input.arcEndIsCentreNoStep', params: { detail, end: r.end } },
     );
   }
+  /**
+   * #1840 ([ADR-802](../../docs/06-decisions.md#adr-802)): «מנקודה A ישר חותך את המעגל O בנקודות C ו-D» with A already ON
+   * circle O. A line through a point of a circle meets it once more at most, so no drawing has both C and D. Refused
+   * with the operator's sentence (ruling 2026-10-08 on #1840: "Refuse and explain"), letters from the statement and the
+   * circle worded through the circle seam (ADR-755). Never escalated, never drawn with a crossing off the circle.
+   */
+  if (!r.ok && r.reason === 'secant-from-on-circle') {
+    return refuse(
+      'conflict',
+      { source: 'parser', result: `secant-from-on-circle:${r.from}:${r.a}${r.b}` },
+      { key: 'input.secantFromOnCircle', params: { from: r.from, a: r.a, b: r.b, circle: { circleThe: { id: r.circle, letter: r.center } } } },
+    );
+  }
   if (!r.ok && r.reason === 'cevian-wrong-side') {
     return refuse('guided', { source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` }, { key: 'input.cevianWrongSide', params: { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') } });
   }

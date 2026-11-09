@@ -16121,3 +16121,14 @@ Each of those points moves along a curve.
 **Decision.** Parity rows `circle-noun-not-subject-2713-01…04` in `shell/__tests__/fixtures/geo-input-parity.ts`, exception X8 for 3-D. Row 04 («מעגל O, נקודה A על המעגל ונקודה B על המעגל») is an unscheduled `knownGap` cell for analytic: analytic reads no «נקודה A על המעגל ונקודה B על המעגל» joined by «ו», even after «מעגל O», a reading it lacks independently of this class.
 
 **Behaviour change for a student:** none in analytic.
+
+## ADR-AG-443 — A secant from a point: analytic does not read the sentence; the parity rows record it (#1840)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug port (analytic) · round #2783, stream D · branch `fix/1840-secant-binds-circle` · **sibling:** [ADR-801](06-decisions.md#adr-801), [ADR-802](06-decisions.md#adr-802) (2-D) · LADDER stage: **none**
+**Requirements:** none (internal) · **Design:** none (internal)
+
+**Measured** (`dd9d409f`, `decideSubmit`). Analytic refuses «מנקודה E ישר חותך את המעגל O בנקודות C ו-D» as `bad-operand` in every figure measured: after «מעגל O» alone, after «נקודה E», and after the two-circle opener. It has no secant-from-a-point reading, so there is no binding or crossing to port; the port needs that reading first.
+
+**Decision.** Parity rows `secant-from-crossing-refused-1840-01/02` (2-D refuses with the ruled sentence; analytic refuses too, for its own reason, so the verdicts agree) and `secant-from-point-names-circle-1840-03`, `secant-through-existing-point-1840-04` with unscheduled `knownGap` cells for analytic, noting the missing reading.
+
+**Behaviour change for a student:** none in analytic.
