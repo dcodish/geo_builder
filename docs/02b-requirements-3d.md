@@ -741,7 +741,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   make simple is drawn simple** (#1986, ADR-3D-418; the operator's "search first, refuse last", 2026-10-09):
   «דלתון ABCD · מרובע ABDC» is drawn as a dart, «מרובע ABCD · מרובע ABDC» as a concave quadrilateral, and
   «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» as a genuine trapezoid (k > 4) — never crossed and green, and
-  «הציגו תצורה אחרת» keeps every declared ring simple. A ring over a coordinate letter is refused, in the same words,
+  «הציגו תצורה אחרת» keeps every declared ring simple. **A solid's base is one of the rings** (#2702, ADR-3D-438):
+  «פירמידה SABCD שבסיסה דלתון · מרובע ABDC» draws the pyramid on a dart base (a kite still, the reflex corner on its
+  axis), and so do a pyramid whose base is general or unstated («פירמידה SABCD», «… שבסיסה מרובע») and a prism's
+  general base («מנסרה ABCDA'B'C'D'»); an unstated base's rectangle is a default and yields to the second ring. A
+  base convex whenever simple — a stated rectangle, square, parallelogram or trapezoid, a box or cube, or a right
+  pyramid's base (a circle passes through it) — still refuses the second ring. A ring over a coordinate letter is refused, in the same words,
   only when the widened search finds no simple drawing. A ring with a free vertex is drawn simple by choice of
   configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over

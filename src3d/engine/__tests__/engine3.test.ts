@@ -7,11 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand3, freeDims, unstatedPyramidReading3 } from '../apply';
 import { verifyClaim } from '../claims';
-import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, type QuadPreference3 } from '../evaluate';
-import { quadDrawnDegenerate } from '../baseShapes';
+import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
+import { concaveSeatVertices3, quadDrawnDegenerate } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
-import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
+import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -657,5 +657,57 @@ describe('stability (first-class regression)', () => {
     for (const id of CUBE_IDS) {
       expect(p1.get(id)).toEqual(p0.get(id));
     }
+  });
+});
+
+/**
+ * #2702 (ADR-3D-438) — a solid's quad base takes the concave seat when a second ring orders its letters differently
+ * (ADR-3D-418's yield, a solid edition): a kite base as a dart about its axis, a general base (and an unstated one,
+ * whose rectangle yields) anywhere, a prism's general base the same. A base convex whenever simple, or a right
+ * pyramid's (cyclic) base, keeps the convex seat; a single ring is untouched.
+ */
+describe('#2702 — a second ring over a solid base draws the base as a dart', () => {
+  const PYR = ['A', 'B', 'C', 'D', 'S'];
+  const ABDC: Command3 = { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'D', 'C'] };
+  const simple = (c: Construction3, seed: number, ring: string[]) => !ringSelfCrossing3(ring.map((id) => evaluate3(c, seed).get(id)!));
+
+  it('a kite base is a dart about its axis: both rings simple, the kite kept, the reflex corner A or C by seed', () => {
+    const c = build({ type: 'solid', kind: 'pyramidKite', ids: PYR }, ABDC);
+    expect(concaveSeatVertices3(c, ['A', 'B', 'C', 'D'])).toEqual([0, 2]);
+    const reflex = new Set<number>();
+    for (let seed = 0; seed < 12; seed++) {
+      const p = evaluate3(c, seed);
+      expect(simple(c, seed, ['A', 'B', 'C', 'D']), `@${seed}`).toBe(true);
+      expect(simple(c, seed, ['A', 'B', 'D', 'C']), `@${seed}`).toBe(true);
+      expect(dist3(p.get('A')!, p.get('B')!)).toBeCloseTo(dist3(p.get('A')!, p.get('D')!), 9);
+      expect(dist3(p.get('C')!, p.get('B')!)).toBeCloseTo(dist3(p.get('C')!, p.get('D')!), 9);
+      const r = ['A', 'B', 'C', 'D'].map((id) => p.get(id)!);
+      const n = cross3(sub3(r[1], r[0]), sub3(r[3], r[0]));
+      [0, 2].forEach((i) => { if (dot3(cross3(sub3(r[i], r[(i + 3) % 4]), sub3(r[(i + 1) % 4], r[i])), n) * dot3(cross3(sub3(r[1], r[0]), sub3(r[2], r[1])), n) < 0) reflex.add(i); });
+    }
+    expect(reflex).toEqual(new Set([0, 2]));
+  });
+
+  it('a general base, an unstated base and a prism\'s general base take the seat; the unstated rectangle yields', () => {
+    const unstated: SolidCommand = { type: 'solid', kind: 'pyramid4gr', ids: PYR, baseUnstated: true };
+    for (const first of [{ type: 'solid', kind: 'pyramidQuad', ids: PYR } as SolidCommand, unstated, { type: 'solid', kind: 'prism4g', ids: CUBE_IDS, oblique: true } as SolidCommand]) {
+      const c = build(first, ABDC);
+      expect(c.solids[0].kind, first.kind).toBe(first.kind === 'pyramid4gr' ? 'pyramidQuad' : first.kind);
+      for (let seed = 0; seed < 6; seed++) {
+        expect(simple(c, seed, ['A', 'B', 'C', 'D']), `${first.kind} @${seed}`).toBe(true);
+        expect(simple(c, seed, ['A', 'B', 'D', 'C']), `${first.kind} @${seed}`).toBe(true);
+      }
+    }
+  });
+
+  it('unchanged: a stated rectangle, a parallelogram, a right kite pyramid and a single ring keep the convex seat', () => {
+    for (const kind of ['pyramid4gr', 'pyramidPar', 'pyramidKiteR', 'pyramidQuadR'] as const) {
+      const c = build({ type: 'solid', kind, ids: PYR }, ABDC);
+      expect(c.solids[0].kind, kind).toBe(kind); // no mark: the stated rectangle never yields
+      expect(concaveSeatVertices3(c, ['A', 'B', 'C', 'D']), kind).toBeNull();
+    }
+    const one = build({ type: 'solid', kind: 'pyramidKite', ids: PYR });
+    expect(concaveSeatVertices3(one, ['A', 'B', 'C', 'D'])).toBeNull();
+    expect(solidDimsAll3(one, 3)[0]).toEqual(solidDims('pyramidKite', 'solid-pyramidKite-ABCDS', 3));
   });
 });

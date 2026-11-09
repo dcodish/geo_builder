@@ -237,11 +237,79 @@ export const displayLabel = (id: Id): string => id.replace(/'/g, '′');
 
 const edgeKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** World-space face normal (first-two-edges cross), oriented OUTWARD from `center`. */
+/** World-space face normal (first-two-edges cross), oriented OUTWARD from `center`. Exact for a CONVEX solid only. */
 function outwardNormal(ring: Vec3[], center: Vec3): Vec3 {
   const n = cross3(sub3(ring[1], ring[0]), sub3(ring[2], ring[0]));
   const toFace = sub3(centroid3(ring), center);
   return dot3(n, toFace) >= 0 ? n : { x: -n.x, y: -n.y, z: -n.z };
+}
+
+/** A planar ring's Newell normal — its area vector, right for a ring with a reflex corner too (a dart base). */
+function newellNormal(ring: readonly Vec3[]): Vec3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    x += (a.y - b.y) * (a.z + b.z);
+    y += (a.z - b.z) * (a.x + b.x);
+    z += (a.x - b.x) * (a.y + b.y);
+  }
+  return { x, y, z };
+}
+
+/**
+ * #2702 ([ADR-3D-438](../../docs/06b-decisions-3d.md#adr-3d-438)) — every face's OUTWARD normal, for a solid that may be
+ * NON-CONVEX (a pyramid or prism over a dart base). The centroid test (`outwardNormal`) is exact only on a convex solid:
+ * beside a reflex base corner the solid's centroid lies outside a lateral face's half-space, and that face read
+ * backwards (measured: 12 of 60 faces on the kite dart). So the faces are wound CONSISTENTLY (each shared edge
+ * traversed in opposite directions by its two faces, walked from face 0), and the closed surface's signed volume says
+ * which way is out. A surface that is not a closed manifold — a flat polygon's double-sided ring, a collapsed sample —
+ * keeps the centroid test, so a convex solid's signs are the ones it always had.
+ */
+export function solidFaceNormals(solid: SolidObj, positions: Positions3): Vec3[] {
+  const rings = solid.faces.map((f) => f.map((id) => positions.get(id)!));
+  const center = centroid3(solid.ids.map((id) => positions.get(id)!));
+  const fallback = () => rings.map((r) => outwardNormal(r, center));
+  const n = solid.faces.length;
+  // directed edge a→b → the faces that traverse it that way (as listed)
+  const edgeFaces = new Map<string, { f: number; fwd: boolean }[]>();
+  solid.faces.forEach((face, f) => {
+    for (let i = 0; i < face.length; i++) {
+      const a = face[i];
+      const b = face[(i + 1) % face.length];
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      const list = edgeFaces.get(k) ?? [];
+      list.push({ f, fwd: a < b });
+      edgeFaces.set(k, list);
+    }
+  });
+  if ([...edgeFaces.values()].some((l) => l.length !== 2)) return fallback(); // not a closed 2-manifold
+  const sign = new Array<number>(n).fill(0);
+  sign[0] = 1;
+  const queue = [0];
+  while (queue.length) {
+    const f = queue.shift()!;
+    for (const list of edgeFaces.values()) {
+      const me = list.find((e) => e.f === f);
+      if (!me) continue;
+      const other = list.find((e) => e !== me)!;
+      // consistent winding: the two faces traverse the shared edge in OPPOSITE directions once their signs apply
+      const want = me.fwd === other.fwd ? -sign[f] : sign[f];
+      if (sign[other.f] === 0) {
+        sign[other.f] = want;
+        queue.push(other.f);
+      } else if (sign[other.f] !== want) return fallback(); // non-orientable as listed
+    }
+  }
+  if (sign.some((s) => s === 0)) return fallback();
+  const normals = rings.map((r, f) => scale3(newellNormal(r), sign[f]));
+  // signed volume (divergence theorem): Σ (area vector · a point of the face) / 3
+  let volume = 0;
+  normals.forEach((nv, f) => { volume += dot3(nv, centroid3(rings[f])) / 6; });
+  if (!(Math.abs(volume) > 1e-12)) return fallback();
+  return volume > 0 ? normals : normals.map((nv) => scale3(nv, -1));
 }
 
 /**
@@ -250,10 +318,10 @@ function outwardNormal(ring: Vec3[], center: Vec3): Vec3 {
  */
 function strictlyInside(solid: SolidObj, positions: Positions3, p: Vec3): boolean {
   if (!solid.ids.every((id) => positions.has(id))) return false; // an unplaced vertex: no body to be inside
-  const center = centroid3(solid.ids.map((id) => positions.get(id)!));
-  for (const face of solid.faces) {
+  const normals = solidFaceNormals(solid, positions);
+  for (const [f, face] of solid.faces.entries()) {
     const ring = face.map((id) => positions.get(id)!);
-    const raw = outwardNormal(ring, center);
+    const raw = normals[f];
     if (norm3(raw) < 1e-12) continue;
     if (dot3(normalize3(raw), sub3(p, ring[0])) > -1e-7) return false;
   }
@@ -282,11 +350,11 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
   const anyFront = new Map<string, boolean>();
   for (const solid of c.solids) {
     if (!solid.ids.every((id) => positions.has(id))) continue; // a bound apex its degenerate ring left unplaced draws nothing
-    const center = centroid3(solid.ids.map((id) => positions.get(id)!));
-    for (const face of solid.faces) {
+    const normals = solidFaceNormals(solid, positions); // #2702: right on a non-convex (dart-base) solid too
+    for (const [f, face] of solid.faces.entries()) {
       const ring = face.map((id) => positions.get(id)!);
       const surface = (faceCount.get(faceKey(face)) ?? 0) < 2 && !inPartner(solid, centroid3(ring));
-      const front = surface && dot3(outwardNormal(ring, center), eye) > 1e-12;
+      const front = surface && dot3(normals[f], eye) > 1e-12;
       for (let i = 0; i < face.length; i++) {
         const k = edgeKey(face[i], face[(i + 1) % face.length]);
         anyFront.set(k, (anyFront.get(k) ?? false) || front);
@@ -321,11 +389,11 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
 
   for (const solid of c.solids) {
     if (!solid.ids.every((id) => positions.has(id))) continue; // #2490: an unplaced bound apex has no body to occlude
-    const center = centroid3(solid.ids.map((id) => positions.get(id)!));
+    const normals = solidFaceNormals(solid, positions);
     let inside = true;
     let onAnyFrontFace = false;
     let onAnyFace = false;
-    for (const face of solid.faces) {
+    for (const [f, face] of solid.faces.entries()) {
       const ring = face.map((id) => positions.get(id)!);
       // #817 (ADR-3D-176): a COLLAPSED face (zero area) has no normal to speak of — `normalize3` throws
       // on it, and this call sat on the path of every «הציגו תצורה אחרת», so one degenerate sample took
@@ -334,7 +402,7 @@ export function auxSegmentHidden(c: Construction3, positions: Positions3, a: Id,
       // several normalize sites in this file are guarded — this one was missed. The renderer is a pure
       // consumer of engine output (CLAUDE.md) and must be TOTAL over it: a bad drawing is a bug to fix
       // upstream (the seed preference), never grounds to crash.
-      const raw = outwardNormal(ring, center);
+      const raw = normals[f];
       if (norm3(raw) < 1e-12) continue;
       const n = normalize3(raw);
       const d = dot3(n, sub3(mid, ring[0]));

@@ -856,7 +856,12 @@ function deriveCore3(
     const cmds = r.cmds.flatMap((k, i): Command3[] => {
       if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return [k];
       const out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
-      const read = i < minted || !(named ??= namesQuadBase3(f.utterance)) ? unstatedPyramidReading3(at, out) : [out];
+      let read: Command3[] = [out];
+      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) {
+        read = unstatedPyramidReading3(at, out);
+        // #2702 (ADR-3D-438): a base the pyramid makes, with no shape named — its rectangle is a default that yields
+        if (read.length === 1 && read[0] === out && QUAD_PYRAMIDS[out.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[out.kind]?.right) read = [{ ...out, baseUnstated: true as const }];
+      }
       if (read.length !== 1 || read[0] !== k) changed = true;
       return read;
     });

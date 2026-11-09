@@ -1110,7 +1110,16 @@ that could be a dart (a kite, a general quadrilateral) fails the check open, and
 ([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
 letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
 the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
-cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **A solid's base takes the seat too**
+([ADR-3D-438](06b-decisions-3d.md#adr-3d-438), #2702): `solidDimsAll3` asks `concaveSeatVertices3` of the base ring of a
+`pyramidQuad`, `prism4g` or `pyramidKite` (`CONCAVE_SEAT_KINDS3`), and the seat reads every declared quad over the letters
+(`declaredQuads3`, a pyramid's base included), so a kite base may be reflex only on its axis and a right pyramid's cyclic
+base never. The general bases lead with the same `[cx, cy, dx, dy]` gauge as `polygon4`, so `polygon4ConcaveDims` replaces
+those four; a kite keeps its symmetry structurally and takes a dart window of its own `[half, axis]` (`concaveSolidDims3`).
+An UNSTATED pyramid base (`SolidObj.baseUnstated`, set by the fold's `namesQuadBase3` reading) yields its default
+rectangle to `pyramidQuad` when a polygon over its letters orders them differently (`yieldUnstatedBase3`, apply). The
+renderer orients faces of a solid that may be non-convex by a consistent winding and the signed volume
+(`solidFaceNormals`, scene3.ts), not by the centroid, which reads a face beside the reflex corner backwards. **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
