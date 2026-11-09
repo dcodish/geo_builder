@@ -3909,6 +3909,53 @@
       "limits": "Not the distance range, not a note on a side change, not other loci beyond the same rule.",
       "at": "2026-11-09T21:01:56.861Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2805a",
+      "issue": 2805,
+      "question": "3-D cube on a cube face («קובייה A'B'C'D'EFGH»): does «הציגו תצורה אחרת» reach the inward cube whose new corners all land on A–D (with the coincidence notice), or outward only?",
+      "class": "coincident-configuration-reachability",
+      "verdict": "escalate",
+      "reason": "ADR-486 (2026-09-08: collisions only when no other config) points to outward only; ADR-W-199 §3 (more than one way, allow changing) points to both; ADR-W-199 does not address coincident drawings.",
+      "nearest": [
+        {
+          "quote": "we have a rule that nodes never collide if there is an option to show them in a different way. only when there is no other config, we should do that and write that they collide",
+          "date": "2026-09-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/942#issuecomment-5584308603"
+        },
+        {
+          "quote": "if there is more than 1 way to build it - we draw a possible config and allow user to change configs",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-199"
+        }
+      ],
+      "at": "2026-11-09T21:09:27.380Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2805b",
+      "issue": 2805,
+      "question": "3-D «מחומש ABCDE» then «מנסרה ישרה שבסיסה מחומש ...»: (a) the pentagon keeps its shape; (b) fitted to a regular one.",
+      "class": "existing-base-keeps-its-shape",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "An existing pentagon/hexagon keeps its own shape under a prism stated with the bare noun; without «משוכלל» no regularity is stated.",
+      "precedents": [
+        {
+          "quote": "if משוכלל is not mentioned, so its just the shape and if its משוכלל so draw it like that.",
+          "date": "2026-09-01",
+          "link": "https://github.com/dcodish/geo_builder/issues/835#issuecomment-5489192419"
+        },
+        {
+          "quote": "Keep its shape",
+          "date": "2026-11-08",
+          "link": "https://github.com/dcodish/geo_builder/issues/2490#issuecomment-6725451264"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Not the blank-canvas kind, not «משוכלל», not a note.",
+      "at": "2026-11-09T21:09:27.380Z",
+      "status": "pending"
     }
   ],
   "demoted": {
