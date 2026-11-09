@@ -20531,3 +20531,20 @@ No new student text. Every sentence is an existing ruled string.
 **Not changed.** The figure, every verdict, and every lowered command. A file saved before this field shows no tag.
 
 **Behaviour change for a student:** a height or median typed without its side or triangle («AE גובה», «תיכון מ-A») keeps the student's words on its row and shows the shape it was drawn in beside them («במשולש ABC»), and that shape stays after a second shape, undo/redo, save/load and a share link.
+
+## ADR-810 — 2-D's submit pipeline writes the real box once, through the shared rule: a line typed during the wait stays (#2782)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug (P2, 2-D) · round #2783, stream J · branch `fix/2782-busy-submit-kept` · **parent:** [ADR-W-198](06w-decisions-workspace.md#adr-w-198) · LADDER stage: **none**
+**Operator:** 2026-11-09, *"2782 - enter should be disabled"* (the question offered "Enter disabled while it waits, with the text kept").
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-34 · **Design:** [04w](04w-design-shell.md) § "Sentence boundaries", the 2-D seam paragraph
+
+**Measured before** (`main` @ `4a06aae9`, browser, every request +150 ms): «משולש ABC», then «AB = 5» typed and Enter pressed 150 ms later. Enter was refused (busy); when the first line finished, `ui.clearText()` — `setText('')` in `App.tsx` — emptied the box, which by then held «AB = 5». One row, an empty box, no message.
+
+**Decision.**
+1. `SubmitUi.editText(update)` is the box, written as an update of what it holds NOW; `App.tsx` passes its state setter. `clearText`/`setText` stay as the unguarded writes of a headless driver with no box.
+2. `runSubmit` wraps the UI once (`boxUi`): every exit — a row, an answered store-op, a taught canonical, the model's row, a paragraph's remainder — writes through `boxAfterSubmit(submitted, …)`. The paragraph chain still reads each sentence's outcome from its own capture and writes the real box once at the end.
+3. The busy gate (E3) is unchanged.
+
+**Locks.** `src/app/__tests__/submitPipeline.test.ts`: «משולש ABC» commits while the box is typed over with «AB = 5», and «AB = 5» stays; the same for a pasted paragraph; an untouched box is cleared.
+
+**Behaviour change for a student:** a line typed while the previous one is processing stays in the box when that one finishes.

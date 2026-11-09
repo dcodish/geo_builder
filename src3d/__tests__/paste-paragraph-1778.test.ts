@@ -22,8 +22,8 @@ const one = (raw: string): SentenceOutcome => {
 
 const submitBox = async (raw: string): Promise<string> => {
   let box = raw;
-  await submitTyped(raw, one, (t) => {
-    box = t;
+  await submitTyped(raw, one, (update) => {
+    box = update(box);
   });
   return box;
 };

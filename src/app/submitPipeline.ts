@@ -54,18 +54,26 @@ import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
 import { renderNote } from './renderNote';
 import { studentVocabulary } from './studentVocabulary';
-import { splitSentences, submitSentences, type SentenceOutcome } from '../../shell/sentences';
+import { boxAfterSubmit, splitSentences, submitSentences, type BoxUpdate, type SentenceOutcome } from '../../shell/sentences';
 import type { CevianHost } from '../../shell/cevianHost';
 
 export interface SubmitUi {
   setInputNote(msg: string): void;
   setRenameNote(msg: string): void;
   setLlmDropped(steps: string[]): void;
-  /** Clear the input field (a successful submission). */
-  clearText(): void;
+  /**
+   * #2782 ([ADR-810](../../docs/06-decisions.md#adr-810), ADR-W-198): THE INPUT BOX, written as an update of what it
+   * holds NOW — a React state setter fits. When it is given, the pipeline writes the box only through it, and only
+   * while the box still holds the submitted text (`boxAfterSubmit`): a line the student typed during the wait is
+   * never erased. A caller with an input box passes this; a headless driver passes `clearText`/`setText` instead.
+   */
+  editText?(update: BoxUpdate): void;
+  /** Clear the input field (a successful submission). Unguarded — used only when `editText` is absent. */
+  clearText?(): void;
   /**
    * #1611 (ADR-591, ADR-W-030): REPLACE the input text with a taught canonical sentence, so one Enter builds
-   * what the note teaches. Optional — a caller with no input box (a headless driver) omits it.
+   * what the note teaches. Optional — a caller with no input box (a headless driver) omits it. Unguarded — used
+   * only when `editText` is absent.
    */
   setText?(text: string): void;
   setBusy(busy: boolean): void;
@@ -150,13 +158,37 @@ function commitLine(batch: AnyCommand[], statements: readonly AnyCommand[], utte
  * and the chain stops at the first sentence the pipeline leaves in the box; the box then holds that sentence —
  * or its taught canonical — followed by the rest.
  */
-export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<void> {
+export async function runSubmit(utterance: string, submitDeps: SubmitDeps): Promise<void> {
+  const deps: BoxDeps = { ...submitDeps, ui: boxUi(submitDeps.ui, utterance) };
   const sentences = splitSentences(utterance);
   if (!sentences) return runSentence(utterance, deps);
   if (deps.isBusy()) return; // a submit is already in flight (E3)
   const box = await submitSentences(sentences, (text, i) => chainSentence(text, i, deps));
   if (box) deps.ui.setText?.(box);
   else deps.ui.clearText();
+}
+
+/** The UI as the pipeline's sentences write it: the box's two writes always present. */
+interface BoxUi extends SubmitUi {
+  clearText(): void;
+}
+type BoxDeps = SubmitDeps & { ui: BoxUi };
+
+/**
+ * #2782 (ADR-810, ADR-W-198) — THE ONE PLACE the pipeline's writes reach the real box. Every exit of a submit — a
+ * row, an answered store-op, a taught canonical, a paragraph's remainder — clears or replaces the box through here,
+ * as an update of what the box holds when the submit FINISHES: only the text that was submitted is replaced. A
+ * submit awaits (the geometry worker's first download, the model fallback) and Enter is off while it does, so a line
+ * typed meanwhile sits in the box — and the clear that ended the first submit used to erase it.
+ */
+function boxUi(ui: SubmitUi, submitted: string): BoxUi {
+  const edit = ui.editText;
+  if (!edit) return { ...ui, clearText: () => ui.clearText?.() };
+  return {
+    ...ui,
+    clearText: () => edit(boxAfterSubmit(submitted, '')),
+    setText: (text: string) => edit(boxAfterSubmit(submitted, text)),
+  };
 }
 
 /**
@@ -166,7 +198,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
  * the caller's display view is the one painted before the paste — and the post-commit search is awaited, so
  * it never sees a figure mid-rewrite.
  */
-async function chainSentence(text: string, i: number, deps: SubmitDeps): Promise<SentenceOutcome> {
+async function chainSentence(text: string, i: number, deps: BoxDeps): Promise<SentenceOutcome> {
   let outcome: SentenceOutcome = 'kept';
   let settling: void | Promise<void> = undefined;
   const storeView = () => {
@@ -195,7 +227,7 @@ async function chainSentence(text: string, i: number, deps: SubmitDeps): Promise
   return outcome;
 }
 
-async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
+async function runSentence(utterance: string, deps: BoxDeps): Promise<void> {
   const { t, locale, ui } = deps;
   if (deps.isBusy()) return; // a submit is already in flight (E3) — chips/enter can't race a second one
   ui.setInputNote('');

@@ -12,8 +12,8 @@ import { pasteSuite, type PasteRunner } from '../../shell/__tests__/fixtures/pas
 
 const submitBox = async (raw: string): Promise<string> => {
   let box = raw;
-  await submitTyped(raw, (s) => (submitLine(s) ? 'consumed' : 'kept'), (t) => {
-    box = t;
+  await submitTyped(raw, (s) => (submitLine(s) ? 'consumed' : 'kept'), (update) => {
+    box = update(box);
   });
   return box;
 };

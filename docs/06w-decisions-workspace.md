@@ -7307,3 +7307,31 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 **Not decided here.** Removing the PCs' keys from root's `authorized_keys`, plan step 5, waits for the operator. The keys serve more than deploys, and the server's other login paths are his call. The security detail stays off this public log.
 
 **Behaviour change for a student:** none.
+
+## ADR-W-198 — A finished submit writes the box only while it still holds what was submitted: a line typed during the wait is never erased (#2782)
+
+**Status:** accepted · 2026-11-09 · bug (P2, 2-D + 3-D + analytic + complex) · round #2783, stream J · branch `fix/2782-busy-submit-kept` · **sibling:** [ADR-810](06-decisions.md#adr-810) (2-D's pipeline seam) · LADDER stage: **none** (the input box; no rung moves)
+**Operator:** 2026-11-09, asked whether a line typed while the previous one is processing should run on its own afterwards, or Enter be disabled while it waits with the text kept: *"2782 - enter should be disabled"*.
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-34, and its parity row · **Design:** [04w](04w-design-shell.md) § "Sentence boundaries" (`boxAfterSubmit`, `submitTyped`'s updater)
+
+**Measured before** (`main` @ `4a06aae9`, a real browser through `scripts/lib/browser-harness.mjs`, the model stubbed). The first line was submitted; 150 ms later the box was refilled with a second line and Enter pressed; the rows and the box were read 5 s later.
+- 2-D, every request delayed 150 ms (the geometry worker's first download, the issue's cause): «משולש ABC» then «AB = 5» — one row, «משולש ABC»; the box **empty**.
+- 3-D, a line answered by the stubbed model 1.5 s late: «תבנה לי קובייה יפה בבקשה» then «AB = 5» — one row; the box **empty**.
+- Analytic, the same: «תבנה לי מעגל יפה בבקשה» then «A(1,2)» — one row; the box **empty**.
+- In all three, Enter was already refused while busy (the shared `InputArea`'s greyed «חושב…» submit button; 2-D's synchronous ref gate). Complex is synchronous and has no wait.
+
+**Cause.** Every builder ends a submit by writing its answer to the box as a bare value — `''` for a row, the canonical for a taught sentence, the remainder for a paragraph: 2-D's `ui.clearText()` (`setText('')`), and the shared `submitTyped`'s `setBox`. A submit awaits (the worker, the model), and by the time it writes, the box can hold the student's NEXT line. The write erased it.
+
+**Decision.**
+1. **One rule, one helper:** `boxAfterSubmit(submitted, next)` in `shell/sentences.ts` returns an UPDATE of the box's current text — the submitted text becomes `next`; any other text stays as typed. A finished submit never writes the box any other way.
+2. **`submitTyped`'s `setBox` takes that update**, not a string. 3-D, analytic and complex pass their React state setter, which applies an updater to the box's current value; no product code changed.
+3. **2-D's pipeline** writes the real box through the same helper (ADR-810).
+4. **Enter stays off while busy**, unchanged, as the operator ruled.
+
+**Not changed.** What a line builds, every refusal and note, the busy gate, a paragraph's chain. A box the student did not touch is cleared or replaced exactly as before.
+
+**Locks.** `shell/__tests__/sentences-1778.test.ts`: `boxAfterSubmit`'s two cases, and `submitTyped` with a pending submit whose box is typed over — consumed, taught and a paragraph — keeps the typed line. The four `paste-paragraph-1778` thin locks apply the update. `src/app/__tests__/submitPipeline.test.ts` (ADR-810) for 2-D.
+
+**Found, not built.** A 2-D example chip clicked while the first line is processing is dropped silently by the busy gate (measured: «משולש ABC», then the «מקבילית ABCD» chip 150 ms later — one row). What it should do is a question for the operator, raised on #2782.
+
+**Behaviour change for a student:** a line typed while the previous one is still being processed is no longer erased when that one finishes; it stays in the box, ready for Enter. In every builder.

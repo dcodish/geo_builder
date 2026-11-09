@@ -150,14 +150,29 @@ export async function submitSentences(
 export async function submitTyped(
   raw: string,
   submitOne: (text: string) => SentenceOutcome | Promise<SentenceOutcome>,
-  setBox: (text: string) => void,
+  setBox: (update: BoxUpdate) => void,
 ): Promise<void> {
   const sentences = splitSentences(raw);
   if (sentences) {
-    setBox(await submitSentences(sentences, submitOne));
+    setBox(boxAfterSubmit(raw, await submitSentences(sentences, submitOne)));
     return;
   }
   const outcome = await submitOne(raw);
-  if (outcome === 'consumed') setBox('');
-  else if (outcome !== 'kept') setBox(outcome.prefill);
+  if (outcome === 'consumed') setBox(boxAfterSubmit(raw, ''));
+  else if (outcome !== 'kept') setBox(boxAfterSubmit(raw, outcome.prefill));
+}
+
+/** An update of the input box from what it holds NOW — the shape of a React state setter's updater. */
+export type BoxUpdate = (current: string) => string;
+
+/**
+ * #2782 ([ADR-W-198](../docs/06w-decisions-workspace.md#adr-w-198)) — A FINISHED SUBMIT WRITES THE BOX ONLY WHILE THE BOX
+ * STILL HOLDS WHAT WAS SUBMITTED. A submit can wait (the geometry worker's first download, the model fallback), and
+ * the student can type the next line meanwhile; Enter is off while it waits, so that line sits in the box. Writing the
+ * submit's answer over it («» for a row, a taught canonical) erased a line nobody had read. The answer is applied as an
+ * update of the box's CURRENT text: the submitted text becomes `next`; anything else the student typed stays as typed.
+ * Every builder's box goes through here — 2-D's pipeline and {@link submitTyped} for the others.
+ */
+export function boxAfterSubmit(submitted: string, next: string): BoxUpdate {
+  return (current) => (current === submitted ? next : current);
 }

@@ -165,6 +165,13 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   sentence followed by the rest. A paste that carries a claim to prove is not split; it is refused whole
   (FR-SU-15). The operator's ruling: «split into rows».
   - Sources: [ADR-W-125](06w-decisions-workspace.md#adr-w-125), #1778.
+- **FR-SU-34 (Must)** — **A line typed while the previous one is processing is never erased.** While a line is
+  being processed, «הוסף» shows a greyed «חושב…» and Enter does nothing. A line the student types meanwhile stays
+  in the box when the first line finishes, as typed, ready for Enter; the first line's row, its taught canonical
+  sentence or a paragraph's remainder replaces the box only while the box still holds the text that was
+  submitted. Holds in all four builders. The operator's ruling (2026-11-09): «enter should be disabled», answering
+  the question that offered «Enter disabled while it waits, with the text kept».
+  - Sources: [ADR-W-198](06w-decisions-workspace.md#adr-w-198), [ADR-810](06-decisions.md#adr-810), #2782.
 - **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
   builders an angle measure written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at
   once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». 3-D says it of its own subject, «של המרחב» ([ADR-3D-424](06b-decisions-3d.md#adr-3d-424), #2335).
@@ -327,6 +334,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Behaviour | 2-D | 3-D | Analytic | Complex | Status |
 | --- | --- | --- | --- | --- | --- |
 | A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
+| A line typed while the previous one is processing | Enter off («חושב…»); the line stays in the box | same | same | same (no wait: complex is synchronous) | **Same** (ADR-W-198, FR-SU-34) |
 | A line that refers to a point the figure lacks («M אמצע AB», «AB = 2 AD» on a blank page) | created free; the notice «נוצרה נקודה חדשה X — …» with ✕ removing the line | same; a named line too («הישר k …»), with no notice (ADR-W-163) | same | created silently, no notice | **Gap** — complex #2562 (`later`); ruled 2026-09-27 (#1467, ADR-W-162); one notice, `shell/frame/CreatedNotice.tsx` + suite keys |
 | An AI answer that drops a shape or role word the student typed («שווה צלעת» answered «משולש ABC») | refused, the word named (dropped-given) | same | records today | n/a (no AI fallback) | **Ruled** — 2026-10-08 (#1906, ADR-W-144, FR-SU-21); analytic's half is #1906's third item; one reader, `shell/llm/honestyCore.ts` `propertyWords` |
 | Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |
