@@ -10,7 +10,7 @@ import { evaluate3, resolve3 } from '../../engine/evaluate';
 import { emptyConstruction3, type Command3, type Construction3 } from '../../engine/types';
 import { v3 } from '../../engine/vec3';
 import { cameraFrame, HOME_CAMERA, project3 } from '../camera';
-import { buildScene3, displayLabel, hiddenEdgeKeys } from '../scene3';
+import { buildScene3, displayLabel, hiddenEdgeKeys, solidFaceNormals } from '../scene3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 
@@ -266,5 +266,66 @@ describe('buildScene3', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
     const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.points.map((p) => p.label)).toContain('D′');
+  });
+});
+
+/**
+ * #2702 (ADR-3D-438) — a solid over a DART base is not convex: beside the reflex corner the solid's centroid lies
+ * outside a lateral face's half-space, so the centroid test read that face backwards. The normals come from the
+ * consistently wound closed surface and its signed volume: every face points away from the body.
+ */
+describe('#2702 — outward face normals on a non-convex solid', () => {
+  const PYR = ['A', 'B', 'C', 'D', 'S'];
+  const make = (...cmds: Command3[]): Construction3 => {
+    let c = emptyConstruction3();
+    for (const k of cmds) {
+      const r = applyCommand3(c, k);
+      if (!r.ok) throw new Error(JSON.stringify(r.error));
+      c = r.next;
+    }
+    return c;
+  };
+  const sub = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
+  const dot = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+  it('every face of a dart-base pyramid points away from the apex side it does not hold (12 seeds)', () => {
+    const c = make({ type: 'solid', kind: 'pyramidKite', ids: PYR }, { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'D', 'C'] });
+    for (let seed = 0; seed < 12; seed++) {
+      const p = evaluate3(c, seed);
+      const s = c.solids[0];
+      const normals = solidFaceNormals(s, p);
+      s.faces.forEach((face, f) => {
+        // the base: the apex lies behind it
+        if (face.length === 4) expect(dot(normals[f], sub(p.get('S')!, p.get(face[0])!)), `@${seed} ${face.join('')}`).toBeLessThan(0);
+        if (face.length === 3) {
+          // the lateral face's outward side is the side AWAY from the base ring's interior: the base face's own
+          // midpoint of the edge it shares, nudged into the base polygon, lies behind it
+          const [a, b] = face.filter((id) => id !== 'S');
+          const mid = v3((p.get(a)!.x + p.get(b)!.x) / 2, (p.get(a)!.y + p.get(b)!.y) / 2, (p.get(a)!.z + p.get(b)!.z) / 2);
+          const ring = ['A', 'B', 'C', 'D'];
+          const ia = ring.indexOf(a), ib = ring.indexOf(b);
+          const [u, w] = (ia + 1) % 4 === ib ? [p.get(a)!, p.get(b)!] : [p.get(b)!, p.get(a)!];
+          const R = ring.map((id) => p.get(id)!);
+          let N = v3(0, 0, 0);
+          for (let i = 0; i < 4; i++) { const q = R[i], r = R[(i + 1) % 4]; N = v3(N.x + (q.y - r.y) * (q.z + r.z), N.y + (q.z - r.z) * (q.x + r.x), N.z + (q.x - r.x) * (q.y + r.y)); }
+          const e = sub(w, u);
+          const inward = v3(N.y * e.z - N.z * e.y, N.z * e.x - N.x * e.z, N.x * e.y - N.y * e.x); // N × e: into the ring
+          const probe = v3(mid.x + 1e-3 * inward.x, mid.y + 1e-3 * inward.y, mid.z + 1e-3 * inward.z);
+          expect(dot(normals[f], sub(probe, p.get(face[0])!)), `@${seed} ${face.join('')}`).toBeLessThan(0);
+        }
+      });
+    }
+  });
+
+  it('a convex solid reads the signs the centroid test always gave', () => {
+    const c = make({ type: 'solid', kind: 'cube', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] });
+    const p = evaluate3(c, 0);
+    const s = c.solids[0];
+    const center = s.ids.map((id) => p.get(id)!).reduce((m, q) => v3(m.x + q.x / 8, m.y + q.y / 8, m.z + q.z / 8), v3(0, 0, 0));
+    solidFaceNormals(s, p).forEach((n, f) => {
+      const ring = s.faces[f].map((id) => p.get(id)!);
+      const fc = ring.reduce((m, q) => v3(m.x + q.x / 4, m.y + q.y / 4, m.z + q.z / 4), v3(0, 0, 0));
+      expect(dot(n, sub(fc, center))).toBeGreaterThan(0);
+    });
   });
 });
