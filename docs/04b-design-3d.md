@@ -330,7 +330,19 @@ right angle is stated at any corner of that ring (M4; the #116 default, ring-sco
   made cyclic is refuted rather than drawn.
 
 The circle rewrites the ring's `quad-general` preference (#615) to the cyclic member, marked `right` by a
-stated right angle. A right trapezoid in a circle (`cyclic.forced = rectangle`) is refused by `parse3` as
+stated right angle.
+
+**The preference tier of the seed search (#2749, [ADR-3D-451](06b-decisions-3d.md#adr-3d-451) /
+[ADR-3D-452](06b-decisions-3d.md#adr-3d-452)).** A `quad-general` preference ("draw the stated quadrilateral visibly as
+itself") is narrowed by ONE rule, `narrowedPreference3` (apply.ts): once the ring is stated to be another kind too, the
+preference is the meet's, and a square has none. Three seats call it: a later noun over the ring (`recordShape`'s
+narrowing branch), a bound pyramid's stated base (`applyBoundPyramid3`) and a circle through the ring
+(`noteInscribedQuad`, the stated kind being `CYCLIC_MEMBER`'s). What no seat can see (a relation that forces the
+special case: «מלבן ABCD» · «AC ⟂ BD») is caught where the preference is paid: at the first valid seed a preference
+vetoes, `firstSatisfyingSeed3` asks `possibleShapePreferences3` once, which drops a preference whose ring is drawn
+degenerate to solver precision (1e-6, never the drawing's 0.06) at EVERY claim sample (`claimSeeds` × every parameter branch, the `verifyClaim` bar), and judges that seed
+again. A forced special case costs four samples instead of the 200-seed budget, and the seed drawn is the one the
+full sweep fell back to. A right trapezoid in a circle (`cyclic.forced = rectangle`) is refused by `parse3` as
 `inscribed-contradicts-noun` (#1554); a quadrilateral's incircle refuses `incircle-needs-triangle` (#1838).
 
 **One noun list, and an incircle the engine does not draw (#1891, [ADR-3D-311](06b-decisions-3d.md#adr-3d-311)).**

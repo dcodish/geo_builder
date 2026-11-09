@@ -564,6 +564,10 @@ const SEEDED: SeededCorpus = {
   // #2714 (ADR-3D-447): the issue's SSA lines — two triangles meet them, and «הציגו תצורה אחרת» reaches the second
   // (before: AC 6.21 at 48/48 seeds). Both roots, the alternation and the one-root controls are asserted in pivot3.test.ts.
   'ssa-two-triangles-2714.geo3.json': ['משולש ABC', 'AB = 5', 'BC = 4', '∠BAC = 40°'],
+  // #2749 (ADR-3D-451/452): the issue's 179 s sequence — a rectangle narrowed to a square by a later noun (before: every
+  // later line paid the 200-seed sweep; «|SA| = 5» measured 244 s at f6c14ca2). The seed, the resolve counts and the
+  // relation rows are asserted in engine3.test.ts; this is the build + drift net.
+  'rectangle-then-square-2749.geo3.json': ['מלבן ABCD', 'ריבוע ABCD', 'קטע AS', '|SA| = 5'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
