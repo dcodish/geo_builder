@@ -761,8 +761,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
     never rewritten as a fraction («AC = 4.1» reads «4.1», not «41/10»), as in 2-D. A fraction or a root reads as typed
     («9/2», «2√3», «√20», «√8», #1497, [ADR-3D-426](06b-decisions-3d.md#adr-3d-426)), and so does a stated coordinate
     («B(0.5,0,0)», «B(2/3,0,0)») and a vector coefficient («SD = (2/3)u» reads «2/3u»). The same holds for a free
-    vector's stated «|u| = 2.5».
-  - Sources: ADR-3D-235, #918; ADR-3D-416, #2361.
+    vector's stated «|u| = 2.5», a stated dot product («u·v = 2.5») and a letter's stated value («k = 0.4», «α = 62.5»,
+    whatever the letter names), which also never reads «k = ?» once its value was typed (#2703,
+    [ADR-3D-443](06b-decisions-3d.md#adr-3d-443)). A value the tool computes («|AD| = 5/2» beside «AB = 2.5») stays
+    computed.
+  - Sources: ADR-3D-235, #918; ADR-3D-416, #2361; ADR-3D-426, #1497; ADR-3D-443, #2703.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
   on the canvas (a coordinate, an equation, a typed line; a plane declared by name only is not one) are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated

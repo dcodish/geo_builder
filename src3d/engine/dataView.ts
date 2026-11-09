@@ -1276,7 +1276,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     if ((degs as number[]).some((g) => Math.abs(g0 - g) > 0.05)) continue; // seed-varying → not knowledge, no value
     // #986: the row names the statement the student made — «2α = 60°», never «α = 60°» beside an
     // «α = 30°» from a mark wearing the same letter with a different coefficient.
-    relations.push(`${angleMarkText(mk) || `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
+    // #2703: a measure that IS the letter's given value prints as the student gave it (givenText falls back to the tiers
+    // when it is not, as on a «2α» mark)
+    relations.push(`${angleMarkText(mk) || `∠${mk.p}${mk.vertex}${mk.q}`} = ${givenText(g0, mk.label ? c.symbolGivens.get(mk.label)?.src : undefined, cleanNum)}°`);
   }
 
   // #297 — forced/stated ANGLE EQUALITIES (∠SAD = ∠SAB): when two+ markers are equal in EVERY sampled
@@ -1466,6 +1468,17 @@ export function dataView(c: Construction3, seed: number): DataPanel {
      */
     if (letterIsGaugeLength3(c, sym)) {
       params.push(paramRow(sym, null));
+      continue;
+    }
+    /**
+     * #2703 ([ADR-3D-443](docs/06b-decisions-3d.md#adr-3d-443)) — a letter the student GAVE a value prints that value, as
+     * typed (#1497's ruling: a given is printed as the student typed it), before any lane prices it: «k = 2.5», never
+     * the tiers' «5/2», and never «k = ?» beside a number the student typed (a `vec-defined` point runs no pivot, so
+     * the pin lane had no reading to price). After the gauge gate, which is about a letter naming a length.
+     */
+    const givenVal = c.symbolGivens.get(sym);
+    if (givenVal) {
+      params.push(paramRow(sym, givenText(givenVal.value, givenVal.src, (v) => cleanNum(v, 1e-4)), givenVal.value));
       continue;
     }
     // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
@@ -1742,7 +1755,7 @@ function freeMetricRow(m: FreeVecMetric3): string {
     case 'mag-rel':
       return `${mag(m.e1)} = ${m.c === 1 ? '' : givenText(m.c, m.src, cleanNum)}${mag(m.e2)}`;
     case 'dot':
-      return `${side(m.e1)} · ${side(m.e2)} = ${cleanNum(m.value)}`;
+      return `${side(m.e1)} · ${side(m.e2)} = ${givenText(m.value, m.src, cleanNum)}`; // #2703: a stated dot product, as typed
     case 'par':
       return `${side(m.e1)} ∥ ${side(m.e2)}`;
     case 'cos':

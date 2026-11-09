@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T06:49:52.875Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "הווקטורים u ו-v",
+      "cmds": [
+        {
+          "type": "declare-vector",
+          "names": [
+            "u",
+            "v"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "u·v = 2.5",
+      "cmds": [
+        {
+          "type": "dot-given",
+          "v1": "u",
+          "v2": "v",
+          "value": 2.5,
+          "src": "2.5"
+        }
+      ]
+    }
+  ]
+}

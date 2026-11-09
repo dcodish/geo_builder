@@ -180,6 +180,7 @@ function clone(c: Construction3): Construction3 {
     circleMembers3: [...c.circleMembers3],
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
+    symbolGivens: new Map(c.symbolGivens),
     claims: [...c.claims],
     scaleGivens: [...c.scaleGivens],
     scalarPins: [...c.scalarPins],
@@ -1042,7 +1043,7 @@ function freeVecMetricOf3(c: Construction3, cmd: Command3): FreeVecMetric3 | nul
       m = { kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c, ...(cmd.src ? { src: cmd.src } : {}) };
       break;
     case 'dot-given':
-      m = { kind: 'dot', e1: one(cmd.v1), e2: one(cmd.v2), value: cmd.value };
+      m = { kind: 'dot', e1: one(cmd.v1), e2: one(cmd.v2), value: cmd.value, ...spellingOf(cmd) }; // #2703: as typed
       break;
     case 'cos-angle':
       m = { kind: 'cos', e1: atomExpr(cmd.u), e2: atomExpr(cmd.v), cos: cmd.cos };
@@ -1094,7 +1095,8 @@ function anchoredMetricTwin3(c: Construction3, m: FreeVecMetric3): Command3 | nu
     case 'dot': {
       const [a, b] = [single(sides[0]), single(sides[1])];
       if (!a || !b || a.atom.kind !== 'named' || b.atom.kind !== 'named') return null;
-      return { type: 'dot-given', v1: a.atom.name, v2: b.atom.name, value: m.value / (a.coeff * b.coeff) };
+      // #2703: the spelling rides only on an undivided value, as `mag-val`'s does
+      return { type: 'dot-given', v1: a.atom.name, v2: b.atom.name, value: m.value / (a.coeff * b.coeff), ...(a.coeff * b.coeff === 1 ? spellingOf(m) : {}) };
     }
   }
 }
@@ -4292,7 +4294,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           r = { ok: true, next };
         }
       }
-      return r;
+      if (!r.ok) return r;
+      // #2703 (ADR-3D-443): the letter's value as the student gave it, for the panel — every owner kind alike
+      const given = clone(r.next);
+      given.symbolGivens.set(cmd.symbol, { value: cmd.value, ...(cmd.src !== undefined ? { src: cmd.src } : {}) });
+      return { ok: true, next: given };
     }
 
     // #587 (ADR-3D-152): `ABEC מלבן` is the RECTANGLE instance of the general stated-quad-shape

@@ -206,3 +206,62 @@ describe('#517 — the operator’s exact literal points print as facts', () => 
     expect(p.pointCoords.B).toEqual({ text: '(1/2, 1, 0)', kind: 'fact' });
   });
 });
+
+/**
+ * #2703 ([ADR-3D-443](../../docs/06b-decisions-3d.md#adr-3d-443)) — a dot product or a letter's value typed as a decimal
+ * prints as typed (#1497's ruling, 2026-09-28: a given is printed as the student typed it; a derived value goes through
+ * the tiers). Before: «u · v = 5/2», «k = 2/5», and «k = ?» on a vec-defined point that runs no pivot.
+ */
+describe('#2703 — a typed decimal prints as typed in the dot and letter rows', () => {
+  beforeEach(reset);
+  const build = (us: string[]) => {
+    us.forEach(submit);
+    expect(useGeo3.getState().lastError, us.join(' · ')).toBeNull();
+    return panel();
+  };
+  const param = (p: DataPanel, sym: string) => p.params?.find((r) => r.sym === sym)?.text;
+  const CUBE = "קובייה ABCDA'B'C'D'";
+
+  it('the dot product: «u·v = 2.5», «0.75», «-2.5»; an integer unchanged', () => {
+    expect(build(['הווקטורים u ו-v', 'u·v = 2.5']).stated).toContain('u · v = 2.5');
+    reset();
+    expect(build(['וקטור u', 'וקטור v', 'u·v = 0.75']).stated).toContain('u · v = 0.75');
+    reset();
+    expect(build(['הווקטורים u ו-v', 'u·v = -2.5']).stated).toContain('u · v = -2.5');
+    reset();
+    expect(build(['הווקטורים u ו-v', 'u·v = 3']).stated).toContain('u · v = 3');
+  });
+
+  it('the letter value, on every owner: vec-def, vec-defined (was «?»), length, angle, component, rider', () => {
+    expect(param(build([CUBE, 'E על AC כך ש-AE = k·AC', 'k = 0.4']), 'k')).toBe('k = 0.4');
+    reset();
+    expect(param(build([CUBE, 'AE = k·AC', 'k = 2.5']), 'k')).toBe('k = 2.5');
+    reset();
+    expect(param(build(["תיבה ABCDA'B'C'D'", '|AB| = k', 'k = 2.5']), 'k')).toBe('k = 2.5');
+    reset();
+    const ang = build(['פירמידה ABCDS שבסיסה ריבוע', '∠SAB = α', 'α = 62.5']);
+    expect(param(ang, 'α')).toBe('α = 62.5');
+    expect(ang.relations).toContain('α = 62.5°'); // found in round: the mark's measure is the letter's given
+    reset();
+    expect(param(build(['C(p,1,0)', 'p = 2.5']), 'p')).toBe('p = 2.5');
+    reset();
+    expect(param(build(['A(0,0,0)', 'B(4,0,0)', 'E על AB', 'AE = t·AB', 't = 0.25']), 't')).toBe('t = 0.25');
+    reset();
+    expect(param(build(['B(2t,t,1)', 't = 1.5']), 't')).toBe('t = 1.5');
+  });
+
+  it('controls: a fraction and an integer keep their form; a long decimal reads the house two decimals (sr-22)', () => {
+    expect(param(build([CUBE, 'E על AC כך ש-AE = k·AC', 'k = 1/2']), 'k')).toBe('k = 1/2');
+    reset();
+    expect(param(build([CUBE, 'AE = k·AC', 'k = 2']), 'k')).toBe('k = 2');
+    reset();
+    expect(param(build([CUBE, 'AE = k·AC', 'k = 2.125']), 'k')).toBe('k = 2.13');
+  });
+
+  it('a DERIVED row beside a typed decimal stays computed: |AD| = 5/2 (#1497 ruling, 2026-09-28)', () => {
+    const p = build([CUBE, 'AB = 2.5', 'קטע AD']);
+    const row = (l: string) => p.vectors.find((v) => v.label === l)?.mag;
+    expect(row('AB')).toBe('|AB| = 2.5');
+    expect(row('AD')).toBe('|AD| = 5/2');
+  });
+});

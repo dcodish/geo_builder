@@ -131,3 +131,21 @@ describe('#2490 — does a pyramid sentence name its base shape?', () => {
     expect(parse3('פירמידה ABCDS')).toEqual(parse3('פירמידה ABCDS שבסיסה מלבן'));
   });
 });
+
+// #2703 (ADR-3D-443): a dot product and a letter's value carry the student's spelling, as a length does (#1497)
+describe('#2703 — a stated dot product and a letter value carry their spelling', () => {
+  const cmd = (s: string) => {
+    const r = parse3(s);
+    expect(r.ok, s).toBe(true);
+    return r.ok ? r.commands[0] : null;
+  };
+  it('a decimal or a fraction carries `src`; an integer carries nothing', () => {
+    expect(cmd('u·v = 2.5')).toEqual({ type: 'dot-given', v1: 'u', v2: 'v', value: 2.5, src: '2.5' });
+    expect(cmd('u·v = -2.5')).toEqual({ type: 'dot-given', v1: 'u', v2: 'v', value: -2.5, src: '-2.5' });
+    expect(cmd('u·v = 24')).toEqual({ type: 'dot-given', v1: 'u', v2: 'v', value: 24 });
+    expect(cmd('k = 2.5')).toEqual({ type: 'symbol-value', symbol: 'k', value: 2.5, src: '2.5' });
+    expect(cmd('k = 0.4')).toEqual({ type: 'symbol-value', symbol: 'k', value: 0.4, src: '0.4' });
+    expect(cmd('k = 1/2')).toEqual({ type: 'symbol-value', symbol: 'k', value: 0.5, src: '1/2' });
+    expect(cmd('k = 2')).toEqual({ type: 'symbol-value', symbol: 'k', value: 2 });
+  });
+});
