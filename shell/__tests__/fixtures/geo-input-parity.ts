@@ -1978,6 +1978,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2733 (ADR-AG-428; ADR-W-177, operator 2026-11-02 "accept with message"): a line through a point already on the circle names
   // its two crossings; one of them is forced onto that point and recorded there with «… נפלו על אותה נקודה.».
   { id: 'crossing-pair-on-named-point-2733', family: 'circles', steps: ['מעגל O', 'A על מעגל O', 'הישר AO חותך את מעגל O בנקודות C ו-D'], expect: 'builds', exception: 'X8', note: 'one of C and D lands on A with the notice; 2-D puts C on A at every configuration, analytic leaves which letter to the configuration (its existing rule for an unlabelled curve). Analytic refused it unsatisfiable before ADR-AG-428' },
+  // ── #2713 (ADR-800 / ADR-AG-442): a circle's own noun phrase names the circle; its letters are no subject of the statement beside it ──
+  { id: 'circle-noun-not-subject-2713-01', family: 'circles', steps: ['מעגל O, נקודה A על המעגל'], expect: 'builds', exception: 'X8', note: '2-D also put O on its own circle (a false red row) before ADR-800; analytic read it clean' },
+  { id: 'circle-noun-not-subject-2713-02', family: 'circles', steps: ['מעגל O ברדיוס R, נקודה A על המעגל'], expect: 'builds', exception: 'X8', note: '2-D minted a point R on the circle before ADR-800' },
+  { id: 'circle-noun-not-subject-2713-03', family: 'circles', steps: ['מעגל שמרכזו O, נקודה A על המעגל'], expect: 'builds', exception: 'X8' },
+  { id: 'circle-noun-not-subject-2713-04', family: 'circles', steps: ['מעגל O, נקודה A על המעגל ונקודה B על המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: '2-D refused it «|OO| = |OB|» before ADR-800; analytic reads no «נקודה A על המעגל ונקודה B על המעגל», even after «מעגל O» (measured 4a06aae9)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

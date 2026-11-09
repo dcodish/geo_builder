@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, COPULA_HE, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, foldIndexedName, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_REF_HE, CIRCLE_ROLE_REF_EN, LINE_NOUN, LINE_OPERAND_NOUN, POINT_OPERAND_NOUN, EXTENSION_REF, CIRCLE_NOUN_PHRASE_HE, CIRCLE_NOUN_PHRASE_EN } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -8526,6 +8526,11 @@ const pairOnCircle: Rule = (s, ctx) => {
   ];
 };
 
+/** #2713 ([ADR-800](../../docs/06-decisions.md#adr-800)) — a subject run with every circle noun phrase blanked
+ *  (lexicon `CIRCLE_NOUN_PHRASE_*`): what is left is what the statement is ABOUT. */
+const CIRCLE_NP = new RegExp(`${CIRCLE_NOUN_PHRASE_HE}|${CIRCLE_NOUN_PHRASE_EN}`, 'g');
+const subjectRun = (run: string): string => run.replace(CIRCLE_NP, ' ');
+
 /** "A is on circle O" / "A על מעגל O" — inscribed point(s). The subject may be a LIST — "A ו C נמצאות
  *  על המעגל" / "points A, C are on the circle" — and EVERY listed label gets the membership (the
  *  ADR-076 uppercase-label-list convention, so "points"/"נמצאות" are never read as labels). The old
@@ -8558,11 +8563,17 @@ const pointOnCircle: Rule = (s, ctx) => {
     if (intro) ({ center, prepend } = intro);
   }
   if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
-  const ids = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  // #2713 (ADR-800): a circle's own noun phrase in the run («מעגל O, נקודה A על המעגל», "circle O with radius R, point
+  // A on the circle") NAMES that circle; its letters are not subjects. Blanked before the labels are read, so the
+  // centre is no member of its own circle. A point the student DID put on its centre («O על מעגל O», «מעגל O, נקודה O
+  // על המעגל») keeps its subject: the letter there stands outside any noun phrase.
+  const run = subjectRun(m[1]);
+  const ids = (run.match(/[A-Z]\d*/g) ?? []).map(up);
   // A distinct uppercase run is the subject list; anything else falls back to the legacy
   // first-single-label read (e.g. a lowercase label) so looser phrasings keep parsing as before.
-  const subjects =
-    ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(m[1].match(/\b([A-Za-z]\d*)\b/)![1])];
+  const first = run.match(/\b([A-Za-z]\d*)\b/);
+  if (!ids.length && !first) return null; // the run held only the circle's own name: no subject was stated
+  const subjects = ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(first![1])];
   return [...prepend, ...subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }))];
 };
 

@@ -1,0 +1,47 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-09T12:00:00.000Z",
+  "name": "issue-2713-circle-radius-symbol-then-point",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O ברדיוס R, נקודה A על המעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "implied": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "מעגל O ברדיוס R, נקודה A על המעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "מעגל O ברדיוס R, נקודה A על המעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "radius-symbol",
+        "circle": "circle-O",
+        "name": "R"
+      },
+      "enabled": true
+    }
+  ]
+}

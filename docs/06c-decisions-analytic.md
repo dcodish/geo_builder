@@ -16079,3 +16079,14 @@ Each of those points moves along a curve.
 
 **Behaviour change for a student:** «AE גובה» keeps the student's words on its row and shows «במשולש ABC» beside it. An earlier row edited or un-muted into a second shape no longer turns it into a question: it stays the triangle's height, as in 2-D.
 
+
+## ADR-AG-442 — A circle's own noun phrase is no subject: analytic already reads it so, and the parity rows hold it (#2713)
+
+**Date:** 2026-11-09 · **Status:** accepted · bug port (analytic) · round #2783, stream D · branch `fix/2713-circle-noun-subject` · **sibling:** [ADR-800](06-decisions.md#adr-800) (2-D) · LADDER stage: **none**
+**Requirements:** none (internal) · **Design:** none (internal)
+
+**Measured** (`main` @ `4a06aae9`, `decideSubmit` → `derive`). «מעגל O, נקודה A על המעגל», «מעגל O ברדיוס R, נקודה A על המעגל», «מעגל O, A על המעגל», «מעגל O, נקודות A ו-B על המעגל» and "circle O, point A on the circle" record `circle-at O` with A alone on it: no membership of O, no point R. The 2-D fix (ADR-800) brings 2-D to analytic's reading, so the port is the parity rows and no code.
+
+**Decision.** Parity rows `circle-noun-not-subject-2713-01…04` in `shell/__tests__/fixtures/geo-input-parity.ts`, exception X8 for 3-D. Row 04 («מעגל O, נקודה A על המעגל ונקודה B על המעגל») is an unscheduled `knownGap` cell for analytic: analytic reads no «נקודה A על המעגל ונקודה B על המעגל» joined by «ו», even after «מעגל O», a reading it lacks independently of this class.
+
+**Behaviour change for a student:** none in analytic.

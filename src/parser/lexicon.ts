@@ -148,6 +148,19 @@ export const CIRCLE_ROLE_REF_EN = String.raw`(?:\bthe\s+)?(?!\S+\s+circles\b)${C
 export const circleRole = (adj: string): 'outer' | 'inner' =>
   /^(?:פנימי|קטן|inner|internal|small)/i.test(adj) ? 'inner' : 'outer';
 
+// ── A circle's own noun phrase (#2713, ADR-800) ───────────────────────────────────────────────────
+/**
+ * A circle named by its noun phrase — «מעגל O», «במעגל O», «המעגל שמרכזו (בנקודה) O», «מעגל O ברדיוס R» / "circle O",
+ * "circle centred at O", "circle O with radius R". The letters in it NAME the circle (its centre, its radius symbol);
+ * they are never the subject of a statement beside it, so a subject-run reader blanks this phrase before it reads
+ * its labels («מעגל O, נקודה A על המעגל» states A on the circle, not O). Singular only; capture-free. Case-SENSITIVE
+ * on purpose (the HE twin's name is uppercase, as a subject run reads it); the EN twin spells its own capital.
+ */
+const CIRCLE_RADIUS_TAIL_HE = String.raw`(?:\s+(?:ב|ש|עם\s+)?רדיוסו?\s+(?:(?:הוא|=)\s*)?${LABEL}(?![A-Za-z\d]))?`;
+const CIRCLE_RADIUS_TAIL_EN = String.raw`(?:\s+(?:(?:with|of)\s+)?radius\s+(?:(?:is|=)\s*)?${LABEL}(?![A-Za-z\d]))?`;
+export const CIRCLE_NOUN_PHRASE_HE = String.raw`(?<![א-ת])[ובלמש]{0,2}ה?מעגל\s+(?:(?:ש|אשר\s+)?מרכזו\s+(?:ב-?\s*)?(?:ה?נקודה\s+)?)?${ULABEL}(?![A-Za-z\d])${CIRCLE_RADIUS_TAIL_HE}`;
+export const CIRCLE_NOUN_PHRASE_EN = String.raw`(?<![A-Za-z])(?:[Tt]he\s+)?[Cc]ircle\s+(?:(?:with\s+(?:the\s+)?)?cent(?:er|re)(?:e?d)?\s+(?:at\s+)?(?:point\s+)?)?${ULABEL}(?![A-Za-z\d])${CIRCLE_RADIUS_TAIL_EN}`;
+
 // ── A circle by its relation to a polygon (#2545, ADR-768) ─────────────────────────────────────────
 /**
  * The two RING relations of a circle, as the adjective after the circle noun. ADR-650's voice trap, side by side:

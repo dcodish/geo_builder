@@ -95,3 +95,32 @@ describe('multi-point on-circle (ADR-240)', () => {
     expect(r.commands).toContainEqual({ type: 'segment', a: 'A', b: 'B' });
   });
 });
+
+/** #2713 (ADR-800) — a circle's own noun phrase in the subject run names the circle; its letters are not subjects. */
+describe('#2713 — the circle noun phrase is not a subject', () => {
+  const membersOf = (s: string, ctx = {}): string[] | null => {
+    const r = parse(s, ctx);
+    return r.ok ? r.commands.flatMap((c) => (c.type === 'point-on-circle' ? [c.id] : [])).sort() : null;
+  };
+  it.each<[string, string[]]>([
+    ['מעגל O, נקודה A על המעגל', ['A']],
+    ['מעגל O ונקודה A על המעגל', ['A']],
+    ['במעגל O נקודה A על המעגל', ['A']],
+    ['מעגל שמרכזו O, נקודה A על המעגל', ['A']],
+    ['מעגל O ברדיוס R, נקודה A על המעגל', ['A']], // found in round: the radius symbol is the circle's too
+    ['מעגל O, נקודות A ו-B על המעגל', ['A', 'B']],
+    ['circle O, point A on the circle', ['A']],
+    ['circle O with radius R, point A on the circle', ['A']],
+  ])('%s', (s, members) => {
+    expect(membersOf(s)).toEqual(members);
+    expect(membersOf(s, circleCtx().ctx)).toEqual(members); // the circle already drawn
+  });
+  it.each<[string, string[]]>([
+    ['O על מעגל O', ['O']],
+    ['O ו-A על מעגל O', ['A', 'O']],
+    ['מעגל O, נקודה O על המעגל', ['O']],
+    ['מעגל O ו-O על המעגל', ['O']],
+  ])('a point the student DID put on the centre keeps its subject: %s', (s, members) => {
+    expect(membersOf(s)).toEqual(members);
+  });
+});
