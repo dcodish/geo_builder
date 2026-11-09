@@ -91,3 +91,20 @@ describe('#432 — a vacuous collinear removes no DOF', () => {
     expect(freeDofCount(replay(restated, 0).construction)).toBe(freeDofCount(replay(base, 0).construction));
   });
 });
+
+/**
+ * #2758 ([ADR-799](docs/06-decisions.md#adr-799)): a solved point at a DOUBLE root keeps pinning its column. «מלבן ABCD ·
+ * AB = 4 · BC = 2 · E על CD · ∠AEB = 90°»: the circle on AB just touches CD, so E is CD's midpoint and its embedded
+ * row is flat in E's own parameter there, and a combination of «AB = 4» and «BC = 2». The first-order rank dropped it
+ * and counted E free (1 DOF); the root is isolated at second order, so the figure is rigid.
+ */
+describe('#2758 — a tangent solved point is not a free degree of freedom', () => {
+  const dof = (steps: string[]) => freeDofCount(replay(factsFrom(steps), 0).construction);
+  it('the tangent rider (both spellings of the right angle) leaves 0 DOF', () => {
+    expect(dof(['מלבן ABCD', 'AB = 4', 'BC = 2', 'E על CD', '∠AEB = 90°'])).toBe(0);
+    expect(dof(['מלבן ABCD', 'AB = 4', 'BC = 2', 'E על CD', 'AE ⟂ BE'])).toBe(0);
+  });
+  it('the secant neighbour (two simple roots) is 0 DOF, as before', () => {
+    expect(dof(['מלבן ABCD', 'AB = 4', 'BC = 1.9', 'E על CD', '∠AEB = 90°'])).toBe(0);
+  });
+});

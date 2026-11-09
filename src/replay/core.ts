@@ -33,6 +33,7 @@ import { crossingPastSecond } from '@/engine/extensionSide';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
+import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
 import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
@@ -4780,7 +4781,13 @@ export interface Determinacy {
    *  (a hand-built verdict); `figureDeterminacy` always sets it. */
   complete?: boolean;
 }
-const CONFIG_REL_TOL = 1e-4;
+/**
+ * #2758 ([ADR-798](docs/06-decisions.md#adr-798)): two samples are the same configuration when they differ by less
+ * than a TANGENCY can be split by the precision the figure is solved to — `DOUBLE_ROOT_SPLIT` (√SOLVE_PRECISION,
+ * the engine's tolerance table), never a separate literal. The old 1e-4 sat BELOW that split: «מלבן ABCD · AB = 4 ·
+ * BC = 2 · E על CD · ∠AEB = 90°» (E forced to CD's midpoint) counted its √tol-split pair as two configurations.
+ */
+const CONFIG_REL_TOL = DOUBLE_ROOT_SPLIT;
 export function figureDeterminacy(shared: Pick<SharedSamples, 'samples' | 'determined'> & { complete?: boolean }): Determinacy {
   const pool = shared.samples;
   const complete = shared.complete ?? true; // a hand-built pool is taken as given
@@ -4841,8 +4848,8 @@ export const POOL_WORK_CAP = 4_000_000;
  */
 /**
  * #1599 (ADR-558): a sample is EVIDENCE only if it satisfies the figure's givens more tightly than the
- * knowledge tests compare samples (1e-4 relative — the values panel's `REL_TOL`, the configuration count's
- * `CONFIG_REL_TOL`). The solver ACCEPTS a solution inside its own tolerance (0.5° for an angle), so one
+ * knowledge tests compare samples (1e-4 relative — the values panel's `REL_TOL`; the configuration count's
+ * `CONFIG_REL_TOL` is the coarser `DOUBLE_ROOT_SPLIT`, #2758). The solver ACCEPTS a solution inside its own tolerance (0.5° for an angle), so one
  * sample in a pool can sit at the edge of it: measured on the q4 chord figure, 23 of 24 samples held «זווית
  * EKO = זווית ABK» to ~1e-7° and one to 4e-4°, which moved BC by 2e-4 — enough to withhold a value that is
  * 5.31 in every drawing the button shows, and to count a phantom second configuration. So a sample whose

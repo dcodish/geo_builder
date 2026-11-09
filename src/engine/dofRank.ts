@@ -44,6 +44,9 @@ export const RANK_TOL = 1e-4;
 export const ZERO_ROW_TOL = 1e-7;
 /** Central-difference step in u-space (the carrier's value divided by max(1, |value|)) — the solveLM step. */
 const H = 1e-6;
+/** #2758 (ADR-799): the step of the second difference that reads a double root's curvature — a step that keeps
+ *  roundoff (eps/H2²) and truncation (H2²) both near 1e-8. */
+const H2 = 1e-4;
 
 export interface RankResult {
   /** What the stated constraints consume: rank(J) minus the solved-point columns — see `constraintRank`; may be negative. */
@@ -52,11 +55,21 @@ export interface RankResult {
   unranked: Constraint[];
 }
 
+export interface JacobianRow {
+  con: Constraint;
+  grad: number[];
+  /** #2758 (ADR-799): a solved point's embedded row at a DOUBLE root — flat in its own column, curved in it —
+   *  which pins that column at second order even where the first-order rank finds it dependent. */
+  secondOrderPin?: boolean;
+}
+
 /** One parameter of the Jacobian's column space: which carrier, which component, its current values. */
 interface Column {
   id: Id;
   idx: number;
   vals: number[];
+  /** an unbaked solved point's column (written directly, never clamped) */
+  solved?: boolean;
 }
 
 /**
@@ -70,7 +83,7 @@ export function constraintJacobian(
   c: Construction,
   movable: Id[],
   cons: Constraint[],
-): { rows: { con: Constraint; grad: number[] }[]; /** embedded rows of unbaked solved points, appended last */ embedded: number } | null {
+): { rows: JacobianRow[]; /** embedded rows of unbaked solved points, appended last */ embedded: number } | null {
   const solvedBaked = resolveDrivenMemo(c);
   const base0 = evaluateCore(solvedBaked, { skipConstraints: true });
   if (!base0.ok) return null;
@@ -87,6 +100,7 @@ export function constraintJacobian(
    */
   const solvedIds = new Set<Id>();
   const embeddedRows: Constraint[] = [];
+  const embeddedIds: Id[] = []; // parallel to embeddedRows: the solved point whose column each row belongs to
   // The solved points are read off the ORIGINAL construction: `resolveDriven` promotes a COUPLED pair of
   // them («BC=BE» solving E while «∠ACB=∠BED» solves B, each referencing the other) to numeric
   // on-segment carriers and bakes their solved `t` with the directive cleared — so in the baked
@@ -101,6 +115,7 @@ export function constraintJacobian(
       if (o.kind === 'on-segment') {
         solvedIds.add(o.id);
         embeddedRows.push(orig.constraint);
+        embeddedIds.push(o.id);
         return o;
       }
       if (o.kind !== 'on-segment-solved') return o;
@@ -114,17 +129,20 @@ export function constraintJacobian(
       if (den < 1e-18) return o;
       solvedIds.add(o.id);
       embeddedRows.push(o.constraint);
+      embeddedIds.push(o.id);
       return { kind: 'on-segment' as const, id: o.id, a: o.a, b: o.b, t: ((p.x - a.x) * dx + (p.y - a.y) * dy) / den };
     }),
   };
-  const eqs = [...cons, ...embeddedRows].filter((k) => !isOrderConstraint(k));
+  const statedEqs = cons.filter((k) => !isOrderConstraint(k));
+  const embeddedEqs = embeddedRows.map((k, e) => ({ k, id: embeddedIds[e] })).filter(({ k }) => !isOrderConstraint(k));
+  const eqs = [...statedEqs, ...embeddedEqs.map(({ k }) => k)];
   const byId = new Map(baked.objects.map((o) => [o.id, o] as const));
   const cols: Column[] = [];
   for (const id of [...movable, ...solvedIds]) {
     const o = byId.get(id);
     const vals = o ? carrierParams(o) : null;
     if (!vals) continue;
-    for (let i = 0; i < vals.length; i++) cols.push({ id, idx: i, vals });
+    for (let i = 0; i < vals.length; i++) cols.push({ id, idx: i, vals, solved: solvedIds.has(id) });
   }
   const rowsAt = (pos: Map<Id, Vec>): number[][] =>
     eqs.map((k) => (constraintRefs(k).every((id) => pos.has(id)) ? residualRows(k, (id) => pos.get(id)!) : [NaN]));
@@ -134,21 +152,10 @@ export function constraintJacobian(
   // grads[k][i] = the gradient (over every column) of constraint k's i-th residual row
   const grads = r0.map((rs) => rs.map(() => new Array<number>(cols.length).fill(NaN)));
   for (let j = 0; j < cols.length; j++) {
-    const { id, idx, vals } = cols[j];
-    const s = Math.max(1, Math.abs(vals[idx]));
-    const h = H * s;
-    const shifted = (d: number) => {
-      const v = vals.slice();
-      v[idx] += d;
-      // An unbaked solved point is written directly: `setCarrierVals` clamps an on-segment `t` to its
-      // segment, and a solved foot may legitimately sit beyond it.
-      const next = solvedIds.has(id)
-        ? { ...baked, objects: baked.objects.map((o) => (o.id === id && o.kind === 'on-segment' ? { ...o, t: v[0] } : o)) }
-        : setCarrierVals(baked, new Map([[id, v]]));
-      return evaluateCore(next, { skipConstraints: true });
-    };
-    const plus = shifted(h);
-    const minus = shifted(-h);
+    // the step is H in u-space (·max(1, |value|) — `shiftedCfg`)
+    const shifted = (d: number) => evaluateCore(shiftedCfg(baked, cols[j], d), { skipConstraints: true });
+    const plus = shifted(H);
+    const minus = shifted(-H);
     // A step that leaves the figure's feasible set — a secant whose sampled seat is so near tangency
     // that 1e-6 past it has no second crossing (measured on the #432 figure at seeds 1 and 2) — is
     // differenced ONE-SIDED from the other step rather than voiding the whole Jacobian: a void falls
@@ -165,7 +172,51 @@ export function constraintJacobian(
       }
     }
   }
-  return { rows: eqs.flatMap((con, k) => grads[k].map((grad) => ({ con, grad }))), embedded: embeddedRows.length };
+  const rows: JacobianRow[] = eqs.flatMap((con, k) => grads[k].map((grad) => ({ con, grad })));
+  // #2758 ([ADR-799](../../docs/06-decisions.md#adr-799)) — a solved point at a DOUBLE root. Its embedded row is
+  // stationary in its own parameter there (∂g/∂t = 0: the circle on AB just touching CD), so the row has no
+  // component on its column. Where the row is independent of the others that is the ordinary case — the
+  // tangency is a fold of a smooth solution set, and the row consumes its column as always. Where the givens
+  // already force the row (BC = AB/2 above makes it a combination of «AB = 4» and «BC = 2»), the first-order
+  // rank drops it, and the column reads FREE: a tangent E, pinned at CD's midpoint, counted one degree of
+  // freedom. It is not free: g is CURVED in t (∂²g/∂t² ≠ 0), so the root is isolated at second order and moving
+  // t breaks it with nothing left to compensate. Such a row is flagged, and `constraintRank` counts a
+  // dependent flagged row as still consuming its column.
+  embeddedEqs.forEach(({ k: con, id }, e) => {
+    const k = statedEqs.length + e;
+    const tj = cols.findIndex((col) => col.id === id);
+    if (tj < 0) return;
+    grads[k].forEach((grad, i) => {
+      const n = norm(grad);
+      if (!(n >= ZERO_ROW_TOL) || grad.some((x) => !Number.isFinite(x)) || Math.abs(grad[tj]) >= RANK_TOL * n) return;
+      const gAt = (d: number): number => {
+        const r = evaluateCore(shiftedCfg(baked, cols[tj], d), { skipConstraints: true });
+        if (!r.ok || !constraintRefs(con).every((q) => r.positions.has(q))) return NaN;
+        return residualRows(con, (q) => r.positions.get(q)!)[i] ?? NaN;
+      };
+      const curvature = (gAt(H2) - 2 * r0[k][i] + gAt(-H2)) / (H2 * H2);
+      if (Number.isFinite(curvature) && Math.abs(curvature) > RANK_TOL * n) {
+        const row = rows.find((r) => r.con === con && r.grad === grad);
+        if (row) row.secondOrderPin = true;
+      }
+    });
+  });
+  return { rows, embedded: embeddedRows.length };
+}
+
+/**
+ * The construction with one column moved by `d` in u-space (·max(1, |value|)). An unbaked solved point is written
+ * directly: `setCarrierVals` clamps an on-segment `t` to its segment, and a solved foot may legitimately
+ * sit beyond it.
+ */
+function shiftedCfg(cfg: Construction, col: Column, d: number): Construction {
+  const o = cfg.objects.find((x) => x.id === col.id);
+  const cur = o ? carrierParams(o) : null;
+  if (!o || !cur) return cfg;
+  const v = cur.slice();
+  v[col.idx] += d * Math.max(1, Math.abs(col.vals[col.idx]));
+  if (o.kind === 'on-segment' && col.solved) return { ...cfg, objects: cfg.objects.map((x) => (x === o ? { ...o, t: v[0] } : x)) };
+  return setCarrierVals(cfg, new Map([[col.id, v]]));
 }
 
 const norm = (v: number[]): number => Math.sqrt(v.reduce((s, x) => s + x * x, 0));
@@ -190,14 +241,18 @@ export function constraintRank(c: Construction, movable: Id[], cons: Constraint[
   // classification), so they must never be the row judged dependent on a stated given — the stated
   // given is the one that then reads as adding nothing, which is the honest attribution.
   const basis: number[][] = [];
-  for (const { con, grad } of jac.rows) {
+  let pinnedAtSecondOrder = 0; // #2758 (ADR-799): dependent double-root rows that still pin their column
+  for (const { con, grad, secondOrderPin } of jac.rows) {
     if (unranked.has(con) || grad.some((x) => !Number.isFinite(x))) continue;
     const n0 = norm(grad);
     if (n0 < ZERO_ROW_TOL) continue;
     let v = grad.map((x) => x / n0);
     for (let pass = 0; pass < 2; pass++) for (const b of basis) { const p = dot(v, b); v = v.map((x, i) => x - p * b[i]); }
     const n = norm(v);
-    if (n < RANK_TOL) continue;
+    if (n < RANK_TOL) {
+      if (secondOrderPin) pinnedAtSecondOrder += 1;
+      continue;
+    }
     basis.push(v.map((x) => x / n));
   }
   // The UNREDUCED count is shape DOF = (raw + solved columns) − rank(J) − gauge. The caller counts raw
@@ -206,7 +261,7 @@ export function constraintRank(c: Construction, movable: Id[], cons: Constraint[
   // REDUNDANT — two solved points on one shared equation (the tangent-quad figure «מרובע GCHF חסום
   // במעגל» · «AB משיק למעגל בנקודה F», where F's |OF| = r IS G's concyclicity) — nets a genuine
   // hidden freedom the figure draws one member of, which is why this can be NEGATIVE.
-  return { consumed: basis.length - jac.embedded, unranked: [...unranked] };
+  return { consumed: basis.length + pinnedAtSecondOrder - jac.embedded, unranked: [...unranked] };
 }
 
 /**

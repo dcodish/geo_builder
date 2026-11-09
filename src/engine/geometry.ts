@@ -180,12 +180,76 @@ export function lineLineIntersect(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
 }
 
 /**
+ * #2758 ([ADR-798](../../docs/06-decisions.md#adr-798)) — THE ENGINE'S TOLERANCE TABLE: how precisely a figure is
+ * solved, and what follows from it. One literal; everything below is derived from it.
+ *
+ *  - `SOLVE_PRECISION` — the RELATIVE residual the numeric solvers leave on a figure they report solved (a
+ *    length, an angle, any residual, as a fraction of its own scale). The driven solvers' polish lands here
+ *    (measured on «מלבן ABCD · AB = 4 · BC = 2»: |BC| − |AB|/2 up to 1.3e-7 of the side over 27 samples), and
+ *    LM's acceptance `Σr² ≤ 1e-12` is the same bar squared.
+ *  - `DOUBLE_ROOT_SPLIT` — a residual of even multiplicity (a TANGENCY: the circle on AB just touching CD) moves
+ *    off its root quadratically, so a figure solved to `SOLVE_PRECISION` splits that one root into two about
+ *    √SOLVE_PRECISION apart (relative). Two answers closer than this are not distinguishable from one tangency
+ *    split by the solver's own precision — the floor any "are these two different?" test must sit at or above.
+ */
+export const SOLVE_PRECISION = 1e-6;
+export const DOUBLE_ROOT_SPLIT = Math.sqrt(SOLVE_PRECISION);
+
+/**
+ * #2758 (ADR-798): the DOUBLE ROOTS of a sampled residual. A tangency is an EXTREMUM of f that reaches zero; on a
+ * figure solved to {@link SOLVE_PRECISION} it reaches zero only to that precision, so it shows up as a sign-change
+ * pair √SOLVE_PRECISION apart (a touch that overshoots), or as no sign change at all (one that falls short). Both
+ * are ONE root: the extremum itself. Each interior local minimum of |f| whose two grid neighbours sit on the SAME
+ * side of zero is polished to the extremum of f (ternary search on s·f); when |f| there is within
+ * `SOLVE_PRECISION` of the residual's own scale along the carrier (its largest |f| on the grid), that extremum
+ * replaces every sign-change root inside its bracket. A genuine pair of roots — an extremum that crosses zero by
+ * more than the precision — is left alone. Returns the extremum parameters with the bracket each one owns.
+ */
+function doubleRoots(f: (t: number) => number, ts: readonly number[], fs: readonly number[]): { t: number; lo: number; hi: number }[] {
+  let scaleF = 0;
+  for (const v of fs) if (isFinite(v) && Math.abs(v) > scaleF) scaleF = Math.abs(v);
+  if (!(scaleF > 0)) return [];
+  const eta = SOLVE_PRECISION * scaleF;
+  const out: { t: number; lo: number; hi: number }[] = [];
+  for (let i = 1; i + 1 < fs.length; i++) {
+    const a = fs[i - 1];
+    const m = fs[i];
+    const b = fs[i + 1];
+    if (!isFinite(a) || !isFinite(m) || !isFinite(b) || a === 0 || b === 0) continue;
+    if (a < 0 !== b < 0) continue; // the neighbours straddle zero: a simple crossing, not an extremum
+    if (!(Math.abs(m) <= Math.abs(a) && Math.abs(m) <= Math.abs(b))) continue; // not a local minimum of |f|
+    // the parabola through the three samples: skip an extremum that plainly stays clear of zero (cheap — no polish)
+    const vertex = m - (b - a) * (b - a) / (8 * (a - 2 * m + b) || Infinity);
+    if (Math.abs(vertex) > 1e3 * eta && Math.abs(m) > 1e3 * eta) continue;
+    const s = a < 0 ? -1 : 1; // f lies on side s of zero around the extremum; the extremum minimises s·f
+    const val = (t: number) => {
+      const r = s * f(t);
+      return isFinite(r) ? r : Infinity;
+    };
+    let lo = ts[i - 1];
+    let hi = ts[i + 1];
+    for (let k = 0; k < 80; k++) {
+      const m1 = lo + (hi - lo) / 3;
+      const m2 = hi - (hi - lo) / 3;
+      if (val(m1) < val(m2)) hi = m2;
+      else lo = m1;
+    }
+    const t = (lo + hi) / 2;
+    const v = f(t);
+    if (isFinite(v) && Math.abs(v) <= eta) out.push({ t, lo: ts[i - 1], hi: ts[i + 1] });
+  }
+  return out;
+}
+
+/**
  * All roots of a scalar residual f over t ∈ [tMin,tMax]. Deterministic: scan a
  * fixed grid for sign changes, then bisect each bracket (ADR-012/ADR-014 —
  * constraint-driven DOF). Returns the roots ascending; each is a solution
  * *branch*. Non-finite samples (e.g. an angle measured at a coincident point)
  * are skipped. f is any constraint residual (0 ⇔ satisfied) — the solver is
- * generic over the constraint type.
+ * generic over the constraint type. A root of even multiplicity (a tangency) is
+ * ONE root, found whether solver precision made it overshoot into a sign-change
+ * pair or fall just short of zero ({@link doubleRoots}, #2758).
  */
 export function solveParam(
   f: (t: number) => number,
@@ -193,16 +257,21 @@ export function solveParam(
   tMax = 1,
   steps = 256,
 ): number[] {
-  const roots: number[] = [];
+  let roots: number[] = [];
   const addRoot = (r: number) => {
     if (!roots.some((o) => Math.abs(o - r) < 1e-7)) roots.push(r);
   };
+  const ts: number[] = [tMin];
+  const fs: number[] = [];
   let pt = tMin;
   let pf = f(tMin);
+  fs.push(pf);
   if (isFinite(pf) && pf === 0) addRoot(tMin); // an endpoint that is exactly a root
   for (let i = 1; i <= steps; i++) {
     const t = tMin + ((tMax - tMin) * i) / steps;
     const ft = f(t);
+    ts.push(t);
+    fs.push(ft);
     if (isFinite(ft) && ft === 0) {
       addRoot(t); // sample lands exactly on a root (e.g. a symmetric configuration)
     } else if (isFinite(pf) && isFinite(ft) && pf !== 0 && (pf < 0) !== (ft < 0)) {
@@ -229,7 +298,11 @@ export function solveParam(
     pt = t;
     pf = ft;
   }
-  return roots;
+  for (const d of doubleRoots(f, ts, fs)) {
+    roots = roots.filter((r) => r < d.lo || r > d.hi);
+    addRoot(d.t);
+  }
+  return roots.sort((x, y) => x - y);
 }
 
 /**

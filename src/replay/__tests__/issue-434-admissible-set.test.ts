@@ -157,3 +157,21 @@ describe('#434 — failing CLOSED, and the paths that must not change', () => {
     expect(sharedSamples(facts)).toBe(sharedSamples(facts));
   });
 });
+
+/**
+ * #2758 ([ADR-798](../../../docs/06-decisions.md#adr-798)): configuration distinctness is the engine's DOUBLE_ROOT_SPLIT
+ * (√SOLVE_PRECISION), not its own literal. Two samples closer than a tangency can be split by solver precision are one
+ * configuration; the old 1e-4 sat below that split and counted a tangent E as two.
+ */
+describe('#2758 — the configuration count is no finer than a tangency’s solver split', () => {
+  const pool = (dx: number) => ({
+    determined: true,
+    samples: [0, dx].map((d) => new Map([['A', { x: 0, y: 0 }], ['B', { x: 4, y: 0 }], ['E', { x: 2 + d, y: 2 }]])),
+  });
+  it('a 5e-4-relative difference (inside √SOLVE_PRECISION) is one configuration — it was two', () => {
+    expect(figureDeterminacy(pool(0.003)).configurations).toBe(1);
+  });
+  it('a 5e-3-relative difference is two configurations', () => {
+    expect(figureDeterminacy(pool(0.03)).configurations).toBe(2);
+  });
+});
