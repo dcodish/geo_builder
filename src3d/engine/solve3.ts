@@ -63,13 +63,12 @@ export const leastSquaresStats = { solves: 0, evals: 0 };
 /** #2806 (ADR-3D-458): the floor under a relative difference's denominator — the 1e-12 every normalised row uses. */
 const REL_DIFF_FLOOR = 1e-12;
 /**
- * #2806 (ADR-3D-458) — a SIGNED relative difference `(p − q) / ((p + q) / 2)` of two non-negative magnitudes: zero exactly
+ * #2806 (ADR-3D-458) — a SIGNED relative difference `(p − q) / (p + q)` of two non-negative magnitudes: zero exactly
  * where `p = q`, crossing zero through it (the ADR-3D-006 lesson), and of degree 0 under a common rescaling. The one
- * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them. Over the MEAN magnitude,
- * so at a unit-size figure its slope equals the raw difference's and the descent's conditioning is unchanged.
+ * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them.
  */
 export function relDiff3(p: number, q: number): number {
-  return (p - q) / Math.max((p + q) / 2, REL_DIFF_FLOOR);
+  return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
 }
 
 export function leastSquares(residuals0: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
@@ -828,7 +827,7 @@ export function scalarPinRows3(
       }
       // #2806 (ADR-3D-458): each component over |l| + |r| — still signed, now scale-free like every
       // similarity-invariant row, so a shrinking figure cannot zero it
-      const den = env.gaugeFrozen ? 1 : Math.max((norm3(l) + norm3(r)) / 2, REL_DIFF_FLOOR);
+      const den = env.gaugeFrozen ? 1 : Math.max(norm3(l) + norm3(r), REL_DIFF_FLOOR);
       out.push((l.x - r.x) / den, (l.y - r.y) / den, (l.z - r.z) / den);
     } else if (pin.kind === 'volume3') {
       // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
