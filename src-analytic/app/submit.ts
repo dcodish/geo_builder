@@ -51,32 +51,38 @@ const typedAt = (line: string, id: string): number => {
  * Keyed by WHAT is labelled, never counted, so a second spelling of a value already shown («AB=a+3» · «AB=3+a», #2105)
  * adds no key. The relation layers (`equalLengths`, `equalAngles`) are not values (ADR-W-118 B2) and are not read.
  *
- * NOR IS THE KNEE (`rights`): 2-D's ADR-542 counts lengths, angles and areas, and its lock 4 leaves a ⟂ restatement
- * implied because the ⟂ mark carries no number; the issue's own line keeps «AB ⟂ BC» on a figure already perpendicular a
- * no-op. Here «∢ABC = 90» and «AB ⟂ BC» lower to ONE constraint (the parser's right-angle rule), so a knee read off the
- * layer cannot tell the angle sentence from the relation, and counting it recorded «AB מאונך ל-AC» on three pinned
- * points. Left out until that is ruled (#2491's round report).
+ * THE KNEE (`rights`) COUNTS ONLY WHEN IT WAS STATED AS AN ANGLE VALUE (#2704, [ADR-AG-437](../../docs/06c-decisions-analytic.md#adr-ag-437)).
+ * «∢ABC = 90» and «AB ⟂ BC» lower to ONE constraint, so the knee alone cannot tell the angle sentence from the
+ * relation; the fold now keeps the statement (`Construction.statedRightAngles`) and the layer tags its knee `spoken`. A
+ * spoken knee is a value (2-D's ADR-542 commits «∠ABC = 90» on a square with the knee drawn); a ⟂ knee is a relation and
+ * is never a key, so «AB ⟂ BC» on a figure already perpendicular, and «AB מאונך ל-AC» on three pinned points, stay no-ops.
+ * A spoken knee is new only when the current figure draws NO knee at that angle (`kneeKeys`): «AB ⟂ BC» · «∢ABC = 90»
+ * and «∢ABC = 90» twice show nothing new.
  */
-const statedValueKeys = (s: StatedMeasures): Set<string> => {
-  const pair = (a: string, b: string) => [a, b].sort().join('|');
-  return new Set([
+const pair = (a: string, b: string) => [a, b].sort().join('|');
+const statedValueKeys = (s: StatedMeasures): Set<string> =>
+  new Set([
     ...s.lengths.map((x) => `L:${pair(x.a, x.b)}`),
     ...s.angles.map((x) => `A:${x.v}:${pair(x.a, x.b)}`),
     ...s.areas.map((x) => `S:${[...x.ids].sort().join('|')}`),
     ...s.arcs.map((x) => `C:${x.circle}:${pair(x.a, x.b)}`),
     ...s.sideEquations.map((x) => `E:${pair(x.a, x.b)}`),
   ]);
-};
+
+/** Every knee's keys — a foot's knee stands for the right angle toward either end of its line (`alt`). */
+const kneeKeys = (r: StatedMeasures['rights'][number]): string[] => [`R:${r.v}:${pair(r.a, r.b)}`, ...(r.alt ? [`R:${r.v}:${pair(r.a, r.alt)}`] : [])];
 
 /**
  * DOES THE LINE ADD A VALUE THE FIGURE CAN SHOW? (#2491, ADR-AG-401 — 2-D's `impliedByPrior` visibility half, ADR-542:
  * *"Objects and labels are visible; a step that adds one has produced"*.) True when the trial's stated-measure layer
- * labels something the current figure's does not. Read off what `derive` already computed for both, so it costs nothing.
+ * labels something the current figure's does not, or draws a SPOKEN knee where the current figure draws no knee
+ * (#2704). Read off what `derive` already computed for both, so it costs nothing.
  */
 export function addsStatedValue(current: Pick<Derivation, 'stated'>, trial: Pick<Derivation, 'stated'>): boolean {
   const before = statedValueKeys(current.stated);
   for (const k of statedValueKeys(trial.stated)) if (!before.has(k)) return true;
-  return false;
+  const knees = new Set(current.stated.rights.flatMap(kneeKeys));
+  return trial.stated.rights.some((r) => r.spoken && !kneeKeys(r).some((k) => knees.has(k)));
 }
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */

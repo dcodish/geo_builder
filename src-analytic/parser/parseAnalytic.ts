@@ -8835,10 +8835,11 @@ function parseConstraint(raw: string): RuleOutcome {
     // universal reading of ∡ABC, and it needs no figure.
     if (b && c) {
       if (a === b || b === c || a === c) return refuse('repeated-vertex', line);
-      return made([{ t: 'constraint', k: rightAngleAt(b, a, c), src: line }]);
+      // #2704 (ADR-AG-437): an ANGLE sentence, said once here — it lowers to the very constraint «AB ⟂ BC» does.
+      return made([{ t: 'constraint', k: rightAngleAt(b, a, c), angleSentence: true, src: line }]);
     }
     // One letter: the figure decides which rays, so M1 does (see `apply`).
-    if (!b && !c) return made([{ t: 'right-angle', id: a, src: line }]);
+    if (!b && !c) return made([{ t: 'right-angle', id: a, angleSentence: true, src: line }]);
     // Two letters name no angle at all; saying so beats guessing which one was meant.
     return refuse('bad-operand', line);
   }
