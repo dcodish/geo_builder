@@ -45,7 +45,7 @@ import { knowledgeSamples3 } from '../engine/evaluate';
 import { sampleStats } from '../engine/rng';
 import { declaredKind3, QUAD_PYRAMIDS } from '../engine/baseShapes';
 import { readShapePhrase3 } from '../lexicon/shapePhrase3';
-import type { Command3, Construction3, Id, Positions3 } from '../engine/types';
+import type { Command3, Construction3, Id, Positions3, SolidKind } from '../engine/types';
 import type { NarrowedRing3 } from '../engine/notices';
 
 /** The fact shape this module reads (the store's `Fact3`, without importing the store — no cycle). */
@@ -78,7 +78,7 @@ const VALUE_CLAIMS = new Set<string>([
  * equal pairs, the isosceles trapezoid's diagonals, the one-line inscription's cyclic fix — and a `soft` default) is
  * the noun, never a given.
  */
-export function rowClass3(cmds: readonly Command3[]): CauseClass {
+export function rowClass3(cmds: readonly Command3[], c?: Pick<Construction3, 'solids'>): CauseClass {
   let circum = false;
   let rightPyramid = false;
   let value = false;
@@ -89,7 +89,9 @@ export function rowClass3(cmds: readonly Command3[]): CauseClass {
       if (cmd.def.kind === 'circum') circum = true;
     } else if (cmd.type === 'concyclic' || cmd.type === 'point-on-circle3') circum = true;
     else if (cmd.type === 'solid') {
-      if (QUAD_PYRAMIDS[cmd.kind]?.right) rightPyramid = true;
+      // #2490 (ADR-3D-437): a right pyramid over a ring that already exists, stating no base shape, only CHECKS that the
+      // ring is cyclic (the apply refuses one that is not) — it forces nothing, so it is the ring's definition, never a cause
+      if (QUAD_PYRAMIDS[cmd.kind]?.right && !rightnessCheckedOnly3(cmd.kind, cmd.ids, c)) rightPyramid = true;
     } else if (cmd.type === 'point3') {
       if (cmd.x !== null || cmd.y !== null || cmd.z !== null || cmd.syms?.some((x) => x !== null)) value = true; // «A(0,2,-1)» states numbers
     } else if (DEFINITION_CMDS.has(cmd.type)) continue;
@@ -140,6 +142,12 @@ function triangleNoun3(utterance: string): NarrowKind | null {
   if (has('right')) return 'right-triangle';
   if (has('isosceles')) return 'isosceles-triangle';
   return 'triangle';
+}
+
+/** #2490 (ADR-3D-437): is this right quad pyramid the figure's BOUND one with no stated base shape — «ישרה» checked, never imposed? */
+function rightnessCheckedOnly3(kind: SolidKind, ids: readonly Id[], c?: Pick<Construction3, 'solids'>): boolean {
+  if (!c || QUAD_PYRAMIDS[kind]?.base !== 'quad') return false;
+  return c.solids.some((s) => s.bound !== undefined && s.kind === kind && s.ids.length === ids.length && s.ids.every((id, i) => id === ids[i]));
 }
 
 /** Every ring a row's commands DECLARE with a noun, and the kind each noun states. */
@@ -255,7 +263,7 @@ function compute(facts: readonly NFact3[], seed: number, c: Construction3, ok: (
     }
   }
   if (!rings.size) return [];
-  const classOf = new Map(rows.map((f) => [f.id, rowClass3(f.cmds)]));
+  const classOf = new Map(rows.map((f) => [f.id, rowClass3(f.cmds, c)]));
   const enabledIds = new Set(facts.filter((f) => f.enabled).map((f) => f.id));
   const out: NarrowedRing3[] = [];
   // #2171 (ADR-3D-345, 2-D's ADR-656 #4): two nouns the ring carries together — the kind both name, said once; read off

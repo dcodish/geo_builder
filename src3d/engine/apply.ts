@@ -21,7 +21,7 @@ import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reaches
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { freeMetricOperands3, spellingOf, symbolValueOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
-import { hasClaimResidual3 } from './claims';
+import { hasClaimResidual3, verifyClaim } from './claims';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -1910,6 +1910,8 @@ function boundPyramidOf3(c: Construction3, cmd: SolidCommand): { base: Id[]; ape
 
 /** The quad-pyramid kind whose base is a general quadrilateral and whose apex is free: «פירמידה ABCDS שבסיסה מרובע». */
 const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && !QUAD_PYRAMIDS[k]?.right)!;
+/** ...and its right twin, «פירמידה ישרה ABCDS שבסיסה מרובע»: the apex over the ring's circumcentre (ADR-3D-437). */
+const GENERAL_RIGHT_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && QUAD_PYRAMIDS[k]?.right)!;
 
 /**
  * #2490 ([ADR-3D-436](../../docs/06b-decisions-3d.md#adr-3d-436)) — A PYRAMID WHOSE BASE SHAPE IS UNSTATED KEEPS THE SHAPE
@@ -1928,14 +1930,16 @@ const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k
  * pyramid that does not bind (a standalone one, a base only partly drawn) keeps the rectangle: there the default draws
  * the base the pyramid makes. A stated shape is never read here, and stays a given about the ring (ADR-3D-434 §3).
  *
- * A RIGHT kind is returned as read. Its rightness entails a cyclic base, and the parser lowered the cyclic fix of the
- * base it read (none for a rectangle), so the general quadrilateral would leave the right foot over a ring with no
- * circumcentre. What «פירמידה ישרה ABCDS» should make of an existing quadrilateral is a separate question for the operator.
+ * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437)) — A RIGHT kind reads the same way, as its right twin
+ * «פירמידה ישרה ABCDS שבסיסה מרובע» (operator, 2026-11-09: *"reject"*). Its rightness entails a cyclic base, and over a
+ * ring that already exists the ring keeps its shape, so «ישרה» is CHECKED against the ring, never imposed on it: the
+ * bound apply refuses a ring its own statements do not make cyclic (`applyBoundPyramid3`). The parser lowered the
+ * cyclic fix of the base it read — none for the rectangle — so nothing after this command drives the ring either.
  */
 export function unstatedPyramidBase3(c: Construction3, cmd: SolidCommand): SolidCommand {
   const spec = QUAD_PYRAMIDS[cmd.kind];
-  if (!spec || spec.right || spec.base === 'quad' || !boundPyramidOf3(c, cmd)) return cmd;
-  return { ...cmd, kind: GENERAL_QUAD_PYRAMID };
+  if (!spec || spec.base === 'quad' || !boundPyramidOf3(c, cmd)) return cmd;
+  return { ...cmd, kind: spec.right ? GENERAL_RIGHT_QUAD_PYRAMID : GENERAL_QUAD_PYRAMID };
 }
 
 /**
@@ -1985,6 +1989,15 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
   for (const k of lowered) {
     r = applyCommand3(r.next, k);
     if (!r.ok) return r;
+  }
+  // #2490 (ADR-3D-437, operator 2026-11-09: "reject"): a RIGHT pyramid that states no base shape, over a ring that
+  // already exists, needs that ring to be cyclic — and the ring keeps its shape, so this is a CHECK (M1, verify-only),
+  // never a drive. Decided by what the ring's own statements entail — its family, a circle stated through it, its
+  // stated angles, the faces of the solid it belongs to — through the claim verifier (every claim seed × every branch,
+  // docs/17 M3), never from the one drawing: a sample that happens to be cyclic is not a ring that is.
+  if (spec?.right && spec.base === 'quad' && base.length === 4 && !verifyClaim({ type: 'concyclic', ids: [...base] }, r.next, 0)) {
+    const known = knownQuadKind(r.next, base);
+    return { ok: false, error: { code: 'right-pyramid-base-not-cyclic', ring: [...base], ...(known ? { shape: known } : {}) } };
   }
   // ...and the ring's DRAWING PREFERENCE is judged against what is now stated over it in total (#1792's rule for a
   // circle through a ring): «מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» is a square, so the rectangle's "never look like
