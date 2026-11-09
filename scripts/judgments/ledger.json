@@ -3810,6 +3810,63 @@
       ],
       "at": "2026-11-09T20:22:21.487Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2793a",
+      "issue": 2793,
+      "question": "3-D, a coordinate sign alone on an unanchored solid («קובייה ABCDA'B'C'D'» · «z של B שלילי»): (a) anchors the solid like an axis point (axes drawn, placement sampled under the sign); (b) floor drawing kept, moved only as far as the sign needs, no axes, nothing sampled.",
+      "class": "coordinate-sign-anchors-frame",
+      "verdict": "escalate",
+      "reason": "No ruling decides whether a half-space sign is a placement; FR-SP-4 lists anchors without a sign; Q-2789a and '4 - b' cover a point on an axis, not a sign.",
+      "nearest": [
+        {
+          "quote": "they are on the floor until they are placed by user somewhere",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/issues/2630"
+        },
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        }
+      ],
+      "at": "2026-11-09T20:46:17.138Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2793b",
+      "issue": 2793,
+      "question": "Does Q-2789a (a point on an axis anchors the frame) hold for the solid's OWN vertex («הקודקוד A נמצא על החלק החיובי של ציר ה-x»)? (a) yes, placement sampled, axes drawn; (b) least move from the default, no axes.",
+      "class": "axis-point-anchors-frame",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "A solid's own vertex stated on a coordinate axis places the solid in the frame like any axis point: accepted, axes drawn, the slide along the axis on the stated side sampled by «הציגו תצורה אחרת».",
+      "precedents": [
+        {
+          "quote": "we would not refuse something that can be built",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-199"
+        },
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "they are on the floor until they are placed by user somewhere",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/issues/2630"
+        },
+        {
+          "quote": "it seems that A is hard coded at 0,0,0",
+          "date": "2026-07-28",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06b-decisions-3d.md#adr-3d-095"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Not a sign alone (Q-2793a), not the free-DOF cue count (#2505 e23), not a vertex on a coordinate plane, not #2799.",
+      "at": "2026-11-09T20:46:17.138Z",
+      "status": "pending"
     }
   ],
   "demoted": {
