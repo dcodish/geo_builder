@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T00:00:00.000Z",
+  "name": "cube-size-free-plane-2746",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "אורך AB = 4",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 4
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "מישור π3",
+      "cmds": [
+        {
+          "type": "free-plane",
+          "name": "π3"
+        }
+      ]
+    }
+  ]
+}

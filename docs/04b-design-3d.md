@@ -834,6 +834,15 @@ object is never one: a free plane (`PlaneDef.free`) and a free line have their o
 by their resolvers, so sampling the figure's six as well would sample one relative pose twice. Declaring or pinning
 one leaves the figure where it was. A free plane given an equation stops being free and counts.
 
+**One absolute-frame predicate (#2746, [ADR-3D-453](06b-decisions-3d.md#adr-3d-453)).** The scale given (#754) asks the
+same question, "would a uniform rescale detach an absolute object?", so `scaleGivenSafe` calls `hasAbsoluteFrameObject`
+and keeps no list of its own; only a rescale's own exclusions stay there (no solid, a revolution or a `circles3`,
+`scalePinned`, and a `partial` point pending a ruling). The predicate lives in `types.ts` beside `absolutePointCount`,
+re-exported from `evaluate.ts`. A free or figure-derived plane or line is resolved from the figure, so the rescale
+carries it: a plane's offset and a line's anchor scale by k. A free plane pinned by a stated distance to a figure point
+(#508/#528) does not commute with the factor, so it re-resolves from the rescaled positions (`reresolveFreeObjects3`,
+the #557 rule) and its riders, feet and crossings are re-seated.
+
 **The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
 offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
 

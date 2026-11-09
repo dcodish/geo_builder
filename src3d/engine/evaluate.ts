@@ -44,7 +44,7 @@ import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scaleP
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
 import { freeJointPin3, freeVecDofCount3, pureFreeLetter3, pureFreeVectors3, solveFreeVectors3, spanBasis3 } from './freeVecSystem';
-import { absolutePointCount, freeCoordKey, gaugeFramePoint3, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
+import { absolutePointCount, freeCoordKey, hasAbsoluteFrameObject, gaugeFramePoint3, openPinSymsOf, pivotRuns3, symbolValueOf, vecDefOfSymbol } from './types';
 import { carrierParams3, determinationReach3 } from './carriers';
 import { resolveFreePlane } from './freePlane';
 import { placeUnnamedCentre3, resolveFreeCircle } from './freeCircle';
@@ -1663,39 +1663,8 @@ export function orientationStated3(c: Construction3): boolean {
   );
 }
 
-/**
- * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
- * given by its equation, a point given by its coordinates? While the answer is NO, the canonical
- * placement (first vertex at the origin, second along +x) is pure gauge and freezing it costs
- * nothing. The moment the answer is YES, that placement stops being a gauge and becomes a real,
- * UNSTATED degree of freedom: where the solid sits relative to the absolute object is something the
- * student never said, so it must be sampled (ADR-052 / M4), not frozen at a value that happens to
- * put the canonical origin exactly on a line through the origin.
- *
- * #2592 (ADR-3D-435): a FREE plane («מישור π3», `PlaneDef.free`) is not an absolute object. It carries
- * no absolute data: its three DOFs are sampled by `resolveFreePlane` relative to the figure, so sampling
- * the figure's six as well samples one relative pose twice. Counting it threw an unplaced solid off the
- * floor (and drew the axes) the moment a bare plane was declared, and the first membership or ∥/⊥ put
- * it back: two jumps. It is the free line's rule (never counted) stated for planes. A free plane later
- * given an equation stops being `free` and counts; one related to a coordinate plane, an axis or an
- * equation plane counts through that other object, which this predicate reads already.
- */
-export function hasAbsoluteFrameObject(c: Construction3): boolean {
-  if (c.pins.length > 0) return true;
-  for (const def of c.planes.values()) if (!def.free) return true;
-  for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
-  // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
-  // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
-  // FACES. The list enumerated the absolute objects that can be DECLARED and missed the frame itself,
-  // so a figure related to [xy] kept the canonical placement and the relation was judged against a
-  // position nothing had chosen — then reported as the student's error.
-  if (c.coordPlanePins.length > 0) return true;
-  for (const cl of c.claims) {
-    const ops = cl.type === 'plane-rel' || cl.type === 'distance-rel' || cl.type === 'mutual-rel' ? [cl.a, cl.b] : cl.type === 'line-rel' ? [cl.op] : [];
-    if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) return true;
-  }
-  return absolutePointCount(c) > 0;
-}
+/** #367 / ADR-3D-435 — moved to `types.ts` (ADR-3D-453) so the scale given asks the SAME predicate; re-exported. */
+export { hasAbsoluteFrameObject };
 
 /**
  * #508 — a free plane whose OFFSET is pinned by a stated distance to a figure POINT, and #487 — a free
@@ -3270,6 +3239,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       const k = Math.pow(stated / m0, 1 / power);
       for (const [id, p] of pos) pos.set(id, v3(p.x * k, p.y * k, p.z * k));
       for (const [name, pl] of planes) planes.set(name, { n: pl.n, d: pl.d * k });
+      // #2746 (ADR-3D-453): a relative line (free, plane-plane, common-perp, projection) is admitted now that the
+      // scale given asks `hasAbsoluteFrameObject`; it was resolved at the frozen gauge, so its anchor scales with
+      // the figure exactly as a plane's offset does and every membership survives verbatim. A direction is scale-free.
+      for (const [name, ln] of lines) lines.set(name, { ...ln, anchor: v3(ln.anchor.x * k, ln.anchor.y * k, ln.anchor.z * k) });
+      // #2746: a stated DISTANCE from a figure point to a free plane (#508/#528) is a magnitude in the world's units, the
+      // one free-object resolution a uniform factor does not commute with (k·2 is not 2, and two distances fit a normal
+      // that depends on the figure's size). Such a plane re-resolves from the final, rescaled positions — the #557 rule
+      // (free objects hold against FINAL positions) — and its riders, feet and crossings are re-seated with it.
+      if (freePlaneOffsetPinned3(c)) reresolveFreeObjects3(c, seed, pos, planes, lines, freePlaneDofs, freeLineDofs);
     }
   }
 
