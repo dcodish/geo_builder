@@ -917,7 +917,15 @@ whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate
 declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
-otherwise. A right kind is left as read, because its cyclic fix is the parser's for the base it read.
+otherwise. A right kind reads as ITS stated twin «פירמידה ישרה ABCDS שבסיסה מרובע»
+([ADR-3D-437](06b-decisions-3d.md#adr-3d-437)): `unstatedPyramidReading3` returns the general right kind `pyramidQuadR`
+plus that twin's cyclic fix, `cyclicFixCommands('quad', ring)` (a shape-internal `concyclic`), which now lives in
+`baseShapes.ts` beside `CYCLIC_MEMBER` so the parser and the fold lower one fix. Both callers (`expandFact`, the mint
+trial) apply the whole list. The ring's own free DOF absorb the fix (M1); a determined ring that is not cyclic is the
+existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier whether the ring was ALREADY cyclic before
+the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
+`base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
+narrowed nothing (Q-2490d).
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 

@@ -557,6 +557,11 @@ const SEEDED: SeededCorpus = {
   // stability are asserted in engine3.test.ts; these are the build + drift net.
   'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
   'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
+  // #2490 (ADR-3D-437; ADR-W-199) — a right pyramid over an existing ring fits the ring to its cyclic member: the
+  // operator's lines (a general quadrilateral becomes a cyclic one, never the rectangle) and Q-2490c (a stated rhombus
+  // becomes a square). The class rows are asserted in pyramid-base.test.ts; these are the build + drift + load net.
+  'right-pyramid-existing-quad-2490.geo3.json': ['מרובע ABCD', 'פירמידה ישרה ABCDS'],
+  'right-pyramid-rhombus-2490.geo3.json': ['מעוין ABCD', 'פירמידה ישרה ABCDS שבסיסה מעוין'],
   // #2703 (ADR-3D-443) — a dot product and a letter's value typed as decimals keep their spelling (before: «5/2», and
   // «k = ?» on the vec-defined point). The rows are asserted in data-view.test.ts; these are the build + drift net.
   'dot-given-decimal-2703.geo3.json': ['הווקטורים u ו-v', 'u·v = 2.5'],

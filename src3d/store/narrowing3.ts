@@ -45,7 +45,7 @@ import { knowledgeSamples3 } from '../engine/evaluate';
 import { sampleStats } from '../engine/rng';
 import { declaredKind3, QUAD_PYRAMIDS } from '../engine/baseShapes';
 import { readShapePhrase3 } from '../lexicon/shapePhrase3';
-import type { Command3, Construction3, Id, Positions3 } from '../engine/types';
+import type { Command3, Construction3, Id, Positions3, SolidCommand } from '../engine/types';
 import type { NarrowedRing3 } from '../engine/notices';
 
 /** The fact shape this module reads (the store's `Fact3`, without importing the store — no cycle). */
@@ -77,8 +77,12 @@ const VALUE_CLAIMS = new Set<string>([
  * numeric value, any other relation, or a definition. A noun's OWN lowering (`origin: 'shape'` — the equilateral's
  * equal pairs, the isosceles trapezoid's diagonals, the one-line inscription's cyclic fix — and a `soft` default) is
  * the noun, never a given.
+ *
+ * #2490 ([ADR-3D-437](../../docs/06b-decisions-3d.md#adr-3d-437); Q-2490d): a right pyramid over a ring a circle already
+ * passed through (`SolidObj.boundCyclic`, read off the folded figure `c`) narrowed nothing: it is that ring's definition,
+ * never a cause — «קובייה …» · «פירמידה ישרה ABCDS» says nothing, exactly as the plain «פירמידה ABCDS» there.
  */
-export function rowClass3(cmds: readonly Command3[]): CauseClass {
+export function rowClass3(cmds: readonly Command3[], c?: Pick<Construction3, 'solids'>): CauseClass {
   let circum = false;
   let rightPyramid = false;
   let value = false;
@@ -89,7 +93,7 @@ export function rowClass3(cmds: readonly Command3[]): CauseClass {
       if (cmd.def.kind === 'circum') circum = true;
     } else if (cmd.type === 'concyclic' || cmd.type === 'point-on-circle3') circum = true;
     else if (cmd.type === 'solid') {
-      if (QUAD_PYRAMIDS[cmd.kind]?.right) rightPyramid = true;
+      if (QUAD_PYRAMIDS[cmd.kind]?.right && !boundOnCyclicRing3(cmd, c)) rightPyramid = true;
     } else if (cmd.type === 'point3') {
       if (cmd.x !== null || cmd.y !== null || cmd.z !== null || cmd.syms?.some((x) => x !== null)) value = true; // «A(0,2,-1)» states numbers
     } else if (DEFINITION_CMDS.has(cmd.type)) continue;
@@ -109,6 +113,11 @@ export function rowClass3(cmds: readonly Command3[]): CauseClass {
   if (rightPyramid) return 'rightPyramid';
   if (value) return 'value';
   return 'definition';
+}
+
+/** #2490 (ADR-3D-437): is this right pyramid, in the folded figure, bound over a ring a circle already passed through? */
+function boundOnCyclicRing3(cmd: SolidCommand, c?: Pick<Construction3, 'solids'>): boolean {
+  return !!c?.solids.some((s) => s.boundCyclic && s.ids.length === cmd.ids.length && s.ids.every((id, i) => id === cmd.ids[i]));
 }
 
 /** A right angle typed on a triangle ring's own corner — «זווית C = 90», «זווית ACB = 90» or «AC ⊥ BC» (card 3). */
@@ -255,7 +264,7 @@ function compute(facts: readonly NFact3[], seed: number, c: Construction3, ok: (
     }
   }
   if (!rings.size) return [];
-  const classOf = new Map(rows.map((f) => [f.id, rowClass3(f.cmds)]));
+  const classOf = new Map(rows.map((f) => [f.id, rowClass3(f.cmds, c)]));
   const enabledIds = new Set(facts.filter((f) => f.enabled).map((f) => f.id));
   const out: NarrowedRing3[] = [];
   // #2171 (ADR-3D-345, 2-D's ADR-656 #4): two nouns the ring carries together — the kind both name, said once; read off
