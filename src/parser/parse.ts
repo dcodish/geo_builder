@@ -149,6 +149,10 @@ export type ParseResult =
   // A centre is not a point ON its circle, so there is no such arc: refused naming the statement and the point, never
   // lowered into an angle with a repeated vertex. `circle` is the circle's id (the message names no circle).
   | { ok: false; reason: 'arc-end-is-centre'; end: string; circle: Id }
+  // #1840 (ADR-802): «מנקודה A ישר חותך את המעגל O בנקודות C ו-D» where A already lies ON circle O. A line through a
+  // point of a circle meets it at most once more, so it cannot cut it at two further points: refused naming the
+  // statement's letters (operator ruling 2026-10-08), never drawn with a crossing left off the circle.
+  | { ok: false; reason: 'secant-from-on-circle'; from: string; circle: Id; center: string; a: string; b: string }
   // #546 (ADR-443): an ANONYMOUS circle reference («המעגל» with no centre named) in a circle-construct
   // statement, beside ≥2 circles, that even the membership tie-break could not bind — WHICH circle is
   // the student's to say (ADR-052), never a silent pick, never a paid LLM guess. `centers` are the
@@ -457,7 +461,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | { clarify: 'arc-end-is-centre'; end: string; circle: Id };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | { clarify: 'arc-end-is-centre'; end: string; circle: Id } | { clarify: 'secant-from-on-circle'; from: string; circle: Id; center: string; a: string; b: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -702,7 +706,7 @@ const namesUnnamedCircleMember = (s: string, ctx: ParseContext): boolean => {
   return autos.some((t) => { const m = membersOfCenter(ctx, t); return pts.some((p) => m.has(p)); });
 };
 
-const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupposes?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
+const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupposes?: boolean; reference?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
   const namedRaw = circleCenter(s);
   // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
   const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
@@ -715,7 +719,10 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { presupp
     // CANDIDATE (`implied: 'by-member'`): `impliedCircleBinding` binds it when a point the sentence places on it
     // already rides an unnamed circle, and otherwise it stands as the new circle the letter declares (ADR-565
     // decision 1: «CD קוטר במעגל O» with new C, D). Unmarked, it skipped the #186 seam and drew a third circle.
-    const candidate = namesUnnamedCircleMember(s, ctx) ? { implied: 'by-member' as const } : {};
+    // #1840 (ADR-801): a rule whose sentence REFERS to its circle («ישר … חותך את המעגל O») passes `reference`: the fresh
+    // letter is then a reference like `withImplicitCircles`' own (`implied: true`, the full ADR-347 order), exactly as its
+    // sibling «AC חותך את המעגל O בנקודה D» (`lineMeetsCircle`) reads it. With no unnamed circle it stands, as declared.
+    const candidate = opts?.reference ? { implied: true as const } : namesUnnamedCircleMember(s, ctx) ? { implied: 'by-member' as const } : {};
     return {
       center: named,
       prepend: [{ type: 'circle', id: circleId(named), center: named, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...candidate }],
@@ -8804,7 +8811,9 @@ const secantFromExternal: Rule = (s, ctx) => {
   if (!eM) return null;
   // Resolve-or-INTRODUCE (#159, the tangent rules' secant sibling): the opener "from E outside the
   // circle a line cuts it at A,B" introduces its own circle (free radius); named-but-absent creates.
-  const resolved = resolveOrIntroduceCircle(s, ctx);
+  // #1840 (ADR-801): «… חותך את המעגל O …» refers to its circle — after two drawn circles a fresh letter names one of
+  // them by use (the #1688 ruling: «the next new letter names the other»), never a third circle beside them.
+  const resolved = resolveOrIntroduceCircle(s, ctx, { reference: true });
   if (!resolved) return null;
   const center = resolved.center;
   const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two intersections "A and B" / "A ו-B"
@@ -8818,16 +8827,18 @@ const secantFromExternal: Rule = (s, ctx) => {
   // wrong root as the line turns and then B collapses onto the known point ("would be at the same point").
   if (ctx.points?.includes(E)) {
     const lineId = `sec-${E}${A}`;
-    // If A already EXISTS it is a direction point, NOT a new on-circle crossing — never re-place it on
-    // the circle (that wrongly pins it to two circles at once). Then B is the crossing away from E
-    // (E on the circle → the second crossing; E external → the far exit). If A is new, it's the
-    // near on-circle end and B is the crossing away from A.
-    const aExists = ctx.points?.includes(A);
+    // #1840 (ADR-802): A line through a point OF the circle meets it at most once more, so "from E it cuts the circle at A
+    // and B" cannot hold when E already rides it. Refused naming the statement, never drawn with a crossing off the
+    // circle. (Read on the circle as resolved: after a naming by use, on the re-parse.)
+    if (membersOfCenter(ctx, center).has(E)) return { clarify: 'secant-from-on-circle', from: E, circle: circ, center: up(center), a: A, b: B };
+    // #1840 (ADR-802): A is a crossing the sentence names, so it lies ON the circle whether it is new or already placed
+    // (M1: an existing id lowers to the membership). The old "an existing A is only a direction point" read dropped the
+    // stated incidence: the line was drawn through A and the figure stayed green with A off the circle.
     return [
       ...resolved.prepend,
-      ...(aExists ? [] : [{ type: 'point-on-circle', id: A, circle: circ } as const]),
+      { type: 'point-on-circle', id: A, circle: circ },
       { type: 'line-through', id: lineId, a: E, b: A },
-      { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, avoid: aExists ? E : A },
+      { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, avoid: A },
       { type: 'segment', a: E, b: A }, // the drawn secant E–A
     ];
   }
@@ -15553,6 +15564,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'nested-pair-radius') return { ok: false, reason: 'nested-pair-radius', parts: res.parts };
   if (res.clarify === 'equal-circles-nested') return { ok: false, reason: 'equal-circles-nested', relation: res.relation };
   if (res.clarify === 'arc-end-is-centre') return { ok: false, reason: 'arc-end-is-centre', end: res.end, circle: res.circle };
+  if (res.clarify === 'secant-from-on-circle') return { ok: false, reason: 'secant-from-on-circle', from: res.from, circle: res.circle, center: res.center, a: res.a, b: res.b };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

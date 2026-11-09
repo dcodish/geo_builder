@@ -227,20 +227,16 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'two-circles-then-secant-from-A',
-    title: 'two circles → point C on the right circle → a secant from existing A cuts the left circle at D',
+    title: 'two circles → C on the right circle → AC cuts the left circle at D (the student’s own lines, #1840)',
     guards:
-      'the LLM fallback re-parsed its canonical steps with NO figure context, so "from A a line cuts circle O at C and D" fell to the "first secant" branch (which needs an "outside" cue) and was DROPPED — "the next command failed". llmParse now threads the figure context (and accumulates ids across steps) into each re-parse, so the secant-from-an-existing-point branch fires. (Steps 2–3 are the LLM canonical lines the log recorded; parsed here with context exactly as llmParse does.)',
-    steps: [
-      'שני מעגלים נחתכים בנקודות A ו- B',
-      'C על מעגל P', // LLM canonical for "C נקודה על המעגל הימני"
-      'מנקודה A ישר חותך את המעגל O בנקודות C ו-D', // LLM canonical for "AC חותך את המעגל השמאלי בנקודה D"
-    ],
+      'Re-authored for #1840 (ADR-801): the sequence used to be the LLM’s canonical mistranslation («C על מעגל P» · «מנקודה A ישר חותך את המעגל O בנקודות C ו-D»), which drew a THIRD circle O. These are the student’s own lines from the log: C on the right circle, D on the left circle, on line AC. Two circles, never three.',
+    steps: ['שני מעגלים נחתכים בנקודות A ו- B', 'C נקודה על המעגל הימני', 'AC חותך את המעגל השמאלי בנקודה D'],
     check(fig) {
       allStepsOk(fig);
-      expect(fig.positions.has('D'), 'D placed (the step did not drop)').toBe(true);
-      // D is the OTHER crossing of line A–C with the left circle O ⇒ D is ON circle O.
-      const O = fig.construction.objects.find((o) => o.kind === 'circle' && ['O', '@ctr-O'].includes((o as { center: Id }).center)) as { radius: { value: number } }; // anon centre (ADR-342)
-      expect(dist(at(fig, 'O'), at(fig, 'D'))).toBeCloseTo(O.radius.value, 2);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle') as { id: Id; center: Id }[];
+      expect(circles.length, 'two circles, never a third').toBe(2);
+      const [A, C, D] = [at(fig, 'A'), at(fig, 'C'), at(fig, 'D')];
+      expect(Math.abs((D.x - A.x) * (C.y - A.y) - (D.y - A.y) * (C.x - A.x)) / (dist(D, A) * dist(A, C)), 'D on line AC').toBeLessThan(1e-6);
     },
   },
   {
@@ -6443,8 +6439,58 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs((E.x - Q.x) * (C.x - A.x) + (E.y - Q.y) * (C.y - A.y)) / (dist(E, Q) * dist(A, C)), 'QE ⟂ AC').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'secant-from-crossing-after-two-circles-1840',
+    title: 'The issue’s own lines: a line from A (on both circles) cannot cut circle O at C and D — refused, no third circle (#1840)',
+    guards: 'Operator ruling 2026-10-08 on #1840 ("Refuse and explain"): after two drawn circles «המעגל O» names the other drawn circle (the #1688 ruling), never a third. A lies on it, so a line from A meets it only once more. Before ADR-801/802 the line drew a third circle O and left C off it, green.',
+    steps: ['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D'],
+    refusedSteps: [{ step: 3, reason: 'secant-from-on-circle', with: { from: 'A', center: 'O', a: 'C', b: 'D' }, why: 'ADR-802, operator ruling 2026-10-08 on #1840' }],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.construction.objects.filter((o) => o.kind === 'circle').length, 'two circles').toBe(2);
+      expect(fig.positions.has('D'), 'the refused line committed nothing').toBe(false);
+    },
+  },
+  {
+    id: 'secant-from-crossing-two-lines-1840',
+    title: 'The two-line variant: «שני מעגלים נחתכים» · «מנקודה A ישר חותך את המעגל O בנקודות C ו-D» is refused the same way (#1840)',
+    guards: 'ADR-801/802: the two-line variant drew a third circle O. O now names a drawn circle (interchangeable circles name by order, #1688 ruling (b)) and A lies on it.',
+    steps: ['שני מעגלים נחתכים בנקודות A ו- B', 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D'],
+    refusedSteps: [{ step: 2, reason: 'secant-from-on-circle', with: { from: 'A', center: 'O' }, why: 'ADR-802, operator ruling 2026-10-08 on #1840' }],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.construction.objects.filter((o) => o.kind === 'circle').length, 'two circles').toBe(2);
+    },
+  },
+  {
+    id: 'secant-from-point-names-other-circle-1840',
+    title: 'After two circles, one named P, «מנקודה E ישר חותך את המעגל O בנקודות F ו-G» names the other drawn circle O (#1840)',
+    guards: 'ADR-801: the secant rule’s circle is a reference, as in its sibling «AC חותך את המעגל O בנקודה D». Before, a third circle O was minted beside the two.',
+    steps: ['שני מעגלים נחתכים בנקודות A ו- B', 'C על מעגל P', 'נקודה E', 'מנקודה E ישר חותך את המעגל O בנקודות F ו-G'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle') as { id: Id; center: Id }[];
+      expect(circles.length, 'two circles, never a third').toBe(2);
+      expect(circles.map((c) => c.center).sort(), 'P and the other drawn circle, now named O').toEqual(['O', 'P']);
+      const r = fig.circles.get('circle-O')!;
+      expect(dist(at(fig, 'A'), r.center), 'O is the drawn circle through A').toBeCloseTo(r.r, 6);
+      for (const p of ['F', 'G']) expect(dist(at(fig, p), r.center), `${p} on circle O`).toBeCloseTo(r.r, 6);
+    },
+  },
+  {
+    id: 'secant-through-existing-point-puts-it-on-circle-1840',
+    title: 'A line from E cuts circle O at an EXISTING C: C is put on circle O, never left off it (#1840)',
+    guards: 'ADR-802: the secant rule read an existing first crossing as a direction point only, so «מנקודה E ישר חותך את המעגל O בנקודות C ו-D» drew the line through C with C off the circle, green.',
+    steps: ['מעגל O', 'נקודה E', 'נקודה C', 'מנקודה E ישר חותך את המעגל O בנקודות C ו-D'],
+    check(fig) {
+      allStepsOk(fig);
+      const r = fig.circles.get('circle-O')!;
+      for (const p of ['C', 'D']) expect(dist(at(fig, p), r.center), `${p} on circle O`).toBeCloseTo(r.r, 6);
+      const [E, C, D] = [at(fig, 'E'), at(fig, 'C'), at(fig, 'D')];
+      expect(Math.abs((D.x - E.x) * (C.y - E.y) - (D.y - E.y) * (C.x - E.x)) / (dist(D, E) * dist(E, C)), 'E, C, D collinear').toBeLessThan(1e-6);
+    },
+  },
 ];
-
 /** #2538 (ADR-763): the circle's centre strictly inside the ring, and the foot from it onto every side strictly within the side. */
 function ringEnclosesCircle(f: ReturnType<typeof replay>, ids: string[]): boolean {
   const c = f.circles.get('circle-O');
