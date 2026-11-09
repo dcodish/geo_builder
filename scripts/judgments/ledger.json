@@ -3956,6 +3956,16 @@
       "limits": "Not the blank-canvas kind, not «משוכלל», not a note.",
       "at": "2026-11-09T21:09:27.380Z",
       "status": "pending"
+    },
+    {
+      "id": "text-2810-circle-line-crossed",
+      "kind": "text",
+      "issue": "#2810",
+      "what": "The refusal shown when a CIRCLE line («מעגל חוסם את ABDC») completes the impossibility of two existing quadrilateral orders: the shared crossed-shape message (no new text) vs a new sentence naming both quadrilaterals",
+      "choice": "The shared crossed-shape message «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «מעגל חוסם את ABDC»…» — it names the statement; no new text",
+      "chosen": true,
+      "at": "2026-11-09T23:24:38.970Z",
+      "status": "pending"
     }
   ],
   "demoted": {
