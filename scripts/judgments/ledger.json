@@ -3711,6 +3711,31 @@
       ],
       "at": "2026-11-09T11:44:29.148Z",
       "status": "escalated"
+    },
+    {
+      "id": "Q-2490d",
+      "issue": 2490,
+      "question": "In 3-D, «פירמידה ישרה ABCDS» (or «… שבסיסה מרובע») over an existing quadrilateral that a circle already passes through, so the base does not change: should a build note show? (a) no note; (b) always «constrained to a cyclic quadrilateral».",
+      "class": "forced-narrowing-note",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "The build note appears only when the givens force the figure into a narrower named shape than the one asked for (P16, ADR-W-129). A right pyramid on a ring a circle already passes through narrows nothing, so neither spelling shows a note, including «quadrilateral → square» on a cube face.",
+      "precedents": [
+        {
+          "quote": "this comment is relevant for all cases where we end up drawing sometihng else than what user asked for (meaning a special kind of what he asked for that has a name). This should go in pedagogy so its a rule.",
+          "date": "2026-10-12",
+          "link": "https://github.com/dcodish/geo_builder/issues/1996"
+        },
+        {
+          "quote": "Every forced narrowing, whatever caused it.",
+          "date": "2026-10-13",
+          "link": "https://github.com/dcodish/geo_builder/issues/1996#issuecomment-6141540122"
+        }
+      ],
+      "confidence": "high",
+      "limits": "Only a ring that already passes through a circle. Not the note when the base does change (ADR-3D-080, ADR-W-129), nor cube · «פירמידה ABCDA'» (#2495).",
+      "at": "2026-11-09T20:14:21.274Z",
+      "status": "pending"
     }
   ],
   "demoted": {
