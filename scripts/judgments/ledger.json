@@ -3966,6 +3966,53 @@
       "chosen": true,
       "at": "2026-11-09T23:24:38.970Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2814a",
+      "issue": 2814,
+      "question": "The #827 pyramid (p = ±4): once both figures are always reachable, does D's data-panel row read (a) «D(3, 4, 0) או (3, -4, 0)» or (b) «D(3, p, 0)»?",
+      "class": "two-branch-stated-letter-point-row",
+      "verdict": "escalate",
+      "reason": "FR-EQ-4a (#1506 'two options - yes … not more than 2') and FR-VC-4a (#2077 'the letter', for a FREE letter) conflict; neither covers a stated letter with exactly two values; the letter reading for this pyramid is a session re-base (ADR-3D-368).",
+      "nearest": [
+        {
+          "quote": "2 options - yes - because many exams ask questions that have 2 options. but not more than 2.",
+          "date": "2026-09-29",
+          "link": "https://github.com/dcodish/geo_builder/issues/1506#issuecomment-5896457046"
+        },
+        {
+          "quote": "option B - the data panel holds the truth. so once k is known, we use it.",
+          "date": "2026-10-14",
+          "link": "https://github.com/dcodish/geo_builder/issues/2077#issuecomment-6165780942"
+        }
+      ],
+      "at": "2026-11-10T00:45:07.834Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2814b",
+      "issue": 2814,
+      "question": "May a solver change alter which valid configuration is drawn first at a given configuration number? (a) yes; (b) keep today's first drawing.",
+      "class": "first-drawn-configuration-choice",
+      "verdict": "ruled",
+      "choice": "a",
+      "ruling": "Any valid configuration may be drawn first; a solver change may change which one appears at a configuration number, provided none is gained or lost and every status is unchanged.",
+      "precedents": [
+        {
+          "quote": "if there is more than 1 way to build it - we draw a possible config and allow user to change configs",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/06w-decisions-workspace.md#adr-w-199"
+        },
+        {
+          "quote": "Ruling: yes, accept the redraw.",
+          "date": "2026-10-04",
+          "link": "https://github.com/dcodish/geo_builder/issues/863#issuecomment-5982062061"
+        }
+      ],
+      "confidence": "medium",
+      "limits": "Not a specifically ruled first drawing (a stated sign, ADR-3D-400 floor, 2-D extension ladder); not a change gaining/losing a configuration or changing a status; not Q-2814a; not the 2.7× cost sign-off.",
+      "at": "2026-11-10T00:45:07.834Z",
+      "status": "pending"
     }
   ],
   "demoted": {
