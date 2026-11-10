@@ -1198,6 +1198,8 @@ export function App() {
           ? t('slopeVertical')
           : a.fact === 'lines-cross'
             ? t('askLinesCross')
+            : a.fact === 'parabola-no-centre'
+              ? /* #2625 (ADR-AG-454 Am. 1): the refusal's own sentence, one wording for both lanes */ t('errParabolaNoCentre')
             : a.fact === 'points' && a.points
               ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
                    locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
