@@ -116,6 +116,12 @@ describe('#2735 — the question box answers in the parameter', () => {
     expect(answer(E, 'אורך הציר הראשי').value).toBe('10k');
   });
 
+  it('a DETERMINED figure has no parameter: its letters are unknowns the givens pin, never answered in (round #2822)', () => {
+    // the book's p2-15: three ellipses, a and b pinned to three roots — never «x²/a² + y²/b² = 1»
+    const lines = ['נתונה אליפסה שציריה הם צירי השיעורים', 'F1 ו-F2 מוקדי האליפסה', 'נתון ישר l המקביל לציר ה-x', 'הישר l חותך את האליפסה בנקודות A ו-B', 'AB=8', 'AF1=6', 'AF2=10'];
+    expect(answer(lines, 'משוואת האליפסה').value ?? '').not.toMatch(/a²|b²/);
+  });
+
   it('«הביעו באמצעות k את שיעורי הנקודות F1 ו-F2» answers each focus', () => {
     const a = answer(['x²/144 + y²/(144 − 4k²) = 1', '0 < k < 6', 'F1 הוא המוקד הימני של האליפסה', 'F2 הוא המוקד השמאלי של האליפסה'], 'הביעו באמצעות k את שיעורי הנקודות F1 ו-F2');
     expect(a.parts?.map((p) => p.value)).toEqual(['(2k, 0)', '(-2k, 0)']);

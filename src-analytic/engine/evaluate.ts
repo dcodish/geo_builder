@@ -6813,7 +6813,13 @@ function letterPool(c: Construction): LetterPool | 'pending' | null {
   }
   pool.fill();
   const figs = admittedOf(c, pool.ready());
-  if (figs.length < 3) return null;
+  /*
+   * A LETTER TO ANSWER IN IS A FREE PARAMETER, never an unknown the givens pin (round #2822, with #2731). A DETERMINED
+   * figure (no continuous freedom in any configuration) has no parameter: its letters take finitely many values, one per
+   * root, and the book's p2-15 ellipse read «x²/a² + y²/b² = 1» across its three roots, a² = a² — true and empty, where
+   * the honest answer is that the figure has three solutions (ADR-AG-451).
+   */
+  if (figs.length < 3 || figs.every((f) => f.carrierDof === 0)) return null;
   const envs = figs.map((f) => f.env);
   const varying = letters.filter((sym) => {
     const vs = envs.map((e) => e[sym]);
