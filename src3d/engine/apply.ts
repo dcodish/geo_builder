@@ -20,7 +20,7 @@ import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3,
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reachesFreeCarrier3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
-import { freeMetricOperands3, spellingOf, symbolValueOf } from './types';
+import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 import { hasClaimResidual3, verifyClaim } from './claims';
 
@@ -286,7 +286,13 @@ function recordClaim3(next: Construction3, c: Construction3, claim: Claim3, driv
     return 'param';
   }
   if (drive) {
+    const pinsBefore = next.scalarPins.length;
     drive.pin();
+    // #2795 (ADR-3D-483): the pin drives this claim — what the held-pin release checks when it leaves the pin out
+    for (let i = pinsBefore; i < next.scalarPins.length; i++) {
+      const pin = next.scalarPins[i];
+      scalarPinOrigin3.set(pin, { ...scalarPinOrigin3.get(pin), claim });
+    }
     if (drive.record === 'arbiter') recordPinGiven(next, claim as PinGivenClaim);
     else if (drive.record === 'claim') next.claims.push(claim);
     return 'pin';

@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2790 (ADR-3D-484) — the held row: the base angles restated after «AB = AC» are their own row, with the notice, and move
+  // nothing (#2795, ADR-3D-483). The file is saved with «AB = AC» UNTICKED (set after generation): the restated row holds
+  // the triangle isosceles on its own. The class is asserted in already-drawn-1990.test.ts; this is the build + drift + load net.
+  'held-row-2790.geo3.json': ['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB'],
   // #2814 (ADR-3D-461) — the operator's #827 exam pyramid, p = ±4 with no sign: the row lists both configurations at every
   // seed and presses alternate them. The sweep over seeds 0–23 is asserted in issue-827.test.ts and the pool in
   // engine/__tests__/pivot3.test.ts; this is the build + drift + load net.

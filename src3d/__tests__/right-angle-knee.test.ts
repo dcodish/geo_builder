@@ -238,8 +238,8 @@ describe('S2 — a stated ⊥ between a segment and a named line', () => {
     // and typed, the same ⊥ is already known
     build(steps.slice(0, -1));
     useGeo3.getState().submit(steps[steps.length - 1]);
-    expect(useGeo3.getState().facts).toHaveLength(4);
-    expect(useGeo3.getState().lastNotice).toEqual({ code: 'already-stated' });
+    expect(useGeo3.getState().facts).toHaveLength(5);
+    expect(useGeo3.getState().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it('a driven ⊥ whose segment never meets ℓ draws NO knee (the R³ honesty rule)', () => {

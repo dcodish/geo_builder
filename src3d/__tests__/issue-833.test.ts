@@ -96,14 +96,15 @@ describe('#833 — honesty is preserved in both directions', () => {
 
   // #2341 (ADR-3D-449, operator 2026-11-06: "In all cases it should say כבר קיים"): on a cube the ∥ is ALREADY HELD, so
   // it is answered «כבר קיים» with no row, and draws nothing. Was: a ✓ row that drew the bottom diagonal AC.
-  it('a ∥ the cube already holds is already known: no row, nothing drawn', () => {
+  // #2790 (ADR-3D-484): held — its own row, with the notice, drawn like any row: its operand AC is drawn
+  it('a ∥ the cube already holds is held: its own row, its operand drawn', () => {
     reset();
     [CUBE, "AC מקביל למישור A'B'C'D'"].forEach(submit);
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(1);
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
     const d = derive3(st().facts, st().seed);
-    expect(d.construction.segments.some(([a, b]) => (a === 'A' && b === 'C') || (a === 'C' && b === 'A'))).toBe(false);
+    expect(d.construction.segments.some(([a, b]) => (a === 'A' && b === 'C') || (a === 'C' && b === 'A'))).toBe(true);
   });
 
   it('parses through the real grammar (no hand-built commands)', () => {

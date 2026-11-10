@@ -387,6 +387,9 @@ function revolutionResidual(cl: { solid: string; value: number }, c: Constructio
   return actual === null ? null : { r: actual - cl.value, tol: valueTol(cl.value) };
 }
 
+/** #2795 (ADR-3D-483): the verifier's one verdict on a claim at one resolved configuration — the held-pin release's check. */
+export const claimHoldsAt3 = (claim: Claim3, c: Construction3, resolved: Resolved3): boolean => holdsAt(claim, c, resolved);
+
 function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean {
   // #375: a claim may reference a resolved LINE, not only positions. `evaluate3` is literally
   // `resolve3(...).positions`, so taking the whole Resolved3 costs nothing and stops the claim lane
