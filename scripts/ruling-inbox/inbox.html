@@ -150,7 +150,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
 <script>
 (function(){
   const $ = s => document.querySelector(s);
-  const state = { items: new Map(), answers: new Map(), meta: null, tab: 'decide', loaded: { items:false, answers:false }, db: null, drafts: {} };
+  const state = { items: new Map(), answers: new Map(), meta: null, tab: 'decide', loaded: { items:false, answers:false }, db: null, drafts: {}, sentHere: new Set() };
   const TABS = ['decide','test'];
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const PRODUCT = { '2d':'2-D', '3d':'3-D', analytic:'Analytic', complex:'Complex', workspace:'Workspace', server:'Server' };
@@ -322,7 +322,7 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     const list = $('#list');
     if (!state.loaded.items) return;
     let rows = all.filter(it => bucket(it) === state.tab);
-    const sent = it => state.answers.has(it.id) ? 1 : 0;
+    const sent = it => (state.answers.has(it.id) && !state.sentHere.has(it.id)) ? 1 : 0; // sent in this view: stays in place
     rows.sort((a,b) => sent(a) - sent(b) || (a.rank||999) - (b.rank||999) || String(a.created||'').localeCompare(String(b.created||'')));
     if (!rows.length) {
       const msg = { decide:['No decisions waiting','When a fix plan needs your call, it appears here with its options and a recommendation.'],
@@ -384,7 +384,19 @@ dialog.lb p{color:#e6e9ef;font-size:13px;margin:6px 2px 0}
     if (it.kind === 'decision') { const c = d.choice != null ? d.choice : prev.choice; if (c != null) doc.choice = c; }
     else { doc.verdict = d.verdict != null ? d.verdict : prev.verdict; if (doc.verdict === 'fail' && !note) { state.drafts[id] = Object.assign({}, d, { err: 'Say what was wrong, so the fix can start from it.' }); render(); return; } }
     const btn = document.querySelector('.send[data-id="' + CSS.escape(id) + '"]'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-    try { await state.db.doc('answers/' + id).set(doc); delete state.drafts[id]; state.answers.set(id, doc); render(); }
+    try {
+      await state.db.doc('answers/' + id).set(doc); delete state.drafts[id]; state.answers.set(id, doc); state.sentHere.add(id);
+      openSet.delete(id);
+      const order = [...document.querySelectorAll('#list details.card')].map(d => d.dataset.id);
+      const after = order.slice(order.indexOf(id) + 1).concat(order.slice(0, order.indexOf(id)));
+      const next = after.find(k => !state.answers.has(k));
+      if (next) openSet.add(next);
+      render();
+      const el = next && document.querySelector('#list details.card[data-id="' + CSS.escape(next) + '"]');
+      const prev = document.querySelector('#list details.card[data-id="' + CSS.escape(id) + '"]');
+      if (el) el.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      else if (prev) prev.scrollIntoView({ block: 'nearest' });
+    }
     catch(err) { state.drafts[id] = Object.assign({}, d, { err: 'Not saved: ' + (err && err.message ? err.message : 'the database refused it') + '. Your text is kept; try again.' }); render(); }
   }
 
