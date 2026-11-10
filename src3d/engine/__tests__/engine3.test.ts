@@ -5,13 +5,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { applyCommand3, freeDims, unstatedPyramidBase3 } from '../apply';
-import { verifyClaim } from '../claims';
-import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, type QuadPreference3 } from '../evaluate';
-import { quadDrawnDegenerate } from '../baseShapes';
+import { applyCommand3, freeDims, unstatedPyramidReading3 } from '../apply';
+import { claimResidual3, residualHolds3, verifyClaim } from '../claims';
+import { evaluate3, firstSatisfyingSeed3, freeDofCount3, meetsRequirements3, meetsShapePreferences3, possibleShapePreferences3, resolve3, resolveStats3, solidDims, solidDimsAll3, type QuadPreference3 } from '../evaluate';
+import { commandStatesCircle3, concaveSeatVertices3, quadDrawnDegenerate, statedConcyclic3 } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
-import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
+import { cross3, dist3, dot3, lerp3, norm3, ringSelfCrossing3, sub3, v3 } from '../vec3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -386,7 +386,7 @@ describe('#2490 — a pyramid over an existing base is a bound solid', () => {
 });
 
 /**
- * #2490 (ADR-3D-436) — `unstatedPyramidBase3`: a pyramid whose base shape is unstated reads, over a ring that already
+ * #2490 (ADR-3D-436) — `unstatedPyramidReading3`: a pyramid whose base shape is unstated reads, over a ring that already
  * exists, as the quadrilateral its letters name (operator 2026-11-08: *"Keep its shape"*). The read command applied over
  * a free quadrilateral leaves its four shape DOFs free; the default rectangle stays where the pyramid makes its base.
  */
@@ -394,6 +394,12 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
   const PYR = ['A', 'B', 'C', 'D', 'S'];
   const plain: SolidCommand = { type: 'solid', kind: 'pyramid4gr', ids: PYR };
   const quad = (): Construction3 => build({ type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] });
+  /** the plain kind always reads as ONE command */
+  const one = (c: Construction3, cmd: SolidCommand): Command3 => {
+    const read = unstatedPyramidReading3(c, cmd);
+    expect(read).toHaveLength(1);
+    return read[0];
+  };
   const cornerCos = (c: Construction3, seed: number) => {
     const p = evaluate3(c, seed);
     const ring = ['A', 'B', 'C', 'D'].map((id) => p.get(id)!);
@@ -405,15 +411,15 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
   };
 
   it('over an existing ring the default yields: the general-quadrilateral kind, every other field kept', () => {
-    expect(unstatedPyramidBase3(quad(), plain)).toEqual({ ...plain, kind: 'pyramidQuad' });
-    expect(unstatedPyramidBase3(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }), plain).kind).toBe('pyramidQuad');
+    expect(one(quad(), plain)).toEqual({ ...plain, kind: 'pyramidQuad' });
+    expect(one(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }), plain)).toMatchObject({ kind: 'pyramidQuad' });
     const prism = build({ type: 'solid', kind: 'prism4g', ids: CUBE_IDS, oblique: true });
-    expect(unstatedPyramidBase3(prism, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', "B'", "A'", 'S'] }).kind).toBe('pyramidQuad');
+    expect(one(prism, { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', "B'", "A'", 'S'] })).toMatchObject({ kind: 'pyramidQuad' });
   });
 
   it('applied, the ring keeps its shape and its DOFs: a free quadrilateral is never a rectangle, host + 3', () => {
     const before = quad();
-    const r = applyCommand3(before, unstatedPyramidBase3(before, plain));
+    const r = applyCommand3(before, one(before, plain));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.next.solids[1]).toMatchObject({ kind: 'pyramidQuad', bound: ['A', 'B', 'C', 'D'] });
@@ -426,19 +432,100 @@ describe('#2490 — an unstated pyramid base over an existing ring keeps the rin
   it('a trapezoid keeps its shape instead of being refused against the default rectangle', () => {
     const trap = build({ type: 'quad-shape', base: 'trapezoid', ids: ['A', 'B', 'C', 'D'] });
     expect(applyCommand3(trap, plain)).toEqual({ ok: false, error: { code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' } });
-    expect(applyCommand3(trap, unstatedPyramidBase3(trap, plain)).ok).toBe(true);
+    expect(applyCommand3(trap, one(trap, plain)).ok).toBe(true);
   });
 
-  it('left as read: a pyramid that makes its own base, a right kind, a run that does not bind, an unlettered run', () => {
-    expect(unstatedPyramidBase3(emptyConstruction3(), plain)).toBe(plain); // standalone: ADR-3D-011's rectangle draws the base
-    const right: SolidCommand = { type: 'solid', kind: 'pyramid4r', ids: PYR };
-    expect(unstatedPyramidBase3(quad(), right)).toBe(right); // the right pyramid over an existing ring is the operator's question
+  it('left as read: a pyramid that makes its own base, a run that does not bind, an unlettered run', () => {
+    expect(one(emptyConstruction3(), plain)).toBe(plain); // standalone: ADR-3D-011's rectangle draws the base
     const tri = build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] });
-    expect(unstatedPyramidBase3(tri, plain)).toBe(plain); // a base only partly there: no binding, today's refusal
+    expect(one(tri, plain)).toBe(plain); // a base only partly there: no binding, today's refusal
     const unlettered: SolidCommand = { ...plain, lettersUnstated: true };
-    expect(unstatedPyramidBase3(quad(), unlettered)).toBe(unlettered); // FR-SP-24: never binds by default letters
+    expect(one(quad(), unlettered)).toBe(unlettered); // FR-SP-24: never binds by default letters
     const tetra: SolidCommand = { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'S'] };
-    expect(unstatedPyramidBase3(tri, tetra)).toBe(tetra); // a triangular base has no default shape to yield
+    expect(one(tri, tetra)).toBe(tetra); // a triangular base has no default shape to yield
+  });
+});
+
+/**
+ * #2490 (ADR-3D-468, ADR-W-199) — `unstatedPyramidReading3` on a RIGHT kind: over a ring that already exists it reads
+ * as its stated twin «פירמידה ישרה ABCDS שבסיסה מרובע» — the general right kind PLUS the twin's cyclic fix — so the
+ * ring's own free DOF absorb «ישרה» (a free quadrilateral becomes a cyclic one, never the rectangle), and a ring a
+ * circle already passes through is drawn as it was, with no build note (Q-2490d).
+ */
+describe('#2490 — a right pyramid over an existing ring fits the ring to a cyclic one', () => {
+  const PYR = ['A', 'B', 'C', 'D', 'S'];
+  const RING = ['A', 'B', 'C', 'D'];
+  const right: SolidCommand = { type: 'solid', kind: 'pyramid4r', ids: PYR };
+  const ring = (base: 'quad' | 'square' | 'rectangle' | 'kite'): Construction3 =>
+    base === 'quad' ? build({ type: 'solid', kind: 'polygon4', ids: RING }) : build({ type: 'quad-shape', base, ids: ['A', 'B', 'C', 'D'] });
+  const applyAll = (c: Construction3, cmds: readonly Command3[]) => {
+    let r: ReturnType<typeof applyCommand3> = { ok: true, next: c };
+    for (const k of cmds) {
+      if (!r.ok) break;
+      r = applyCommand3(r.next, k);
+    }
+    return r;
+  };
+  const dof = (c: Construction3) => freeDofCount3(c, resolve3(c, 0));
+
+  it('reads as the general right kind plus ONE concyclic shape relation on the ring, every other field kept', () => {
+    expect(unstatedPyramidReading3(ring('quad'), right)).toEqual([{ ...right, kind: 'pyramidQuadR' }, { type: 'concyclic', ids: ['A', 'B', 'C', 'D'], origin: 'shape' }]);
+    const onCube = unstatedPyramidReading3(build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }), right);
+    expect(onCube.map((k) => k.type === 'solid' ? k.kind : k.type)).toEqual(['pyramidQuadR', 'concyclic']);
+  });
+
+  it('left as read: a standalone right pyramid (its rectangle), an unlettered run, a run that does not bind, a triangle', () => {
+    expect(unstatedPyramidReading3(emptyConstruction3(), right)).toEqual([right]);
+    const unlettered: SolidCommand = { ...right, lettersUnstated: true };
+    expect(unstatedPyramidReading3(ring('quad'), unlettered)).toEqual([unlettered]);
+    expect(unstatedPyramidReading3(build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }), right)).toEqual([right]);
+    const tri: SolidCommand = { type: 'solid', kind: 'pyramid3', ids: ['A', 'B', 'C', 'S'] };
+    expect(unstatedPyramidReading3(build({ type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] }), tri)).toEqual([tri]);
+  });
+
+  it('applied over a free quadrilateral: the ring becomes cyclic, not a rectangle, and the DOF count is unchanged (-1 cyclic, +1 height)', () => {
+    const before = ring('quad');
+    const r = applyAll(before, unstatedPyramidReading3(before, right));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.next.solids[1]).toMatchObject({ kind: 'pyramidQuadR', bound: RING });
+    expect(r.next.solids[1].boundCyclic).toBeUndefined(); // it was constrained: the build note shows
+    expect(verifyClaim({ type: 'concyclic', ids: RING }, r.next, 0)).toBe(true);
+    expect(dof(r.next)).toBe(dof(before));
+    // ADR-052: a general cyclic quadrilateral, never the rectangle at every seed
+    const notRect = [0, 1, 2, 3, 4, 5].some((seed) => {
+      const p = resolve3(r.next, seed).positions;
+      const [a, b, c] = ['A', 'B', 'C'].map((id) => p.get(id)!);
+      return Math.abs(dot3(sub3(a, b), sub3(c, b)) / (norm3(sub3(a, b)) * norm3(sub3(c, b)))) > 0.01;
+    });
+    expect(notRect).toBe(true);
+  });
+
+  it('over a kite: a right kite (DOF unchanged), never the square', () => {
+    const before = ring('kite');
+    const r = applyAll(before, unstatedPyramidReading3(before, right));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(verifyClaim({ type: 'concyclic', ids: RING }, r.next, 0)).toBe(true);
+    expect(dof(r.next)).toBe(dof(before));
+  });
+
+  it('over a ring a circle already passes through (square, rectangle, cube face): unmoved, boundCyclic, one DOF more', () => {
+    for (const before of [ring('square'), ring('rectangle'), build({ type: 'solid', kind: 'cube', ids: CUBE_IDS })]) {
+      const r = applyAll(before, unstatedPyramidReading3(before, right));
+      expect(r.ok).toBe(true);
+      if (!r.ok) continue;
+      const solid = r.next.solids.find((x) => x.kind === 'pyramidQuadR')!;
+      expect(solid).toMatchObject({ bound: RING, boundCyclic: true });
+      expect(dof(r.next)).toBe(dof(before) + 1);
+      for (const seed of [0, 3]) {
+        const p = evaluate3(r.next, seed);
+        // the already-known cyclic fix re-solves the ring in place: solver noise, never a move (≤ 1e-7)
+        for (const id of RING) expect(dist3(p.get(id)!, evaluate3(before, seed).get(id)!)).toBeLessThan(1e-7);
+        const lateral = RING.map((id) => dist3(p.get('S')!, p.get(id)!));
+        for (const l of lateral) expect(l).toBeCloseTo(lateral[0], 6);
+      }
+    }
   });
 });
 
@@ -557,6 +644,94 @@ describe('#2749 — an impossible drawing preference is not demanded', () => {
   });
 });
 
+describe('#2810 — letters a stated circle passes through have one simple order (ADR-3D-467)', () => {
+  const quad = (ids = ['A', 'B', 'C', 'D']): Command3 => ({ type: 'solid', kind: 'polygon4', ids });
+  const two = (...more: Command3[]) => build(quad(), ...more, { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'D', 'C'] });
+
+  it('statedConcyclic3 reads a circle through the ring, a concyclic claim or pin, and a right pyramid base', () => {
+    const circum = build(quad(), { type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } });
+    expect(statedConcyclic3(circum, ['A', 'B', 'D', 'C'])).toBe(true); // any order of the same letters
+    const fix = build(quad(), { type: 'concyclic', ids: ['A', 'B', 'C', 'D'] });
+    expect(fix.scalarPins.some((p) => p.kind === 'concyclic') || fix.claims.some((k) => k.type === 'concyclic')).toBe(true);
+    expect(statedConcyclic3(fix, ['A', 'B', 'C', 'D'])).toBe(true);
+    const right = build(quad(), { type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(statedConcyclic3(right, ['A', 'B', 'C', 'D'])).toBe(true);
+    // nothing states a circle: a bare quad, a plain (not right) pyramid, a kite, a circle through three of the four
+    expect(statedConcyclic3(build(quad()), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build(quad(), { type: 'solid', kind: 'pyramidQuad', ids: ['A', 'B', 'C', 'D', 'S'] }), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build({ type: 'quad-shape', base: 'kite', ids: ['A', 'B', 'C', 'D'] }), ['A', 'B', 'C', 'D'])).toBe(false);
+    expect(statedConcyclic3(build(quad(), { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } }), ['A', 'B', 'C', 'D'])).toBe(false);
+  });
+
+  it('a rider stated on the circle joins its letters', () => {
+    const c = build(
+      { type: 'solid', kind: 'polygon3', ids: ['A', 'B', 'C'] },
+      { type: 'circle3', id: 'circle-ABC', def: { kind: 'circum', ring: ['A', 'B', 'C'] } },
+      { type: 'point-on-circle3', point: 'D', circle: 'circle-ABC' },
+    );
+    expect(statedConcyclic3(c, ['A', 'B', 'C', 'D'])).toBe(true);
+    expect(statedConcyclic3(c, ['A', 'B', 'C', 'E'])).toBe(false);
+  });
+
+  it('concaveSeatVertices3 yields to a stated circle (flat ring and kite alike); no circle keeps the seat', () => {
+    expect(concaveSeatVertices3(two(), ['A', 'B', 'D', 'C'])).not.toBeNull(); // C1: no circle, the seat stays
+    expect(concaveSeatVertices3(two({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
+    expect(concaveSeatVertices3(two({ type: 'concyclic', ids: ['A', 'B', 'C', 'D'] }), ['A', 'B', 'D', 'C'])).toBeNull();
+    const kite = (...more: Command3[]) => build({ type: 'quad-shape', base: 'kite', ids: ['A', 'B', 'C', 'D'] }, ...more, quad(['A', 'B', 'D', 'C']));
+    expect(concaveSeatVertices3(kite(), ['A', 'B', 'D', 'C'])).not.toBeNull();
+    expect(concaveSeatVertices3(kite({ type: 'circle3', id: 'circle-ABCD', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }), ['A', 'B', 'D', 'C'])).toBeNull();
+  });
+
+  it('commandStatesCircle3 names the lines a crossing is blamed on', () => {
+    const L = ['A', 'B', 'D', 'C'];
+    expect(commandStatesCircle3({ type: 'circle3', id: 'c', def: { kind: 'circum', ring: ['A', 'B', 'C', 'D'] } }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'circle3', id: 'c', def: { kind: 'incircle', ring: ['A', 'B', 'C', 'D'] } }, L)).toBe(false);
+    expect(commandStatesCircle3({ type: 'concyclic', ids: ['A', 'B', 'C', 'D'] }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] }, L)).toBe(true);
+    expect(commandStatesCircle3({ type: 'solid', kind: 'pyramidQuad', ids: ['A', 'B', 'C', 'D', 'S'] }, L)).toBe(false);
+  });
+
+  it('the concyclic VERIFIER is in-order concyclicity: a dart with ∠A + ∠C = 180°, a crossed order and a skew quad are refuted', () => {
+    const at = (pts: Record<string, [number, number, number]>) => new Map(Object.entries(pts).map(([k, [x, y, z]]) => [k, v3(x, y, z)]));
+    const holds = (ids: string[], pos: Map<string, ReturnType<typeof v3>>) =>
+      residualHolds3(claimResidual3({ type: 'concyclic', ids }, emptyConstruction3(), pos));
+    const t = [0.3, 1.4, 2.9, 4.6];
+    const cyc = at(Object.fromEntries(['A', 'B', 'C', 'D'].map((k, i) => [k, [2 * Math.cos(t[i]), 2 * Math.sin(t[i]), 0]])) as never);
+    expect(holds(['A', 'B', 'C', 'D'], cyc)).toBe(true);
+    expect(holds(['A', 'B', 'D', 'C'], cyc)).toBe(false); // the crossed order of four concyclic points
+    // a dart: C inside triangle ABD with ∠BAD + ∠BCD = 180° (B, D at ±1 on the x-axis, A above, C above too)
+    const A: [number, number, number] = [0, 2, 0];
+    const angA = Math.acos(3 / 5); // ∠BAD at A(0,2) with B(−1,0), D(1,0)
+    // ∠BCD = π − ∠A: C on the axis, above BD, at height 1 / tan((π − ∠A) / 2) = 0.5 — inside triangle ABD
+    const dart = at({ A, B: [-1, 0, 0], C: [0, 1 / Math.tan((Math.PI - angA) / 2), 0], D: [1, 0, 0] });
+    const cosAt = (v: string, p: string, q: string) => {
+      const u1 = sub3(dart.get(p)!, dart.get(v)!);
+      const u2 = sub3(dart.get(q)!, dart.get(v)!);
+      return dot3(u1, u2) / (norm3(u1) * norm3(u2));
+    };
+    expect(Math.abs(cosAt('A', 'B', 'D') + cosAt('C', 'B', 'D'))).toBeLessThan(1e-12); // the old residual's zero
+    expect(holds(['A', 'B', 'C', 'D'], dart)).toBe(false);
+    // A turned 40° about the line BD keeps |AB|, |AD| and so ∠BAD: opposite angles still supplementary, off one plane
+    const [B, D, A0] = [cyc.get('B')!, cyc.get('D')!, cyc.get('A')!];
+    const k = sub3(D, B);
+    const kn = v3(k.x / norm3(k), k.y / norm3(k), k.z / norm3(k));
+    const p = sub3(A0, B);
+    const [co, si] = [Math.cos(0.7), Math.sin(0.7)];
+    const kp = cross3(kn, p);
+    const kd = dot3(kn, p);
+    const rot = v3(p.x * co + kp.x * si + kn.x * kd * (1 - co), p.y * co + kp.y * si + kn.y * kd * (1 - co), p.z * co + kp.z * si + kn.z * kd * (1 - co));
+    const skew = new Map(cyc);
+    skew.set('A', v3(B.x + rot.x, B.y + rot.y, B.z + rot.z));
+    expect(Math.abs(skew.get('A')!.z)).toBeGreaterThan(0.1);
+    expect(holds(['A', 'B', 'C', 'D'], skew)).toBe(false);
+    // a circumscribed pentagon's backstop tuples [r0, r1, r2, v] hold in order
+    const s = [0.2, 1.3, 2.5, 3.9, 5.1];
+    const pent = at(Object.fromEntries(['A', 'B', 'C', 'D', 'E'].map((k, i) => [k, [Math.cos(s[i]), Math.sin(s[i]), 1]])) as never);
+    expect(holds(['A', 'B', 'C', 'D'], pent)).toBe(true);
+    expect(holds(['A', 'B', 'C', 'E'], pent)).toBe(true);
+  });
+});
+
 describe('stability (first-class regression)', () => {
   it('adding a fact never moves existing points — same seed, same samples', () => {
     const before = build({ type: 'solid', kind: 'box', ids: CUBE_IDS });
@@ -570,5 +745,57 @@ describe('stability (first-class regression)', () => {
     for (const id of CUBE_IDS) {
       expect(p1.get(id)).toEqual(p0.get(id));
     }
+  });
+});
+
+/**
+ * #2702 (ADR-3D-469) — a solid's quad base takes the concave seat when a second ring orders its letters differently
+ * (ADR-3D-418's yield, a solid edition): a kite base as a dart about its axis, a general base (and an unstated one,
+ * whose rectangle yields) anywhere, a prism's general base the same. A base convex whenever simple, or a right
+ * pyramid's (cyclic) base, keeps the convex seat; a single ring is untouched.
+ */
+describe('#2702 — a second ring over a solid base draws the base as a dart', () => {
+  const PYR = ['A', 'B', 'C', 'D', 'S'];
+  const ABDC: Command3 = { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'D', 'C'] };
+  const simple = (c: Construction3, seed: number, ring: string[]) => !ringSelfCrossing3(ring.map((id) => evaluate3(c, seed).get(id)!));
+
+  it('a kite base is a dart about its axis: both rings simple, the kite kept, the reflex corner A or C by seed', () => {
+    const c = build({ type: 'solid', kind: 'pyramidKite', ids: PYR }, ABDC);
+    expect(concaveSeatVertices3(c, ['A', 'B', 'C', 'D'])).toEqual([0, 2]);
+    const reflex = new Set<number>();
+    for (let seed = 0; seed < 12; seed++) {
+      const p = evaluate3(c, seed);
+      expect(simple(c, seed, ['A', 'B', 'C', 'D']), `@${seed}`).toBe(true);
+      expect(simple(c, seed, ['A', 'B', 'D', 'C']), `@${seed}`).toBe(true);
+      expect(dist3(p.get('A')!, p.get('B')!)).toBeCloseTo(dist3(p.get('A')!, p.get('D')!), 9);
+      expect(dist3(p.get('C')!, p.get('B')!)).toBeCloseTo(dist3(p.get('C')!, p.get('D')!), 9);
+      const r = ['A', 'B', 'C', 'D'].map((id) => p.get(id)!);
+      const n = cross3(sub3(r[1], r[0]), sub3(r[3], r[0]));
+      [0, 2].forEach((i) => { if (dot3(cross3(sub3(r[i], r[(i + 3) % 4]), sub3(r[(i + 1) % 4], r[i])), n) * dot3(cross3(sub3(r[1], r[0]), sub3(r[2], r[1])), n) < 0) reflex.add(i); });
+    }
+    expect(reflex).toEqual(new Set([0, 2]));
+  });
+
+  it('a general base, an unstated base and a prism\'s general base take the seat; the unstated rectangle yields', () => {
+    const unstated: SolidCommand = { type: 'solid', kind: 'pyramid4gr', ids: PYR, baseUnstated: true };
+    for (const first of [{ type: 'solid', kind: 'pyramidQuad', ids: PYR } as SolidCommand, unstated, { type: 'solid', kind: 'prism4g', ids: CUBE_IDS, oblique: true } as SolidCommand]) {
+      const c = build(first, ABDC);
+      expect(c.solids[0].kind, first.kind).toBe(first.kind === 'pyramid4gr' ? 'pyramidQuad' : first.kind);
+      for (let seed = 0; seed < 6; seed++) {
+        expect(simple(c, seed, ['A', 'B', 'C', 'D']), `${first.kind} @${seed}`).toBe(true);
+        expect(simple(c, seed, ['A', 'B', 'D', 'C']), `${first.kind} @${seed}`).toBe(true);
+      }
+    }
+  });
+
+  it('unchanged: a stated rectangle, a parallelogram, a right kite pyramid and a single ring keep the convex seat', () => {
+    for (const kind of ['pyramid4gr', 'pyramidPar', 'pyramidKiteR', 'pyramidQuadR'] as const) {
+      const c = build({ type: 'solid', kind, ids: PYR }, ABDC);
+      expect(c.solids[0].kind, kind).toBe(kind); // no mark: the stated rectangle never yields
+      expect(concaveSeatVertices3(c, ['A', 'B', 'C', 'D']), kind).toBeNull();
+    }
+    const one = build({ type: 'solid', kind: 'pyramidKite', ids: PYR });
+    expect(concaveSeatVertices3(one, ['A', 'B', 'C', 'D'])).toBeNull();
+    expect(solidDimsAll3(one, 3)[0]).toEqual(solidDims('pyramidKite', 'solid-pyramidKite-ABCDS', 3));
   });
 });

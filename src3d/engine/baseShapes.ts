@@ -493,6 +493,45 @@ export const CYCLIC_MEMBER_NAME: Record<QuadBase, string> = {
   quad: 'cyclicQuad',
 };
 
+/**
+ * The constraint «ישרה» adds so the stated base becomes CYCLIC — the operator's 2026-07-27 ruling
+ * (#305). A right pyramid's apex sits over the base's circumcentre, which exists iff the base is
+ * cyclic; rather than refuse, the base is constrained into the cyclic member of its OWN family and
+ * a build notice names what it became. Nothing is invented: the base noun and «ישרה» jointly
+ * ENTAIL it (the ADR-165 / ADR-123 allowed-with-a-notice precedent). Lowered as ordinary relations —
+ * the ADR-110 macro pattern — so the solver does the work and no new engine construct is needed.
+ * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
+ *
+ * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468)): lives in the engine, beside `CYCLIC_MEMBER`, so the
+ * parser (a base the line states) and the fold's reading of an unstated base over an existing ring
+ * (`unstatedPyramidReading3`) lower the one fix.
+ */
+export function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
+  return shapeInternal3(cyclicFixRelations(base, ring)); // #1844: equal DIAGONALS are the shape's, not a drawn pair
+}
+
+export function cyclicFixRelations(base: QuadBase, ring: Id[]): ShapeRelation3[] {
+  const fix = CYCLIC_MEMBER[base].fix;
+  switch (fix.kind) {
+    case 'none':
+      return [];
+    case 'right-angle': {
+      const v = ring[fix.vertex];
+      const prev = ring[(fix.vertex + 3) % 4];
+      const nxt = ring[(fix.vertex + 1) % 4];
+      return [{ type: 'cos-angle', u: { kind: 'pair', from: v, to: prev }, v: { kind: 'pair', from: v, to: nxt }, cos: 0 }];
+    }
+    // an isosceles trapezoid: its DIAGONALS are equal, |AC| = |BD|. #1792: not the legs — with AB ∥ DC,
+    // |AD| = |BC| also holds on every PARALLELOGRAM, and a free flat ring solved onto that branch at 3 of 8
+    // seeds (a circle through a parallelogram's vertices then missed one). Equal diagonals on a trapezoid
+    // admit only the isosceles trapezoid and the rectangle — both cyclic, both isosceles trapezoids.
+    case 'equal-diagonals':
+      return [{ type: 'length-rel', a1: ring[0], b1: ring[2], rhs: { pair: [ring[1], ring[3]] }, c: 1 }];
+    case 'concyclic':
+      return [{ type: 'concyclic', ids: [...ring] }];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The quad-pyramid family: BASE × TOP, as one table
 // ---------------------------------------------------------------------------
@@ -619,6 +658,57 @@ export function ringReordered3(c: Pick<Construction3, 'quadShapes' | 'solids' | 
   return declaredRings3(c).some((r) => r.length === ids.length && [...r].sort().join() === letters && ringKeyIds3(r) !== own);
 }
 
+/** What `statedConcyclic3` reads: the construction's statements, never positions. */
+export type StatedConcyclicCtx3 = Pick<Construction3, 'quadShapes' | 'solids' | 'claims' | 'circles3' | 'circleMembers3' | 'scalarPins' | 'points'>;
+
+/**
+ * #2810 ([ADR-3D-467](../../docs/06b-decisions-3d.md#adr-3d-467)) — DOES A STATEMENT PUT EVERY ONE OF THESE LETTERS ON
+ * ONE CIRCLE? Four or more concyclic points are in convex position, so they have exactly ONE simple cyclic order:
+ * a ring over them has no concave drawing, and a second ring over the same letters in another order crosses in every
+ * configuration — the sufficient reason ADR-3D-327's structural pass reads beside `convexWhenSimple`. The statements:
+ *  - a circle through the points: a circle through a ring (`circum`), plus every point stated on that circle
+ *    (a rider «D על המעגל», a placed member) — for ANY circle;
+ *  - a `concyclic` claim or pin over them (the circle backstop's tuples, a noun's cyclic fix, a right pyramid's twin);
+ *  - a RIGHT quad pyramid's base (a right pyramid's apex is over the base's circumcentre, so the base is cyclic).
+ * Structural: what was stated, never what one drawing happens to show (M3).
+ */
+export function statedConcyclic3(c: Omit<StatedConcyclicCtx3, 'quadShapes'>, letters: readonly Id[]): boolean {
+  if (letters.length < 4) return false;
+  const covers = (ids: readonly Id[]) => letters.every((l) => ids.includes(l));
+  if (letters.length === 4) {
+    if (c.solids.some((s) => QUAD_PYRAMIDS[s.kind]?.right === true && s.ids.length >= 4 && covers(s.ids.slice(0, 4)))) return true;
+    if (c.claims.some((k) => k.type === 'concyclic' && covers(k.ids))) return true;
+    if (c.scalarPins.some((p) => p.kind === 'concyclic' && covers(p.ids))) return true;
+  }
+  return c.circles3.some((circle) => {
+    const on: Id[] = circle.def.kind === 'circum' ? [...circle.def.ring] : [];
+    for (const [id, def] of c.points) if (def.kind === 'on-circle3' && def.circle === circle.id) on.push(id);
+    for (const m of c.circleMembers3) if (m.circle === circle.id) on.push(m.point);
+    return covers(on);
+  });
+}
+
+/**
+ * #2810 (ADR-3D-467) — does this COMMAND state that some of `letters` lie on one circle? The store's blame reader for
+ * the concyclicity `statedConcyclic3` found: the line that completed a crossing may be the circle, the cyclic fix or
+ * the right pyramid, not a ring line (ADR-3D-322: the latest line is the one refused).
+ */
+export function commandStatesCircle3(k: Command3, letters: readonly Id[]): boolean {
+  const meets = (ids: readonly Id[], n: number) => ids.filter((x) => letters.includes(x)).length >= n;
+  switch (k.type) {
+    case 'circle3':
+      return k.def.kind === 'circum' && meets(k.def.ring, 3);
+    case 'concyclic':
+      return meets(k.ids, 4);
+    case 'point-on-circle3':
+      return letters.includes(k.point);
+    case 'solid':
+      return QUAD_PYRAMIDS[k.kind]?.right === true && letters.length === 4 && meets(k.ids, 4);
+    default:
+      return false;
+  }
+}
+
 /**
  * #1986 (ADR-3D-418) — WHICH VERTICES of a reordered flat quadrilateral may be its reflex corner, as indices into
  * `ids`; null when no concave seat is registered. Read off the shapes stated over the same letters, never off a list
@@ -627,11 +717,16 @@ export function ringReordered3(c: Pick<Construction3, 'quadShapes' | 'solids' | 
  * about its axis (its 1st and 3rd letters — B and D are mirror images, so neither can sit inside the other three),
  * and a kite with an adjective (the right kite) is convex. Every other vertex of a general quadrilateral may be reflex.
  */
-export function concaveSeatVertices3(c: Pick<Construction3, 'quadShapes' | 'solids' | 'claims'>, ids: readonly Id[]): number[] | null {
+export function concaveSeatVertices3(c: StatedConcyclicCtx3 & Pick<Construction3, 'quadShapes'>, ids: readonly Id[]): number[] | null {
   if (ids.length !== 4 || !ringReordered3(c, ids)) return null;
+  // #2810 (ADR-3D-467): four points a stated circle passes through are in convex position — no concave drawing
+  if (statedConcyclic3(c, ids)) return null;
   const letters = [...ids].sort().join();
   let allowed = [0, 1, 2, 3];
-  for (const q of c.quadShapes) {
+  // #2702 (ADR-3D-469): every quad DECLARED over the letters, a pyramid's base among them (`declaredQuads3`) — so a kite
+  // base is a dart only about its axis, as a flat kite is. A RIGHT pyramid's base is cyclic: the stated-circle reader
+  // above answers it (#2810, ADR-3D-467), with every other statement of a circle, so no list of kinds is kept here.
+  for (const q of declaredQuads3(c)) {
     if ([...q.ids].sort().join() !== letters) continue;
     if (convexWhenSimple(q.base) || (q.base === 'kite' && q.adj)) return null;
     if (q.base === 'kite') allowed = allowed.filter((i) => ids[i] === q.ids[0] || ids[i] === q.ids[2]);

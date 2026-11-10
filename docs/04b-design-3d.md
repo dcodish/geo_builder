@@ -376,7 +376,13 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   kite and the bare quadrilateral — makes the crossing STRUCTURAL. `derive3` groups the declared rings by letter SET
   after the retry fixpoint and BEFORE the claim pass: a group with two cyclic orders, one of them convex-when-simple,
   refuses the LATEST declaring fact `ring-crossed`. Running first is why no verdict has to be overridden; ADR-3D-322's
-  sample-based pass stays where it is, for the rings whose figure the pivot can still place.
+  sample-based pass stays where it is, for the rings whose figure the pivot can still place. Since #2810
+  ([ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) the pass reads every declared ring of four or more (`declaredRings3`:
+  pentagons, bound bases) and a second sufficient reason, `statedConcyclic3` (baseShapes.ts: a circle through the
+  letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
+  convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
+  a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
+  ring for the blame too.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -963,11 +969,19 @@ The base SHAPE a bound pyramid carries is only a stated one ([ADR-3D-436](06b-de
 reads «פירמידה ABCDS» and «… שבסיסה מלבן» as one command (ADR-3D-011's rectangle is the default that draws a base the
 pyramid makes), so the fold decides from the row's own text (`namesQuadBase3`, the rule's own reader): a non-right pyramid
 whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate the solid apply also asks) is read in
-`expandFact` as the general-quadrilateral kind (`unstatedPyramidBase3`), the twin «… שבסיסה מרובע». A minted bare
+`expandFact` as the general-quadrilateral kind (`unstatedPyramidReading3`), the twin «… שבסיסה מרובע». A minted bare
 declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
-otherwise. A right kind is left as read, because its cyclic fix is the parser's for the base it read.
+otherwise. A right kind reads as ITS stated twin «פירמידה ישרה ABCDS שבסיסה מרובע»
+([ADR-3D-468](06b-decisions-3d.md#adr-3d-468)): `unstatedPyramidReading3` returns the general right kind `pyramidQuadR`
+plus that twin's cyclic fix, `cyclicFixCommands('quad', ring)` (a shape-internal `concyclic`), which now lives in
+`baseShapes.ts` beside `CYCLIC_MEMBER` so the parser and the fold lower one fix. Both callers (`expandFact`, the mint
+trial) apply the whole list. The ring's own free DOF absorb the fix (M1); a determined ring that is not cyclic is the
+existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier whether the ring was ALREADY cyclic before
+the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
+`base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
+narrowed nothing (Q-2490d).
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
@@ -1162,7 +1176,19 @@ that could be a dart (a kite, a general quadrilateral) fails the check open, and
 ([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
 letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
 the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
-cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **A solid's base takes the seat too**
+([ADR-3D-469](06b-decisions-3d.md#adr-3d-469), #2702): `solidDimsAll3` asks `concaveSeatVertices3` of the base ring of a
+`pyramidQuad`, `prism4g` or `pyramidKite` (`CONCAVE_SEAT_KINDS3`), and the seat reads every declared quad over the letters
+(`declaredQuads3`, a pyramid's base included), so a kite base may be reflex only on its axis and a cyclic base never. The general bases lead with the same `[cx, cy, dx, dy]` gauge as `polygon4`, so `polygon4ConcaveDims` replaces
+those four; a kite keeps its symmetry structurally and takes a dart window of its own `[half, axis]` (`concaveSolidDims3`).
+An UNSTATED pyramid base (`SolidObj.baseUnstated`, set by the fold's `namesQuadBase3` reading) yields its default
+rectangle to `pyramidQuad` when a polygon over its letters orders them differently (`yieldUnstatedBase3`, apply). The
+renderer orients faces of a solid that may be non-convex by a consistent winding and the signed volume
+(`solidFaceNormals`, scene3.ts), not by the centroid, which reads a face beside the reflex corner backwards. The seat yields to a stated circle
+(`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) — a circle through the letters, a cyclic fix, a
+right pyramid's base: concyclic letters have no concave drawing, and the `concyclic` claim verifies in-order
+concyclicity — coplanar, diagonals crossing, opposite angles supplementary — so a dart can no longer verify the circle
+(the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at

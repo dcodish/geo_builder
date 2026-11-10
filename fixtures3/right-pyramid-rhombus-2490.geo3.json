@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-09T22:27:06.404Z",
+  "seed": 1,
+  "facts": [
+    {
+      "utterance": "מעוין ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rhombus",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "פירמידה ישרה ABCDS שבסיסה מעוין",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramidRhombR",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        },
+        {
+          "type": "length-rel",
+          "a1": "A",
+          "b1": "B",
+          "rhs": {
+            "pair": [
+              "A",
+              "D"
+            ]
+          },
+          "c": 1,
+          "origin": "shape"
+        },
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "A",
+            "to": "D"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "A",
+            "to": "B"
+          },
+          "cos": 0,
+          "origin": "shape"
+        }
+      ]
+    }
+  ]
+}
