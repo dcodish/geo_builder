@@ -122,8 +122,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A point stated on a coordinate axis or half-axis («P נמצא על החלק החיובי של ציר ה-x», «P נמצא על ציר ה-x») anchors the
   figure like any absolute object: its placement is sampled and the axes are drawn. A size stated beside an object a
   rescale about the origin keeps (an axis point, the origin, a coordinate plane or axis, a plane or a typed line through
-  the origin) holds in both orders (#2789).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456), [ADR-3D-457](06b-decisions-3d.md#adr-3d-457).
+  the origin) holds in both orders (#2789). **A solid's own vertex stated on an axis or half-axis** («הקודקוד A נמצא על החלק
+  החיובי של ציר ה-x»), **or a coordinate sign beside an absolute object** («P(5,5,5)» · «x של A חיובי»), is honoured by
+  placing the figure: the vertex lies on the stated side at every configuration, «הציגו תצורה אחרת» slides the solid along
+  the axis (a pure slide, so the free-DOF cue does not count it), and a vertex on a whole axis is not held at the origin
+  (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)). A sign alone on an unanchored solid is #2809.
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456), [ADR-3D-457](06b-decisions-3d.md#adr-3d-457), [ADR-3D-465](06b-decisions-3d.md#adr-3d-465).
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:
@@ -741,7 +745,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   that completes the flatness is refused, either order, naming the statements and the solid in its own noun:
   «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» (operator
   ruling 2026-10-07, #1860; it was a notice before). A thin but real solid («∠BAS = 41 · ∠DAS = 50») builds with no
-  notice and no refusal. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
+  notice and no refusal. **Nor is a declared solid or polygon shrunk to a point:** givens that hold only when the whole
+  shape meets in one point («קובייה ABCDA'B'C'D'» · «הקודקוד A/B/C נמצא על ציר ה-x»: three corners of a square are never
+  collinear) are refused on the line that completes them, naming the statements, in the same words (#2799,
+  [ADR-3D-464](06b-decisions-3d.md#adr-3d-464)); the refusal arrives at once. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
   «משולש ABC», or an incidence on a rider or on a point that already exists, in whichever order the two are stated — «M על AB · M אמצע BC» and «M אמצע BC · M על AB» alike, #1847) is refused, naming the statements — a straight line is not a
   triangle. **The same holds when the givens hold only in the LIMIT of a collapse** («משולש ABC · |BA| = |BC| ·
   ∠ACB = 90°», or «AC ⊥ BC» / «CA ⊥ CB», in either order, or «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°»: the right angle
@@ -781,7 +788,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   אינם נמצאים במישור אחד — ולכן …»). A ring with at least one
   FREE vertex is BUILT, that point driven into the plane — an unstated freedom is never an error; the placed
   vertices do not move unless the noun itself states something about them (a rectangle's right angle).
-  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-3D-322, ADR-3D-325, ADR-3D-356, ADR-W-048, ADR-W-115, ADR-W-121,
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-464, ADR-3D-314, ADR-3D-319, ADR-3D-322, ADR-3D-325, ADR-3D-356, ADR-W-048, ADR-W-115, ADR-W-121,
     ADR-413, ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1927, #1928, #1935, #1978, #2810 (ADR-3D-467).
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
   on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on

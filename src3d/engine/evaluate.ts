@@ -1157,7 +1157,7 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
-import { componentSignsHold } from './operands';
+import { componentSignsHold, positionalComponentSigns3 } from './operands';
 
 
 /**
@@ -1753,6 +1753,54 @@ export function gaugePlacedIds3(c: Construction3): Id[] {
   return ids;
 }
 
+/**
+ * #2793 Part 2a (ADR-3D-465): the 24 proper rotations that map the coordinate axes onto themselves, as axis-angle
+ * vectors — the deterministic widening of the funnel's search when no sampled rotation keeps the stated signs.
+ */
+const AXIS_ALIGNED_ROTATIONS3: readonly Vec3[] = (() => {
+  const out: Vec3[] = [];
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  for (const p of perms) {
+    for (let sgn = 0; sgn < 8; sgn++) {
+      const m = [0, 1, 2].map((r) => [0, 1, 2].map((col) => (col === p[r] ? (sgn >> r) & 1 ? -1 : 1 : 0)));
+      const det =
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+      if (det !== 1) continue;
+      const tr = m[0][0] + m[1][1] + m[2][2];
+      const ang = Math.acos(Math.max(-1, Math.min(1, (tr - 1) / 2)));
+      if (ang < 1e-9) { out.push(v3(0, 0, 0)); continue; }
+      if (Math.PI - ang < 1e-9) {
+        // a half turn: the axis is the column of (M + I) with the largest norm
+        const cols = [0, 1, 2].map((j) => v3(m[0][j] + (j === 0 ? 1 : 0), m[1][j] + (j === 1 ? 1 : 0), m[2][j] + (j === 2 ? 1 : 0)));
+        const ax = cols.reduce((a, b) => (norm3(b) > norm3(a) ? b : a));
+        out.push(scale3(normalize3(ax), Math.PI));
+        continue;
+      }
+      const ax = v3(m[2][1] - m[1][2], m[0][2] - m[2][0], m[1][0] - m[0][1]);
+      out.push(scale3(ax, ang / (2 * Math.sin(ang))));
+    }
+  }
+  return out;
+})();
+
+/**
+ * #2793 (ADR-3D-465 Am. 1) — may resolve3's stage 5 SLIDE a solved placement along its leftover translation? The probe
+ * measures WHERE the translation is free (null J_τ); this says whether that freedom is a placement DOF the drawing samples:
+ *  - only against the ABSOLUTE frame (FR-SP-4): with no absolute object, rank J_τ > 0 can come from a free point's own
+ *    coordinates (a minted S in «SM ⊥ ABC»), and sliding the figure against it is a gauge move that re-solves the relation;
+ *  - a placement an absolute plane or membership drives with no point pin (ADR-3D-180, unchanged);
+ *  - a stated SIGN to aim at (ADR-W-199: a figure that keeps the sign is drawn, never refused);
+ *  - point pins that state an axis or the origin (every stated component 0): the solid's vertex on an axis anchors the
+ *    frame and the slide along it is sampled (judged Q-2793b, with Q-2789a). A pin stating an off-origin component
+ *    («x_B = 3») leaves its other axes a gauge (ADR-3D-373: the figure is unchanged), so it does not slide unsigned.
+ */
+export function translationSlideSampled3(c: Construction3): boolean {
+  if (!hasAbsoluteFrameObject(c)) return false;
+  if (c.pins.length === 0 && translationDrivenAbsolute3(c)) return true;
+  if (c.signGivens.length > 0 || positionalComponentSigns3(c).length > 0) return true;
+  return c.pins.length > 0 && c.pins.every((p) => [p.x, p.y, p.z].every((v) => v === null || v === 0));
+}
+
 /** Does `resolve3` SAMPLE the placement (rather than freeze it at the canonical gauge)? */
 export function placementSampled3(c: Construction3): boolean {
   return c.solids.length > 0 && hasAbsoluteFrameObject(c) && translationGaugeFree3(c);
@@ -2155,7 +2203,7 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
           pivots.reduce<PlacementFreedom3>(
             (acc, p) => {
               const f = p.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3;
-              return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree };
+              return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree, translation: [] };
             },
             { ...NO_PLACEMENT_FREEDOM3 },
           )
@@ -2848,9 +2896,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     //    probe the applied solution (or the canonical gauge when nothing had to move) along a seeded
     //    direction; a fully pinned placement snaps back and stays put — the exam's prism is bit-identical.
     //    Transactional like stage 4: a slid figure that breaks a sign given or the parameter is rolled back.
-    if (c.pins.length === 0 && translationDrivenAbsolute3(c) && !(pivot && pivot.solutions === 0)) {
+    //    #2793 (ADR-3D-465): the gate is the MEASURED question, asked of every placement the pivot solved (or the
+    //    canonical gauge of a placement an absolute plane drives with nothing to move): does it keep a leftover
+    //    translation, null(J_τ)? The probe answers it (`PlacementFreedom3.translation`). The old gate, "no point pin",
+    //    stood in for that question and got a PARTIAL pin wrong: «A על ציר ה-x» states two of A's three coordinates, so
+    //    the slide along the axis was never sampled (A at the origin at every seed) and «…על החלק החיובי…» was refused.
+    const slideFrom = warm.x ?? (translationDrivenAbsolute3(c) ? [0, 0, 0, 0, 0, 0, 0, ...dims0] : null);
+    if (slideFrom && translationSlideSampled3(c) && !(pivot && pivot.solutions === 0)) {
       const members = buildMemberPins();
-      const x0 = warm.x ?? [0, 0, 0, 0, 0, 0, 0, ...dims0];
+      const x0 = slideFrom;
       const mirror = warm.mirror ?? false;
       const posBefore = new Map(pos);
       const paramBefore = paramOut;
@@ -2953,8 +3007,24 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           applySolutions(parked);
           pinParam();
           resolveLatePlanes();
-          const paramBroke =
+          const broke = (): boolean =>
             paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+          let paramBroke = broke();
+          // #2793 (ADR-3D-465): the resize is about the gauge origin, so it can carry a signed vertex across an axis
+          // («B, D על החלק החיובי של ציר ה-x»: the full-size cube straddles the origin). Where a translation is left,
+          // the stage-5 slide AIMS the resized figure back at the signs; only when none can is the resize undone.
+          if (!paramBroke && !signsHold() && warm.x && hasAbsoluteFrameObject(c)) {
+            const xS = [...warm.x];
+            const slid = solveStage(() =>
+              solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xS, mirror: warm.mirror ?? false }),
+            );
+            if (slid.length > 0) {
+              applySolutions(slid);
+              pinParam();
+              resolveLatePlanes();
+              paramBroke = broke();
+            }
+          }
           if (paramBroke || !signsHold()) {
             pos.clear();
             for (const [id, q] of posBefore) pos.set(id, q);
@@ -3284,7 +3354,74 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // enough — clearance is a correctness-adjacent floor (never draw a false coincidence), legibility
       // is what the leftover freedom is then spent on.
       const LEGIBLE = 8; // degrees: a 90° that draws within 8° of square reads as square
-      let best: { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number; holds: boolean } | null = null;
+      /**
+       * #2793 Part 2a (ADR-3D-465) — A STATED SIGN IS A GIVEN; GENERAL POSITION IS A PREFERENCE. The candidates were
+       * ranked by clearance and legibility and never asked the signs, so «P(5,5,5)» · «x של A חיובי» held at the seeds
+       * whose candidate happened to land A.x > 0 and was refused at the others. Now a candidate that breaks a stated sign
+       * is not a figure (ranked below every one that keeps them), and the translation is AIMED: after the candidate's
+       * rotation, each axis's signs ask `t` for one open interval (above every "> 0" vertex's −value, below every "< 0"
+       * one's); the sampled `t` stands when inside it with a margin, else a seeded `t` inside it is taken.
+       */
+      const stateSigns = c.signGivens.filter((g) => c.points.get(g.id)?.kind !== 'partial');
+      const signed = stateSigns.length > 0 || positionalComponentSigns3(c).length > 0;
+      // how many of the stated signs hold, counted in statement order up to the first that breaks: a set no placement
+      // keeps is then drawn keeping the EARLIER statements, so the line refused is the one that completed the
+      // contradiction, never an older one turned red
+      const signScore = (): number => {
+        let n = 0;
+        for (const g of stateSigns) {
+          const q = pos.get(g.id);
+          if (!(q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9))) return n;
+          n++;
+        }
+        return componentSignsHold(c, (id) => pos.get(id)) ? n + 1 : n;
+      };
+      const allSigns = stateSigns.length + 1;
+      const gaugeSet = new Set(gaugeIds);
+      const aimT = (w: Vec3, tSample: Vec3, u: (a: Axis3) => number): Vec3 | null => {
+        if (!translationFree || stateSigns.length === 0) return tSample;
+        place({ t: v3(0, 0, 0), w, s: 1, mirror: false });
+        const t = { x: tSample.x, y: tSample.y, z: tSample.z };
+        for (const a of ['x', 'y', 'z'] as const) {
+          let lo = -Infinity;
+          let hi = Infinity;
+          for (const g of stateSigns) {
+            if (g.axis !== a || !gaugeSet.has(g.id)) continue;
+            const q = pos.get(g.id);
+            if (!q) continue;
+            if (g.positive) lo = Math.max(lo, -q[a]);
+            else hi = Math.min(hi, -q[a]);
+          }
+          if (!(lo < hi)) return null;
+          const m = Math.min(0.25 * extent, (hi - lo) / 4);
+          if (t[a] > lo + m && t[a] < hi - m) continue;
+          t[a] = Number.isFinite(lo) && Number.isFinite(hi) ? lo + (hi - lo) * (0.25 + 0.5 * u(a))
+            : Number.isFinite(lo) ? lo + extent * (0.25 + u(a)) : hi - extent * (0.25 + u(a));
+        }
+        return v3(t.x, t.y, t.z);
+      };
+      type Candidate = { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number; holds: boolean; signs: number };
+      let best = null as Candidate | null;
+      const tryCandidate = (g0: Parameters<typeof applyGauge>[1], u: (a: Axis3) => number): boolean => {
+        const aimed = signed ? aimT(g0.w, g0.t, u) : g0.t;
+        const g = aimed ? { ...g0, t: aimed } : g0;
+        place(g);
+        const clear = clearance();
+        const legib = legibility();
+        // #2798 (ADR-3D-456): a placement where a mixed point no longer exists (a stated crossing carried off its
+        // edge) draws nothing the student stated — it ranks below every placement that keeps them all
+        const holds = mixedIds.length === 0 || mixedPointsHold3(c, pos, mixedIds);
+        const signs = signed ? signScore() : allSigns;
+        // Ranking: keep the stated signs first (#2793), then clear the absolute objects (a false coincidence is a
+        // drawing that LIES), then read correctly. Without a spin axis `legib` is 0 for every candidate, and without a
+        // sign every candidate keeps them, so this reduces exactly to the previous rules — those figures cannot move.
+        const better =
+          !best ||
+          (best.signs !== signs ? signs > best.signs
+            : best.holds !== holds ? holds : best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
+        if (better) best = { g, clear, legib, holds, signs };
+        return signs === allSigns && holds && clear >= MARGIN && (!spinAxis || legib <= LEGIBLE);
+      };
       for (let attempt = 0; attempt < 12; attempt++) {
         const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
@@ -3299,27 +3436,28 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           s: 1,
           mirror: false,
         };
-        place(g);
-        const clear = clearance();
-        const legib = legibility();
-        // #2798 (ADR-3D-456): a placement where a mixed point no longer exists (a stated crossing carried off its
-        // edge) draws nothing the student stated — it ranks below every placement that keeps them all
-        const holds = mixedIds.length === 0 || mixedPointsHold3(c, pos, mixedIds);
-        // Ranking: clear the absolute objects first (a false coincidence is a drawing that LIES), then
-        // read correctly. Without a spin axis `legib` is 0 for every candidate, so this reduces exactly
-        // to the previous clearance-only rule — the existing figures cannot move.
-        const better =
-          !best ||
-          (best.holds !== holds ? holds : best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
-        if (better) best = { g, clear, legib, holds };
-        if (holds && clear >= MARGIN && (!spinAxis || legib <= LEGIBLE)) break;
+        if (tryCandidate(g, (a) => sample(seed, `placement-${attempt}-aim-${a}`, 0, 1))) break;
+      }
+      // #2793 Part 2a: no sampled rotation kept every sign — the search widens deterministically before any refusal:
+      // the 24 axis-aligned proper rotations of the canonical frame, then seeded extras. A work bound (M3), no clock:
+      // each candidate is one placement, no solve.
+      if (signed && rotationFree && best && best.signs < allSigns) {
+        const extras = [...AXIS_ALIGNED_ROTATIONS3, ...Array.from({ length: 24 }, (_, i) => {
+          const k = (n: string) => sample(seed, `placement-sign-${i}-${n}`, -1, 1);
+          return scale3(normalize3(v3(k('ax'), k('ay'), k('az'))), sample(seed, `placement-sign-${i}-angle`, 0, 2 * Math.PI));
+        })];
+        for (let i = 0; i < extras.length; i++) {
+          const k = (n: string) => sample(seed, `placement-sign-t-${i}-${n}`, -1, 1);
+          const t = translationFree ? v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5) : v3(0, 0, 0);
+          if (tryCandidate({ t, w: extras[i], s: 1, mirror: false }, (a) => sample(seed, `placement-sign-${i}-aim-${a}`, 0, 1))) break;
+        }
       }
       // no sampled placement keeps every mixed point: the solved placement is kept when it does (it was the frame the
       // statements were accepted in), so the figure is never moved into one that refuses them
       const stay = { t: v3(0, 0, 0), w: v3(0, 0, 0), s: 1, mirror: false };
       if (best && !best.holds) {
         place(stay);
-        if (mixedPointsHold3(c, pos, mixedIds)) best = { g: stay, clear: 0, legib: 0, holds: true };
+        if (mixedPointsHold3(c, pos, mixedIds)) best = { g: stay, clear: 0, legib: 0, holds: true, signs: signed ? signScore() : allSigns };
       }
       if (best) place(best.g);
     }

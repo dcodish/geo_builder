@@ -36,6 +36,12 @@ const SEEDED: SeededCorpus = {
     'פירמידה SABCD שבסיסה מקבילית', 'המקצוע SA הוא גובה בפירמידה', 'M אמצע אלכסון BD', 'נסמן: AB = u, AD = v, AS = w',
     'A(0,0,0)', 'B(0,5,0)', 'S(0,0,6)', 'D(3,p,0)', '|u| = |v|',
   ],
+  // #2793 (ADR-3D-465) — the report: a solid's first vertex on half an axis was refused sign-unsatisfiable. The side, the slide and
+  // the other half-axes are asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-vertex-half-axis-2793.geo3.json': ["קובייה ABCDA'B'C'D'", 'הקודקוד A נמצא על החלק החיובי של ציר ה-x'],
+  // #2799 (ADR-3D-464) — the report's buildable half: B and D on +x drew the cube at a point at five seeds of eight. Its normal
+  // size is asserted in issue-1860-flat-solid-refused.test.ts; this is the build + drift + load net.
+  'cube-diagonal-half-axis-2799.geo3.json': ["קובייה ABCDA'B'C'D'", 'הקודקוד B נמצא על החלק החיובי של ציר ה-x', 'הקודקוד D נמצא על החלק החיובי של ציר ה-x'],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],

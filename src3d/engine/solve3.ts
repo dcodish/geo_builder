@@ -71,7 +71,18 @@ export function relDiff3(p: number, q: number): number {
   return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
 }
 
-export function leastSquares(residuals0: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
+export function leastSquares(
+  residuals0: (x: number[]) => number[],
+  x0: number[],
+  iterations = 120,
+  /**
+   * #2799 (ADR-3D-464) — an optional EARLY-OUT (docs/17 §7: "solvers early-out on divergence"): asked at the start and
+   * after every 8th accepted step; true ends the solve where it stands. The pivot passes "already collapsed to a point
+   * and exact" — an attractor LM only approaches geometrically (the scale halves, the error never reaches 1e-24), so
+   * the full iteration budget was spent on a candidate the acceptance sites then reject.
+   */
+  stop?: (x: number[]) => boolean,
+): { x: number[]; err: number } {
   leastSquaresStats.solves++;
   const residuals = (y: number[]): number[] => {
     leastSquaresStats.evals++;
@@ -89,6 +100,8 @@ export function leastSquares(residuals0: (x: number[]) => number[], x0: number[]
   // failure, and paid a full central-difference Jacobian for each rung. Cached here and invalidated only
   // where x actually moves, so the trajectory is identical and the tail costs one residual call a rung.
   let jac: { J: number[][]; JtJ: number[][]; Jtr: number[] } | null = null;
+  if (stop && stop(x)) return { x, err };
+  let accepted = 0;
 
   for (let iter = 0; iter < iterations; iter++) {
     if (!jac) {
@@ -144,6 +157,7 @@ export function leastSquares(residuals0: (x: number[]) => number[], x0: number[]
       jac = null; // x moved — the Jacobian must be recomputed there
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break;
+      if (stop && ++accepted % 8 === 0 && stop(x)) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
@@ -639,9 +653,16 @@ export interface PlacementFreedom3 {
   counted: number;
   rotation: number[][];
   scaleFree: boolean;
+  /**
+   * #2793 (ADR-3D-465): an orthonormal basis of the leftover TRANSLATION, null(J_τ) — unit world directions the
+   * whole figure may slide along with every placement residual still exact («A על ציר ה-x»: the x-axis). Empty when
+   * the translation is pinned (rank J_τ = 3). All three axes when NOTHING relates the translation to the absolute
+   * frame (rank J_τ = 0): then the translation is a gauge, not a freedom, and no stage slides it.
+   */
+  translation: number[][];
 }
 /** A placement with no leftover freedom at all (no probe ran, or nothing is free). */
-export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false };
+export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false, translation: [] };
 
 /** #2368 — the eigenvectors of a small symmetric matrix by cyclic Jacobi, sorted by ascending eigenvalue. */
 export function symmetricEigen(a0: readonly (readonly number[])[]): { values: number[]; vectors: number[][] } {
@@ -1363,7 +1384,10 @@ export function solvePivot(
       const rank7 = cols[0].length === 0 ? 0 : numericRank(cols7);
       const counted = Math.max(0, 7 - rank7 - (3 - rankT));
       const scaleFree = rank7 === rank;
-      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree });
+      // #2793 (ADR-3D-465): null(J_τ), the eigenvectors of J_τᵀJ_τ with the smallest eigenvalues
+      const translation =
+        rankT >= 3 ? [] : symmetricEigen([0, 1, 2].map((i) => [0, 1, 2].map((j) => cols[i].reduce((a, v, r) => a + v * cols[j][r], 0)))).vectors.slice(0, 3 - rankT);
+      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree, translation });
       const jtj = cols.map((ci) => cols.map((cj) => ci.reduce((a, v, r) => a + v * cj[r], 0)));
       const generators = symmetricEigen(jtj).vectors.slice(0, dim);
       // the leftover TURN: the ω-parts of the rigid null space span it (a translation generator has none)
@@ -1373,7 +1397,7 @@ export function solvePivot(
         const gram = [3, 4, 5].map((i) => [3, 4, 5].map((j) => generators.reduce((a, g) => a + g[i] * g[j], 0)));
         rotation = symmetricEigen(gram).vectors.slice(3 - rotRank);
       }
-      return (memo = { dim, generators, counted, rotation, scaleFree });
+      return (memo = { dim, generators, counted, rotation, scaleFree, translation });
     };
   };
   /**
@@ -1664,6 +1688,64 @@ export function solvePivot(
    * the generic contradiction. Recorded at the acceptance sites (`noteFlatSolid`), read by `flatSolidRefusal`.
    */
   let flatSolidSeen: SolidObj | null = null;
+  // #518 (ADR-3D-133): the seed's size target — see the scale anchor below. Declared here because the
+  // collapse judge reads it (#2799, ADR-3D-464): the seed's own drawn size is the yardstick of "a point".
+  const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
+  /**
+   * #2799 (ADR-3D-464) — THE YARDSTICK OF A SCALE COLLAPSE: the size the seed would draw the figure at
+   * (`exp(logScale0)` × the canonical span at the seed's dims), lowered to the smallest absolute length
+   * the student STATED (two stated positions, a stated component difference, a stated length or vector),
+   * so a figure placed at a small stated size is never judged collapsed. Computed once, lazily.
+   */
+  let lRefMemo: number | null = null;
+  const lRef = (): number => {
+    if (lRefMemo !== null) return lRefMemo;
+    const pos0 = evalCanonical(dims0);
+    let span = 0;
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos0.get(id)).filter((p): p is Vec3 => !!p);
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) span = Math.max(span, norm3(sub3(pts[j], pts[i])));
+    }
+    let ref = Math.exp(logScale0) * (span > 1e-12 ? span : 1);
+    const stated: number[] = [];
+    const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const absPts: Vec3[] = [];
+    for (const def of c.points.values()) if (def.kind === 'coord') absPts.push(v3(def.x, def.y, def.z));
+    for (const p of pointPins) {
+      const [x, y, z] = [num(p.x), num(p.y), num(p.z)];
+      if (x !== null && y !== null && z !== null) absPts.push(v3(x, y, z));
+    }
+    for (let i = 0; i < absPts.length; i++) for (let j = i + 1; j < absPts.length; j++) stated.push(norm3(sub3(absPts[j], absPts[i])));
+    for (const ax of ['x', 'y', 'z'] as const) {
+      const vals = pointPins.map((p) => num(p[ax])).filter((v): v is number => v !== null);
+      for (let i = 0; i < vals.length; i++) for (let j = i + 1; j < vals.length; j++) stated.push(Math.abs(vals[j] - vals[i]));
+    }
+    for (const p of c.scalarPins) if (p.kind === 'length') stated.push(Math.abs(p.value));
+    for (const p of [...vecPins, ...c.pairPins]) {
+      const [x, y, z] = [num(p.x), num(p.y), num(p.z)];
+      if (x !== null && y !== null && z !== null) stated.push(Math.hypot(x, y, z));
+    }
+    for (const d of stated) if (d > 1e-12) ref = Math.min(ref, d);
+    return (lRefMemo = ref);
+  };
+  /** #2799 (ADR-3D-464): the first declared solid this candidate draws at a point (its drawn span ≤ 1e-4 of {@link lRef}), or null. */
+  const scaleCollapsedAt = (x: number[]): SolidObj | null => {
+    const s = Math.exp(x[6]);
+    if (!(s < Infinity)) return null;
+    const dims = x.slice(7, 7 + nDims);
+    const override = coupled ? new Map(coupled.syms.map((sy, i) => [sy, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(dims, override, riderMap(x));
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      if (pts.length < 2) continue;
+      let maxD = 0;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
+      if (s * maxD <= 1e-4 * lRef()) return solid;
+    }
+    return null;
+  };
+  /** #2799 (ADR-3D-464): the drawn-at-a-point half of the LM early-out (each solve adds "and exact" on its own rows). */
+  const atPoint = (x: number[]): boolean => x.length >= 7 && c.solids.length > 0 && scaleCollapsedAt(x) !== null;
   /** The SOLID half of `degenerate` (#1735 split it out): a collapsed solid is not a figure. */
   const collapsed = (x: number[]): boolean => {
     // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
@@ -1688,6 +1770,12 @@ export function solvePivot(
         }
       }
       if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
+      // #2799 (ADR-3D-464): the DRAWN size, not only the canonical shape. The figure drawn is `t + s·R(p)`
+      // (`applyGauge`), so a solve that meets the givens by driving the gauge's scale s → 0 changed nothing the
+      // ratio tests above and below look at: the whole solid at one point passed as "not collapsed". A rotation
+      // and a mirror are rigid, so the drawn span is s·maxD; collapsed when ≤ 1e-4 (the same hard ratio) of the
+      // seed's drawn size, floored by the smallest stated absolute length ({@link lRef}).
+      if (pts.length >= 2 && Math.exp(x[6]) * maxD <= 1e-4 * lRef()) return true;
       // #872 (ADR-3D-212): the FLAT collapse the pairwise test cannot see. Vertices stay well
       // separated while the solid loses its VOLUME — a פירמידה whose apex is driven into its own
       // base plane is not a pyramid, and the sentence that flattened it has not been satisfied, it
@@ -2141,7 +2229,9 @@ export function solvePivot(
     Object.assign([] as PivotResult[], { collapse: { ring: [...solid.ids], riderKeys: riders.map((r) => r.id), forced: true, solid: solid.kind } });
   const noteFlatSolid = (x: number[], primary: number): void => {
     if (flatSolidSeen || primary >= 1e-10) return;
-    flatSolidSeen = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x)));
+    // #2799 (ADR-3D-464): an exact candidate the scale test rejected — the whole solid at one point is the limit of
+    // flat, and refused in the same words (2-D refuses a ring squashed to a point with its flat refusal, ADR-643 B1)
+    flatSolidSeen = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x))) ?? (x.length >= 7 ? scaleCollapsedAt(x) : null);
   };
   /** The empty pool after an exact flat-solid rejection: an open figure if the retry finds one, else the refusal. */
   const flatSolidRefusal = (): PivotPool => {
@@ -2292,7 +2382,6 @@ export function solvePivot(
   // cost hard figures real solution branches (a mirror gone, a sign branch gone — the first attempt's
   // full-suite failures). A genuinely determining given overrides the 1e-4 pull, exactly as it
   // overrides dims0 and the symbol anchors.
-  const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
   // deterministic multi-start: one fixed set of eight initial rotations, REORDERED by the seed (never rotated
   // by it), so an under-determined placement lands in the same handful of basins at every seed. It is not a
   // sample: a leftover turn or size is sampled after the solve, by the resolver's stage 6 (#2378, ADR-3D-379).
@@ -2462,7 +2551,11 @@ export function solvePivot(
       const fPinS = (z: number[]) => [...fZS(z), 1e3 * (z[6] - dS)];
       const zS = polish(fPinS, [0, 0, 0, 0, 0, 0, dS]);
       const xS = atS(zS);
-      if (degenerate(xS) || pErr(xS) >= drawnAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
+      // #2793 (ADR-3D-465): the base's own exactness, measured at the size it is parked at. A residual in world units grows
+      // with the figure, so a base drawn small (a speck the sign filter chose) carries its round-off up by e^{dS}: judged at
+      // the base's size, an exact full-size park read as inexact and the speck stayed drawn.
+      const sizeAccept = Math.min(ACCEPT, Math.max(drawnAccept, 10 * pErr(probe.x) * Math.exp(2 * Math.max(0, dS))));
+      if (degenerate(xS) || pErr(xS) >= sizeAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
       return [resultAt(xS)];
     }
     if (probe.freedom === 'turn') {
@@ -2525,10 +2618,50 @@ export function solvePivot(
     const fP = residualsFor(probe.mirror);
     const pErr = (x: number[]): number => fP(x).reduce((a, v) => a + v * v, 0);
     if (degenerate(probe.x) || pErr(probe.x) >= ACCEPT) return [];
+    // #2793 (ADR-3D-465): the slide asks the MEASURED question — is a translation left, null(J_τ)? None (rank 3, the
+    // placement is pinned) or all three (rank 0: nothing relates the translation to the absolute frame, so it is a
+    // gauge, FR-SP-4) — nothing to slide. The direction is drawn INSIDE null(J_τ): a free R³ direction nearly
+    // orthogonal to it moved nothing and was dropped, so a sign could fail at some seeds.
+    const basis = placementFreedomAt(probe.x, probe.mirror)().translation.map((b) => v3(b[0], b[1], b[2]));
+    if (basis.length === 0 || basis.length === 3) return [];
     const h = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + k * 78.233)) * 43758.5453) % 1;
     const raw = v3(h(1) - 0.5, h(2) - 0.5, h(3) - 0.5);
-    const dir = scale3(norm3(raw) < 1e-6 ? v3(1, 0, 0) : scale3(raw, 1 / norm3(raw)), probe.flip ? -1 : 1);
-    const step = Math.exp(probe.x[6]) * (0.4 + 0.8 * h(4)); // in figure units, so the move is visible at any scale
+    let inNull = basis.reduce((acc, b) => add3(acc, scale3(b, dot3(raw, b))), v3(0, 0, 0));
+    if (norm3(inNull) < 1e-6) inNull = basis[0];
+    const dir = scale3(inNull, (probe.flip ? -1 : 1) / norm3(inNull));
+    const unit = Math.exp(probe.x[6]); // figure units, so the move is visible at any scale
+    let step = unit * (0.4 + 0.8 * h(4));
+    // #2793 (ADR-3D-465): a stated SIGN is AIMED at, not only filtered for. Along `dir` every sign condition is linear in
+    // the step (a translation), so the steps that keep every sign form one interval; the seeded step stands when it is
+    // inside it (with a margin), else a seeded step inside it is taken. No interval: the seeded step, and the caller's
+    // sign check rolls the slide back.
+    if (signConds.length > 0) {
+      const at0 = atFor(probe.mirror, probe.x);
+      const at1 = atFor(probe.mirror, [probe.x[0] + dir.x, probe.x[1] + dir.y, probe.x[2] + dir.z, ...probe.x.slice(3)]);
+      let lo = -Infinity;
+      let hi = Infinity;
+      let feasible = true;
+      for (const sc of signConds) {
+        const v0 = sc.value(at0);
+        const v1 = sc.value(at1);
+        if (v0 === undefined || v1 === undefined) continue;
+        const d = v1 - v0;
+        if (Math.abs(d) < 1e-9) {
+          if (sc.positive ? !(v0 > 1e-9) : !(v0 < -1e-9)) feasible = false;
+          continue;
+        }
+        if ((d > 0) === sc.positive) lo = Math.max(lo, -v0 / d);
+        else hi = Math.min(hi, -v0 / d);
+      }
+      if (feasible && lo < hi) {
+        const m = Math.min(0.25 * unit, (hi - lo) / 4);
+        if (!(step > lo + m && step < hi - m)) {
+          const u = h(5);
+          step = Number.isFinite(lo) && Number.isFinite(hi) ? lo + (hi - lo) * (0.25 + 0.5 * u)
+            : Number.isFinite(lo) ? lo + unit * (0.25 + u) : hi - unit * (0.25 + u);
+        }
+      }
+    }
     const t0 = v3(probe.x[0], probe.x[1], probe.x[2]);
     // The slide is a PLACEMENT question: only translation + rotation move (the Stage-A shape); scale,
     // dims and symbols stay frozen at the solution's values. Opening them invited the explode basin —
@@ -2542,7 +2675,7 @@ export function solvePivot(
     const rp = leastSquares(fPin, probe.x.slice(0, 6), 40);
     const rr = leastSquares(fP6, rp.x);
     let xr = full(rr.x);
-    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, step)) return [];
+    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, Math.abs(step))) return [];
     // #1769 (ADR-3D-395): the slide's acceptance is the same root predicate `collect` applies — a slid figure exact
     // on `ACCEPT` but outside a member pin's verifier bar is released on every unknown (the #1311 release) and
     // judged again; one the release cannot bring onto the bar is no slide, and the drive's placement stands.
@@ -2630,6 +2763,9 @@ export function solvePivot(
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
     const primaryErr = (x: number[]): number => fPrimary(x).reduce((s, v) => s + v * v, 0);
+    /** #2799 (ADR-3D-464): the cold sweeps' early-out — drawn at a point AND exact on the givens' rows: every acceptance
+     *  site rejects it (`collapsed`) and `noteFlatSolid` records it, so further iterations only shrink it further. */
+    const exactAtPoint = (x: number[]): boolean => atPoint(x) && primaryErr(x) < 1e-10;
     /**
      * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
      * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
@@ -2770,10 +2906,10 @@ export function solvePivot(
     };
     const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
-      let r0 = leastSquares(fSeed, x0);
+      let r0 = leastSquares(fSeed, x0, 120, exactAtPoint);
       // polish: restart LM (fresh damping) from the found point until it stops improving
       for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(fSeed, r0.x);
+        const r2 = leastSquares(fSeed, r0.x, 120, exactAtPoint);
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
@@ -2943,9 +3079,9 @@ export function solvePivot(
         for (const f of variants) {
           const widened = dims0.map(f);
           for (const x0 of starts) {
-            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
+            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)], 120, exactAtPoint);
             for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-              const r2 = leastSquares(fSeed, r.x);
+              const r2 = leastSquares(fSeed, r.x, 120, exactAtPoint);
               if (r2.err >= r.err * 0.99) break;
               r = r2;
             }
