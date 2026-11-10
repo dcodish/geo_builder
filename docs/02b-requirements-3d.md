@@ -942,6 +942,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   1/12w», «נקודה M מקיימת: …», «M מקיים …», "the point M satisfies …" build exactly as the statement after the frame
   does, behind «נתון כי» too, whenever that statement names M. A frame whose statement does not name its point
   («הנקודה D מקיימת AB = 3») is not read this way. 2-D and analytic read the same frame (ADR-819, ADR-AG-460).
+  A vector term with a minus and a divisor («BN=u/2-v/2», «BK=-v/2+w/4») builds as its «−1/2v» spelling does (two spellings
+  of one vector, docs/17 §9).
   - Sources: ADR-3D-479; #2062.
 - **FR-SP-32 (Must)** — **Whether a point lies in a plane is in the data panel, and the exam's question points there**
   (#2062; operator 2026-10-14, card `d14b-2062-question` A, *"if now - we should"*). The panel's mutual-position

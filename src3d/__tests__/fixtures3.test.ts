@@ -32,6 +32,9 @@ const SEEDED: SeededCorpus = {
   // #2062 (ADR-3D-479, ADR-3D-480) — bagrut 03572 Q2 in the exam's own wording: the subject frame «הנקודה M מקיימת …» reads
   // as the bare «BM = …», and «מישור AEC» gives the panel its «M נמצאת במישור AEC» row (asserted in data-view.test.ts and
   // queries.test.ts); this is the build + drift + load net. The figure prefix «בסרטוט שלפניכם» is 3-D's parked #1679.
+  // #2062 (ADR-3D-479) — a vector term with a minus and a divisor («−v/2») is accepted as its «−1/2v» twin; the gate's
+  // candidate is asserted in honesty3.test.ts. Build + drift + load net.
+  'negative-divisor-terms-2062.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", 'BN=u/2-v/2', 'BK=-v/2+w/4'],
   'bagrut-03572-q2-wording-2062.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "הנקודה E היא אמצע המקצוע BB'", 'הנקודה M מקיימת BM = 1/6u − 2/3v + 1/12w', 'מישור AEC'],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
