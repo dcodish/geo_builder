@@ -15032,7 +15032,7 @@ The plan also overstates 2-D. Measured through `decideDeterministic2D` at `28dac
 - `pointParents3` gives the apex its ring as parents, so the drive routing (`reachesFreeCarrier3`), `parentsFirst3` and `builtFrom3` walk through it.
 - `placementFixers3` adds the ring's fixers.
 - The store's `declaresRing3` names the pyramid line as the bound base's declaration, and only for that ring: the line that declared a bound pyramid whose `bound` IS the ring. A ring that merely shares letters with a solid's run («פירמידה SABCD» · «מרובע SABC», skew) keeps its own line as its declaration, so it is still refused `ring-not-flat` (#1928, #1978). A first cut matched any solid command whose run held the ring plus one letter, so the blame landed on the pyramid line and «מרובע SABC» recorded; the batch caught it.
-- `hiddenEdgeKeys` and the scene draw an edge two solids share ONCE. A face both solids carry decides no edge's dashing, and an edge or face inside a solid the bound solid shares vertices with is dashed. Solids that share no vertex dash exactly as before.
+- `hiddenEdgeKeys` and the scene draw an edge two solids share ONCE. A face both solids carry decides no edge's dashing, and an edge or face inside a solid the bound solid shares vertices with is dashed. Solids that share no vertex dash exactly as before. **Amended by [ADR-3D-481](#adr-3d-481) (2026-11-10, #2819):** the code counted a face's vertex set across all FACES, so a flat polygon's own double-sided ring read as shared and every flat polygon drew fully dashed; "both solids" is now counted as two different solids.
 - Argued safe: `GAUGE_KINDS` (the apex rides the gauge with its ring); `CONFIGURATION_VERTEX_KINDS3` (the bound base is judged for crossing like any declared ring); the collapse and sliver gates in `solve3.ts` and `solidFaceCollapsed` (they read positions, and a flattened bound pyramid is refused like a standalone one); `solidSubject`, the volume and `tetra-altitude` readers, `vertexAngle3`, `dataView` and the notices (ids, faces and edges only); `solidFloorFrame3` (a bound solid at index 0 is a pyramid standing on its base).
 - The single-solid «הבסיס» sentinels stay as they are: with a cube and a pyramid, which base the student means is theirs to say (ADR-052).
 
@@ -15462,3 +15462,18 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `issue-2764-independent-parts.test.ts`: written with `seed` a number and `seedParts` beside it; the file, the link and the session load back the same drawing; an old `seed: 7` file with no `seedParts` loads ok with its first part at 7; a malformed entry is dropped. `fixtures3/nine-separate-shapes-2764.geo3.json` carries `seedParts`, so the corpus net loads the field.
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
+
+## ADR-3D-481 — A shared face is carried by two different solids, never by one solid twice: a flat polygon is drawn solid again (#2819)
+
+**Status:** accepted · 2026-11-10 · bug (P2, 3d) · fix round #2822, stream H1 · amends [ADR-3D-434](#adr-3d-434)
+**Requirements:** none (restores the promise of [ADR-3D-025](#adr-3d-025): "a flat figure never renders fully dashed") · **Design:** [04b](04b-design-3d.md) § "A pyramid over an existing base is a BOUND solid" (one sentence: the count is of solids) · **Ladder:** none (renderer)
+
+**Instance.** The operator, failing spot audit round-2722:T38 («מלבן ABCD» · «מעוין ABCD»), 2026-11-10: *"the behavior is correct but why are lines now dashed? when did we decide on that"*. Re-measured at `67dd576b`: every lone `polygon3` / `polygon4` / `polygon5` (triangle, rectangle, trapezoid, pentagon) hid EVERY edge from the default camera and from below.
+
+**Root cause.** ADR-3D-434's shared-face rule in `hiddenEdgeKeys` (`src3d/render/scene3.ts`) identified a face by its sorted vertex set and counted occurrences over ALL faces of ALL solids. A flat polygon is modelled with double-sided faces (ADR-3D-025: the ring plus its reverse, so one side always faces the camera); the two share one sorted key, so the polygon's own face counted 2, was "no surface", no edge had a front face, and every edge was dashed. The class: any one solid that carries one vertex set on two of its faces. A shared face is a property of TWO solids.
+
+**Decision.** `hiddenEdgeKeys` records, per face key, the SET of solid indices that carry it, and a face is shared only when two different solids do. A pyramid bound on a cube's face is unchanged (the cube and the pyramid are two solids), and so is a pyramid bound on a stated polygon. Checked for the same double count: `auxSegmentHidden` keys no face; the other sorted-id face keyings (`polygonsAt3` in `vertexAngle3.ts`, `shapeWarnings3` in `notices.ts`) deduplicate, they do not count, so a double-sided ring is read once there already.
+
+**Locks.** Unit, `scene3-shared-edges.test.ts`: a lone polygon3/4/5 hides no edge from the default camera or from below; the operator's figure (`fixtures3/rectangle-rhombus-merged-2171.geo3.json`, already his exact two lines) loaded through the real path hides no edge; a pyramid on a cube's face still hides an edge of the shared face from a view where the cube's face ABCD faces the camera (mutation-checked: it fails when the shared rule is switched off).
+
+**Behaviour change for a student:** a flat triangle, quadrilateral or pentagon in 3-D is drawn with solid lines again, as before 8 Nov.

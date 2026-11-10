@@ -272,8 +272,19 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
   const { eye } = cameraFrame(cam);
   const hidden = new Set<string>();
   const faceKey = (f: readonly Id[]): string => [...f].sort().join('|');
-  const faceCount = new Map<string, number>();
-  for (const s of c.solids) for (const f of s.faces) faceCount.set(faceKey(f), (faceCount.get(faceKey(f)) ?? 0) + 1);
+  // #2819 (ADR-3D-481): a shared face is a property of TWO solids — count the SOLIDS that carry a vertex set, never its
+  // faces. A flat polygon carries its ring twice (the ring and its reverse, so one side always faces the camera), and
+  // counting faces read that one shape as two solids sharing a face: no surface, every edge dashed.
+  const carriers = new Map<string, Set<number>>();
+  c.solids.forEach((s, i) => {
+    for (const f of s.faces) {
+      const k = faceKey(f);
+      const set = carriers.get(k) ?? new Set<number>();
+      set.add(i);
+      carriers.set(k, set);
+    }
+  });
+  const shared = (f: readonly Id[]): boolean => (carriers.get(faceKey(f))?.size ?? 0) >= 2;
   /** the other solids `solid` shares vertices with — the only ones whose body can hold its faces */
   const partners = (solid: SolidObj): SolidObj[] => c.solids.filter((o) => o !== solid && o.ids.filter((id) => solid.ids.includes(id)).length >= 3);
   const inPartner = (solid: SolidObj, p: Vec3): boolean => partners(solid).some((o) => strictlyInside(o, positions, p));
@@ -285,7 +296,7 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
     const center = centroid3(solid.ids.map((id) => positions.get(id)!));
     for (const face of solid.faces) {
       const ring = face.map((id) => positions.get(id)!);
-      const surface = (faceCount.get(faceKey(face)) ?? 0) < 2 && !inPartner(solid, centroid3(ring));
+      const surface = !shared(face) && !inPartner(solid, centroid3(ring));
       const front = surface && dot3(outwardNormal(ring, center), eye) > 1e-12;
       for (let i = 0; i < face.length; i++) {
         const k = edgeKey(face[i], face[(i + 1) % face.length]);
