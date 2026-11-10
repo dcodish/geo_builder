@@ -124,7 +124,7 @@ describe('#1860 — i18n: the notice is retired in both languages', () => {
 });
 
 /**
- * #2806 ([ADR-3D-458](../../docs/06b-decisions-3d.md#adr-3d-458)) — A SIMILARITY-INVARIANT RELATION IS SCALE-FREE IN THE
+ * #2806 ([ADR-3D-462](../../docs/06b-decisions-3d.md#adr-3d-462)) — A SIMILARITY-INVARIANT RELATION IS SCALE-FREE IN THE
  * PIVOT. «ריבוע ABCD» · «הקודקוד A נמצא על ציר ה-x» was drawn at |AB| = 1.55e-6 with every line green, after a 3.8 s
  * seed sweep: one stated point turns the gauge scale into an unknown, and `length-rel` / `mag-rel` / `vec-eq` were raw
  * differences (degree 1 in the scale), so the solve met them by shrinking the whole figure to a point. Every
@@ -132,7 +132,7 @@ describe('#1860 — i18n: the notice is retired in both languages', () => {
  */
 const X_AXIS = 'הקודקוד A נמצא על ציר ה-x';
 const runAt = (lines: readonly string[], seed: number) => {
-  let st: { facts: Fact3[]; seed: number } = { facts: [], seed };
+  let st: { facts: Fact3[]; seed: Seed3 } = { facts: [], seed };
   let uncached = 0;
   for (let i = 0; i < lines.length; i++) {
     const before = resolveStats3.uncached;
@@ -284,7 +284,7 @@ describe('#2806 — every similarity-invariant pin row is scale-free (the PIN_FI
       expect(r1.some((v) => Math.abs(v) > 1e-6), `${kind}: the placement must miss the relation`).toBe(true);
       if (r1.some((v, j) => Math.abs(v - r2[j]) > 1e-9 * Math.max(1, Math.abs(v)))) bad.push(`${kind}: ${r1.join(',')} → ${r2.join(',')}`);
     }
-    expect(bad, 'a similarity-invariant pin must be normalised by its operands (ADR-3D-458)').toEqual([]);
+    expect(bad, 'a similarity-invariant pin must be normalised by its operands (ADR-3D-462)').toEqual([]);
   }, 60_000);
 
   it('the probe tells the two apart: a kind that fixes the scale changes its row', () => {

@@ -60,10 +60,10 @@ const unpack = (x: number[]) => ({ t: v3(x[0], x[1], x[2]), w: v3(x[3], x[4], x[
  *  one the anchored projected walk makes. Locks assert these by COUNT, never by clock. */
 export const leastSquaresStats = { solves: 0, evals: 0 };
 
-/** #2806 (ADR-3D-458): the floor under a relative difference's denominator — the 1e-12 every normalised row uses. */
+/** #2806 (ADR-3D-462): the floor under a relative difference's denominator — the 1e-12 every normalised row uses. */
 const REL_DIFF_FLOOR = 1e-12;
 /**
- * #2806 (ADR-3D-458) — a SIGNED relative difference `(p − q) / (p + q)` of two non-negative magnitudes: zero exactly
+ * #2806 (ADR-3D-462) — a SIGNED relative difference `(p − q) / (p + q)` of two non-negative magnitudes: zero exactly
  * where `p = q`, crossing zero through it (the ADR-3D-006 lesson), and of degree 0 under a common rescaling. The one
  * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them.
  */
@@ -298,7 +298,7 @@ export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3;
  * hand-maintained list drifts; a total function over the union cannot.
  */
 /*
- * #2806 ([ADR-3D-458](../../docs/06b-decisions-3d.md#adr-3d-458)) — THE CONSEQUENCE OF `false`: a kind marked
+ * #2806 ([ADR-3D-462](../../docs/06b-decisions-3d.md#adr-3d-462)) — THE CONSEQUENCE OF `false`: a kind marked
  * similarity-invariant here has a pivot residual of DEGREE 0 in the gauge scale (normalised by its operands, the
  * `mutual` rule). A raw difference such as `|a1b1| − c·|a2b2|` is degree 1, so a solve with a free scale meets it by
  * shrinking the whole figure to a point (#2806: a square beside one stated point drawn at 1e-6). Locked over this
@@ -695,7 +695,7 @@ export function symmetricEigen(a0: readonly (readonly number[])[]): { values: nu
  */
 const FLAT_RING_FAN: readonly (readonly [number, number])[] = [[0.25, 0.2], [0.75, 0.2], [0.5, 0.45], [-0.4, 0.5], [1.4, 0.5]];
 /**
- * #2806 ([ADR-3D-458](../../docs/06b-decisions-3d.md#adr-3d-458)) — THE SCALAR PINS' RESIDUAL ROWS, one per `ScalarPin`
+ * #2806 ([ADR-3D-462](../../docs/06b-decisions-3d.md#adr-3d-462)) — THE SCALAR PINS' RESIDUAL ROWS, one per `ScalarPin`
  * kind, read through the pivot's frame accessor `at`. Lifted out of `solvePivot`'s residual closure so the rule
  * `PIN_FIXES_SCALE` states — a similarity-invariant kind's row is of degree 0 in the gauge scale — can be locked
  * over the table directly (`issue-936-degenerate.test.ts`), not only through whichever figures a test happens to build.
@@ -714,7 +714,7 @@ export function scalarPinRows3(
     gaugeFrozen?: boolean;
   },
 ): void {
-  // #2806 (ADR-3D-458): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
+  // #2806 (ADR-3D-462): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
   const ratioRow = (p: number, q: number): number => (env.gaugeFrozen ? p - q : relDiff3(p, q));
   // V8-f: a VecAtom operand → its (gauge-transformed) direction
   const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
@@ -812,7 +812,7 @@ export function scalarPinRows3(
       const b1 = at(pin.b1);
       const a2 = at(pin.a2);
       const b2 = at(pin.b2);
-      // #2806 (ADR-3D-458): normalised by the operands (`relDiff3`) — degree 0 in the gauge scale, so the
+      // #2806 (ADR-3D-462): normalised by the operands (`relDiff3`) — degree 0 in the gauge scale, so the
       // pivot can never meet a ratio of lengths by shrinking the figure to a point
       out.push(a1 && b1 && a2 && b2 ? ratioRow(norm3(sub3(b1, a1)), pin.c * norm3(sub3(b2, a2))) : 10);
     } else if (pin.kind === 'vec-eq') {
@@ -825,7 +825,7 @@ export function scalarPinRows3(
         out.push(10, 10, 10);
         continue;
       }
-      // #2806 (ADR-3D-458): each component over |l| + |r| — still signed, now scale-free like every
+      // #2806 (ADR-3D-462): each component over |l| + |r| — still signed, now scale-free like every
       // similarity-invariant row, so a shrinking figure cannot zero it
       const den = env.gaugeFrozen ? 1 : Math.max(norm3(l) + norm3(r), REL_DIFF_FLOOR);
       out.push((l.x - r.x) / den, (l.y - r.y) / den, (l.z - r.z) / den);
@@ -847,7 +847,7 @@ export function scalarPinRows3(
       // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
       const e1 = exprAt(pin.e1);
       const e2 = exprAt(pin.e2);
-      // #2806 (ADR-3D-458): normalised like `length-rel` — one helper, so the two forms cannot drift
+      // #2806 (ADR-3D-462): normalised like `length-rel` — one helper, so the two forms cannot drift
       out.push(e1 && e2 ? ratioRow(norm3(e1), pin.c * norm3(e2)) : 10);
     } else if (pin.kind === 'mag-val') {
       // #393/#335: |e| − value — the absolute-size twin of `length`.

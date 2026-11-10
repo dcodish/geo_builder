@@ -46,7 +46,7 @@ const SEEDED: SeededCorpus = {
   // cancels, so it reads as lengths and T is created free. The class is asserted in issue-1156-ratio-taught.test.ts; this is
   // the build + drift + load net.
   'new-point-equal-lengths-2804.geo3.json': ['מרובע ABCD', 'מעגל חוסם את ABCD', 'TA = TB'],
-  // #2806 (ADR-3D-458) — the report: a square beside one vertex on an axis, drawn shrunk to a dot (every line green) and
+  // #2806 (ADR-3D-462) — the report: a square beside one vertex on an axis, drawn shrunk to a dot (every line green) and
   // 3.8 s to submit. The size, the square and the work count are asserted in issue-936-degenerate.test.ts; this is the
   // build + drift + load net.
   'square-vertex-axis-2806.geo3.json': ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-x'],

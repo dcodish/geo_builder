@@ -1082,7 +1082,7 @@ asks `structurallyOnRun3`: off-plane keeps ADR-3D-146's foot; in-plane mints a `
 ⟂. `degenerate()` rejects a NON-flat solid's ring at zero area (2-D ADR-413's rule in R³); a FLAT ring's
 collapse goes to a **frozen-dims retry** with the shape fixed at the seed's sample.
 
-**A similarity-invariant relation is scale-free in the pivot** (#2806, [ADR-3D-458](06b-decisions-3d.md#adr-3d-458)).
+**A similarity-invariant relation is scale-free in the pivot** (#2806, [ADR-3D-462](06b-decisions-3d.md#adr-3d-462)).
 Every relation `PIN_FIXES_SCALE` marks similarity-invariant has a residual of degree 0 in the gauge scale
 (normalised by its operands, `relDiff3` for the magnitude ratios `length-rel` / `mag-rel`, `|l| + |r|` for
 `vec-eq`), so the pivot can never satisfy it by shrinking the figure while one stated point makes the scale an
