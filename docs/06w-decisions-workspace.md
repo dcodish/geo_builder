@@ -1382,7 +1382,7 @@ ADR-3D-040 (the guidance registers), [ADR-W-029](#adr-w-029), [ADR-052](06-decis
 
 ## ADR-W-031 — A restated fact SUCCEEDS, appends no row, and says so — in every product (#613)
 
-> **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. This entry holds until #2790 lands.
+> **⚠ Ruled to change — superseded by [ADR-W-200](#adr-w-200)** (operator 2026-11-09, #2790: *"if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists … this ruling is for all tools."*): a restated fact is to be accepted as its own row, with a notice. **⚠ Superseded in 2-D** by [ADR-W-204](#adr-w-204) / [ADR-822](06-decisions.md#adr-822) (2026-11-10); this entry holds in 3-D, analytic and complex until #2790's ports land.
 
 **Operator ruling (2026-08-16):** *"if a fact is already known - it should not be added. this is true to
 all tools."*
@@ -7393,7 +7393,7 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 
 ## ADR-W-200 — A line restating what the figure already holds is accepted as its own row, with a notice that it already exists, in every builder (#2790)
 
-**Status:** accepted · 2026-11-09 · operator ruling, all four builders · not yet built (#2790) · **supersedes** [ADR-W-031](#adr-w-031) (2026-08-16) and [ADR-3D-449](06b-decisions-3d.md#adr-3d-449) · LADDER stage: **none** (the submit decision)
+**Status:** accepted · 2026-11-09 · operator ruling, all four builders · **built in 2-D** ([ADR-W-204](#adr-w-204), [ADR-822](06-decisions.md#adr-822), 2026-11-10); 3-D, analytic and complex pending (#2790) · **supersedes** [ADR-W-031](#adr-w-031) (2026-08-16) and [ADR-3D-449](06b-decisions-3d.md#adr-3d-449) · LADDER stage: **none** (the submit decision)
 **Operator:** 2026-11-09, in chat, answering round #2786's question on one behaviour for a restated fact (#2704, #2341):
 > "ruling - if user enters an input that is already existing in the diagram, it should be accepted but with a notice that it already exists. this should be on all tools. logic is that basically this should not happen but if it does, we accept it for cases where the user might want to delete/disable a previous input and still wants a specific relation to exist. so this needs to be done in all cases. this ruling is for all tools."
 
@@ -7447,3 +7447,13 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 3. **Every builder**, after a review of each place a lowercase label is refused, taught or sent to the AI today (#2823). A builder whose own convention is lowercase (complex's «z1», «w») keeps it where the review shows the letter is not a point.
 
 **Why.** Students type on phones, where capitals cost an extra tap each time.
+
+## ADR-W-204 — ADR-W-200 built in 2-D: the held row, its one notice, and the shared table every builder will assert (#2790, #2795)
+
+**Status:** accepted · 2026-11-10 · round #2822 · **builds** [ADR-W-200](#adr-w-200) in 2-D ([ADR-822](06-decisions.md#adr-822), with [ADR-821](06-decisions.md#adr-821)); 3-D, analytic and complex are its remaining ports · LADDER stage: **none** (the submit decision)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-36 (2-D built; three builders a known gap) · **Design:** none (internal) — the suite key `suite.notice.alreadyHeld` and the shared table `shell/__tests__/fixtures/held-row-2790.ts`
+
+**Decision.**
+1. **One notice key** for a held row in every builder: `suite.notice.alreadyHeld` — «זה כבר קיים באיור — נוסף כנתון נפרד.» / "That's already on the figure — added as a separate given." (new text of the session's, ADR-W-174). `suite.notice.alreadyDrawn` retires when the last builder ports.
+2. **One shared table** of held sequences and controls (`held-row-2790.ts`), asserted by each tree through its own decision: one row appended, the notice, no point moves, the relation holding once the earlier row is unticked and deleted.
+3. **Split landing.** The round landed 2-D first (the reference, ADR-W-118 B1); until the ports land, 3-D, analytic and complex answer a held line with their old no-row note — a parity known gap naming #2790.

@@ -52,9 +52,9 @@ export type GateRefusal =
   | 'extension-side';
 
 export type GateVerdict =
-  | { kind: 'commit'; commands: AnyCommand[] }
-  /** a clean RE-ENTRY of things that already exist — friendly, and NOT an escalation (ADR-156) */
-  | { kind: 'noop' }
+  /** `held` (#2790, ADR-822, ADR-W-200): the line restates what the figure holds — still its own row, with the notice.
+   *  A clean RE-ENTRY of things that already exist was the friendly no-op of ADR-156; it is this row now. */
+  | { kind: 'commit'; commands: AnyCommand[]; held?: true }
   | { kind: 'refused'; reason: GateRefusal; detail?: string; step?: string };
 
 /**
@@ -68,7 +68,13 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   const ctx = ctxOf(facts);
   // #2064 (ADR-643): a height named by two existing vertices — the app's own predicate, called, never mirrored
   const vp = vertexPairVerdict(utterance, ctx, facts, seed, ROLE_READING_WORK_CAP);
-  if (vp?.kind === 'implied') return { kind: 'noop' };
+  if (vp?.kind === 'implied') {
+    const commands = vp.readings.flatMap((reading) => {
+      const pr = parse(reading, ctx);
+      return pr.ok ? pr.commands : [];
+    });
+    return { kind: 'commit', commands, held: true };
+  }
   if (vp?.kind === 'adopt') return gateVerdict(facts, vp.reading, seed);
   const r = parse(utterance, ctx);
   if (!r.ok) return { kind: 'refused', reason: 'parse', detail: r.reason };
@@ -93,16 +99,19 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
    * so a lock written through the gate read a no-op as a refusal. Surfaced by #1988, whose «דלתון ABCD» over a
    * declared square lowers to equalities the square already entails.
    */
-  if (outcome.reason === 'implied') return { kind: 'noop' };
+  if (outcome.reason === 'implied') return { kind: 'commit', commands: r.commands, held: true };
   if (outcome.reason === 'empty') {
     // ADR-156: re-typing something already drawn is a friendly no-op, never an LLM escalation. The
     // signal is "produced nothing, not an error, and every label it names already exists".
     const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
     const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
-    if (newLabels.length === 0) return { kind: 'noop' };
+    if (newLabels.length === 0) return { kind: 'commit', commands: r.commands, held: true };
   }
   return { kind: 'refused', reason: outcome.reason === 'error' ? 'error' : 'empty', detail: outcome.detail };
 }
+
+/** #2790 (ADR-822): a verdict's kind, with a held restatement's row read as 'held' — what the re-based no-op locks assert. */
+export const heldKind = (v: GateVerdict): GateVerdict['kind'] | 'held' => (v.kind === 'commit' && v.held ? 'held' : v.kind);
 
 /**
  * Drive a sequence through the gate, committing what the app would commit — so the resulting fact list
@@ -117,12 +126,16 @@ export function driveThroughGate(utterances: string[]): { facts: Fact[]; refused
   const refused: { index: number; utterance: string; verdict: GateVerdict }[] = [];
   utterances.forEach((utterance, index) => {
     const v = gateVerdict(useGeoStore.getState().facts, utterance, useGeoStore.getState().seed);
+    if (v.kind === 'commit' && v.held) {
+      // #2790 (ADR-822): a held restatement is its own row — the app's `ownRow` commit
+      useGeoStore.getState().executeMany(v.commands, utterance, undefined, { ownRow: true });
+      return;
+    }
     if (v.kind === 'commit') {
       const group = `g${useGeoStore.getState().facts.length}`;
       for (const c of v.commands) useGeoStore.getState().execute(c, utterance, group);
       return;
     }
-    if (v.kind === 'noop') return; // nothing to commit, and nothing wrong
     refused.push({ index, utterance, verdict: v });
   });
   return { facts: useGeoStore.getState().facts, refused };

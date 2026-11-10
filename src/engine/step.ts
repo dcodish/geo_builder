@@ -8,7 +8,7 @@
  */
 
 import { engineErrorDebugText } from './errors';
-import { statedSegmentRatio, statedSegmentT } from './verify';
+import { declaredRingsHold, statedSegmentRatio, statedSegmentT } from './verify';
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, heldRiderOfRelation, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
@@ -1272,6 +1272,20 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
     if (prevCons.includes(con)) continue; // the figure's own row, not this step's
     if (constraintRefs(con).some((id) => !prevPositions.has(id))) return r;
     if (!isSatisfied(con, get)) return r; // the figure does NOT satisfy it — it must move
+    // #2795 (ADR-821, hole H2): an ORDER row is a region, never a rank row (ADR-039), so `impliedByFigure`
+    // rightly answers `false` for it. A `collinear-order` is judged by its two halves instead: its
+    // COLLINEARITY by the rank test over collinear rows on its points (identically satisfied for a rider, so
+    // a zero gradient), and its SIGN by rung (5) below — `evaluate` checks the order, so "the released figure
+    // evaluates at every counted re-sampled seed" is the sign test over the prior's own layouts. Any other
+    // order row (a bound) has no equality half to prove and keeps today's answer.
+    if (isOrderConstraint(con)) {
+      if (con.type !== 'collinear-order' || con.points.length < 3) return r;
+      const [p0, ...rest] = con.points;
+      const pn = rest[rest.length - 1];
+      const halves = rest.slice(0, -1).map((q): Constraint => ({ type: 'collinear', a: q, b: p0, c: pn }));
+      if (!halves.every((h) => impliedByFigure(prev, movableIds(prev), prevCons, h))) return r;
+      continue;
+    }
     if (!impliedByFigure(prev, movableIds(prev), prevCons, con)) return r; // only coincidentally true here
   }
   // (3) RELEASE — the claimed carriers go back to exactly what the prior figure had.
@@ -1289,7 +1303,20 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
   // so the released figure must stay green under re-sampling. Without it, a row coincidentally true AND
   // coincidentally dependent at one symmetric default draw would be released and then violated at every
   // other seed — a figure that reads green here and red on «הציגו תצורה אחרת».
-  for (const s of [1, 2, 3]) if (!evaluate(applySeed(released, s)).ok) return r;
+  //
+  // #2795 (ADR-821, hole H3): a re-sampled seed COUNTS only where the PRIOR is a figure there — it evaluates
+  // and every declared ring keeps its identity (`declaredRingsHold`, the `checkGivens` trapezoid rule). At a
+  // seed where the isosceles trapezoid's own legs equality lands on its parallelogram root, the prior is no
+  // figure (the seed search never shows it), so the released figure failing there proves nothing. Seeds 1..6
+  // are drawn until 3 count; with fewer than 3 counted the proof is not made and today's answer stands.
+  let counted = 0;
+  for (let s = 1; s <= 6 && counted < 3; s++) {
+    const pe = evaluate(applySeed(prev, s));
+    if (!pe.ok || !declaredRingsHold(prev, pe.positions)) continue;
+    counted += 1;
+    if (!evaluate(applySeed(released, s)).ok) return r;
+  }
+  if (counted < 3) return r;
   return { ...r, construction: released, positions: e.positions, ladder: [...(r.ladder ?? []), 'implied:release'] };
 }
 

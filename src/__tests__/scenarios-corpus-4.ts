@@ -48,7 +48,7 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
-import { gateVerdict } from './submit-gate';
+import { gateVerdict, heldKind } from './submit-gate';
 import i18n from '@/i18n';
 import { circleResolver, humanizeError } from '@/i18n/humanizeError';
 import { circleMenuTitle } from '@/i18n/circleText';
@@ -3836,7 +3836,7 @@ export const SCENARIOS_4: Scenario[] = [
       }
       // the control: the square's own points in a simple order are never refused — since #1953 (ADR-618) they are
       // the square's own ring restated, a no-op («כבר קיים»), where they committed a second row before
-      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB').kind, '«מרובע ADCB» is a restatement').toBe('noop');
+      expect(heldKind(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB')), '«מרובע ADCB» is a restatement').toBe('held');
     },
   },
   {
@@ -3950,9 +3950,9 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const facts = factsOf(['ריבוע ABCD']);
       for (const line of ['מרובע ADCB', 'מרובע BCDA', 'ריבוע BCDA', 'מרובע ABCD']) {
-        expect(gateVerdict(facts, line).kind, `«ריבוע ABCD» · «${line}» is a restatement`).toBe('noop');
+        expect(heldKind(gateVerdict(facts, line)), `«ריבוע ABCD» · «${line}» is a restatement`).toBe('held');
       }
-      expect(gateVerdict(factsOf(['משולש ABC']), 'משולש ACB').kind, '«משולש ABC» · «משולש ACB» is a restatement').toBe('noop');
+      expect(heldKind(gateVerdict(factsOf(['משולש ABC']), 'משולש ACB')), '«משולש ABC» · «משולש ACB» is a restatement').toBe('held');
       // the crossing order is another ring, and stays #1927's refusal
       const crossed = gateVerdict(facts, 'מרובע ACBD');
       expect(crossed.kind === 'refused' && crossed.reason, '«מרובע ACBD» is still refused').toBe('crossed-ring');
@@ -4010,7 +4010,7 @@ export const SCENARIOS_4: Scenario[] = [
       // #1988 — an IMPLIED noun commits nothing and is never refused as a redefinition
       const sq = factsOf(['ריבוע ABCD']);
       for (const line of ['מלבן ABCD', 'מעוין ABCD', 'מקבילית ABCD', 'דלתון ABCD', 'מלבן BCDA'])
-        expect(gateVerdict(sq, line), line).toEqual({ kind: 'noop' });
+        expect(gateVerdict(sq, line), line).toMatchObject({ kind: 'commit', held: true });
       // and the declared square is still a square afterwards
       const poly = replay(sq).construction.objects.find((o) => o.kind === 'polygon');
       expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('square');
@@ -4118,8 +4118,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(regular, 'מחומש ABCDE חסום במעגל').kind, 'the reported second line commits').toBe('commit');
       // and the two honest no-ops stay no-ops: «בר חסימה» asks for the circle NOT to be drawn,
       // and a pentagon already on a VISIBLE circle really is already drawn
-      expect(gateVerdict(regular, 'מחומש ABCDE בר חסימה').kind, '«בר חסימה» adds nothing').toBe('noop');
-      expect(gateVerdict(factsOf(['מחומש משוכלל ABCDE חסום במעגל']), 'מחומש ABCDE חסום במעגל').kind, 'a VISIBLE circle really is already drawn').toBe('noop');
+      expect(heldKind(gateVerdict(regular, 'מחומש ABCDE בר חסימה')), '«בר חסימה» adds nothing').toBe('held');
+      expect(heldKind(gateVerdict(factsOf(['מחומש משוכלל ABCDE חסום במעגל']), 'מחומש ABCDE חסום במעגל')), 'a VISIBLE circle really is already drawn').toBe('held');
       // (the reveal moves nothing: asserted at a fixed seed in the unit lock — this check runs under the
       // cross-seed sweep, where `fig` is at seed s and a seed-0 comparison is not the same configuration)
     },
@@ -4442,7 +4442,7 @@ export const SCENARIOS_4: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       const sq = factsOf(['ריבוע ABCD']);
-      expect(gateVerdict(sq, 'AB גובה').kind, '«AB גובה» is already true').toBe('noop');
+      expect(heldKind(gateVerdict(sq, 'AB גובה')), '«AB גובה» is already true').toBe('held');
       const r = parse('AB גובה', ctxOf(sq));
       expect(r.ok && r.commands.some((c) => c.type === 'foot'), 'the parser never redefines B as a foot').toBe(false);
       expect(dist(at(fig, 'A'), at(fig, 'B')), 'the square keeps its size').toBeGreaterThan(1);
@@ -4459,7 +4459,7 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const sq = factsOf(['ריבוע ABCD']);
       for (const line of ['BC גובה ל- AB', 'BC גובה ל-AB']) {
-        expect(gateVerdict(sq, line).kind, line).toBe('noop');
+        expect(heldKind(gateVerdict(sq, line)), line).toBe('held');
         const r = parse(line, ctxOf(sq));
         expect(r.ok && r.commands, line).toContainEqual({ type: 'set-perpendicular', a: 'C', b: 'B', c: 'B', d: 'A' });
       }
@@ -4473,7 +4473,7 @@ export const SCENARIOS_4: Scenario[] = [
     steps: ['ריבוע ABCD'],
     check(fig) {
       allStepsOk(fig);
-      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AB גובה לצלע BC').kind).toBe('noop');
+      expect(heldKind(gateVerdict(factsOf(['ריבוע ABCD']), 'AB גובה לצלע BC'))).toBe('held');
     },
   },
   {
@@ -4944,7 +4944,7 @@ export const SCENARIOS_4: Scenario[] = [
       // the ring keeps the adjective, and «טרפז» after it still restates
       const poly = fig.construction.objects.find((o) => o.kind === 'polygon');
       expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('isosceles-trapezoid');
-      expect(gateVerdict(iso, 'טרפז ABCD')).toEqual({ kind: 'noop' });
+      expect(gateVerdict(iso, 'טרפז ABCD')).toMatchObject({ kind: 'commit', held: true });
     },
   },
   {
@@ -5188,7 +5188,7 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('M'), 'the touch is M').toBe(true);
       const facts = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים']);
       for (const line of ['המעגלים O ו-P משיקים', 'מעגל P משיק למעגל O', 'המעגלים P ו-O משיקים']) {
-        expect(gateVerdict(facts, line).kind, `«${line}» restates the tangency`).toBe('noop');
+        expect(heldKind(gateVerdict(facts, line)), `«${line}» restates the tangency`).toBe('held');
       }
       const twin = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים P ו-O משיקים בנקודה X']);
       const t = replay(twin);
@@ -5235,7 +5235,7 @@ export const SCENARIOS_4: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       const v = gateVerdict(factsOf(['מלבן ABCD', 'מעוין ABCD']), 'ריבוע ABCD');
-      expect(v.kind, JSON.stringify(v)).toBe('noop');
+      expect(heldKind(v), JSON.stringify(v)).toBe('held');
     },
   },  {
     id: 'diagonal-height-refused-2117',
@@ -6663,6 +6663,55 @@ export const SCENARIOS_4: Scenario[] = [
         expect(relOf(replay(cur.facts, cur.seed)), 'riders press ' + (k + 1)).not.toBe('disjoint');
         expect(meetsRequirements(cur.facts, cur.seed)).toBe(true);
       }
+    },
+  },
+  {
+    id: 'restated-diagonals-isosceles-trapezoid-stays-put-2795',
+    title:
+      '#2795 (ADR-821): «טרפז שווה שוקיים ABCD · AC = BD» — the equal diagonals the isosceles trapezoid already has move no point at any displayable seed (was 0.46 / 0.20 / 0.42 / 0.10), keep every freedom, and «AC = BD» holds alone once the earlier «AD = BC» of a plain trapezoid is unticked',
+    guards:
+      "Re-measured at pickup on 67dd576b through the real submit gate: the second line committed and moved the trapezoid 0.46 / (2.9) / 0.20 / 0.42 / 0.10 at seeds 0–4 ((2.9): seed 1 draws the trapezoid on its parallelogram root, not a figure). Root cause: ADR-623's forcing proof had three holes — H1 a structurally equal prior row thrown away as evidence (impliedByFigure), H2 an order row never released (a reversed rider), H3 a re-sampled seed counted where the PRIOR is no figure (its parallelogram root). Fix (ADR-821): only the row itself is left out, a collinear-order is judged by its collinear half and the re-sample sign test, and a seed counts only where every declared ring keeps its identity (declaredRingsHold, the checkGivens trapezoid rule). The class matrix is src/engine/__tests__/ladder-contract.test.ts and the held-row table src/__tests__/already-drawn-1990.test.ts.",
+    steps: ['טרפז שווה שוקיים ABCD', 'AC = BD'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(dist(at(fig, 'B'), at(fig, 'D')), 6);
+      const before = factsOf(['טרפז שווה שוקיים ABCD']);
+      const after = factsOf(['טרפז שווה שוקיים ABCD', 'AC = BD']);
+      for (const seed of [0, 2, 3, 4]) {
+        if (!meetsRequirements(before, seed)) continue;
+        const a = replay(before, seed).positions, b = replay(after, seed).positions;
+        for (const [id, q] of a) expect(Math.hypot(q.x - b.get(id)!.x, q.y - b.get(id)!.y), `${id} at seed ${seed} must not move`).toBeLessThan(1e-6);
+      }
+      expect(freeDofCount(replay(after, 0).construction)).toBe(freeDofCount(replay(before, 0).construction));
+      // the consequence spelled on a plain trapezoid: unticking «AD = BC» leaves «AC = BD» holding
+      const plain = factsOf(['טרפז ABCD', 'AD = BC', 'AC = BD']);
+      const legs = groupKey(plain.find((f) => f.utterance === 'AD = BC')!);
+      const muted = plain.map((f) => (groupKey(f) === legs ? { ...f, enabled: false } : f));
+      const m = replay(muted, 0);
+      expect(m.lastError).toBeNull();
+      expect(dist(m.positions.get('A')!, m.positions.get('C')!)).toBeCloseTo(dist(m.positions.get('B')!, m.positions.get('D')!), 6);
+    },
+  },
+  {
+    id: 'restated-rider-reversed-stays-put-2795',
+    title:
+      '#2795 (ADR-821): «משולש ABC · D על AB · D על BA» — the reversed rider moves no point (D moved up to 3.3), and «D על BA» alone keeps D on AB once «D על AB» is unticked',
+    guards:
+      "Re-measured at pickup on 67dd576b: «D על BA» committed and moved D 2.0 / 1.1 / 3.0 / 0.20 / 3.3 at seeds 0–4. The M1 lowering adds collinear + collinear-order [B, D, A]; the order row took D's own t and D was re-solved from another start, because ADR-623's release never judged an order row (hole H2). FR-EN-9: the segment's direction is no part of what it defines. Fix: ADR-821 (see restated-diagonals-isosceles-trapezoid-stays-put-2795).",
+    steps: ['משולש ABC', 'D על AB', 'D על BA'],
+    check(fig) {
+      allStepsOk(fig);
+      const before = factsOf(['משולש ABC', 'D על AB']);
+      const after = factsOf(['משולש ABC', 'D על AB', 'D על BA']);
+      for (const seed of [0, 1, 2, 3, 4]) {
+        const a = replay(before, seed).positions, b = replay(after, seed).positions;
+        for (const [id, q] of a) expect(Math.hypot(q.x - b.get(id)!.x, q.y - b.get(id)!.y), `${id} at seed ${seed} must not move`).toBeLessThan(1e-6);
+      }
+      const first = groupKey(after.find((f) => f.utterance === 'D על AB')!);
+      const m = replay(after.map((f) => (groupKey(f) === first ? { ...f, enabled: false } : f)), 0);
+      expect(m.lastError).toBeNull();
+      const [A, B, D] = ['A', 'B', 'D'].map((id) => m.positions.get(id)!);
+      expect(dist(A, D) + dist(D, B), 'D stays on AB').toBeCloseTo(dist(A, B), 6);
     },
   },
 ];

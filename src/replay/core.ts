@@ -35,7 +35,7 @@ import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecuted
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
 import { DOUBLE_ROOT_SPLIT } from '@/engine/geometry';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, isSatisfied, declaredRingsHold, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption, unspelled } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -587,10 +587,17 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
  *
  * Returns the SAME array when nothing changed, and never mutates: a changed fact is a new object, so
  * {@link trialChanges} can name exactly what a candidate step touched.
+ *
+ * `ownRow` (#2790, [ADR-822](docs/06-decisions.md#adr-822), ADR-W-200): the line RESTATES what the figure holds and is
+ * accepted as its own row, so the three ABSORBING rules — an enabled twin, an `ifAbsent` point over an existing one,
+ * a sizeless circle reference — append instead. A DISABLED twin is still re-enabled in place (FR-EN-9: re-typing a
+ * muted row brings it back). The engine's upsert decides the figure exactly as before, and ADR-623's release
+ * (`releaseImpliedOwnership`) keeps a repeated row from moving it (#2795).
  */
-export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyCommand) => Fact, utterance?: string, committed = facts.length): Fact[] {
-  const dup = facts.find((f) => deepEqual(f.cmd, cmd));
+export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyCommand) => Fact, utterance?: string, committed = facts.length, ownRow = false): Fact[] {
+  const dup = facts.find((f) => deepEqual(f.cmd, cmd) && !(ownRow && f.enabled));
   if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
+  if (ownRow) return [...facts, mint(cmd)];
   // #2480 (ADR-757): only a fact THIS batch appended may be rewritten in place; a committed row is immutable
   const ownBatch = (f: Fact) => facts.indexOf(f) >= committed;
   if (cmd.type === 'free-point') {
@@ -3991,11 +3998,19 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     const all = trialFacts(facts, commands);
     if (trialChanges(facts, all).length === 0) return false; // nothing changed — `empty`'s business, not this arm's
     const after = replay(all, seed);
-    // Anything OTHER than a constraint means the step built something. Objects and labels are visible;
-    // a step that adds one has produced, whatever else it also did.
-    if (after.construction.objects.length !== before.construction.objects.length) return false;
+    // Anything OTHER than a constraint means the step built something — with two exceptions since #2790
+    // ([ADR-822](docs/06-decisions.md#adr-822), ADR-W-200 §1: "a value the points already decide"): the line's OWN
+    // VALUE (a new measure label) and its OPERAND INK (a segment or line over placed points the statement itself
+    // names — «AC = 3√2» draws AC). Both are drawn by the row either way; what this decides is only whether the
+    // row also carries the «already there» notice. Any other new object (a point, a circle, a polygon) is new.
+    const priorIds = new Set(before.construction.objects.map((o) => o.id));
+    const newObjects = after.construction.objects.filter((o) => !priorIds.has(o.id));
+    if (after.construction.objects.length - newObjects.length !== before.construction.objects.length) return false;
+    if (newObjects.some((o) => (o.kind !== 'segment' && o.kind !== 'line') || objectParents(o).some((id) => !before.positions.has(id)))) return false;
     const labels = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
-    if (labels(after.labels) !== labels(before.labels)) return false;
+    if (labels(after.labels) < labels(before.labels)) return false;
+    // The FIRST absolute magnitude is a statement about SCALE (ADR-237, #883) — never held, whatever the pool says.
+    if (!scalePinned(before.construction) && scalePinned(after.construction)) return false;
 
     // Every constraint the step contributes — the CHECK list and the DRIVEN ones alike (#1602, ADR-557).
     // A new given that becomes a drive (an on-segment rider solved by it) never enters `constraints`, so
@@ -4010,9 +4025,11 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
       return true;
     });
     if (added.length === 0) return false;
-    // The order/bound family has no scale-invariant residual to test — fail open rather than guess.
-    if (added.some((con) => isOrderConstraint(con))) return false;
-
+    // #2790 (ADR-822): operand ink must be over points the statement itself names
+    if (newObjects.length) {
+      const named = new Set(added.flatMap((con) => constraintRefs(con)));
+      if (newObjects.some((o) => objectParents(o).some((id) => !named.has(id)))) return false;
+    }
     const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate: on the clock (ADR-558)
     if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
     if (pool.samples.length === 0) return false;
@@ -4021,11 +4038,19 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
       added.every((con) => {
         if (constraintRefs(con).some((id) => !positions.has(id))) return false; // cannot be established
         const get = (id: Id) => positions.get(id) as Vec;
+        // #2795 (ADR-821): an order/bound row has no scale-invariant residual, but a SIGN needs none — it is held where
+        // the engine's own check passes at every sample (and at every unvaried choice below). It used to fail open, so
+        // «D על BA» after «D על AB» was never judged held.
+        if (isOrderConstraint(con)) return isSatisfied(con, get);
         const r = residual(con, get);
         if (!Number.isFinite(r)) return false;
         return Math.abs(r) <= residualTolerance(con, constraintScale(con, get)); // else NOT entailed
       });
-    if (!pool.samples.every(holdsAt)) return false;
+    // #2795 (ADR-821, hole H3 at the gate): a sample counts only where the PRIOR is a figure — a declared trapezoid on its
+    // parallelogram root is a layout the seed search never shows, so a relation failing there proves nothing.
+    const figures = pool.samples.filter((p) => declaredRingsHold(before.construction, p));
+    if (!pool.determined && figures.length < IMPLIED_MIN_SAMPLES) return false;
+    if (figures.length === 0 || !figures.every(holdsAt)) return false;
 
     // #1922 (ADR-605, amending ADR-542): "satisfied everywhere the figure can be" must range over the TOOL'S OWN
     // unstated choices too (ADR-052). The pool varies the variants always, but the branch/side/seat axes only on
