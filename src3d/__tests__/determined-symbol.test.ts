@@ -139,9 +139,18 @@ describe('#302 — the class, beyond the reported instance', () => {
     expect(parametricDecomp(c, 'A', 'E', SEEDS)).toBe('t·w');
   });
 
-  it('TWO roaming symbols return null — never a faked single-parameter form (#301)', () => {
+  // #1829 (ADR-3D-471), operator ruling 2026-10-06: *"it is ok for an answer to include a parameter or even more if thats
+  // the only way to show it"* — two roaming letters are BOTH in the form, never a faked single-parameter one (#301)
+  it('TWO roaming symbols answer in both letters (#1829), never a faked single-parameter form (#301)', () => {
     const c = build(['פירמידה ABCDS שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS', 'AF=k*AD']);
     expect(c.vecDefs.filter((v) => v.symbol).length).toBe(2);
-    expect(parametricDecomp(c, 'E', 'F', SEEDS)).toBeNull();
+    expect(parametricDecomp(c, 'E', 'F', SEEDS)).toBe('−t·w + k·u');
+  });
+
+  it('#1829: a letter its relation DETERMINES reads its value in the params row, as the ask «t» answers it', () => {
+    const d = derive3(OPERATOR_FIGURE, 0);
+    const rows = dataView(d.construction, 0).params;
+    expect(rows.find((r) => r.sym === 't')).toMatchObject({ value: '1/2', open: false }); // before: «t = ?»
+    expect(rows.find((r) => r.sym === 'k')).toMatchObject({ open: true });
   });
 });

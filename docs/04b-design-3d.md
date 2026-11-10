@@ -1495,6 +1495,18 @@ composer sits in the engine (`render → engine`); a row's arrow comes from `lex
 asserts the section count and `dir: 'app'` on each (never a section-level `dir: 'ltr'`, #559). Every
 measurement field of `DataPanel` keeps only what agrees across the samples.
 
+**The open letters: one list, three readers (#1829, [ADR-3D-471](06b-decisions-3d.md#adr-3d-471)).** `paramRows3(c,
+resolved)` is the `params` loop as a function; `dataView` calls it before its vector rows, and its `open` rows (each
+with its sampled values, whether a stated relation drives it, and whether it names a measure: an angle or a length)
+are the figure's free letters for every reader. `parametricFitter3(c, seeds, open)` pins the non-measure letters through
+`pinLetters3` (apply's `symbol-value`, the student's «t = …» door) at fractions of their sampled span (three per letter
+with the others held, plus one held-out joint sample), fits each basis coefficient as an affine function of all of them,
+and accepts the fit only when the middle probe and the held-out sample sit on it to 1e-4. It runs only where
+`basisDecompose` found no seed-stable form, and its pinned samples are shared by every row of the panel. The ask
+lane's `vectorForms` takes the same fitter, and `pinFreeMeasures` (the «תלוי ב-…» rescue) pins the undriven open
+letters other than the one asked. A vec-def letter is read off the drawing by `vecDefLetterAt3`, the reader the ask
+«t» already used, so a determined letter closes its row.
+
 **A parameter's roots: one join, two surfaces (#1591, [ADR-3D-303](06b-decisions-3d.md#adr-3d-303); [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867).**
 `branchAnswer(sym, branches)` classifies the roots through `shell/valueOptions`: «±√2» for a symmetric pair,
 «-2 או m = 4» for any other pair, `null` for none or three and more (the open «m = ?» row). The panel's `params` row prints

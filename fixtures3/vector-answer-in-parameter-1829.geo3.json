@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T13:42:35.067Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מלבן ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rectangle",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB→ = u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ],
+          "marked": true
+        }
+      ]
+    },
+    {
+      "utterance": "AD→ = v",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "D",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ],
+          "marked": true
+        }
+      ]
+    },
+    {
+      "utterance": "AB=1",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "|AD|=√7",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "D",
+            "value": 2.6457513110645907,
+            "src": "√7"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "DF→ = t*DC→",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "D",
+          "to": "F",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "D",
+                "to": "C"
+              }
+            }
+          ],
+          "symbol": "t",
+          "marked": true
+        }
+      ]
+    },
+    {
+      "utterance": "BE→ = t*BC→",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "B",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "B",
+                "to": "C"
+              }
+            }
+          ],
+          "symbol": "t",
+          "marked": true
+        }
+      ]
+    }
+  ]
+}

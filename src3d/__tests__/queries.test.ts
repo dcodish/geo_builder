@@ -404,3 +404,69 @@ describe('#642 — naming the subject is the same question', () => {
     expect(ans(prism, 'אורך AB').answer).not.toBeNull();
   });
 });
+
+/**
+ * #1829 (ADR-3D-471) — an answer may be stated in the figure's free letters when that is the only way to state it
+ * (operator, 2026-10-06: *"it is ok for an answer to include a parameter or even more if thats the only way to show
+ * it"*). Before, «AE» on his rectangle read «לא נקבע על ידי הנתונים»: the parametric form knew one vec-def letter and
+ * his t defines two points, and the «תלוי ב-…» rescue knew angle labels only.
+ */
+describe('#1829 — answers that keep the free letters', () => {
+  beforeEach(reset);
+  const RECT = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'];
+
+  it.each([
+    ['AE', 'u + t·v'],
+    ['AE→', 'u + t·v'],
+    ['וקטור AE', 'u + t·v'],
+    ['vector AE', 'u + t·v'],
+    ['AF→', 't·u + v'],
+    ['EF→', '(t − 1)·u + (1 − t)·v'],
+  ])("the operator's rectangle: «%s» answers %s", (q, want) => {
+    expect(ans(RECT, q).answer).toBe(want);
+  });
+
+  it('a vector with a letter-free answer keeps it (precedence: the stable form first)', () => {
+    expect(ans(RECT, 'AC→').answer).toBe('u + v');
+    expect(ans(RECT, 'AB→').answer).toBe('u');
+  });
+
+  it('a length that depends on t answers «depends on t», not «not determined»', () => {
+    expect(ans(RECT, '|AE|')).toMatchObject({ answer: null, note: 'depends', param: 't' });
+  });
+
+  it('one letter, one number: F and E are drawn at the same t in every configuration', () => {
+    const { c } = build(RECT);
+    for (const s of [0, 1, 7, 1013, 2027]) {
+      const p = resolve3(c, s).positions;
+      const ratio = (a: string, b: string, x: string) => {
+        const ab = { x: p.get(b)!.x - p.get(a)!.x, y: p.get(b)!.y - p.get(a)!.y, z: p.get(b)!.z - p.get(a)!.z };
+        const ax = { x: p.get(x)!.x - p.get(a)!.x, y: p.get(x)!.y - p.get(a)!.y, z: p.get(x)!.z - p.get(a)!.z };
+        return (ab.x * ax.x + ab.y * ax.y + ab.z * ax.z) / (ab.x * ab.x + ab.y * ab.y + ab.z * ab.z);
+      };
+      expect(ratio('D', 'C', 'F'), `seed ${s}`).toBeCloseTo(ratio('B', 'C', 'E'), 9);
+    }
+  });
+
+  it('two letters answer in both (s·u + t·v class): each coefficient carries its own letter', () => {
+    const two = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'DF→ = t*DC→'];
+    expect(ans(two, 'AE').answer).toBe('u + s·v');
+    expect(ans(two, 'EF').answer).toBe('(t − 1)·u + (1 − s)·v');
+    // both letters in ONE coefficient: E and F on the same side, measured from its two ends
+    expect(ans(['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'CF→ = t*CB→'], 'EF').answer).toBe('(1 − s − t)·v');
+  });
+
+  it('a non-affine dependence (s·t) never prints a linear form — it «depends on» its letters', () => {
+    const bilinear = ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'BE→ = s*BC→', 'EF→ = t*ED→'];
+    const r = ans(bilinear, 'AF');
+    expect(r.answer).toBeNull();
+    expect(r).toMatchObject({ note: 'depends', param: 's, t' });
+  });
+
+  it("the data panel's vector rows print the ask's form (one decision, two surfaces)", () => {
+    const { c, seed } = build([...RECT, 'AE']);
+    const row = dataView(c, seed).vectors.find((v) => v.label === 'AE');
+    expect(row?.decomp).toBe(answerQuery(c, 'AE', seed).answer);
+    expect(row?.decomp).toBe('u + t·v');
+  });
+});

@@ -4007,9 +4007,13 @@ function evaluateSolidsAndPoints(
           // the SC line, the sampler just never looked there. A default that survives a contradicting
           // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
           const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
+          // #1829 (ADR-3D-471): ONE LETTER, ONE NUMBER — the draw is keyed by the letter's FIRST definition, so
+          // «DF = t·DC» and «BE = t·BC» place F and E at the same t (keyed per point, they drew two different t's).
+          // A letter with one definition keeps its key, so its drawing is unchanged.
+          const keyPt = c.vecDefs.find((d) => d.symbol === vd.symbol)?.unknown ?? vd.unknown;
           k = neg
-            ? sample(seed, `sym-${vd.symbol}-${vd.unknown}`, -0.8, -0.2)
-            : sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8);
+            ? sample(seed, `sym-${vd.symbol}-${keyPt}`, -0.8, -0.2)
+            : sample(seed, `sym-${vd.symbol}-${keyPt}`, 0.2, 0.8);
         }
       }
       // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
