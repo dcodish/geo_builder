@@ -1,5 +1,9 @@
 /**
- * #2268 (ADR-CX-084) — A STATEMENT THE EXACT SOLVE ALREADY ENTAILS ADDS NOTHING, AND SAYS SO.
+ * #2268 (ADR-CX-084) → #2790 (ADR-CX-089, ADR-W-200) — A STATEMENT THE EXACT SOLVE ALREADY ENTAILS IS ITS OWN ROW, AND SAYS SO.
+ *
+ * Re-based on the operator's 2026-11-09 ruling (*"if user enters an input that is already existing in the diagram, it should
+ * be accepted but with a notice that it already exists. this should be on all tools"*): the detector below is unchanged;
+ * the line is now recorded, with the suite's `suite.notice.alreadyHeld`. The history of #2268:
  *
  * The operator, playing round #2245's T85/T86: *"should accept and say that this is already known."*
  * «z1 = 15cis(π/7)» · «|z1| = 15» and «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» · «z2 = 3z1» were accepted and
@@ -21,14 +25,14 @@ beforeEach(() => store().resetSession());
 
 const play = (...lines: string[]): boolean[] => lines.map((l) => submitLine(l));
 
-/** The noop: accepted, no row added, the note names nothing but the sentence, no error. */
+/** The held row (#2790): accepted, one row added, the already-held note, no error. */
 const expectAlreadyKnown = (givens: string[], restated: string) => {
   expect(play(...givens).every(Boolean), givens.join(' · ')).toBe(true);
   const before = [...store().lines];
   expect(submitLine(restated), restated).toBe(true);
-  expect(store().lines, restated).toEqual(before);
+  expect(store().lines, restated).toEqual([...before, restated]);
   expect(store().lastError, restated).toBeNull();
-  expect(store().lastNote, restated).toEqual({ key: 'already-known', detail: restated });
+  expect(store().lastNote, restated).toEqual({ key: 'already-held', detail: restated });
 };
 
 /** Recorded as a new given, exactly as before the fix. */
@@ -39,14 +43,14 @@ const expectRecorded = (givens: string[], line: string) => {
   expect(store().lastNote, line).toBeNull();
 };
 
-describe('#2268 — the operator\'s cases (T85, T86): already known, nothing recorded', () => {
+describe('#2268 — the operator\'s cases (T85, T86): already known — its own row since #2790', () => {
   it('T85 · «z1 = 15cis(π/7)» → «|z1| = 15»', () => expectAlreadyKnown(['z1 = 15cis(π/7)'], '|z1| = 15'));
   it('T86 · «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» → «z2 = 3z1»', () =>
     expectAlreadyKnown(['z1 = 5cis(π/7)', 'z2 = 15cis(π/7)'], 'z2 = 3z1'));
 
-  it('the sentence is 2-D\'s noop sentence (`suite.notice.alreadyDrawn`), in both languages', () => {
-    expect(complexI18n.t('suite.notice.alreadyDrawn', { lng: 'he' })).toBe('זה כבר קיים באיור — אין מה להוסיף.');
-    expect(complexI18n.t('suite.notice.alreadyDrawn', { lng: 'en' })).toBe("That's already on the figure — nothing to add.");
+  it('the sentence is the suite\'s held note (`suite.notice.alreadyHeld`), in both languages', () => {
+    expect(complexI18n.t('suite.notice.alreadyHeld', { lng: 'he' })).toBe('זה כבר קיים באיור — נוסף כנתון נפרד.');
+    expect(complexI18n.t('suite.notice.alreadyHeld', { lng: 'en' })).toBe("That's already on the figure — added as a separate given.");
   });
 
   it('the figure is unchanged by the noop, and the next line clears the note', () => {
@@ -56,7 +60,7 @@ describe('#2268 — the operator\'s cases (T85, T86): already known, nothing rec
     expect(deriveLines(activeLines(), 0, 0).points.map((p) => [p.name, p.z])).toEqual(drawn);
     expect(submitLine('z2 = 2z1')).toBe(true);
     expect(store().lastNote).toBeNull();
-    expect(store().lines).toEqual(['z1 = 15cis(π/7)', 'z2 = 2z1']);
+    expect(store().lines).toEqual(['z1 = 15cis(π/7)', '|z1| = 15', 'z2 = 2z1']);
   });
 });
 

@@ -23,7 +23,7 @@ the session scratchpad, never in the repo.
 | `pulls/<issue>` | a pull into a week: `pulled` (he clicked on the page) → `recorded` | the page, then this skill |
 | `history/open` | open issues per day since the first issue, total and per group (2-D, 3-D, analytic, complex, infrastructure), and opened/closed per week, rebuilt from GitHub every refresh (ADR-W-159 Am. 1, #2652) | this skill |
 | `snapshots/<YYYY-MM-DD>` | counts: open total, by phase, by tool × priority × type, per workstream | this skill, one per day |
-| `decisions/<id>` | a plan decision: `open` → `answered` (he clicked on the page) → `recorded` | the page, then this skill |
+| `decisions/<id>` | **legacy, closed to new questions since 2026-11-10** ([ADR-W-202](../../../docs/06w-decisions-workspace.md#adr-w-202) Am. 2): every open question lives on the Rulings Inbox; this collection keeps only history (`recorded`, or `moved` with `movedTo`). A new open one here is a defect — move it to the inbox. | history only |
 | `tools/snapshot` | a pointer to `scripts/roadmap-snapshot.mjs` | — |
 
 **The earliest snapshot (2026-10-26) is the baseline the page measures progress from. Never overwrite

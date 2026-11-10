@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { runFallback } from '../app/fallback';
-import { commitRecord, decideSubmit } from '../app/submit';
+import { commitRecord, decideSubmit, isHeld } from '../app/submit';
 import { derive } from '../engine/derive';
 import { nameReading } from '../engine/names';
 import { curveByName } from '../engine/types';
@@ -105,7 +105,7 @@ describe('#1350 — the class, not the instance', () => {
   });
 
   it('a restatement of a held name adds nothing and raises nothing — «כבר ידוע», unchanged', () => {
-    expect(decideSubmit(L3, [N3, L3], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit(L3, [N3, L3], 0))).toBe(true);
   });
 
   it('mixing digit and Roman for ONE name is still refused (ADR-AG-170 Am. 2), not noticed', () => {
@@ -115,7 +115,7 @@ describe('#1350 — the class, not the instance', () => {
   });
 
   it('#1342\'s own rows are unchanged', () => {
-    expect(decideSubmit('נתון הישר 2x-y+8=0', ['נתון הישר 1: 2x-y+8=0'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('נתון הישר 2x-y+8=0', ['נתון הישר 1: 2x-y+8=0'], 0))).toBe(true);
     const v = decideSubmit('נתון הישר l2: 2x-y+8=0', ['נתון הישר l1: 2x-y+8=0'], 0);
     expect(v.kind === 'refused' && v.error.key).toBe('already-named');
   });

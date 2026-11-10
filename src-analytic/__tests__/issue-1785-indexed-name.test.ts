@@ -130,6 +130,6 @@ describe('#1785 — must not change', () => {
   });
 
   it('a named line keeps its slope sentence: «שיפוע l1 הוא 2» on «l1: y = 2x» is not refused', () => {
-    expect(play(['l1: y = 2x', 'שיפוע l1 הוא 2'])).toEqual(['record', 'already-follows']);
+    expect(play(['l1: y = 2x', 'שיפוע l1 הוא 2'])).toEqual(['record', 'record']);
   });
 });

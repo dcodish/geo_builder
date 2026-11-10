@@ -11,7 +11,7 @@
  * store does. `not-handled` is the one refusal `reachesFallback` hands to the model — never called here.
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit, type SubmitVerdict } from '../app/submit';
+import { decideSubmit, isHeld, type SubmitVerdict } from '../app/submit';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
 import {
   catalogCoverageFaults,
@@ -23,11 +23,9 @@ import {
 /** One submit verdict, in the rows' vocabulary. An `ambiguous-*` refusal is a question to the student. */
 function verdictOfAnalytic(v: SubmitVerdict): StepVerdict {
   switch (v.kind) {
+    // #2790 (ADR-AG-462): a held line is a row too, with the already-held notice
     case 'record':
-      return { verdict: 'builds' };
-    case 'already-known':
-    case 'already-follows':
-      return { verdict: 'builds', code: v.kind };
+      return isHeld(v) ? { verdict: 'builds', code: 'already-held' } : { verdict: 'builds' };
     case 'refused':
       if (v.error.key === 'not-handled') return { verdict: 'not-handled' };
       return { verdict: /^ambiguous/.test(v.error.key) ? 'asks' : 'refused', code: v.error.key };

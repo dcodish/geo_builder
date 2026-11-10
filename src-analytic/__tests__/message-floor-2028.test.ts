@@ -31,6 +31,9 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'proof-target': [{}],
   'radian-angle': [{ detail: 'π/2' }],
   'arc-length-unread': [{ detail: 'AB' }], // #2032 (ADR-AG-408)
+  'parabola-no-diameter': [{ detail: 'AB' }], // #2625 (ADR-AG-454)
+  'not-canonical': [{ detail: 'פרבולה קנונית (y - 1)^2 = 4(x - 2)', line: '(y - 1)^2 = 4(x - 2)', curve: 'parabola' }, { detail: 'אליפסה קנונית (x - 3)^2/25 + y^2/9 = 1', line: '(x - 3)^2/25 + y^2/9 = 1', curve: 'ellipse' }], // #2664 (ADR-AG-455)
+  'parabola-no-centre': [{ detail: 'O מרכז הפרבולה' }], // #2625 (ADR-AG-454 Am. 1)
   'unread-name': [{}],
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
@@ -84,10 +87,6 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'ambiguous-side': [{}],
   'polygon-not-supported': [{}],
   'already-named': [{ holder: 'P' }, { holder: 'l1', holderKind: 'line' }],
-  'line-exists': [
-    { detail: 'l2 אנך אמצעי ל-EK', declared: 'אנך אמצעי ל-EK', lineName: 'l2', offer: 'נסמן את האנך האמצעי ל-EK ב-l2' },
-    { detail: 'l2 אנך אמצעי ל-EK', declared: 'אנך אמצעי ל-EK', lineName: 'l2' },
-  ], // #2584 (ADR-AG-346)
   'alias-taken': [{ holder: 'P' }],
   'rename-bad-name': [{}],
   'rename-same': [{}],

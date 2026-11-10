@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3 } from '../engine/evaluate';
 import { dist3, ringSelfCrossing3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
+import { answerQuery } from '../engine/queries';
 import { dataView, panelIsEmpty } from '../engine/dataView';
 import i18n3d from '../i18n';
 import { errorText3 } from '../i18n/errorText3';
@@ -872,5 +873,152 @@ describe('SCENARIO — #2795: the base angles restated after «AB = AC» move no
       const after = derive3(state().facts, s).resolved.positions;
       for (const [id, p] of before[s]) expect(dist3(p, after.get(id)!), `${id} @${s}`).toBeLessThanOrEqual(1e-9);
     });
+  });
+});
+
+// crossed-ring-concyclic-2810 (#2810, ADR-3D-467) — found in round #2808: «מרובע ABCD» · «מעגל חוסם את ABCD» · «מרובע ABDC»
+// was accepted with ABDC drawn crossed (5/6 seeds) or as a dart under a circle that missed a vertex (the sixth). Four
+// points on one stated circle have ONE simple order, so the line that completes a second order is refused
+// `ring-crossed` — whichever line that is: the ring, the circle, or the right pyramid. Refusals, so a bespoke lock.
+describe('SCENARIO — crossed-ring-concyclic-2810: a second order over a cyclic ring is refused', () => {
+  beforeEach(reset);
+  const pos = (id: string) => derived().positions.get(id)!;
+  /** Ptolemy's defect of A, B, C, D in their convex order: 0 iff the four are on one circle. */
+  const ptolemy = () => {
+    const L = (u: string, v: string) => dist3(pos(u), pos(v));
+    const p = [L('A', 'C') * L('B', 'D'), L('A', 'B') * L('C', 'D'), L('B', 'C') * L('A', 'D')].sort((x, y) => x - y);
+    return Math.abs(p[2] - p[1] - p[0]) / p[2];
+  };
+
+  it.each([
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R1, the reported case
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ACBD']], // R2
+    [['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC']], // R3
+    [['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABCD']], // R4: the circle line completes it
+    [['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC']], // R5
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS שבסיסה מרובע', 'מרובע ABDC']], // R6
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS', 'מרובע ABDC']], // R7
+    [['מרובע ABCD', 'מרובע ABDC', 'פירמידה ישרה ABCDS']], // R8: the pyramid line completes it
+    [['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC']], // R9: no dart under a circle
+    [['מחומש ABCDE', 'מעגל חוסם את ABCDE', 'מחומש ABDCE']], // R10
+    [['מרובע ABCD', 'מעגל חוסם את ABCD', 'משולש ABD', 'מרובע ABDC']], // R11
+    [['משולש ABC', 'מעגל חוסם את ABC', 'D על המעגל', 'מרובע ABCD', 'מרובע ABDC']], // a rider on the circle
+  ])('%j', (lines) => {
+    lines.forEach(submit);
+    const last = lines[lines.length - 1];
+    expect(state().lastError).toEqual({ code: 'ring-crossed', stated: last });
+    expect(state().facts.map((f) => f.utterance)).toEqual(lines.slice(0, -1));
+  });
+
+  it.each([
+    [['מרובע ABCD', 'מרובע ABDC'], false], // C1: no circle, both drawn simple (one concave)
+    [['דלתון ABCD', 'מרובע ABDC'], false], // C2: a dart
+    [['מרובע ABCD', 'מעגל חוסם את ABCD'], true], // C4: one ring and its circle
+    [['דלתון ABCD', 'מעגל חוסם את ABCD'], true],
+    [['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC'], false], // C3: the kite base drawn as a dart (#2702, ADR-3D-469)
+    [['מרובע ABCD', 'פירמידה ישרה ABCDS'], true], // the right pyramid fits ABCD to a cyclic quadrilateral (#2490, ADR-3D-468)
+  ])('%j builds, every ring simple at seeds 0–5', (lines, circle) => {
+    lines.forEach(submit);
+    for (let seed = 0; seed < 6; seed++) {
+      useGeo3.setState({ seed });
+      expectAllOk();
+      const rings = state().facts.flatMap((f) => (/^(מרובע|דלתון) /.test(f.utterance) ? [f.utterance.split(' ')[1].split('')] : []));
+      for (const r of rings) expect(ringSelfCrossing3(r.map(pos)), `seed ${seed} ${r.join('')}`).toBe(false);
+      if (circle) expect(ptolemy(), `seed ${seed}`).toBeLessThan(1e-6);
+    }
+  });
+});
+
+// right-pyramid-existing-quad-2490 (#2490, ADR-3D-468) — the operator's lines and the ruling of 2026-11-09 (ADR-W-199:
+// "we would not refuse something that can be built"): «פירמידה ישרה ABCDS» over a quadrilateral that already exists fits
+// it to a quadrilateral a circle passes through, with its own free DOF. The figure built green before the fix too, as a
+// rectangle, so the lock is bespoke: ABCD is cyclic, not a rectangle at some configuration, and varies across presses
+// (ADR-052); and a ring whose own givens forbid a circle is refused, naming them.
+describe('right-pyramid-existing-quad-2490 — «מרובע ABCD» · «פירמידה ישרה ABCDS» fits ABCD to a cyclic quadrilateral', () => {
+  beforeEach(reset);
+  const ring = ['A', 'B', 'C', 'D'];
+  const angles = () => {
+    const pos = derived().positions;
+    return ring.map((v, i) => {
+      const at = pos.get(v)!;
+      const a = pos.get(ring[(i + 3) % 4])!;
+      const b = pos.get(ring[(i + 1) % 4])!;
+      const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
+      return (Math.acos(dot / (dist3(at, a) * dist3(at, b))) * 180) / Math.PI;
+    });
+  };
+
+  it('builds; ABCD is cyclic at every press, not always a rectangle, and its shape varies', () => {
+    submit('מרובע ABCD');
+    submit('פירמידה ישרה ABCDS');
+    expectAllOk();
+    expect(derived().construction.solids[1]).toMatchObject({ kind: 'pyramidQuadR', bound: ring });
+    const seen: number[][] = [];
+    for (let press = 0; press < 6; press++) {
+      const [a, b, c, d] = angles();
+      expect(a + c, `press ${press}`).toBeCloseTo(180, 4);
+      expect(b + d, `press ${press}`).toBeCloseTo(180, 4);
+      seen.push([a, b, c, d]);
+      useGeo3.getState().resample();
+      expectAllOk();
+    }
+    expect(seen.some((q) => q.some((x) => Math.abs(x - 90) > 1))).toBe(true);
+    expect(new Set(seen.map((q) => q[0].toFixed(3))).size).toBeGreaterThan(1);
+  });
+
+  it('REFUSAL: «מקבילית ABCD» · «∠DAB = 60» · «פירמידה ישרה ABCDS» names both earlier lines', () => {
+    ['מקבילית ABCD', '∠DAB = 60', 'פירמידה ישרה ABCDS'].forEach(submit);
+    expect(state().lastError).toEqual({ code: 'givens-contradict', stated: 'פירמידה ישרה ABCDS', others: ['מקבילית ABCD', '∠DAB = 60'] });
+    expect(state().facts).toHaveLength(2);
+  });
+});
+
+// pyramid-dart-base-2702 (#2702, ADR-3D-469) — the operator's two lines and the plan's class rows (q-1986-pyramid; #1927
+// 2026-10-09: "Refuse only when nothing the student wrote can save it"): a second ring over a solid's base letters draws
+// the base as a dart, both rings simple at every configuration. A base convex whenever simple — a stated rectangle,
+// parallelogram, square, a box, or a right pyramid's cyclic base — still refuses the second ring.
+describe('pyramid-dart-base-2702 — «פירמידה SABCD שבסיסה דלתון» · «מרובע ABDC» draws a dart base', () => {
+  beforeEach(reset);
+  const simpleAt = (seed: number, ids: string) => {
+    const pos = derive3(state().facts, seed).positions;
+    return !ringSelfCrossing3([...ids].map((id) => pos.get(id)!));
+  };
+  it.each([
+    [['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC']],
+    [['פירמידה SABCD שבסיסה מרובע', 'מרובע ABDC']],
+    [['פירמידה SABCD', 'מרובע ABDC']],
+    [["מנסרה ABCDA'B'C'D'", 'מרובע ABDC']],
+  ])('%j builds with both rings simple at seeds 0–5', (lines) => {
+    for (const l of lines) submit(l);
+    expectAllOk();
+    for (let seed = 0; seed < 6; seed++) {
+      expect(simpleAt(seed, 'ABCD'), `@${seed}`).toBe(true);
+      expect(simpleAt(seed, 'ABDC'), `@${seed}`).toBe(true);
+    }
+  });
+  it.each([
+    ['פירמידה ישרה SABCD שבסיסה דלתון'],
+    ['פירמידה SABCD שבסיסה מלבן'],
+    ['פירמידה SABCD שבסיסה מקבילית'],
+    ['פירמידה SABCD שבסיסה ריבוע'],
+    ["תיבה ABCDA'B'C'D'"],
+  ])('REFUSAL: %s · «מרובע ABDC» — no configuration saves the second ring', (first) => {
+    submit(first);
+    submit('מרובע ABDC');
+    expect(state().lastError).toEqual({ code: 'ring-crossed', stated: 'מרובע ABDC' });
+    expect(state().facts.map((f) => f.utterance)).toEqual([first]);
+  });
+});
+
+// #1541 (ADR-3D-475) — the operator's exact sequence (prod, 2026-09-29): the panel printed B and B', and the
+// ask box answered «משוואת BB'» with «לא זוהה». The line is now asked the way it is stated, answered as given.
+describe('line-ask-by-points-1541 — «משוואת BB\'» answers the line through two known points', () => {
+  beforeEach(reset);
+
+  it("his figure: «משוואת BB'» → x = (0, 7, 8) + t·(2, 8, -16)", () => {
+    ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'].forEach(submit);
+    expectAllOk();
+    const r = answerQuery(derived().construction, "משוואת BB'", state().seed);
+    expect(r).toMatchObject({ answer: 'x = (0, 7, 8) + t·(2, 8, -16)', echo: 'plain' });
   });
 });

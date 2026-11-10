@@ -66,3 +66,54 @@ export const HELD_CASES_3D: readonly HeldCase[] = [
   { lines: ['מרובע ABCD', 'פירמידה ABCDS', 'פירמידה ABCDS'], earlier: 1, why: 'an exact repeat that creates a point (the fold steps it aside while its twin stands)' },
   { lines: ['A(0,0,0)', 'B(2,0,0)', 'M אמצע AB', 'M אמצע AB'], earlier: 2, why: 'an exact repeat of a construction' },
 ];
+/**
+ * Analytic's cases (#2790's §1 measurement, [ADR-AG-462](../../../docs/06c-decisions-analytic.md#adr-ag-462) /
+ * [ADR-AG-463](../../../docs/06c-decisions-analytic.md#adr-ag-463)): the two old no-row verdicts (`already-known`,
+ * `already-follows`), the held values and operand ink that recorded silently, and the drawn line restated under a NEW
+ * name (operator 2026-11-09 "b": the row names the line).
+ */
+export const HELD_CASES_ANALYTIC: readonly HeldCase[] = [
+  { lines: ['משולש ABC', 'משולש ABC'], why: 'an exact repeat of a shape (was already-known)' },
+  { lines: ['A(0,0)', 'B(3,0)', 'AB = 3', 'AB = 3'], earlier: 2, why: 'an exact repeat of a value (was already-known)' },
+  { lines: ['A(0,0)', 'B(√2,0)', 'B(√2,0)'], earlier: 1, why: 'a restated point (was already-known)' },
+  { lines: ['ריבוע ABCD', 'AB ∥ CD'], why: 'a side relation the square holds (was already-known)' },
+  { lines: ['משולש ABC', '∢ABC = 90', 'AB ⊥ BC'], earlier: 1, why: 'another spelling (was already-known)' },
+  { lines: ['ריבוע ABCD', 'AB ⊥ BC'], why: 'a relation the square settles (was already-follows)' },
+  { lines: ['משולש ABC', 'AB = AC', '∢ABC = ∢ACB'], earlier: 1, why: 'the base angles of an isosceles triangle (was already-follows)' },
+  { lines: ['A(0,0)', 'B(3,0)', 'AB = 3'], why: 'a held VALUE that recorded silently (ADR-AG-401)' },
+  { lines: ['ריבוע ABCD', '∢ABC = 90'], why: 'a held right angle that recorded silently (#2704)' },
+  { lines: ['ריבוע ABCD', 'AB = 3', 'AC = 3√2'], why: 'a held VALUE with its operand ink (operator 2026-11-10: drawn and marked)' },
+  { lines: ['טרפז שווה שוקיים ABCD', '|AC| = |BD|'], why: 'held operand ink: both diagonals drawn (ADR-AG-420)' },
+  {
+    lines: ['E(0,0)', 'K(4,2)', 'האנך האמצעי לקטע EK', 'l2 אנך אמצעי ל-EK'],
+    earlier: 2,
+    why: 'a drawn line restated under a NEW name — the row names it (operator 2026-11-09 "b", T32 withdrawn)',
+  },
+];
+
+/** Analytic's controls: a contradiction is refused; a pinning value and a default-pinning line record with no notice. */
+export const HELD_CONTROLS_ANALYTIC = {
+  refused: [['A(0,0)', 'B(3,0)', 'AB = 4']],
+  silent: [
+    ['משולש ABC', 'AB = 3'],
+    ['טרפז ABCD', 'AB ∥ CD'],
+  ],
+} as const;
+
+/** Complex's cases (#2790 §1, [ADR-CX-089](../../../docs/06d-decisions-complex.md#adr-cx-089)): every `known` answer of #2268. */
+export const HELD_CASES_COMPLEX: readonly HeldCase[] = [
+  { lines: ['z1 = 3+4i', 'z1 = 3+4i'], earlier: 0, why: 'an exact repeat' },
+  { lines: ['z1 = 3+4i', '|z1| = 5'], earlier: 0, why: 'a modulus the definition decides' },
+  { lines: ['z1 = 3+4i', 'z2 = 1-i', 'z1 = 3+4i'], earlier: 0, why: 'an exact repeat after another line' },
+  { lines: ['|z| = 2', '|z| = 2'], earlier: 0, why: 'the same given twice, over a free direction' },
+  { lines: ['z1 = 15cis(π/7)', '|z1| = 15'], earlier: 0, why: "the operator's T85 (#2268)" },
+];
+
+/** Complex's controls: a contradiction is refused; a new given, and a Re/Im value the exact core does not carry (02d), record silently. */
+export const HELD_CONTROLS_COMPLEX = {
+  refused: [['z1 = 3+4i', '|z1| = 6']],
+  silent: [
+    ['|z1| = 15', 'arg z1 = 30'],
+    ['z1 = 3+4i', 'Re(z1) = 3'],
+  ],
+} as const;

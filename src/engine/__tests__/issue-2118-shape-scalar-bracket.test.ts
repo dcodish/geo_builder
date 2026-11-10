@@ -39,6 +39,7 @@ const SEED1 = {
 describe('#2118 — a driven shape scalar whose root lies outside the restarts’ reach still solves', () => {
   it('the reported seed: the solve from k₀ = 0.6 lands on the convex root C = (8.796, 0.773)', () => {
     const before = drivenSolveStats.shapeRescue;
+    const lmBefore = drivenSolveStats.lmRescued;
     const r = evaluate(cyclicTrapezoid(SEED1.A, SEED1.B, SEED1.D));
     expect(r.ok, JSON.stringify(r.ok ? '' : r)).toBe(true);
     if (!r.ok) return;
@@ -52,7 +53,10 @@ describe('#2118 — a driven shape scalar whose root lies outside the restarts�
     const along = (dx - mx) * ux + (dy - my) * uy;
     expect(C.x).toBeCloseTo(dx - 2 * along * ux, 6);
     expect(C.y).toBeCloseTo(dy - 2 * along * uy, 6);
-    expect(drivenSolveStats.shapeRescue - before, 'the rescue is what solved it').toBe(1);
+    // #2797 (ADR-816): the failing joint solve now reaches the LM rescue rung first (inside `multiStartSolve`), which
+    // lands on the same closed-form root, so the bracket is not opened. Either way a retry-only rescue solved it.
+    expect(drivenSolveStats.lmRescued - lmBefore, 'the LM rung is what solved it').toBe(1);
+    expect(drivenSolveStats.shapeRescue - before, 'so the bracket was not needed').toBe(0);
   });
 
   it('a solve that already succeeds never reaches the rescue (the success path is bit-identical)', () => {

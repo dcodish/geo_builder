@@ -13,7 +13,7 @@ import { definiteCircle3 } from './definiteCircle';
 import { riderPairsT, riderVectorT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
+import { baseKind3, baseRingOf, boundSolidDimCount3, CYCLIC_MEMBER, cyclicFixCommands, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_BASES, QUAD_PYRAMIDS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, ringKeyIds3, shapeInternal3, type QuadBase } from './baseShapes';
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, LETTER_MEANING_CLASHES, letterMeanings3, pinSymsOf, symbolOwnersOf, symsOfAffine, unusedLetter3 } from './types';
@@ -22,7 +22,7 @@ import { builtFrom3, carrierParams3, determinationReach3, pointParents3, reaches
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, FreeVecMetric3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom, VecExpr, VecRelCommand } from './types';
 import { freeMetricOperands3, scalarPinOrigin3, spellingOf, symbolValueOf } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
-import { hasClaimResidual3 } from './claims';
+import { hasClaimResidual3, verifyClaim } from './claims';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -1965,7 +1965,7 @@ const PYR_BASE: Partial<Record<SolidKind, number>> = {
  * #2490 ([ADR-3D-434](../../docs/06b-decisions-3d.md#adr-3d-434)) — the ONE gate of the bound solid: a pyramid-family
  * declaration whose run is a base the figure holds plus an apex of its own (`boundPyramidRun3`), over letters the student
  * TYPED (an unlettered noun the parser lettered keeps today's reading). The solid apply and the fold's reading of an
- * unstated base (`unstatedPyramidBase3`) both ask it, so the two can never disagree about which pyramids bind.
+ * unstated base (`unstatedPyramidReading3`) both ask it, so the two can never disagree about which pyramids bind.
  */
 function boundPyramidOf3(c: Construction3, cmd: SolidCommand): { base: Id[]; apex: Id } | null {
   const baseN = PYR_BASE[cmd.kind];
@@ -1975,6 +1975,8 @@ function boundPyramidOf3(c: Construction3, cmd: SolidCommand): { base: Id[]; ape
 
 /** The quad-pyramid kind whose base is a general quadrilateral and whose apex is free: «פירמידה ABCDS שבסיסה מרובע». */
 const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && !QUAD_PYRAMIDS[k]?.right)!;
+/** ...and its right twin, «פירמידה ישרה ABCDS שבסיסה מרובע»: the apex over the ring's circumcentre (ADR-3D-468). */
+const GENERAL_RIGHT_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k) => QUAD_PYRAMIDS[k]?.base === 'quad' && QUAD_PYRAMIDS[k]?.right)!;
 
 /**
  * #2490 ([ADR-3D-436](../../docs/06b-decisions-3d.md#adr-3d-436)) — A PYRAMID WHOSE BASE SHAPE IS UNSTATED KEEPS THE SHAPE
@@ -1993,14 +1995,21 @@ const GENERAL_QUAD_PYRAMID = (Object.keys(QUAD_PYRAMIDS) as SolidKind[]).find((k
  * pyramid that does not bind (a standalone one, a base only partly drawn) keeps the rectangle: there the default draws
  * the base the pyramid makes. A stated shape is never read here, and stays a given about the ring (ADR-3D-434 §3).
  *
- * A RIGHT kind is returned as read. Its rightness entails a cyclic base, and the parser lowered the cyclic fix of the
- * base it read (none for a rectangle), so the general quadrilateral would leave the right foot over a ring with no
- * circumcentre. What «פירמידה ישרה ABCDS» should make of an existing quadrilateral is a separate question for the operator.
+ * #2490 ([ADR-3D-468](../../docs/06b-decisions-3d.md#adr-3d-468)) — A RIGHT kind reads as ITS stated twin, «פירמידה ישרה
+ * ABCDS שבסיסה מרובע»: the general right kind PLUS the cyclic fix the parser lowers for that twin (`cyclicFixCommands`,
+ * a `concyclic` relation on the ring). Its rightness entails a cyclic base, and over a ring that already exists the
+ * ring's own free DOF absorb it (ADR-W-199: a figure that can be drawn is drawn; M1: drive a free ring, verify a
+ * determined one). So «מרובע ABCD» becomes a general cyclic quadrilateral, never the rectangle (ADR-052), a kite a right
+ * kite, a trapezoid an isosceles one; a ring whose givens forbid a circle is the existing `givens-contradict` refusal,
+ * naming those givens. The rectangle the parser read had no cyclic fix of its own, so nothing else drives the ring.
+ *
+ * Returns the commands the declaration applies as: the command itself when nothing is re-read.
  */
-export function unstatedPyramidBase3(c: Construction3, cmd: SolidCommand): SolidCommand {
+export function unstatedPyramidReading3(c: Construction3, cmd: SolidCommand): Command3[] {
   const spec = QUAD_PYRAMIDS[cmd.kind];
-  if (!spec || spec.right || spec.base === 'quad' || !boundPyramidOf3(c, cmd)) return cmd;
-  return { ...cmd, kind: GENERAL_QUAD_PYRAMID };
+  if (!spec || spec.base === 'quad' || !boundPyramidOf3(c, cmd)) return [cmd];
+  if (!spec.right) return [{ ...cmd, kind: GENERAL_QUAD_PYRAMID }];
+  return [{ ...cmd, kind: GENERAL_RIGHT_QUAD_PYRAMID }, ...cyclicFixCommands('quad', cmd.ids.slice(0, 4))];
 }
 
 /**
@@ -2021,7 +2030,8 @@ export function unstatedPyramidBase3(c: Construction3, cmd: SolidCommand): Solid
  *     `solid-vertex` of it. Placed in the ring's frame with the apex's own dims (evaluate's `boundApexPosition3`).
  *
  * A right kind's rightness is the placement's (the foot at the ring's circumcentre); what «ישרה» entails about the base
- * — the cyclic fix — rides the parser's own commands after this one, as on a standalone pyramid.
+ * — the cyclic fix — rides the parser's own commands after this one, as on a standalone pyramid (and, for a base shape
+ * left unstated, the fold's reading's: `unstatedPyramidReading3`, ADR-3D-468).
  */
 function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], apex: Id): ApplyResult3 {
   const ids = [...base, apex];
@@ -2051,6 +2061,12 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
     r = applyCommand3(r.next, k);
     if (!r.ok) return r;
   }
+  // #2490 (ADR-3D-468; Q-2490d, judged 2026-11-09): a right pyramid over a ring a circle ALREADY passes through narrows
+  // nothing, so it shows no build note (`base-constrained`). Decided by what the ring's own statements entail before
+  // this line — its family, a circle stated through it, its angles, the faces of the solid it belongs to — through the
+  // claim verifier (every claim seed × every branch, docs/17 M3), never from the one drawing. The cyclic fix that
+  // follows this command still applies either way: on such a ring it is already known and moves nothing.
+  const cyclicBefore = !!spec?.right && spec.base === 'quad' && base.length === 4 && verifyClaim({ type: 'concyclic', ids: [...base] }, r.next, 0);
   // ...and the ring's DRAWING PREFERENCE is judged against what is now stated over it in total (#1792's rule for a
   // circle through a ring): «מלבן ABCD» · «פירמידה ABCDS שבסיסה ריבוע» is a square, so the rectangle's "never look like
   // a square" fails at every seed and the seed sweep paid its whole budget on every later line (8 s for «|SA| = 5»).
@@ -2067,12 +2083,42 @@ function applyBoundPyramid3(c: Construction3, cmd: SolidCommand, base: Id[], ape
     ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}),
     ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}),
     bound: [...base],
+    ...(cyclicBefore ? { boundCyclic: true as const } : {}),
   };
   const out: Construction3 = { ...r.next, solids: [...r.next.solids, solid], points: new Map(r.next.points), requirements };
   // a yielding placeholder keeps its slot in the point order (a point defined from it later still follows it); a new
   // apex is appended, after every base point it is placed from
   out.points.set(apex, { kind: 'solid-vertex', solid: out.solids.length - 1, index: base.length });
   return { ok: true, next: out };
+}
+
+/**
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — AN UNSTATED BASE'S RECTANGLE YIELDS TO A SECOND RING
+ * OVER ITS LETTERS (M4: a default yields to a statement; ADR-052).
+ *
+ * «פירמידה SABCD» draws its base as ADR-3D-011's free-aspect rectangle: the default for a base nobody described. «מרובע
+ * ABDC» then declares another cyclic order over the same four letters, which a rectangle (convex whenever simple) can
+ * never draw simple, so the default would refuse a sentence a general quadrilateral base satisfies. The student stated
+ * nothing that makes ABCD a rectangle, so the default yields: the pyramid's base becomes the general quadrilateral it
+ * always could have been (`pyramidQuad`, the twin «… שבסיסה מרובע»), and its concave seat draws both rings simple
+ * (`concaveSeatVertices3`). A STATED base («… שבסיסה מלבן») carries no mark and keeps its shape — and its refusal.
+ * Mutates `next` (the clone the caller returns), on a fresh `solids` array so the per-solid dim memo stays true.
+ */
+function yieldUnstatedBase3(next: Construction3, ring: readonly Id[]): void {
+  if (ring.length !== 4) return;
+  const letters = [...ring].sort().join();
+  const own = ringKeyIds3(ring);
+  let changed = false;
+  const solids = next.solids.map((s) => {
+    if (!s.baseUnstated || s.bound) return s;
+    const base = baseRingOf(s);
+    if (!base || base.length !== 4 || [...base].sort().join() !== letters || ringKeyIds3(base) === own) return s;
+    changed = true;
+    const { baseUnstated: _unstated, ...rest } = s;
+    void _unstated;
+    return { ...rest, kind: GENERAL_QUAD_PYRAMID };
+  });
+  if (changed) next.solids = solids;
 }
 
 /**
@@ -2385,6 +2431,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         recordClaim3(nextRef, c, { type: 'polygon-open', ids: [...cmd.ids], given: true });
         // #1935 (ADR-3D-356): ...and the ring is FLAT — a free vertex rides the plane of the placed ones
         flattenRingFreeVertices3(nextRef, cmd.ids);
+        yieldUnstatedBase3(nextRef, cmd.ids);
         return { ok: true, next: nextRef };
       }
       // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
@@ -2519,6 +2566,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
         ...(cmd.oblique ? { oblique: true as const } : {}),
         ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}), // #1918
+        ...(cmd.baseUnstated && QUAD_PYRAMIDS[cmd.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[cmd.kind]?.right ? { baseUnstated: true as const } : {}), // #2702
         ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}), // #1918
       };
       const solidIndex = next.solids.length;

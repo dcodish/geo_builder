@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../apply';
 import { verifyClaim } from '../claims';
 import { resolve3 } from '../evaluate';
-import { ssaFanStats } from '../solve3';
+import { dimsFanStats, ssaFanStats } from '../solve3';
 import { emptyConstruction3, type Command3, type Construction3 } from '../types';
 import { dist3 } from '../vec3';
 
@@ -196,5 +196,117 @@ describe('#2714 — a determined flat triangle with two roots pools both', () =>
     const hist = values([tri, len('A', 'B', 5), len('B', 'C', 4)], 'A', 'C');
     expect(hist.size).toBeGreaterThanOrEqual(40);
     expect(ssaFanStats.runs).toBe(before);
+  });
+});
+
+describe('#2814 — a determined shape\'s reflected dims root is pooled from the found one (ADR-3D-461)', () => {
+  const D_SYM: Command3 = { type: 'point3', id: 'D', x: 3, y: null, z: 0, syms: [null, 'p', null], srcs: ['3', 'p', '0'] } as unknown as Command3;
+  const UV: Command3 = {
+    type: 'mag-rel', e1: [{ coeff: 1, atom: { kind: 'named', name: 'u' } }], e2: [{ coeff: 1, atom: { kind: 'named', name: 'v' } }], c: 1,
+  } as unknown as Command3;
+  const vec = (name: string, from: string, to: string): Command3[] =>
+    [{ type: 'segment3', a: from, b: to }, { type: 'name-vector', name, from, to }] as Command3[];
+  /** The operator's #827 exam pyramid, as its nine lines lower: p = ±4, no sign given. */
+  const PYRAMID: Command3[] = [
+    { type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] },
+    { type: 'seg-plane-rel', rel: 'perp', a: 'S', b: 'A', plane: [] } as unknown as Command3,
+    { type: 'point-on-segment3', id: 'M', a: 'B', b: 'D', t: 0.5 },
+    ...vec('u', 'A', 'B'), ...vec('v', 'A', 'D'), ...vec('w', 'A', 'S'),
+    { type: 'point3', id: 'A', x: 0, y: 0, z: 0 },
+    { type: 'point3', id: 'B', x: 0, y: 5, z: 0 },
+    { type: 'point3', id: 'S', x: 0, y: 0, z: 6 },
+    D_SYM,
+    UV,
+  ];
+  /** The same base with no height and no S: a free apex beside the discrete D. */
+  const FREE_APEX: Command3[] = [
+    { type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] },
+    ...vec('u', 'A', 'B'), ...vec('v', 'A', 'D'),
+    { type: 'point3', id: 'A', x: 0, y: 0, z: 0 },
+    { type: 'point3', id: 'B', x: 0, y: 5, z: 0 },
+    D_SYM,
+    UV,
+  ];
+  const signsOfD = (c: Construction3, s: number): string[] => {
+    const roots = resolve3(c, s).pivot?.pointRoots?.D ?? [resolve3(c, s).positions.get('D')!];
+    return [...new Set(roots.map((q) => q.y.toFixed(2)))].sort();
+  };
+
+  it('the #827 pyramid: the pool carries D.y = +4 AND −4 at every seed 0–23, and the fan is what reached it', () => {
+    const c = build(PYRAMID);
+    const before = dimsFanStats.found;
+    for (let s = 0; s < 24; s++) expect(signsOfD(c, s).join(' '), `seed ${s}`).toBe('-4.00 4.00');
+    expect(dimsFanStats.found, 'the driven-dims fan ran and added the reflected root (docs/17 §9)').toBeGreaterThan(before);
+  });
+
+  it('the pick is over the two distinct configurations: seeds alternate the sign of p', () => {
+    const c = build(PYRAMID);
+    const ys = [0, 1, 2, 3, 4, 5].map((s) => resolve3(c, s).positions.get('D')!.y.toFixed(0));
+    for (let s = 0; s < 6; s++) expect(resolve3(c, s).pivot?.solutions, `seed ${s}`).toBe(2);
+    expect(new Set(ys.filter((_, i) => i % 2 === 0)).size).toBe(1);
+    expect(new Set(ys.filter((_, i) => i % 2 === 1)).size).toBe(1);
+    expect(ys[0]).not.toBe(ys[1]);
+  });
+
+  it('the free-apex variant: both signs pooled at every seed 0–23', () => {
+    const c = build(FREE_APEX);
+    for (let s = 0; s < 24; s++) expect(signsOfD(c, s).join(' '), `seed ${s}`).toBe('-4.00 4.00');
+  });
+
+  it('the continuum guard: a free side is never reflected into extra configurations, and stays the seed\'s sample', () => {
+    // the first prototype (no "driven only" / "settle did not move" gate) drew AB = 20.08 on the rectangle
+    const rect = build([
+      { type: 'quad-shape', base: 'rectangle', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'segment3', a: 'A', b: 'D' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'D', value: 2 * Math.sqrt(7), src: '2√7' } },
+    ] as Command3[]);
+    const trap = build([
+      { type: 'quad-shape', base: 'trapezoid', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'perp-to-base', from: 'A' },
+      { type: 'segment3', a: 'A', b: 'E' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'E', value: 3 } },
+    ] as Command3[]);
+    const ab = new Set<string>();
+    for (let s = 0; s < 24; s++) {
+      for (const c of [rect, trap]) expect(resolve3(c, s).pivot?.solutions ?? 1, `seed ${s}`).toBeLessThanOrEqual(2);
+      const p = resolve3(rect, s).positions;
+      const v = dist3(p.get('A')!, p.get('B')!);
+      expect(v, `seed ${s}: AB is a sampled side, not a far reflection`).toBeLessThan(15);
+      ab.add(v.toFixed(2));
+    }
+    expect(ab.size, 'AB is still sampled per seed').toBeGreaterThanOrEqual(12);
+  });
+
+  it('a fixed vertex mirrored over a side, with a FREE vertex beside it, is the mirror pass figure: never pooled', () => {
+    // measured: without the determined-points twin test the fan pooled C mirrored over AB on «מרובע ABCD · |AB| = 10 ·
+    // |BC| = 9.99 · AC ⊥ BC» (D free), the pool grew 2 → 4 and the submit's seed search walked 9 → 36 (118 → 868 ms)
+    const quad = build([
+      { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'segment3', a: 'A', b: 'B' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'B', value: 10 } },
+      { type: 'segment3', a: 'B', b: 'C' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'B', b: 'C', value: 9.99 } },
+      { type: 'cos-angle', u: { kind: 'pair', from: 'A', to: 'C' }, v: { kind: 'pair', from: 'B', to: 'C' }, cos: 0 },
+    ] as unknown as Command3[]);
+    for (let s = 0; s < 8; s++) expect(resolve3(quad, s).pivot?.solutions ?? 1, `seed ${s}`).toBeLessThanOrEqual(2);
+  });
+
+  it('work count: a free figure pays nothing; a mirror twin (a rectangle turned over) is never solved', () => {
+    const runs = dimsFanStats.runs, tries = dimsFanStats.tries;
+    const free = build([{ type: 'quad-shape', base: 'rectangle', ids: ['A', 'B', 'C', 'D'] }] as Command3[]);
+    for (let s = 0; s < 6; s++) resolve3(free, s);
+    expect(dimsFanStats.runs).toBe(runs);
+    const det = build([
+      { type: 'quad-shape', base: 'rectangle', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'segment3', a: 'A', b: 'B' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'B', value: 1 } },
+      { type: 'segment3', a: 'A', b: 'D' },
+      { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'D', value: Math.sqrt(7) } },
+    ] as Command3[]);
+    const r0 = dimsFanStats.runs, t0 = dimsFanStats.tries;
+    for (let s = 0; s < 6; s++) resolve3(det, s);
+    // ≤ (driven dims + 1) starts per fan run; a congruent (mirror-twin) start costs no LM solve at all
+    expect(dimsFanStats.tries - t0).toBeLessThanOrEqual(2 * (dimsFanStats.runs - r0));
+    void tries;
   });
 });

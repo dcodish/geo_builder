@@ -11,7 +11,7 @@
  * The locks CALL the shipped path (`decideSubmit`, `derive`, `parseLine`).
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { derive } from '../engine/derive';
 import { parseLine } from '../parser/parseAnalytic';
 
@@ -75,7 +75,7 @@ describe('ADR-AG-233 — the from-point tangent sentence, every spelling (#1430)
 
   it('restating the two tangents adds nothing', () => {
     const lines = [...C, 'מנקודה P יוצאים שני משיקים למעגל'];
-    expect(decideSubmit('מנקודה P יוצאים שני משיקים למעגל', lines, 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('מנקודה P יוצאים שני משיקים למעגל', lines, 0))).toBe(true);
   });
 });
 

@@ -87,6 +87,28 @@ describe('#2790 — 3-D accepts a held line as its own row, with the notice', ()
   });
 });
 
+// Q-2790c (a) [judged], 2026-11-10, from the operator's 2026-11-06 «In all cases it should say כבר קיים» + ADR-W-200: a held
+// relation row shows ONE note — the held notice; the older #396 / #842 / #850 «already known» notes retire for it.
+describe('#2790 — a held relation row shows exactly one note', () => {
+  it.each([
+    [['המישור π1: z = 0', 'המישור π2: x = 0', 'π1 ניצב ל-π2']], // #396: two self-determined planes
+    [["קובייה ABCDA'B'C'D'", 'מישור ABCD', 'E אמצע AC', 'BE מוכל במישור ABCD']], // #842: a containment
+    [["קובייה ABCDA'B'C'D'", "AB מקביל למישור A'B'C'D'"]], // #850: an implied ∥
+  ])('%j', (lines) => {
+    for (const l of lines) st().submit(l);
+    expect(st().lastError).toBeNull();
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
+    const d = derive3(st().facts, st().seed);
+    expect(d.notices.filter((n) => n.kind === 'already-known'), 'no second note').toEqual([]);
+  });
+
+  it('a row NOT recorded as held (loaded from a file) keeps its #396 note', () => {
+    for (const l of ['המישור π1: z = 0', 'המישור π2: x = 0', 'π1 ניצב ל-π2']) st().submit(l);
+    const loaded = st().facts.map(({ held: _held, ...f }) => f);
+    expect(derive3(loaded, 0).notices.some((n) => n.kind === 'already-known' && n.rel === 'objects')).toBe(true);
+  });
+});
+
 describe('#2790 — the notice text, and the App reads the suite key', () => {
   for (const lng of ['he', 'en'] as const) {
     it(lng, () => {

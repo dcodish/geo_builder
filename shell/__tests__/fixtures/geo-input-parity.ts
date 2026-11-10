@@ -275,6 +275,8 @@ export function gapState(g: KnownGap): GapState {
  */
 export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>> = {
   '#2458': 'open', // 3-D reading «A_1» and the glyph (#2075's sibling half)
+  '#2811': 'open', // #2810 (ADR-3D-467): 2-D accepts the circle-last order «מרובע ABCD · מרובע ABDC · מעגל חוסם את ABDC» crossed
+  '#2812': 'open', // #2810 (ADR-3D-467): analytic accepts a second order over a cyclic quadrilateral's letters, drawn crossed
   '#2226': 'open', // was #1171, merged into #2226 by the #2654 family sweep 2026-11-01
   '#1448': 'closed',
   '#1677': 'icebox',
@@ -1384,6 +1386,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1863 (ADR-AG-376): the conic chip's curves — analytic's alone by design (2-D and 3-D have no conics; X2)
   { id: 'conic-parabola-chip-1863', family: 'topic', steps: ['נתונה פרבולה שמשוואתה y^2=54x'], expect: 'builds', exception: 'X2', note: 'carries the focus/directrix chip in analytic' },
   { id: 'conic-ellipse-chip-1863', family: 'topic', steps: ['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'], expect: 'builds', exception: 'X2', note: 'carries the foci/directrices chip in analytic' },
+  // #2625 (ADR-AG-454): a parabola has no centre, so «AB קוטר בפרבולה» is refused with its reason, never sent to the model
+  { id: 'parabola-diameter-2625', family: 'topic', steps: ['AB קוטר בפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it `parabola-no-diameter`. Neither sibling has a parabola: 2-D BUILDS the sentence, dropping the noun; 3-D hands it to the model (both found in round #2822)' },
+  // #2625 (ADR-AG-454 Am. 1): the parabola's centre, the same reason, every spelling the centre role reads
+  { id: 'parabola-centre-named-2625', family: 'topic', steps: ['O מרכז הפרבולה'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
+  { id: 'parabola-centre-first-2625', family: 'topic', steps: ['מרכז הפרבולה הוא O'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
+  { id: 'parabola-centre-en-2625', family: 'topic', steps: ['O is the centre of the parabola'], contextFor: { analytic: ['נתונה פרבולה שמשוואתה y^2=8x'] }, expect: 'refused', knownGap: [{ product: '2d' }, { product: '3d' }], note: 'analytic refuses it parabola-no-centre (ADR-AG-454 Am. 1, ruling Q-2625b (a)); neither sibling has a parabola and both hand it to the model' },
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
   // #1849 (ADR-W-115, operator ruling 2026-10-07): a DECLARED polygon the givens force flat is REFUSED in every builder — a flat line is not a triangle
@@ -1475,6 +1483,15 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1991-03', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ACBD'], expect: 'refused' },
   { id: 'crossed-ring-1991-04', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ACBD'], expect: 'refused' },
   { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
+  // #2810 (ADR-3D-467): letters a stated circle passes through have ONE simple order, so a second order over them is
+  // refused on the line that completes it — the ring, or the circle. 2-D refuses the circle-first spellings; 3-D now
+  // refuses all of them (it drew the second ring crossed, or a dart under a circle that missed a vertex).
+  { id: 'crossed-ring-2810-01', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }], note: 'the reported case' },
+  { id: 'crossed-ring-2810-02', family: 'polygons', steps: ['מרובע ABCD', 'המרובע ABCD חסום במעגל', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2812' }] },
+  { id: 'crossed-ring-2810-03', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC', 'מעגל חוסם את ABDC'], expect: 'refused', knownGap: [{ product: '2d', issue: '#2811' }, { product: 'analytic', issue: '#2812' }], note: 'the circle line completes the contradiction' },
+  { id: 'crossed-ring-2810-04', family: 'polygons', steps: ['דלתון ABCD', 'מעגל חוסם את ABCD', 'מרובע ABDC'], expect: 'refused', note: 'a kite with its circle is a right kite: no dart' },
+  { id: 'crossed-ring-2810-05', family: 'polygons', steps: ['מחומש ABCDE', 'מעגל חוסם את ABCDE', 'מחומש ABDCE'], expect: 'refused', knownGap: [{ product: 'analytic' }], note: 'analytic does not read a circle through a pentagon (its context line is not-handled): an unscheduled cell' },
+  { id: 'crossed-ring-2810-06', family: 'polygons', steps: ['מרובע ABCD', 'מעגל חוסם את ABCD'], expect: 'builds', note: 'one ring and its circle — the control' },
 
   // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
   // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too; since #1986 (ADR-3D-418)
@@ -2008,7 +2025,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'tangent-pair-from-inside-2151', family: 'tangents', steps: ['מעגל O', 'P בתוך המעגל', 'PA ו-PB משיקים למעגל'], expect: 'refused', exception: 'X8', note: '2-D committed it red with the circle shrunk before ADR-814; analytic already refused it' },
   { id: 'tangent-pair-from-inside-rev-2151', family: 'tangents', steps: ['מעגל O', 'PA ו-PB משיקים למעגל', 'P בתוך המעגל'], expect: 'refused', exception: 'X8', note: 'the reverse order: the side line is refused' },
   { id: 'tangents-from-inside-rev-2151', family: 'tangents', steps: ['מעגל O', 'מהנקודה P העבירו משיקים למעגל', 'הנקודה P בתוך המעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic' }], note: "the reverse order: the side line is refused. analytic does not read the «מהנקודה P העבירו משיקים» / «משיק מ-P» spellings at all (not-handled; teach on the context line) — a reading gap, not #2151's defect" },
-  { id: 'tangents-from-outside-2151', family: 'tangents', steps: ['מעגל O', 'הנקודה P מחוץ למעגל', 'מהנקודה P העבירו משיקים למעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: "the control. analytic does not read the «מהנקודה P העבירו משיקים» / «משיק מ-P» spellings at all (not-handled; teach on the context line) — a reading gap, not #2151's defect" },
+  { id: 'tangents-from-outside-2151', family: 'tangents', steps: ['מעגל O', 'הנקודה P מחוץ למעגל', 'מהנקודה P העבירו משיקים למעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic' }], note: "the control. analytic does not read the «מהנקודה P העבירו משיקים» / «משיק מ-P» spellings at all (not-handled; teach on the context line) — a reading gap, not #2151's defect" },  // ── #2797 (ADR-816): a fixed pentagon of free vertices closed by its last side — 2-D's driven solver did not converge past ~8 unknowns
+  { id: 'pentagon-closing-side-2797', family: 'polygons', steps: ['מחומש ABCDE', 'AB = 5', 'BC = 4', 'זווית ABC = 100', 'CD = 4', 'זווית BCD = 110', 'זווית CDE = 100', 'EA = 4.5'], expect: 'builds', note: '2-D refused «EA = 4.5» as over-constrained after 9 s before ADR-816 (BE 5.99 now, convex); analytic draws BE 5.99; 3-D draws it concave (BE 9.33, #1916)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

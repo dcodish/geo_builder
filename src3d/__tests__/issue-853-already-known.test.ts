@@ -29,8 +29,11 @@ const build = (us: string[]) => {
   // #2341 (ADR-3D-449): typed, a held statement is «כבר קיים» with no row; it is kept here as the row a save holds
   for (const u of us) submitOrSave3(u);
 };
+/** #2790 (Q-2790c [judged], ADR-3D-484): a TYPED held row says the held notice only; this lock reads the note's detection on
+ *  the rows as a file holds them (no held mark), where it still speaks. The typed path: already-drawn-1990.test.ts. */
+const asSaved = () => st().facts.map(({ held: _held, ...f }) => f);
 const known = (): Extract<BuildNotice3, { kind: 'already-known' }>[] =>
-  derive3(st().facts, st().seed).notices.filter(
+  derive3(asSaved(), st().seed).notices.filter(
     (n): n is Extract<BuildNotice3, { kind: 'already-known' }> => n.kind === 'already-known',
   );
 

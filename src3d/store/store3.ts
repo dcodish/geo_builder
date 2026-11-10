@@ -36,13 +36,13 @@ import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidBase3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, mintFree, ringKeyIds3, segmentEquationKind3, unstatedPyramidReading3 } from '../engine/apply';
 import { freeNamesIn3 } from '../engine/freeVecSystem';
 import { assertedRunOf3, declaresOnly3, lineSlotNames3, mintableCircle3, mintableId3, mintablePlane3, mintableSolid3, mintEligible3 } from '../engine/mintable';
 import { definiteCircle3 } from '../engine/definiteCircle';
 import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
-import { convexWhenSimple, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { commandStatesCircle3, convexWhenSimple, statedConcyclic3, declaredKind3, declaredQuads3, declaredRings3 as declaredRingsOf3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { magnitudeSizeStated3, scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
@@ -66,6 +66,10 @@ export interface Fact3 {
   utterance: string;
   cmds: Command3[];
   enabled: boolean;
+  /** #2790 (ADR-3D-484, Q-2790c): the line was recorded as a HELD row — the figure already held it when it was typed. Its
+   *  one note is the held notice; the derive's older «already known» relation notes stay quiet for its claims. Not saved:
+   *  a row loaded from a file is read as typed. */
+  held?: true;
 }
 
 export type FactStatus3 = 'ok' | 'disabled' | EngineError3;
@@ -868,7 +872,8 @@ function deriveCore3(
   /** #2490 (ADR-3D-434): a pyramid run the row's own text does not spell was lettered by the parser — marked, so it
    *  never binds to existing points (`SolidCommand.lettersUnstated`). The stored fact keeps its commands unchanged.
    *  #2490 (ADR-3D-436): and a pyramid whose base SHAPE goes unnamed, over a ring the figure `at` already holds, is read
-   *  as the quadrilateral its letters name (`unstatedPyramidBase3`): the ring keeps its shape. The row's own text says
+   *  as the quadrilateral its letters name (`unstatedPyramidReading3`): the ring keeps its shape; a RIGHT one as its
+   *  stated twin, with the cyclic fix that twin lowers (ADR-3D-468). The row's own text says
    *  whether a shape was named (`namesQuadBase3`); a solid the mint pass declared for the row is its bare declaration
    *  («פירמידה ABCDS», listed first), which names none. Every reader after the fold reads this, as `resolvedCmds`. */
   const expandFact = (at: Construction3, f: Fact3): ReturnType<typeof expandFactRaw> => {
@@ -877,12 +882,17 @@ function deriveCore3(
     const minted = presolids?.[f.id]?.cmds.length ?? 0;
     let named: boolean | undefined;
     let changed = false;
-    const cmds = r.cmds.map((k, i) => {
-      if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return k;
-      let out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
-      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) out = unstatedPyramidBase3(at, out);
-      if (out !== k) changed = true;
-      return out;
+    const cmds = r.cmds.flatMap((k, i): Command3[] => {
+      if (k.type !== 'solid' || !isPyramidKind3(k.kind)) return [k];
+      const out: SolidCommand = spellsLetters3(f.utterance, k.ids) ? k : { ...k, lettersUnstated: true as const };
+      let read: Command3[] = [out];
+      if (i < minted || !(named ??= namesQuadBase3(f.utterance))) {
+        read = unstatedPyramidReading3(at, out);
+        // #2702 (ADR-3D-469): a base the pyramid makes, with no shape named — its rectangle is a default that yields
+        if (read.length === 1 && read[0] === out && QUAD_PYRAMIDS[out.kind]?.base === 'rectangle' && !QUAD_PYRAMIDS[out.kind]?.right) read = [{ ...out, baseUnstated: true as const }];
+      }
+      if (read.length !== 1 || read[0] !== k) changed = true;
+      return read;
     });
     return changed ? { ok: true, cmds } : r;
   };
@@ -1338,13 +1348,17 @@ function deriveCore3(
           let refused: FactStatus3 | null = null;
           for (const cmd of declCmds) {
             // #2490 (ADR-3D-436): a minted solid is its bare declaration, whose base shape is unstated — tried as the
-            // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`)
-            const r = applyCommand3(made, seated(m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidBase3(made, cmd) : cmd));
-            if (!r.ok) {
-              refused = r.error;
-              break;
+            // fold will apply it, so the trial's verdict is the line's (a trapezoid keeps its shape, never `shape-disjoint`);
+            // a right one with its twin's cyclic fix (ADR-3D-468), every command the fold will apply
+            for (const k of m.kind === 'solid' && cmd.type === 'solid' ? unstatedPyramidReading3(made, cmd) : [cmd]) {
+              const r = applyCommand3(made, seated(k));
+              if (!r.ok) {
+                refused = r.error;
+                break;
+              }
+              made = r.next;
             }
-            made = r.next;
+            if (refused) break;
           }
           if (refused) {
             st = refused;
@@ -1531,12 +1545,18 @@ function deriveCore3(
    *
    * Blamed on the LATEST of the two declarations — the line that completed the contradiction — exactly as
    * ADR-3D-322 blames the ring-first order's shape line.
+   *
+   * #2810 ([ADR-3D-467](../../docs/06b-decisions-3d.md#adr-3d-467)) — A SECOND SUFFICIENT REASON: letters a stated
+   * circle passes through (`statedConcyclic3`: a circle through them, a cyclic fix, a right pyramid's base) are in
+   * convex position too, whatever noun the ring wears. Every declared ring of four or more letters is read
+   * (`declaredRings3`: pentagons and bound bases included), and when the circle is the proof, the lines that stated it
+   * join the blame: a circle or right-pyramid line that completed the contradiction is the one refused.
    */
   {
     const ringsByLetters = new Map<string, { ids: Id[]; convex: boolean }[]>();
     const letterKey = (ids: readonly Id[]) => [...ids].sort().join('');
     const addRing = (ids: readonly Id[], convex: boolean) => {
-      if (ids.length !== 4 || new Set(ids).size !== 4) return;
+      if (ids.length < 4 || new Set(ids).size !== ids.length) return;
       const k = letterKey(ids);
       const list = ringsByLetters.get(k) ?? [];
       if (!list.some((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))) list.push({ ids: [...ids], convex });
@@ -1544,15 +1564,22 @@ function deriveCore3(
       ringsByLetters.set(k, list);
     };
     for (const q of declaredQuads3(c)) addRing(q.ids, convexWhenSimple(q.base));
-    for (const sld of c.solids) if (sld.kind === 'polygon4') addRing(sld.ids, false); // a bare «מרובע» promises nothing
+    for (const ring of declaredRingsOf3(c)) addRing(ring, false); // a bare «מרובע» / «מחומש» promises nothing by its noun
+    /** The letters a stated circle passes through (ADR-3D-467) — their convexity is the circle's, not a noun's. */
+    const cyclicLetters = new Set([...ringsByLetters.values()].filter((l) => l.length >= 2 && statedConcyclic3(c, l[0].ids)).map((l) => letterKey(l[0].ids)));
     /** Does fact `f` declare exactly this ring, in this cyclic order? (ADR-3D-322's own reader.) */
     const declaresRingOrdered = (f: Fact3, ring: readonly Id[]) =>
-      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring));
+      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') &&
+        // #2810 (ADR-3D-467): a quad pyramid declares its BASE ring (base ids first) — a bound one over existing letters
+        ((k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring)) ||
+          (k.type === 'solid' && ring.length === 4 && QUAD_PYRAMIDS[k.kind] !== undefined && ringKeyIds3(k.ids.slice(0, 4)) === ringKeyIds3(ring))));
     for (const list of ringsByLetters.values()) {
       if (list.length < 2) continue;
+      const byCircle = cyclicLetters.has(letterKey(list[0].ids));
       for (const crossed of list) {
-        if (!list.some((other) => other !== crossed && other.convex)) continue;
-        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids)));
+        if (!byCircle && !list.some((other) => other !== crossed && other.convex)) continue;
+        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids) ||
+          (byCircle && !list.some((o) => o.convex) && f.cmds.some((k) => commandStatesCircle3(k, r.ids)))));
         const blamed = involved[involved.length - 1];
         if (!blamed || status[blamed.id] !== 'ok') continue;
         status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
@@ -2374,7 +2401,10 @@ function deriveCore3(
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seedNumber3(seed), c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
+  // #2790 (ADR-3D-484, Q-2790c [judged]): a HELD row's claims say the held notice only — the #396/#842/#850 notes retire there
+  const heldIds = new Set(facts.filter((f) => f.held).map((f) => f.id));
+  const heldClaims = new Set(claimOwners.filter((o) => heldIds.has(o.factId)).flatMap((o) => c.claims.slice(o.from, o.to)));
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed, heldClaims), shapeWarnings: shapeWarnings3(c, positions), coincidences: coincidences3(c, positions), resolvedCmds, created, createdCircles, readings };
 }
 
 export interface Geo3State {
@@ -2958,7 +2988,11 @@ export function decideCommands3(
   const named = toolLetterTakenOver3(candidate, fact.id, seed);
   if (named) [candidate, derived, status] = [named.facts, named.derived, named.derived.status[fact.id]];
   if (opts.twins && !held) held = (knownSegmentEquationTwin3(facts, seed, fact, derived) ?? impliedByPrior3(facts, seed, fact, derived)) !== null;
-  if (held) return { kind: 'record', fact, facts: candidate, seed, held: true }; // the figure already holds it: nothing to search
+  if (held) {
+    // the figure already holds it: nothing to search; the row is marked held (its one note is the held notice, Q-2790c)
+    const heldFact: Fact3 = { ...fact, held: true };
+    return { kind: 'record', fact: heldFact, facts: candidate.map((f) => (f.id === fact.id ? heldFact : f)), seed, held: true };
+  }
   if (!opts.seedSearch) return { kind: 'record', fact, facts: candidate, seed };
   // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
   // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within

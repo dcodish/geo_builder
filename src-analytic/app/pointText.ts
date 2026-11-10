@@ -12,9 +12,11 @@ import { exprText, literalText, type Expr } from '../engine/expr';
 import { givenText } from '../../shell/literal';
 import { knownCurve, knownValue, knownValues, reportPending } from '../engine/evaluate';
 import { valueText } from './panelRows';
+import { lettersText } from './curveText';
+import type { Monomial } from '../engine/locusFit';
 
 /** A coordinate's verdict; `pending` = not yet read over the whole configuration pool (#1473). */
-type Know = { known: boolean; value?: number; pending?: boolean };
+type Know = { known: boolean; value?: number; pending?: boolean; letters?: Monomial };
 
 export function pointText(
   d: ReturnType<typeof derive>,
@@ -82,6 +84,16 @@ export function pointText(
     return `(${exprText(stated.x)}, ${exprText(stated.y)})`;
   }
 
+  /**
+   * A COORDINATE THE FIGURE FIXES IN THE STUDENT'S LETTERS (#2735, ADR-AG-458) — «(2k, 0)», where it read «(x_F₁, 0)». Operator,
+   * 2026-11-07: *"yes - we should support (2k,0) in the data panel"*. Each coordinate is a number, or a monomial
+   * `readInLetters` read and verified at every configuration of the pool (`withLetters`); a coordinate that is neither
+   * keeps the forms below.
+   */
+  const part = (k: Know): string | null => (k.known ? fmt(k.value as number) : k.letters ? lettersText(k.letters, fmt) : null);
+  const [px, py] = [part(kx), part(ky)];
+  if (px !== null && py !== null) return `(${px}, ${py})`;
+
   const on = d.construction.constraints.find((k) => k.t === 'on-curve' && k.id === id);
   if (on && on.t === 'on-curve') {
     // The SAME gate the curve rows use: a carrier whose coefficients still move says nothing here.
@@ -97,9 +109,8 @@ export function pointText(
   }
 
   // One coordinate pinned and the other open — «B על ציר ה-x» — reads the same way.
-  if (kx.known !== ky.known) {
-    return kx.known ? `(${fmt(kx.value as number)}, y_${id})` : `(x_${id}, ${fmt(ky.value as number)})`;
-  }
+  // #2735: a coordinate read in the letters is as fixed as a number here.
+  if ((px === null) !== (py === null)) return px !== null ? `(${px}, y_${id})` : `(x_${id}, ${py})`;
   return '—';
 }
 

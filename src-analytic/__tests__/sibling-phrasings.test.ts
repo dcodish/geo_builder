@@ -9,7 +9,7 @@
  * refusal the app hands to the model — never called here (standing rule 2).
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit, type SubmitVerdict } from '../app/submit';
+import { decideSubmit, isHeld, type SubmitVerdict } from '../app/submit';
 import { parseLine } from '../parser/parseAnalytic';
 import { derive } from '../engine/derive';
 import { COMMAND_CATALOG_ANALYTIC } from '../parser/catalogAnalytic';
@@ -20,12 +20,11 @@ import { readKnown, writeKnown, writeMode } from '../../shell/__tests__/fixtures
 function outcomeOf(v: SubmitVerdict): Outcome {
   switch (v.kind) {
     case 'record': {
+      // #2790 (ADR-AG-462): a held line is a row too, with the already-held notice
+      if (isHeld(v)) return { verdict: 'builds', code: 'already-held' };
       const p = parseLine(v.line);
       return { verdict: 'builds', shape: p.ok ? fingerprint(p.facts) : `unparsed:${p.code}` };
     }
-    case 'already-known':
-    case 'already-follows':
-      return { verdict: 'builds', code: v.kind };
     case 'refused':
       if (v.error.key === 'not-handled') return { verdict: 'not-handled' };
       return { verdict: /^ambiguous/.test(v.error.key) ? 'asks' : 'refused', code: v.error.key };
@@ -44,7 +43,7 @@ const runAnalytic: DecideRunner = (context, lines) => {
   for (const line of context) {
     const v = decideSubmit(line, recorded, 0);
     if (v.kind === 'record') recorded.push(v.line);
-    else if (v.kind !== 'already-known' && v.kind !== 'already-follows') return null;
+    else return null;
   }
   const current = derive(recorded, 0);
   return lines.map((line) => outcomeOf(decideSubmit(line, recorded, 0, current)));
