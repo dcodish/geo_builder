@@ -7453,3 +7453,5 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 2. **About 6 parallel streams**, not ~10.
 3. **Every item runs its builders' whole-figure case files by path** before `ready` (ADR-W-191's skipped set is where #2806, #2797, #2799 and #2735 broke the tip).
 4. **`scripts/round-merge-insertions.mjs`** resolves same-point-insertion conflicts from the three stage blobs (locked by `server/__tests__/round-merge-insertions.test.ts`); anything else is merged by hand and `tsc -b` runs first.
+
+**ADR-W-202 Amendment 2 (2026-11-10): the Rulings Inbox is the ONE place a question waits for him.** Operator: *"the builder roadmap has decisions for me to take that are not on the ruling inbox - is that ok?"* It was not: seven open questions from round #2745 sat only on the roadmap page's decisions panel. They moved to the inbox (each marked `moved` on the roadmap with a pointer), and from now on no session posts an open question to the roadmap page; its `decisions` collection is history only (fix-round Step 2 4c and Step 5, roadmap-refresh).

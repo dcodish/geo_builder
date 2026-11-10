@@ -254,7 +254,7 @@ Each item, inside its stream:
    *"issues found during a round are fixed immediately are the test case of the round tests them"*).
    - **Same cause, same chokepoint:** a case the fix turns up that has the item's cause and chokepoint (a sibling phrasing, the same gap in another spelling) is fixed inside the item. It gets its own play-sheet case, marked *found in round*, and a line in the item's ledger entry.
    - **Anything else:** a comment or checklist line on its parent issue (docs/22 §1). A new issue only when the search finds no parent; the issue-creation hook asks for the `Searched:` line.
-   - **A found case whose student-visible outcome nobody ruled on** (rule 7) is not fixed. It goes in the round report's **Questions** list and on the roadmap page's decisions panel, and the stream carries on.
+   - **A found case whose student-visible outcome nobody ruled on** (rule 7) is not fixed. It goes in the round report's **Questions** list and on the **Rulings Inbox** (ADR-W-202) — the ONE place a question waits for him; never on the roadmap page's decisions panel — and the stream carries on.
 5. **Commits reference the round:** every item commit carries `Fixes #NN` AND mentions the
    round issue (`round #RR`) — from any commit you can find the round, from the round every
    commit.
@@ -428,7 +428,7 @@ Final body, in order:
   `operator: play=N audits=N`. `scripts/round-metrics.mjs` reads both lines for the roadmap page's
   "Fix rounds" panel (ADR-W-169); a line without the new fields still reads, its headline estimated.
 - **Questions** — the found cases that need a ruling (Step 2, 4c), one line each. They are also posted
-  on the roadmap page's decisions panel.
+  on the Rulings Inbox (ADR-W-202), never on the roadmap page.
 - **The published report's URL** (Step 5b), on its own line near the top — the artifact is the
   operator's surface onto this ledger, and a URL that lives only in the session chat is lost.
 - **The stats line**, exactly this machine-greppable form, always last:
