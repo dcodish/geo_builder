@@ -1753,6 +1753,24 @@ const AXIS_ALIGNED_ROTATIONS3: readonly Vec3[] = (() => {
   return out;
 })();
 
+/**
+ * #2793 (ADR-3D-465 Am. 1) — may resolve3's stage 5 SLIDE a solved placement along its leftover translation? The probe
+ * measures WHERE the translation is free (null J_τ); this says whether that freedom is a placement DOF the drawing samples:
+ *  - only against the ABSOLUTE frame (FR-SP-4): with no absolute object, rank J_τ > 0 can come from a free point's own
+ *    coordinates (a minted S in «SM ⊥ ABC»), and sliding the figure against it is a gauge move that re-solves the relation;
+ *  - a placement an absolute plane or membership drives with no point pin (ADR-3D-180, unchanged);
+ *  - a stated SIGN to aim at (ADR-W-199: a figure that keeps the sign is drawn, never refused);
+ *  - point pins that state an axis or the origin (every stated component 0): the solid's vertex on an axis anchors the
+ *    frame and the slide along it is sampled (judged Q-2793b, with Q-2789a). A pin stating an off-origin component
+ *    («x_B = 3») leaves its other axes a gauge (ADR-3D-373: the figure is unchanged), so it does not slide unsigned.
+ */
+export function translationSlideSampled3(c: Construction3): boolean {
+  if (!hasAbsoluteFrameObject(c)) return false;
+  if (c.pins.length === 0 && translationDrivenAbsolute3(c)) return true;
+  if (c.signGivens.length > 0 || positionalComponentSigns3(c).length > 0) return true;
+  return c.pins.length > 0 && c.pins.every((p) => [p.x, p.y, p.z].every((v) => v === null || v === 0));
+}
+
 /** Does `resolve3` SAMPLE the placement (rather than freeze it at the canonical gauge)? */
 export function placementSampled3(c: Construction3): boolean {
   return c.solids.length > 0 && hasAbsoluteFrameObject(c) && translationGaugeFree3(c);
@@ -2839,7 +2857,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     //    stood in for that question and got a PARTIAL pin wrong: «A על ציר ה-x» states two of A's three coordinates, so
     //    the slide along the axis was never sampled (A at the origin at every seed) and «…על החלק החיובי…» was refused.
     const slideFrom = warm.x ?? (translationDrivenAbsolute3(c) ? [0, 0, 0, 0, 0, 0, 0, ...dims0] : null);
-    if (slideFrom && !(pivot && pivot.solutions === 0)) {
+    if (slideFrom && translationSlideSampled3(c) && !(pivot && pivot.solutions === 0)) {
       const members = buildMemberPins();
       const x0 = slideFrom;
       const mirror = warm.mirror ?? false;
@@ -2950,7 +2968,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           // #2793 (ADR-3D-465): the resize is about the gauge origin, so it can carry a signed vertex across an axis
           // («B, D על החלק החיובי של ציר ה-x»: the full-size cube straddles the origin). Where a translation is left,
           // the stage-5 slide AIMS the resized figure back at the signs; only when none can is the resize undone.
-          if (!paramBroke && !signsHold() && warm.x) {
+          if (!paramBroke && !signsHold() && warm.x && hasAbsoluteFrameObject(c)) {
             const xS = [...warm.x];
             const slid = solveStage(() =>
               solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xS, mirror: warm.mirror ?? false }),

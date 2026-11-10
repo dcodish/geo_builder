@@ -12,7 +12,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
-import { freeDofCount3, hasAbsoluteFrameObject, placementSampled3 } from '../engine/evaluate';
+import { freeDofCount3, hasAbsoluteFrameObject, placementSampled3, translationSlideSampled3 } from '../engine/evaluate';
 import { absoluteFrameObjects3, absolutePointCount } from '../engine/types';
 import { dataView } from '../engine/dataView';
 import { answerQuery } from '../engine/queries';
@@ -741,5 +741,15 @@ describe('#2793 — a solid’s vertex on half an axis, and a sign beside a fixe
     expect(t1).toHaveLength(1);
     expect(Math.abs(t1[0][0])).toBeCloseTo(1, 6);
     expect(tr([CUBE, 'A(1,2,3)', 'AB = (1,0,0)'])).toHaveLength(0);
+  });
+
+  it('which leftover translation the drawing slides (translationSlideSampled3): the ruled members only', () => {
+    const c = (lines: readonly string[]) => drawn(lines, 0).construction;
+    expect(translationSlideSampled3(c([CUBE, 'הקודקוד A נמצא על ציר ה-x'])), 'an axis statement (Q-2793b)').toBe(true);
+    expect(translationSlideSampled3(c([CUBE, 'P(5,5,5)', 'x של A חיובי'])), 'a sign to aim at').toBe(true);
+    // ADR-3D-373: an off-origin component leaves its other axes a gauge; the figure does not move for it
+    expect(translationSlideSampled3(c(["תיבה ABCDA'B'C'D'", 'X_B=3'])), 'x_B = 3, no sign').toBe(false);
+    // FR-SP-4: no absolute object — a free point's coordinates are not the frame (#1499's «SM⊥ABC»)
+    expect(translationSlideSampled3(c(['ABC משולש', 'M אמצע BC', 'SM⊥ABC'])), 'no absolute object').toBe(false);
   });
 });
