@@ -48,8 +48,8 @@ describe('#2341 — typed today, an entailed relation is already known (ADR-3D-4
     st().submit("קובייה ABCDA'B'C'D'");
     st().submit(line);
     expect(st().lastError).toBeNull();
-    expect(st().facts).toHaveLength(1);
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().facts).toHaveLength(2);
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
   });
 });
 

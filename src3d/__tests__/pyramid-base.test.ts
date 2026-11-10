@@ -385,14 +385,14 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
     expect(narrowed()).toHaveLength(1);
   });
 
-  it('the pyramid typed again is still «already stated», with a shape reference elsewhere in the figure too', () => {
+  it('the pyramid typed again is held (#2790: its own row), with a shape reference elsewhere in the figure too', () => {
     for (const lines of [['מרובע ABCD', 'פירמידה ABCDS'], ['משולש EFG', 'המשולש ישר זווית', 'מרובע ABCD', 'פירמידה ABCDS']]) {
       build(lines);
       const n = state().facts.length;
       submit('פירמידה ABCDS');
       expect(state().lastError, lines.join(' · ')).toBeNull();
-      expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-stated' });
-      expect(state().facts, lines.join(' · ')).toHaveLength(n);
+      expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-held' });
+      expect(state().facts, lines.join(' · ')).toHaveLength(n + 1);
     }
   });
 });

@@ -304,9 +304,10 @@ function alreadyKnown(c: Construction3, samples: readonly Resolved3[]): BuildNot
 
   // ---- case 1 (#612, ADR-3D-158): a shape statement that was true of the figure already.
   // Test: the apply-time flag — `applyShape` records the statement it found nothing to change.
-  for (const r of c.redundantShapes) {
-    out.push({ kind: 'already-known', rel: 'shape', subject: [...r.ids].join(''), shape: r.base });
-  }
+  // #2790 (ADR-3D-484): retired. A shape statement the figure already holds is a HELD row, and the held notice
+  // («זה כבר קיים באיור — נוסף כנתון נפרד.», `suite.notice.alreadyHeld`) is the one thing it says — 2-D's answer (the
+  // #2171 pair table). The apply-time flag stays: `impliedByPrior3` reads it as the statement's own part.
+  void c.redundantShapes;
 
   // ---- case 2 (#396, ADR-3D-108): a relation between two SELF-DETERMINED objects could never have
   // driven anything — both are fixed by their own defining equations, so the statement adds nothing.

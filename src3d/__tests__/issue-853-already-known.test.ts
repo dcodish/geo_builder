@@ -41,7 +41,8 @@ describe('#853 — the four cases are ONE channel', () => {
 
   /** One figure per case, each the figure its own issue reported. */
   const CASES: { name: string; steps: string[]; rel: string }[] = [
-    { name: '#612 a shape the figure already held', steps: ['פירמידה ABCDS שבסיסה ריבוע', 'ריבוע ABCD'], rel: 'shape' },
+    // #612's shape case left this channel in #2790 (ADR-3D-484): a held shape row says the held notice only (2-D's answer);
+    // its lock is issue-612-615-shape-naming.test.ts and already-drawn-1990.test.ts
     { name: '#396 two self-determined objects', steps: ['המישור π1: z = 0', 'המישור π2: x = 0', 'π1 ניצב ל-π2'], rel: 'objects' },
     { name: '#842 a containment both endpoints already met', steps: [CUBE, 'מישור ABCD', 'E אמצע AC', 'BE מוכל במישור ABCD'], rel: 'contained' },
     { name: '#850 a ∥ the figure implies', steps: [CUBE, "AB מקביל למישור A'B'C'D'"], rel: 'parallel' },

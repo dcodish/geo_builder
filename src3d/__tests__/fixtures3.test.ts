@@ -29,6 +29,10 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2790 (ADR-3D-484) — the held row: the base angles restated after «AB = AC» are their own row, with the notice, and move
+  // nothing (#2795, ADR-3D-483). The file is saved with «AB = AC» UNTICKED (set after generation): the restated row holds
+  // the triangle isosceles on its own. The class is asserted in already-drawn-1990.test.ts; this is the build + drift + load net.
+  'held-row-2790.geo3.json': ['משולש ABC', 'AB = AC', 'זווית ABC = זווית ACB'],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],

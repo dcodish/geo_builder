@@ -8,6 +8,10 @@
  * ADR-3D-449 — the general rule (operator 2026-11-06: *"In all cases it should say כבר קיים"*; [judged] Q-2341,
  * 2026-11-09): any statement the figure before it already holds in every admissible configuration is answered by
  * `impliedByPrior3` in `decideCommands3`, the same `already-stated` verdict, with no row.
+ *
+ * #2790 ([ADR-3D-484](../../docs/06b-decisions-3d.md#adr-3d-484), ADR-W-200, operator 2026-11-09) — the same detector,
+ * a new outcome: the line is accepted as its own row, `held`, with the notice «זה כבר קיים באיור — נוסף כנתון נפרד.», and is
+ * drawn like any row (its knee, its value). Every "no row" below is re-based to "its own row"; the rows' set is unchanged.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { decideDeterministic3 } from '../app/decideDeterministic3';
@@ -25,18 +29,21 @@ function build(lines: readonly string[]) {
     expect(st().lastError, `«${l}» is context`).toBeNull();
   }
 }
-const verdict = (line: string) => decideDeterministic3(st(), line).kind;
+const verdict = (line: string) => {
+  const v = decideDeterministic3(st(), line);
+  return v.kind === 'record' && v.held ? 'held' : v.kind;
+};
 
 beforeEach(() => build([]));
 
 describe("#2341 — the operator's sequence", () => {
-  it('«B=(√2,0,0)» after «B(√2,0,0)»: no row, the note, the figure unchanged', () => {
+  it('«B=(√2,0,0)» after «B(√2,0,0)»: its own row, the note, the figure unchanged', () => {
     build(['A(0,0,0)', 'B(√2,0,0)']);
     const before = derive3(st().facts, st().seed).positions.get('B');
     st().submit('B=(√2,0,0)');
-    expect(st().facts.map((f) => f.utterance)).toEqual(['A(0,0,0)', 'B(√2,0,0)']);
+    expect(st().facts.map((f) => f.utterance)).toEqual(['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)']);
     expect(st().lastError).toBeNull();
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
     expect(derive3(st().facts, st().seed).positions.get('B')).toEqual(before);
   });
 
@@ -62,7 +69,7 @@ describe('#2341 — the class: one statement in two spellings', () => {
     [['A(0,0,0)', 'B(2,0,0)', 'K על AB', 'K(1,0,0)'], 'K=(1,0,0)'], // a rider placed by its coordinates
   ])('%j + «%s»', (lines, line) => {
     build(lines);
-    expect(verdict(line)).toBe('already-stated');
+    expect(verdict(line)).toBe('held');
   });
 
   it('a muted twin is re-ticked with no note, as the #613 rule does', () => {
@@ -87,13 +94,13 @@ describe('#2341 — a length restated, [judged] q21 2026-11-05 (2-D\'s noop)', (
     [['משולש ABC', 'AB = √2'], 'BA = √2'],
     [["קובייה ABCDA'B'C'D'", 'AB = 3'], 'BA = 3'],
     [['A(0,0,0)', 'B(3,0,0)', 'AB = 3'], 'BA = 3'],
-  ])('%j + «%s»: no row, the note', (lines, line) => {
+  ])('%j + «%s»: its own row, the note', (lines, line) => {
     build(lines);
     const rows = st().facts.length;
     st().submit(line);
-    expect(st().facts).toHaveLength(rows);
+    expect(st().facts).toHaveLength(rows + 1);
     expect(st().lastError).toBeNull();
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
   });
 
   it.each(['BA = 4', 'AB = 4'])('«AB = 3» + «%s» is still refused', (line) => {
@@ -115,8 +122,8 @@ describe('#2341 — a length restated, [judged] q21 2026-11-05 (2-D\'s noop)', (
 
   it('a first value on a segment the figure already fixes is already known ([judged] Q-2341, 2026-11-09)', () => {
     build(['A(0,0,0)', 'B(√2,0,0)']);
-    expect(verdict('AB = √2')).toBe('already-stated');
-    expect(verdict('BA = √2')).toBe('already-stated');
+    expect(verdict('AB = √2')).toBe('held');
+    expect(verdict('BA = √2')).toBe('held');
   });
 });
 
@@ -126,8 +133,8 @@ describe('#2341 — ADR-3D-449: a statement the figure already holds is already 
     const rows = st().facts.length;
     st().submit(line);
     expect(st().lastError, line).toBeNull();
-    expect(st().facts, line).toHaveLength(rows);
-    expect(st().lastNotice, line).toEqual({ code: 'already-stated' });
+    expect(st().facts, line).toHaveLength(rows + 1);
+    expect(st().lastNotice, line).toEqual({ code: 'already-held' });
   };
 
   it.each([
@@ -145,15 +152,16 @@ describe('#2341 — ADR-3D-449: a statement the figure already holds is already 
     [["תיבה ABCDA'B'C'D'"], "המישור ABC מקביל למישור A'B'C'"],
     [['המישור π1: z = 0', 'המישור π2: x = 0'], 'π1 ניצב ל-π2'],
     [['A(0,0,0)', 'B(a,0,0)', 'a = 2'], 'B=(2,0,0)'], // the letter is decided, so the point is
-  ])('%j + «%s»: no row, the note', (lines, line) => known(lines, line));
+  ])('%j + «%s»: its own row, the note', (lines, line) => known(lines, line));
 
-  it('«AB ⟂ AD» on a cube draws no new right-angle mark (ruled 2026-11-06)', () => {
+  // #2790 (ADR-3D-484): the row is drawn like any accepted row (ADR-W-118 B2): its right-angle knee is back
+  it('«AB ⟂ AD» on a cube draws its right-angle knee, as the same line on any figure does', () => {
     build(["קובייה ABCDA'B'C'D'"]);
     const before = derive3(st().facts, st().seed);
     const marks = buildScene3(before.construction, before.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).marks.length;
     st().submit('AB ⟂ AD');
     const after = derive3(st().facts, st().seed);
-    expect(buildScene3(after.construction, after.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).marks).toHaveLength(marks);
+    expect(buildScene3(after.construction, after.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1).marks.length).toBeGreaterThan(marks);
   });
 
   it('the figure does not change', () => {
@@ -166,10 +174,10 @@ describe('#2341 — ADR-3D-449: a statement the figure already holds is already 
   it('the notice is cleared by the next ordinary statement', () => {
     build(["קובייה ABCDA'B'C'D'"]);
     st().submit('AB ∥ CD');
-    expect(st().lastNotice).toEqual({ code: 'already-stated' });
+    expect(st().lastNotice).toEqual({ code: 'already-held' });
     st().submit("M אמצע AB");
     expect(st().lastNotice).toBeNull();
-    expect(st().facts).toHaveLength(2);
+    expect(st().facts).toHaveLength(3);
   });
 
   it('the model lane asks without the rule, as it always has (the twin rule is the grammar lane\'s)', () => {
@@ -214,7 +222,7 @@ describe('#2341 — ADR-3D-449: the boundary — what still commits', () => {
 
   it('a sign selects among configurations, so it commits even where every sample obeys it', () => {
     build(['A(0,0,0)', 'B(a,0,0)']);
-    expect(verdict('a חיובי')).not.toBe('already-stated');
+    expect(verdict('a חיובי')).not.toBe('held');
   });
 });
 
