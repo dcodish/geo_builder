@@ -712,7 +712,12 @@ export function multiStartSolve(
       return rescue.rows(x);
     };
     for (const start of [seed, ...restarts.slice(0, LM_RESCUE_RESTARTS)]) {
-      if (left <= 0 || (start !== seed && budgetExceeded())) break; // #259's discipline: never open a start past a budget
+      // #259's discipline: never open a start past a budget — the seed start INCLUDED. Nelder–Mead exempts its seed
+      // pass so there is always a candidate to judge; the rung has one already (the seed, judged above), and a rung
+      // that opened past the budget answered a ladder the budget had cut: a capped re-attempt (ADR-583) came back
+      // `ok` from work beyond its cap, so the cut stopped meaning "not examined to the end" (#1770, ADR-586; round
+      // #2822 measured the forced-cap sweep's cut re-attempts read as successes).
+      if (left <= 0 || budgetExceeded()) break;
       drivenSolveStats.lmRescue++;
       const before = evals;
       const x = solveLM(rows, start, { scale: rescue.scale, regularize: { weight: 1e-3, toward: seed }, maxIter: LM_RESCUE_ITERS, maxEvals: Math.min(perStart, left) }).x;

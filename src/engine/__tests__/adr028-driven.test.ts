@@ -10,7 +10,7 @@ import { parse } from '@/parser';
 import { build, applyStep } from '../step';
 import { drivenSolveStats, evaluate } from '../evaluate';
 import { applySeed } from '../sample';
-import { work } from '../solveBudget';
+import { withExecutedCap, work } from '../solveBudget';
 import { factsOf } from '../../__tests__/scenario-pipeline';
 import { replay } from '@/replay/core';
 import { dist, footOnLine } from '../geometry';
@@ -147,6 +147,20 @@ describe('the LM rescue rung (#2797, ADR-816)', () => {
     const fig = replay(factsOf(['מרובע ABCD', 'AB = 5', 'BC = 4', 'זווית ABC = 100', 'CD = 4']));
     expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
     expect(drivenSolveStats.lmRescue - before).toBe(0);
+  });
+
+  it('the rung opens NO start past a spent budget — not even the seed start (#259; round #2822, #1770’s cut)', () => {
+    const prior = replay(factsOf(P7)).construction;
+    const at = applySeed(prior, 3); // Nelder–Mead alone fails this seed; the rung rescues it (measured)
+    // capped FIRST — the evaluate memo would serve a warm second call without executing anything
+    const capped0 = drivenSolveStats.lmRescue;
+    const out = withExecutedCap(50, () => evaluate(at));
+    expect(out.exhausted, 'the cap cut the ladder').toBe(true);
+    expect(drivenSolveStats.lmRescue - capped0, 'a cut ladder gets no LM start').toBe(0);
+    expect(out.value.ok, 'so a cut ladder never comes back solved from work beyond its cap').toBe(false);
+    const free0 = drivenSolveStats.lmRescue;
+    expect(evaluate(at).ok, 'unbudgeted, the rung rescues the seed').toBe(true);
+    expect(drivenSolveStats.lmRescue - free0, 'the rung ran').toBeGreaterThan(0);
   });
 
   it('a cold and a warm evaluate of the rescued figure charge the same work (docs/17 §7, ADR-558)', () => {

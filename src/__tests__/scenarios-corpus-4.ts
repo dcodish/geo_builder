@@ -6676,7 +6676,7 @@ export const SCENARIOS_4: Scenario[] = [
       const facts = factsOf(['מחומש ABCDE', 'AB = 5', 'BC = 4', 'זווית ABC = 100', 'CD = 4', 'זווית BCD = 110', 'זווית CDE = 100']);
       const v = gateVerdict(facts, 'EA = 1');
       expect(v.kind === 'refused' && v.reason, '«EA = 1» is refused as a conflict, never committed as waiting').toBe('error');
-      if (v.kind === 'refused') expect(v.detail ?? '', 'the refusal names the statement').toMatch(/|EA| = 1 cannot hold/);
+      if (v.kind === 'refused') expect(v.detail ?? '', 'the refusal names the statement').toMatch(/\|EA\| = 1 cannot hold/);
       expect(gateVerdict(facts, 'EA = 4.5').kind, 'the reachable closing side commits').toBe('commit');
     },
   },
