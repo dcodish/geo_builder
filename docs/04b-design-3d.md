@@ -490,7 +490,8 @@ else the two smallest gcd-reduced members of (b, −a, 0), (c, 0, −a), (0, c, 
 integer scaling `planeEqStr` prints). Every piece is checked (on the plane, in it, independent) or the row is
 withheld. The panel's planes block and the query lane's plane branch call it wherever they print the equation —
 no other gate — and the panel also lists every non-free equation-given plane on the equation's agreement alone
-(absolute, so no translation anchor).
+(absolute, so no translation anchor). The panel prefixes the parametric row with the plane's name only when the name is not
+already its symbol (`ABCD: π = …`, but a plane named π prints `π = …`, never `π: π = …` — #2820, [ADR-3D-482](06b-decisions-3d.md#adr-3d-482)).
 
 **The read-back samples the placement's leftover rigid freedom** (#2368, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375)).
 Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the

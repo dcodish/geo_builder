@@ -15462,3 +15462,16 @@ Three hand-written copies become one helper. The pyramid seat now matches the ri
 **Locks.** `issue-2764-independent-parts.test.ts`: written with `seed` a number and `seedParts` beside it; the file, the link and the session load back the same drawing; an old `seed: 7` file with no `seedParts` loads ok with its first part at 7; a malformed entry is dropped. `fixtures3/nine-separate-shapes-2764.geo3.json` carries `seedParts`, so the corpus net loads the field.
 
 **Behaviour change for a student:** none beyond ADR-3D-454's.
+
+## ADR-3D-482 — A plane's parametric row prints its name once: «π = …», never «π: π = …» (#2820)
+
+**Status:** accepted · 2026-11-10 · bug (P3, 3d) · fix round #2822, stream H2 · amends [ADR-3D-376](#adr-3d-376)
+**Requirements:** none (restores [ADR-3D-187](#adr-3d-187)'s row; no new promise) · **Design:** [04b](04b-design-3d.md) § *A plane's two forms are one derivation from its equation* · **Ladder:** stage 5d (display)
+
+**Context.** Operator, 2026-11-10 (spot audit round-2727:T56, «מישור π 2x+y=1»): the data panel showed «π: π = (0, 1, 0) + t·(0, 0, 1) + s·(1, -2, 0)» — "an extra pi". The panel's `planeRows` composed `${name}: ${par}`, and `par` (`parametricPlaneForm`) already opens with the plane's symbol (ADR-3D-187). Two labels were composed independently, so when the row's name IS its symbol — a plane the student named (`planeSymbols` maps a named plane to itself) — the name printed twice. Since #2367 (ADR-3D-376), which added the prefix.
+
+**Decision.** `planeRows` prints the parametric row as `par` alone when `planeSymbols(c).get(name) === name`, and as `${name}: ${par}` otherwise («ABCD: π = …», «ABCD: π1 = …» — the prefix says which run the symbol stands for). The equation row keeps `${name}: …` (`planeEqStr` carries no name). The query lane (`queries.ts`) already prints `par` with no prefix, so the two surfaces agree; no change there. One composition point, so every named plane (π, π1, π3, …) is covered, not the one spelling.
+
+**Locks.** `src3d/__tests__/data-view.test.ts` (#2820 block: the report's exact rows; a box's «מישור ABCD» keeps «ABCD: π = …»; beside a named π the generated π1 keeps its prefix) and `fixtures3/plane-named-pi-2820.geo3.json`.
+
+**Behaviour change for a student:** the data panel's parametric row for a plane he named reads «π = …» with the name once.

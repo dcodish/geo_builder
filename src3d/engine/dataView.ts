@@ -1422,8 +1422,12 @@ export function dataView(c: Construction3, seed: Seed3): DataPanel {
   const pointKnown = (id: Id): boolean => !!pointComps[id] && pointComps[id].every((v) => !v.includes('?'));
   const planeRows = (name: string, eq: { x: number; y: number; z: number; d: number }): void => {
     planes.push(`${name}: ${planeEqStr(eq)}`);
-    const par = parametricPlaneForm(eq, { run: c.pointPlanes.get(name), positions, pointKnown }, symbols.get(name) ?? 'π');
-    if (par) planes.push(`${name}: ${par}`);
+    const symbol = symbols.get(name) ?? 'π';
+    const par = parametricPlaneForm(eq, { run: c.pointPlanes.get(name), positions, pointKnown }, symbol);
+    // #2820 (ADR-3D-482): the parametric form already opens with the plane's symbol (ADR-3D-187). The
+    // `name:` prefix earns its place only when it says something the symbol does not («ABCD: π = …»); when
+    // the name IS the symbol (a plane the student called π) it would print the name twice, «π: π = …».
+    if (par) planes.push(symbol === name ? par : `${name}: ${par}`);
   };
   if (anchoredAxes.size > 0) { // #315: a plane equation's d-term is translation-dependent — same anchor requirement, per axis (#2340)
     // #487 (ADR-3D-124): a FREE plane joins the same multi-sample gate — while unpinned it RESAMPLES,

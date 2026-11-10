@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2820 (ADR-3D-482) — the report: the data panel printed «π: π = …» for a plane the student named π. The row is asserted
+  // in data-view.test.ts; this is the build + drift + load net.
+  'plane-named-pi-2820.geo3.json': ['מישור π 2x+y=1'],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],
