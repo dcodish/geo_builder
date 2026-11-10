@@ -1019,6 +1019,16 @@ shapes the first one found (a flat ring's mirror is its turn-over, so the root s
 slid by the settle and never reaches the fan. Quadrilaterals and pentagons are not fanned (measured: 2-D
 differs per figure, and the fan cost 2.8× / 8×). `ssaFanStats` counts runs and roots found.
 
+**A determined shape's reflected roots are reached from the found one** (#2814, [ADR-3D-461](06b-decisions-3d.md#adr-3d-461)).
+The same gate for any other shape (`nDims > 0`, no coupled symbol, not a plane drive, settle did not move the dims,
+dims off the sample): each DRIVEN dim (off its sample, non-zero) is negated in turn, from the found solution, and
+the primary residuals are solved; only when none of those finds a root is the all-driven-dims reflection tried. An
+exact, open, member-holding result is settled (`settleFreeDims`, skipped when no dim is at its sample) and joins the
+pool after the found root when its dims are new. A reflected start, or a solved root, whose DETERMINED points (those no
+free dim moves) are CONGRUENT to the found one's (`congruentShapes3`, a reflection included: a rectangle or box turned
+over; a fixed vertex mirrored over a side beside a free one) is the found root's mirror twin: never solved, never pooled. A dim still at its sample is never reflected (it is free; reflecting it pooled points of a continuum).
+The second mirror tries only the first mirror's found dims. `dimsFanStats` counts runs, LM starts and roots found.
+
 **The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
 `claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit
@@ -1240,7 +1250,7 @@ asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m
 
 **Two configurations print as one «או» row ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506; [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867).**
 `twoConfigurations3` (`dataView.ts`) asks whether a not-fully-determined point has EXACTLY two members
-(`sameConfig`) — the same two at every sample, the drawn one among them, judged beside #827's
+(`samePointConfig3`, `configs3.ts`, the one predicate the pivot pick also uses) — the same two at every sample, the drawn one among them, judged beside #827's
 `pivot.pointRoots` check. If so `points` carries one row `S(…) או (…)`, each configuration printed whole by
 `coordStr`, instead of `S(?, 7/2, ?)`, and `pointOptions[id]` carries the same text for the ask lane's point
 answer; `pointCoords` keeps the partial form; anything else returns `null`. The ask lane answers either text
@@ -1249,6 +1259,16 @@ and a `params` row carries `value` beside `text` for the same reason ([ADR-3D-33
 The vector answer (`vectorForms`, `queries.ts`) skips the decomposition when a NAMED atom decomposes to the unit
 vector on its own name (`isUnitOn`): a basis vector asked by its name answers only its coordinates, or nothing
 (the undetermined note) without a frame; a pair keeps its decomposition ([ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072).
+
+**The pivot pick is over DISTINCT configurations** (#2814, [ADR-3D-461](06b-decisions-3d.md#adr-3d-461)). `applySolutions` (`evaluate.ts`)
+reads each admissible solution's drawn positions (`finalFrameOf`) plus its pin-symbol values and orders the pool with
+`configurationOrder3` (`configs3.ts`): exact repeats dropped (`sameConfiguration3`), the rest grouped by discrete root —
+the intrinsic shape, every point in the frame of its first three non-collinear points, which a proper rigid motion
+keeps and a reflection of a non-flat figure does not — groups in canonical order (larger on the first differing
+component), interleaved round-robin. `chosen = distinct[seed % n]`; `pivot.solutions` and `pointRoots` read the
+distinct list. The drive's warm start stays the SOLVER-order entry `solverOrder[seed % n]` (moving it changed stage
+4's drive start and lost the #1769 prism's k = −1 root). So consecutive configurations alternate the roots, and a
+change to LM start noise cannot move which configuration a seed draws.
 
 ## The submit decision and refusals
 

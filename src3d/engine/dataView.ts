@@ -16,6 +16,7 @@
  */
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
+import { CONFIG_DEDUP_REL, samePointConfig3 } from './configs3';
 import { seedNumber3, type Seed3 } from './components3';
 import { givenText } from '../../shell/literal';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
@@ -670,18 +671,12 @@ const rootsAgree = (a: number, b: number, scale: number): boolean =>
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
 /**
- * #1506 (ADR-3D-289) — the dedup tolerance for "are these two pool entries the SAME configuration?".
- *
- * Wider than {@link rootsAgree} on purpose: that asks whether two roots agree on a COORDINATE (a
- * knowledge claim, so it is tight); this asks whether two entries are one configuration counted twice
- * (the pool holds byte-identical and solver-scattered repeats), and two genuinely different
- * configurations are separated by far more than 1e-3 of the point's size.
+ * #1506 (ADR-3D-289) — "are these two pool entries the SAME configuration?". Wider than {@link rootsAgree} on
+ * purpose: that asks whether two roots agree on a COORDINATE (a knowledge claim, so it is tight); this asks whether
+ * two entries are one configuration counted twice. #2814 (ADR-3D-461): ONE predicate, shared with the pivot's pick
+ * (`configs3.ts`), so the drawing and this row count configurations the same way.
  */
-const CONFIG_DEDUP_REL = 1e-3;
-const sameConfig = (a: Vec3, b: Vec3): boolean => {
-  const tol = CONFIG_DEDUP_REL * Math.max(rootScale(a), rootScale(b));
-  return Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.z - b.z) <= tol;
-};
+const sameConfig = samePointConfig3;
 
 /** One sample's view of a point, for {@link twoConfigurations3}: the admissible pool's positions
  *  (`pivot.pointRoots[id]`, absent when the pool holds one solution) and the position actually drawn. */

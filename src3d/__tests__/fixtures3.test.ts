@@ -29,6 +29,13 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2814 (ADR-3D-461) — the operator's #827 exam pyramid, p = ±4 with no sign: the row lists both configurations at every
+  // seed and presses alternate them. The sweep over seeds 0–23 is asserted in issue-827.test.ts and the pool in
+  // engine/__tests__/pivot3.test.ts; this is the build + drift + load net.
+  'pyramid-two-branch-827-2814.geo3.json': [
+    'פירמידה SABCD שבסיסה מקבילית', 'המקצוע SA הוא גובה בפירמידה', 'M אמצע אלכסון BD', 'נסמן: AB = u, AD = v, AS = w',
+    'A(0,0,0)', 'B(0,5,0)', 'S(0,0,6)', 'D(3,p,0)', '|u| = |v|',
+  ],
   // #2789 (ADR-3D-457) — the report: a size beside a point on the positive x-axis was refused size-on-solid, and the cube sat with
   // P on edge AB. The size, the axis and the sampled placement are asserted in placement-gauge.test.ts; this is the build + drift + load net.
   'cube-size-half-axis-2789.geo3.json': ["קובייה ABCDA'B'C'D'", 'P נמצא על החלק החיובי של ציר ה-x', 'אורך AB = 4'],

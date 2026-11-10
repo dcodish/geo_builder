@@ -12,6 +12,7 @@ import { quadDrawnDegenerate } from '../baseShapes';
 import { pointParents3 } from '../carriers';
 import { emptyConstruction3, type Command3, type Construction3, type SolidCommand } from '../types';
 import { cross3, dist3, dot3, lerp3, norm3, sub3, v3 } from '../vec3';
+import { configurationOrder3, congruentShapes3, intrinsicShape3, sameConfiguration3, type PoolConfig3 } from '../configs3';
 
 const CUBE_IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
 const PRISM_IDS = ['A', 'B', 'C', "A'", "B'", "C'"];
@@ -570,5 +571,50 @@ describe('stability (first-class regression)', () => {
     for (const id of CUBE_IDS) {
       expect(p1.get(id)).toEqual(p0.get(id));
     }
+  });
+});
+
+describe('#2814 — the pivot pick is over DISTINCT configurations, in an order the configurations decide (ADR-3D-461)', () => {
+  type P = [string, [number, number, number]][];
+  const cfg = (pts: P, pinSymbols?: Record<string, number>): PoolConfig3 => ({ pos: new Map(pts.map(([id, [x, y, z]]) => [id, v3(x, y, z)])), pinSymbols });
+  // the #827 pyramid's two roots (D at y = ±4), each found more than once (both mirrors, several starts)
+  const plus = (eps = 0): PoolConfig3 => cfg([['A', [0, 0, 0]], ['B', [0, 5, 0]], ['D', [3, 4 + eps, 0]], ['S', [0, 0, 6]]]);
+  const minus = (eps = 0): PoolConfig3 => cfg([['A', [0, 0, 0]], ['B', [0, 5, 0]], ['D', [3, -4 + eps, 0]], ['S', [0, 0, 6]]]);
+
+  it('exact repeats are dropped (one configuration counted twice is one)', () => {
+    const pool = [plus(), plus(1e-6), minus(), plus(), minus(2e-6)];
+    const order = configurationOrder3(pool);
+    expect(order).toHaveLength(2);
+    expect(sameConfiguration3(pool[order[0]], pool[order[1]])).toBe(false);
+  });
+
+  it('the order is independent of the pool order: any shuffle picks the same configuration per index', () => {
+    const pools = [[plus(), minus(), plus()], [minus(), plus(), minus()], [minus(), minus(), plus()]];
+    const picked = pools.map((pool) => configurationOrder3(pool).map((i) => pool[i].pos.get('D')!.y.toFixed(0)).join(','));
+    expect(new Set(picked).size).toBe(1);
+  });
+
+  it('two placements of ONE shape (SSA\'s two mirrors of a flat triangle) fall in one group; two roots alternate', () => {
+    const tri = (cy: number, flipZ: number): PoolConfig3 => cfg([['A', [0, 0, 0]], ['B', [5, 0, 0]], ['C', [cy, 0, flipZ]]]);
+    expect(intrinsicShape3(tri(2, 3)).map((v) => +v.toFixed(9) || 0)).toEqual(intrinsicShape3(tri(2, -3)).map((v) => +v.toFixed(9) || 0));
+    // pool: root 1 in two placements, root 2 in two placements → root1, root2, root1, root2
+    const pool = [tri(2, 3), tri(2, -3), tri(4, 1), tri(4, -1)];
+    const order = configurationOrder3(pool);
+    expect(order).toHaveLength(4);
+    const root = (i: number) => pool[i].pos.get('C')!.x;
+    expect(root(order[0])).not.toBe(root(order[1]));
+    expect(root(order[0])).toBe(root(order[2]));
+  });
+
+  it('pin-symbol values join the configuration: equal positions with different roots are two', () => {
+    const order = configurationOrder3([plus(), cfg([...plus().pos].map(([id, q]) => [id, [q.x, q.y, q.z]]) as P, { k: 2 })]);
+    expect(order).toHaveLength(2);
+  });
+
+  it('congruence up to reflection: a rectangle turned over is its own mirror twin, a different parallelogram is not', () => {
+    const rect = (s: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(1, 0, 0)], ['C', v3(1, s * 2.6, 0)], ['D', v3(0, s * 2.6, 0)]]);
+    expect(congruentShapes3(rect(1), rect(-1))).toBe(true);
+    const par = (dx: number) => new Map([['A', v3(0, 0, 0)], ['B', v3(5, 0, 0)], ['C', v3(5 + dx, 4, 0)], ['D', v3(dx, 4, 0)]]);
+    expect(congruentShapes3(par(3), par(-3))).toBe(false);
   });
 });

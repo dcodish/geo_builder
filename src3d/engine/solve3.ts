@@ -19,6 +19,7 @@
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
+import { congruentShapes3 } from './configs3';
 import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -677,6 +678,8 @@ export function symmetricEigen(a0: readonly (readonly number[])[]): { values: nu
 const FLAT_RING_FAN: readonly (readonly [number, number])[] = [[0.25, 0.2], [0.75, 0.2], [0.5, 0.45], [-0.4, 0.5], [1.4, 0.5]];
 /** #2714 (docs/17 §9): exercised counters — how often the fan ran on a determined flat ring, and the roots it added. */
 export const ssaFanStats = { runs: 0, found: 0 };
+/** #2814 (ADR-3D-461, docs/17 §9): the driven-dims fan's counters — calls it ran on, LM starts it paid, roots it added. */
+export const dimsFanStats = { runs: 0, tries: 0, found: 0 };
 
 /**
  * The pivot's canonical evaluator. `reseat` (#2798, ADR-3D-456) re-derives the figure's MIXED points (`figureLanes3`) in
@@ -2503,6 +2506,8 @@ export function solvePivot(
   const reseatStages: (() => void)[] = [];
   /** #2714 (ADR-3D-447): the shapes the first mirror's fan found — the second mirror tries only these. */
   let fanShapes: number[][] | null = null;
+  /** #2814 (ADR-3D-461): the dims the first mirror's driven-dims fan found — the second mirror tries only these. */
+  let dimsFanRoots: number[][] | null = null;
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -2932,6 +2937,91 @@ export function solvePivot(
         results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), err, x: [...sx] });
       };
       pushSolution(bx, bestAccept);
+      /**
+       * #2814 (ADR-3D-461, generalises ADR-3D-447 beyond a lone flat ring) — A DETERMINED SHAPE'S REFLECTED ROOTS,
+       * reached WARM from the found solution.
+       *
+       * Off the pooled path the first exact cold start ends this mirror's search, and every cold start carries the
+       * dims at the seed's one sample — so when the givens determine a dim up to sign, only the sign the sample's
+       * basin falls into is found. The operator's #827 exam pyramid («D(3,p,0)» · «|u| = |v|», p = ±4): the ±4
+       * pair lives in the parallelogram's one shape dim, and the pool carried only +4 at 10 of 24 seeds — the
+       * panel then printed «D(3, 4, 0)», a branch value as knowledge (ADR-3D-194), and «הציגו תצורה אחרת» could
+       * not reach −4. The #797 walk (pin symbols), the #818 walk (a stated sign, failure path) and the #2714 fan
+       * (a lone flat ring) each cover a neighbour of this case, never this one.
+       *
+       * The gate is #2714's determinedness signal: the #1854 settle could not move the dims and they are off the
+       * seed's sample. Within it only a DRIVEN dim is reflected (off its sample, non-zero): a dim still at its
+       * sample is free, and reflecting it pools points of a continuum (measured: «מלבן ABCD · AD=2*√7» drew
+       * AB = 20.08). Each start is the found solution with the driven dim(s) negated, solved on the givens' rows;
+       * an exact, open, member-holding result is SETTLED (a free dim the reflection disturbed goes back to the
+       * sample) and joins after the found root when its dims are new. The second mirror tries only the first
+       * mirror's found dims, so the fan is never paid twice. A free figure never reaches the gate and pays 0.
+       *
+       * Cost (docs/17 §7; measured, the plan's 2.7× on «מלבן ABCD · AB=1 · AD=√7» is the reason for each):
+       *  - a reflected start, or a solved root, whose DETERMINED points (those no free dim moves) are CONGRUENT to the
+       *    found one's, a reflection included, is the found root's mirror twin, which the mirror pass owns — a twin
+       *    start is never solved and a twin root never pooled (a rectangle, a box, a right pyramid turned over; a
+       *    quadrilateral's fixed C mirrored over AB with D free, which grew a pool 2 → 4 and a seed search 9 → 36);
+       *  - the all-driven-dims start runs only when no single-dim start found a root;
+       *  - a fully determined base (no dim at its sample) skips the settle — it has no free dim to return.
+       */
+      if (!flatRingDims && nDims > 0 && nSym === 0 && !planeDrive) {
+        const settleMoved = bx.slice(7, 7 + nDims).some((v, i) => Math.abs(v - parked[7 + i]) > 1e-7);
+        if (!settleMoved && dimOffset(bx) > 1e-6) {
+          dimsFanStats.runs++;
+          const base = bx.slice(7, 7 + nDims);
+          const kept: number[][] = [base];
+          const anyFree = base.some((v, i) => Math.abs(v - dims0[i]) <= 1e-6);
+          // the points a FREE dim moves are left out of the twin test: a free dim absorbs whatever the reflection did
+          // to them, so the root is a twin when the points the givens DETERMINE are congruent (a quadrilateral's fixed
+          // C mirrored over AB, with D free, is the mirror pass's figure, not a new configuration)
+          const freeDep = new Set<Id>();
+          const base0 = evalCanonical(base, undefined, riderMap(bx));
+          for (let i = 0; i < nDims; i++) {
+            if (Math.abs(base[i] - dims0[i]) > 1e-6) continue;
+            const nudged = [...base];
+            nudged[i] += 1e-3 * Math.max(1, Math.abs(base[i]));
+            for (const [id, q] of evalCanonical(nudged, undefined, riderMap(bx))) {
+              const p = base0.get(id);
+              if (!p || norm3(sub3(q, p)) > 1e-9) freeDep.add(id);
+            }
+          }
+          const determined = (pos: Positions3): Positions3 => new Map([...pos].filter(([id]) => !freeDep.has(id)));
+          const baseShape = determined(base0);
+          const twin = (dims: number[]): boolean => congruentShapes3(determined(evalCanonical(dims, undefined, riderMap(bx))), baseShape);
+          const tryDims = (dims: number[]): number[] | null => {
+            if (twin(dims)) return null; // a mirror twin, known before solving
+            dimsFanStats.tries++;
+            const x0 = [...bx];
+            for (let i = 0; i < nDims; i++) x0[7 + i] = dims[i];
+            const r = leastSquares(fPrimary, x0);
+            if (degenerate(r.x) || primaryErr(r.x) >= ACCEPT || !membersHold(mirror, r.x)) return null;
+            const sx = anyFree ? settleFreeDims(r.x) : r.x;
+            const d = sx.slice(7, 7 + nDims);
+            if (kept.some((q) => q.every((v, i) => Math.abs(v - d[i]) < 1e-4)) || twin(d)) return null; // …or once solved
+            kept.push(d);
+            dimsFanStats.found++;
+            pushSolution(sx, primaryErr(sx));
+            return d;
+          };
+          if (dimsFanRoots) {
+            for (const d of dimsFanRoots) tryDims(d);
+          } else {
+            const found: number[][] = [];
+            const driven = base.map((_, i) => i).filter((i) => Math.abs(base[i]) > 1e-6 && Math.abs(base[i] - dims0[i]) > 1e-6);
+            const reflect = (set: number[]): number[] => base.map((v, i) => (set.includes(i) ? -v : v));
+            for (const i of driven) {
+              const d = tryDims(reflect([i]));
+              if (d) found.push(d);
+            }
+            if (found.length === 0 && driven.length > 1) {
+              const d = tryDims(reflect(driven));
+              if (d) found.push(d);
+            }
+            dimsFanRoots = found;
+          }
+        }
+      }
       /**
        * #2714 (ADR-3D-447) — A DETERMINED FLAT RING'S OTHER DISCRETE ROOTS, reached FROM THE FOUND SOLUTION.
        *
