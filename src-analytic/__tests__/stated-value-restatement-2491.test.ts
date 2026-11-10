@@ -8,7 +8,7 @@
  * adds something the student can SEE. Ruling 2026-10-24 (card e18, A): an area restated is recorded and shown too.
  */
 import { describe, expect, it } from 'vitest';
-import { addsStatedValue, decideSubmit } from '../app/submit';
+import { addsStatedValue, decideSubmit, isHeld } from '../app/submit';
 import { derive } from '../engine/derive';
 import { depsPrecedeDependents } from '../engine/carriers';
 
@@ -63,15 +63,15 @@ describe('#2491 — the class: a value the figure already satisfies records and 
 });
 
 const CONTROLS: Array<[string, string[], string]> = [
-  ['the same value twice', ['A(0,0)', 'B(4,0)', 'AB = 4', 'AB = 4'], 'already-known'],
-  ['a right angle twice', ['משולש ABC', '∢ABC = 90', '∢ABC = 90'], 'already-known'],
-  ['«∢ABC = 90» after «AB ⟂ BC» (the knee is already drawn)', ['משולש ABC', 'AB ⟂ BC', '∢ABC = 90'], 'already-known'],
-  ['«AB ⟂ BC» after «∢ABC = 90»', ['משולש ABC', '∢ABC = 90', 'AB ⟂ BC'], 'already-known'],
-  ['a radius twice', ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 5'], 'already-known'],
-  ['a line that states no value', ['A(0,0)', 'B(4,0)', 'B נמצא על ציר ה-x'], 'already-follows'],
-  ['another spelling of a value already shown', ['קטע AB', 'AB=a+3', 'AB=3+a'], 'already-follows'],
+  ['the same value twice', ['A(0,0)', 'B(4,0)', 'AB = 4', 'AB = 4'], 'record'],
+  ['a right angle twice', ['משולש ABC', '∢ABC = 90', '∢ABC = 90'], 'record'],
+  ['«∢ABC = 90» after «AB ⟂ BC» (the knee is already drawn)', ['משולש ABC', 'AB ⟂ BC', '∢ABC = 90'], 'record'],
+  ['«AB ⟂ BC» after «∢ABC = 90»', ['משולש ABC', '∢ABC = 90', 'AB ⟂ BC'], 'record'],
+  ['a radius twice', ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 5'], 'record'],
+  ['a line that states no value', ['A(0,0)', 'B(4,0)', 'B נמצא על ציר ה-x'], 'record'],
+  ['another spelling of a value already shown', ['קטע AB', 'AB=a+3', 'AB=3+a'], 'record'],
   // A ⟂ knee is a relation, never a value key (ADR-AG-401; #2704 counts only a knee stated as an angle value).
-  ['a perpendicularity the pinned points already have', ['A(0,0)', 'B(4,0)', 'C(0,3)', 'AB', 'AC', 'AB מאונך ל-AC'], 'already-follows'],
+  ['a perpendicularity the pinned points already have', ['A(0,0)', 'B(4,0)', 'C(0,3)', 'AB', 'AC', 'AB מאונך ל-AC'], 'record'],
 ];
 
 describe('#2491 — a line whose value is already shown, or that states none, keeps the no-op answer', () => {
@@ -132,7 +132,7 @@ describe('#2704 — a right angle stated as an angle value records and draws its
   });
 
   it('«AB ⟂ BC» (a no-op) then «∢ABC = 90» on a square records', () => {
-    expect(decideSubmit('AB ⟂ BC', ['ריבוע ABCD'], 0).kind).toBe('already-follows');
+    expect(isHeld(decideSubmit('AB ⟂ BC', ['ריבוע ABCD'], 0))).toBe(true);
     expect(decideSubmit('∢ABC = 90', ['ריבוע ABCD'], 0).kind).toBe('record');
   });
 
@@ -152,12 +152,12 @@ describe('#2704 — a right angle stated as an angle value records and draws its
 });
 
 const SPOKEN_CONTROLS: Array<[string, string[], string]> = [
-  ['«AB ⟂ BC» on a square', ['ריבוע ABCD', 'AB ⟂ BC'], 'already-follows'],
-  ['«AB מאונך ל-BC» on a square', ['ריבוע ABCD', 'AB מאונך ל-BC'], 'already-follows'],
-  ['«∢ABC = 90» twice', ['משולש ABC', '∢ABC = 90', '∢ABC = 90'], 'already-known'],
-  ['«AB ⟂ BC» then «∢ABC = 90» (the knee is already drawn)', ['משולש ABC', 'AB ⟂ BC', '∢ABC = 90'], 'already-known'],
-  ['«∢ABC = 90» then «AB ⟂ BC»', ['משולש ABC', '∢ABC = 90', 'AB ⟂ BC'], 'already-known'],
-  ['«זווית B ישרה» after «∢ABC = 90»', ['משולש ABC', '∢ABC = 90', 'זווית B ישרה'], 'already-known'],
+  ['«AB ⟂ BC» on a square', ['ריבוע ABCD', 'AB ⟂ BC'], 'record'],
+  ['«AB מאונך ל-BC» on a square', ['ריבוע ABCD', 'AB מאונך ל-BC'], 'record'],
+  ['«∢ABC = 90» twice', ['משולש ABC', '∢ABC = 90', '∢ABC = 90'], 'record'],
+  ['«AB ⟂ BC» then «∢ABC = 90» (the knee is already drawn)', ['משולש ABC', 'AB ⟂ BC', '∢ABC = 90'], 'record'],
+  ['«∢ABC = 90» then «AB ⟂ BC»', ['משולש ABC', '∢ABC = 90', 'AB ⟂ BC'], 'record'],
+  ['«זווית B ישרה» after «∢ABC = 90»', ['משולש ABC', '∢ABC = 90', 'זווית B ישרה'], 'record'],
 ];
 
 describe('#2704 — a relation, or a knee already drawn, keeps the no-op answer', () => {

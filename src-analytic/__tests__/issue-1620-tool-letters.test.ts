@@ -91,7 +91,7 @@ describe('one point, one name (#1153), and stable letters', () => {
     expect(fig(['משולש ABC', 'D אמצע BC', 'תיכון מ-A במשולש ABC']).figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
     expect(fig(['משולש ABC', 'D אמצע BC', 'תיכון מ-A במשולש ABC']).minted).toEqual([]);
     expect(fig(['משולש ABC', 'האנך מ-A ל-BC', 'גובה מ-A במשולש ABC']).figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'H']);
-    expect(verdictKey(['משולש ABC', 'גובה מ-A במשולש ABC', 'גובה מנקודה A'])).toBe('already-known');
+    expect(verdictKey(['משולש ABC', 'גובה מ-A במשולש ABC', 'גובה מנקודה A'])).toBe('record');
   });
 
   it('a later NAME for the tool’s point takes the tool’s letter over: one point D, no notice (#2674)', () => {

@@ -15,12 +15,12 @@
 import { knowledgeSamples3, letterIsGaugeLength3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { seedNumber3, type Seed3 } from './components3';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, pointPlaneRow3, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, pointPlaneRow3, branchAnswer, decompStr, lineEquationForms3, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { revolutionMeasure } from './claims';
-import { angleAskOperands, componentAskOf, foldPrimes3, membershipQuestion3, revolutionAskOf } from '../parser/parse3';
+import { angleAskOperands, componentAskOf, foldPrimes3, lineAskOf, membershipQuestion3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
 import { namedVector3 } from './vecExpr';
@@ -63,6 +63,9 @@ type Query =
   // #317: «מישור ABC» / «plane ABC» / a named plane — its canonical equation, when it is forced.
   // The exam's «מצאו את משוואת המישור» asked as a QUESTION instead of entered as a figure-changing fact.
   | { kind: 'plane'; name: string | null; ids: Id[] | null }
+  // #1541 (ADR-3D-475): «משוואת BB'» / «משוואת הישר ℓ» — a line's equation, read by the statement grammar
+  // (`lineAskOf`). A POINT PAIR is answered from its two points; a NAMED line from the canvas echo's decision.
+  | { kind: 'line'; name: string; pair: [Id, Id] | null }
   // #2062 (ADR-3D-480): «האם הנקודה M נמצאת במישור AEC?» — answered by pointing at the panel's point × plane row.
   | { kind: 'membership'; point: Id; plane: string };
 
@@ -138,6 +141,7 @@ function vectorAtoms(q: Query): Atom[] {
     case 'point':
     case 'component':
     case 'plane':
+    case 'line':
     case 'membership':
       return [];
     default: {
@@ -382,6 +386,7 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (c.planes.has(nm) || c.pointPlanes.has(nm) || c.relPlanes.has(nm)) return { kind: 'plane', name: nm, ids: null };
   }
 
+
   // #1547 — ONE COORDINATE: the statement grammar's frame with its value dropped. The point must BE a
   // point of this construction, exactly as the whole-point head below demands.
   {
@@ -405,6 +410,15 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   if (combo) return { kind: 'combo', terms: combo, mag: false };
   const va = atomOf(c, bare);
   if (va) return { kind: 'vector', a: va };
+
+  // #1541 (ADR-3D-475) — LINE: «משוואת BB'», «משוואת הישר AB», «הישר ℓ», "the equation of line AB" — the
+  // plane head's sibling, read BY the statement grammar (SAYABLE ⇒ ASKABLE, ADR-3D-279), never a private regex.
+  // After the vector head: the statement grammar also lowers «וקטור AB היא x = …» to a line, and «וקטור AB»
+  // has always been the vector question — a reader added later never takes an established answer.
+  {
+    const ln = lineAskOf(s);
+    if (ln) return { kind: 'line', name: ln.name, pair: ln.pair };
+  }
 
   // SYMBOL: a bare parameter letter the figure carries — «t» from «AE=t·AS», a pin's open symbol, or the
   // algebraic lane's parameter «m» (NOT a declared vector — those became a vector query above). Its solved
@@ -482,6 +496,7 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
     case 'point':
     case 'component':
     case 'plane':
+    case 'line':
     case 'membership':
       return null;
     case 'distance': {
@@ -670,6 +685,44 @@ function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind
     }
   }
   return { text, answer: parts.length > 0 ? parts.join(' · ') : null, note: 'noFrame' };
+}
+
+/**
+ * #1541 (ADR-3D-475) — a LINE's equation, asked.
+ *
+ * A NAMED line answers from the SAME decision the canvas echo makes (`lineEquationForms3`, the #481 rule):
+ * a stated line is the student's own given; a derived one prints numbers only when they are knowledge.
+ *
+ * A POINT PAIR answers `x = P + t·PQ` — anchored at the first-named point, the direction the pair's own
+ * vector, unreduced (operator ruling, 2026-09-29: "as given"; it is the «BB'» answer one row away). It is
+ * knowledge only when BOTH points are, by the panel's own per-component decision (the plane's parametric
+ * form asks the same `pointComps`), and only on a figure with a coordinate frame — the plane's #315/#813
+ * gate, with the note worded about a line.
+ */
+function lineAnswer(c: Construction3, text: string, q: Extract<Query, { kind: 'line' }>, seed: Seed3): Answer3 {
+  if (!q.pair) {
+    const resolved = resolve3(c, seed);
+    if (!resolved.lines.has(q.name)) return { text, answer: null, note: 'noObject' };
+    const form = lineEquationForms3(c, resolved)(q.name);
+    return form ? { text, answer: form } : { text, answer: null, note: 'undetermined' };
+  }
+  const [p, r] = q.pair;
+  if (!c.points.has(p) || !c.points.has(r)) return { text, answer: null, note: 'unavailable' };
+  if (translationAnchoredAxes3(c).size === 0) return { text, answer: null, note: 'noFrameLine' };
+  const comps = dataView(c, seed).pointComps;
+  const known = (id: Id): boolean => !!comps[id] && comps[id].every((v) => !v.includes('?'));
+  if (!known(p) || !known(r)) return { text, answer: null, note: 'undetermined' };
+  // …and the numbers themselves agree across the sampled configurations (a stated SYMBOL «B(1, t, 2)» is no
+  // '?' to the panel, but its sampled value is one drawing, never a given — ADR-052)
+  const per = knowledgeSamples3(c, querySeeds3(seed), RB).map((x) => [x.positions.get(p), x.positions.get(r)] as const);
+  if (per.some(([u, v]) => !u || !v)) return { text, answer: null, note: 'unavailable' };
+  const [a, b] = per[0] as readonly [Vec3, Vec3];
+  const near = (u: Vec3, v: Vec3): boolean => norm3(sub3(u, v)) <= 1e-4 * Math.max(1, norm3(v));
+  if (!per.every(([u, v]) => near(u!, a) && near(v!, b))) return { text, answer: null, note: 'undetermined' };
+  const d = sub3(b, a);
+  // two names for one point span no line
+  if (norm3(d) <= 1e-9 * Math.max(1, norm3(a))) return { text, answer: null, note: 'undetermined' };
+  return { text, answer: `x = ${coordStr(a)} + t·${coordStr(d)}` };
 }
 
 /**
@@ -878,6 +931,8 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: Seed3): An
     // one representation per ROW — never joined by `|` (operator, 2026-08-30)
     return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };
   }
+
+  if (q.kind === 'line') return lineAnswer(c, text, q, seed);
 
   // #1449 — a solid of revolution answers from its STATED sizes through the claim verifier's formulas,
   // written as the exam writes it (100π). An unstated size is a free DOF (ADR-052), so undetermined.

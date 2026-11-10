@@ -80,7 +80,7 @@ export function registerShard(k: number, n: number): void {
           for (const verb of verbs) {
             for (const line of lines) {
               const v = decideSubmit(`${verb} ${line}`, context, 0);
-              if (v.kind === 'record' || v.kind === 'already-known' || v.kind === 'already-follows') {
+              if (v.kind === 'record') {
                 committed.push(`[${context.length}] ${verb} ${line} -> ${v.kind}`);
               }
             }

@@ -29,6 +29,22 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2814 (ADR-3D-461) — the operator's #827 exam pyramid, p = ±4 with no sign: the row lists both configurations at every
+  // seed and presses alternate them. The sweep over seeds 0–23 is asserted in issue-827.test.ts and the pool in
+  // engine/__tests__/pivot3.test.ts; this is the build + drift + load net.
+  'pyramid-two-branch-827-2814.geo3.json': [
+    'פירמידה SABCD שבסיסה מקבילית', 'המקצוע SA הוא גובה בפירמידה', 'M אמצע אלכסון BD', 'נסמן: AB = u, AD = v, AS = w',
+    'A(0,0,0)', 'B(0,5,0)', 'S(0,0,6)', 'D(3,p,0)', '|u| = |v|',
+  ],
+  // #2793 (ADR-3D-465) — the report: a solid's first vertex on half an axis was refused sign-unsatisfiable. The side, the slide and
+  // the other half-axes are asserted in placement-gauge.test.ts; this is the build + drift + load net.
+  'cube-vertex-half-axis-2793.geo3.json': ["קובייה ABCDA'B'C'D'", 'הקודקוד A נמצא על החלק החיובי של ציר ה-x'],
+  // #2799 (ADR-3D-464) — the report's buildable half: B and D on +x drew the cube at a point at five seeds of eight. Its normal
+  // size is asserted in issue-1860-flat-solid-refused.test.ts; this is the build + drift + load net.
+  'cube-diagonal-half-axis-2799.geo3.json': ["קובייה ABCDA'B'C'D'", 'הקודקוד B נמצא על החלק החיובי של ציר ה-x', 'הקודקוד D נמצא על החלק החיובי של ציר ה-x'],
+  // #2820 (ADR-3D-482) — the report: the data panel printed «π: π = …» for a plane the student named π. The row is asserted
+  // in data-view.test.ts; this is the build + drift + load net.
+  'plane-named-pi-2820.geo3.json': ['מישור π 2x+y=1'],
   // #2062 (ADR-3D-479, ADR-3D-480) — bagrut 03572 Q2 in the exam's own wording: the subject frame «הנקודה M מקיימת …» reads
   // as the bare «BM = …», and «מישור AEC» gives the panel its «M נמצאת במישור AEC» row (asserted in data-view.test.ts and
   // queries.test.ts); this is the build + drift + load net. The figure prefix «בסרטוט שלפניכם» is 3-D's parked #1679.
@@ -46,6 +62,10 @@ const SEEDED: SeededCorpus = {
   // cancels, so it reads as lengths and T is created free. The class is asserted in issue-1156-ratio-taught.test.ts; this is
   // the build + drift + load net.
   'new-point-equal-lengths-2804.geo3.json': ['מרובע ABCD', 'מעגל חוסם את ABCD', 'TA = TB'],
+  // #2806 (ADR-3D-462) — the report: a square beside one vertex on an axis, drawn shrunk to a dot (every line green) and
+  // 3.8 s to submit. The size, the square and the work count are asserted in issue-936-degenerate.test.ts; this is the
+  // build + drift + load net.
+  'square-vertex-axis-2806.geo3.json': ['ריבוע ABCD', 'הקודקוד A נמצא על ציר ה-x'],
   // #2707 (ADR-3D-445) — the report: two parallel planes on a blank canvas, which drew as a line and a dot at half the
   // seeds (a crossing read at machine precision). The predicate is asserted in engine/__tests__/lines3.test.ts; this is the build + drift + load net.
   'parallel-planes-free-2707.geo3.json': ['המישור ABCD מקביל למישור EFGH'],
@@ -567,6 +587,12 @@ const SEEDED: SeededCorpus = {
   // issue-1986-ring-search.test.ts; these are the build + drift net.
   'kite-dart-second-ring-1986.geo3.json': ['דלתון ABCD', 'מרובע ABDC'],
   'coord-letter-trapezoid-1986.geo3.json': ['A(k,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'D(3,3,0)', 'טרפז ABCD'],
+  // #2702 (ADR-3D-469) — the report and its unstated-base and prism siblings: a second ring over a solid's base letters is
+  // drawn on a dart base, where it was refused ring-crossed. The seat is asserted in engine3.test.ts, the class rows in
+  // scenarios3.test.ts; these are the build + drift + load net.
+  'pyramid-kite-dart-2702.geo3.json': ['פירמידה SABCD שבסיסה דלתון', 'מרובע ABDC'],
+  'pyramid-unstated-dart-2702.geo3.json': ['פירמידה SABCD', 'מרובע ABDC'],
+  'prism-quad-dart-2702.geo3.json': ["מנסרה ABCDA'B'C'D'", 'מרובע ABDC'],
   // #1542 (ADR-3D-429): the operator's exact sequence; the geometry, the chip and the lead are asserted in issue-1542.test.ts
   'plane-equation-sentence-1542.geo3.json': ["קוביה ABCDA'B'C'D'", "משוואת מישור A'B'C'D' היא x+4y-8z-126=0", 'B(0,7,8)'],
   // #2490 (ADR-3D-434): the operator's exact sequence (round #2466 T38) and #2478's — a pyramid over a base that already
@@ -574,6 +600,11 @@ const SEEDED: SeededCorpus = {
   // stability are asserted in engine3.test.ts; these are the build + drift net.
   'pyramid-on-cube-face-2490.geo3.json': ["קובייה ABCDA'B'C'D'", 'פירמידה ABCDS'],
   'pyramid-on-square-2478.geo3.json': ['ריבוע ABCD', 'פירמידה ABCDS שבסיסה ריבוע'],
+  // #2490 (ADR-3D-468; ADR-W-199) — a right pyramid over an existing ring fits the ring to its cyclic member: the
+  // operator's lines (a general quadrilateral becomes a cyclic one, never the rectangle) and Q-2490c (a stated rhombus
+  // becomes a square). The class rows are asserted in pyramid-base.test.ts; these are the build + drift + load net.
+  'right-pyramid-existing-quad-2490.geo3.json': ['מרובע ABCD', 'פירמידה ישרה ABCDS'],
+  'right-pyramid-rhombus-2490.geo3.json': ['מעוין ABCD', 'פירמידה ישרה ABCDS שבסיסה מעוין'],
   // #2703 (ADR-3D-443) — a dot product and a letter's value typed as decimals keep their spelling (before: «5/2», and
   // «k = ?» on the vec-defined point). The rows are asserted in data-view.test.ts; these are the build + drift net.
   'dot-given-decimal-2703.geo3.json': ['הווקטורים u ו-v', 'u·v = 2.5'],

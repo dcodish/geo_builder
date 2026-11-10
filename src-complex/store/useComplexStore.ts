@@ -110,10 +110,11 @@ export type InputError =
   | { key: 'reserved-constant'; detail: string; constant: ReservedConstant };
 
 /**
- * #2268 (ADR-CX-084) — a NOTE about the line just typed, not a refusal: the statement is true and the
- * figure already knew it, so nothing was recorded. 2-D's noop sentence; `detail` is the student's line.
+ * #2268 (ADR-CX-084) → #2790 ([ADR-CX-089](../../docs/06d-decisions-complex.md#adr-cx-089), ADR-W-200) — a NOTE about the
+ * line just typed, not a refusal: the statement is true and the figure already held it. The line is recorded as its own
+ * row and the note rides that commit; `detail` is the student's line.
  */
-export type InputNote = { key: 'already-known'; detail: string };
+export type InputNote = { key: 'already-held'; detail: string };
 
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as
@@ -177,7 +178,7 @@ interface ComplexState {
   seed: number;
   view: 'cart' | 'polar';
   lastError: InputError | null;
-  /** #2268 — the last line added nothing (already known); shown as a notice, cleared by the next step */
+  /** #2268 / #2790 — the last line restated what the figure already held; shown as a notice, cleared by the next step */
   lastNote: InputNote | null;
   /** The load audit (ADR-242, via shell/save): what the last load could NOT restore — the report
    *  the App shows so a dropped line is never silent. Null = nothing to report. */
@@ -192,7 +193,8 @@ interface ComplexState {
   serialize: () => SavedSession;
   // --- what `app/submit.ts` writes: the store records, it does not decide ---
   /** an ACCEPTED v2 line, with the configuration the gate found for it */
-  recordLine: (line: string, seed: number) => void;
+  /** #2790 (ADR-CX-089): `note` — the line was already held; the notice is set in the same commit that records it */
+  recordLine: (line: string, seed: number, note?: InputNote) => void;
   /**
    * UNDO / REDO (#1099) — the row member this builder was missing.
    *
@@ -205,7 +207,6 @@ interface ComplexState {
   undo: () => void;
   redo: () => void;
   setError: (e: InputError) => void;
-  setNote: (n: InputNote) => void;
   setLoadAudit: (a: LoadAudit<InputError> | null) => void;
   resetSession: () => void;
   restoreView: (v: {
@@ -291,10 +292,9 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
     };
   },
 
-  recordLine: (line, seed) =>
-    set(({ lines }) => ({ lines: [...lines, cleanLine(line)], seed, lastError: null, lastNote: null })),
+  recordLine: (line, seed, note) =>
+    set(({ lines }) => ({ lines: [...lines, cleanLine(line)], seed, lastError: null, lastNote: note ?? null })),
   setError: (lastError) => set({ lastError, lastNote: null }),
-  setNote: (lastNote) => set({ lastNote, lastError: null }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
   resetSession: () =>
     set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, lastNote: null, loadAudit: null }),

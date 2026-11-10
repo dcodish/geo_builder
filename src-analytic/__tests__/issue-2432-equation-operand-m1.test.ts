@@ -39,7 +39,7 @@ const L = 'נתון הישר l: 3x+4y=25';
 
 describe('#2432 — «משוואת המשיק היא <eq>» of an existing line means that line', () => {
   it('the reported two lines: no refusal, no internal id — the tangency already holds (r = 5 is the distance)', () => {
-    expect(verdicts([FIXED, L, 'משוואת המשיק היא 3x+4y=25'])).toEqual(['record', 'record', 'already-follows']);
+    expect(verdicts([FIXED, L, 'משוואת המשיק היא 3x+4y=25'])).toEqual(['record', 'record', 'record']);
   });
   for (const [lang, sentence] of [['he', 'משוואת המשיק היא 3x+4y=25'], ['en', 'the equation of the tangent is 3x+4y=25'], ['he', 'משוואת המשיק היא 6x+8y=50']] as const) {
     it(`${lang}: «${sentence}» on a free radius is a given about l — r = 5 at every seed, and l stays the one line`, () => {

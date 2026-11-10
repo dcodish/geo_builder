@@ -36,6 +36,20 @@ source of givens** ([02c](02c-requirements-analytic.md) P2/P3).
 (`y = mx + 8`), with no symbolic algebra. **`conic.ts` — equation → curve, plus the canonicity gate.** **`curves.ts` —
 curve geometry**: resolution, membership residuals and the renderer's polylines, pure.
 
+**The conic's frame** ([ADR-AG-455](06c-decisions-analytic.md#adr-ag-455), #2664). `classify` completes the square, so a
+parabola or an ellipse with axes parallel to the coordinate axes is read anywhere: `NumCurve` carries `h`, `k` (the
+centre or vertex) and, for a parabola opening along y, `axis: 'y'`. The fields are ABSENT on a curve at the origin
+opening along x, so a canonical curve is the same object with the same numbers as before. `engine/conicFrame.ts`, a
+leaf, is the one reader of the frame: `toLocal` / `toWorld` (a point), `vecFrame` (a direction: the swap only),
+`lineToWorld` and `canonicalOf`. Every closed form (the residual, the focus, the directrix, the foci, the role points,
+the walk of a straight in `lineQuadratic`, the normal and the conic-circle rows of `solve.ts`, the polyline, the extent)
+reads the point in the curve's frame and returns through it; none re-derives the offset. Two parabolas in different
+frames meet in up to four points and neither is closed, so `conicsMeet` walks the first along its own parameter over a
+span holding every crossing. The knowledge gate reads `h` and `k` at every configuration, absent as 0, and a
+parabola's axis is part of its family. `curveText.conicEquationText` is the one printer: vertex form when moved, today's
+text at the origin. «קנונית» rides on `Curve.canonical` to `classify`, which refuses a moved curve under it
+(`not-canonical`).
+
 ### The model — objects, and the register that makes them free
 
 The primitive is the **geometric object** ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)): a `Construction` is
@@ -414,7 +428,7 @@ Through a point, the noun «אנך» is the LINE: `case 'אנך'` teaches «הי
 `pointSpelling` (`app/pointOrder.ts`) teaches a point in a spelling the book does not use: «(3,5)A», «A = (3,5)» and a bare «(3,5)» ([ADR-AG-422](06c-decisions-analytic.md#adr-ag-422), #1774).
 `confirmTaught(lines, seed)` (`app/submit.ts`) is what the 471 ratchet calls.
 
-*Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`
+*Identifiers:* `record` · `imperativeCandidates` · `isHeld`
 
 A restatement is `known` when every fact of the line is absorbed in `applyFact`; a selector is compared by
 `selectorIdentity`, which reads a `distinct` selector as the SET it is, so a ring restated in another order is
@@ -1039,8 +1053,8 @@ Four one-side lines stay a solved `circle-at`.
 ### The same relations about the ellipse and the parabola ([ADR-AG-355](06c-decisions-analytic.md#adr-ag-355), #2618)
 
 **Parse: one curve-host atom.** `CONIC_NOUN_HE` / `CONIC_NOUN_EN` («אליפסה», «פרבולה») sit beside the circle phrase in the
-chord readers (`CHORD_CIRCLE_HE`, `CHORD_ONE_EN`, `CHORD_LIST_EN`), the diameter readers (the ellipse only: a parabola has
-no centre, #2625), the tangent noun (`TANGENT_HOST_HE/EN` → `readTangentNoun`), the from-point reader (`TANGENT_FROM_*`)
+chord readers (`CHORD_CIRCLE_HE`, `CHORD_ONE_EN`, `CHORD_LIST_EN`), the diameter readers (the parabola group refuses there, `parabola-no-diameter`: it has
+no centre, [ADR-AG-454](06c-decisions-analytic.md#adr-ag-454)), the tangent noun (`TANGENT_HOST_HE/EN` → `readTangentNoun`), the from-point reader (`TANGENT_FROM_*`)
 and the line-first order of `parseCircleAt`. The inscribed family adds `parseConicInscribed` after every circle reader,
 and «קודקודי ה<noun> XYZW נמצאים על <host>» (`VERTICES_ON_HE/EN`) is `cyclicFacts` on a circle and
 `conicInscribedFacts` on a conic. A conic takes no name or centre tail: the fact carries its kind as
@@ -1543,7 +1557,14 @@ of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions
 `walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over
 the sampler's domain clipped to ±`pinReach` (`GRID` points uniform in asinh; sign change or touching minimum, kept at
 `ROOT_EPS`), and `evaluateUncached`'s `seedPinRoots` seeds the chosen root before stage one — seed 0 the root nearest
-its sample, other seeds `ROOT_STREAM`; `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
+its sample, other seeds `ROOT_STREAM`; a DETERMINED BLOCK's roots are the same kind of axis
+([ADR-AG-451](06c-decisions-analytic.md#adr-ag-451)): when configuration 0 of an assignment converged with `carrierDof` 0 and an
+unknown no pin fixed, `blockRootsOf` lists the roots of its `carrierSystem` by deflated descent (`pinRoots.ts`
+`enumerateBlockRoots`: `BLOCK_STARTS` fixed nudges of the anchor × up to `BLOCK_ROUNDS`, every root found so far deflated,
+each candidate polished on the real residuals and judged — domains, free-direction signs, `admissibleAt`; directions
+mod π; at most `OPTION_CAP + 1`), memoised per (construction, assignment), and `steerToBlockRoot` starts configuration
+s ≥ 1 at admitted root ⌊jitter(s + `BLOCK_STREAM`)·n⌋, vertices and parameters both; configuration 0 is never steered,
+and a root past the anchor writes `;b<i>` into `rootKey`. `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.
@@ -2010,9 +2031,13 @@ conic, `solid` / `none` for a circle (a hidden circle also drops its centre cros
 
 ### The submit path's three answers ([ADR-AG-020](06c-decisions-analytic.md#adr-ag-020))
 
-`App.submit` dry-runs the list with the new line: `faulted` refuses, `created` / `narrowed` record, `known` gives a
-notice. The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
-because `absorbed` hid two events. **Before either no-op answer** (`already-known`, `already-follows`) the decision
+`App.submit` dry-runs the list with the new line: `faulted` refuses; `created` / `narrowed` record; `known` records too, as
+its own row with the already-held notice ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462), ADR-W-200). The effect is decided once, at the apply boundary, and carried by `fold` and `derive`; `narrowed` exists
+because `absorbed` hid two events. **Held lines** ([ADR-AG-462](06c-decisions-analytic.md#adr-ag-462)): a `known` outcome, or a line passing
+the #1063 entailment gate (`entailedGiven`: the given holds, the freedom did not drop, no tool assumption was pinned,
+true in every configuration, nothing gained but its operand ink, `inklessGained`), records with `notice.code`
+`already-held`, which `noticeText` words as `suite.notice.alreadyHeld`; `isHeld(verdict)` reads it. The fallback and
+the triage replay drop a model's held step, as they dropped the old no-row verdicts. **Before the held answer** the decision
 asks `addsStatedValue(current, trial)` (`app/submit.ts`): a trial whose stated-measure layer labels something the
 current figure's does not — keyed by what is labelled (segment, vertex and rays, ring, arc), never
 counted — records, so its value is drawn (2-D's ADR-542 visibility half; [ADR-AG-401](06c-decisions-analytic.md#adr-ag-401)).
@@ -2086,7 +2111,7 @@ answers them with a value, a trace and a `mark` `{ from, foot }`, drawn by `buil
 
 `app/submit.ts` (what a line DOES), `app/ask.ts` (what an answer IS), `app/answers.ts` (what the row list BECOMES): the
 component and the locks call the same pure function, `decideSubmit(raw, lines, seed, current)` →
-`'ignored'` / `'refused'` / `'already-known'` / `'already-follows'` / `'record'`. The mark rides on the `Answer` and is
+`'ignored'` / `'refused'` / `'record'` / `'teach'` / `'rename'` / `'swap'` (a held line is a `record`, ADR-AG-462). The mark rides on the `Answer` and is
 drawn only when the distance is knowledge; `asPair` gates a length offer.
 
 *Identifiers:* `src-analytic/app/` · `lines` · `derive(lines, seed)` · `ask`
@@ -2140,7 +2165,19 @@ CAS: measure → snap → verify on a ratio. The kind itself is read by `kindCon
 (#2608): the same `KIND_TOL`, without demanding rational coefficients. So חורף 25 now reads
 `(x − 16a)² + y² = (25a)²`.
 
-*Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic`
+**The same reader, for a value and a drawn curve ([ADR-AG-458](06c-decisions-analytic.md#adr-ag-458), #2735).** The
+monomial fit is one exported function, `readInLetters`, and the locus fit is one of its callers. `evaluate.ts`'s
+`letterPool` takes the admitted configuration pool (filled off the page, `'pending'` on a deferred one not yet
+complete), the student's letters that move across it (no tool symbol, at most two) and their values per
+configuration; `valueInLetters` reads a scalar (degree ≥ 1 only) and `curveEquationInLetters` a curve through
+`curveInLetters`. `withLetters` adds the result to an OPEN verdict as `Knowledge.letters`; only `pointKnowledge`
+(the panel's point rows and the ask point arm), `segmentKnowledge`'s length and the ask lane's bare length opt in, and
+`curveEquationOf` returns `{ letters }` after `known` and `options`. Printing: `lettersText` (a signed monomial),
+`pointText` (each coordinate a number or a monomial), `valueText`, `openCurveText(c, id, symbolic)` (a stated curve
+keeps its own equation) and `curveAnswer`, both through `symbolicLocusEquation`. The ask lane reads
+«הביעו באמצעות k את …» before every rule ([ADR-AG-459](06c-decisions-analytic.md#adr-ag-459)).
+
+*Identifiers:* `parametricShape` · `verifySymbolic` · `kindConic` · `KIND_TOL` · `MONO_TOL` · `MAX_LETTERS` · `symbolic` · `readInLetters` · `curveInLetters` · `valueInLetters` · `vectorInLetters` · `curveEquationInLetters` · `withLetters` · `pointKnowledge` · `lettersText` · `roleInLetters`
 
 #### Drawn is not named: an unnamed set is still drawn ([ADR-AG-380](06c-decisions-analytic.md#adr-ag-380), #2628)
 
@@ -2225,14 +2262,14 @@ or several.
 
 **A line stated again** ([ADR-AG-346](06c-decisions-analytic.md#adr-ag-346), #2584): both twin arms of `applyStatement` (the
 equation twin, `identicalCurve`; the construction twin, `lineAtTwin`) ask one verdict, `restatedLine`: known · rename
-(over the tool's l-number, or a carrier) · `already-named` (`holderKind: 'line'`) · `line-exists` (a new name for a drawn,
-unnamed line). `line-exists` reaches the submit path with the twin's id; `derive` adds the row that drew it
-(`declared`), and `parser/lineOffer.ts` writes «נסמן את <description> ב-<name>» from the `line-at`, kept only when
-`decideSubmit` would record it; `sentenceOutcome` pre-fills it. `name-line-object` (`parseNameLineObject`) is that
-sentence: its operand is any clause the grammar reads as one `line-at`; M1 builds or restates it and names it as
+(over the tool's l-number, or a carrier) · `already-named` (`holderKind: 'line'`) · `held-name` (a new name for a drawn,
+unnamed line: the line takes the name — `nameConstructedLine` for a `line-at`, the promotion arm for an equation line —
+and the outcome carries the `already-held` notice; [ADR-AG-463](06c-decisions-analytic.md#adr-ag-463), withdrawing T32's
+`line-exists` refusal and `parser/lineOffer.ts`). `name-line-object` (`parseNameLineObject`) names a line by its
+description: its operand is any clause the grammar reads as one `line-at`; M1 builds or restates it and names it as
 `name-line` does.
 
-*Identifiers:* `roleLineRef` · `perp-bisector` · `restatedLine` · `lineAtTwin` · `line-exists` · `name-line-object` · `lineOfferCandidate`
+*Identifiers:* `roleLineRef` · `perp-bisector` · `restatedLine` · `lineAtTwin` · `held-name` · `nameConstructedLine` · `name-line-object`
 
 #### It rides the ask lane, and widens one field
 

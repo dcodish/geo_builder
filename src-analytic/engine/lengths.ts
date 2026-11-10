@@ -100,7 +100,7 @@ export type MeasureTerm =
 export type RoleEnd = { p: Id } | { role: EllipseRole };
 
 /** The point a role end stands at, given the points and the ellipse's semi-axes. */
-export function roleEndAt(end: RoleEnd, at: (id: Id) => Pt | null, ellipse: { a: number; b: number } | null): Pt | null {
+export function roleEndAt(end: RoleEnd, at: (id: Id) => Pt | null, ellipse: { a: number; b: number; h?: number; k?: number } | null): Pt | null {
   if ('p' in end) return at(end.p);
   return ellipse ? ellipseRolePoint(ellipse, end.role) : null;
 }
@@ -586,7 +586,7 @@ export function evalLengthExpr(
    */
   lineAt?: (name: string) => { a: number; b: number; c: number } | null,
   /** Resolve a curve by id — an ellipse's role points (#2616) and a tangent's circle (#2620) need it; absent, such a term cannot be judged. */
-  curveAt?: (id: Id) => { kind: string; a?: number; b?: number; cx?: number; cy?: number; r?: number } | null,
+  curveAt?: (id: Id) => { kind: string; a?: number; b?: number; h?: number; k?: number; cx?: number; cy?: number; r?: number } | null,
 ): number | null {
   const bound: Record<string, number> = { ...env };
   for (let i = 0; i < le.terms.length; i += 1) {
@@ -625,7 +625,7 @@ export function evalLengthExpr(
       value = Math.abs(lu.c / nu - (flip * lv.c) / nv);
     } else if (term.kind === 'ellipse-dist') {
       const k = curveAt?.(term.curve) ?? null;
-      const e = k && k.kind === 'ellipse' && typeof k.a === 'number' && typeof k.b === 'number' ? { a: k.a, b: k.b } : null;
+      const e = k && k.kind === 'ellipse' && typeof k.a === 'number' && typeof k.b === 'number' ? { a: k.a, b: k.b, h: k.h, k: k.k } : null;
       const p = roleEndAt(term.u, at, e);
       const q = roleEndAt(term.v, at, e);
       if (!p || !q) return null;

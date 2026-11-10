@@ -139,7 +139,7 @@ describe('one circle — 2-D’s spellings', () => {
   });
 
   it('«מרכז המעגל» binds the circle the figure has, and draws one when there is none', () => {
-    expect(typed(['נתון מעגל', 'מרכז המעגל']).kinds).toEqual(['record', 'already-known']);
+    expect(typed(['נתון מעגל', 'מרכז המעגל']).kinds).toEqual(['record', 'record']);
     builds(['מרכז המעגל']);
     expect(circles(derive(['מרכז המעגל'], 0))).toHaveLength(1);
     expect(typed(['נתון מעגל', 'נתון מעגל', 'מרכז המעגל']).kinds[2]).toBe('refused:ambiguous-shape');

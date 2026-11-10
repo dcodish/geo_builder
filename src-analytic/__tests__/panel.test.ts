@@ -15,6 +15,9 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
 import { isKnowledge, knownCurve } from '../engine/evaluate';
+import { openCurveText, panelKnowledge, segmentKnowledge, segmentLengthText } from '../app/panelRows';
+import { pointText as panelPointText } from '../app/pointText';
+import { fmtAnalytic } from '../format';
 
 const OPERATOR_FIGURE = [
   'משולש ABC',
@@ -152,5 +155,54 @@ describe('#1078 — the knowledge gate is the SOLVE’s tolerance, not a tighter
       return Math.hypot(b.x - a.x, b.y - a.y);
     });
     expect(k.known).toBe(false);
+  });
+});
+
+/**
+ * #2735 (ADR-AG-458) — A VALUE THE FIGURE FIXES IN THE STUDENT'S LETTER IS SHOWN IN THAT LETTER. Operator, 2026-11-07:
+ * *"yes - we should support (2k,0) in the data panel"*; 2026-11-09, option C: coordinates, curve equations and lengths.
+ * Measured on main @ 86768862: F₁ read «(x_F₁, 0)», the midpoint of A(2k,0) and B(0,4k) read «—», the focus circle
+ * «O(F), r = r_F», and AF₁ nothing. These call the panel's own decisions (`panelKnowledge`, `pointText`,
+ * `segmentLengthText`, `openCurveText`), the functions `App` renders.
+ */
+describe('#2735 — answers in the parameter', () => {
+  const Q9 = ['x²/144 + y²/(144 − 4k²) = 1', '0 < k < 6', 'F1 הוא המוקד הימני של האליפסה', 'נתונה פרבולה שמשוואתה y^2=2px', 'F1 מוקד הפרבולה', 'A על הפרבולה', 'A ברביע הראשון', 'AF1 = 10k'];
+  const Q16 = ['x²/(25k²) + y²/(16k²) = 1', 'k > 0', 'F הוא המוקד הימני של האליפסה', 'E היא נקודת החיתוך של האליפסה עם החלק החיובי של ציר ה-x', 'נתון מעגל שמרכזו F', 'המעגל עובר דרך E', 'B היא נקודת החיתוך של האליפסה עם החלק החיובי של ציר ה-y'];
+  const rows = (lines: string[]) => {
+    const d = derive(lines, 0);
+    expect(d.faults, lines.join(' · ')).toEqual([]);
+    const pk = panelKnowledge(d);
+    const pts = Object.fromEntries(pk.points.map((p) => [p.id, panelPointText(d, p.id, p.x, p.y, fmtAnalytic)]));
+    const segs = Object.fromEntries(segmentKnowledge(d).map((s) => [s.ends.join(''), segmentLengthText(s, fmtAnalytic)]));
+    const curves = Object.fromEntries(pk.curves.map((c) => [c.id, openCurveText(d.construction, c.id, c.symbolic)]));
+    return { pts, segs, curves };
+  };
+
+  it('Q9 (קיץ 2023): F₁ is (2k, 0), A is (8k, 8k), and AF₁ reads 10k', () => {
+    const r = rows(Q9);
+    expect(r.pts['F₁']).toBe('(2k, 0)');
+    expect(r.pts.A).toBe('(8k, 8k)');
+    expect(r.segs['AF₁']).toBe('10k');
+  });
+
+  it('Q16 (מועד ב 2025): F (3k, 0), E (5k, 0), B (0, 4k), and the circle about F through E is (x − 3k)² + y² = (2k)²', () => {
+    const r = rows(Q16);
+    expect(r.pts).toMatchObject({ F: '(3k, 0)', E: '(5k, 0)', B: '(0, 4k)' });
+    expect(r.curves['circle-at-F']).toBe('(x − 3k)² + y² = (2k)²');
+    // the stated ellipse keeps the student's own equation
+    expect(Object.values(r.curves)).toContain('x^2/(25·k^2) + y^2/(16·k^2) - 1 = 0');
+  });
+
+  it('a midpoint of A(2k,0) and B(0,4k) is (k, 2k); the stated points keep their own spelling', () => {
+    expect(rows(['A(2k,0)', 'B(0,4k)', 'M אמצע AB']).pts).toEqual({ A: '(2·k, 0)', B: '(0, 4·k)', M: '(k, 2k)' });
+  });
+
+  it('a coordinate that is not a monomial keeps today’s row, never a wrong form', () => {
+    expect(rows(['A(k,0)', 'B(2,0)', 'M אמצע AB']).pts.M).toBe('(x_M, 0)');
+  });
+
+  it('a figure with no letter is unchanged: the reader never runs', () => {
+    expect(rows(['A(0,0)', 'B(1,0)', 'M אמצע AB']).pts.M).toBe('(1/2, 0)');
+    expect(rows(['A(0,0)', 'B על ציר ה-x']).pts.B).toBe('(x_B, 0)');
   });
 });

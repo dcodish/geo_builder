@@ -48,6 +48,8 @@ const REFUSES_LAST_LINE: Record<string, string> = {
   'issue-1963-circle-through-collinear': 'forced-collinear',
   // #2115 — AB is a side of the triangle, so it cannot bisect an angle: the last line is refused, as in 2-D.
   'issue-2115-bisector-on-side': 'bisector-is-side',
+  // #2664 — «קנונית» said of a parabola its equation puts off the origin: the word is a claim, refused by name.
+  'issue-2664-canonical-word-refused': 'not-canonical',
 };
 
 beforeEach(() => {

@@ -20,7 +20,7 @@
  */
 
 import { derive } from '../engine/derive';
-import { decideSubmit } from './submit';
+import { decideSubmit, isHeld } from './submit';
 import { decideRename, decideSwap } from './rename';
 
 /** One logged event, as the production sink writes it (`ev`, then the fields `analyticsSubmitAnalytic` keeps). */
@@ -114,13 +114,10 @@ export function replayAnalyticSession(events: readonly LoggedEvent[], budgetMs =
         case 'ignored':
           res = { now: 'skip', detail: '', degraded };
           break;
+        // #2790 (ADR-AG-462): a held line records too — its own row, with the already-held notice
         case 'record':
           advance([...lines, v.line]);
-          res = { now: 'built', detail: 'record', degraded };
-          break;
-        case 'already-known':
-        case 'already-follows':
-          res = { now: 'built-nothing', detail: v.kind, degraded };
+          res = { now: 'built', detail: isHeld(v) ? 'held' : 'record', degraded };
           break;
         case 'teach':
           res = { now: 'guided', detail: `teach:${v.verb}`, degraded };
@@ -170,8 +167,10 @@ export function replayAnalyticSession(events: readonly LoggedEvent[], budgetMs =
     let next = lines;
     for (const l of committed) {
       const v = decideSubmit(l, next, 0, derive(next, 0));
-      if (v.kind === 'record') next = [...next, v.line];
-      else if (v.kind !== 'already-known' && v.kind !== 'already-follows') {
+      // a model's held line is dropped, as the fallback drops it (#2790)
+      if (v.kind === 'record') {
+        if (!isHeld(v)) next = [...next, v.line];
+      } else {
         degraded = true;
         break;
       }

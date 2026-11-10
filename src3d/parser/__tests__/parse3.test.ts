@@ -150,6 +150,26 @@ describe('#2703 — a stated dot product and a letter value carry their spelling
   });
 });
 
+/**
+ * #2490 (ADR-3D-468) — the right pyramid's cyclic fix moved to the engine (`cyclicFixCommands`, `baseShapes.ts`), so the
+ * fold's reading of an unstated base lowers the same fix the parser does. A pure move: the parser's output is unchanged.
+ */
+describe('#2490 — the right pyramid lowers the engine\'s one cyclic fix', () => {
+  const cmds = (s: string) => {
+    const r = parse3(s);
+    if (!r.ok) throw new Error(s);
+    return r.commands;
+  };
+  it('each base keeps the fix of its cyclic member, stamped as the shape\'s own', () => {
+    expect(cmds('פירמידה ישרה ABCDS שבסיסה מרובע').slice(1)).toEqual([{ type: 'concyclic', ids: ['A', 'B', 'C', 'D'], origin: 'shape' }]);
+    expect(cmds('פירמידה ישרה ABCDS שבסיסה דלתון').slice(1)).toEqual([
+      { type: 'cos-angle', u: { kind: 'pair', from: 'B', to: 'A' }, v: { kind: 'pair', from: 'B', to: 'C' }, cos: 0, origin: 'shape' },
+    ]);
+    expect(cmds('פירמידה ישרה ABCDS שבסיסה טרפז').slice(1)).toEqual([{ type: 'length-rel', a1: 'A', b1: 'C', rhs: { pair: ['B', 'D'] }, c: 1, origin: 'shape' }]);
+    expect(cmds('פירמידה ישרה ABCDS')).toEqual([{ type: 'solid', kind: 'pyramid4r', ids: ['A', 'B', 'C', 'D', 'S'] }]); // a rectangle: no fix
+  });
+});
+
 // #2062 (ADR-3D-479): the exam's subject frame «הנקודה M מקיימת …» is read as the bare statement it frames
 describe('#2062 — the subject frame «הנקודה M מקיימת …» reads as its statement', () => {
   const BARE = ['BM = 1/6u - 2/3v + 1/12w', 'AM = 3', 'AM = MB', '∠AMB = 90', 'M אמצע BC', 'AM = t·AB', 'M(1,2,3)'];

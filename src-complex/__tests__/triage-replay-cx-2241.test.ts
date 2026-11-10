@@ -33,7 +33,7 @@ const Z2 = 'z1 = 1+i'; // incompatible with Z while Z is in the figure
 describe('#2241 — decideSubmitCx is the whole decision, and submitLine only dispatches on it', () => {
   const cases: [ReturnType<typeof S>, string, SubmitVerdictCx['kind'], string?][] = [
     [S([]), Z, 'record'],
-    [S([Z]), Z, 'known'],
+    [S([Z]), Z, 'record'], // #2790 (ADR-CX-089): a held line is its own row, with the note
     [S([Z]), Z2, 'refuse', 'incompatible'],
     [S([Z], [0]), Z2, 'record'], // a muted line does not veto (B5)
     [S([Z]), '|z1|?', 'ask'],
@@ -59,8 +59,8 @@ describe('#2241 — decideSubmitCx is the whole decision, and submitLine only di
       expect(ok, raw).toBe(kind !== 'refuse');
       if (v.kind === 'refuse') expect(st.lastError).toEqual(v.error);
       if (v.kind === 'record') expect(st.lines).toEqual([...state.lines, v.line]);
+      if (v.kind === 'record') expect(st.lastNote).toEqual(v.note ?? null);
       if (v.kind === 'ask') expect(st.queries).toContain(v.line);
-      if (v.kind === 'known') expect(st.lastNote).toEqual(v.note);
     }
   });
 });
@@ -134,7 +134,7 @@ describe('#2241 — replayComplexSession follows the logged actions, and degrade
     const out = replayComplexSession([sub(Z), sub(Z), sub('|z1|?'), sub('blah blah foo'), sub('prove that w is real'), sub('')], LOGGED);
     expect(out.map((o) => `${o.now}:${o.detail}`)).toEqual([
       'built:record',
-      'built-nothing:already-known',
+      'built:held', // #2790 (ADR-CX-089): a held line is its own row
       'built:ask',
       'not-handled:not-handled',
       'refused:proof-target',

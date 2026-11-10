@@ -266,6 +266,35 @@ describe('#2703 — a typed decimal prints as typed in the dot and letter rows',
   });
 });
 
+/**
+ * #2820 ([ADR-3D-482](../../docs/06b-decisions-3d.md#adr-3d-482)) — the parametric row opens with the plane's symbol
+ * (ADR-3D-187); its `name:` prefix prints only when the name says something the symbol does not. Before: «π: π = …».
+ */
+describe('#2820 — a plane named π prints its name once in the parametric row', () => {
+  beforeEach(reset);
+  const build = (us: string[]) => {
+    us.forEach(submit);
+    expect(useGeo3.getState().lastError, us.join(' · ')).toBeNull();
+    return panel();
+  };
+  const BOX = ["תיבה ABCDA'B'C'D'", 'A(0,0,0)', 'B(2,0,0)', 'D(0,3,0)', "A'(0,0,4)"];
+
+  it('the report: «מישור π 2x+y=1» → «π = …», the equation row keeps its «π:»', () => {
+    expect(build(['מישור π 2x+y=1']).planes).toEqual(['π: 2x + y - 1 = 0', 'π = (0, 1, 0) + t·(0, 0, 1) + s·(1, -2, 0)']);
+  });
+
+  it('control: a plane named by its points keeps «ABCD: π = …», and beside a named π the symbols stay apart', () => {
+    expect(build([...BOX, 'מישור ABCD']).planes).toEqual(['ABCD: z = 0', 'ABCD: π = (0, 0, 0) + t·(2, 0, 0) + s·(0, 3, 0)']);
+    reset();
+    expect(build([...BOX, 'מישור ABCD', 'מישור π 2x+y=1']).planes).toEqual([
+      'ABCD: z = 0',
+      'ABCD: π1 = (0, 0, 0) + t·(2, 0, 0) + s·(0, 3, 0)',
+      'π: 2x + y - 1 = 0',
+      'π = (0, 1, 0) + t·(0, 0, 1) + s·(1, -2, 0)',
+    ]);
+  });
+});
+
 // #2062 (ADR-3D-480; the operator's ruling of 2026-10-14, card `d14b-2062-question` A): a point × plane row
 describe('#2062 — the panel says whether a point the student introduced lies in a plane', () => {
   beforeEach(reset);

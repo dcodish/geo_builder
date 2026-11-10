@@ -37,7 +37,7 @@ import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves'
 import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { Construction, Id, NumCurve } from '../engine/types';
-import { knownCurve, knownCurveOptions } from '../engine/evaluate';
+import { curveEquationInLetters, knownCurve, knownCurveOptions } from '../engine/evaluate';
 import type { LocusShape, Monomial, SymbolicCurve } from '../engine/locusFit';
 
 /**
@@ -514,6 +514,34 @@ function parabolaCoefficient(m: number): string {
 
 const gcdInt = (a: number, b: number): number => (b ? gcdInt(b, a % b) : a);
 
+/**
+ * A PARABOLA OR AN ELLIPSE, WHEREVER IT SITS (#2664, [ADR-AG-455](../../docs/06c-decisions-analytic.md#adr-ag-455)) — the
+ * one printer every surface calls. At the origin opening along x it is exactly today's text (`parabolaEquationText`,
+ * `ellipseEquationText`). Moved, it is the textbook's vertex form: `(x − 3)²/25 + (y + 1)²/9 = 1`, `(y − 1)² = 4(x − 2)`,
+ * `x² = 8y`, the same math text in both locales.
+ */
+export function conicEquationText(c: NumCurve & { kind: 'parabola' | 'ellipse' }): string {
+  const h = c.h ?? 0;
+  const k = c.k ?? 0;
+  if (c.kind === 'ellipse') {
+    if (h === 0 && k === 0) return ellipseEquationText(c.a * c.a, c.b * c.b);
+    // A denominator that is not a whole number is bracketed — `(y − 1)²/(9/4)`, never `/9/4` (#2614's reading trap).
+    const under = (v: number) => (/^-?\d+(\.\d+)?$/.test(fmt(v)) ? fmt(v) : `(${fmt(v)})`);
+    return `${shifted('x', h)}/${under(c.a * c.a)} + ${shifted('y', k)}/${under(c.b * c.b)} = 1`;
+  }
+  if (h === 0 && k === 0 && c.axis !== 'y') return parabolaEquationText(2 * c.p);
+  // (v − v0)² = 2p(u − u0): v is y for a parabola opening along x, x for one opening along y.
+  const [sq, sqAt, lin, linAt] = c.axis === 'y' ? ['x', h, 'y', k] : ['y', k, 'x', h];
+  const twoP = 2 * c.p;
+  const mag = parabolaCoefficient(Math.abs(twoP));
+  const sign = twoP < 0 ? '-' : '';
+  const zero = fmt(Math.abs(linAt)) === fmt(0);
+  const linear = zero ? lin : `(${lin} ${linAt < 0 ? '+' : '-'} ${fmt(Math.abs(linAt))})`;
+  // A unit coefficient on a bracket drops the bracket: `(x − 2)² = y + 1`, never `(y + 1)` alone.
+  const rhs = mag === '' && !zero ? `${sign ? `-${linear}` : linear.slice(1, -1)}` : `${sign}${mag}${linear}`;
+  return `${shifted(sq, sqAt)} = ${rhs}`;
+}
+
 export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): CurveParts {
   switch (c.kind) {
     case 'line': {
@@ -543,7 +571,7 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
     case 'parabola': {
       const f = parabolaFocus(c);
       return {
-        equation: parabolaEquationText(2 * c.p),
+        equation: conicEquationText(c),
         // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
         details: [
           { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${val(f.x)}, ${val(f.y)}`) },
@@ -560,15 +588,16 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
        */
       if (Math.abs(c.a - c.b) <= 1e-9 * Math.max(1, c.a, c.b)) {
         return {
-          equation: ellipseEquationText(c.a * c.a, c.b * c.b),
+          equation: conicEquationText(c),
           details: [
             { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
-            { label: 'curveRoundCentreLabel', text: at(nameAt, 0, 0, '0, 0') },
+            // Its own centre (#2664): the origin unless it was moved.
+            { label: 'curveRoundCentreLabel', text: at(nameAt, c.h ?? 0, c.k ?? 0, c.h === undefined && c.k === undefined ? '0, 0' : `${val(c.h ?? 0)}, ${val(c.k ?? 0)}`) },
           ],
         };
       }
       return {
-        equation: ellipseEquationText(c.a * c.a, c.b * c.b),
+        equation: conicEquationText(c),
         details: [
           { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
           { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${val(f1.x)}, ${val(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${val(f2.x)}, ${val(f2.y)}`)}` },
@@ -685,9 +714,9 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
     }
     // The conics print through the panel's ONE printer per kind (#2614, ADR-AG-357), never a spelling of their own.
     case 'parabola':
-      return parabolaEquationText(2 * c.p);
     case 'ellipse':
-      return ellipseEquationText(c.a * c.a, c.b * c.b);
+      // A moved conic's offsets in this printer's minus sign (`shift` above), as the locus circle prints them (#2664).
+      return conicEquationText(c).replace(/ - /g, ' − ');
   }
 }
 
@@ -712,6 +741,14 @@ function monomialText(m: Monomial, fmt: (v: number) => string): string {
   return `${shown === fmt(1) ? '' : shown}${letters}`;
 }
 
+/**
+ * A VALUE IN THE STUDENT'S LETTERS, SIGNED (#2735, ADR-AG-458) — `2k`, `-k/2`, `k²`: the locus's monomial spelling with its
+ * sign, so a coordinate, a length and a curve's parameters print the one way the locus equations already do.
+ */
+export function lettersText(m: Monomial, fmt: (v: number) => string): string {
+  return `${m.c < 0 ? '-' : ''}${monomialText(m, fmt)}`;
+}
+
 /** A monomial that is ONE atom — a number or a single letter — needs no brackets before `²` or after `/`. */
 const isAtom = (t: string): boolean => /^(\d+|[A-Za-z])$/.test(t);
 
@@ -734,7 +771,7 @@ function monomialRoot(m: Monomial): Monomial | null {
  * a circle with `r²` written as a square when it is one (`(x − 16a)² + y² = (25a)²`, #1187), a parabola `y² = 4ax`,
  * an ellipse `x²/(4a²) + y²/b² = 1`. Every monomial was verified against the traces before it reached here.
  */
-function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
+export function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
   const signed = (m: Monomial, sym: string): string => {
     if (m.c === 0) return '';
     const body = monomialText(m, fmt);
@@ -772,10 +809,17 @@ function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): st
  * configurations give (`knownCurveOptions`, #1716), else nothing. «משוואת l1» answered null while the panel row listed
  * two options because the ask's by-name branch asked only the first half; one function, so they cannot disagree again.
  */
-export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | null;
+/*
+ * #2735 (ADR-AG-458, operator 2026-11-09 option C): else the equation in the student's letters — a curve the figure fixes
+ * as monomials in its parameters («(x − 3k)² + y² = (2k)²»), read and verified over the same pool, printed by the locus
+ * equations' own printer. Asked only once the curve is neither known, nor an option set, nor pending.
+ */
+export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | { letters: SymbolicCurve } | null;
 export function curveEquationOf(c: Construction, id: Id): CurveEquation {
   const known = knownCurve(c, id);
   if (known) return { known };
   const options = knownCurveOptions(c, id);
-  return options ? { options } : null;
+  if (options) return { options };
+  const letters = curveEquationInLetters(c, id);
+  return letters && letters !== 'pending' ? { letters } : null;
 }

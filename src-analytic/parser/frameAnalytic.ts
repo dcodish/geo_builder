@@ -216,8 +216,6 @@ const CARDINAL_SHIN = `(?:${[...Object.keys(HE_NUM_UNITS), ...Object.keys(HE_NUM
   .join('|')})(?![א-ת])`;
 
 const UNWRAP: ReadonlyArray<[RegExp, string]> = [
-  // A whole line in parentheses — «(O היא ראשית הצירים)».
-  [/^\((.*)\)$/, '$1'],
   // The conjunction that continues the previous sentence — «והנקודה C …», «וידוע כי …», «וכי DO/DE = 2/3».
   [/^וכי\s+/, ''],
   // «ומרכז המעגל השני הוא …» (#2552, ADR-AG-336) — the sentence opener `segmentsOf` cuts before, unwrapped as the others.
@@ -256,11 +254,29 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/\s*\.$/, ''],
 ];
 
+/**
+ * A whole line in parentheses — «(O היא ראשית הצירים)» — is the line. Only when the opening bracket is the one the LAST
+ * one closes (#2664, ADR-AG-455): «(y-1)^2 = 4(x-2)» opens and closes with brackets that are not a pair, and peeling
+ * them left «y-1)^2 = 4(x-2», which no rule reads, so a translated parabola went to the model.
+ */
+function wholeParens(s: string): string {
+  if (!s.startsWith('(') || !s.endsWith(')')) return s;
+  let depth = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    if (s[i] === '(') depth += 1;
+    else if (s[i] === ')') depth -= 1;
+    if (depth === 0 && i < s.length - 1) return s; // the first bracket closed before the end: not one wrapper
+  }
+  return s.slice(1, -1).trim();
+}
+
 /** Strip the textbook wrapper until nothing more comes off. */
 export function unwrap(line: string): string {
   let s = line.trim();
   for (let guard = 0; guard < 8; guard += 1) {
     const before = s;
+    // The wrapper's first entry: a whole line in parentheses, then the rest in order.
+    s = wholeParens(s);
     for (const [from, to] of UNWRAP) s = s.replace(from, to).trim();
     s = dropShapeQualifier(s);
     if (s === before) break;

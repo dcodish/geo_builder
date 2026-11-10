@@ -19,7 +19,7 @@
  * re-deciding what "the same statement" means (#1102/#1118).
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { derive } from '../engine/derive';
 import { canonicalConstraint } from '../engine/solve';
 
@@ -98,13 +98,13 @@ describe('#1159 symptom 2 — an assumption is never quoted back as the student�
    */
   it('a parallelogram’s pair is a real given, and restating it is still absorbed', () => {
     for (const line of ['AB מקביל ל-CD', 'AB מקביל ל-DC']) {
-      expect(decideSubmit(line, ['מקבילית ABCD'], 0).kind, line).toBe('already-known');
+      expect(isHeld(decideSubmit(line, ['מקבילית ABCD'], 0)), line).toBe(true);
     }
   });
 
   /** Pinning happens ONCE: having pinned it, saying it again is an ordinary restatement. */
   it('pinning is not repeatable — the second restatement is absorbed', () => {
-    expect(decideSubmit('AB מקביל ל-CD', ['טרפז ABCD', 'AB מקביל ל-CD'], 0).kind).toBe('already-known');
+    expect(isHeld(decideSubmit('AB מקביל ל-CD', ['טרפז ABCD', 'AB מקביל ל-CD'], 0))).toBe(true);
   });
 });
 

@@ -96,8 +96,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   one is drawn and «הציגו תצורה אחרת» reaches the other; a length no position of the point can meet («AD = 5» on AB = 4)
   is still refused (#1816). **A triangle the givens fix in two ways** («משולש ABC · AB = 5 · BC = 4 · ∠BAC = 40°»,
   two sides and an angle not between them) is drawn one way and «הציגו תצורה אחרת» reaches the other, as 2-D does
-  (#2714); givens that fix one triangle keep showing that one.
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour); ADR-3D-447 (#2714, 2-D's behaviour).
+  (#2714); givens that fix one triangle keep showing that one. **The same holds for any solid the givens fix in two
+  ways** (the exam pyramid with «D(3,p,0)» · «|u| = |v|», p = ±4; S above or below a plane): both configurations are
+  always among the drawings, and **each press of «הציגו תצורה אחרת» shows the other one**, as 2-D does (#2814). Which
+  of them is drawn first may be either; every drawing is one the givens allow.
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour); ADR-3D-393 (#1782, 2-D's behaviour); ADR-3D-432 (#1816, 2-D's behaviour); ADR-3D-447 (#2714, 2-D's behaviour); [ADR-3D-461](06b-decisions-3d.md#adr-3d-461) (#2814, 2-D's behaviour; first drawing judged 2026-11-10, ADR-W-199).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form); ADR-3D-436 (a pyramid's unstated base over an existing ring).
@@ -119,8 +122,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A point stated on a coordinate axis or half-axis («P נמצא על החלק החיובי של ציר ה-x», «P נמצא על ציר ה-x») anchors the
   figure like any absolute object: its placement is sampled and the axes are drawn. A size stated beside an object a
   rescale about the origin keeps (an axis point, the origin, a coordinate plane or axis, a plane or a typed line through
-  the origin) holds in both orders (#2789).
-  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456), [ADR-3D-457](06b-decisions-3d.md#adr-3d-457).
+  the origin) holds in both orders (#2789). **A solid's own vertex stated on an axis or half-axis** («הקודקוד A נמצא על החלק
+  החיובי של ציר ה-x»), **or a coordinate sign beside an absolute object** («P(5,5,5)» · «x של A חיובי»), is honoured by
+  placing the figure: the vertex lies on the stated side at every configuration, «הציגו תצורה אחרת» slides the solid along
+  the axis (a pure slide, so the free-DOF cue does not count it), and a vertex on a whole axis is not held at the origin
+  (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)). A sign alone on an unanchored solid is #2809.
+  - Sources: ADR-3D-272, #1861, ADR-3D-379, ADR-3D-400, [ADR-3D-435](06b-decisions-3d.md#adr-3d-435), [ADR-3D-456](06b-decisions-3d.md#adr-3d-456), [ADR-3D-457](06b-decisions-3d.md#adr-3d-457), [ADR-3D-465](06b-decisions-3d.md#adr-3d-465).
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
   utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
   duality", and these rules hold it:
@@ -615,7 +622,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «S₁(1.33, 7/2, 3.33)» and «S₂(−4.33, 7/2, −2.33)», each row a WHOLE admissible point (components are
   never mixed across configurations), in a fixed order that does not change with the configuration on
   screen. Only two (operator: *"many exams ask questions that have 2 options. but not more than 2"*).
-  - Sources: ADR-3D-289, #1506.
+  **A coordinate the student wrote as a letter is listed the same way** when the givens leave it two values: the exam
+  pyramid's «D(3,p,0)» with p = ±4 reads «D(3, 4, 0) או (3, -4, 0)» at every configuration, while the point's label
+  on the figure keeps «D(3, p, 0)»; one value alone is never printed (operator, 2026-11-10: *"since there are only 2
+  options, we give both"*).
+  - Sources: ADR-3D-289, #1506; [ADR-3D-461](06b-decisions-3d.md#adr-3d-461), #2814 (operator ruling 2026-11-10).
 - **FR-EQ-4b (Should)** — **A parameter's roots are written as the student writes the answer.** When the
   givens leave a figure parameter two values, the data panel and the ask lane both list them: a pair that
   are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —
@@ -696,8 +707,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
   solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is
   answered as a question with the value dropped: «הזווית בין המישורים π1 ו-π2» → 54.74°, «נפח החרוט» →
-  100π.
-  - Sources: ADR-052, ADR-3D-279, #1449.
+  100π. A **line's equation** is askable the same way: «משוואת BB'» / «משוואת הישר BB'» / «הישר BB'» answers
+  `x = (0, 7, 8) + t·(2, 8, -16)` — anchored at the first-named point, the pair's own direction, unreduced —
+  when both points are known on a figure with coordinates (otherwise the reason, never a sampled number);
+  «משוואת הישר ℓ» answers what the canvas label shows.
+  - Sources: ADR-052, ADR-3D-279, #1449, ADR-3D-475, #1541.
 
 ## Rendering
 
@@ -731,7 +745,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   that completes the flatness is refused, either order, naming the statements and the solid in its own noun:
   «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» (operator
   ruling 2026-10-07, #1860; it was a notice before). A thin but real solid («∠BAS = 41 · ∠DAS = 50») builds with no
-  notice and no refusal. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
+  notice and no refusal. **Nor is a declared solid or polygon shrunk to a point:** givens that hold only when the whole
+  shape meets in one point («קובייה ABCDA'B'C'D'» · «הקודקוד A/B/C נמצא על ציר ה-x»: three corners of a square are never
+  collinear) are refused on the line that completes them, naming the statements, in the same words (#2799,
+  [ADR-3D-464](06b-decisions-3d.md#adr-3d-464)); the refusal arrives at once. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
   «משולש ABC», or an incidence on a rider or on a point that already exists, in whichever order the two are stated — «M על AB · M אמצע BC» and «M אמצע BC · M על AB» alike, #1847) is refused, naming the statements — a straight line is not a
   triangle. **The same holds when the givens hold only in the LIMIT of a collapse** («משולש ABC · |BA| = |BC| ·
   ∠ACB = 90°», or «AC ⊥ BC» / «CA ⊥ CB», in either order, or «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°»: the right angle
@@ -751,9 +768,18 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   make simple is drawn simple** (#1986, ADR-3D-418; the operator's "search first, refuse last", 2026-10-09):
   «דלתון ABCD · מרובע ABDC» is drawn as a dart, «מרובע ABCD · מרובע ABDC» as a concave quadrilateral, and
   «A(k,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» as a genuine trapezoid (k > 4) — never crossed and green, and
-  «הציגו תצורה אחרת» keeps every declared ring simple. A ring over a coordinate letter is refused, in the same words,
+  «הציגו תצורה אחרת» keeps every declared ring simple. **A solid's base is one of the rings** (#2702, ADR-3D-469):
+  «פירמידה SABCD שבסיסה דלתון · מרובע ABDC» draws the pyramid on a dart base (a kite still, the reflex corner on its
+  axis), and so do a pyramid whose base is general or unstated («פירמידה SABCD», «… שבסיסה מרובע») and a prism's
+  general base («מנסרה ABCDA'B'C'D'»); an unstated base's rectangle is a default and yields to the second ring. A
+  base convex whenever simple — a stated rectangle, square, parallelogram or trapezoid, a box or cube, or a right
+  pyramid's base (a circle passes through it) — still refuses the second ring. A ring over a coordinate letter is refused, in the same words,
   only when the widened search finds no simple drawing. A ring with a free vertex is drawn simple by choice of
-  configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
+  configuration, never refused. **Letters a stated circle passes through have one simple order** (#2810, ADR-3D-467):
+  over a ring with a circumcircle («מעגל חוסם את ABCD», «המרובע ABCD חסום במעגל»), a cyclic fix, a right pyramid's base
+  or points stated on one circle, another order of the same letters («מרובע ABDC») is refused in the same words on the
+  line that completes it — the ring, the circle line or the right pyramid line — and a circle through a ring is never
+  drawn green over points that are not on it (no dart under a circle). **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the
@@ -762,8 +788,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   אינם נמצאים במישור אחד — ולכן …»). A ring with at least one
   FREE vertex is BUILT, that point driven into the plane — an unstated freedom is never an error; the placed
   vertices do not move unless the noun itself states something about them (a rectangle's right angle).
-  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-3D-322, ADR-3D-325, ADR-3D-356, ADR-W-048, ADR-W-115, ADR-W-121,
-    ADR-413, ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1927, #1928, #1935, #1978.
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-464, ADR-3D-314, ADR-3D-319, ADR-3D-322, ADR-3D-325, ADR-3D-356, ADR-W-048, ADR-W-115, ADR-W-121,
+    ADR-413, ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1927, #1928, #1935, #1978, #2810 (ADR-3D-467).
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
   on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)
@@ -916,8 +942,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   state no base shape («פירמידה ABCDS») keeps the shape of the base it stands on, and no proportion is assumed (operator
   2026-11-08: *"Keep its shape"*, ADR-052): «מרובע ABCD» · «פירמידה ABCDS» stays a general quadrilateral that «הציגו תצורה
   אחרת» keeps varying, a rhombus or a trapezoid keeps its kind, an oblique prism's side face stays oblique (FR-SP-3), and
-  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base, and
-  «פירמידה ישרה ABCDS» over an existing quadrilateral is unchanged. Height, volume, an
+  a cube's face reads no narrowing note. A pyramid with no base drawn first still has a free-aspect rectangle base. A
+  **right** pyramid whose words state no base shape («פירמידה ישרה ABCDS», "right pyramid ABCDS") over a ring that
+  already exists reads exactly as «פירמידה ישרה ABCDS שבסיסה מרובע»: the ring is fitted to a quadrilateral a circle
+  passes through with its own free DOF (FR-SU-35, [ADR-W-199](06w-decisions-workspace.md#adr-w-199); operator
+  2026-11-09), so a general quadrilateral becomes a general cyclic one that «הציגו תצורה אחרת» keeps varying (never the
+  rectangle), a rhombus a square, a parallelogram a rectangle, a kite a right kite and a trapezoid an isosceles one, with
+  the build note naming the change. A ring a circle already passes through (a square, a rectangle, an isosceles
+  trapezoid, a box or cube face, a ring with a stated circle or with supplementary stated opposite angles) is drawn as it
+  was, with no build note (Q-2490d). A ring whose own givens forbid a circle («מקבילית ABCD» · «∠DAB = 60») is refused,
+  naming those givens ([ADR-3D-468](06b-decisions-3d.md#adr-3d-468)). Height, volume, an
   edge length and an angle to the base («גובה הפירמידה», «נפח הפירמידה ABCDS = 5», «|SA| = 5», «הזווית בין SC למישור
   ABCD היא 40») are accepted as on a standalone pyramid; «גובה הפירמידה» names the figure's one pyramid when other
   solids stand beside it. A base whose letters are not in one plane («פירמידה ABCA'S» on the cube) is refused for

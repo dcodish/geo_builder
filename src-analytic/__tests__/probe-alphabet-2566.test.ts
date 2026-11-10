@@ -55,11 +55,11 @@ describe.each([...OUTSIDE, ...CONTROLS])('the letter %s', (L) => {
   });
 
   it('row 1: the same sentence again is already known', () => {
-    expect(submit(given(L), [given(L)]).kind).toBe('already-known');
+    expect(submit(given(L), [given(L)]).kind).toBe('record');
   });
 
   it('row 2: «משוואת המעגל היא» with the same equation is already known', () => {
-    expect(submit(`משוואת המעגל היא ${circle(L)}`, [given(L)]).kind).toBe('already-known');
+    expect(submit(`משוואת המעגל היא ${circle(L)}`, [given(L)]).kind).toBe('record');
   });
 
   it('row 3: the centre sentence typed by hand records', () => {
@@ -68,7 +68,7 @@ describe.each([...OUTSIDE, ...CONTROLS])('the letter %s', (L) => {
 
   it('row 4: the same circle respelled is already known, and one curve is drawn', () => {
     const respelled = `נתון מעגל שמשוואתו (x-13)^2+y^2-${L}^2=0`;
-    expect(submit(respelled, [given(L)]).kind).toBe('already-known');
+    expect(submit(respelled, [given(L)]).kind).toBe('record');
     expect(stated([given(L), respelled])).toHaveLength(1);
   });
 
@@ -82,7 +82,7 @@ describe.each([...OUTSIDE, ...CONTROLS])('the letter %s', (L) => {
   it('row 6: the equation given to a bare circle, then repeated, is already known', () => {
     const named = `משוואת המעגל היא ${circle(L)}`;
     expect(submit(named, ['נתון מעגל']).kind).toBe('record');
-    expect(submit(named, ['נתון מעגל', named]).kind).toBe('already-known');
+    expect(submit(named, ['נתון מעגל', named]).kind).toBe('record');
   });
 });
 

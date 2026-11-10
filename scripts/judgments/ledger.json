@@ -4034,6 +4034,75 @@
       ],
       "at": "2026-11-10T13:50:21.025Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-diameter",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «AB קוטר בפרבולה» (a parabola has no centre, so no diameter); the refusal-style lock asks for one next step",
+      "choice": "«לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «AB מיתר בפרבולה».» — the reason, then the chord sentence in the student's own letters, which the next line reads",
+      "chosen": true,
+      "at": "2026-11-10T15:30:56.751Z",
+      "status": "pending"
+    },
+    {
+      "id": "Q-2625b",
+      "issue": 2625,
+      "question": "Should «מרכז הפרבולה», «O מרכז הפרבולה», \"the centre of the parabola\" get the same no-centre refusal as «AB קוטר בפרבולה»? (a) same refusal family; (b) leave them to the AI.",
+      "class": "parabola-centre-presupposition-refusal-scope",
+      "verdict": "escalate",
+      "reason": "A feature's scope (reserved rule 3) with no precedent: his words reach only the diameter.",
+      "nearest": [
+        {
+          "quote": "there is a קוטר and we need to support it. when drawing it, like in circle, there is dof as to where it is exactly",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/2618"
+        }
+      ],
+      "at": "2026-11-10T15:32:39.429Z",
+      "status": "escalated"
+    },
+    {
+      "id": "Q-2793c",
+      "issue": 2793,
+      "question": "«תיבה» · «X_B=3» (one off-origin component, no sign): should «הציגו תצורה אחרת» slide the figure along its unanchored axes? (a) keep ADR-3D-373, it stays put; (b) slide at every configuration.",
+      "class": "stated-component-unanchored-axis-slide",
+      "verdict": "escalate",
+      "reason": "(b) would reverse ADR-3D-373 §4 with no ruling ordering it; his words conflict (ADR-052 no fixed position vs FR-SP-4 keep it flat on the floor); ADR-3D-373's figure decision is a session's scoping, not his words.",
+      "nearest": [
+        {
+          "quote": "4 - b",
+          "date": "2026-11-09",
+          "link": "https://github.com/dcodish/geo_builder/issues/2746#issuecomment-6745659180"
+        },
+        {
+          "quote": "Keep it flat on the floor",
+          "date": "2026-10-31",
+          "link": "https://github.com/dcodish/geo_builder/blob/main/docs/02b-requirements-3d.md"
+        }
+      ],
+      "at": "2026-11-10T15:52:09.298Z",
+      "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-centre",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «O מרכז הפרבולה» and its spellings (a parabola has no centre; ruled Q-2625b (a))",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.» — the reason, then an honest next step: the vertex is what the student may mean, and the tool does not read it yet",
+      "chosen": true,
+      "at": "2026-11-10T17:24:27.784Z",
+      "status": "pending"
+    },
+    {
+      "id": "text-2790-held-notice",
+      "kind": "text",
+      "issue": "#2790",
+      "what": "The notice a held restatement's row carries in every builder (ADR-W-200 / ADR-W-204), replacing «זה כבר קיים באיור — אין מה להוסיף.»",
+      "choice": "«זה כבר קיים באיור — נוסף כנתון נפרד.» / \"That's already on the figure — added as a separate given.\" (the plan's text, suite key suite.notice.alreadyHeld)",
+      "chosen": true,
+      "at": "2026-11-10T16:16:52.922Z",
+      "status": "pending"
     }
   ],
   "demoted": {

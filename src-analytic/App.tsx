@@ -949,14 +949,9 @@ export function App() {
         setError(verdict.error);
         return sentenceOutcome(verdict);
       /**
-       * #1990 (ADR-AG-330, operator ruling 2026-10-10: every builder uses 2-D's note). A restated line and a line the
-       * figure already satisfies in every configuration are both 2-D's no-op (`noop-exists` / `implied-restatement`),
-       * and 2-D answers both with the one sentence, `suite.notice.alreadyDrawn`.
+       * #2790 (ADR-AG-462, ADR-W-200): a line the figure already holds is a `record` too — its own row, with the suite's
+       * `suite.notice.alreadyHeld` riding the commit (`noticeText`), as 2-D says it (ADR-W-204).
        */
-      case 'already-known':
-      case 'already-follows':
-        setNotice(t('suite.notice.alreadyDrawn'));
-        return sentenceOutcome(verdict);
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
         // transient surfaces, so a notice set before it would be erased by the very line that earned it.
@@ -1203,6 +1198,8 @@ export function App() {
           ? t('slopeVertical')
           : a.fact === 'lines-cross'
             ? t('askLinesCross')
+            : a.fact === 'parabola-no-centre'
+              ? /* #2625 (ADR-AG-454 Am. 1): the refusal's own sentence, one wording for both lanes */ t('errParabolaNoCentre')
             : a.fact === 'points' && a.points
               ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
                    locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
@@ -2003,7 +2000,7 @@ export function App() {
                  * would have to be set correctly at every mint site, and the name already answers
                  * truthfully at all of them.
                  */
-                rows: knows.curves.map(({ id, known, pending, options, letters }) => {
+                rows: knows.curves.map(({ id, known, pending, options, letters, symbolic }) => {
                   const c = d.figure.curves.find((cu) => cu.id === id)!;
                   // The SAME honesty gate the point rows use: an equation prints only when every
                   // coefficient is invariant across the free DOFs. A parabola whose `a` is still
@@ -2049,7 +2046,7 @@ export function App() {
                   const parts = known ? curveParts(known, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }) : null;
                   return (
                     <span key={c.id}>
-                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(` ${isolateRtlName('או')} `) : openCurveText(d.construction, c.id))} />
+                      <ValueRow text={namedRow(name, parts ? parts.equation : pending ? checking : options ? options.map((o) => curveParts(o, (x, y) => pointAt(d.figure, x, y), { vertical: t('slopeVertical') }).equation).join(` ${isolateRtlName('או')} `) : openCurveText(d.construction, c.id, symbolic))} />
                       {parts?.details && (
                         <details style={askTraceBox} open>
                           <summary style={askTraceToggle} title={t('curveDetailsToggle')}>

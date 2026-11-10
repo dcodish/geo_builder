@@ -93,8 +93,8 @@ describe('#1926 — what stays as it was', () => {
     [['מרובע ABCD', 'טרפז ABCD'], 'record'],
     [['טרפז ABCD', 'טרפז שווה שוקיים ABCD'], 'record'],
     [['מקבילית ABCD', 'מלבן ABCD'], 'record'],
-    [['מקבילית ABCD', 'AB ∥ CD'], 'already-known'],
-    [['מקבילית ABCD', 'מקבילית ABCD'], 'already-known'],
+    [['מקבילית ABCD', 'AB ∥ CD'], 'record'],
+    [['מקבילית ABCD', 'מקבילית ABCD'], 'record'],
   ])('%j → %s', (lines, kind) => {
     expect(last(lines, 0).kind).toBe(kind);
   });
