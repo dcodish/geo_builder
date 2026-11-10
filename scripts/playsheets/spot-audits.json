@@ -1,51 +1,6 @@
 {
   "pending": [
     {
-      "sheet": "round-2727",
-      "id": "T54",
-      "kind": "analytic:blind-review",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "path": "/analytic.html",
-      "lines": [
-        "c(4,7)"
-      ],
-      "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה»."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T52",
-      "kind": "2d:assertion",
-      "queued": "2026-11-06",
-      "product": "2d",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "P על AB",
-        "Q על AC",
-        "דרך P מעבירים אנך ל-AB",
-        "דרך Q מעבירים אנך ל-AC",
-        "E על האנך"
-      ],
-      "lookFor": "Asks which, naming both; the line stays in the box."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T51",
-      "kind": "2d:assertion",
-      "queued": "2026-11-06",
-      "product": "2d",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "P על AB",
-        "דרך P מעבירים אנך ל-AB",
-        "האנך חותך את AC בנקודה E"
-      ],
-      "lookFor": "E on the canvas."
-    },
-    {
       "sheet": "fix-2737",
       "id": "T4",
       "kind": "analytic:assertion",
@@ -700,6 +655,60 @@
       "pass": true,
       "date": "2026-11-10",
       "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T51",
+      "kind": "2d:assertion",
+      "queued": "2026-11-06",
+      "product": "2d",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "P על AB",
+        "דרך P מעבירים אנך ל-AB",
+        "האנך חותך את AC בנקודה E"
+      ],
+      "lookFor": "E on the canvas.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T54",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "path": "/analytic.html",
+      "lines": [
+        "c(4,7)"
+      ],
+      "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה».",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T52",
+      "kind": "2d:assertion",
+      "queued": "2026-11-06",
+      "product": "2d",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "P על AB",
+        "Q על AC",
+        "דרך P מעבירים אנך ל-AB",
+        "דרך Q מעבירים אנך ל-AC",
+        "E על האנך"
+      ],
+      "lookFor": "Asks which, naming both; the line stays in the box.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10: passes; the crossing-dot inconsistency between the two perpendiculars is #2821"
     }
   ],
   "demoted": {
