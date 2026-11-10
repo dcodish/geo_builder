@@ -7432,3 +7432,18 @@ So in analytic and complex, the claims their questions carry (lengths and slopes
 5. **🎮 only for his judgment.** A case whose pass a screenshot or an assertion can show is ✅ or 👁 and is closed by the session (assertion, blind review, spot audits). 🎮 is kept for: a feature PR's acceptance (one headline case per PR; its other cases close as ✅/👁); anything shipped beyond what he asked; and a feel no screenshot carries (a drag, a delay, an animation).
 
 **Not changed.** Eligibility (`auto-ok`, no `[proposed]`, no open question), the never-patch escalation exit, item gates, the full suite per landing, the round issue as the live ledger, the published report.
+
+## ADR-W-203 — A lowercase letter that can only be a point label is accepted and written in uppercase; an ambiguous one asks for uppercase, in every builder (#2823)
+
+**Status:** accepted · 2026-11-10 · operator ruling, all four builders · not yet built (#2823) · changes what 2-D's lowercase-names message and analytic's AI fallback do today · LADDER stage: **none** (the reading of a label)
+**Operator:** 2026-11-10, Rulings Inbox, answering #2807's lowercase question («נקודה t» in 3-D):
+> "new ruling that we need to think about: when a lowercase is used for a point, we should accept it if its for sure an upper case. like נקודה j or משולש abc. the reason is mobile phones where it a pain to use capital always. so we need a review on where we reject these letters and if its for sure upper case, we accept but the input is written in upper case. where we are not sure, we ask user to use upper case. This would be for all tools and its different than what we have until now"
+
+**Requirements:** [02w](02w-requirements-workspace.md) (a row is added when #2823 is built) · **Design:** none yet; #2823's plan names it
+
+**Decision.**
+1. **Certain → accepted, written uppercase.** Where a lowercase letter can only be a point label («נקודה j», the letter run after a polygon noun «משולש abc»), the line is accepted and its row shows the label in uppercase.
+2. **Not certain → ask.** Where it could be something else (a line, a vector, a parameter, a complex number's letter), the student is asked to write the point in uppercase. Never a guess.
+3. **Every builder**, after a review of each place a lowercase label is refused, taught or sent to the AI today (#2823). A builder whose own convention is lowercase (complex's «z1», «w») keeps it where the review shows the letter is not a point.
+
+**Why.** Students type on phones, where capitals cost an extra tap each time.
