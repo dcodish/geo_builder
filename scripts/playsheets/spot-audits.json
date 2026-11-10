@@ -2,19 +2,6 @@
   "pending": [
     {
       "sheet": "round-2722",
-      "id": "T38",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "lines": [
-        "מלבן ABCD",
-        "מעוין ABCD"
-      ],
-      "lookFor": "The ⓘ opens the note."
-    },
-    {
-      "sheet": "round-2722",
       "id": "T39",
       "kind": "3d:assertion",
       "queued": "2026-11-06",
@@ -679,6 +666,22 @@
       "pass": true,
       "date": "2026-11-10",
       "note": "test cases from 2808 pass"
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T38",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "מלבן ABCD",
+        "מעוין ABCD"
+      ],
+      "lookFor": "The ⓘ opens the note.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10: \"the behavior is correct but why are lines now dashed?\" — the case's claim (the ⓘ note) holds; the dashed drawing is a separate bug, #2819"
     }
   ],
   "demoted": {}
