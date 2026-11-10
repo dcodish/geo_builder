@@ -1424,7 +1424,7 @@ function figureFreeDofCount3(c: Construction3, resolved: Resolved3): number {
 type VecDef = Construction3['vecDefs'][number];
 
 /** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
-function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>): Vec3 | null {
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number, free?: ReadonlyMap<string, Vec3>, letterVal?: (sym: string) => number): Vec3 | null {
   const evalR = (P: Vec3): Vec3 | null => {
     const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
     const from = get(vd.from);
@@ -1447,7 +1447,8 @@ function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: numb
         vvec = a && b ? sub3(b, a) : null;
       }
       if (!vvec) return null;
-      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+      // #1551 (ADR-3D-472): a term naming its own letter (a definition with several) reads that letter's number
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * (t.sym !== undefined && letterVal ? letterVal(t.sym) : kValue)));
     }
     return acc;
   };
@@ -4020,8 +4021,22 @@ function evaluateSolidsAndPoints(
       // and the sampled free DOF alike. Recording per-branch missed the sampled case, and the sign
       // verifier then reported `sign-unsatisfiable` on a figure whose k was a perfectly positive sample.
       if (vd.symbol) ratioSymbols?.set(vd.symbol, k);
+      /**
+       * #1551 (ADR-3D-472): a definition with SEVERAL letters («EN = a·EA + b·EC») — each letter a free number, given its
+       * stated value or sampled like a one-letter ratio (one letter, one number: keyed by its first definition, the sign
+       * given choosing the side). No relation drives these letters; a point placed by them has one free DOF per letter.
+       */
+      const letterVals = new Map<string, number>();
+      for (const sym of vd.symbols ?? []) {
+        const given = symbolValueOf(c, sym);
+        const keyPt = c.vecDefs.find((d) => d.symbols?.includes(sym) || d.symbol === sym)?.unknown ?? vd.unknown;
+        const neg = c.paramSigns.some((g) => g.sym === sym && !g.positive);
+        const v = given ?? (neg ? sample(seed, `sym-${sym}-${keyPt}`, -0.8, -0.2) : sample(seed, `sym-${sym}-${keyPt}`, 0.2, 0.8));
+        letterVals.set(sym, v);
+        ratioSymbols?.set(sym, v);
+      }
       // #1188 step 2: a definition over a free vector reads its pure value (apply admits only pure, symbol-free ones)
-      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined);
+      const P = solveVecDef(c, vd, pos, k, vd.terms.some((t) => t.atom.kind === 'named' && c.freeVectors.has(t.atom.name)) ? pureFreeVectors3(c, seed) : undefined, (sym) => letterVals.get(sym) ?? 0);
       if (P) pos.set(id, P);
     } else if (def.kind === 'vec-pair') {
       // the cevian intersection: each relation traces an affine line in its own symbol

@@ -1870,22 +1870,32 @@ export const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UN
  * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
  */
 const SYM_TERM = new RegExp(
-  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?)?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
+  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?)?\s*[·×*]?\s*([a-wα-ω])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
 );
 
-export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
+/**
+ * #1551 ([ADR-3D-472](../../docs/06b-decisions-3d.md#adr-3d-472)): an expression may carry SEVERAL letters, one per term
+ * («EM = a·EA + b·EC», «αEA + βEC»: the alphabet does not choose the path). One letter keeps today's shape exactly
+ * (`symbol`, no per-term letter), so every one-letter command and saved file is unchanged; with two or more, each
+ * lettered term names its own (`sym`) and the expression lists them (`symbols`). Degree stays 1: a term carries at
+ * most one letter, so «ab·EA», «a²EA» and «a/b» have nowhere to live and stay refused (FR-VC-3).
+ */
+export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string; symbols?: string[] } | null {
   const parts = splitTopLevelTerms(src);
   if (!parts || parts.length === 0) return null;
   const terms: SymTerm[] = [];
-  let symbol: string | undefined;
+  const letters: string[] = [];
+  let termLetter: string | undefined;
   const bindSymbol = (letter: string): boolean => {
-    if (symbol && symbol !== letter) return false;
-    symbol = letter;
+    if (termLetter && termLetter !== letter) return false; // two letters in ONE term: degree 2
+    termLetter = letter;
+    if (!letters.includes(letter)) letters.push(letter);
     return true;
   };
   for (const part of parts) {
     const m = part.match(SYM_TERM);
     if (!m) return null;
+    termLetter = undefined;
     const [, sign, paren, numRaw, symLetter, pairA, pairB, named, divisor] = m;
     let coeff: LinExpr = { k: 1, p: 0 };
     if (paren) {
@@ -1913,10 +1923,12 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
     const signed: LinExpr = sign === '-' ? { k: neg(coeff.k), p: neg(coeff.p) } : coeff;
     // #1497: a purely numeric coefficient keeps its spelling, «(2/3)u» as «2/3»; a letter's never does
     const spelled = !symLetter && coeff.p === 0 ? statedSrc(paren ?? `${numRaw ?? ''}${divisor ? `/${divisor}` : ''}`) : {};
-    if (pairA) terms.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: pairA, to: pairB } });
-    else terms.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: named } });
+    const own = termLetter !== undefined ? { sym: termLetter } : {};
+    if (pairA) terms.push({ coeff: signed, ...spelled, atom: { kind: 'pair', from: pairA, to: pairB }, ...own });
+    else terms.push({ coeff: signed, ...spelled, atom: { kind: 'named', name: named }, ...own });
   }
-  return { terms, symbol };
+  if (letters.length <= 1) return { terms: terms.map(({ sym: _sym, ...t }) => t), symbol: letters[0] };
+  return { terms, symbols: letters };
 }
 
 /**
@@ -2187,7 +2199,6 @@ const volumeEqPoly: Rule = (s) => {
 
 const vecEqClaim: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
-  if (GREEK.test(s)) return null; // unknown scalars belong to spanPoint, never a claim
   const parts = s.split('=');
   if (parts.length !== 2) return null;
   const lhsPair = parts[0].trim().match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
@@ -2198,7 +2209,7 @@ const vecEqClaim: Rule = (s0) => {
     // lane; dropping it here is what made every spelling indistinguishable at apply, so the ambiguity
     // guard refused the arrow form its own clarification teaches. Recorded only when true, so an
     // unmarked command is byte-identical to before (and a saved figure's JSON is unchanged).
-    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(VEC_MARKED ? { marked: true as const } : {}) }];
+    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol, ...(rhs.symbols ? { symbols: rhs.symbols } : {}), ...(VEC_MARKED ? { marked: true as const } : {}) }];
   }
   // #1783 (ADR-3D-391): «3BD = AD» is «AD = 3·BD» — the same sentence with its sides swapped (Am. 1: it was lowered
   // with the reciprocal, «AD = ⅓·BD», a different sentence). It lowers to the same
@@ -2208,7 +2219,7 @@ const vecEqClaim: Rule = (s0) => {
   if (rhsPair) {
     const l = parseSymExpr(parts[0]);
     const [term] = l?.terms ?? [];
-    if (l && !l.symbol && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
+    if (l && !l.symbol && !l.symbols && l.terms.length === 1 && term.atom.kind === 'pair' && term.coeff.p === 0 && term.coeff.k !== 0)
       return [{
         type: 'vec-rel', from: rhsPair[1], to: rhsPair[2],
         terms: [{ coeff: { k: term.coeff.k, p: 0 }, atom: term.atom }],

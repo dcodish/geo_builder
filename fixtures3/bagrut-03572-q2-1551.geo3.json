@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-11-10T14:04:27.185Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AA' = w, AB = v, AD = u",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "A'"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "A'"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "A",
+          "to": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "A",
+          "to": "D"
+        }
+      ]
+    },
+    {
+      "utterance": "E אמצע BB'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "E",
+          "a": "B",
+          "b": "B'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "EA",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "E",
+          "b": "A",
+          "bare": true
+        }
+      ]
+    },
+    {
+      "utterance": "EC",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "E",
+          "b": "C",
+          "bare": true
+        }
+      ]
+    },
+    {
+      "utterance": "BM=u/6-2v/3+w/12",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "B",
+          "to": "M",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.16666666666666666,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            },
+            {
+              "coeff": {
+                "k": -0.6666666666666666,
+                "p": 0
+              },
+              "src": "2/3",
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            },
+            {
+              "coeff": {
+                "k": 0.08333333333333333,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "w"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "EM = a·EA + b·EC",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "E",
+          "to": "M",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "E",
+                "to": "A"
+              },
+              "sym": "a"
+            },
+            {
+              "coeff": {
+                "k": 0,
+                "p": 1
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "E",
+                "to": "C"
+              },
+              "sym": "b"
+            }
+          ],
+          "symbols": [
+            "a",
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור AEC",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "AEC",
+          "ids": [
+            "A",
+            "E",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "|w| = 4",
+      "cmds": [
+        {
+          "type": "vec-mag",
+          "name": "w",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "utterance": "BM ⊥ AEC",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "E"
+        },
+        {
+          "type": "segment3",
+          "a": "E",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "A"
+        },
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "B",
+          "b": "M",
+          "plane": [
+            "A",
+            "E",
+            "C"
+          ]
+        }
+      ]
+    }
+  ]
+}

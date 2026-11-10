@@ -585,6 +585,9 @@ const SEEDED: SeededCorpus = {
   // #1829 (ADR-3D-471): the operator's rectangle, saved with his «AE» ask (before: «AE⃗ — לא נקבע על ידי הנתונים»; now
   // «u + t·v»). The answers, the shared t and the panel parity are asserted in queries.test.ts; this is the build + drift net.
   'vector-answer-in-parameter-1829.geo3.json': ['מלבן ABCD', 'AB→ = u', 'AD→ = v', 'AB=1', '|AD|=√7', 'DF→ = t*DC→', 'BE→ = t*BC→'],
+  // #1551 (ADR-3D-472): bagrut 2026 summer 03572 Q2 as typed in prod (before: «EM = a·EA + b·EC» not understood). The
+  // letters (a = 2/3, b = 1/6), M in plane AEC and the 2/1/4 box are asserted in issue-1551-two-letter-vec-rel.test.ts.
+  'bagrut-03572-q2-1551.geo3.json': ["תיבה ABCDA'B'C'D'", "נסמן: AA' = w, AB = v, AD = u", "E אמצע BB'", 'EA', 'EC', 'BM=u/6-2v/3+w/12', 'EM = a·EA + b·EC', 'מישור AEC', '|w| = 4', 'BM ⊥ AEC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
