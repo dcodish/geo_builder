@@ -1,72 +1,6 @@
 {
   "pending": [
     {
-      "sheet": "round-2722",
-      "id": "T39",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "lines": [
-        "פירמידה ישרה SABCD שבסיסה מרובע"
-      ],
-      "lookFor": "«הבסיס (ABCD)», ⓘ strip."
-    },
-    {
-      "sheet": "round-2722",
-      "id": "T71",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "AB = AC"
-      ],
-      "lookFor": "The row is kept, with 2 ticks."
-    },
-    {
-      "sheet": "round-2722",
-      "id": "T72",
-      "kind": "analytic:blind-review",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "אורך השוק AB הוא 5"
-      ],
-      "lookFor": "«5» on AB, no ticks."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T56",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5175",
-      "path": "/3d.html",
-      "lines": [
-        "מישור π 2x+y=1"
-      ],
-      "lookFor": "The panel reads π: 2x + y - 1 = 0."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T55",
-      "kind": "3d:blind-review",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5175",
-      "path": "/3d.html",
-      "lines": [
-        "קוביה ABCDA'B'C'D'",
-        "AB = 3",
-        "AC = 3√2"
-      ],
-      "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row."
-    },
-    {
       "sheet": "round-2727",
       "id": "T54",
       "kind": "analytic:blind-review",
@@ -682,7 +616,90 @@
       "pass": true,
       "date": "2026-11-10",
       "note": "operator 2026-11-10: \"the behavior is correct but why are lines now dashed?\" — the case's claim (the ⓘ note) holds; the dashed drawing is a separate bug, #2819"
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T39",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "lines": [
+        "פירמידה ישרה SABCD שבסיסה מרובע"
+      ],
+      "lookFor": "«הבסיס (ABCD)», ⓘ strip.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T72",
+      "kind": "analytic:blind-review",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "אורך השוק AB הוא 5"
+      ],
+      "lookFor": "«5» on AB, no ticks.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10, Rulings Inbox"
+    },
+    {
+      "sheet": "round-2722",
+      "id": "T71",
+      "kind": "analytic:assertion",
+      "queued": "2026-11-06",
+      "product": "analytic",
+      "base": "http://localhost:5175",
+      "lines": [
+        "משולש ABC",
+        "AB = AC"
+      ],
+      "lookFor": "The row is kept, with 2 ticks.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10: the at-rest ticks should go and a marks toggle is wanted — both are #2181"
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T56",
+      "kind": "3d:assertion",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5175",
+      "path": "/3d.html",
+      "lines": [
+        "מישור π 2x+y=1"
+      ],
+      "lookFor": "The panel reads π: 2x + y - 1 = 0.",
+      "pass": true,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10: the claim holds; the doubled π in the parametric row is #2820"
+    },
+    {
+      "sheet": "round-2727",
+      "id": "T55",
+      "kind": "3d:blind-review",
+      "queued": "2026-11-06",
+      "product": "3d",
+      "base": "http://localhost:5175",
+      "path": "/3d.html",
+      "lines": [
+        "קוביה ABCDA'B'C'D'",
+        "AB = 3",
+        "AC = 3√2"
+      ],
+      "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row.",
+      "pass": false,
+      "date": "2026-11-10",
+      "note": "operator 2026-11-10: a restated length must be accepted as a row with the notice AND drawn with its value (ADR-W-200, #2790); prod answers «כבר קיים» with no row"
     }
   ],
-  "demoted": {}
+  "demoted": {
+    "3d:blind-review": 0
+  }
 }
