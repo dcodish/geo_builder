@@ -37,7 +37,7 @@ import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves'
 import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
 import type { Construction, Id, NumCurve } from '../engine/types';
-import { knownCurve, knownCurveOptions } from '../engine/evaluate';
+import { curveEquationInLetters, knownCurve, knownCurveOptions } from '../engine/evaluate';
 import type { LocusShape, Monomial, SymbolicCurve } from '../engine/locusFit';
 
 /**
@@ -712,6 +712,14 @@ function monomialText(m: Monomial, fmt: (v: number) => string): string {
   return `${shown === fmt(1) ? '' : shown}${letters}`;
 }
 
+/**
+ * A VALUE IN THE STUDENT'S LETTERS, SIGNED (#2735, ADR-AG-458) — `2k`, `-k/2`, `k²`: the locus's monomial spelling with its
+ * sign, so a coordinate, a length and a curve's parameters print the one way the locus equations already do.
+ */
+export function lettersText(m: Monomial, fmt: (v: number) => string): string {
+  return `${m.c < 0 ? '-' : ''}${monomialText(m, fmt)}`;
+}
+
 /** A monomial that is ONE atom — a number or a single letter — needs no brackets before `²` or after `/`. */
 const isAtom = (t: string): boolean => /^(\d+|[A-Za-z])$/.test(t);
 
@@ -734,7 +742,7 @@ function monomialRoot(m: Monomial): Monomial | null {
  * a circle with `r²` written as a square when it is one (`(x − 16a)² + y² = (25a)²`, #1187), a parabola `y² = 4ax`,
  * an ellipse `x²/(4a²) + y²/b² = 1`. Every monomial was verified against the traces before it reached here.
  */
-function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
+export function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): string {
   const signed = (m: Monomial, sym: string): string => {
     if (m.c === 0) return '';
     const body = monomialText(m, fmt);
@@ -772,10 +780,17 @@ function symbolicLocusEquation(s: SymbolicCurve, fmt: (v: number) => string): st
  * configurations give (`knownCurveOptions`, #1716), else nothing. «משוואת l1» answered null while the panel row listed
  * two options because the ask's by-name branch asked only the first half; one function, so they cannot disagree again.
  */
-export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | null;
+/*
+ * #2735 (ADR-AG-458, operator 2026-11-09 option C): else the equation in the student's letters — a curve the figure fixes
+ * as monomials in its parameters («(x − 3k)² + y² = (2k)²»), read and verified over the same pool, printed by the locus
+ * equations' own printer. Asked only once the curve is neither known, nor an option set, nor pending.
+ */
+export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | { letters: SymbolicCurve } | null;
 export function curveEquationOf(c: Construction, id: Id): CurveEquation {
   const known = knownCurve(c, id);
   if (known) return { known };
   const options = knownCurveOptions(c, id);
-  return options ? { options } : null;
+  if (options) return { options };
+  const letters = curveEquationInLetters(c, id);
+  return letters && letters !== 'pending' ? { letters } : null;
 }

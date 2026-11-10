@@ -10,7 +10,8 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { curveInLetters, readInLetters, type Monomial, type SymbolicCurve } from './locusFit';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, isRadiusSymbol, labelRows, narrowedDomain, noFreedomReaches, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf, parentsOf } from './derived';
 import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
@@ -6138,7 +6139,10 @@ export function reportPending(c: Construction): void {
  * configurations — set only by {@link knownValue}, never by {@link isKnowledge}, which answers the narrower
  * question "is this ONE value".
  */
-export type Knowledge = { known: true; value: number } | { known: false; pending?: true; options?: readonly number[] };
+export type Knowledge =
+  | { known: true; value: number }
+  /** `letters` (#2735, ADR-AG-458): the value moves, and moves as this monomial in the student's letters — {@link valueInLetters}. */
+  | { known: false; pending?: true; options?: readonly number[]; letters?: Monomial };
 
 /**
  * The seeds a DEFAULT gate reads, or `null` for "fill and read all". On a deferred pool, first the
@@ -6774,6 +6778,118 @@ export function knownCurve(
     return null;
   }
   return first;
+}
+
+/**
+ * ═══ THE THIRD VERDICT FOR A VALUE — IT MOVES, AND MOVES AS A MONOMIAL IN THE STUDENT'S LETTERS (#2735, ADR-AG-458) ═══
+ *
+ * The gates above have two verdicts for a value: the same at every configuration (print it) or not (open). Operator,
+ * 2026-11-07: *"yes - we should support (2k,0) in the data panel"*; 2026-11-09, option C: coordinates, curve equations
+ * and lengths, in the panel and the question box. F₁ on x²/144 + y²/(144 − 4k²) = 1 with 0 < k < 6 is (2k, 0) at every
+ * configuration and was printed «(x_F₁, 0)».
+ *
+ * So over the SAME admitted configuration pool every gate judges (ADR-AG-180 — no new sweep), each configuration's
+ * letter values (`f.env`) and the value read there go to {@link readInLetters}, the one reader the locus's third verdict
+ * uses (ADR-AG-351): measure → snap a ratio `value / letterᵉ` → substitute back at every configuration. **Not CAS**: a
+ * dependence that is not a monomial (`k + 1`, `√(144 − 4k²)`) is not found, and the caller keeps today's row. A
+ * `2|k|` reads only when the stated domain keeps `k` on one side of 0, because the pool samples only admissible values.
+ *
+ * Only the student's own letters (never a tool symbol), only those that move across the pool, at most two. A figure
+ * with no letter costs nothing: the register is empty and the pool is never touched. On the page a pool not yet
+ * complete answers `'pending'` — a read over part of the pool is not knowledge, exactly as for a value (#1473).
+ */
+const MAX_VALUE_LETTERS = 2;
+type LetterPool = { figs: Figure[]; envs: Array<Readonly<Record<string, number>>>; varying: string[] };
+function letterPool(c: Construction): LetterPool | 'pending' | null {
+  const used = usedSymbols(c);
+  const letters = paramRegister(c)
+    .map((p) => p.sym)
+    .filter((sym) => used.has(sym) && !isDirectionSymbol(sym) && !isRadiusSymbol(sym));
+  if (letters.length === 0) return null;
+  const pool = poolOf(c);
+  if (pool.deferred && !pool.complete()) {
+    pool.notePending();
+    return 'pending';
+  }
+  pool.fill();
+  const figs = admittedOf(c, pool.ready());
+  if (figs.length < 3) return null;
+  const envs = figs.map((f) => f.env);
+  const varying = letters.filter((sym) => {
+    const vs = envs.map((e) => e[sym]);
+    if (vs.some((v) => v === undefined || !Number.isFinite(v))) return false;
+    const lo = Math.min(...vs);
+    const hi = Math.max(...vs);
+    return hi - lo > 1e-9 * Math.max(1, Math.abs(hi), Math.abs(lo));
+  });
+  if (varying.length === 0 || varying.length > MAX_VALUE_LETTERS) return null;
+  return { figs, envs, varying: varying.sort() };
+}
+
+/** A value as a monomial in the student's letters, of degree ≥ 1; `null` when it is not one; `'pending'` on a partial pool. */
+export function valueInLetters(c: Construction, read: (f: Figure) => number | null): Monomial | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const vals: number[] = [];
+  for (const f of lp.figs) {
+    const v = read(f);
+    if (v === null || !Number.isFinite(v)) return null;
+    vals.push(v);
+  }
+  const m = readInLetters(vals, lp.envs, lp.varying);
+  return m && Object.keys(m.pow).length > 0 ? m : null;
+}
+
+/**
+ * A VECTOR of values in the letters — each component a monomial, a constant allowed (degree 0), at least one moving —
+ * for an answer printed from several numbers at once (a role's coordinates, a directrix's position). `read` returns the
+ * same number of components at every configuration, or `null` when the answer's shape changes there.
+ */
+export function vectorInLetters(c: Construction, read: (f: Figure) => number[] | null): Monomial[] | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const rows: number[][] = [];
+  for (const f of lp.figs) {
+    const v = read(f);
+    if (v === null || v.length === 0 || (rows.length > 0 && v.length !== rows[0].length) || v.some((n) => !Number.isFinite(n))) return null;
+    rows.push(v);
+  }
+  const monos: Monomial[] = [];
+  for (let i = 0; i < rows[0].length; i += 1) {
+    const m = readInLetters(
+      rows.map((r) => r[i]),
+      lp.envs,
+      lp.varying,
+    );
+    if (!m) return null;
+    monos.push(m);
+  }
+  return monos.some((m) => Object.keys(m.pow).length > 0) ? monos : null;
+}
+
+/** A curve's equation in the student's letters ({@link curveInLetters}), `null` when it has none, `'pending'` on a partial pool. */
+export function curveEquationInLetters(c: Construction, id: Id): SymbolicCurve | 'pending' | null {
+  const lp = letterPool(c);
+  if (lp === null || lp === 'pending') return lp;
+  const curves: NumCurve[] = [];
+  for (const f of lp.figs) {
+    const cur = f.curves.find((q) => q.id === id)?.curve;
+    if (!cur) return null;
+    curves.push(cur);
+  }
+  return curveInLetters(curves, lp.envs, lp.varying);
+}
+
+/**
+ * The value gate's verdict with the third verdict added (#2735): an OPEN verdict — not known, no option set, not pending —
+ * is asked {@link valueInLetters}. Opted into by the rows the ruling names (a point's coordinates, a segment's length);
+ * a slope, an angle or a parameter's own row never reads it.
+ */
+export function withLetters(c: Construction, k: Knowledge, read: (f: Figure) => number | null): Knowledge {
+  if (k.known || k.pending || k.options) return k;
+  const m = valueInLetters(c, read);
+  if (m === 'pending') return { known: false, pending: true };
+  return m ? { known: false, letters: m } : k;
 }
 
 // ---------------------------------------------------------------------------
