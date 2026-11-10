@@ -981,6 +981,23 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   opens, never refused. «הציגו תצורה אחרת» redraws every shape. A figure tied to coordinates, a coordinate letter, a free
   vector, a stated size or a solid of revolution is still drawn as one.
   - Sources: ADR-3D-454, ADR-3D-455; #2764.
+- **FR-SP-31 (Must)** — **The exam's subject frame reads as its statement** (#2062; operator 2026-10-14, card
+  `d14b-2062-frame` A: *"read in front of any statement, in all three tools"*). «הנקודה M מקיימת BM = 1/6u − 2/3v +
+  1/12w», «נקודה M מקיימת: …», «M מקיים …», "the point M satisfies …" build exactly as the statement after the frame
+  does, behind «נתון כי» too, whenever that statement names M. A frame whose statement does not name its point
+  («הנקודה D מקיימת AB = 3») is not read this way. 2-D and analytic read the same frame (ADR-819, ADR-AG-460).
+  A vector term with a minus and a divisor («BN=u/2-v/2», «BK=-v/2+w/4») builds as its «−1/2v» spelling does (two spellings
+  of one vector, docs/17 §9).
+  - Sources: ADR-3D-479; #2062.
+- **FR-SP-32 (Must)** — **Whether a point lies in a plane is in the data panel, and the exam's question points there**
+  (#2062; operator 2026-10-14, card `d14b-2062-question` A, *"if now - we should"*). The panel's mutual-position
+  section lists, for every point the student introduced that is not a vertex of a solid, against every plane in the
+  figure it does not define: «M נמצאת במישור AEC» or «M אינה נמצאת במישור AEC», only when it holds in every
+  configuration. «האם הנקודה M נמצאת במישור AEC?» (the main input or the ask box, "is M in plane AEC?" too) adds
+  nothing to the figure and answers «התשובה מופיעה בלוח הנתונים — שורת המיקום ההדדי של M ומישור AEC»; the main input
+  opens the panel, and the row is highlighted. Where the panel has no such row, the answer is «לא נקבע על ידי הנתונים».
+  The question never goes to the model.
+  - Sources: ADR-3D-480; #2062.
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
   documented remaining niche is orthoscheme.

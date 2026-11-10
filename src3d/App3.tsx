@@ -27,7 +27,7 @@ import { orderToolActions } from '../shell/frame/toolRow';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's own buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
 import registry from '../products.json';
-import { dataView, panelIsEmpty, radiusRowLabel3 } from './engine/dataView';
+import { dataView, mutualRowKey3, panelIsEmpty, pointPlaneRowKey3, radiusRowLabel3 } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { defaultPlaneDisplay3 } from './engine/types';
@@ -129,6 +129,13 @@ export default function App3() {
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1000px)').matches,
   );
   const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
+  // #2062 (ADR-3D-480): the panel row a membership question points at — highlighted and scrolled into view
+  const [highlightRow, setHighlightRow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!highlightRow) return;
+    const el = document.querySelector(`[data-row-key="${CSS.escape(highlightRow)}"]`);
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlightRow, showData]);
   // #742: the row disables (never hides) — the 2-D canUndo/canRedo mechanism, mirrored.
   const canUndo3 = useStore(useGeo3.temporal, (s) => s.pastStates.length > 0);
   const canRedo3 = useStore(useGeo3.temporal, (s) => s.futureStates.length > 0);
@@ -597,6 +604,11 @@ export default function App3() {
     }
     dispatchVerdict(v);
     let err = useGeo3.getState().lastError;
+    // #2062 (ADR-3D-480): the exam's membership question points at a panel row — open the panel and highlight it
+    if (err?.code === 'answer-in-panel') {
+      setHighlightRow(err.known ? pointPlaneRowKey3(err.point, err.plane) : null);
+      if (err.known) setShowData(true);
+    } else setHighlightRow(null);
     logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
@@ -1228,8 +1240,14 @@ export default function App3() {
                             : `dataPanel.mutual.${m.rel}`,
                           { a: m.a, b: m.b },
                         );
+                        const rowKey = mutualRowKey3(m);
                         return (
-                          <span key={`${m.rel}-${m.a}-${m.b}`} dir={textDir3(line)} className="block font-medium">
+                          <span
+                            key={rowKey}
+                            data-row-key={rowKey}
+                            dir={textDir3(line)}
+                            className={`block font-medium${highlightRow === rowKey ? ' rounded bg-amber-100 ring-2 ring-amber-400' : ''}`}
+                          >
                             {line}
                           </span>
                         );
@@ -1277,10 +1295,10 @@ export default function App3() {
                                 </span>
                               ))}
                               {/* #813: a note may ACCOMPANY an answer (a frameless plane reports its shape and says why no equation follows) */}
-                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
+                              {r.note && <span className="font-normal text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>}
                             </span>
                           ) : (
-                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                            <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param, ...r.inPanel })}</span>
                           )}
                         </span>
                         <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
@@ -1316,6 +1334,9 @@ export default function App3() {
                   unreadableHint={t('query.note.notUnderstood')}
                   onSubmit={(text) => {
                     addQuery(text);
+                    // #2062 (ADR-3D-480): a membership question asked here highlights the row its answer points at
+                    const a = answerQuery(derived.construction, text, seed);
+                    setHighlightRow(a.inPanel ? pointPlaneRowKey3(a.inPanel.point, a.inPanel.plane) : null);
                   }}
                   palette={{ symbols: SYMBOL_SPECS_3, startCollapsed: true, compact: true, toggleTitle: t('palette.show') }}
                 />

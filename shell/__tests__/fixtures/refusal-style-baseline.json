@@ -61,6 +61,16 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
+  "3d:answer-in-panel #1": {
+   "key": "answer-in-panel",
+   "reason": "ruled",
+   "note": "#2062, operator 2026-10-14 (card d14b-2062-question A): the ruled sentence verbatim, «התשובה מופיעה בלוח הנתונים — שורת המיקום ההדדי של M ומישור AEC»; the pointer IS the next step (ADR-3D-480)"
+  },
+  "3d:answer-in-panel #2": {
+   "key": "answer-in-panel",
+   "reason": "ruled",
+   "note": "#2062, the same card: where the panel has no row, the ask lane's existing «לא נקבע על ידי הנתונים» (ADR-3D-480)"
+  },
   "3d:bad-file #1": {
    "key": "bad-file",
    "reason": "queued",

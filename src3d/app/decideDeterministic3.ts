@@ -60,6 +60,7 @@ type StoreOwnCode3 = Exclude<NonNullable<StoreError3>, EngineError3>['code'];
 // the plain and the coefficient forms alike), and it is still the clarification it always was, in either form.
 const STORE_CATEGORY3: Record<StoreOwnCode3 | 'ambiguous-vector-length', RefusalCategory3> = {
   'proof-target': 'guided', // #1666: what the student must PROVE, answered with the pointer (2-D's `scope:proof`)
+  'answer-in-panel': 'guided', // #2062: an exam question about a point and a plane, answered with the panel row it points at
   'juxtaposed-numbers': 'guided', // #2286: two numbers side by side, answered with the suite's readings sentence (`scope:juxtaposed-numbers`)
   'radian-angle': 'guided', // #1837: an angle in radians, answered with 2-D's degrees sentence (`scope:radian-angle`)
   'unread-name': 'guided', // #1919: a letter the tool cannot read, answered with the point-name sentence
