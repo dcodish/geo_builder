@@ -16,6 +16,7 @@ import { layoutFreeVectorScene3 } from './freeVectorLayout';
 import { cleanMag } from '../engine/dataView';
 import { ANGLE_TOL_DEG, lineAngleDeg, vertexAngleDeg } from '../engine/claims';
 import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { FLAT_SOLID_KINDS } from '../engine/solve3';
 import { DIRECTION_REL_TOL, distanceWitness, operandKey, relDeviation, resolveOperand, type OperandGeom } from '../engine/operands';
 import { defaultPlaneDisplay3, lengthMarkText, type Construction3, type Id, type Operand3, type Positions3, type SolidObj } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 , runRingOrder } from '../engine/vec3';
@@ -340,8 +341,23 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
   const { eye } = cameraFrame(cam);
   const hidden = new Set<string>();
   const faceKey = (f: readonly Id[]): string => [...f].sort().join('|');
-  const faceCount = new Map<string, number>();
-  for (const s of c.solids) for (const f of s.faces) faceCount.set(faceKey(f), (faceCount.get(faceKey(f)) ?? 0) + 1);
+  // #2819 (ADR-3D-481): a face is inside a union only when two different solids WITH A BODY carry its vertex set — count
+  // the bodied SOLIDS, never the faces. A flat polygon carries its ring twice (ring and reverse, so one side always faces
+  // the camera) and has no body: counting faces read that one shape as two solids sharing a face (every edge dashed),
+  // and counting it as a carrier made a pyramid's base on it an interior face (its edges dashed from below too). A flat
+  // polygon's face that a bodied solid also carries decides nothing: that solid's own face is the surface there.
+  const bodied = new Map<string, Set<number>>();
+  c.solids.forEach((s, i) => {
+    if (FLAT_SOLID_KINDS.has(s.kind)) return;
+    for (const f of s.faces) {
+      const k = faceKey(f);
+      const set = bodied.get(k) ?? new Set<number>();
+      set.add(i);
+      bodied.set(k, set);
+    }
+  });
+  const isSurface = (solid: SolidObj, f: readonly Id[]): boolean =>
+    (bodied.get(faceKey(f))?.size ?? 0) < (FLAT_SOLID_KINDS.has(solid.kind) ? 1 : 2);
   /** the other solids `solid` shares vertices with — the only ones whose body can hold its faces */
   const partners = (solid: SolidObj): SolidObj[] => c.solids.filter((o) => o !== solid && o.ids.filter((id) => solid.ids.includes(id)).length >= 3);
   const inPartner = (solid: SolidObj, p: Vec3): boolean => partners(solid).some((o) => strictlyInside(o, positions, p));
@@ -353,7 +369,7 @@ export function hiddenEdgeKeys(c: Construction3, positions: Positions3, cam: Cam
     const normals = solidFaceNormals(solid, positions); // #2702: right on a non-convex (dart-base) solid too
     for (const [f, face] of solid.faces.entries()) {
       const ring = face.map((id) => positions.get(id)!);
-      const surface = (faceCount.get(faceKey(face)) ?? 0) < 2 && !inPartner(solid, centroid3(ring));
+      const surface = isSurface(solid, face) && !inPartner(solid, centroid3(ring));
       const front = surface && dot3(normals[f], eye) > 1e-12;
       for (let i = 0; i < face.length; i++) {
         const k = edgeKey(face[i], face[(i + 1) % face.length]);

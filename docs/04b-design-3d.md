@@ -973,7 +973,10 @@ three dims join the flat dim vector like any shape dim, so a bound pyramid contr
 `pointParents3` gives the apex its ring as parents, `placementFixers3` adds the ring's fixers, and `declaredRings3`
 counts the bound base as a declared ring, so the ring checks (skew, crossing) judge it. The renderer draws a shared
 edge once, lets no face both solids carry decide an edge's dashing, and dashes an edge inside a solid it shares
-vertices with (`hiddenEdgeKeys`).
+vertices with (`hiddenEdgeKeys`). A face is "shared" when two DIFFERENT solids WITH A BODY carry its vertex set: the
+count is of bodied solids, never of faces (a flat polygon carries its own ring twice, ring and reverse), and a flat
+polygon's face that a bodied solid also carries decides nothing, that solid's face being the surface there
+([ADR-3D-481](06b-decisions-3d.md#adr-3d-481)).
 
 The base SHAPE a bound pyramid carries is only a stated one ([ADR-3D-436](06b-decisions-3d.md#adr-3d-436)). The parser
 reads «פירמידה ABCDS» and «… שבסיסה מלבן» as one command (ADR-3D-011's rectangle is the default that draws a base the
