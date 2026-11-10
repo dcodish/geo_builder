@@ -79,6 +79,9 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'size-on-solid': [{}],
   'unknown-symbol': [{ id: 'k' }],
   'sign-not-selectable': [{ id: 'k' }],
+  // #1524 (ADR-3D-477): a stated range on a letter
+  'param-bound-unsatisfiable': [{ id: 'k' }],
+  'param-bound-not-selectable': [{ id: 'k' }],
   'ambiguous-angle': [{ id: 'B' }],
   'no-prism-to-make-right': [{}],
   'ambiguous-prism': [{}],

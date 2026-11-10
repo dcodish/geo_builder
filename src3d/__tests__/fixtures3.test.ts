@@ -582,6 +582,13 @@ const SEEDED: SeededCorpus = {
   // point). Saved with `seedParts`, so the corpus also loads the new file field. The per-line work, the stability and the
   // round trips are asserted in issue-2764-independent-parts.test.ts; this is the build + drift + load net.
   'nine-separate-shapes-2764.geo3.json': ['מרובע', 'טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית', 'מקבילית', 'מלבן', 'מעוין', 'ריבוע', 'דלתון'],
+  // #1524 (ADR-3D-477): a parameter's RANGE — «k ≥ 0» (the sign that allows zero) selects the root of the 60° angle, the
+  // appositive and the standalone spelling both; «2 ≤ k ≤ 9» checks it. The refusals and the sampled windows are asserted in
+  // adr-3d-032.test.ts; this is the build + drift + load net.
+  'param-range-1524.geo3.json': [
+    'תיבה', "מישור A'B'C'D' הוא x+4y-8z-142=0", 'B(0,7,6)', 'משוואת הישר AB היא x = (0,7,6) + t(0,2,1)', 'אורך המקצוע AB הוא 5√5',
+    'שיעור ה-y של הקודקוד A שלילי', 'נתונה נקודה M(k,1,3), k ≥ 0', 'גודל הזווית שבין הישר AB ובין הישר AM הוא 60', '2 ≤ k ≤ 9',
+  ],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

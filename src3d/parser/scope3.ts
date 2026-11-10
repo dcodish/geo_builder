@@ -205,7 +205,7 @@ const RULES3: ScopeRule3[] = [
       // a TWO-SIDED numeric bound around a lone lowercase letter: 60<a<90, 60 ≤ a ≤ 90.
       // The RESERVED letters are excluded by name — «60<t<90» is a student bounding the figure
       // PARAMETER, and answering it with "use ∠ABC or α" would be guidance about the wrong thing; it
-      // stays an honest not-understood until a parameter-bound form exists.
+      // reads as the parameter's range (#1524, ADR-3D-477 — `paramBound`'s chain takes exactly these letters).
       /^\s*\d+(?:\.\d+)?\s*[<≤]\s*(?![tkmuvwxyz](?![a-z]))[a-z]\s*[<≤]\s*\d+(?:\.\d+)?\s*$/,
       // Deliberately NOT extended to «זווית a» / «angle a = 60»: the #181 ANCHORED UPLIFT already owns
       // a single letter after an angle noun — it reads as the point label A and «angle b = 60» builds

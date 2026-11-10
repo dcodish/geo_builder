@@ -516,6 +516,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the figure cannot satisfy is refused naming the statement, an unknown letter as unknown; a stated sign
   («k חיובי») is honoured the same way.
   - Sources: ADR-052, ADR-3D-219, ADR-3D-236, ADR-3D-433 (the coordinate parameter's value against the givens that pin it, in either order); #814, #902, #922, #930, #1896.
+- **FR-VC-2g (Must)** — **A student can state a RANGE for a letter the figure carries**: `t ≥ 0`, `k ≤ 3`, `k > 2`,
+  `2 ≤ k ≤ 5`, the typed `>=` / `<=`, «k גדול מ-2», «k קטן או שווה ל-3», «k לפחות 2», «k לכל היותר 3», and the English
+  mirrors. A free letter is drawn inside its range and «הציגו תצורה אחרת» re-samples inside it; a determined letter keeps
+  the root that lies in it; a range the givens leave no value in is refused naming the statement, and of two
+  contradicting ranges the newer is refused. A strict range at zero is the sign. The palette offers `<`, `>`, `≤`, `≥`.
+  Ranges on lengths, distances and angles are later arms of the same issue.
+  - Sources: ADR-3D-477, ADR-3D-478; #1524 (operator ruling 2026-09-29, option C).
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is

@@ -1127,6 +1127,7 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // #814's `componentValue` / `componentSignsHold` live in operands.ts (#818: the pivot's sign-axis
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
+import { boundHolds3, boundWindow3, symBound3 } from './bound3';
 import { componentSignsHold } from './operands';
 
 
@@ -1154,7 +1155,10 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
   // difference structural. Sign givens are applied HERE for the first time: they were honoured on the
   // paramGivens path (`pinParam`) but silently ignored on this one, so `k הוא פרמטר חיובי` plus a ⟂
   // given could draw the negative root — a figure contradicting a stated given.
-  const signed = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+  // #1524 (ADR-3D-477): the parameter's OWN stated range (a sign or a range), folded — a range stated on another
+  // letter never filters this one's roots.
+  const own = symBound3(c, c.param);
+  const signed = own ? roots.filter((t) => boundHolds3(own, t)) : roots;
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
@@ -1185,8 +1189,8 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number, param
 /** The half-line an UNPINNED parameter is sampled on — a stated sign narrows it (ADR-3D-032). `reach` (#1986,
  *  ADR-3D-418, analytic's ADR-AG-256) widens the window's OPEN side(s) only; 1 is the default window, bit-identical. */
 function openParamRange3(c: Construction3, reach = 1): [number, number] {
-  const sign = c.paramSigns.find(() => true);
-  return sign ? (sign.positive ? [0.3, 3 * reach] : [-3 * reach, -0.3]) : [-3 * reach, 3 * reach];
+  // #1524 (ADR-3D-477): a stated range narrows the window the way a sign did — a sign gives the same half-windows
+  return boundWindow3(symBound3(c, c.param), -3 * reach, 3 * reach, 0.3);
 }
 
 /**
@@ -1574,8 +1578,8 @@ function firstNonDegenerateRoot(
   // Filtered by `sym` deliberately. The other sign consumers in this file apply `paramSigns.every`
   // to every root regardless of which symbol each sign names — sound while a figure has one symbol,
   // and not something to copy: here a second vec-def's sign must not constrain this one's branch.
-  const signs = c.paramSigns.filter((g) => g.sym === vd.symbol);
-  const eligible = signs.length ? roots.filter((k) => signs.every((g) => (g.positive ? k > 1e-9 : k < -1e-9))) : roots;
+  const own = symBound3(c, vd.symbol); // #1524: a sign or a range, folded
+  const eligible = own ? roots.filter((k) => boundHolds3(own, k)) : roots;
   for (const k of eligible) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
   // No root honours the sign: return nothing, so the point stays UNPLACED and the store's existing
   // vec-rel check refuses honestly. A sign that cannot be satisfied must never fall back to a root
@@ -2324,7 +2328,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // snapped first, so the value the verifier's own predicate judges is the value drawn (ADR-3D-286 §3)
       roots = snapAndDedupe(candidates).filter(holdsAll);
     }
-    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const ownBound = symBound3(c, c.param); // #1524 (ADR-3D-477): the parameter's own sign or range
+    const pool0 = ownBound ? roots.filter((t) => boundHolds3(ownBound, t)) : roots;
     const pool = pool0.length > 0 ? pool0 : roots;
     if (pool.length > 0) {
       const value = opts.paramValue !== undefined ? nearestBranch(pool, opts.paramValue) : pool[seed % pool.length]; // #1474
@@ -2475,7 +2480,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         // among pivot solutions, exactly like a coordinate sign given
         const symsOk = c.paramSigns.every((s) => {
           const v = sol.pinSymbols?.[s.sym];
-          return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
+          const b = symBound3(c, s.sym); // #1524: the letter's folded sign or range
+          return v === undefined || !b ? true : boundHolds3(b, v);
         });
         if (!symsOk) return false;
         // #814: the same selection for a letter that NAMES a free component («p חיובי» after
@@ -4006,10 +4012,10 @@ function evaluateSolidsAndPoints(
           // and «k שלילי» falsely `sign-unsatisfiable`: the figure can perfectly well put N beyond S on
           // the SC line, the sampler just never looked there. A default that survives a contradicting
           // statement is asserting a given the student never gave (ADR-052), so the range follows the sign.
-          const neg = c.paramSigns.some((g) => g.sym === vd.symbol && !g.positive);
-          k = neg
-            ? sample(seed, `sym-${vd.symbol}-${vd.unknown}`, -0.8, -0.2)
-            : sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8);
+          // #1524 (ADR-3D-477): ...and a stated RANGE is the student choosing which part of it; a sign gives the
+          // same windows as before ((0.2, 0.8) / (−0.8, −0.2)).
+          const [k0, k1] = boundWindow3(symBound3(c, vd.symbol), 0.2, 0.8, 0.2);
+          k = sample(seed, `sym-${vd.symbol}-${vd.unknown}`, k0, k1);
         }
       }
       // #930 (ADR-3D-236): record the value ACTUALLY used, on every path — the pinned root pick above
