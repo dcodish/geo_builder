@@ -1,0 +1,393 @@
+{
+ "name": "round-2808",
+ "title": "Fix round #2808 — 2026-11-10 (batch on main)",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "3-D: a midpoint of a cube vertex and a stated point stays the midpoint (#2798)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(1,2,3)",
+    "M אמצע AP"
+   ],
+   "cycles": 3,
+   "expectFigure": [
+    "M",
+    "P"
+   ],
+   "lookFor": "In every drawing M sits on segment AP, halfway, while the cube moves.",
+   "before": "M was drawn 1–4 units off AP, every line green."
+  },
+  {
+   "id": "T2",
+   "title": "3-D: a midpoint of two stated points never moves with the cube (#2798)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(1,2,3)",
+    "Q(4,0,1)",
+    "M אמצע PQ"
+   ],
+   "cycles": 2,
+   "lookFor": "M stays at (2.5, 1, 2) in every drawing while the cube moves.",
+   "before": "M moved with the cube."
+  },
+  {
+   "id": "T3",
+   "title": "3-D: a true statement about the midpoint is accepted (#2798)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(1,2,3)",
+    "M אמצע AP",
+    "AM = MP"
+   ],
+   "lookFor": "The last line is no longer refused: it answers «זה כבר קיים באיור» (3-D's answer for a held fact until #2790 lands).",
+   "before": "Refused as wrong (claim-refuted).",
+   "expect": [
+    "כבר קיים באיור"
+   ],
+   "expectAbsent": [
+    "claim-refuted"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "3-D: a point on the plane through two cube vertices and a stated point builds (#2798)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(1,2,3)",
+    "מישור ABP",
+    "E על המישור ABP"
+   ],
+   "expectFigure": [
+    "E"
+   ],
+   "lookFor": "Accepted; E drawn on that plane.",
+   "before": "Refused (not-on-plane)."
+  },
+  {
+   "id": "T5",
+   "title": "3-D: a plane's crossing with a cube's diagonal stays on it (#2798, found in round)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "המישור π1: x + y + z - 1 = 0",
+    "המישור π1 חותך את AC' בנקודה E"
+   ],
+   "cycles": 2,
+   "lookFor": "E is on AC' and on π1 in every drawing.",
+   "before": "E was drawn off π1."
+  },
+  {
+   "id": "T6",
+   "title": "3-D: a cube's size beside a point on the positive x-axis is accepted (#2789, the report)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P נמצא על החלק החיובי של ציר ה-x",
+    "אורך AB = 4"
+   ],
+   "cycles": 2,
+   "expectRows": [
+    "אורך AB = 4"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "expectConfigsDiffer": true,
+   "lookFor": "The size is accepted, the edge is 4, P is on the positive x-axis, the axes are drawn, and the cube moves on each press.",
+   "before": "The size was refused and P sat on edge AB."
+  },
+  {
+   "id": "T7",
+   "title": "3-D: size first, then the axis point (#2789)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אורך AB = 4",
+    "P נמצא על החלק החיובי של ציר ה-x"
+   ],
+   "expectRows": [
+    "אורך AB = 4"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "The length stays green and the edge stays 4.",
+   "before": "The length turned red and the cube shrank back."
+  },
+  {
+   "id": "T8",
+   "title": "3-D: a box keeps a point stated on the x-axis on the axis (#2789)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "P נמצא על ציר ה-x",
+    "אורך AB = 4"
+   ],
+   "cycles": 3,
+   "lookFor": "P is on the x-axis in every drawing.",
+   "before": "P was drawn off the axis at most seeds, every line green."
+  },
+  {
+   "id": "T9",
+   "title": "3-D: a cube's size beside a line through the origin is accepted (#2789)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "l1:x=t(1,1,1)",
+    "אורך AB = 4"
+   ],
+   "expectRows": [
+    "אורך AB = 4"
+   ],
+   "expectAbsent": [
+    "size-on-solid"
+   ],
+   "lookFor": "The size is accepted.",
+   "before": "Refused."
+  },
+  {
+   "id": "T10",
+   "title": "3-D REFUSAL: a cube's size beside a stated point off the origin is still refused (#2789; #2792 next)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "P(2,0,0)",
+    "אורך AB = 4"
+   ],
+   "expectRefusal": "גודל מספרי",
+   "lookFor": "The size is still refused: «נתון גודל מספרי על גוף עם ממדים חופשיים עדיין לא נתמך כאן» (that family is #2792, next round).",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T11",
+   "title": "3-D: a point equally far from two triangle vertices builds (#2804, the report)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "TA = TB"
+   ],
+   "expectFigure": [
+    "T"
+   ],
+   "expectAbsent": [
+    "no-solution"
+   ],
+   "lookFor": "T is drawn with the «created T» notice; the row reads «|TA| = |TB|»; «הציגו תצורה אחרת» moves T.",
+   "before": "Refused: no position of T."
+  },
+  {
+   "id": "T12",
+   "title": "3-D: the same over a quadrilateral in a circle (#2804)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "מעגל חוסם את ABCD",
+    "TA = TB"
+   ],
+   "expectFigure": [
+    "T"
+   ],
+   "lookFor": "Builds, T drawn.",
+   "before": "Refused."
+  },
+  {
+   "id": "T13",
+   "title": "3-D: «AT = BT» on an empty page draws three separate points (#2804)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "AT = BT"
+   ],
+   "expectFigure": [
+    "A",
+    "B",
+    "T"
+   ],
+   "lookFor": "A, B and T are three separate dots, with T equally far from A and B.",
+   "before": "Built with A and B on one dot."
+  },
+  {
+   "id": "T14",
+   "title": "3-D: a definition still defines — «AT = TB» makes T the midpoint (#2804, regression guard)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "AT = TB"
+   ],
+   "expectFigure": [
+    "T"
+   ],
+   "lookFor": "T is the midpoint of AB.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T15",
+   "title": "3-D REFUSAL: a negative coefficient is still refused (#2804)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "AT = -TB"
+   ],
+   "expectRefusal": "T",
+   "lookFor": "Refused, naming T.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T16",
+   "title": "3-D: nine separate shapes answer fast and the earlier ones never jump (#2764, the report)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע",
+    "טרפז",
+    "טרפז שווה שוקיים",
+    "טרפז ישר זווית",
+    "מקבילית",
+    "מלבן",
+    "מעוין",
+    "ריבוע",
+    "דלתון"
+   ],
+   "lookFor": "Each line answers within about a second, and the shapes already drawn never move when the next one is added. (Separate shapes may land in different places than before — your «3 - yes».)",
+   "before": "Lines 7–9 took 6, 8 and 39 s, and line 9 redrew every shape."
+  },
+  {
+   "id": "T17",
+   "title": "3-D: a quadrilateral in a circle stays put when an unrelated rhombus is added (#2764)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מרובע ABCD",
+    "מעגל חוסם את ABCD",
+    "מעוין EFGH"
+   ],
+   "lookFor": "ABCD does not move when the rhombus appears.",
+   "before": "It moved by up to 0.34.",
+   "verifiedBy": "lock: src3d/__tests__/issue-2764-independent-parts.test.ts asserts ABCD moves 0 when the rhombus (and a second circle on EFGH) is added, seeds 0–3 (#2791 rows); a single screenshot cannot show «did not move»",
+   "expectRows": [
+    "מעוין EFGH"
+   ]
+  },
+  {
+   "id": "T18",
+   "title": "3-D: a line linking two squares still holds (#2764, your Q-2764a «b»)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע EFGH",
+    "AB ∥ EF"
+   ],
+   "expectRows": [
+    "AB ∥ EF"
+   ],
+   "lookFor": "Every row green.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T19",
+   "title": "2-D: two circles' views each hold the case they claim (#2240, the report)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים"
+   ],
+   "cycles": 9,
+   "expectConfigsDiffer": true,
+   "lookFor": "Across the presses the views go crossing → separate → one inside the other, repeating; a «separate» or «inside» view is never two crossing circles.",
+   "before": "Press 1 («separate») and press 8 («inside») drew crossing circles."
+  },
+  {
+   "id": "T20",
+   "title": "2-D: a pair forced apart stays apart on every press (#2240, riskiest)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים",
+    "מעגל O שרדיוסו 3",
+    "מעגל P שרדיוסו 2",
+    "OP = 10"
+   ],
+   "cycles": 3,
+   "lookFor": "The forced pair holds its one case at every press (by the lock). In the browser this spelling draws four circles — #2413.",
+   "before": "The same picture; each press now takes about 0.15 s instead of 0.02 s (accepted, «8 - 1»).",
+   "verifiedBy": "lock: the #2240 scenario bare-circle-pair-configurations-2240 and displayable-config.test.ts (forced pair settles on its one case, every press). The browser spelling here does not reach the bare pair: the naming lines draw two NEW circles (an existing bug, #2413, commented 2026-11-10)",
+   "expectRows": [
+    "OP = 10"
+   ]
+  },
+  {
+   "id": "T21",
+   "title": "2-D: stated containment stays contained (#2240, regression guard)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים מוכלים"
+   ],
+   "cycles": 3,
+   "lookFor": "One circle inside the other at every press.",
+   "before": "Unchanged."
+  }
+ ]
+}

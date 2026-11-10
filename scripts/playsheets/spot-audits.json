@@ -1,638 +1,666 @@
 {
-  "pending": [
-    {
-      "sheet": "round-2722",
-      "id": "T38",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "lines": [
-        "מלבן ABCD",
-        "מעוין ABCD"
-      ],
-      "lookFor": "The ⓘ opens the note."
-    },
-    {
-      "sheet": "round-2722",
-      "id": "T39",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "lines": [
-        "פירמידה ישרה SABCD שבסיסה מרובע"
-      ],
-      "lookFor": "«הבסיס (ABCD)», ⓘ strip."
-    },
-    {
-      "sheet": "round-2722",
-      "id": "T71",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "AB = AC"
-      ],
-      "lookFor": "The row is kept, with 2 ticks."
-    },
-    {
-      "sheet": "round-2722",
-      "id": "T72",
-      "kind": "analytic:blind-review",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "אורך השוק AB הוא 5"
-      ],
-      "lookFor": "«5» on AB, no ticks."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T56",
-      "kind": "3d:assertion",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5175",
-      "path": "/3d.html",
-      "lines": [
-        "מישור π 2x+y=1"
-      ],
-      "lookFor": "The panel reads π: 2x + y - 1 = 0."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T55",
-      "kind": "3d:blind-review",
-      "queued": "2026-11-06",
-      "product": "3d",
-      "base": "http://localhost:5175",
-      "path": "/3d.html",
-      "lines": [
-        "קוביה ABCDA'B'C'D'",
-        "AB = 3",
-        "AC = 3√2"
-      ],
-      "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T54",
-      "kind": "analytic:blind-review",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "path": "/analytic.html",
-      "lines": [
-        "c(4,7)"
-      ],
-      "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה»."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T53",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-06",
-      "product": "analytic",
-      "base": "http://localhost:5175",
-      "path": "/analytic.html",
-      "lines": [
-        "A(0,0)",
-        "B(6,0)",
-        "הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2"
-      ],
-      "lookFor": "Two rows, P on AB."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T52",
-      "kind": "2d:assertion",
-      "queued": "2026-11-06",
-      "product": "2d",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "P על AB",
-        "Q על AC",
-        "דרך P מעבירים אנך ל-AB",
-        "דרך Q מעבירים אנך ל-AC",
-        "E על האנך"
-      ],
-      "lookFor": "Asks which, naming both; the line stays in the box."
-    },
-    {
-      "sheet": "round-2727",
-      "id": "T51",
-      "kind": "2d:assertion",
-      "queued": "2026-11-06",
-      "product": "2d",
-      "base": "http://localhost:5175",
-      "lines": [
-        "משולש ABC",
-        "P על AB",
-        "דרך P מעבירים אנך ל-AB",
-        "האנך חותך את AC בנקודה E"
-      ],
-      "lookFor": "E on the canvas."
-    },
-    {
-      "sheet": "fix-2737",
-      "id": "T4",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-07",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "A(0,0)",
-        "B(6,0)",
-        "C(2,4)",
-        "משולש ABC",
-        "M אמצע BC"
-      ],
-      "lookFor": "M = (4, 2), as before."
-    },
-    {
-      "sheet": "round-2745",
-      "id": "T4",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-08",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "x^2+y^2=25",
-        "T(0,5)",
-        "הישר y=5 משיק למעגל בנקודה K"
-      ],
-      "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
-    },
-    {
-      "sheet": "prod-2026-11-09-2",
-      "id": "P10",
-      "kind": "complex:assertion",
-      "queued": "2026-11-09",
-      "product": "complex",
-      "base": "https://themathbible.com",
-      "path": "/complex-builder/",
-      "lines": [
-        "z1 = 3+4i"
-      ],
-      "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
-    }
-  ],
-  "results": [
-    {
-      "sheet": "round-2665",
-      "id": "T4",
-      "kind": "3d:assertion",
-      "queued": "2026-11-02",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "נתון: v = (10,-5,0)"
-      ],
-      "lookFor": "A floating arrow v with no dot at its start; the row is green.",
-      "pass": true,
-      "date": "2026-11-02",
-      "note": "operator 2026-11-02: all the rest of the tests pass"
-    },
-    {
-      "sheet": "prod-2026-11-03",
-      "id": "P2",
-      "kind": "3d:assertion",
-      "queued": "2026-11-03",
-      "product": "3d",
-      "base": "https://themathbible.com",
-      "path": "/3d-builder/",
-      "lines": [
-        "A(0,0,0)",
-        "B(2,0,0)",
-        "M אמצע AB",
-        "N אמצע AB"
-      ],
-      "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "fix-2691",
-      "id": "T3",
-      "kind": "analytic:blind-review",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5180",
-      "path": "/analytic.html",
-      "lines": [
-        "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
-        "K מרכז המעגל I",
-        "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
-        "L מרכז המעגל II",
-        "A על המעגל I",
-        "B על המעגל II",
-        "המשיק למעגל I בנקודה A",
-        "המשיק למעגל II בנקודה B",
-        "המשיקים נפגשים בנקודה M",
-        "MA = MB",
-        "M על הישר 4x+y+3=0",
-        "נתון הישר l1: 4x+y+3=0",
-        "הישר l1 מאונך ל-KL"
-      ],
-      "lookFor": "K, L, A, B, M כתובות ליד הנקודות, לא על מעגל, משיק או ישר",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T29",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "משולש CDE",
-        "A על CD",
-        "B על CE",
-        "מרובע ABED חסום במעגל",
-        "משולש ABC חסום במעגל",
-        "F אמצע הקשת BC במעגל O"
-      ],
-      "lookFor": "Still two circles, no third. O is drawn at the centre of the circle through A, B and C, and F sits on that circle, midway along arc BC.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T28",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "משולש CDE",
-        "A על CD",
-        "B על CE",
-        "מרובע ABED חסום במעגל",
-        "משולש ABC חסום במעגל"
-      ],
-      "lookFor": "Two circles are drawn: one through A, B, E and D, and a second through A, B and C. The equations panel lists «⊙ABE» and «⊙ABC».",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T9",
-      "kind": "2d:blind-review",
-      "queued": "2026-11-03",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מרובע ABCD",
-        "הקרניים AB ו-CD נחתכים בנקודה M"
-      ],
-      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T8",
-      "kind": "2d:blind-review",
-      "queued": "2026-11-03",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מרובע ABCD",
-        "M נקודת החיתוך של הקרניים AB ו-CD"
-      ],
-      "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T23",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "A(1,2)",
-        "הישר l1: y=2x+1",
-        "l1 מאונך לציר ה-x ועובר דרך A"
-      ],
-      "lookFor": "The last line is refused with «השם הזה כבר תפוס בשרטוט — הוא ישר…», and l1 stays the line y = 2x + 1.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T22",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "A(1,2)",
-        "ישר l1 מאונך לציר ה-x דרך A"
-      ],
-      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "prod-2026-11-03b",
-      "id": "P8",
-      "kind": "complex:blind-review",
-      "queued": "2026-11-03",
-      "product": "complex",
-      "base": "https://themathbible.com",
-      "path": "/complex-builder/",
-      "lines": [
-        "z = 3 + 4i"
-      ],
-      "lookFor": "z is plotted at (3, 4).",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T18",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "a הוא פרמטר שונה מאפס",
-        "A(a,0)",
-        "במשולש ישר זווית ABC (∢BAC = 90°)",
-        "שיעור ה-x של הקדקוד B הוא -a",
-        "הצלע BC מקבילה לציר ה-x",
-        "הנקודה M היא אמצע הצלע BC"
-      ],
-      "lookFor": "A does not move, so its row has no «הצג מקום גאומטרי» chip and no curve is drawn for A.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2678",
-      "id": "T21",
-      "kind": "analytic:assertion",
-      "queued": "2026-11-03",
-      "product": "analytic",
-      "base": "http://localhost:5173",
-      "path": "/analytic.html",
-      "lines": [
-        "A(1,2)",
-        "l1 מאונך לציר ה-x ועובר דרך A"
-      ],
-      "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "operator 2026-11-04: all tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T1",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P משיקים מבחוץ"
-      ],
-      "lookFor": "The last line is refused, naming «מעגל P מוכל בתוך מעגל O».",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T2",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P נחתכים בנקודות X ו-Y"
-      ],
-      "lookFor": "The last line is refused, naming the containment; no X or Y drawn.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T3",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "המעגלים O ו-P משיקים מבחוץ",
-        "מעגל P מוכל בתוך מעגל O"
-      ],
-      "lookFor": "The containment line is refused, naming the tangency.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T4",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P זרים"
-      ],
-      "lookFor": "Refused, naming the containment.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T6",
-      "kind": "2d:assertion",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל O",
-        "מעגל P",
-        "מעגל P מוכל בתוך מעגל O",
-        "המעגלים O ו-P משיקים מבפנים"
-      ],
-      "lookFor": "Builds; no refusal.",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2697",
-      "id": "T7",
-      "kind": "2d:blind-review",
-      "queued": "2026-11-04",
-      "product": "2d",
-      "base": "http://localhost:5173",
-      "path": "/",
-      "lines": [
-        "מעגל שמרכזו O",
-        "מעגל שמרכזו P",
-        "נקודה A על מעגל P",
-        "המשך AO חותך את מעגל P בנקודה R"
-      ],
-      "lookFor": "Along the line: A, then O, then R; O inside circle P. Still so after «הציגו תצורה אחרת».",
-      "pass": true,
-      "date": "2026-11-04",
-      "note": "all other tests pass"
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T40",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "מעגל שמרכזו O משיק לישר AB בנקודה T",
-        "מעגל חסום במשולש ABC",
-        "D על המעגל O"
-      ],
-      "lookFor": "D on circle O, green.",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all pass"
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T41",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "המשולש ABC חסום במעגל",
-        "D על המעגל",
-        "מעגל חסום במשולש ABC"
-      ],
-      "lookFor": "D stays green on the circumcircle.",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all pass"
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T42",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "מעגל שמרכזו O משיק לישר AB בנקודה T",
-        "D על המעגל",
-        "מעגל חסום במשולש ABC"
-      ],
-      "lookFor": "D stays green on circle O.",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all pass"
-    },
-    {
-      "sheet": "round-2783",
-      "id": "T43",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "הווקטורים u ו-v",
-        "u·v = 2.5"
-      ],
-      "lookFor": "The data panel shows «u · v = 2.5».",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all pass"
-    },
-    {
-      "sheet": "round-2786",
-      "id": "T8",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "A(0,0,0)",
-        "B(3,0,0)",
-        "AB = 3"
-      ],
-      "lookFor": "Two rows, the note, no segment AB and no «3» label.",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all tests pass (operator 2026-11-09)"
-    },
-    {
-      "sheet": "round-2786",
-      "id": "T9",
-      "kind": "3d:assertion",
-      "queued": "2026-11-09",
-      "product": "3d",
-      "base": "http://localhost:5173",
-      "path": "/3d.html",
-      "lines": [
-        "קובייה ABCDA'B'C'D'",
-        "AB ∥ AD"
-      ],
-      "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
-      "pass": true,
-      "date": "2026-11-09",
-      "note": "all tests pass (operator 2026-11-09)"
-    }
-  ],
-  "demoted": {}
+ "pending": [
+  {
+   "sheet": "round-2722",
+   "id": "T38",
+   "kind": "3d:assertion",
+   "queued": "2026-11-06",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "מלבן ABCD",
+    "מעוין ABCD"
+   ],
+   "lookFor": "The ⓘ opens the note."
+  },
+  {
+   "sheet": "round-2722",
+   "id": "T39",
+   "kind": "3d:assertion",
+   "queued": "2026-11-06",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "lines": [
+    "פירמידה ישרה SABCD שבסיסה מרובע"
+   ],
+   "lookFor": "«הבסיס (ABCD)», ⓘ strip."
+  },
+  {
+   "sheet": "round-2722",
+   "id": "T71",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-06",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "AB = AC"
+   ],
+   "lookFor": "The row is kept, with 2 ticks."
+  },
+  {
+   "sheet": "round-2722",
+   "id": "T72",
+   "kind": "analytic:blind-review",
+   "queued": "2026-11-06",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "אורך השוק AB הוא 5"
+   ],
+   "lookFor": "«5» on AB, no ticks."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T56",
+   "kind": "3d:assertion",
+   "queued": "2026-11-06",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "מישור π 2x+y=1"
+   ],
+   "lookFor": "The panel reads π: 2x + y - 1 = 0."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T55",
+   "kind": "3d:blind-review",
+   "queued": "2026-11-06",
+   "product": "3d",
+   "base": "http://localhost:5175",
+   "path": "/3d.html",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "AB = 3",
+    "AC = 3√2"
+   ],
+   "lookFor": "No ✓ on «AB = 3», ✓ on the «AC = 3√2» row."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T54",
+   "kind": "analytic:blind-review",
+   "queued": "2026-11-06",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "c(4,7)"
+   ],
+   "lookFor": "The box holds «C(4,7)» with the note «שם של נקודה נכתב באות גדולה»."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T53",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-06",
+   "product": "analytic",
+   "base": "http://localhost:5175",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "הנקודה P נמצאת על הקטע AB ומחלקת אותו ביחס AP:PB = 1:2"
+   ],
+   "lookFor": "Two rows, P on AB."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T52",
+   "kind": "2d:assertion",
+   "queued": "2026-11-06",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "P על AB",
+    "Q על AC",
+    "דרך P מעבירים אנך ל-AB",
+    "דרך Q מעבירים אנך ל-AC",
+    "E על האנך"
+   ],
+   "lookFor": "Asks which, naming both; the line stays in the box."
+  },
+  {
+   "sheet": "round-2727",
+   "id": "T51",
+   "kind": "2d:assertion",
+   "queued": "2026-11-06",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "lines": [
+    "משולש ABC",
+    "P על AB",
+    "דרך P מעבירים אנך ל-AB",
+    "האנך חותך את AC בנקודה E"
+   ],
+   "lookFor": "E on the canvas."
+  },
+  {
+   "sheet": "fix-2737",
+   "id": "T4",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-07",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(2,4)",
+    "משולש ABC",
+    "M אמצע BC"
+   ],
+   "lookFor": "M = (4, 2), as before."
+  },
+  {
+   "sheet": "round-2745",
+   "id": "T4",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-08",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "x^2+y^2=25",
+    "T(0,5)",
+    "הישר y=5 משיק למעגל בנקודה K"
+   ],
+   "lookFor": "Records: K sits on T, «T ו-K נפלו על אותה נקודה.»"
+  },
+  {
+   "sheet": "prod-2026-11-09-2",
+   "id": "P10",
+   "kind": "complex:assertion",
+   "queued": "2026-11-09",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i»."
+  },
+  {
+   "sheet": "round-2808",
+   "id": "T21",
+   "kind": "2d:blind-review",
+   "queued": "2026-11-10",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים מוכלים"
+   ],
+   "lookFor": "One circle inside the other at every press."
+  },
+  {
+   "sheet": "round-2808",
+   "id": "T8",
+   "kind": "3d:blind-review",
+   "queued": "2026-11-10",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "P נמצא על ציר ה-x",
+    "אורך AB = 4"
+   ],
+   "lookFor": "P is on the x-axis in every drawing."
+  }
+ ],
+ "results": [
+  {
+   "sheet": "round-2665",
+   "id": "T4",
+   "kind": "3d:assertion",
+   "queued": "2026-11-02",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "נתון: v = (10,-5,0)"
+   ],
+   "lookFor": "A floating arrow v with no dot at its start; the row is green.",
+   "pass": true,
+   "date": "2026-11-02",
+   "note": "operator 2026-11-02: all the rest of the tests pass"
+  },
+  {
+   "sheet": "prod-2026-11-03",
+   "id": "P2",
+   "kind": "3d:assertion",
+   "queued": "2026-11-03",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "A(0,0,0)",
+    "B(2,0,0)",
+    "M אמצע AB",
+    "N אמצע AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». «N אמצע AB» records, with «M ו-N נפלו על אותה נקודה.»",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "fix-2691",
+   "id": "T3",
+   "kind": "analytic:blind-review",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5180",
+   "path": "/analytic.html",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "K מרכז המעגל I",
+    "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
+    "L מרכז המעגל II",
+    "A על המעגל I",
+    "B על המעגל II",
+    "המשיק למעגל I בנקודה A",
+    "המשיק למעגל II בנקודה B",
+    "המשיקים נפגשים בנקודה M",
+    "MA = MB",
+    "M על הישר 4x+y+3=0",
+    "נתון הישר l1: 4x+y+3=0",
+    "הישר l1 מאונך ל-KL"
+   ],
+   "lookFor": "K, L, A, B, M כתובות ליד הנקודות, לא על מעגל, משיק או ישר",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T29",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש CDE",
+    "A על CD",
+    "B על CE",
+    "מרובע ABED חסום במעגל",
+    "משולש ABC חסום במעגל",
+    "F אמצע הקשת BC במעגל O"
+   ],
+   "lookFor": "Still two circles, no third. O is drawn at the centre of the circle through A, B and C, and F sits on that circle, midway along arc BC.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T28",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש CDE",
+    "A על CD",
+    "B על CE",
+    "מרובע ABED חסום במעגל",
+    "משולש ABC חסום במעגל"
+   ],
+   "lookFor": "Two circles are drawn: one through A, B, E and D, and a second through A, B and C. The equations panel lists «⊙ABE» and «⊙ABC».",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T9",
+   "kind": "2d:blind-review",
+   "queued": "2026-11-03",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "הקרניים AB ו-CD נחתכים בנקודה M"
+   ],
+   "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T8",
+   "kind": "2d:blind-review",
+   "queued": "2026-11-03",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "M נקודת החיתוך של הקרניים AB ו-CD"
+   ],
+   "lookFor": "ABCD stays an ordinary (convex, non-crossed) quadrilateral, and M is drawn outside it, on the extension of AB.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T23",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(1,2)",
+    "הישר l1: y=2x+1",
+    "l1 מאונך לציר ה-x ועובר דרך A"
+   ],
+   "lookFor": "The last line is refused with «השם הזה כבר תפוס בשרטוט — הוא ישר…», and l1 stays the line y = 2x + 1.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T22",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(1,2)",
+    "ישר l1 מאונך לציר ה-x דרך A"
+   ],
+   "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "prod-2026-11-03b",
+   "id": "P8",
+   "kind": "complex:blind-review",
+   "queued": "2026-11-03",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z = 3 + 4i"
+   ],
+   "lookFor": "z is plotted at (3, 4).",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T18",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "a הוא פרמטר שונה מאפס",
+    "A(a,0)",
+    "במשולש ישר זווית ABC (∢BAC = 90°)",
+    "שיעור ה-x של הקדקוד B הוא -a",
+    "הצלע BC מקבילה לציר ה-x",
+    "הנקודה M היא אמצע הצלע BC"
+   ],
+   "lookFor": "A does not move, so its row has no «הצג מקום גאומטרי» chip and no curve is drawn for A.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2678",
+   "id": "T21",
+   "kind": "analytic:assertion",
+   "queued": "2026-11-03",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(1,2)",
+    "l1 מאונך לציר ה-x ועובר דרך A"
+   ],
+   "lookFor": "The line is accepted, and l1 is drawn as the vertical line x = 1 through A.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "operator 2026-11-04: all tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T1",
+   "kind": "2d:assertion",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל P מוכל בתוך מעגל O",
+    "המעגלים O ו-P משיקים מבחוץ"
+   ],
+   "lookFor": "The last line is refused, naming «מעגל P מוכל בתוך מעגל O».",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T2",
+   "kind": "2d:assertion",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל P מוכל בתוך מעגל O",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "The last line is refused, naming the containment; no X or Y drawn.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T3",
+   "kind": "2d:assertion",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים מבחוץ",
+    "מעגל P מוכל בתוך מעגל O"
+   ],
+   "lookFor": "The containment line is refused, naming the tangency.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T4",
+   "kind": "2d:assertion",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל P מוכל בתוך מעגל O",
+    "המעגלים O ו-P זרים"
+   ],
+   "lookFor": "Refused, naming the containment.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T6",
+   "kind": "2d:assertion",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל P מוכל בתוך מעגל O",
+    "המעגלים O ו-P משיקים מבפנים"
+   ],
+   "lookFor": "Builds; no refusal.",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2697",
+   "id": "T7",
+   "kind": "2d:blind-review",
+   "queued": "2026-11-04",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל שמרכזו O",
+    "מעגל שמרכזו P",
+    "נקודה A על מעגל P",
+    "המשך AO חותך את מעגל P בנקודה R"
+   ],
+   "lookFor": "Along the line: A, then O, then R; O inside circle P. Still so after «הציגו תצורה אחרת».",
+   "pass": true,
+   "date": "2026-11-04",
+   "note": "all other tests pass"
+  },
+  {
+   "sheet": "round-2783",
+   "id": "T40",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "מעגל חסום במשולש ABC",
+    "D על המעגל O"
+   ],
+   "lookFor": "D on circle O, green.",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all pass"
+  },
+  {
+   "sheet": "round-2783",
+   "id": "T41",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "המשולש ABC חסום במעגל",
+    "D על המעגל",
+    "מעגל חסום במשולש ABC"
+   ],
+   "lookFor": "D stays green on the circumcircle.",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all pass"
+  },
+  {
+   "sheet": "round-2783",
+   "id": "T42",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "מעגל שמרכזו O משיק לישר AB בנקודה T",
+    "D על המעגל",
+    "מעגל חסום במשולש ABC"
+   ],
+   "lookFor": "D stays green on circle O.",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all pass"
+  },
+  {
+   "sheet": "round-2783",
+   "id": "T43",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "הווקטורים u ו-v",
+    "u·v = 2.5"
+   ],
+   "lookFor": "The data panel shows «u · v = 2.5».",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all pass"
+  },
+  {
+   "sheet": "round-2786",
+   "id": "T8",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(3,0,0)",
+    "AB = 3"
+   ],
+   "lookFor": "Two rows, the note, no segment AB and no «3» label.",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all tests pass (operator 2026-11-09)"
+  },
+  {
+   "sheet": "round-2786",
+   "id": "T9",
+   "kind": "3d:assertion",
+   "queued": "2026-11-09",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "AB ∥ AD"
+   ],
+   "lookFor": "Refused: «הטענה לא מתקיימת בציור — בדקו את החישוב»; one row.",
+   "pass": true,
+   "date": "2026-11-09",
+   "note": "all tests pass (operator 2026-11-09)"
+  }
+ ],
+ "demoted": {}
 }
