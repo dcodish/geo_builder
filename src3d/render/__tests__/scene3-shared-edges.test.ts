@@ -14,7 +14,8 @@ import { buildScene3, hiddenEdgeKeys } from '../scene3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deserializeFigure3 } from '../../store/figureFile3';
-import { derive3 } from '../../store/store3';
+import { derive3, type Fact3 } from '../../store/store3';
+import { parse3 } from '../../parser/parse3';
 
 const CUBE: Command3 = { type: 'solid', kind: 'cube', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] };
 const PYRAMID: Command3 = { type: 'solid', kind: 'pyramid4gr', ids: ['A', 'B', 'C', 'D', 'S'] };
@@ -144,4 +145,36 @@ describe('#2819 — a lone flat polygon is never dashed', () => {
     }
     expect(witnessed).toBe(true);
   });
+});
+
+/**
+ * #2819 (ADR-3D-481, found in round #2822): a flat polygon has no body, so a face it shares with a solid is that solid's
+ * surface, never an interior face. «ריבוע ABCD» · «פירמידה ABCDS»: from below the pyramid's base faces the camera and
+ * its edges are drawn solid; from above they border only back-facing faces and stay dashed (ADR-3D-007 §5).
+ */
+describe('#2819 — a pyramid on a stated flat polygon: the base is the pyramid\'s surface', () => {
+  const BELOW = { yaw: HOME_CAMERA.yaw, pitch: -0.8 };
+  const figure = (lines: string[]) =>
+    lines.map((u, i) => {
+      const p = parse3(u);
+      if (!p.ok) throw new Error(u);
+      return { id: `f${i}`, utterance: u, cmds: p.commands, enabled: true } as unknown as Fact3;
+    });
+
+  for (const [lines, base] of [
+    [['ריבוע ABCD', 'פירמידה ABCDS'], ['A|B', 'B|C', 'C|D', 'A|D']],
+    [['משולש ABC', 'פירמידה ABCS'], ['A|B', 'B|C', 'A|C']],
+  ] as const) {
+    it(`${lines.join(' · ')}: no base edge hidden from below; a back base edge still hidden from above`, () => {
+      const facts = figure([...lines]);
+      for (const seed of [0, 1, 2]) {
+        const d = derive3(facts, seed);
+        expect(d.construction.solids.some((s) => s.kind.startsWith('polygon'))).toBe(true);
+        const below = hiddenEdgeKeys(d.construction, d.positions, BELOW);
+        expect(base.filter((k) => below.has(k)), `seed ${seed}, below`).toEqual([]);
+        const home = hiddenEdgeKeys(d.construction, d.positions, HOME_CAMERA);
+        expect(base.some((k) => home.has(k)), `seed ${seed}, home`).toBe(true);
+      }
+    });
+  }
 });
