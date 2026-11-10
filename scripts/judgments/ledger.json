@@ -4044,6 +4044,23 @@
       "chosen": true,
       "at": "2026-11-10T15:30:56.751Z",
       "status": "pending"
+    },
+    {
+      "id": "Q-2625b",
+      "issue": 2625,
+      "question": "Should «מרכז הפרבולה», «O מרכז הפרבולה», \"the centre of the parabola\" get the same no-centre refusal as «AB קוטר בפרבולה»? (a) same refusal family; (b) leave them to the AI.",
+      "class": "parabola-centre-presupposition-refusal-scope",
+      "verdict": "escalate",
+      "reason": "A feature's scope (reserved rule 3) with no precedent: his words reach only the diameter.",
+      "nearest": [
+        {
+          "quote": "there is a קוטר and we need to support it. when drawing it, like in circle, there is dof as to where it is exactly",
+          "date": "2026-10-30",
+          "link": "https://github.com/dcodish/geo_builder/issues/2618"
+        }
+      ],
+      "at": "2026-11-10T15:32:39.429Z",
+      "status": "escalated"
     }
   ],
   "demoted": {
