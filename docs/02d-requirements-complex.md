@@ -117,13 +117,14 @@ behind it; their history is in [06d](06d-decisions-complex.md).
     [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
   adds information about the existing number; it never silently replaces it.
-  - **A restatement that adds nothing is answered, not recorded.** A statement the earlier ones already
-    force exactly («|z1| = 15» after «z1 = 15cis(π/7)», «z2 = 3z1» after «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)»,
-    the same given typed twice) is accepted with 2-D's sentence «זה כבר קיים באיור — אין מה להוסיף.» and adds
-    no row. "Force" is exact, never sampled: a value that only holds in the drawing (over a free number) is a
-    new given and is recorded; a relation the exact core does not carry (Re/Im, a distance) is recorded as
-    before. A loaded session keeps its saved rows.
-  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084)
+  - **A restatement is accepted as its own row, and said** (operator 2026-11-09, ADR-W-200). A statement the
+    earlier ones already force exactly («|z1| = 15» after «z1 = 15cis(π/7)», «z2 = 3z1» after «z1 = 5cis(π/7)» ·
+    «z2 = 15cis(π/7)», the same given typed twice) is recorded as its own row with the suite sentence
+    «זה כבר קיים באיור — נוסף כנתון נפרד.»; muting or deleting the row that implied it leaves the relation in force. "Force" is exact,
+    never sampled: a value that only holds in the drawing (over a free number) is a new given and is recorded with no
+    note; a relation the exact core does not carry (Re/Im, a distance) is recorded with no note (a known gap of the
+    note's reach, #2790). A loaded session keeps its saved rows and says nothing.
+  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md), [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089)
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
   write in the next sentence. **The spelling does not matter**: `z³ − 8 = 0`, `z³ + 8 = 0`, `2z³ = 16`

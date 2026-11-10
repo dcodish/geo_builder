@@ -9,6 +9,7 @@
  * read it without an import cycle through `crossing-order.ts`.
  */
 import type { Pt } from './derived';
+import { toLocal, vecFrame } from './conicFrame';
 import type { NumCurve } from './types';
 
 /** A straight line with a DIRECTION: a point `p0` on it, and the way it is walked. */
@@ -19,7 +20,9 @@ export interface Walk {
 
 /** The quadratic `A·t² + B·t + C` a walked straight `p0 + t·d` leaves in a canonical conic — `null` for a non-conic. */
 export function lineQuadratic(w: Walk, conic: NumCurve): { A: number; B: number; C: number } | null {
-  const { p0, d } = w;
+  // A moved conic (#2664) is walked in its own frame: the walk's start carried there, its direction swapped with the
+  // axis. `t` is the same parameter in both frames, so the quadratic is the world's.
+  const { p0, d } = conic.kind === 'parabola' || conic.kind === 'ellipse' ? { p0: toLocal(conic, w.p0.x, w.p0.y), d: vecFrame(conic, w.d) } : w;
   let A = 0;
   let B = 0;
   let C = 0;

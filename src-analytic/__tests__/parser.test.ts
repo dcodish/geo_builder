@@ -16,6 +16,8 @@ import { evaluate } from '../engine/evaluate';
 import { derive } from '../engine/derive';
 import { buildScene } from '../render/scene';
 import { reportedDof } from '../engine/carriers';
+import { errorText } from '../app/errorText';
+import { analyticI18n } from '../i18n';
 
 describe('catalog — every entry parses, in BOTH languages', () => {
   for (const entry of COMMAND_CATALOG_ANALYTIC) {
@@ -610,5 +612,86 @@ describe('#1074 — the segment NOUN is optional', () => {
   it('still refuses «EE», and still canonicalises FE to EF', () => {
     expect(derive(['E(0,0)', 'F(3,4)', 'EE'], 0).faults.map((f) => f.code)).toEqual(['repeated-vertex']);
     expect(derive(['EF', 'FE'], 0).outcomes[1]).toBe('known');
+  });
+});
+
+describe('#2625 (ADR-AG-454) — a diameter of the parabola is refused with its reason, never escalated', () => {
+  it.each([
+    ['AB קוטר בפרבולה'],
+    ['AB קוטר של הפרבולה'],
+    ['הקוטר AB של הפרבולה'],
+    ['קוטר AB בפרבולה'],
+    ['AB is a diameter of the parabola'],
+  ])('«%s» → parabola-no-diameter', (line) => {
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-diameter', detail: 'AB' });
+  });
+  it.each([['AB קוטר באליפסה'], ['AB קוטר במעגל'], ['AB is a diameter of the ellipse'], ['AB מיתר בפרבולה']])('control «%s» still reads', (line) => {
+    expect(parseLine(line).ok).toBe(true);
+  });
+  it('the sentence names the reason, in both locales', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const err = { key: 'parabola-no-diameter', detail: 'PQ' } as const;
+    const plain = (x: string) => x.replace(/[⁦-⁩]/g, '');
+    expect(plain(errorText(err, analyticI18n.getFixedT('he') as unknown as T))).toBe('לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «PQ מיתר בפרבולה».');
+    expect(plain(errorText(err, analyticI18n.getFixedT('en') as unknown as T))).toBe('A parabola has no centre, so it has no diameter. If you meant a chord, write «PQ is a chord of the parabola».');
+  });
+  it('the taught chord is one the next line reads (docs/17 §9)', () => {
+    expect(parseLine('PQ מיתר בפרבולה').ok).toBe(true);
+    expect(parseLine('PQ is a chord of the parabola').ok).toBe(true);
+  });
+});
+
+describe('#2664 (ADR-AG-455) — the reader of a non-canonical conic', () => {
+  it('a line opening and closing with brackets that are not one pair is not unwrapped: «(y-1)^2 = 4(x-2)» reads', () => {
+    const r = parseLine('(y-1)^2 = 4(x-2)');
+    expect(r.ok && r.facts[0].t).toBe('curve');
+    // A whole line in brackets is still the line.
+    const wrapped = parseLine('(O היא ראשית הצירים)');
+    expect(wrapped.ok && wrapped.facts.map((f) => f.t)).toEqual((({ ok, ...r }) => ok && 'facts' in r ? r.facts.map((f) => f.t) : null)(parseLine('O היא ראשית הצירים')));
+  });
+  it.each([
+    ['נתונה פרבולה קנונית שמשוואתה (y-1)^2=4(x-2)', true],
+    ['נתונה אליפסה קנונית (x-3)^2/25+y^2/9=1', true],
+    ['the canonical parabola y^2=8x', true],
+    ['נתונה פרבולה שמשוואתה (y-1)^2=4(x-2)', false],
+  ])('«%s» carries the word «קנונית» as a claim: %s', (line, claimed) => {
+    const r = parseLine(line);
+    const curve = r.ok ? r.facts.find((f) => f.t === 'curve') : undefined;
+    expect(curve && curve.t === 'curve' ? curve.curve.canonical === true : null).toBe(claimed);
+  });
+  it('the refusal names the equation and the word, in both locales', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const plain = (x: string) => x.replace(/[⁦-⁩]/g, '');
+    const err = { key: 'not-canonical', detail: 'פרבולה קנונית (y-1)^2=4(x-2)', line: '(y-1)^2=4(x-2)', curve: 'parabola' } as const;
+    expect(plain(errorText(err, analyticI18n.getFixedT('he') as unknown as T))).toBe(
+      'המשוואה «(y-1)^2=4(x-2)» אינה של פרבולה קנונית: פרבולה זו אינה בראשית הצירים. הסירו את המילה «קנונית» כדי לבנות אותה.',
+    );
+    expect(plain(errorText(err, analyticI18n.getFixedT('en') as unknown as T))).toBe(
+      'The equation «(y-1)^2=4(x-2)» is not of a parabola in canonical position: it is not at the origin. Remove the word «canonical» to build it.',
+    );
+  });
+});
+
+describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola is refused with its reason (ruling Q-2625b (a))', () => {
+  it.each([
+    ['מרכז הפרבולה'],
+    ['O מרכז הפרבולה'],
+    ['O הוא מרכז הפרבולה'],
+    ['מרכז הפרבולה הוא O'],
+    ['מרכז הפרבולה הוא (0,0)'],
+    ['the centre of the parabola'],
+    ['O is the centre of the parabola'],
+    ['O is the center of the parabola'],
+  ])('«%s» → parabola-no-centre', (line) => {
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-centre', detail: line });
+  });
+  it.each([['O מרכז האליפסה'], ['O is the centre of the ellipse'], ['O מרכז המעגל'], ['F מוקד הפרבולה']])('control «%s» still reads', (line) => {
+    expect(parseLine(line).ok).toBe(true);
+  });
+  it('the sentence: the reason, then the vertex said plainly to be unread (no next step the tool reads)', () => {
+    type T = (k: string, o?: Record<string, unknown>) => string;
+    const err = { key: 'parabola-no-centre', detail: 'O מרכז הפרבולה' } as const;
+    expect(errorText(err, analyticI18n.getFixedT('he') as unknown as T)).toBe('לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.');
+    expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre. If you meant its vertex, the tool does not read it yet.');
   });
 });

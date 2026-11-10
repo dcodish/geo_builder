@@ -58,7 +58,7 @@ import { extensionSideVerdict } from './extensionSide';
 import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { lostRingNote } from './unreadRingRole';
-import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
+import { applyCommand, deepEqual, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
   autoNamedLabels,
@@ -210,8 +210,15 @@ export type Verdict2D =
       readonly note: DecideNote | null;
       /** #1973 (ADR-797): the shape a cevian whose sentence named none was resolved in — stamped on the line's facts */
       readonly host?: CevianHost;
+      /**
+       * #2790 ([ADR-822](../../docs/06-decisions.md#adr-822), ADR-W-200): the line RESTATES what the figure already
+       * holds. It is still its own row — committed with `ownRow`, so an exact repeat is appended beside its enabled twin
+       * rather than absorbed — and `note` is the one «already there» notice. Unticking or deleting the earlier row then
+       * leaves this row holding the relation.
+       */
+      readonly restates?: true;
     }
-  /** nothing to add (already drawn, a restatement, or a name the auto-bind already gave): the text clears */
+  /** nothing to add (a name the auto-bind already gave): the text clears */
   | {
       readonly kind: 'noop';
       readonly binds: readonly DecideBind[];
@@ -227,6 +234,9 @@ export type Verdict2D =
       /** why the grammar declined, when it did (`weak === null`) — what log-triage reports as the gap */
       readonly parseReason: string | null;
     };
+
+/** #2790 ([ADR-822](../../docs/06-decisions.md#adr-822), ADR-W-200): the one suite notice a held restatement's row carries. */
+export const HELD_NOTICE = 'suite.notice.alreadyHeld';
 
 export interface DecideHooks {
   /**
@@ -489,7 +499,12 @@ export async function decideFromParse(
   {
     const vp = vertexPairVerdict(utterance, pctx, facts, seed, roleReadingConfig.cap);
     if (vp?.kind === 'implied') {
-      return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', detail: 'vertex-pair' }], note: { key: 'suite.notice.alreadyDrawn' } };
+      // #2790 (ADR-822, ADR-W-200): the right angle the pair already shows is the line's own row, with the notice
+      const commands = vp.readings.flatMap((reading) => {
+        const pr = parse(reading, pctx);
+        return pr.ok ? pr.commands : [];
+      });
+      return { kind: 'commit', deferred: false, restates: true, binds, commands, logs: [...logs, { source: 'parser', result: 'held-restatement', detail: 'vertex-pair', commands }], note: { key: HELD_NOTICE } };
     }
     if (vp?.kind === 'adopt') {
       const v = await decideFromParse(state, vp.reading, locale, hooks, opts);
@@ -1080,8 +1095,15 @@ export async function decideFromParse(
       if ((outcome.reason === 'implied' || outcome.reason === 'empty') && identityBound) {
         return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null, ...(r.host ? { host: r.host } : {}) };
       }
+      // #2790 (ADR-822, ADR-W-200, operator 2026-11-09): a line the figure already holds is ACCEPTED as its own row,
+      // with the one notice that it is already there — so deleting or unticking the earlier row leaves it in force.
+      // FR-EN-9 (unchanged by ADR-W-200): retyping a MUTED row re-ticks it — that row was not on the figure, so it is a
+      // plain commit with no notice, and the fold re-enables the twin in place rather than appending a second row
+      if ((outcome.reason === 'implied' || outcome.reason === 'empty') && r.commands.some((c) => facts.some((f) => !f.enabled && deepEqual(f.cmd, c)))) {
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'muted-reticked', commands: r.commands }], note: null, ...(r.host ? { host: r.host } : {}) };
+      }
       if (outcome.reason === 'implied') {
-        return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };
+        return { kind: 'commit', deferred: false, restates: true, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'held-restatement', commands: r.commands }], note: { key: HELD_NOTICE }, ...(r.host ? { host: r.host } : {}) };
       }
       if (outcome.reason === 'empty') {
         // A #186 auto-bind ALREADY changed the figure (an unnamed circle took the student's name and
@@ -1093,7 +1115,8 @@ export async function decideFromParse(
         const existing = new Set((pctx.points ?? []).map((p) => p.toUpperCase()));
         const newLabels = statedLabelTokens(utterance).filter((l) => !existing.has(l)); // case-blind (#779)
         if (newLabels.length === 0) {
-          return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'noop-exists', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };
+          // #2790 (ADR-822): a re-entry — an exact repeat included («exact repeats included», ADR-W-200 §4) — is its own row
+          return { kind: 'commit', deferred: false, restates: true, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'held-reentry', commands: r.commands }], note: { key: HELD_NOTICE }, ...(r.host ? { host: r.host } : {}) };
         }
       }
       weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt

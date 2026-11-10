@@ -88,9 +88,14 @@ describe('#1432 — the ASKS', () => {
     expect(answer(lines, 'היקף ABC').value).toBe(answer(lines, 'AB+BC+CA').value);
   });
 
-  it('a PARAMETERISED parabola has no invariant focus — the honest null, never a sampled point', () => {
+  /*
+   * Re-based by #2735 (ADR-AG-458/459, operator 2026-11-07 and option C 2026-11-09: answer in the parameter, the question
+   * box alike). The focus still has no invariant VALUE and is never a sampled point; it is the student's own letter
+   * read and verified at every configuration, (a/2, 0).
+   */
+  it('a PARAMETERISED parabola has no invariant focus — never a sampled point; it answers in the student’s letter', () => {
     const a = answer(['נתונה פרבולה שמשוואתה y^2=2ax'], 'מוקד הפרבולה');
-    expect(a.value).toBeNull();
+    expect(a.value).toBe('(a/2, 0)');
   });
 
   it('the radius of a FREE circle is not knowledge — null, never the sampled value', () => {
@@ -295,7 +300,7 @@ describe('#1432 am. 1 — ONE role reader: every spelling of radius, focus, dire
     ['משוואת המדריך היא x=-2'],
     ['the directrix is x=-2'],
   ])('directrix «%s» is a true restatement — already known', (line) => {
-    expect(last(['נתונה פרבולה שמשוואתה y^2=8x', line]).kind).toBe('already-known');
+    expect(last(['נתונה פרבולה שמשוואתה y^2=8x', line]).kind).toBe('record');
   });
 
   it('a wrong directrix refuses by name, whatever its orientation', () => {
@@ -425,6 +430,6 @@ describe('#1432 am. 1 — the directrix is DERIVED, never assumed vertical', () 
   });
 
   it('the given is judged line against line: a proportional restatement is the same line', () => {
-    expect(last(['נתונה פרבולה שמשוואתה y^2=8x', 'משוואת המדריך היא 2x+4=0']).kind).toBe('already-known');
+    expect(last(['נתונה פרבולה שמשוואתה y^2=8x', 'משוואת המדריך היא 2x+4=0']).kind).toBe('record');
   });
 });

@@ -6,7 +6,7 @@
  * 0, 2, 3, 5 of 0–7; Q3 drew N1 = N2 at every seed. Every figure case runs the real path: `decideSubmit`, then `derive`.
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { derive } from '../engine/derive';
 import { reportedDof } from '../engine/carriers';
 import { curvesCoincide } from '../engine/evaluate';
@@ -140,7 +140,7 @@ describe('#2395 — the class', () => {
   it('a restatement in the other order is absorbed', () => {
     const lines = ['נקודה P', 'נקודה Q', 'P ≠ Q'];
     expect(submitAll(lines)).toEqual(['record', 'record', 'record']);
-    expect(decideSubmit('Q ≠ P', lines, 0).kind).not.toBe('record');
+    expect(isHeld(decideSubmit('Q ≠ P', lines, 0))).toBe(true); // #2790: its own row, with the notice
   });
 
   it('the judge: lines by direction and offset, circles by centre and radius, kinds never mixed', () => {

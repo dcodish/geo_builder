@@ -14,7 +14,7 @@
  * taught remedy is a hypothesis).
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit, reachesFallback } from '../app/submit';
+import { decideSubmit, isHeld, reachesFallback } from '../app/submit';
 import { anotherConfiguration } from '../app/another';
 import { derive } from '../engine/derive';
 import { canonicalConstraint } from '../engine/solve';
@@ -78,7 +78,7 @@ describe('#1407 — the lone vertex MEANS what its three-letter twin means', () 
 
   it('restating the angle in three letters, either ray order, is ALREADY KNOWN — one given, not two', () => {
     for (const twin of ['זווית ACB = 60', 'זווית BCA = 60']) {
-      expect(decideSubmit(twin, [...TRI, 'זווית C = 60'], 0).kind, twin).toBe('already-known');
+      expect(isHeld(decideSubmit(twin, [...TRI, 'זווית C = 60'], 0)), twin).toBe(true);
     }
   });
 

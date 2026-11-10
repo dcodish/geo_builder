@@ -1,0 +1,158 @@
+{
+ "name": "prod-2026-11-10-2",
+ "title": "Prod smoke — deploy prod/2026-11-10-2 (round #2822 wave 1)",
+ "cases": [
+  {
+   "id": "P1",
+   "title": "#2731 the parabola question gives both answers",
+   "class": "verified",
+   "product": "analytic",
+   "base": "https://themathbible.com",
+   "path": "/analytic-builder/",
+   "lines": [
+    "נתונה פרבולה שמשוואתה y^2=4px",
+    "p > 0",
+    "K על הפרבולה",
+    "y_K = 12",
+    "F מוקד הפרבולה",
+    "KF = 20"
+   ],
+   "asks": [
+    "p"
+   ],
+   "expect": [
+    "2 או 18"
+   ],
+   "lookFor": "«p» answers «2 או 18».",
+   "before": "«2»."
+  },
+  {
+   "id": "P2",
+   "title": "#2797 a fixed pentagon closes",
+   "class": "verified",
+   "product": "2d",
+   "base": "https://themathbible.com",
+   "path": "/geo-builder/",
+   "lines": [
+    "מחומש ABCDE",
+    "AB = 5",
+    "BC = 4",
+    "זווית ABC = 100",
+    "CD = 4",
+    "זווית BCD = 110",
+    "זווית CDE = 100",
+    "EA = 4.5"
+   ],
+   "expectAbsent": [
+    "סותר"
+   ],
+   "lookFor": "Every line green; a convex pentagon.",
+   "before": "«EA = 4.5» refused after ~9 s."
+  },
+  {
+   "id": "P3",
+   "title": "#2799 a cube with three corners on one axis is refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הקודקוד A נמצא על ציר ה-x",
+    "הקודקוד B נמצא על ציר ה-x",
+    "הקודקוד C נמצא על ציר ה-x"
+   ],
+   "expectRefusal": "שטוח",
+   "lookFor": "The last line is refused (a flat solid is not a cube).",
+   "before": "Accepted after ~48 s, drawn as a dot."
+  },
+  {
+   "id": "P4",
+   "title": "#2793 a cube vertex on the positive x-axis is accepted",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הקודקוד A נמצא על החלק החיובי של ציר ה-x"
+   ],
+   "expectAbsent": [
+    "אף תצורה"
+   ],
+   "lookFor": "Accepted, A on +x.",
+   "before": "Refused (sign)."
+  },
+  {
+   "id": "P5",
+   "title": "#2810 a second order over a quadrilateral in a circle is refused",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "מרובע ABCD",
+    "מעגל חוסם את ABCD",
+    "מרובע ABDC"
+   ],
+   "expectRefusal": "מרובע ABDC",
+   "lookFor": "The last line refused, naming «מרובע ABDC».",
+   "before": "Accepted crossed."
+  },
+  {
+   "id": "P6",
+   "title": "#2806 a square beside an axis point has normal size",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "ריבוע ABCD",
+    "הקודקוד A נמצא על ציר ה-x"
+   ],
+   "expectAbsent": [
+    "שטוח"
+   ],
+   "lookFor": "A full-size square.",
+   "before": "A dot after ~4 s."
+  },
+  {
+   "id": "P7",
+   "title": "#1541 the ask box gives a line by two points",
+   "class": "verified",
+   "product": "3d",
+   "base": "https://themathbible.com",
+   "path": "/3d-builder/",
+   "lines": [
+    "קוביה ABCDA'B'C'D'",
+    "משוואת מישור A'B'C'D' היא x+4y-8z-126=0",
+    "B(0,7,8)"
+   ],
+   "asks": [
+    "משוואת BB'"
+   ],
+   "expect": [
+    "t·(2, 8, -16)"
+   ],
+   "lookFor": "«x = (0, 7, 8) + t·(2, 8, -16)».",
+   "before": "«לא זוהה»."
+  },
+  {
+   "id": "P8",
+   "title": "Complex loads and builds (untouched this round)",
+   "class": "verified",
+   "product": "complex",
+   "base": "https://themathbible.com",
+   "path": "/complex-builder/",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "The point z₁ is drawn, labelled «z₁ = 3+4i».",
+   "before": "Unchanged.",
+   "section": "prod",
+   "expect": [
+    "z₁ = 3+4i"
+   ]
+  }
+ ]
+}

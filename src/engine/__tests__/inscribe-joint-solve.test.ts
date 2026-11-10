@@ -58,6 +58,10 @@ function withVariant(prefix: string[], shape: 'square' | 'rectangle', variant: n
  * leading candidate and gets a session when a case arrives, not a slot on speculation. Do NOT flip this
  * cell to make a change pass; if it starts building, that is the gap CLOSING and the cell is updated in
  * the same commit as the fix that closed it.
+ *
+ * CLOSED by #2797 ([ADR-816](docs/06-decisions.md#adr-816)), 2026-11-10: the driven solvers' LM rescue rung
+ * (Levenberg–Marquardt on the joint cost's signed rows, run only when Nelder–Mead accepted nothing) reaches the
+ * hypotenuse seating, so `square@B#3` builds a verified square and every one of the 36 cells is `builds`.
  */
 type Outcome = 'builds' | { refuses: RegExp };
 const OUTCOMES: Record<string, Outcome> = Object.fromEntries([
@@ -67,9 +71,7 @@ const OUTCOMES: Record<string, Outcome> = Object.fromEntries([
       [`rectangle@${rt}#${v}`, 'builds' as Outcome],
     ]),
   ),
-  // the one open gap — and after ADR-493 arm 1 it names the SQUARE'S OWN obligation, never the
-  // student's «∠ABC = 90°», which holds perfectly well and which they must not be sent to change.
-  ['square@B#3', { refuses: /\|DE\| = \|EF\|/ } as Outcome],
+  // square@B#3 was the one open gap (refused naming «|DE| = |EF|»); ADR-816 closed it — it builds.
 ]);
 
 describe('a macro\'s defining constraints are solved as one coupled system (ADR-338 / #166)', () => {

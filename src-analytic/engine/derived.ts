@@ -17,7 +17,8 @@
  * caller record an honest vacancy instead of drawing a point at `NaN` or, worse, at some default —
  * which would be [ADR-052](../../docs/06-decisions.md#adr-052)'s sin in derived clothing.
  */
-import type { CommonTangentFamily, Id } from './types';
+import type { CommonTangentFamily, Id, NumCurve } from './types';
+import { toWorld } from './conicFrame';
 import { commonTangentLine } from './commonTangents';
 import { CONIC_ROLE_WORDS } from '../parser/conicRoleWords';
 
@@ -136,7 +137,15 @@ export type EllipseRole =
   /** #1863 (ADR-AG-377) — the centre: the origin, the ellipse being canonical. «P מרכז האליפסה» names it. */
   | { k: 'centre' };
 
-export function ellipseRolePoint(e: { a: number; b: number }, role: EllipseRole): Pt | null {
+export function ellipseRolePoint(e: { a: number; b: number; h?: number; k?: number }, role: EllipseRole): Pt | null {
+  const p = canonicalRolePoint(e, role);
+  // Moved (#2664, ADR-AG-455): read at the origin, carried to the centre. Absent offsets leave the point untouched.
+  const h = e.h ?? 0;
+  const k = e.k ?? 0;
+  return p && (h !== 0 || k !== 0) ? { x: p.x + h, y: p.y + k } : p;
+}
+
+function canonicalRolePoint(e: { a: number; b: number }, role: EllipseRole): Pt | null {
   const { a, b } = e;
   if (!(a > 0) || !(b > 0)) return null;
   const xMajor = a >= b;
@@ -446,7 +455,7 @@ export function evalRule(
   r: DerivedRule,
   at: (id: Id) => Pt | null,
   /** The resolved curves, for the rules that need them. Absent means "no curve is available". */
-  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number; r?: number; a?: number; b?: number; c?: number } | null,
+  curveAt?: (id: Id) => { kind?: string; cx?: number; cy?: number; r?: number; a?: number; b?: number; c?: number; h?: number; k?: number } | null,
 ): Pt | null {
   const ps = parentsOf(r).map(at);
   if (ps.some((p) => p === null)) return null;
@@ -463,15 +472,16 @@ export function evalRule(
       // The same vacancy discipline as the centre: not a parabola here, no focus here (#1432).
       // y² = 2px → focus (p/2, 0) — `curves.ts`'s own closed form, INLINED because curves.ts
       // (via evaluate) already depends on this module and an import back would be a cycle.
-      const c = curveAt?.(r.curve) as { kind?: string; p?: number } | null;
+      const c = curveAt?.(r.curve) as unknown as NumCurve | null;
       if (!c || c.kind !== 'parabola' || typeof c.p !== 'number') return null;
-      return { x: c.p / 2, y: 0 };
+      // Moved (#2664): the conic's own frame, a leaf module, so the import is no cycle.
+      return toWorld(c, c.p / 2, 0);
     }
     case 'ellipse-point': {
       // The same vacancy discipline: not an ellipse here, no role point here (#2616).
       const c = curveAt?.(r.curve);
       if (!c || c.kind !== 'ellipse' || typeof c.a !== 'number' || typeof c.b !== 'number') return null;
-      return ellipseRolePoint({ a: c.a, b: c.b }, r.role);
+      return ellipseRolePoint({ a: c.a, b: c.b, h: c.h, k: c.k }, r.role);
     }
     case 'touch-point': {
       const circle = (id: Id) => {

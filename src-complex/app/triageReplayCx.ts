@@ -133,13 +133,10 @@ export function replayComplexSession(events: readonly LoggedEventCx[], opts: Rep
         case 'record':
           // the store keeps the ingested text (`cleanLine`), and so does the replay: a later delete names it
           go({ ...state, lines: [...state.lines, ingestTypedText(v.line)], seed: v.seed });
-          res = { now: 'built', detail: 'record', degraded };
+          res = { now: 'built', detail: v.note ? 'held' : 'record', degraded }; // #2790: a held line is a row too
           break;
         case 'ask':
           res = { now: 'built', detail: 'ask', degraded }; // filed in the ask lane: the figure is unchanged
-          break;
-        case 'known':
-          res = { now: 'built-nothing', detail: v.note.key, degraded };
           break;
         case 'refuse':
           res =

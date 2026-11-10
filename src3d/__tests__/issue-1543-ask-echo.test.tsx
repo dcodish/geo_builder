@@ -33,10 +33,10 @@ const HIS = ["קוביה ABCDA'B'C'D'", "מישור A'B'C'D' הוא x+4y-8z-126=
 beforeEach(reset);
 
 describe('#1543 — the echo wears an arrow only when the question was READ as a vector', () => {
-  it("his exact sequence: «משוואת BB'» is refused, and its echo carries no arrow", () => {
+  it("his exact sequence: «משוואת BB'» — a LINE question (#1541), and its echo carries no arrow", () => {
     build(...HIS);
     const { r, html } = echo("משוואת BB'");
-    expect(r.note).toBe('notUnderstood');
+    expect(r.answer).toBe('x = (0, 7, 8) + t·(2, 8, -16)'); // #1541 (ADR-3D-475): answered as the line it asks for
     expect(r.echo).toBe('plain');
     expect(html).not.toContain('<mover');
     expect(html).toContain('BB&#x27;'); // the letters are still there, plain
@@ -45,7 +45,7 @@ describe('#1543 — the echo wears an arrow only when the question was READ as a
   it.each([
     'אורך AB', // a SEGMENT length, by the word
     'length AB',
-    'משוואת הישר AB', // not understood today; a line once #1541 lands — never a vector
+    'משוואת הישר AB', // a line (#1541) — never a vector
     'המרחק בין A ל-BC', // a distance
     'זווית ABC', // an angle at a vertex
     "מישור A'B'C'D'", // a plane

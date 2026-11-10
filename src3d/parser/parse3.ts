@@ -34,7 +34,7 @@ import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhra
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
-import { CYCLIC_MEMBER, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
+import { cyclicFixCommands, cyclicFixRelations, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
@@ -894,7 +894,7 @@ function statedQuadBase(s: string): QuadBase | null {
  * #2490 ([ADR-3D-436](../../docs/06b-decisions-3d.md#adr-3d-436)) — does this sentence NAME a quad base's shape? `false`
  * is `rightPyramid`'s `statedQuadBase(s) ?? 'rectangle'`: ADR-3D-011's default, which draws a NEW base. The command is
  * the same either way («פירמידה ABCDS» and «… שבסיסה מלבן» both read `pyramid4gr`), and this parser is context-free, so
- * the fold asks this of the row's own text when the base already exists (`unstatedPyramidBase3`): the same reader on
+ * the fold asks this of the row's own text when the base already exists (`unstatedPyramidReading3`): the same reader on
  * the same normalized text as the rule, never a second vocabulary.
  */
 export function namesQuadBase3(utterance: string): boolean {
@@ -1052,41 +1052,6 @@ const QUAD_PYRAMID_KIND: Record<QuadBase, { free: SolidKind; right: SolidKind }>
   trapezoid: { free: 'pyramidTrap', right: 'pyramidTrapR' },
   quad: { free: 'pyramidQuad', right: 'pyramidQuadR' },
 };
-
-/**
- * The constraint «ישרה» adds so the stated base becomes CYCLIC — the operator's 2026-07-27 ruling
- * (#305). A right pyramid's apex sits over the base's circumcentre, which exists iff the base is
- * cyclic; rather than refuse, the base is constrained into the cyclic member of its OWN family and
- * a build notice names what it became. Nothing is invented: the base noun and «ישרה» jointly
- * ENTAIL it (the ADR-165 / ADR-123 allowed-with-a-notice precedent). Lowered as ordinary relations —
- * the ADR-110 macro pattern — so the solver does the work and no new engine construct is needed.
- * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
- */
-function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
-  return shapeInternal3(cyclicFixRelations(base, ring)); // #1844: equal DIAGONALS are the shape's, not a drawn pair
-}
-
-function cyclicFixRelations(base: QuadBase, ring: Id[]): ShapeRelation3[] {
-  const fix = CYCLIC_MEMBER[base].fix;
-  switch (fix.kind) {
-    case 'none':
-      return [];
-    case 'right-angle': {
-      const v = ring[fix.vertex];
-      const prev = ring[(fix.vertex + 3) % 4];
-      const nxt = ring[(fix.vertex + 1) % 4];
-      return [{ type: 'cos-angle', u: { kind: 'pair', from: v, to: prev }, v: { kind: 'pair', from: v, to: nxt }, cos: 0 }];
-    }
-    // an isosceles trapezoid: its DIAGONALS are equal, |AC| = |BD|. #1792: not the legs — with AB ∥ DC,
-    // |AD| = |BC| also holds on every PARALLELOGRAM, and a free flat ring solved onto that branch at 3 of 8
-    // seeds (a circle through a parallelogram's vertices then missed one). Equal diagonals on a trapezoid
-    // admit only the isosceles trapezoid and the rectangle — both cyclic, both isosceles trapezoids.
-    case 'equal-diagonals':
-      return [{ type: 'length-rel', a1: ring[0], b1: ring[2], rhs: { pair: [ring[1], ring[3]] }, c: 1 }];
-    case 'concyclic':
-      return [{ type: 'concyclic', ids: [...ring] }];
-  }
-}
 
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
  *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
@@ -5723,6 +5688,30 @@ export function angleAskOperands(raw: string): { a: Operand3; b: Operand3 } | nu
   if (cmd.type === 'plane-rel' && cmd.rel === 'angle') return { a: cmd.a, b: cmd.b };
   if (cmd.type === 'line-rel' && cmd.rel === 'angle') return { a: { kind: 'line', name: cmd.line }, b: cmd.op };
   if (cmd.type === 'line-plane-angle') return { a: { kind: 'segment', a: cmd.a, b: cmd.b }, b: { kind: 'plane-run', ids: cmd.plane } };
+  return null;
+}
+
+/**
+ * #1541 (ADR-3D-475) — the ask form of a LINE's equation, read the way {@link angleAskOperands} reads an
+ * angle: «משוואת BB'» is «משוואת BB' היא x = …» without its value. The question is lowered by the
+ * statement grammar (`parametricLine`) with a placeholder body, and only the NAME it binds is kept — a
+ * point pair («BB'») or a line name («ℓ», «l1» → «ℓ1»). Every head the statement reads («משוואת הישר AB»,
+ * «הצגה פרמטרית של הישר AB», «הישר ℓ», "the equation of line AB") is askable by construction; no second
+ * grammar (ADR-3D-279's Rejected clause).
+ */
+export function lineAskOf(raw: string): { name: string; pair: [string, string] | null } | null {
+  const q = raw.replace(/\s*[?？]\s*$/, '').trim();
+  // A line question NAMES its subject with a head («משוואת», «הישר», "equation of line"): a single bare
+  // token («BB'», «l») stays the vector / symbol / point lanes' question, where it has always been read.
+  if (!q || !/\s/.test(q)) return null;
+  for (const copula of [':', ' היא', ' הוא', ' is']) {
+    const r = parse3(`${q}${copula} x = (0,0,0) + t(1,0,0)`);
+    if (!r.ok || r.commands.length === 0) continue;
+    const [head, ...rest] = r.commands;
+    if (head.type !== 'line3' || !rest.every((cmd) => cmd.type === 'on-line' && cmd.line === head.name)) continue;
+    const pair = head.name.match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
+    return { name: head.name, pair: pair ? [pair[1], pair[2]] : null };
+  }
   return null;
 }
 

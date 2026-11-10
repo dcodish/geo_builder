@@ -13,7 +13,11 @@ import { fmtAnalytic } from '../format';
 import { givenText } from '../../shell/literal';
 import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
-import type { CurveKind } from '../engine/types';
+import type { CurveKind, NumCurve } from '../engine/types';
+
+/** A circle's centre, or a round ellipse's (#1863), the origin unless it was moved (#2664). */
+const centreOf = (c: NumCurve): { x: number; y: number } =>
+  c.kind === 'circle' ? { x: c.cx, y: c.cy } : c.kind === 'ellipse' ? { x: c.h ?? 0, y: c.k ?? 0 } : { x: 0, y: 0 };
 import { mergedLabels } from '../../shell/converge';
 import { tickStep } from '../../shell/ticks';
 import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
@@ -904,8 +908,9 @@ export function buildScene(
       // #2688: with the values switched off, the centre's coordinate label goes too — the cross stays
       centre: (c.curve.kind === 'circle' || (c.curve.kind === 'ellipse' && knows.circleShaped?.(c.id))) && ink !== 'none' && ink !== 'ghost'
         ? {
-            cx: t.sx(c.curve.kind === 'circle' ? c.curve.cx : 0),
-            cy: t.sy(c.curve.kind === 'circle' ? c.curve.cy : 0),
+            // an ellipse's own centre (#2664): the origin when it was not moved
+            cx: t.sx(centreOf(c.curve).x),
+            cy: t.sy(centreOf(c.curve).y),
             /**
              * The label is the mark's only when NO point stands there (#1086).
              *
@@ -920,8 +925,8 @@ export function buildScene(
             label:
               display.values &&
               knows.curveKnown?.(c.id) &&
-              !hasPointAt(fig, c.curve.kind === 'circle' ? c.curve.cx : 0, c.curve.kind === 'circle' ? c.curve.cy : 0)
-                ? lbl(c.curve.kind === 'circle' ? `(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})` : '(0, 0)')
+              !hasPointAt(fig, centreOf(c.curve).x, centreOf(c.curve).y)
+                ? lbl(c.curve.kind === 'circle' || centreOf(c.curve).x !== 0 || centreOf(c.curve).y !== 0 ? `(${fmtAnalytic(centreOf(c.curve).x)}, ${fmtAnalytic(centreOf(c.curve).y)})` : '(0, 0)')
                 : undefined,
           }
         : undefined,

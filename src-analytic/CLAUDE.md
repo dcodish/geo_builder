@@ -11,7 +11,7 @@ work) and `gh issue list --label analytic`. A guard test rejects dated progress 
 ## What this is
 
 The **fourth** app in this repo, for the bagrut **analytic-geometry** question (שאלון 572 Q1): the
-coordinate plane, with points, lines, circles and canonical conics as objects carrying equations.
+coordinate plane, with points, lines, circles and axis-parallel conics as objects carrying equations.
 **Contract:** [02c](../docs/02c-requirements-analytic.md) (what) · [04c](../docs/04c-design-analytic.md) (how) ·
 decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md). The finished build plan (docs/19) is
 archived; see the archive table in [docs/README](../docs/README.md). Issue label `analytic`.
@@ -30,9 +30,8 @@ this tool *supplies* the one the exam withholds.
 2. **NO CAS** ([ADR-AG-001](../docs/06c-decisions-analytic.md#adr-ag-001) D1). The equation layer
    parses and EVALUATES; it never simplifies, solves or manipulates symbolically. Pinning a
    parameter is a numeric root-find. Anything beyond a 1–2-DOF root-find goes back to the operator.
-3. **Canonical conics only.** No hyperbola, no rotated conic, no translated conic — absent from
-   twenty exams and from the formula sheet. `engine/conic.ts` refuses each **by name**; adding one
-   is a decision, not a fix.
+3. **Axis-parallel conics only** ([ADR-AG-455](../docs/06c-decisions-analytic.md#adr-ag-455)). No hyperbola, no
+   rotated conic: `engine/conic.ts` refuses each **by name**; adding one is a decision, not a fix.
 4. **Suite conformance is part of the acceptance gate**, not polish
    ([ADR-AG-004](../docs/06c-decisions-analytic.md#adr-ag-004)): the chrome is mounted from `shell/`,
    never re-implemented, and the roster/locale/parity checklist is green before a slice is "done".

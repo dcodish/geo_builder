@@ -2336,3 +2336,15 @@ over all four (ADR-041).
 ### `bare-circle-pair-configurations-2240` — «שני מעגלים»: every view «הציגו תצורה אחרת» offers is the configuration it stands for (#2240, ADR-815)
 
 **Guards against:** a "separate" or "one inside the other" view of the bare pair drawn crossing, so the button showed one case twice in a cycle. **Asserts** 12 presses of the real view search, each view in its variant's case (crossing / apart / nested) and all three shown; with both radii stated, «OP = 10» settles apart, «OP = 0.5» nested and «OP = 5» on the touch (the boundary is never rejected), each meeting every requirement; a common point through two riders is never drawn apart.
+
+### `pentagon-impossible-closing-side-refuses` — «מחומש ABCDE» · … · ∠CDE = 100° · «EA = 1» is refused naming the statement, never parked as waiting (#2797, ADR-817)
+
+**Guards against:** a closing side no configuration reaches (E rides the ray from D and comes no closer to A than 2.11) committed as a red «waiting for givens» row once the solver samples the pentagon's free side. **Asserts** the seven lines build green; «EA = 1» is refused by the gate as an over-constraint naming |EA| = 1; «EA = 4.5» commits.
+
+### `restated-diagonals-isosceles-trapezoid-stays-put-2795` — «טרפז שווה שוקיים ABCD · AC = BD»: the equal diagonals the trapezoid already has move no point (#2795, ADR-821)
+
+**Guards against:** a fact the figure is forced to hold re-seating it through ADR-623's holes — the twin row thrown away as evidence (H1), an order row never released (H2), a re-sampled seed counted where the prior is the trapezoid's parallelogram root (H3); it moved 0.46 / 0.20 / 0.42 / 0.10 at the displayable seeds. **Asserts** AC = BD on the drawn figure, no point moves at seeds 0, 2, 3, 4 (each displayable before the line), the free-DOF count unchanged, and on «טרפז ABCD» · «AD = BC» · «AC = BD» unticking «AD = BC» leaves AC = BD holding.
+
+### `restated-rider-reversed-stays-put-2795` — «משולש ABC · D על AB · D על BA»: the reversed rider moves nothing (#2795, ADR-821)
+
+**Guards against:** the reversed rider's `collinear-order` claiming D's own parameter and re-solving D from another start (moved up to 3.3). **Asserts** no point moves at seeds 0–4, and with «D על AB» unticked «D על BA» alone keeps D on AB.

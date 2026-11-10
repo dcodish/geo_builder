@@ -273,8 +273,8 @@ describe('#2490 — a pyramid over an existing base', () => {
  * #2490 (ADR-3D-436) — a pyramid whose base shape is unstated KEEPS the shape of a base that already exists (operator
  * 2026-11-08: *"Keep its shape"*; ADR-052). Through the store, every host and spelling of the class: the ring is drawn
  * exactly as it was before the pyramid line, its DOFs stay (host + 3), no rectangle is imposed, so no narrowing note
- * says one was. The default rectangle stays where the pyramid makes its own base, a stated shape stays a given, and the
- * right pyramid is unchanged (its question is the operator's). The unit is engine3.test.ts's `unstatedPyramidBase3`.
+ * says one was. The default rectangle stays where the pyramid makes its own base, and a stated shape stays a given. The
+ * right pyramid is ADR-3D-468's (the describe below). The unit is engine3.test.ts's `unstatedPyramidReading3`.
  */
 describe('#2490 — an unstated pyramid base keeps the shape of the ring it stands on', () => {
   beforeEach(reset);
@@ -375,16 +375,6 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
     expect(state().lastError).toEqual({ code: 'shape-disjoint', stated: 'rectangle', actual: 'trapezoid' });
   });
 
-  it('UNCHANGED: the right pyramid keeps today\'s reading (a rectangle base; on the cube, its note)', () => {
-    build(['מרובע ABCD', 'פירמידה ישרה ABCDS']);
-    expectAllOk();
-    expect(derived().construction.solids[1].kind).toBe('pyramid4r');
-    for (let seed = 0; seed < 4; seed++) expect(isRectangle(derive3(state().facts, seed).positions, ['A', 'B', 'C', 'D'])).toBe(true);
-    build([CUBE, 'פירמידה ישרה ABCDS']);
-    expectAllOk();
-    expect(narrowed()).toHaveLength(1);
-  });
-
   it('the pyramid typed again is still «already stated», with a shape reference elsewhere in the figure too', () => {
     for (const lines of [['מרובע ABCD', 'פירמידה ABCDS'], ['משולש EFG', 'המשולש ישר זווית', 'מרובע ABCD', 'פירמידה ABCDS']]) {
       build(lines);
@@ -394,5 +384,174 @@ describe('#2490 — an unstated pyramid base keeps the shape of the ring it stan
       expect(state().lastNotice, lines.join(' · ')).toEqual({ code: 'already-stated' });
       expect(state().facts, lines.join(' · ')).toHaveLength(n);
     }
+  });
+});
+
+/**
+ * #2490 (ADR-3D-468; ADR-W-199, operator 2026-11-09: *"we would not refuse something that can be built"*) — a RIGHT
+ * pyramid whose base shape is unstated, over a ring that already exists, reads as its stated twin «פירמידה ישרה ABCDS
+ * שבסיסה מרובע»: the ring is fitted to the cyclic member of its own family with its own free DOF, and refused only when
+ * its own givens forbid a circle, naming them. A ring a circle already passes through is drawn as it was, with no build
+ * note (Q-2490d). Through the store, every host of the class. The unit is engine3.test.ts's `unstatedPyramidReading3`.
+ */
+describe('#2490 — a right pyramid over an existing ring fits the ring to its cyclic member', () => {
+  beforeEach(reset);
+  type P3 = { x: number; y: number; z: number };
+  const RING = ['A', 'B', 'C', 'D'];
+  const CUBE = "קובייה ABCDA'B'C'D'";
+  const RIGHT = 'פירמידה ישרה ABCDS';
+  const build = (lines: readonly string[]) => {
+    reset();
+    for (const u of lines) submit(u);
+  };
+  const dofOf = (facts = state().facts, seed = state().seed) => {
+    const d = derive3(facts, seed);
+    return freeDofCount3(d.construction, d.resolved);
+  };
+  /** the build notes this class can show, as `narrowed:<from>-><to>:<cause>` / `base-constrained:<from>-><to>` */
+  const notes = (): string[] =>
+    derived().notices.flatMap((n) => {
+      if (n.kind === 'narrowed') {
+        const note = n.note as { from?: string; to?: string; cause?: { kind: string } };
+        return [`narrowed:${note.from}->${note.to}:${note.cause?.kind}`];
+      }
+      return n.kind === 'base-constrained' ? [`base-constrained:${n.from}->${n.to}`] : [];
+    });
+  /** the interior angle of the ring at vertex i, in degrees */
+  const angle = (p: ReadonlyMap<string, P3>, i: number) => {
+    const at = p.get(RING[i])!;
+    const a = p.get(RING[(i + 3) % 4])!;
+    const b = p.get(RING[(i + 1) % 4])!;
+    const dot = (a.x - at.x) * (b.x - at.x) + (a.y - at.y) * (b.y - at.y) + (a.z - at.z) * (b.z - at.z);
+    return (Math.acos(dot / (dist(at, a) * dist(at, b))) * 180) / Math.PI;
+  };
+  /** a convex flat ring a circle passes through: its opposite angles are supplementary */
+  const cyclic = (p: ReadonlyMap<string, P3>) => Math.abs(angle(p, 0) + angle(p, 2) - 180) < 1e-4 && Math.abs(angle(p, 1) + angle(p, 3) - 180) < 1e-4;
+  const right = (p: ReadonlyMap<string, P3>, i: number) => Math.abs(angle(p, i) - 90) < 1e-4;
+  const rectangle = (p: ReadonlyMap<string, P3>) => [0, 1, 2, 3].every((i) => right(p, i));
+  const square = (p: ReadonlyMap<string, P3>) => rectangle(p) && Math.abs(dist(p.get('A')!, p.get('B')!) - dist(p.get('B')!, p.get('C')!)) < 1e-6;
+  const SEEDS = [0, 1, 2, 3, 4, 5];
+
+  // [host lines, the cyclic member it becomes, the narrowing note (none for a plain quadrilateral)]
+  const FITTED: [string[], (p: ReadonlyMap<string, P3>) => boolean, string | null][] = [
+    [['מרובע ABCD'], cyclic, null],
+    [['מעוין ABCD'], square, 'narrowed:rhombus->square:rightPyramid'],
+    [['מקבילית ABCD'], rectangle, 'narrowed:parallelogram->rectangle:rightPyramid'],
+    [['דלתון ABCD'], (p) => cyclic(p) && right(p, 1) && right(p, 3), 'narrowed:kite->right-kite:rightPyramid'],
+    [['טרפז ABCD'], (p) => cyclic(p) && Math.abs(dist(p.get('A')!, p.get('C')!) - dist(p.get('B')!, p.get('D')!)) < 1e-6, 'narrowed:trapezoid->isosceles-trapezoid:rightPyramid'],
+  ];
+
+  it('a ring that can still move is fitted to its cyclic member: builds, the build note names the change, DOF host + 0', () => {
+    for (const [host, member, narrowing] of FITTED) {
+      const label = [...host, RIGHT].join(' · ');
+      build(host);
+      const hostDof = dofOf();
+      submit(RIGHT);
+      expectAllOk();
+      expect(derived().construction.solids.at(-1), label).toMatchObject({ kind: 'pyramidQuadR', bound: RING });
+      expect(dofOf(), label).toBe(hostDof); // −1 the cyclic fix, +1 the apex height
+      for (const seed of SEEDS) expect(member(derive3(state().facts, seed).positions), `${label} @${seed}`).toBe(true);
+      expect(notes(), label).toEqual([...(narrowing ? [narrowing] : []), 'base-constrained:quad->cyclicQuad']);
+    }
+  });
+
+  it('ADR-052: a free quadrilateral becomes a GENERAL cyclic one — not a rectangle, and «הציגו תצורה אחרת» varies it', () => {
+    build(['מרובע ABCD', RIGHT]);
+    expect(SEEDS.some((seed) => !rectangle(derive3(state().facts, seed).positions))).toBe(true);
+    const shapes = new Set(SEEDS.map((seed) => angle(derive3(state().facts, seed).positions, 0).toFixed(3)));
+    expect(shapes.size).toBeGreaterThan(1);
+    // and the kite is a right kite, never the square the default rectangle made of it
+    build(['דלתון ABCD', RIGHT]);
+    expect(SEEDS.some((seed) => !square(derive3(state().facts, seed).positions))).toBe(true);
+  });
+
+  // [host lines, seeds the ring is compared at]: a host whose ring is SOLVED (a stated circle, stated angles) is moved
+  // by ANY added solid at one seed, a disjoint cube too (~0.007 at seed 0; ~0.017 at seed 4) — a separate stability bug,
+  // #2791, not this class — so that seed is left out for those two hosts only
+  const ALREADY: [string[], number[]][] = [
+    [['ריבוע ABCD'], SEEDS],
+    [['מלבן ABCD'], SEEDS],
+    [['טרפז שווה שוקיים ABCD'], SEEDS],
+    [['מרובע ABCD', '∠DAB = 100', '∠BCD = 80'], [0, 1, 2, 3, 5]],
+    [[CUBE], SEEDS],
+    [["תיבה ABCDA'B'C'D'"], SEEDS],
+    [['מרובע ABCD', 'מעגל חוסם את ABCD'], SEEDS.slice(1)],
+  ];
+
+  it('a ring a circle already passes through builds as it was: unmoved, host + 1 DOF, and NO build note (Q-2490d), both spellings', () => {
+    for (const [host, seeds] of ALREADY) {
+      for (const line of [RIGHT, 'פירמידה ישרה ABCDS שבסיסה מרובע']) {
+        const label = [...host, line].join(' · ');
+        build(host);
+        const hostFacts = state().facts;
+        const hostDof = dofOf();
+        submit(line);
+        expectAllOk();
+        expect(derived().construction.solids.at(-1), label).toMatchObject({ kind: 'pyramidQuadR', bound: RING, boundCyclic: true });
+        expect(dofOf(), label).toBe(hostDof + 1);
+        expect(notes(), label).toEqual([]);
+        for (const seed of seeds) {
+          const p = derive3(state().facts, seed).positions;
+          const q = derive3(hostFacts, seed).positions;
+          for (const id of RING) expect(dist(p.get(id)!, q.get(id)!), `${label} @${seed}: ${id}`).toBeLessThan(1e-6);
+        }
+      }
+    }
+  });
+
+  it('REFUSAL: a ring whose own givens forbid a circle is refused, naming those givens, and nothing is recorded', () => {
+    const cases: [string[], string[]][] = [
+      [['מקבילית ABCD', '∠DAB = 60'], ['מקבילית ABCD', '∠DAB = 60']],
+      [['מעוין ABCD', '∠DAB = 60'], ['מעוין ABCD', '∠DAB = 60']],
+      [['מרובע ABCD', '∠DAB = 60', '∠BCD = 60'], ['∠DAB = 60', '∠BCD = 60']],
+    ];
+    for (const [host, others] of cases) {
+      build(host);
+      submit(RIGHT);
+      expect(state().lastError, host.join(' · ')).toEqual({ code: 'givens-contradict', stated: RIGHT, others });
+      expect(state().facts.map((f) => f.utterance)).toEqual(host);
+    }
+    // the other order: the angle is the line refused, naming the parallelogram and the pyramid
+    build(['מקבילית ABCD', RIGHT, '∠DAB = 60']);
+    expect(state().lastError).toEqual({ code: 'givens-contradict', stated: '∠DAB = 60', others: ['מקבילית ABCD', RIGHT] });
+  });
+
+  it('spelling parity: the unstated line, its English, and the stated twin draw the same figure with the same DOF', () => {
+    const figure = (line: string) => {
+      build(['מרובע ABCD', line]);
+      expectAllOk();
+      return SEEDS.map((seed) => ({ dof: dofOf(state().facts, seed), p: RING.map((id) => derive3(state().facts, seed).positions.get(id)!) }));
+    };
+    const ref = figure(RIGHT);
+    for (const line of ['right pyramid ABCDS', 'פירמידה ישרה SABCD שבסיסה מרובע']) {
+      const got = figure(line);
+      for (const [i, g] of got.entries()) {
+        expect(g.dof, `${line} @${i}`).toBe(ref[i].dof);
+        for (const [j, q] of g.p.entries()) expect(dist(q, ref[i].p[j]), `${line} @${i}: ${RING[j]}`).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it('a later volume line keeps the fitted ring, and an oblique prism\'s face is fitted with the note', () => {
+    build(['מרובע ABCD', RIGHT, 'נפח הפירמידה ABCDS = 11']);
+    expectAllOk();
+    for (const seed of SEEDS) expect(cyclic(derive3(state().facts, seed).positions), `volume @${seed}`).toBe(true);
+    build(["מנסרה שבסיסה מקבילית ABCDA'B'C'D'", "פירמידה ישרה ABB'A'S"]);
+    expectAllOk();
+    expect(derived().construction.solids.at(-1)).toMatchObject({ kind: 'pyramidQuadR', bound: ['A', 'B', "B'", "A'"] });
+    expect(notes()).toEqual(['narrowed:quadrilateral->rectangle:rightPyramid', 'base-constrained:quad->cyclicQuad']);
+  });
+
+  it('UNCHANGED: a triangle base, a standalone right pyramid (its rectangle), and a stated rhombus becomes a square', () => {
+    build(['משולש ABC', 'פירמידה ישרה ABCS']);
+    expectAllOk();
+    build([RIGHT]);
+    expectAllOk();
+    expect(derived().construction.solids[0].kind).toBe('pyramid4r');
+    for (const seed of SEEDS) expect(rectangle(derive3(state().facts, seed).positions)).toBe(true);
+    build(['מעוין ABCD', 'פירמידה ישרה ABCDS שבסיסה מעוין']);
+    expectAllOk();
+    for (const seed of SEEDS) expect(square(derive3(state().facts, seed).positions)).toBe(true);
+    expect(notes()).toEqual(['narrowed:rhombus->square:rightPyramid']);
   });
 });

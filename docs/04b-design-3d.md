@@ -286,7 +286,10 @@ bound the name. **A refusal names a cause the figure does not contradict** (ADR-
 `angleAskOperands` and `revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep
 the relation it lowers to; `parseQuery` turns those into `angle-ops` (measured by `angleBetweenOperands`)
 and `rev` (measured by `revolutionMeasure` in claims.ts) — the verifier's own geometry, so a spelling the
-statement lane learns is askable the same day.
+statement lane learns is askable the same day. `lineAskOf` (ADR-3D-475, #1541) does the same for a line's
+equation — the placeholder is a parametric body and it keeps the NAME `parametricLine` binds; `parseQuery`'s
+`line` kind answers a point pair as `x = P + t·PQ` (frame + both points known) and a named line through
+`lineEquationForms3` (dataView.ts), the one decision `buildScene3`'s line echo also calls.
 
 ### A stated quad shape has three arms, and the middle one always CREATES the corner (#587/#601/#985)
 
@@ -376,7 +379,13 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   kite and the bare quadrilateral — makes the crossing STRUCTURAL. `derive3` groups the declared rings by letter SET
   after the retry fixpoint and BEFORE the claim pass: a group with two cyclic orders, one of them convex-when-simple,
   refuses the LATEST declaring fact `ring-crossed`. Running first is why no verdict has to be overridden; ADR-3D-322's
-  sample-based pass stays where it is, for the rings whose figure the pivot can still place.
+  sample-based pass stays where it is, for the rings whose figure the pivot can still place. Since #2810
+  ([ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) the pass reads every declared ring of four or more (`declaredRings3`:
+  pentagons, bound bases) and a second sufficient reason, `statedConcyclic3` (baseShapes.ts: a circle through the
+  letters, with its riders and members; a `concyclic` claim or pin; a right quad pyramid's base): concyclic points are in
+  convex position. When the circle is the proof, the facts that stated it (`commandStatesCircle3`) join the blame, so
+  a circle or right-pyramid line that completed the contradiction is the one refused; a quad pyramid declares its base
+  ring for the blame too.
 - **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
   has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
   untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
@@ -490,7 +499,8 @@ else the two smallest gcd-reduced members of (b, −a, 0), (c, 0, −a), (0, c, 
 integer scaling `planeEqStr` prints). Every piece is checked (on the plane, in it, independent) or the row is
 withheld. The panel's planes block and the query lane's plane branch call it wherever they print the equation —
 no other gate — and the panel also lists every non-free equation-given plane on the equation's agreement alone
-(absolute, so no translation anchor).
+(absolute, so no translation anchor). The panel prefixes the parametric row with the plane's name only when the name is not
+already its symbol (`ABCD: π = …`, but a plane named π prints `π = …`, never `π: π = …` — #2820, [ADR-3D-482](06b-decisions-3d.md#adr-3d-482)).
 
 **The read-back samples the placement's leftover rigid freedom** (#2368, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375)).
 Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the
@@ -501,7 +511,7 @@ central-difference Jacobian of the primary residuals — the full construction, 
 over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
 coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
 raw axis-angle at |w| = 2π), and returns `6 − numericRank` with the null space (`symmetricEigen` of JᵀJ). Scale is
-excluded from `dim` (#518 samples it) and dims are held (seed-sampled); a seventh column, the size, gives `counted` (turn + size, a pure slide excluded), `rotation` and `scaleFree`, which the cue and the drawn walks read (ADR-3D-379). `resolve3(c, s, { placementImage: true })` replays the
+excluded from `dim` (#518 samples it) and dims are held (seed-sampled); a seventh column, the size, gives `counted` (turn + size, a pure slide excluded), `rotation` and `scaleFree`, which the cue and the drawn walks read (ADR-3D-379). `translation` is a basis of null(J_τ), the leftover slide: stage 5 slides only for the members `translationSlideSampled3` admits (an absolute frame, and a plane drive with no point pin, a stated sign, or axis/origin pins; ADR-3D-465 Am. 1) and only when 0 < rank J_τ < 3 (pinned at 3; a gauge at 0), along a seeded direction inside it, with the step AIMED at the stated signs (each sign is linear in the step along the direction, so the admissible steps are one interval; the seeded step stands inside it, else a seeded step inside it is taken). Stage 6's size park, when it carries a signed vertex across an axis, is followed by the same aimed slide before it is undone ([ADR-3D-465](06b-decisions-3d.md#adr-3d-465)). `resolve3(c, s, { placementImage: true })` replays the
 plain resolve's pivot pools (`pivotStageMemo3`, read by the image only) and then walks the chosen solution along a
 seeded unit combination of the generators — the #803 slide pattern: hard-pin the projection, release on the primary
 residuals, keep it only if exact, non-degenerate and moved; transactional on signs and the parameter. The image
@@ -883,6 +893,13 @@ re-derived (`reseatMixed3`), and a candidate where one no longer exists (a state
 `crossingOnInk3` bound the status pass reads) ranks below every candidate that keeps them all; when none does, the
 solved placement is kept.
 
+**A stated sign is aimed at (#2793, [ADR-3D-465](06b-decisions-3d.md#adr-3d-465)).** The funnel ranks a candidate first by how
+many stated signs it keeps, in statement order to the first that breaks (an impossible set keeps the earlier statements, so
+the completing line is refused), then as above. Per candidate rotation the translation is aimed axis by axis: above every
+"> 0" vertex's −value, below every "< 0" one's, the sampled value kept when inside with a margin of 0.25 extent. When
+none of the 12 keeps every sign, the 24 axis-aligned proper rotations and 24 seeded ones are tried (a work bound, one
+placement each).
+
 **The unknown layout** is [gauge 7 | dims | coupled symbols | pin symbols | rider lane]. The rider lane holds riders,
 offsets, free coordinates and, on the joint rung only, the enrolled free-vector unknowns (`free-joint`, ADR-3D-421).
 
@@ -957,17 +974,28 @@ three dims join the flat dim vector like any shape dim, so a bound pyramid contr
 `pointParents3` gives the apex its ring as parents, `placementFixers3` adds the ring's fixers, and `declaredRings3`
 counts the bound base as a declared ring, so the ring checks (skew, crossing) judge it. The renderer draws a shared
 edge once, lets no face both solids carry decide an edge's dashing, and dashes an edge inside a solid it shares
-vertices with (`hiddenEdgeKeys`).
+vertices with (`hiddenEdgeKeys`). A face is "shared" when two DIFFERENT solids WITH A BODY carry its vertex set: the
+count is of bodied solids, never of faces (a flat polygon carries its own ring twice, ring and reverse), and a flat
+polygon's face that a bodied solid also carries decides nothing, that solid's face being the surface there
+([ADR-3D-481](06b-decisions-3d.md#adr-3d-481)).
 
 The base SHAPE a bound pyramid carries is only a stated one ([ADR-3D-436](06b-decisions-3d.md#adr-3d-436)). The parser
 reads «פירמידה ABCDS» and «… שבסיסה מלבן» as one command (ADR-3D-011's rectangle is the default that draws a base the
 pyramid makes), so the fold decides from the row's own text (`namesQuadBase3`, the rule's own reader): a non-right pyramid
 whose base shape is unnamed and whose run binds (`boundPyramidOf3`, the one gate the solid apply also asks) is read in
-`expandFact` as the general-quadrilateral kind (`unstatedPyramidBase3`), the twin «… שבסיסה מרובע». A minted bare
+`expandFact` as the general-quadrilateral kind (`unstatedPyramidReading3`), the twin «… שבסיסה מרובע». A minted bare
 declaration (FR-SP-25) names none, and the mint pass's trial reads it the same way. The read command is the row's
 `resolvedCmds`, so apply lowers no shape and the narrowing, blame and crossing passes read a quadrilateral; the stored
 fact keeps its parsed commands. The twin rule reads a row as applied only when it holds a shape reference, and as typed
-otherwise. A right kind is left as read, because its cyclic fix is the parser's for the base it read.
+otherwise. A right kind reads as ITS stated twin «פירמידה ישרה ABCDS שבסיסה מרובע»
+([ADR-3D-468](06b-decisions-3d.md#adr-3d-468)): `unstatedPyramidReading3` returns the general right kind `pyramidQuadR`
+plus that twin's cyclic fix, `cyclicFixCommands('quad', ring)` (a shape-internal `concyclic`), which now lives in
+`baseShapes.ts` beside `CYCLIC_MEMBER` so the parser and the fold lower one fix. Both callers (`expandFact`, the mint
+trial) apply the whole list. The ring's own free DOF absorb the fix (M1); a determined ring that is not cyclic is the
+existing `givens-contradict`. `applyBoundPyramid3` asks the claim verifier whether the ring was ALREADY cyclic before
+the line (`verifyClaim` concyclic, every claim seed × branch, M3) and stamps `SolidObj.boundCyclic`; then neither the
+`base-constrained` note nor a narrowing cause is read off the pyramid (`rowClass3` takes the folded figure), since it
+narrowed nothing (Q-2490d).
 
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
@@ -1018,6 +1046,16 @@ shows today's drawing first and the next configuration the other triangle. The s
 shapes the first one found (a flat ring's mirror is its turn-over, so the root sets coincide). A free shape is
 slid by the settle and never reaches the fan. Quadrilaterals and pentagons are not fanned (measured: 2-D
 differs per figure, and the fan cost 2.8× / 8×). `ssaFanStats` counts runs and roots found.
+
+**A determined shape's reflected roots are reached from the found one** (#2814, [ADR-3D-461](06b-decisions-3d.md#adr-3d-461)).
+The same gate for any other shape (`nDims > 0`, no coupled symbol, not a plane drive, settle did not move the dims,
+dims off the sample): each DRIVEN dim (off its sample, non-zero) is negated in turn, from the found solution, and
+the primary residuals are solved; only when none of those finds a root is the all-driven-dims reflection tried. An
+exact, open, member-holding result is settled (`settleFreeDims`, skipped when no dim is at its sample) and joins the
+pool after the found root when its dims are new. A reflected start, or a solved root, whose DETERMINED points (those no
+free dim moves) are CONGRUENT to the found one's (`congruentShapes3`, a reflection included: a rectangle or box turned
+over; a fixed vertex mirrored over a side beside a free one) is the found root's mirror twin: never solved, never pooled. A dim still at its sample is never reflected (it is free; reflecting it pooled points of a continuum).
+The second mirror tries only the first mirror's found dims. `dimsFanStats` counts runs, LM starts and roots found.
 
 **The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
@@ -1071,6 +1109,13 @@ the cold-start loop, the dims widening, `collect()` and the `invariantOnly` loop
 asks `structurallyOnRun3`: off-plane keeps ADR-3D-146's foot; in-plane mints a `free3` letter driven by the
 ⟂. `degenerate()` rejects a NON-flat solid's ring at zero area (2-D ADR-413's rule in R³); a FLAT ring's
 collapse goes to a **frozen-dims retry** with the shape fixed at the seed's sample.
+
+**A similarity-invariant relation is scale-free in the pivot** (#2806, [ADR-3D-462](06b-decisions-3d.md#adr-3d-462)).
+Every relation `PIN_FIXES_SCALE` marks similarity-invariant has a residual of degree 0 in the gauge scale
+(normalised by its operands, `relDiff3` for the magnitude ratios `length-rel` / `mag-rel`, `|l| + |r|` for
+`vec-eq`), so the pivot can never satisfy it by shrinking the figure while one stated point makes the scale an
+unknown (on the frozen-gauge `invariantOnly` solve the rows keep their raw form, so a figure without a pin solves as before). The rows live in `scalarPinRows3`, and the rule is locked over the table: every `false` kind's row is
+unchanged when the figure doubles (`issue-936-degenerate.test.ts`).
 
 **The base sentinel names a solid's base; a flat polygon has none** (#1907, ADR-3D-315). `seg-plane-rel`
 with `plane: []` resolves to the single solid's base ring — unless that solid is a `FLAT_SOLID_KINDS`
@@ -1134,7 +1179,11 @@ the line `givens-contradict`, naming the statements.
 `settleFlatRings` judges every solid, not only the flat kinds: `closedFigure(r)` adds `solidSliver(r)` — a non-flat
 solid whose `flatnessRatio` is under `SOLID_THIN_RATIO` (1e-2, #936's calibration, moved into `solve3.ts`) is
 released on its own residuals and counts as flat if the re-solved solid is flat (`flatSolidAt`, the #872
-off-plane test, 1e-4 of span), or a limit root by the same `limitRoot` verdict on its `flatnessRatio` (ADR-3D-372). An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
+off-plane test, 1e-4 of span), or a limit root by the same `limitRoot` verdict on its `flatnessRatio` (ADR-3D-372). **The drawn size is judged too** (#2799, [ADR-3D-464](06b-decisions-3d.md#adr-3d-464)): `collapsed()` rejects a solid whose span
+`exp(logScale)·maxD` is ≤ 1e-4 of `lRef` (the seed's drawn size, lowered to the smallest stated absolute length), and
+`noteFlatSolid` records it (`scaleCollapsedAt`) when no solid is flat, so the empty pool is refused as that solid. The cold
+sweeps pass `leastSquares` an early-out (`exactAtPoint`: drawn at a point and exact) so the failure path does not spend the
+full iteration budget on a candidate it will reject. An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
 (`noteFlatSolid`, at every acceptance site); an empty pool with one runs the open-figure retry and otherwise
 comes back `collapse: { ring: solid ids, forced: true, solid: kind }`. `derive3` names it as a solid
 (`polygon-collapsed` with `solid: nounOfKind(kind)`, the letters as the declaring statement wrote them) and
@@ -1162,7 +1211,19 @@ that could be a dart (a kite, a general quadrilateral) fails the check open, and
 ([ADR-3D-418](06b-decisions-3d.md#adr-3d-418)) 3-D draws that drawing: **the concave seat** — a flat `polygon4` whose
 letters another declared ring orders differently (`ringReordered3`, the yield condition) is seated with one vertex inside
 the triangle of the other three (`polygon4ConcaveDims`; which vertex is drawn from the seed, as a branch is), where every
-cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **The ring preference** — a seed whose
+cyclic order is simple at once; a single ring keeps the convex seat bit-identically. **A solid's base takes the seat too**
+([ADR-3D-469](06b-decisions-3d.md#adr-3d-469), #2702): `solidDimsAll3` asks `concaveSeatVertices3` of the base ring of a
+`pyramidQuad`, `prism4g` or `pyramidKite` (`CONCAVE_SEAT_KINDS3`), and the seat reads every declared quad over the letters
+(`declaredQuads3`, a pyramid's base included), so a kite base may be reflex only on its axis and a cyclic base never. The general bases lead with the same `[cx, cy, dx, dy]` gauge as `polygon4`, so `polygon4ConcaveDims` replaces
+those four; a kite keeps its symmetry structurally and takes a dart window of its own `[half, axis]` (`concaveSolidDims3`).
+An UNSTATED pyramid base (`SolidObj.baseUnstated`, set by the fold's `namesQuadBase3` reading) yields its default
+rectangle to `pyramidQuad` when a polygon over its letters orders them differently (`yieldUnstatedBase3`, apply). The
+renderer orients faces of a solid that may be non-convex by a consistent winding and the signed volume
+(`solidFaceNormals`, scene3.ts), not by the centroid, which reads a face beside the reflex corner backwards. The seat yields to a stated circle
+(`statedConcyclic3`, #2810, [ADR-3D-467](06b-decisions-3d.md#adr-3d-467)) — a circle through the letters, a cyclic fix, a
+right pyramid's base: concyclic letters have no concave drawing, and the `concyclic` claim verifies in-order
+concyclicity — coplanar, diagonals crossing, opposite angles supplementary — so a dart can no longer verify the circle
+(the solver pin keeps its sign-crossing descent form). **The ring preference** — a seed whose
 declared rings (`declaredRings3`, the one enumeration this loop and the seed search share) are all simple joins
 `meetsShapePreferences3`'s tier in `firstSatisfyingSeed3`, so a forced crossing still resolves at today's fallback seed.
 **The reach** — an unpinned coordinate letter whose default draw crosses a declared ring over its point is re-drawn at
@@ -1240,7 +1301,7 @@ asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m
 
 **Two configurations print as one «או» row ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506; [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867).**
 `twoConfigurations3` (`dataView.ts`) asks whether a not-fully-determined point has EXACTLY two members
-(`sameConfig`) — the same two at every sample, the drawn one among them, judged beside #827's
+(`samePointConfig3`, `configs3.ts`, the one predicate the pivot pick also uses) — the same two at every sample, the drawn one among them, judged beside #827's
 `pivot.pointRoots` check. If so `points` carries one row `S(…) או (…)`, each configuration printed whole by
 `coordStr`, instead of `S(?, 7/2, ?)`, and `pointOptions[id]` carries the same text for the ask lane's point
 answer; `pointCoords` keeps the partial form; anything else returns `null`. The ask lane answers either text
@@ -1249,6 +1310,16 @@ and a `params` row carries `value` beside `text` for the same reason ([ADR-3D-33
 The vector answer (`vectorForms`, `queries.ts`) skips the decomposition when a NAMED atom decomposes to the unit
 vector on its own name (`isUnitOn`): a basis vector asked by its name answers only its coordinates, or nothing
 (the undetermined note) without a frame; a pair keeps its decomposition ([ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072).
+
+**The pivot pick is over DISTINCT configurations** (#2814, [ADR-3D-461](06b-decisions-3d.md#adr-3d-461)). `applySolutions` (`evaluate.ts`)
+reads each admissible solution's drawn positions (`finalFrameOf`) plus its pin-symbol values and orders the pool with
+`configurationOrder3` (`configs3.ts`): exact repeats dropped (`sameConfiguration3`), the rest grouped by discrete root —
+the intrinsic shape, every point in the frame of its first three non-collinear points, which a proper rigid motion
+keeps and a reflection of a non-flat figure does not — groups in canonical order (larger on the first differing
+component), interleaved round-robin. `chosen = distinct[seed % n]`; `pivot.solutions` and `pointRoots` read the
+distinct list. The drive's warm start stays the SOLVER-order entry `solverOrder[seed % n]` (moving it changed stage
+4's drive start and lost the #1769 prism's k = −1 root). So consecutive configurations alternate the roots, and a
+change to LM start noise cannot move which configuration a seed draws.
 
 ## The submit decision and refusals
 

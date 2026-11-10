@@ -82,15 +82,15 @@ describe('submit pipeline — grammar path', () => {
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 
-  it('a clean re-entry of an existing figure is the friendly no-op, never an LLM escalation', async () => {
+  it('a clean re-entry of an existing figure is its own row with the held notice, never an LLM escalation (#2790, ADR-W-200)', async () => {
     const { deps: d1 } = makeDeps();
     await runSubmit('ריבוע ABCD', d1);
     const before = useGeoStore.getState().facts.length;
     const { deps, calls, notes } = makeDeps();
     await runSubmit('ריבוע ABCD', deps);
-    expect(useGeoStore.getState().facts.length).toBe(before);
-    expect(notes()).toEqual(['suite.notice.alreadyDrawn']);
-    expect(calls.busy[calls.busy.length - 1]).toBe(false); // spinner cleared
+    expect(useGeoStore.getState().facts.length).toBe(before + 1);
+    expect(notes()).toEqual(['suite.notice.alreadyHeld']);
+    expect(calls.resolved, 'a row: the post-commit resolve owns the spinner, as for any commit').toBe(1);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 
@@ -391,6 +391,9 @@ describe('#786 (ADR-460 Am. 2) — the clause-fallback lane BUILDS these, with t
 /**
  * #613 (ADR-W-031) — the 2-D CONFORMANCE lock for the cross-product rule.
  *
+ * ⚠ Re-based by #2790 (ADR-W-200 / ADR-822, operator 2026-11-09): ADR-W-031 is superseded — a restated line is now
+ * ACCEPTED as its own row, with the held notice, so deleting the earlier row leaves it in force. The history below is kept.
+ *
  * The operator's ruling ("if a fact is already known - it should not be added. this is true to all
  * tools") widened #613 from a 3-D fix to a workspace rule, and the ruling required measuring 2-D for
  * the same defect before building. Measured: 2-D does NOT have it. `foldFact` has deduped a restated
@@ -401,8 +404,8 @@ describe('#786 (ADR-460 Am. 2) — the clause-fallback lane BUILDS these, with t
  * invariant, and an invariant with a conformant product and no test is one refactor from being a
  * non-conformant product with no test.
  */
-describe('submit pipeline — a restated fact succeeds, adds no row, and says so (#613)', () => {
-  it('the second «ריבוע ABCD» adds nothing and answers with the already-drawn note', async () => {
+describe('submit pipeline — a restated fact succeeds, is its own row, and says so (#613 → #2790, ADR-W-200)', () => {
+  it('the second «ריבוע ABCD» is its own row and answers with the held notice', async () => {
     const { deps: d1 } = makeDeps();
     await runSubmit('ריבוע ABCD', d1);
     const before = useGeoStore.getState().facts;
@@ -410,8 +413,9 @@ describe('submit pipeline — a restated fact succeeds, adds no row, and says so
 
     const { deps, calls, notes } = makeDeps();
     await runSubmit('ריבוע ABCD', deps);
-    expect(useGeoStore.getState().facts, 'the fact list is untouched').toBe(before);
-    expect(notes()[0], 'the success is legible, not silent').toContain('suite.notice.alreadyDrawn');
+    expect(useGeoStore.getState().facts.length, 'one row appended (ADR-W-200: exact repeats included)').toBe(before.length + 1);
+    expect(useGeoStore.getState().facts.slice(0, before.length), 'the earlier rows are untouched').toEqual(before);
+    expect(notes()[0], 'the success is legible, not silent').toContain('suite.notice.alreadyHeld');
     expect(calls.cleared, 'the input is cleared — this SUCCEEDED').toBe(1);
     expect(llmParseMock, 'never a paid call for a repeat').not.toHaveBeenCalled();
   });

@@ -1,36 +1,92 @@
 /**
- * #1990 (ADR-AG-330, ADR-W-152; operator ruling 2026-10-10, option A) — analytic's two no-op notes are 2-D's sentence,
- * `suite.notice.alreadyDrawn`: a restated line (`already-known`, was «זה כבר ידוע מהנתונים שכתבתם…») and a line the
- * figure already satisfies in every configuration (`already-follows`, was «זה כבר נובע מהנתונים שכתבתם…»), which is
- * 2-D's `implied-restatement` and answers the same sentence there. The shared assertions:
- * `shell/__tests__/fixtures/already-drawn-1990.ts`.
+ * #1990 (ADR-W-152) → #2790 ([ADR-AG-462](../../docs/06c-decisions-analytic.md#adr-ag-462),
+ * [ADR-AG-463](../../docs/06c-decisions-analytic.md#adr-ag-463), ADR-W-200 / ADR-W-204) — analytic's held row.
+ *
+ * A line the figure already holds — a restatement (was `already-known`), a given the figure already settles (was
+ * `already-follows`), a held value or its operand ink (recorded silently), a drawn line restated under a new name (was
+ * T32's refusal) — is RECORDED as its own row with the one suite notice (`suite.notice.alreadyHeld`), moves no point,
+ * and keeps its relation once the earlier row is muted or deleted. The table is shared with every builder:
+ * `shell/__tests__/fixtures/held-row-2790.ts`.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analyticI18n } from '../i18n';
-import { decideSubmit } from '../app/submit';
-import { lockAlreadyDrawn, RULED_ALREADY_DRAWN } from '../../shell/__tests__/fixtures/already-drawn-1990';
+import { decideSubmit, isHeld, noticeText, type NoticeT } from '../app/submit';
+import { derive } from '../engine/derive';
+import { HELD_CASES_ANALYTIC, HELD_CONTROLS_ANALYTIC, HELD_NOTICE } from '../../shell/__tests__/fixtures/held-row-2790';
 
 const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+const plain = (s: string | null) => (s ?? '').replace(/[⁦-⁩]/g, '');
+const tOf = (lng: 'he' | 'en'): NoticeT => analyticI18n.getFixedT(lng) as unknown as NoticeT;
+const SEEDS = [0, 1, 2, 3];
 
-describe("#1990 — analytic's no-op verdicts, and the one note they are worded with", () => {
-  it.each([
-    [['ריבוע ABCD'], 'ריבוע ABCD', 'already-known'],
-    [['ריבוע ABCD'], 'מרובע ADCB', 'already-known'],
-    [['משולש ABC', '∠ABC = 90'], 'AB ⟂ BC', 'already-known'],
-    // #2491 (ADR-AG-401): «AB = 4» over a drawn AB now records (its 4 is drawn); a line that states no value keeps the note.
-    [['A(0,0)', 'B(4,0)'], 'B נמצא על ציר ה-x', 'already-follows'],
-  ])('%j · «%s» → %s', (lines, line, kind) => {
-    expect(decideSubmit(line, lines, 0).kind).toBe(kind);
-  });
+/** The drawing before and after the line, as the App draws them: the trial starts from the configuration on the screen. */
+function maxMove(lines: readonly string[], more: readonly string[], seed: number): number {
+  const cur = derive(lines, seed);
+  const a = cur.figure.points;
+  const b = derive(more, cur.configuration, cur.construction.seedNames ?? {}, cur.pins).figure.points;
+  let m = 0;
+  for (const p of a) {
+    const q = b.find((r) => r.id === p.id);
+    if (q) m = Math.max(m, Math.hypot(p.x - q.x, p.y - q.y));
+  }
+  return m;
+}
 
-  it('both verdicts take the one branch that reads the suite key', () => {
-    const at = app.indexOf("case 'already-known':");
-    expect(at).toBeGreaterThan(0);
-    const branch = app.slice(at, app.indexOf('return sentenceOutcome(verdict);', at));
-    expect(branch).toContain("case 'already-follows':");
-    expect(branch).toContain(`t('${RULED_ALREADY_DRAWN.key}')`);
+describe('#2790 — analytic accepts a held line as its own row, with the notice', () => {
+  for (const c of HELD_CASES_ANALYTIC) {
+    it(`${c.lines.join(' · ')} — ${c.why}`, () => {
+      const prior = c.lines.slice(0, -1);
+      const last = c.lines[c.lines.length - 1];
+      const v = decideSubmit(last, prior, 0);
+      // (i) a row: the line records; (ii) with the one notice, in both languages
+      expect(v.kind, last).toBe('record');
+      expect(isHeld(v), last).toBe(true);
+      if (v.kind !== 'record') return;
+      for (const lng of ['he', 'en'] as const) expect(plain(noticeText(v.notice, tOf(lng))), lng).toBe(HELD_NOTICE[lng]);
+      // (iii) nothing moves, at 4 seeds, and nothing faults
+      for (const s of SEEDS) {
+        expect(maxMove(prior, c.lines, s), `seed ${s}`).toBeLessThan(1e-6);
+        expect(derive(c.lines, s).faults, `seed ${s}`).toEqual([]);
+      }
+      // (iv) the earlier row muted or deleted (analytic folds the ACTIVE lines: both read the same list): the restated row
+      // stands alone and holds
+      if (c.earlier === undefined) return;
+      const alone = c.lines.filter((_, i) => i !== c.earlier);
+      for (const s of SEEDS) {
+        const d = derive(alone, s);
+        expect(d.faults, `seed ${s}`).toEqual([]);
+        expect(d.figure.unsatisfied, `seed ${s}`).toEqual([]);
+        expect(d.outcomes[alone.length - 1], `seed ${s}: the row now carries the relation`).not.toBe('known');
+      }
+    });
+  }
+
+  it('the T32 line names the drawn line: one perpendicular bisector, called l2', () => {
+    const d = derive(['E(0,0)', 'K(4,2)', 'האנך האמצעי לקטע EK', 'l2 אנך אמצעי ל-EK'], 0);
+    const lines = d.construction.objects.filter((o) => o.kind === 'line-at');
+    expect(lines.map((o) => (o as { name?: string }).name)).toEqual(['l2']);
   });
 });
 
-lockAlreadyDrawn('analytic', (lng) => analyticI18n.getFixedT(lng)(RULED_ALREADY_DRAWN.key) as string, app);
+describe('#2790 — controls: what is false is refused, what adds information records with no notice', () => {
+  it.each(HELD_CONTROLS_ANALYTIC.refused.map((l) => [l]))('%j is refused', (lines) => {
+    expect(decideSubmit(lines[lines.length - 1], lines.slice(0, -1), 0).kind).toBe('refused');
+  });
+  it.each(HELD_CONTROLS_ANALYTIC.silent.map((l) => [l]))('%j records with no notice', (lines) => {
+    const v = decideSubmit(lines[lines.length - 1], lines.slice(0, -1), 0);
+    expect(v.kind).toBe('record');
+    expect(isHeld(v)).toBe(false);
+  });
+});
+
+describe('#2790 — the App words a held row with the suite key, through the record commit', () => {
+  it('no no-row branch is left, and the retired note is not read', () => {
+    expect(app).not.toContain("case 'already-known':");
+    expect(app).not.toContain("'suite.notice.alreadyDrawn'");
+    expect(app).toContain('commitRecord(verdict, recordLine, t)');
+  });
+  it('the key reads the ruled sentence in both languages', () => {
+    for (const lng of ['he', 'en'] as const) expect(plain(analyticI18n.getFixedT(lng)(HELD_NOTICE.key) as string)).toBe(HELD_NOTICE[lng]);
+  });
+});
