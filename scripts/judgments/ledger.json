@@ -4083,6 +4083,16 @@
       ],
       "at": "2026-11-10T15:52:09.298Z",
       "status": "escalated"
+    },
+    {
+      "id": "text-2625-parabola-no-centre",
+      "kind": "text",
+      "issue": "#2625",
+      "what": "The refusal for «O מרכז הפרבולה» and its spellings (a parabola has no centre; ruled Q-2625b (a))",
+      "choice": "«לפרבולה אין מרכז. אם התכוונתם לקודקוד הפרבולה, הכלי עדיין לא קורא אותו.» — the reason, then an honest next step: the vertex is what the student may mean, and the tool does not read it yet",
+      "chosen": true,
+      "at": "2026-11-10T17:24:27.784Z",
+      "status": "pending"
     }
   ],
   "demoted": {
