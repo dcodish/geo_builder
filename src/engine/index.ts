@@ -25,7 +25,7 @@ export {
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
 export { allConstraints, applySeed, freeDofs, freeDofCount, movableIds, scalePinned, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
-export { checkGivens, checkLabels, forcedOffArcs, type ForcedOffArc, type PrintedLabels } from './verify';
+export { checkGivens, checkLabels, declaredRingsHold, trapezoidMorphed, forcedOffArcs, type ForcedOffArc, type PrintedLabels } from './verify';
 export { solveBudget, budgetExceeded, withSolveBudget } from './solveBudget';
 export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples, distinctSamples, isScaffoldId } from './relations';

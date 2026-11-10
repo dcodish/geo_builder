@@ -197,8 +197,10 @@ never as a contradiction or a refutation.
   drive rows (ADR-CX-029) are computed after it. The student's own rows (`given`) stay what the canvas,
   the formulas and the rotations read; a closed zero stays the numeric residue (the log-polar carrier has
   no zero).
-- **A restatement the exact solve already entails adds no row** (stage 0e′, `entailedBy` in
-  `replay/derive2.ts`, asked by `submitLine` through `lineEntailed`; [ADR-CX-084](06d-decisions-complex.md#adr-cx-084)).
+- **A restatement the exact solve already entails is its own row, with the already-held note** (stage 0e′, `entailedBy` in
+  `replay/derive2.ts`, asked by `decideSubmitCx` through `lineEntailed` after the gate accepts the line; the `record`
+  verdict carries `note`, and `recordLine(line, seed, note)` sets `lastNote` in the same commit;
+  [ADR-CX-084](06d-decisions-complex.md#adr-cx-084), [ADR-CX-089](06d-decisions-complex.md#adr-cx-089)).
   The fold's exact half (`exactSolve`: parameter signs, stage 1a′, the claim drive rows) is one function that
   `foldConstraints` and `entailedBy` share. A typed line is entailed when its lowering adds only constraint
   rows (no name, object, claim, measure, filter, sequence, selection or unread line), none of them deferred,

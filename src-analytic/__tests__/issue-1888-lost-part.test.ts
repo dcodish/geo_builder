@@ -243,7 +243,7 @@ describe('class locks over the catalog', () => {
         withOpener++;
         const records = (piece: string, before: readonly string[]) => {
           const k = decideSubmit(piece, [...lines, ...before], 0).kind;
-          return k === 'record' || k === 'already-known' || k === 'already-follows';
+          return k === 'record';
         };
         const lost = declinedThrough(line, records);
         if (lost) flagged.push(`${lines.join(' · ')} ⟶ «${line}» ⟶ ${lost.parts.join(' | ')}`);

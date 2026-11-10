@@ -10,9 +10,10 @@
  * equation instead of a hand-matched pattern per spelling: `(x−3)²+(y−4)²=9`, `x²+y²−2ax−2x=0` and
  * `x²−6x+y²+t=0` are three spellings of one circle, and this reads all three the same way.
  *
- * The classifier is also **the canonicity gate** (docs/19 §2a): a rotated conic (`B ≠ 0`), a
- * translated parabola or ellipse, and a hyperbola are all REFUSED by name. Twenty exams contain
- * none of them; a student who types one deserves to be told, not to be mis-drawn.
+ * The classifier is also **the scope gate** (docs/19 §2a): a rotated conic (`B ≠ 0`) and a hyperbola are REFUSED by
+ * name. A parabola or an ellipse whose axes are parallel to the coordinate axes is READ wherever it sits, and a parabola
+ * opening along y too (#2664, ADR-AG-455): the square is completed here, and the offset is carried on the curve
+ * (`h`, `k`, `axis`, read through `conicFrame.ts`), absent at the origin so the canonical curve is unchanged.
  */
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import type { NumCurve } from './types';
@@ -56,7 +57,13 @@ export type ClassifyResult =
   /** Structurally not a curve at this parameter value (empty set, degenerate). Not an error. */
   | { ok: false; reason: 'vacant' }
   /** Outside the product's declared scope — the student is told which. */
-  | { ok: false; reason: 'rotated' | 'translated-conic' | 'hyperbola' | 'not-a-curve' }
+  | { ok: false; reason: 'rotated' | 'hyperbola' | 'not-a-curve' }
+  /**
+   * #2664 (ADR-AG-455) — the statement said «קנונית» («פרבולה קנונית», «אליפסה קנונית», "canonical") and the equation's
+   * curve is not at the origin. The word is a claim checked where the family is decided, never dropped. `actual` is the
+   * family the equation describes.
+   */
+  | { ok: false; reason: 'not-canonical'; actual: NumCurve['kind'] }
   /**
    * The statement NAMED a family and the equation is another one (02c R7, #1514 pre-play):
    * «פרבולה I שמשוואתה x^2+y^2=16». `actual` is what the equation describes, so the refusal can say
@@ -72,21 +79,29 @@ export type ClassifyResult =
  * student who wrote «אליפסה» and typed a hyperbola's equation is told about the hyperbola, rather
  * than being handed a generic "cannot read that".
  */
-export function classify(k: Conic, expect?: NumCurve['kind']): ClassifyResult {
+export function classify(k: Conic, expect?: NumCurve['kind'], canonical?: boolean): ClassifyResult {
+  const res = withClaims(k, expect);
+  // «קנונית» (#2664): a conic said canonical whose equation moved it off the origin is refused naming the word.
+  if (canonical && res.ok && (res.curve.kind === 'parabola' || res.curve.kind === 'ellipse') && (res.curve.h !== undefined || res.curve.k !== undefined)) {
+    return { ok: false, reason: 'not-canonical', actual: res.curve.kind };
+  }
+  return res;
+}
+
+function withClaims(k: Conic, expect?: NumCurve['kind']): ClassifyResult {
   const res = classifyFamily(k);
   /**
    * A CIRCLE IS THE a = b ELLIPSE (operator ruling 2026-09-29, ADR-AG-170 Am. 2): «נתונה אליפסה I
    * שמשוואתה x^2+y^2=16» is accepted as the student's ellipse — it resolves AS an ellipse (a = b = r),
    * so its name, «P על האליפסה I», crossings and the ellipse's own roles hold. Its foci coincide at the
-   * centre (c = √(a²−b²) = 0). The canonical-ellipse scope still applies: an off-centre circle under
-   * the ellipse noun is a translated ellipse. The only pair the ruling changed — every other
-   * noun/family mismatch below is still refused.
+   * centre (c = √(a²−b²) = 0). Off the origin it is a translated ellipse (#2664), centred where the circle is. The
+   * only pair the ruling changed — every other noun/family mismatch below is still refused.
    */
   if (expect === 'ellipse' && res.ok && res.curve.kind === 'circle') {
     const { cx, cy, r } = res.curve;
     const scale = Math.max(1, r);
-    if (Math.abs(cx) > 1e-9 * scale || Math.abs(cy) > 1e-9 * scale) return { ok: false, reason: 'translated-conic' };
-    return { ok: true, curve: { kind: 'ellipse', a: r, b: r } };
+    const off = (v: number) => (Math.abs(v) > 1e-9 * scale ? v : 0);
+    return { ok: true, curve: framed({ kind: 'ellipse', a: r, b: r }, off(cx), off(cy)) };
   }
   // ONE comparison for every noun × every family: the claim is checked HERE, where the family is
   // decided, so no naming clause and no future noun can skip it. A scope refusal (hyperbola,
@@ -124,26 +139,49 @@ function classifyFamily(k: Conic): ClassifyResult {
     return { ok: true, curve: { kind: 'circle', cx, cy, r: Math.sqrt(r2) } };
   }
 
-  // --- parabola: exactly one square term ---
+  // --- parabola: exactly one square term (#2664: anywhere, opening along x or y) ---
   if (A === 0 && C !== 0) {
-    // C·y² + D·x + E·y + F = 0. Canonical needs E = F = 0 and D ≠ 0.
-    if (E !== 0 || F !== 0) return { ok: false, reason: 'translated-conic' };
-    if (D === 0) return { ok: false, reason: 'not-a-curve' };
-    return { ok: true, curve: { kind: 'parabola', p: -D / (2 * C) } };
+    // C·y² + D·x + E·y + F = 0 → (y − k)² = 2p(x − h): k = −E/2C, p = −D/2C, h from the constant.
+    if (D === 0) return { ok: false, reason: 'not-a-curve' }; // two horizontal lines, or none
+    const k0 = E === 0 ? 0 : -E / (2 * C);
+    const h0 = -(F - C * k0 * k0) / D;
+    return { ok: true, curve: framed({ kind: 'parabola', p: -D / (2 * C) }, offset(h0, scale), k0) };
   }
   if (C === 0 && A !== 0) {
-    // A parabola on the Y-axis (`x² = 2py`) is not in the corpus and not in the type.
-    return { ok: false, reason: 'translated-conic' };
+    // A·x² + D·x + E·y + F = 0 → (x − h)² = 2p(y − k), the mirror: the parabola opens along y.
+    if (E === 0) return { ok: false, reason: 'not-a-curve' };
+    const h0 = D === 0 ? 0 : -D / (2 * A);
+    const k0 = -(F - A * h0 * h0) / E;
+    return { ok: true, curve: framed({ kind: 'parabola', p: -E / (2 * A), axis: 'y' }, h0, offset(k0, scale)) };
   }
 
   // --- two unequal square terms ---
   if (A * C < 0) return { ok: false, reason: 'hyperbola' };
-  // Ellipse. Canonical needs no linear terms (centred at the origin) and F on the other side.
-  if (D !== 0 || E !== 0) return { ok: false, reason: 'translated-conic' };
-  const a2 = -F / A;
-  const b2 = -F / C;
-  if (a2 <= 0 || b2 <= 0) return { ok: false, reason: 'vacant' };
-  return { ok: true, curve: { kind: 'ellipse', a: Math.sqrt(a2), b: Math.sqrt(b2) } };
+  // Ellipse: complete both squares, A(x − h)² + C(y − k)² = −F′.
+  const h0 = D === 0 ? 0 : -D / (2 * A);
+  const k0 = E === 0 ? 0 : -E / (2 * C);
+  const F1 = F - A * h0 * h0 - C * k0 * k0;
+  const a2 = -F1 / A;
+  const b2 = -F1 / C;
+  if (!(a2 > 0) || !(b2 > 0) || isZero(F1, scale)) return { ok: false, reason: 'vacant' };
+  return { ok: true, curve: framed({ kind: 'ellipse', a: Math.sqrt(a2), b: Math.sqrt(b2) }, h0, k0) };
+}
+
+/** A completed-square offset that is round-off of a zero (the constant term's relative zero) reads as zero. */
+function offset(v: number, scale: number): number {
+  return isZero(v, scale) ? 0 : v;
+}
+
+/**
+ * The curve with its frame (#2664): a zero offset and the x axis are written as ABSENT, so a canonical curve is the same
+ * object it always was (`conicFrame.ts` reads absent as 0 and 'x').
+ */
+function framed<C extends Extract<NumCurve, { kind: 'parabola' | 'ellipse' }>>(c: C, h: number, k: number): C {
+  const out = { ...c } as C & { h?: number; k?: number; axis?: 'x' | 'y' };
+  if (out.axis === 'x') delete out.axis;
+  if (h !== 0) out.h = h;
+  if (k !== 0) out.k = k;
+  return out;
 }
 
 /**
@@ -175,15 +213,15 @@ const conicMemo = new WeakMap<Expr, Map<string, ClassifyResult>>();
 const numKey = (v: number) => (Object.is(v, -0) ? '-0' : String(v));
 
 /** The two steps together, for the common case. */
-export function curveFromEquation(eq: Expr, env: Env, expect?: NumCurve['kind']): ClassifyResult {
-  if (!conicMemoOn || typeof eq !== 'object' || eq === null) return fitAndClassify(eq, env, expect);
+export function curveFromEquation(eq: Expr, env: Env, expect?: NumCurve['kind'], canonical?: boolean): ClassifyResult {
+  if (!conicMemoOn || typeof eq !== 'object' || eq === null) return fitAndClassify(eq, env, expect, canonical);
   let syms = symbolsMemo.get(eq);
   if (!syms) {
     // x and y are the probe coordinates `fitConic` supplies itself; nothing else reaches the result.
     syms = symbolsOf(eq).filter((s) => s !== 'x' && s !== 'y');
     symbolsMemo.set(eq, syms);
   }
-  let key = expect ?? '';
+  let key = (expect ?? '') + (canonical ? '!' : '');
   for (const s of syms) key += `|${Object.prototype.hasOwnProperty.call(env, s) ? numKey(env[s]) : 'u'}`;
   let perEq = conicMemo.get(eq);
   if (!perEq) {
@@ -192,7 +230,7 @@ export function curveFromEquation(eq: Expr, env: Env, expect?: NumCurve['kind'])
   }
   const hit = perEq.get(key);
   if (hit) return hit;
-  const out = fitAndClassify(eq, env, expect);
+  const out = fitAndClassify(eq, env, expect, canonical);
   if (out.ok) Object.freeze(out.curve);
   Object.freeze(out);
   // A parameterised equation under a solve sees a new value per iterate; bound it rather than grow.
@@ -201,11 +239,11 @@ export function curveFromEquation(eq: Expr, env: Env, expect?: NumCurve['kind'])
   return out;
 }
 
-function fitAndClassify(eq: Expr, env: Env, expect?: NumCurve['kind']): ClassifyResult {
+function fitAndClassify(eq: Expr, env: Env, expect?: NumCurve['kind'], canonical?: boolean): ClassifyResult {
   conicStats.fits += 1;
   const k = fitConic(eq, env);
   if (!k) return { ok: false, reason: 'vacant' };
-  return classify(k, expect);
+  return classify(k, expect, canonical);
 }
 
 /**

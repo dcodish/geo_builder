@@ -88,3 +88,54 @@ describe('#1027 — an answer passes the same honesty gate as a row', () => {
     expect(answer(SQUARE_ISH, 'שלום').missing).toBeUndefined();
   });
 });
+
+/** #2735 (ADR-AG-458, option C 2026-11-09): the question box answers in the letter where the panel does. */
+describe('#2735 — the question box answers in the parameter', () => {
+  const Q16 = ['x²/(25k²) + y²/(16k²) = 1', 'k > 0', 'F הוא המוקד הימני של האליפסה', 'E היא נקודת החיתוך של האליפסה עם החלק החיובי של ציר ה-x', 'נתון מעגל שמרכזו F', 'המעגל עובר דרך E'];
+  it.each([
+    ['מהם שיעורי F?', '(3k, 0)'],
+    ['הביעו באמצעות k את שיעורי הנקודה F', '(3k, 0)'],
+    ['הביעו באמצעות k את משוואת המעגל', '(x − 3k)² + y² = (2k)²'],
+    ['FE', '2k'],
+  ])('«%s» → «%s»', (q, value) => {
+    expect(answer(Q16, q).value).toBe(value);
+  });
+
+  it('with no sign on k, |AB| = 2√5·|k| is not one monomial and prints no form; with k > 0 it reads', () => {
+    expect(answer(['A(2k,0)', 'B(0,4k)'], 'AB').value).toBeNull();
+    expect(answer(['k > 0', 'A(2k,0)', 'B(0,4k)'], 'AB').value).toBe('4.47k'); // this file's own formatter; the page's prints 2√5k
+  });
+
+  it('a conic the givens fix only in k answers its roles in k: focus, directrix, foci, radius, axis', () => {
+    const P = ['נתונה הפרבולה y^2 = 8kx'];
+    expect(answer(P, 'שיעורי המוקד').value).toBe('(2k, 0)');
+    expect(answer(P, 'הביעו באמצעות k את משוואת מדריך הפרבולה').value).toBe('x = -2k');
+    const E = ['x²/(25k²) + y²/(16k²) = 1', 'k > 0', 'נתון מעגל שמרכזו (3k,0) ורדיוסו 2k'];
+    expect(answer(E, 'שיעורי המוקדים').value).toBe('(3k, 0), (-3k, 0)');
+    expect(answer(E, 'אורך הרדיוס').value).toBe('2k');
+    expect(answer(E, 'אורך הציר הראשי').value).toBe('10k');
+  });
+
+  it('a DETERMINED figure has no parameter: its letters are unknowns the givens pin, never answered in (round #2822)', () => {
+    // the book's p2-15: three ellipses, a and b pinned to three roots — never «x²/a² + y²/b² = 1»
+    const lines = ['נתונה אליפסה שציריה הם צירי השיעורים', 'F1 ו-F2 מוקדי האליפסה', 'נתון ישר l המקביל לציר ה-x', 'הישר l חותך את האליפסה בנקודות A ו-B', 'AB=8', 'AF1=6', 'AF2=10'];
+    expect(answer(lines, 'משוואת האליפסה').value ?? '').not.toMatch(/a²|b²/);
+  });
+
+  it('«הביעו באמצעות k את שיעורי הנקודות F1 ו-F2» answers each focus', () => {
+    const a = answer(['x²/144 + y²/(144 − 4k²) = 1', '0 < k < 6', 'F1 הוא המוקד הימני של האליפסה', 'F2 הוא המוקד השמאלי של האליפסה'], 'הביעו באמצעות k את שיעורי הנקודות F1 ו-F2');
+    expect(a.parts?.map((p) => p.value)).toEqual(['(2k, 0)', '(-2k, 0)']);
+  });
+});
+
+describe('#2625 (ADR-AG-454 Am. 1) — the centre of a parabola: there is none, said so', () => {
+  const P = ['נתונה פרבולה שמשוואתה y^2=8x'];
+  it.each([['מרכז הפרבולה'], ['שיעורי מרכז הפרבולה'], ['the centre of the parabola'], ['the center of the parabola']])('«%s»', (q) => {
+    const a = answer(P, q);
+    expect(a.value).toBeNull();
+    expect(a.fact).toBe('parabola-no-centre');
+  });
+  it('control: the ellipse keeps its centre', () => {
+    expect(answer(['נתונה אליפסה שמשוואתה x^2/25+y^2/9=1'], 'מרכז האליפסה').value).toBe('(0, 0)');
+  });
+});

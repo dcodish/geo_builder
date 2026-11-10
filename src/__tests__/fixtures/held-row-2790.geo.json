@@ -1,0 +1,188 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-11-10T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g1.0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB = AC",
+      "group": "g1",
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "utterance": "AB = AC",
+      "group": "g1",
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "A",
+        "d": "C"
+      },
+      "utterance": "AB = AC",
+      "group": "g1",
+      "enabled": true
+    },
+    {
+      "id": "g2.0",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "utterance": "זווית ABC = זווית ACB",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "utterance": "זווית ABC = זווית ACB",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "A"
+      },
+      "utterance": "זווית ABC = זווית ACB",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "B"
+      },
+      "utterance": "זווית ABC = זווית ACB",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "cmd": {
+        "type": "set-angle-ratio",
+        "v1": "B",
+        "a1": "A",
+        "b1": "C",
+        "v2": "C",
+        "a2": "A",
+        "b2": "B",
+        "k": 1
+      },
+      "utterance": "זווית ABC = זווית ACB",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g3.0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB = AC",
+      "group": "g3",
+      "enabled": true
+    },
+    {
+      "id": "g3.1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "utterance": "AB = AC",
+      "group": "g3",
+      "enabled": true
+    },
+    {
+      "id": "g3.2",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "A",
+        "d": "C"
+      },
+      "utterance": "AB = AC",
+      "group": "g3",
+      "enabled": true
+    },
+    {
+      "id": "g4.0",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "D על AB",
+      "group": "g4",
+      "enabled": true
+    },
+    {
+      "id": "g5.0",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "utterance": "D על BA",
+      "group": "g5",
+      "enabled": true
+    },
+    {
+      "id": "g5.1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "B",
+        "b": "A"
+      },
+      "utterance": "D על BA",
+      "group": "g5",
+      "enabled": true
+    }
+  ]
+}

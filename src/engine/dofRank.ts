@@ -291,8 +291,10 @@ export function impliedByFigure(c: Construction, movable: Id[], cons: readonly C
   // vector — which would read as "identically satisfied" for any row at all. Nothing is movable, so
   // nothing can be released either: answer the honest `false` rather than a vacuous `true`.
   if (!movable.length) return false;
-  const key = JSON.stringify(con);
-  const others = cons.filter((k) => k !== con && JSON.stringify(k) !== key);
+  // #2795 (ADR-821, hole H1): only `con` ITSELF is left out — never a structurally equal prior row. A prior
+  // twin («AB = AC» typed again, or «AD = BC» on an isosceles trapezoid whose macro made that very `equal`) is
+  // exactly the evidence that the row adds nothing; dropping it by JSON made every exact repeat read as new.
+  const others = cons.filter((k) => k !== con);
   const jac = constraintJacobian(c, movable, [...others, con]);
   if (!jac) return false;
   const mine = jac.rows.filter((r) => r.con === con);

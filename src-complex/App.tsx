@@ -798,8 +798,8 @@ export function App() {
               {lastError && (
                 <Banner kind="error">{errorText(lastError, t)}</Banner>
               )}
-              {/* #2268 (ADR-CX-084): a true restatement added nothing — a notice, not a refusal */}
-              {lastNote && <Banner kind="notice">{t('suite.notice.alreadyDrawn')}</Banner>}
+              {/* #2268 (ADR-CX-084) → #2790 (ADR-CX-089, ADR-W-204): a held line is its own row — a notice, not a refusal */}
+              {lastNote && <Banner kind="notice">{t('suite.notice.alreadyHeld')}</Banner>}
               {/* #1595 (ADR-CX-086, ADR-W-176): two named numbers on one dot are accepted, and the page always says so —
                   2-D's ADR-123 sentence through the suite key, read from the drawn figure while it has the pair */}
               {coincidences.length > 0 && (

@@ -83,15 +83,29 @@ describe('#1506 — exactly two configurations print both, in one row joined by 
     }
   });
 
+  // #2814 (ADR-3D-461): swept over EVERY configuration 0–23, not three. At `main` @ 86768862 the pool held 3–5 entries
+  // with duplicates and S was drawn 'above' only at seeds 0, 14, 15, 16, 23 — whether seeds 0–2 showed both was copy
+  // counts and start order, which #2806's residual change moved.
   it('the order is canonical — it does not follow which configuration is drawn', () => {
     build(T7);
     const seen = new Map<string, string>(); // drawn side → rows
-    for (const seed of [0, 1, 2]) {
+    for (let seed = 0; seed < 24; seed++) {
       const { panel, drawn } = panelAt(seed);
       seen.set(drawn.get('S')!.x > 0 ? 'above' : 'below', JSON.stringify(rowsOf(panel.points, 'S')));
+      expect(derive3(st().facts, seed).resolved.pivot?.solutions, `seed ${seed}: two DISTINCT configurations`).toBe(2);
     }
     expect([...seen.keys()].sort(), 'both configurations must be drawn somewhere in the sweep').toEqual(['above', 'below']);
     expect(new Set(seen.values()).size).toBe(1);
+  });
+
+  it('#2814: each press of «הציגו תצורה אחרת» shows the other configuration', () => {
+    build(T7);
+    const sides: string[] = [];
+    for (let k = 0; k < 4; k++) {
+      st().resample();
+      sides.push(derive3(st().facts, st().seed).positions.get('S')!.x > 0 ? 'above' : 'below');
+    }
+    for (let k = 1; k < sides.length; k++) expect(sides[k], `press ${k + 1}`).not.toBe(sides[k - 1]);
   });
 
   it('the canvas label keeps the #827 partial form — the node shows ONE configuration', () => {

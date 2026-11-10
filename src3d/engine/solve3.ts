@@ -20,6 +20,7 @@ import { boundAnchor3, boundHolds3, boundReflect3, signBound3, symBound3, type B
 import { offsetSampleK, riderSampleT } from './onSegmentRatio';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { carrierParams3, gaugeFramePoint3, mixedPointIds3 } from './carriers';
+import { congruentShapes3 } from './configs3';
 import { evalAffine, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Operand3, type Positions3, type ScalarPin, type SolidKind, type SolidObj, type VecAtom, type VecExpr } from './types';
 import { componentValue, distanceBetween, memberHolds3, onLineHolds3, positionalComponentSigns3, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
@@ -60,7 +61,29 @@ const unpack = (x: number[]) => ({ t: v3(x[0], x[1], x[2]), w: v3(x[3], x[4], x[
  *  one the anchored projected walk makes. Locks assert these by COUNT, never by clock. */
 export const leastSquaresStats = { solves: 0, evals: 0 };
 
-export function leastSquares(residuals0: (x: number[]) => number[], x0: number[], iterations = 120): { x: number[]; err: number } {
+/** #2806 (ADR-3D-462): the floor under a relative difference's denominator — the 1e-12 every normalised row uses. */
+const REL_DIFF_FLOOR = 1e-12;
+/**
+ * #2806 (ADR-3D-462) — a SIGNED relative difference `(p − q) / (p + q)` of two non-negative magnitudes: zero exactly
+ * where `p = q`, crossing zero through it (the ADR-3D-006 lesson), and of degree 0 under a common rescaling. The one
+ * form of every magnitude-ratio pin (`length-rel`, `mag-rel`), so it cannot drift between them.
+ */
+export function relDiff3(p: number, q: number): number {
+  return (p - q) / Math.max(p + q, REL_DIFF_FLOOR);
+}
+
+export function leastSquares(
+  residuals0: (x: number[]) => number[],
+  x0: number[],
+  iterations = 120,
+  /**
+   * #2799 (ADR-3D-464) — an optional EARLY-OUT (docs/17 §7: "solvers early-out on divergence"): asked at the start and
+   * after every 8th accepted step; true ends the solve where it stands. The pivot passes "already collapsed to a point
+   * and exact" — an attractor LM only approaches geometrically (the scale halves, the error never reaches 1e-24), so
+   * the full iteration budget was spent on a candidate the acceptance sites then reject.
+   */
+  stop?: (x: number[]) => boolean,
+): { x: number[]; err: number } {
   leastSquaresStats.solves++;
   const residuals = (y: number[]): number[] => {
     leastSquaresStats.evals++;
@@ -78,6 +101,8 @@ export function leastSquares(residuals0: (x: number[]) => number[], x0: number[]
   // failure, and paid a full central-difference Jacobian for each rung. Cached here and invalidated only
   // where x actually moves, so the trajectory is identical and the tail costs one residual call a rung.
   let jac: { J: number[][]; JtJ: number[][]; Jtr: number[] } | null = null;
+  if (stop && stop(x)) return { x, err };
+  let accepted = 0;
 
   for (let iter = 0; iter < iterations; iter++) {
     if (!jac) {
@@ -133,6 +158,7 @@ export function leastSquares(residuals0: (x: number[]) => number[], x0: number[]
       jac = null; // x moved — the Jacobian must be recomputed there
       lambda = Math.max(lambda / 3, 1e-12);
       if (err < 1e-24) break;
+      if (stop && ++accepted % 8 === 0 && stop(x)) break;
     } else {
       lambda *= 10;
       if (lambda > 1e12) break;
@@ -286,7 +312,14 @@ export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3;
  * is the frozen unit) and that the student was never given. The COMMAND_SAVEABLE lesson (#288): a
  * hand-maintained list drifts; a total function over the union cannot.
  */
-const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
+/*
+ * #2806 ([ADR-3D-462](../../docs/06b-decisions-3d.md#adr-3d-462)) — THE CONSEQUENCE OF `false`: a kind marked
+ * similarity-invariant here has a pivot residual of DEGREE 0 in the gauge scale (normalised by its operands, the
+ * `mutual` rule). A raw difference such as `|a1b1| − c·|a2b2|` is degree 1, so a solve with a free scale meets it by
+ * shrinking the whole figure to a point (#2806: a square beside one stated point drawn at 1e-6). Locked over this
+ * table in `issue-936-degenerate.test.ts`: every `false` kind's row is unchanged when the gauge scale doubles.
+ */
+export const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   'free-joint': false, // #2684 (ADR-3D-421): read off the pin — see `scalePinned`
   length: true, // |DC| = 4 — an absolute size
   'length-sum': true, // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| = value — an absolute size, like `length`
@@ -621,9 +654,16 @@ export interface PlacementFreedom3 {
   counted: number;
   rotation: number[][];
   scaleFree: boolean;
+  /**
+   * #2793 (ADR-3D-465): an orthonormal basis of the leftover TRANSLATION, null(J_τ) — unit world directions the
+   * whole figure may slide along with every placement residual still exact («A על ציר ה-x»: the x-axis). Empty when
+   * the translation is pinned (rank J_τ = 3). All three axes when NOTHING relates the translation to the absolute
+   * frame (rank J_τ = 0): then the translation is a gauge, not a freedom, and no stage slides it.
+   */
+  translation: number[][];
 }
 /** A placement with no leftover freedom at all (no probe ran, or nothing is free). */
-export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false };
+export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false, translation: [] };
 
 /** #2368 — the eigenvectors of a small symmetric matrix by cyclic Jacobi, sorted by ascending eigenvalue. */
 export function symmetricEigen(a0: readonly (readonly number[])[]): { values: number[]; vectors: number[][] } {
@@ -676,8 +716,377 @@ export function symmetricEigen(a0: readonly (readonly number[])[]): { values: nu
  * its middle, and beyond each end. Fixed, never seeded — it enumerates roots, it does not sample.
  */
 const FLAT_RING_FAN: readonly (readonly [number, number])[] = [[0.25, 0.2], [0.75, 0.2], [0.5, 0.45], [-0.4, 0.5], [1.4, 0.5]];
+/**
+ * #2806 ([ADR-3D-462](../../docs/06b-decisions-3d.md#adr-3d-462)) — THE SCALAR PINS' RESIDUAL ROWS, one per `ScalarPin`
+ * kind, read through the pivot's frame accessor `at`. Lifted out of `solvePivot`'s residual closure so the rule
+ * `PIN_FIXES_SCALE` states — a similarity-invariant kind's row is of degree 0 in the gauge scale — can be locked
+ * over the table directly (`issue-936-degenerate.test.ts`), not only through whichever figures a test happens to build.
+ * `env.riderAt`: a rider unknown's current value (`undefined` when the key is no rider); `env.symAt`: a symbol's.
+ */
+export function scalarPinRows3(
+  c: Construction3,
+  at: (id: Id) => Vec3 | null,
+  out: number[],
+  env: {
+    lines?: Map<string, { anchor: Vec3; dir: Vec3 }>;
+    symAt: (sym: string) => number | null | undefined;
+    riderAt: (key: string) => number | undefined;
+    /** #2806: the dims-only `invariantOnly` solve, gauge frozen at identity — no scale unknown to shrink, so the
+     *  ratio rows keep their raw form there and every figure without a pin solves bit-identically to before. */
+    gaugeFrozen?: boolean;
+  },
+): void {
+  // #2806 (ADR-3D-462): a magnitude ratio, degree 0 in the gauge scale wherever the scale is an unknown
+  const ratioRow = (p: number, q: number): number => (env.gaugeFrozen ? p - q : relDiff3(p, q));
+  // V8-f: a VecAtom operand → its (gauge-transformed) direction
+  const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
+    if (atom.kind === 'named') {
+      const d = c.vectors.get(atom.name);
+      if (!d) return null;
+      const a = at(d.from);
+      const b = at(d.to);
+      return a && b ? sub3(b, a) : null;
+    }
+    const a = at(atom.from);
+    const b = at(atom.to);
+    return a && b ? sub3(b, a) : null;
+  };
+  const cosOf = (u: Vec3, v: Vec3) => dot3(u, v) / Math.max(norm3(u) * norm3(v), 1e-12);
+  // #393/#335 (ADR-3D-107): Σ coeff·atom at the trial positions — evalExpr's in-solve twin
+  const exprAt = (expr: import('./types').VecExpr): Vec3 | null => {
+    let acc: Vec3 = { x: 0, y: 0, z: 0 };
+    for (const { coeff, atom } of expr) {
+      const w = dirOf(atom);
+      if (!w) return null;
+      acc = { x: acc.x + coeff * w.x, y: acc.y + coeff * w.y, z: acc.z + coeff * w.z };
+    }
+    return acc;
+  };
+  for (const pin of c.scalarPins) {
+    if (pin.kind === 'free-joint') {
+      // #2684 (ADR-3D-421): the enrolled unknowns ride the rider lane; one that no residual reads keeps its sample
+      const u0 = new Map(pin.unknowns.map((u) => [u.key, u.t0]));
+      out.push(...pin.residuals(at, (key) => {
+        return env.riderAt(key) ?? u0.get(key) ?? NaN;
+      }));
+    } else if (pin.kind === 'length') {
+      const a = at(pin.a);
+      const b = at(pin.b);
+      out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);
+    } else if (pin.kind === 'length-sum') {
+      // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| − value — SIGNED, so it crosses zero (never a non-negative residual)
+      let sum = 0;
+      let ok = true;
+      for (const t of pin.terms) {
+        const a = at(t.a);
+        const b = at(t.b);
+        if (!a || !b) ok = false;
+        else sum += t.c * norm3(sub3(b, a));
+      }
+      out.push(ok ? sum - pin.value : 10);
+    } else if (pin.kind === 'letter-tie') {
+      // #2580 (ADR-3D-384): |ab| − coef·(the number the letter also names), the number read at the trial unknowns:
+      // a pin symbol's slot, a named component's coordinate, a rider's parameter off its host — signed, so it crosses
+      const a = at(pin.a);
+      const b = at(pin.b);
+      const v = pivotLetterValue3(c, pin.q, at, env.symAt);
+      out.push(a && b && v !== undefined ? norm3(sub3(b, a)) - pin.coef * v : 10);
+    } else if (pin.kind === 'vangle') {
+      const vtx = at(pin.vertex);
+      const p = at(pin.p);
+      const q = at(pin.q);
+      if (!vtx || !p || !q) {
+        out.push(10);
+        continue;
+      }
+      const d1 = sub3(p, vtx);
+      const d2 = sub3(q, vtx);
+      const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
+      out.push(dot3(d1, d2) / den - Math.cos((pin.deg * Math.PI) / 180));
+    } else if (pin.kind === 'seg-angle') {
+      // #909 — the two-segment angle. |cos| (not the signed cos `vangle` uses above): the two
+      // segments are independent, so which endpoint each was written from is arbitrary, and a
+      // signed target would make «BC'» and «C'B» state different things. |cos| is exactly what
+      // `verifyClaim`/`angle-seg-eq` measures. The kink at |cos| = 0 is harmless: LM minimises the
+      // SQUARE of this residual, and cos(deg) = 0 (a 90° given) sits at that square's smooth floor.
+      const a1 = at(pin.a1);
+      const b1 = at(pin.b1);
+      const a2 = at(pin.a2);
+      const b2 = at(pin.b2);
+      if (!a1 || !b1 || !a2 || !b2) {
+        out.push(10);
+        continue;
+      }
+      const u = sub3(b1, a1);
+      const w = sub3(b2, a2);
+      const den = Math.max(norm3(u) * norm3(w), 1e-12);
+      out.push(Math.abs(dot3(u, w)) / den - Math.cos((pin.deg * Math.PI) / 180));
+    } else if (pin.kind === 'dot') {
+      const d1v = c.vectors.get(pin.v1);
+      const d2v = c.vectors.get(pin.v2);
+      const a1 = d1v && at(d1v.from);
+      const b1 = d1v && at(d1v.to);
+      const a2 = d2v && at(d2v.from);
+      const b2 = d2v && at(d2v.to);
+      out.push(a1 && b1 && a2 && b2 ? dot3(sub3(b1, a1), sub3(b2, a2)) - pin.value : 10);
+    } else if (pin.kind === 'length-rel') {
+      const a1 = at(pin.a1);
+      const b1 = at(pin.b1);
+      const a2 = at(pin.a2);
+      const b2 = at(pin.b2);
+      // #2806 (ADR-3D-462): normalised by the operands (`relDiff3`) — degree 0 in the gauge scale, so the
+      // pivot can never meet a ratio of lengths by shrinking the figure to a point
+      out.push(a1 && b1 && a2 && b2 ? ratioRow(norm3(sub3(b1, a1)), pin.c * norm3(sub3(b2, a2))) : 10);
+    } else if (pin.kind === 'vec-eq') {
+      // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
+      // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
+      // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
+      const l = exprAt(pin.lhs);
+      const r = exprAt(pin.rhs);
+      if (!l || !r) {
+        out.push(10, 10, 10);
+        continue;
+      }
+      // #2806 (ADR-3D-462): each component over |l| + |r| — still signed, now scale-free like every
+      // similarity-invariant row, so a shrinking figure cannot zero it
+      const den = env.gaugeFrozen ? 1 : Math.max(norm3(l) + norm3(r), REL_DIFF_FLOOR);
+      out.push((l.x - r.x) / den, (l.y - r.y) / den, (l.z - r.z) / den);
+    } else if (pin.kind === 'volume3') {
+      // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
+      // (laneAt), through the SAME resolver the claim verifier uses (`subjectVolume`), so the
+      // drive targets exactly what the arbiter checks. Signed difference — crosses zero.
+      const subject = resolveSolidSubject(c, pin.noun, pin.ids);
+      const v = subjectVolume(subject, { get: (id: Id) => at(id) ?? undefined } as unknown as Map<Id, Vec3>);
+      out.push(v === null ? 10 : v - pin.value);
+    } else if (pin.kind === 'area3') {
+      // #1447 — the triangle area drives: |cross|/2 − value.
+      const a = at(pin.ids[0]);
+      const b = at(pin.ids[1]);
+      const d3 = at(pin.ids[2]);
+      out.push(a && b && d3 ? norm3(cross3(sub3(b, a), sub3(d3, a))) / 2 - pin.value : 10);
+    } else if (pin.kind === 'mag-rel') {
+      // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
+      // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
+      const e1 = exprAt(pin.e1);
+      const e2 = exprAt(pin.e2);
+      // #2806 (ADR-3D-462): normalised like `length-rel` — one helper, so the two forms cannot drift
+      out.push(e1 && e2 ? ratioRow(norm3(e1), pin.c * norm3(e2)) : 10);
+    } else if (pin.kind === 'mag-val') {
+      // #393/#335: |e| − value — the absolute-size twin of `length`.
+      const e = exprAt(pin.e);
+      out.push(e ? norm3(e) - pin.value : 10);
+    } else if (pin.kind === 'concyclic') {
+      // #305: a convex quad is CYCLIC iff its opposite angles are supplementary, i.e.
+      // cos(A) + cos(C) = 0. Deliberately NOT Ptolemy (|AC|.|BD| - |AB|.|CD| - |BC|.|AD|):
+      // that expression is non-negative, so it TOUCHES zero instead of crossing it and the
+      // least-squares descent stalls a visible ~1e-3 short (the ADR-3D-006 touch-zero lesson).
+      // This form changes SIGN through the cyclic configuration and is scale-free (cosines).
+      const q = pin.ids.map((id) => at(id));
+      if (q.length === 4 && q.every((v): v is Vec3 => v !== undefined)) {
+        const [A, B, C, D] = q as Vec3[];
+        const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
+          const u1 = sub3(p1, v);
+          const u2 = sub3(p2, v);
+          const den = Math.max(norm3(u1) * norm3(u2), 1e-12);
+          return dot3(u1, u2) / den;
+        };
+        out.push(cosAt(A, B, D) + cosAt(C, B, D));
+      } else out.push(10);
+    } else if (pin.kind === 'mutual') {
+      // S4 (#378): a CLOSED mutual position between two gauge operands.
+      //
+      // Every residual here is a SIGNED COMPONENT, never a magnitude. The natural scalars —
+      // |d1×d2| for parallel, |w·(d1×d2)| for meeting — are non-negative, so they TOUCH zero
+      // instead of crossing it and the least-squares descent stalls short of the solution (the
+      // ADR-3D-006 lesson, restated in the `concyclic` branch above and measured again here).
+      // The component forms change sign through the configuration, so the descent runs into it.
+      // All are normalized by the operand magnitudes ⇒ scale-free ⇒ similarity-invariant, so a
+      // shrinking figure can never zero them (the collapse-basin class).
+      const sides = mutualSides(pin.a, pin.b, c, { lines: env.lines ?? new Map(), planes: new Map() }, (id) => at(id) ?? null);
+      const wide = pin.rel !== 'intersecting'; // parallel/coincident align directions: 3 components
+      if (!sides) {
+        for (let i = 0; i < (pin.rel === 'coincident' ? 6 : wide ? 3 : 1); i++) out.push(10);
+        continue;
+      }
+      const [s1, s2] = sides;
+      const d1 = s1.geom.dir!;
+      const d2 = s2.geom.dir!;
+      const w = sub3(s2.geom.point!, s1.geom.point!);
+      const n1 = norm3(d1);
+      const n2 = norm3(d2);
+      const cxd = cross3(d1, d2);
+      if (pin.rel === 'intersecting') {
+        // coplanarity, SIGNED: the triple product crosses zero as the lines pass through meeting
+        const den = Math.max(n1 * n2 * norm3(w), 1e-12);
+        out.push(dot3(w, cxd) / den);
+      } else {
+        const den = Math.max(n1 * n2, 1e-12);
+        out.push(cxd.x / den, cxd.y / den, cxd.z / den); // directions aligned
+        if (pin.rel === 'coincident') {
+          // …and side 2's anchor lies ON side 1: w × d1 vanishes (again componentwise)
+          const wx = cross3(w, d1);
+          const den2 = Math.max(n1 * norm3(w), 1e-12);
+          out.push(wx.x / den2, wx.y / den2, wx.z / den2);
+        }
+      }
+    } else if (pin.kind === 'cos-angle') {
+      const u = dirOf(pin.u);
+      const v = dirOf(pin.v);
+      out.push(u && v ? cosOf(u, v) - pin.cos : 10); // G6: cos(u,v) = value (normalized ⇒ invariant)
+    } else if (pin.kind === 'dot-eq') {
+      const a = dirOf(pin.a);
+      const b = dirOf(pin.b);
+      const cc = dirOf(pin.c);
+      const d = dirOf(pin.d);
+      // G9: u·v = c·d, normalized by the operand norms so the residual is O(1) & scale-free
+      const scale = a && b && cc && d ? Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12) : 1;
+      out.push(a && b && cc && d ? (dot3(a, b) - dot3(cc, d)) / scale : 10);
+    } else if (pin.kind === 'cos-eq') {
+      const a = dirOf(pin.a);
+      const b = dirOf(pin.b);
+      const cc = dirOf(pin.c);
+      const d = dirOf(pin.d);
+      out.push(a && b && cc && d ? cosOf(a, b) - cosOf(cc, d) : 10); // G10: ∠(a,b) = ∠(c,d)
+    } else if (pin.kind === 'bisector-dir') {
+      /**
+       * #872 — apex→tip IS the internal bisector ray of ∠(a·apex·b).
+       *
+       * SIGNED COMPONENTS of the unit-direction difference (the ADR-3D-006 touch-zero lesson): a
+       * magnitude like |u−v| touches zero instead of crossing it and the descent stalls short of the
+       * solution. Three residuals for a two-parameter condition is the same deliberate redundancy the
+       * `mutual` cross-product residual carries, and it is scale-free — both sides are unit vectors.
+       *
+       * This single expression also fixes the SIGN for free: an equal-angle residual is satisfied by
+       * the EXTERNAL bisector too, a direction difference is not.
+       */
+      const O = at(pin.apex);
+      const A = at(pin.a);
+      const B = at(pin.b);
+      const T = at(pin.tip);
+      const u = O && A && B ? bisectorDir3(O, A, B) : null;
+      const ray = O && T ? sub3(T, O) : null;
+      if (!u || !ray || norm3(ray) < 1e-12) {
+        out.push(10, 10, 10);
+      } else {
+        const w = normalize3(ray);
+        out.push(w.x - u.x, w.y - u.y, w.z - u.z);
+      }
+    } else if (pin.kind === 'line-plane-angle') {
+      const a = at(pin.a);
+      const b = at(pin.b);
+      const ring = pin.plane.map(at);
+      if (!a || !b || ring.some((p) => !p)) {
+        out.push(10);
+      } else {
+        const u = sub3(b, a);
+        const n = cross3(sub3(ring[1]!, ring[0]!), sub3(ring[ring.length - 1]!, ring[0]!));
+        const den = Math.max(norm3(n) * norm3(u), 1e-12);
+        out.push(Math.abs(dot3(n, u)) / den - Math.sin((pin.deg * Math.PI) / 180)); // sin β − sin(given)
+      }
+    } else if (pin.kind === 'distance') {
+      // S5 (#378): |a b| = value, through the same geometry the claim and the query lane read.
+      const abs = { lines: env.lines ?? new Map(), planes: new Map() };
+      const ga = resolveOperand(pin.a, c, abs)(at);
+      const gb = resolveOperand(pin.b, c, abs)(at);
+      const d = ga && gb ? distanceBetween(ga, gb) : null;
+      out.push(d === null ? 10 : d - pin.value); // signed: crosses zero through the solution
+    } else if (pin.kind === 'plane-rel') {
+      // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Residuals are
+      // SIGNED COMPONENTS (the ADR-3D-006 touch-zero lesson): a magnitude like |n1×n2| touches
+      // zero instead of crossing it and the descent stalls short. Which form applies follows the
+      // one rule in `relDeviation` — same-type sides read one way, a mixed pair inverts.
+      const abs = { lines: env.lines ?? new Map(), planes: new Map() };
+      const ga = resolveOperand(pin.a, c, abs)(at);
+      const gb = resolveOperand(pin.b, c, abs)(at);
+      const va = ga?.dir ?? ga?.normal;
+      const vb = gb?.dir ?? gb?.normal;
+      const mixed = !!ga && !!gb && !ga.dir !== !gb.dir; // exactly one side is planar
+      // #614: containment between two PLANAR sides is coincidence — same statement, so the same
+      // residual, rather than a second spelling that could drift from it.
+      const rel = pin.rel === 'contained' && !mixed ? 'coincident' : pin.rel;
+      const wide = rel === 'parallel' || rel === 'coincident' || rel === 'contained' ? !mixed : mixed; // 3 components vs 1
+      // #614: CONTAINED is direction AND position — the parallel component plus one offset row, the
+      // same shape `coincident` already uses one operand-kind up (two planes rather than a line and
+      // a plane). A mixed pair reads its direction in ONE component, so the count is 2.
+      const count = rel === 'coincident' ? 4 : rel === 'contained' ? 2 : rel === 'angle' ? 1 : wide ? 3 : 1;
+      if (!va || !vb || norm3(va) < 1e-12 || norm3(vb) < 1e-12) {
+        for (let i = 0; i < count; i++) out.push(10);
+        continue;
+      }
+      const den = Math.max(norm3(va) * norm3(vb), 1e-12);
+      if (rel === 'angle') {
+        const t = ((pin.deg ?? 0) * Math.PI) / 180;
+        out.push(Math.abs(dot3(va, vb)) / den - (mixed ? Math.sin(t) : Math.cos(t)));
+      } else if (wide || rel === 'coincident') {
+        const x = cross3(va, vb);
+        out.push(x.x / den, x.y / den, x.z / den);
+      } else {
+        out.push(dot3(va, vb) / den);
+      }
+      if (rel === 'contained') {
+        /**
+         * #614 — …and the linear operand must SIT ON the plane, not merely run parallel to it.
+         *
+         * One offset row: the signed distance from the linear side's own point to the plane,
+         * size-normalized exactly as `coincident`'s is, so the residual is scale-free and CROSSES
+         * zero through the solution (the ADR-3D-006 touch-zero lesson) rather than touching it.
+         */
+        const lin = ga!.dir ? ga! : gb!;
+        const pln = ga!.dir ? gb! : ga!;
+        if (pln.normal === undefined || pln.d === undefined || lin.point === undefined) out.push(10);
+        else {
+          let extent = 1;
+          for (const id of c.points.keys()) {
+            const q = at(id);
+            if (q) extent = Math.max(extent, norm3(q));
+          }
+          out.push((dot3(pln.normal, lin.point) + pln.d) / (Math.max(norm3(pln.normal), 1e-12) * extent));
+        }
+      }
+      if (rel === 'coincident') {
+        // …and the planes must share an offset. Size-normalized so the residual is scale-free.
+        const na = norm3(va);
+        const nb = norm3(vb);
+        const da = ga!.d;
+        const db = gb!.d;
+        if (da === undefined || db === undefined) out.push(10);
+        else {
+          const flip = dot3(va, vb) < 0 ? -1 : 1;
+          let extent = 1;
+          for (const id of c.points.keys()) {
+            const q = at(id);
+            if (q) extent = Math.max(extent, norm3(q));
+          }
+          out.push((da / na - (flip * db) / nb) / extent);
+        }
+      }
+    } else {
+      const a = at(pin.a);
+      const b = at(pin.b);
+      const ring = pin.plane.map(at);
+      if (!a || !b || ring.some((p) => !p)) {
+        out.push(10, 10);
+        continue;
+      }
+      const d = sub3(b, a);
+      const e1 = sub3(ring[1]!, ring[0]!);
+      const e2 = sub3(ring[2]!, ring[0]!);
+      if (pin.kind === 'seg-perp-plane') {
+        const s1 = Math.max(norm3(d) * norm3(e1), 1e-12);
+        const s2 = Math.max(norm3(d) * norm3(e2), 1e-12);
+        out.push(dot3(d, e1) / s1, dot3(d, e2) / s2);
+      } else {
+        const n = cross3(e1, e2);
+        out.push(dot3(d, n) / Math.max(norm3(d) * norm3(n), 1e-12), 0);
+      }
+    }
+  }
+}
+
 /** #2714 (docs/17 §9): exercised counters — how often the fan ran on a determined flat ring, and the roots it added. */
 export const ssaFanStats = { runs: 0, found: 0 };
+/** #2814 (ADR-3D-461, docs/17 §9): the driven-dims fan's counters — calls it ran on, LM starts it paid, roots it added. */
+export const dimsFanStats = { runs: 0, tries: 0, found: 0 };
 
 /**
  * The pivot's canonical evaluator. `reseat` (#2798, ADR-3D-456) re-derives the figure's MIXED points (`figureLanes3`) in
@@ -975,7 +1384,10 @@ export function solvePivot(
       const rank7 = cols[0].length === 0 ? 0 : numericRank(cols7);
       const counted = Math.max(0, 7 - rank7 - (3 - rankT));
       const scaleFree = rank7 === rank;
-      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree });
+      // #2793 (ADR-3D-465): null(J_τ), the eigenvectors of J_τᵀJ_τ with the smallest eigenvalues
+      const translation =
+        rankT >= 3 ? [] : symmetricEigen([0, 1, 2].map((i) => [0, 1, 2].map((j) => cols[i].reduce((a, v, r) => a + v * cols[j][r], 0)))).vectors.slice(0, 3 - rankT);
+      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree, translation });
       const jtj = cols.map((ci) => cols.map((cj) => ci.reduce((a, v, r) => a + v * cj[r], 0)));
       const generators = symmetricEigen(jtj).vectors.slice(0, dim);
       // the leftover TURN: the ω-parts of the rigid null space span it (a translation generator has none)
@@ -985,7 +1397,7 @@ export function solvePivot(
         const gram = [3, 4, 5].map((i) => [3, 4, 5].map((j) => generators.reduce((a, g) => a + g[i] * g[j], 0)));
         rotation = symmetricEigen(gram).vectors.slice(3 - rotRank);
       }
-      return (memo = { dim, generators, counted, rotation, scaleFree });
+      return (memo = { dim, generators, counted, rotation, scaleFree, translation });
     };
   };
   /**
@@ -1176,345 +1588,16 @@ export function solvePivot(
       }
     }
 
-    // V8-f: a VecAtom operand → its (gauge-transformed) direction
-    const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
-      if (atom.kind === 'named') {
-        const d = c.vectors.get(atom.name);
-        if (!d) return null;
-        const a = at(d.from);
-        const b = at(d.to);
-        return a && b ? sub3(b, a) : null;
-      }
-      const a = at(atom.from);
-      const b = at(atom.to);
-      return a && b ? sub3(b, a) : null;
-    };
-    const cosOf = (u: Vec3, v: Vec3) => dot3(u, v) / Math.max(norm3(u) * norm3(v), 1e-12);
-    // #393/#335 (ADR-3D-107): Σ coeff·atom at the trial positions — evalExpr's in-solve twin
-    const exprAt = (expr: import('./types').VecExpr): Vec3 | null => {
-      let acc: Vec3 = { x: 0, y: 0, z: 0 };
-      for (const { coeff, atom } of expr) {
-        const w = dirOf(atom);
-        if (!w) return null;
-        acc = { x: acc.x + coeff * w.x, y: acc.y + coeff * w.y, z: acc.z + coeff * w.z };
-      }
-      return acc;
-    };
     const scalarStart = out.length; // #990: the scalar pins' rows begin here
-    for (const pin of c.scalarPins) {
-      if (pin.kind === 'free-joint') {
-        // #2684 (ADR-3D-421): the enrolled unknowns ride the rider lane; one that no residual reads keeps its sample
-        const u0 = new Map(pin.unknowns.map((u) => [u.key, u.t0]));
-        out.push(...pin.residuals(at, (key) => {
-          const i = riders.findIndex((r) => r.id === key);
-          return i >= 0 ? x[riderBase + i] : (u0.get(key) ?? NaN);
-        }));
-      } else if (pin.kind === 'length') {
-        const a = at(pin.a);
-        const b = at(pin.b);
-        out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);
-      } else if (pin.kind === 'length-sum') {
-        // #1680 (ADR-3D-392): Σ cᵢ·|aᵢbᵢ| − value — SIGNED, so it crosses zero (never a non-negative residual)
-        let sum = 0;
-        let ok = true;
-        for (const t of pin.terms) {
-          const a = at(t.a);
-          const b = at(t.b);
-          if (!a || !b) ok = false;
-          else sum += t.c * norm3(sub3(b, a));
-        }
-        out.push(ok ? sum - pin.value : 10);
-      } else if (pin.kind === 'letter-tie') {
-        // #2580 (ADR-3D-384): |ab| − coef·(the number the letter also names), the number read at the trial unknowns:
-        // a pin symbol's slot, a named component's coordinate, a rider's parameter off its host — signed, so it crosses
-        const a = at(pin.a);
-        const b = at(pin.b);
-        const v = pivotLetterValue3(c, pin.q, at, (sym) => symAt(x, sym));
-        out.push(a && b && v !== undefined ? norm3(sub3(b, a)) - pin.coef * v : 10);
-      } else if (pin.kind === 'vangle') {
-        const vtx = at(pin.vertex);
-        const p = at(pin.p);
-        const q = at(pin.q);
-        if (!vtx || !p || !q) {
-          out.push(10);
-          continue;
-        }
-        const d1 = sub3(p, vtx);
-        const d2 = sub3(q, vtx);
-        const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
-        out.push(dot3(d1, d2) / den - Math.cos((pin.deg * Math.PI) / 180));
-      } else if (pin.kind === 'seg-angle') {
-        // #909 — the two-segment angle. |cos| (not the signed cos `vangle` uses above): the two
-        // segments are independent, so which endpoint each was written from is arbitrary, and a
-        // signed target would make «BC'» and «C'B» state different things. |cos| is exactly what
-        // `verifyClaim`/`angle-seg-eq` measures. The kink at |cos| = 0 is harmless: LM minimises the
-        // SQUARE of this residual, and cos(deg) = 0 (a 90° given) sits at that square's smooth floor.
-        const a1 = at(pin.a1);
-        const b1 = at(pin.b1);
-        const a2 = at(pin.a2);
-        const b2 = at(pin.b2);
-        if (!a1 || !b1 || !a2 || !b2) {
-          out.push(10);
-          continue;
-        }
-        const u = sub3(b1, a1);
-        const w = sub3(b2, a2);
-        const den = Math.max(norm3(u) * norm3(w), 1e-12);
-        out.push(Math.abs(dot3(u, w)) / den - Math.cos((pin.deg * Math.PI) / 180));
-      } else if (pin.kind === 'dot') {
-        const d1v = c.vectors.get(pin.v1);
-        const d2v = c.vectors.get(pin.v2);
-        const a1 = d1v && at(d1v.from);
-        const b1 = d1v && at(d1v.to);
-        const a2 = d2v && at(d2v.from);
-        const b2 = d2v && at(d2v.to);
-        out.push(a1 && b1 && a2 && b2 ? dot3(sub3(b1, a1), sub3(b2, a2)) - pin.value : 10);
-      } else if (pin.kind === 'length-rel') {
-        const a1 = at(pin.a1);
-        const b1 = at(pin.b1);
-        const a2 = at(pin.a2);
-        const b2 = at(pin.b2);
-        out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
-      } else if (pin.kind === 'vec-eq') {
-        // #1183: a VECTOR equation drives — three SIGNED component residuals, so the descent crosses
-        // zero instead of touching it (the ADR-3D-006 lesson `concyclic` records below). `exprAt`
-        // already evaluates a `VecExpr`, so a named vector and a point pair reach this by one path.
-        const l = exprAt(pin.lhs);
-        const r = exprAt(pin.rhs);
-        if (!l || !r) {
-          out.push(10, 10, 10);
-          continue;
-        }
-        out.push(l.x - r.x, l.y - r.y, l.z - r.z);
-      } else if (pin.kind === 'volume3') {
-        // #1447 — the volume DRIVES the free dims. Measured in the same lane frame as `length`
-        // (laneAt), through the SAME resolver the claim verifier uses (`subjectVolume`), so the
-        // drive targets exactly what the arbiter checks. Signed difference — crosses zero.
-        const subject = resolveSolidSubject(c, pin.noun, pin.ids);
-        const v = subjectVolume(subject, { get: (id: Id) => laneAt(id) ?? undefined } as unknown as Map<Id, Vec3>);
-        out.push(v === null ? 10 : v - pin.value);
-      } else if (pin.kind === 'area3') {
-        // #1447 — the triangle area drives: |cross|/2 − value.
-        const a = laneAt(pin.ids[0]);
-        const b = laneAt(pin.ids[1]);
-        const d3 = laneAt(pin.ids[2]);
-        out.push(a && b && d3 ? norm3(cross3(sub3(b, a), sub3(d3, a))) / 2 - pin.value : 10);
-      } else if (pin.kind === 'mag-rel') {
-        // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
-        // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
-        const e1 = exprAt(pin.e1);
-        const e2 = exprAt(pin.e2);
-        out.push(e1 && e2 ? norm3(e1) - pin.c * norm3(e2) : 10);
-      } else if (pin.kind === 'mag-val') {
-        // #393/#335: |e| − value — the absolute-size twin of `length`.
-        const e = exprAt(pin.e);
-        out.push(e ? norm3(e) - pin.value : 10);
-      } else if (pin.kind === 'concyclic') {
-        // #305: a convex quad is CYCLIC iff its opposite angles are supplementary, i.e.
-        // cos(A) + cos(C) = 0. Deliberately NOT Ptolemy (|AC|.|BD| - |AB|.|CD| - |BC|.|AD|):
-        // that expression is non-negative, so it TOUCHES zero instead of crossing it and the
-        // least-squares descent stalls a visible ~1e-3 short (the ADR-3D-006 touch-zero lesson).
-        // This form changes SIGN through the cyclic configuration and is scale-free (cosines).
-        const q = pin.ids.map((id) => at(id));
-        if (q.length === 4 && q.every((v): v is Vec3 => v !== undefined)) {
-          const [A, B, C, D] = q as Vec3[];
-          const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
-            const u1 = sub3(p1, v);
-            const u2 = sub3(p2, v);
-            const den = Math.max(norm3(u1) * norm3(u2), 1e-12);
-            return dot3(u1, u2) / den;
-          };
-          out.push(cosAt(A, B, D) + cosAt(C, B, D));
-        } else out.push(10);
-      } else if (pin.kind === 'mutual') {
-        // S4 (#378): a CLOSED mutual position between two gauge operands.
-        //
-        // Every residual here is a SIGNED COMPONENT, never a magnitude. The natural scalars —
-        // |d1×d2| for parallel, |w·(d1×d2)| for meeting — are non-negative, so they TOUCH zero
-        // instead of crossing it and the least-squares descent stalls short of the solution (the
-        // ADR-3D-006 lesson, restated in the `concyclic` branch above and measured again here).
-        // The component forms change sign through the configuration, so the descent runs into it.
-        // All are normalized by the operand magnitudes ⇒ scale-free ⇒ similarity-invariant, so a
-        // shrinking figure can never zero them (the collapse-basin class).
-        const sides = mutualSides(pin.a, pin.b, c, { lines: lines ?? new Map(), planes: new Map() }, (id) => at(id) ?? null);
-        const wide = pin.rel !== 'intersecting'; // parallel/coincident align directions: 3 components
-        if (!sides) {
-          for (let i = 0; i < (pin.rel === 'coincident' ? 6 : wide ? 3 : 1); i++) out.push(10);
-          continue;
-        }
-        const [s1, s2] = sides;
-        const d1 = s1.geom.dir!;
-        const d2 = s2.geom.dir!;
-        const w = sub3(s2.geom.point!, s1.geom.point!);
-        const n1 = norm3(d1);
-        const n2 = norm3(d2);
-        const cxd = cross3(d1, d2);
-        if (pin.rel === 'intersecting') {
-          // coplanarity, SIGNED: the triple product crosses zero as the lines pass through meeting
-          const den = Math.max(n1 * n2 * norm3(w), 1e-12);
-          out.push(dot3(w, cxd) / den);
-        } else {
-          const den = Math.max(n1 * n2, 1e-12);
-          out.push(cxd.x / den, cxd.y / den, cxd.z / den); // directions aligned
-          if (pin.rel === 'coincident') {
-            // …and side 2's anchor lies ON side 1: w × d1 vanishes (again componentwise)
-            const wx = cross3(w, d1);
-            const den2 = Math.max(n1 * norm3(w), 1e-12);
-            out.push(wx.x / den2, wx.y / den2, wx.z / den2);
-          }
-        }
-      } else if (pin.kind === 'cos-angle') {
-        const u = dirOf(pin.u);
-        const v = dirOf(pin.v);
-        out.push(u && v ? cosOf(u, v) - pin.cos : 10); // G6: cos(u,v) = value (normalized ⇒ invariant)
-      } else if (pin.kind === 'dot-eq') {
-        const a = dirOf(pin.a);
-        const b = dirOf(pin.b);
-        const cc = dirOf(pin.c);
-        const d = dirOf(pin.d);
-        // G9: u·v = c·d, normalized by the operand norms so the residual is O(1) & scale-free
-        const scale = a && b && cc && d ? Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12) : 1;
-        out.push(a && b && cc && d ? (dot3(a, b) - dot3(cc, d)) / scale : 10);
-      } else if (pin.kind === 'cos-eq') {
-        const a = dirOf(pin.a);
-        const b = dirOf(pin.b);
-        const cc = dirOf(pin.c);
-        const d = dirOf(pin.d);
-        out.push(a && b && cc && d ? cosOf(a, b) - cosOf(cc, d) : 10); // G10: ∠(a,b) = ∠(c,d)
-      } else if (pin.kind === 'bisector-dir') {
-        /**
-         * #872 — apex→tip IS the internal bisector ray of ∠(a·apex·b).
-         *
-         * SIGNED COMPONENTS of the unit-direction difference (the ADR-3D-006 touch-zero lesson): a
-         * magnitude like |u−v| touches zero instead of crossing it and the descent stalls short of the
-         * solution. Three residuals for a two-parameter condition is the same deliberate redundancy the
-         * `mutual` cross-product residual carries, and it is scale-free — both sides are unit vectors.
-         *
-         * This single expression also fixes the SIGN for free: an equal-angle residual is satisfied by
-         * the EXTERNAL bisector too, a direction difference is not.
-         */
-        const O = at(pin.apex);
-        const A = at(pin.a);
-        const B = at(pin.b);
-        const T = at(pin.tip);
-        const u = O && A && B ? bisectorDir3(O, A, B) : null;
-        const ray = O && T ? sub3(T, O) : null;
-        if (!u || !ray || norm3(ray) < 1e-12) {
-          out.push(10, 10, 10);
-        } else {
-          const w = normalize3(ray);
-          out.push(w.x - u.x, w.y - u.y, w.z - u.z);
-        }
-      } else if (pin.kind === 'line-plane-angle') {
-        const a = at(pin.a);
-        const b = at(pin.b);
-        const ring = pin.plane.map(at);
-        if (!a || !b || ring.some((p) => !p)) {
-          out.push(10);
-        } else {
-          const u = sub3(b, a);
-          const n = cross3(sub3(ring[1]!, ring[0]!), sub3(ring[ring.length - 1]!, ring[0]!));
-          const den = Math.max(norm3(n) * norm3(u), 1e-12);
-          out.push(Math.abs(dot3(n, u)) / den - Math.sin((pin.deg * Math.PI) / 180)); // sin β − sin(given)
-        }
-      } else if (pin.kind === 'distance') {
-        // S5 (#378): |a b| = value, through the same geometry the claim and the query lane read.
-        const abs = { lines: lines ?? new Map(), planes: new Map() };
-        const ga = resolveOperand(pin.a, c, abs)(at);
-        const gb = resolveOperand(pin.b, c, abs)(at);
-        const d = ga && gb ? distanceBetween(ga, gb) : null;
-        out.push(d === null ? 10 : d - pin.value); // signed: crosses zero through the solution
-      } else if (pin.kind === 'plane-rel') {
-        // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Residuals are
-        // SIGNED COMPONENTS (the ADR-3D-006 touch-zero lesson): a magnitude like |n1×n2| touches
-        // zero instead of crossing it and the descent stalls short. Which form applies follows the
-        // one rule in `relDeviation` — same-type sides read one way, a mixed pair inverts.
-        const abs = { lines: lines ?? new Map(), planes: new Map() };
-        const ga = resolveOperand(pin.a, c, abs)(at);
-        const gb = resolveOperand(pin.b, c, abs)(at);
-        const va = ga?.dir ?? ga?.normal;
-        const vb = gb?.dir ?? gb?.normal;
-        const mixed = !!ga && !!gb && !ga.dir !== !gb.dir; // exactly one side is planar
-        // #614: containment between two PLANAR sides is coincidence — same statement, so the same
-        // residual, rather than a second spelling that could drift from it.
-        const rel = pin.rel === 'contained' && !mixed ? 'coincident' : pin.rel;
-        const wide = rel === 'parallel' || rel === 'coincident' || rel === 'contained' ? !mixed : mixed; // 3 components vs 1
-        // #614: CONTAINED is direction AND position — the parallel component plus one offset row, the
-        // same shape `coincident` already uses one operand-kind up (two planes rather than a line and
-        // a plane). A mixed pair reads its direction in ONE component, so the count is 2.
-        const count = rel === 'coincident' ? 4 : rel === 'contained' ? 2 : rel === 'angle' ? 1 : wide ? 3 : 1;
-        if (!va || !vb || norm3(va) < 1e-12 || norm3(vb) < 1e-12) {
-          for (let i = 0; i < count; i++) out.push(10);
-          continue;
-        }
-        const den = Math.max(norm3(va) * norm3(vb), 1e-12);
-        if (rel === 'angle') {
-          const t = ((pin.deg ?? 0) * Math.PI) / 180;
-          out.push(Math.abs(dot3(va, vb)) / den - (mixed ? Math.sin(t) : Math.cos(t)));
-        } else if (wide || rel === 'coincident') {
-          const x = cross3(va, vb);
-          out.push(x.x / den, x.y / den, x.z / den);
-        } else {
-          out.push(dot3(va, vb) / den);
-        }
-        if (rel === 'contained') {
-          /**
-           * #614 — …and the linear operand must SIT ON the plane, not merely run parallel to it.
-           *
-           * One offset row: the signed distance from the linear side's own point to the plane,
-           * size-normalized exactly as `coincident`'s is, so the residual is scale-free and CROSSES
-           * zero through the solution (the ADR-3D-006 touch-zero lesson) rather than touching it.
-           */
-          const lin = ga!.dir ? ga! : gb!;
-          const pln = ga!.dir ? gb! : ga!;
-          if (pln.normal === undefined || pln.d === undefined || lin.point === undefined) out.push(10);
-          else {
-            let extent = 1;
-            for (const id of c.points.keys()) {
-              const q = at(id);
-              if (q) extent = Math.max(extent, norm3(q));
-            }
-            out.push((dot3(pln.normal, lin.point) + pln.d) / (Math.max(norm3(pln.normal), 1e-12) * extent));
-          }
-        }
-        if (rel === 'coincident') {
-          // …and the planes must share an offset. Size-normalized so the residual is scale-free.
-          const na = norm3(va);
-          const nb = norm3(vb);
-          const da = ga!.d;
-          const db = gb!.d;
-          if (da === undefined || db === undefined) out.push(10);
-          else {
-            const flip = dot3(va, vb) < 0 ? -1 : 1;
-            let extent = 1;
-            for (const id of c.points.keys()) {
-              const q = at(id);
-              if (q) extent = Math.max(extent, norm3(q));
-            }
-            out.push((da / na - (flip * db) / nb) / extent);
-          }
-        }
-      } else {
-        const a = at(pin.a);
-        const b = at(pin.b);
-        const ring = pin.plane.map(at);
-        if (!a || !b || ring.some((p) => !p)) {
-          out.push(10, 10);
-          continue;
-        }
-        const d = sub3(b, a);
-        const e1 = sub3(ring[1]!, ring[0]!);
-        const e2 = sub3(ring[2]!, ring[0]!);
-        if (pin.kind === 'seg-perp-plane') {
-          const s1 = Math.max(norm3(d) * norm3(e1), 1e-12);
-          const s2 = Math.max(norm3(d) * norm3(e2), 1e-12);
-          out.push(dot3(d, e1) / s1, dot3(d, e2) / s2);
-        } else {
-          const n = cross3(e1, e2);
-          out.push(dot3(d, n) / Math.max(norm3(d) * norm3(n), 1e-12), 0);
-        }
-      }
-    }
+    scalarPinRows3(c, at, out, {
+      lines,
+      gaugeFrozen: invariantOnly,
+      symAt: (sym) => symAt(x, sym),
+      riderAt: (key) => {
+        const i = riders.findIndex((r) => r.id === key);
+        return i >= 0 ? x[riderBase + i] : undefined;
+      },
+    });
     scalarRows = [scalarStart, out.length]; // #990: …and end here
     // V8-c coupled symbol conditions: the vec-defined endpoint is baked into `pos` at the
     // trial symbol value (via `override`), so its ⟂/∥-to-plane residual drives the symbol
@@ -1605,6 +1688,64 @@ export function solvePivot(
    * the generic contradiction. Recorded at the acceptance sites (`noteFlatSolid`), read by `flatSolidRefusal`.
    */
   let flatSolidSeen: SolidObj | null = null;
+  // #518 (ADR-3D-133): the seed's size target — see the scale anchor below. Declared here because the
+  // collapse judge reads it (#2799, ADR-3D-464): the seed's own drawn size is the yardstick of "a point".
+  const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
+  /**
+   * #2799 (ADR-3D-464) — THE YARDSTICK OF A SCALE COLLAPSE: the size the seed would draw the figure at
+   * (`exp(logScale0)` × the canonical span at the seed's dims), lowered to the smallest absolute length
+   * the student STATED (two stated positions, a stated component difference, a stated length or vector),
+   * so a figure placed at a small stated size is never judged collapsed. Computed once, lazily.
+   */
+  let lRefMemo: number | null = null;
+  const lRef = (): number => {
+    if (lRefMemo !== null) return lRefMemo;
+    const pos0 = evalCanonical(dims0);
+    let span = 0;
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos0.get(id)).filter((p): p is Vec3 => !!p);
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) span = Math.max(span, norm3(sub3(pts[j], pts[i])));
+    }
+    let ref = Math.exp(logScale0) * (span > 1e-12 ? span : 1);
+    const stated: number[] = [];
+    const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const absPts: Vec3[] = [];
+    for (const def of c.points.values()) if (def.kind === 'coord') absPts.push(v3(def.x, def.y, def.z));
+    for (const p of pointPins) {
+      const [x, y, z] = [num(p.x), num(p.y), num(p.z)];
+      if (x !== null && y !== null && z !== null) absPts.push(v3(x, y, z));
+    }
+    for (let i = 0; i < absPts.length; i++) for (let j = i + 1; j < absPts.length; j++) stated.push(norm3(sub3(absPts[j], absPts[i])));
+    for (const ax of ['x', 'y', 'z'] as const) {
+      const vals = pointPins.map((p) => num(p[ax])).filter((v): v is number => v !== null);
+      for (let i = 0; i < vals.length; i++) for (let j = i + 1; j < vals.length; j++) stated.push(Math.abs(vals[j] - vals[i]));
+    }
+    for (const p of c.scalarPins) if (p.kind === 'length') stated.push(Math.abs(p.value));
+    for (const p of [...vecPins, ...c.pairPins]) {
+      const [x, y, z] = [num(p.x), num(p.y), num(p.z)];
+      if (x !== null && y !== null && z !== null) stated.push(Math.hypot(x, y, z));
+    }
+    for (const d of stated) if (d > 1e-12) ref = Math.min(ref, d);
+    return (lRefMemo = ref);
+  };
+  /** #2799 (ADR-3D-464): the first declared solid this candidate draws at a point (its drawn span ≤ 1e-4 of {@link lRef}), or null. */
+  const scaleCollapsedAt = (x: number[]): SolidObj | null => {
+    const s = Math.exp(x[6]);
+    if (!(s < Infinity)) return null;
+    const dims = x.slice(7, 7 + nDims);
+    const override = coupled ? new Map(coupled.syms.map((sy, i) => [sy, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(dims, override, riderMap(x));
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      if (pts.length < 2) continue;
+      let maxD = 0;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
+      if (s * maxD <= 1e-4 * lRef()) return solid;
+    }
+    return null;
+  };
+  /** #2799 (ADR-3D-464): the drawn-at-a-point half of the LM early-out (each solve adds "and exact" on its own rows). */
+  const atPoint = (x: number[]): boolean => x.length >= 7 && c.solids.length > 0 && scaleCollapsedAt(x) !== null;
   /** The SOLID half of `degenerate` (#1735 split it out): a collapsed solid is not a figure. */
   const collapsed = (x: number[]): boolean => {
     // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
@@ -1629,6 +1770,12 @@ export function solvePivot(
         }
       }
       if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
+      // #2799 (ADR-3D-464): the DRAWN size, not only the canonical shape. The figure drawn is `t + s·R(p)`
+      // (`applyGauge`), so a solve that meets the givens by driving the gauge's scale s → 0 changed nothing the
+      // ratio tests above and below look at: the whole solid at one point passed as "not collapsed". A rotation
+      // and a mirror are rigid, so the drawn span is s·maxD; collapsed when ≤ 1e-4 (the same hard ratio) of the
+      // seed's drawn size, floored by the smallest stated absolute length ({@link lRef}).
+      if (pts.length >= 2 && Math.exp(x[6]) * maxD <= 1e-4 * lRef()) return true;
       // #872 (ADR-3D-212): the FLAT collapse the pairwise test cannot see. Vertices stay well
       // separated while the solid loses its VOLUME — a פירמידה whose apex is driven into its own
       // base plane is not a pyramid, and the sentence that flattened it has not been satisfied, it
@@ -2082,7 +2229,9 @@ export function solvePivot(
     Object.assign([] as PivotResult[], { collapse: { ring: [...solid.ids], riderKeys: riders.map((r) => r.id), forced: true, solid: solid.kind } });
   const noteFlatSolid = (x: number[], primary: number): void => {
     if (flatSolidSeen || primary >= 1e-10) return;
-    flatSolidSeen = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x)));
+    // #2799 (ADR-3D-464): an exact candidate the scale test rejected — the whole solid at one point is the limit of
+    // flat, and refused in the same words (2-D refuses a ring squashed to a point with its flat refusal, ADR-643 B1)
+    flatSolidSeen = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x))) ?? (x.length >= 7 ? scaleCollapsedAt(x) : null);
   };
   /** The empty pool after an exact flat-solid rejection: an open figure if the retry finds one, else the refusal. */
   const flatSolidRefusal = (): PivotPool => {
@@ -2233,7 +2382,6 @@ export function solvePivot(
   // cost hard figures real solution branches (a mirror gone, a sign branch gone — the first attempt's
   // full-suite failures). A genuinely determining given overrides the 1e-4 pull, exactly as it
   // overrides dims0 and the symbol anchors.
-  const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
   // deterministic multi-start: one fixed set of eight initial rotations, REORDERED by the seed (never rotated
   // by it), so an under-determined placement lands in the same handful of basins at every seed. It is not a
   // sample: a leftover turn or size is sampled after the solve, by the resolver's stage 6 (#2378, ADR-3D-379).
@@ -2404,7 +2552,11 @@ export function solvePivot(
       const fPinS = (z: number[]) => [...fZS(z), 1e3 * (z[6] - dS)];
       const zS = polish(fPinS, [0, 0, 0, 0, 0, 0, dS]);
       const xS = atS(zS);
-      if (degenerate(xS) || pErr(xS) >= drawnAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
+      // #2793 (ADR-3D-465): the base's own exactness, measured at the size it is parked at. A residual in world units grows
+      // with the figure, so a base drawn small (a speck the sign filter chose) carries its round-off up by e^{dS}: judged at
+      // the base's size, an exact full-size park read as inexact and the speck stayed drawn.
+      const sizeAccept = Math.min(ACCEPT, Math.max(drawnAccept, 10 * pErr(probe.x) * Math.exp(2 * Math.max(0, dS))));
+      if (degenerate(xS) || pErr(xS) >= sizeAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
       return [resultAt(xS)];
     }
     if (probe.freedom === 'turn') {
@@ -2467,10 +2619,56 @@ export function solvePivot(
     const fP = residualsFor(probe.mirror);
     const pErr = (x: number[]): number => fP(x).reduce((a, v) => a + v * v, 0);
     if (degenerate(probe.x) || pErr(probe.x) >= ACCEPT) return [];
+    // #2793 (ADR-3D-465): the slide asks the MEASURED question — is a translation left, null(J_τ)? None (rank 3, the
+    // placement is pinned) or all three (rank 0: nothing relates the translation to the absolute frame, so it is a
+    // gauge, FR-SP-4) — nothing to slide. The direction is drawn INSIDE null(J_τ): a free R³ direction nearly
+    // orthogonal to it moved nothing and was dropped, so a sign could fail at some seeds.
+    const basis = placementFreedomAt(probe.x, probe.mirror)().translation.map((b) => v3(b[0], b[1], b[2]));
+    if (basis.length === 0 || basis.length === 3) return [];
     const h = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + k * 78.233)) * 43758.5453) % 1;
     const raw = v3(h(1) - 0.5, h(2) - 0.5, h(3) - 0.5);
-    const dir = scale3(norm3(raw) < 1e-6 ? v3(1, 0, 0) : scale3(raw, 1 / norm3(raw)), probe.flip ? -1 : 1);
-    const step = Math.exp(probe.x[6]) * (0.4 + 0.8 * h(4)); // in figure units, so the move is visible at any scale
+    let inNull = basis.reduce((acc, b) => add3(acc, scale3(b, dot3(raw, b))), v3(0, 0, 0));
+    if (norm3(inNull) < 1e-6) inNull = basis[0];
+    const dir = scale3(inNull, (probe.flip ? -1 : 1) / norm3(inNull));
+    const unit = Math.exp(probe.x[6]); // figure units, so the move is visible at any scale
+    let step = unit * (0.4 + 0.8 * h(4));
+    // #2793 (ADR-3D-465): a stated SIGN is AIMED at, not only filtered for. Along `dir` every sign condition is linear in
+    // the step (a translation), so the steps that keep every sign form one interval; the seeded step stands when it is
+    // inside it (with a margin), else a seeded step inside it is taken. No interval: the seeded step, and the caller's
+    // sign check rolls the slide back.
+    if (signConds.length > 0) {
+      const at0 = atFor(probe.mirror, probe.x);
+      const at1 = atFor(probe.mirror, [probe.x[0] + dir.x, probe.x[1] + dir.y, probe.x[2] + dir.z, ...probe.x.slice(3)]);
+      let lo = -Infinity;
+      let hi = Infinity;
+      let feasible = true;
+      for (const sc of signConds) {
+        const v0 = sc.value(at0);
+        const v1 = sc.value(at1);
+        if (v0 === undefined || v1 === undefined) continue;
+        const d = v1 - v0;
+        if (Math.abs(d) < 1e-9) {
+          if (!boundHolds3(sc.bound, v0)) feasible = false;
+          continue;
+        }
+        // #1524 (ADR-3D-477): each stated END of the condition's interval (a sign's 0, a range's lo/hi) bounds the step:
+        // v0 + d·s past `end` on the interval's side. A sign gives exactly the old −v0/d cut.
+        for (const [end, below] of [[sc.bound.lo, false], [sc.bound.hi, true]] as const) {
+          if (end === null) continue;
+          const cut = (end - v0) / d;
+          if ((d > 0) !== below) lo = Math.max(lo, cut);
+          else hi = Math.min(hi, cut);
+        }
+      }
+      if (feasible && lo < hi) {
+        const m = Math.min(0.25 * unit, (hi - lo) / 4);
+        if (!(step > lo + m && step < hi - m)) {
+          const u = h(5);
+          step = Number.isFinite(lo) && Number.isFinite(hi) ? lo + (hi - lo) * (0.25 + 0.5 * u)
+            : Number.isFinite(lo) ? lo + unit * (0.25 + u) : hi - unit * (0.25 + u);
+        }
+      }
+    }
     const t0 = v3(probe.x[0], probe.x[1], probe.x[2]);
     // The slide is a PLACEMENT question: only translation + rotation move (the Stage-A shape); scale,
     // dims and symbols stay frozen at the solution's values. Opening them invited the explode basin —
@@ -2484,7 +2682,7 @@ export function solvePivot(
     const rp = leastSquares(fPin, probe.x.slice(0, 6), 40);
     const rr = leastSquares(fP6, rp.x);
     let xr = full(rr.x);
-    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, step)) return [];
+    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-6 * Math.max(1, Math.abs(step))) return [];
     // #1769 (ADR-3D-395): the slide's acceptance is the same root predicate `collect` applies — a slid figure exact
     // on `ACCEPT` but outside a member pin's verifier bar is released on every unknown (the #1311 release) and
     // judged again; one the release cannot bring onto the bar is no slide, and the drive's placement stands.
@@ -2504,6 +2702,8 @@ export function solvePivot(
   const reseatStages: (() => void)[] = [];
   /** #2714 (ADR-3D-447): the shapes the first mirror's fan found — the second mirror tries only these. */
   let fanShapes: number[][] | null = null;
+  /** #2814 (ADR-3D-461): the dims the first mirror's driven-dims fan found — the second mirror tries only these. */
+  let dimsFanRoots: number[][] | null = null;
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -2570,6 +2770,9 @@ export function solvePivot(
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
     const primaryErr = (x: number[]): number => fPrimary(x).reduce((s, v) => s + v * v, 0);
+    /** #2799 (ADR-3D-464): the cold sweeps' early-out — drawn at a point AND exact on the givens' rows: every acceptance
+     *  site rejects it (`collapsed`) and `noteFlatSolid` records it, so further iterations only shrink it further. */
+    const exactAtPoint = (x: number[]): boolean => atPoint(x) && primaryErr(x) < 1e-10;
     /**
      * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
      * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
@@ -2710,10 +2913,10 @@ export function solvePivot(
     };
     const fSeed = fFor(symAnchorTargets);
     for (const x0 of starts) {
-      let r0 = leastSquares(fSeed, x0);
+      let r0 = leastSquares(fSeed, x0, 120, exactAtPoint);
       // polish: restart LM (fresh damping) from the found point until it stops improving
       for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
-        const r2 = leastSquares(fSeed, r0.x);
+        const r2 = leastSquares(fSeed, r0.x, 120, exactAtPoint);
         if (r2.err >= r0.err * 0.99) break;
         r0 = r2;
       }
@@ -2883,9 +3086,9 @@ export function solvePivot(
         for (const f of variants) {
           const widened = dims0.map(f);
           for (const x0 of starts) {
-            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)]);
+            let r = leastSquares(fSeed, [...x0.slice(0, 7), ...widened, ...x0.slice(7 + nDims)], 120, exactAtPoint);
             for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-              const r2 = leastSquares(fSeed, r.x);
+              const r2 = leastSquares(fSeed, r.x, 120, exactAtPoint);
               if (r2.err >= r.err * 0.99) break;
               r = r2;
             }
@@ -2933,6 +3136,91 @@ export function solvePivot(
         results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, riderTs, scalarConsumed: scalarConsumedAt([...sx], mirror), err, x: [...sx] });
       };
       pushSolution(bx, bestAccept);
+      /**
+       * #2814 (ADR-3D-461, generalises ADR-3D-447 beyond a lone flat ring) — A DETERMINED SHAPE'S REFLECTED ROOTS,
+       * reached WARM from the found solution.
+       *
+       * Off the pooled path the first exact cold start ends this mirror's search, and every cold start carries the
+       * dims at the seed's one sample — so when the givens determine a dim up to sign, only the sign the sample's
+       * basin falls into is found. The operator's #827 exam pyramid («D(3,p,0)» · «|u| = |v|», p = ±4): the ±4
+       * pair lives in the parallelogram's one shape dim, and the pool carried only +4 at 10 of 24 seeds — the
+       * panel then printed «D(3, 4, 0)», a branch value as knowledge (ADR-3D-194), and «הציגו תצורה אחרת» could
+       * not reach −4. The #797 walk (pin symbols), the #818 walk (a stated sign, failure path) and the #2714 fan
+       * (a lone flat ring) each cover a neighbour of this case, never this one.
+       *
+       * The gate is #2714's determinedness signal: the #1854 settle could not move the dims and they are off the
+       * seed's sample. Within it only a DRIVEN dim is reflected (off its sample, non-zero): a dim still at its
+       * sample is free, and reflecting it pools points of a continuum (measured: «מלבן ABCD · AD=2*√7» drew
+       * AB = 20.08). Each start is the found solution with the driven dim(s) negated, solved on the givens' rows;
+       * an exact, open, member-holding result is SETTLED (a free dim the reflection disturbed goes back to the
+       * sample) and joins after the found root when its dims are new. The second mirror tries only the first
+       * mirror's found dims, so the fan is never paid twice. A free figure never reaches the gate and pays 0.
+       *
+       * Cost (docs/17 §7; measured, the plan's 2.7× on «מלבן ABCD · AB=1 · AD=√7» is the reason for each):
+       *  - a reflected start, or a solved root, whose DETERMINED points (those no free dim moves) are CONGRUENT to the
+       *    found one's, a reflection included, is the found root's mirror twin, which the mirror pass owns — a twin
+       *    start is never solved and a twin root never pooled (a rectangle, a box, a right pyramid turned over; a
+       *    quadrilateral's fixed C mirrored over AB with D free, which grew a pool 2 → 4 and a seed search 9 → 36);
+       *  - the all-driven-dims start runs only when no single-dim start found a root;
+       *  - a fully determined base (no dim at its sample) skips the settle — it has no free dim to return.
+       */
+      if (!flatRingDims && nDims > 0 && nSym === 0 && !planeDrive) {
+        const settleMoved = bx.slice(7, 7 + nDims).some((v, i) => Math.abs(v - parked[7 + i]) > 1e-7);
+        if (!settleMoved && dimOffset(bx) > 1e-6) {
+          dimsFanStats.runs++;
+          const base = bx.slice(7, 7 + nDims);
+          const kept: number[][] = [base];
+          const anyFree = base.some((v, i) => Math.abs(v - dims0[i]) <= 1e-6);
+          // the points a FREE dim moves are left out of the twin test: a free dim absorbs whatever the reflection did
+          // to them, so the root is a twin when the points the givens DETERMINE are congruent (a quadrilateral's fixed
+          // C mirrored over AB, with D free, is the mirror pass's figure, not a new configuration)
+          const freeDep = new Set<Id>();
+          const base0 = evalCanonical(base, undefined, riderMap(bx));
+          for (let i = 0; i < nDims; i++) {
+            if (Math.abs(base[i] - dims0[i]) > 1e-6) continue;
+            const nudged = [...base];
+            nudged[i] += 1e-3 * Math.max(1, Math.abs(base[i]));
+            for (const [id, q] of evalCanonical(nudged, undefined, riderMap(bx))) {
+              const p = base0.get(id);
+              if (!p || norm3(sub3(q, p)) > 1e-9) freeDep.add(id);
+            }
+          }
+          const determined = (pos: Positions3): Positions3 => new Map([...pos].filter(([id]) => !freeDep.has(id)));
+          const baseShape = determined(base0);
+          const twin = (dims: number[]): boolean => congruentShapes3(determined(evalCanonical(dims, undefined, riderMap(bx))), baseShape);
+          const tryDims = (dims: number[]): number[] | null => {
+            if (twin(dims)) return null; // a mirror twin, known before solving
+            dimsFanStats.tries++;
+            const x0 = [...bx];
+            for (let i = 0; i < nDims; i++) x0[7 + i] = dims[i];
+            const r = leastSquares(fPrimary, x0);
+            if (degenerate(r.x) || primaryErr(r.x) >= ACCEPT || !membersHold(mirror, r.x)) return null;
+            const sx = anyFree ? settleFreeDims(r.x) : r.x;
+            const d = sx.slice(7, 7 + nDims);
+            if (kept.some((q) => q.every((v, i) => Math.abs(v - d[i]) < 1e-4)) || twin(d)) return null; // …or once solved
+            kept.push(d);
+            dimsFanStats.found++;
+            pushSolution(sx, primaryErr(sx));
+            return d;
+          };
+          if (dimsFanRoots) {
+            for (const d of dimsFanRoots) tryDims(d);
+          } else {
+            const found: number[][] = [];
+            const driven = base.map((_, i) => i).filter((i) => Math.abs(base[i]) > 1e-6 && Math.abs(base[i] - dims0[i]) > 1e-6);
+            const reflect = (set: number[]): number[] => base.map((v, i) => (set.includes(i) ? -v : v));
+            for (const i of driven) {
+              const d = tryDims(reflect([i]));
+              if (d) found.push(d);
+            }
+            if (found.length === 0 && driven.length > 1) {
+              const d = tryDims(reflect(driven));
+              if (d) found.push(d);
+            }
+            dimsFanRoots = found;
+          }
+        }
+      }
       /**
        * #2714 (ADR-3D-447) — A DETERMINED FLAT RING'S OTHER DISCRETE ROOTS, reached FROM THE FOUND SOLUTION.
        *

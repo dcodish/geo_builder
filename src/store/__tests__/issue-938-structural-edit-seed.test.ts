@@ -29,8 +29,16 @@ import { useGeoStore, replay, groupKey } from '@/store/geoStore';
 import { parse } from '@/parser';
 import { ctxOf } from '../../__tests__/scenario-pipeline';
 
-const SEQ = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC'];
-/** A seed measured to refuse this fact list — one of exactly three in 0..199. */
+/** The operator's sequence. Its three broken seeds (4, 37, 139) were solver stalls, healed by #2797 (ADR-816). */
+const OPERATOR_SEQ = ['משולש ABC', 'זוית B ישרה', 'ריבוע DEFG חסום במשולש ABC'];
+/**
+ * The figure the mechanism locks run on (round #2822): a broken seed that survives every solver BY CONSTRUCTION —
+ * #360's square with E on AB and |CE| = 5.2 (status-attribution.test.ts): feasible at the default side
+ * (5.2 ∈ [s, s√2]), but the sampled side at some seeds puts 5.2 out of E's reach, and a 1-D bounded root that
+ * does not exist is rescued by no retry start. The operator's own sequence no longer has a broken seed to lock on.
+ */
+const SEQ = ['ריבוע ABCD', 'נקודה E על AB', 'CE=5.2'];
+/** A seed measured to refuse SEQ (103 of 0..199 do; seed 0 builds). */
 const BROKEN_SEED = 4;
 
 function submit(u: string) {
@@ -56,14 +64,23 @@ beforeEach(() => {
 });
 
 describe('#938 — the operator’s report', () => {
-  it('the seed is REAL hidden state: seed 4 refuses a fact list 197 of 200 seeds draw', () => {
-    build();
+  it('the operator’s sequence: its three broken seeds (4, 37, 139) were solver stalls — it now draws at all 200 (ADR-816)', () => {
+    useGeoStore.setState({ facts: [], seed: 0 });
+    for (const u of OPERATOR_SEQ) submit(u);
     const facts = useGeoStore.getState().facts;
     const refusing = [];
     for (let s = 0; s < 200; s++) if (replay(facts, s).lastError !== null) refusing.push(s);
-    // The premise of the whole issue. If this ever changes, the numbers in this file are stale and the
-    // fix should be re-measured rather than the constant edited.
-    expect(refusing).toEqual([4, 37, 139]);
+    // The premise of the issue, re-measured (round #2822): the driven solver's LM rescue rung reaches the
+    // inscribed square at the three seeds where Nelder–Mead stalled. The mechanism locks below need a seed that
+    // is broken by construction, so they run on SEQ.
+    expect(refusing).toEqual([]);
+  }, 300000);
+
+  it('the seed is REAL hidden state: seed 4 refuses a fact list that seed 0 draws', () => {
+    build();
+    const facts = useGeoStore.getState().facts;
+    expect(replay(facts, 0).lastError).toBeNull();
+    expect(replay(facts, BROKEN_SEED).lastError).not.toBeNull();
   }, 300000);
 
   it('delete the square, re-enter the identical line → the SAME outcome as the first time', () => {

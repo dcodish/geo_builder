@@ -210,6 +210,10 @@ export function errorText(error: InputError, t: Translate): string {
     'radian-angle': 'errRadianAngle',
     // #2032 (ADR-AG-408) — an arc's length is refused, naming the sentence that is read, until #2710
     'arc-length-unread': 'errArcLengthUnread',
+    // #2625 (ADR-AG-454) — a parabola has no centre, so no diameter: its own reason, not the generic refusal
+    'parabola-no-diameter': 'errParabolaNoDiameter',
+    // #2625 (ADR-AG-454 Am. 1) — the same reason for its centre; the vertex the student may mean is not read yet, said so
+    'parabola-no-centre': 'errParabolaNoCentre',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
@@ -258,6 +262,8 @@ export function errorText(error: InputError, t: Translate): string {
     // An id with no prefix (and so no kind) falls to the kind-free wording rather than guessing.
     'unknown-reference': kind ? UNKNOWN_REF_KEY[kind] : 'errUnknownRef',
     'kind-mismatch': 'errKindMismatch',
+    // #2664 (ADR-AG-455) — «קנונית» with an equation off the origin: the session's sentence (ADR-W-174)
+    'not-canonical': 'errNotCanonical',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
     // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
@@ -288,8 +294,6 @@ export function errorText(error: InputError, t: Translate): string {
     'polygon-not-supported': 'errPolygonNotSupported',
     // #2584 (ADR-AG-346): a line's holder is called a line (#1164: the refusal names the holder)
     'already-named': error.key === 'already-named' && error.holderKind === 'line' ? 'errAlreadyNamedLine' : 'errAlreadyNamed',
-    // #2584 (ADR-AG-346, T32): the line already drawn, its row, and the naming sentence the box now holds
-    'line-exists': error.key === 'line-exists' && error.offer ? 'errLineExists' : 'errLineExistsAlone',
     'alias-taken': 'errAliasTaken',
     // #2054 / #2061 (ADR-AG-277) — 2-D's sentences (ADR-661): the second name, and the same letter's other coefficient
     'name-taken': error.key === 'name-taken' && error.nameKind === 'length'
@@ -328,7 +332,7 @@ export function errorText(error: InputError, t: Translate): string {
     'load-unreadable': 'errLoadUnreadable',
   }[error.key];
   const crossed: SecondCrossingCurve =
-    (error.key === 'third-crossing' || error.key === 'tangent-no-second-crossing') && error.curve ? error.curve : 'circle';
+    (error.key === 'third-crossing' || error.key === 'tangent-no-second-crossing' || error.key === 'not-canonical') && error.curve ? error.curve : 'circle';
   const near = error.key === 'unknown-reference' && error.nearMiss ? ` ${nearMissText(kind ?? 'curve', error.nearMiss, t)}` : '';
   return t(key, {
     detail: error.detail,
@@ -359,7 +363,7 @@ export function errorText(error: InputError, t: Translate): string {
         : '',
     second: error.key === 'crossing-already-named' && error.operands ? error.operands[1] : '',
     other: 'other' in error ? error.other : '',
-    line: error.key === 'third-crossing' ? (error.line ?? '') : '',
+    line: error.key === 'third-crossing' || error.key === 'not-canonical' ? (error.line ?? '') : '',
     a: error.key === 'third-crossing' ? (error.a ?? '') : '',
     b: error.key === 'third-crossing' ? (error.b ?? '') : '',
     id: error.key === 'tangent-no-second-crossing' ? (error.id ?? '') : '',
@@ -397,7 +401,6 @@ export function errorText(error: InputError, t: Translate): string {
     product: error.key === 'mixed-number' ? error.product : error.key === 'juxtaposed-numbers' ? (error.product ?? '') : '',
     comma: error.key === 'juxtaposed-numbers' ? (error.comma ?? '') : '',
     letter: error.key === 'capital-magnitude' ? error.letter : '',
-    lineName: error.key === 'line-exists' ? error.lineName : '',
     corrected: error.key === 'capital-magnitude' ? error.corrected : '',
     role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : error.role === 'hypotenuse' ? 'roleWordHypotenuse' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',

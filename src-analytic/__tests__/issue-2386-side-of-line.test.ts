@@ -9,7 +9,7 @@
  * path: `decideSubmit` per line, then `derive` at the seeds.
  */
 import { describe, expect, it } from 'vitest';
-import { decideSubmit } from '../app/submit';
+import { decideSubmit, isHeld } from '../app/submit';
 import { errorText } from '../app/errorText';
 import { derive } from '../engine/derive';
 import { reportedDof } from '../engine/carriers';
@@ -98,7 +98,7 @@ describe('#2386 — every spelling reads the right side', () => {
   it("a restatement with the line's letters swapped is absorbed («LK» is «KL»)", () => {
     const lines = ['K(3,4)', 'L(-5,2)', 'נקודה M', 'M מעל הישר KL'];
     expect(submitAll(lines)).toEqual(['record', 'record', 'record', 'record']);
-    expect(decideSubmit('M מעל הישר LK', lines, 0).kind).not.toBe('record');
+    expect(isHeld(decideSubmit('M מעל הישר LK', lines, 0))).toBe(true); // #2790: its own row, with the notice
   });
 });
 

@@ -129,6 +129,39 @@ const internallyTangent = (commands: readonly Command[], a: Id, b: Id): boolean 
   commands.some((c) => c.type === 'circles-tangent' && !c.external && ((c.circle1 === a && c.circle2 === b) || (c.circle1 === b && c.circle2 === a)));
 
 /**
+ * A declared TRAPEZOID a→b→c→d whose BOTH pairs of opposite sides are parallel (within ~1°) is no longer a
+ * trapezoid — it morphed into a parallelogram (`figure.v.trapezoidMorph`). The ONE geometric rule, read by
+ * {@link checkGivens} and by {@link declaredRingsHold} (#2795, [ADR-821](../../docs/06-decisions.md#adr-821)).
+ */
+export function trapezoidMorphed(a: Vec, b: Vec, c: Vec, d: Vec): boolean {
+  const par = (p: Vec, q: Vec, r: Vec, s: Vec) => {
+    const ux = q.x - p.x, uy = q.y - p.y, vx = s.x - r.x, vy = s.y - r.y;
+    const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (lu < 1e-9 || lv < 1e-9) return false;
+    return Math.abs(ux * vy - uy * vx) / (lu * lv) < Math.sin((Math.PI / 180) * 1); // within ~1°
+  };
+  return par(a, b, c, d) && par(b, c, d, a);
+}
+
+const TRAPEZOID_KINDS: ReadonlySet<string> = new Set(['trapezoid', 'isosceles-trapezoid', 'right-trapezoid']);
+
+/**
+ * #2795 ([ADR-821](../../docs/06-decisions.md#adr-821)) — does every DECLARED ring keep its identity in this
+ * layout? Read from the construction alone (the polygon's `declaredAs`), so the engine's ADR-623 release can ask
+ * it of a re-sampled prior: a layout where a declared trapezoid sits on its parallelogram root is not a figure
+ * (`checkGivens` rejects it, so the seed search never shows it), and a release must not be judged there.
+ */
+export function declaredRingsHold(c: Construction, positions: Map<Id, Vec>): boolean {
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length !== 4 || !o.declaredAs || !TRAPEZOID_KINDS.has(o.declaredAs)) continue;
+    const [a, b, cc, d] = o.vertices.map((id) => positions.get(id));
+    if (!a || !b || !cc || !d) continue;
+    if (trapezoidMorphed(a, b, cc, d)) return false;
+  }
+  return true;
+}
+
+/**
  * Check the figure's final coordinates against the relations its commands ASSERT. Returns the
  * relations that DON'T hold (empty = the drawing matches every stated given).
  */
@@ -595,13 +628,7 @@ export function checkGivens(
     if (cmd.type !== 'trapezoid') continue;
     const [a, b, c, d] = cmd.ids.map((id) => positions.get(id));
     if (!a || !b || !c || !d) continue;
-    const par = (p: Vec, q: Vec, r: Vec, s: Vec) => {
-      const ux = q.x - p.x, uy = q.y - p.y, vx = s.x - r.x, vy = s.y - r.y;
-      const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
-      if (lu < 1e-9 || lv < 1e-9) return false;
-      return Math.abs(ux * vy - uy * vx) / (lu * lv) < Math.sin((Math.PI / 180) * 1); // within ~1°
-    };
-    if (par(a, b, c, d) && par(b, c, d, a)) {
+    if (trapezoidMorphed(a, b, c, d)) {
       const quad = cmd.ids.join('');
       violations.push({
         relation: 'parallel',

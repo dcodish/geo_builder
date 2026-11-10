@@ -63,7 +63,7 @@ describe('#1620 — the exam construction imperatives are taught (ADR-AG-206)', 
     expect(v).toEqual({ kind: 'teach', verb: expect.any(String), canonical: taught });
     if (v.kind !== 'teach') return;
     expect(typed.includes(v.verb), "the verb quoted back is the student's own word").toBe(true);
-    expect(['record', 'already-known', 'already-follows']).toContain(decideSubmit(v.canonical, before, 0).kind);
+    expect(['record', 'record', 'record']).toContain(decideSubmit(v.canonical, before, 0).kind);
   });
 
   /**

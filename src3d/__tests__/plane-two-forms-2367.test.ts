@@ -72,9 +72,11 @@ function consistent(eqRow: string, parRow: string): void {
 function panelPairs(planes: readonly string[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const r of planes) {
-    const i = r.indexOf(': ');
-    const k = r.slice(0, i);
-    (out.get(k) ?? out.set(k, []).get(k)!).push(r.slice(i + 2));
+    // #2820 (ADR-3D-482): a plane whose name IS its symbol prints its parametric row unprefixed, «π = …»;
+    // every other row is «label: …»
+    const m = /^([^=:]+): /.exec(r);
+    const k = m ? m[1] : r.slice(0, r.indexOf(' = '));
+    (out.get(k) ?? out.set(k, []).get(k)!).push(m ? r.slice(m[0].length) : r);
   }
   return out;
 }

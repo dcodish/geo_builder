@@ -53,8 +53,6 @@ function recorded(q: CorpusQuestion): number {
         seed = taught.configuration ?? seed;
         count += 1;
       }
-    } else if (verdict.kind === 'already-known' || verdict.kind === 'already-follows') {
-      count += 1;
     }
   }
   return count;

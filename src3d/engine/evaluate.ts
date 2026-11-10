@@ -40,6 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
+import { configurationOrder3 } from './configs3';
 import { applyGauge, FLAT_SOLID_KINDS, NO_PLACEMENT_FREEDOM3, pinRootKey, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3, type CanonicalEval3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3, namedVector3 } from './vecExpr';
@@ -241,6 +242,34 @@ function polygon4ConcaveDims(key: string, seed: number, allowed: readonly number
 /** #2764 (ADR-3D-454): solid `i`'s index in the WHOLE figure — itself, except inside a part (`partsOf3`). */
 export const wholeSolidIndex3 = (c: Construction3, i: number): number => c.partOf?.solidIndex[i] ?? i;
 
+/**
+ * #2702 ([ADR-3D-469](../../docs/06b-decisions-3d.md#adr-3d-469)) — the kinds whose quad base may take the concave seat:
+ * the flat quadrilateral (ADR-3D-418), and a solid's base a dart can draw — a general quadrilateral (`pyramidQuad`,
+ * `prism4g`) or a kite (`pyramidKite`). A right pyramid's base is cyclic (convex whenever simple) and is not here.
+ */
+const CONCAVE_SEAT_KINDS3: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon4', 'pyramidQuad', 'prism4g', 'pyramidKite']);
+
+/**
+ * #2702 (ADR-3D-469) — a solid's dims with its quad base on the concave seat. The general bases (`polygon4`,
+ * `pyramidQuad`, `prism4g`) lead with C, D in the A, B gauge — exactly what `polygon4ConcaveDims` returns — so the
+ * seat replaces those four and the apex's or the lateral dims follow unchanged. A kite keeps its symmetry (|AB| = |AD|,
+ * |CB| = |CD|, structural) and takes a DART window of its own two dims: reflex at C, C rides the axis inside triangle
+ * ABD (`axis` = f·cos(half), f ∈ [0.25, 0.75]); reflex at A, the half-angle opens past 90° (`half` ∈ [95°, 130°]).
+ * Which corner is reflex is drawn from the seed among the allowed ones (FR-ALT-2), as ADR-3D-418 draws it.
+ */
+function concaveSolidDims3(solid: SolidObj, key: string, seed: number, seat: readonly number[]): number[] {
+  if (solid.kind === 'polygon4') return polygon4ConcaveDims(key, seed, seat);
+  const dims = solidDims(solid.kind, key, seed, solid.oblique);
+  if (solid.kind !== 'pyramidKite') return [...polygon4ConcaveDims(key, seed, seat), ...dims.slice(4)];
+  const reflex = seat[Math.min(seat.length - 1, Math.floor(sample(seed, `${key}-reflex`, 0, seat.length)))];
+  const [half, axis] = dims;
+  const dart =
+    reflex === 0
+      ? [(sample(seed, `${key}-dart-half`, 95, 130) * Math.PI) / 180, axis]
+      : [half, sample(seed, `${key}-dart-axis`, 0.25, 0.75) * Math.cos(half)];
+  return [...dart, ...dims.slice(2)];
+}
+
 /** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
 export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
   return [...solidDimsAll3(c, seed)[i]];
@@ -258,7 +287,8 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
   let bySeed = solidDimsMemo3.get(c.solids);
   if (!bySeed) solidDimsMemo3.set(c.solids, (bySeed = new Map()));
   // #1986 (ADR-3D-418): which flat quadrilaterals take the concave seat is part of the configuration's identity
-  const concave = c.solids.map((solid) => (solid.kind === 'polygon4' ? concaveSeatVertices3(c, solid.ids) : null));
+  // #2702 (ADR-3D-469): ...and so do a solid's own quad base — a general or kite pyramid base, a general prism base
+  const concave = c.solids.map((solid) => (CONCAVE_SEAT_KINDS3.has(solid.kind) && !solid.bound ? concaveSeatVertices3(c, baseRingOf(solid)!) : null));
   const memoKey = concave.some(Boolean) ? `${seed}|${concave.map((v) => (v ? v.join('') : '-')).join('|')}` : seed;
   let all = bySeed.get(memoKey);
   if (!all) {
@@ -267,7 +297,7 @@ export function solidDimsAll3(c: Construction3, seed: number): readonly (readonl
       if (solid.bound) return boundSolidDims3(solid.kind, `bound-${solid.kind}-${solid.ids.join('')}`, seed, !flatHostOf3(c, solid));
       const key = `solid-${solid.kind}-${solid.ids.join('')}`;
       const seat = concave[i];
-      const shape = seat ? polygon4ConcaveDims(key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
+      const shape = seat ? concaveSolidDims3(solid, key, seed, seat) : solidDims(solid.kind, key, seed, solid.oblique);
       // #2764 (ADR-3D-454): a part's solid keeps its index in the whole, so it is sampled as it is there
       return wholeSolidIndex3(c, i) === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
     });
@@ -1128,7 +1158,7 @@ import { memberHolds3, onLineHolds3 } from './operands';
 // continuation reads them too, and solve3 must never import evaluate) — re-exported for the store.
 export { componentValue, componentSignsHold } from './operands';
 import { boundHolds3, boundWindow3, symBound3 } from './bound3';
-import { componentSignsHold } from './operands';
+import { componentSignsHold, positionalComponentSigns3 } from './operands';
 
 
 /**
@@ -1727,6 +1757,54 @@ export function gaugePlacedIds3(c: Construction3): Id[] {
   return ids;
 }
 
+/**
+ * #2793 Part 2a (ADR-3D-465): the 24 proper rotations that map the coordinate axes onto themselves, as axis-angle
+ * vectors — the deterministic widening of the funnel's search when no sampled rotation keeps the stated signs.
+ */
+const AXIS_ALIGNED_ROTATIONS3: readonly Vec3[] = (() => {
+  const out: Vec3[] = [];
+  const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  for (const p of perms) {
+    for (let sgn = 0; sgn < 8; sgn++) {
+      const m = [0, 1, 2].map((r) => [0, 1, 2].map((col) => (col === p[r] ? (sgn >> r) & 1 ? -1 : 1 : 0)));
+      const det =
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+      if (det !== 1) continue;
+      const tr = m[0][0] + m[1][1] + m[2][2];
+      const ang = Math.acos(Math.max(-1, Math.min(1, (tr - 1) / 2)));
+      if (ang < 1e-9) { out.push(v3(0, 0, 0)); continue; }
+      if (Math.PI - ang < 1e-9) {
+        // a half turn: the axis is the column of (M + I) with the largest norm
+        const cols = [0, 1, 2].map((j) => v3(m[0][j] + (j === 0 ? 1 : 0), m[1][j] + (j === 1 ? 1 : 0), m[2][j] + (j === 2 ? 1 : 0)));
+        const ax = cols.reduce((a, b) => (norm3(b) > norm3(a) ? b : a));
+        out.push(scale3(normalize3(ax), Math.PI));
+        continue;
+      }
+      const ax = v3(m[2][1] - m[1][2], m[0][2] - m[2][0], m[1][0] - m[0][1]);
+      out.push(scale3(ax, ang / (2 * Math.sin(ang))));
+    }
+  }
+  return out;
+})();
+
+/**
+ * #2793 (ADR-3D-465 Am. 1) — may resolve3's stage 5 SLIDE a solved placement along its leftover translation? The probe
+ * measures WHERE the translation is free (null J_τ); this says whether that freedom is a placement DOF the drawing samples:
+ *  - only against the ABSOLUTE frame (FR-SP-4): with no absolute object, rank J_τ > 0 can come from a free point's own
+ *    coordinates (a minted S in «SM ⊥ ABC»), and sliding the figure against it is a gauge move that re-solves the relation;
+ *  - a placement an absolute plane or membership drives with no point pin (ADR-3D-180, unchanged);
+ *  - a stated SIGN to aim at (ADR-W-199: a figure that keeps the sign is drawn, never refused);
+ *  - point pins that state an axis or the origin (every stated component 0): the solid's vertex on an axis anchors the
+ *    frame and the slide along it is sampled (judged Q-2793b, with Q-2789a). A pin stating an off-origin component
+ *    («x_B = 3») leaves its other axes a gauge (ADR-3D-373: the figure is unchanged), so it does not slide unsigned.
+ */
+export function translationSlideSampled3(c: Construction3): boolean {
+  if (!hasAbsoluteFrameObject(c)) return false;
+  if (c.pins.length === 0 && translationDrivenAbsolute3(c)) return true;
+  if (c.signGivens.length > 0 || positionalComponentSigns3(c).length > 0) return true;
+  return c.pins.length > 0 && c.pins.every((p) => [p.x, p.y, p.z].every((v) => v === null || v === 0));
+}
+
 /** Does `resolve3` SAMPLE the placement (rather than freeze it at the canonical gauge)? */
 export function placementSampled3(c: Construction3): boolean {
   return c.solids.length > 0 && hasAbsoluteFrameObject(c) && translationGaugeFree3(c);
@@ -2129,7 +2207,7 @@ function joinParts3(c: Construction3, rs: readonly Resolved3[], seed: Seed3): Re
           pivots.reduce<PlacementFreedom3>(
             (acc, p) => {
               const f = p.placementFreedom?.() ?? NO_PLACEMENT_FREEDOM3;
-              return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree };
+              return { dim: acc.dim + f.dim, generators: [], counted: acc.counted + f.counted, rotation: [], scaleFree: acc.scaleFree || f.scaleFree, translation: [] };
             },
             { ...NO_PLACEMENT_FREEDOM3 },
           )
@@ -2499,7 +2577,18 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
         });
       };
       const satisfying = solutions.filter(satisfiesSigns);
-      const pool = satisfying.length > 0 ? satisfying : solutions;
+      const solverOrder = satisfying.length > 0 ? satisfying : solutions;
+      /**
+       * #2814 (ADR-3D-461, extends ADR-3D-168 Am. 1's interleave) — THE PICK IS OVER DISTINCT CONFIGURATIONS, in an
+       * order the configurations alone decide (`configurationOrder3`). `pool[seed % pool.length]` over the raw pool
+       * indexed COPIES: one configuration found by both mirrors or several starts appeared several times, so the
+       * branch drawn at consecutive seeds followed copy counts and start order (#1499's T7 stayed on «below» for 7
+       * presses), and any change to LM start noise moved it (#2806). The frames computed here are reused below.
+       */
+      const frames = solverOrder.length > 1 ? solverOrder.map(finalFrameOf) : null;
+      const order = frames ? configurationOrder3(solverOrder.map((sol, i) => ({ pos: frames[i], pinSymbols: sol.pinSymbols }))) : solverOrder.map((_, i) => i);
+      const pool = order.map((i) => solverOrder[i]);
+      const poolFrames = frames ? order.map((i) => frames[i]) : null;
       if (pool.length > 0) {
         const chosen = pool[seed % pool.length];
         // #797 (ADR-3D-168 Am. 1): the ADMISSIBLE pool's distinct values per pin symbol —
@@ -2530,12 +2619,12 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
          * no branch to miss, and this is the solver's hot path.
          */
         const pointRoots: Record<string, Vec3[]> = {};
-        if (pool.length > 1) {
-          for (const sol of pool) {
+        if (pool.length > 1 && poolFrames) {
+          for (const frame of poolFrames) {
             // the same lane rule the chosen solution below uses (`finalFrameOf`) — an equation-plane point is
             // Lane-A absolute and must NOT be transformed, or every branch would look distinct; a mixed point is
             // re-derived in the solution's own frame (#2798)
-            for (const [id, q] of finalFrameOf(sol)) {
+            for (const [id, q] of frame) {
               // Stored ONE ENTRY PER POOL SOLUTION, in pool order, deliberately NOT deduplicated:
               // `pointRoots[a][i]` and `pointRoots[b][i]` must describe the same configuration, or a
               // consumer asking about the VECTOR a→b would pair positions from different branches.
@@ -2544,11 +2633,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
             }
           }
         }
-        warm.x = [...chosen.x];
-        warm.mirror = chosen.mirror;
+        // #2814 (ADR-3D-461): the drive's warm start stays the SOLVER-order entry — measured, warming from the new pick
+        // moved stage 4's drive start and the #1769 prism's drive lost its k = −1 root. The drawing changes; the
+        // drive's search does not.
+        const warmFrom = solverOrder[seed % solverOrder.length];
+        warm.x = [...warmFrom.x];
+        warm.mirror = warmFrom.mirror;
         // the figure lane rides the chosen similarity, the fixed lane stays verbatim, and a mixed point is re-derived
         // from its own definition in the final frame (#2798, ADR-3D-456)
-        for (const [id, q] of finalFrameOf(chosen)) pos.set(id, q);
+        for (const [id, q] of poolFrames ? poolFrames[seed % pool.length] : finalFrameOf(chosen)) pos.set(id, q);
         pivot = {
           solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols,
           ...(chosen.riderTs ? { riderTs: chosen.riderTs } : {}),
@@ -2809,9 +2902,15 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
     //    probe the applied solution (or the canonical gauge when nothing had to move) along a seeded
     //    direction; a fully pinned placement snaps back and stays put — the exam's prism is bit-identical.
     //    Transactional like stage 4: a slid figure that breaks a sign given or the parameter is rolled back.
-    if (c.pins.length === 0 && translationDrivenAbsolute3(c) && !(pivot && pivot.solutions === 0)) {
+    //    #2793 (ADR-3D-465): the gate is the MEASURED question, asked of every placement the pivot solved (or the
+    //    canonical gauge of a placement an absolute plane drives with nothing to move): does it keep a leftover
+    //    translation, null(J_τ)? The probe answers it (`PlacementFreedom3.translation`). The old gate, "no point pin",
+    //    stood in for that question and got a PARTIAL pin wrong: «A על ציר ה-x» states two of A's three coordinates, so
+    //    the slide along the axis was never sampled (A at the origin at every seed) and «…על החלק החיובי…» was refused.
+    const slideFrom = warm.x ?? (translationDrivenAbsolute3(c) ? [0, 0, 0, 0, 0, 0, 0, ...dims0] : null);
+    if (slideFrom && translationSlideSampled3(c) && !(pivot && pivot.solutions === 0)) {
       const members = buildMemberPins();
-      const x0 = warm.x ?? [0, 0, 0, 0, 0, 0, 0, ...dims0];
+      const x0 = slideFrom;
       const mirror = warm.mirror ?? false;
       const posBefore = new Map(pos);
       const paramBefore = paramOut;
@@ -2914,8 +3013,24 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           applySolutions(parked);
           pinParam();
           resolveLatePlanes();
-          const paramBroke =
+          const broke = (): boolean =>
             paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+          let paramBroke = broke();
+          // #2793 (ADR-3D-465): the resize is about the gauge origin, so it can carry a signed vertex across an axis
+          // («B, D על החלק החיובי של ציר ה-x»: the full-size cube straddles the origin). Where a translation is left,
+          // the stage-5 slide AIMS the resized figure back at the signs; only when none can is the resize undone.
+          if (!paramBroke && !signsHold() && warm.x && hasAbsoluteFrameObject(c)) {
+            const xS = [...warm.x];
+            const slid = solveStage(() =>
+              solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xS, mirror: warm.mirror ?? false }),
+            );
+            if (slid.length > 0) {
+              applySolutions(slid);
+              pinParam();
+              resolveLatePlanes();
+              paramBroke = broke();
+            }
+          }
           if (paramBroke || !signsHold()) {
             pos.clear();
             for (const [id, q] of posBefore) pos.set(id, q);
@@ -3245,7 +3360,74 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
       // enough — clearance is a correctness-adjacent floor (never draw a false coincidence), legibility
       // is what the leftover freedom is then spent on.
       const LEGIBLE = 8; // degrees: a 90° that draws within 8° of square reads as square
-      let best: { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number; holds: boolean } | null = null;
+      /**
+       * #2793 Part 2a (ADR-3D-465) — A STATED SIGN IS A GIVEN; GENERAL POSITION IS A PREFERENCE. The candidates were
+       * ranked by clearance and legibility and never asked the signs, so «P(5,5,5)» · «x של A חיובי» held at the seeds
+       * whose candidate happened to land A.x > 0 and was refused at the others. Now a candidate that breaks a stated sign
+       * is not a figure (ranked below every one that keeps them), and the translation is AIMED: after the candidate's
+       * rotation, each axis's signs ask `t` for one open interval (above every "> 0" vertex's −value, below every "< 0"
+       * one's); the sampled `t` stands when inside it with a margin, else a seeded `t` inside it is taken.
+       */
+      const stateSigns = c.signGivens.filter((g) => c.points.get(g.id)?.kind !== 'partial');
+      const signed = stateSigns.length > 0 || positionalComponentSigns3(c).length > 0;
+      // how many of the stated signs hold, counted in statement order up to the first that breaks: a set no placement
+      // keeps is then drawn keeping the EARLIER statements, so the line refused is the one that completed the
+      // contradiction, never an older one turned red
+      const signScore = (): number => {
+        let n = 0;
+        for (const g of stateSigns) {
+          const q = pos.get(g.id);
+          if (!(q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9))) return n;
+          n++;
+        }
+        return componentSignsHold(c, (id) => pos.get(id)) ? n + 1 : n;
+      };
+      const allSigns = stateSigns.length + 1;
+      const gaugeSet = new Set(gaugeIds);
+      const aimT = (w: Vec3, tSample: Vec3, u: (a: Axis3) => number): Vec3 | null => {
+        if (!translationFree || stateSigns.length === 0) return tSample;
+        place({ t: v3(0, 0, 0), w, s: 1, mirror: false });
+        const t = { x: tSample.x, y: tSample.y, z: tSample.z };
+        for (const a of ['x', 'y', 'z'] as const) {
+          let lo = -Infinity;
+          let hi = Infinity;
+          for (const g of stateSigns) {
+            if (g.axis !== a || !gaugeSet.has(g.id)) continue;
+            const q = pos.get(g.id);
+            if (!q) continue;
+            if (g.positive) lo = Math.max(lo, -q[a]);
+            else hi = Math.min(hi, -q[a]);
+          }
+          if (!(lo < hi)) return null;
+          const m = Math.min(0.25 * extent, (hi - lo) / 4);
+          if (t[a] > lo + m && t[a] < hi - m) continue;
+          t[a] = Number.isFinite(lo) && Number.isFinite(hi) ? lo + (hi - lo) * (0.25 + 0.5 * u(a))
+            : Number.isFinite(lo) ? lo + extent * (0.25 + u(a)) : hi - extent * (0.25 + u(a));
+        }
+        return v3(t.x, t.y, t.z);
+      };
+      type Candidate = { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number; holds: boolean; signs: number };
+      let best = null as Candidate | null;
+      const tryCandidate = (g0: Parameters<typeof applyGauge>[1], u: (a: Axis3) => number): boolean => {
+        const aimed = signed ? aimT(g0.w, g0.t, u) : g0.t;
+        const g = aimed ? { ...g0, t: aimed } : g0;
+        place(g);
+        const clear = clearance();
+        const legib = legibility();
+        // #2798 (ADR-3D-456): a placement where a mixed point no longer exists (a stated crossing carried off its
+        // edge) draws nothing the student stated — it ranks below every placement that keeps them all
+        const holds = mixedIds.length === 0 || mixedPointsHold3(c, pos, mixedIds);
+        const signs = signed ? signScore() : allSigns;
+        // Ranking: keep the stated signs first (#2793), then clear the absolute objects (a false coincidence is a
+        // drawing that LIES), then read correctly. Without a spin axis `legib` is 0 for every candidate, and without a
+        // sign every candidate keeps them, so this reduces exactly to the previous rules — those figures cannot move.
+        const better =
+          !best ||
+          (best.signs !== signs ? signs > best.signs
+            : best.holds !== holds ? holds : best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
+        if (better) best = { g, clear, legib, holds, signs };
+        return signs === allSigns && holds && clear >= MARGIN && (!spinAxis || legib <= LEGIBLE);
+      };
       for (let attempt = 0; attempt < 12; attempt++) {
         const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
@@ -3260,27 +3442,28 @@ function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): R
           s: 1,
           mirror: false,
         };
-        place(g);
-        const clear = clearance();
-        const legib = legibility();
-        // #2798 (ADR-3D-456): a placement where a mixed point no longer exists (a stated crossing carried off its
-        // edge) draws nothing the student stated — it ranks below every placement that keeps them all
-        const holds = mixedIds.length === 0 || mixedPointsHold3(c, pos, mixedIds);
-        // Ranking: clear the absolute objects first (a false coincidence is a drawing that LIES), then
-        // read correctly. Without a spin axis `legib` is 0 for every candidate, so this reduces exactly
-        // to the previous clearance-only rule — the existing figures cannot move.
-        const better =
-          !best ||
-          (best.holds !== holds ? holds : best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
-        if (better) best = { g, clear, legib, holds };
-        if (holds && clear >= MARGIN && (!spinAxis || legib <= LEGIBLE)) break;
+        if (tryCandidate(g, (a) => sample(seed, `placement-${attempt}-aim-${a}`, 0, 1))) break;
+      }
+      // #2793 Part 2a: no sampled rotation kept every sign — the search widens deterministically before any refusal:
+      // the 24 axis-aligned proper rotations of the canonical frame, then seeded extras. A work bound (M3), no clock:
+      // each candidate is one placement, no solve.
+      if (signed && rotationFree && best && best.signs < allSigns) {
+        const extras = [...AXIS_ALIGNED_ROTATIONS3, ...Array.from({ length: 24 }, (_, i) => {
+          const k = (n: string) => sample(seed, `placement-sign-${i}-${n}`, -1, 1);
+          return scale3(normalize3(v3(k('ax'), k('ay'), k('az'))), sample(seed, `placement-sign-${i}-angle`, 0, 2 * Math.PI));
+        })];
+        for (let i = 0; i < extras.length; i++) {
+          const k = (n: string) => sample(seed, `placement-sign-t-${i}-${n}`, -1, 1);
+          const t = translationFree ? v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5) : v3(0, 0, 0);
+          if (tryCandidate({ t, w: extras[i], s: 1, mirror: false }, (a) => sample(seed, `placement-sign-${i}-aim-${a}`, 0, 1))) break;
+        }
       }
       // no sampled placement keeps every mixed point: the solved placement is kept when it does (it was the frame the
       // statements were accepted in), so the figure is never moved into one that refuses them
       const stay = { t: v3(0, 0, 0), w: v3(0, 0, 0), s: 1, mirror: false };
       if (best && !best.holds) {
         place(stay);
-        if (mixedPointsHold3(c, pos, mixedIds)) best = { g: stay, clear: 0, legib: 0, holds: true };
+        if (mixedPointsHold3(c, pos, mixedIds)) best = { g: stay, clear: 0, legib: 0, holds: true, signs: signed ? signScore() : allSigns };
       }
       if (best) place(best.g);
     }

@@ -83,7 +83,7 @@ describe('#2621 B — a line given by its direction alone', () => {
     const two = ['ישר מאונך לציר ה-x', 'ישר המאונך לציר ה-x'];
     expect(kinds(two)).toEqual(['record', 'record']);
     expect(derive(two, 0).figure.curves.filter((q) => q.curve.kind === 'line')).toHaveLength(2);
-    expect(kinds(['ישר מאונך לציר ה-x', 'ישר מאונך לציר ה-x'])).toEqual(['record', 'already-follows']);
+    expect(kinds(['ישר מאונך לציר ה-x', 'ישר מאונך לציר ה-x'])).toEqual(['record', 'record']);
   });
 
   it('the side is its own row, and holds at every seed; a given that contradicts it is refused naming that given', () => {
@@ -106,7 +106,7 @@ describe('#2621 B — a line given by its direction alone', () => {
   });
 
   it('a named line the figure has keeps its reading: the relation about it, as before', () => {
-    expect(last(['נתון ישר l: y=3', 'ישר l מקביל לציר ה-x']).kind).toBe('already-follows');
+    expect(last(['נתון ישר l: y=3', 'ישר l מקביל לציר ה-x']).kind).toBe('record');
     expect(last(['נתון ישר l: y=2x+1', 'ישר l מקביל לציר ה-x']).error?.key).toBe('unsatisfiable');
     expect(derive(['נתון ישר l: y=2x+1', 'ישר l מאונך לציר ה-y'], 0).figure.curves.filter((q) => q.curve.kind === 'line')).toHaveLength(1);
   });
@@ -120,9 +120,16 @@ describe('#2621 B — a line given by its direction alone', () => {
     }
   });
 
-  it('the book\'s p2-15, one given per row, answers what the two-point form answers', () => {
+  // #2731 (ADR-AG-451; operator 2026-11-10, "if there are 2 possible answers, we give them and anything else we leave open"):
+  // three ellipses meet p2-15's givens (foci on the x-axis — the book's — and two with foci on the y-axis), so the equation
+  // is open; the first drawing is still the book's ellipse. The three are locked in issue-2731-determined-roots.test.ts.
+  it('the book\'s p2-15, one given per row, records, draws the book\'s ellipse first, and leaves the equation open (three ellipses)', () => {
     expect(kinds(p215.lines)).toEqual(p215.lines.map(() => 'record'));
-    expect(ask(derive(p215.lines, 0), 'משוואת האליפסה', fmtAnalytic).value).toContain('x²/64 + y²/48 = 1');
+    const d = derive(p215.lines, 0);
+    expect(ask(d, 'משוואת האליפסה', fmtAnalytic)).toEqual({ question: 'משוואת האליפסה', value: null });
+    const e = d.figure.curves.find((q) => q.curve.kind === 'ellipse')!.curve as unknown as { a: number; b: number };
+    expect(e.a).toBeCloseTo(8, 6);
+    expect(e.b).toBeCloseTo(Math.sqrt(48), 6);
   });
 
   // Ruled since (judged q-2621-parallel; ADR-AG-367 Am. 1): the single row draws a true parallel (issue-2621-side-parallel.test.ts);
