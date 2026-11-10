@@ -623,15 +623,20 @@ describe('#2625 (ADR-AG-454) — a diameter of the parabola is refused with its 
     ['קוטר AB בפרבולה'],
     ['AB is a diameter of the parabola'],
   ])('«%s» → parabola-no-diameter', (line) => {
-    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-diameter', detail: line });
+    expect(parseLine(line)).toEqual({ ok: false, code: 'parabola-no-diameter', detail: 'AB' });
   });
   it.each([['AB קוטר באליפסה'], ['AB קוטר במעגל'], ['AB is a diameter of the ellipse'], ['AB מיתר בפרבולה']])('control «%s» still reads', (line) => {
     expect(parseLine(line).ok).toBe(true);
   });
   it('the sentence names the reason, in both locales', () => {
     type T = (k: string, o?: Record<string, unknown>) => string;
-    const err = { key: 'parabola-no-diameter', detail: 'AB קוטר בפרבולה' } as const;
-    expect(errorText(err, analyticI18n.getFixedT('he') as unknown as T)).toBe('לפרבולה אין מרכז, ולכן אין לה קוטר.');
-    expect(errorText(err, analyticI18n.getFixedT('en') as unknown as T)).toBe('A parabola has no centre, so it has no diameter.');
+    const err = { key: 'parabola-no-diameter', detail: 'PQ' } as const;
+    const plain = (x: string) => x.replace(/[⁦-⁩]/g, '');
+    expect(plain(errorText(err, analyticI18n.getFixedT('he') as unknown as T))).toBe('לפרבולה אין מרכז, ולכן אין לה קוטר. אם התכוונתם למיתר, כתבו «PQ מיתר בפרבולה».');
+    expect(plain(errorText(err, analyticI18n.getFixedT('en') as unknown as T))).toBe('A parabola has no centre, so it has no diameter. If you meant a chord, write «PQ is a chord of the parabola».');
+  });
+  it('the taught chord is one the next line reads (docs/17 §9)', () => {
+    expect(parseLine('PQ מיתר בפרבולה').ok).toBe(true);
+    expect(parseLine('PQ is a chord of the parabola').ok).toBe(true);
   });
 });
